@@ -87,11 +87,11 @@ module ReviewShell =
         | Error _ -> Error ReviewBackendManager.Path.InvalidFindings
         | Ok findings -> Ok findings
 
-    let private resolveActiveIncumbency (store: IEventStore) (workId: string) : Result<string, string> =
-        match Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore store workId with
+    let private resolveActiveIncumbency (gitCommonDir: string) (workId: string) : Result<string, string> =
+        match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
         | Some work ->
-            match work.Active with
-            | Some active -> Ok active.Id
+            match work.ActiveId with
+            | Some id -> Ok id
             | None -> Error ReviewBackendManager.Path.BindingUnavailable
         | None -> Error ReviewBackendManager.Path.BindingUnavailable
 
@@ -103,27 +103,32 @@ module ReviewShell =
     // incumbency resolve to the exact review invocation, or to the rejection
     // path the old nested matches produced.
     let private preparePlanReview
+        (gitCommonDir: string)
         (planStore: IEventStore option)
         (args: HostToolArguments)
         (context: HostToolContext)
         : Result<(IEventStore * string * (string * string) list), string> =
-        resolveStore planStore
-        |> Result.bind (fun store -> parseFindings args |> Result.map (fun findings -> (store, findings)))
-        |> Result.bind (fun (store, findings) ->
-            resolveActiveIncumbency store context.SessionId
-            |> Result.map (fun incumbencyId -> (store, incumbencyId, gapsOf findings)))
+        if String.IsNullOrWhiteSpace gitCommonDir then
+            Error "git common directory is missing"
+        else
+            resolveStore planStore
+            |> Result.bind (fun store -> parseFindings args |> Result.map (fun findings -> (store, findings)))
+            |> Result.bind (fun (store, findings) ->
+                resolveActiveIncumbency gitCommonDir context.SessionId
+                |> Result.map (fun incumbencyId -> (store, incumbencyId, gapsOf findings)))
 
     let private executePlan
+        (gitCommonDir: string)
         (planStore: IEventStore option)
         (args: HostToolArguments)
         (context: HostToolContext)
         : Task<string> =
         task {
             // planning-022 binding: workId is the caller's session.
-            match preparePlanReview planStore args context with
+            match preparePlanReview gitCommonDir planStore args context with
             | Error path -> return planRejected path
             | Ok(store, incumbencyId, gaps) ->
-                let! result = ReviewPlanBackend.executeReview store context.SessionId incumbencyId gaps
+                let! result = ReviewPlanBackend.executeReview gitCommonDir store context.SessionId incumbencyId gaps
 
                 return renderPlanReview result
         }
@@ -141,8 +146,12 @@ module ReviewShell =
         let noteArgument = "note", ToolHostCodec.optionalStringSchema factory
 
         let dispatch args context =
+            let gitCommonDir =
+                scope.WorkspaceDirectory
+                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                |> Option.defaultValue ""
             if scope.IsRole(context, Role.Plan) then
-                executePlan planStore args context
+                executePlan gitCommonDir planStore args context
             else
                 ReviewBackendManager.execute scope args context
 

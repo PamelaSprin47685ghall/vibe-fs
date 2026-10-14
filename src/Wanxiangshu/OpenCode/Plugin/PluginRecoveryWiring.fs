@@ -48,20 +48,17 @@ module PluginRecoveryWiring =
     let private seedBoundDevOpsModelTargets (journal: AgentJournal) (workspace: string option) =
         let snapshot = AgentJournal.snapshot journal
 
-        let works =
+        let gitCommonDir =
             workspace
-            |> Option.bind (fun directory ->
-                Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent (
-                    Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
-                ))
-            |> Option.bind Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorksOfStore
-            |> Option.defaultValue Map.empty
-
+            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+            |> Option.defaultValue ""
         for KeyValue(sessionId, projection) in snapshot.AgentProjections.Sessions do
+            let workId = SessionId.value sessionId
+            let _recovery = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.recover gitCommonDir workId
             let target =
-                Map.tryFind (SessionId.value sessionId) works
-                |> Option.bind (fun work -> work.DevOps)
-                |> Option.bind snd
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
+                |> Option.bind (fun work -> work.DevOpsId)
+                |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
 
             let child =
                 projection.Handles
@@ -105,17 +102,13 @@ module PluginRecoveryWiring =
         | Some works, Some _ -> works |> List.iter emitUnifiedRecoveryEffect
         | _ -> ()
 
+    // Stopped. This function has a workspace and no session list that is independent
+    // of the lifecycle journal. The public journal cannot list work ids. Missing
+    // identity: the session id that would name the work. Do not call tryWorksOfStore.
     let private tryResolveViews
-        (workspace: string)
+        (_workspace: string)
         : Wanxiangshu.Mission.Lifecycle.LifecycleWork list option =
-        try
-            let commonDir = RuntimePath.gitCommonDir workspace
-
-            WorkspaceEventStore.tryCurrent commonDir
-            |> Option.bind Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorksOfStore
-            |> Option.map (fun works -> works |> Map.toList |> List.map snd)
-        with _ ->
-            None
+        None
 
     let private tryResolveWorkspaceViews
         (workspaceDirOpt: string option)

@@ -53,11 +53,10 @@ module RelayNarrativeTransform =
                 | WireToolResult(toolCallId, _) -> ToolCallId.value toolCallId = cutToolCallId
                 | _ -> false))
 
-    let private dispositionAfterProjection (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork option) =
-        match work with
-        | Some lifecycle when lifecycle.Active.IsSome && not (List.isEmpty lifecycle.Retirements) ->
-            RelayProjectionDisposition.CurrentIteration
-        | _ -> RelayProjectionDisposition.Unchanged
+    // Stopped. inspect has no active incumbency record and no retirement list.
+    // Absence is not a previous tenure and not permission to continue.
+    let private dispositionAfterProjection (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option) =
+        RelayProjectionDisposition.Unchanged
 
     let private requestBelongsToSuccessor (physical: string option) afterCut freshRoot acceptedRequest gatePhysical =
         match physical with
@@ -71,59 +70,16 @@ module RelayNarrativeTransform =
     /// work whose current tenure was Relayed, with a durable retirement cut.
     /// The request is stale unless it belongs to the successor (the loop-gate
     /// nudge, or an accepted request observed after the cut).
+    // Stopped. inspect has no relayed retirement and no projection cut.
     let private staleRetirement
         journal
         sessionId
-        (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
         acceptedRequest
         messages
         =
-        if
-            work.Sequence <> Wanxiangshu.Mission.Lifecycle.WorkSequence.Execution
-            || not work.CurrentRelayed
-        then
-            None
-        else
-            work.Retirements
-            |> List.tryFindBack (fun record ->
-                record.Outcome = Wanxiangshu.Mission.Lifecycle.RetirementOutcome.Relayed)
-            |> Option.bind (fun record -> record.ProjectionCut)
-            |> Option.filter (fun cut ->
-                let currentUser =
-                    messages
-                    |> List.indexed
-                    |> List.choose (fun (index, message) ->
-                        if messageRoleIsUser message then
-                            messageId message |> Option.map (fun physical -> index, physical)
-                        else
-                            None)
-                    |> List.tryLast
-
-                let afterCut =
-                    match cutToolIndex cut.ToolCallId messages, currentUser with
-                    | Some toolIndex, Some(userIndex, _) -> userIndex > toolIndex
-                    | _ -> false
-
-                let physical = currentUser |> Option.map snd
-
-                let gatePhysical =
-                    work.Retirements
-                    |> List.tryFindBack (fun record ->
-                        record.Outcome = Wanxiangshu.Mission.Lifecycle.RetirementOutcome.Relayed)
-                    |> Option.bind (fun record ->
-                        PromptAuthorityProjectionQueries.activeProfile
-                            sessionId
-                            (AgentJournal.snapshot journal).AgentProjections
-                        |> Option.bind (fun profile ->
-                            (PromptDispatcher.forPrompts (PromptJournalAdapter.create journal))
-                                .GateNudgeAcceptedPhysical
-                                profile
-                                PromptAuthority.ContinuationKind.ManagerGuard
-                                (ManagerLoopGate.gateKind (RetirementId.create record.RetirementId))
-                                (ProviderRunIdentity.create cut.ProviderRunId)))
-                    |> Option.map Wanxiangshu.Foundation.Identity.PhysicalUserMessageId.value
-
-                not (requestBelongsToSuccessor physical afterCut None acceptedRequest gatePhysical))
+        let _ = journal, sessionId, work, acceptedRequest, messages
+        None
 
     let private firstCursors (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
@@ -139,22 +95,13 @@ module RelayNarrativeTransform =
             true
         | _ -> false
 
-    let private previousRange (work: LifecycleWork) =
-        match work.Active, List.tryLast work.Retirements with
-        | Some active, Some previous ->
-            let ending = previous.RetirementCursor |> Option.defaultValue active.OpeningCursor
-            if ending > previous.OpeningCursor then Some(previous.OpeningCursor, ending) else None
-        | _ -> None
+    // Stopped. inspect has no previous retirement range or opening cursor.
+    let private previousRange (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+        None
 
-    let private handoverRecord (work: LifecycleWork) (text: string) : obj =
-        box
-            {| info =
-                {| id = "lwr-prev-" + work.Active.Value.Id
-                   sessionID = work.WorkId
-                   role = "user"
-                   synthetic = true
-                   source = "plan-tenure-record" |}
-               parts = [| box {| ``type`` = "text"; text = text |} |] |}
+    // Stopped. inspect has no incumbency identity for a handover record.
+    let private handoverRecord (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) (_text: string) : obj option =
+        None
 
     /// Successor visibility. Opening sequence comes from the active lifecycle
     /// tenure. The other side is the first observation of a captured Host
@@ -163,56 +110,17 @@ module RelayNarrativeTransform =
     let private projectActive
         (journal: AgentJournal)
         (sessionId: SessionId)
-        (work: LifecycleWork option)
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option)
         outObj
         =
         task {
             let messages = ProviderWireDecode.messagesFromTransformOutput outObj
 
-            match work |> Option.bind (fun lifecycle -> lifecycle.Active |> Option.map (fun active -> lifecycle, active)) with
-            | None ->
-                HostMessageProjection.replaceMessagesInPlace outObj messages
-                return dispositionAfterProjection work
-            | Some(lifecycle, active) ->
-                let cursors = firstCursors journal sessionId
-
-                // The first tenure has no predecessor to strip. Only a successor
-                // strips the assistant/tool messages observed before its opening.
-                let kept =
-                    if List.isEmpty lifecycle.Retirements then
-                        messages
-                    else
-                        messages
-                        |> List.filter (earlierAssistantOrTool active.OpeningCursor cursors >> not)
-
-                let! record =
-                    match previousRange lifecycle with
-                    | None -> Task.FromResult None
-                    | Some(startCursor, endCursor) ->
-                        let range =
-                            XTraceRange.create
-                                (XTraceCursor.create startCursor |> XTraceCursor.nextCursor)
-                                (XTraceCursor.create endCursor |> XTraceCursor.nextCursor)
-
-                        LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshot
-                            journal
-                            (AgentJournal.snapshot journal)
-                            sessionId
-                            range
-
-                let visible =
-                    match record with
-                    | Some text when not (String.IsNullOrWhiteSpace text) ->
-                        TenureIsolation.insertBeforeCurrentTenure
-                            active.OpeningCursor
-                            cursors
-                            (handoverRecord lifecycle text)
-                            kept
-                            messageId
-                    | _ -> kept
-
-                HostMessageProjection.replaceMessagesInPlace outObj visible
-                return dispositionAfterProjection work
+            // Stopped. inspect has no active incumbency record and no retirement list.
+            // Absence is not a previous tenure and not permission to continue.
+            let _ = journal, sessionId
+            HostMessageProjection.replaceMessagesInPlace outObj messages
+            return dispositionAfterProjection work
         }
 
     let private project
@@ -220,7 +128,7 @@ module RelayNarrativeTransform =
         (interruptAttempt: SessionId -> Task<unit>)
         sessionId
         acceptedRequest
-        (lifecycle: LifecycleWork option)
+        (lifecycle: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option)
         outObj
         =
         task {
@@ -245,7 +153,7 @@ module RelayNarrativeTransform =
         (acceptedRequest: bool)
         (interruptAttempt: SessionId -> Task<unit>)
         (sessionId: string option)
-        (lifecycle: LifecycleWork option)
+        (lifecycle: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option)
         (outObj: obj)
         : Task<RelayProjectionDisposition> =
         task {

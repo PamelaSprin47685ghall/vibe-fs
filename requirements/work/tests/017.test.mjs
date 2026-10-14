@@ -8,14 +8,14 @@ test('WHAT[work-017] 同一期望权威的后到推进被拒绝，不得改成�
   const workId = 'work-authority-conflict'
   const scout = surface.advance(workId, '', 'not-the-authority', 'probe-next')
   assert.equal(scout.decision, 'Refuse')
-  assert.equal(scout.detail, 'advance expected mismatch')
+  assert.equal(scout.detail, 'Invalid authority advance')
   const expected = scout.authority
   assert.notEqual(expected, '')
   assert.notEqual(expected, 'not-the-authority')
 
   const kept = surface.advance(workId, '', expected, 'next-kept')
   assert.equal(kept.decision, 'Write')
-  assert.equal(kept.detail, 'advanced')
+  assert.equal(kept.detail, 'Advanced')
   assert.equal(kept.names, 'AdvanceCommitted')
   assert.equal(kept.bytes.includes('next-kept'), true)
   assert.equal(kept.bytes.includes('next-late'), false)
@@ -25,7 +25,7 @@ test('WHAT[work-017] 同一期望权威的后到推进被拒绝，不得改成�
 
   const late = surface.advance(workId, kept.bytes, expected, 'next-late')
   assert.equal(late.decision, 'Refuse')
-  assert.equal(late.detail, 'advance expected mismatch')
+  assert.equal(late.detail, 'Invalid authority advance')
   assert.equal(late.authority, 'next-kept')
   assert.notEqual(late.authority, 'next-late')
   assert.equal(late.names, '')

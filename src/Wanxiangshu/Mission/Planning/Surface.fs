@@ -102,6 +102,11 @@ module PlanningSurface =
                    path = null
                    error = err |}
 
+    let readAndValidatePlan (root: string) (workId: string) : obj =
+        match PlanTools.readAndValidatePlan root workId with
+        | Ok(_, digest, path) -> box {| ok = true; digest = digest; path = path; error = null |}
+        | Error err -> box {| ok = false; digest = null; path = null; error = err |}
+
     let readPlan (root: string) (workId: string) : obj =
         match PlanPath.readPlan root workId with
         | Ok content ->
@@ -197,6 +202,13 @@ module PlanningSurface =
             | Error err -> return box {| ok = false; error = err |}
         }
 
+    let private acquiredCommonDir (store: IEventStore) : string option =
+        let text =
+            emitJsExpr (box store) "$0 && typeof $0.gitCommonDir === 'string' ? $0.gitCommonDir : ''"
+            |> string
+
+        if String.IsNullOrWhiteSpace text then None else Some text
+
     let executeDeliver
         (store: IEventStore)
         (root: string)
@@ -215,16 +227,20 @@ module PlanningSurface =
                 match extractInt64Opt retirementCursor with
                 | None -> Task.FromResult(Error "Plan retirement cursor evidence is required")
                 | Some cursor ->
-                    PlanTools.executeDeliver
-                        store
-                        root
-                        workId
-                        incumbencyId
-                        providerRunId
-                        toolCallId
-                        hasBlocker
-                        spawnFn
-                        cursor
+                    match acquiredCommonDir store with
+                    | None -> Task.FromResult(Error "git common directory is missing")
+                    | Some gitCommonDir ->
+                        PlanTools.executeDeliver
+                            gitCommonDir
+                            store
+                            root
+                            workId
+                            incumbencyId
+                            providerRunId
+                            toolCallId
+                            hasBlocker
+                            spawnFn
+                            cursor
 
             match outcome with
             | Ok res ->
@@ -267,23 +283,34 @@ module PlanningSurface =
         let delegateFn = delegateOfJs delegateTo
 
         task {
-            match! PlanTools.executeAsk store workId intent delegateFn with
-            | Ok res ->
-                return
-                    box
-                        {| ok = true
-                           kind = res.Kind
-                           workRecord = res.WorkRecord
-                           status = res.Status
-                           error = null |}
-            | Error err ->
+            match acquiredCommonDir store with
+            | None ->
                 return
                     box
                         {| ok = false
                            kind = null
                            workRecord = null
                            status = null
-                           error = err |}
+                           error = "git common directory is missing" |}
+            | Some gitCommonDir ->
+                let! outcome = PlanTools.executeAsk gitCommonDir store workId intent delegateFn
+
+                return
+                    match outcome with
+                    | Error error ->
+                        box
+                            {| ok = false
+                               kind = null
+                               workRecord = null
+                               status = null
+                               error = error |}
+                    | Ok asked ->
+                        box
+                            {| ok = true
+                               kind = asked.Kind
+                               workRecord = asked.WorkRecord
+                               status = asked.Status
+                               error = null |}
         }
 
     let executeJsPlan (root: string) (workId: string) (action: string) (content: obj) (patches: obj) : obj =
@@ -375,7 +402,16 @@ module PlanningSurface =
                            gaps = null
                            error = err |}
             | Ok gaps ->
-                match! ReviewPlanBackend.executeReview store workId incumbencyId gaps with
+                match acquiredCommonDir store with
+                | None ->
+                    return
+                        box
+                            {| ok = false
+                               outcome = null
+                               gaps = null
+                               error = "git common directory is missing" |}
+                | Some gitCommonDir ->
+                match! ReviewPlanBackend.executeReview gitCommonDir store workId incumbencyId gaps with
                 | Error err ->
                     return
                         box
@@ -399,6 +435,7 @@ module PlanningSurface =
                canonicalWorkKey = canonicalWorkKey
                resolvePlanPath = resolvePlanPath
                readPlan = readPlan
+               readAndValidatePlan = readAndValidatePlan
                rewritePlanAtomic = rewritePlanAtomic
                editPlanAtomic = editPlanAtomic
                ensurePlanWorkOpened = ensurePlanWorkOpened

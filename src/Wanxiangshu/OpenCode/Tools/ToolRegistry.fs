@@ -447,16 +447,23 @@ module ToolRegistry =
             return renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation.Value runOutcome
         }
 
-    let private resolveActiveTenure (store: IEventStore) (sessionId: string) =
-        match Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore store sessionId with
+    let private resolveActiveTenure (gitCommonDir: string) (sessionId: string) =
+        match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId with
         | Some work ->
-            match work.Active with
+            match work.ActiveId with
             | None -> Error "No active incumbency found for this work"
-            | Some active -> Ok active.Review.IsSome
+            | Some _ -> Ok work.Reviewed
         | None -> Error "No active incumbency found for this work"
 
     let private executeTenureSandbox prose root store sessionId programSource =
-        match resolveActiveTenure store sessionId with
+        let stamped = emitJsExpr store "$0 && typeof $0.gitCommonDir === 'string' ? $0.gitCommonDir : ''"
+        let stampedDir = if isNull stamped then "" else string stamped
+        let gitCommonDir =
+            if String.IsNullOrWhiteSpace stampedDir then
+                Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir root
+            else
+                stampedDir
+        match resolveActiveTenure gitCommonDir sessionId with
         | Error reason ->
             JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason))
             |> Task.FromResult
@@ -480,7 +487,7 @@ module ToolRegistry =
         else
             executeTenureSandbox prose rootOpt.Value storeOpt.Value sessionId programSourceOpt.Value
 
-    let runPlanProgram prose store root sessionId program =
+    let runPlanProgram prose (store: IEventStore) root sessionId program =
         runPlanProgramCore prose (Some store) (Some root) sessionId (Some program)
 
     let create
@@ -640,15 +647,27 @@ module ToolRegistry =
                 match storeOpt with
                 | None -> return "ask failed: the plan workspace is unavailable"
                 | Some store ->
-                    let delegateTo = devopsDelegateOf syncRuntime ctx
-                    let! outcome = PlanTools.executeAsk store ctx.SessionId (args.Text "intent") delegateTo
-                    return renderAskOutcome outcome
+                    let gitCommonDir =
+                        match workspaceDirectory with
+                        | Some workspace -> Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+                        | None -> ""
+                    if String.IsNullOrWhiteSpace gitCommonDir then
+                        return "ask failed: git common directory is missing"
+                    else
+                        let delegateTo = devopsDelegateOf syncRuntime ctx
+                        let! outcome =
+                            Wanxiangshu.Mission.Planning.PlanTools.executeAsk
+                                gitCommonDir
+                                store
+                                ctx.SessionId
+                                (args.Text "intent")
+                                delegateTo
+                        return renderAskOutcome outcome
             }
 
         let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : string option =
             Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory runtime.WorkspaceDirectory sessionId
-            |> Option.bind (fun work -> work.Active)
-            |> Option.map (fun active -> active.Id)
+            |> Option.bind (fun work -> work.ActiveId)
 
         // planning-008: the receipt names the artifact path and the fact that
         // an execution session started; the spawned session id stays out of
@@ -800,19 +819,27 @@ module ToolRegistry =
                     match! resolveDeliverRetirementCursor runtime ctx with
                     | Error err -> return sprintf "deliver failed: %s" err
                     | Ok retirementCursor ->
-                        let! outcome =
-                            PlanTools.executeDeliver
-                                store
-                                root
-                                ctx.SessionId
-                                incumbencyId
-                                providerRunId
-                                toolCallId
-                                hasBlocker
-                                (deliverSpawn runtime)
-                                retirementCursor
+                        let gitCommonDir =
+                            runtime.WorkspaceDirectory
+                            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                            |> Option.defaultValue ""
+                        if String.IsNullOrWhiteSpace gitCommonDir then
+                            return "deliver failed: git common directory is missing"
+                        else
+                            let! outcome =
+                                PlanTools.executeDeliver
+                                    gitCommonDir
+                                    store
+                                    root
+                                    ctx.SessionId
+                                    incumbencyId
+                                    providerRunId
+                                    toolCallId
+                                    hasBlocker
+                                    (deliverSpawn runtime)
+                                    retirementCursor
 
-                        return renderDeliverOutcome outcome
+                            return renderDeliverOutcome outcome
             }
 
         let executeDeliverTool
@@ -865,7 +892,9 @@ module ToolRegistry =
                 Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory
                     runtime.WorkspaceDirectory
                     ctx.SessionId
-                |> Option.map (fun work -> work.Sequence)
+                |> Option.bind (fun _work ->
+                    // Stopped. inspect has no work sequence.
+                    None)
 
             { managerSpec with
                 Admission =

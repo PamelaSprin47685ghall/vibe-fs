@@ -4,9 +4,9 @@ import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
-const eventsOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
-const incumbencyIdOf = (text) =>
-  [...eventsOf(text)].reverse().find((event) => event.event_type === 'IncumbencyOpened').payload.incumbencyId
+const framesOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
+const eventsOf = (text) => framesOf(text).flatMap((frame) => frame.events ?? [])
+const incumbencyIdOf = (text) => [...eventsOf(text)].reverse().find((event) => event.type === 'IncumbencyOpened').incumbencyId
 
 const replayed = (text, run, call, head) => {
   const again = surface.replayStateProbe(text, run, call, head)
@@ -20,13 +20,13 @@ const replayed = (text, run, call, head) => {
 
 const climb = (workId, root, head) => {
   let text = surface.encodeOpening('plan', workId, root, head)
-  assert.equal(surface.readProbe(text).position, 'ActiveRebound')
+  assert.equal(surface.readProbe(text).next, 'Review')
   for (let step = 0; step < 2; step += 1) {
     const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
     assert.equal(reviewed.decision, 'Write', reviewed.detail)
     const relayed = surface.deliverProbe(`${text}${reviewed.bytes}`, `run-${step}`, `call-${step}`, BigInt(head) + BigInt(step + 1))
     assert.equal(relayed.decision, 'Write', relayed.detail)
-    assert.equal(relayed.detail, 'relayed')
+    assert.equal(relayed.detail, 'Relayed')
     text = `${text}${reviewed.bytes}${relayed.bytes}`
   }
   const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
@@ -37,7 +37,9 @@ const climb = (workId, root, head) => {
 test('WHAT[work-022] rotation facts and exact replay return the original state', () => {
   const opened = surface.encodeOpening('plan', 'work-1', '/repo/root', 0n)
   const openProbe = surface.readProbe(opened)
-  assert.equal(openProbe.position, 'ActiveRebound')
+  assert.equal(openProbe.next, 'Review')
+  assert.equal(openProbe.opened, true)
+  assert.equal(openProbe.activeId.length > 0, true)
   assert.equal(openProbe.names, 'WorkOpened,IncumbencyOpened')
   const openView = surface.documentView(opened)
   assert.equal(openView.root, '/repo/root')
@@ -46,8 +48,10 @@ test('WHAT[work-022] rotation facts and exact replay return the original state',
 
   // A second WorkOpened is not an idempotent replay of the first.
   const secondOpen = surface.readProbe(opened + opened)
-  assert.notEqual(secondOpen.position, 'ActiveRebound')
-  assert.equal(secondOpen.detail.includes('second WorkOpened'), true)
+  assert.equal(secondOpen.ok, false)
+  assert.equal(secondOpen.opened, false)
+  assert.equal(secondOpen.names, '')
+  assert.equal(secondOpen.reason.includes('already open'), true)
 
   const firstId = incumbencyIdOf(opened)
   const reviewed = surface.reviewProbe(opened, firstId, 'Promoted')
@@ -59,18 +63,18 @@ test('WHAT[work-022] rotation facts and exact replay return the original state',
   assert.equal(reviewedView.projection, 'S2')
   assert.equal(reviewedView.activeId, firstId, 'review keeps the same incumbency')
 
-  const secondReview = surface.reviewProbe(reviewedText, firstId, 'Promoted')
+  const secondReview = surface.reviewProbe(reviewedText, firstId, 'Stayed')
   assert.equal(secondReview.decision, 'Refuse')
   assert.match(secondReview.detail, /already reviewed/i)
   assert.deepEqual(surface.documentView(reviewedText), reviewedView, 'a refused review writes nothing')
 
   const relayed = surface.deliverProbe(reviewedText, 'run-1', 'call-1', 10n)
   assert.equal(relayed.decision, 'Write')
-  assert.equal(relayed.detail, 'relayed')
+  assert.equal(relayed.detail, 'Relayed')
   assert.equal(relayed.names, 'IncumbencyRetired,IncumbencyOpened')
   const relayedEvents = eventsOf(relayed.bytes)
-  assert.equal(relayedEvents[0].payload.outcome, 'Relayed')
-  assert.equal(relayedEvents[0].payload.incumbencyId, firstId)
+  assert.equal(relayedEvents[0].outcome, 'Relayed')
+  assert.equal(relayedEvents[0].incumbencyId, firstId)
   const relayedText = `${reviewedText}${relayed.bytes}`
   const relayedView = surface.documentView(relayedText)
   assert.equal(relayedView.delivered, false, 'Relayed must not set Delivered')
@@ -101,23 +105,27 @@ test('WHAT[work-022] rotation facts and exact replay return the original state',
 
   const reopened = surface.reopenProbe(deliveredText, incumbencyIdOf(authorized))
   assert.equal(reopened.decision, 'Write', reopened.detail)
-  assert.equal(reopened.names, 'Reopened')
-  assert.equal(JSON.parse(reopened.bytes).payload.incumbencyId, incumbencyIdOf(authorized))
+  assert.equal(reopened.detail, 'Reopened')
+  assert.equal(reopened.names.includes('Reopened'), true)
+  assert.equal(reopened.names.includes('IncumbencyOpened'), true)
   const reopenedText = `${deliveredText}${reopened.bytes}`
   const reopenedView = surface.documentView(reopenedText)
   assert.equal(reopenedView.delivered, false)
   assert.equal(reopenedView.projection, 'S3')
-  assert.equal(reopenedView.activeId, incumbencyIdOf(authorized), 'reopen reuses the delivered incumbency id')
+  assert.notEqual(reopenedView.activeId, '')
+  assert.notEqual(reopenedView.activeId, incumbencyIdOf(authorized), 'reopen opens a new tenure')
   assert.equal(reopenedView.retiredCount, 3, 'reopen does not rewrite retired history')
-  assert.equal(reopenedView.authorized, true)
+  assert.equal(reopenedView.authorized, false)
 })
 
 test('WHAT[work-022] conflicting payloads and illegal transitions fail closed', () => {
   const opened = surface.encodeOpening('plan', 'work-1', '/repo/root1', 0n)
   const conflicted = surface.encodeOpening('plan', 'work-1', '/repo/root2', 0n)
   const openConflict = surface.readProbe(opened + conflicted)
-  assert.notEqual(openConflict.position, 'ActiveRebound')
-  assert.equal(openConflict.detail.includes('second WorkOpened'), true)
+  assert.equal(openConflict.ok, false)
+  assert.equal(openConflict.opened, false)
+  assert.equal(openConflict.names, '')
+  assert.equal(openConflict.reason.includes('already open'), true)
 
   const firstId = incumbencyIdOf(opened)
   const secondActive = surface.detachedOpeningProbe(opened)
@@ -133,12 +141,12 @@ test('WHAT[work-022] conflicting payloads and illegal transitions fail closed', 
   const relayed = surface.deliverProbe(stayedText, 'run-stay', 'call-stay', 10n)
   assert.equal(relayed.decision, 'Write', relayed.detail)
   const successor = eventsOf(relayed.bytes)[1]
-  assert.equal(successor.payload.stage, 'S1', 'a Stayed retirement keeps the stage for the successor')
-  assert.equal(eventsOf(relayed.bytes)[1].payload.stage, 'S1', 'the kernel keeps the successor at the retired projection')
+  assert.equal(successor.stage, 'S1', 'a Stayed retirement keeps the stage for the successor')
+  assert.equal(eventsOf(relayed.bytes)[1].stage, 'S1', 'the kernel keeps the successor at the retired projection')
 
   const whileActive = surface.deliverProbe(opened, 'run-active', 'call-active', 11n)
   assert.equal(whileActive.decision, 'Write')
-  assert.equal(whileActive.detail, 'relayed', 'an unauthorized active tenure relays; it does not deliver')
+  assert.equal(whileActive.detail, 'Relayed', 'an unauthorized active tenure relays; it does not deliver')
   assert.equal(surface.documentView(`${opened}${whileActive.bytes}`).delivered, false)
 
   const reopenActive = surface.reopenProbe(opened, firstId)

@@ -20,6 +20,10 @@ module JournalIntegration =
           FaultScope = fun envelope -> EventStreamId.value envelope.StreamId
           Integrate =
             fun current envelope ->
+                // Stopped. settleCompletedLife needs a SessionId. The old reader took that
+                // id from the stream name lifecycle/<workId>. A committed Delivered decision
+                // carries retirementId and incumbencyId, not SessionId. Do not invent it,
+                // do not translate the decision into IncumbencyRetired, and do not dual-write.
                 if envelope.EventType = Wanxiangshu.Mission.Lifecycle.LifecycleEventTypes.IncumbencyRetired then
                     let projection = unbox<ProjectionSet> current
 

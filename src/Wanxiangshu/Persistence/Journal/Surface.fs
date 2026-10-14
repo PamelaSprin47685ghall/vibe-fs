@@ -421,7 +421,7 @@ module JournalSurface =
                     let integrator =
                         CanonicalIntegrator.createWithRules
                             (CanonicalIntegrator.baseRules
-                             @ [ Wanxiangshu.Mission.Lifecycle.LifecycleIntegrationRules.rule ])
+                             )
                             AuthoritativeEventTypes.isKnown
 
                     let store =
@@ -466,8 +466,7 @@ module JournalSurface =
         task {
             let integrator =
                 CanonicalIntegrator.createWithRules
-                    (CanonicalIntegrator.baseRules
-                     @ [ Wanxiangshu.Mission.Lifecycle.LifecycleIntegrationRules.rule ])
+                    CanonicalIntegrator.baseRules
                     AuthoritativeEventTypes.isKnown
 
             let store = EventStore.createLocal (str commonDir) (str writerId) integrator

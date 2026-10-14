@@ -137,11 +137,17 @@ module PluginHooks =
                         workspaceDirectory
                         (SessionId.value sessionId)
                     |> Option.bind (fun work ->
-                        match work.Sequence, work.Active with
-                        | Wanxiangshu.Mission.Lifecycle.WorkSequence.Plan, Some _ ->
-                            match Wanxiangshu.Mission.Lifecycle.LifecycleFold.projection work with
-                            | Ok(stage, _) -> stagePathOf stage
-                            | Error _ -> None
+                        match work.Stage, work.ActiveId with
+                        | "S1", Some _
+                        | "S2", Some _
+                        | "S3", Some _ ->
+                            stagePathOf (
+                                match work.Stage with
+                                | "S1" -> Wanxiangshu.Mission.Lifecycle.StageElement.S1
+                                | "S2" -> Wanxiangshu.Mission.Lifecycle.StageElement.S2
+                                | "S3" -> Wanxiangshu.Mission.Lifecycle.StageElement.S3
+                                | _ -> Wanxiangshu.Mission.Lifecycle.StageElement.S1
+                            )
                         | _ -> None)
                 | _ -> None
 

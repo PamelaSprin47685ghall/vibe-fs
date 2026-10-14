@@ -7,31 +7,46 @@ const surface = lifecycle.LifecycleSurface ?? lifecycle
 const opening = () => surface.encodeOpening('plan', 'work-1', '/repo', 7n)
 
 const incumbencyIdOf = (text) =>
-  JSON.parse(text.split('\n').find((line) => line.includes('IncumbencyOpened'))).payload.incumbencyId
+  [...text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line)).flatMap((frame) => frame.events ?? [])].reverse().find((event) => event.type === 'IncumbencyOpened').incumbencyId
 
 test('WHAT[work-012] 同一 workId 的第二笔 WorkOpened 不得被折叠成已开立', () => {
   const first = opening()
   assert.equal(first.includes('confirmationCount'), false)
   assert.equal(first.includes('"spawn"'), false)
   const opened = surface.readProbe(first)
-  assert.equal(opened.position, 'ActiveRebound')
+  assert.equal(opened.next, 'Review')
   assert.equal(opened.sequence, 'S1,S2,S3')
   assert.equal(opened.names.includes('WorkOpened'), true)
   assert.equal(opened.names.includes('IncumbencyOpened'), true)
 
   const second = first + first
   const again = surface.readProbe(second)
-  assert.notEqual(again.position, 'ActiveRebound')
-  assert.equal(again.detail.includes('second WorkOpened'), true)
+  assert.equal(again.ok, false)
+  assert.equal(again.opened, false)
+  assert.equal(again.names, '')
+  assert.equal(again.reason.includes('Replayed'), true)
 })
-test('WHAT[work-012] 开立载荷出现确认次数或 spawn 字段时，真实折叠拒绝', () => {
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+test('WHAT[work-012] 开立载荷出现确认次数或 spawn 字段时，公开读取拒绝', () => {
   const bytes = opening()
-  const mutated = bytes.replace(
-    '{"authorityInitial"',
-    '{"confirmationCount":1,"spawn":true,"authorityInitial"',
-  )
-  const read = surface.readProbe(mutated)
-  assert.equal(read.position, 'StorageInvalid')
+  const frame = JSON.parse(bytes)
+  const opened = frame.events.find((event) => event.type === 'WorkOpened')
+  opened.confirmationCount = 1
+  opened.spawn = true
+  const read = surface.readProbe(`${canonical(frame)}\n`)
+  assert.equal(read.ok, false)
+  assert.equal(read.opened, false)
+  assert.equal(read.names, '')
+  assert.equal(read.activeId, '')
+  assert.match(read.reason, /Unknown field/)
+  assert.notEqual(read.next, 'Review')
 })
 test('WHAT[work-012] S4 的 Promoted 不得置交付授权，S1 的 Promoted 也不得置真', () => {
   const s4 = surface.encodeOpening('S4', 'work-s4', '/repo', 3n)

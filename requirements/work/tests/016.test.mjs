@@ -4,30 +4,40 @@ import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
-const incumbencyIdOf = (text) =>
-  JSON.parse(text.split('\n').find((line) => line.includes('IncumbencyOpened'))).payload.incumbencyId
+function canonical(value) {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`
+  }
+  return JSON.stringify(value)
+}
 
-test('WHAT[work-016] 旧生命周期名字不得被统一解码收成新事件', () => {
+const incumbencyIdOf = (text) =>
+  JSON.parse(text.split('\n').find((line) => line.includes('IncumbencyOpened'))).events.find((event) => event.type === 'IncumbencyOpened').incumbencyId
+
+test('WHAT[work-016] 旧生命周期名字不得被公开读取收成新事件', () => {
   const opened = surface.encodeOpening('plan', 'work-old-name', '/repo', 7n)
   const reviewed = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Promoted')
   assert.equal(reviewed.decision, 'Write')
 
-  const bytes = reviewed.bytes
-  const produced = JSON.parse(bytes)
-  assert.equal(produced.event_type, 'Reviewed')
+  const produced = JSON.parse(reviewed.bytes).events[0]
+  assert.equal(produced.type, 'Reviewed')
 
-  const decoded = surface.decodeDocument(bytes)
-  assert.equal(decoded.ok, true)
-  assert.equal(decoded.names, 'Reviewed')
-  assert.equal(decoded.names.includes('WorkOpened'), false)
+  const accepted = surface.readProbe(opened + reviewed.bytes)
+  assert.equal(accepted.ok, true)
+  assert.equal(accepted.names.includes('Reviewed'), true)
+  assert.equal(accepted.next, 'Continue')
 
   for (const oldName of ['RoadOpened', 'AssessmentCommitted']) {
-    const renamed = bytes.replace('Reviewed', oldName)
-    assert.equal(JSON.parse(renamed).event_type, oldName)
-    assert.equal(renamed.endsWith('\n'), true)
-    const refused = surface.decodeDocument(renamed)
+    const frame = JSON.parse(reviewed.bytes)
+    frame.events[0].type = oldName
+    const renamed = `${canonical(frame)}\n`
+    assert.equal(JSON.parse(renamed).events[0].type, oldName)
+    const refused = surface.readProbe(opened + renamed)
     assert.equal(refused.ok, false)
     assert.equal(refused.names, '')
-    assert.equal(refused.fault.includes(oldName), true)
+    assert.equal(refused.opened, false)
+    assert.equal(refused.activeId, '')
+    assert.match(refused.reason, /Unknown lifecycle event/)
   }
 })

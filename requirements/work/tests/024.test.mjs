@@ -11,9 +11,9 @@ import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurfa
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
-const eventsOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
-const incumbencyIdOf = (text) =>
-  [...eventsOf(text)].reverse().find((event) => event.event_type === 'IncumbencyOpened').payload.incumbencyId
+const framesOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
+const eventsOf = (text) => framesOf(text).flatMap((frame) => frame.events ?? [])
+const incumbencyIdOf = (text) => [...eventsOf(text)].reverse().find((event) => event.type === 'IncumbencyOpened').incumbencyId
 
 const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-024-'))
@@ -85,7 +85,7 @@ test('WHAT[work-024] a reviewed tenure may write; a second review and a delivere
 
     const again = await surface.seedReview(store, 'work-24b', 'Promoted')
     assert.equal(again.ok, false, 'a tenure carries one review')
-    assert.match(again.error, /already reviewed/i)
+    assert.equal(again.error, 'RequestIdConflict')
     assert.equal(surface.workView(store, 'work-24b').reviewed, 'Stayed')
   })
 
@@ -114,13 +114,13 @@ test('WHAT[work-024] deliver refuses a blocker and an unauthorized tenure relays
   const opened = surface.encodeOpening('plan', 'work-24d', '/root', 0n)
   const blocked = surface.deliverProbe(opened, 'run-blocked', 'call-blocked', 9n)
   assert.equal(blocked.decision, 'Write', blocked.detail)
-  assert.equal(blocked.detail, 'relayed', 'an unauthorized tenure relays; stage does not change that')
+  assert.equal(blocked.detail, 'Relayed', 'an unauthorized tenure relays; stage does not change that')
   assert.equal(blocked.names, 'IncumbencyRetired,IncumbencyOpened')
-  assert.equal(eventsOf(blocked.bytes)[0].payload.outcome, 'Relayed')
+  assert.equal(eventsOf(blocked.bytes)[0].outcome, 'Relayed')
 
   const reviewed = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Stayed')
   const stayed = surface.deliverProbe(`${opened}${reviewed.bytes}`, 'run-stay', 'call-stay', 11n)
   assert.equal(stayed.decision, 'Write', stayed.detail)
-  assert.equal(stayed.detail, 'relayed', 'Stayed keeps the unauthorized relay path on every stage')
+  assert.equal(stayed.detail, 'Relayed', 'Stayed keeps the unauthorized relay path on every stage')
   assert.equal(surface.documentView(`${opened}${reviewed.bytes}${stayed.bytes}`).projection, 'S1')
 })

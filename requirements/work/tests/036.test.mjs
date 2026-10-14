@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { DurableWork } from 'wanxiangli/durable-work'
+import { SqliteJournal } from 'wanxiangli/eventstore'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
@@ -28,48 +31,61 @@ test('WHAT[work-036] the first prompt of a plan session opens the work and start
   // is a later ask, not part of opening.
   const sessionId = 'ses-plan-entry-1'
   const bytes = life.encodeOpening('plan', sessionId, '/workspace/repo', 7n)
-  const events = bytes.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
-  assert.deepEqual(events.map((event) => event.event_type), ['WorkOpened', 'IncumbencyOpened'])
-  assert.equal(events.some((event) => event.event_type === 'DevOpsBound'), false)
-  assert.equal(events[0].payload.workId, sessionId)
-  assert.equal(events[1].payload.stage, 'S1')
-  assert.equal(events[1].payload.openingCursor, '7')
+  const events = bytes.split('\n').filter((line) => line.length > 0).flatMap((line) => JSON.parse(line).events ?? [])
+  assert.deepEqual(events.map((event) => event.type), ['WorkOpened', 'IncumbencyOpened'])
+  assert.equal(events.some((event) => event.type === 'DevOpsBound'), false)
+  assert.equal(events[0].workId, sessionId)
+  assert.equal(events[1].stage, 'S1')
+  assert.equal(events[1].openingCursor, 7)
   const probed = life.readProbe(bytes)
-  assert.equal(probed.position, 'ActiveRebound')
+  assert.equal(probed.next, 'Review')
   assert.equal(probed.sequence, 'S1,S2,S3')
 
   await withStore(async (store, root) => {
-    const batches = []
-    const append = store.Append.bind(store)
-    store.Append = async (envelopes) => {
-      const batch = []
-      for (const envelope of envelopes) batch.push(envelope)
-      batches.push(batch)
-      return append(envelopes)
+    const openingAppends = () => {
+      const path = life.journalPath(store.gitCommonDir)
+      if (!existsSync(path)) return []
+      const database = new DatabaseSync(path)
+      const journal = new SqliteJournal(database)
+      try {
+        return journal.read(sessionId)
+      } finally {
+        journal.close()
+      }
     }
 
     const missing = await surface.PlanningSurface.ensurePlanWorkOpened(store, root, sessionId, undefined)
     assert.equal(missing.ok, false, 'opening without an observed cursor must refuse')
     assert.match(missing.error, /opening cursor was not observed/i)
-    assert.equal(batches.length, 0)
+    assert.equal(openingAppends().length, 0)
 
     const opened = await surface.PlanningSurface.ensurePlanWorkOpened(store, root, sessionId, 7n)
     assert.equal(opened.ok, true, opened.error)
-    assert.equal(batches.length, 1, 'the two opening events share one append')
-    assert.deepEqual(batches[0].map((envelope) => envelope.EventType), ['WorkOpened', 'IncumbencyOpened'])
-    assert.equal(batches[0].some((envelope) => envelope.EventType === 'DevOpsBound'), false)
-    assert.equal(String(batches[0][1].Payload.openingCursor), '7')
-    assert.equal(batches[0][1].Payload.stage, 'S1')
+    const appended = openingAppends()
+    assert.equal(appended.length, 1, 'the two opening events share one append')
+    const events = JSON.parse(appended[0]).events
+    assert.deepEqual(events.map((event) => event.type), ['WorkOpened', 'IncumbencyOpened'])
+    assert.equal(events.some((event) => event.type === 'DevOpsBound'), false)
+    assert.equal(events[1].openingCursor, 7)
+    assert.equal(events[1].stage, 'S1')
 
-    const work = store.TryCurrent('Lifecycle').get(sessionId)
-    assert.equal(work.WorkId, sessionId)
-    assert.equal(String(work.Active.OpeningStage), 'S1')
-    assert.equal(String(work.Active.OpeningCursor), '7')
-    assert.equal(work.DevOps ?? null, null, 'opening does not bind DevOps')
+    const viewDatabase = new DatabaseSync(life.journalPath(store.gitCommonDir))
+    const viewJournal = new SqliteJournal(viewDatabase)
+    try {
+      const view = new DurableWork(sessionId, viewJournal).inspect()
+      assert.equal(view.workId, sessionId)
+      assert.deepEqual(view.sequence, ['S1', 'S2', 'S3'])
+      assert.equal(view.stage, 'S1')
+      assert.equal(view.active.openingStage, 'S1')
+      assert.equal(view.active.openingCursor, 7)
+      assert.equal(view.devopsId ?? null, null, 'opening does not bind DevOps')
+    } finally {
+      viewJournal.close()
+    }
 
     const again = await surface.PlanningSurface.ensurePlanWorkOpened(store, root, sessionId, 8n)
     assert.equal(again.ok, true)
-    assert.equal(batches.length, 1, 'an already-open work must not append duplicate events')
+    assert.equal(openingAppends().length, 1, 'an already-open work must not append duplicate events')
   })
 })
 

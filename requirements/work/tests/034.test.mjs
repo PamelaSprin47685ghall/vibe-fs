@@ -19,9 +19,9 @@ const assemble = (rawMessages, tenure, materializePrev, messageCursors) =>
   surface.PlanningSurface.assembleTenureMessages(rawMessages, tenure, materializePrev, messageCursors)
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
-const eventsOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
-const incumbencyIdOf = (text) =>
-  [...eventsOf(text)].reverse().find((event) => event.event_type === 'IncumbencyOpened').payload.incumbencyId
+const framesOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
+const eventsOf = (text) => framesOf(text).flatMap((frame) => frame.events ?? [])
+const incumbencyIdOf = (text) => [...eventsOf(text)].reverse().find((event) => event.type === 'IncumbencyOpened').incumbencyId
 
 test('WHAT[work-034] initial tenure (S1) assembles U + current messages with no LWR_prev and requests reanchor on first turn', () => {
   const rawMessages = [
@@ -322,7 +322,7 @@ test('WHAT[work-034] S1 with no retirement carries no previous range', () => {
   assert.equal(view.openingStage, 'S1')
   assert.equal(view.latestRetirement, '')
   assert.equal(view.predecessor, '')
-  assert.equal(view.openingCursor, 0n)
+  assert.equal(view.openingCursor, 0)
 })
 
 test('WHAT[work-034] S1 retirement preserves its opening range for the next tenure', () => {
@@ -333,13 +333,13 @@ test('WHAT[work-034] S1 retirement preserves its opening range for the next tenu
   assert.equal(relayed.decision, 'Write', relayed.detail)
   const retired = eventsOf(relayed.bytes)[0]
   const successor = eventsOf(relayed.bytes)[1]
-  assert.equal(retired.payload.retirementCursor, '25')
-  assert.equal(successor.payload.openingCursor, '25')
-  assert.equal(successor.payload.stage, 'S1', 'Stayed keeps the opening stage for the successor')
+  assert.equal(retired.retirementCursor, 25)
+  assert.equal(successor.openingCursor, 25)
+  assert.equal(successor.stage, 'S1', 'Stayed keeps the opening stage for the successor')
   const view = life.documentView(`${opened}${reviewed.bytes}${relayed.bytes}`)
   assert.equal(view.latestRetirement, '7,25')
   assert.equal(view.predecessor, '7,25')
-  assert.equal(view.openingCursor, 25n)
+  assert.equal(view.openingCursor, 25)
 })
 
 test('WHAT[work-034] tenure assembly consumes PreviousRange into LWR_prev', () => {

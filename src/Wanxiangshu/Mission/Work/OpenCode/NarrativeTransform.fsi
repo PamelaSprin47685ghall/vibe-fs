@@ -17,6 +17,6 @@ module RelayNarrativeTransform =
         acceptedRequest: bool ->
         interruptAttempt: (SessionId -> Task<unit>) ->
         sessionId: string option ->
-        lifecycle: LifecycleWork option ->
+        lifecycle: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option ->
         outObj: obj ->
             Task<RelayProjectionDisposition>

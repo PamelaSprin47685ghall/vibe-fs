@@ -21,10 +21,10 @@
     <Compile Include="Mission/Lifecycle/Codec.fs"/>
     <Compile Include="Mission/Lifecycle/Kernel.fsi"/>
     <Compile Include="Mission/Lifecycle/Kernel.fs"/>
+    <Compile Include="Mission/Lifecycle/DurableWorkHost.fsi"/>
+    <Compile Include="Mission/Lifecycle/DurableWorkHost.fs"/>
     <Compile Include="Mission/Lifecycle/Surface.fsi"/>
     <Compile Include="Mission/Lifecycle/Surface.fs"/>
-    <Compile Include="Mission/Lifecycle/Integration.fsi"/>
-    <Compile Include="Mission/Lifecycle/Integration.fs"/>
     <Compile Include="Mission/Planning/PlanPath.fsi"/>
     <Compile Include="Mission/Planning/PlanPath.fs"/>
     <Compile Include="Mission/Planning/PlanWorkOpen.fsi"/>

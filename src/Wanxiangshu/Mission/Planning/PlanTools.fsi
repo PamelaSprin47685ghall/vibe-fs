@@ -23,12 +23,18 @@ type AskResult =
 
 module PlanTools =
 
+    /// The one plan artifact read used by deliver and by the plan surface: the
+    /// content, its digest, and the resolved path. Empty or missing is an error.
+    val readAndValidatePlan:
+        root: string -> workId: string -> Result<string * string * string, string>
+
     /// planning-007 / planning-008: deliver splits on authorization — an
     /// authorized tenure takes the terminal delivery path (spawn + retire +
     /// PlanDelivered), an unauthorized one relays to the next incumbency.
     /// `spawn` starts the parentless manager execution session and returns its
     /// session id (planning-023).
     val executeDeliver:
+        gitCommonDir: string ->
         store: IEventStore ->
         root: string ->
         workId: string ->
@@ -45,6 +51,7 @@ module PlanTools =
     /// carries the real delegation capability (injected by the tool surface);
     /// at most one pending delegation per work, tracked in process memory.
     val executeAsk:
+        gitCommonDir: string ->
         store: IEventStore ->
         workId: string ->
         intent: string ->

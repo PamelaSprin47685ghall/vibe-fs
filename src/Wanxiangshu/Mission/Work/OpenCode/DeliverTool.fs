@@ -59,7 +59,7 @@ module DeliverTool =
 
     /// The one lifecycle work this session owns, read from the same workspace
     /// EventStore the kernel writes.
-    let private lifecycleWorkOf (directory: string) (sessionId: string) : (IEventStore * LifecycleWork) option =
+    let private lifecycleWorkOf (directory: string) (sessionId: string) : (IEventStore * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) option =
         let commonDir = RuntimePath.gitCommonDir directory
 
         if String.IsNullOrWhiteSpace commonDir then
@@ -67,7 +67,9 @@ module DeliverTool =
         else
             match WorkspaceEventStore.tryCurrent commonDir with
             | None -> None
-            | Some held -> LifecycleKernel.tryWorkOfStore held sessionId |> Option.map (fun work -> held, work)
+            | Some held ->
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
+                |> Option.map (fun seen -> held, seen)
 
     let private deterministicId prefix payload create =
         HostDigest.sha256Hex (prefix + "\n" + payload)
@@ -192,14 +194,14 @@ module DeliverTool =
         match lifecycleWorkOf bound.Directory context.SessionId with
         | None -> Error(text Path.BindingUnavailable)
         | Some(_, work) ->
-            match work.Active with
+            match work.ActiveId with
             | None -> Error(text Path.BindingUnavailable)
             | Some active ->
                 Ok
                     { Bound = bound
                       SessionId = SessionId.create context.SessionId
-                      Incumbent = active.Id
-                      Reviewed = active.Review.IsSome }
+                      Incumbent = active
+                      Reviewed = work.Reviewed }
 
     let private confirmationResult (prepared: PreparedRetirement) pending =
         let deferred =
@@ -281,69 +283,14 @@ module DeliverTool =
         =
         let confirmed =
             WorkspaceEventStore.tryLifecycleWorkOfDirectory scope.WorkspaceDirectory context.SessionId
-            |> Option.bind (fun work -> work.Active)
-            |> Option.bind (fun active -> active.Confirmed)
+            |> Option.map (fun work -> work.Confirmed)
 
         match confirmed with
-        | None -> confirmFirst ()
-        | Some(confirmedRun, confirmedCall) when confirmedCall = toolCallId && confirmedRun = providerRunId ->
-            scope.UnfreezeRetirement context.SessionId
-            Task.FromResult(Ok(confirmationResult prepared pending))
-        | Some(_, confirmedCall) when confirmedCall = toolCallId ->
-            Task.FromResult(Error "RetirementConfirmationReplayConflict")
-        | Some _ ->
-            task {
-                let directory = scope.WorkspaceDirectory
-                let commonDir = directory |> Option.map RuntimePath.gitCommonDir
-                let store =
-                    match commonDir with
-                    | None -> None
-                    | Some dir when String.IsNullOrWhiteSpace dir -> None
-                    | Some dir ->
-                        match WorkspaceEventStore.tryCurrent dir with
-                        | Some held -> Some held
-                        | None -> Some(WorkspaceEventStore.acquire dir)
-
-                match store with
-                | None -> return Error "lifecycle store is unavailable"
-                | Some held ->
-                    match LifecycleKernel.tryWorkOfStore held context.SessionId with
-                    | None -> return Error "lifecycle work is missing"
-                    | Some work ->
-                        let fence =
-                            { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
-                              Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
-
-                        let blockerDigest =
-                            let blockers = scope.RetirementBlockersFor context.SessionId
-                            if List.isEmpty blockers then None else Some(String.concat "\n" blockers)
-
-                        let! observedHead =
-                            observedRetirementCursor scope context prepared.Bound.Journal
-
-                        match
-                            Wanxiangshu.Mission.Lifecycle.LifecycleKernel.deliverExecution
-                                HostDigest.sha256Hex
-                                work
-                                fence
-                                observedHead
-                                blockerDigest
-                        with
-                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
-                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
-                            scope.UnfreezeRetirement context.SessionId
-                            return Ok(confirmationResult prepared pending)
-                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
-                            match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit held context.SessionId events with
-                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) ->
-                                scope.UnfreezeRetirement context.SessionId
-                                return Ok(text Path.Retired)
-                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted) ->
-                                return Error "retirement was not committed"
-                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown) ->
-                                return Error "retirement commit is unknown"
-                            | Error reason -> return Error reason
-            }
+        | None
+        | Some false -> confirmFirst ()
+        | Some true ->
+            // Stopped. inspect has a confirmed bit and no confirmation run or call identity.
+            Task.FromResult(Error "inspect has no confirmation run or call identity")
 
     let private runFrozen (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =
         let hasAssessment = prepared.Reviewed
@@ -365,10 +312,11 @@ module DeliverTool =
                         | Some held -> Some held
                         | None -> Some(WorkspaceEventStore.acquire dir)
 
-                match store with
-                | None -> return Error "lifecycle store is unavailable"
-                | Some held ->
-                    match LifecycleKernel.tryWorkOfStore held context.SessionId with
+                match commonDir, store with
+                | _, None -> return Error "lifecycle store is unavailable"
+                | None, _ -> return Error "lifecycle store is unavailable"
+                | Some journalDir, Some held ->
+                    match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected journalDir context.SessionId with
                     | None -> return Error "lifecycle work is missing"
                     | Some work ->
                         let fence =
@@ -382,31 +330,37 @@ module DeliverTool =
                         let! observedHead =
                             observedRetirementCursor scope context prepared.Bound.Journal
 
-                        match
-                            Wanxiangshu.Mission.Lifecycle.LifecycleKernel.deliverExecution
-                                HostDigest.sha256Hex
-                                work
-                                fence
-                                observedHead
-                                blockerDigest
-                        with
-                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
-                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
-                            scope.UnfreezeRetirement context.SessionId
-                            return Ok(confirmationResult prepared pending)
-                        | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, label) ->
-                            match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit held context.SessionId events with
-                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable) ->
+                        match observedHead with
+                        | None -> return Error "retirement cursor was not observed"
+                        | Some cursor ->
+                            let blockers = scope.RetirementBlockersFor context.SessionId
+                            let requestId = providerRunId + ":" + toolCallId
+                            let command =
+                                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                                    "Deliver"
+                                    [ "incumbencyId", box prepared.Incumbent
+                                      "providerRunId", box providerRunId
+                                      "toolCallId", box toolCallId
+                                      "cursor", box (float cursor)
+                                      "blockers", box (List.toArray blockers) ]
+                            let receipt =
+                                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
+                                    journalDir
+                                    context.SessionId
+                                    requestId
+                                    command
+                            if receipt.Status = "Unknown" || receipt.Status = "NotWritten" || receipt.Status = "Conflict" then
+                                return Error(if receipt.Reason = "" then receipt.Status else receipt.Reason)
+                            elif receipt.Kind = "ReviewRequired" then
+                                return Error "assessment required"
+                            elif receipt.Status = "Committed" || receipt.Status = "Replayed" then
                                 scope.UnfreezeRetirement context.SessionId
-                                if label = "confirmed" then
+                                if receipt.Kind = "Confirmed" then
                                     return Ok(confirmationResult prepared pending)
                                 else
                                     return Ok(text Path.Retired)
-                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted) ->
-                                return Error "retirement was not committed"
-                            | Ok(Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown) ->
-                                return Error "retirement commit is unknown"
-                            | Error reason -> return Error reason
+                            else
+                                return Error(if receipt.Reason = "" then receipt.Status else receipt.Reason)
             }
 
         if not hasAssessment then
@@ -441,13 +395,13 @@ module DeliverTool =
         try
             match lifecycleWorkOf target.Bound.Directory (SessionId.value target.SessionId) with
             | Some(_, work) ->
-                match work.Active with
-                | Some active when active.Id = target.Incumbent ->
+                match work.ActiveId, work.Reviewed with
+                | Some id, reviewed when id = target.Incumbent ->
                     Ok
                         { Bound = target.Bound
                           SessionId = target.SessionId
                           Incumbent = target.Incumbent
-                          Reviewed = active.Review.IsSome }
+                          Reviewed = reviewed }
                 | _ -> Error(text Path.BindingUnavailable)
             | None -> Error(text Path.BindingUnavailable)
         with _ ->

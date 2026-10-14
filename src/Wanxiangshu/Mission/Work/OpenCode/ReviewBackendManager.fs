@@ -199,7 +199,7 @@ module ReviewBackendManager =
 
     /// The one lifecycle work this session owns, read from the same workspace
     /// EventStore the plugin writes. No relay fact, no certificate.
-    let private lifecycleWorkOf (directory: string) (sessionId: string) : (IEventStore * LifecycleWork) option =
+    let private lifecycleWorkOf (directory: string) (sessionId: string) : (IEventStore * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) option =
         let commonDir = RuntimePath.gitCommonDir directory
 
         if String.IsNullOrWhiteSpace commonDir then
@@ -207,7 +207,9 @@ module ReviewBackendManager =
         else
             match WorkspaceEventStore.tryCurrent commonDir with
             | None -> None
-            | Some held -> LifecycleKernel.tryWorkOfStore held sessionId |> Option.map (fun work -> held, work)
+            | Some held ->
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
+                |> Option.map (fun seen -> held, seen)
 
     type private BoundReviewInvocation =
         { Findings: ReviewFindings
@@ -255,10 +257,10 @@ module ReviewBackendManager =
             match lifecycleWorkOf bound.Directory context.SessionId with
             | None -> Error BindingUnavailable
             | Some(_, work) ->
-                match work.Active with
-                | None -> Error BindingUnavailable
-                | Some active when active.Review.IsSome -> Error AlreadySubmitted
-                | Some active ->
+                match work.ActiveId, work.Reviewed with
+                | None, _ -> Error BindingUnavailable
+                | Some _, true -> Error AlreadySubmitted
+                | Some activeId, false ->
                     scope.ActiveProfileFor sessionId
                     |> Option.map (fun profile ->
                         AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
@@ -267,7 +269,7 @@ module ReviewBackendManager =
                         { Bound = bound
                           SessionId = sessionId
                           RootAuthorityUserMessageId = rootAuthorityUserMessageId
-                          IncumbencyId = active.Id })
+                          IncumbencyId = activeId })
         with _ ->
             Error BindingUnavailable
 
@@ -320,15 +322,33 @@ module ReviewBackendManager =
                 match lifecycleWorkOf prepared.Bound.Directory context.SessionId with
                 | None -> return Error RecordFailed
                 | Some(held, work) ->
-                    match LifecycleKernel.review work prepared.IncumbencyId outcome with
-                    | KernelDecision.Refuse _ -> return Error RecordFailed
-                    | KernelDecision.Done _ -> return Ok(acceptedResult prepared.Bound.Findings)
-                    | KernelDecision.Write(events, _) ->
-                        match! LifecycleKernel.commit held context.SessionId events with
-                        | Ok CommitOutcome.AppendDurable -> return Ok(acceptedResult prepared.Bound.Findings)
-                        | Ok CommitOutcome.AppendNotAttempted
-                        | Ok CommitOutcome.CommitUnknown -> return Error RecordFailed
-                        | Error _ -> return Error RecordFailed
+                    let gitCommonDir =
+                        Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir prepared.Bound.Directory
+                    let requestId = prepared.IncumbencyId + ":review"
+                    let findings =
+                        prepared.Bound.Findings
+                        |> Wanxiangshu.Mission.Work.ReviewFindings.values
+                        |> List.map (fun finding -> finding.AcceptanceCriteria + "\n" + finding.WorkPlan)
+                        |> List.toArray
+                        |> box
+                    let command =
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                            "Review"
+                            [ "incumbencyId", box prepared.IncumbencyId
+                              "reviewerId", box context.SessionId
+                              "findings", findings ]
+                    let receipt =
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
+                            gitCommonDir
+                            context.SessionId
+                            requestId
+                            command
+                    if receipt.Reason = "Incumbency already reviewed" then
+                        return Error RecordFailed
+                    elif receipt.Status = "Committed" || receipt.Status = "Replayed" then
+                        return Ok(acceptedResult prepared.Bound.Findings)
+                    else
+                        return Error RecordFailed
         }
 
     let private renderExecution =

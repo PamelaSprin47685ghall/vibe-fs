@@ -2,6 +2,7 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Collections.Generic
+open Fable.Core.JsInterop
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Sphinx.V2.Composition
@@ -22,7 +23,6 @@ module WorkspaceEventStore =
         @ Wanxiangshu.Sphinx.V2.Composition.Bind.rules
         @ Wanxiangshu.Repository.Knowledge.Casebook.CasebookIntegrationRules.rules
         @ Wanxiangshu.Repository.Programming.Js.JsTransactionIntegrationRules.rules
-        @ Wanxiangshu.Mission.Lifecycle.LifecycleIntegrationRules.rules
 
     /// durable-events-019 registration-necessity seam: the production history
     /// program with exactly one named registration removed. Every other
@@ -63,6 +63,9 @@ module WorkspaceEventStore =
             member _.AllHeads() = active.Value.AllHeads()
             member _.ReloadLocal() = active.Value.ReloadLocal() }
 
+    let private rememberCommonDir (store: IEventStore) (commonDir: string) =
+        emitJsStatement (box store, commonDir) "$0.gitCommonDir = $1"
+
     let acquire (commonDir: string) : IEventStore =
         if String.IsNullOrWhiteSpace commonDir then
             failwith "WorkspaceEventStore.acquire: commonDir is empty"
@@ -71,16 +74,16 @@ module WorkspaceEventStore =
             match shared.TryGetValue commonDir with
             | true, entry ->
                 entry.RefCount <- entry.RefCount + 1
+                rememberCommonDir entry.Store commonDir
                 entry.Store
-            | false, _ ->
-                // durable-events-020: owning the workspace capability is not the
+            | false, _ ->                // durable-events-020: owning the workspace capability is not the
                 // same thing as consuming durable semantics. Canonical replay is
                 // deliberately behind the IEventStore methods so plugin load can
                 // finish without folding the entire workspace history.
                 let store = deferredStore commonDir
 
                 shared.[commonDir] <- { Store = store; RefCount = 1 }
-
+                rememberCommonDir store commonDir
                 store)
 
     let private lookupCurrent commonDir : IEventStore option =
@@ -98,31 +101,32 @@ module WorkspaceEventStore =
 
     /// The unified lifecycle work already folded into a held store. A missing
     /// current or a missing work is None; the caller keeps the store for commit.
+    // Stopped. This signature has a store and a work id, and no directory on the call chain.
+    // Missing identity: git common directory. Do not answer from the old lifecycle projection.
     let tryLifecycleWorkOfStore (store: IEventStore) (workId: string) : Wanxiangshu.Mission.Lifecycle.LifecycleWork option =
-        Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore store workId
+        None
 
     /// Every unified lifecycle work already folded into a held store.
+    // Stopped. The public journal has no list of work ids. Do not scan sqlite and do not invent a registry.
     let tryLifecycleWorksOfStore
         (store: IEventStore)
         : Map<string, Wanxiangshu.Mission.Lifecycle.LifecycleWork> option =
-        Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorksOfStore store
+        None
 
     /// The unified lifecycle work for one session, read from the already-owned
     /// workspace store. Missing workspace, missing store, missing current,
     /// missing work, or a blank common dir all yield None.
-    let tryLifecycleWork (workspace: string) (workId: string) : Wanxiangshu.Mission.Lifecycle.LifecycleWork option =
+    let tryLifecycleWork (workspace: string) (workId: string) : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
         let commonDir = RuntimePath.gitCommonDir workspace
-
-        commonDir
-        |> tryCurrent
-        |> Option.bind (fun held -> tryLifecycleWorkOfStore held workId)
+        if String.IsNullOrWhiteSpace commonDir then None
+        else Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir workId
 
     /// Directory-option variant. A missing directory is the same None as a
     /// blank common dir or an unowned store.
     let tryLifecycleWorkOfDirectory
         (workspaceDirectory: string option)
         (workId: string)
-        : Wanxiangshu.Mission.Lifecycle.LifecycleWork option =
+        : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
         workspaceDirectory |> Option.bind (fun workspace -> tryLifecycleWork workspace workId)
 
     let private decrementEntry commonDir (entry: SharedEntry) =

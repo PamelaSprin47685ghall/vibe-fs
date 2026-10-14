@@ -245,10 +245,9 @@ module PluginHostWiring =
                         workspaceDirectory
                         (SessionId.value sessionId)
 
-                workOpt
-                |> Option.exists (fun work ->
-                    not (List.isEmpty work.Retirements)
-                    && activeRoot.IsNone)
+                // Stopped. inspect has no retirement list. A missing list is not an empty list.
+                let _ = workOpt
+                false && activeRoot.IsNone
 
             match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) (Some isLifecycleTerminated) with
             | Error err -> return raise (InvalidOperationException err)

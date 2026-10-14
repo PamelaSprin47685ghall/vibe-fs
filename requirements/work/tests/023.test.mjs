@@ -1,16 +1,20 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as planning from '../../../dist/Mission/Planning/Surface.js'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
-const eventsOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
-const incumbencyIdOf = (text) =>
-  [...eventsOf(text)].reverse().find((event) => event.event_type === 'IncumbencyOpened').payload.incumbencyId
+const framesOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
+const eventsOf = (text) => framesOf(text).flatMap((frame) => frame.events ?? [])
+const incumbencyIdOf = (text) => [...eventsOf(text)].reverse().find((event) => event.type === 'IncumbencyOpened').incumbencyId
 
 const open = (workId) => {
   const text = surface.encodeOpening('plan', workId, '/root', 0n)
-  assert.equal(surface.readProbe(text).position, 'ActiveRebound')
+  assert.equal(surface.readProbe(text).next, 'Review')
   return text
 }
 
@@ -19,7 +23,7 @@ const promoteAndRelay = (text, step) => {
   assert.equal(reviewed.decision, 'Write', reviewed.detail)
   const relayed = surface.deliverProbe(`${text}${reviewed.bytes}`, `run-${step}`, `call-${step}`, BigInt(step) * 10n + 10n)
   assert.equal(relayed.decision, 'Write', relayed.detail)
-  assert.equal(relayed.detail, 'relayed')
+  assert.equal(relayed.detail, 'Relayed')
   return { reviewed, relayed, text: `${text}${reviewed.bytes}${relayed.bytes}` }
 }
 
@@ -44,7 +48,7 @@ test('WHAT[work-023] the projection advances only on Promoted, and only the fina
 
   const relay1 = surface.deliverProbe(`${opened}${first.bytes}`, 'run-1', 'call-1', 10n)
   assert.equal(relay1.decision, 'Write', relay1.detail)
-  assert.equal(eventsOf(relay1.bytes)[1].payload.stage, 'S2', 'relay opens the successor at the retired projection')
+  assert.equal(eventsOf(relay1.bytes)[1].stage, 'S2', 'relay opens the successor at the retired projection')
   const s2Tenure = surface.documentView(`${opened}${first.bytes}${relay1.bytes}`)
   assert.equal(s2Tenure.projection, 'S2')
   assert.equal(s2Tenure.authorized, false)
@@ -83,7 +87,17 @@ test('WHAT[work-023] delivery and reopen do not touch the stage', () => {
   assert.equal(before.projection, 'S3')
   assert.equal(before.authorized, true)
 
-  const delivered = surface.deliverStateProbe(text, 'run-deliver', 'call-deliver', 30n)
+  const root = mkdtempSync(join(tmpdir(), 'wxs-work-023-'))
+  let delivered
+  try {
+    const written = planning.PlanningSurface.rewritePlanAtomic(root, 'work-2', '# plan\n')
+    assert.equal(written.ok, true, written.error)
+    const selected = planning.PlanningSurface.readAndValidatePlan(root, 'work-2')
+    assert.equal(selected.ok, true, selected.error)
+    delivered = surface.deliverStateProbe(text, 'run-deliver', 'call-deliver', 30n, { digest: selected.digest, path: selected.path })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
   assert.equal(delivered.decision, 'Write', delivered.detail)
   assert.equal(delivered.detail, 'delivered')
   const deliveredText = `${text}${delivered.bytes}`
@@ -111,12 +125,17 @@ test('WHAT[work-023] illegal stage and review transitions are rejected', () => {
   const relayed = surface.deliverProbe(`${opened}${promoted.bytes}`, 'run-3', 'call-3', 10n)
   assert.equal(relayed.decision, 'Write', relayed.detail)
   const retiredText = `${opened}${promoted.bytes}${relayed.bytes}`
-  const late = surface.reviewProbe(retiredText, incumbencyIdOf(opened), 'Promoted')
-  assert.equal(late.decision, 'Refuse', 'review of a retired incumbency is rejected')
+  const retiredId = incumbencyIdOf(opened)
+  const firstReviewRequestId = JSON.parse(promoted.bytes).requestId
+  const lateRequestId = `review:${retiredId}:Stayed`
+  assert.notEqual(lateRequestId, firstReviewRequestId)
+  const late = surface.reviewProbe(retiredText, retiredId, 'Stayed')
+  assert.equal(late.decision, 'Refuse')
+  assert.equal(late.detail, 'Incumbency mismatch')
 
-  assert.equal(eventsOf(relayed.bytes)[1].payload.stage, 'S2', 'the kernel opens the successor at the retired projection, not S3')
+  assert.equal(eventsOf(relayed.bytes)[1].stage, 'S2', 'the kernel opens the successor at the retired projection, not S3')
   const paired = surface.readProbe(`${opened}${promoted.bytes}${relayed.bytes}`)
-  assert.equal(paired.position, 'ActiveRebound')
+  assert.equal(paired.next, 'Review')
 
   const execution = surface.encodeOpening('S4', 'work-s4', '/root', 3n)
   const executionPromotion = surface.reviewProbe(execution, incumbencyIdOf(execution), 'Promoted')

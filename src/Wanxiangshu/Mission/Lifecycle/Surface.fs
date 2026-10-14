@@ -2,6 +2,9 @@ namespace Wanxiangshu.Mission.Lifecycle
 
 open System
 open System.Threading.Tasks
+open System.Collections.Generic
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Host
 open Wanxiangshu.Persistence.EventStore
 
@@ -11,77 +14,704 @@ module LifecycleSurface =
 
     let authorityInitial (workId: string) = LifecycleIdentity.authorityInitial sha256 workId
 
-    let private document (events: LifecycleEvent list) =
-        events |> List.map LifecycleCodec.encodeLine |> String.concat "\n" |> fun body -> body + "\n"
+    let observeDurable (requestId: string) (durableResult: obj) =
+        let seen = DurableWorkHost.observe requestId durableResult
+        box
+            {| requestId = seen.RequestId
+               status = seen.Status
+               kind = seen.Kind
+               reason = seen.Reason |}
+
+    let mayStartDelivery (durableResult: obj) = DurableWorkHost.mayStart durableResult
+
+    let journalPath (gitCommonDir: string) = DurableWorkHost.journalPath gitCommonDir
+
+
+    [<Import("DatabaseSync", "node:sqlite")>]
+    let private DatabaseSync: obj = jsNative
+
+    [<Import("SqliteJournal", "wanxiangli/eventstore")>]
+    let private SqliteJournal: obj = jsNative
+
+    [<Import("DurableWork", "wanxiangli/durable-work")>]
+    let private DurableWork: obj = jsNative
+
+    [<Emit("JSON.parse($0)")>]
+    let private parseJson (_text: string) : obj = jsNative
+
+    [<Emit("Number($0)")>]
+    let private asNumber (_value: int64) : float = jsNative
+
+    [<Emit("$0 != null && typeof $0 === 'object'")>]
+    let private isRecord (_value: obj) : bool = jsNative
+
+    let private remembered = Dictionary<string, string array>()
+
+    let private recall (workId: string) =
+        let found, records = remembered.TryGetValue workId
+        if found then records else [||]
+
+    let private remember (workId: string) (records: string array) =
+        remembered.[workId] <- Array.copy records
+
+    let private command (kind: string) (fields: (string * obj) list) =
+        createObj (("type", box kind) :: fields)
+
+    let private sequenceOf (kind: string) =
+        if kind = "S4" || kind = "spawn" then box [| "S4" |] else box [| "S1"; "S2"; "S3" |]
+
+    let private recordsOf (text: string) =
+        text.Split('\n') |> Array.filter (fun line -> line.Length > 0)
+
+    let private workIdOf (records: string array) =
+        if records.Length = 0 then
+            "unread"
+        else
+            let events: obj array = unbox (parseJson records.[0])?events
+            match events |> Array.tryFind (fun event -> string (event?``type``) = "WorkOpened") with
+            | Some event -> string (event?workId)
+            | None -> "unread"
+
+    let private namesOfRecord (record: string) =
+        if record.Length = 0 then
+            ""
+        else
+            let events: obj array = unbox (parseJson record)?events
+            events |> Array.map (fun event -> string (event?``type``)) |> String.concat ","
+
+    let private joinRecords (records: string array) =
+        if records.Length = 0 then "" else (records |> String.concat "\n") + "\n"
+
+    let private useJournal (workId: string) (records: string array) (body: obj -> 'a) : 'a =
+        let connection: obj = createNew DatabaseSync ":memory:"
+        let mutable journal: obj option = None
+        try
+            let opened: obj = createNew SqliteJournal connection
+            journal <- Some opened
+            let mutable revision = 0.
+            for record in records do
+                let requestId = string (parseJson record)?requestId
+                let ack: obj = opened?append (workId, revision, requestId, record)
+                let status = string ack?status
+                if status <> "Committed" then
+                    failwith (status + ": " + string ack?reason)
+                revision <- unbox<float> ack?revision
+            body (createNew DurableWork (workId, opened))
+        finally
+            match journal with
+            | Some opened -> opened?close ()
+            | None -> connection?close ()
+
+    let private openCommand (root: string) (kind: string) (head: float) =
+        command "Open" [
+            "root", box root
+            "sequence", sequenceOf kind
+            "ownerId", box "owner"
+            "openingCursor", box head
+        ]
+
+    let private reviewCommand (incumbencyId: string) (outcome: string) =
+        let findings: obj =
+            match outcome with
+            | "Promoted" -> box ([||]: string array)
+            | "Stayed" -> box [| "stayed" |]
+            | _ -> null
+        command "Review" [
+            "incumbencyId", box incumbencyId
+            "reviewerId", box "reviewer"
+            "findings", findings
+        ]
+
+    let private deliverCommand (incumbencyId: string) (providerRunId: string) (toolCallId: string) (head: float) (draft: (string * string) option) =
+        let fields =
+            [ "incumbencyId", box incumbencyId
+              "providerRunId", box providerRunId
+              "toolCallId", box toolCallId
+              "cursor", box head
+              "blockers", box ([||]: string array)
+              "nextOwnerId", box "owner" ]
+
+        match draft with
+        | None -> command "Deliver" fields
+        | Some(digest, path) -> command "Deliver" (fields @ [ "draft", box {| digest = digest; path = path |} ])
+
+    let private lastOf (records: string array) =
+        if records.Length = 0 then "" else records.[records.Length - 1]
+
+    let private shape (failed: bool) (error: string) (status: string) (kind: string) (reason: string) (wrote: bool) (record: string) (authorized: bool) (authority: string) =
+        if failed then
+            box
+                {| decision = "Refuse"
+                   detail = error
+                   names = ""
+                   bytes = ""
+                   authorized = authorized
+                   authority = authority |}
+        else
+            match status, wrote with
+            | "Applied", true
+            | "Committed", true ->
+                box
+                    {| decision = "Write"
+                       detail = kind
+                       names = namesOfRecord record
+                       bytes = record + "\n"
+                       authorized = authorized
+                       authority = authority |}
+            | "Replayed", _ ->
+                box
+                    {| decision = "Done"
+                       detail = status
+                       names = ""
+                       bytes = ""
+                       authorized = authorized
+                       authority = authority |}
+            | "Observed", _ ->
+                box
+                    {| decision = "Done"
+                       detail = kind
+                       names = ""
+                       bytes = ""
+                       authorized = authorized
+                       authority = authority |}
+            | _ ->
+                box
+                    {| decision = "Refuse"
+                       detail = if reason.Length = 0 then status else status + ": " + reason
+                       names = ""
+                       bytes = ""
+                       authorized = authorized
+                       authority = authority |}
+
+    let private attempt (workId: string) (records: string array) (requestId: string) (command: obj) =
+        try
+            useJournal workId records (fun work ->
+                let prior: obj = work?inspect ()
+                let priorAuthority = if isNull prior?authority then "" else string prior?authority
+                let authorizedPrior = if isNull prior?deliveryAuthorized then false else unbox<bool> prior?deliveryAuthorized
+                let before: string array = unbox (work?records ())
+                try
+                    let result: obj = work?execute (requestId, command)
+                    let after: string array = unbox (work?records ())
+                    let snapshot: obj = work?inspect ()
+                    let decision = result?result
+                    let kind = if isRecord decision then string decision?kind else ""
+                    let reason = if isNull result?reason then "" else string result?reason
+                    shape false "" (string result?status) kind reason (after.Length > before.Length) (lastOf after) (unbox<bool> snapshot?deliveryAuthorized) (if isNull snapshot?authority then priorAuthority else string snapshot?authority)
+                with error ->
+                    shape true error.Message "" "" "" false "" authorizedPrior priorAuthority)
+        with error ->
+            shape true error.Message "" "" "" false "" false ""
 
     let encodeOpening (kind: string) (workId: string) (root: string) (head: int64) =
-        let openingKind =
-            match kind with
-            | "S4" -> OpeningKind.ManagerDirect
-            | "spawn" -> OpeningKind.SpawnedExecution
-            | _ -> OpeningKind.UserPlan
-
-        let firstLine = if kind = "spawn" then Some LifecycleIdentity.spawnMark else None
-
-        match LifecycleKernel.openWork sha256 openingKind firstLine workId root false (Some head) with
-        | KernelDecision.Write(events, _) -> document events
-        | KernelDecision.Refuse reason -> "REFUSE " + reason
-        | KernelDecision.Done label -> "DONE " + label
-
-    let private probeOf (text: string) =
-        match LifecycleKernel.readRecovery text false with
-        | Error(ReadFault.StorageInvalid reason) -> ("StorageInvalid", reason, false, "", "")
-        | Error(ReadFault.PairIncomplete reason) -> ("PairIncomplete", reason, false, "", "")
-        | Error(ReadFault.Rejected reason) -> ("Rejected", reason, false, "", "")
-        | Ok(position, next) ->
-            match LifecycleCodec.readDocument text with
-            | Error fault ->
-                match fault with
-                | ReadFault.StorageInvalid reason -> ("StorageInvalid", reason, false, "", "")
-                | ReadFault.PairIncomplete reason -> ("PairIncomplete", reason, false, "", "")
-                | ReadFault.Rejected reason -> ("Rejected", reason, false, "", "")
-            | Ok events ->
-                match LifecycleFold.applyAll events with
-                | Error reason -> ("Rejected", reason, false, "", "")
-                | Ok work ->
-                    let authorized =
-                        match LifecycleFold.folded work with
-                        | Ok folded -> folded.DeliveryAuthorized
-                        | Error _ -> false
-
-                    let sequence = WorkSequence.render work.Sequence |> String.concat ","
-                    let names = events |> List.map LifecycleCodec.eventTypeOf |> String.concat ","
-                    let positionName =
-                        match position with
-                        | RecoveryPosition.PairIncomplete -> "PairIncomplete"
-                        | RecoveryPosition.Rejected -> "Rejected"
-                        | RecoveryPosition.Conflict -> "Conflict"
-                        | RecoveryPosition.DeliveredIdempotent -> "DeliveredIdempotent"
-                        | RecoveryPosition.ActiveRebound -> "ActiveRebound"
-                        | RecoveryPosition.Nothing -> "Nothing"
-
-                    let nextName =
-                        match next with
-                        | RecoveryNext.StopPairIncomplete -> "StopPairIncomplete"
-                        | RecoveryNext.StopRejected -> "StopRejected"
-                        | RecoveryNext.StopConflict -> "StopConflict"
-                        | RecoveryNext.StopDelivered -> "StopDelivered"
-                        | RecoveryNext.StopNothing -> "StopNothing"
-                        | RecoveryNext.WaitForUserPrompt -> "WaitForUserPrompt"
-                        | RecoveryNext.EnterSuccessorPrompt -> "EnterSuccessorPrompt"
-                        | RecoveryNext.EnterDispatch -> "EnterDispatch"
-
-                    (positionName, nextName, authorized, sequence, names)
+        let seen = attempt workId [||] ("open:" + workId) (openCommand root kind (asNumber head))
+        let decision = string seen?decision
+        if decision = "Write" then string seen?bytes else "REFUSE " + string seen?detail
 
     let readProbe (text: string) =
-        let position, detail, authorized, sequence, names = probeOf text
+        let records = recordsOf text
+        let workId = workIdOf records
+        try
+            useJournal workId records (fun work ->
+                let snapshot: obj = work?inspect ()
+                let recovery: obj = work?recover ()
+                let history: obj array = unbox (work?history ())
+                let names =
+                    history
+                    |> Array.collect (fun frame ->
+                        let events: obj array = unbox frame?events
+                        events |> Array.map (fun event -> string (event?``type``)))
+                    |> String.concat ","
+                let requestIds =
+                    history |> Array.map (fun frame -> string frame?requestId) |> String.concat ","
+                let sequence =
+                    if isNull snapshot?sequence then
+                        ""
+                    else
+                        let items: obj array = unbox snapshot?sequence
+                        items |> Array.map string |> String.concat ","
+                let active: obj = snapshot?active
+                box
+                    {| ok = true
+                       next = string recovery?next
+                       opened = unbox<bool> snapshot?opened
+                       stage = if isNull snapshot?stage then "" else string snapshot?stage
+                       sequence = sequence
+                       names = names
+                       revision = unbox<float> snapshot?revision
+                       authorized = unbox<bool> snapshot?deliveryAuthorized
+                       reason = ""
+                       activeId = if isNull active then "" else string active?id
+                       requestIds = requestIds |})
+        with error ->
+            box
+                {| ok = false
+                   next = ""
+                   opened = false
+                   stage = ""
+                   sequence = ""
+                   names = ""
+                   revision = 0.
+                   authorized = false
+                   reason = error.Message
+                   activeId = ""
+                   requestIds = "" |}
+
+    let reviewProbe (text: string) (incumbencyId: string) (outcome: string) =
+        match outcome with
+        | "Promoted"
+        | "Stayed" ->
+            let records = recordsOf text
+            attempt (workIdOf records) records ("review:" + incumbencyId + ":" + outcome) (reviewCommand incumbencyId outcome)
+        | _ ->
+            box
+                {| decision = "Refuse"
+                   detail = "review outcome rejected"
+                   names = ""
+                   bytes = ""
+                   authorized = false
+                   authority = "" |}
+
+    let finalPromotionProbe (text: string) =
+        let records = recordsOf text
+        let workId = workIdOf records
+        try
+            useJournal workId records (fun work ->
+                let mutable steps = 0
+                let mutable authorized = false
+                let mutable stage = ""
+                while steps < 4 && not authorized do
+                    steps <- steps + 1
+                    let snapshot: obj = work?inspect ()
+                    let active: obj = snapshot?active
+                    if isNull active then
+                        authorized <- unbox<bool> snapshot?deliveryAuthorized
+                        stage <- if isNull snapshot?stage then "" else string snapshot?stage
+                        steps <- 4
+                    else
+                        let id = string active?id
+                        let reviewed: obj = work?execute ("promote:" + string steps + ":" + id, reviewCommand id "Promoted")
+                        ignore reviewed
+                        let after: obj = work?inspect ()
+                        authorized <- unbox<bool> after?deliveryAuthorized
+                        stage <- if isNull after?stage then "" else string after?stage
+                        if not authorized && not (isNull after?active) then
+                            let cursor = unbox<float> after?active?openingCursor + float steps
+                            let delivered: obj =
+                                work?execute (
+                                    "promote-deliver:" + string steps,
+                                    deliverCommand (string after?active?id) "run-final" ("call-" + string steps) cursor None
+                                )
+                            ignore delivered
+                            let followed: obj = work?inspect ()
+                            authorized <- unbox<bool> followed?deliveryAuthorized
+                            stage <- if isNull followed?stage then "" else string followed?stage
+                box {| authorized = authorized; detail = stage |})
+        with error ->
+            box {| authorized = false; detail = error.Message |}
+
+    let private supplied (draft: obj) =
+        emitJsExpr draft "$0 != null && $0 !== undefined"
+
+    let private draftPair (draft: obj) =
+        if not (supplied draft) then
+            None
+        else
+            Some(string draft?digest, string draft?path)
+
+    let deliverProbe (text: string) (providerRunId: string) (toolCallId: string) (head: int64) (draft: obj) =
+        let records = recordsOf text
+        let workId = workIdOf records
+        let incumbencyId =
+            if records.Length = 0 then
+                ""
+            else
+                try
+                    useJournal workId records (fun work ->
+                        let snapshot: obj = work?inspect ()
+                        if isNull snapshot?active then "" else string snapshot?active?id)
+                with _ -> ""
+        let selected = draftPair draft
+        let requested =
+            attempt workId records ("deliver:" + providerRunId + ":" + toolCallId) (deliverCommand incumbencyId providerRunId toolCallId (asNumber head) selected)
+        if selected.IsNone || string requested?decision <> "Write" || string requested?detail <> "DeliveryRequested" then
+            requested
+        else
+            let digest, path = selected.Value
+            let operationId =
+                let events: obj array = unbox (parseJson (string requested?bytes))?events
+                string (events |> Array.find (fun event -> string event?``type`` = "DeliveryRequested"))?operationId
+            let observed =
+                attempt
+                    workId
+                    (Array.append records (recordsOf (string requested?bytes)))
+                    operationId
+                    (command
+                        "ResolveDelivery"
+                        [ "operationId", box operationId
+                          "outcome", box "Accepted"
+                          "execSessionId", box ("exec:" + operationId)
+                          "digest", box digest
+                          "path", box path
+                          "blockers", box ([||]: string array) ])
+            if string observed?decision <> "Write" then
+                observed
+            else
+                box
+                    {| decision = "Write"
+                       detail = "delivered"
+                       names = namesOfRecord (string observed?bytes)
+                       bytes = string requested?bytes + string observed?bytes
+                       authorized = unbox<bool> observed?authorized
+                       authority = string observed?authority |}
+
+    let replayProbe (text: string) (providerRunId: string) (toolCallId: string) (head: int64) =
+        deliverProbe text providerRunId toolCallId head null
+
+    let deliverStateProbe (text: string) (providerRunId: string) (toolCallId: string) (head: int64) (draft: obj) =
+        deliverProbe text providerRunId toolCallId head draft
+
+    let replayStateProbe (text: string) (providerRunId: string) (toolCallId: string) (head: int64) (draft: obj) =
+        let first = deliverProbe text providerRunId toolCallId head draft
+        let written = string first?bytes
+        let nextText = if written.Length = 0 then text else text + written
+        let second = deliverProbe nextText providerRunId toolCallId head draft
         box
-            {| position = position
-               detail = detail
-               next = detail
-               authorized = authorized
-               sequence = sequence
-               names = names |}
+            {| decision = string second?decision
+               detail = string second?detail
+               names = string second?names
+               bytes = string second?bytes
+               original = string first?detail |}
+
+    let private retirementIdOf (text: string) (incumbencyId: string) =
+        recordsOf text
+        |> Array.tryPick (fun record ->
+            let events: obj array = unbox (parseJson record)?events
+            events
+            |> Array.tryPick (fun event ->
+                if string (event?``type``) = "IncumbencyRetired" && string event?incumbencyId = incumbencyId then
+                    Some(string event?retirementId)
+                else
+                    None))
+
+    let reopenProbe (text: string) (incumbencyId: string) =
+        let records = recordsOf text
+        let workId = workIdOf records
+        let retirementId = retirementIdOf text incumbencyId |> Option.defaultValue incumbencyId
+        let cursor =
+            try
+                useJournal workId records (fun work ->
+                    let snapshot: obj = work?inspect ()
+                    let rounds: obj array = if isNull snapshot?rounds then [||] else unbox snapshot?rounds
+                    if rounds.Length = 0 then 0. else unbox<float> rounds.[rounds.Length - 1]?retirementCursor)
+            with _ -> 0.
+        let reopen =
+            command "Reopen" [
+                "retirementId", box retirementId
+                "ownerId", box "owner"
+                "openingCursor", box cursor
+                "blockers", box ([||]: string array)
+            ]
+        attempt workId records ("reopen:" + retirementId) reopen
+
+    let commitProbe (name: string) =
+        match name with
+        | "Committed"
+        | "Replayed"
+        | "Conflict"
+        | "NotWritten"
+        | "Unknown" -> name
+        | _ -> "not-durable"
+
+    let private produceOpenReview (workId: string) =
+        useJournal workId [||] (fun work ->
+            let opened: obj = work?execute ("open:" + workId, openCommand "/repo" "plan" 7.)
+            ignore opened
+            let snapshot: obj = work?inspect ()
+            let id = string snapshot?active?id
+            let reviewed: obj = work?execute ("review:" + id + ":Stayed", reviewCommand id "Stayed")
+            ignore reviewed
+            let records: string array = unbox (work?records ())
+            Array.copy records)
+
+    let advance (workId: string) (prior: string) (expected: string) (next: string) =
+        try
+            let records = Array.append (produceOpenReview workId) (recordsOf prior)
+            useJournal workId records (fun work ->
+                let priorSnap: obj = work?inspect ()
+                let authority = if isNull priorSnap?authority then "" else string priorSnap?authority
+                let active: obj = priorSnap?active
+                if isNull active then
+                    box
+                        {| decision = "Refuse"
+                           detail = "no active incumbency"
+                           names = ""
+                           bytes = ""
+                           authorized = false
+                           authority = authority |}
+                else
+                    let advanceCommand =
+                        command "Advance" [
+                            "incumbencyId", box (string active?id)
+                            "expected", box expected
+                            "next", box next
+                        ]
+                    try
+                        let result: obj = work?execute ("advance:" + expected + ":" + next, advanceCommand)
+                        let after: string array = unbox (work?records ())
+                        let snapshot: obj = work?inspect ()
+                        let decision = result?result
+                        let kind = if isRecord decision then string decision?kind else ""
+                        let status = string result?status
+                        let record = lastOf after
+                        if status = "Committed" then
+                            box
+                                {| decision = "Write"
+                                   detail = kind
+                                   names = namesOfRecord record
+                                   bytes = record + "\n"
+                                   authorized = unbox<bool> snapshot?deliveryAuthorized
+                                   authority = string snapshot?authority |}
+                        else
+                            box
+                                {| decision = "Done"
+                                   detail = kind
+                                   names = ""
+                                   bytes = ""
+                                   authorized = unbox<bool> snapshot?deliveryAuthorized
+                                   authority = authority |}
+                    with error ->
+                        box
+                            {| decision = "Refuse"
+                               detail = error.Message
+                               names = ""
+                               bytes = ""
+                               authorized = false
+                               authority = authority |})
+        with error ->
+            box
+                {| decision = "Refuse"
+                   detail = error.Message
+                   names = ""
+                   bytes = ""
+                   authorized = false
+                   authority = "" |}
+
+    let private runSeed (workId: string) (requestId: string) (issued: obj) =
+        try
+            Ok(
+                useJournal workId (recall workId) (fun work ->
+                    let before: string array = unbox (work?records ())
+                    let result: obj = work?execute (requestId, issued)
+                    let after: string array = unbox (work?records ())
+                    remember workId after
+                    result, after.Length > before.Length)
+            )
+        with error ->
+            Error error.Message
+
+    let private stampedDir (store: obj) : string option =
+        let raw = emitJsExpr store "$0 && typeof $0.gitCommonDir === 'string' ? $0.gitCommonDir : ''"
+        let text = if isNull raw then "" else string raw
+        if String.IsNullOrWhiteSpace text then None else Some text
+
+    let seedOpen (store: obj) (kind: string) (workId: string) (root: string) (head: int64) : Task<obj> =
+        task {
+            match stampedDir store with
+            | Some dir ->
+                let issued = openCommand root kind (asNumber head)
+                let receipt = DurableWorkHost.execute dir workId ("open:" + workId) issued
+                if receipt.Status = "Committed" || receipt.Status = "Replayed" then
+                    return box {| ok = true; opened = true; error = "" |}
+                else
+                    return box {| ok = false; opened = false; error = if receipt.Reason = "" then receipt.Status else receipt.Reason |}
+            | None ->
+            if (recall workId).Length > 0 then
+                return box {| ok = true; opened = false; error = "" |}
+            else
+                match runSeed workId ("open:" + workId) (openCommand root kind (asNumber head)) with
+                | Ok(result, wrote) ->
+                    let status = string result?status
+                    return box {| ok = status = "Committed" || status = "Replayed"; opened = wrote; error = "" |}
+                | Error reason -> return box {| ok = false; opened = false; error = reason |}
+        }
+
+    let seedReview (store: obj) (workId: string) (outcome: string) : Task<obj> =
+        task {
+            match stampedDir store, outcome with
+            | Some dir, ("Promoted" | "Stayed") ->
+                match DurableWorkHost.inspected dir workId with
+                | None -> return box {| ok = false; reviewed = false; error = "lifecycle work is missing" |}
+                | Some work ->
+                    match work.ActiveId with
+                    | None -> return box {| ok = false; reviewed = false; error = "no active incumbency" |}
+                    | Some incumbencyId ->
+                        let receipt =
+                            DurableWorkHost.execute dir workId ("review:" + workId) (reviewCommand incumbencyId outcome)
+                        if receipt.Status = "Committed" || receipt.Status = "Replayed" then
+                            return box {| ok = true; reviewed = true; error = "" |}
+                        else
+                            return
+                                box
+                                    {| ok = false
+                                       reviewed = false
+                                       error = if receipt.Reason = "" then receipt.Status else receipt.Reason |}
+            | _, _ ->
+            match outcome with
+            | "Promoted"
+            | "Stayed" ->
+                if (recall workId).Length = 0 then
+                    return box {| ok = false; reviewed = false; error = "lifecycle work is missing" |}
+                else
+                    let incumbencyId =
+                        try
+                            useJournal workId (recall workId) (fun work ->
+                                let snapshot: obj = work?inspect ()
+                                if isNull snapshot?active then "" else string snapshot?active?id)
+                        with error -> error.Message
+                    if incumbencyId.Length = 0 then
+                        return box {| ok = false; reviewed = false; error = "no active incumbency" |}
+                    else
+                        match runSeed workId ("review:" + incumbencyId + ":" + outcome) (reviewCommand incumbencyId outcome) with
+                        | Ok(result, wrote) ->
+                            let status = string result?status
+                            return box {| ok = status = "Committed" || status = "Replayed"; reviewed = wrote; error = "" |}
+                        | Error reason -> return box {| ok = false; reviewed = false; error = reason |}
+            | _ -> return box {| ok = false; reviewed = false; error = "review outcome rejected" |}
+        }
+
+    let seedDeliver (store: obj) (workId: string) (providerRunId: string) (toolCallId: string) (head: int64) : Task<obj> =
+        task {
+            match stampedDir store with
+            | Some dir ->
+                match DurableWorkHost.inspected dir workId with
+                | None -> return box {| ok = false; decision = "missing"; error = "lifecycle work is missing" |}
+                | Some work ->
+                    let incumbencyId = work.ActiveId |> Option.defaultValue ""
+                    let receipt =
+                        DurableWorkHost.execute
+                            dir
+                            workId
+                            ("deliver:" + providerRunId + ":" + toolCallId)
+                            (deliverCommand incumbencyId providerRunId toolCallId (asNumber head) None)
+                    let kind = if receipt.Kind.Length = 0 then receipt.Status else receipt.Kind
+                    if receipt.Status = "Committed" || receipt.Status = "Replayed" || receipt.Status = "Observed" then
+                        return box {| ok = true; decision = kind; error = "" |}
+                    else
+                        return
+                            box
+                                {| ok = false
+                                   decision = "Refuse"
+                                   error = if receipt.Reason = "" then receipt.Status else receipt.Reason |}
+            | None ->
+            if (recall workId).Length = 0 then
+                return box {| ok = false; decision = "missing"; error = "lifecycle work is missing" |}
+            else
+                let incumbencyId =
+                    try
+                        useJournal workId (recall workId) (fun work ->
+                            let snapshot: obj = work?inspect ()
+                            if isNull snapshot?active then "" else string snapshot?active?id)
+                    with error -> error.Message
+                match runSeed workId ("deliver:" + providerRunId + ":" + toolCallId) (deliverCommand incumbencyId providerRunId toolCallId (asNumber head) None) with
+                | Ok(result, _) ->
+                    let status = string result?status
+                    let decision = result?result
+                    let kind = if isRecord decision then string decision?kind else status
+                    return box {| ok = status = "Committed" || status = "Replayed" || status = "Observed"; decision = kind; error = "" |}
+                | Error reason -> return box {| ok = false; decision = "Refuse"; error = reason |}
+        }
+
+    let seedConfirmation (store: obj) (workId: string) (providerRunId: string) (toolCallId: string) : Task<obj> =
+        task {
+            match stampedDir store with
+            | Some dir ->
+                match DurableWorkHost.inspected dir workId with
+                | None -> return box {| ok = false; error = "lifecycle work is missing" |}
+                | Some work ->
+                    let incumbencyId = work.ActiveId |> Option.defaultValue ""
+                    let receipt =
+                        DurableWorkHost.execute
+                            dir
+                            workId
+                            ("deliver:" + providerRunId + ":" + toolCallId)
+                            (deliverCommand incumbencyId providerRunId toolCallId (asNumber 1L) None)
+                    if (receipt.Status = "Committed" || receipt.Status = "Replayed") && receipt.Kind = "Confirmed" then
+                        return box {| ok = true; error = "" |}
+                    else
+                        let refusal =
+                            if receipt.Kind.Length > 0 then receipt.Kind
+                            elif receipt.Reason.Length > 0 then receipt.Reason
+                            else receipt.Status
+                        return box {| ok = false; error = refusal |}
+            | None ->
+                if (recall workId).Length = 0 then
+                    return box {| ok = false; error = "lifecycle work is missing" |}
+                else
+                    let! delivered = seedDeliver store workId providerRunId toolCallId 1L
+                    let admitted = unbox<bool> delivered?ok
+                    if admitted && string delivered?decision = "Confirmed" then
+                        return box {| ok = true; error = "" |}
+                    else
+                        return box {| ok = false; error = string delivered?decision + " " + string delivered?error |}
+        }
+
+    let documentView (text: string) =
+        let records = recordsOf text
+        let workId = workIdOf records
+        try
+            useJournal workId records (fun work ->
+                let snapshot: obj = work?inspect ()
+                let recovery: obj = work?recover ()
+                if not (unbox<bool> snapshot?opened) then
+                    box {| found = false; detail = "not opened" |}
+                else
+                    let active: obj = snapshot?active
+                    let rounds: obj array = if isNull snapshot?rounds then [||] else unbox snapshot?rounds
+                    let history: obj array = unbox (work?history ())
+                    let mutable digest = ""
+                    let mutable path = ""
+                    let mutable execSessionId = ""
+                    for frame in history do
+                        let events: obj array = unbox frame?events
+                        for event in events do
+                            if string (event?``type``) = "IncumbencyRetired" && string event?outcome = "Delivered" then
+                                if not (isNull event?digest) then digest <- string event?digest
+                                if not (isNull event?path) then path <- string event?path
+                                if not (isNull event?execSessionId) then execSessionId <- string event?execSessionId
+                    let predecessor =
+                        if rounds.Length = 0 then
+                            ""
+                        else
+                            let round = rounds.[rounds.Length - 1]
+                            string round?openingCursor + "," + string round?retirementCursor
+                    let latest =
+                        if rounds.Length = 0 then
+                            ""
+                        else
+                            let round = rounds.[0]
+                            string round?openingCursor + "," + string round?retirementCursor
+                    box
+                        {| found = true
+                           detail = ""
+                           workId = string snapshot?workId
+                           root = string snapshot?root
+                           projection = string snapshot?stage
+                           authorized = unbox<bool> snapshot?deliveryAuthorized
+                           active = not (isNull active)
+                           activeId = if isNull active then "" else string active?id
+                           openingStage = if isNull active then "" else string active?openingStage
+                           openingCursor = if isNull active then 0. else unbox<float> active?openingCursor
+                           retiredCount = rounds.Length
+                           delivered = isNull active && string recovery?next = "Done"
+                           digest = digest
+                           path = path
+                           execSessionId = execSessionId
+                           devopsId = if isNull snapshot?devopsId then "" else string snapshot?devopsId
+                           predecessor = predecessor
+                           latestRetirement = latest |})
+        with error ->
+            box {| found = false; detail = error.Message |}
 
     let private readFaultText (fault: ReadFault) =
         match fault with
@@ -93,337 +723,6 @@ module LifecycleSurface =
         LifecycleCodec.readDocument text
         |> Result.mapError readFaultText
         |> Result.bind LifecycleFold.applyAll
-
-    let reviewProbe (text: string) (incumbencyId: string) (outcome: string) =
-        match workOf text, ReviewOutcome.parse outcome with
-        | Error error, _ -> box {| decision = "Refuse"; detail = error |}
-        | _, None -> box {| decision = "Refuse"; detail = "review outcome rejected" |}
-        | Ok work, Some reviewOutcome ->
-            match LifecycleKernel.review work incumbencyId reviewOutcome with
-            | KernelDecision.Refuse reason -> box {| decision = "Refuse"; detail = reason |}
-            | KernelDecision.Done label -> box {| decision = "Done"; detail = label |}
-            | KernelDecision.Write(events, label) ->
-                let folded = workOf (text + document events)
-                let authorized =
-                    match folded with
-                    | Ok next ->
-                        match LifecycleFold.folded next with
-                        | Ok view -> view.DeliveryAuthorized
-                        | Error _ -> false
-                    | Error _ -> false
-
-                box
-                    {| decision = "Write"
-                       detail = label
-                       authorized = authorized
-                       names = events |> List.map LifecycleCodec.eventTypeOf |> String.concat ","
-                       bytes = document events |}
-
-    let finalPromotionProbe (text: string) =
-        let rec promote (current: string) (remaining: int) =
-            if remaining = 0 then
-                match workOf current with
-                | Error error -> box {| authorized = false; detail = error |}
-                | Ok work ->
-                    match LifecycleFold.folded work with
-                    | Ok folded -> box {| authorized = folded.DeliveryAuthorized; detail = StageElement.render folded.Projection |}
-                    | Error error -> box {| authorized = false; detail = error |}
-            else
-                match workOf current with
-                | Error error -> box {| authorized = false; detail = error |}
-                | Ok work ->
-                    match work.Active with
-                    | None -> box {| authorized = false; detail = "no active incumbency" |}
-                    | Some active ->
-                        match LifecycleKernel.review work active.Id ReviewOutcome.Promoted with
-                        | KernelDecision.Write(events, _) ->
-                            let reviewed = current + document events
-                            match LifecycleFold.folded (match workOf reviewed with | Ok value -> value | Error _ -> work) with
-                            | Ok folded when folded.DeliveryAuthorized ->
-                                box {| authorized = true; detail = StageElement.render folded.Projection |}
-                            | Ok _ ->
-                                let reviewedWork =
-                                    match workOf reviewed with
-                                    | Ok value -> value
-                                    | Error _ -> work
-
-                                match
-                                    LifecycleKernel.deliverOneshot
-                                        sha256
-                                        reviewedWork
-                                        { ProviderRunId = Some "run-final"
-                                          ToolCallId = Some(string remaining) }
-                                        (Some 20L)
-                                        None
-                                        SessionLookup.None
-                                        None
-                                        None
-                                with
-                                | KernelDecision.Write(relayed, _) -> promote (reviewed + document relayed) (remaining - 1)
-                                | KernelDecision.Refuse reason -> box {| authorized = false; detail = reason |}
-                                | KernelDecision.Done label -> box {| authorized = false; detail = label |}
-                            | Error error -> box {| authorized = false; detail = error |}
-                        | KernelDecision.Refuse reason -> box {| authorized = false; detail = reason |}
-                        | KernelDecision.Done label -> box {| authorized = false; detail = label |}
-
-        promote text 3
-
-    let private fence providerRunId toolCallId =
-        { HostFence.ProviderRunId = Some providerRunId
-          HostFence.ToolCallId = Some toolCallId }
-
-    let deliverProbe (text: string) (providerRunId: string) (toolCallId: string) (head: int64) =
-        match workOf text with
-        | Error error -> box {| decision = "Refuse"; detail = error |}
-        | Ok work ->
-            let decision =
-                if work.Sequence = WorkSequence.Execution then
-                    LifecycleKernel.deliverExecution sha256 work (fence providerRunId toolCallId) (Some head) None
-                else
-                    LifecycleKernel.deliverOneshot
-                        sha256
-                        work
-                        (fence providerRunId toolCallId)
-                        (Some head)
-                        None
-                        SessionLookup.None
-                        None
-                        None
-
-            match decision with
-            | KernelDecision.Refuse reason -> box {| decision = "Refuse"; detail = reason |}
-            | KernelDecision.Done label -> box {| decision = "Done"; detail = label; names = "" |}
-            | KernelDecision.Write(events, label) ->
-                box
-                    {| decision = "Write"
-                       detail = label
-                       names = events |> List.map LifecycleCodec.eventTypeOf |> String.concat ","
-                       bytes = document events |}
-
-    let replayProbe (text: string) (providerRunId: string) (toolCallId: string) =
-        deliverProbe text providerRunId toolCallId 1L
-
-    let private refusal (reason: string) =
-        box {| decision = "Refuse"; detail = reason; names = ""; bytes = "" |}
-
-    let private written (events: LifecycleEvent list) (label: string) =
-        box
-            {| decision = "Write"
-               detail = label
-               names = events |> List.map LifecycleCodec.eventTypeOf |> String.concat ","
-               bytes = document events |}
-
-    let private oneshotDecision (work: LifecycleWork) (providerRunId: string) (toolCallId: string) (head: int64) =
-        let deliveredLookup =
-            SessionLookup.One
-                { ExecSessionId = "exec-session-1"
-                  WorkId = Some work.WorkId }
-
-        if work.Sequence = WorkSequence.Execution then
-            KernelDecision.Refuse "oneshot deliver requires S1 S2 S3"
-        elif
-            work.Retirements
-            |> List.exists (fun record ->
-                record.Outcome = RetirementOutcome.Delivered
-                && record.ProviderRunId = Some providerRunId
-                && record.ToolCallId = Some toolCallId)
-        then
-            LifecycleKernel.deliverOneshot
-                sha256
-                work
-                (fence providerRunId toolCallId)
-                (Some head)
-                None
-                deliveredLookup
-                None
-                None
-        else
-            match LifecycleFold.projection work with
-            | Error error -> KernelDecision.Refuse error
-            | Ok(_, true) ->
-                LifecycleKernel.deliverOneshot
-                    sha256
-                    work
-                    (fence providerRunId toolCallId)
-                    (Some head)
-                    None
-                    deliveredLookup
-                    (Some
-                        { Missing = false
-                          Empty = false
-                          Digest = "sha256-receipt"
-                          Path = "plan.md" })
-                    (Some "exec-session-1")
-            | Ok(_, false) ->
-                LifecycleKernel.deliverOneshot
-                    sha256
-                    work
-                    (fence providerRunId toolCallId)
-                    (Some head)
-                    None
-                    SessionLookup.None
-                    None
-                    None
-
-    let deliverStateProbe (text: string) (providerRunId: string) (toolCallId: string) (head: int64) =
-        match workOf text with
-        | Error error -> refusal error
-        | Ok work ->
-            match oneshotDecision work providerRunId toolCallId head with
-            | KernelDecision.Refuse reason -> refusal reason
-            | KernelDecision.Done label ->
-                box
-                    {| decision = "Done"
-                       detail = label
-                       names = ""
-                       bytes = ""
-                       original = label |}
-            | KernelDecision.Write(events, label) ->
-                written events label
-
-    let replayStateProbe (text: string) (providerRunId: string) (toolCallId: string) (head: int64) =
-        match workOf text with
-        | Error error -> refusal error
-        | Ok work ->
-            match oneshotDecision work providerRunId toolCallId head with
-            | KernelDecision.Refuse reason -> refusal reason
-            | KernelDecision.Done label ->
-                box
-                    {| decision = "Done"
-                       detail = label
-                       names = ""
-                       bytes = ""
-                       original = label |}
-            | KernelDecision.Write(events, label) ->
-                let writtenText = text + document events
-                match workOf writtenText with
-                | Error error -> refusal error
-                | Ok next ->
-                    match oneshotDecision next providerRunId toolCallId head with
-                    | KernelDecision.Refuse reason -> refusal reason
-                    | KernelDecision.Write(_, _) -> refusal "exact replay wrote a second event"
-                    | KernelDecision.Done replayLabel ->
-                        match workOf writtenText with
-                        | Error error -> refusal error
-                        | Ok replayed when replayed = next ->
-                            box
-                                {| decision = "Done"
-                                   detail = replayLabel
-                                   names = ""
-                                   bytes = ""
-                                   original = label |}
-                        | Ok _ -> refusal "exact replay changed the folded work"
-
-    let reopenProbe (text: string) (incumbencyId: string) =
-        match workOf text with
-        | Error error -> refusal error
-        | Ok work ->
-            match LifecycleKernel.reopen work incumbencyId with
-            | KernelDecision.Refuse reason -> refusal reason
-            | KernelDecision.Done label -> box {| decision = "Done"; detail = label; names = ""; bytes = "" |}
-            | KernelDecision.Write(events, label) -> written events label
-
-    let detachedOpeningProbe (text: string) =
-        match workOf text with
-        | Error error -> box {| decision = "Refuse"; detail = error; names = "" |}
-        | Ok work ->
-            match LifecycleKernel.refuseDetachedOpening work with
-            | KernelDecision.Write(events, _) ->
-                box
-                    {| decision = "Write"
-                       detail = "opened"
-                       names = events |> List.map LifecycleCodec.eventTypeOf |> String.concat "," |}
-            | KernelDecision.Refuse reason -> box {| decision = "Refuse"; detail = reason; names = "" |}
-            | KernelDecision.Done label -> box {| decision = "Done"; detail = label; names = "" |}
-
-    let commitProbe (name: string) =
-        let fault = { Phase = Unchecked.defaultof<AppendPhase>; Cause = Exception name }
-        let classified =
-            match name with
-            | "AppendDurable" -> LifecycleKernel.classifyCommit (Ok())
-            | "AppendNotAttempted" ->
-                LifecycleKernel.classifyCommit (
-                    Error(
-                        AppendError.AppendNotAttempted
-                            { Requested = []
-                              Prepared = None
-                              Primary = fault
-                              CleanupFailures = []
-                              PriorRejection = None }
-                    )
-                )
-            | "CommitUnknown" ->
-                LifecycleKernel.classifyCommit (
-                    Error(
-                        AppendError.CommitUnknown
-                            { Requested = []
-                              Prepared = Unchecked.defaultof<PreparedAppend>
-                              Primary = fault
-                              CleanupFailures = [] }
-                    )
-                )
-            | _ -> Error "unclassified"
-
-        match classified with
-        | Ok CommitOutcome.AppendDurable -> "AppendDurable"
-        | Ok CommitOutcome.AppendNotAttempted -> "AppendNotAttempted"
-        | Ok CommitOutcome.CommitUnknown -> "CommitUnknown"
-        | Error _ -> "not-durable"
-
-    let advance (workId: string) (prior: string) (expected: string) (next: string) =
-        let refuse detail =
-            box
-                {| decision = "Refuse"
-                   detail = detail
-                   names = ""
-                   bytes = ""
-                   authority = "" |}
-
-        let reviewed =
-            let opened = encodeOpening "plan" workId "/repo" 7L
-            if opened.StartsWith "REFUSE " then
-                Error opened
-            else
-                match workOf opened with
-                | Error error -> Error error
-                | Ok work ->
-                    match work.Active, ReviewOutcome.parse "Stayed" with
-                    | None, _ -> Error "no active incumbency"
-                    | _, None -> Error "review outcome rejected"
-                    | Some active, Some outcome ->
-                        match LifecycleKernel.review work active.Id outcome with
-                        | KernelDecision.Write(events, _) -> Ok(opened + document events)
-                        | KernelDecision.Refuse reason -> Error reason
-                        | KernelDecision.Done label -> Error label
-
-        match reviewed with
-        | Error error -> refuse error
-        | Ok text ->
-            match workOf (text + prior) with
-            | Error error -> refuse error
-            | Ok work ->
-                match LifecycleKernel.advance work expected next with
-                | KernelDecision.Refuse reason ->
-                    box
-                        {| decision = "Refuse"
-                           detail = reason
-                           names = ""
-                           bytes = ""
-                           authority = work.Authority |}
-                | KernelDecision.Done label ->
-                    box
-                        {| decision = "Done"
-                           detail = label
-                           names = ""
-                           bytes = ""
-                           authority = work.Authority |}
-                | KernelDecision.Write(events, label) ->
-                    box
-                        {| decision = "Write"
-                           detail = label
-                           names = events |> List.map LifecycleCodec.eventTypeOf |> String.concat ","
-                           bytes = document events
-                           authority = work.Authority |}
 
     let decodeDocument (text: string) =
         match LifecycleCodec.readDocument text with
@@ -438,10 +737,19 @@ module LifecycleSurface =
                    names = events |> List.map LifecycleCodec.eventTypeOf |> String.concat ","
                    fault = "" |}
 
-    // Test-facing seeding: commit real unified lifecycle events into the
-    // workspace store the plugin already reads. No relay facts, no certificate,
-    // no second vocabulary. These helpers exist so executable tests can stand up
-    // an incumbency, a review, or a retirement without inventing a private store.
+    let detachedOpeningProbe (text: string) =
+        match workOf text with
+        | Error error -> box {| decision = "Refuse"; detail = error; names = "" |}
+        | Ok work ->
+            match LifecycleKernel.refuseDetachedOpening work with
+            | KernelDecision.Write(events, _) ->
+                box
+                    {| decision = "Write"
+                       detail = "opened"
+                       names = events |> List.map LifecycleCodec.eventTypeOf |> String.concat "," |}
+            | KernelDecision.Refuse reason -> box {| decision = "Refuse"; detail = reason; names = "" |}
+            | KernelDecision.Done label -> box {| decision = "Done"; detail = label; names = "" |}
+
     let private heldStore (store: obj) : IEventStore = unbox store
 
     let private workOfStore (held: IEventStore) (workId: string) : LifecycleWork option =
@@ -461,105 +769,6 @@ module LifecycleSurface =
         | "S4" -> OpeningKind.ManagerDirect
         | "spawn" -> OpeningKind.SpawnedExecution
         | _ -> OpeningKind.UserPlan
-
-    let seedOpen (store: obj) (kind: string) (workId: string) (root: string) (head: int64) : Task<obj> =
-        task {
-            let held = heldStore store
-
-            match workOfStore held workId with
-            | Some _ -> return box {| ok = true; opened = false; error = "" |}
-            | None ->
-                let firstLine =
-                    if kind = "spawn" then Some LifecycleIdentity.spawnMark else None
-
-                match LifecycleKernel.openWork sha256 (openingKindOf kind) firstLine workId root false (Some head) with
-                | KernelDecision.Write(events, _) ->
-                    match! commitEvents held workId events with
-                    | Ok() -> return box {| ok = true; opened = true; error = "" |}
-                    | Error reason -> return box {| ok = false; opened = false; error = reason |}
-                | KernelDecision.Refuse reason -> return box {| ok = false; opened = false; error = reason |}
-                | KernelDecision.Done label -> return box {| ok = false; opened = false; error = label |}
-        }
-
-    let seedReview (store: obj) (workId: string) (outcome: string) : Task<obj> =
-        task {
-            let held = heldStore store
-
-            match workOfStore held workId, ReviewOutcome.parse outcome with
-            | None, _ -> return box {| ok = false; reviewed = false; error = "lifecycle work is missing" |}
-            | _, None -> return box {| ok = false; reviewed = false; error = "review outcome rejected" |}
-            | Some work, Some reviewOutcome ->
-                match work.Active with
-                | None -> return box {| ok = false; reviewed = false; error = "no active incumbency" |}
-                | Some active ->
-                    match LifecycleKernel.review work active.Id reviewOutcome with
-                    | KernelDecision.Done label -> return box {| ok = true; reviewed = false; error = label |}
-                    | KernelDecision.Refuse reason -> return box {| ok = false; reviewed = false; error = reason |}
-                    | KernelDecision.Write(events, _) ->
-                        match! commitEvents held workId events with
-                        | Ok() -> return box {| ok = true; reviewed = true; error = "" |}
-                        | Error reason -> return box {| ok = false; reviewed = false; error = reason |}
-        }
-
-    let seedDeliver
-        (store: obj)
-        (workId: string)
-        (providerRunId: string)
-        (toolCallId: string)
-        (head: int64)
-        : Task<obj> =
-        task {
-            let held = heldStore store
-
-            match workOfStore held workId with
-            | None -> return box {| ok = false; decision = "missing"; error = "lifecycle work is missing" |}
-            | Some work ->
-                let fence =
-                    { HostFence.ProviderRunId = Some providerRunId
-                      HostFence.ToolCallId = Some toolCallId }
-
-                let decision =
-                    if work.Sequence = WorkSequence.Execution then
-                        LifecycleKernel.deliverExecution sha256 work fence (Some head) None
-                    else
-                        LifecycleKernel.deliverOneshot sha256 work fence (Some head) None SessionLookup.None None None
-
-                match decision with
-                | KernelDecision.Refuse reason -> return box {| ok = false; decision = "Refuse"; error = reason |}
-                | KernelDecision.Done label -> return box {| ok = true; decision = "Done"; error = label |}
-                | KernelDecision.Write(events, label) ->
-                    match! commitEvents held workId events with
-                    | Ok() -> return box {| ok = true; decision = label; error = "" |}
-                    | Error reason -> return box {| ok = false; decision = label; error = reason |}
-        }
-
-    /// Seed the illegal fact "confirmation without review" directly. The fold
-    /// accepts the event, so a test can prove the execution gate fails closed on
-    /// it. The kernel's own deliver path never writes this.
-    let seedConfirmation
-        (store: obj)
-        (workId: string)
-        (providerRunId: string)
-        (toolCallId: string)
-        : Task<obj> =
-        task {
-            let held = heldStore store
-
-            match workOfStore held workId with
-            | None -> return box {| ok = false; error = "lifecycle work is missing" |}
-            | Some work ->
-                match work.Active with
-                | None -> return box {| ok = false; error = "no active incumbency" |}
-                | Some active ->
-                    match!
-                        commitEvents
-                            held
-                            workId
-                            [ LifecycleEvent.ConfirmationCommitted(active.Id, providerRunId, toolCallId) ]
-                    with
-                    | Ok() -> return box {| ok = true; error = "" |}
-                    | Error reason -> return box {| ok = false; error = reason |}
-        }
 
     let workView (store: obj) (workId: string) =
         let held = heldStore store
@@ -583,81 +792,6 @@ module LifecycleSurface =
                     |> Option.bind (fun active -> active.Confirmed)
                     |> Option.isSome
                    delivered = work.CurrentDelivered |}
-
-    let documentView (text: string) =
-        match workOf text with
-        | Error error -> box {| found = false; detail = error |}
-        | Ok work ->
-            let folded = LifecycleFold.folded work
-
-            let projection, authorized =
-                match folded with
-                | Ok view ->
-                    let stage =
-                        match work.Active, work.DeliveredRecord with
-                        | None, Some record -> record.Stage |> Option.map StageElement.render
-                        | _ -> None
-                    Option.defaultValue (StageElement.render view.Projection) stage, view.DeliveryAuthorized
-                | Error _ -> "", false
-
-            let activeStage =
-                work.Active
-                |> Option.map (fun active -> StageElement.render active.OpeningStage)
-                |> Option.defaultValue ""
-
-            let activeId = work.Active |> Option.map (fun active -> active.Id) |> Option.defaultValue ""
-
-            let openingCursor =
-                work.Active |> Option.map (fun active -> active.OpeningCursor) |> Option.defaultValue 0L
-
-            let predecessor =
-                let prior =
-                    work.Retirements
-                    |> List.filter (fun record -> record.Outcome = RetirementOutcome.Relayed)
-                    |> List.tryLast
-
-                match work.Active, prior with
-                | Some active, Some record when record.RetirementCursor = Some active.OpeningCursor -> Some record
-                | Some active, Some record when
-                    active.OpeningCursor = 0L
-                    && record.IncumbencyId <> active.Id
-                    && (work.DeliveredRecord |> Option.exists (fun delivered -> delivered.IncumbencyId = active.Id))
-                    ->
-                    Some record
-                | _ -> None
-                |> Option.map (fun record -> string record.OpeningCursor + "," + (record.RetirementCursor |> Option.map string |> Option.defaultValue ""))
-                |> Option.defaultValue ""
-
-            let latest =
-                work.Retirements
-                |> List.tryLast
-                |> Option.map (fun record ->
-                    string record.OpeningCursor
-                    + ","
-                    + (record.RetirementCursor |> Option.map string |> Option.defaultValue ""))
-                |> Option.defaultValue ""
-
-            let receipt = work.DeliveredRecord
-
-            box
-                {| found = true
-                   detail = ""
-                   workId = work.WorkId
-                   root = work.Root
-                   projection = projection
-                   authorized = authorized
-                   active = work.Active.IsSome
-                   activeId = activeId
-                   openingStage = activeStage
-                   openingCursor = openingCursor
-                   retiredCount = work.Retirements.Length
-                   delivered = work.CurrentDelivered
-                   digest = receipt |> Option.bind (fun record -> record.Digest) |> Option.defaultValue ""
-                   path = receipt |> Option.bind (fun record -> record.Path) |> Option.defaultValue ""
-                   execSessionId = receipt |> Option.bind (fun record -> record.ExecSessionId) |> Option.defaultValue ""
-                   devopsId = work.DevOps |> Option.map fst |> Option.defaultValue ""
-                   predecessor = predecessor
-                   latestRetirement = latest |}
 
     let bindDevOps (store: obj) (workId: string) (devopsId: string) (target: obj) : Task<obj> =
         task {

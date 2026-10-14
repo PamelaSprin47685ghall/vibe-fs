@@ -676,30 +676,12 @@ module PluginTransforms =
             Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory workspaceDirectory sid
 
 
+        // Stopped. inspect has no opening cursor and no previous retirement range.
         let buildTenureOf
-            (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
-            (fresh: bool)
-            : Wanxiangshu.Mission.Planning.ActiveTenureInfo =
-            let active = work.Active.Value
-
-            let previousRange =
-                match List.tryLast work.Retirements with
-                | Some previous ->
-                    let ending = previous.RetirementCursor |> Option.defaultValue active.OpeningCursor
-                    if ending > previous.OpeningCursor then Some(previous.OpeningCursor, ending) else None
-                | None -> None
-
-            let stage =
-                match Wanxiangshu.Mission.Lifecycle.LifecycleFold.projection work with
-                | Ok(projected, _) -> Wanxiangshu.Mission.Lifecycle.StageElement.render projected
-                | Error _ -> Wanxiangshu.Mission.Lifecycle.StageElement.render active.OpeningStage
-
-            { WorkId = work.WorkId
-              IncumbencyId = active.Id
-              Stage = stage
-              OpeningCursor = active.OpeningCursor
-              PreviousRange = previousRange
-              IsFreshHandover = fresh }
+            (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+            (_fresh: bool)
+            : Wanxiangshu.Mission.Planning.ActiveTenureInfo option =
+            None
 
         let tenureReanchorEpoch (durable: AgentJournal) (sessionId: SessionId) : ActivePrefixEpoch =
             match AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections with
@@ -726,32 +708,13 @@ module PluginTransforms =
                 | Error failure -> return raise (JournalAppendException failure)
             }
 
+        // Stopped. inspect has no previous retirement range or opening cursor.
         let previousTenureRecord
-            (durable: AgentJournal)
-            (sessionId: SessionId)
-            (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
+            (_durable: AgentJournal)
+            (_sessionId: SessionId)
+            (_tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
             =
-            match tryReadLifecycleWork (SessionId.value sessionId) with
-            | Some work when work.Active.IsSome && work.Retirements.IsEmpty |> not ->
-                let previous = List.last work.Retirements
-                let ending =
-                    previous.RetirementCursor
-                    |> Option.defaultValue work.Active.Value.OpeningCursor
-
-                if ending > previous.OpeningCursor then
-                    let range =
-                        XTraceRange.create
-                            (XTraceCursor.create previous.OpeningCursor |> XTraceCursor.nextCursor)
-                            (XTraceCursor.create ending |> XTraceCursor.nextCursor)
-
-                    Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshot
-                        durable
-                        (AgentJournal.snapshot durable)
-                        sessionId
-                        range
-                else
-                    Task.FromResult None
-            | _ -> Task.FromResult None
+            Task.FromResult None
 
         // COMPANION-003: the Plan session is a top-level main session; nothing
         // else owns its opening. Without opening evidence the bounded LWR_prev
@@ -801,7 +764,7 @@ module PluginTransforms =
                       HasSemanticParts = not (List.isEmpty message.Parts)
                       Raw = raw }))
 
-        let isolatePlanTenure (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork) (sid: string) (outObj: obj) =
+        let isolatePlanTenure (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) (sid: string) (outObj: obj) =
             task {
                 let durable =
                     journal
@@ -822,39 +785,16 @@ module PluginTransforms =
 
                 do! capturePlanSessionOpening durable sessionId trace rawMessages
 
-                let epoch = tenureReanchorEpoch durable sessionId
-
-                let tenure =
-                    buildTenureOf
-                        work
-                        (not (PrefixEpochProjection.isTenureReanchored work.Active.Value.Id epoch))
-
-                if tenure.OpeningCursor > XTraceCursor.sequence (XTraceProjection.headCursor trace) then
-                    invalidOp "Plan opening cursor exceeds the captured XTrace frontier"
-
-                let! previousRecord = previousTenureRecord durable sessionId tenure
-
-                let assembled =
-                    Wanxiangshu.Mission.Planning.TenureIsolation.assemble
-                        (tenureMessagesOf rawMessages)
-                        tenure
-                        (XTraceProjection.hostMessageFirstCursors trace)
-                        previousRecord
-
-                if assembled.ReanchorRequested then
-                    do! reanchorTenure durable sessionId tenure epoch
-
-                HostMessageProjection.replaceMessagesInPlace outObj assembled.Messages
+                // Stopped. inspect has no opening cursor and no previous retirement range.
+                let _ = durable, sessionId, rawMessages, outObj, trace
+                return ()
             }
 
+        // Stopped. inspect has no work sequence. Absence is not a plan tenure.
         let applyResolvedTenure (sid: string) (outObj: obj) =
             task {
-                match tryReadLifecycleWork sid with
-                | Some work when
-                    work.Sequence = Wanxiangshu.Mission.Lifecycle.WorkSequence.Plan && work.Active.IsSome
-                    ->
-                    return! isolatePlanTenure work sid outObj
-                | _ -> return ()
+                let _ = sid, outObj
+                return ()
             }
 
         let applyTenureIsolation (sidOpt: string option) (outObj: obj) : Task<unit> =

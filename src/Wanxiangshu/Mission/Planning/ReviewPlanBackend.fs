@@ -45,48 +45,54 @@ module ReviewPlanBackend =
         else
             ReviewOutcome.Stayed
 
-    let private lifecycleWorkOf
-        (store: IEventStore)
-        (workId: string)
-        : Result<Wanxiangshu.Mission.Lifecycle.LifecycleWork, PlanReviewError> =
-        match LifecycleKernel.tryWorkOfStore store workId with
-        | None -> Error PlanReviewError.NoActiveIncumbency
-        | Some work -> Ok work
-
     // planning-022: each incumbency reviews exactly once. The kernel refuses a
     // second review for the same tenure; that refusal is the already-reviewed
     // error, not a record failure.
+    /// The reviewer is never the incumbency owner. A plan work opens with the
+    /// session id as owner, so the reviewer must be a distinct bound identity.
+    [<Literal>]
+    let private ReviewerId = "plan-reviewer"
+
     let executeReview
+        (gitCommonDir: string)
         (store: IEventStore)
         (workId: string)
         (incumbencyId: string)
         (gaps: (string * string) list)
         : Task<Result<PlanReviewResult, PlanReviewError>> =
         task {
-            match lifecycleWorkOf store workId with
-            | Error error -> return Error error
-            | Ok work ->
-                match work.Active with
+            if String.IsNullOrWhiteSpace gitCommonDir then
+                return Error(PlanReviewError.RecordFailed "git common directory is missing")
+            else
+                match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
                 | None -> return Error PlanReviewError.NoActiveIncumbency
-                | Some active when active.Id <> incumbencyId ->
-                    return Error(PlanReviewError.IncumbencyMismatch(active.Id, incumbencyId))
-                | Some _ ->
-                    let outcome = reviewOutcome gaps
-
-                    match
-                        LifecycleKernel.review work incumbencyId outcome
-                    with
-                    | KernelDecision.Refuse reason ->
-                        if reason = "incumbency already reviewed" then
+                | Some work ->
+                    match work.ActiveId with
+                    | None -> return Error PlanReviewError.NoActiveIncumbency
+                    | Some active when active <> incumbencyId ->
+                        return Error(PlanReviewError.IncumbencyMismatch(active, incumbencyId))
+                    | Some _ ->
+                        let outcome = reviewOutcome gaps
+                        let findings =
+                            gaps
+                            |> List.map (fun (left, right) -> left + "\n" + right)
+                            |> List.toArray
+                            |> box
+                        let requestId = incumbencyId + ":review"
+                        let command =
+                            DurableWorkHost.command
+                                "Review"
+                                [ "incumbencyId", box incumbencyId
+                                  "reviewerId", box ReviewerId
+                                  "findings", findings ]
+                        let receipt = DurableWorkHost.execute gitCommonDir workId requestId command
+                        // The library refuses a second review under either a
+                        // fresh request id (Incumbency already reviewed) or the
+                        // same request id with different bytes (RequestIdConflict).
+                        if receipt.Reason = "Incumbency already reviewed" || receipt.Reason = "RequestIdConflict" then
                             return Error(PlanReviewError.AlreadyReviewed incumbencyId)
-                        else
-                            return Error(PlanReviewError.RecordFailed reason)
-                    | KernelDecision.Done _ ->
-                        return Error(PlanReviewError.RecordFailed "review was not written")
-                    | KernelDecision.Write(events, _) ->
-                        match! LifecycleKernel.commit store workId events with
-                        | Ok(CommitOutcome.AppendDurable) ->
+                        elif receipt.Status = "Committed" || receipt.Status = "Replayed" then
                             return Ok { Outcome = outcome; Gaps = gaps }
-                        | Ok _ -> return Error(PlanReviewError.RecordFailed "review commit is not durable")
-                        | Error reason -> return Error(PlanReviewError.RecordFailed reason)
+                        else
+                            return Error(PlanReviewError.RecordFailed(if receipt.Reason = "" then receipt.Status else receipt.Reason))
         }

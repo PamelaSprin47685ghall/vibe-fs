@@ -14,10 +14,10 @@ module WorkspaceEventStore =
     /// The unified lifecycle work for one session, read from the already-owned
     /// workspace store. Missing workspace, missing store, missing current,
     /// missing work, or a blank common dir all yield None.
-    val tryLifecycleWork: workspace: string -> workId: string -> Wanxiangshu.Mission.Lifecycle.LifecycleWork option
+    val tryLifecycleWork: workspace: string -> workId: string -> Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option
     /// Directory-option variant of tryLifecycleWork. None workspace yields None.
     val tryLifecycleWorkOfDirectory:
-        workspaceDirectory: string option -> workId: string -> Wanxiangshu.Mission.Lifecycle.LifecycleWork option
+        workspaceDirectory: string option -> workId: string -> Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option
     /// The same read when the caller already holds the store and must commit
     /// through it. Missing current or missing work yields None.
     val tryLifecycleWorkOfStore:

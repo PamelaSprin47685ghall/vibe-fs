@@ -33,6 +33,7 @@ module ReviewPlanBackend =
     /// authorize delivery); non-empty gaps keep it in place and return as
     /// repair obligations. Each incumbency reviews exactly once.
     val executeReview:
+        gitCommonDir: string ->
         store: IEventStore ->
         workId: string ->
         incumbencyId: string ->

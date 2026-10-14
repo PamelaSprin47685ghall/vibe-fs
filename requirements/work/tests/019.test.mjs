@@ -20,20 +20,7 @@ const bound = (sessionID, callID) => ({ sessionID, agent: 'manager', callID, mes
 
 const storeOf = (directory) => workspaceEvents.acquire(realpathSync(join(directory, '.git')))
 
-// seedDeliver refuses to write ConfirmationCommitted without a review. The fold
-// accepts the event, so the illegal fact is seeded directly into the same
-// workspace store the plugin reads.
-const seedConfirmationWithoutReview = async (directory, sessionID) => {
-  const store = storeOf(directory)
-  const appended = await lifecycle.seedConfirmation(
-    store,
-    sessionID,
-    'run-seeded-confirmation',
-    'call-seeded-confirmation',
-  )
-  const view = lifecycle.workView(store, sessionID)
-  return { ...view, error: appended.ok ? '' : appended.error }
-}
+
 
 // 执行入口门禁：tool.execute.before 只对评审专用工具（js-manager）与跨角色
 // 绕路工具（js-engineer/js-devops）生效；Host 原生工具（read）与 office 工具
@@ -112,22 +99,27 @@ test('WHAT[work-019] 评审已接纳且尚未确认时 read 与固定 DevOps 派
   })
 })
 
-test('WHAT[work-019] 有确认且没有评审时 deliver 在执行入口被拒绝，review 不被空集拒绝', async () => {
-  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+test('WHAT[work-019] 确认先于评审时公开 Deliver 拒绝，且不落下确认', async () => {
+  await withExecutablePlugin(async (_hooks, directory, createdIds, runtime) => {
     const sessionID = 'ses-confirm-first'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
-    // 确认先于评审是非法事实。seedDeliver 不会在无评审时落下确认，所以这一格
-    // 直接把 ConfirmationCommitted 追加进插件正在读的同一份工作区事件库。
-    const seeded = await seedConfirmationWithoutReview(directory, sessionID)
-    assert.equal(seeded.confirmed, true, seeded.error)
-    assert.equal(seeded.reviewed, '')
-    const deliverResult = await hooks.tool.deliver.execute({}, bound(sessionID, 'call-confirm-first'))
-    assert.match(String(deliverResult), denied)
-    assert.doesNotMatch(String(deliverResult), /assessment_required = true/)
-    assert.equal(lifecycle.workView(storeOf(directory), sessionID).active, true)
-    // review 不被空集拒绝：空 findings 是合法评审输入，但需要真实绑定消息。
-    // 此处仅断言静态权限：Manager 的 review 权限在角色层固定 allow。
+    const store = storeOf(directory)
+    const before = lifecycle.workView(store, sessionID)
+    const seeded = await lifecycle.seedConfirmation(
+      store,
+      sessionID,
+      'run-seeded-confirmation',
+      'call-seeded-confirmation',
+    )
+    assert.equal(seeded.ok, false, seeded.error)
+    assert.match(String(seeded.error), /ReviewRequired/)
+    const after = lifecycle.workView(store, sessionID)
+    assert.equal(after.confirmed, false)
+    assert.equal(after.reviewed, '')
+    assert.equal(after.active, before.active)
+    assert.equal(after.delivered, before.delivered)
+    assert.equal(after.sequence, before.sequence)
     assert.equal(rolePermissionRules('manager').review, 'allow')
     assert.equal(createdIds.length, 0)
   })

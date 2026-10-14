@@ -10,9 +10,9 @@ import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurfa
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
-const eventsOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
-const incumbencyIdOf = (text) =>
-  [...eventsOf(text)].reverse().find((event) => event.event_type === 'IncumbencyOpened').payload.incumbencyId
+const framesOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
+const eventsOf = (text) => framesOf(text).flatMap((frame) => frame.events ?? [])
+const incumbencyIdOf = (text) => [...eventsOf(text)].reverse().find((event) => event.type === 'IncumbencyOpened').incumbencyId
 
 const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-035-'))
@@ -34,23 +34,35 @@ const climb = (workId, relays) => {
   return text
 }
 
-test('WHAT[work-035] a delivered document recovers DeliveredIdempotent and never ActiveRebound', () => {
+test('WHAT[work-035] a delivered document recovers Done and not Review', () => {
   let text = climb('work-rec-1', 2)
   const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
   text = `${text}${reviewed.bytes}`
-  const delivered = surface.deliverStateProbe(text, 'run-final', 'call-final', 30n)
+  const planRoot = mkdtempSync(join(tmpdir(), 'wxs-work-035-plan-'))
+  let delivered
+  let selected
+  try {
+    const written = planning.PlanningSurface.rewritePlanAtomic(planRoot, 'work-rec-1', '# plan\n')
+    assert.equal(written.ok, true, written.error)
+    selected = planning.PlanningSurface.readAndValidatePlan(planRoot, 'work-rec-1')
+    assert.equal(selected.ok, true, selected.error)
+    delivered = surface.deliverStateProbe(text, 'run-final', 'call-final', 30n, { digest: selected.digest, path: selected.path })
+  } finally {
+    rmSync(planRoot, { recursive: true, force: true })
+  }
   assert.equal(delivered.decision, 'Write', delivered.detail)
   text = `${text}${delivered.bytes}`
 
   const read = surface.readProbe(text)
-  assert.equal(read.position, 'DeliveredIdempotent')
-  assert.notEqual(read.position, 'ActiveRebound')
-  assert.equal(read.next, 'StopDelivered')
+  assert.equal(read.ok, true)
+  assert.equal(read.next, 'Done')
+  assert.equal(read.activeId, '')
+  assert.notEqual(read.next, 'Review')
   const view = surface.documentView(text)
   assert.equal(view.delivered, true)
   assert.equal(view.active, false)
-  assert.equal(view.digest, 'sha256-receipt')
-  assert.equal(view.path, 'plan.md')
+  assert.equal(view.digest, selected.digest)
+  assert.equal(view.path, selected.path)
   assert.equal(view.projection, 'S3')
 })
 
@@ -75,7 +87,9 @@ test('WHAT[work-035] an active work rebinds the incumbency and stage; draft text
     const promoted = surface.reviewProbe(bytes, incumbencyIdOf(bytes), 'Promoted')
     const successor = surface.deliverProbe(`${bytes}${promoted.bytes}`, 'run-2', 'call-2', 11n)
     const folded = surface.readProbe(`${bytes}${promoted.bytes}${successor.bytes}`)
-    assert.equal(folded.position, 'ActiveRebound')
+    assert.equal(folded.ok, true)
+    assert.equal(folded.next, 'Review')
+    assert.equal(folded.activeId.length > 0, true)
     const view = surface.documentView(`${bytes}${promoted.bytes}${successor.bytes}`)
     assert.equal(view.activeId.length > 0, true)
     assert.equal(view.openingStage, 'S2', 'recovery reads the folded stage, not the draft text')
@@ -84,7 +98,7 @@ test('WHAT[work-035] an active work rebinds the incumbency and stage; draft text
   })
 })
 
-test('WHAT[work-035] a missing draft stays ActiveRebound and is not read as delivered', async () => {
+test('WHAT[work-035] a missing draft stays Review and is not read as delivered', async () => {
   await withStore(async (store, root) => {
     const opened = await surface.seedOpen(store, 'plan', 'work-rec-3', root, 1n)
     assert.equal(opened.ok, true, opened.error)
@@ -94,13 +108,15 @@ test('WHAT[work-035] a missing draft stays ActiveRebound and is not read as deli
     assert.equal(stored.active, true)
     assert.equal(stored.delivered, false)
     const folded = surface.readProbe(surface.encodeOpening('plan', 'work-rec-3', root, 1n))
-    assert.equal(folded.position, 'ActiveRebound')
-    assert.notEqual(folded.position, 'DeliveredIdempotent')
+    assert.equal(folded.ok, true)
+    assert.equal(folded.next, 'Review')
+    assert.equal(folded.activeId.length > 0, true)
+    assert.notEqual(folded.next, 'Done')
     assert.equal(surface.documentView(surface.encodeOpening('plan', 'work-rec-3', root, 1n)).openingStage, 'S1')
   })
 })
 
-test('WHAT[work-035] a missing work recovers Nothing and does not guess', async () => {
+test('WHAT[work-035] a missing work is not opened and does not guess', async () => {
   await withStore(async (store) => {
     const missing = surface.workView(store, 'work-rec-4')
     assert.equal(missing.found, false)
@@ -109,36 +125,63 @@ test('WHAT[work-035] a missing work recovers Nothing and does not guess', async 
     assert.equal(missing.sequence, '')
   })
   const rejected = surface.readProbe('\n')
-  assert.equal(rejected.position, 'Rejected', 'a newline with no WorkOpened is not a guessed opening')
-  assert.notEqual(rejected.position, 'ActiveRebound')
-  assert.notEqual(rejected.position, 'DeliveredIdempotent')
+  assert.equal(rejected.ok, true)
+  assert.equal(rejected.opened, false, 'a newline with no WorkOpened is not a guessed opening')
+  assert.equal(rejected.next, 'Open')
+  assert.equal(rejected.names, '')
+  assert.equal(rejected.activeId, '')
+  assert.notEqual(rejected.next, 'Done')
+  assert.notEqual(rejected.next, 'Review')
 })
 
-test('WHAT[work-035] a delivered document that also names an active incumbency is Conflict', () => {
+test('WHAT[work-035] a delivered document that also names an active incumbency recovers Continue', () => {
   let text = climb('work-rec-5', 2)
   const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
-  const delivered = surface.deliverStateProbe(`${text}${reviewed.bytes}`, 'run-5', 'call-5', 30n)
+  const planRoot = mkdtempSync(join(tmpdir(), 'wxs-work-035-conflict-'))
+  let delivered
+  try {
+    const written = planning.PlanningSurface.rewritePlanAtomic(planRoot, 'work-rec-5', '# plan\n')
+    assert.equal(written.ok, true, written.error)
+    const selected = planning.PlanningSurface.readAndValidatePlan(planRoot, 'work-rec-5')
+    assert.equal(selected.ok, true, selected.error)
+    delivered = surface.deliverStateProbe(`${text}${reviewed.bytes}`, 'run-5', 'call-5', 30n, { digest: selected.digest, path: selected.path })
+  } finally {
+    rmSync(planRoot, { recursive: true, force: true })
+  }
   text = `${text}${reviewed.bytes}${delivered.bytes}`
-  assert.equal(surface.readProbe(text).position, 'DeliveredIdempotent')
+  assert.equal(surface.readProbe(text).next, 'Done')
 
   const forged = `${text}${surface.encodeOpening('plan', 'work-rec-5', '/root', 40n)}`
   const conflict = surface.readProbe(forged)
-  assert.equal(conflict.position, 'Rejected')
-  assert.notEqual(conflict.position, 'DeliveredIdempotent')
-  assert.notEqual(conflict.position, 'ActiveRebound')
+  assert.equal(conflict.ok, true)
+  assert.equal(conflict.opened, true)
+  assert.equal(conflict.next, 'Continue')
+  assert.equal(conflict.activeId.length > 0, true)
 })
 
-test('WHAT[work-035] recovery effects keep DeliveredIdempotent, ActiveRebound and omit Nothing', async () => {
+test('WHAT[work-035] recovery effects keep Done, and Continue while an incumbency stays open, and a missing id stays unopened', async () => {
   const effects = []
   let delivered = climb('work-batch-deliv', 2)
   const reviewed = surface.reviewProbe(delivered, incumbencyIdOf(delivered), 'Promoted')
-  const receipt = surface.deliverStateProbe(`${delivered}${reviewed.bytes}`, 'run-b', 'call-b', 30n)
+  const planRoot = mkdtempSync(join(tmpdir(), 'wxs-work-035-effects-'))
+  let receipt
+  try {
+    const written = planning.PlanningSurface.rewritePlanAtomic(planRoot, 'work-batch-deliv', '# plan\n')
+    assert.equal(written.ok, true, written.error)
+    const selected = planning.PlanningSurface.readAndValidatePlan(planRoot, 'work-batch-deliv')
+    assert.equal(selected.ok, true, selected.error)
+    receipt = surface.deliverStateProbe(`${delivered}${reviewed.bytes}`, 'run-b', 'call-b', 30n, { digest: selected.digest, path: selected.path })
+  } finally {
+    rmSync(planRoot, { recursive: true, force: true })
+  }
   delivered = `${delivered}${reviewed.bytes}${receipt.bytes}`
   effects.push(surface.readProbe(delivered))
   effects.push(surface.readProbe(climb('work-batch-active', 2)))
   assert.equal(effects.length, 2)
-  assert.equal(effects[0].position, 'DeliveredIdempotent')
-  assert.equal(effects[1].position, 'ActiveRebound')
+  assert.equal(effects[0].next, 'Done')
+  assert.equal(effects[0].activeId, '')
+  assert.equal(effects[1].next, 'Continue')
+  assert.equal(effects[1].activeId.length > 0, true)
   assert.equal(surface.documentView(delivered).workId, 'work-batch-deliv')
   assert.equal(surface.documentView(climb('work-batch-active', 2)).workId, 'work-batch-active')
 

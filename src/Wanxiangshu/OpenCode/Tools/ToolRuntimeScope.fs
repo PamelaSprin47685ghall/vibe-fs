@@ -455,29 +455,27 @@ type ToolRuntimeScope
     /// workspace EventStore the lifecycle kernel writes.
     let activeIncumbencyOfSession (directory: string option) (sessionId: string) : string option =
         Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory directory sessionId
-        |> Option.bind (fun work -> work.Active)
-        |> Option.map (fun active -> active.Id)
+        |> Option.bind (fun work -> work.ActiveId)
 
     let managerFactsOfSession (directory: string option) (sessionId: string) : ManagerCapabilityFacts =
-        let lifecycle =
+        // The capability gate reads the wanxiangli work snapshot for this
+        // session. No phase enum crosses this boundary: an inactive work grants
+        // nothing, a recorded cleanup blocker confines to the finish window, a
+        // promoted final incumbent keeps the read/cleanup/close-out surface, and
+        // every other active fact keeps the full Manager set.
+        match
             Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory directory sessionId
-
-        match lifecycle with
+        with
         | Some work ->
-            match work.Active with
-            | None -> defaultEmptyManagerFacts
-            | Some active ->
-                let promoted =
-                    match active.Review with
-                    | Some review -> review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted
-                    | None -> false
-
+            match work.ActiveId, work.Reviewed with
+            | None, _ -> defaultEmptyManagerFacts
+            | Some _, reviewed ->
                 { HasActiveIncumbency = true
-                  HasAssessment = active.Review.IsSome
-                  HasConfirmation = active.Confirmed.IsSome
-                  IsFinalIncumbent = promoted
-                  CleanupBlockerDigest = active.CleanupBlockerDigest }
-        | _ -> defaultEmptyManagerFacts
+                  HasAssessment = reviewed
+                  HasConfirmation = work.Confirmed
+                  IsFinalIncumbent = work.ReviewOutcome = Some "Promoted"
+                  CleanupBlockerDigest = work.BlockerDigest }
+        | None -> defaultEmptyManagerFacts
 
     let devopsBindingTasks = Dictionary<string, Task<unit>>()
 

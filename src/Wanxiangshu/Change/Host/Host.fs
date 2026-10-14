@@ -148,32 +148,23 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             directory
             (SessionId.value record.ManagerSessionId)
 
-    let loopSignalOfWork (work: LifecycleWork) =
-        match work.Active, List.tryLast work.Retirements with
-        | Some _, _ -> None
-        | None, Some retirement when retirement.Outcome = Wanxiangshu.Mission.Lifecycle.RetirementOutcome.Relayed ->
-            Some ManagerLoopSignal.Continue
-        | None, Some retirement ->
-            Some(
-                ManagerLoopSignal.ExceptionalTerminal(
-                    sprintf
-                        "Retirement %s has no durable Relayed or Delivered confirmation"
-                        retirement.RetirementId
-                )
-            )
-        | None, None -> None
+    // Stopped. inspect has no retirement outcome. Absence is not Continue.
+    // Stopped. inspect has no retirement outcome. Absence is not Continue.
+    let loopSignalOfWork (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+        None
 
     let requireOpenWork (record: ManagerJobProjection) =
         lifecycleWorkOf record |> Result.requireSome "Manager session is not open"
 
-    let requireCommittedRetirement (work: LifecycleWork) =
-        List.tryLast work.Retirements
-        |> Result.requireSome "Manager loop continuation requires a committed retirement"
+    // Stopped. inspect has no retirement list or outcome.
+    let requireCommittedRetirement (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+        Error "inspect has no retirement outcome"
 
-    let activateNextIfAbsent (work: LifecycleWork) : Task<Result<string, string>> =
-        match work.Active with
-        | Some active -> Task.FromResult(Ok active.Id)
-        | None -> Task.FromResult(Error "no legal incumbency opening")
+    // Stopped. inspect has an active id, not an incumbency record, and no retirement outcome.
+    let activateNextIfAbsent (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) : Task<Result<string, string>> =
+        match work.ActiveId with
+        | Some id -> Task.FromResult(Ok id)
+        | None -> Task.FromResult(Error "inspect has no active incumbency")
 
     let requireRelayAndJob (relay: OrchestratorRelayPort option) (jobId: ManagerJobId) (relayError: string) =
         match relay, requireJobRecord jobId with
@@ -222,14 +213,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 requireRelayAndJob relayPortOpt jobId "Manager loop continuation requires a durable journal"
 
             let! work = requireOpenWork record
-            let! retirement = requireCommittedRetirement work
-
-            let! incumbent =
-                match retirement.Outcome with
-                | Wanxiangshu.Mission.Lifecycle.RetirementOutcome.Relayed
-                | Wanxiangshu.Mission.Lifecycle.RetirementOutcome.Delivered -> activateNextIfAbsent work
-
-            return IncumbencyId.create incumbent
+            let! _retirement = requireCommittedRetirement work
+            return! Error "inspect has no retirement outcome"
         }
 
     let finalizeRegisteredWorktree (agentId: string) =
@@ -270,10 +255,10 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWork
             (Wanxiangshu.Foundation.Identity.WorktreePath.value worktreePath)
             (SessionId.value managerSessionId)
-            |> Option.bind (fun work ->
-                work.Active
-                |> Option.bind (fun active -> active.Review)
-                |> Option.map (fun stamp -> stamp.Outcome, work.Authority))
+            |> Option.bind (fun _work ->
+                // Stopped. inspect has no active incumbency record.
+                // None is not reviewed and not unreviewed.
+                None)
 
     let relayPort: RelayPort =
         { CreateManagerSession = createManagerSession
@@ -439,19 +424,18 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 lock joinGate (fun () -> joinInFlight <- false)
         }
 
-    let requireActiveWorkOwnedIncumbent (work: LifecycleWork) : Result<string, string> =
-        match work.Active with
-        | None -> Error "Manager session has no active incumbent"
-        | Some active when work.Retirements |> List.exists (fun record -> record.IncumbencyId = active.Id) ->
-            Error(sprintf "Relay incumbency %s is already retired" active.Id)
-        | Some active when active.Review.IsNone ->
-            Error "Relay incumbency cannot take new charge before assessment is recorded"
-        | Some active -> Ok active.Id
+    // Stopped. inspect has an active id and a reviewed bit, but no retirement list.
+    // Absence of that list is not permission to continue.
+    let requireActiveWorkOwnedIncumbent (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) : Result<string, string> =
+        match work.ActiveId, work.Reviewed with
+        | None, _ -> Error "inspect has no active incumbency"
+        | Some _, false -> Error "Relay incumbency cannot take new charge before assessment is recorded"
+        | Some id, true -> Error(sprintf "inspect has no retirement list for incumbency %s" id)
 
     let advanceAuthorityRevision
         (relay: OrchestratorRelayPort)
         (record: ManagerJobProjection)
-        (work: LifecycleWork)
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
         (incumbent: string)
         (nextRevision: AuthorityRevision)
         (prompt: string)
@@ -481,38 +465,35 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     | Some held -> held
                     | None -> Wanxiangshu.OpenCode.WorkspaceEventStore.acquire commonDir
 
-                let workOpt =
-                    Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore
-                        store
+                match
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected
+                        commonDir
                         (SessionId.value record.ManagerSessionId)
-
-                match workOpt with
+                with
                 | None -> return! Error "lifecycle work is missing"
-                | Some work when String.IsNullOrEmpty work.Authority ->
+                | Some seen when String.IsNullOrEmpty seen.Authority ->
                     return! Error "expected advance is missing"
-                | Some work ->
-                    match
-                        Wanxiangshu.Mission.Lifecycle.LifecycleKernel.advance
-                            work
-                            (AuthorityRevision.value expectedRevision)
-                            (AuthorityRevision.value nextRevision)
-                    with
-                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return! Error reason
-                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ ->
+                | Some _seen ->
+                    let workId = SessionId.value record.ManagerSessionId
+                    let expected = AuthorityRevision.value expectedRevision
+                    let next = AuthorityRevision.value nextRevision
+                    let requestId = incumbent + ":" + expected + ":" + next
+                    let command =
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                            "Advance"
+                            [ "incumbencyId", box incumbent
+                              "expected", box expected
+                              "next", box next ]
+                    let receipt =
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute commonDir workId requestId command
+                    if receipt.Status = "Committed" || receipt.Status = "Replayed" then
                         return WorktreePath.value record.WorktreePath
-                    | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
-                        match!
-                            Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit
-                                store
-                                (SessionId.value record.ManagerSessionId)
-                                events
-                        with
-                        | Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable ->
-                            return WorktreePath.value record.WorktreePath
-                        | Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendNotAttempted ->
-                            return! Error "advance was not committed"
-                        | Wanxiangshu.Mission.Lifecycle.CommitOutcome.CommitUnknown ->
-                            return! Error "advance commit is unknown"
+                    else
+                        return!
+                            Error(
+                                "gate continuation was sent; lifecycle commit failed: "
+                                + (if receipt.Reason = "" then receipt.Status else receipt.Reason)
+                            )
         }
 
     let continueManagerJobCore
@@ -535,11 +516,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let nextRevision =
                 authorityRevisionFor record callerProviderRun callerToolCallId prompt
 
-            if work.AdvanceHistory |> List.exists (fun revision -> AuthorityRevision.create revision = nextRevision) then
-                return WorktreePath.value record.WorktreePath
-            else
-                let! incumbent = requireActiveWorkOwnedIncumbent work
-                return! advanceAuthorityRevision relay record work incumbent nextRevision prompt callerProviderRun
+            // Stopped. inspect has no advance history. Absence is not an authority match.
+            let! incumbent = requireActiveWorkOwnedIncumbent work
+            return! advanceAuthorityRevision relay record work incumbent nextRevision prompt callerProviderRun
         }
 
     let runAuthorityUpdate (jobId: ManagerJobId) (action: unit -> Task<Result<string, string>>) =

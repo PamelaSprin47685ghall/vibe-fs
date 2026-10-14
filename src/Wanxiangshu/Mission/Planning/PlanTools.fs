@@ -2,7 +2,6 @@ namespace Wanxiangshu.Mission.Planning
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Host
 open Wanxiangshu.Persistence.EventStore
 
@@ -42,7 +41,7 @@ module PlanTools =
             let digest = HostDigest.sha256Hex content
             Ok(digest, planPath)
 
-    let private readAndValidatePlan (root: string) (workId: string) : Result<string * string * string, string> =
+    let readAndValidatePlan (root: string) (workId: string) : Result<string * string * string, string> =
         match PlanPath.readPlan root workId with
         | Error err -> Error(sprintf "Cannot deliver: plan artifact is empty or missing (%s)" err)
         | Ok content when String.IsNullOrWhiteSpace content -> Error "Cannot deliver: plan artifact is empty"
@@ -65,10 +64,13 @@ module PlanTools =
     /// The one lifecycle work this session owns, read from the same workspace
     /// EventStore the plan entry writes.
     let private lifecycleWorkOf
-        (store: IEventStore)
+        (gitCommonDir: string)
         (workId: string)
-        : Wanxiangshu.Mission.Lifecycle.LifecycleWork option =
-        Wanxiangshu.Mission.Lifecycle.LifecycleKernel.tryWorkOfStore store workId
+        : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
+        if String.IsNullOrWhiteSpace gitCommonDir then
+            None
+        else
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
 
     let private commitLifecycleDeliver
         (store: IEventStore)
@@ -135,6 +137,7 @@ module PlanTools =
         }
 
     let executeDeliver
+        (gitCommonDir: string)
         (store: IEventStore)
         (root: string)
         (workId: string)
@@ -146,56 +149,122 @@ module PlanTools =
         (retirementCursor: int64)
         : Task<Result<DeliverResult, string>> =
         task {
-            match lifecycleWorkOf store workId with
-            | None -> return Error "lifecycle work is missing"
-            | Some work ->
-                match work.Active with
-                | None -> return Error "No active incumbency found for this work"
-                | Some active when active.Id <> incumbencyId ->
-                    return
-                        Error(
-                            sprintf
-                                "Active incumbency ID '%s' does not match invocation target '%s'"
-                                active.Id
-                                incumbencyId
-                        )
-                | Some _ ->
-                    let fence =
-                        { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
-                          Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
+            if String.IsNullOrWhiteSpace gitCommonDir then
+                return Error "git common directory is missing"
+            else
+                match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
+                | None -> return Error "lifecycle work is missing"
+                | Some work ->
+                    match work.ActiveId with
+                    | None -> return Error "No active incumbency found for this work"
+                    | Some active when active <> incumbencyId ->
+                        return
+                            Error(
+                                sprintf
+                                    "Active incumbency ID '%s' does not match invocation target '%s'"
+                                    active
+                                    incumbencyId
+                            )
+                    | Some _ ->
+                        let fence =
+                            { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
+                              Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
 
-                    let blockerDigest = if hasBlocker then Some "retirement-blocked" else None
+                        let blockerDigest = if hasBlocker then Some "retirement-blocked" else None
 
-                    let authorized =
-                        match Wanxiangshu.Mission.Lifecycle.LifecycleFold.folded work with
-                        | Ok folded -> folded.DeliveryAuthorized
-                        | Error _ -> false
+                        // Stopped the old fold. Delivery authorization is already on the snapshot.
+                        let authorized = work.DeliveryAuthorized
 
-                    if not authorized || hasBlocker then
-                        return! commitLifecycleDeliver store workId work fence retirementCursor blockerDigest None None
-                    else
-                        match readAndValidatePlan root workId with
-                        | Error err -> return Error err
-                        | Ok(content, digest, planPath) ->
-                            match! spawnExecutionSessionFor spawn content with
-                            | Error err -> return Error err
-                            | Ok execSessionId ->
-                                let draft: Wanxiangshu.Mission.Lifecycle.DeliverDraft =
-                                    { Missing = false
-                                      Empty = false
-                                      Digest = digest
-                                      Path = planPath }
-
-                                return!
-                                    commitLifecycleDeliver
-                                        store
-                                        workId
-                                        work
-                                        fence
-                                        retirementCursor
-                                        blockerDigest
-                                        (Some draft)
-                                        (Some execSessionId)
+                        let requestId = providerRunId + ":" + toolCallId
+                        let blockers = if hasBlocker then [| "retirement-blocked" |] else [| |]
+                        let draftFields =
+                            if hasBlocker || not authorized then
+                                []
+                            else
+                                match readAndValidatePlan root workId with
+                                | Error _ -> []
+                                | Ok(_, digest, planPath) ->
+                                    [ "draft", box {| digest = digest; path = planPath |} ]
+                        let command =
+                            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                                "Deliver"
+                                ([ "incumbencyId", box incumbencyId
+                                   "providerRunId", box providerRunId
+                                   "toolCallId", box toolCallId
+                                   "cursor", box (float retirementCursor)
+                                   "blockers", box blockers ]
+                                 @ draftFields)
+                        let receipt =
+                            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
+                        if receipt.Status = "Unknown" || receipt.Status = "NotWritten" || receipt.Status = "Conflict" then
+                            return Error(if receipt.Reason = "" then receipt.Status else receipt.Reason)
+                        elif receipt.Kind = "ReviewRequired" then
+                            return Error "assessment required"
+                        elif receipt.Status = "Committed" && receipt.Kind = "DeliveryRequested" then
+                            let operationId = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "operationId"
+                            let digest = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "digest"
+                            let path = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "path"
+                            match readAndValidatePlan root workId with
+                            | Error err ->
+                                let refused =
+                                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                                        "ResolveDelivery"
+                                        [ "operationId", box operationId
+                                          "outcome", box "NotStarted"
+                                          "reason", box err ]
+                                let _ = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId operationId refused
+                                return Error err
+                            | Ok(content, _, _) ->
+                                match! spawnExecutionSessionFor spawn content with
+                                | Error err ->
+                                    let refused =
+                                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                                            "ResolveDelivery"
+                                            [ "operationId", box operationId
+                                              "outcome", box "NotStarted"
+                                              "reason", box err ]
+                                    let _ = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId operationId refused
+                                    return Error err
+                                | Ok execSessionId ->
+                                    let accepted =
+                                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                                            "ResolveDelivery"
+                                            [ "operationId", box operationId
+                                              "outcome", box "Accepted"
+                                              "execSessionId", box execSessionId
+                                              "digest", box digest
+                                              "path", box path
+                                              "blockers", box blockers ]
+                                    let resolved =
+                                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId operationId accepted
+                                    if resolved.Status <> "Committed" && resolved.Status <> "Replayed" then
+                                        return Error(if resolved.Reason = "" then resolved.Status else resolved.Reason)
+                                    else
+                                        return
+                                            Ok
+                                                { Ok = true
+                                                  Relayed = false
+                                                  Delivered = resolved.Kind = "Delivered"
+                                                  RetiredIncumbencyId = ""
+                                                  RetirementOutcome = resolved.Kind
+                                                  Digest = digest
+                                                  Path = path
+                                                  ExecSessionId = execSessionId
+                                                  NextIncumbencyId = ""
+                                                  Message = "Plan delivered" }
+                        else
+                            return
+                                Ok
+                                    { Ok = receipt.Status = "Committed" || receipt.Status = "Replayed"
+                                      Relayed = receipt.Kind = "Relayed"
+                                      Delivered = receipt.Kind = "Delivered"
+                                      RetiredIncumbencyId = ""
+                                      RetirementOutcome = receipt.Kind
+                                      Digest = ""
+                                      Path = ""
+                                      ExecSessionId = ""
+                                      NextIncumbencyId = ""
+                                      Message = receipt.Kind }
         }
 
     // planning-010: at most one pending ask delegation per work. The tracker
@@ -212,15 +281,17 @@ module PlanTools =
     let private clearPendingAsk (workId: string) : unit =
         lock pendingAskGate (fun () -> pendingAskWorks.Remove workId |> ignore)
 
+    // Snapshot has no delivered mark. Do not treat delivery authorization as already delivered.
     let private validateAskWork
-        (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
         (intent: string)
         : Result<unit, string> =
-        match work.CurrentDelivered, work.Active, String.IsNullOrWhiteSpace intent with
-        | true, _, _ -> Error "The planning artifact has already been delivered. No further questions are permitted."
-        | false, _, true -> Error "Intent cannot be empty"
-        | false, None, _ -> Error "No active incumbency found for this work"
-        | false, Some _, false -> Ok()
+        if String.IsNullOrWhiteSpace intent then
+            Error "Intent cannot be empty"
+        elif work.ActiveId.IsNone then
+            Error "No active incumbency found for this work"
+        else
+            Ok()
 
     let private captureDelegation (delegateTo: string -> Task<string>) (intent: string) : Task<Result<string, string>> =
         task {
@@ -234,35 +305,38 @@ module PlanTools =
     // The binding is persisted single-flight after the delegation returns.
     // An already-bound work is Done and writes nothing (planning-010).
     let private ensureDevOpsBound
+        (gitCommonDir: string)
         (store: IEventStore)
         (workId: string)
-        (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
+        (incumbencyId: string)
         : Task<Result<unit, string>> =
         task {
-            match
-                Wanxiangshu.Mission.Lifecycle.LifecycleKernel.bindDevOps
-                    work
-                    Wanxiangshu.Mission.Lifecycle.BindTrigger.Ask
-                    (PlanWorkOpen.deriveDevOpsId workId)
-                    None
-            with
-            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done _ -> return Ok()
-            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
-            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, _) ->
-                match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit store workId events with
-                | Ok Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable -> return Ok()
-                | Ok _ -> return Error "Failed to bind plan DevOps: deliver was not committed"
-                | Error reason -> return Error(sprintf "Failed to bind plan DevOps: %s" reason)
+            let _ = store
+            let requestId = workId + ":bind:" + incumbencyId
+            let command =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    "BindDevOps"
+                    [ "incumbencyId", box incumbencyId
+                      "trigger", box "Ask"
+                      "devopsId", box (PlanWorkOpen.deriveDevOpsId workId)
+                      "target", null ]
+            let receipt =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
+            if receipt.Status = "Committed" || receipt.Status = "Replayed" || receipt.Status = "Observed" then
+                return Ok()
+            else
+                return Error(sprintf "Failed to bind plan DevOps: %s" (if receipt.Reason = "" then receipt.Status else receipt.Reason))
         }
 
     let private bindDevOpsAndComplete
+        (gitCommonDir: string)
         (store: IEventStore)
         (workId: string)
-        (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
+        (activeId: string)
         (record: string)
         : Task<Result<AskResult, string>> =
         task {
-            match! ensureDevOpsBound store workId work with
+            match! ensureDevOpsBound gitCommonDir store workId activeId with
             | Error err -> return Error err
             | Ok() ->
                 return
@@ -273,9 +347,10 @@ module PlanTools =
         }
 
     let private finishPendingAsk
+        (gitCommonDir: string)
         (store: IEventStore)
         (workId: string)
-        (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
+        (activeId: string)
         (delegation: Result<string, string>)
         : Task<Result<AskResult, string>> =
         task {
@@ -283,29 +358,31 @@ module PlanTools =
             | Error err -> return Error err
             | Ok record when String.IsNullOrWhiteSpace record ->
                 return Error "The DevOps delegation returned an empty work record"
-            | Ok record -> return! bindDevOpsAndComplete store workId work record
+            | Ok record -> return! bindDevOpsAndComplete gitCommonDir store workId activeId record
         }
 
     let private runPendingAsk
+        (gitCommonDir: string)
         (store: IEventStore)
         (workId: string)
-        (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
+        (activeId: string)
         (intent: string)
         (delegateTo: string -> Task<string>)
         : Task<Result<AskResult, string>> =
         task {
             try
                 let! delegation = captureDelegation delegateTo intent
-                let! completed = finishPendingAsk store workId work delegation
+                let! completed = finishPendingAsk gitCommonDir store workId activeId delegation
                 return completed
             finally
                 clearPendingAsk workId
         }
 
     let private beginPendingAsk
+        (gitCommonDir: string)
         (store: IEventStore)
         (workId: string)
-        (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
+        (activeId: string)
         (intent: string)
         (delegateTo: string -> Task<string>)
         : Task<Result<AskResult, string>> =
@@ -314,20 +391,21 @@ module PlanTools =
                 Error(sprintf "An ask delegation is already pending for this work (%s); wait for it to finish" workId)
             )
         else
-            runPendingAsk store workId work intent delegateTo
+            runPendingAsk gitCommonDir store workId activeId intent delegateTo
 
     let executeAsk
+        (gitCommonDir: string)
         (store: IEventStore)
         (workId: string)
         (intent: string)
         (delegateTo: string -> Task<string>)
         : Task<Result<AskResult, string>> =
-        match lifecycleWorkOf store workId with
+        match lifecycleWorkOf gitCommonDir workId with
         | None -> Task.FromResult(Error "lifecycle work is missing")
         | Some work ->
             match validateAskWork work intent with
             | Error err -> Task.FromResult(Error err)
-            | Ok() -> beginPendingAsk store workId work intent delegateTo
+            | Ok() -> beginPendingAsk gitCommonDir store workId (Option.defaultValue "" work.ActiveId) intent delegateTo
 
     let executeJsPlan
         (root: string)
