@@ -21,8 +21,7 @@ type ManagerJobProjection =
       WorktreePath: WorktreePath
       TargetRef: TargetRef
       TargetBranchFrozen: string
-      CandidateReady:
-          {| CandidateCommit: CommitHash |} option
+      CandidateReady: {| CandidateCommit: CommitHash |} option
       ConflictDetected:
           {| CandidateCommit: CommitHash
              TargetHeadSnapshot: CommitHash
@@ -262,8 +261,7 @@ module OrchestratorProjection =
 
     let recordCandidateReady
         (jobId: ManagerJobId)
-        (payload:
-            {| CandidateCommit: CommitHash |})
+        (payload: {| CandidateCommit: CommitHash |})
         (projection: OrchestratorProjection)
         =
         updateActiveJob

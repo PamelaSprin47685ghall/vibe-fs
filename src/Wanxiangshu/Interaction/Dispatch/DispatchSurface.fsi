@@ -10,7 +10,6 @@ open Wanxiangshu.Persistence.Journal
 /// constructors, send observations, and claim counts are plain values.
 [<RequireQualifiedAccess>]
 module DispatchSurface =
-    val closeCompletedHumanRootManager: projection: obj -> obj
     val internal sessionPort: port: obj -> ISessionHostPort
     val internal rootWorkspaceReader: directory: obj -> IRootWorkspaceReader
 

@@ -180,17 +180,17 @@ Plan 的轮换生命周期由不可变 Durable 事件驱动并投影状态。结
   3. `IncumbencyOpened(workId, incumbencyId, stage, openingCursor)`：开启新任期并标记当前阶段。
   4. `IncumbencyRetired(incumbencyId, outcome)`：标记任期退休，outcome 仅限 `Relayed` 或 `Delivered`。`Relayed` 表示接力退休（任期让位于下一任），`Delivered` 表示终态交付退休。
   5. `Reviewed(incumbencyId, stage, outcome)`：记录本任的 review 裁决，outcome 仅限 `Promoted`（晋级或授权）或 `Stayed`（留任原 stage）。
-  6. `Reopened(incumbencyId)`：把已交付的工作回滚到 active 状态（见 [037]）。
+  6. `Reopened(retirementId)`：把已交付的工作回滚到 active 状态并开启一个新任期（见 [037]）。
   同一事件的重复重放必须保持幂等。
-- 禁止后果：同一 workId 同时至多一个活跃任期（`Active`）。已退休任期列表（`Retired`）只增不减。`Reviewed` 每任至多一条；已评任期不得再次评。`Reopened` 清除投影中的 `Delivered` 并把 `Active` 恢复为该任期（沿用原 incumbencyId、原 stage 与原授权），不生成新任期；`Retired` 列表中的历史记录不删除。`Relayed` 退休的任期严禁复活；`Delivered` 退休的任期仅可经 `Reopened` 复活一次回 active。禁止在这些事实之外引入旁路状态机、内存标记或外部计数器。禁止 `AskPending` 与 `AskResolved`（该挂起协议已由 [027] 自然停止语义取代）。
-- 失败后果：遇到同一身份但载荷不同的冲突事件（含同一任期的第二条不同 `Reviewed`），或检测到不合法的状态跃迁（如重复激活、幽灵任期、无 `Delivered` 时的 `Reopened`、`Reopened` 的 incumbencyId 与退休记录不匹配），系统必须抛出 `StorageInvalid` 并关闭，严禁跳过或猜测。
+- 禁止后果：同一 workId 同时至多一个活跃任期（`Active`）。已退休任期列表（`Retired`）只增不减。`Reviewed` 每任至多一条；已评任期不得再次评。`Reopened` 清除投影中的 `Delivered`，并以同一笔追加开启一个新任期：沿用原 stage，交付授权重置为假，新 incumbencyId 由固定标记 `reopened-incumbency-v1` 确定性派生、与旧任期不同；`Retired` 列表中的历史记录不删除。`Relayed` 退休的任期严禁复活；`Delivered` 退休的任期仅可经 `Reopened` 触发一次重开，旧任期永不复活。禁止在这些事实之外引入旁路状态机、内存标记或外部计数器。禁止 `AskPending` 与 `AskResolved`（该挂起协议已由 [027] 自然停止语义取代）。
+- 失败后果：遇到同一身份但载荷不同的冲突事件（含同一任期的第二条不同 `Reviewed`），或检测到不合法的状态跃迁（如重复激活、幽灵任期、无 `Delivered` 时的 `Reopened`、`Reopened` 的 retirementId 与退休记录不匹配），系统必须抛出 `StorageInvalid` 并关闭，严禁跳过或猜测。
 
 ## [023] 阶段推进、授权与状态正交
 
 规划流程的阶段（Stage）严格单向：`S1`（事实与取舍）、`S2`（理解与路径）、`S3`（流程与伪代码）。工作状态（state）为 `active | delivered`。stage 与 state 正交。
 
 - 允许后果：阶段推进唯一由 `Reviewed(Promoted)` 驱动：`S1` 晋级到 `S2`；`S2` 晋级到 `S3`；`S3` 晋级即授权（`Authorized = true`，本任获得交付权，见 [026]）。接力（`deliver` 无权路径，见 [025]）开出的下一任沿用退休时的 stage，不推进阶段。`state` 由结果为 Delivered 的 `IncumbencyRetired` 进入 `delivered`、由 `Reopened` 回到 `active`。
-- 禁止后果：阶段严禁逆行、跳级或由 review 之外的任何事件推进（接力、交付、重开均不推进 stage）。未获授权（`Authorized = false`）的 `deliver` 严禁走终态交付路径，只能走接力。授权一旦授予，本任保持至退休；重开恢复的任期沿用原授权。
+- 禁止后果：阶段严禁逆行、跳级或由 review 之外的任何事件推进（接力、交付、重开均不推进 stage）。未获授权（`Authorized = false`）的 `deliver` 严禁走终态交付路径，只能走接力。授权一旦授予，本任保持至退休；重开出的新任期交付授权为假。
 - 失败后果：在不满足推进条件时收到 `Reviewed(Promoted)`（如对已退休任期、或 stage 越界），Fold 必须返回强类型错误，底层存储零写入。
 
 ## [024] 动作许可矩阵
@@ -338,9 +338,9 @@ Plan 机制的引入不得对既有系统角色与流程产生任何侵入或行
 
 Plan 工作的状态（state）为 `active | delivered`，由 Durable 事实驱动，与 stage（[023]）正交。
 
-- 允许后果：结果为 Delivered 的 `IncumbencyRetired` 把 state 置为 `delivered`；`Reopened` 把 state 回滚为 `active`。处于 `delivered` 的 work 收到用户新 prompt（reprompt）时，系统追加 `Reopened(incumbencyId)`（incumbencyId 取自该 work 的 `Delivered` 退休记录）：投影清除 `Delivered`，并把 `Active` 恢复为该任期——沿用原 incumbencyId、原 stage、原授权，不生成新任期、不重置阶段。恢复后模型在原任期上继续工作（可修改 `P`、可再次 `deliver`）。该任期开任时继承的上任记录范围保持不变；不能把它自己的 `Delivered` 退休记录误当成上一任期。
-- 禁止后果：严禁在无 `Delivered` 事实时追加 `Reopened`。严禁借重开推进或回退 stage、生成新任期、清除 `Reviewed` 历史或重置授权。严禁在非 reprompt 场景（如恢复、调度）自动触发重开。`Retired` 列表的历史记录严禁删除。
-- 失败后果：同一身份重放幂等；载荷或 incumbencyId 与 `Delivered` 退休记录不符时拒绝；底层存储零写入。
+- 允许后果：结果为 Delivered 的 `IncumbencyRetired` 把 state 置为 `delivered`；`Reopened` 把 state 回滚为 `active`。处于 `delivered` 的 work 收到用户新 prompt（reprompt）时，系统以同一笔追加写入 `Reopened(retirementId)`（retirementId 取自该 work 的 `Delivered` 退休记录）与新的 `IncumbencyOpened`：投影清除 `Delivered`，`Active` 转为新任期——新 incumbencyId 由固定标记 `reopened-incumbency-v1` 与 retirementId、本次请求身份确定性派生，stage 沿用重开时的 stage，交付授权重置为假；旧任期永不复活。恢复后模型在新任期上继续工作：新任期在成功调用 `review` 前重新锁定为只读，之后可修改 `P`、可再次 `deliver`。重开的新任期保持被重开任期最初开任时继承的上任记录范围；被重开任期自己的 `Delivered` 退休记录不作为新任期的上一任期。
+- 禁止后果：严禁在无 `Delivered` 事实时追加 `Reopened`。严禁借重开推进或回退 stage、复活旧任期、清除 `Reviewed` 历史或恢复旧任期的交付授权。严禁在非 reprompt 场景（如恢复、调度）自动触发重开。`Retired` 列表的历史记录严禁删除。
+- 失败后果：同一身份重放幂等；载荷或 retirementId 与 `Delivered` 退休记录不符时拒绝；底层存储零写入。
 
 ## [038] review 晋级门
 
@@ -381,3 +381,7 @@ Relayed 只注销旧 Manager 的派工与控制租约。固定 DevOps、已接�
 ## [045] 历史不代替工作区
 
 provider 上下文由剥除后留下的本任消息、用户原文与显式资源构成。工作区由调用方自行检查，projection 不转述其内容。当前动作由事实约束的资源与能力表达，不由前任摘要代替。
+
+## [046] durable 结果的观察与启动条件
+
+work host 观察 durable 执行结果时原样保留调用方传入的 requestId，replay 沿用原 id，不铸造替代。物理启动只对 committed 的 DeliveryRequested 为真；Committed 的其它 kind、Replayed、Unknown、NotWritten 与 Conflict 一律不得启动。work journal 固定位于 `<git-common-dir>/wanxiangshu/work.sqlite`，不在事件流目录内。

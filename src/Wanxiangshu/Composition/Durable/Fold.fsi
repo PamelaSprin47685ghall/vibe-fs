@@ -14,9 +14,6 @@ module Fold =
 
     val foldEnvelope: projection: ProjectionSet -> envelope: Envelope -> Result<ProjectionSet, FoldRejection>
 
-    /// A unified S4 Delivered retirement completes the manager life.
-    val settleCompletedLife: projection: ProjectionSet -> sessionId: SessionId -> ProjectionSet
-
     val isOk: result: Result<'T, 'E> -> bool
 
     val unwrap: result: Result<'T, 'E> -> 'T

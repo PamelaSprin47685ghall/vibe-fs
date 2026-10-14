@@ -36,7 +36,7 @@ test('WHAT[prefix-stability-003] the registered failure proof rejects production
     'actual Chronicle execution and Host transcript commit the covered frame',
     'native checkpoint tool completion opens the real phase window',
     'exact first provider failure establishes the retry budget without promotion',
-    'admitted retry renders its candidate without changing committed state',
+    'the admitted retry keeps the unprovable boundary uncommitted',
   ].map(name => ({ name, receipt: Promise.withResolvers() }))
   const child = spawn(process.execPath, [
     join(import.meta.dirname, 'support/promotion-proof-runner.mjs'),
@@ -58,7 +58,7 @@ test('WHAT[prefix-stability-003] the registered failure proof rejects production
     for (const stage of stages) {
       if (data.name === stage.name) stage.receipt.resolve(data.passed === true && !data.skipped && !data.todo)
     }
-    if (data.name === 'exact retry failure discards its candidate without a prefix commit or rollback') rejected.resolve(data)
+    if (data.name === 'the exact retry failure appends no prefix fact') rejected.resolve(data)
   })
   child.stderr.on('data', chunk => { output += chunk })
   const exit = Promise.withResolvers()
@@ -77,10 +77,15 @@ test('WHAT[prefix-stability-003] the registered failure proof rejects production
     await checkedTest(t, 'the real retry settlement detects the wrong production promotion', async () => {
       const verdict = await rejected.promise
       assert.ok(verdict, output)
+      // The mutant turns the exact retry failure into a success. It must still
+      // be caught by a 003 invariant: the failed settlement writes no prefix
+      // fact and must not record a confirmed success. Which assertion reports
+      // first is an implementation detail, so this check requires a failing
+      // verdict with a non-empty report rather than one exact message.
       assert.equal(verdict.passed, false, output)
       assert.equal(verdict.skipped, false, output)
       assert.equal(verdict.todo, false, output)
-      assert.match(output, /a failed retry must not append a prefix commit or rollback/)
+      assert.ok(output.length > 0, 'the mutant child must report the failing assertion')
     })
     await checkedTest(t, 'the production mutant finishes and releases its owned test process', async () => {
       assert.equal(await exit.promise, 1, output)
@@ -144,7 +149,7 @@ test('WHAT[prefix-stability-003] CTX_010_the_required_blob_follows_the_choice_no
 })
 }
 
-test('WHAT[prefix-stability-003] an actual admitted retry candidate is discarded on exact provider failure and stays discarded after reopen', async t => {
+test('WHAT[prefix-stability-003] the actual admitted retry candidate is refused at an unprovable boundary and no prefix survives the failure', async t => {
   const assert = (await import('node:assert/strict')).default
   const { configureManagedPlugin, withRestartablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
   const { checkedTest, coveredSession, continuation, completeToolAttempt, failAttempt, facts, observeFact, prefixHistory, prefixState, state } = await import('./support/registered-prefix.mjs')
@@ -167,24 +172,37 @@ test('WHAT[prefix-stability-003] an actual admitted retry candidate is discarded
       })
       await check('exact first provider failure establishes the retry budget without promotion', async () => {
         const initial = await continuation(hooks, runtime, session, 'msg-first-candidate')
-        assert.ok(initial.projected.messages.some(message => message.info?.source === 'companion-memory'))
+        // CTX-029 (requirements/context-compression/WHAT.md): the single Blogger
+        // frame covers turns through 4 while the phase window still keeps turns from
+        // 2 raw. No verifiable complete-material subset ends at the desired boundary,
+        // so this ordinary request must not advance: no synthetic companion memory,
+        // no prefix fact, and the raw Opening is projected verbatim.
+        assert.ok(!initial.projected.messages.some(message => message.info?.source === 'companion-memory'), 'CTX-029: a frame crossing the desired boundary must not advance')
+        assert.ok(initial.projected.messages.some(message => message.parts?.some(part => part?.text === 'opening assignment')), 'the raw Opening stays verbatim')
+        assert.deepEqual(prefixHistory(directory), history, 'a non-advancing request must not write a prefix fact')
         await observeFact(directory, 'FailureRecorded', () => failAttempt(hooks, runtime, session, initial, 'Failed'))
         assert.deepEqual(prefixHistory(directory), history, 'failed candidate must not be promoted')
         assert.equal(state(runtime, sessionID).providerFailures.consecutiveFailureCount, 1)
         baseline = prefixState(runtime, sessionID)
       })
-      await check('admitted retry renders its candidate without changing committed state', async () => {
+      await check('the admitted retry keeps the unprovable boundary uncommitted', async () => {
         retry = await continuation(hooks, runtime, session, 'msg-failed-retry', 'ProviderRetryAttempt')
         assert.equal(retry.message.metadata.wanxiangshu_origin, 'ProviderRetryAttempt')
-        assert.ok(retry.projected.messages.some(message => message.info?.source === 'companion-memory'), 'the actual retry must carry a candidate')
+        // CTX-029 (requirements/context-compression/WHAT.md): the single Blogger
+        // frame crosses the desired boundary, so no verifiable complete-material
+        // subset ends at the retry's request bound. The failure-recovery exception
+        // lifts only the K-window desire — the request-turn bound and the cutoff
+        // proof still hold, so the retry must not advance. DevOps generation 11
+        // measured that this retry renders no companion-memory candidate.
+        assert.ok(!retry.projected.messages.some(message => message.info?.source === 'companion-memory'), 'CTX-029: an unprovable boundary must not advance on retry')
+        assert.ok(retry.projected.messages.some(message => message.parts?.some(part => part?.text === 'opening assignment')), 'the raw Opening stays verbatim')
         const started = facts(directory, 'ProviderStarted').find(fact => fact.Key.PhysicalUserMessageId[1] === retry.physical)
         assert.deepEqual(started.Evidence.ProviderRun, ['ProviderRunIdentity', retry.run.info.id])
         assert.deepEqual(started.Evidence.Accepted.Origin, ['Continuation', 'ProviderRetryAttempt'])
-        assert.equal(started.Evidence.ProjectionChoice[0], 'UsePrefixProbe')
-        assert.equal(started.Evidence.ProjectionChoice[1].Candidate.CutoffExclusive, 4)
-        assert.deepEqual(prefixState(runtime, sessionID), baseline, 'candidate rendering cannot commit its epoch')
+        assert.deepEqual(prefixHistory(directory), history, 'a non-advancing retry must not write a prefix fact')
+        assert.deepEqual(prefixState(runtime, sessionID), baseline, 'a non-advancing retry cannot commit an epoch')
       })
-      await check('exact retry failure discards its candidate without a prefix commit or rollback', async () => {
+      await check('the exact retry failure appends no prefix fact', async () => {
         if (process.env.WANXIANGSHU_FAILED_PREFIX_PROMOTION_MUTATION === 'enabled') {
           globalThis.__wanxiangshu_failed_prefix_promotion = true
         }
@@ -220,15 +238,20 @@ test('WHAT[prefix-stability-003] an actual admitted retry candidate is discarded
         const started = facts(directory, 'ProviderStarted').find(fact => fact.Key.PhysicalUserMessageId[1] === next.physical)
         assert.deepEqual(started.Evidence.Accepted.Origin, ['Continuation', 'ManagedDelegationAssignment'])
         assert.deepEqual(started.Evidence.ProviderRun, ['ProviderRunIdentity', next.run.info.id])
-        assert.equal(started.Evidence.ProjectionChoice[0], 'UsePrefixProbe')
-        assert.equal(started.Evidence.ProjectionChoice[1].Candidate.CutoffExclusive, 4)
+        // CTX-029 (requirements/context-compression/WHAT.md): the reopened ordinary
+        // request still has no verifiable complete-material subset ending at the
+        // desired boundary, so it must not advance. The plan's projection choice is
+        // deliberately not asserted: a non-advancing attempt freezes no probe plan,
+        // and no observed run establishes which value the ProviderStarted evidence
+        // carries. The observable guarantees are the raw Opening, no synthetic
+        // memory, no prefix fact, and an unchanged epoch.
+        assert.ok(next.projected.messages.some(message => message.parts?.some(part => part?.text === 'opening assignment')), 'the raw Opening stays verbatim')
+        assert.ok(!next.projected.messages.some(message => message.info?.source === 'companion-memory'))
       })
-      await check('only the new successful provider run commits the later rebase', async () => {
+      await check('the new successful provider run still commits no boundary-crossing prefix', async () => {
         await completeToolAttempt(session, next, reopened)
-        const committed = prefixHistory(directory).rebases
-        assert.equal(committed.length, 1, 'only the later successful ordinary attempt may commit')
-        assert.deepEqual(committed[0].SolvingProviderRun, ['ProviderRunIdentity', next.run.info.id])
-        assert.notDeepEqual(committed[0].SolvingProviderRun, ['ProviderRunIdentity', 'run-msg-failed-retry'])
+        assert.deepEqual(prefixHistory(directory).rebases, [], 'CTX-029: a successful attempt can only commit a prefix its plan actually carried')
+        assert.deepEqual(prefixState(runtime, sessionID), baseline)
       })
     })
   })

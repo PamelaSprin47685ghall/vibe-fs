@@ -100,6 +100,7 @@ module LifecycleFold =
                     | None -> Error "review stage is not in the sequence"
                     | Some index ->
                         let last = index = stages.Length - 1
+
                         match review.Outcome, last, work.Sequence with
                         | ReviewOutcome.Stayed, _, _ -> Ok(review.Stage, false)
                         | ReviewOutcome.Promoted, false, _ -> Ok(stages.[index + 1], false)
@@ -141,6 +142,7 @@ module LifecycleFold =
 
     let private retire (work: LifecycleWork) (record: RetirementRecord) =
         let relayed = record.Outcome = RetirementOutcome.Relayed
+
         { work with
             Active = None
             PendingRelay = relayed
@@ -158,9 +160,14 @@ module LifecycleFold =
         | LifecycleEvent.WorkOpened(workId, _, _, _) when work.WorkId = workId -> Error "second WorkOpened"
         | LifecycleEvent.WorkOpened _ -> Error "WorkOpened workId mismatch"
         | LifecycleEvent.DevOpsBound(workId, devopsId, target) ->
-            if workId <> work.WorkId then Error "DevOpsBound workId mismatch"
-            elif work.DevOps.IsSome then Ok work
-            else Ok { work with DevOps = Some(devopsId, target) }
+            if workId <> work.WorkId then
+                Error "DevOpsBound workId mismatch"
+            elif work.DevOps.IsSome then
+                Ok work
+            else
+                Ok
+                    { work with
+                        DevOps = Some(devopsId, target) }
         | LifecycleEvent.IncumbencyOpened(workId, incumbencyId, stage, openingCursor) ->
             if workId <> work.WorkId then
                 Error "IncumbencyOpened workId mismatch"
@@ -200,7 +207,12 @@ module LifecycleFold =
         | LifecycleEvent.ConfirmationCommitted(incumbencyId, providerRunId, toolCallId) ->
             match work.Active with
             | Some active when active.Id = incumbencyId && active.Confirmed.IsNone ->
-                Ok { work with Active = Some { active with Confirmed = Some(providerRunId, toolCallId) } }
+                Ok
+                    { work with
+                        Active =
+                            Some
+                                { active with
+                                    Confirmed = Some(providerRunId, toolCallId) } }
             | Some active when active.Id = incumbencyId -> Ok work
             | _ -> Error "confirmation without this active incumbency"
         | LifecycleEvent.IncumbencyRetiredOneshot retired ->
@@ -247,7 +259,10 @@ module LifecycleFold =
                 else
                     Ok
                         { work with
-                            Active = Some { active with Review = Some { Stage = stage; Outcome = outcome } } }
+                            Active =
+                                Some
+                                    { active with
+                                        Review = Some { Stage = stage; Outcome = outcome } } }
             | Some active when
                 active.Id = incumbencyId
                 && active.Review = Some { Stage = stage; Outcome = outcome }
@@ -291,7 +306,12 @@ module LifecycleFold =
         | LifecycleEvent.RetirementBlocked(incumbencyId, blockerDigest) ->
             match work.Active with
             | Some active when active.Id = incumbencyId ->
-                Ok { work with Active = Some { active with CleanupBlockerDigest = Some blockerDigest } }
+                Ok
+                    { work with
+                        Active =
+                            Some
+                                { active with
+                                    CleanupBlockerDigest = Some blockerDigest } }
             | _ -> Error "blocked retirement without this active incumbency"
 
     let applyAll (events: LifecycleEvent list) : Result<LifecycleWork, string> =
@@ -327,20 +347,22 @@ module LifecycleFold =
             Ok(RecoveryPosition.Conflict, RecoveryNext.StopConflict)
         elif work.CurrentDelivered && work.Active.IsNone then
             match work.Sequence, work.DeliveredRecord with
-            | WorkSequence.Plan, Some record
-                when record.Outcome = RetirementOutcome.Delivered
-                     && record.RetirementCursor.IsSome
-                     && record.ExpectedAdvance <> ""
-                     && record.ExecSessionId.IsSome
-                     && record.Digest.IsSome
-                     && record.Path.IsSome
-                     && record.ProjectionCut.IsNone ->
+            | WorkSequence.Plan, Some record when
+                record.Outcome = RetirementOutcome.Delivered
+                && record.RetirementCursor.IsSome
+                && record.ExpectedAdvance <> ""
+                && record.ExecSessionId.IsSome
+                && record.Digest.IsSome
+                && record.Path.IsSome
+                && record.ProjectionCut.IsNone
+                ->
                 Ok(RecoveryPosition.DeliveredIdempotent, RecoveryNext.StopDelivered)
-            | WorkSequence.Execution, Some record
-                when record.Outcome = RetirementOutcome.Delivered
-                     && record.ProjectionCut.IsSome
-                     && record.ExpectedAdvance <> ""
-                     && record.RetirementCursor.IsNone ->
+            | WorkSequence.Execution, Some record when
+                record.Outcome = RetirementOutcome.Delivered
+                && record.ProjectionCut.IsSome
+                && record.ExpectedAdvance <> ""
+                && record.RetirementCursor.IsNone
+                ->
                 Ok(RecoveryPosition.DeliveredIdempotent, RecoveryNext.StopDelivered)
             | _ -> Ok(RecoveryPosition.Conflict, RecoveryNext.StopConflict)
         elif work.Active.IsSome then
@@ -348,12 +370,10 @@ module LifecycleFold =
             | Error _ -> Ok(RecoveryPosition.Conflict, RecoveryNext.StopConflict)
             | Ok _ ->
                 match work.Sequence, work.CurrentRelayed, work.Active with
-                | WorkSequence.Plan, _, _ ->
-                    Ok(RecoveryPosition.ActiveRebound, RecoveryNext.WaitForUserPrompt)
+                | WorkSequence.Plan, _, _ -> Ok(RecoveryPosition.ActiveRebound, RecoveryNext.WaitForUserPrompt)
                 | WorkSequence.Execution, true, Some active when active.Review.IsNone ->
                     Ok(RecoveryPosition.ActiveRebound, RecoveryNext.EnterSuccessorPrompt)
-                | WorkSequence.Execution, _, _ ->
-                    Ok(RecoveryPosition.ActiveRebound, RecoveryNext.EnterDispatch)
+                | WorkSequence.Execution, _, _ -> Ok(RecoveryPosition.ActiveRebound, RecoveryNext.EnterDispatch)
         elif not work.CurrentRelayed then
             Ok(RecoveryPosition.Nothing, RecoveryNext.StopNothing)
         else

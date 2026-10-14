@@ -9,7 +9,6 @@ import * as Projection from '../../../dist/Participant/Provider/Projection/Surfa
 import * as Journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as Enforcer from '../../../dist/Enforcer/Surface.js'
 import * as Dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
-import * as Trace from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 import { acceptAuthorityRoot, awaitPrompted, configureManagedPlugin, withRestartablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const sha256 = (text) => createHash('sha256').update(text, 'utf8').digest('hex')
@@ -87,7 +86,7 @@ let fixtureOrdinal = 0
 const productionDigest = async (callId, path) => {
   fixtureOrdinal += 1
   const sessionID = `ses-production-prefix-digest-${fixtureOrdinal}`
-  let committed
+  let observationDigest
   let expectedPrefix
   const record = async (hooks, directory, host, journalRuntime) => {
     const runtime = { ...journalRuntime, ...host }
@@ -161,6 +160,8 @@ const productionDigest = async (callId, path) => {
       { role: 'user', parts: [{ kind: 'text', text: 'continue current work' }] },
     ])
     assert.equal(observation[0].NextCoveredPrefixDigest, sha256(Projection.renderSemantic(expectedPrefix)))
+    assert.notEqual(observation[0].NextCoveredPrefixDigest, sha256(Projection.renderSemantic({ ...expectedPrefix, messages: expectedPrefix.messages.slice(0, 3) })))
+    observationDigest = observation[0].NextCoveredPrefixDigest
     const checkpointInput = { tool: 'todowrite', sessionID, callID: 'call-prefix-checkpoint' }
     const checkpointOutput = { args: { todos: [] } }
     await hooks['tool.execute.before'](checkpointInput, checkpointOutput)
@@ -188,7 +189,11 @@ const productionDigest = async (callId, path) => {
     runtime.pushHostMessage(sessionID, solvingRun)
     const tentative = { messages: structuredClone(messages) }
     await hooks['experimental.chat.messages.transform']({ sessionID }, tentative)
-    assert.ok(tentative.messages.some(message => message.info?.source === 'companion-memory'), 'production Wire must admit the proven prefix')
+    // CTX-029 (requirements/context-compression/WHAT.md): the single Blogger frame
+    // covers turns through 4 while the phase window still keeps turns from 2 raw.
+    // No verifiable complete-material subset ends at the desired boundary, so the
+    // ordinary request must not advance and no synthetic memory may appear.
+    assert.ok(!tentative.messages.some(message => message.info?.source === 'companion-memory'), 'CTX-029: a frame crossing the desired boundary must not advance')
     solvingRun.info.finish = 'tool-calls'
     solvingRun.info.time.completed = 9
     solvingRun.parts = [{ type: 'tool-call', tool: 'read', callID: 'call-prefix-tail', args: { path: 'tail' } }]
@@ -203,11 +208,7 @@ const productionDigest = async (callId, path) => {
     })
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: structuredClone(messages) })
     const rebases = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
-    assert.equal(rebases.length, 1)
-    assert.equal(rebases[0].CutoffExclusive, 4)
-    assert.equal(rebases[0].CoveredPrefixDigest, sha256(Projection.renderSemantic(expectedPrefix)))
-    assert.notEqual(rebases[0].CoveredPrefixDigest, sha256(Projection.renderSemantic({ ...expectedPrefix, messages: expectedPrefix.messages.slice(0, 3) })))
-    committed = rebases[0]
+    assert.equal(rebases.length, 0, 'CTX-029: a boundary-crossing prefix must stay uncommitted')
   }
   await withRestartablePlugin(async (start, directory, host) => {
     const hooks = await start()
@@ -218,14 +219,14 @@ const productionDigest = async (callId, path) => {
     await configureManagedPlugin(reopened)
     await host.withRuntime(async (runtime) => {
       const state = Journal.JournalSurface_snapshot(runtime.journal).sessionProjections[sessionID]
-      assert.deepEqual(state.prefixEpoch, { epochId: 1n, snapshotPresent: true })
-      const projection = await Trace.currentProjection(runtime.journal, sessionID)
-      assert.equal(sha256(Projection.renderSemantic({ ...projection, messages: projection.messages.slice(0, committed.CutoffExclusive) })), committed.CoveredPrefixDigest)
+      assert.equal(state.prefixEpoch ?? null, null, 'CTX-029: no committed epoch may exist without a promotable probe')
       const rebases = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
-      assert.deepEqual(rebases, [committed])
+      assert.deepEqual(rebases, [], 'CTX-029: reopening must not resurrect an uncommitted boundary-crossing prefix')
+      const replayed = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'BlogObservationCommitted')).filter(Boolean)
+      assert.equal(replayed[0].NextCoveredPrefixDigest, observationDigest, 'the durable coverage digest survives reopen unchanged')
     })
   })
-  return committed.CoveredPrefixDigest
+  return observationDigest
 }
 
 test('WHAT[provider-projection-011] registered production transforms persist and replay the exact semantic prefix digest', async () => {
@@ -240,21 +241,26 @@ test('WHAT[provider-projection-011] real argument changes alter the durable prod
   assert.notEqual(first, changed)
 })
 
-for (const mutation of ['hash', 'cutoff']) {
-  test(`WHAT[provider-projection-011] the registered production proof detects an incorrect ${mutation} wiring`, async () => {
-    const run = promisify(execFile)
-    const env = { ...process.env, WANXIANGSHU_PREFIX_DIGEST_MUTATION: mutation }
-    delete env.NODE_TEST_CONTEXT
-    await assert.rejects(
-      () => run(process.execPath, [
-        '--experimental-loader', join(import.meta.dirname, 'support/prefix-digest-mutation-loader.mjs'),
-        '--test', '--test-name-pattern', 'registered production transforms persist and replay', import.meta.filename,
-      ], { env }),
-      error => {
-        assert.equal(error.code, 1)
-        assert.match(error.stdout, /production Wire must admit the proven prefix/)
-        return true
-      },
-    )
-  })
-}
+test('WHAT[provider-projection-011] the registered production proof detects a boundary-crossing prefix promotion', async () => {
+  // CTX-029 (requirements/context-compression/WHAT.md): a frame that crosses the
+  // desired boundary must not advance. The earlier digest-wiring mutants produced
+  // the same non-advance outcome as the correct behaviour, so they could no longer
+  // form a counterexample. This mutation reintroduces the opposite defect: it takes
+  // the frozen material subset past the phase boundary and disables the boundary
+  // refusals. The production test's own non-advance assertion must then go red and
+  // report the violation.
+  const run = promisify(execFile)
+  const env = { ...process.env, WANXIANGSHU_PREFIX_DIGEST_MUTATION: 'crossing' }
+  delete env.NODE_TEST_CONTEXT
+  await assert.rejects(
+    () => run(process.execPath, [
+      '--experimental-loader', join(import.meta.dirname, 'support/prefix-digest-mutation-loader.mjs'),
+      '--test', '--test-name-pattern', 'registered production transforms persist and replay', import.meta.filename,
+    ], { env }),
+    error => {
+      assert.equal(error.code, 1)
+      assert.match(error.stdout, /CTX-029: a frame crossing the desired boundary must not advance/)
+      return true
+    },
+  )
+})

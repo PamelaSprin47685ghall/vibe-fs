@@ -31,4 +31,5 @@ module ToolRegistrySurface =
     val jsPlanDescription: language: string -> string
 
     /// The existing tool-name lookup. Role decides a shared verb; catalog order does not.
-    val permissionOfToolName: role: Wanxiangshu.Foundation.Role -> name: string -> Wanxiangshu.Foundation.ToolPermission option
+    val permissionOfToolName:
+        role: Wanxiangshu.Foundation.Role -> name: string -> Wanxiangshu.Foundation.ToolPermission option

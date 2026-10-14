@@ -245,9 +245,12 @@ module PluginHostWiring =
                         workspaceDirectory
                         (SessionId.value sessionId)
 
-                // Stopped. inspect has no retirement list. A missing list is not an empty list.
-                let _ = workOpt
-                false && activeRoot.IsNone
+                // Delivered closes the work: the final retirement left no
+                // active tenure to continue. A missing list is not an empty
+                // list, so an open work is never terminated here.
+                match workOpt with
+                | Some work -> work.Delivered && activeRoot.IsNone
+                | None -> false
 
             match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) (Some isLifecycleTerminated) with
             | Error err -> return raise (InvalidOperationException err)

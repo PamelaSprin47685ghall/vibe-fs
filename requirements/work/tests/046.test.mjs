@@ -16,7 +16,7 @@ const open = (work, requestId) =>
     openingCursor: 7,
   })
 
-test('WHAT[work-010] durable result keeps the caller requestId and only a committed DeliveryRequested may start', () => {
+test('WHAT[work-046] durable result keeps the caller requestId and only a committed DeliveryRequested may start', () => {
   const database = new DatabaseSync(':memory:')
   const journal = new SqliteJournal(database)
   const work = new DurableWork('work-1', journal)

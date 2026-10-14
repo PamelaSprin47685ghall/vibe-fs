@@ -123,12 +123,12 @@ module PluginHooks =
             // session's active plan incumbency. Non-plan sessions, missing
             // stores and delivered works resolve None and append nothing, so
             // the non-plan system prompt path stays byte-identical.
-            let stagePathOf (stage: Wanxiangshu.Mission.Lifecycle.StageElement) : string option =
-                match stage with
-                | Wanxiangshu.Mission.Lifecycle.StageElement.S1 -> Some "planning/s1"
-                | Wanxiangshu.Mission.Lifecycle.StageElement.S2 -> Some "planning/s2"
-                | Wanxiangshu.Mission.Lifecycle.StageElement.S3 -> Some "planning/s3"
-                | Wanxiangshu.Mission.Lifecycle.StageElement.S4 -> None
+            let stagePathFor (stage: string) (activeId: string option) : string option =
+                match stage, activeId with
+                | "S1", Some _ -> Some "planning/s1"
+                | "S2", Some _ -> Some "planning/s2"
+                | "S3", Some _ -> Some "planning/s3"
+                | _ -> None
 
             let planStageFor (sessionId: SessionId) : string option =
                 match roleFor sessionId with
@@ -136,19 +136,7 @@ module PluginHooks =
                     Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory
                         workspaceDirectory
                         (SessionId.value sessionId)
-                    |> Option.bind (fun work ->
-                        match work.Stage, work.ActiveId with
-                        | "S1", Some _
-                        | "S2", Some _
-                        | "S3", Some _ ->
-                            stagePathOf (
-                                match work.Stage with
-                                | "S1" -> Wanxiangshu.Mission.Lifecycle.StageElement.S1
-                                | "S2" -> Wanxiangshu.Mission.Lifecycle.StageElement.S2
-                                | "S3" -> Wanxiangshu.Mission.Lifecycle.StageElement.S3
-                                | _ -> Wanxiangshu.Mission.Lifecycle.StageElement.S1
-                            )
-                        | _ -> None)
+                    |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)
                 | _ -> None
 
             let systemTransform =
@@ -337,15 +325,18 @@ module PluginHooks =
                 if readonlyDelegationPredictorConfigured () then
                     ReadonlyDelegationContract.decorateDefinition toolInput toolOutput
 
-            let isReviewPermitted toolName (facts: ManagerCapabilityFacts) =
-                if toolName = "js-manager" && facts.HasActiveIncumbency then
-                    OfficeCapability.isAllowedForManagerFacts facts ToolPermission.Read
-                else
+            let reviewToolPermitted toolName (facts: ManagerCapabilityFacts) =
                 match ManagerReviewTools.requiredPermissions toolName with
                 | Some required ->
                     let allowed = OfficeCapability.permissionsForManagerFacts facts
                     Set.isSubset required allowed && not (Set.isEmpty allowed)
                 | None -> false
+
+            let isReviewPermitted toolName (facts: ManagerCapabilityFacts) =
+                if toolName = "js-manager" && facts.HasActiveIncumbency then
+                    OfficeCapability.isAllowedForManagerFacts facts ToolPermission.Read
+                else
+                    reviewToolPermitted toolName facts
 
             let assertReviewPermitted toolName sessionId =
                 let facts = getManagerCapabilityFacts sessionId

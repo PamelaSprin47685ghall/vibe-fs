@@ -865,8 +865,7 @@ module TemporalSurface =
         (current :?> ProviderFailureHandle).State |> providerFailureToJs
 
     let sessionReuseIdentityScenario (firstAccepted: obj) (secondAccepted: obj) : obj =
-        let accept (current: ProjectionSet) (fact: obj) =
-            Fold.foldFact current (factOfJs fact)
+        let accept (current: ProjectionSet) (fact: obj) = Fold.foldFact current (factOfJs fact)
 
         let closeFirst (current: ProjectionSet) (fact: obj) =
             let sessionId = sessionIdOf (fact?payload?SessionId)

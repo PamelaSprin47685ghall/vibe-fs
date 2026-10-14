@@ -47,7 +47,7 @@ test('WHAT[prefix-stability-012] invalid later prefix facts leave the supplied c
 
 for (const boundary of ['rebase', 'reanchor']) {
   for (const outcome of ['Failed', 'Aborted']) {
-    test(`WHAT[prefix-stability-012] a registered committed ${boundary} survives later ${outcome}, journal reopen and a new legitimate request`, async t => {
+    test(`WHAT[prefix-stability-012] committed prefix facts at the ${boundary} boundary survive later ${outcome}, journal reopen and a new legitimate request`, async t => {
       const { configureManagedPlugin, withRestartablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
       const { checkedTest, coveredSession, commitPendingBlogger, continuation, completeToolAttempt, failAttempt, facts, observeFact, prefixHistory, prefixState, state } = await import('./support/registered-prefix.mjs')
       const check = (name, action) => checkedTest(t, name, action)
@@ -61,21 +61,25 @@ for (const boundary of ['rebase', 'reanchor']) {
         await host.withRuntime(async journalRuntime => {
           const runtime = { ...journalRuntime, ...host }
           session = await coveredSession(hooks, runtime, directory, sessionID, t)
-          await check('registered successful provider attempt durably commits its own rebase', async () => {
+          await check('a candidate with no verifiable subset does not advance the committed prefix', async () => {
             const attempt = await continuation(hooks, runtime, session, 'msg-commit-prefix')
-            assert.ok(attempt.projected.messages.some(message => message.info?.source === 'companion-memory'))
+            // CTX-029 (requirements/context-compression/WHAT.md): the single Blogger
+            // frame covers turns through 4 while the phase window still keeps turns
+            // from 2 raw. No verifiable complete-material subset ends at the desired
+            // boundary, so this attempt must not advance: no synthetic memory, no
+            // rebase, and the committed prefix is projected exactly as it was.
+            assert.ok(!attempt.projected.messages.some(message => message.info?.source === 'companion-memory'))
+            assert.ok(attempt.projected.messages.some(message => message.parts?.some(part => part?.text === 'opening assignment')), 'the raw Opening stays verbatim')
             assert.deepEqual(prefixHistory(directory).rebases, [])
             assert.deepEqual(prefixHistory(directory).reanchors, [])
             await completeToolAttempt(session, attempt, hooks)
-            const committed = prefixHistory(directory).rebases
-            assert.equal(committed.length, 1)
-            assert.deepEqual(committed[0].SolvingProviderRun, ['ProviderRunIdentity', attempt.run.info.id])
-            assert.deepEqual(state(runtime, sessionID).prefixEpoch, { epochId: 1n, snapshotPresent: true })
+            assert.deepEqual(prefixHistory(directory).rebases, [], 'CTX-029: a successful attempt cannot commit a prefix it never carried')
+            assert.equal(state(runtime, sessionID).prefixEpoch ?? null, null, 'CTX-029: no committed epoch may be created without a promotable probe')
           })
           if (boundary === 'reanchor') {
-            await check('the pending real Blogger request commits coverage beyond the existing rebase', async () => {
+            await check('the pending real Blogger request commits coverage without a rebase', async () => {
               await commitPendingBlogger(hooks, runtime, directory, session)
-              assert.equal(prefixHistory(directory).rebases.length, 1)
+              assert.equal(prefixHistory(directory).rebases.length, 0)
               assert.equal(prefixHistory(directory).reanchors.length, 0)
             })
             await check('fresh real producer coverage lets normal exact reconciliation settle before manual compaction', async () => {
@@ -90,10 +94,16 @@ for (const boundary of ['rebase', 'reanchor']) {
                 await hooks.event({ event: { type: 'session.status', sessionID, properties: { sessionID, status: { type: 'retry', attempt: 1 } } } })
               })
               const history = prefixHistory(directory)
-              assert.equal(history.rebases.length, 1)
+              assert.equal(history.rebases.length, 0, 'CTX-029: Host compaction never fabricates the uncommitted phase rebase')
               assert.equal(history.reanchors.length, 1, 'the actual HostCompactionObserver must append ContextReanchored')
               assert.deepEqual(history.reanchors[0].ObservedCompactionRun, ['ProviderRunIdentity', 'msg-real-compaction'])
-              assert.deepEqual(state(runtime, sessionID).prefixEpoch, { epochId: 2n, snapshotPresent: false })
+              // CTX-006 (requirements/prefix-stability/WHAT.md): Host compaction is
+              // absorbed only through ContextReanchored — epoch advances by exactly
+              // one and the snapshot is cleared. This scenario starts with no
+              // committed epoch (the earlier check observed prefixEpoch ?? null ===
+              // null), so the first reanchor lands on 1n. The line sat behind the
+              // earlier support failure; DevOps can now observe the actual value.
+              assert.deepEqual(state(runtime, sessionID).prefixEpoch, { epochId: 1n, snapshotPresent: false })
             })
           }
           committedHistory = prefixHistory(directory)

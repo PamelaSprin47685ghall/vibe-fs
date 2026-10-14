@@ -20,9 +20,7 @@ type ManagerJobProjection =
       WorktreePath: WorktreePath
       TargetRef: TargetRef
       TargetBranchFrozen: string
-      CandidateReady:
-          {| CandidateCommit: CommitHash
-             |} option
+      CandidateReady: {| CandidateCommit: CommitHash |} option
       ConflictDetected:
           {| CandidateCommit: CommitHash
              TargetHeadSnapshot: CommitHash
@@ -123,10 +121,7 @@ module OrchestratorProjection =
             OrchestratorProjection
 
     val recordCandidateReady:
-        ManagerJobId ->
-        {| CandidateCommit: CommitHash |} ->
-        OrchestratorProjection ->
-            OrchestratorProjection
+        ManagerJobId -> {| CandidateCommit: CommitHash |} -> OrchestratorProjection -> OrchestratorProjection
 
     val recordConflictDetected:
         ManagerJobId ->

@@ -65,11 +65,11 @@ text
 
 跑正式门禁入口。
 
-    node --test requirements/structured-workflow/tests/fsharp-control-pyramid.test.mjs
+    node --test requirements/structured-workflow/tests/004.test.mjs
 
 只跑扫描器合同。
 
-    node --test requirements/structured-workflow/tests/error-handling-vocabulary.test.mjs
+    node --test requirements/structured-workflow/tests/019.test.mjs
 
 只跑先修 vocabulary 合同。
 

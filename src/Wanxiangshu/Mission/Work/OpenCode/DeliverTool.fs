@@ -59,17 +59,23 @@ module DeliverTool =
 
     /// The one lifecycle work this session owns, read from the same workspace
     /// EventStore the kernel writes.
-    let private lifecycleWorkOf (directory: string) (sessionId: string) : (IEventStore * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) option =
+    let private lifecycleWorkOf
+        (directory: string)
+        (sessionId: string)
+        : (IEventStore * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) option =
         let commonDir = RuntimePath.gitCommonDir directory
 
-        if String.IsNullOrWhiteSpace commonDir then
-            None
-        else
-            match WorkspaceEventStore.tryCurrent commonDir with
-            | None -> None
-            | Some held ->
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
-                |> Option.map (fun seen -> held, seen)
+        let held =
+            if String.IsNullOrWhiteSpace commonDir then
+                None
+            else
+                WorkspaceEventStore.tryCurrent commonDir
+
+        match held with
+        | None -> None
+        | Some held ->
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
+            |> Option.map (fun seen -> held, seen)
 
     let private deterministicId prefix payload create =
         HostDigest.sha256Hex (prefix + "\n" + payload)
@@ -100,12 +106,33 @@ module DeliverTool =
         | Some value -> Ok value
         | None -> Error error
 
-    /// The second deliver writes the retirement cursor from the XTrace head of
-    /// the exchange that owns this call. A head already on the journal is used
-    /// as-is. Otherwise the owning assistant/tool exchange is captured, the
-    /// same observation the one-shot path makes, and its new head is read.
-    /// A missing snapshot or owning message is not a guessed cursor: None
-    /// leaves the kernel refusal unchanged.
+    /// The second deliver writes the retirement cursor from the XTrace head
+    /// observed on the Host snapshot. A head already on the journal is used
+    /// as-is; otherwise the snapshot messages are captured through the real
+    /// XTrace path and the receipt's current head is read. The capture is
+    /// append-only and idempotent, so a message already observed adds nothing.
+    /// A missing snapshot is not a guessed cursor: None leaves the kernel
+    /// refusal unchanged.
+    let private captureObservedCursor
+        (journal: AgentJournal)
+        (sessionId: SessionId)
+        (snapshotPort: ISessionSnapshotPort)
+        : Task<int64 option> =
+        task {
+            let! messagesResult = snapshotPort.GetMessages sessionId
+
+            match messagesResult with
+            | Error _ -> return None
+            | Ok messages ->
+                let! captured =
+                    XTraceCapture.captureSessionMessagesWithReceipt (Some journal) sessionId messages
+
+                return
+                    captured
+                    |> Result.toOption
+                    |> Option.map (fun receipt -> XTraceCursor.sequence receipt.CurrentHead)
+        }
+
     let private observedRetirementCursor (scope: ToolRuntimeScope) (context: HostToolContext) (journal: AgentJournal) =
         let headOf projections =
             AgentProjection.tryFind (SessionId.create context.SessionId) projections
@@ -114,44 +141,11 @@ module DeliverTool =
 
         let current = headOf (AgentJournal.snapshot journal).AgentProjections
 
-        match current, scope.Snapshot, context.ProviderRunId, context.ToolCallId with
-        | Some cursor, _, _, _ -> Task.FromResult(Some cursor)
-        | None, None, _, _
-        | None, _, None, _
-        | None, _, _, None -> Task.FromResult None
-        | None, Some snapshotPort, Some providerRun, Some toolCall ->
-            task {
-                let sessionId = SessionId.create context.SessionId
-                let owningMessageId = ProviderRunIdentity.value providerRun
-                let owningCallId = ToolCallId.value toolCall
-
-                match! snapshotPort.GetMessages sessionId with
-                | Error _ -> return None
-                | Ok messages ->
-                    match
-                        messages
-                        |> List.tryFindIndex (fun (message: SessionMessage) ->
-                            message.Id = owningMessageId && message.Role = "assistant")
-                    with
-                    | None -> return None
-                    | Some index ->
-                        let ownsCall =
-                            messages.[index].ToolParts
-                            |> Array.exists (fun part ->
-                                ToolCallId.value part.ToolCallId = owningCallId && part.ToolName = "deliver")
-
-                        if not ownsCall then
-                            return None
-                        else
-                            match!
-                                XTraceCapture.captureSessionMessagesWithReceipt
-                                    (Some journal)
-                                    sessionId
-                                    messages.[0..index]
-                            with
-                            | Error _ -> return None
-                            | Ok _ -> return headOf (AgentJournal.snapshot journal).AgentProjections
-            }
+        match current, scope.Snapshot with
+        | Some cursor, _ -> Task.FromResult(Some cursor)
+        | None, None -> Task.FromResult None
+        | None, Some snapshotPort ->
+            captureObservedCursor journal (SessionId.create context.SessionId) snapshotPort
 
     type private BoundRetirement =
         { ToolCallId: ToolCallId
@@ -187,21 +181,19 @@ module DeliverTool =
         | Some _, _, _, _, _, _ -> Error(text Path.NonManagerRole)
         | None, _, _, _, _, _ -> Error(text Path.NoAuthority)
 
-    let private prepareTarget
-        (context: HostToolContext)
-        (bound: BoundRetirement)
-        : Result<PreparedRetirement, string> =
-        match lifecycleWorkOf bound.Directory context.SessionId with
+    let private prepareTarget (context: HostToolContext) (bound: BoundRetirement) : Result<PreparedRetirement, string> =
+        let located =
+            lifecycleWorkOf bound.Directory context.SessionId
+            |> Option.bind (fun (_, work) -> work.ActiveId |> Option.map (fun active -> work, active))
+
+        match located with
         | None -> Error(text Path.BindingUnavailable)
-        | Some(_, work) ->
-            match work.ActiveId with
-            | None -> Error(text Path.BindingUnavailable)
-            | Some active ->
-                Ok
-                    { Bound = bound
-                      SessionId = SessionId.create context.SessionId
-                      Incumbent = active
-                      Reviewed = work.Reviewed }
+        | Some(work, active) ->
+            Ok
+                { Bound = bound
+                  SessionId = SessionId.create context.SessionId
+                  Incumbent = active
+                  Reviewed = work.Reviewed }
 
     let private confirmationResult (prepared: PreparedRetirement) pending =
         let deferred =
@@ -272,6 +264,10 @@ module DeliverTool =
         else
             runBlocked prepared blockers
 
+    /// The confirmed path of the two-stage deliver. The committed confirmation
+    /// fence names the run and call that confirmed; this call either replays
+    /// that exact confirmation to its recorded state, or is the different call
+    /// that closes out.
     let private runConfirmed
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
@@ -281,16 +277,116 @@ module DeliverTool =
         providerRunId
         confirmFirst
         =
-        let confirmed =
+        let confirmedReplay =
             WorkspaceEventStore.tryLifecycleWorkOfDirectory scope.WorkspaceDirectory context.SessionId
-            |> Option.map (fun work -> work.Confirmed)
+            |> Option.bind (fun work -> work.Confirmation)
+            |> Option.exists (fun fence -> fence.ProviderRunId = providerRunId && fence.ToolCallId = toolCallId)
 
-        match confirmed with
-        | None
-        | Some false -> confirmFirst ()
-        | Some true ->
-            // Stopped. inspect has a confirmed bit and no confirmation run or call identity.
-            Task.FromResult(Error "inspect has no confirmation run or call identity")
+        if confirmedReplay then
+            scope.UnfreezeRetirement context.SessionId
+            Task.FromResult(Ok(confirmationResult prepared pending))
+        else
+            confirmFirst ()
+
+    let private deliverFrozenCursor
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (prepared: PreparedRetirement)
+        (pending: (string * string) list)
+        (providerRunId: string)
+        (toolCallId: string)
+        (journalDir: string)
+        (cursor: int64)
+        : Task<Result<string, string>> =
+        let blockers = scope.RetirementBlockersFor context.SessionId
+        let requestId = providerRunId + ":" + toolCallId
+
+        let command =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                "Deliver"
+                [ "incumbencyId", box prepared.Incumbent
+                  "providerRunId", box providerRunId
+                  "toolCallId", box toolCallId
+                  "cursor", box (float cursor)
+                  "blockers", box (List.toArray blockers)
+                  "nextOwnerId", box context.SessionId ]
+
+        let receipt =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute journalDir context.SessionId requestId command
+
+        let durableOutcome =
+            receipt.Status = "Committed"
+            || receipt.Status = "Replayed"
+            || receipt.Status = "Observed"
+
+        if
+            receipt.Status = "Unknown"
+            || receipt.Status = "NotWritten"
+            || receipt.Status = "Conflict"
+        then
+            Task.FromResult(
+                Error(
+                    if receipt.Reason = "" then
+                        receipt.Status
+                    else
+                        receipt.Reason
+                )
+            )
+        elif receipt.Kind = "ReviewRequired" then
+            Task.FromResult(Error "assessment required")
+        elif durableOutcome then
+            scope.UnfreezeRetirement context.SessionId
+
+            Task.FromResult(
+                Ok(
+                    if receipt.Kind = "Confirmed" then
+                        confirmationResult prepared pending
+                    else
+                        text Path.Retired
+                )
+            )
+        else
+            Task.FromResult(
+                Error(
+                    if receipt.Reason = "" then
+                        receipt.Status
+                    else
+                        receipt.Reason
+                )
+            )
+
+    let private observeFrozenCursor
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (prepared: PreparedRetirement)
+        (pending: (string * string) list)
+        (providerRunId: string)
+        (toolCallId: string)
+        (journalDir: string)
+        : Task<Result<string, string>> =
+        task {
+            let! observedHead = observedRetirementCursor scope context prepared.Bound.Journal
+
+            match observedHead with
+            | None -> return Error "retirement cursor was not observed"
+            | Some cursor ->
+                return! deliverFrozenCursor scope context prepared pending providerRunId toolCallId journalDir cursor
+        }
+
+    let private runFrozenDeliver
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (prepared: PreparedRetirement)
+        (pending: (string * string) list)
+        (providerRunId: string)
+        (toolCallId: string)
+        (journalDir: string)
+        : Task<Result<string, string>> =
+        task {
+            match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected journalDir context.SessionId with
+            | None -> return Error "lifecycle work is missing"
+            | Some _ -> return! observeFrozenCursor scope context prepared pending providerRunId toolCallId journalDir
+        }
 
     let private runFrozen (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedRetirement) =
         let hasAssessment = prepared.Reviewed
@@ -303,64 +399,20 @@ module DeliverTool =
             task {
                 let directory = scope.WorkspaceDirectory
                 let commonDir = directory |> Option.map RuntimePath.gitCommonDir
+
                 let store =
-                    match commonDir with
-                    | None -> None
-                    | Some dir when String.IsNullOrWhiteSpace dir -> None
-                    | Some dir ->
+                    commonDir
+                    |> Option.filter (fun dir -> not (String.IsNullOrWhiteSpace dir))
+                    |> Option.map (fun dir ->
                         match WorkspaceEventStore.tryCurrent dir with
-                        | Some held -> Some held
-                        | None -> Some(WorkspaceEventStore.acquire dir)
+                        | Some held -> held
+                        | None -> WorkspaceEventStore.acquire dir)
 
                 match commonDir, store with
                 | _, None -> return Error "lifecycle store is unavailable"
                 | None, _ -> return Error "lifecycle store is unavailable"
-                | Some journalDir, Some held ->
-                    match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected journalDir context.SessionId with
-                    | None -> return Error "lifecycle work is missing"
-                    | Some work ->
-                        let fence =
-                            { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
-                              Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
-
-                        let blockerDigest =
-                            let blockers = scope.RetirementBlockersFor context.SessionId
-                            if List.isEmpty blockers then None else Some(String.concat "\n" blockers)
-
-                        let! observedHead =
-                            observedRetirementCursor scope context prepared.Bound.Journal
-
-                        match observedHead with
-                        | None -> return Error "retirement cursor was not observed"
-                        | Some cursor ->
-                            let blockers = scope.RetirementBlockersFor context.SessionId
-                            let requestId = providerRunId + ":" + toolCallId
-                            let command =
-                                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                                    "Deliver"
-                                    [ "incumbencyId", box prepared.Incumbent
-                                      "providerRunId", box providerRunId
-                                      "toolCallId", box toolCallId
-                                      "cursor", box (float cursor)
-                                      "blockers", box (List.toArray blockers) ]
-                            let receipt =
-                                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
-                                    journalDir
-                                    context.SessionId
-                                    requestId
-                                    command
-                            if receipt.Status = "Unknown" || receipt.Status = "NotWritten" || receipt.Status = "Conflict" then
-                                return Error(if receipt.Reason = "" then receipt.Status else receipt.Reason)
-                            elif receipt.Kind = "ReviewRequired" then
-                                return Error "assessment required"
-                            elif receipt.Status = "Committed" || receipt.Status = "Replayed" then
-                                scope.UnfreezeRetirement context.SessionId
-                                if receipt.Kind = "Confirmed" then
-                                    return Ok(confirmationResult prepared pending)
-                                else
-                                    return Ok(text Path.Retired)
-                            else
-                                return Error(if receipt.Reason = "" then receipt.Status else receipt.Reason)
+                | Some journalDir, Some _ ->
+                    return! runFrozenDeliver scope context prepared pending providerRunId toolCallId journalDir
             }
 
         if not hasAssessment then
@@ -388,22 +440,27 @@ module DeliverTool =
     // output is contained by the durable cut (ProjectionCut.ProviderRunId) plus Retired
     // tool denial; the retired run's further provider requests are refused in
     // the transform hook by exact manager-loop gate identity, so the run ends there.
+    let private refreshedTarget
+        (target: PreparedRetirement)
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        =
+        match work.ActiveId, work.Reviewed with
+        | Some id, reviewed when id = target.Incumbent ->
+            Ok
+                { Bound = target.Bound
+                  SessionId = target.SessionId
+                  Incumbent = target.Incumbent
+                  Reviewed = reviewed }
+        | _ -> Error(text Path.BindingUnavailable)
+
     let private refreshAfterFreeze
         (context: HostToolContext)
         (target: PreparedRetirement)
         : Result<PreparedRetirement, string> =
         try
-            match lifecycleWorkOf target.Bound.Directory (SessionId.value target.SessionId) with
-            | Some(_, work) ->
-                match work.ActiveId, work.Reviewed with
-                | Some id, reviewed when id = target.Incumbent ->
-                    Ok
-                        { Bound = target.Bound
-                          SessionId = target.SessionId
-                          Incumbent = target.Incumbent
-                          Reviewed = reviewed }
-                | _ -> Error(text Path.BindingUnavailable)
-            | None -> Error(text Path.BindingUnavailable)
+            lifecycleWorkOf target.Bound.Directory (SessionId.value target.SessionId)
+            |> Option.map (fun (_, work) -> refreshedTarget target work)
+            |> Option.defaultValue (Error(text Path.BindingUnavailable))
         with _ ->
             Error(text Path.FinishFailed)
 
@@ -418,11 +475,7 @@ module DeliverTool =
             scope.UnfreezeRetirement context.SessionId
             raise (InvalidOperationException error)
 
-    let private executePrepared
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        (target: PreparedRetirement)
-        =
+    let private executePrepared (scope: ToolRuntimeScope) (context: HostToolContext) (target: PreparedRetirement) =
         task {
             try
                 scope.TryFreezeRetirement(context.SessionId, target.Incumbent) |> ignore

@@ -10,6 +10,13 @@ type AuthorityRootAcceptedPayload =
       AuthorityKind: string
       IdentitySeed: PromptIdentitySeed }
 
+type AuthorityLogicalRunClosedPayload =
+    { SessionId: SessionId
+      LogicalRunId: LogicalRunId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      RootKind: string
+      ClosureWitness: string }
+
 [<RequireQualifiedAccess>]
 type PromptAbandonReason =
     | SendFailed of error: string
@@ -38,3 +45,4 @@ type PromptFactCases =
            SessionId: SessionId
            Reason: PromptAbandonReason |}
     | AuthorityRootAccepted of AuthorityRootAcceptedPayload
+    | AuthorityLogicalRunClosed of AuthorityLogicalRunClosedPayload

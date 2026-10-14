@@ -88,19 +88,18 @@ type ManagerLoopSignal =
     | ExceptionalTerminal of string
 
 type RelayPort =
-    { CreateManagerSession: ManagerStart -> Task<Result<SessionId, string>>
-      ActivateManager: ManagerJobId -> Task<Result<unit, string>>
-      AwaitLoopSignal: ManagerJobId -> Task<Result<ManagerLoopSignal, string>>
-      ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
-      PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
-      TerminateWorkResources: ManagerJobId -> Task<unit>
-      /// The durable unified review fact for a manager session, with the work's
-      /// authority count. `None` when no review is durable yet: the publish gate
-      /// then refuses with zero writes.
-      LifecycleReviewed:
-        SessionId ->
-        Wanxiangshu.Foundation.Identity.WorktreePath ->
-            (Wanxiangshu.Mission.Lifecycle.ReviewOutcome * string) option }
+    {
+        CreateManagerSession: ManagerStart -> Task<Result<SessionId, string>>
+        ActivateManager: ManagerJobId -> Task<Result<unit, string>>
+        AwaitLoopSignal: ManagerJobId -> Task<Result<ManagerLoopSignal, string>>
+        ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
+        PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
+        TerminateWorkResources: ManagerJobId -> Task<unit>
+        /// The durable unified review fact for a manager session, with the work's
+        /// authority count. `None` when no review is durable yet: the publish gate
+        /// then refuses with zero writes.
+        LifecycleReviewed: SessionId -> Wanxiangshu.Foundation.Identity.WorktreePath -> (string * string) option
+    }
 
 type OrchestratorJournalPort =
     { AppendFact: StreamId -> AgentFact -> Task<Result<ProjectionSet, string>>

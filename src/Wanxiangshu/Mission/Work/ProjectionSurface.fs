@@ -26,7 +26,13 @@ module ProjectionSurface =
                 Task.FromResult()
 
             let! disposition =
-                RelayNarrativeTransform.apply (Some journal.Journal) acceptedRequest interrupt (Some sessionId) None output
+                RelayNarrativeTransform.apply
+                    (Some journal.Journal)
+                    acceptedRequest
+                    interrupt
+                    (Some sessionId)
+                    None
+                    output
 
             return
                 box

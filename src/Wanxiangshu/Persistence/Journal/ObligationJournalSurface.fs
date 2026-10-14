@@ -12,11 +12,7 @@ open System.Threading.Tasks
 module ObligationJournalSurface =
 
     let private refused reason : Task<obj> =
-        Task.FromResult(
-            box
-                {| ok = false
-                   error = reason |}
-        )
+        Task.FromResult(box {| ok = false; error = reason |})
 
     /// Retired. A refusal, so a migrated caller learns why instead of inferring it.
     let appendMagicTodo (handle: JournalHandle) : obj =

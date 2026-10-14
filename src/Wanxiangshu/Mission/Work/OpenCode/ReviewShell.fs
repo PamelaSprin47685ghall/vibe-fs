@@ -60,7 +60,7 @@ module ReviewShell =
         // planning-022: the gaps return to the model as repair obligations,
         // echoed verbatim below the outcome instruction.
         let instructionPath =
-            if review.Outcome = Wanxiangshu.Mission.Lifecycle.ReviewOutcome.Promoted then
+            if review.Outcome = PlanReviewOutcome.Promoted then
                 Path.PlanPromoted
             else
                 Path.PlanStayed
@@ -87,13 +87,15 @@ module ReviewShell =
         | Error _ -> Error ReviewBackendManager.Path.InvalidFindings
         | Ok findings -> Ok findings
 
-    let private resolveActiveIncumbency (gitCommonDir: string) (workId: string) : Result<string, string> =
-        match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
-        | Some work ->
-            match work.ActiveId with
-            | Some id -> Ok id
-            | None -> Error ReviewBackendManager.Path.BindingUnavailable
+    let private activeIncumbencyId (activeId: string option) : Result<string, string> =
+        match activeId with
+        | Some id -> Ok id
         | None -> Error ReviewBackendManager.Path.BindingUnavailable
+
+    let private resolveActiveIncumbency (gitCommonDir: string) (workId: string) : Result<string, string> =
+        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
+        |> Option.bind (fun work -> work.ActiveId)
+        |> activeIncumbencyId
 
     let private gapsOf (findings: ReviewFindings) : (string * string) list =
         ReviewFindings.values findings
@@ -150,6 +152,7 @@ module ReviewShell =
                 scope.WorkspaceDirectory
                 |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
                 |> Option.defaultValue ""
+
             if scope.IsRole(context, Role.Plan) then
                 executePlan gitCommonDir planStore args context
             else

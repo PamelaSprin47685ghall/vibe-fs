@@ -537,9 +537,15 @@ const lifecycleStore = (runtime) => {
   return workspaceEventStoreSurface.acquire(realpathSync(join(directory, '.git')))
 }
 
-export const openIncumbency = async (runtime, sessionId, incumbencyId = `inc-${sessionId}`, kind = 'S4') => {
+export const openIncumbency = async (
+  runtime,
+  sessionId,
+  incumbencyId = `inc-${sessionId}`,
+  kind = 'S4',
+  ownerId = 'owner',
+) => {
   const store = lifecycleStore(runtime)
-  const result = await lifecycleSurface.seedOpen(store, kind, sessionId, runtime.directory, 1n)
+  const result = await lifecycleSurface.seedOpenAs(store, kind, sessionId, runtime.directory, 1n, ownerId)
   if (!result?.ok) throw new Error(`openIncumbency(${sessionId}) rejected: ${result?.error ?? 'unknown error'}`)
   return result
 }
@@ -556,13 +562,14 @@ export const injectAcceptedAssessment = async (
   sessionId,
   incumbencyId = `inc-${sessionId}`,
   outcome = 'Stayed',
+  reviewerId = 'reviewer',
 ) => {
   const store = lifecycleStore(runtime)
   const opened = await lifecycleSurface.workView(store, sessionId)
   if (!opened?.found) {
     await openIncumbency(runtime, sessionId, incumbencyId)
   }
-  const result = await lifecycleSurface.seedReview(store, sessionId, outcome)
+  const result = await lifecycleSurface.seedReviewAs(store, sessionId, outcome, reviewerId)
   if (!result?.ok) {
     throw new Error(`injectAcceptedAssessment(${sessionId}) rejected: ${result?.error ?? 'unknown error'}`)
   }

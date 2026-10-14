@@ -447,22 +447,28 @@ module ToolRegistry =
             return renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation.Value runOutcome
         }
 
+    let private activeReviewed (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+        match work.ActiveId with
+        | None -> Error "No active incumbency found for this work"
+        | Some _ -> Ok work.Reviewed
+
     let private resolveActiveTenure (gitCommonDir: string) (sessionId: string) =
         match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId with
-        | Some work ->
-            match work.ActiveId with
-            | None -> Error "No active incumbency found for this work"
-            | Some _ -> Ok work.Reviewed
+        | Some work -> activeReviewed work
         | None -> Error "No active incumbency found for this work"
 
     let private executeTenureSandbox prose root store sessionId programSource =
-        let stamped = emitJsExpr store "$0 && typeof $0.gitCommonDir === 'string' ? $0.gitCommonDir : ''"
+        let stamped =
+            emitJsExpr store "$0 && typeof $0.gitCommonDir === 'string' ? $0.gitCommonDir : ''"
+
         let stampedDir = if isNull stamped then "" else string stamped
+
         let gitCommonDir =
             if String.IsNullOrWhiteSpace stampedDir then
                 Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir root
             else
                 stampedDir
+
         match resolveActiveTenure gitCommonDir sessionId with
         | Error reason ->
             JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason))
@@ -560,18 +566,19 @@ module ToolRegistry =
                 ?eventPort = eventPort
             )
 
+        let generatedJsSpecFor (role: Role) =
+            JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse
+            |> Option.map (fun surface ->
+                JsToolSpec.create
+                    factory
+                    surface
+                    (defaultArg workspaceDirectory "")
+                    jsTransactionPersistence
+                    (Some groundingObservation))
+
         let generatedJsSpecs () =
             [ for role in Roles.all do
-                  match JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse with
-                  | Some surface ->
-                      yield
-                          JsToolSpec.create
-                              factory
-                              surface
-                              (defaultArg workspaceDirectory "")
-                              jsTransactionPersistence
-                              (Some groundingObservation)
-                  | None -> () ]
+                  yield! generatedJsSpecFor role |> Option.toList ]
 
         let predictorJsSpec () =
             let admission =
@@ -637,6 +644,36 @@ module ToolRegistry =
         // explicit IEventStore annotation would make this module carry both
         // the EventStore and the Journal surface token (unified-store
         // dual-write gate). The store itself is resolved once below.
+        let askGitCommonDir (directory: string option) =
+            match directory with
+            | Some workspace -> Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+            | None -> ""
+
+        let askWithStore
+            store
+            (syncRuntime: SyncDelegateRuntime option)
+            (args: HostToolArguments)
+            (ctx: HostToolContext)
+            : Task<string> =
+            task {
+                let gitCommonDir = askGitCommonDir workspaceDirectory
+
+                if String.IsNullOrWhiteSpace gitCommonDir then
+                    return "ask failed: git common directory is missing"
+                else
+                    let delegateTo = devopsDelegateOf syncRuntime ctx
+
+                    let! outcome =
+                        Wanxiangshu.Mission.Planning.PlanTools.executeAsk
+                            gitCommonDir
+                            store
+                            ctx.SessionId
+                            (args.Text "intent")
+                            delegateTo
+
+                    return renderAskOutcome outcome
+            }
+
         let executeAskTool
             storeOpt
             (syncRuntime: SyncDelegateRuntime option)
@@ -646,23 +683,7 @@ module ToolRegistry =
             task {
                 match storeOpt with
                 | None -> return "ask failed: the plan workspace is unavailable"
-                | Some store ->
-                    let gitCommonDir =
-                        match workspaceDirectory with
-                        | Some workspace -> Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
-                        | None -> ""
-                    if String.IsNullOrWhiteSpace gitCommonDir then
-                        return "ask failed: git common directory is missing"
-                    else
-                        let delegateTo = devopsDelegateOf syncRuntime ctx
-                        let! outcome =
-                            Wanxiangshu.Mission.Planning.PlanTools.executeAsk
-                                gitCommonDir
-                                store
-                                ctx.SessionId
-                                (args.Text "intent")
-                                delegateTo
-                        return renderAskOutcome outcome
+                | Some store -> return! askWithStore store syncRuntime args ctx
             }
 
         let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : string option =
@@ -803,43 +824,68 @@ module ToolRegistry =
             | Ok res -> renderDeliverReceipt res
             | Error err -> sprintf "deliver failed: %s" err
 
+        let deliverCursor
+            store
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (incumbencyId: string)
+            (gitCommonDir: string)
+            : Task<string> =
+            task {
+                let providerRunId =
+                    ctx.ProviderRunId
+                    |> Option.map ProviderRunIdentity.value
+                    |> Option.defaultValue ""
+
+                let toolCallId =
+                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
+
+                let hasBlocker = not (List.isEmpty (runtime.RetirementBlockersFor ctx.SessionId))
+
+                match! resolveDeliverRetirementCursor runtime ctx with
+                | Error err -> return sprintf "deliver failed: %s" err
+                | Ok retirementCursor ->
+                    let! outcome =
+                        PlanTools.executeDeliver
+                            gitCommonDir
+                            store
+                            root
+                            ctx.SessionId
+                            incumbencyId
+                            providerRunId
+                            toolCallId
+                            hasBlocker
+                            (deliverSpawn runtime)
+                            retirementCursor
+
+                    return renderDeliverOutcome outcome
+            }
+
+        let deliverForIncumbency
+            store
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (incumbencyId: string)
+            : Task<string> =
+            task {
+                let gitCommonDir =
+                    runtime.WorkspaceDirectory
+                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                    |> Option.defaultValue ""
+
+                if String.IsNullOrWhiteSpace gitCommonDir then
+                    return "deliver failed: git common directory is missing"
+                else
+                    return! deliverCursor store root runtime ctx incumbencyId gitCommonDir
+            }
+
         let runDeliver store (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
             task {
                 match lifecycleActiveIncumbencyOf runtime ctx.SessionId with
                 | None -> return "deliver failed: no active incumbency found for this work"
-                | Some incumbencyId ->
-                    let providerRunId =
-                        ctx.ProviderRunId |> Option.map ProviderRunIdentity.value |> Option.defaultValue ""
-
-                    let toolCallId =
-                        ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
-
-                    let hasBlocker = not (List.isEmpty (runtime.RetirementBlockersFor ctx.SessionId))
-
-                    match! resolveDeliverRetirementCursor runtime ctx with
-                    | Error err -> return sprintf "deliver failed: %s" err
-                    | Ok retirementCursor ->
-                        let gitCommonDir =
-                            runtime.WorkspaceDirectory
-                            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
-                            |> Option.defaultValue ""
-                        if String.IsNullOrWhiteSpace gitCommonDir then
-                            return "deliver failed: git common directory is missing"
-                        else
-                            let! outcome =
-                                PlanTools.executeDeliver
-                                    gitCommonDir
-                                    store
-                                    root
-                                    ctx.SessionId
-                                    incumbencyId
-                                    providerRunId
-                                    toolCallId
-                                    hasBlocker
-                                    (deliverSpawn runtime)
-                                    retirementCursor
-
-                            return renderDeliverOutcome outcome
+                | Some incumbencyId -> return! deliverForIncumbency store root runtime ctx incumbencyId
             }
 
         let executeDeliverTool
@@ -888,13 +934,11 @@ module ToolRegistry =
                   Admission = planningAdmission
                   Execute = fun _ ctx -> executeDeliverTool planStore planRoot runtime ctx }
 
-            let sequenceOf (ctx: HostToolContext) =
+            let sequenceOf (ctx: HostToolContext) : string list option =
                 Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory
                     runtime.WorkspaceDirectory
                     ctx.SessionId
-                |> Option.bind (fun _work ->
-                    // Stopped. inspect has no work sequence.
-                    None)
+                |> Option.map (fun work -> work.Sequence)
 
             { managerSpec with
                 Admission =
@@ -904,7 +948,7 @@ module ToolRegistry =
                 Execute =
                     fun args ctx ->
                         match sequenceOf ctx with
-                        | Some Wanxiangshu.Mission.Lifecycle.WorkSequence.Plan -> planSpec.Execute args ctx
+                        | Some [ "S1"; "S2"; "S3" ] -> planSpec.Execute args ctx
                         | _ -> managerSpec.Execute args ctx }
 
         let baseSpecs =

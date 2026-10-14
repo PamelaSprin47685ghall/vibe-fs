@@ -2,6 +2,7 @@ namespace Wanxiangshu.Mission.Lifecycle
 
 module DurableWorkHost =
     val journalPath: gitCommonDir: string -> string
+
     type HostReceipt =
         { RequestId: string
           Status: string
@@ -9,6 +10,7 @@ module DurableWorkHost =
           Reason: string
           Revision: float
           Result: obj }
+
     val observe: requestId: string -> durableResult: obj -> HostReceipt
     val admitted: receipt: HostReceipt -> bool
     val resultText: receipt: HostReceipt -> name: string -> string
@@ -19,6 +21,23 @@ module DurableWorkHost =
     val useWork: gitCommonDir: string -> workId: string -> body: (obj -> 'a) -> 'a
     val execute: gitCommonDir: string -> workId: string -> requestId: string -> command: obj -> HostReceipt
     val inspect: gitCommonDir: string -> workId: string -> obj
+
+    type HostRunFence =
+        { ProviderRunId: string
+          ToolCallId: string }
+
+    type HostRetirement =
+        { RetirementId: string
+          IncumbencyId: string
+          Outcome: string
+          Fence: HostRunFence
+          ProjectionCut: bool }
+
+    type HostAdvance =
+        { IncumbencyId: string
+          Expected: string
+          Next: string }
+
     type InspectedWork =
         { Opened: bool
           Sequence: string list
@@ -38,6 +57,11 @@ module DurableWorkHost =
           Authority: string
           Confirmed: bool
           BlockerDigest: string option
-          Root: string option }
+          Root: string option
+          Retirements: HostRetirement list
+          Confirmation: HostRunFence option
+          ProjectionCut: HostRunFence option
+          Advances: HostAdvance list }
+
     val inspected: gitCommonDir: string -> workId: string -> InspectedWork option
     val recover: gitCommonDir: string -> workId: string -> obj

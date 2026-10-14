@@ -1429,16 +1429,28 @@ module ForkToolSurface =
     let injectAcceptedAssessment (value: obj) (owner: string) : Task =
         ignore value
         ignore owner
+
         task {
-            return raise (InvalidOperationException("injectAcceptedAssessment refused: no event store, observed head, or workId; zero writes"))
+            return
+                raise (
+                    InvalidOperationException(
+                        "injectAcceptedAssessment refused: no event store, observed head, or workId; zero writes"
+                    )
+                )
         }
         :> Task
 
     let injectAuditPendingIncumbency (value: obj) (owner: string) : Task =
         ignore value
         ignore owner
+
         task {
-            return raise (InvalidOperationException("injectAuditPendingIncumbency refused: no event store, observed head, or workId; zero writes"))
+            return
+                raise (
+                    InvalidOperationException(
+                        "injectAuditPendingIncumbency refused: no event store, observed head, or workId; zero writes"
+                    )
+                )
         }
         :> Task
 

@@ -46,26 +46,39 @@ module LifecycleKernel =
     /// Every unified lifecycle work folded into a held store. A missing current
     /// yields None; an empty fold yields Some empty.
     val tryWorksOfStore: store: IEventStore -> Map<string, LifecycleWork> option
-    val openWork: (string -> string) -> OpeningKind -> firstPromptLine: string option -> workId: string -> root: string -> alreadyOpened: bool -> observedHead: int64 option -> KernelDecision
+
+    val openWork:
+        (string -> string) ->
+        OpeningKind ->
+        firstPromptLine: string option ->
+        workId: string ->
+        root: string ->
+        alreadyOpened: bool ->
+        observedHead: int64 option ->
+            KernelDecision
+
     val bindDevOps: LifecycleWork -> BindTrigger -> devopsId: string -> target: string option -> KernelDecision
     val review: LifecycleWork -> incumbencyId: string -> ReviewOutcome -> KernelDecision
+
     val deliverOneshot:
-        (string -> string)
-        -> LifecycleWork
-        -> HostFence
-        -> observedHead: int64 option
-        -> blockerDigest: string option
-        -> SessionLookup
-        -> DeliverDraft option
-        -> startedSessionId: string option
-        -> KernelDecision
+        (string -> string) ->
+        LifecycleWork ->
+        HostFence ->
+        observedHead: int64 option ->
+        blockerDigest: string option ->
+        SessionLookup ->
+        DeliverDraft option ->
+        startedSessionId: string option ->
+            KernelDecision
+
     val deliverExecution:
-        (string -> string)
-        -> LifecycleWork
-        -> HostFence
-        -> observedHead: int64 option
-        -> blockerDigest: string option
-        -> KernelDecision
+        (string -> string) ->
+        LifecycleWork ->
+        HostFence ->
+        observedHead: int64 option ->
+        blockerDigest: string option ->
+            KernelDecision
+
     val reopen: LifecycleWork -> incumbencyId: string -> KernelDecision
     val advance: LifecycleWork -> expected: string -> next: string -> KernelDecision
     val refuseDetachedOpening: LifecycleWork -> KernelDecision

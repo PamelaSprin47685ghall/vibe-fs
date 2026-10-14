@@ -672,16 +672,16 @@ module PluginTransforms =
             | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Plan -> Some sid
             | _ -> None
 
+        /// Borrow the already-owned workspace store for a directory, acquiring
+        /// it when this process does not own one yet.
+        let lifecycleStoreFor (dir: string) =
+            match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent dir with
+            | Some held -> Some held
+            | None -> Some(Wanxiangshu.OpenCode.WorkspaceEventStore.acquire dir)
+
         let tryReadLifecycleWork (sid: string) =
             Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory workspaceDirectory sid
 
-
-        // Stopped. inspect has no opening cursor and no previous retirement range.
-        let buildTenureOf
-            (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
-            (_fresh: bool)
-            : Wanxiangshu.Mission.Planning.ActiveTenureInfo option =
-            None
 
         let tenureReanchorEpoch (durable: AgentJournal) (sessionId: SessionId) : ActivePrefixEpoch =
             match AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections with
@@ -707,14 +707,6 @@ module PluginTransforms =
                 | Ok _ -> ()
                 | Error failure -> return raise (JournalAppendException failure)
             }
-
-        // Stopped. inspect has no previous retirement range or opening cursor.
-        let previousTenureRecord
-            (_durable: AgentJournal)
-            (_sessionId: SessionId)
-            (_tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
-            =
-            Task.FromResult None
 
         // COMPANION-003: the Plan session is a top-level main session; nothing
         // else owns its opening. Without opening evidence the bounded LWR_prev
@@ -763,32 +755,6 @@ module PluginTransforms =
                       IsSynthetic = ProviderWireCapture.isSyntheticMessage raw
                       HasSemanticParts = not (List.isEmpty message.Parts)
                       Raw = raw }))
-
-        let isolatePlanTenure (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) (sid: string) (outObj: obj) =
-            task {
-                let durable =
-                    journal
-                    |> Option.defaultWith (fun () -> invalidOp "Plan journal is unavailable")
-
-                let sessionId = SessionId.create sid
-                do! restoreProtocolArguments outObj
-                let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
-
-                let! captured =
-                    rawMessages
-                    |> List.filter (ProviderWireCapture.isSyntheticMessage >> not)
-                    |> captureXTraceMessages (Some sid)
-
-                let trace =
-                    captured.Current
-                    |> Option.defaultWith (fun () -> invalidOp "Plan XTrace is unavailable")
-
-                do! capturePlanSessionOpening durable sessionId trace rawMessages
-
-                // Stopped. inspect has no opening cursor and no previous retirement range.
-                let _ = durable, sessionId, rawMessages, outObj, trace
-                return ()
-            }
 
         // Stopped. inspect has no work sequence. Absence is not a plan tenure.
         let applyResolvedTenure (sid: string) (outObj: obj) =
@@ -872,8 +838,7 @@ module PluginTransforms =
                         else
                             invalidOp ("MANAGER-LOOP-004: retired attempt interrupt failed: " + error)
 
-                    let lifecycle =
-                        sidOpt |> Option.bind tryReadLifecycleWork
+                    let lifecycle = sidOpt |> Option.bind tryReadLifecycleWork
 
                     return!
                         RelayNarrativeTransform.apply
@@ -912,6 +877,12 @@ module PluginTransforms =
                         ProviderWireDecode.messagesFromTransformOutput outObj
                         |> captureXTraceMessages projectionSessionIdOpt
 
+                    let storeForDirectory dir =
+                        if System.String.IsNullOrWhiteSpace dir then
+                            None
+                        else
+                            lifecycleStoreFor dir
+
                     match captured.Receipt with
                     | None -> return captured
                     | Some receipt ->
@@ -920,13 +891,7 @@ module PluginTransforms =
                         let borrowedStore =
                             workspaceDirectory
                             |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
-                            |> Option.bind (fun dir ->
-                                if System.String.IsNullOrWhiteSpace dir then
-                                    None
-                                else
-                                    match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent dir with
-                                    | Some held -> Some held
-                                    | None -> Some(Wanxiangshu.OpenCode.WorkspaceEventStore.acquire dir))
+                            |> Option.bind storeForDirectory
 
                         do!
                             ManagerWorkflow.ensureManagerWorkOpened

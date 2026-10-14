@@ -384,8 +384,7 @@ module HookDispatcher =
         else
             ensureUnixSshMultiplex workspace
 
-    let private hooksDisabled () =
-        disableHooksEnv () = "1"
+    let private hooksDisabled () = disableHooksEnv () = "1"
 
     /// Remove hooks this product installed, leaving any foreign hook untouched.
     let private uninstallOwnedHook hooksDir kind =

@@ -134,7 +134,7 @@ test('WHAT[work-035] a missing work is not opened and does not guess', async () 
   assert.notEqual(rejected.next, 'Review')
 })
 
-test('WHAT[work-035] a delivered document that also names an active incumbency recovers Continue', () => {
+test('WHAT[work-035] a second opening with the same request id and different bytes is refused', () => {
   let text = climb('work-rec-5', 2)
   const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
   const planRoot = mkdtempSync(join(tmpdir(), 'wxs-work-035-conflict-'))
@@ -153,13 +153,14 @@ test('WHAT[work-035] a delivered document that also names an active incumbency r
 
   const forged = `${text}${surface.encodeOpening('plan', 'work-rec-5', '/root', 40n)}`
   const conflict = surface.readProbe(forged)
-  assert.equal(conflict.ok, true)
-  assert.equal(conflict.opened, true)
-  assert.equal(conflict.next, 'Continue')
-  assert.equal(conflict.activeId.length > 0, true)
+  assert.equal(conflict.ok, false, 'the conflicting replay must be refused')
+  assert.equal(conflict.opened, false)
+  assert.equal(conflict.next, '')
+  assert.equal(conflict.activeId, '')
+  assert.match(conflict.reason, /RequestIdConflict/)
 })
 
-test('WHAT[work-035] recovery effects keep Done, and Continue while an incumbency stays open, and a missing id stays unopened', async () => {
+test('WHAT[work-035] recovery effects keep Done and Review for an open incumbency while a missing id stays unopened', async () => {
   const effects = []
   let delivered = climb('work-batch-deliv', 2)
   const reviewed = surface.reviewProbe(delivered, incumbencyIdOf(delivered), 'Promoted')
@@ -180,7 +181,7 @@ test('WHAT[work-035] recovery effects keep Done, and Continue while an incumbenc
   assert.equal(effects.length, 2)
   assert.equal(effects[0].next, 'Done')
   assert.equal(effects[0].activeId, '')
-  assert.equal(effects[1].next, 'Continue')
+  assert.equal(effects[1].next, 'Review')
   assert.equal(effects[1].activeId.length > 0, true)
   assert.equal(surface.documentView(delivered).workId, 'work-batch-deliv')
   assert.equal(surface.documentView(climb('work-batch-active', 2)).workId, 'work-batch-active')

@@ -754,7 +754,7 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
   })
 
   // 3. State transition: the accepted review is a unified Reviewed fact. Stayed keeps delivery closed.
-  const incId = JSON.parse(opening.trim().split('\n')[1]).payload.incumbencyId
+  const incId = lifecycle.readProbe(opening).activeId
   const reviewed = lifecycle.reviewProbe(opening, incId, 'Stayed')
   assert.equal(reviewed.decision, 'Write', reviewed.detail)
   const afterReview = lifecycle.readProbe(opening + reviewed.bytes)

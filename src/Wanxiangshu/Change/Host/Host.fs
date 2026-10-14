@@ -144,27 +144,33 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let lifecycleWorkOf (record: ManagerJobProjection) =
         let directory = WorktreePath.value record.WorktreePath
-        Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWork
-            directory
-            (SessionId.value record.ManagerSessionId)
+        Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWork directory (SessionId.value record.ManagerSessionId)
 
-    // Stopped. inspect has no retirement outcome. Absence is not Continue.
-    // Stopped. inspect has no retirement outcome. Absence is not Continue.
-    let loopSignalOfWork (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
-        None
+    /// The loop signal the last committed retirement holds for Change: a
+    /// Delivered tenure has a candidate to publish, a Relayed tenure hands the
+    /// road to its successor. No retirement is not permission to continue, so
+    /// the caller keeps waiting on durable change instead of inventing one.
+    let loopSignalOfWork (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+        work.Retirements
+        |> List.tryLast
+        |> Option.bind (fun retirement ->
+            match retirement.Outcome with
+            | "Delivered" -> Some ManagerLoopSignal.Candidate
+            | "Relayed" -> Some ManagerLoopSignal.Continue
+            | _ -> None)
 
     let requireOpenWork (record: ManagerJobProjection) =
         lifecycleWorkOf record |> Result.requireSome "Manager session is not open"
 
-    // Stopped. inspect has no retirement list or outcome.
-    let requireCommittedRetirement (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
-        Error "inspect has no retirement outcome"
-
-    // Stopped. inspect has an active id, not an incumbency record, and no retirement outcome.
-    let activateNextIfAbsent (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) : Task<Result<string, string>> =
-        match work.ActiveId with
-        | Some id -> Task.FromResult(Ok id)
-        | None -> Task.FromResult(Error "inspect has no active incumbency")
+    /// The last committed retirement on this work. The list is projected from
+    /// committed IncumbencyRetired facts only; a missing or unnamed retirement
+    /// is refused rather than treated as a relay.
+    let requireCommittedRetirement
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        : Result<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement, string> =
+        match work.Retirements |> List.tryLast with
+        | Some retirement when not (String.IsNullOrWhiteSpace retirement.IncumbencyId) -> Ok retirement
+        | _ -> Error "inspect has no retirement outcome"
 
     let requireRelayAndJob (relay: OrchestratorRelayPort option) (jobId: ManagerJobId) (relayError: string) =
         match relay, requireJobRecord jobId with
@@ -213,8 +219,12 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 requireRelayAndJob relayPortOpt jobId "Manager loop continuation requires a durable journal"
 
             let! work = requireOpenWork record
-            let! _retirement = requireCommittedRetirement work
-            return! Error "inspect has no retirement outcome"
+            let! retirement = requireCommittedRetirement work
+
+            match retirement.Outcome, work.ActiveId with
+            | "Relayed", Some activeId -> return IncumbencyId.create activeId
+            | "Relayed", None -> return! Error "relay continuation has no successor incumbency"
+            | _ -> return! Error(sprintf "retirement %s is not a relay continuation" retirement.RetirementId)
         }
 
     let finalizeRegisteredWorktree (agentId: string) =
@@ -246,19 +256,21 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 lock runtime.Gate (fun () -> runtime.Children.Remove managerId |> ignore)
         }
 
-    /// The durable unified review fact for a manager session, read from the
-    /// workspace EventStore the lifecycle kernel writes.
+    /// The durable unified review fact for a manager session: the recorded
+    /// Promoted/Stayed outcome together with the work's authority count. None
+    /// means no review is durable yet, and the publish gate refuses with zero
+    /// writes.
     let lifecycleReviewed
         (managerSessionId: SessionId)
         (worktreePath: Wanxiangshu.Foundation.Identity.WorktreePath)
-        : (Wanxiangshu.Mission.Lifecycle.ReviewOutcome * string) option =
+        : (string * string) option =
         Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWork
             (Wanxiangshu.Foundation.Identity.WorktreePath.value worktreePath)
             (SessionId.value managerSessionId)
-            |> Option.bind (fun _work ->
-                // Stopped. inspect has no active incumbency record.
-                // None is not reviewed and not unreviewed.
-                None)
+        |> Option.bind (fun work ->
+            match work.Reviewed, work.ReviewOutcome with
+            | true, Some outcome -> Some(outcome, work.Authority)
+            | _ -> None)
 
     let relayPort: RelayPort =
         { CreateManagerSession = createManagerSession
@@ -424,13 +436,88 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                 lock joinGate (fun () -> joinInFlight <- false)
         }
 
-    // Stopped. inspect has an active id and a reviewed bit, but no retirement list.
-    // Absence of that list is not permission to continue.
-    let requireActiveWorkOwnedIncumbent (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) : Result<string, string> =
-        match work.ActiveId, work.Reviewed with
-        | None, _ -> Error "inspect has no active incumbency"
-        | Some _, false -> Error "Relay incumbency cannot take new charge before assessment is recorded"
-        | Some id, true -> Error(sprintf "inspect has no retirement list for incumbency %s" id)
+    /// The active Relay incumbency that owns the work's current authority. The
+    /// last committed AdvanceCommitted must have produced exactly the authority
+    /// the work now carries (or no advance has happened since the opening):
+    /// otherwise the active tenure is not the one a new charge may advance.
+    let requireActiveWorkOwnedIncumbent
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        : Result<string, string> =
+        let lastAdvance = work.Advances |> List.tryLast
+
+        match work.ActiveId, work.Reviewed, lastAdvance with
+        | None, _, _ -> Error "inspect has no active incumbency"
+        | Some _, false, _ -> Error "Relay incumbency cannot take new charge before assessment is recorded"
+        | Some _, true, _ when String.IsNullOrWhiteSpace work.Authority -> Error "inspect has no authority to advance"
+        | Some id, true, Some advance when advance.Next <> work.Authority ->
+            Error(sprintf "active incumbency %s does not own the current authority" id)
+        | Some id, true, _ -> Ok id
+
+    let acquireLifecycleStore (commonDir: string) =
+        match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent commonDir with
+        | Some held -> held
+        | None -> Wanxiangshu.OpenCode.WorkspaceEventStore.acquire commonDir
+
+    let advanceReceiptOutcome
+        (directory: string)
+        (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
+        : Result<string, string> =
+        if receipt.Status = "Committed" || receipt.Status = "Replayed" then
+            Ok directory
+        else
+            Error(
+                "gate continuation was sent; lifecycle commit failed: "
+                + (if receipt.Reason = "" then
+                       receipt.Status
+                   else
+                       receipt.Reason)
+            )
+
+    let executeAuthorityAdvance
+        (directory: string)
+        (commonDir: string)
+        (workId: string)
+        (incumbent: string)
+        (expected: string)
+        (next: string)
+        : Result<string, string> =
+        acquireLifecycleStore commonDir |> ignore
+
+        match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir workId with
+        | None -> Error "lifecycle work is missing"
+        | Some seen when String.IsNullOrEmpty seen.Authority -> Error "expected advance is missing"
+        | Some _seen ->
+            let requestId = incumbent + ":" + expected + ":" + next
+
+            let command =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    "Advance"
+                    [ "incumbencyId", box incumbent; "expected", box expected; "next", box next ]
+
+            let receipt =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute commonDir workId requestId command
+
+            advanceReceiptOutcome directory receipt
+
+    let commitAuthorityAdvance
+        (record: ManagerJobProjection)
+        (incumbent: string)
+        (expected: string)
+        (next: string)
+        : Result<string, string> =
+        let directory = WorktreePath.value record.WorktreePath
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
+
+        if String.IsNullOrWhiteSpace commonDir then
+            Error "lifecycle store is unavailable"
+        else
+            executeAuthorityAdvance
+                directory
+                commonDir
+                (SessionId.value record.ManagerSessionId)
+                incumbent
+                expected
+                next
 
     let advanceAuthorityRevision
         (relay: OrchestratorRelayPort)
@@ -445,7 +532,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let expectedRevision = AuthorityRevision.create work.Authority
             let gateKind = "relay-authority-update:" + AuthorityRevision.value nextRevision
 
-            let! physicalAuthorityMessage =
+            let! _physicalAuthorityMessage =
                 deps.SendGateContinuation
                     record.ManagerSessionId
                     prompt
@@ -455,45 +542,12 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     gateKind
                     callerProviderRun
 
-            let directory = WorktreePath.value record.WorktreePath
-            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
-            if String.IsNullOrWhiteSpace commonDir then
-                return! Error "lifecycle store is unavailable"
-            else
-                let store =
-                    match Wanxiangshu.OpenCode.WorkspaceEventStore.tryCurrent commonDir with
-                    | Some held -> held
-                    | None -> Wanxiangshu.OpenCode.WorkspaceEventStore.acquire commonDir
-
-                match
-                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected
-                        commonDir
-                        (SessionId.value record.ManagerSessionId)
-                with
-                | None -> return! Error "lifecycle work is missing"
-                | Some seen when String.IsNullOrEmpty seen.Authority ->
-                    return! Error "expected advance is missing"
-                | Some _seen ->
-                    let workId = SessionId.value record.ManagerSessionId
-                    let expected = AuthorityRevision.value expectedRevision
-                    let next = AuthorityRevision.value nextRevision
-                    let requestId = incumbent + ":" + expected + ":" + next
-                    let command =
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                            "Advance"
-                            [ "incumbencyId", box incumbent
-                              "expected", box expected
-                              "next", box next ]
-                    let receipt =
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute commonDir workId requestId command
-                    if receipt.Status = "Committed" || receipt.Status = "Replayed" then
-                        return WorktreePath.value record.WorktreePath
-                    else
-                        return!
-                            Error(
-                                "gate continuation was sent; lifecycle commit failed: "
-                                + (if receipt.Reason = "" then receipt.Status else receipt.Reason)
-                            )
+            return!
+                commitAuthorityAdvance
+                    record
+                    incumbent
+                    (AuthorityRevision.value expectedRevision)
+                    (AuthorityRevision.value nextRevision)
         }
 
     let continueManagerJobCore

@@ -15,6 +15,7 @@ type PromptAuthorityFoldRejection =
     | AuthorityRootSchemaRejected of string
     | AuthorityRootSeedRejected of PromptAuthority.IdentitySeedValidationError
     | AuthorityRootLedgerRejected of string
+    | AuthorityLogicalRunClosureRejected of string
 
 [<RequireQualifiedAccess>]
 module PromptAuthorityFoldRejection =
@@ -24,6 +25,7 @@ module PromptAuthorityFoldRejection =
         | PromptAuthorityFoldRejection.AuthorityRootSchemaRejected _
         | PromptAuthorityFoldRejection.AuthorityRootSeedRejected _
         | PromptAuthorityFoldRejection.AuthorityRootLedgerRejected _ -> "AuthorityRootAccepted"
+        | PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected _ -> "AuthorityLogicalRunClosed"
 
     let message (rejection: PromptAuthorityFoldRejection) : string =
         match rejection with
@@ -31,6 +33,7 @@ module PromptAuthorityFoldRejection =
         | PromptAuthorityFoldRejection.AuthorityRootSchemaRejected reason -> reason
         | PromptAuthorityFoldRejection.AuthorityRootSeedRejected error -> sprintf "%A" error
         | PromptAuthorityFoldRejection.AuthorityRootLedgerRejected reason -> reason
+        | PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected reason -> reason
 
 module PromptFactFold =
 
@@ -108,6 +111,32 @@ module PromptFactFold =
                       ProviderFailureProjection.forAuthority payload.LogicalRunId payload.AuthorityRootUserMessageId
                   ) ]))
 
+    let private foldAuthorityLogicalRunClosed
+        (authorityOf: SessionId -> PromptAuthority.PromptAuthorityProjection option)
+        (payload: AuthorityLogicalRunClosedPayload)
+        : Result<PromptAuthorityProjectionChange list, PromptAuthorityFoldRejection> =
+        let currentAuthority =
+            authorityOf payload.SessionId |> Option.defaultValue PromptAuthorityLedger.empty
+
+        match currentAuthority.ActiveLogicalRun with
+        | None -> Ok []
+        | Some active when
+            active.LogicalRunId = payload.LogicalRunId
+            && active.AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+            ->
+            PromptAuthorityRun.closeAuthority
+                payload.LogicalRunId
+                payload.AuthorityRootUserMessageId
+                currentAuthority
+            |> Result.map (fun closed ->
+                [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, closed) ])
+            |> Result.mapError PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected
+        | Some _ ->
+            Error(
+                PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected
+                    "AuthorityLogicalRunClosed conflicts with the active logical run"
+            )
+
     let fold
         (authorityOf: SessionId -> PromptAuthority.PromptAuthorityProjection option)
         (runtimeStartCount: int)
@@ -165,3 +194,8 @@ module PromptFactFold =
         // ── authority ───────────────────────────────────────────────────────
 
         | PromptFactCases.AuthorityRootAccepted payload -> foldAuthorityRootAccepted authorityOf payload
+
+        // ── closure ─────────────────────────────────────────────────────────
+
+        | PromptFactCases.AuthorityLogicalRunClosed payload ->
+            foldAuthorityLogicalRunClosed authorityOf payload

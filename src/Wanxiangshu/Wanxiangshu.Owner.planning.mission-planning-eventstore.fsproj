@@ -13,6 +13,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
     <Compile Include="Mission/Lifecycle/Facts.fsi"/>
     <Compile Include="Mission/Lifecycle/Facts.fs"/>
     <Compile Include="Mission/Lifecycle/Fold.fsi"/>

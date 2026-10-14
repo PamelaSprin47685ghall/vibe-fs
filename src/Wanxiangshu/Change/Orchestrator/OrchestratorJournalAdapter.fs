@@ -29,8 +29,7 @@ module OrchestratorJournalAdapter =
                 task {
                     let! _ = AgentJournal.awaitChangeFrom revision journal
                     return ()
-                }
-        }
+                } }
 
     let forEngine (journal: AgentJournal) : OrchestratorJournalPort =
         { AppendFact =

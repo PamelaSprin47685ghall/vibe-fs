@@ -37,3 +37,5 @@ module PromptFact =
             AgentFact
 
     val AuthorityRootAccepted: payload: AuthorityRootAcceptedPayload -> AgentFact
+
+    val AuthorityLogicalRunClosed: payload: AuthorityLogicalRunClosedPayload -> AgentFact

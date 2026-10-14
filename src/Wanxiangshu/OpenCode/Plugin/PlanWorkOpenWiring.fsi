@@ -7,7 +7,4 @@ module PlanWorkOpenWiring =
     /// bound, first incumbency at S1) on the workspace EventStore for the
     /// first prompt of a plan session. Failures are diagnosed, never raised.
     val ensurePlanWorkOpenedForSession:
-        workspaceDirectory: string option ->
-        sid: string ->
-        observedHead: int64 option ->
-            Task<unit>
+        workspaceDirectory: string option -> sid: string -> observedHead: int64 option -> Task<unit>

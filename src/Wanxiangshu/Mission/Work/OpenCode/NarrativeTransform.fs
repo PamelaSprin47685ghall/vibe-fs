@@ -53,10 +53,14 @@ module RelayNarrativeTransform =
                 | WireToolResult(toolCallId, _) -> ToolCallId.value toolCallId = cutToolCallId
                 | _ -> false))
 
-    // Stopped. inspect has no active incumbency record and no retirement list.
-    // Absence is not a previous tenure and not permission to continue.
-    let private dispositionAfterProjection (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option) =
-        RelayProjectionDisposition.Unchanged
+    /// The projection disposition of one request. An active tenure means the
+    /// message set belongs to the current iteration; a work with no active
+    /// tenure has no iteration to project and stays unchanged. Absence is not
+    /// a previous tenure and not permission to continue.
+    let private dispositionAfterProjection (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option) =
+        match work with
+        | Some current when current.ActiveId.IsSome -> RelayProjectionDisposition.CurrentIteration
+        | _ -> RelayProjectionDisposition.Unchanged
 
     let private requestBelongsToSuccessor (physical: string option) afterCut freshRoot acceptedRequest gatePhysical =
         match physical with
@@ -66,20 +70,73 @@ module RelayNarrativeTransform =
             || (afterCut && acceptedRequest)
         | _ -> false
 
+    /// A request is after the cut when its last real user message sits past
+    /// the message that carries the cut tool call.
+    let private afterCut (cutToolCallId: string) (lastUserIndex: int option) messages =
+        match lastUserIndex, cutToolIndex cutToolCallId messages with
+        | Some userIndex, Some cutIndex -> userIndex > cutIndex
+        | _ -> false
+
     /// The retired attempt is decided from the unified lifecycle work: an S4
     /// work whose current tenure was Relayed, with a durable retirement cut.
     /// The request is stale unless it belongs to the successor (the loop-gate
     /// nudge, or an accepted request observed after the cut).
-    // Stopped. inspect has no relayed retirement and no projection cut.
     let private staleRetirement
-        journal
-        sessionId
+        (journal: AgentJournal)
+        (sessionId: SessionId)
         (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
-        acceptedRequest
-        messages
+        (acceptedRequest: bool)
+        (messages: obj list)
         =
-        let _ = journal, sessionId, work, acceptedRequest, messages
-        None
+        let relayedCut =
+            work.Retirements
+            |> List.tryFind (fun retirement -> retirement.ProjectionCut && retirement.Outcome = "Relayed")
+
+        let sessionProjection =
+            AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
+
+        let lastUserIndex =
+            messages
+            |> List.indexed
+            |> List.rev
+            |> List.tryPick (fun (index, message) -> if messageRoleIsUser message then Some index else None)
+
+        let physical =
+            lastUserIndex
+            |> Option.bind (fun index -> messages |> List.tryItem index)
+            |> Option.bind messageId
+
+        let requestIsSuccessor (retirement: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement) =
+            let physicalAfterCut =
+                work.ProjectionCut
+                |> Option.map (fun cut -> afterCut cut.ToolCallId lastUserIndex messages)
+                |> Option.defaultValue false
+
+            let freshRoot =
+                if physicalAfterCut then
+                    sessionProjection
+                    |> Option.bind (fun session -> session.PromptAuthority)
+                    |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+                    |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
+                else
+                    None
+
+            let gatePhysical =
+                sessionProjection
+                |> Option.bind (fun session -> session.PromptAuthority)
+                |> Option.bind (fun authority ->
+                    PromptAuthority.gateNudgeAcceptedPhysical
+                        sessionId
+                        PromptAuthority.ContinuationKind.ManagerGuard
+                        (ManagerLoopGate.gateKind (RetirementId.create retirement.RetirementId))
+                        (ProviderRunIdentity.create retirement.Fence.ProviderRunId)
+                        authority)
+                |> Option.map PhysicalUserMessageId.value
+
+            requestBelongsToSuccessor physical physicalAfterCut freshRoot acceptedRequest gatePhysical
+
+        relayedCut
+        |> Option.filter (fun retirement -> not (requestIsSuccessor retirement))
 
     let private firstCursors (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
@@ -91,22 +148,17 @@ module RelayNarrativeTransform =
         match messageRole message, messageId message |> Option.bind (fun id -> Map.tryFind id cursors) with
         | Some role, Some sequence when
             (role.ToLowerInvariant() = "assistant" || role.ToLowerInvariant() = "tool")
-            && sequence < openingCursor ->
+            && sequence < openingCursor
+            ->
             true
         | _ -> false
-
-    // Stopped. inspect has no previous retirement range or opening cursor.
-    let private previousRange (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
-        None
-
-    // Stopped. inspect has no incumbency identity for a handover record.
-    let private handoverRecord (_work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) (_text: string) : obj option =
-        None
 
     /// Successor visibility. Opening sequence comes from the active lifecycle
     /// tenure. The other side is the first observation of a captured Host
     /// message id. A message absent from that map has not been captured yet,
-    /// so it stays. The retirement cut is not a strip condition.
+    /// so it stays. Only assistant and tool interactions strictly earlier
+    /// than the opening are stripped; user input stays. The retirement cut is
+    /// not a strip condition.
     let private projectActive
         (journal: AgentJournal)
         (sessionId: SessionId)
@@ -116,10 +168,21 @@ module RelayNarrativeTransform =
         task {
             let messages = ProviderWireDecode.messagesFromTransformOutput outObj
 
-            // Stopped. inspect has no active incumbency record and no retirement list.
-            // Absence is not a previous tenure and not permission to continue.
-            let _ = journal, sessionId
-            HostMessageProjection.replaceMessagesInPlace outObj messages
+            let cursors, openingCursor =
+                match work with
+                | Some current when current.ActiveId.IsSome ->
+                    (firstCursors journal sessionId, current.OpeningCursor |> Option.map (fun cursor -> int64 cursor))
+                | _ -> Map.empty, None
+
+            let kept =
+                messages
+                |> List.filter (fun message ->
+                    not (
+                        openingCursor
+                        |> Option.exists (fun opening -> earlierAssistantOrTool opening cursors message)
+                    ))
+
+            HostMessageProjection.replaceMessagesInPlace outObj kept
             return dispositionAfterProjection work
         }
 
@@ -162,13 +225,6 @@ module RelayNarrativeTransform =
             // re-encode it.
             match journal, sessionId, lifecycle with
             | Some durable, Some value, Some work when not (String.IsNullOrWhiteSpace value) ->
-                return!
-                    project
-                        durable
-                        interruptAttempt
-                        (SessionId.create value)
-                        acceptedRequest
-                        (Some work)
-                        outObj
+                return! project durable interruptAttempt (SessionId.create value) acceptedRequest (Some work) outObj
             | _ -> return RelayProjectionDisposition.Unchanged
         }

@@ -3,7 +3,6 @@ namespace Wanxiangshu.Mission.Planning
 open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
-open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.EventStore
 
@@ -104,8 +103,18 @@ module PlanningSurface =
 
     let readAndValidatePlan (root: string) (workId: string) : obj =
         match PlanTools.readAndValidatePlan root workId with
-        | Ok(_, digest, path) -> box {| ok = true; digest = digest; path = path; error = null |}
-        | Error err -> box {| ok = false; digest = null; path = null; error = err |}
+        | Ok(_, digest, path) ->
+            box
+                {| ok = true
+                   digest = digest
+                   path = path
+                   error = null |}
+        | Error err ->
+            box
+                {| ok = false
+                   digest = null
+                   path = null
+                   error = err |}
 
     let readPlan (root: string) (workId: string) : obj =
         match PlanPath.readPlan root workId with
@@ -188,12 +197,7 @@ module PlanningSurface =
             // so currying never gets in the way.
             unbox<Task<string>> (emitJsExpr (spawnVal, agent, prompt) "$0($1, $2)")
 
-    let ensurePlanWorkOpened
-        (store: IEventStore)
-        (root: string)
-        (sessionId: string)
-        (observedHead: obj)
-        : Task<obj> =
+    let ensurePlanWorkOpened (store: IEventStore) (root: string) (sessionId: string) (observedHead: obj) : Task<obj> =
         task {
             let head = extractInt64Opt observedHead
 
@@ -384,6 +388,11 @@ module PlanningSurface =
                    work_plan = workPlan |})
         |> Array.ofList
 
+    let private renderReviewOutcome (outcome: PlanReviewOutcome) : string =
+        match outcome with
+        | PlanReviewOutcome.Promoted -> "Promoted"
+        | PlanReviewOutcome.Stayed -> "Stayed"
+
     let executeReview
         (store: IEventStore)
         (workId: string)
@@ -411,21 +420,21 @@ module PlanningSurface =
                                gaps = null
                                error = "git common directory is missing" |}
                 | Some gitCommonDir ->
-                match! ReviewPlanBackend.executeReview gitCommonDir store workId incumbencyId gaps with
-                | Error err ->
-                    return
-                        box
-                            {| ok = false
-                               outcome = null
-                               gaps = null
-                               error = PlanReviewError.render err |}
-                | Ok review ->
-                    return
-                        box
-                            {| ok = true
-                               outcome = ReviewOutcome.render review.Outcome
-                               gaps = gapsToJs review.Gaps
-                               error = Unchecked.defaultof<string> |}
+                    match! ReviewPlanBackend.executeReview gitCommonDir store workId incumbencyId gaps with
+                    | Error err ->
+                        return
+                            box
+                                {| ok = false
+                                   outcome = null
+                                   gaps = null
+                                   error = PlanReviewError.render err |}
+                    | Ok review ->
+                        return
+                            box
+                                {| ok = true
+                                   outcome = renderReviewOutcome review.Outcome
+                                   gaps = gapsToJs review.Gaps
+                                   error = Unchecked.defaultof<string> |}
         }
 
     let PlanningSurface: obj =

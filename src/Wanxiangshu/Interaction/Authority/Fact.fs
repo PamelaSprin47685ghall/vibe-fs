@@ -19,3 +19,6 @@ module PromptFact =
 
     let AuthorityRootAccepted (payload: AuthorityRootAcceptedPayload) =
         AgentFact.Prompt(PromptFactCases.AuthorityRootAccepted payload)
+
+    let AuthorityLogicalRunClosed (payload: AuthorityLogicalRunClosedPayload) =
+        AgentFact.Prompt(PromptFactCases.AuthorityLogicalRunClosed payload)

@@ -103,11 +103,7 @@ module OrchestratorProgram =
         deps.Relay.PrepareCandidate job.JobId
         |> mapTaskError (fun error -> failed job (sprintf "Candidate admission failed: %s" error))
 
-    let private recordCandidate
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (candidate: CommitHash)
-        =
+    let private recordCandidate (deps: OrchestratorProgramDeps) (job: ManagerJob) (candidate: CommitHash) =
         append
             deps
             job
@@ -115,11 +111,7 @@ module OrchestratorProgram =
                 {| ManagerJobId = job.JobId
                    CandidateCommit = candidate |})
 
-    let private recordRebased
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        (target: CommitHash)
-        =
+    let private recordRebased (deps: OrchestratorProgramDeps) (job: ManagerJob) (target: CommitHash) =
         taskResult {
             let! rebased = readHead deps job
 
@@ -540,8 +532,7 @@ module OrchestratorProgram =
                 | Ok() -> return! runManagerLoop deps job
             }
 
-        let publishValidated (evidence: PublicationEvidence) =
-            continueValidatedPublish evidence
+        let publishValidated (evidence: PublicationEvidence) = continueValidatedPublish evidence
 
         let certifiedEvidence
             (rebasedReady:
@@ -593,10 +584,7 @@ module OrchestratorProgram =
             | Some record -> return! continueCertifiedWithRecord record
         }
 
-    and private handleQualityCandidate
-        (deps: OrchestratorProgramDeps)
-        (job: ManagerJob)
-        : Task<OrchestratorVerdict> =
+    and private handleQualityCandidate (deps: OrchestratorProgramDeps) (job: ManagerJob) : Task<OrchestratorVerdict> =
         let resumeLoop () = runManagerLoop deps job
 
         let bindingChanged () =
@@ -614,8 +602,7 @@ module OrchestratorProgram =
             |> continueUnit afterConflictRecord
 
         let afterConflictHead files candidate =
-            targetHead deps job
-            |> continueResult (recordObservedConflict files candidate)
+            targetHead deps job |> continueResult (recordObservedConflict files candidate)
 
         let handleObservedConflict files =
             readHead deps job |> continueResult (afterConflictHead files)
@@ -629,8 +616,7 @@ module OrchestratorProgram =
             let afterCandidateRecord () =
                 handleRebase deps job candidate target (rebaseReason rebased)
 
-            recordCandidate deps job candidate
-            |> continueUnit afterCandidateRecord
+            recordCandidate deps job candidate |> continueUnit afterCandidateRecord
 
         let admitPreparedCandidate candidate target =
             let rebased =
@@ -651,8 +637,7 @@ module OrchestratorProgram =
             | _ -> handleObservedConflict files
 
         let onPrepareFailure _ =
-            conflictedFilesResult deps job
-            |> continueResult handleConflictFiles
+            conflictedFilesResult deps job |> continueResult handleConflictFiles
 
         task {
             let! outcome = prepareCandidateResult deps job

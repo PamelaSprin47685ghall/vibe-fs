@@ -58,7 +58,11 @@ module LifecycleKernel =
               PayloadRefs = []
               Payloads = Map.empty }
 
-    let commit (store: IEventStore) (workId: string) (events: LifecycleEvent list) : Task<Result<CommitOutcome, string>> =
+    let commit
+        (store: IEventStore)
+        (workId: string)
+        (events: LifecycleEvent list)
+        : Task<Result<CommitOutcome, string>> =
         if List.isEmpty events then
             Task.FromResult(Error "append requires at least one envelope")
         else
@@ -83,10 +87,17 @@ module LifecycleKernel =
         store.TryCurrent "Lifecycle"
         |> Option.map (fun current -> unbox<Map<string, LifecycleWork>> current)
 
-    let private opened (workId: string) (root: string) (sequence: WorkSequence) (sha256: string -> string) (head: int64) =
+    let private opened
+        (workId: string)
+        (root: string)
+        (sequence: WorkSequence)
+        (sha256: string -> string)
+        (head: int64)
+        =
         let authority = LifecycleIdentity.authorityInitial sha256 workId
         let incumbencyId = LifecycleIdentity.firstIncumbencyId sha256 workId
         let first = WorkSequence.elements sequence |> List.head
+
         [ LifecycleEvent.WorkOpened(workId, root, sequence, authority)
           LifecycleEvent.IncumbencyOpened(workId, incumbencyId, first, head) ]
 
@@ -100,6 +111,7 @@ module LifecycleKernel =
         (observedHead: int64 option)
         : KernelDecision =
         let marked = firstPromptLine = Some LifecycleIdentity.spawnMark
+
         if alreadyOpened then
             KernelDecision.Refuse "second WorkOpened"
         elif kind = OpeningKind.SpawnedExecution && not marked then
@@ -117,12 +129,20 @@ module LifecycleKernel =
 
             match sequence, observedHead with
             | None, _ -> KernelDecision.Refuse "opening kind is not a sequence"
-            | Some seq, _ when (WorkSequence.elements seq |> List.length) <> 1 && (WorkSequence.elements seq |> List.length) <> 3 ->
+            | Some seq, _ when
+                (WorkSequence.elements seq |> List.length) <> 1
+                && (WorkSequence.elements seq |> List.length) <> 3
+                ->
                 KernelDecision.Refuse "sequence length is neither 1 nor 3"
             | Some _, None -> KernelDecision.Refuse "opening cursor was not observed"
             | Some seq, Some head -> KernelDecision.Write(opened workId root seq sha256 head, "opened")
 
-    let bindDevOps (work: LifecycleWork) (trigger: BindTrigger) (devopsId: string) (target: string option) : KernelDecision =
+    let bindDevOps
+        (work: LifecycleWork)
+        (trigger: BindTrigger)
+        (devopsId: string)
+        (target: string option)
+        : KernelDecision =
         let allowed =
             match work.Sequence, trigger with
             | WorkSequence.Execution, BindTrigger.Resume
@@ -188,8 +208,9 @@ module LifecycleKernel =
                 KernelDecision.Refuse "RetirementReplayConflict"
             elif outcome = RetirementOutcome.Delivered then
                 match sessions, record.ExecSessionId, record.Path with
-                | SessionLookup.One known, Some stored, Some path
-                    when known.ExecSessionId = stored && known.WorkId = Some work.WorkId && path <> "" ->
+                | SessionLookup.One known, Some stored, Some path when
+                    known.ExecSessionId = stored && known.WorkId = Some work.WorkId && path <> ""
+                    ->
                     KernelDecision.Done "idempotent"
                 | _ -> KernelDecision.Refuse "RetirementReplayConflict"
             else
@@ -280,10 +301,7 @@ module LifecycleKernel =
                         | SessionLookup.Many -> KernelDecision.Refuse "more than one execution session"
                         | SessionLookup.One _ -> KernelDecision.Refuse "execution session already exists"
                         | SessionLookup.None ->
-                            KernelDecision.Write(
-                                [ LifecycleEvent.RetirementBlocked(active.Id, digest) ],
-                                "blocked"
-                            )
+                            KernelDecision.Write([ LifecycleEvent.RetirementBlocked(active.Id, digest) ], "blocked")
                     | None ->
                         match LifecycleFold.projection work with
                         | Error error -> KernelDecision.Refuse error
@@ -319,16 +337,7 @@ module LifecycleKernel =
                                     | Ok events -> KernelDecision.Write(events, "delivered")
                         | Ok(_, false) ->
                             match
-                                oneshotRetired
-                                    sha256
-                                    work
-                                    active
-                                    fence
-                                    RetirementOutcome.Relayed
-                                    cursor
-                                    None
-                                    None
-                                    None
+                                oneshotRetired sha256 work active fence RetirementOutcome.Relayed cursor None None None
                             with
                             | Error error -> KernelDecision.Refuse error
                             | Ok events -> KernelDecision.Write(events, "relayed")
@@ -396,10 +405,7 @@ module LifecycleKernel =
                         ->
                         match blockerDigest with
                         | Some digest ->
-                            KernelDecision.Write(
-                                [ LifecycleEvent.RetirementBlocked(active.Id, digest) ],
-                                "blocked"
-                            )
+                            KernelDecision.Write([ LifecycleEvent.RetirementBlocked(active.Id, digest) ], "blocked")
                         | None ->
                             match active.Review with
                             | None -> KernelDecision.Refuse "review is missing"
@@ -443,7 +449,11 @@ module LifecycleKernel =
             KernelDecision.Refuse "active tenure blocks reopen"
         else
             match work.DeliveredRecord with
-            | Some record when record.Outcome = RetirementOutcome.Delivered && record.IncumbencyId = incumbencyId && record.Stage.IsSome ->
+            | Some record when
+                record.Outcome = RetirementOutcome.Delivered
+                && record.IncumbencyId = incumbencyId
+                && record.Stage.IsSome
+                ->
                 KernelDecision.Write([ LifecycleEvent.Reopened incumbencyId ], "reopened")
             | Some record when record.Outcome = RetirementOutcome.Relayed ->
                 KernelDecision.Refuse "relayed retirement cannot reopen"
@@ -468,9 +478,9 @@ module LifecycleKernel =
 
     let readRecovery (text: string) (draftExists: bool) : Result<RecoveryPosition * RecoveryNext, ReadFault> =
         ignore draftExists
+
         match LifecycleCodec.readDocument text with
-        | Error(ReadFault.PairIncomplete reason) ->
-            Ok(RecoveryPosition.PairIncomplete, RecoveryNext.StopPairIncomplete)
+        | Error(ReadFault.PairIncomplete reason) -> Ok(RecoveryPosition.PairIncomplete, RecoveryNext.StopPairIncomplete)
         | Error fault -> Error fault
         | Ok events ->
             match LifecycleFold.applyAll events with

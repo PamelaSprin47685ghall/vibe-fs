@@ -39,7 +39,6 @@ module PlanWorkOpenWiring =
             let storeOpt = commonDirOpt |> Option.bind WorkspaceEventStore.tryCurrent
 
             match commonDirOpt, storeOpt with
-            | Some commonDir, Some store ->
-                do! runPlanWorkOpen store (commonDir + "/wanxiangshu") sid observedHead
+            | Some commonDir, Some store -> do! runPlanWorkOpen store (commonDir + "/wanxiangshu") sid observedHead
             | _ -> Diagnostic.emit "plan-work-open-store-unavailable" [ "work_id", sid ]
         }

@@ -22,6 +22,75 @@ module PlanWorkOpen =
     let internal deriveDevOpsId (workId: string) : string =
         "devops-" + (HostDigest.sha256Hex ("plan-devops:" + workId)).[..15]
 
+    let private resolveStoreDir (root: string) (stampedDir: string) =
+        if not (String.IsNullOrWhiteSpace stampedDir) then
+            stampedDir
+        elif root.EndsWith("/wanxiangshu") then
+            root.Substring(0, root.Length - "/wanxiangshu".Length)
+        else
+            root
+
+    let private receiptRefusal (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) =
+        if receipt.Reason = "" then
+            receipt.Status
+        else
+            receipt.Reason
+
+    let private settleOpenReceipt
+        (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
+        : Task<Result<unit, string>> =
+        if receipt.Status = "Committed" || receipt.Status = "Replayed" then
+            Task.FromResult(Ok())
+        else
+            Task.FromResult(Error(receiptRefusal receipt))
+
+    let private ensureOpened
+        (root: string)
+        (sessionId: string)
+        (head: int64)
+        (gitCommonDir: string)
+        : Task<Result<unit, string>> =
+        let snapshot =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspect gitCommonDir sessionId
+
+        let opened = snapshot?opened
+
+        if unbox<bool> opened then
+            Task.FromResult(Ok())
+        else
+            let requestId = sessionId + ":open:" + string head
+
+            let command =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    "Open"
+                    [ "root", box root
+                      "sequence", Wanxiangshu.Mission.Lifecycle.DurableWorkHost.planSequence ()
+                      "ownerId", box sessionId
+                      "openingCursor", box (float head) ]
+
+            let receipt =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir sessionId requestId command
+
+            settleOpenReceipt receipt
+
+    let private openDerived
+        (store: IEventStore)
+        (root: string)
+        (sessionId: string)
+        (head: int64)
+        : Task<Result<unit, string>> =
+        let stamped =
+            emitJsExpr store "$0 && typeof $0.gitCommonDir === 'string' ? $0.gitCommonDir : ''"
+
+        let stampedDir = if isNull stamped then "" else string stamped
+        let derived = resolveStoreDir root stampedDir
+        let parentExists = existsSync derived
+
+        if String.IsNullOrWhiteSpace derived || not parentExists then
+            Task.FromResult(Error "the plan store cannot be read")
+        else
+            ensureOpened root sessionId head derived
+
     let ensurePlanWorkOpened
         (store: IEventStore)
         (root: string)
@@ -33,37 +102,4 @@ module PlanWorkOpen =
         elif observedHead.IsNone then
             Task.FromResult(Error "opening cursor was not observed")
         else
-            let stamped = emitJsExpr store "$0 && typeof $0.gitCommonDir === 'string' ? $0.gitCommonDir : ''"
-            let stampedDir = if isNull stamped then "" else string stamped
-            let derived =
-                if not (String.IsNullOrWhiteSpace stampedDir) then
-                    stampedDir
-                elif root.EndsWith("/wanxiangshu") then
-                    root.Substring(0, root.Length - "/wanxiangshu".Length)
-                else
-                    root
-            let parentExists = existsSync derived
-            if String.IsNullOrWhiteSpace derived || not parentExists then
-                Task.FromResult(Error "the plan store cannot be read")
-            else
-            let gitCommonDir = derived
-            let head = observedHead.Value
-            let snapshot = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspect gitCommonDir sessionId
-            let opened = snapshot?opened
-            if unbox<bool> opened then
-                Task.FromResult(Ok())
-            else
-                let requestId = sessionId + ":open:" + string head
-                let command =
-                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                        "Open"
-                        [ "root", box root
-                          "sequence", Wanxiangshu.Mission.Lifecycle.DurableWorkHost.planSequence ()
-                          "ownerId", box sessionId
-                          "openingCursor", box (float head) ]
-                let receipt =
-                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir sessionId requestId command
-                if receipt.Status = "Committed" || receipt.Status = "Replayed" then
-                    Task.FromResult(Ok())
-                else
-                    Task.FromResult(Error(if receipt.Reason = "" then receipt.Status else receipt.Reason))
+            openDerived store root sessionId observedHead.Value

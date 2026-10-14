@@ -52,9 +52,13 @@ module PluginRecoveryWiring =
             workspace
             |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
             |> Option.defaultValue ""
+
         for KeyValue(sessionId, projection) in snapshot.AgentProjections.Sessions do
             let workId = SessionId.value sessionId
-            let _recovery = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.recover gitCommonDir workId
+
+            let _recovery =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.recover gitCommonDir workId
+
             let target =
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
                 |> Option.bind (fun work -> work.DevOpsId)
@@ -78,44 +82,6 @@ module PluginRecoveryWiring =
             readExistingFile (System.IO.Path.Combine(root, relPath))
         with _ ->
             None
-
-    /// Algorithm F: recovery reads the unified fold, not the retired Plan events.
-    let private emitUnifiedRecoveryEffect (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork) : unit =
-        match Wanxiangshu.Mission.Lifecycle.LifecycleFold.recover work with
-        | Error reason ->
-            Diagnostic.emit "plan-recovery-conflict" [ "work_id", work.WorkId; "reason", reason ]
-        | Ok(position, _) ->
-            match position with
-            | Wanxiangshu.Mission.Lifecycle.RecoveryPosition.DeliveredIdempotent ->
-                Diagnostic.emit "plan-work-delivered-idempotent" [ "work_id", work.WorkId ]
-            | Wanxiangshu.Mission.Lifecycle.RecoveryPosition.ActiveRebound ->
-                Diagnostic.emit "plan-work-active-rebound" [ "work_id", work.WorkId ]
-            | Wanxiangshu.Mission.Lifecycle.RecoveryPosition.Conflict ->
-                Diagnostic.emit "plan-recovery-conflict" [ "work_id", work.WorkId ]
-            | _ -> ()
-
-    let private evaluatePlanRecovery
-        (worksOpt: Wanxiangshu.Mission.Lifecycle.LifecycleWork list option)
-        (workspaceDirOpt: string option)
-        : unit =
-        match worksOpt, workspaceDirOpt with
-        | Some works, Some _ -> works |> List.iter emitUnifiedRecoveryEffect
-        | _ -> ()
-
-    // Stopped. This function has a workspace and no session list that is independent
-    // of the lifecycle journal. The public journal cannot list work ids. Missing
-    // identity: the session id that would name the work. Do not call tryWorksOfStore.
-    let private tryResolveViews
-        (_workspace: string)
-        : Wanxiangshu.Mission.Lifecycle.LifecycleWork list option =
-        None
-
-    let private tryResolveWorkspaceViews
-        (workspaceDirOpt: string option)
-        : Wanxiangshu.Mission.Lifecycle.LifecycleWork list option =
-        match workspaceDirOpt with
-        | Some workspace when not (String.IsNullOrWhiteSpace workspace) -> tryResolveViews workspace
-        | _ -> None
 
     let attach (boot: PluginBoot.Boot) : unit =
         let scope = boot.Scope
@@ -188,15 +154,6 @@ module PluginRecoveryWiring =
                     match boot.Journal with
                     | Some journal -> seedBoundDevOpsModelTargets journal boot.WorkspaceDirectory
                     | None -> ()
-
-                    // planning-018 / Algorithm J: Plan crash recovery idempotent evaluation
-                    // Recover Plan position from durable projection without text guessing.
-                    // Delivered remains final; Active rebinds without recreating work or resuming uninvited DevOps.
-                    try
-                        let viewsOpt = tryResolveWorkspaceViews boot.WorkspaceDirectory
-                        evaluatePlanRecovery viewsOpt boot.WorkspaceDirectory
-                    with ex ->
-                        Diagnostic.emit "plan-crash-recovery-failed" [ "error", ex.Message ]
 
                     // crash-reconciliation-018: the load-phase normalization above owes
                     // one restart status guidance to the next real user instruction.

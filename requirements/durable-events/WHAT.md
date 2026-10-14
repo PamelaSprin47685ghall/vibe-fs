@@ -111,3 +111,7 @@ semantic fold失败必须先durable写入对应bad fact与`ProjectionCutTail`，
 协议升级需要接纳旧事实时，唯一合法路径是离线一次性迁移：经 EventStore 所有者的读取、payload 与 append 边界，在备份或副本上追加**仅承载历史材料的导入事实**。导入事实是全新的 `event_type`（追加词汇表原则，不与旧类型同名复用），载荷只重建旧事实的因果位置、digest、payload 引用与覆盖范围等历史证据。导入事实不得充当任何新时代协议的准入凭证：不得由它推导出可运行的授权、绑定或候选，不得产生副本，也不参与新委托的生命周期判定。
 
 存储层不因导入而出现迁移代次：[009] 的 leave-unread 与拒绝语义不变，运行时不双读、双写、不自动迁移、不维护旧载荷解析；未迁移的旧存储由入口检查拒绝以新运行时消费并给出明确迁移指引，禁止边读边跳过。迁移不得原地改写 append-only 历史、Git raw object 或 refs，不得清库，不得覆盖用户配置；envelope 父边、payload refs、decision 引用与 XTrace 因果锚点必须保留或正确重建，并以 cold replay 对照证明业务 Current 一致。迁移工具、输入/输出版本与一次性操作步骤由 owning package 提供自动化测试。
+
+## [027] 退役生命周期词汇保持 fail-closed 拒绝
+
+迁移前内核经由 ndjson 事件流持久化的 9 类生命周期事件类型（`WorkOpened`、`DevOpsBound`、`IncumbencyOpened`、`ConfirmationCommitted`、`IncumbencyRetired`、`Reviewed`、`Reopened`、`AdvanceCommitted`、`RetirementBlocked`）已退出权威词汇表。保留历史中残留任一此类 `event_type` 的 canonical 行在 boot/reload 校验时必须整体拒绝装载：以 boot 阶段的可观察形态 `local EventStore boot failed: unknown durable event type during replay: <event_type>`（核心形态为 `unknown durable event type during replay: <event_type>`）fail-closed，不得跳过、静默装载、改写或删除该行。移除该行后同一目录的其余合法历史必须可正常装载，以证明拒绝来自该行本身；上述类型不得被重新注册回权威词汇表，也不得放宽 `isKnown` 使其重新可读。

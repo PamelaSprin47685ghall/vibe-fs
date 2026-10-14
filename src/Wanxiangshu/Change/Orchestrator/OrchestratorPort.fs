@@ -3,6 +3,7 @@ namespace Wanxiangshu.Change
 open System.Threading.Tasks
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation.Identity
+
 type OrchestratorRecoveryView =
     { ActiveJobs: ManagerJobProjection list
       Handles: AgentLinkageProjection option }

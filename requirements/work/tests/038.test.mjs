@@ -67,14 +67,16 @@ test('WHAT[work-038] empty findings promote the tenure; non-empty findings keep 
     const opened = await surface.PlanningSurface.ensurePlanWorkOpened(store, commonDir, 'work-22a', 0n)
     assert.equal(opened.ok, true, opened.error)
     const activeId = openedActiveId(life.encodeOpening('plan', 'work-22a', commonDir, 0n))
-    const stayed = await surface.PlanningSurface.executeReview(store, 'work-22a', activeId, [
-      {
-        acceptance_criteria: 'The tradeoff table covers storage engines',
-        work_plan: 'Add a storage engine comparison to the plan',
-      },
-    ], null)
-    assert.equal(stayed.ok, false)
-    assert.match(stayed.error, /cannot review its own incumbency/i)
+    const finding = {
+      acceptance_criteria: 'The tradeoff table covers storage engines',
+      work_plan: 'Add a storage engine comparison to the plan',
+    }
+    // The reviewer is a distinct bound identity, not the incumbency owner:
+    // the same call succeeds and keeps the tenure with the gaps returned.
+    const stayed = await surface.PlanningSurface.executeReview(store, 'work-22a', activeId, [finding], null)
+    assert.equal(stayed.ok, true, stayed.error)
+    assert.equal(stayed.outcome, 'Stayed')
+    assert.deepEqual(stayed.gaps, [finding])
   })
 })
 
@@ -103,8 +105,9 @@ test('WHAT[work-038] a fresh tenure with empty findings is promoted', async () =
     assert.equal(opened.ok, true, opened.error)
     const activeId = openedActiveId(life.encodeOpening('plan', 'work-22b', commonDir, 0n))
     const promotedLive = await surface.PlanningSurface.executeReview(store, 'work-22b', activeId, [], null)
-    assert.equal(promotedLive.ok, false)
-    assert.match(promotedLive.error, /cannot review its own incumbency/i)
+    assert.equal(promotedLive.ok, true, promotedLive.error)
+    assert.equal(promotedLive.outcome, 'Promoted')
+    assert.deepEqual(promotedLive.gaps, [])
   })
 })
 

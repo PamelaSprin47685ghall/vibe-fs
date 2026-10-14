@@ -200,4 +200,23 @@ test('WHAT[interaction-authority-008] plugin claim is frozen even if the later p
   assert.equal('effectiveAgent' in resolved, false, 'intent carries no EffectiveAgent')
   assert.equal('selectedAgent' in resolved, false, 'intent carries no SelectedAgent')
 })
+test('WHAT[interaction-authority-008] a landed AgentOwnerRoot physical message is a no-op replay, not an unclaimed rejection', () => {
+  const durable = snapshot({
+    activeParticipant: 'engineer',
+    activeKind: 'AgentOwnerRoot',
+    landings: [
+      {
+        promptKey: 'landed-owner-root',
+        physicalUserMessageId: 'msg-chat',
+        origin: 'AgentOwnerRoot',
+        participant: 'engineer',
+      },
+    ],
+  })
+
+  assert.deepEqual(
+    decide(message({ promptKey: 'landed-owner-root', explicitAgent: 'engineer' }), durable),
+    { case: 'NoManagedExecution', reason: 'AlreadyAcceptedHostMessage', origin: 'AgentOwnerRoot' },
+  )
+})
 }

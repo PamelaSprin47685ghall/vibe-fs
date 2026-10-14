@@ -3,7 +3,6 @@ namespace Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Strength
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Programming.Js
-open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Sphinx.V2.Core
 
 [<RequireQualifiedAccess>]
@@ -23,7 +22,6 @@ module AuthoritativeEventTypes =
               yield! JsTransactionEventTypes.all
               yield! CasebookEventTypes.all
               yield! StrengthEventTypes.all
-              yield! LifecycleEventTypes.all
               // Version 1 remains readable for the domain's explicit semantic cut.
               // New transitions use the strict canonical version 2 payload.
               yield! SphinxV2EventTypes.all ]

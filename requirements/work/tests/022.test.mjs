@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as planning from '../../../dist/Mission/Planning/Surface.js'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -8,10 +12,10 @@ const framesOf = (text) => text.split('\n').filter((line) => line.length > 0).ma
 const eventsOf = (text) => framesOf(text).flatMap((frame) => frame.events ?? [])
 const incumbencyIdOf = (text) => [...eventsOf(text)].reverse().find((event) => event.type === 'IncumbencyOpened').incumbencyId
 
-const replayed = (text, run, call, head) => {
-  const again = surface.replayStateProbe(text, run, call, head)
+const replayed = (text, run, call, head, draft) => {
+  const again = surface.replayStateProbe(text, run, call, head, draft)
   assert.equal(again.decision, 'Done', again.detail)
-  assert.equal(again.detail, 'idempotent')
+  assert.equal(again.detail, 'Replayed')
   const original = surface.documentView(text)
   const after = surface.documentView(text)
   assert.deepEqual(after, original, 'exact replay returns the original folded state')
@@ -46,12 +50,13 @@ test('WHAT[work-022] rotation facts and exact replay return the original state',
   assert.equal(openView.projection, 'S1')
   assert.equal(openView.retiredCount, 0)
 
-  // A second WorkOpened is not an idempotent replay of the first.
+  // The same opening record under the same request id is an idempotent
+  // replay, not a second opening.
   const secondOpen = surface.readProbe(opened + opened)
-  assert.equal(secondOpen.ok, false)
-  assert.equal(secondOpen.opened, false)
-  assert.equal(secondOpen.names, '')
-  assert.equal(secondOpen.reason.includes('already open'), true)
+  assert.equal(secondOpen.ok, true, secondOpen.reason)
+  assert.equal(secondOpen.opened, true)
+  assert.equal(secondOpen.names, 'WorkOpened,IncumbencyOpened')
+  assert.equal(secondOpen.next, 'Review')
 
   const firstId = incumbencyIdOf(opened)
   const reviewed = surface.reviewProbe(opened, firstId, 'Promoted')
@@ -83,7 +88,7 @@ test('WHAT[work-022] rotation facts and exact replay return the original state',
   assert.notEqual(relayedView.activeId, firstId)
   const relayAgain = surface.deliverProbe(relayedText, 'run-1', 'call-1', 10n)
   assert.equal(relayAgain.decision, 'Done', relayAgain.detail)
-  assert.equal(relayAgain.detail, 'idempotent')
+  assert.equal(relayAgain.detail, 'Replayed')
   assert.equal(relayAgain.names, '')
   assert.deepEqual(surface.documentView(relayedText), relayedView, 'exact relay replay returns the original state')
 
@@ -91,17 +96,28 @@ test('WHAT[work-022] rotation facts and exact replay return the original state',
   const authorizedView = surface.documentView(authorized)
   assert.equal(authorizedView.projection, 'S3')
   assert.equal(authorizedView.authorized, true)
-  const delivered = surface.deliverStateProbe(authorized, 'run-final', 'call-final', 30n)
+  const planRoot = mkdtempSync(join(tmpdir(), 'wxs-work-022-plan-'))
+  let delivered
+  let selected
+  try {
+    const written = planning.PlanningSurface.rewritePlanAtomic(planRoot, 'work-1b', '# plan\n')
+    assert.equal(written.ok, true, written.error)
+    selected = planning.PlanningSurface.readAndValidatePlan(planRoot, 'work-1b')
+    assert.equal(selected.ok, true, selected.error)
+    delivered = surface.deliverStateProbe(authorized, 'run-final', 'call-final', 30n, { digest: selected.digest, path: selected.path })
+  } finally {
+    rmSync(planRoot, { recursive: true, force: true })
+  }
   assert.equal(delivered.decision, 'Write', delivered.detail)
   assert.equal(delivered.detail, 'delivered')
   assert.equal(delivered.names, 'IncumbencyRetired')
   const deliveredText = `${authorized}${delivered.bytes}`
   const deliveredView = surface.documentView(deliveredText)
   assert.equal(deliveredView.delivered, true)
-  assert.equal(deliveredView.digest, 'sha256-receipt')
-  assert.equal(deliveredView.execSessionId, 'exec-session-1')
+  assert.equal(deliveredView.digest, selected.digest)
+  assert.equal(deliveredView.execSessionId.startsWith('exec:'), true)
   assert.equal(deliveredView.active, false)
-  replayed(deliveredText, 'run-final', 'call-final', 30n)
+  replayed(deliveredText, 'run-final', 'call-final', 30n, { digest: selected.digest, path: selected.path })
 
   const reopened = surface.reopenProbe(deliveredText, incumbencyIdOf(authorized))
   assert.equal(reopened.decision, 'Write', reopened.detail)
@@ -125,7 +141,7 @@ test('WHAT[work-022] conflicting payloads and illegal transitions fail closed', 
   assert.equal(openConflict.ok, false)
   assert.equal(openConflict.opened, false)
   assert.equal(openConflict.names, '')
-  assert.equal(openConflict.reason.includes('already open'), true)
+  assert.equal(openConflict.reason.includes('RequestIdConflict'), true)
 
   const firstId = incumbencyIdOf(opened)
   const secondActive = surface.detachedOpeningProbe(opened)
@@ -151,11 +167,20 @@ test('WHAT[work-022] conflicting payloads and illegal transitions fail closed', 
 
   const reopenActive = surface.reopenProbe(opened, firstId)
   assert.equal(reopenActive.decision, 'Refuse')
-  assert.match(reopenActive.detail, /active tenure|no delivered/i)
+  assert.match(reopenActive.detail, /inactive/i)
 
   const authorized = climb('work-2', '/repo/root', 0n)
-  const retiredId = incumbencyIdOf(authorized)
-  const delivered = surface.deliverStateProbe(authorized, 'run-2', 'call-2', 30n)
+  const planRoot = mkdtempSync(join(tmpdir(), 'wxs-work-022-deliver-'))
+  let delivered
+  try {
+    const written = planning.PlanningSurface.rewritePlanAtomic(planRoot, 'work-2', '# plan\n')
+    assert.equal(written.ok, true, written.error)
+    const selected = planning.PlanningSurface.readAndValidatePlan(planRoot, 'work-2')
+    assert.equal(selected.ok, true, selected.error)
+    delivered = surface.deliverStateProbe(authorized, 'run-2', 'call-2', 30n, { digest: selected.digest, path: selected.path })
+  } finally {
+    rmSync(planRoot, { recursive: true, force: true })
+  }
   assert.equal(delivered.decision, 'Write', delivered.detail)
   const deliveredText = `${authorized}${delivered.bytes}`
   const wrong = surface.reopenProbe(deliveredText, 'not-the-delivered-incumbency')

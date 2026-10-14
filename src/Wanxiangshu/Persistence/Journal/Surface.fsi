@@ -20,6 +20,8 @@ module JournalSurface =
 
     val boot: commonDir: string -> runtimeId: string -> processId: int -> startedAt: string -> Task<obj>
     val acquireSharedForWorkspace: workspace: string -> processId: int -> startedAt: string -> Task<obj>
+    /// interaction-authority-018: append one exact HumanRoot/Manager logical-run closure through the shared journal owner.
+    val appendAuthorityLogicalRunClosed: commonDir: string -> sessionId: string -> retirementId: string -> Task<unit>
     val dispose: handle: JournalHandle -> unit
     val runtimeId: handle: JournalHandle -> string
     /// The store this handle's writer owns, or null when it has none.

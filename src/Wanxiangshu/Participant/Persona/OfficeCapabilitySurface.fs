@@ -67,8 +67,7 @@ module OfficeCapabilitySurface =
             Some
                 { HasActiveIncumbency = unbox<bool> (facts?hasActiveIncumbency)
                   HasAssessment = unbox<bool> (facts?hasAssessment)
-                  HasConfirmation =
-                    not (isNullish facts?hasConfirmation) && unbox<bool> facts?hasConfirmation
+                  HasConfirmation = not (isNullish facts?hasConfirmation) && unbox<bool> facts?hasConfirmation
                   IsFinalIncumbent = unbox<bool> (facts?isFinalIncumbent)
                   CleanupBlockerDigest = if isNullish digest then None else Some digest }
 

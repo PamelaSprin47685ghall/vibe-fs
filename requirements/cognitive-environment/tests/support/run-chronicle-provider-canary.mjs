@@ -13,6 +13,9 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../../../..')
 const marker = fs.readFileSync(path.join(root, 'resources/provider/cognitive-environment/blogger-chronicle-text/en.md'), 'utf8').trim()
 const bloggerRequests = []
+// 015 diagnostics: every POST body's tool census, independent of the chronicle
+// counter below. Observational only; it never feeds a pass/fail decision.
+const providerRequestsCensus = []
 const providerErrors = []
 const callbacks = new Set()
 let finish
@@ -29,6 +32,13 @@ const handleProviderRequest = async (request, response) => {
       return
     }
     const body = JSON.parse(bytes.toString('utf8'))
+    // 015 diagnostics: record every POST that reached the provider, before any
+    // business branch. The chronicle counter and all assertions stay unchanged.
+    providerRequestsCensus.push({
+      session: request.headers['x-session-affinity'] ?? null,
+      model: body.model ?? null,
+      tools: (body.tools ?? []).map(tool => tool.function?.name ?? tool.name),
+    })
     const chronicle = (body.tools ?? []).find(tool => (tool.function?.name ?? tool.name) === 'chronicle')
     if (!chronicle) {
       sendSSE(response, buildTextChunks('main-canary', 'The material is ready for its permanent record.', 1))
@@ -65,6 +75,9 @@ let scenarioDir
 let timeout
 let probe
 let result
+// 015 diagnostics: the manager session id, hoisted so the failure path can ask
+// the Host for its children. Assignment semantics are unchanged.
+let sessionId
 const failures = []
 const cleanupErrors = []
 const api = async (pathname, body) => {
@@ -78,6 +91,45 @@ const api = async (pathname, body) => {
   return text ? JSON.parse(text) : null
 }
 const valueOf = response => response?.data?.data ?? response?.data ?? response
+// 015 diagnostics: best-effort failure observation. Every probe is wrapped so a
+// diagnostic failure can never become a canary failure; nothing here feeds any
+// assertion, status code or canary timing decision (the verdict is already
+// captured in `failures` before this runs).
+const collectFailureDiagnostics = async () => {
+  const note = message => console.error(`[015-diagnostics] ${message}`)
+  const logTail = (label, file) => {
+    try {
+      if (!file || !fs.existsSync(file)) return
+      const lines = fs.readFileSync(file, 'utf8').split('\n')
+      note(`${label} tail (${lines.length} lines):\n${lines.slice(-120).join('\n')}`)
+    } catch (error) {
+      note(`${label} unavailable: ${error?.message ?? error}`)
+    }
+  }
+  try {
+    logTail('opencode.log', path.join(host.workDir, 'opencode.log'))
+    logTail('scenario opencode.log', path.join(scenarioDir ?? '', 'opencode.log'))
+  } catch (error) {
+    note(`opencode.log collection skipped: ${error?.message ?? error}`)
+  }
+  if (sessionId) {
+    try {
+      const response = await fetch(`${host.baseUrl}/session/${sessionId}/children`, {
+        signal: AbortSignal.timeout(3000),
+      })
+      const text = await response.text()
+      note(`children(${sessionId}) status=${response.status} body=${text.slice(0, 4000)}`)
+    } catch (error) {
+      note(`children observation skipped: ${error?.message ?? error}`)
+    }
+  } else {
+    note('children observation skipped: manager session id was never assigned')
+  }
+  note(`provider requests total=${providerRequestsCensus.length}; chronicle=${bloggerRequests.length}`)
+  for (const [index, request] of providerRequestsCensus.entries()) {
+    note(`request ${index} session=${request.session} model=${request.model} tools=${request.tools.join(',') || '(none)'}`)
+  }
+}
 try {
   timeout = setTimeout(() => fail(new Error(`Blogger provider requests missing: observed ${bloggerRequests.length}`)), 30000)
   provider = await startHttpServer((request, response) => {
@@ -104,7 +156,8 @@ export default function route(role) { return { model: role === 'blogger' ? 'test
   })
   probe = new EventProbe(host.baseUrl, host.workDir)
   await probe.connect()
-  const session = valueOf(await api('/api/session', { agent: 'manager', model: { providerID: 'test', id: 'test-model' } })).id
+  sessionId = valueOf(await api('/api/session', { agent: 'manager', model: { providerID: 'test', id: 'test-model' } })).id
+  const session = sessionId
   await api(`/session/${session}/prompt_async`, {
     messageID: 'msg-chronicle-provider-canary', agent: 'manager',
     model: { providerID: 'test', modelID: 'test-model' },
@@ -146,6 +199,7 @@ export default function route(role) { return { model: role === 'blogger' ? 'test
   result = { providerRequests: bloggerRequests.length, chronicleCompleted: true, historyClean: true, journalClean: true }
 } catch (error) {
   console.error(host.stdoutLog)
+  await collectFailureDiagnostics()
   failures.push(error)
 } finally {
   clearTimeout(timeout)

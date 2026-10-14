@@ -130,6 +130,10 @@ const DURABLE_SUBSTRATE_OWNER_PATHS = Object.freeze([
   'src/Wanxiangshu/OpenCode/Host/WorkspaceEventStore.fs',
   'src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs',
   'src/Wanxiangshu/Verification/EventStoreWriterSurface.fs',
+  // Host-owned lifecycle journal for new work (work.sqlite): the only module
+  // that opens and closes it. Registered as its exact physical owner; the
+  // cutover to the canonical EventStore is consumer wiring, not this task.
+  'src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs',
 ])
 const isDurableSubstrateOwnerPath = (file) =>
   DURABLE_SUBSTRATE_OWNER_PATHS.some((expected) => pathIs(file, expected))

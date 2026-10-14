@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {withReview, scores} from './support/plugin.mjs'
 import {withSuccessor, messageId} from './support/cut.mjs'
-import { withExecutablePlugin, acceptAuthorityRoot } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { withExecutablePlugin, acceptAuthorityRoot, injectAcceptedAssessment, lifecycleWorkView } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 test('WHAT[work-011] actual Promoted deliver confirms then retires without abort and dispatches no successor', async () => {
   await withReview(async ({execute, hooks, runtime, session}) => {
@@ -250,4 +250,34 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
     assert.deepEqual(strayWake.messages, [])
     assert.equal(runtime.abortedIds.length, abortsBefore)
   })
+})
+
+test('WHAT[work-011] a review whose reviewer identity is the incumbency owner is refused by the kernel self-review gate', async () => {
+  // The Manager backend reviews as the fixed manager-reviewer identity. Seed the
+  // incumbency with that same identity as owner: the reviewer equals the owner,
+  // and the kernel refuses the self-review instead of recording it.
+  await withReview(async ({execute, runtime, session}) => {
+    assert.equal(lifecycleWorkView(runtime, session).active, true)
+    await assert.rejects(
+      execute(scores('PERFECT')),
+      (error) => {
+        assert.match(String(error && error.message ? error.message : error), /owner cannot review/i)
+        return true
+      },
+    )
+    // The refusal wrote nothing: the tenure stays active and unreviewed.
+    const afterTool = lifecycleWorkView(runtime, session)
+    assert.equal(afterTool.reviewed, '')
+    assert.equal(afterTool.active, true)
+    // The seeding path with the explicit reviewer identity is refused by the
+    // same gate, so an identity that never reaches the kernel would fail here.
+    await assert.rejects(
+      injectAcceptedAssessment(runtime, session, undefined, 'Promoted', 'manager-reviewer'),
+      (error) => {
+        assert.match(String(error && error.message ? error.message : error), /owner cannot review/i)
+        return true
+      },
+    )
+    assert.equal(lifecycleWorkView(runtime, session).reviewed, '')
+  }, {ownerId: 'manager-reviewer'})
 })

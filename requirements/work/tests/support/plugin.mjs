@@ -7,14 +7,14 @@ export const findings = grade => grade === 'REVISE'
   ? { findings: [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }] }
   : { findings: [] }
 export const scores = findings
-export const withReview = async body => withExecutablePlugin(async (hooks, directory, created, runtime) => {
+export const withReview = async (body, {ownerId} = {}) => withExecutablePlugin(async (hooks, directory, created, runtime) => {
   const session = 'review-manager'
   await acceptAuthorityRoot(runtime, session, 'manager', 'user-root')
   await hooks['chat.message']({sessionID: session, agent: 'manager'}, {
     message: {id: 'user-root', role: 'user', agent: 'manager', model: {providerID: 'provider', modelID: 'manager-model'}},
     parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}],
   })
-  await openIncumbency(runtime, session)
+  await openIncumbency(runtime, session, `inc-${session}`, 'S4', ownerId)
   runtime.pushHostMessage(session, {info: {id: 'user-root', role: 'user', sessionID: session, time: {created: 1}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]})
   let createdAt = 1
   const execute = async (input, {call = 'review-call', run = 'review-run', before = 'I independently inspected the current workspace.', after = 'after review'} = {}) => {

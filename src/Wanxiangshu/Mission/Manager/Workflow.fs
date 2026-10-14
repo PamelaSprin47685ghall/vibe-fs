@@ -193,6 +193,63 @@ module ManagerWorkflow =
 
             ignore receipt
 
+    /// S4 retirement is the exact durable completion of a Manager life. The
+    /// completed retirement and the still-active HumanRoot/Manager authority
+    /// are read as named steps; only their meeting appends the closure fact.
+    /// A projection that already lost its active run writes nothing, so
+    /// repeated transforms stay idempotent.
+    let private completedManagerRetirement
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        =
+        if work.Sequence = [ "S4" ] && work.ActiveId.IsNone && work.Delivered then
+            work.Retirements |> List.tryFind (fun retirement -> retirement.Outcome = "Delivered")
+        else
+            None
+
+    let private activeHumanRootManager (journal: AgentJournal) (session: SessionId) =
+        PromptAuthorityProjectionQueries.activeProfile session (AgentJournal.snapshot journal).AgentProjections
+        |> Option.filter (fun active ->
+            active.CanonicalRole = Role.Manager
+            && active.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot)
+
+    let private appendManagerAuthorityClosure
+        (journal: AgentJournal)
+        (session: SessionId)
+        (active: PromptAuthority.AuthorityExecutionProfile)
+        (retirementId: string)
+        : Task<unit> =
+        task {
+            let fact =
+                PromptFact.AuthorityLogicalRunClosed
+                    { SessionId = session
+                      LogicalRunId = active.LogicalRunId
+                      AuthorityRootUserMessageId = active.AuthorityRootUserMessageId
+                      RootKind = "HumanRoot"
+                      ClosureWitness = retirementId }
+
+            match! AgentJournal.appendAgent (StreamId.Session session) None fact journal with
+            | Ok _ -> return ()
+            | Error failure -> return invalidOp ("authority closure append failed: " + string failure)
+        }
+
+    let private closeCompletedManagerAuthority
+        (journal: AgentJournal)
+        (gitCommonDir: string)
+        (sessionId: string)
+        : Task<unit> =
+        task {
+            let session = SessionId.create sessionId
+
+            let retirement =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId
+                |> Option.bind completedManagerRetirement
+
+            match retirement, activeHumanRootManager journal session with
+            | Some delivered, Some active ->
+                return! appendManagerAuthorityClosure journal session active delivered.RetirementId
+            | _ -> return ()
+        }
+
     let ensureManagerWorkOpened
         (journal: AgentJournal option)
         (workspaceDirectory: string option)
@@ -202,7 +259,6 @@ module ManagerWorkflow =
         (providerRunIdOpt: ProviderRunIdentity option)
         : Task<unit> =
         task {
-            ignore journal
             ignore providerRunIdOpt
 
             match store, sessionIdTextOpt, workspaceDirectory with
@@ -211,7 +267,12 @@ module ManagerWorkflow =
             | _, _, None -> return ()
             | Some _held, Some sessionId, Some root ->
                 observedHead |> Option.iter (openManagerWorkAtHead sessionId root)
-                return ()
+
+                match journal with
+                | Some durable ->
+                    let gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir root
+                    return! closeCompletedManagerAuthority durable gitCommonDir sessionId
+                | None -> return! Task.FromResult()
         }
 
     let private deliverLoopPrompt

@@ -138,6 +138,29 @@ module ChatAdmissionIntentSurface =
 
         physical, continuation
 
+    let private landingOf
+        (sessionId: SessionId)
+        (value: obj)
+        : PhysicalUserMessageId * PromptAuthority.AcceptedDispatch =
+        let physical =
+            requiredString "landing.physicalUserMessageId" value?physicalUserMessageId
+            |> PhysicalUserMessageId.create
+
+        let promptKey = requiredString "landing.promptKey" value?promptKey |> PromptKey.create
+
+        let participant =
+            optionalString value?participant
+            |> Option.orElseWith (fun () -> optionalString value?selectedAgent)
+            |> Option.defaultWith (fun () -> invalidArg "landing.participant" "landing.participant must be non-empty")
+
+        physical,
+        { PromptKey = promptKey
+          SessionId = sessionId
+          Origin = requiredString "landing.origin" value?origin |> originOf
+          IdentitySeed = PromptAuthority.IdentitySeed.RootSelection(rootIdentity participant)
+          PayloadDigest = "surface-landing"
+          PhysicalUserMessageId = physical }
+
     let private authoritySnapshot
         (decoded: ChatAdmissionIntent.DecodedMessage)
         (snapshot: obj)
@@ -162,6 +185,12 @@ module ChatAdmissionIntentSurface =
                 else
                     unbox<obj array> snapshot?acceptedContinuations
 
+            let landings: obj array =
+                if isNull snapshot?landings then
+                    [||]
+                else
+                    unbox<obj array> snapshot?landings
+
             let projection: PromptAuthority.PromptAuthorityProjection =
                 { PromptAuthority.empty with
                     ActiveLogicalRun = activeProfile snapshot sessionId
@@ -170,7 +199,8 @@ module ChatAdmissionIntentSurface =
                         |> Array.map claimOf
                         |> Array.map (fun claim -> claim.PromptKey, claim)
                         |> Map.ofArray
-                    AcceptedContinuationIds = accepted |> Array.map acceptedContinuationOf |> Map.ofArray }
+                    AcceptedContinuationIds = accepted |> Array.map acceptedContinuationOf |> Map.ofArray
+                    PhysicalLandings = landings |> Array.map (landingOf sessionId) |> Map.ofArray }
 
             { ChatAdmissionIntent.DurableSnapshot.Authority = Some projection
               AcceptedExecutionEvidence = None }
@@ -223,11 +253,11 @@ module ChatAdmissionIntentSurface =
             box
                 {| ``case`` = "NoManagedExecution"
                    reason = "UnmanagedMessage" |}
-        | ChatAdmissionIntent.Decision.NoManagedExecution(ChatAdmissionIntent.NoManagedExecutionReason.AlreadyAcceptedHostMessage continuation) ->
+        | ChatAdmissionIntent.Decision.NoManagedExecution(ChatAdmissionIntent.NoManagedExecutionReason.AlreadyAcceptedHostMessage origin) ->
             box
                 {| ``case`` = "NoManagedExecution"
                    reason = "AlreadyAcceptedHostMessage"
-                   origin = originName (PromptAuthority.PromptOrigin.Continuation continuation) |}
+                   origin = originName origin |}
         | ChatAdmissionIntent.Decision.ExternalRootIntent evidence ->
             let participant =
                 evidence.IdentitySeed

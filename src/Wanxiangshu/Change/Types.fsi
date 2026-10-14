@@ -54,10 +54,7 @@ type RelayPort =
       ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
       PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
       TerminateWorkResources: ManagerJobId -> Task<unit>
-      LifecycleReviewed:
-        SessionId ->
-        Wanxiangshu.Foundation.Identity.WorktreePath ->
-            (Wanxiangshu.Mission.Lifecycle.ReviewOutcome * string) option }
+      LifecycleReviewed: SessionId -> Wanxiangshu.Foundation.Identity.WorktreePath -> (string * string) option }
 
 type OrchestratorJournalPort =
     { AppendFact: StreamId -> AgentFact -> Task<Result<ProjectionSet, string>>

@@ -33,7 +33,11 @@ module PluginTransformSurface =
                   CaptureXTraceMessages =
                     fun _ _ ->
                         record "capture"
-                        Task.FromResult { RawMessages = []; Current = None; Receipt = None }
+
+                        Task.FromResult
+                            { RawMessages = []
+                              Current = None
+                              Receipt = None }
                   CommitStrengthTrace = fun _ _ _ -> complete "commit-trace"
                   RefreshCompanionXTrace = fun _ _ -> record "refresh-companion"
                   ApplyCompanion = fun _ _ _ -> complete "companion"

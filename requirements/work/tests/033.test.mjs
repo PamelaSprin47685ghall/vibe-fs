@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import test from 'node:test'
 import { SqliteJournal } from 'wanxiangli/eventstore'
+import { DurableWork } from 'wanxiangli/durable-work'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
@@ -55,7 +56,7 @@ test('WHAT[work-033] lifecycle payload keys are ordered by Unicode code point', 
     let text = opened
     for (let step = 0; step < 2; step += 1) {
       const reviewStep = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
-      const relayStep = surface.deliverProbe(`${text}${reviewStep.bytes}`, `run-${step}`, `call-${step}`, BigInt(step + 1))
+      const relayStep = surface.deliverProbe(`${text}${reviewStep.bytes}`, `run-${step}`, `call-${step}`, 43n + BigInt(step))
       text = `${text}${reviewStep.bytes}${relayStep.bytes}`
     }
     const last = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
@@ -66,7 +67,7 @@ test('WHAT[work-033] lifecycle payload keys are ordered by Unicode code point', 
       assert.equal(written.ok, true, written.error)
       const selected = planning.PlanningSurface.readAndValidatePlan(planRoot, 'work-1')
       assert.equal(selected.ok, true, selected.error)
-      receipt = surface.deliverStateProbe(`${text}${last.bytes}`, 'run-final', 'call-final', 30n, { digest: selected.digest, path: selected.path })
+      receipt = surface.deliverStateProbe(`${text}${last.bytes}`, 'run-final', 'call-final', 50n, { digest: selected.digest, path: selected.path })
     } finally {
       rmSync(planRoot, { recursive: true, force: true })
     }
@@ -83,16 +84,20 @@ test('WHAT[work-033] lifecycle payload keys are ordered by Unicode code point', 
 })
 
 test('WHAT[work-033] canonical lines round-trip and keep int64 cursor precision', () => {
-  const large = 9007199254740995n
-  const opened = surface.encodeOpening('plan', 'work-1', '/repo/root', large)
+  const precise = 9007199254740991n
+  const opened = surface.encodeOpening('plan', 'work-1', '/repo/root', precise)
   assert.equal(opened.endsWith('\n'), true, 'a canonical lifecycle line ends with LF')
   const decoded = surface.decodeDocument(opened)
   assert.equal(decoded.ok, true, decoded.fault)
   assert.equal(decoded.names, 'WorkOpened,IncumbencyOpened')
   const openedEvent = eventsOf(opened)[1]
-  assert.equal(openedEvent.openingCursor, '9007199254740995')
-  assert.equal(BigInt(openedEvent.openingCursor), large)
-  assert.equal(surface.documentView(opened).openingCursor, large)
+  assert.equal(openedEvent.openingCursor, Number(precise))
+  assert.equal(BigInt(openedEvent.openingCursor), precise)
+  assert.equal(surface.documentView(opened).openingCursor, Number(precise))
+
+  const outside = surface.encodeOpening('plan', 'work-1', '/repo/root', precise + 4n)
+  assert.equal(outside.startsWith('REFUSE'), true, 'a cursor outside the safe range is refused, not rounded')
+  assert.equal(outside.endsWith('\n'), false)
 
   const truncated = opened.replace(/\n$/, '')
   assert.equal(truncated.endsWith('\n'), false)
@@ -182,6 +187,33 @@ test('WHAT[work-033] an illegal first stage is rejected by the fold before any l
       assert.equal(appended.length, 1)
       const events = JSON.parse(appended[0]).events
       assert.equal(events[1].stage, 'S1', 'the kernel does not append an S2 opening')
+    } finally {
+      journal.close()
+    }
+  })
+})
+
+test('WHAT[work-033] a same-request replay is idempotent and a different payload is a structured conflict', async () => {
+  await withStore(async (store) => {
+    const database = new DatabaseSync(surface.journalPath(store.gitCommonDir))
+    const journal = new SqliteJournal(database)
+    try {
+      const durable = new DurableWork('work-replay', journal)
+      const command = (root) => ({ type: 'Open', root, sequence: ['S1', 'S2', 'S3'], ownerId: 'owner', openingCursor: 0 })
+
+      const first = durable.execute('open:work-replay', command('/workspace'))
+      assert.equal(first.status, 'Committed')
+      assert.equal(journal.read('work-replay').length, 1)
+
+      const replay = durable.execute('open:work-replay', command('/workspace'))
+      assert.equal(replay.status, 'Replayed', 'the same request id and payload replays the original receipt')
+      assert.equal(journal.read('work-replay').length, 1, 'a replay appends nothing')
+
+      const conflict = durable.execute('open:work-replay', command('/other-workspace'))
+      assert.equal(conflict.status, 'Conflict', 'a different payload under the same request id is a structured conflict, not a thrown failure')
+      assert.equal(conflict.reason, 'RequestIdConflict')
+      assert.equal(journal.read('work-replay').length, 1, 'a conflict appends nothing')
+      assert.equal(durable.inspect().revision, 1, 'a conflict leaves the revision unchanged')
     } finally {
       journal.close()
     }

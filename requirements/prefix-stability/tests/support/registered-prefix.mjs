@@ -158,7 +158,13 @@ export const commitPendingBlogger = async (hooks, runtime, directory, session) =
   assert.deepEqual(committed.at(-1).ProviderRun, ['ProviderRunIdentity', session.bloggerNext.info.id])
   assert.equal(committed.at(-1).PreviousIngestedThroughSequence, '4')
   assert.equal(committed.at(-1).NextIngestedThroughSequence, '6')
-  assert.ok(committed.at(-1).NextCoverableTurnCutoffExclusive > 4)
+  // The second chunk covers sequence 4..6 but stops before the next complete
+  // host turn boundary, so BlogProjection_applyEntry keeps the coverable cutoff
+  // at 4 (CTX-016: CoverableTurnCutoffExclusive advances only on complete host
+  // turns; CTX-028: a checkpoint's turn is never cut mid call/result). The
+  // first frame already ends at cutoff 4 and DevOps generation 11 measured
+  // that this second observation does not move it past 4.
+  assert.equal(committed.at(-1).NextCoverableTurnCutoffExclusive, 4)
   const cycles = state(runtime, session.sessionID).bloggerCycles
   assert.equal(cycles.receiptCount, 2)
   assert.ok(cycles.receiptRuns.includes(session.bloggerNext.info.id), 'the second producer must have its durable cycle receipt')

@@ -420,8 +420,7 @@ module JournalSurface =
                 task {
                     let integrator =
                         CanonicalIntegrator.createWithRules
-                            (CanonicalIntegrator.baseRules
-                             )
+                            (CanonicalIntegrator.baseRules)
                             AuthoritativeEventTypes.isKnown
 
                     let store =
@@ -454,6 +453,71 @@ module JournalSurface =
                            error = $"{error.Fact}: {error.Reason}" |}
         }
 
+    /// interaction-authority-018: append the exact durable closure of one
+    /// HumanRoot/Manager logical run through the process-local shared journal
+    /// owner. A missing shared entry refuses instead of creating a second
+    /// writer; an already-closed projection is a no-op, so repeated transforms
+    /// stay idempotent.
+    let appendAuthorityLogicalRunClosed
+        (commonDir: string)
+        (sessionId: string)
+        (retirementId: string)
+        : Task<unit> =
+        task {
+            let session = SessionId.create sessionId
+
+            // Only a pre-existing shared entry may be reused; the refusing
+            // callback guarantees no second writer is created when it is absent.
+            let refuseMissingEntry
+                (_: RuntimeId)
+                (_: int)
+                (_: DateTimeOffset)
+                : Task<Result<AgentJournal, FoldRejection>> =
+                failwith "authority closure refused: no shared journal runtime for this common dir"
+
+            let! acquired =
+                SharedAgentJournal.acquire
+                    (RuntimePath.forCommonDir commonDir)
+                    0
+                    (DateTimeOffset.Parse "1970-01-01T00:00:00Z")
+                    refuseMissingEntry
+
+            match acquired with
+            | Error error ->
+                return failwith ("authority closure refused: " + error.Fact + ": " + error.Reason)
+            | Ok journal ->
+                // The acquire above takes one share of the ref-counted shared entry; the
+                // finally below returns it. After the last holder releases, a later closure
+                // append refuses instead of creating a second writer (interaction-authority-018).
+                try
+                    let active =
+                        PromptAuthorityProjectionQueries.activeProfile
+                            session
+                            (AgentJournal.snapshot journal).AgentProjections
+
+                    match active with
+                    | Some profile when
+                        profile.CanonicalRole = Role.Manager
+                        && profile.AuthorityKind = PromptAuthority.RootAuthorityKind.HumanRoot
+                        ->
+                        let fact =
+                            PromptFact.AuthorityLogicalRunClosed
+                                { SessionId = session
+                                  LogicalRunId = profile.LogicalRunId
+                                  AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+                                  RootKind = "HumanRoot"
+                                  ClosureWitness = retirementId }
+
+                        let! result = AgentJournal.appendAgent (StreamId.Session session) None fact journal
+
+                        match result with
+                        | Ok _ -> return ()
+                        | Error failure -> return failwith ("authority closure append failed: " + string failure)
+                    | _ -> return ()
+                finally
+                    SharedAgentJournal.release (Some journal)
+        }
+
     /// Open a workspace journal directly. The returned journal is an opaque
     /// capability and must be released with `dispose`.
     let bootWithWriterId
@@ -465,9 +529,7 @@ module JournalSurface =
         : Task<obj> =
         task {
             let integrator =
-                CanonicalIntegrator.createWithRules
-                    CanonicalIntegrator.baseRules
-                    AuthoritativeEventTypes.isKnown
+                CanonicalIntegrator.createWithRules CanonicalIntegrator.baseRules AuthoritativeEventTypes.isKnown
 
             let store = EventStore.createLocal (str commonDir) (str writerId) integrator
 

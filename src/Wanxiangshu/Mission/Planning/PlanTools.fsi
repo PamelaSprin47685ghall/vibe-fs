@@ -25,8 +25,7 @@ module PlanTools =
 
     /// The one plan artifact read used by deliver and by the plan surface: the
     /// content, its digest, and the resolved path. Empty or missing is an error.
-    val readAndValidatePlan:
-        root: string -> workId: string -> Result<string * string * string, string>
+    val readAndValidatePlan: root: string -> workId: string -> Result<string * string * string, string>
 
     /// planning-007 / planning-008: deliver splits on authorization — an
     /// authorized tenure takes the terminal delivery path (spawn + retire +

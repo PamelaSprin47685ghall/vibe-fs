@@ -86,3 +86,9 @@ module RuntimePath =
             |> runtimeDirectory
         with _ ->
             stateDirectory workspace
+
+    /// The shared journal runtime directory for an already-resolved git common
+    /// dir. Callers that hold the common dir must derive the same owner key as
+    /// forWorkspace.
+    let forCommonDir (commonDirectory: string) =
+        commonDirectory |> canonicalPath |> runtimeDirectory

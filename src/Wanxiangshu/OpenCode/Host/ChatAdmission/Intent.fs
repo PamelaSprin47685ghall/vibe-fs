@@ -33,7 +33,7 @@ module ChatAdmissionIntent =
     [<RequireQualifiedAccess>]
     type NoManagedExecutionReason =
         | UnmanagedMessage
-        | AlreadyAcceptedHostMessage of PromptAuthority.ContinuationKind
+        | AlreadyAcceptedHostMessage of PromptAuthority.PromptOrigin
 
     [<RequireQualifiedAccess>]
     /// DSL-class: Evidence
@@ -197,7 +197,7 @@ module ChatAdmissionIntent =
 
     [<RequireQualifiedAccess>]
     type private KnownEvidence =
-        | Accepted of PromptAuthority.ContinuationKind
+        | Accepted of PromptAuthority.PromptOrigin
         | Pending of PromptAuthority.PromptClaim
         | HostInternal
         | Unaccepted
@@ -209,15 +209,23 @@ module ChatAdmissionIntent =
         : KnownEvidence =
         let accepted = Map.tryFind physicalMessageId projection.AcceptedContinuationIds
 
+        let landed = Map.tryFind physicalMessageId projection.PhysicalLandings
+
         let pending =
             message.PromptKey
             |> Option.bind (fun promptKey -> Map.tryFind promptKey projection.PendingClaims)
 
-        match accepted, pending, isHostInternal message with
-        | Some continuation, _, _ -> KnownEvidence.Accepted continuation
-        | None, Some claim, _ -> KnownEvidence.Pending claim
-        | None, None, true -> KnownEvidence.HostInternal
-        | None, None, false -> KnownEvidence.Unaccepted
+        // dispatch-protocol-006: exact landing evidence answers which claim
+        // landed this physical message. A replay of an accepted Authority Root
+        // has no continuation mapping and no pending claim left, so without
+        // this evidence the replay would be refused as unclaimed.
+        match accepted, landed, pending, isHostInternal message with
+        | Some continuation, _, _, _ ->
+            KnownEvidence.Accepted(PromptAuthority.PromptOrigin.Continuation continuation)
+        | None, Some landing, _, _ -> KnownEvidence.Accepted landing.Origin
+        | None, None, Some claim, _ -> KnownEvidence.Pending claim
+        | None, None, None, true -> KnownEvidence.HostInternal
+        | None, None, None, false -> KnownEvidence.Unaccepted
 
     let private resolveUnaccepted
         (key: ChatExecutionKey)
@@ -250,8 +258,8 @@ module ChatAdmissionIntent =
               PhysicalUserMessageId = physicalMessageId }
 
         match knownEvidence message projection physicalMessageId with
-        | KnownEvidence.Accepted continuation ->
-            Decision.NoManagedExecution(NoManagedExecutionReason.AlreadyAcceptedHostMessage continuation)
+        | KnownEvidence.Accepted origin ->
+            Decision.NoManagedExecution(NoManagedExecutionReason.AlreadyAcceptedHostMessage origin)
         | KnownEvidence.Pending claim -> pendingPrompt key claim.PromptKey claim message.ExplicitAgent
         | KnownEvidence.HostInternal -> hostInternal message
         | KnownEvidence.Unaccepted -> resolveUnaccepted key message projection

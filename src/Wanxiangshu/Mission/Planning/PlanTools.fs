@@ -72,68 +72,176 @@ module PlanTools =
         else
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
 
-    let private commitLifecycleDeliver
-        (store: IEventStore)
+    let private requireMatchingActive
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        (incumbencyId: string)
+        : Result<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork, string> =
+        match work.ActiveId with
+        | None -> Error "No active incumbency found for this work"
+        | Some active when active <> incumbencyId ->
+            Error(sprintf "Active incumbency ID '%s' does not match invocation target '%s'" active incumbencyId)
+        | Some _ -> Ok work
+
+    let private activeWorkOf
+        (gitCommonDir: string)
         (workId: string)
-        (work: Wanxiangshu.Mission.Lifecycle.LifecycleWork)
-        (fence: Wanxiangshu.Mission.Lifecycle.HostFence)
-        (retirementCursor: int64)
-        (blockerDigest: string option)
-        (draft: Wanxiangshu.Mission.Lifecycle.DeliverDraft option)
-        (startedSessionId: string option)
+        (incumbencyId: string)
+        : Result<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork, string> =
+        let workOpt =
+            if String.IsNullOrWhiteSpace gitCommonDir then
+                None
+            else
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
+
+        match String.IsNullOrWhiteSpace gitCommonDir, workOpt with
+        | true, _ -> Error "git common directory is missing"
+        | false, None -> Error "lifecycle work is missing"
+        | false, Some work -> requireMatchingActive work incumbencyId
+
+    let private draftFieldsFor (root: string) (workId: string) (hasBlocker: bool) (authorized: bool) =
+        if hasBlocker || not authorized then
+            []
+        else
+            readAndValidatePlan root workId
+            |> Result.map (fun (_, digest, planPath) -> [ "draft", box {| digest = digest; path = planPath |} ])
+            |> Result.defaultValue []
+
+    let private refuseDelivery (gitCommonDir: string) (workId: string) (operationId: string) (reason: string) : unit =
+        let refused =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                "ResolveDelivery"
+                [ "operationId", box operationId
+                  "outcome", box "NotStarted"
+                  "reason", box reason ]
+
+        let _ =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId operationId refused
+
+        ()
+
+    let private receiptRefusal (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt) =
+        if receipt.Reason = "" then
+            receipt.Status
+        else
+            receipt.Reason
+
+    let private settledDelivery
+        (resolved: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
+        (digest: string)
+        (path: string)
+        (execSessionId: string)
+        : Result<DeliverResult, string> =
+        if resolved.Status <> "Committed" && resolved.Status <> "Replayed" then
+            Error(receiptRefusal resolved)
+        else
+            Ok
+                { Ok = true
+                  Relayed = false
+                  Delivered = resolved.Kind = "Delivered"
+                  RetiredIncumbencyId = ""
+                  RetirementOutcome = resolved.Kind
+                  Digest = digest
+                  Path = path
+                  ExecSessionId = execSessionId
+                  NextIncumbencyId = ""
+                  Message = "Plan delivered" }
+
+    let private startAndSettleDelivery
+        (gitCommonDir: string)
+        (workId: string)
+        (operationId: string)
+        (digest: string)
+        (path: string)
+        (blockers: string array)
+        (spawn: string -> string -> Task<string>)
+        (content: string)
         : Task<Result<DeliverResult, string>> =
         task {
-            match
-                Wanxiangshu.Mission.Lifecycle.LifecycleKernel.deliverOneshot
-                    HostDigest.sha256Hex
-                    work
-                    fence
-                    (Some retirementCursor)
-                    blockerDigest
-                    Wanxiangshu.Mission.Lifecycle.SessionLookup.None
-                    draft
-                    startedSessionId
-            with
-            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Refuse reason -> return Error reason
-            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Done label -> return Error label
-            | Wanxiangshu.Mission.Lifecycle.KernelDecision.Write(events, label) ->
-                match! Wanxiangshu.Mission.Lifecycle.LifecycleKernel.commit store workId events with
-                | Ok Wanxiangshu.Mission.Lifecycle.CommitOutcome.AppendDurable ->
-                    let nextIncumbencyId =
-                        events
-                        |> List.tryPick (function
-                            | Wanxiangshu.Mission.Lifecycle.LifecycleEvent.IncumbencyOpened(_, id, _, _) -> Some id
-                            | _ -> None)
-                        |> Option.defaultValue ""
+            match! spawnExecutionSessionFor spawn content with
+            | Error err ->
+                refuseDelivery gitCommonDir workId operationId err
+                return Error err
+            | Ok execSessionId ->
+                let accepted =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                        "ResolveDelivery"
+                        [ "operationId", box operationId
+                          "outcome", box "Accepted"
+                          "execSessionId", box execSessionId
+                          "digest", box digest
+                          "path", box path
+                          "blockers", box blockers ]
 
-                    let digest = draft |> Option.map (fun value -> value.Digest) |> Option.defaultValue ""
-                    let path = draft |> Option.map (fun value -> value.Path) |> Option.defaultValue ""
-                    let execSessionId = startedSessionId |> Option.defaultValue ""
+                let resolved =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId operationId accepted
 
-                    let message =
-                        match label with
-                        | "relayed" -> "Relayed to the next incumbency"
-                        | "delivered" -> "Plan delivered"
-                        | "blocked" -> "Retirement is blocked by live resources; nothing was retired"
-                        | other -> other
+                return settledDelivery resolved digest path execSessionId
+        }
 
-                    return
-                        Ok
-                            { Ok = true
-                              Relayed = label = "relayed"
-                              Delivered = label = "delivered"
-                              RetiredIncumbencyId = ""
-                              RetirementOutcome =
-                                if label = "relayed" then "Relayed"
-                                elif label = "delivered" then "Delivered"
-                                else ""
-                              Digest = digest
-                              Path = path
-                              ExecSessionId = execSessionId
-                              NextIncumbencyId = nextIncumbencyId
-                              Message = message }
-                | Ok _ -> return Error "deliver was not committed"
-                | Error reason -> return Error reason
+    let private resolveDeliveryRequest
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (operationId: string)
+        (digest: string)
+        (path: string)
+        (blockers: string array)
+        (spawn: string -> string -> Task<string>)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            match readAndValidatePlan root workId with
+            | Error err ->
+                refuseDelivery gitCommonDir workId operationId err
+                return Error err
+            | Ok(content, _, _) ->
+                return! startAndSettleDelivery gitCommonDir workId operationId digest path blockers spawn content
+        }
+
+    let private interpretDeliverReceipt
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (blockers: string array)
+        (spawn: string -> string -> Task<string>)
+        (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            if
+                receipt.Status = "Unknown"
+                || receipt.Status = "NotWritten"
+                || receipt.Status = "Conflict"
+            then
+                return
+                    Error(
+                        if receipt.Reason = "" then
+                            receipt.Status
+                        else
+                            receipt.Reason
+                    )
+            elif receipt.Kind = "ReviewRequired" then
+                return Error "assessment required"
+            elif receipt.Status = "Committed" && receipt.Kind = "DeliveryRequested" then
+                let operationId =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "operationId"
+
+                let digest =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "digest"
+
+                let path = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "path"
+                return! resolveDeliveryRequest gitCommonDir root workId operationId digest path blockers spawn
+            else
+                return
+                    Ok
+                        { Ok = receipt.Status = "Committed" || receipt.Status = "Replayed"
+                          Relayed = receipt.Kind = "Relayed"
+                          Delivered = receipt.Kind = "Delivered"
+                          RetiredIncumbencyId = ""
+                          RetirementOutcome = receipt.Kind
+                          Digest = ""
+                          Path = ""
+                          ExecSessionId = ""
+                          NextIncumbencyId = ""
+                          Message = receipt.Kind }
         }
 
     let executeDeliver
@@ -149,122 +257,28 @@ module PlanTools =
         (retirementCursor: int64)
         : Task<Result<DeliverResult, string>> =
         task {
-            if String.IsNullOrWhiteSpace gitCommonDir then
-                return Error "git common directory is missing"
-            else
-                match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId with
-                | None -> return Error "lifecycle work is missing"
-                | Some work ->
-                    match work.ActiveId with
-                    | None -> return Error "No active incumbency found for this work"
-                    | Some active when active <> incumbencyId ->
-                        return
-                            Error(
-                                sprintf
-                                    "Active incumbency ID '%s' does not match invocation target '%s'"
-                                    active
-                                    incumbencyId
-                            )
-                    | Some _ ->
-                        let fence =
-                            { Wanxiangshu.Mission.Lifecycle.HostFence.ProviderRunId = Some providerRunId
-                              Wanxiangshu.Mission.Lifecycle.HostFence.ToolCallId = Some toolCallId }
+            match activeWorkOf gitCommonDir workId incumbencyId with
+            | Error err -> return Error err
+            | Ok work ->
+                let authorized = work.DeliveryAuthorized
+                let requestId = providerRunId + ":" + toolCallId
+                let blockers = if hasBlocker then [| "retirement-blocked" |] else [||]
+                let draftFields = draftFieldsFor root workId hasBlocker authorized
 
-                        let blockerDigest = if hasBlocker then Some "retirement-blocked" else None
+                let command =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                        "Deliver"
+                        ([ "incumbencyId", box incumbencyId
+                           "providerRunId", box providerRunId
+                           "toolCallId", box toolCallId
+                           "cursor", box (float retirementCursor)
+                           "blockers", box blockers ]
+                         @ draftFields)
 
-                        // Stopped the old fold. Delivery authorization is already on the snapshot.
-                        let authorized = work.DeliveryAuthorized
+                let receipt =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
 
-                        let requestId = providerRunId + ":" + toolCallId
-                        let blockers = if hasBlocker then [| "retirement-blocked" |] else [| |]
-                        let draftFields =
-                            if hasBlocker || not authorized then
-                                []
-                            else
-                                match readAndValidatePlan root workId with
-                                | Error _ -> []
-                                | Ok(_, digest, planPath) ->
-                                    [ "draft", box {| digest = digest; path = planPath |} ]
-                        let command =
-                            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                                "Deliver"
-                                ([ "incumbencyId", box incumbencyId
-                                   "providerRunId", box providerRunId
-                                   "toolCallId", box toolCallId
-                                   "cursor", box (float retirementCursor)
-                                   "blockers", box blockers ]
-                                 @ draftFields)
-                        let receipt =
-                            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
-                        if receipt.Status = "Unknown" || receipt.Status = "NotWritten" || receipt.Status = "Conflict" then
-                            return Error(if receipt.Reason = "" then receipt.Status else receipt.Reason)
-                        elif receipt.Kind = "ReviewRequired" then
-                            return Error "assessment required"
-                        elif receipt.Status = "Committed" && receipt.Kind = "DeliveryRequested" then
-                            let operationId = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "operationId"
-                            let digest = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "digest"
-                            let path = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "path"
-                            match readAndValidatePlan root workId with
-                            | Error err ->
-                                let refused =
-                                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                                        "ResolveDelivery"
-                                        [ "operationId", box operationId
-                                          "outcome", box "NotStarted"
-                                          "reason", box err ]
-                                let _ = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId operationId refused
-                                return Error err
-                            | Ok(content, _, _) ->
-                                match! spawnExecutionSessionFor spawn content with
-                                | Error err ->
-                                    let refused =
-                                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                                            "ResolveDelivery"
-                                            [ "operationId", box operationId
-                                              "outcome", box "NotStarted"
-                                              "reason", box err ]
-                                    let _ = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId operationId refused
-                                    return Error err
-                                | Ok execSessionId ->
-                                    let accepted =
-                                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                                            "ResolveDelivery"
-                                            [ "operationId", box operationId
-                                              "outcome", box "Accepted"
-                                              "execSessionId", box execSessionId
-                                              "digest", box digest
-                                              "path", box path
-                                              "blockers", box blockers ]
-                                    let resolved =
-                                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId operationId accepted
-                                    if resolved.Status <> "Committed" && resolved.Status <> "Replayed" then
-                                        return Error(if resolved.Reason = "" then resolved.Status else resolved.Reason)
-                                    else
-                                        return
-                                            Ok
-                                                { Ok = true
-                                                  Relayed = false
-                                                  Delivered = resolved.Kind = "Delivered"
-                                                  RetiredIncumbencyId = ""
-                                                  RetirementOutcome = resolved.Kind
-                                                  Digest = digest
-                                                  Path = path
-                                                  ExecSessionId = execSessionId
-                                                  NextIncumbencyId = ""
-                                                  Message = "Plan delivered" }
-                        else
-                            return
-                                Ok
-                                    { Ok = receipt.Status = "Committed" || receipt.Status = "Replayed"
-                                      Relayed = receipt.Kind = "Relayed"
-                                      Delivered = receipt.Kind = "Delivered"
-                                      RetiredIncumbencyId = ""
-                                      RetirementOutcome = receipt.Kind
-                                      Digest = ""
-                                      Path = ""
-                                      ExecSessionId = ""
-                                      NextIncumbencyId = ""
-                                      Message = receipt.Kind }
+                return! interpretDeliverReceipt gitCommonDir root workId blockers spawn receipt
         }
 
     // planning-010: at most one pending ask delegation per work. The tracker
@@ -313,6 +327,7 @@ module PlanTools =
         task {
             let _ = store
             let requestId = workId + ":bind:" + incumbencyId
+
             let command =
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
                     "BindDevOps"
@@ -320,12 +335,26 @@ module PlanTools =
                       "trigger", box "Ask"
                       "devopsId", box (PlanWorkOpen.deriveDevOpsId workId)
                       "target", null ]
+
             let receipt =
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
-            if receipt.Status = "Committed" || receipt.Status = "Replayed" || receipt.Status = "Observed" then
+
+            if
+                receipt.Status = "Committed"
+                || receipt.Status = "Replayed"
+                || receipt.Status = "Observed"
+            then
                 return Ok()
             else
-                return Error(sprintf "Failed to bind plan DevOps: %s" (if receipt.Reason = "" then receipt.Status else receipt.Reason))
+                return
+                    Error(
+                        sprintf
+                            "Failed to bind plan DevOps: %s"
+                            (if receipt.Reason = "" then
+                                 receipt.Status
+                             else
+                                 receipt.Reason)
+                    )
         }
 
     let private bindDevOpsAndComplete
@@ -400,12 +429,14 @@ module PlanTools =
         (intent: string)
         (delegateTo: string -> Task<string>)
         : Task<Result<AskResult, string>> =
-        match lifecycleWorkOf gitCommonDir workId with
-        | None -> Task.FromResult(Error "lifecycle work is missing")
-        | Some work ->
-            match validateAskWork work intent with
-            | Error err -> Task.FromResult(Error err)
-            | Ok() -> beginPendingAsk gitCommonDir store workId (Option.defaultValue "" work.ActiveId) intent delegateTo
+        let validated =
+            match lifecycleWorkOf gitCommonDir workId with
+            | None -> Error "lifecycle work is missing"
+            | Some work -> validateAskWork work intent |> Result.map (fun () -> work)
+
+        match validated with
+        | Error err -> Task.FromResult(Error err)
+        | Ok work -> beginPendingAsk gitCommonDir store workId (Option.defaultValue "" work.ActiveId) intent delegateTo
 
     let executeJsPlan
         (root: string)

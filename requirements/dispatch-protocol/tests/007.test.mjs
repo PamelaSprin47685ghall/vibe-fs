@@ -159,7 +159,7 @@ test('WHAT[dispatch-protocol-007] the pure authority owner preserves an unlanded
   assertObserved.deepEqual(authorityObserved.closeAuthority(root.logicalRun, root.authorityRoot, closed.value).value, closed.value)
 })
 
-test('WHAT[dispatch-protocol-007] the pure Manager Ledger close preserves unknown roots and consumed None scopes while clearing only Manager run resources', () => {
+test('WHAT[dispatch-protocol-007] the runtime exact-run close preserves unknown roots and consumed None scopes while clearing only run resources', () => {
   const hash = input => `manager-ledger-hash(${input})`
   const rootOrigin = { kind: 'AuthorityRoot', label: 'AgentOwnerRoot' }
   for (const [kind, participant] of [['HumanRoot', 'engineer'], ['AgentOwnerRoot', 'engineer'], ['HumanRoot', 'manager']]) {
@@ -210,25 +210,28 @@ test('WHAT[dispatch-protocol-007] the pure Manager Ledger close preserves unknow
     assertObserved.equal(authorityObserved.nextClaimSequence(pendingScope, state), 2)
     assertObserved.equal(authorityObserved.nextClaimSequence(acceptedScope, state), 2)
 
-    // This exercises the actual pure Ledger owner, not a durable RetirementCommitted witness.
-    const closed = dispatchObserved.closeCompletedHumanRootManager(state)
-    if (kind !== 'HumanRoot' || participant !== 'manager') {
-      assertObserved.deepEqual(closed, state, `${kind}/${participant} is outside the Manager Ledger close contract`)
-      continue
-    }
-    assertObserved.equal(closed.activeLogicalRun, null)
-    assertObserved.deepEqual(closed.lastAuthorityProfile, root)
-    assertObserved.deepEqual(closed.pendingClaims, [unknown.value])
-    assertObserved.equal(authorityObserved.nextClaimSequence(unknownScope, closed), 2)
-    assertObserved.equal(authorityObserved.nextClaimSequence(consumedScope, closed), 3)
-    assertObserved.equal(authorityObserved.nextClaimSequence(pendingScope, closed), 1)
-    assertObserved.equal(authorityObserved.nextClaimSequence(acceptedScope, closed), 1)
-    assertObserved.deepEqual(closed.acceptedContinuations, [])
-    assertObserved.deepEqual(closed.physicalLandings, state.physicalLandings)
-    assertObserved.deepEqual(closed.acceptedDispatches, state.acceptedDispatches)
-    assertObserved.equal(authorityObserved.resolveKnownOrigin('', unknownKey, false, closed), 'AuthorityRoot')
-    assertObserved.equal(authorityObserved.resolveKnownOrigin(continuationPhysical, continuationKey, false, closed), 'UnknownOrigin')
-    assertObserved.deepEqual(dispatchObserved.closeCompletedHumanRootManager(closed), closed)
+    // The durable closure writer is AuthorityLogicalRunClosed (GAP-123); this
+    // pure runtime close is exact-run. Manager-only filtering belongs to the
+    // writer side (activeHumanRootManager + appendManagerAuthorityClosure) and
+    // is not expressible through this pure boundary.
+    const closed = authorityObserved.closeAuthority(root.logicalRun, root.authorityRoot, state)
+    assertObserved.equal(closed.ok, true, closed.ok ? '' : closed.error)
+    const value = closed.value
+    assertObserved.equal(value.activeLogicalRun, null, `${kind}/${participant} exact-run close clears the active run`)
+    assertObserved.deepEqual(value.lastAuthorityProfile, root)
+    assertObserved.deepEqual(value.pendingClaims, [unknown.value])
+    assertObserved.equal(authorityObserved.nextClaimSequence(unknownScope, value), 2)
+    assertObserved.equal(authorityObserved.nextClaimSequence(consumedScope, value), 3)
+    assertObserved.equal(authorityObserved.nextClaimSequence(pendingScope, value), 1)
+    assertObserved.equal(authorityObserved.nextClaimSequence(acceptedScope, value), 1)
+    assertObserved.deepEqual(value.acceptedContinuations, [])
+    assertObserved.deepEqual(value.physicalLandings, state.physicalLandings)
+    assertObserved.deepEqual(value.acceptedDispatches, state.acceptedDispatches)
+    assertObserved.equal(authorityObserved.resolveKnownOrigin('', unknownKey, false, value), 'AuthorityRoot')
+    assertObserved.equal(authorityObserved.resolveKnownOrigin(continuationPhysical, continuationKey, false, value), 'UnknownOrigin')
+    const again = authorityObserved.closeAuthority(root.logicalRun, root.authorityRoot, value)
+    assertObserved.equal(again.ok, true, again.ok ? '' : again.error)
+    assertObserved.deepEqual(again.value, value, 'an exact-run close is idempotent once LastAuthorityProfile matches the requested run')
   }
 })
 

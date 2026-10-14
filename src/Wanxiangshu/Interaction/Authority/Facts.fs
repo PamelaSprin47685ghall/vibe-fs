@@ -11,6 +11,15 @@ type AuthorityRootAcceptedPayload =
       AuthorityKind: string
       IdentitySeed: PromptIdentitySeed }
 
+/// The exact durable closure of one logical run. It carries the accepted
+/// root identity and the exact retirement witness that completed the run.
+type AuthorityLogicalRunClosedPayload =
+    { SessionId: SessionId
+      LogicalRunId: LogicalRunId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      RootKind: string
+      ClosureWitness: string }
+
 /// Durable prompt-authority facts. These facts belong to the authority boundary;
 /// Composition only routes the family through the journal's outer union.
 [<RequireQualifiedAccess>]
@@ -45,3 +54,4 @@ type PromptFactCases =
            SessionId: SessionId
            Reason: PromptAbandonReason |}
     | AuthorityRootAccepted of AuthorityRootAcceptedPayload
+    | AuthorityLogicalRunClosed of AuthorityLogicalRunClosedPayload

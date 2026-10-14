@@ -94,8 +94,7 @@ module LifecycleCodec =
                 [ stringField "incumbencyId" incumbencyId
                   stringField "outcome" (ReviewOutcome.render outcome)
                   stringField "stage" (StageElement.render stage) ]
-        | LifecycleEvent.Reopened incumbencyId ->
-            Encode.object [ stringField "incumbencyId" incumbencyId ]
+        | LifecycleEvent.Reopened incumbencyId -> Encode.object [ stringField "incumbencyId" incumbencyId ]
         | LifecycleEvent.AdvanceCommitted(incumbencyId, expected, next) ->
             Encode.object
                 [ stringField "expected" expected
@@ -116,8 +115,7 @@ module LifecycleCodec =
             | Some(_, value) ->
                 match Decode.fromValue ("$." + name) (Decode.option Decode.string) value with
                 | Ok text -> Decode.succeed text
-                | Error _ -> Decode.fail (name + " is present but not a string")
-            )
+                | Error _ -> Decode.fail (name + " is present but not a string"))
 
     let private forbid (names: string list) : Decoder<unit> =
         Decode.object (fun get ->
@@ -126,12 +124,14 @@ module LifecycleCodec =
                 match get.Optional.Field name Decode.string with
                 | Some _ -> failwith ("forbidden field " + name)
                 | None -> ())
+
             ())
 
-    let private decodeSequence : Decoder<WorkSequence> =
+    let private decodeSequence: Decoder<WorkSequence> =
         Decode.field "sequence" (Decode.list Decode.string)
         |> Decode.andThen (fun rendered ->
             let parsed = rendered |> List.map StageElement.parse
+
             if parsed |> List.exists Option.isNone then
                 Decode.fail "sequence element is not S1, S2, S3 or S4"
             else
@@ -139,10 +139,9 @@ module LifecycleCodec =
                 | Some sequence -> Decode.succeed sequence
                 | None -> Decode.fail "sequence length is neither 1 nor 3")
 
-    let private decodeWorkOpened : Decoder<LifecycleEvent> =
+    let private decodeWorkOpened: Decoder<LifecycleEvent> =
         Decode.map4
-            (fun authority root sequence workId ->
-                LifecycleEvent.WorkOpened(workId, root, sequence, authority))
+            (fun authority root sequence workId -> LifecycleEvent.WorkOpened(workId, root, sequence, authority))
             (requireString "authorityInitial")
             (requireString "root")
             decodeSequence
@@ -162,22 +161,22 @@ module LifecycleCodec =
             | Some outcome -> Decode.succeed outcome
             | None -> Decode.fail "outcome is neither Relayed nor Delivered")
 
-    let private decodeReviewOutcome : Decoder<ReviewOutcome> =
+    let private decodeReviewOutcome: Decoder<ReviewOutcome> =
         requireString "outcome"
         |> Decode.andThen (fun value ->
             match ReviewOutcome.parse value with
             | Some outcome -> Decode.succeed outcome
             | None -> Decode.fail "review outcome is neither Promoted nor Stayed")
 
-    let private decodeCut : Decoder<ProjectionCut> =
-        Decode.field "projectionCut" (
-            Decode.map2
+    let private decodeCut: Decoder<ProjectionCut> =
+        Decode.field
+            "projectionCut"
+            (Decode.map2
                 (fun providerRunId toolCallId ->
                     { ProviderRunId = providerRunId
                       ToolCallId = toolCallId })
                 (Decode.field "providerRunId" Decode.string)
-                (Decode.field "toolCallId" Decode.string)
-        )
+                (Decode.field "toolCallId" Decode.string))
 
     let private hasField (payload: JsonValue) (name: string) =
         match Decode.fromValue "$" (Decode.keyValuePairs Decode.value) payload with
@@ -185,14 +184,15 @@ module LifecycleCodec =
         | Error _ -> false
 
     let decodePayload (eventType: string) (payload: JsonValue) : Result<LifecycleEvent, string> =
-        let run (decoder: Decoder<LifecycleEvent>) =
-            Decode.fromValue "$" decoder payload
+        let run (decoder: Decoder<LifecycleEvent>) = Decode.fromValue "$" decoder payload
 
         if eventType = LifecycleEventTypes.WorkOpened then
-            if hasField payload "confirmationCount"
-               || hasField payload "spawn"
-               || hasField payload "autoDispatch"
-               || hasField payload "snapshotId" then
+            if
+                hasField payload "confirmationCount"
+                || hasField payload "spawn"
+                || hasField payload "autoDispatch"
+                || hasField payload "snapshotId"
+            then
                 Error "opening payload contains a forbidden field"
             else
                 run decodeWorkOpened
@@ -254,13 +254,14 @@ module LifecycleCodec =
                         (requireString "providerRunId")
                         (requireString "toolCallId")
                     |> Decode.andThen (fun build ->
-                        Decode.map2
-                            build
-                            (Decode.field "retirementCursor" Decode.int64)
-                            (requireString "retirementId"))
+                        Decode.map2 build (Decode.field "retirementCursor" Decode.int64) (requireString "retirementId"))
                 )
             elif hasField payload "projectionCut" then
-                if hasField payload "digest" || hasField payload "path" || hasField payload "execSessionId" then
+                if
+                    hasField payload "digest"
+                    || hasField payload "path"
+                    || hasField payload "execSessionId"
+                then
                     Error "execution retirement payload contains a delivery field"
                 else
                     run (
@@ -349,9 +350,7 @@ module LifecycleCodec =
             Error(ReadFault.StorageInvalid "lifecycle document does not end with a newline")
         else
             let lines =
-                text.Split [| '\n' |]
-                |> Array.toList
-                |> List.filter (fun line -> line <> "")
+                text.Split [| '\n' |] |> Array.toList |> List.filter (fun line -> line <> "")
 
             let decoded =
                 lines

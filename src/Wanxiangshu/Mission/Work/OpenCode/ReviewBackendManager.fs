@@ -49,6 +49,12 @@ module ReviewBackendManager =
         [<Literal>]
         let AlreadySubmitted = "tool/review/already-submitted"
 
+    /// The reviewer is never the incumbency owner. A manager work opens with
+    /// the session id as owner, so the reviewer must be a distinct identity;
+    /// the kernel refuses an owner reviewing its own incumbency.
+    [<Literal>]
+    let private ReviewerId = "manager-reviewer"
+
     type private ReviewFailure =
         | BindingUnavailable
         | MissingRequest
@@ -199,17 +205,19 @@ module ReviewBackendManager =
 
     /// The one lifecycle work this session owns, read from the same workspace
     /// EventStore the plugin writes. No relay fact, no certificate.
-    let private lifecycleWorkOf (directory: string) (sessionId: string) : (IEventStore * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) option =
+    let private lifecycleWorkOf
+        (directory: string)
+        (sessionId: string)
+        : (IEventStore * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) option =
         let commonDir = RuntimePath.gitCommonDir directory
 
         if String.IsNullOrWhiteSpace commonDir then
             None
         else
-            match WorkspaceEventStore.tryCurrent commonDir with
-            | None -> None
-            | Some held ->
+            WorkspaceEventStore.tryCurrent commonDir
+            |> Option.bind (fun held ->
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
-                |> Option.map (fun seen -> held, seen)
+                |> Option.map (fun seen -> held, seen))
 
     type private BoundReviewInvocation =
         { Findings: ReviewFindings
@@ -250,26 +258,32 @@ module ReviewBackendManager =
                       Directory = directory
                       Journal = journal })
 
+    let private resolveAssessment
+        (scope: ToolRuntimeScope)
+        (sessionId: SessionId)
+        (directorySessionId: string)
+        (bound: BoundReviewInvocation)
+        : Result<PreparedAssessment, string> =
+        lifecycleWorkOf bound.Directory directorySessionId
+        |> Option.bind (fun (_, work) ->
+            match work.ActiveId, work.Reviewed with
+            | None, _ -> Error BindingUnavailable
+            | Some _, true -> Error AlreadySubmitted
+            | Some activeId, false ->
+                scope.ActiveProfileFor sessionId
+                |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
+                |> requireSome BindingUnavailable
+                |> Result.map (fun rootAuthorityUserMessageId ->
+                    { Bound = bound
+                      SessionId = sessionId
+                      RootAuthorityUserMessageId = rootAuthorityUserMessageId
+                      IncumbencyId = activeId }))
+
     let private prepareAssessment (scope: ToolRuntimeScope) (context: HostToolContext) (bound: BoundReviewInvocation) =
         let sessionId = SessionId.create context.SessionId
 
         try
-            match lifecycleWorkOf bound.Directory context.SessionId with
-            | None -> Error BindingUnavailable
-            | Some(_, work) ->
-                match work.ActiveId, work.Reviewed with
-                | None, _ -> Error BindingUnavailable
-                | Some _, true -> Error AlreadySubmitted
-                | Some activeId, false ->
-                    scope.ActiveProfileFor sessionId
-                    |> Option.map (fun profile ->
-                        AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
-                    |> requireSome BindingUnavailable
-                    |> Result.map (fun rootAuthorityUserMessageId ->
-                        { Bound = bound
-                          SessionId = sessionId
-                          RootAuthorityUserMessageId = rootAuthorityUserMessageId
-                          IncumbencyId = activeId })
+            resolveAssessment scope sessionId context.SessionId bound
         with _ ->
             Error BindingUnavailable
 
@@ -295,11 +309,7 @@ module ReviewBackendManager =
     /// binding is still validated first (relay-assessment-007: a rejected
     /// invocation writes nothing and consumes no slot), but its eight fields do
     /// not enter the event.
-    let private runPrepared
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        (prepared: PreparedAssessment)
-        =
+    let private runPrepared (scope: ToolRuntimeScope) (context: HostToolContext) (prepared: PreparedAssessment) =
         task {
             let! binding =
                 captureBinding
@@ -312,43 +322,44 @@ module ReviewBackendManager =
 
             match binding with
             | Error failure -> return Error failure
-            | Ok _ ->
-                let outcome =
-                    if ReviewFindings.isEmpty prepared.Bound.Findings then
-                        ReviewOutcome.Promoted
-                    else
-                        ReviewOutcome.Stayed
+            | Ok _ -> ()
 
-                match lifecycleWorkOf prepared.Bound.Directory context.SessionId with
-                | None -> return Error RecordFailed
-                | Some(held, work) ->
-                    let gitCommonDir =
-                        Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir prepared.Bound.Directory
-                    let requestId = prepared.IncumbencyId + ":review"
-                    let findings =
-                        prepared.Bound.Findings
-                        |> Wanxiangshu.Mission.Work.ReviewFindings.values
-                        |> List.map (fun finding -> finding.AcceptanceCriteria + "\n" + finding.WorkPlan)
-                        |> List.toArray
-                        |> box
-                    let command =
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
-                            "Review"
-                            [ "incumbencyId", box prepared.IncumbencyId
-                              "reviewerId", box context.SessionId
-                              "findings", findings ]
-                    let receipt =
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
-                            gitCommonDir
-                            context.SessionId
-                            requestId
-                            command
-                    if receipt.Reason = "Incumbency already reviewed" then
-                        return Error RecordFailed
-                    elif receipt.Status = "Committed" || receipt.Status = "Replayed" then
-                        return Ok(acceptedResult prepared.Bound.Findings)
-                    else
-                        return Error RecordFailed
+            match lifecycleWorkOf prepared.Bound.Directory context.SessionId with
+            | None -> return Error RecordFailed
+            | Some _ -> ()
+
+            let gitCommonDir =
+                Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir prepared.Bound.Directory
+
+            let requestId = prepared.IncumbencyId + ":review"
+
+            let findings =
+                prepared.Bound.Findings
+                |> Wanxiangshu.Mission.Work.ReviewFindings.values
+                |> List.map (fun finding -> finding.AcceptanceCriteria + "\n" + finding.WorkPlan)
+                |> List.toArray
+                |> box
+
+            let command =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    "Review"
+                    [ "incumbencyId", box prepared.IncumbencyId
+                      "reviewerId", box ReviewerId
+                      "findings", findings ]
+
+            let receipt =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
+                    gitCommonDir
+                    context.SessionId
+                    requestId
+                    command
+
+            if receipt.Reason = "Incumbency already reviewed" then
+                return Error RecordFailed
+            elif receipt.Status = "Committed" || receipt.Status = "Replayed" then
+                return Ok(acceptedResult prepared.Bound.Findings)
+            else
+                return Error RecordFailed
         }
 
     let private renderExecution =

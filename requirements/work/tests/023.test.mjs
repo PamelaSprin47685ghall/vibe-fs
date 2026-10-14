@@ -111,8 +111,8 @@ test('WHAT[work-023] delivery and reopen do not touch the stage', () => {
   const restored = surface.documentView(`${deliveredText}${reopened.bytes}`)
   assert.equal(restored.delivered, false)
   assert.equal(restored.projection, 'S3')
-  assert.equal(restored.activeId, before.activeId)
-  assert.equal(restored.authorized, true, 'reopen keeps the authorization of the delivered tenure')
+  assert.notEqual(restored.activeId, before.activeId, 'reopen starts a new incumbency, not the delivered one')
+  assert.equal(restored.authorized, false, 'a reopened tenure starts unauthorized')
 })
 
 test('WHAT[work-023] illegal stage and review transitions are rejected', () => {

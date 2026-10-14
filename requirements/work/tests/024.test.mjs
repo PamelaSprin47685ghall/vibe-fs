@@ -5,6 +5,7 @@ import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import { runJsPlan } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { rolePermissionRules } from '../../../dist/OpenCode/Tools/ToolSurface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
@@ -98,7 +99,17 @@ test('WHAT[work-024] a reviewed tenure may write; a second review and a delivere
   }
   const reviewed = surface.reviewProbe(text, incumbencyIdOf(text), 'Promoted')
   text = `${text}${reviewed.bytes}`
-  const delivered = surface.deliverStateProbe(text, 'run-final', 'call-final', 30n)
+  const root = mkdtempSync(join(tmpdir(), 'wxs-work-024-draft-'))
+  let delivered
+  try {
+    const written = planning.PlanningSurface.rewritePlanAtomic(root, 'work-24c', '# plan\n')
+    assert.equal(written.ok, true, written.error)
+    const selected = planning.PlanningSurface.readAndValidatePlan(root, 'work-24c')
+    assert.equal(selected.ok, true, selected.error)
+    delivered = surface.deliverStateProbe(text, 'run-final', 'call-final', 30n, { digest: selected.digest, path: selected.path })
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
   text = `${text}${delivered.bytes}`
   const view = surface.documentView(text)
   assert.equal(view.delivered, true)

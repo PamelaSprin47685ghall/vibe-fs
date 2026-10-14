@@ -1111,12 +1111,6 @@ module DispatchSurface =
                             |> Option.defaultValue null
                            count = counter.Count |}) |}
 
-    let closeCompletedHumanRootManager (projection: obj) : obj =
-        projection
-        |> RuntimeSurface.projectionOf
-        |> PromptAuthorityLedger.closeCompletedHumanRootManager
-        |> RuntimeSurface.projectionToJs
-
     let private watermarkText (value: obj) =
         if isNull value then "" else string value
 

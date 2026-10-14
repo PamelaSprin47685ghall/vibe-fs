@@ -95,7 +95,24 @@ type LifecycleEvent =
 module LifecycleIdentity =
     val spawnMark: string
     val authorityInitial: (string -> string) -> workId: string -> string
-    val oneshotRetirementId: (string -> string) -> workId: string -> providerRunId: string -> toolCallId: string -> outcome: string -> expectedAdvance: string -> string
-    val executionRetirementId: (string -> string) -> workId: string -> providerRunId: string -> toolCallId: string -> outcome: string -> expectedAdvance: string -> string
+
+    val oneshotRetirementId:
+        (string -> string) ->
+        workId: string ->
+        providerRunId: string ->
+        toolCallId: string ->
+        outcome: string ->
+        expectedAdvance: string ->
+            string
+
+    val executionRetirementId:
+        (string -> string) ->
+        workId: string ->
+        providerRunId: string ->
+        toolCallId: string ->
+        outcome: string ->
+        expectedAdvance: string ->
+            string
+
     val successorIncumbencyId: (string -> string) -> retirementId: string -> string
     val firstIncumbencyId: (string -> string) -> workId: string -> string

@@ -13,21 +13,22 @@ test('WHAT[managed-session-lifecycle-024] active DevOps handle rejects a second 
 })
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
-const eventLine = (eventType, payload) => `${JSON.stringify({ event_type: eventType, payload })}\n`
-const boundEvent = (devopsId, target) => eventLine('DevOpsBound', { devopsId, target, workId: 'road_alpha' })
+const eventsOf = (text) => text.split('\n').filter((line) => line.length > 0).flatMap((line) => JSON.parse(line).events ?? [])
+const eventLine = (requestId, events) => `${JSON.stringify({ events, requestHash: '0'.repeat(64), requestId })}\n`
+const boundEvent = (devopsId, target) => eventLine('bind:road_alpha', [{ devopsId, target, type: 'DevOpsBound' }])
 
 test('WHAT[managed-session-lifecycle-024] road projection retains the supplied logical operator and model binding', () => {
   const opened = surface.encodeOpening('S4', 'road_alpha', '/repo', 1n)
   const bound = boundEvent('devops:road_alpha', 'provider/fixed-model:high')
   const retained = surface.decodeDocument(`${opened}${bound}`)
   assert.equal(retained.ok, true, retained.fault)
-  const observed = JSON.parse(`${opened}${bound}`.trim().split('\n').at(-1)).payload
+  const observed = eventsOf(`${opened}${bound}`).find((event) => event.type === 'DevOpsBound')
   assert.equal(observed.devopsId, 'devops:road_alpha')
   assert.equal(observed.target, 'provider/fixed-model:high')
 
   const folded = surface.readProbe(`${opened}${bound}`)
   assert.equal(retained.names.split(',').includes('DevOpsBound'), true)
-  assert.equal(folded.position, 'ActiveRebound')
+  assert.equal(folded.next, 'Review')
   assert.equal(folded.names.split(',').at(-1), 'DevOpsBound')
 })
 

@@ -23,35 +23,6 @@ module Fold =
 
     let private reject = FoldRejection.reject
 
-    /// A unified S4 `Delivered` retirement completes the manager life: the human
-    /// root authority closes and the life's deferred work closes with it. This is
-    /// the same settlement the retired relay fact used to trigger, now driven by
-    /// the one lifecycle vocabulary.
-    let settleCompletedLife (projection: ProjectionSet) (sessionId: SessionId) : ProjectionSet =
-        let agents = projection.AgentProjections
-
-        let attentionAfterClosure =
-            Wanxiangshu.Interaction.Attention.AttentionProjection.closeLife sessionId agents.Attention
-
-        let updatedAgents =
-            match
-                AgentProjection.tryUpdate
-                    sessionId
-                    (fun session ->
-                        Ok
-                            { session with
-                                PromptAuthority =
-                                    session.PromptAuthority
-                                    |> Option.map
-                                        Wanxiangshu.Interaction.Authority.PromptAuthorityLedger.closeCompletedHumanRootManager })
-                    agents
-            with
-            | Ok next -> next
-            | Error _ -> agents
-
-        { projection with
-            AgentProjections = { updatedAgents with Attention = attentionAfterClosure } }
-
     let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =
         // DSL-003: one dispatch per bounded-context family; each family folds
         // through its own branch so no fold depends on the whole catalogue.

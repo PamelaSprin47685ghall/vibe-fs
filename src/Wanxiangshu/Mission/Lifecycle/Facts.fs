@@ -47,7 +47,8 @@ module WorkSequence =
         | WorkSequence.Plan -> 1
         | WorkSequence.Execution -> 2
 
-    let render (sequence: WorkSequence) = elements sequence |> List.map StageElement.render
+    let render (sequence: WorkSequence) =
+        elements sequence |> List.map StageElement.render
 
 [<RequireQualifiedAccess>]
 type RetirementOutcome =
@@ -146,7 +147,15 @@ module LifecycleIdentity =
         (outcome: string)
         (expectedAdvance: string)
         =
-        workId + "\n" + providerRunId + "\n" + toolCallId + "\n" + outcome + "\n" + expectedAdvance
+        workId
+        + "\n"
+        + providerRunId
+        + "\n"
+        + toolCallId
+        + "\n"
+        + outcome
+        + "\n"
+        + expectedAdvance
 
     let oneshotRetirementId
         (sha256: string -> string)
@@ -156,7 +165,10 @@ module LifecycleIdentity =
         (outcome: string)
         (expectedAdvance: string)
         =
-        sha256 ("oneshot-retirement-v1\n" + retirementFields workId providerRunId toolCallId outcome expectedAdvance)
+        sha256 (
+            "oneshot-retirement-v1\n"
+            + retirementFields workId providerRunId toolCallId outcome expectedAdvance
+        )
 
     let executionRetirementId
         (sha256: string -> string)
@@ -166,7 +178,10 @@ module LifecycleIdentity =
         (outcome: string)
         (expectedAdvance: string)
         =
-        sha256 ("retirement-v1\n" + retirementFields workId providerRunId toolCallId outcome expectedAdvance)
+        sha256 (
+            "retirement-v1\n"
+            + retirementFields workId providerRunId toolCallId outcome expectedAdvance
+        )
 
     let successorIncumbencyId (sha256: string -> string) (retirementId: string) =
         sha256 ("successor-incumbency-v1\n" + retirementId)

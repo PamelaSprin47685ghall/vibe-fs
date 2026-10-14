@@ -42,15 +42,16 @@ module TenureIsolation =
             match pending, rest with
             | None, _ -> List.rev reversed @ rest
             | Some pendingRecord, [] -> List.rev (pendingRecord :: reversed)
-            | Some pendingRecord, message :: tail ->
-                let cursor =
-                    messageId message
-                    |> Option.bind (fun id -> Map.tryFind id messageCursors)
+            | Some pendingRecord, message :: tail -> placeMessage reversed pendingRecord message tail
 
-                if isCurrentTenurePhysical openingCursor cursor then
-                    List.rev reversed @ (pendingRecord :: message :: tail)
-                else
-                    place (message :: reversed) pending tail
+        and placeMessage reversed pendingRecord message tail =
+            let cursor =
+                messageId message |> Option.bind (fun id -> Map.tryFind id messageCursors)
+
+            if isCurrentTenurePhysical openingCursor cursor then
+                List.rev reversed @ (pendingRecord :: message :: tail)
+            else
+                place (message :: reversed) (Some pendingRecord) tail
 
         place [] (Some record) messages
 
@@ -121,7 +122,8 @@ module TenureIsolation =
         (raw: obj)
         : obj list * obj option =
         match pendingRecord, cursor with
-        | Some record, Some sequence when isCurrentTenurePhysical tenure.OpeningCursor (Some sequence) -> raw :: record :: reversed, None
+        | Some record, Some sequence when isCurrentTenurePhysical tenure.OpeningCursor (Some sequence) ->
+            raw :: record :: reversed, None
         | _ -> raw :: reversed, pendingRecord
 
     let private step

@@ -463,10 +463,8 @@ type ToolRuntimeScope
         // nothing, a recorded cleanup blocker confines to the finish window, a
         // promoted final incumbent keeps the read/cleanup/close-out surface, and
         // every other active fact keeps the full Manager set.
-        match
-            Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory directory sessionId
-        with
-        | Some work ->
+        Wanxiangshu.OpenCode.WorkspaceEventStore.tryLifecycleWorkOfDirectory directory sessionId
+        |> Option.map (fun work ->
             match work.ActiveId, work.Reviewed with
             | None, _ -> defaultEmptyManagerFacts
             | Some _, reviewed ->
@@ -474,8 +472,8 @@ type ToolRuntimeScope
                   HasAssessment = reviewed
                   HasConfirmation = work.Confirmed
                   IsFinalIncumbent = work.ReviewOutcome = Some "Promoted"
-                  CleanupBlockerDigest = work.BlockerDigest }
-        | None -> defaultEmptyManagerFacts
+                  CleanupBlockerDigest = work.BlockerDigest })
+        |> Option.defaultValue defaultEmptyManagerFacts
 
     let devopsBindingTasks = Dictionary<string, Task<unit>>()
 
