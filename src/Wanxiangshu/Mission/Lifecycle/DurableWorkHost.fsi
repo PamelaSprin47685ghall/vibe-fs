@@ -19,6 +19,7 @@ module DurableWorkHost =
     val planSequence: unit -> obj
     val executionSequence: unit -> obj
     val useWork: gitCommonDir: string -> workId: string -> body: (obj -> 'a) -> 'a
+    val useEphemeralWork: workId: string -> records: string array -> body: (obj -> 'a) -> 'a
     val execute: gitCommonDir: string -> workId: string -> requestId: string -> command: obj -> HostReceipt
     val inspect: gitCommonDir: string -> workId: string -> obj
 

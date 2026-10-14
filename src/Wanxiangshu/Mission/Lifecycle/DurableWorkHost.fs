@@ -9,8 +9,17 @@ open Fable.Core.JsInterop
 /// They do not hold the connection.
 module DurableWorkHost =
 
-    [<Import("DatabaseSync", "node:sqlite")>]
-    let private DatabaseSync: obj = jsNative
+    [<Import("createRequire", "node:module")>]
+    let private createRequire (_url: string) : obj = jsNative
+
+    [<Emit("import.meta.url")>]
+    let private moduleUrl: string = jsNative
+
+    [<Emit("typeof globalThis.Bun !== 'undefined'")>]
+    let private runningOnBun () : bool = jsNative
+
+    [<Emit("$0($1)")>]
+    let private requireModule (_require: obj) (_name: string) : obj = jsNative
 
     [<Import("SqliteJournal", "wanxiangli/eventstore")>]
     let private SqliteJournal: obj = jsNative
@@ -23,6 +32,16 @@ module DurableWorkHost =
 
     let private ensureDir (path: string) =
         mkdirSync path (createObj [ "recursive" ==> true ])
+
+    let private openDatabase (path: string) : obj =
+        let require = createRequire moduleUrl
+
+        if runningOnBun () then
+            let sqlite = requireModule require "bun:sqlite"
+            createNew sqlite?Database path
+        else
+            let sqlite = requireModule require "node:sqlite"
+            createNew sqlite?DatabaseSync path
 
     [<Emit("$0 != null && typeof $0 === 'object'")>]
     let private isRecord (_value: obj) : bool = jsNative
@@ -112,7 +131,7 @@ module DurableWorkHost =
     let useWork (gitCommonDir: string) (workId: string) (body: obj -> 'a) : 'a =
         let path = journalPath gitCommonDir
         ensureDir (parentOf path)
-        let connection = createNew DatabaseSync path
+        let connection = openDatabase path
         // DSL-MUTABLE: resource — the journal this call opened, closed exactly once in finally
         let mutable journal: obj option = None
 
@@ -121,6 +140,32 @@ module DurableWorkHost =
             journal <- Some opened
             let work: obj = createNew DurableWork (workId, opened)
             body work
+        finally
+            closeJournal journal connection
+
+    let private appendSeed (journal: obj) (workId: string) (revision: float) (record: string) : float =
+        let frame: obj = emitJsExpr record "JSON.parse($0)"
+        let requestId = text (nested frame "requestId")
+        let acknowledgement: obj = journal?append (workId, revision, requestId, record)
+        let status = text (nested acknowledgement "status")
+
+        if status <> "Committed" && status <> "Replayed" then
+            failwith (status + ": " + text (nested acknowledgement "reason"))
+
+        unbox<float> (nested acknowledgement "revision")
+
+    /// Test/probe host for canonical records. It uses the same runtime-specific
+    /// SQLite selection as the durable path and does not expose the connection.
+    let useEphemeralWork (workId: string) (records: string array) (body: obj -> 'a) : 'a =
+        let connection = openDatabase ":memory:"
+        // DSL-MUTABLE: resource — the probe's one journal handle, closed exactly once in finally
+        let mutable journal: obj option = None
+
+        try
+            let opened: obj = createNew SqliteJournal connection
+            journal <- Some opened
+            records |> Array.fold (appendSeed opened workId) 0. |> ignore
+            body (createNew DurableWork (workId, opened))
         finally
             closeJournal journal connection
 

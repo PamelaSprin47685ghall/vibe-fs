@@ -223,10 +223,11 @@ Plan 的轮换生命周期由不可变 Durable 事件驱动并投影状态。结
 
 当跑者调用 `deliver` 且本任已获授权（`Authorized = true`）时，系统建立终态交付。
 
-- 允许后果：系统首先核查当前任期无活跃 blocker，随后读取 `P` 文件内容并确认其非空。计算内容哈希（`sha256`）与字节长度。启动一个无 parent 的 Manager 执行会话（init prompt = `P` 全文，见 [039]）并取得 `execSessionId`。追加一笔 `IncumbencyRetired(incumbencyId, Delivered)`。载荷还含 digest、path、execSessionId。
+- 允许后果：系统首先核查当前任期无活跃 blocker，读取 `P` 的非空原文并计算 digest/path；随后**先持久提交**唯一 `DeliveryRequested(operationId, digest, path)`。只有这次调用收到 `Committed + DeliveryRequested` 才可发起一次 parentless Manager 执行；Replayed/Observed/Unknown/NotWritten/Conflict 都不是启动许可。启动前再次读取 `P`，字节摘要或路径已变化则确认为 NotStarted，绝不把另一版计划送进已预留的 operation。
+- 允许后果：外部启动结果分三类。确切承接才提交 `ResolveDelivery(Accepted, execSessionId, digest, path)` 并退休为 Delivered；确切的启动前拒绝才提交 `NotStarted` 并允许以后以新请求身份显式再试；`AcceptanceUnknown`、创建回执丢失或异常结果保持 pending，不写 NotStarted、不再次启动。恢复和重放只观察原 operation，直到外部事实把它收敛。
   成功后归还本会话占用的 provider 额度，向用户呈现最终产物路径与回执（含执行会话已启动的事实），规划宣告完成，不再调用任何模型。
 - 禁止后果：`P` 为空或不存在时严禁交付。无授权时严禁走本路径（走 [025] 接力）。`execSessionId` 严禁进入 provider 可见面。交付完成后，本任期内严禁再调用模型；再次 `deliver` 只可能由用户 reprompt 触发，且必须先经 `Reopened` 回 active（见 [037]），严禁绕过重开直接复用 delivered 投影。
-- 失败后果：若文件读取失败、为空、执行会话启动失败或持久化出错，交付调用必须失败，当前任期保持不退休状态，底层存储零写入。
+- 失败后果：预留前的文件读取/校验失败为零写入；预留提交失败为零启动。预留后的明确 NotStarted 可以追加拒绝事实，当前任期继续活跃；结果未知则保留 `DeliveryRequested` 作为未完成义务。任何路径都不得用“启动函数抛异常”本身证明外部效果没有发生。
 
 ## [027] 自然停止
 
@@ -385,3 +386,7 @@ provider 上下文由剥除后留下的本任消息、用户原文与显式资�
 ## [046] durable 结果的观察与启动条件
 
 work host 观察 durable 执行结果时原样保留调用方传入的 requestId，replay 沿用原 id，不铸造替代。物理启动只对 committed 的 DeliveryRequested 为真；Committed 的其它 kind、Replayed、Unknown、NotWritten 与 Conflict 一律不得启动。work journal 固定位于 `<git-common-dir>/wanxiangshu/work.sqlite`，不在事件流目录内。
+
+## [047] lifecycle SQLite 宿主边界
+
+Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择：Node 使用 `node:sqlite` 的 `DatabaseSync`，Bun 使用 `bun:sqlite` 的 `Database`。运行时选择只有一处；Surface 的内存 probe 与 durable 工作路径必须复用同一选择，不得各自静态导入某一运行时专属 SQLite 模块。Node 与 Bun 都必须能够真实加载 Lifecycle 产物、完成持久开立、关闭连接并重开读取同一工作；模块装载不得因另一个运行时不存在的内建模块而失败。

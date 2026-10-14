@@ -30,15 +30,14 @@ module LifecycleSurface =
     let journalPath (gitCommonDir: string) =
         DurableWorkHost.journalPath gitCommonDir
 
+    let execute (gitCommonDir: string) (workId: string) (requestId: string) (command: obj) =
+        DurableWorkHost.execute gitCommonDir workId requestId command
 
-    [<Import("DatabaseSync", "node:sqlite")>]
-    let private DatabaseSync: obj = jsNative
+    let inspect (gitCommonDir: string) (workId: string) =
+        DurableWorkHost.inspect gitCommonDir workId
 
-    [<Import("SqliteJournal", "wanxiangli/eventstore")>]
-    let private SqliteJournal: obj = jsNative
-
-    [<Import("DurableWork", "wanxiangli/durable-work")>]
-    let private DurableWork: obj = jsNative
+    let inspected (gitCommonDir: string) (workId: string) =
+        DurableWorkHost.inspected gitCommonDir workId
 
     [<Emit("JSON.parse($0)")>]
     let private parseJson (_text: string) : obj = jsNative
@@ -98,31 +97,7 @@ module LifecycleSurface =
             (records |> String.concat "\n") + "\n"
 
     let private useJournal (workId: string) (records: string array) (body: obj -> 'a) : 'a =
-        let connection: obj = createNew DatabaseSync ":memory:"
-        // DSL-MUTABLE: resource — the probe's one journal handle, closed exactly once below
-        let mutable journal: obj option = None
-
-        try
-            let opened: obj = createNew SqliteJournal connection
-            journal <- Some opened
-            // DSL-MUTABLE: algorithm-scratch — replay revision while seeding probe frames
-            let mutable revision = 0.
-
-            for record in records do
-                let requestId = string (parseJson record)?requestId
-                let ack: obj = opened?append (workId, revision, requestId, record)
-                let status = string ack?status
-
-                if status <> "Committed" && status <> "Replayed" then
-                    failwith (status + ": " + string ack?reason)
-
-                revision <- unbox<float> ack?revision
-
-            body (createNew DurableWork (workId, opened))
-        finally
-            match journal with
-            | Some opened -> opened?close ()
-            | None -> connection?close ()
+        DurableWorkHost.useEphemeralWork workId records body
 
     let private openCommand (root: string) (kind: string) (head: float) (ownerId: string) =
         command
@@ -443,7 +418,10 @@ module LifecycleSurface =
                     let cut = event?projectionCut
                     let fence = if isRecord cut then cut else event
 
-                    if string fence?providerRunId = providerRunId && string fence?toolCallId = toolCallId then
+                    if
+                        string fence?providerRunId = providerRunId
+                        && string fence?toolCallId = toolCallId
+                    then
                         Some(string event?incumbencyId)
                     else
                         None))
@@ -609,7 +587,9 @@ module LifecycleSurface =
 
     let private produceOpenReview (workId: string) =
         useJournal workId [||] (fun work ->
-            let opened: obj = work?execute ("open:" + workId, openCommand "/repo" "plan" 7. "owner")
+            let opened: obj =
+                work?execute ("open:" + workId, openCommand "/repo" "plan" 7. "owner")
+
             ignore opened
             let snapshot: obj = work?inspect ()
             let id = string snapshot?active?id
@@ -714,7 +694,14 @@ module LifecycleSurface =
         let text = if isNull raw then "" else string raw
         if String.IsNullOrWhiteSpace text then None else Some text
 
-    let private seedOpenAt (store: obj) (kind: string) (workId: string) (root: string) (cursor: float) (ownerId: string) : Task<obj> =
+    let private seedOpenAt
+        (store: obj)
+        (kind: string)
+        (workId: string)
+        (root: string)
+        (cursor: float)
+        (ownerId: string)
+        : Task<obj> =
         task {
             match stampedDir store with
             | Some dir ->
@@ -769,7 +756,14 @@ module LifecycleSurface =
                                    error = reason |}
         }
 
-    let private seedOpenWith (store: obj) (kind: string) (workId: string) (root: string) (head: int64) (ownerId: string) : Task<obj> =
+    let private seedOpenWith
+        (store: obj)
+        (kind: string)
+        (workId: string)
+        (root: string)
+        (head: int64)
+        (ownerId: string)
+        : Task<obj> =
         task {
             match cursorOf head with
             | None ->
@@ -784,7 +778,14 @@ module LifecycleSurface =
     let seedOpen (store: obj) (kind: string) (workId: string) (root: string) (head: int64) : Task<obj> =
         seedOpenWith store kind workId root head "owner"
 
-    let seedOpenAs (store: obj) (kind: string) (workId: string) (root: string) (head: int64) (ownerId: string) : Task<obj> =
+    let seedOpenAs
+        (store: obj)
+        (kind: string)
+        (workId: string)
+        (root: string)
+        (head: int64)
+        (ownerId: string)
+        : Task<obj> =
         seedOpenWith store kind workId root head ownerId
 
     let private seedReviewWith (store: obj) (workId: string) (outcome: string) (reviewerId: string) : Task<obj> =
