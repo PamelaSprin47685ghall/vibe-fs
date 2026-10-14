@@ -809,15 +809,7 @@ module ToolRegistry =
         // The execution session spawn capability handed to PlanTools: the
         // provider-visible receipt never carries the spawned session id.
         let deliverSpawn (runtime: ToolRuntimeScope) (agent: string) (prompt: string) =
-            task {
-                let! spawned = runtime.SpawnExecutionSession(agent, prompt)
-
-                return
-                    match spawned with
-                    | Ok sessionId -> sessionId
-                    | Error reason ->
-                        raise (InvalidOperationException(sprintf "Execution session spawn failed: %s" reason))
-            }
+            runtime.SpawnExecutionSession(agent, prompt)
 
         let renderDeliverOutcome outcome =
             match outcome with

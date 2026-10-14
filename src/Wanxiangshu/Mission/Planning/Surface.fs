@@ -190,12 +190,18 @@ module PlanningSurface =
         else
             None
 
-    let private spawnOfJs (spawnVal: obj) : string -> string -> Task<string> =
+    let private spawnOfJs (spawnVal: obj) : string -> string -> Task<DeliverySpawnOutcome> =
         fun (agent: string) (prompt: string) ->
-            // The spawn argument arrives as a plain JavaScript function
-            // (agent, prompt) => Promise<sessionId>; call it through JS interop
-            // so currying never gets in the way.
-            unbox<Task<string>> (emitJsExpr (spawnVal, agent, prompt) "$0($1, $2)")
+            task {
+                try
+                    // Test/interop surface: a resolved JS function is a proved
+                    // Started result. Rejection is conservatively Unknown.
+                    let! sessionId = unbox<Task<string>> (emitJsExpr (spawnVal, agent, prompt) "$0($1, $2)")
+
+                    return DeliverySpawnOutcome.Started sessionId
+                with ex ->
+                    return DeliverySpawnOutcome.Unknown ex.Message
+            }
 
     let ensurePlanWorkOpened (store: IEventStore) (root: string) (sessionId: string) (observedHead: obj) : Task<obj> =
         task {

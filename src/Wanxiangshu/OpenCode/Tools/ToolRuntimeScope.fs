@@ -26,6 +26,56 @@ open Wanxiangshu.Process
 open Wanxiangshu.OpenCode.Host
 
 
+/// The parentless manager execution spawn used by an authorized delivery.
+/// Every branch reports what the Host actually proved; an unproven creation or
+/// admission stays Unknown and never unlocks a fresh delivery operation.
+module private ExecutionSpawn =
+    type private Spawn = Wanxiangshu.Mission.Planning.DeliverySpawnOutcome
+
+    let unknown (prefix: string) (reason: string) : Spawn =
+        Spawn.Unknown(sprintf "%s: %s" prefix reason)
+
+    let ofSendOutcome (sessionId: SessionId) (outcome: Outcome.SendOutcome) : Spawn =
+        match outcome with
+        | Outcome.SendOutcome.AdmittedWithReceipt _
+        | Outcome.SendOutcome.AdmittedWithPhysicalMessage _ -> Spawn.Started(SessionId.value sessionId)
+        | Outcome.SendOutcome.Retryable reason
+        | Outcome.SendOutcome.Fatal reason ->
+            Spawn.NotStarted(sprintf "Execution session prompt was not admitted: %s" reason)
+        | Outcome.SendOutcome.AcceptanceUnknown reason ->
+            unknown "Execution session prompt acceptance is unknown" reason
+
+    let private prompt (sessions: ISessionHostPort) (agent: string) (text: string) (sessionId: SessionId) =
+        task {
+            use _listener = sessions.SubscribeTerminal(sessionId, (fun _ _ -> ()))
+
+            let sendOptions: SessionPromptOptions =
+                { Model = None
+                  Agent = Some agent
+                  Directory = None
+                  Metadata = None
+                  Tools = None
+                  DetachedListener = None }
+
+            let! outcome = sessions.SendPrompt(sessionId, text, sendOptions)
+            return ofSendOutcome sessionId outcome
+        }
+
+    let start (sessions: ISessionHostPort) (agent: string) (text: string) : Task<Spawn> =
+        task {
+            let options: OpenCodeChildOptions =
+                { Title = Some agent
+                  Agent = Some agent
+                  Directory = None }
+
+            match! sessions.CreateSiblingSession(SessionId.create agent, None, options) with
+            // Session creation itself is a Host effect. A generic transport
+            // error does not prove that the Host failed before creating it.
+            | Error error -> return unknown "Execution session creation outcome is unknown" error
+            | Ok sessionId -> return! prompt sessions agent text sessionId
+        }
+
+
 /// Owns every per-session tool runtime.
 ///
 /// AGENT-007: Role comes from the Authority Root's CanonicalRole and nothing
@@ -747,37 +797,14 @@ type ToolRuntimeScope
     /// no-op terminal listener satisfies the send-before-listen order check
     /// (the reacting listener belongs to whoever awaits the agent, not to the
     /// spawn). A missing Host transport fails closed.
-    member _.SpawnExecutionSession(agent: string, prompt: string) : Task<Result<string, string>> =
+    member _.SpawnExecutionSession
+        (agent: string, prompt: string)
+        : Task<Wanxiangshu.Mission.Planning.DeliverySpawnOutcome> =
         task {
-            let options: OpenCodeChildOptions =
-                { Title = Some agent
-                  Agent = Some agent
-                  Directory = None }
-
-            let sendOutcomeOf (sessionId: SessionId) (outcome: Outcome.SendOutcome) : Result<string, string> =
-                match outcome with
-                | Outcome.SendOutcome.AdmittedWithReceipt _
-                | Outcome.SendOutcome.AdmittedWithPhysicalMessage _ -> Ok(SessionId.value sessionId)
-                | Outcome.SendOutcome.Retryable reason
-                | Outcome.SendOutcome.AcceptanceUnknown reason
-                | Outcome.SendOutcome.Fatal reason ->
-                    Error(sprintf "Execution session prompt delivery failed: %s" reason)
-
-            match! sessions.CreateSiblingSession(SessionId.create agent, None, options) with
-            | Error error -> return Error(sprintf "Execution session spawn failed: %s" error)
-            | Ok sessionId ->
-                use _listener = sessions.SubscribeTerminal(sessionId, (fun _ _ -> ()))
-
-                let sendOptions: SessionPromptOptions =
-                    { Model = None
-                      Agent = Some agent
-                      Directory = None
-                      Metadata = None
-                      Tools = None
-                      DetachedListener = None }
-
-                let! outcome = sessions.SendPrompt(sessionId, prompt, sendOptions)
-                return sendOutcomeOf sessionId outcome
+            try
+                return! ExecutionSpawn.start sessions agent prompt
+            with ex ->
+                return ExecutionSpawn.unknown "Execution session spawn outcome is unknown" ex.Message
         }
 
     /// Manager authorization facts for the capability gate, derived purely

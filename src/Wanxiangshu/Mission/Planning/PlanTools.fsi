@@ -21,6 +21,11 @@ type AskResult =
       WorkRecord: string
       Status: string }
 
+type DeliverySpawnOutcome =
+    | Started of sessionId: string
+    | NotStarted of reason: string
+    | Unknown of reason: string
+
 module PlanTools =
 
     /// The one plan artifact read used by deliver and by the plan surface: the
@@ -30,8 +35,8 @@ module PlanTools =
     /// planning-007 / planning-008: deliver splits on authorization — an
     /// authorized tenure takes the terminal delivery path (spawn + retire +
     /// PlanDelivered), an unauthorized one relays to the next incumbency.
-    /// `spawn` starts the parentless manager execution session and returns its
-    /// session id (planning-023).
+    /// `spawn` reports whether the parentless manager execution was admitted,
+    /// definitely not started, or remains acceptance-unknown (planning-023).
     val executeDeliver:
         gitCommonDir: string ->
         store: IEventStore ->
@@ -41,7 +46,7 @@ module PlanTools =
         providerRunId: string ->
         toolCallId: string ->
         hasBlocker: bool ->
-        spawn: (string -> string -> Task<string>) ->
+        spawn: (string -> string -> Task<DeliverySpawnOutcome>) ->
         retirementCursor: int64 ->
             Task<Result<DeliverResult, string>>
 

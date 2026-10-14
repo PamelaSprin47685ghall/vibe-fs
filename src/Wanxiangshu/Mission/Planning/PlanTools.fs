@@ -23,6 +23,11 @@ type AskResult =
       WorkRecord: string
       Status: string }
 
+type DeliverySpawnOutcome =
+    | Started of sessionId: string
+    | NotStarted of reason: string
+    | Unknown of reason: string
+
 module PlanTools =
 
     let private requireOpt (err: string) =
@@ -48,18 +53,6 @@ module PlanTools =
         | Ok content ->
             resolvePathAndDigest content root workId
             |> Result.map (fun (digest, planPath) -> (content, digest, planPath))
-
-    let private spawnExecutionSessionFor
-        (spawn: string -> string -> Task<string>)
-        (planContent: string)
-        : Task<Result<string, string>> =
-        task {
-            try
-                let! execSessionId = spawn "manager" planContent
-                return Ok execSessionId
-            with ex ->
-                return Error(sprintf "Execution session spawn failed: %s" ex.Message)
-        }
 
     /// The one lifecycle work this session owns, read from the same workspace
     /// EventStore the plan entry writes.
@@ -153,15 +146,20 @@ module PlanTools =
         (digest: string)
         (path: string)
         (blockers: string array)
-        (spawn: string -> string -> Task<string>)
+        (spawn: string -> string -> Task<DeliverySpawnOutcome>)
         (content: string)
         : Task<Result<DeliverResult, string>> =
         task {
-            match! spawnExecutionSessionFor spawn content with
-            | Error err ->
+            match! spawn "manager" content with
+            | NotStarted err ->
                 refuseDelivery gitCommonDir workId operationId err
                 return Error err
-            | Ok execSessionId ->
+            | Unknown err ->
+                // DeliveryRequested remains pending. Unknown acceptance is not
+                // evidence that the external effect did not happen, so it must
+                // never unlock a fresh operation.
+                return Error(sprintf "Execution session spawn outcome is unknown: %s" err)
+            | Started execSessionId ->
                 let accepted =
                     Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
                         "ResolveDelivery"
@@ -186,15 +184,19 @@ module PlanTools =
         (digest: string)
         (path: string)
         (blockers: string array)
-        (spawn: string -> string -> Task<string>)
+        (spawn: string -> string -> Task<DeliverySpawnOutcome>)
         : Task<Result<DeliverResult, string>> =
         task {
             match readAndValidatePlan root workId with
             | Error err ->
                 refuseDelivery gitCommonDir workId operationId err
                 return Error err
-            | Ok(content, _, _) ->
+            | Ok(content, currentDigest, currentPath) when currentDigest = digest && currentPath = path ->
                 return! startAndSettleDelivery gitCommonDir workId operationId digest path blockers spawn content
+            | Ok _ ->
+                let error = "Cannot deliver: plan artifact changed after delivery reservation"
+                refuseDelivery gitCommonDir workId operationId error
+                return Error error
         }
 
     let private interpretDeliverReceipt
@@ -202,7 +204,7 @@ module PlanTools =
         (root: string)
         (workId: string)
         (blockers: string array)
-        (spawn: string -> string -> Task<string>)
+        (spawn: string -> string -> Task<DeliverySpawnOutcome>)
         (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
         : Task<Result<DeliverResult, string>> =
         task {
@@ -253,7 +255,7 @@ module PlanTools =
         (providerRunId: string)
         (toolCallId: string)
         (hasBlocker: bool)
-        (spawn: string -> string -> Task<string>)
+        (spawn: string -> string -> Task<DeliverySpawnOutcome>)
         (retirementCursor: int64)
         : Task<Result<DeliverResult, string>> =
         task {
