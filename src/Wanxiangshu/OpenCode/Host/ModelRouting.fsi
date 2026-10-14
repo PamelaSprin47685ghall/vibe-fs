@@ -100,6 +100,7 @@ module ModelRouting =
         member TryReadExecution: sessionId: string * physicalUserMessageId: string -> ExecutionAdmissionLease option
 
         member WasExecutionSuperseded: sessionId: string * physicalUserMessageId: string -> bool
+        member WasStoppedExecutionSuperseded: sessionId: string * physicalUserMessageId: string -> bool
 
         member OwnsExecutionAdmission: sessionId: string * physicalUserMessageId: string -> bool
 
@@ -211,6 +212,7 @@ module ModelRouting =
     val internal cancelRetainedInputsForSession: sessionId: SessionId -> unit
 
     val internal wasExecutionSuperseded: key: ChatExecutionKey -> bool
+    val internal wasStoppedExecutionSuperseded: key: ChatExecutionKey -> bool
 
     val internal ownsExecutionAdmission: key: ChatExecutionKey -> bool
 

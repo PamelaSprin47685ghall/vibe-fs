@@ -451,6 +451,10 @@ module ModelRouting =
         let boundDevopsTargetBySession = Dictionary<string, ModelRoutingTarget>()
         // DSL-MUTABLE: resource — superseded physical user message identities per session
         let supersededPhysical = HashSet<string * string>()
+        // DSL-MUTABLE: resource — physical executions whose provider step was explicitly
+        // stopped (SuppressProviderStep). Only a stopped AND superseded execution may
+        // carry a trailing chat.params without a committed lease.
+        let stoppedPhysical = HashSet<string * string>()
         // DSL-MUTABLE: resource — execution purpose per admitted physical user
         // message. The purpose outlives the active lease so a stale or superseded
         // commit still knows whether it was a readonly-delegate execution;
@@ -1754,6 +1758,11 @@ module ModelRouting =
             | None -> false
             | Some exact -> lock gate (fun () -> supersededPhysical.Contains exact)
 
+        member _.WasStoppedExecutionSuperseded(sessionId: string, physicalUserMessageId: string) : bool =
+            match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
+            | None -> false
+            | Some exact -> lock gate (fun () -> supersededPhysical.Contains exact && stoppedPhysical.Contains exact)
+
         member _.OwnsExecutionAdmission(sessionId: string, physicalUserMessageId: string) : bool =
             match normalizePhysicalExecutionKey sessionId physicalUserMessageId with
             | None -> false
@@ -1930,6 +1939,7 @@ module ModelRouting =
             | None -> ()
             | Some(normSessionId, normPhysicalUserMessageId) ->
                 lock gate (fun () ->
+                    stoppedPhysical.Add((normSessionId, normPhysicalUserMessageId)) |> ignore
                     capacity.SuppressStep(normSessionId, normPhysicalUserMessageId)
                     let prefix = sprintf "%s:%s:" normSessionId normPhysicalUserMessageId
 
@@ -2156,6 +2166,18 @@ module ModelRouting =
         match lock sharedGate (fun () -> sharedRuntime) with
         | Some runtime ->
             runtime.WasExecutionSuperseded(
+                SessionId.value key.SessionId,
+                PhysicalUserMessageId.value key.PhysicalUserMessageId
+            )
+        | None -> false
+
+    /// A retired attempt that was explicitly stopped and then superseded by its
+    /// successor. A merely superseded execution (HumanMessage, BusyAgentNudge)
+    /// does not qualify: its stale lease must still be refused (host-boundary-033).
+    let internal wasStoppedExecutionSuperseded (key: ChatExecutionKey) : bool =
+        match lock sharedGate (fun () -> sharedRuntime) with
+        | Some runtime ->
+            runtime.WasStoppedExecutionSuperseded(
                 SessionId.value key.SessionId,
                 PhysicalUserMessageId.value key.PhysicalUserMessageId
             )

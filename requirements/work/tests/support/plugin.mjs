@@ -1,5 +1,7 @@
 import { withExecutablePlugin, acceptAuthorityRoot, openIncumbency } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 
+process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
 // A non-empty findings array is the only failing shape; an empty array passes.
 export const findings = grade => grade === 'REVISE'
   ? { findings: [{ acceptance_criteria: 'the target state is not yet reached', work_plan: 'close the remaining gap' }] }
