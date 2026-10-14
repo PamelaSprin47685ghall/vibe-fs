@@ -141,17 +141,20 @@ test('WHAT[work-036] subsequent manager transform passes on an already-open work
 
     const commonDir = join(directory, '.git')
     const store = workspace.acquire(commonDir)
-    const work1 = store.TryCurrent('Lifecycle').get(managerSession)
-    assert.ok(work1, 'first transform opens the manager work')
-
-    let duplicateAppends = 0
-    const origAppend = store.Append.bind(store)
-    store.Append = async (envelopes) => {
-      for (const env of envelopes) {
-        if (env.EventType === 'WorkOpened' || env.EventType === 'IncumbencyOpened') duplicateAppends += 1
+    const openingEvents = () => {
+      const path = life.journalPath(store.gitCommonDir)
+      if (!existsSync(path)) return []
+      const database = new DatabaseSync(path)
+      const journal = new SqliteJournal(database)
+      try {
+        return journal.read(managerSession).flatMap((line) => JSON.parse(line).events ?? [])
+      } finally {
+        journal.close()
       }
-      return origAppend(envelopes)
     }
+    const openedCount = () =>
+      openingEvents().filter((event) => event.type === 'WorkOpened' || event.type === 'IncumbencyOpened').length
+    assert.equal(openedCount(), 2, 'first transform opens the manager work with exactly the two opening events')
 
     asst1.info.finish = 'stop'
     asst1.info.time.completed = 3
@@ -171,6 +174,6 @@ test('WHAT[work-036] subsequent manager transform passes on an already-open work
     }
     runtime.pushHostMessage(managerSession, asst2)
     await hooks['experimental.chat.messages.transform']({ sessionID: managerSession }, { messages: [user1, asst1] })
-    assert.equal(duplicateAppends, 0, 'subsequent transform pass must not re-append WorkOpened / IncumbencyOpened')
+    assert.equal(openedCount(), 2, 'subsequent transform pass must not re-append WorkOpened / IncumbencyOpened')
   })
 })
