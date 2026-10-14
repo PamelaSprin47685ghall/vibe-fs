@@ -6,7 +6,13 @@ import { REPO_ROOT, deriveExpectedClosure } from '../../../scripts/verify-packag
 
 test('WHAT[distribution-001] the expected package closure contains compiled entry and both-language resources', () => {
   const closure = deriveExpectedClosure()
-  for (const relative of ['dist/OpenCode/Plugin/Plugin.js', 'resources/provider/role/manager/en.md', 'resources/provider/role/manager/zh-CN.md']) {
+  for (const relative of [
+    'dist/OpenCode/Plugin/Plugin.js',
+    'resources/provider/role/manager/en.md',
+    'resources/provider/role/manager/zh-CN.md',
+    'node_modules/wanxiangli/dist/lifecycle/Work.js',
+    'node_modules/wanxiangli/dist/assembly/DurableWork.js',
+  ]) {
     assert.ok(closure.has(relative), relative)
     assert.ok(existsSync(join(REPO_ROOT, relative)))
     assert.ok(readFileSync(join(REPO_ROOT, relative)).length > 0)

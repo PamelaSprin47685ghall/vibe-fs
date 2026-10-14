@@ -46,15 +46,17 @@ import "wanxiangshu"
 → dist/OpenCode/Plugin/Plugin.js
 ```
 
-`package.json` 的 `main` / `exports["."]` 指向同一路径。npm 包含 `dist/` 与 `resources/`，不含源码与测试树。
+`package.json` 的 `main` / `exports["."]` 指向同一路径。本仓自身只把 `dist/` 与 `resources/` 列入 files；Lifecycle 依赖的独立 `wanxiangli` 以 bundled npm dependency 一并进入最终 tarball，不从源码树或本机路径解析。
 
 ### 系统要求
 
-- Node.js `>= 20`（`engines.node`）
+- Node.js `>= 22.13.0`（`engines.node`；Lifecycle 的 Node 路径使用内建 `node:sqlite`）
 - OpenCode Host，peer 依赖 `@opencode-ai/plugin`（`>= 1.17.4`）
 - 从源码构建时：.NET SDK（`global.json`）与 `dotnet tool restore`（Fable、Fantomas）
 
 `packageManager` = `npm@11.12.1`。安装依赖使用 `npm ci`（已提交 `package-lock.json`）。
+
+源码 checkout 所需的 `wanxiangli` 依赖固定为仓库内 `vendor/wanxiangli-0.5.1.tgz`；本地如另有 `wanxiangli/` 源码仓，只用于独立开发且被本仓忽略。构建、测试和发布不得读取该源码目录。
 
 ### 获取与安装
 
@@ -205,7 +207,7 @@ artifacts/     中间产物与本地发布产物，不提交
 
 ### 开发环境
 
-Node.js ≥ 20，`npm@11.12.1`；.NET SDK（`global.json`）；本地工具 `.config/dotnet-tools.json`（Fable、Fantomas）。
+Node.js ≥ 22.13.0，`npm@11.12.1`；.NET SDK（`global.json`）；本地工具 `.config/dotnet-tools.json`（Fable、Fantomas）。
 
 ### 首次设置
 
@@ -291,7 +293,7 @@ resources/wanxiangshu.mjs
 ### 构建与打包
 
 - **构建**：`scripts/build.mjs`（增量：按输入摘要判定 no-op / focused / full / clean 四模式，plan 与 run 共用判定；非源码输入或工具链变化进入 full 编译但不清空 `dist/`；仅源图删除、重命名或显式 `--clean` 时清空输出目录后重建；其余情况按受影响分片增量聚焦编译；随后把入库的 loop detector envelope 复制到 `dist/` 并校验入口与资源）。除这一处 runtime import 产物外，不把 `resources/` 复制进 `dist/`。
-- **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）。不得含 `src/`、`requirements/`、`scripts/`、`artifacts/`。
+- **打包**：仓库根 `npm pack`（或 `--pack-destination artifacts/package`）。tarball = 本仓 `dist/` + `resources/` + metadata（`package.json`、`README.md`、`LICENSE`）+ 明确 bundle 的 `node_modules/wanxiangli/**`。不得含本仓 `src/`、`requirements/`、`scripts/`、`artifacts/`，也不得夹带其它 `node_modules`。release verifier 逐文件核对 bundle，并在外部消费者测试前删除另装的顶层 `wanxiangli`，防止环境兜底。
 
 发布预检：`npm run verify:release`（干净工作树；验证日志默认写 `.fable-build/verify-logs/`，已被 .gitignore 忽略；CI 工作流 `.github/workflows/ci.yml` 运行同一命令，但无 artifact 上传，runner 结束后只剩余作业控制台输出）。
 

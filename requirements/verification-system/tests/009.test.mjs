@@ -374,14 +374,14 @@ test('WHAT[verification-system-009] repository closure gates reject an unassigne
       '--test-reporter=tap',
       'requirements/distribution/tests/004.test.mjs',
     ]
-    write(fixture, 'package.json', JSON.stringify({ files: ['dist/', 'resources/'] }))
+    write(fixture, 'package.json', JSON.stringify({ files: ['dist/', 'resources/'], bundleDependencies: ['wanxiangli'] }))
     const validPackageGate = runNode(fixture, packageArgs)
     assert.equal(validPackageGate.status, 0, validPackageGate.stderr || validPackageGate.stdout)
     assert.match(validPackageGate.stdout, /# tests 1\b/)
     assert.match(validPackageGate.stdout, /# pass 1\b/)
 
     for (const files of [['resources/'], ['dist/'], ['dist/', 'resources/', 'src/'], ['resources/', 'dist/']]) {
-      write(fixture, 'package.json', JSON.stringify({ files }))
+      write(fixture, 'package.json', JSON.stringify({ files, bundleDependencies: ['wanxiangli'] }))
       const packageGate = runNode(fixture, packageArgs)
       assert.equal(packageGate.status, 1, packageGate.stderr || packageGate.stdout)
       assert.match(packageGate.stdout, /not ok 1 - WHAT\[distribution-004\]/)

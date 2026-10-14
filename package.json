@@ -16,7 +16,7 @@
     "resources/"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13.0"
   },
   "allowScripts": {
     "@waishnav/devspace": true,
@@ -79,12 +79,15 @@
     "effect": "4.0.0-beta.83",
     "gpt-tokenizer": "^4.0.0",
     "proper-lockfile": "^4.1.2",
-    "wanxiangli": "file:wanxiangli/wanxiangli-0.5.0.tgz",
+    "wanxiangli": "file:vendor/wanxiangli-0.5.1.tgz",
     "zod": "4.5.4"
   },
   "overrides": {
     "bun-pty": "$bun-pty"
   },
+  "bundleDependencies": [
+    "wanxiangli"
+  ],
   "devDependencies": {
     "@opencode-ai/plugin": "1.18.29",
     "acorn": "^8.18.0",

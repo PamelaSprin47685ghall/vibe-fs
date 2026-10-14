@@ -1,5 +1,6 @@
 # Dependencies
 /node_modules/
+/wanxiangli/
 
 # .NET and F# compiler outputs & caches
 bin/
@@ -16,6 +17,7 @@ obj/
 .fable-build/
 /.wireit/
 /*.tgz
+!/vendor/wanxiangli-0.5.1.tgz
 
 # Local environment & credentials
 /.env

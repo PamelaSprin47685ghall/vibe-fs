@@ -14,7 +14,7 @@ package.json 的 main 与 exports["."] 均指向 artifact 内实际存在的 `./
 
 ## [004] 内容白名单
 
-package.json 的 files 白名单固定为 `["dist/", "resources/"]`。不得打包源码、测试、内部工具、规范文档或非运行时开发资产。
+package.json 的 files 白名单固定为 `["dist/", "resources/"]`；这是本仓自身内容的唯一生产白名单。显式 `bundleDependencies` 可以把已经作为 npm dependency 安装的独立运行时库带入 artifact，但每个 bundle 必须逐文件进入发布闭包校验，不能借此允许任意 `node_modules`、源码工作树、测试或内部工具混入。当前唯一 bundle 是 `wanxiangli`。
 
 ## [005] 同一份 Production Bytes
 
@@ -26,7 +26,7 @@ dist 是唯一编译产物。发布须通过 `scripts/build.mjs --clean` 重建�
 
 ## [007] 发布证明
 
-verify:release 覆盖构建、真实 npm pack、解包和消费者验证。校验归档成员仅限 dist 与 resources，并在非仓库目录按生产入口导入；dry-run 不构成打包证明。
+verify:release 覆盖构建、真实 npm pack、解包和消费者验证。校验归档成员只允许本仓白名单、固定根文件与显式 bundle 的完整字节闭包；在非仓库目录删除另装的顶层 bundle 后，仍须按生产入口导入。dry-run 不构成打包证明。
 
 ## [008] 资源闭合
 
@@ -34,7 +34,11 @@ verify:release 覆盖构建、真实 npm pack、解包和消费者验证。校�
 
 ## [009] 归档校验
 
-解析归档流时校验成员结构、完整性及 npm pack 结果的结构与包名。成员须为包根内安全相对路径，拒绝绝对路径、`..`、符号链接等非普通文件及开发/测试/源码/内部脚本/构建元数据；异常立即拒绝。
+解析归档流时校验成员结构、完整性及 npm pack 结果的结构与包名。成员须为包根内安全相对路径，拒绝绝对路径、`..`、符号链接等非普通文件及开发/测试/源码/内部脚本/构建元数据；`node_modules/**` 只有 package.json 显式声明的 bundle、且字节与安装的受控依赖完全一致时才允许。异常立即拒绝。
+
+## [011] 独立生命周期依赖的可复现交付
+
+`wanxiangshu` 只通过 npm artifact 依赖 `wanxiangli`，不从其源码目录、dist 或 npm link 取生产代码。源码 checkout 使用仓库内跟踪的精确 tgz 完成 `npm ci`；最终 `wanxiangshu` tarball 将同一版本作为 bundled dependency 自包含交付。package-lock 的版本与 integrity 必须对应该 tgz。删除源码侧 `wanxiangli/` 目录后，构建、测试和 pack 不受影响；删除消费者顶层另装的 `wanxiangli` 后，安装产物仍可真实加载 lifecycle。
 
 ## [010] 活跃注册一致
 

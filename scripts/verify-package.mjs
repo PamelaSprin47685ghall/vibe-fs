@@ -46,6 +46,7 @@ export const BANNED_PREFIXES = [
 ]
 
 export const BANNED_PATTERNS = [/\.log$/i]
+export const ALLOWED_BUNDLED_PREFIXES = ['node_modules/wanxiangli']
 
 export function createVerificationError(code, filePath, reason) {
   const err = new Error(reason)
@@ -97,6 +98,13 @@ export function checkPathTraversal(member) {
 export function isBannedMember(member) {
   const norm = normalizeMemberPath(member)
   if (!norm) return false
+
+  if (norm === 'node_modules' || norm.startsWith('node_modules/')) {
+    const allowed = ALLOWED_BUNDLED_PREFIXES.some(
+      (prefix) => norm === prefix || norm.startsWith(`${prefix}/`),
+    )
+    if (!allowed) return true
+  }
 
   for (const banned of BANNED_PREFIXES) {
     const cleanBanned = banned.endsWith('/') ? banned.slice(0, -1) : banned
@@ -160,6 +168,51 @@ export function deriveExpectedClosure({ root = REPO_ROOT } = {}) {
         size: stat.size,
         fullSourcePath,
       })
+    }
+  }
+
+  // 4. Explicit bundled runtime dependencies. These are part of the shipped
+  // byte closure, not development node_modules leakage. Derive them from the
+  // exact installed package that npm pack will bundle so package verification
+  // cannot accidentally pass by borrowing a top-level dependency later.
+  const packageJson = JSON.parse(fs.readFileSync(path.join(resolvedRoot, 'package.json'), 'utf8'))
+  const bundled = packageJson.bundleDependencies ?? packageJson.bundledDependencies ?? []
+
+  for (const dependency of bundled) {
+    const dependencyRoot = path.join(resolvedRoot, 'node_modules', dependency)
+    if (!fs.existsSync(dependencyRoot)) {
+      throw createVerificationError(
+        'bundled-dependency-missing',
+        dependency,
+        `Bundled dependency is not installed: ${dependency}`,
+      )
+    }
+
+    const pending = [dependencyRoot]
+    while (pending.length > 0) {
+      const current = pending.pop()
+      for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+        const full = path.join(current, entry.name)
+        if (entry.isDirectory()) {
+          pending.push(full)
+          continue
+        }
+        if (!entry.isFile()) {
+          throw createVerificationError(
+            'bundled-dependency-non-regular',
+            path.relative(resolvedRoot, full),
+            `Bundled dependency contains a non-regular entry: ${dependency}`,
+          )
+        }
+        const relative = path.relative(dependencyRoot, full).replace(/\\/g, '/')
+        const member = path.posix.join('node_modules', dependency, relative)
+        const bytes = fs.readFileSync(full)
+        expected.set(member, {
+          sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+          size: bytes.length,
+          fullSourcePath: full,
+        })
+      }
     }
   }
 
@@ -432,6 +485,26 @@ export async function runExternalConsumer({
     path.join(isolatedRoot, 'package-lock.json'),
   )
 
+  // file: dependencies used by the source checkout must exist for the isolated
+  // npm ci as well. Copy only the exact tracked artifact, never the sibling
+  // source repository.
+  const rootPackage = JSON.parse(fs.readFileSync(path.join(resolvedRoot, 'package.json'), 'utf8'))
+  for (const specifier of Object.values(rootPackage.dependencies ?? {})) {
+    if (typeof specifier !== 'string' || !specifier.startsWith('file:')) continue
+    const relative = specifier.slice('file:'.length)
+    const source = path.resolve(resolvedRoot, relative)
+    const destination = path.resolve(isolatedRoot, relative)
+    if (!source.startsWith(resolvedRoot + path.sep) || !destination.startsWith(isolatedRoot + path.sep)) {
+      throw createVerificationError(
+        'consumer-file-dependency-outside-root',
+        relative,
+        `Runtime file dependency must stay inside the repository: ${relative}`,
+      )
+    }
+    fs.mkdirSync(path.dirname(destination), { recursive: true })
+    fs.copyFileSync(source, destination)
+  }
+
 
   // Run npm ci --omit=dev --ignore-scripts --no-audit --no-fund
   try {
@@ -460,6 +533,22 @@ export async function runExternalConsumer({
     fs.rmSync(targetPkgDir, { recursive: true, force: true })
   }
   fs.cpSync(extractedPackageDir, targetPkgDir, { recursive: true })
+
+  const bundledWanxiangli = path.join(targetPkgDir, 'node_modules', 'wanxiangli', 'package.json')
+  if (!fs.existsSync(bundledWanxiangli)) {
+    throw createVerificationError(
+      'bundled-wanxiangli-missing',
+      bundledWanxiangli,
+      'Extracted wanxiangshu package does not contain its bundled wanxiangli runtime dependency',
+    )
+  }
+
+  // Do not let a separately installed top-level dependency mask a missing or
+  // broken bundled dependency during the actual consumer proof.
+  const topLevelWanxiangli = path.join(isolatedRoot, 'node_modules', 'wanxiangli')
+  if (fs.existsSync(topLevelWanxiangli)) {
+    fs.rmSync(topLevelWanxiangli, { recursive: true, force: true })
+  }
 
   // 3. Create consumer/ directory outside with separate package.json
   const consumerDir = path.join(scratchDir, 'consumer')
@@ -510,6 +599,7 @@ export async function runExternalConsumer({
 
     // Locate wanxiangshu in node_modules
     const pkgRoot = path.resolve('node_modules/wanxiangshu');
+    const lifecycleDependency = path.join(pkgRoot, 'node_modules/wanxiangli/package.json');
 
     const enLaw = path.join(pkgRoot, 'resources/provider/world/common-law/en.md');
     const zhLaw = path.join(pkgRoot, 'resources/provider/world/common-law/zh-CN.md');
@@ -518,6 +608,8 @@ export async function runExternalConsumer({
     assert.ok(fs.existsSync(enLaw), 'resources/provider/world/common-law/en.md missing in consumed package');
     assert.ok(fs.existsSync(zhLaw), 'resources/provider/world/common-law/zh-CN.md missing in consumed package');
     assert.ok(fs.existsSync(roleEn), 'resources/provider/role/manager/en.md missing in consumed package');
+    assert.ok(fs.existsSync(lifecycleDependency), 'bundled wanxiangli dependency missing in consumed package');
+    assert.equal(JSON.parse(fs.readFileSync(lifecycleDependency, 'utf8')).version, '0.5.1');
 
     assert.ok(fs.readFileSync(enLaw, 'utf8').trim().length > 0, 'en common law is empty');
     assert.ok(fs.readFileSync(zhLaw, 'utf8').trim().length > 0, 'zh common law is empty');

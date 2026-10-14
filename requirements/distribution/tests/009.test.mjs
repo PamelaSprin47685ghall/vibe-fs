@@ -5,6 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import * as tar from 'tar'
 import {
+  ALLOWED_BUNDLED_PREFIXES,
   BANNED_PREFIXES,
   ROOT_FILE_WHITELIST,
   checkPathTraversal,
@@ -59,10 +60,13 @@ test('WHAT[distribution-009] isBannedMember flags dev, test, scripts, source and
   assert.equal(isBannedMember('.github/workflows/ci.yml'), true)
   assert.equal(isBannedMember('debug.log'), true)
   assert.equal(isBannedMember('dist/sub/output.log'), true)
+  assert.equal(isBannedMember('node_modules/rogue/package.json'), true)
 
   assert.equal(isBannedMember('dist/OpenCode/Plugin/Plugin.js'), false)
   assert.equal(isBannedMember('resources/provider/role/manager/en.md'), false)
   assert.equal(isBannedMember('package.json'), false)
+  assert.deepEqual(ALLOWED_BUNDLED_PREFIXES, ['node_modules/wanxiangli'])
+  assert.equal(isBannedMember('node_modules/wanxiangli/package.json'), false)
 })
 
 test('WHAT[distribution-009] parsePackResult accepts single valid npm pack json output', () => {
