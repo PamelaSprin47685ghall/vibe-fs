@@ -64,11 +64,18 @@ module ProcessRunner =
         (collector: OutputCollector)
         (budget: TimeSpan)
         (waited: WaitOutcome)
+        (failure: string option)
         : Result<ProcessOutcome, ProcessError> =
-        if waited.TimedOut then
-            Error(ProcessError.TimeoutExceeded budget)
-        else
-            Ok(buildResult collector waited.ExitCode)
+        match failure, waited.TimedOut with
+        | Some message, _ -> Error(ProcessError.ExecutionFailed message)
+        | None, true -> Error(ProcessError.TimeoutExceeded budget)
+        | None, false -> Ok(buildResult collector waited.ExitCode)
+
+    let private discardFailedOutput (collector: OutputCollector) (result: Result<ProcessOutcome, ProcessError>) =
+        if Result.isError result then
+            discard collector
+
+        result
 
     let private spawnHost
         (hostSpawn: HostSpawn)
@@ -113,16 +120,9 @@ module ProcessRunner =
                 let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
                 killQuietly child
 
-                let result =
-                    match child.Failure.Value with
-                    | Some message -> Error(ProcessError.ExecutionFailed message)
-                    | None -> outcomeAfterWait collector budget waited
-
-                match result with
-                | Ok _ -> return result
-                | Error _ ->
-                    discard collector
-                    return result
+                return
+                    outcomeAfterWait collector budget waited child.Failure.Value
+                    |> discardFailedOutput collector
             with error ->
                 discard collector
                 return raise error
