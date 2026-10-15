@@ -8,7 +8,7 @@ import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurfa
 
 const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-planning-028-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   try {
     await body(workspace.acquire(commonDir), root, commonDir)

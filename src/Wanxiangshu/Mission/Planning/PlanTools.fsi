@@ -49,6 +49,30 @@ module PlanTools =
         retirementCursor: int64 ->
             Task<Result<DeliverResult, string>>
 
+    val enterPostS3OrRelay:
+        gitCommonDir: string ->
+        root: string ->
+        workId: string ->
+        incumbencyId: string ->
+        providerRunId: string ->
+        toolCallId: string ->
+        retirementBlockers: (unit -> string array) ->
+        retirementCursor: int64 ->
+            Task<Result<DeliverResult, string>>
+
+    val startPostS3Execution:
+        gitCommonDir: string ->
+        root: string ->
+        workId: string ->
+        providerRunId: string ->
+        toolCallId: string ->
+        retirementBlockers: (unit -> string array) ->
+        createSession: (string -> string -> Task<Result<string, string>>) ->
+        promptSession: (string -> string -> string -> Task<DeliverySpawnOutcome>) ->
+        discardSession: (string -> Task<Result<unit, string>>) ->
+        retirementCursor: int64 ->
+            Task<Result<DeliverResult, string>>
+
     /// Reconcile a bound execution after restart from an exact Host-observed
     /// first user prompt. No external effect is issued by this function.
     val reconcileBoundExecution:

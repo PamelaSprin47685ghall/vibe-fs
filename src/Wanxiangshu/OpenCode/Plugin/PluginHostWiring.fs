@@ -251,6 +251,7 @@ module PluginHostWiring =
                 // active tenure to continue. A missing list is not an empty
                 // list, so an open work is never terminated here.
                 match workOpt with
+                | Some work when work.Delivered && work.Sequence = [ "S1"; "S2"; "S3" ] -> true
                 | Some work -> work.Delivered && activeRoot.IsNone
                 | None -> false
 

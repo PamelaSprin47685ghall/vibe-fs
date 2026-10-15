@@ -8,8 +8,8 @@ import * as quiescence from '../../../dist/OpenCode/Host/QuiescenceSurface.js'
 
 // 通过真实插件/日志组合验证；Host 双件只控制通知和中断观察。
 const question = 'Which deployment environment should this task target?'
-const context = (session, call = 'ask-call', run = 'ask-run') => ({
-  sessionID: session, agent: 'manager', callID: call, messageID: run,
+const context = (session, call = 'ask-call', run = 'ask-run', agent = 'plan') => ({
+  sessionID: session, agent, callID: call, messageID: run,
 })
 const completedAsk = (session, call = 'ask-call', run = 'ask-run', status = 'completed') => ({
   event: {
@@ -22,17 +22,38 @@ const completedAsk = (session, call = 'ask-call', run = 'ask-run', status = 'com
     },
   },
 })
-const humanInput = async (hooks, runtime, session, id, text) => {
-  const message = { id, role: 'user', agent: 'manager', sessionID: session,
-    model: { providerID: 'provider', modelID: 'manager-model' } }
+const humanInput = async (hooks, runtime, session, id, text, agent = 'plan') => {
+  const message = { id, role: 'user', agent, sessionID: session,
+    model: { providerID: 'provider', modelID: `${agent}-model` } }
   runtime.pushHostMessage(session, { info: { ...message, time: { created: 20 } }, parts: [{ type: 'text', text }] })
-  await hooks['chat.message']({ sessionID: session, agent: 'manager', messageID: id }, {
+  await hooks['chat.message']({ sessionID: session, agent, messageID: id }, {
     message, parts: [{ type: 'text', text }],
   })
 }
 
+const withPlanAsk = async (body, { session = 'ask-plan' } = {}) => {
+  const { withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+    await acceptAuthorityRoot(runtime, session, 'plan', 'user-root')
+    await humanInput(hooks, runtime, session, 'user-root', 'Deliver the requested behavior and verification.', 'plan')
+    await openIncumbency(runtime, session, `inc-${session}`, 'plan')
+    await body({ hooks, directory, runtime, session, created })
+  })
+}
+
+test('WHAT[work-049] Manager is forbidden from calling ask', async () => {
+  await withReview(async ({ hooks, runtime, session }) => {
+    let shown = 0
+    runtime.client.tui = { showToast: async () => { shown += 1; return {} } }
+    const denied = await hooks.tool.ask.execute({ question }, context(session, 'ask-manager-denied', 'run-manager-denied', 'manager'))
+    assert.match(denied, /(not available to|not permitted|不允许|不可用|没有权限|denied)/i)
+    assert.equal(shown, 0)
+    assert.deepEqual(userQuestionObservation(runtime.journal, session), [])
+  }, { session: 'ask-manager-forbidden' })
+})
+
 test('WHAT[work-049] ask acknowledges a human question before interrupting and does not dispatch DevOps', async () => {
-  await withReview(async ({ hooks, runtime, session, created, directory }) => {
+  await withPlanAsk(async ({ hooks, runtime, session, created }) => {
     const notices = []
     runtime.client.tui = { showToast: async ({ body }) => { notices.push(body); return {} } }
     const before = projectionObservation(runtime.journal, session).activeLogicalRun
@@ -55,18 +76,11 @@ test('WHAT[work-049] ask acknowledges a human question before interrupting and d
     assert.deepEqual(projectionObservation(runtime.journal, session).activeLogicalRun, before,
       'interrupt is not logical-run completion')
     assert.equal(userQuestionObservation(runtime.journal, session).length, 1)
-    const gate = quiescence.create()
-    quiescence.beginAttempt(gate, session)
-    await managerWorkflow.observeIdle({
-      SubscribeTerminal: () => ({ Dispose() {} }),
-      SendPrompt: async () => { assert.fail('an explicit human wait must not be nudged') },
-    }, runtime.journal, gate, quiescence.observeIdle(gate, session),
-    session, 'user-root', 'user-root', 'ask-run', directory)
   }, { session: 'ask-human-confirmation' })
 })
 
 test('WHAT[work-049] exact ask replay is idempotent and waiting blocks both registered and native tools', async () => {
-  await withReview(async ({ hooks, runtime, session }) => {
+  await withPlanAsk(async ({ hooks, runtime, session }) => {
     let shown = 0
     runtime.client.tui = { showToast: async () => { shown += 1; return {} } }
     const first = await hooks.tool.ask.execute({ question }, context(session))
@@ -90,7 +104,7 @@ test('WHAT[work-049] exact ask replay is idempotent and waiting blocks both regi
 })
 
 test('WHAT[work-049] missing or failed notification does not create a user wait', async () => {
-  await withReview(async ({ hooks, runtime, session }) => {
+  await withPlanAsk(async ({ hooks, runtime, session }) => {
     const absent = await hooks.tool.ask.execute({ question }, context(session))
     assert.match(absent, /could not be acknowledged/i)
     assert.deepEqual(userQuestionObservation(runtime.journal, session), [])
@@ -104,7 +118,7 @@ test('WHAT[work-049] missing or failed notification does not create a user wait'
 })
 
 test('WHAT[work-049] blank and concurrent questions do not create duplicate notifications', async () => {
-  await withReview(async ({ hooks, runtime, session }) => {
+  await withPlanAsk(async ({ hooks, runtime, session }) => {
     let release
     let announced
     const entered = new Promise(resolve => { announced = resolve })
@@ -131,7 +145,7 @@ test('WHAT[work-049] blank and concurrent questions do not create duplicate noti
 })
 
 test('WHAT[work-049] a genuine user reply continues the same authority and makes late ask completion harmless', async () => {
-  await withReview(async ({ hooks, runtime, session }) => {
+  await withPlanAsk(async ({ hooks, runtime, session }) => {
     runtime.client.tui = { showToast: async () => ({}) }
     const before = projectionObservation(runtime.journal, session).activeLogicalRun
     await hooks.tool.ask.execute({ question }, context(session))
@@ -150,7 +164,7 @@ test('WHAT[work-049] a genuine user reply continues the same authority and makes
 })
 
 test('WHAT[work-049] interrupt failure remains explicit and does not turn waiting into completion', async () => {
-  await withReview(async ({ hooks, runtime, session }) => {
+  await withPlanAsk(async ({ hooks, runtime, session }) => {
     runtime.client.tui = { showToast: async () => ({}) }
     await hooks.tool.ask.execute({ question }, context(session))
     const before = projectionObservation(runtime.journal, session).activeLogicalRun
@@ -171,9 +185,9 @@ test('WHAT[work-049] waiting survives plugin restart and the next real input res
     runtime.client.tui = { showToast: async () => { shown += 1; return {} } }
     const first = await start()
     await runtime.withRuntime(async durable => {
-      await acceptAuthorityRoot(durable, session, 'manager', 'question-root')
-      await humanInput(first, runtime, session, 'question-root', 'Finish the deployment plan.')
-      await openIncumbency(durable, session, 'inc-question-restart', 'S4')
+      await acceptAuthorityRoot(durable, session, 'plan', 'question-root')
+      await humanInput(first, runtime, session, 'question-root', 'Finish the deployment plan.', 'plan')
+      await openIncumbency(durable, session, 'inc-question-restart', 'plan')
       assert.match(await first.tool.ask.execute({ question }, context(session)), /question has been sent/i)
       assert.equal(userQuestionObservation(durable.journal, session)[0].answer, null)
     })
@@ -181,7 +195,7 @@ test('WHAT[work-049] waiting survives plugin restart and the next real input res
     const second = await start()
     await runtime.withRuntime(async durable => {
       assert.equal(userQuestionObservation(durable.journal, session)[0].answer, null)
-      await humanInput(second, runtime, session, 'restart-answer', 'Use staging.')
+      await humanInput(second, runtime, session, 'restart-answer', 'Use staging.', 'plan')
       assert.equal(userQuestionObservation(durable.journal, session)[0].answer, 'restart-answer')
       await second.event(completedAsk(session))
       assert.equal(shown, 1)

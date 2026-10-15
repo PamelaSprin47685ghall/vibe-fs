@@ -31,8 +31,20 @@ module PlanWorkOpenWiring =
         task {
             match workspaceDirectory with
             | Some workspace when not (System.String.IsNullOrWhiteSpace workspace) ->
-                let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
-                do! runPlanWorkOpen commonDir (commonDir + "/wanxiangshu") sid observedHead
+                // Root is the worktree the session was opened in. The state
+                // directory is only where the journal lives; writing it as root
+                // makes the same transform's manager opening see a different
+                // work and refuse the first prompt.
+                let root =
+                    Wanxiangshu.Git.GitSubject.execIn workspace [| "rev-parse"; "--show-toplevel" |]
+                    |> fun path -> path.TrimEnd('\r', '\n')
+
+                if System.String.IsNullOrWhiteSpace root then
+                    Diagnostic.emit "plan-work-open-directory-unavailable" [ "work_id", sid ]
+                    invalidOp "Plan lifecycle opening failed: Git did not identify a worktree root"
+
+                let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.initializeStateRoot root
+                do! runPlanWorkOpen commonDir root sid observedHead
             | _ ->
                 Diagnostic.emit "plan-work-open-directory-unavailable" [ "work_id", sid ]
                 invalidOp "Plan lifecycle opening failed: workspace directory is unavailable"

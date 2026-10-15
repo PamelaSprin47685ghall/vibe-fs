@@ -416,6 +416,7 @@ test('WHAT[capability-enforcement-025] an admitted call reads the file and befor
   const { parse: parseToml } = await import('smol-toml')
   const revisionSurface = await import('../../../dist/Persistence/Journal/RevisionSurface.js')
   const workspaceEventStoreSurface = await import('../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js')
+  const journalSurface = await import('../../../dist/Persistence/Journal/Surface.js')
   const lifecycleSurface = await import('../../../dist/Mission/Lifecycle/Surface.js')
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const sessionID = 'ses-p15'
@@ -437,7 +438,7 @@ test('WHAT[capability-enforcement-025] an admitted call reads the file and befor
       return originalExecute(...callArgs)
     }
     const revisionOf = () => revisionSurface.revision(runtime.journal)
-    const lifecycleStore = () => workspaceEventStoreSurface.acquire(realpathSync(join(directory, '.git')))
+    const lifecycleStore = () => workspaceEventStoreSurface.acquire(journalSurface.JournalSurface_initializeStateRoot(directory))
     const reviewOf = () => lifecycleSurface.workView(lifecycleStore(), sessionID).reviewed
 
     // Positive control: before review acceptance the same program drives the

@@ -225,6 +225,13 @@ module DeliverTool =
         else
             confirmFirst ()
 
+    let private enqueueRelayedSuccessor (scope: ToolRuntimeScope) (prepared: PreparedRetirement) (kind: string) =
+        task {
+            if kind = "Relayed" then
+                let! continued = scope.ContinueManagerLoop(prepared.SessionId, prepared.Bound.Directory)
+                continued |> Result.defaultWith (fun error -> raise (InvalidOperationException error))
+        }
+
     let private deliverFrozenCursor
         (scope: ToolRuntimeScope)
         (context: HostToolContext)
@@ -272,16 +279,18 @@ module DeliverTool =
         elif receipt.Kind = "ReviewRequired" then
             Task.FromResult(Error "assessment required")
         elif durableOutcome then
-            scope.UnfreezeRetirement context.SessionId
+            task {
+                do! enqueueRelayedSuccessor scope prepared receipt.Kind
+                scope.UnfreezeRetirement context.SessionId
 
-            Task.FromResult(
-                Ok(
-                    if receipt.Kind = "Confirmed" then
-                        confirmationResult prepared pending
-                    else
-                        text Path.Retired
-                )
-            )
+                return
+                    Ok(
+                        if receipt.Kind = "Confirmed" then
+                            confirmationResult prepared pending
+                        else
+                            text Path.Retired
+                    )
+            }
         else
             Task.FromResult(
                 Error(

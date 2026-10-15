@@ -449,6 +449,27 @@ module PluginHooks =
                     | _ -> ()
                 }
 
+            let requirePostS3Interrupted (result: Result<unit, string>) =
+                match result with
+                | Ok() -> ()
+                | Error reason -> invalidOp ("post-S3 deliver was recorded, but its attempt interrupt failed: " + reason)
+
+            let settlePostS3Deliver rawInput =
+                task {
+                    match toolTerminalObservation "deliver" rawInput, toolRegistration with
+                    | Some(sessionId, callId, "completed", Some providerRun), Some registration ->
+                        let! result =
+                            registration.Runtime.InterruptForPostS3Deliver(
+                                SessionId.create sessionId,
+                                providerRun,
+                                callId
+                            )
+                        requirePostS3Interrupted result
+                    | Some(sessionId, _, "completed", None), Some registration when registration.Runtime.HasPendingPostS3Interrupt sessionId ->
+                        invalidOp "post-S3 deliver result is missing the exact provider message identity; no attempt was interrupted"
+                    | _ -> ()
+                }
+
             let requiredTodoJournal () =
                 journal
                 |> Option.defaultWith (fun () ->
@@ -864,6 +885,7 @@ module PluginHooks =
                 task {
                     do! settleTodoEvent raw
                     do! settleUserQuestion raw
+                    do! settlePostS3Deliver raw
                     do! wired.ObserveEvent raw
                 }
 

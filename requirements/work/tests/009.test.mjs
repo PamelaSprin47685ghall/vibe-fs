@@ -76,7 +76,7 @@ test('WHAT[work-009] ToolRuntimeScope ownership tracks tool-owned-work and PTY l
 
 test('WHAT[work-009] durable ownership host commits Reserve before granting start permission and retains blockers across Cancel and Drain', () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-ownership-009-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   try {
     const reg = 'work-009'

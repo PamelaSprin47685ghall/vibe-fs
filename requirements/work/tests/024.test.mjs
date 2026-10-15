@@ -9,6 +9,7 @@ import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import { runJsPlan } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { rolePermissionRules } from '../../../dist/OpenCode/Tools/ToolSurface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -20,7 +21,7 @@ const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-024-'))
   execFileSync('git', ['init', '--quiet', root])
   try {
-    await body(workspace.acquire(realpathSync(join(root, '.git'))), root)
+    await body(workspace.acquire(journalSurface.JournalSurface_initializeStateRoot(root)), root)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

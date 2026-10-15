@@ -200,7 +200,6 @@ module ToolRegistry =
                 frozen
                 && permission <> ToolPermission.Join
                 && permission <> ToolPermission.Finality
-                && permission <> ToolPermission.Ask
                 ->
                 return denyTaskState ctx spec.Name
             | Some permission when not (OfficeCapability.isAllowedForManagerFacts managerFacts permission) ->
@@ -332,6 +331,8 @@ module ToolRegistry =
           "read-terminal", PtyTool.admission
           "signal-terminal", PtyTool.admission
           "join", JoinTool.admission
+          "ask", ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Ask)
+          "devops", ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.DevOpsConsultation)
           "horizon", HorizonTool.admission
           "fission", FissionTool.admission
           "review", ReviewShell.admission
@@ -681,6 +682,8 @@ module ToolRegistry =
         let renderDeliverReceipt (res: DeliverResult) : string =
             if res.Relayed then
                 res.Message
+            elif res.RetirementOutcome = "PostS3" then
+                sprintf "%s The plan artifact is ready at %s; nudges are permanently disabled and this session is now in post-S3 state." res.Message res.Path
             elif res.Delivered then
                 sprintf "%s The plan artifact is at %s; an execution session has been started." res.Message res.Path
             else
@@ -807,6 +810,16 @@ module ToolRegistry =
             | Ok res -> renderDeliverReceipt res
             | Error err -> sprintf "deliver failed: %s" err
 
+        let registerPostS3IfEntered
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (outcome: Result<DeliverResult, string>)
+            =
+            match outcome, ctx.ProviderRunId, ctx.ToolCallId with
+            | Ok res, Some runId, Some callId when res.RetirementOutcome = "PostS3" ->
+                runtime.RegisterPostS3Interrupt(SessionId.create ctx.SessionId, runId, callId)
+            | _ -> ()
+
         let deliverCursor
             (root: string)
             (runtime: ToolRuntimeScope)
@@ -830,11 +843,47 @@ module ToolRegistry =
                 | Error err -> return sprintf "deliver failed: %s" err
                 | Ok retirementCursor ->
                     let! outcome =
-                        PlanTools.executeDeliver
+                        PlanTools.enterPostS3OrRelay
                             gitCommonDir
                             root
                             ctx.SessionId
                             incumbencyId
+                            providerRunId
+                            toolCallId
+                            retirementBlockers
+                            retirementCursor
+
+                    registerPostS3IfEntered runtime ctx outcome
+
+                    return renderDeliverOutcome outcome
+            }
+
+        let deliverPostS3
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (gitCommonDir: string)
+            : Task<string> =
+            task {
+                let providerRunId =
+                    ctx.ProviderRunId
+                    |> Option.map ProviderRunIdentity.value
+                    |> Option.defaultValue ""
+
+                let toolCallId =
+                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
+
+                let retirementBlockers () =
+                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
+
+                match! resolveDeliverRetirementCursor runtime ctx with
+                | Error err -> return sprintf "deliver failed: %s" err
+                | Ok retirementCursor ->
+                    let! outcome =
+                        PlanTools.startPostS3Execution
+                            gitCommonDir
+                            root
+                            ctx.SessionId
                             providerRunId
                             toolCallId
                             retirementBlockers
@@ -866,9 +915,22 @@ module ToolRegistry =
 
         let runDeliver (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
             task {
-                match lifecycleActiveIncumbencyOf runtime ctx.SessionId with
-                | None -> return "deliver failed: no active incumbency found for this work"
-                | Some incumbencyId -> return! deliverForIncumbency root runtime ctx incumbencyId
+                let gitCommonDir =
+                    runtime.WorkspaceDirectory
+                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
+                    |> Option.defaultValue ""
+
+                match lifecycleWorkOf runtime ctx.SessionId with
+                | Some work when work.ActiveId.IsSome ->
+                    return! deliverForIncumbency root runtime ctx work.ActiveId.Value
+                | Some work when
+                    work.Delivered
+                    && work.Sequence = [ "S1"; "S2"; "S3" ]
+                    && String.IsNullOrWhiteSpace gitCommonDir ->
+                    return "deliver failed: git common directory is missing"
+                | Some work when work.Delivered && work.Sequence = [ "S1"; "S2"; "S3" ] ->
+                    return! deliverPostS3 root runtime ctx gitCommonDir
+                | _ -> return "deliver failed: no active incumbency found for this work"
             }
 
         let executeDeliverTool

@@ -64,7 +64,6 @@ module OfficeCapability =
               ToolPermission.Grep
               ToolPermission.Horizon
               ToolPermission.Join
-              ToolPermission.Ask
               ToolPermission.Finality ]
 
     let permissions (role: Role) : ToolPermission Set =
@@ -72,7 +71,6 @@ module OfficeCapability =
         | Role.Manager ->
             set
                 [ ToolPermission.Fork
-                  ToolPermission.Ask
                   ToolPermission.Resume
                   ToolPermission.Join
                   ToolPermission.Horizon
@@ -142,7 +140,7 @@ module OfficeCapability =
         elif facts.HasConfirmation && not facts.HasAssessment then
             Set.empty
         elif facts.CleanupBlockerDigest.IsSome then
-            set [ ToolPermission.Join; ToolPermission.Finality; ToolPermission.Ask ]
+            set [ ToolPermission.Join; ToolPermission.Finality ]
         elif facts.IsFinalIncumbent then
             managerFinishPermissions
         elif facts.HasAssessment then

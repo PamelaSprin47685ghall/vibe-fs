@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { SqliteJournal } from 'wanxiangli/eventstore'
 import { observeDeliveryDiscovery } from '../../../dist/OpenCode/Host/SessionsSurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 import { acceptAuthorityRoot, withRestartablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
@@ -18,7 +19,7 @@ const accepted = receipt => {
 }
 
 const seedPendingDelivery = async (control, directory, workId, execSessionId, content, bind = true) => {
-  const commonDir = realpathSync(join(directory, '.git'))
+  const commonDir = journalSurface.JournalSurface_initializeStateRoot(directory)
   await control.withRuntime(async runtime => {
     await acceptAuthorityRoot(runtime, workId, 'manager', `root-${workId}`)
   })

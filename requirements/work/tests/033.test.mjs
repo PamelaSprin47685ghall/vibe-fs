@@ -11,6 +11,7 @@ import { Work } from 'wanxiangli/work'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -25,8 +26,9 @@ const withStore = async (body) => {
   try {
     // The journal directory is fixed next to the events dir; tests that open
     // the database directly create it here rather than relying on the host.
-    mkdirSync(join(root, '.git', 'wanxiangshu'), { recursive: true })
-    await body(workspace.acquire(realpathSync(join(root, '.git'))), root)
+    const stateDir = journalSurface.JournalSurface_initializeStateRoot(root)
+    mkdirSync(join(stateDir, 'wanxiangshu'), { recursive: true })
+    await body(workspace.acquire(stateDir), root)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

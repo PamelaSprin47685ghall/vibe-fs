@@ -12,7 +12,7 @@ const host = lifecycle.LifecycleSurface ?? lifecycle
 
 const withWorkspace = async body => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-planning-039-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   try {
     await body(workspace.acquire(commonDir), root, commonDir)

@@ -8,6 +8,7 @@ import { rolePermissionRules } from '../../../dist/OpenCode/Tools/ToolSurface.js
 import { manager, plan } from '../../../dist/Foundation/RolesSurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as workspaceEvents from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 // WHAT[work-019]: 执行入口按 sequence 与当前事实收口。无任期时全部拒绝，
 // 评审未接纳时只读放行而派工拒绝，评审接纳后固定 DevOps 派工恢复，确认先于
@@ -18,7 +19,7 @@ const denied = /当前不可用|不可用|not available right now|not available 
 const devopsDispatchDenied = /尚未被系统接纳|不得向 DevOps 派发|assessment.*not.*accepted|not allowed until/i
 const bound = (sessionID, callID) => ({ sessionID, agent: 'manager', callID, messageID: `msg-${callID}`, providerRunID: `run-${callID}` })
 
-const storeOf = (directory) => workspaceEvents.acquire(realpathSync(join(directory, '.git')))
+const storeOf = (directory) => workspaceEvents.acquire(journalSurface.JournalSurface_initializeStateRoot(directory))
 
 
 

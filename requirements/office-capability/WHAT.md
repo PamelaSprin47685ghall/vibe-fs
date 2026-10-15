@@ -70,4 +70,4 @@ Sphinx 不是 Role、Persona 或普通 subagent，不拥有独立 Fission 身份
 
 Plan 负责在同一物理会话内以多任期接力推进单一规划底稿 `P`：通过 `js-plan` 读写底稿，用 `devops` 同步委派固定 DevOps 做只读调查，用与 Manager 共享的 `review` 承担阶段晋级硬门，用 `deliver` 持权交付或无权接力；需要用户决定时用 `ask(question)` 显式暂停。Plan 的工作工具权限集为 `js-plan`、`devops`、`ask`、`review`、`deliver`；`resume` 与 `handoff` 不属于 Plan 的工具面。
 
-Plan 不获得代码仓库与执行工具的权限，不开放任何真实 shell 或命令执行通道（`devops` 委派的调查含 bash，其只读约束由 office 提示词承担，不做运行时门）。Plan 与 Manager 都不得在目标完成前自然停止；只有成功的 `ask` 形成等待用户的暂停（work-027/049）。Manager 在工作、收尾和 blocker 窗口都可提问；`join` 仍只用于临时等待后台工作。其他角色不因这项修订取得 `ask` 或 `devops` 权限。
+Plan 不获得代码仓库与执行工具的权限，不开放任何真实 shell 或命令执行通道（`devops` 委派的调查含 bash，其只读约束由 office 提示词承担，不做运行时门）。Plan 与 Manager 都不得在目标完成前自然停止；Plan 可通过成功的 `ask` 形成等待用户的暂停（work-027/049），Manager 禁用 `ask`，`join` 只用于临时等待后台工作。其他角色不因这项修订取得 `ask` 或 `devops` 权限。

@@ -138,6 +138,20 @@ module RelayNarrativeTransform =
         relayedCut
         |> Option.filter (fun retirement -> not (requestIsSuccessor retirement))
 
+    let isStaleRetiredAttempt
+        (journal: AgentJournal option)
+        (acceptedRequest: bool)
+        (sessionId: string option)
+        (lifecycle: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option)
+        (outObj: obj)
+        : bool =
+        match journal, sessionId, lifecycle with
+        | Some durable, Some value, Some work when not (String.IsNullOrWhiteSpace value) ->
+            let messages = ProviderWireDecode.messagesFromTransformOutput outObj
+            staleRetirement durable (SessionId.create value) work acceptedRequest messages
+            |> Option.isSome
+        | _ -> false
+
     let private firstCursors (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
         |> Option.bind (fun session -> session.XTrace)

@@ -71,7 +71,7 @@ test('WHAT[work-027] a completed Manager reply with unfinished work receives an 
     assert.equal(sent.length, 1)
     assert.match(sent[0], /not been completed|not end that obligation/i)
     assert.match(sent[0], /join/)
-    assert.match(sent[0], /ask/)
+    assert.doesNotMatch(sent[0], /\bask\b/i)
     await observe('manager-natural-stop-1')
     assert.equal(sent.length, 1, 'the same terminal occasion cannot send twice')
     await observe('manager-natural-stop-2')

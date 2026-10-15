@@ -31,8 +31,20 @@ module ReviewShell =
         [<Literal>]
         let PlanStayed = "tool/review/plan-stayed"
 
+        [<Literal>]
+        let PlanS2 = "planning/s2"
+
+        [<Literal>]
+        let PlanS3 = "planning/s3"
+
     let private providerText (path: string) substitutions =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path substitutions
+
+    let private promotedStageInstructions (target: string) =
+        match target with
+        | "S2" -> [ providerText Path.PlanS2 Map.empty ]
+        | "S3" -> [ providerText Path.PlanS3 Map.empty ]
+        | _ -> []
 
     let admission =
         ToolAdmission.OfficeRole(fun _ role ->
@@ -57,15 +69,15 @@ module ReviewShell =
 
     let private planAccepted (review: PlanReviewResult) =
         // planning-022: the gaps return to the model as repair obligations,
-        // echoed verbatim below the outcome instruction.
-        let instructionPath =
-            if review.Outcome = PlanReviewOutcome.Promoted then
-                Path.PlanPromoted
-            else
-                Path.PlanStayed
-
+        // echoed verbatim below the outcome instruction; a promotion to a new
+        // stage returns that stage's method in the same tool response so the
+        // current tenure can begin its stretch immediately.
         let instructions =
-            [ providerText instructionPath Map.empty ] @ (review.Gaps |> List.map gapLine)
+            if review.Outcome = PlanReviewOutcome.Promoted then
+                [ providerText Path.PlanPromoted Map.empty ]
+                @ promotedStageInstructions review.Target
+            else
+                [ providerText Path.PlanStayed Map.empty ] @ (review.Gaps |> List.map gapLine)
 
         ToolHostCodec.tomlObjectWithInstructions instructions [ "recorded", ToolHostCodec.TBool true ]
 

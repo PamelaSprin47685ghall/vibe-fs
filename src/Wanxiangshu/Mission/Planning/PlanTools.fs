@@ -504,6 +504,10 @@ module PlanTools =
                            "toolCallId", box toolCallId
                            "cursor", box (float retirementCursor)
                            "blockers", box blockers ]
+                         @ (if authorized && Array.isEmpty blockers then
+                                []
+                            else
+                                [ "nextOwnerId", box workId ])
                          @ draftFields)
 
                 let receipt =
@@ -519,6 +523,481 @@ module PlanTools =
                         promptSession
                         discardSession
                         receipt
+        }
+
+    let private postS3SessionId (workId: string) =
+        "post-s3:" + (HostDigest.sha256Hex ("post-s3-session-v1\n" + workId)).[..15]
+
+    let private settlePostS3Transition
+        (gitCommonDir: string)
+        (workId: string)
+        (retirementBlockers: unit -> string array)
+        (receipt: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
+        : Result<DeliverResult, string> =
+        if
+            receipt.Status = "Unknown"
+            || receipt.Status = "NotWritten"
+            || receipt.Status = "Conflict"
+        then
+            Error(if receipt.Reason = "" then receipt.Status else receipt.Reason)
+        elif receipt.Kind = "DeliveryRequested" then
+            let operationId =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "operationId"
+
+            let digest =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "digest"
+
+            let path = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "path"
+            let sessionId = postS3SessionId workId
+
+            bindObservedExecutionSession gitCommonDir workId operationId sessionId
+            |> Result.bind (fun () ->
+                settleAcceptedDelivery
+                    gitCommonDir
+                    workId
+                    operationId
+                    sessionId
+                    digest
+                    path
+                    (retirementBlockers ()))
+            |> Result.map (fun settled ->
+                { settled with
+                    ExecSessionId = ""
+                    RetirementOutcome = "PostS3"
+                    Message = "Plan entered post-S3 state" })
+        elif
+            receipt.Kind = "Relayed"
+            || receipt.Kind = "Blocked"
+            || receipt.Kind = "Delivered"
+        then
+            Ok
+                { Ok = true
+                  Relayed = receipt.Kind = "Relayed"
+                  Delivered = receipt.Kind = "Delivered"
+                  RetiredIncumbencyId = ""
+                  RetirementOutcome =
+                    if receipt.Kind = "Delivered" then "PostS3" else receipt.Kind
+                  Digest = ""
+                  Path = ""
+                  ExecSessionId = ""
+                  NextIncumbencyId = ""
+                  Message = receipt.Kind }
+        else
+            Error(sprintf "Unexpected lifecycle deliver result: %s/%s" receipt.Status receipt.Kind)
+
+    let private executePostS3Authorized
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (incumbencyId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (blockers: string array)
+        (retirementBlockers: unit -> string array)
+        (retirementCursor: int64)
+        : Result<DeliverResult, string> =
+        match readAndValidatePlan root workId with
+        | Error err -> Error err
+        | Ok(_, digest, planPath) ->
+            let requestId = providerRunId + ":" + toolCallId
+
+            let command =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    "Deliver"
+                    [ "incumbencyId", box incumbencyId
+                      "providerRunId", box providerRunId
+                      "toolCallId", box toolCallId
+                      "cursor", box (float retirementCursor)
+                      "blockers", box blockers
+                      "draft", box {| digest = digest; path = planPath |} ]
+
+            let receipt =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
+
+            settlePostS3Transition gitCommonDir workId retirementBlockers receipt
+
+    let private executePostS3RelayOrBlocked
+        (gitCommonDir: string)
+        (workId: string)
+        (incumbencyId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (blockers: string array)
+        (retirementBlockers: unit -> string array)
+        (retirementCursor: int64)
+        : Result<DeliverResult, string> =
+        let requestId = providerRunId + ":" + toolCallId
+
+        let command =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                "Deliver"
+                [ "incumbencyId", box incumbencyId
+                  "providerRunId", box providerRunId
+                  "toolCallId", box toolCallId
+                  "cursor", box (float retirementCursor)
+                  "blockers", box blockers
+                  "nextOwnerId", box workId ]
+
+        let receipt =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
+
+        settlePostS3Transition gitCommonDir workId retirementBlockers receipt
+
+    let private executePostS3ForWork
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (incumbencyId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (retirementBlockers: unit -> string array)
+        (retirementCursor: int64)
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        : Result<DeliverResult, string> =
+        let blockers = retirementBlockers ()
+
+        if work.DeliveryAuthorized && Array.isEmpty blockers then
+            executePostS3Authorized
+                gitCommonDir
+                root
+                workId
+                incumbencyId
+                providerRunId
+                toolCallId
+                blockers
+                retirementBlockers
+                retirementCursor
+        else
+            executePostS3RelayOrBlocked
+                gitCommonDir
+                workId
+                incumbencyId
+                providerRunId
+                toolCallId
+                blockers
+                retirementBlockers
+                retirementCursor
+
+    let enterPostS3OrRelay
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (incumbencyId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (retirementBlockers: unit -> string array)
+        (retirementCursor: int64)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            return
+                activeWorkOf gitCommonDir workId incumbencyId
+                |> Result.bind (
+                    executePostS3ForWork
+                        gitCommonDir
+                        root
+                        workId
+                        incumbencyId
+                        providerRunId
+                        toolCallId
+                        retirementBlockers
+                        retirementCursor
+                )
+        }
+
+    let private discardFreshExecution
+        (discardSession: string -> Task<Result<unit, string>>)
+        (execSessionId: string)
+        (reason: string)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            match! discardSession execSessionId with
+            | Error cleanup ->
+                return
+                    Error(
+                        sprintf "Execution prompt was refused, but its empty session could not be discarded: %s" cleanup
+                    )
+            | Ok() -> return Error reason
+        }
+
+    let private promptFreshExecution
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        (content: string)
+        (digest: string)
+        (path: string)
+        (execSessionId: string)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            match! promptSession execSessionId "manager" content with
+            | NotStarted err -> return! discardFreshExecution discardSession execSessionId err
+            | Unknown err -> return Error(sprintf "Execution session prompt outcome is unknown: %s" err)
+            | Started observedSession when observedSession <> execSessionId ->
+                return Error "Execution prompt returned a different session identity"
+            | Started _ ->
+                return
+                    Ok
+                        { Ok = true
+                          Relayed = false
+                          Delivered = true
+                          RetiredIncumbencyId = ""
+                          RetirementOutcome = "Delivered"
+                          Digest = digest
+                          Path = path
+                          ExecSessionId = execSessionId
+                          NextIncumbencyId = ""
+                          Message = "Plan delivered" }
+        }
+
+    let private createAndPromptFreshExecution
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (createSession: string -> string -> Task<Result<string, string>>)
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        ((content, digest, path): string * string * string)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            let operationId =
+                HostDigest.sha256Hex (
+                    String.concat "\n" [ "post-s3-execution-v1"; workId; providerRunId; toolCallId ]
+                )
+
+            match! createSession operationId "manager" with
+            | Error reason -> return Error reason
+            | Ok execSessionId ->
+                return! promptFreshExecution promptSession discardSession content digest path execSessionId
+        }
+
+    let private startFreshPostS3Execution
+        (root: string)
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (blockers: string array)
+        (createSession: string -> string -> Task<Result<string, string>>)
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            let validated =
+                if not (Array.isEmpty blockers) then
+                    Error "Cannot deliver: live resources block starting execution"
+                else
+                    readAndValidatePlan root workId
+
+            match validated with
+            | Error err -> return Error err
+            | Ok plan ->
+                return!
+                    createAndPromptFreshExecution
+                        workId
+                        providerRunId
+                        toolCallId
+                        createSession
+                        promptSession
+                        discardSession
+                        plan
+        }
+
+    let private reviewAndDeliverReopenedPostS3
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (retirementBlockers: unit -> string array)
+        (createSession: string -> string -> Task<Result<string, string>>)
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        (retirementCursor: int64)
+        (activeId: string)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            let reviewCmd =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    "Review"
+                    [ "incumbencyId", box activeId
+                      "reviewerId", box "plan-reviewer"
+                      "findings", box ([||]: string array) ]
+
+            let reviewed =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
+                    gitCommonDir
+                    workId
+                    (activeId + ":review")
+                    reviewCmd
+
+            if reviewed.Status <> "Committed" && reviewed.Status <> "Replayed" then
+                return Error(receiptRefusal reviewed)
+            else
+                return!
+                    executeDeliver
+                        gitCommonDir
+                        root
+                        workId
+                        activeId
+                        providerRunId
+                        toolCallId
+                        retirementBlockers
+                        createSession
+                        promptSession
+                        discardSession
+                        retirementCursor
+        }
+
+    let private reopenPostS3ActiveId
+        (gitCommonDir: string)
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (blockers: string array)
+        (retirementCursor: int64)
+        (lastRetired: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement)
+        : Result<string, string> =
+        let requestId = providerRunId + ":" + toolCallId
+
+        let reopenCmd =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                "Reopen"
+                [ "retirementId", box lastRetired.RetirementId
+                  "ownerId", box workId
+                  "openingCursor", box (float retirementCursor)
+                  "blockers", box blockers ]
+
+        let reopened =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
+                gitCommonDir
+                workId
+                (requestId + ":reopen")
+                reopenCmd
+
+        if reopened.Status <> "Committed" && reopened.Status <> "Replayed" then
+            Error(receiptRefusal reopened)
+        else
+            lifecycleWorkOf gitCommonDir workId
+            |> Option.bind (fun w -> w.ActiveId)
+            |> requireOpt "Failed to reopen post-S3 incumbency for execution delivery"
+
+    let private startFirstPostS3Execution
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (retirementBlockers: unit -> string array)
+        (createSession: string -> string -> Task<Result<string, string>>)
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        (retirementCursor: int64)
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            let reopenedActive =
+                work.Retirements
+                |> List.tryLast
+                |> requireOpt "No post-S3 retirement found"
+                |> Result.bind (
+                    reopenPostS3ActiveId
+                        gitCommonDir
+                        workId
+                        providerRunId
+                        toolCallId
+                        (retirementBlockers ())
+                        retirementCursor
+                )
+
+            match reopenedActive with
+            | Error err -> return Error err
+            | Ok activeId ->
+                return!
+                    reviewAndDeliverReopenedPostS3
+                        gitCommonDir
+                        root
+                        workId
+                        providerRunId
+                        toolCallId
+                        retirementBlockers
+                        createSession
+                        promptSession
+                        discardSession
+                        retirementCursor
+                        activeId
+        }
+
+    let private dispatchPostS3Execution
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (retirementBlockers: unit -> string array)
+        (createSession: string -> string -> Task<Result<string, string>>)
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        (retirementCursor: int64)
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        : Task<Result<DeliverResult, string>> =
+        let retiredCount =
+            work.Retirements
+            |> List.filter (fun r -> r.Outcome = "Delivered")
+            |> List.length
+
+        if retiredCount <= 1 then
+            startFirstPostS3Execution
+                gitCommonDir
+                root
+                workId
+                providerRunId
+                toolCallId
+                retirementBlockers
+                createSession
+                promptSession
+                discardSession
+                retirementCursor
+                work
+        else
+            startFreshPostS3Execution
+                root
+                workId
+                providerRunId
+                toolCallId
+                (retirementBlockers ())
+                createSession
+                promptSession
+                discardSession
+
+    let startPostS3Execution
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (retirementBlockers: unit -> string array)
+        (createSession: string -> string -> Task<Result<string, string>>)
+        (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
+        (discardSession: string -> Task<Result<unit, string>>)
+        (retirementCursor: int64)
+        : Task<Result<DeliverResult, string>> =
+        task {
+            match lifecycleWorkOf gitCommonDir workId with
+            | None -> return Error "lifecycle work is missing"
+            | Some work when not work.Delivered ->
+                return Error "Cannot start S4 execution before entering post-S3 state"
+            | Some work ->
+                return!
+                    dispatchPostS3Execution
+                        gitCommonDir
+                        root
+                        workId
+                        providerRunId
+                        toolCallId
+                        retirementBlockers
+                        createSession
+                        promptSession
+                        discardSession
+                        retirementCursor
+                        work
         }
 
     let private pendingExecutionEvidence

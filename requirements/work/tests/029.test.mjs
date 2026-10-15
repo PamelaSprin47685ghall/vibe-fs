@@ -8,12 +8,13 @@ import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as registry from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as workspaceEvents from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 // The sandbox resolves the active tenure from the unified lifecycle work, so the
 // store is a real workspace store with one opened plan work.
 const openPlanStore = async (root, workId) => {
   execFileSync('git', ['init', '--quiet', root])
-  const store = workspaceEvents.acquire(fs.realpathSync(path.join(root, '.git')))
+  const store = workspaceEvents.acquire(journalSurface.JournalSurface_initializeStateRoot(root))
   const opened = await lifecycle.seedOpen(store, 'plan', workId, root, 1n)
   assert.equal(opened.ok, true, opened.error)
   return store

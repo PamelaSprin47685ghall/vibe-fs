@@ -12,6 +12,14 @@ type RelayProjectionDisposition =
     | RetiredAttemptStopped
 
 module RelayNarrativeTransform =
+    val isStaleRetiredAttempt:
+        journal: AgentJournal option ->
+        acceptedRequest: bool ->
+        sessionId: string option ->
+        lifecycle: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option ->
+        outObj: obj ->
+            bool
+
     val apply:
         journal: AgentJournal option ->
         acceptedRequest: bool ->

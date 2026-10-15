@@ -42,9 +42,9 @@ test('WHAT[work-032] non-Plan empty stops keep requiring interaction repair', ()
   assert.equal(completedTurn.needsInteractionRepair('manager', true, 'stop', []), true)
 })
 
-test('WHAT[work-032] only Manager and Plan may ask the human', () => {
-  for (const role of ['manager', 'plan']) assert.equal(isAllowed(role, 'Ask'), true)
-  for (const role of ['engineer', 'devops', 'orchestrator', 'blogger', 'coder', 'inspector']) {
+test('WHAT[work-032] only Plan may ask the human; Manager and other roles are denied ask', () => {
+  assert.equal(isAllowed('plan', 'Ask'), true)
+  for (const role of ['manager', 'engineer', 'devops', 'orchestrator', 'blogger', 'coder', 'inspector']) {
     assert.equal(isAllowed(role, 'Ask'), false, role)
     assert.equal(isAllowed(role, 'DevOpsConsultation'), false, role)
   }

@@ -69,3 +69,42 @@ test('WHAT[work-031] the prompt catalog carries a localized PlanSystemPrompt for
     )
   }
 })
+
+test('WHAT[work-031] plan prompts state that S1/S2 review gaps are entry-bar gaps to start the next stage and promoted reviews return the next stage method immediately', () => {
+  const roleEn = fs.readFileSync(path.join(resourcesDir, 'role/plan/en.md'), 'utf8')
+  const roleZh = fs.readFileSync(path.join(resourcesDir, 'role/plan/zh-CN.md'), 'utf8')
+  const s1En = fs.readFileSync(path.join(resourcesDir, 'planning/s1/en.md'), 'utf8')
+  const s1Zh = fs.readFileSync(path.join(resourcesDir, 'planning/s1/zh-CN.md'), 'utf8')
+  const s2En = fs.readFileSync(path.join(resourcesDir, 'planning/s2/en.md'), 'utf8')
+  const s2Zh = fs.readFileSync(path.join(resourcesDir, 'planning/s2/zh-CN.md'), 'utf8')
+  const s3En = fs.readFileSync(path.join(resourcesDir, 'planning/s3/en.md'), 'utf8')
+  const s3Zh = fs.readFileSync(path.join(resourcesDir, 'planning/s3/zh-CN.md'), 'utf8')
+  const deliverEn = fs.readFileSync(path.join(resourcesDir, 'tool/deliver/en.md'), 'utf8')
+  const deliverZh = fs.readFileSync(path.join(resourcesDir, 'tool/deliver/zh-CN.md'), 'utf8')
+  const promotedEn = fs.readFileSync(path.join(resourcesDir, 'tool/review/plan-promoted/en.md'), 'utf8')
+  const promotedZh = fs.readFileSync(path.join(resourcesDir, 'tool/review/plan-promoted/zh-CN.md'), 'utf8')
+
+  // S1 gap is the gap to promotion to S2 (so S2 can start), not whether S2 paths are already written
+  assert.match(s1En, /promotion to `S2`[\s\S]*`S2` can begin/i)
+  assert.match(s1Zh, /能晋级 `S2`[\s\S]*`S2` 能开始/)
+
+  // S2 gap is the gap to promotion to S3 (so S3 can start), not the gap to S3 completion
+  assert.match(s2En, /promotion to `S3`[\s\S]*`S3` can begin[\s\S]*not the gap to `S3` completion/i)
+  assert.match(s2Zh, /能晋级 `S3`[\s\S]*`S3` 能开始[\s\S]*而不是 `S3` 完成的差距/)
+
+  // Role law and plan-promoted state that review immediately returns the next stage requirements
+  assert.match(roleEn, /`review` tool result immediately returns the next stage's method requirements/i)
+  assert.match(roleZh, /`review` 的工具返回值会当场给出下一阶段的方法要求/)
+  assert.doesNotMatch(roleEn, /The one who works in the next stage is some later runner, not you/i)
+  assert.doesNotMatch(roleZh, /进入下一阶段工作的是你之后的某任，不是你/)
+  assert.doesNotMatch(promotedEn, /will be presented on the next request/i)
+  assert.doesNotMatch(promotedZh, /将在下一次请求时呈现/)
+
+  // S3 deliver enters post-S3 state, permanently disables nudges, interrupts like ask, and allows repeated S4 starts on user command
+  assert.match(roleEn, /`post-S3`[\s\S]*permanently disables nudges[\s\S]*interrupts the conversation[\s\S]*repeatedly request starting `S4`/i)
+  assert.match(roleZh, /`post-S3`[\s\S]*永久关闭[\s\S]*中断[\s\S]*反复要求启动 `S4`/)
+  assert.match(s3En, /`post-S3`[\s\S]*repeatedly request starting `S4`/i)
+  assert.match(s3Zh, /`post-S3`[\s\S]*反复要求启动 `S4`/)
+  assert.match(deliverEn, /`post-S3`[\s\S]*repeatedly request starting `S4`/i)
+  assert.match(deliverZh, /`post-S3`[\s\S]*反复要求启动 `S4`/)
+})

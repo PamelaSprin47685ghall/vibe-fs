@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -6,6 +7,7 @@ import test from 'node:test'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as runtimePath from '../../../dist/Persistence/Journal/RuntimePath.js'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -14,7 +16,7 @@ const eventsOf = (text) => framesOf(text).flatMap((frame) => frame.events ?? [])
 
 const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-planning-007-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   try {
     await body(workspace.acquire(commonDir), root, commonDir)
@@ -62,6 +64,36 @@ test('WHAT[work-025] deliver without authorization relays: retires Relayed and o
   assert.equal(written[0].outcome, 'Relayed')
   assert.equal(written[1].stage, 'S2', 'relay keeps the promoted stage')
   assert.equal(written[1].openingCursor, written[0].retirementCursor)
+})
+
+test('WHAT[work-025] an unauthorised durable deliver relays instead of refusing for a missing next owner', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-planning-025-relay-'))
+  execFileSync('git', ['init', '--quiet', root])
+  const commonDir = runtimePath.initializeStateRoot(root)
+  try {
+    const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, root, 'work-relay-owner', 0n)
+    assert.equal(opened.ok, true, opened.error)
+    const store = workspace.acquire(commonDir)
+    const view = life.workView(store, 'work-relay-owner')
+    assert.equal(view.found, true)
+    const reviewed = await life.seedReview(store, 'work-relay-owner', 'Stayed')
+    assert.equal(reviewed.ok, true, reviewed.error)
+    const host = await import('../../../dist/Mission/Lifecycle/DurableWorkHost.js')
+    const inspected = (host.inspected ?? host.DurableWorkHost?.inspected)(commonDir, 'work-relay-owner')
+    const incumbencyId = inspected.ActiveId
+    const result = await surface.PlanningSurface.executeDeliver(
+      commonDir, root, 'work-relay-owner', incumbencyId, 'run-relay', 'call-relay', false,
+      forbiddenExecution(),
+      4n,
+    )
+    assert.equal(result.ok, true, result.error)
+    assert.equal(result.relayed, true)
+    const after = (host.inspected ?? host.DurableWorkHost?.inspected)(commonDir, 'work-relay-owner')
+    assert.notEqual(after.ActiveId, incumbencyId)
+    assert.equal(after.Stage, 'S1')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[work-025] continuous relay across a single work advances tenures at the same stage without spawning', () => {

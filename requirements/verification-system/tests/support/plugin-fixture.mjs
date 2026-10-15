@@ -64,7 +64,7 @@ const setupRoutingHome = (directory) => {
     join(routingDir, 'wanxiangshu.mjs'),
     `export const routingProtocol = 2
 export default function route(role, running, previous, purpose) {
-  if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
+  if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor', 'plan']).has(role)) throw new Error('unexpected managed role: ' + role)
   if (Array.isArray(globalThis.__wanxiangshu_test_routing_seen)) {
     globalThis.__wanxiangshu_test_routing_seen.push({ role, running: running.map((item) => ({ ...item })) })
   }
@@ -547,7 +547,7 @@ export const acceptChildAgentOwnerRoot = async (runtime, childSessionId, promptK
 const lifecycleStore = (runtime) => {
   const directory = runtime?.directory
   if (!directory) throw new Error('lifecycle seeding needs an executable plugin runtime (runtime.directory)')
-  return workspaceEventStoreSurface.acquire(realpathSync(join(directory, '.git')))
+  return workspaceEventStoreSurface.acquire(journalSurface.JournalSurface_initializeStateRoot(directory))
 }
 
 export const openIncumbency = async (

@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -18,7 +19,7 @@ const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-035-'))
   execFileSync('git', ['init', '--quiet', root])
   try {
-    await body(workspace.acquire(realpathSync(join(root, '.git'))), root)
+    await body(workspace.acquire(journalSurface.JournalSurface_initializeStateRoot(root)), root)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

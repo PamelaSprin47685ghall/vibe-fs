@@ -62,8 +62,13 @@ type ToolRuntimeScope =
     member AskUser: ctx: HostToolContext * question: string -> Task<Result<unit, string>>
     member InterruptForUserQuestion:
         sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> Task<Result<unit, string>>
+    member RegisterPostS3Interrupt: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> unit
+    member HasPendingPostS3Interrupt: sessionId: string -> bool
+    member InterruptForPostS3Deliver:
+        sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> Task<Result<unit, string>>
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member RunStarted: (SessionId -> Role -> string option -> unit)
+    member ContinueManagerLoop: sessionId: SessionId * workspace: string -> Task<Result<unit, string>>
 
     /// EXEC-011: the administrator's ceiling on any single process.
     ///

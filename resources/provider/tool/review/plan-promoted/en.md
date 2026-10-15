@@ -1,1 +1,1 @@
-The review passed with empty findings; this tenure is promoted. The next stage's method will be presented on the next request.
+The review passed with empty findings; this tenure is promoted. If the next stage's method requirements appear below, begin writing that new stage immediately in this tenure and call `deliver` to hand over after completing a stretch; if delivery authority has been granted at `S3`, call `deliver` directly to close `S3`, enter the `post-S3` state, and pause for the user's command.

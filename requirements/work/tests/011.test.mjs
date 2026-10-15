@@ -281,3 +281,29 @@ test('WHAT[work-011] a review whose reviewer identity is the incumbency owner is
     assert.equal(lifecycleWorkView(runtime, session).reviewed, '')
   }, {ownerId: 'manager-reviewer', session: 'review-manager-self-review'})
 })
+
+test('WHAT[work-011] Stayed deliver enqueues the successor manager-assess prompt before returning so no LLM request can slip in between', async () => {
+  await withReview(async ({execute, hooks, runtime, session}) => {
+    assert.match(await execute(scores('REVISE')), /recorded = true/)
+    const retirement = {
+      info: {id: 'retirement-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 3}},
+      parts: [{type: 'tool', tool: 'deliver', callID: 'deliver-call', state: {status: 'pending', input: {}}}],
+    }
+    runtime.pushHostMessage(session, retirement)
+    const confirm = {sessionID: session, callID: 'deliver-confirm', messageID: 'retirement-confirm', providerRunID: 'run-confirm', agent: 'manager'}
+    const retire = {sessionID: session, callID: 'deliver-call', messageID: 'retirement-run', providerRunID: 'run-retire', agent: 'manager'}
+    assert.match(await hooks.tool.deliver.execute({}, confirm), /confirmation_required = true/)
+    assert.equal(runtime.prompts.length, 0, 'first confirmation does not enqueue successor')
+
+    let promptsAtReturn = -1
+    const deliverPromise = hooks.tool.deliver.execute({}, retire).then((res) => {
+      promptsAtReturn = runtime.prompts.filter(p => p.sessionID === session).length
+      return res
+    })
+    const result = await deliverPromise
+    assert.match(result, /Finished\. Do not continue work\./)
+    assert.equal(promptsAtReturn, 1, 'successor prompt must already be enqueued when deliver resolves')
+    const promptText = runtime.prompts[0]?.body?.parts?.find(p => p?.type === 'text')?.text ?? ''
+    assert.match(promptText, /(你是接手此任务的第 2 个 Manager|You are the 2 Manager taking over this mission)/)
+  }, {session: 'review-manager-atomic-enqueue'})
+})

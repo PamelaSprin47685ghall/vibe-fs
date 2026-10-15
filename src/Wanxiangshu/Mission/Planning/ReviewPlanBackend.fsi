@@ -12,6 +12,7 @@ type PlanReviewOutcome =
 /// planning-022: the outcome of one review gate on a plan incumbency.
 type PlanReviewResult =
     { Outcome: PlanReviewOutcome
+      Target: string
       Gaps: (string * string) list }
 
 /// planning-022: typed rejections for the plan review gate. The hard

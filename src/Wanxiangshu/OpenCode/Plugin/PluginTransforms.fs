@@ -784,17 +784,47 @@ module PluginTransforms =
                     do! applyResolvedTenure sid outObj
             }
 
+        let acceptedSuccessorRequestFor (sidOpt: string option) (physicalUserMessageId: PhysicalUserMessageId option) =
+            match journal, sidOpt, physicalUserMessageId with
+            | Some durable, Some sessionId, Some physical when not (String.IsNullOrWhiteSpace sessionId) ->
+                let key: ChatExecutionKey =
+                    { SessionId = SessionId.create sessionId
+                      PhysicalUserMessageId = physical }
+
+                (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+                |> ChatExecutionProjection.byKey key
+                |> Option.isSome
+            | _ -> false
+
         { BeginPhysicalProviderAttempt =
             fun sessionId output ->
                 task {
                     do! wired.EnsureVisibleInputAdmission output
 
-                    do!
-                        SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
-                            journal
-                            scope.Sessions.Quiescence.BeginProviderAttempt
-                            sessionId
-                            output
+                    let physicalUserMessageId =
+                        output
+                        |> ProviderWireDecode.messagesFromTransformOutput
+                        |> ProviderWireCapture.lastUserMessageId
+
+                    let acceptedRequest = acceptedSuccessorRequestFor sessionId physicalUserMessageId
+                    let lifecycle = sessionId |> Option.bind tryReadLifecycleWork
+
+                    if
+                        not (
+                            RelayNarrativeTransform.isStaleRetiredAttempt
+                                journal
+                                acceptedRequest
+                                sessionId
+                                lifecycle
+                                output
+                        )
+                    then
+                        do!
+                            SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
+                                journal
+                                scope.Sessions.Quiescence.BeginProviderAttempt
+                                sessionId
+                                output
                 }
           BindSessionStartedAt =
             let port = journal |> Option.map AgentJournalPortAdapter.forSessionStartedAt
@@ -815,17 +845,7 @@ module PluginTransforms =
 
                     // External human messages and internal recovery/guard continuations
                     // admitted into ChatExecutions belong to this active iteration.
-                    let acceptedSuccessorRequest =
-                        match journal, sidOpt, physicalUserMessageId with
-                        | Some durable, Some sessionId, Some physical when not (String.IsNullOrWhiteSpace sessionId) ->
-                            let key: ChatExecutionKey =
-                                { SessionId = SessionId.create sessionId
-                                  PhysicalUserMessageId = physical }
-
-                            (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
-                            |> ChatExecutionProjection.byKey key
-                            |> Option.isSome
-                        | _ -> false
+                    let acceptedSuccessorRequest = acceptedSuccessorRequestFor sidOpt physicalUserMessageId
 
                     let handleInterruptionError (error: string) : unit =
                         if error.Contains "MANAGED-SESSION-016" then
@@ -874,7 +894,7 @@ module PluginTransforms =
 
                     match captured.Receipt with
                     | None -> return captured
-                    | Some receipt ->
+                    | Some receipt when planSessionOf projectionSessionIdOpt |> Option.isNone ->
                         let observedHead = XTraceCursor.sequence receipt.CurrentHead
 
                         do!
@@ -884,6 +904,7 @@ module PluginTransforms =
                                 projectionSessionIdOpt
 
                         return captured
+                    | Some _ -> return captured
                 }
           CommitStrengthTrace =
             fun projectionSessionIdOpt traceState strengthReplayPlans ->

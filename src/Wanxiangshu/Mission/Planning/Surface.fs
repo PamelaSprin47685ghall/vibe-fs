@@ -487,6 +487,7 @@ module PlanningSurface =
                             box
                                 {| ok = true
                                    outcome = renderReviewOutcome review.Outcome
+                                   target = review.Target
                                    gaps = gapsToJs review.Gaps
                                    error = Unchecked.defaultof<string> |}
         }

@@ -84,9 +84,9 @@ sequence 为 S4 时，deliver 是两次调用。第一次只落确认。另一�
 
 ## [011] 两段 deliver 的后继派发
 
-S4 两次调用之后，系统派发同一会话的后继。后继启动后，旧尝试被停止，不得再发一次会话中止。
+S4 两次调用之后，系统在第二次 deliver 返回前原子排队同一会话的后继提示。后继启动后，旧尝试被停止，不得再发一次会话中止。
 
-- 允许后果：已评且第一次确认落地后，第二次调用不结束本次尝试，也不中止会话。下一次 transform 停止已退休的尝试。同一会话只启动一个后继。后继 transform 保留旧物理历史，不再中止一次。用户新 prompt 之后，后继 Manager 工具不再因退休冻结被拒。后任已有新根时，裁剪之后的唤醒被清空，不中止会话，也不因拒绝中断而崩溃。
+- 允许后果：已评且第一次确认落地后，第二次 Relayed 调用在工具返回前先把同一会话的后继提示（`runtime/manager-assess`）排入队列，不中止会话。若下一次 transform 仍是旧任残余尝试，则停止该已退休尝试。同一会话只启动一个后继。后继 transform 剥除前任 assistant 与 tool，保留用户原文与后继提示，不再中止一次。用户新 prompt 之后，后继 Manager 工具不再因退休冻结被拒。后任已有新根时，裁剪之后的唤醒被清空，不中止会话，也不因拒绝中断而崩溃。
 - 禁止后果：不得把第一次确认收成退休。不得在后继已派发后再发一次旧任期的会话中止。不得把旧物理历史从后继消息集里剥掉。
 - 失败后果：在途 Host 中断未完成精确的 provider-step 释放与物理中断之前，不得派发后继。
 
@@ -166,7 +166,7 @@ S4 两次调用之后，系统派发同一会话的后继。后继启动后，�
 
 当调度器识别到 CanonicalRole 为 `Plan`（Wire 标识为 `plan`）时，系统投影其专属权限与工具集。
 
-- 允许后果：Plan 的工作工具为 `js-plan`、`devops`、`ask`、`review`、`deliver`。`js-plan` 与 `devops` 只向 Plan 开放；`ask` 供 Manager 与 Plan 明确询问用户（[049]），不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
+- 允许后果：Plan 的工作工具为 `js-plan`、`devops`、`ask`、`review`、`deliver`。`js-plan`、`devops` 与 `ask` 只向 Plan 开放；`ask` 供 Plan 明确询问用户（[049]），Manager 禁用 `ask`，且 `ask` 不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
 - 禁止后果：Plan 角色禁止获得代码仓库与执行工具的权限，包括但不限于 `read`、`glob`、`grep`、`edit`、`write`、`mv`、`rm`、`run`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`fork`、`fission`、`commission`。严禁向 Plan 开放任何真实 shell 或命令执行通道。`resume` 与 `handoff` 不再属于 Plan 的工具面。
 - 失败后果：任何越权工具调用必须在 `ToolRegistry` 执行门禁被直接拦截（fail-closed），返回强类型拒绝错误，零副作用。
 
@@ -204,9 +204,9 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 工具调用进入执行前，动作门必须基于当前任期、授权与工作状态进行单一判定。
 
 - 允许后果：
-  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `js-plan`、`devops`、`review`、`deliver`；`ask` 另需当前 Manager/Plan 权威与精确调用身份（[049]）；
+  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `js-plan`、`devops`、`ask`、`review`、`deliver`；`ask` 另需当前 Plan 权威与精确调用身份（[049]），Manager 禁用 `ask`；
   2. 每一任期在调用 `review` 工具之前，`js-plan` 工具是严格只读的（仅允许读操作 `read`）；若在此之前尝试写入（`edit`、`rewrite` 等修改操作），动作门与执行层均强制拦截拒绝，并向模型报错说明必须先完成 `review`。当前任期成功调用 `review` 工具之后方解锁写权限；接力（无权 deliver）开启的新任期在其成功调用 `review` 之前重新锁定为只读；
-  3. 工作处于 `delivered` 时，仅允许 `js-plan` 的 `read`，`devops`、`ask`、`review`、`deliver` 一律拒绝（再次动作必须先经用户 reprompt 与 `Reopened` 回 active，见 [037]）；
+  3. 工作处于 `delivered`（`post-S3` 态）时，`js-plan` 仅允许 `read`，`devops` 与 `review` 拒绝；当用户在 `post-S3` 态下输入命令要求执行交付时，允许调用 `deliver` 启动 `S4` 执行会话（且用户可反复要求启动 `S4`）；
   4. `review` 为硬门：本任已有 `Reviewed` 事实时拒绝再次调用（每任恰好一次，见 [038]）；
   5. `devops` 在同一 work 已有一个未决委派时拒绝新委派（见 [028]）；`ask` 正在等待用户时，不准再启动其他工作工具；
   6. `deliver` 要求无活跃 blocker（递归 live 资源）；行为按授权分支：持权走交付（[026]），无权走接力（[025]）。
@@ -227,12 +227,11 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 
 ## [026] deliver 契约（持权交付路径）
 
-当跑者调用 `deliver` 且本任已获授权（`Authorized = true`）时，系统建立终态交付。
+当跑者调用 `deliver` 且本任已获授权（`Authorized = true`）时，系统将规划收束进 `post-S3` 态；随后在 `post-S3` 态下由用户命令触发 `deliver` 启动 `S4` 执行。
 
-- 允许后果：系统首先核查当前任期无活跃 blocker，读取 `P` 的非空原文并计算 digest/path；随后**先持久提交**唯一 `DeliveryRequested(operationId, digest, path)`。只有这次调用收到 `Committed + DeliveryRequested` 才可发起一次 parentless Manager 执行；Replayed/Observed/Unknown/NotWritten/Conflict 都不是启动许可。启动前再次读取 `P`，字节摘要或路径已变化则确认为 NotStarted，绝不把另一版计划送进已预留的 operation。
-- 允许后果：外部启动结果分三类。确切承接才提交 `ResolveDelivery(Accepted, execSessionId, digest, path)` 并退休为 Delivered；确切的启动前拒绝才提交 `NotStarted` 并允许以后以新请求身份显式再试；`AcceptanceUnknown`、创建回执丢失或异常结果保持 pending，不写 NotStarted、不再次启动。恢复和重放只观察原 operation，直到外部事实把它收敛。
-  成功后归还本会话占用的 provider 额度，向用户呈现最终产物路径与回执（含执行会话已启动的事实），规划宣告完成，不再调用任何模型。
-- 禁止后果：`P` 为空或不存在时严禁交付。无授权时严禁走本路径（走 [025] 接力）。`execSessionId` 严禁进入 provider 可见面。交付完成后，本任期内严禁再调用模型；再次 `deliver` 只可能由用户 reprompt 触发，且必须先经 `Reopened` 回 active（见 [037]），严禁绕过重开直接复用 delivered 投影。
+- 允许后果：`S3` 持权任期调用 `deliver` 时，系统核查当前任期无活跃 blocker、确认 `P` 非空后，将工作结算为 `Delivered`（进入 `post-S3` 态），永久关闭该会话的自动催促（nudge），并在 Host 确认该 `deliver` 工具结果完成时像 `ask` 一样调用 `InterruptAttempt` 中断当前对话等待用户，不直接启动 `S4` 执行会话。
+- 允许后果：处于 `post-S3` 态时，若用户输入命令要求执行 `deliver`，模型调用 `deliver` 即读取 `P` 的非空原文并启动无 parent 的 `S4`（Manager）执行会话；用户可以反复要求启动 `S4`。底层预留路径在 `Committed + DeliveryRequested` 时同样遵守先绑定 `execSessionId` 再发送 `P` 全文的持久边界：确切承接才提交 `ResolveDelivery(Accepted, execSessionId, digest, path)`；确切启动前拒绝才提交 `NotStarted`；`AcceptanceUnknown`、创建回执丢失或异常结果保持 pending，不写 NotStarted、不再次启动。
+- 禁止后果：`P` 为空或不存在时严禁进入 `post-S3` 态或启动 `S4`。无授权时严禁走本路径（走 [025] 接力）。`execSessionId` 严禁进入 provider 可见面。进入 `post-S3` 态后永久禁止对该会话发送工作催促（nudge）。
 - 失败后果：预留前的文件读取/校验失败为零写入；预留提交失败为零启动。预留后的明确 NotStarted 可以追加拒绝事实，当前任期继续活跃；结果未知则保留 `DeliveryRequested` 作为未完成义务。任何路径都不得用“启动函数抛异常”本身证明外部效果没有发生。
 
 ## [027] 长程任务禁止静默停止
@@ -289,10 +288,10 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
 
 ## [032] 非 Plan 路径行为不变
 
-Plan 的阶段与任期机制不得污染其他角色；[027]、[049] 明确规定的 Manager 长程连续性与人类提问能力除外。
+Plan 的阶段与任期机制不得污染其他角色；[027] 明确规定的 Manager 长程连续性除外。
 
-- 允许后果：Orchestrator、Engineer、DevOps、Blogger 的既有角色合同不变。Manager 新增 `ask` 与禁止静默停止，`review` 的业务判断不变。
-- 禁止后果：非 Plan 角色严禁获取 `js-plan` 或 `devops`。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
+- 允许后果：Orchestrator、Engineer、DevOps、Blogger 的既有角色合同不变。Manager 禁止静默停止且禁用 `ask`，`review` 的业务判断不变。
+- 禁止后果：非 Plan 角色严禁获取 `js-plan`、`devops` 或 `ask`。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
 - 失败后果：任何非 Plan 回归测试失败均表明破坏了全局不变量，改动必须判定为不合格。
 
 ## [033] wanxiangli record、SQLite 持久化与投影
@@ -356,7 +355,7 @@ Plan 工作的状态（state）为 `active | delivered`，由 Durable 事实驱�
 
 Plan 的阶段推进由 `review` 硬门承担。`review` 与 Manager 共用同一工具名、同一 schema 与同一三问语义（findings 为 `(acceptance_criteria, work_plan)` pairs，空集表示缺口为空，详见 [003]），按角色换评审目标。
 
-- 允许后果：Plan 后端的评审目标 = 下一里程碑，由当前 stage 推出：`S1` 的目标是 `S2`（理解与路径就绪）；`S2` 的目标是 `S3`（流程与伪代码就绪）；`S3` 的目标是「成为最后一任」（获得交付授权）。评审对象是「离目标的 gap」，第一任与后任同一标准。findings 为空集时，系统追加 `Reviewed(incumbencyId, stage, Promoted)`：非 S3 任期晋级到下一 stage，S3 任期置 `Authorized = true`。findings 非空时，系统追加 `Reviewed(incumbencyId, stage, Stayed)`，本任留在原 stage，gaps 作为修复义务返回模型。每任恰好一次 review：已评任期再次调用返回强类型拒绝。
+- 允许后果：Plan 后端的评审目标 = 下一里程碑的准入条件，由当前 stage 推出：`S1` 的目标是能晋级 `S2`（`S1` 事实与取舍底账完备，`S2` 能开始）；`S2` 的目标是能晋级 `S3`（`S2` 理解与路径检验完备，`S3` 能开始）；`S3` 的目标是「成为最后一任」（`S3` 流程与伪代码完备，获得交付授权）。评审对象是「离目标的 gap」，第一任与后任同一标准。findings 为空集时，系统追加 `Reviewed(incumbencyId, stage, Promoted)`：非 S3 任期晋级到下一 stage，并在本次 `review` 工具返回值中立即附带新 stage 的方法说明（`planning/s2` 或 `planning/s3`），供本任直接开始下一阶段写作；S3 任期置 `Authorized = true`。findings 非空时，系统追加 `Reviewed(incumbencyId, stage, Stayed)`，本任留在原 stage，gaps 作为修复义务返回模型。每任恰好一次 review：已评任期再次调用返回强类型拒绝。
 - 禁止后果：严禁第二评审、reverify 或自证（对齐 [003]）。严禁向评审者泄露晋级后的流程编排。严禁以数值评分或八维必填代替 findings pairs。严禁在无活跃任期或已 delivered（未重开）时调用 review。
 - 失败后果：同任第二条不同载荷的 `Reviewed` 必须拒绝（`StorageInvalid`）；工具门禁对已评任期的调用返回强类型拒绝错误，不消耗 provider 请求。
 
@@ -418,7 +417,7 @@ Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择�
 
 ## [049] ask：向用户提问与显式暂停
 
-Manager 与 Plan 可以使用 `ask(question)` 请求继续目标所必需的用户输入。它不调用 DevOps，不假装拿到了用户回答，也不完成工作。
+Plan 可以使用 `ask(question)` 请求继续目标所必需的用户输入；Manager 禁用 `ask`。它不调用 DevOps，不假装拿到了用户回答，也不完成工作。
 
 - 真实呈现询问并成功登记 `UserQuestionAsked` 后，返回“你的询问已经发出”一类占位回执。事实绑定 session、logical run、authority root、提问所依据的物理输入、provider run、tool call 与原问题。占位回执不是用户原文，也不是完成报告。
 - 在 Host 已确认同一个 ask 工具结果的 `message.part.updated/completed` 上，立即调用 `InterruptAttempt`，不靠延时器猜测完成顺序，不在返回结果前销毁工具。不得使用逻辑终止、关闭 authority 或递归取消子资源替代。重复终态不重复中断；别的 call、别的会话或已回答提问的迟到事件不许中断新执行。
