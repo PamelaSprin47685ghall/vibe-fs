@@ -1,6 +1,20 @@
 # Lifecycle cutover 收尾验收
 
-## 判定
+## 合并准入更新 — 2026-10-15
+
+使用者已明确将本次合并条件改为“cutover 总体质量超过当前 master”，不再要求先补齐全部历史证明。合并准入与完整验证通过是两件事：不修改验收器，不把 TODO、skip 或未取得结论的运行算成通过。
+
+本次比较基线是 master `fc87bc4632b220fb770b32a69cdbdc951d676190`，候选生产代码为 `21aea93fc78555ce1bb047275c95f10e81d37114`。已获取远端，候选包含基线全部提交，可以快进，不需要冲突裁决。比较期间两个工作区均无用户未提交改动。
+
+- 同一 Linux、Node 25.9.0、npm 11.12.1 环境下，master 的固定 verify 在格式检查失败。未改动基线源码，另行执行其标准构建与完整 unit：构建通过，但 unit 的 `speculative-investigation-013` 文件未完成收尾，监督器以 watchdog 失败退出；826/827 文件完成，没有权威总结果，不能编造通过数。
+- cutover 的已提交候选完整 unit 为 5039 通过、0 失败，832/832 文件完成；完整 integration 主套件为 767 通过、0 失败，44/44 文件完成。实际打包与隔离消费、独立库 276 项测试已有本文件记录的完整回执。候选未新增或扩大 TODO/skip 接受名单。
+- 净改进不以测试数量判断：master 的持权 Plan 路径先启动外部 session 再提交退休；候选先持久预留、绑定具体 session，之后才发送 prompt，并在未知结果与恢复时避免再次执行。单快照投影、逐 work 恢复隔离、退休资源复查、旧 EventStore 职责退出和独立编译均有正反例。
+
+结论：在已核对的行为、恢复、维护边界和交付证据上，候选总体质量高于基线，符合本次授权的合并条件。允许快进合入 master；这不是对完整 release、Long Stroke 或全部历史 GAP 的通过声明。Node 最低版本改为 22.13.0，以及新 work 不翻译旧生命周期历史，仍按现有 README 与 work 规范执行。
+
+比较记录：`/tmp/lifecycle-master-comparison-verify.log`、`/tmp/lifecycle-master-comparison-build.log`、`/tmp/lifecycle-master-comparison-unit.log`。本次生产代码不变，只补记准入判断并删除 work-025 测试末尾多余空行；该文件五项测试重新通过。
+
+## 前次收尾判定（采用旧准入条件）
 
 先前复现的三个 lifecycle 缺陷已修复；继续检查发现的五个集成失败、安装包版本断言漂移和嵌套验收输出损坏也已有修复及回归证据。完整接受仍未通过，不能合入 master。未降低 TODO/skip 门禁，没有删除或跳过失败用例来换取绿色结果。
 
@@ -91,7 +105,7 @@ node scripts/verify-package.mjs
 /tmp/lifecycle-cutover-supervisor-channel-proof.log
 ```
 
-## 合并边界
+## 前次合并边界（由上方新准入条件更新）
 
 没有新增或扩大待办接受名单。完整 verify 仍因 356 TODO、129 skip 失败；单独执行 integration 也仍有未完成证明。特别是 `work-011` 的真实在途 Host 中断与后继派发顺序、完整 release/Long Stroke 及相关平台证明，不能用普通单元通过替代。
 

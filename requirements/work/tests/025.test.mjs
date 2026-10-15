@@ -144,4 +144,3 @@ test('WHAT[work-025] the first successor cursor opens at the exact consumed-thro
   assert.notEqual(opened.openingCursor, 11)
   assert.notEqual(opened.openingCursor, 20)
 })
-
