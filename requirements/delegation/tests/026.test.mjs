@@ -67,7 +67,7 @@ test('WHAT[delegation-026] RESUME_synchronous_admission_with_async_work_and_join
     const secondJoined = await forkTool.executeJoin(runtime, owner)
     assert.match(secondJoined, /SECOND-ANSWER/)
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -95,7 +95,7 @@ test('WHAT[delegation-026] FORK_TOOL_acceptance_unknown_never_claims_charge_was_
     assert.equal(forkTool.promptCount(runtime), 1, 'physical Host send was attempted exactly once')
     assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -127,7 +127,7 @@ test('WHAT[delegation-026] FORK_TOOL_unconfirmed_dispatch_reports_uncertain_and_
 
     assert.equal(forkTool.promptCount(runtime), 1)
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -151,7 +151,7 @@ test('WHAT[delegation-026] IDLE_ROAD_DEVOPS_COMPANION_does_not_block_join_with_h
     const joinResult = await Promise.race([joinPromise, timeout])
     assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -167,7 +167,7 @@ test('WHAT[delegation-026] RESTART_ADOPTED_IDLE_DEVOPS_does_not_block_join_with_
     assert.equal(forkTool.durableLifecycleByname(first, owner, 'devops'), 'Active')
 
     // 2. Simulate an OS restart: dispose and reopen the same durable journal.
-    forkTool.disposeRuntime(first)
+    await forkTool.disposeRuntime(first)
     const restarted = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
     try {
@@ -186,7 +186,7 @@ test('WHAT[delegation-026] RESTART_ADOPTED_IDLE_DEVOPS_does_not_block_join_with_
       const joinResult = await Promise.race([joinPromise, timeout])
       assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
     } finally {
-      forkTool.disposeRuntime(restarted)
+      await forkTool.disposeRuntime(restarted)
     }
   } finally {
     rmSync(directory, { recursive: true, force: true })
@@ -204,7 +204,7 @@ test('WHAT[delegation-026] RESTART_PENDING_CHILD_WORK_does_not_leak_into_horizon
     await pending
     assert.equal(forkTool.durableLifecycleByname(first, owner, 'Ada'), 'Active')
   } finally {
-    forkTool.disposeRuntime(first)
+    await forkTool.disposeRuntime(first)
   }
 
   const restarted = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -218,7 +218,7 @@ test('WHAT[delegation-026] RESTART_PENDING_CHILD_WORK_does_not_leak_into_horizon
     const joinResult = await Promise.race([joinPromise, timeout])
     assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
   } finally {
-    forkTool.disposeRuntime(restarted)
+    await forkTool.disposeRuntime(restarted)
     rmSync(directory, { recursive: true, force: true })
   }
 })

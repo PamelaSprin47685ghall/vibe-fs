@@ -275,7 +275,7 @@ test('WHAT[managed-session-lifecycle-015] actual recovered fork uses its runtime
   const first = await admit(a, owner, 1, 'COLD-A')
   assert.equal(await forkTool.settle(a, owner, 'COLD-ANSWER-A', 'provider-a'), true)
   const durableAtExit = forkTool.workSnapshot(a, owner)
-  forkTool.disposeRuntime(a)
+  await forkTool.disposeRuntime(a)
 
   try {
     // A cold-reopened journal (fresh writer, full replay — the shape a
@@ -313,7 +313,7 @@ test('WHAT[managed-session-lifecycle-015] actual recovered fork uses its runtime
 
       assert.equal(await forkTool.settle(b, owner, 'COLD-ANSWER-B', 'provider-b'), true)
     } finally {
-      forkTool.disposeRuntime(b)
+      await forkTool.disposeRuntime(b)
     }
   } finally {
     rmSync(directory, { recursive: true, force: true })

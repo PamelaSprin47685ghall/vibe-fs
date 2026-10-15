@@ -60,7 +60,7 @@ test('WHAT[delegation-003] FORK_TOOL_defaults_blank_calling_from_name_and_resume
     assert.match(rejectedCalling, /use fork|用 fork/i)
     assert.equal(forkTool.childCount(runtime), 1, 'resume must not place a second child')
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -82,7 +82,7 @@ test('WHAT[delegation-003] FORK_TOOL_derives_devops_from_a_devops_name_and_refus
     assert.equal(derived, "# Dispatching to DevOps is not allowed until the current review assessment is accepted by the system.\n# Please complete the review or wait for the assessment to be accepted before dispatching.\n")
     assert.equal(forkTool.childCount(runtime), 0, 'a devops name derives devops and cannot be forked')
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -129,7 +129,7 @@ test('WHAT[delegation-003] FORK_TOOL_rejects_an_explicit_calling_that_conflicts_
     refusedFork(reverse)
     assert.equal(forkTool.childCount(runtime), 0, 'an engineer calling for a devops name must not place any child')
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -175,7 +175,7 @@ const refused = (title, body) => {
     try {
       await body(runtime, owner, directory)
     } finally {
-      forkTool.disposeRuntime(runtime)
+      await forkTool.disposeRuntime(runtime)
       rmSync(directory, { recursive: true, force: true })
     }
   })
@@ -209,7 +209,7 @@ test('WHAT[delegation-003] each new ordinary work is cancelled after the fixed r
     assert.equal(forkTool.abortCount(runtime), 2)
   } finally {
     await forkTool.detachToolRuntime(runtime)
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -221,7 +221,7 @@ test('WHAT[delegation-003] a parent cancellation episode rejects new ordinary in
   try {
     await assertAcceptedRefused(runtime, owner, directory)
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -235,7 +235,7 @@ test('WHAT[delegation-003] a failed in-flight cancellation cannot skip scope det
     await assertAcceptedRefused(runtime, owner, directory)
     await assertAcceptedRefused(runtime, siblingOwner, directory)
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -262,7 +262,7 @@ test('WHAT[delegation-003] a synchronous cancellation signal failure releases th
     assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'devops'), 'Active')
   } finally {
     await Promise.allSettled([forkTool.detachToolRuntime(runtime)])
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })

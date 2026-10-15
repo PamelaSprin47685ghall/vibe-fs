@@ -24,7 +24,7 @@ export async function withForkRuntime(owner, run) {
   try {
     return await run(runtime, directory)
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 }

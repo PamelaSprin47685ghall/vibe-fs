@@ -34,7 +34,7 @@ test('WHAT[participant-horizon-011] a restarted process does not present the pre
     await forkTool.cancelOwnerChildren(first, owner)
     assert.match(await forkTool.executeHorizon(first, owner), /Ada.*did not return/)
   } finally {
-    forkTool.disposeRuntime(first)
+    await forkTool.disposeRuntime(first)
   }
 
   const restarted = await forkTool.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
@@ -43,7 +43,7 @@ test('WHAT[participant-horizon-011] a restarted process does not present the pre
     const horizon = await forkTool.executeHorizon(restarted, owner)
     assert.doesNotMatch(horizon, /Ada/)
   } finally {
-    forkTool.disposeRuntime(restarted)
+    await forkTool.disposeRuntime(restarted)
     rmSync(directory, { recursive: true, force: true })
   }
 })

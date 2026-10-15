@@ -375,9 +375,14 @@ module ForkToolSurface =
         member _.OwnerSession(owner: string) = SessionId.create owner
         member _.OwnerAgent(owner: string) = ownerAgents[owner]
 
-        member _.Dispose() =
-            (scope :> IDisposable).Dispose()
-            (journal :> IDisposable).Dispose()
+        member _.DisposeAsync() : Task =
+            task {
+                try
+                    do! scope.DisposeAsync()
+                finally
+                    (journal :> IDisposable).Dispose()
+            }
+            :> Task
 
     type private CapturedChildPromptSender =
         { Runtime: HostForkRuntime
@@ -1454,5 +1459,5 @@ module ForkToolSurface =
         }
         :> Task
 
-    let disposeRuntime (value: obj) =
-        unbox<ForkHarness> value |> fun harness -> harness.Dispose()
+    let disposeRuntime (value: obj) : Task =
+        unbox<ForkHarness> value |> fun harness -> harness.DisposeAsync()

@@ -123,7 +123,7 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
       'completion remains a separately consumable join fact',
     )
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
   }
 })
 }

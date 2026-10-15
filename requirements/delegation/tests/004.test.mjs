@@ -58,7 +58,7 @@ test('WHAT[delegation-004] COMMISSION_TOOL_blank_calling_derives_to_lead_like_an
     }
     assert.equal(blanked, explicit, 'a blank calling must behave exactly like an explicit lead')
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -79,7 +79,7 @@ test('WHAT[delegation-004] COMMISSION_TOOL_rejects_an_explicit_calling_that_conf
     )
     assert.match(conflict, /\u672a\u77e5|Unknown or unavailable calling/i)
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })

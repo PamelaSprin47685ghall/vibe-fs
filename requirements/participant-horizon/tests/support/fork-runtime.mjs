@@ -26,7 +26,7 @@ export const withForkRuntime = async (body) => {
   try {
     await body({ runtime, owner, directory })
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 }

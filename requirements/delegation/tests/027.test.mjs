@@ -149,7 +149,7 @@ for (const replacement of ['active', 'finished', 'successor']) {
       if (replacement === 'successor') assert.match(joined, /SUCCESSOR-DONE/)
     } finally {
       release.resolve()
-      forkTool.disposeRuntime(runtime)
+      await forkTool.disposeRuntime(runtime)
       rmSync(directory, { recursive: true, force: true })
     }
   })

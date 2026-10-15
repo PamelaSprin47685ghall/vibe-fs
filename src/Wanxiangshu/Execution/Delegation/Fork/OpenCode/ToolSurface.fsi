@@ -98,4 +98,4 @@ module ForkToolSurface =
     val consumeWorkWithOutcome: obj -> string -> string -> string -> Task<obj>
     val coldConsumeWorkWithOutcome: string -> string -> string -> string -> Task<obj>
 
-    val disposeRuntime: value: obj -> unit
+    val disposeRuntime: value: obj -> Task

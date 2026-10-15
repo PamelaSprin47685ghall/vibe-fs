@@ -32,6 +32,28 @@ const journalBytes = directory => {
   return names.map(name => ({ name, bytes: readFileSync(join(events, name)) }))
 }
 
+test('WHAT[managed-session-lifecycle-018] Fork disposal waits for runtime detach before the caller releases the journal directory', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-awaited-dispose-'))
+  const owner = 'manager-awaited-dispose'
+  const runtime = await forkTool.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
+  try {
+    forkTool.acceptNextPrompt(runtime)
+    await forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'KEEP-DURABLE-WORK')
+    const work = forkTool.workSnapshot(runtime, owner)
+    assert.equal(forkTool.terminalListenerCount(runtime), 1)
+    const closing = forkTool.disposeRuntime(runtime)
+    assert.equal(typeof closing?.then, 'function', 'disposal must return the actual asynchronous drain')
+    await closing
+    assert.equal(forkTool.terminalListenerCount(runtime), 0, 'all observers are detached before disposal resolves')
+    assert.equal(forkTool.abortCount(runtime), 0)
+    assert.deepEqual(await forkTool.coldWorkSnapshot(directory, owner), work)
+  } finally {
+    await forkTool.detachToolRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 test('WHAT[managed-session-lifecycle-018] the original captured Fork sender rejects after runtime detach without claiming or sending', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-captured-closed-'))
   const owner = 'manager-captured-closed'
@@ -77,7 +99,7 @@ test('WHAT[managed-session-lifecycle-018] the original captured Fork sender reje
     assert.deepEqual(seen, [])
   } finally {
     await forkTool.detachToolRuntime(runtime)
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -155,7 +177,7 @@ test('WHAT[managed-session-lifecycle-018] detaching a pending Fork observer pres
       if (other) await other
       if (mocked) t.mock.timers.reset()
       await forkTool.detachToolRuntime(runtime)
-      forkTool.disposeRuntime(runtime)
+      await forkTool.disposeRuntime(runtime)
       rmSync(directory, { recursive: true, force: true })
     }
   }
@@ -176,7 +198,7 @@ test('WHAT[managed-session-lifecycle-018] actual tool runtime detach preserves d
     assert.equal(forkTool.abortCount(runtime), 0)
     assert.equal(forkTool.childCount(runtime), 1)
   } finally {
-    forkTool.disposeRuntime(runtime)
+    await forkTool.disposeRuntime(runtime)
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -220,7 +242,7 @@ test('WHAT[managed-session-lifecycle-018] real TurnAborted, retry, Fission and u
         `${scenario.label}: a non-authorized stop must not physically abort the child session`)
       durableAtExit = afterStop
     } finally {
-      forkTool.disposeRuntime(a)
+      await forkTool.disposeRuntime(a)
     }
 
     try {
@@ -252,7 +274,7 @@ test('WHAT[managed-session-lifecycle-018] real TurnAborted, retry, Fission and u
         assert.equal(works.find(work => work.root === first.root).lifecycle, scenario.expected,
           `${scenario.label}: re-enlisting new work must not rewrite the stopped root's settled fact`)
       } finally {
-        forkTool.disposeRuntime(b)
+        await forkTool.disposeRuntime(b)
       }
     } finally {
       rmSync(directory, { recursive: true, force: true })
@@ -308,7 +330,7 @@ test('WHAT[managed-session-lifecycle-018] authorized owner cancellation durably 
         if (runtime) await forkTool.detachToolRuntime(runtime)
       } finally {
         try {
-          if (runtime) forkTool.disposeRuntime(runtime)
+          if (runtime) await forkTool.disposeRuntime(runtime)
         } finally {
           rmSync(directory, { recursive: true, force: true })
         }
