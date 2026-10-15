@@ -194,7 +194,9 @@ module internal WanxiangliTrace =
             let parts =
                 chunks
                 |> Array.mapi (fun index chunk ->
-                    captureObsRecord trace (obsPartConfirmed messageId (sprintf "opening:%d" index) index "binary" chunk))
+                    captureObsRecord
+                        trace
+                        (obsPartConfirmed messageId (sprintf "opening:%d" index) index "binary" chunk))
                 |> Array.toList
 
             let finished = captureObsRecord trace (obsMessageFinished messageId chunks.Length)
@@ -229,7 +231,11 @@ module internal WanxiangliTrace =
         let updated =
             { bridge with
                 Records = bridge.Records @ records
-                OpeningCutCursor = if bridge.RecordCount = 0 then cursor else bridge.OpeningCutCursor
+                OpeningCutCursor =
+                    if bridge.RecordCount = 0 then
+                        cursor
+                    else
+                        bridge.OpeningCutCursor
                 RecordCount = cursor }
 
         attachCachedTrace traceCache updated trace

@@ -116,6 +116,7 @@ module ProcessRunner =
             // TimeoutExceeded carrying a different duration than the deadline
             // that expired is a lie the operator cannot detect.
             let budget = budgetSpan estimate ctx
+
             try
                 let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
                 killQuietly child

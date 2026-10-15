@@ -87,7 +87,7 @@ const takeCompletions = (port, count = 1) => new Promise((resolve) => {
   })
 })
 
-test('WHAT[process-execution-003] BACKEND_fork_without_bun_pty_fails_spawn_and_publishes_failed', async () => {
+test('WHAT[process-execution-003] backend load failure publishes a known failure before spawn', async () => {
   const port = backendCreatePort()
   const completion = takeCompletions(port)
   const pid = portFork(port, 'echo hi', 'devops', ptyId('pty-sf'), undefined)
@@ -97,7 +97,7 @@ test('WHAT[process-execution-003] BACKEND_fork_without_bun_pty_fails_spawn_and_p
   assert.equal(item.kind, 'PtyFailed')
   assert.equal(item.ptyId, 'pty-sf')
   assert.equal(item.code, 'ERROR')
-  assert.match(item.message, /^PTY spawn failed: /)
+  assert.match(item.message, /^PTY backend load failed before spawn: /)
   assert.equal(item.closed, true)
 })
 test('WHAT[process-execution-003] BACKEND_concurrent_failed_forks_each_publish_one_completion', async () => {

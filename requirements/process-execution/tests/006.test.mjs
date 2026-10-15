@@ -1,5 +1,10 @@
 import test from 'node:test'
 
+test('WHAT[process-execution-006] cancellation terminates the group after the target exits while a descendant holds stdout', { timeout: 15000 }, async t => {
+  const { verifyDrainingStop } = await import('./support/draining.mjs')
+  await verifyDrainingStop(t, 'cancel')
+})
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { readFileSync } = await import("node:fs");

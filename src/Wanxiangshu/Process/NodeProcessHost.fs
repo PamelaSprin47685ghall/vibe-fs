@@ -9,12 +9,15 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.AsyncSupport
 
 /// JS-host process adapter. Non-PTY child-process execution delegates to
-/// wanxiangli/process (ProcessSession); spool-file I/O stays here so the rest
+/// wanxiangli/supervision (SupervisedProcess); spool-file I/O stays here so the rest
 /// of the Process namespace remains free of raw Node interop.
 module NodeProcessHost =
 
-    [<Import("ProcessSession", "wanxiangli/process")>]
-    let private ProcessSessionCtor: obj = jsNative
+    [<Import("SupervisedProcess", "wanxiangli/supervision")>]
+    let private SupervisedProcessCtor: obj = jsNative
+
+    [<Import("constants", "node:os")>]
+    let private osConstants: obj = jsNative
 
     [<Import("join", "node:path")>]
     let private pathJoin (a: string) (b: string) : string = jsNative
@@ -143,19 +146,20 @@ module NodeProcessHost =
         jsNative
 
     [<Emit("""
-        (async function(ProcessSession, executable, args, cwd, env, stdinText, onStdout, onStderr, onClose, onFailure) {
+        (async function(SupervisedProcess, executable, args, cwd, env, stdinText, onStdout, onStderr, onClose, onFailure, constants) {
             let session;
+            let killRequested = false;
             try {
-                session = new ProcessSession({
+                session = new SupervisedProcess({
                     executable,
                     args: Array.from(args),
                     cwd,
                     env,
                     tailBytes: 0,
                     maxWriteBytes: 16777216,
-                }, 'Capture');
+                });
             } catch (err) {
-                return { ok: false, error: (err && err.message) ? String(err.message) : 'Failed to create ProcessSession' };
+                return { ok: false, error: (err && err.message) ? String(err.message) : 'Failed to create SupervisedProcess' };
             }
             const startResult = await session.started();
             if (!startResult || startResult.kind === 'Failed') {
@@ -164,11 +168,26 @@ module NodeProcessHost =
                     : ('Failed to spawn process: ' + executable);
                 return { ok: false, error: msg };
             }
+            const requestKill = () => {
+                try {
+                    const result = session.signal('SIGKILL');
+                    if (result.kind === 'Requested') killRequested = true;
+                    if (result.kind === 'Failed') onFailure(String(result.error.message));
+                } catch (error) {
+                    onFailure(error && error.message ? String(error.message) : String(error));
+                }
+            };
             const reportClose = state => {
+                const expectedUnknownExit = killRequested && state && state.failure
+                    && state.failure.code === 'UNKNOWN_TARGET_EXIT';
+                if (state && state.failure && !expectedUnknownExit) {
+                    onFailure(String(state.failure.message || 'Process supervision failed'));
+                }
                 const exitInfo = state && state.exit;
+                const signalNumber = exitInfo && exitInfo.signal && constants.signals[exitInfo.signal];
                 const code = (exitInfo && typeof exitInfo.code === 'number')
                     ? exitInfo.code
-                    : ((exitInfo && exitInfo.signal) ? 137 : -1);
+                    : (typeof signalNumber === 'number' ? 128 + signalNumber : -1);
                 onClose(code);
             };
             (async () => {
@@ -202,7 +221,7 @@ module NodeProcessHost =
                     }
                 } catch (error) {
                     onFailure(error && error.message ? String(error.message) : String(error));
-                    session.signal('SIGKILL');
+                    requestKill();
                     session.discardOutput();
                     while (true) {
                         const waited = await session.wait(1000);
@@ -213,11 +232,8 @@ module NodeProcessHost =
                     }
                 }
             })();
-            const killFn = () => {
-                try { session.signal('SIGKILL'); } catch (_) {}
-            };
-            return { ok: true, session, kill: killFn };
-        })($0, $1, $2, $3, $4, $5, $6, $7, $8, $9)
+            return { ok: true, session, kill: requestKill };
+        })($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     """)>]
     let private startProcessSession
         (ctor: obj)
@@ -230,12 +246,13 @@ module NodeProcessHost =
         (onStderr: byte[] -> unit)
         (onClose: int -> unit)
         (onFailure: string -> unit)
+        (constants: obj)
         : Task<obj> =
         jsNative
 
     /// Handle returned by spawn.
     ///
-    /// `Exit` carries the real exit code and nothing else.
+    /// `Exit` carries the target code, or 128 plus its native signal number.
     /// `Exited` is set ONLY by the close/error handlers. `Kill` must not set it:
     /// sending SIGKILL is not the process ending, and conflating the two makes
     /// "kill sent" look like "exit observed" to every waiter.
@@ -347,7 +364,7 @@ module NodeProcessHost =
 
             let! started =
                 startProcessSession
-                    ProcessSessionCtor
+                    SupervisedProcessCtor
                     executable
                     (cmd.Arguments |> List.toArray)
                     cwd
@@ -356,7 +373,10 @@ module NodeProcessHost =
                     onStdout
                     onStderr
                     onClose
-                    (fun message -> failure.Value <- Some message)
+                    (fun message ->
+                        if failure.Value.IsNone then
+                            failure.Value <- Some message)
+                    osConstants
 
             return finalizeStartedSession started exitTcs exitedRef onExited failure ct
         }

@@ -1046,8 +1046,7 @@ type ToolRuntimeScope
         let parentOf candidate =
             let persistedParent =
                 persistedProjections
-                |> Option.bind (fun projections ->
-                    AgentProjection.tryParentOf (SessionId.create candidate) projections)
+                |> Option.bind (fun projections -> AgentProjection.tryParentOf (SessionId.create candidate) projections)
                 |> Option.map SessionId.value
 
             match persistedParent, sessionParents.TryGetValue candidate with

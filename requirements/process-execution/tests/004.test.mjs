@@ -1,5 +1,26 @@
 import test from 'node:test'
 
+test('WHAT[process-execution-004] target signal status does not use the supervisor KILL status', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { constants } = await import('node:os')
+  const runtime = await import('../../../dist/Process/Surface.js')
+  for (const signal of ['SIGTERM', 'SIGINT', 'SIGKILL']) {
+    const result = await runtime.run(
+      runtime.command(process.execPath, ['-e', `process.kill(process.pid, '${signal}')`], undefined, undefined),
+      runtime.estimate(10, 1024, 'medium'),
+      runtime.context(undefined, 5000),
+      runtime.createCancellationToken(false),
+    )
+    assert.equal(result.ok, true)
+    assert.equal(result.value.exitCode, 128 + constants.signals[signal])
+  }
+})
+
+test('WHAT[process-execution-004] deadline terminates the group after the target exits while a descendant holds stdout', { timeout: 15000 }, async t => {
+  const { verifyDrainingStop } = await import('./support/draining.mjs')
+  await verifyDrainingStop(t, 'deadline')
+})
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");

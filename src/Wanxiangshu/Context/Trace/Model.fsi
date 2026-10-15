@@ -23,10 +23,7 @@ module internal WanxiangliTrace =
     val emptyBridge: traceId: string -> ProjectionBridge
 
     val appendOpeningToBridge:
-        assignment: string ->
-        requirements: string list ->
-        bridge: ProjectionBridge ->
-            ProjectionBridge
+        assignment: string -> requirements: string list -> bridge: ProjectionBridge -> ProjectionBridge
 
     val appendPartDescriptorToBridge:
         cursorSequence: int64 ->
