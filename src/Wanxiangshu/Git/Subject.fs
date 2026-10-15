@@ -4,8 +4,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 /// Subject verbs that own the production `git` executable token (§37).
-/// Tree-hash / common-dir / orchestrator-host callers outside Infrastructure/Git|Persist
-/// must go through here (pre-GitGateway cutover).
+/// Source-control and read-only worktree topology callers use this boundary.
 module GitSubject =
 
     /// Sole production spelling of the git executable name.
@@ -16,10 +15,8 @@ module GitSubject =
     //
     // The Process module (NodeProcessHost.spawn / ProcessRunner.run) is async-
     // only: it spawns a child and returns Task<Result<…>>.  GitSubject answers
-    // synchronous callers — HookDispatcher installs hooks during activation,
-    // HookSync resolves the repository root / common-dir before entering the
-    // async converge loop, and RuntimePath resolves the journal common-dir
-    // once per workspace.
+    // synchronous callers — RuntimePath resolves the primary working tree;
+    // source-control callers inspect tree and index identity.
     //
     // Converting these to Task would cascade async through every caller's
     // signature for no ergonomic gain: each is a startup-time introspection

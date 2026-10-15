@@ -208,7 +208,7 @@ module ReviewBackendManager =
         (directory: string)
         (sessionId: string)
         : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
-        let commonDir = RuntimePath.gitCommonDir directory
+        let commonDir = RuntimePath.stateRoot directory
 
         if String.IsNullOrWhiteSpace commonDir then
             None
@@ -324,7 +324,7 @@ module ReviewBackendManager =
             | None -> return Error RecordFailed
             | Some _ ->
                 let gitCommonDir =
-                    Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir prepared.Bound.Directory
+                    Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot prepared.Bound.Directory
 
                 let requestId = prepared.IncumbencyId + ":review"
 

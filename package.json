@@ -35,6 +35,9 @@
     "format:check": "wireit",
     "check": "wireit",
     "build": "node scripts/build.mjs",
+    "deps:update": "node scripts/wanxiangli-source.mjs update",
+    "deps:build": "node scripts/wanxiangli-source.mjs build",
+    "check:no-archives": "node scripts/wanxiangli-source.mjs check",
     "ci:local": "bash scripts/ci-local.sh",
     "diagnostics:collect": "node scripts/diagnostics/collect-incident.mjs"
   },
@@ -56,9 +59,13 @@
       "output": []
     },
     "check": {
-      "command": "node scripts/check.mjs",
+      "command": "node scripts/wanxiangli-source.mjs check && node scripts/check.mjs",
       "files": [
         "scripts/check.mjs",
+        "scripts/wanxiangli-source.mjs",
+        ".gitmodules",
+        "wanxiangli/package.json",
+        "wanxiangli/package-lock.json",
         "scripts/checks/*",
         "scripts/lib/*",
         "src/Wanxiangshu/**",
@@ -79,7 +86,7 @@
     "effect": "4.0.0-beta.83",
     "gpt-tokenizer": "^4.0.0",
     "proper-lockfile": "^4.1.2",
-    "wanxiangli": "file:vendor/wanxiangli-0.8.0.tgz",
+    "wanxiangli": "file:wanxiangli",
     "zod": "4.5.4"
   },
   "overrides": {

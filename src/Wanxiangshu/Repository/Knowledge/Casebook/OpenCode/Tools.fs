@@ -20,7 +20,7 @@ module CasebookTools =
         (owner: CasebookSettlementOwner)
         : ToolSpec list =
         try
-            let store = WorkspaceEventStore.acquire (RuntimePath.gitCommonDir workspaceRoot)
+            let store = WorkspaceEventStore.acquire (RuntimePath.stateRoot workspaceRoot)
 
             [ FetchTool.spec factory workspaceRoot store owner
               JsBookkeeperTool.spec factory ]

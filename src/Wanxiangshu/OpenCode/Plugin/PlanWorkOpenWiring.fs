@@ -31,7 +31,7 @@ module PlanWorkOpenWiring =
         task {
             match workspaceDirectory with
             | Some workspace when not (System.String.IsNullOrWhiteSpace workspace) ->
-                let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+                let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
                 do! runPlanWorkOpen commonDir (commonDir + "/wanxiangshu") sid observedHead
             | _ ->
                 Diagnostic.emit "plan-work-open-directory-unavailable" [ "work_id", sid ]

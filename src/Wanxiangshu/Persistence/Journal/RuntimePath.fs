@@ -3,16 +3,12 @@ namespace Wanxiangshu.Persistence.Journal
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Host
 open Wanxiangshu.Git
 
 module RuntimePath =
 
-    [<Import("isAbsolute", "node:path")>]
-    let private isAbsolute (path: string) : bool = jsNative
-
     [<Import("resolve", "node:path")>]
-    let private resolvePath (basePath: string) (relativePath: string) : string = jsNative
+    let private resolvePath (path: string) : string = jsNative
 
     [<Import("realpathSync", "node:fs")>]
     let private realpathSync (path: string) : string = jsNative
@@ -20,11 +16,20 @@ module RuntimePath =
     [<Import("join", "node:path")>]
     let private joinPath (left: string) (right: string) : string = jsNative
 
-    [<Import("homedir", "node:os")>]
-    let private homeDirectory () : string = jsNative
+    [<Import("lstatSync", "node:fs")>]
+    let private lstat (path: string) (options: obj) : obj = jsNative
 
-    [<Emit("process.env.XDG_STATE_HOME || ''")>]
-    let private xdgStateHome () : string = jsNative
+    [<Import("mkdirSync", "node:fs")>]
+    let private mkdir (path: string) (options: obj) : unit = jsNative
+
+    [<Import("writeFileSync", "node:fs")>]
+    let private writeFile (path: string) (content: string) (options: obj) : unit = jsNative
+
+    [<Import("readFileSync", "node:fs")>]
+    let private readFile (path: string) (encoding: string) : string = jsNative
+
+    [<Emit("$0 != null && $0.code === 'EEXIST'")>]
+    let private alreadyExists (error: exn) : bool = jsNative
 
     let private runtimeDirectory root =
         joinPath (joinPath root "wanxiangshu") "runtimes"
@@ -33,62 +38,82 @@ module RuntimePath =
         try
             realpathSync path
         with _ ->
-            path
+            resolvePath path
 
-    /// `git rev-parse --git-common-dir` for a workspace, asked once per process.
-    ///
-    /// A checkout's common dir cannot move while the Host runs, and this is on the hot path: the
-    /// journal resolves it on every store open, which showed up as ~69 `git` spawns in a single
-    /// canary — synchronous ones, so each blocked the whole event loop for a fact that had not
-    /// changed since the first answer.
-    // DSL-MUTABLE: resource — git common-dir answer cache by workspace
-    let private commonDirAnswers = Collections.Generic.Dictionary<string, string>()
+    let private outsideGit (path: string) =
+        let segments = path.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
 
-    let private askGitCommonDir (workspace: string) : string =
-        match commonDirAnswers.TryGetValue workspace with
-        | true, cached -> cached
-        | _ ->
-            let answer = GitSubject.revParseGitCommonDir workspace
-            commonDirAnswers.[workspace] <- answer
-            answer
+        if segments |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase)) then
+            invalidArg "workspace" "Runtime persistence cannot be placed inside .git"
 
-    let private stateDirectory workspace =
-        let stateRoot =
-            let configured = xdgStateHome ()
+        path
 
-            if String.IsNullOrWhiteSpace configured then
-                joinPath (joinPath (homeDirectory ()) ".local") "state"
-            else
-                configured
+    // DSL-MUTABLE: resource — 主工作树位置缓存，不保存任何业务事实。
+    let private roots = Collections.Generic.Dictionary<string, string>()
 
-        runtimeDirectory (joinPath stateRoot (HostDigest.sha256Hex workspace))
+    let private primaryWorktree (workspace: string) =
+        let listing =
+            try
+                Some(GitSubject.execIn workspace [| "worktree"; "list"; "--porcelain"; "-z" |])
+            with _ ->
+                None
 
-    let private resolveCommonPath (workspace: string) (commonDirectory: string) =
-        if isAbsolute commonDirectory then
-            commonDirectory
-        else
-            resolvePath workspace commonDirectory
+        match listing with
+        | None -> workspace
+        | Some text ->
+            let first = text.Split([| '\u0000' |]) |> Array.takeWhile (fun field -> field <> "")
 
-    let gitCommonDir (workspace: string) : string =
+            if first |> Array.contains "bare" then
+                invalidArg "workspace" "Runtime persistence requires a working tree, not a bare repository"
+
+            match Array.tryHead first with
+            | Some field when field.StartsWith("worktree ", StringComparison.Ordinal) ->
+                field.Substring("worktree ".Length) |> canonicalPath |> outsideGit
+            | _ -> invalidOp "Git did not identify the primary working tree"
+
+    /// Git 只提供只读拓扑：主工作树和 linked worktree 共用主工作树下的状态。
+    /// 没有 Git 仓库时使用给定目录；不回退到 .git、XDG 或旧日志。
+    let stateRoot (workspace: string) : string =
+        if String.IsNullOrWhiteSpace workspace then
+            invalidArg "workspace" "A workspace directory is required"
+
+        let key = workspace |> canonicalPath |> outsideGit
+
+        let primary =
+            match roots.TryGetValue key with
+            | true, value -> value
+            | _ ->
+                let value = primaryWorktree key
+                roots.[key] <- value
+                value
+
+        let target = joinPath primary ".Herdchestra"
+        let existing = lstat target (createObj [ "throwIfNoEntry" ==> false ])
+
+        if not (isNull existing) && (unbox<bool> (existing?isSymbolicLink ()) || not (unbox<bool> (existing?isDirectory ()))) then
+            invalidArg "workspace" ".Herdchestra must be a real directory, not a link or file"
+
+        target
+
+    /// 仅写入者初始化时创建自身忽略规则，不修改项目的 .git/info/exclude。
+    let initializeStateRoot workspace =
+        let target = stateRoot workspace
+        mkdir target (createObj [ "recursive" ==> true ])
+        let ignore = joinPath target ".gitignore"
+
         try
-            let commonDirectory = askGitCommonDir workspace
-            commonDirectory |> resolveCommonPath workspace |> canonicalPath
-        with _ ->
-            workspace
+            writeFile ignore "*\n" (createObj [ "flag" ==> "wx"; "encoding" ==> "utf8" ])
+        with error when alreadyExists error ->
+            let entry = lstat ignore (createObj [ "throwIfNoEntry" ==> false ])
+            if isNull entry
+               || unbox<bool> (entry?isSymbolicLink ())
+               || not (unbox<bool> (entry?isFile ()))
+               || (readFile ignore "utf8").Trim() <> "*" then
+                invalidOp ".Herdchestra/.gitignore must be a regular file excluding all runtime data"
 
-    let forWorkspace workspace =
-        try
-            let commonDirectory = askGitCommonDir workspace
+        target
 
-            commonDirectory
-            |> resolveCommonPath workspace
-            |> canonicalPath
-            |> runtimeDirectory
-        with _ ->
-            stateDirectory workspace
+    let forWorkspace workspace = stateRoot workspace |> runtimeDirectory
 
-    /// The shared journal runtime directory for an already-resolved git common
-    /// dir. Callers that hold the common dir must derive the same owner key as
-    /// forWorkspace.
-    let forCommonDir (commonDirectory: string) =
-        commonDirectory |> canonicalPath |> runtimeDirectory
+    let forStateRoot (stateDirectory: string) =
+        stateDirectory |> canonicalPath |> outsideGit |> runtimeDirectory

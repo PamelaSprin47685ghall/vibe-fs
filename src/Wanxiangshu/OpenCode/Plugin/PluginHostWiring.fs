@@ -47,7 +47,7 @@ module PluginHostWiring =
 
     let private acquireFinalizationStore workspaceRoot =
         try
-            let commonDir = RuntimePath.gitCommonDir workspaceRoot
+            let commonDir = RuntimePath.stateRoot workspaceRoot
             Ok(WorkspaceEventStore.acquire commonDir)
         with ex ->
             Error ex
@@ -168,7 +168,7 @@ module PluginHostWiring =
                     let strengthDurability =
                         match boot.Journal, workspaceDirectory with
                         | Some _, Some workspace ->
-                            WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace)
+                            WorkspaceEventStore.tryCurrent (RuntimePath.stateRoot workspace)
                             |> Option.map StrengthDurability.create
                         | _ -> None
 
@@ -243,7 +243,7 @@ module PluginHostWiring =
                 let workOpt =
                     workspaceDirectory
                     |> Option.bind (fun workspace ->
-                        let commonDir = RuntimePath.gitCommonDir workspace
+                        let commonDir = RuntimePath.stateRoot workspace
 
                         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId))
 

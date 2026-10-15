@@ -56,7 +56,7 @@ module OrdinaryTurnWorkflow =
                 let settled =
                     turn.Directory
                     |> Option.bind (fun directory ->
-                        let commonDir = RuntimePath.gitCommonDir directory
+                        let commonDir = RuntimePath.stateRoot directory
                         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value turn.SessionId))
                     |> Option.exists (fun work ->
                         work.Delivered || List.contains (ProviderRunIdentity.value turn.ProviderRun) work.RetiredRuns)

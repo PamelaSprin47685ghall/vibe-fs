@@ -51,7 +51,6 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
-open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
@@ -135,7 +134,7 @@ module PluginHooks =
                 | Some Role.Plan ->
                     workspaceDirectory
                     |> Option.bind (fun workspace ->
-                        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+                        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
 
                         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId))
                     |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)

@@ -77,7 +77,7 @@ module PluginHost =
         }
 
     let private createWorkspaceJournal workspace : Task<Result<AgentJournal option, string>> =
-        let commonDir = RuntimePath.gitCommonDir workspace
+        let commonDir = RuntimePath.initializeStateRoot workspace
         let runtimeDir = RuntimePath.forWorkspace workspace
         acquireWorkspaceJournal commonDir runtimeDir
 

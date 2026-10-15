@@ -17,6 +17,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { execSync } from 'node:child_process'
+import { initializeStateRoot, stateRoot } from '../lib/state-root.mjs'
 
 function formatDateTime(d) {
   const pad = n => String(n).padStart(2, '0')
@@ -175,12 +176,7 @@ if (fs.existsSync(ocLogPath)) {
 const finalTag = explicitTag || autoErrorTag
 const incidentDirName = `incident-${timeStr}-${finalTag}`
 
-let baseDiagnosticsDir = path.join(process.cwd(), '.diagnostics')
-try {
-  execSync('git rev-parse --is-inside-work-tree 2>/dev/null')
-} catch {
-  baseDiagnosticsDir = path.join(os.homedir(), '.local', 'state', 'wanxiang', 'diagnostics')
-}
+const baseDiagnosticsDir = path.join(initializeStateRoot(process.cwd()), 'diagnostics')
 
 const incidentPath = path.join(baseDiagnosticsDir, incidentDirName)
 fs.mkdirSync(incidentPath, { recursive: true })
@@ -234,14 +230,15 @@ if (!targetWorkspaces.includes(process.cwd())) {
 
 let journalSnapshots = []
 for (const ws of targetWorkspaces) {
-  let wsCommonDir = null
+  let workspaceState = null
   try {
-    const rawCommon = execSync(`git -C "${ws}" rev-parse --git-common-dir 2>/dev/null`, { encoding: 'utf8' }).trim()
-    wsCommonDir = path.resolve(ws, rawCommon)
-  } catch {}
+    workspaceState = stateRoot(ws)
+  } catch (error) {
+    journalSnapshots.push({ workspace: ws, error: error.message })
+  }
 
-  if (wsCommonDir) {
-    const eventsDir = path.join(wsCommonDir, 'wanxiang', 'events')
+  if (workspaceState) {
+    const eventsDir = path.join(workspaceState, 'wanxiangshu', 'events')
     if (fs.existsSync(eventsDir)) {
       const ndjsons = fs.readdirSync(eventsDir)
         .filter(f => f.endsWith('.ndjson'))

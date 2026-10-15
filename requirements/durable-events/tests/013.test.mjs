@@ -90,7 +90,7 @@ const mustOk = (result, label) => {
 const withRepo = (fn) => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-journal-boot-'))
   execFileSync('git', ['init', '--quiet', repo])
-  const commonDir = join(repo, '.git')
+  const commonDir = join(repo, '.Herdchestra')
   return fn(commonDir)
     .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
@@ -145,7 +145,7 @@ const mustOk = (result, label) => {
 const withRepo = (writerId, fn) => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-journal-'))
   execFileSync('git', ['init', '--quiet', repo])
-  const commonDir = join(repo, '.git')
+  const commonDir = join(repo, '.Herdchestra')
   return fn(commonDir)
     .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
@@ -179,7 +179,7 @@ const lifeOpened = (session) => ({
 const openJournal = async (writerId) => {
   const repo = mkdtempSync(join(tmpdir(), `wxs-jrev-${writerId}-`))
   execFileSync('git', ['init', '--quiet', repo])
-  const commonDir = join(repo, '.git')
+  const commonDir = join(repo, '.Herdchestra')
   const opened = await journal.JournalSurface_bootWithWriterId(commonDir, writerId, `rt-${writerId}`, 4242, '2026-04-01T00:00:00Z')
   assert.equal(opened.ok, true, JSON.stringify(opened.error))
   return {

@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
+import { buildSourceDependency } from './wanxiangli-source.mjs'
 
 import { run as runSurfaceManifest } from './checks/js-surface-manifest.mjs'
 import { run as runModuleLinkage } from './checks/js-module-linkage.mjs'
@@ -467,6 +468,8 @@ export async function runBuild({
   let buildCommitted = false
 
   try {
+    // 使用源码依赖的当前产物；不能让旧 node_modules tarball 替新 submodule 报绿。
+    buildSourceDependency(resolvedRoot)
     // A previously interrupted full rebuild may have left a staged backup
     // behind; settle it before reading any build state.
     recoverStaleStagedDist(targetDist)

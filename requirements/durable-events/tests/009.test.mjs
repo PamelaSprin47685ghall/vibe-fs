@@ -260,7 +260,7 @@ const openRepo = (name) => {
   execFileSync('git', ['init', '--quiet', workspace])
   return {
     workspace,
-    commonDir: join(workspace, '.git'),
+    commonDir: join(workspace, '.Herdchestra'),
     close: () => rmSync(workspace, { recursive: true, force: true }),
   }
 }
@@ -332,7 +332,7 @@ integrationTest('WHAT[durable-events-009] local_EventStore_never_reads_or_rewrit
   const repo = mkdtempSync(join(tmpdir(), 'wxs-leave-unread-'))
   try {
     execFileSync('git', ['init', '--quiet', repo])
-    const commonDir = join(repo, '.git')
+    const commonDir = join(repo, '.Herdchestra')
     const planted = plant(commonDir)
     const local = eventStore.create(commonDir, 'fresh-writer')
     const event = {

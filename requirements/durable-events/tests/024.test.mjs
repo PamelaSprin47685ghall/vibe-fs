@@ -24,7 +24,7 @@ for (const scenario of ['valid', 'malformed-release', 'valid-release', 'not-atte
   test(`WHAT[durable-events-024] actual Sphinx Commands.start ${scenario} preserves its original settlement capability and guard`, async t => {
     assert.equal(typeof settlement.create, 'function')
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'sphinx-command-settlement-')))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     const sourceWriter = randomUUID()
     const sourceFile = join(commonDir, 'wanxiangshu', 'events', `${sourceWriter}-0000.ndjson`)
     const command = { commandId: 'settlement-' + scenario, goalText: '实际目标\r\nNUL:\u0000；雪 😀 尾部  ',
@@ -135,7 +135,7 @@ for (const binding of ['wire', 'mcp']) {
     test(`WHAT[durable-events-024] original Sphinx ${binding} binding ${scenario} settles before its physical terminal and independent cold replay`, async t => {
       assert.equal(typeof (binding === 'wire' ? wire.createWithStore : mcp.serveConfigured), 'function')
       const root = realpathSync(mkdtempSync(join(tmpdir(), 'sphinx-physical-binding-')))
-      const commonDir = join(root, '.git')
+      const commonDir = join(root, '.Herdchestra')
       const sourceWriter = randomUUID()
       const fatal = scenario === 'malformed-release'
       const release = scenario.endsWith('-release')
@@ -285,7 +285,7 @@ for (const scenario of ['valid', 'valid-release', 'malformed', 'malformed-releas
     assert.equal(typeof journals.openActualJournalWithStore, 'function')
     assert.equal(typeof journals.observeActualJournalProjection, 'function')
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'journal-physical-settlement-')))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     const sourceWriter = randomUUID()
     const sourceFile = join(commonDir, 'wanxiangshu', 'events', `${sourceWriter}-0000.ndjson`)
     const malformed = scenario.startsWith('malformed')
@@ -419,7 +419,7 @@ for (const variant of ['valid', 'valid-release', 'malformed', 'malformed-release
   test(`WHAT[durable-events-024] original AgentJournal business ${variant} preserves legal initialization before its physical terminal and cold replay`, async t => {
     assert.equal(typeof eventStore.createAppendPayloadStoreAt, 'function')
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'journal-business-settlement-')))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     const sourceWriter = randomUUID()
     const sourceFile = join(commonDir, 'wanxiangshu', 'events', `${sourceWriter}-0000.ndjson`)
     const malformed = variant.startsWith('malformed')

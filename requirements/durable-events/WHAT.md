@@ -1,5 +1,7 @@
 # durable-events — WHAT
 
+2026-10-15 本机状态切换：应用运行数据从 Git 元数据中完全退出。本文关于 Git hook、对象库及远端快照的旧合同由 [010]、[011]、[018]、[028] 的当前版本替代；历史验收数字不证明新目录或退役行为。
+
 ## [001] retained writer 内 Event 是唯一 durable truth 与 append-only
 
 所有动态业务状态必须且仅能由不可变的事件（Event）表达。业务状态变更改为追加新事件，状态撤销改为追加 tombstone/retirement 事件。在 durable-convergence-011 的 writer retention 窗口内，已提交事件不得被单独修改、覆盖、删除或重新解释；超过固定 TTL 的进程 writer 允许作为完整物理流整体退出 retained history。投影（Projection）仅为衍生状态，严禁先修改内存投影后补盘。
@@ -18,7 +20,7 @@
 
 ## [005] Process 对应 single writer 与有界段序列
 
-每个进程实例分配全局唯一的 `WriterId`，且仅独占追加 `.git/wanxiangshu/events/<WriterId>-<seq>.ndjson` 段文件序列（`seq` 为四位零填充十进制，自 `0000` 起连续）。一个 writer 的逻辑流是同 `WriterId` 全部段按 `seq` 递增拼接的字节序列；事件不可篡改、按序重放、只在逻辑流末尾追加的语义对整条逻辑流成立，不依赖单文件的物理形态。单段体积上限为 64 MiB（67,108,864 字节）：追加前若当前段非空且「当前段已有字节数 + 本次编码字节数」超过上限，必须滚动到下一 `seq`；单次追加自身超过上限时允许独占一个段，其后的追加必须滚动。滚动不是独立物理事务：向新段写入的失败沿用 [006] 的既有阶段语义，已写入段字节保持不变；禁止为绕开失败而向超限旧段继续追加。进程退出后其段序列整体封存且不得被新进程接管；超过统一 writer-retention TTL 后允许整条段序列删除。新启动进程必须创建新的 `WriterId`。业务流标识、机器标识与角色均不得作为物理写者划分依据；新分配的 `WriterId` 不得以 `-` 加四位数字结尾。
+每个进程实例分配全局唯一的 `WriterId`，且仅独占追加 `.Herdchestra/wanxiangshu/events/<WriterId>-<seq>.ndjson` 段文件序列（`seq` 为四位零填充十进制，自 `0000` 起连续）。一个 writer 的逻辑流是同 `WriterId` 全部段按 `seq` 递增拼接的字节序列；事件不可篡改、按序重放、只在逻辑流末尾追加的语义对整条逻辑流成立，不依赖单文件的物理形态。单段体积上限为 64 MiB（67,108,864 字节）：追加前若当前段非空且「当前段已有字节数 + 本次编码字节数」超过上限，必须滚动到下一 `seq`；单次追加自身超过上限时允许独占一个段，其后的追加必须滚动。滚动不是独立物理事务：向新段写入的失败沿用 [006] 的既有阶段语义，已写入段字节保持不变；禁止为绕开失败而向超限旧段继续追加。进程退出后其段序列整体封存且不得被新进程接管；超过统一 writer-retention TTL 后允许整条段序列删除。新启动进程必须创建新的 `WriterId`。业务流标识、机器标识与角色均不得作为物理写者划分依据；新分配的 `WriterId` 不得以 `-` 加四位数字结尾。
 
 无段后缀的旧形态文件（`<WriterId>.ndjson`）按其完整内容读取为单条逻辑流。物化边界允许对超上限的旧形态文件执行一次性重组：按行边界把事件行原样分配到新段序列，逻辑流与原文件逐字节等价；全部新段逐一落盘成功后方可删除旧文件。重组只在存储锁内的物化阶段执行，不产生新事件、不改写任何事件字节。旧文件与其段序列并存时，恢复必须先通过收敛判定，判定通过才继续收敛：判定为「字节前缀」（两种形态互为字节前缀或相等）时，较长一方为权威，较短物理形态在其替换或残骸字节处置完落盘后移除；判定为「行级延续」（旧文件由完整 canonical 行组成，且其全部事件 ID 与段序列的事件 ID 无重叠——这是版本过渡期旧进程在重组落地后继续向旧名追加合法事实的形态）时，收敛动作是把旧文件的行原样（字节不变）追加进段序列尾段：尾段剩余空间足够则续写尾段，否则按上限滚动新段；追加完成且落盘后方可删除旧文件。读取层遇到行级延续形态时按「段拼接在前、旧行在后」组装逻辑流，不改动磁盘，物理收敛由物化执行。重叠的事件 ID、半行、非 canonical 行不属于任何收敛判定，按 [007] fail-closed，禁止静默删除或跳过。
 
@@ -40,13 +42,13 @@
 
 存储层不维护任何数据迁移代次或平滑升级机制。对于历史遗留的旧物理格式、私有文件与早期临时存储结构一律采取完全不读取（leave-unread）的策略，禁止运行时双读、双写或自动数据迁移。
 
-## [010] 单一 universal durable substrate 位于 .git 内本地事件文件
+## [010] 本机状态统一位于 .Herdchestra
 
-动态事件的运行时物理载体唯一限定在统一根目录 `<git-common-dir>/wanxiangshu/` 下的 `.git/wanxiangshu/events/*.ndjson`，物理形态为 [005] 的 `<WriterId>-<seq>.ndjson` 段文件与无段后缀的旧形态文件。事件行自包含全部载荷，不存在独立的 payloads 目录。所有业务领域的信封全部进入这套通用文件体系，禁止任何模块维护私有 journal 文件、私有数据库或旁挂载荷文件。历史遗留的 `.git/wanxiang/` 布局按 [009] leave-unread 处理：不读、不写、不自动迁移。
+主工作树的 `.Herdchestra/` 是唯一项目状态根；linked worktree 共用它，非 Git 工作区使用给定工作区下同名目录。通用事件写入 `.Herdchestra/wanxiangshu/events/`，Work 与 Ownership 由各自 owner 管理 `.Herdchestra/wanxiangshu/` 下的 SQLite，诊断写入 `.Herdchestra/diagnostics/`。不同职责可以有不同物理格式，同一事实不能有两份权威。原 `.git/wanxiang/` 与 `.git/wanxiangshu/` 完全不读、不写、不迁移；也不回退到旧目录或 XDG 状态作为恢复来源。
 
-## [011] Git blob 只存在于 remote sync 边界且单段文件对应单 blob
+## [011] 不提供运行数据的 Git 对象与远端同步能力
 
-Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程操作并触发 Hook 时，每个本地 writer 段文件（及无段后缀的旧形态 writer 文件）才被编码为恰好一个 Git blob；一个 writer 的多段在远端快照中表现为同 `WriterId` 的多个 blob。运行时主进程不主动发起远程同步，亦不在事件追加过程中操作 Git blob。
+当前产品只承诺同机持久化。运行数据不得写入 Git objects、refs 或远端分支，不能把 `fetch`、`push`、源码提交当成状态保存或恢复入口。`ProcessGitRawStore`、`WriterStreamSync` 与独立 hook 同步入口退役；本机分段、完整行追加和恢复验证继续保留。
 
 ## [012] PayloadRef 与本地 payload closure
 
@@ -72,9 +74,9 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 向本地追加事件时，运行时的 Git 对象、树和引用操作数必须恒为 0。追加开销仅与当前事件及关联 payload 的字节大小相关，绝对不随历史事件总数或历史文件大小增长。
 
-## [018] remote 操作才同步且全量替换快照
+## [018] 启动和诊断不得修改 Git 配置或安装 hooks
 
-远程同步仅在用户执行 Git 操作时由独立 Hook 进程拉起执行。Hook 对本地 writer 文件与远端 writer blob 应用统一 writer-retention 后进行 k-way merge 校验，物理删除过期本地 writer，并发布不再包含过期 writer 的远端快照。万象术主进程不运行常驻同步定时器或后台上传器。
+插件加载、首次激活、事件追加和诊断都不能改 `.git/config`、`.git/info/exclude` 或 `.git/hooks`，不能安装 SSH wrapper、refspec 或后台同步。`.Herdchestra/.gitignore` 由应用在自身目录内创建并排除全部运行数据。源码 Git 操作与 submodule 管理仍由 Git 自己处理元数据，不是应用持久化。
 
 ## [019] 唯一 canonical Integrator 与业务注册 integration oracle
 
@@ -92,7 +94,7 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 `EventStore.Model.Contract` 只拥有 `EventEnvelope`、`EventStreamId`、`PayloadRef` 等稳定领域模型；`EventStore.Port.Contract` 只拥有 append/read 所需 request/result/error 与 `IEventStore` capability；`EventStore.EventVocabulary.Contract` 只拥有 canonical EventStore event type 集合，并仅依赖 `Strength.EventVocabulary.Contract` 等更基础词汇。`EventStore.Core.Runtime`、`EventStore.Git.Runtime`、Canonical Integrator、Journal、Host acquisition 与 test surface 必须依赖这些 contract，反向依赖禁止。业务 consumer 的 transitive compile input 不得包含 Git object/ref、process/file codec、Canonical Integrator、Strength predictor/replica/runtime 或 Host adapter。
 
-Git 同步所需 object/ref 类型与 `IGitRawStore` 只能位于独立 physical-port contract，由 Git/sync adapter 消费，不得经 `EventStore.Port.Contract` 暴露给业务消费者。Contract locality 的 transitive production `.fs` 不得超过 100；focused EventStore runtime locality 不得超过 185。所有 locality compile 必须由 ProjectReference closure 生成一个零 ProjectReference flat project，并由一次 Fable invocation 编译。
+旧 Git/sync physical adapters 已退役，不得重新引入业务 consumer 闭包。Contract locality 的 transitive production `.fs` 不得超过 100；focused EventStore runtime locality 不得超过 185。所有 locality compile 必须由 ProjectReference closure 生成一个零 ProjectReference flat project，并由一次 Fable invocation 编译。
 
 ## [023] canonical codec、领域 fold 与物理 store 必须分层
 
@@ -108,6 +110,8 @@ semantic fold失败必须先durable写入对应bad fact与`ProjectionCutTail`，
 
 ## [026] 历史材料只能经离线迁移导入为全新导入事实
 
+本条不授权迁入旧 `.git/wanxiang*` 状态。该目录在本轮切换中直接退役；不能把离线导入工具当成恢复旧 Git 数据的后门。
+
 协议升级需要接纳旧事实时，唯一合法路径是离线一次性迁移：经 EventStore 所有者的读取、payload 与 append 边界，在备份或副本上追加**仅承载历史材料的导入事实**。导入事实是全新的 `event_type`（追加词汇表原则，不与旧类型同名复用），载荷只重建旧事实的因果位置、digest、payload 引用与覆盖范围等历史证据。导入事实不得充当任何新时代协议的准入凭证：不得由它推导出可运行的授权、绑定或候选，不得产生副本，也不参与新委托的生命周期判定。
 
 存储层不因导入而出现迁移代次：[009] 的 leave-unread 与拒绝语义不变，运行时不双读、双写、不自动迁移、不维护旧载荷解析；未迁移的旧存储由入口检查拒绝以新运行时消费并给出明确迁移指引，禁止边读边跳过。迁移不得原地改写 append-only 历史、Git raw object 或 refs，不得清库，不得覆盖用户配置；envelope 父边、payload refs、decision 引用与 XTrace 因果锚点必须保留或正确重建，并以 cold replay 对照证明业务 Current 一致。迁移工具、输入/输出版本与一次性操作步骤由 owning package 提供自动化测试。
@@ -115,3 +119,9 @@ semantic fold失败必须先durable写入对应bad fact与`ProjectionCutTail`，
 ## [027] 退役生命周期词汇保持 fail-closed 拒绝
 
 迁移前内核经由 ndjson 事件流持久化的 9 类生命周期事件类型（`WorkOpened`、`DevOpsBound`、`IncumbencyOpened`、`ConfirmationCommitted`、`IncumbencyRetired`、`Reviewed`、`Reopened`、`AdvanceCommitted`、`RetirementBlocked`）已退出权威词汇表。保留历史中残留任一此类 `event_type` 的 canonical 行在 boot/reload 校验时必须整体拒绝装载：以 boot 阶段的可观察形态 `local EventStore boot failed: unknown durable event type during replay: <event_type>`（核心形态为 `unknown durable event type during replay: <event_type>`）fail-closed，不得跳过、静默装载、改写或删除该行。移除该行后同一目录的其余合法历史必须可正常装载，以证明拒绝来自该行本身；上述类型不得被重新注册回权威词汇表，也不得放宽 `isKnown` 使其重新可读。
+
+## [028] 状态根独立于 Git 元数据与旧数据
+
+目录解析只查询 Git 的公开 worktree 拓扑，不打开旧运行数据。主工作树、其子目录及 linked worktree 必须定位同一 `.Herdchestra`；独立仓库、submodule 及非 Git 工作区保持隔离。给定 `.git` 内路径、bare 仓库或链接伪装的 `.Herdchestra` 必须拒绝，不能把这些位置当成状态目录。
+
+新根内的已确认日志和 SQLite 正常恢复；旧 `.git` 数据即使存在、损坏或拥有同一工作身份，也不能影响新根的读取。清理只涉及已确认的应用专属目录、配置及引用，不清空源码 objects，不重写代码历史。测试区分拓扑查询、实际写入和旧数据隔离，不能只凭路径字符串通过宣称整个持久化已经验证。

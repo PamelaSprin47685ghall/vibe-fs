@@ -50,7 +50,7 @@ const event = (id, n, parents = []) => ({
   payload: { n },
   payloadRefs: [],
 })
-const commonDir = async () => path.join(await mkdtemp(path.join(tmpdir(), 'wanxiang-local-log-')), '.git')
+const commonDir = async () => path.join(await mkdtemp(path.join(tmpdir(), 'wanxiang-local-log-')), '.Herdchestra')
 const remove = async (dir) => rm(dir, { recursive: true, force: true })
 
 test('WHAT[durable-events-017] DURABLE_EVENTS_004_017_local_append_has_zero_Git_object_tree_ref_dependencies', async () => {
@@ -129,7 +129,7 @@ function gitPath(filename, commonDir) {
 for (const historyLength of [8, 128]) {
   test(`WHAT[durable-events-017] activated_append_records_no_historical_content_IO_with_${historyLength}_facts_and_cold_replay`, async t => {
     const root = await mkdtemp(path.join(tmpdir(), 'wanxiang-append-io-'))
-    const commonDir = path.join(root, '.git')
+    const commonDir = path.join(root, '.Herdchestra')
     const eventsDir = path.join(commonDir, 'wanxiangshu', 'events')
     const historicalFile = path.join(eventsDir, 'historical-writer-0000.ndjson')
     const writerFile = path.join(eventsDir, 'meter-writer-0000.ndjson')

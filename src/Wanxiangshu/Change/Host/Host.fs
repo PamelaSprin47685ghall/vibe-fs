@@ -144,7 +144,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let lifecycleWorkOf (record: ManagerJobProjection) =
         let directory = WorktreePath.value record.WorktreePath
-        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot directory
         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value record.ManagerSessionId)
 
     /// The loop signal the last committed retirement holds for Change: a
@@ -268,7 +268,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         let commonDir =
             worktreePath
             |> Wanxiangshu.Foundation.Identity.WorktreePath.value
-            |> Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+            |> Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
 
         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value managerSessionId)
         |> Option.bind (fun work ->
@@ -324,7 +324,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             // Canonicalize the repo path via git common-dir so symlinked
             // spellings share one cross-process publish lock.
             let lockRepoPath =
-                Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir deps.RepoPath
+                Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot deps.RepoPath
 
             let sweepLockPath = IntegrationGate.lockPath lockRepoPath (TargetRef.value target)
 
@@ -503,7 +503,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         (next: string)
         : Result<string, string> =
         let directory = WorktreePath.value record.WorktreePath
-        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot directory
 
         if String.IsNullOrWhiteSpace commonDir then
             Error "lifecycle store is unavailable"

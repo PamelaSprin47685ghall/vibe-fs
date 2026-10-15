@@ -592,11 +592,11 @@ module ToolRegistry =
 
         // Lifecycle uses its own wanxiangli journal. The common directory is
         // data passed to that owner, not a borrowed workspace EventStore.
-        let planGitCommonDir = workspaceDirectory |> Option.map RuntimePath.gitCommonDir
+        let planGitCommonDir = workspaceDirectory |> Option.map RuntimePath.stateRoot
 
         let planRoot =
             workspaceDirectory
-            |> Option.map (fun workspace -> RuntimePath.gitCommonDir workspace + "/wanxiangshu")
+            |> Option.map (fun workspace -> RuntimePath.stateRoot workspace + "/wanxiangshu")
 
         let planningAdmission: ToolAdmission =
             ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
@@ -633,7 +633,7 @@ module ToolRegistry =
 
         let askGitCommonDir (directory: string option) =
             match directory with
-            | Some workspace -> Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+            | Some workspace -> Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
             | None -> ""
 
         let askWithLifecycle
@@ -669,7 +669,7 @@ module ToolRegistry =
         let lifecycleWorkOf (runtime: ToolRuntimeScope) (sessionId: string) =
             runtime.WorkspaceDirectory
             |> Option.bind (fun workspace ->
-                let commonDir = RuntimePath.gitCommonDir workspace
+                let commonDir = RuntimePath.stateRoot workspace
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId)
 
         let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : string option =
@@ -855,7 +855,7 @@ module ToolRegistry =
             task {
                 let gitCommonDir =
                     runtime.WorkspaceDirectory
-                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
                     |> Option.defaultValue ""
 
                 if String.IsNullOrWhiteSpace gitCommonDir then

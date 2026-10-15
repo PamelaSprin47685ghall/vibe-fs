@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Mission.Lifecycle
 
 module DurableWorkHost =
-    val journalPath: gitCommonDir: string -> string
+    val journalPath: stateRoot: string -> string
 
     type HostReceipt =
         { RequestId: string

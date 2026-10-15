@@ -137,7 +137,7 @@ module ReviewShell =
         let dispatch args context =
             let gitCommonDir =
                 scope.WorkspaceDirectory
-                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
                 |> Option.defaultValue ""
 
             if scope.IsRole(context, Role.Plan) then

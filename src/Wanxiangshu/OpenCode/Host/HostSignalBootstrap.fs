@@ -15,7 +15,6 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Git.Hook
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
@@ -546,16 +545,8 @@ module HostSignalBootstrap =
                     ChatAdmissionTransaction.production durable (fun managed ->
                         runtime.AcceptManagedChatIntent(ChatAdmissionIntent.ofManaged managed)))
 
-            let durabilityActivation =
-                lazy
-                    (match workspaceDirectory with
-                     | None -> Ok()
-                     | Some workspace -> HookDispatcher.ensure workspace)
-
-            let requireDurabilityActivation () =
-                match durabilityActivation.Value with
-                | Ok() -> scope.ActivateDurability()
-                | Error error -> Diagnostic.fatal "durability-activation-failed" [ "result", error ]
+            // 本机持久化不安装 Git hooks，不改 SSH 配置，不发布运行状态 refs。
+            let requireDurabilityActivation () = scope.ActivateDurability()
 
             let observePhysicalAdmission output sessionId physicalId =
                 scope.Sessions.Quiescence.ObservePhysicalUserMessage(sessionId, physicalId)
@@ -673,7 +664,7 @@ module HostSignalBootstrap =
                         | Ok() -> ()
                         | Error reason -> invalidOp ("Could not settle the user question: " + reason)
                     | _ -> ()
-                    do! requireDurabilityActivation ()
+                    requireDurabilityActivation ()
                 }
 
             let observeVisibleChatMessage raw =
@@ -833,7 +824,7 @@ module HostSignalBootstrap =
                 result
                 =
                 try
-                    completeAdmission intent output result
+                    completeAdmission intent output result |> ignore
 
                     outputs
                     |> Seq.filter (fun requestOutput -> not (obj.ReferenceEquals(requestOutput, output)))
@@ -907,10 +898,10 @@ module HostSignalBootstrap =
                     return acquired
                 }
 
-            let finishUnsettledAdmission intent output =
-                function
-                | Ok(ChatAdmissionTransactionOutcome.Settled _) -> ()
-                | result -> completeAdmission intent output result
+            let finishUnsettledAdmission intent output result =
+                match result with
+                | Ok(ChatAdmissionTransactionOutcome.Settled _) -> result
+                | _ -> completeAdmission intent output result
 
             let startAdmissionFlight
                 durable

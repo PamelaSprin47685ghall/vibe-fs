@@ -25,7 +25,7 @@ const openRepo = (name) => {
   execFileSync('git', ['init', '--quiet', workspace])
   return {
     workspace,
-    commonDir: join(workspace, '.git'),
+    commonDir: join(workspace, '.Herdchestra'),
     close: () => rmSync(workspace, { recursive: true, force: true }),
   }
 }

@@ -14,6 +14,8 @@ type JournalHandle =
 [<RequireQualifiedAccess>]
 module JournalSurface =
     val mapAppendFailure: value: obj -> obj
+    /// 解析并初始化主工作树的本机状态根，不改 Git 配置。
+    val initializeStateRoot: workspace: string -> string
 
     val bootWithWriterId:
         commonDir: string -> writerId: string -> runtimeId: string -> processId: int -> startedAt: string -> Task<obj>

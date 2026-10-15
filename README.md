@@ -56,7 +56,15 @@ import "wanxiangshu"
 
 `packageManager` = `npm@11.12.1`。安装依赖使用 `npm ci`（已提交 `package-lock.json`）。
 
-源码 checkout 所需的 `wanxiangli` 依赖固定为仓库内 `vendor/wanxiangli-0.5.2.tgz`；本地如另有 `wanxiangli/` 源码仓，只用于独立开发且被本仓忽略。构建、测试和发布不得读取该源码目录。
+`wanxiangli/` 是正式 Git submodule，跟踪其 `main`；npm 依赖为 `file:wanxiangli`。先执行 `git submodule update --init -- wanxiangli`，再 `npm ci`。开发更新执行 `npm run deps:update`，它只允许 fast-forward 到 `origin/main`，拒绝覆盖本地改动；之后一并审阅、提交 gitlink 与 lockfile。普通构建使用当前检出的源码，不在运行时联网换依赖。
+
+构建入口先安装并构建 wanxiangli，再编译宿主；仍只从公开 npm 入口导入。没有 vendor tarball 兜底；旧 `node_modules/wanxiangli` 若仍是归档副本，构建会要求先运行 `npm ci`。任何 `.tgz` 都只能是忽略或临时目录内的发行验收产物，永远不得进入 Git。
+
+### 本机状态目录
+
+运行数据统一位于主工作树的 `.Herdchestra/`；同一仓库的 linked worktree 通过 Git 的只读拓扑查询找到这个位置，共用同机状态。非 Git 工作区直接使用自己的 `.Herdchestra/`。业务状态在 `wanxiangshu/` 子目录中按原有职责组织，诊断在 `diagnostics/`。目录内自行创建 `.gitignore` 排除全部运行数据，不修改 `.git/info/exclude`。
+
+旧 `.git/wanxiang`、`.git/wanxiangshu`、`refs/wanxiang/*` 都是退役数据，不读取、不迁入、不作为新历史的恢复来源。插件不再安装 Git hooks、改 SSH 配置或进行运行数据的 Git 同步。暂不承诺跨机恢复。Git 本身管理 submodule 和源代码所需的元数据不属于应用持久化。
 
 ### 获取与安装
 

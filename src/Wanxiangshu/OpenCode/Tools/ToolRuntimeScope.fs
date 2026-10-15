@@ -620,7 +620,7 @@ type ToolRuntimeScope
     let lifecycleWorkOfDirectory (directory: string option) (sessionId: string) =
         directory
         |> Option.bind (fun workspace ->
-            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
 
             if String.IsNullOrWhiteSpace commonDir then
                 None
@@ -1223,7 +1223,7 @@ type ToolRuntimeScope
 
             let durableBlockers =
                 workspaceDirectory
-                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
                 |> Option.filter (String.IsNullOrWhiteSpace >> not)
                 |> Option.map (fun commonDir ->
                     Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipBlockersDurable

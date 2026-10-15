@@ -31,7 +31,7 @@ const mustOk = (result, label) => {
 
 test('WHAT[durable-events-019] every registered business oracle changes its production Current', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-integrator-registration-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
 
   try {
@@ -193,7 +193,7 @@ test('WHAT[durable-events-019] removing one real hostProgram registration blocks
   // fail-closed 形态，不把它伪称为「观察到缺失 Current」。
   for (const ruleName of ['Structural', 'Journal']) {
     const root = mkdtempSync(join(tmpdir(), `wxs-integrator-without-${ruleName.toLowerCase()}-`))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     mkdirSync(commonDir, { recursive: true })
     try {
       assert.throws(
@@ -218,7 +218,7 @@ test('WHAT[durable-events-019] removing one real hostProgram registration blocks
   // 不碰共享工作区。live fact 仍按已知词汇落盘，对应业务 Current 被阻止，
   // 保留注册的 Structural 结果不受牵连。
   const isolatedStore = (ruleName, writerId, root) => {
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     mkdirSync(commonDir, { recursive: true })
     return workspace.createIsolatedWithoutRegistration(commonDir, writerId, ruleName)
   }

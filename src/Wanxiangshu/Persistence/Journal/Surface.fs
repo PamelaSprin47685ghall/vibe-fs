@@ -57,6 +57,10 @@ type JournalHandle private (journal: AgentJournal, release: unit -> unit, store:
 [<RequireQualifiedAccess>]
 module JournalSurface =
 
+    /// 解析并初始化主工作树的本机状态根，不改 Git 配置。
+    let initializeStateRoot (workspace: string) : string =
+        RuntimePath.initializeStateRoot workspace
+
     let private str (value: obj) : string =
         if isNull value then "" else string value
 
@@ -409,7 +413,7 @@ module JournalSurface =
     /// cross this boundary.
     let acquireSharedForWorkspace (workspace: string) (processId: int) (startedAt: string) : Task<obj> =
         task {
-            let commonDirectory = RuntimePath.gitCommonDir workspace
+            let commonDirectory = RuntimePath.initializeStateRoot workspace
             let runtimeDirectory = RuntimePath.forWorkspace workspace
 
             // DSL-MUTABLE: resource — the store the callback just created, so the
@@ -477,7 +481,7 @@ module JournalSurface =
 
             let! acquired =
                 SharedAgentJournal.acquire
-                    (RuntimePath.forCommonDir commonDir)
+                    (RuntimePath.forStateRoot commonDir)
                     0
                     (DateTimeOffset.Parse "1970-01-01T00:00:00Z")
                     refuseMissingEntry

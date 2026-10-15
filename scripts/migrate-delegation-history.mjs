@@ -4,7 +4,7 @@
  * readonly-delegation protocol (requirements/speculative-investigation [015],
  * requirements/durable-events [026]).
  *
- * It runs on a copy of the EventStore (a .git common dir) and appends only
+ * It runs on a copy of the .Herdchestra state directory and appends only
  * DelegationHistoryImported facts. It never touches the live store, Git
  * objects or refs, or user configuration, and it never mutates append-only
  * history: every effect is a new fact appended through the EventStore owner
@@ -12,7 +12,7 @@
  *
  * Usage:
  *   node scripts/migrate-delegation-history.mjs \
- *     --backup <copy-of-.git> --input-version pre-delegation \
+ *     --backup <backup-directory>/.Herdchestra --input-version pre-delegation \
  *     --contract-revision 1 --report <file> [--execute]
  *
  * Without --execute the run is a dry run on a temporary copy of the backup
@@ -20,11 +20,12 @@
  * events derive deterministically from the old event ids.
  */
 
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { stateRoot } from './lib/state-root.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -51,7 +52,7 @@ const CONTRACT_REVISIONS = [1]
 const usage = () =>
   fail(
     [
-      '用法: node scripts/migrate-delegation-history.mjs --backup <copy-of-.git>',
+      '用法: node scripts/migrate-delegation-history.mjs --backup <backup-directory>/.Herdchestra',
       '  --input-version pre-delegation --contract-revision 1 --report <file> [--execute]',
       '不带 --execute 时为 dry run：只在临时副本上规划并写报告，不追加任何事实。',
     ].join('\n'),
@@ -91,11 +92,21 @@ if (!CONTRACT_REVISIONS.includes(contractRevision)) {
 }
 
 const backup = resolve(options.backup)
-if (!existsSync(backup) || !statSync(backup).isDirectory()) fail(`--backup 必须是已存在的 .git common dir 目录: ${backup}`)
+const entry = lstatSync(backup, { throwIfNoEntry: false })
+if (backup.split(/[\\/]+/).some(part => part.toLowerCase() === '.git')) {
+  fail('旧 .git 运行数据已经退役，本工具不读取或迁移它。')
+}
+if (!entry?.isDirectory() || entry.isSymbolicLink() || basename(backup) !== '.Herdchestra') {
+  fail(`--backup 必须是单独备份下的真实 .Herdchestra 目录: ${backup}`)
+}
+const resolvedBackup = realpathSync(backup)
+if (resolvedBackup.split(/[\\/]+/).some(part => part.toLowerCase() === '.git')) {
+  fail('备份路径不得通过父目录链接进入 Git 元数据。')
+}
 
-const liveStore = resolve(join(repoRoot, '.git'))
-if (backup === liveStore || backup === repoRoot || backup.startsWith(liveStore + sep)) {
-  fail(`拒绝在活库上运行: ${backup}；请先复制一份 .git 备份再迁移。`)
+const liveStore = stateRoot(repoRoot)
+if (resolvedBackup === liveStore || resolvedBackup.startsWith(liveStore + sep)) {
+  fail(`拒绝在活库上运行: ${backup}；请先单独备份 .Herdchestra。`)
 }
 
 const EventStore = await loadDist('Persistence/EventStore/Surface.js')
@@ -109,7 +120,7 @@ let ownedTemp = null
 
 if (!options.execute) {
   const base = mkdtempSync(join(tmpdir(), 'wxs-migrate-'))
-  workDir = join(base, '.git')
+  workDir = join(base, '.Herdchestra')
   cpSync(backup, workDir, { recursive: true })
   ownedTemp = base
 }

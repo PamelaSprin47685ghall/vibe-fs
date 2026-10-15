@@ -9,7 +9,7 @@ open Wanxiangshu.Foundation.Identity
 
 /// durable-events-004/005/010/017.
 /// Runtime truth is deliberately boring: one process owns one append-only NDJSON
-/// file under the repository's git common-dir. Git object plumbing is not a
+/// file under the project's .Herdchestra state root. Git object plumbing is not a
 /// dependency of this module and therefore cannot leak into the local append path.
 type ProcessEventLog =
     private
@@ -220,10 +220,29 @@ module ProcessEventLog =
     [<Literal>]
     let WanxiangshuRootName = "wanxiangshu"
 
-    let private wanxiangDirectory commonDir = join2 commonDir WanxiangshuRootName
+    // 所有读写入口都经过此处；不能只在 writer 创建时拒绝旧目录。
+    let private localPath (value: string) =
+        let rejectGit (candidate: string) =
+            if candidate.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
+               |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase)) then
+                invalidArg "stateRoot" "Runtime persistence cannot read or write inside .git"
+
+        if String.IsNullOrWhiteSpace value then
+            invalidArg "stateRoot" "A local state root is required"
+
+        rejectGit value
+        let resolved: string = nodePath?resolve value
+        rejectGit resolved
+        if unbox<bool> (nodeFs?existsSync resolved) then
+            let physical: string = nodeFs?realpathSync resolved
+            rejectGit physical
+        resolved
+
+    let private wanxiangDirectory commonDir =
+        join2 (localPath commonDir) WanxiangshuRootName |> localPath
 
     let private eventsDirectory commonDir =
-        join2 (wanxiangDirectory commonDir) "events"
+        join2 (wanxiangDirectory commonDir) "events" |> localPath
 
     let private ensureDirectory path =
         mkdirSync path (createObj [ "recursive" ==> true ])
@@ -296,8 +315,8 @@ module ProcessEventLog =
             | None -> return raise (StoreLockAcquireTimeout(attempts, currentTimeMs () - started))
         }
 
-    /// Cross-process physical serialization shared by runtime append and the
-    /// standalone Git-hook synchronizer. It protects bytes/snapshot boundaries
+    /// Cross-process physical serialization shared by local runtime writers.
+    /// It protects bytes/snapshot boundaries
     /// only; it is not durable/domain state and contains no history meaning.
     let acquireStoreLock (commonDir: string) : Task<StoreFileGate> =
         task {
@@ -323,9 +342,7 @@ module ProcessEventLog =
                 return raise ex
         }
 
-    /// durable-events-005: the single-segment byte ceiling. 64 MiB leaves
-    /// headroom under the GitHub 100 MiB hard limit for an oversized single
-    /// line that occupies its own segment.
+    /// durable-events-005: 本机追加段的字节上限。它不是 Git 传输限制。
     [<Literal>]
     let DefaultSegmentCapBytes = 67108864
 
@@ -399,7 +416,13 @@ module ProcessEventLog =
 
     let createWithSegmentCap (commonDir: string) (writerId: string) (segmentCap: int) : ProcessEventLog =
         if String.IsNullOrWhiteSpace commonDir then
-            invalidArg "commonDir" "git common-dir is required"
+            invalidArg "commonDir" "a local state root is required"
+
+        if
+            commonDir.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
+            |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase))
+        then
+            invalidArg "commonDir" "runtime persistence cannot be placed inside .git"
 
         if segmentCap <= 0 then
             invalidArg "segmentCap" "segment cap must be positive"

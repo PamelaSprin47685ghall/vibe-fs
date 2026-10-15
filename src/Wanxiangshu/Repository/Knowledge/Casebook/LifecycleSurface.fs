@@ -52,7 +52,7 @@ module CasebookLifecycleSurface =
         CasebookLifecycle.cleanupDraft sessionId
 
     let private acquireStore (workspaceRoot: string) : IEventStore =
-        Wanxiangshu.OpenCode.WorkspaceEventStore.acquire (RuntimePath.gitCommonDir workspaceRoot)
+        Wanxiangshu.OpenCode.WorkspaceEventStore.acquire (RuntimePath.stateRoot workspaceRoot)
 
     let tryFinalize (workspaceRoot: string) (sessionId: string) : Task<obj> =
         let store = acquireStore workspaceRoot

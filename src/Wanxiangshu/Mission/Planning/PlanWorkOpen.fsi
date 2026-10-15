@@ -3,7 +3,7 @@ namespace Wanxiangshu.Mission.Planning
 open System.Threading.Tasks
 
 module PlanWorkOpen =
-    /// root is the plan root directory (<git-common-dir>/wanxiangshu in
+    /// root is the plan root directory (<state-root>/wanxiangshu in
     /// production); sessionId is the plan session id, which becomes the workId.
     /// observedHead is the XTrace head observed at opening; without it the
     /// entry refuses with zero writes.

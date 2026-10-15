@@ -68,7 +68,7 @@ const event = (id, n, parents = []) => ({
   payload: { n },
   payloadRefs: [],
 })
-const commonDir = async () => path.join(await mkdtemp(path.join(tmpdir(), 'wanxiang-local-log-')), '.git')
+const commonDir = async () => path.join(await mkdtemp(path.join(tmpdir(), 'wanxiang-local-log-')), '.Herdchestra')
 const remove = async (dir) => rm(dir, { recursive: true, force: true })
 
 test('WHAT[durable-events-005] DURABLE_EVENTS_005_one_process_is_one_segment_series_and_appends_preserve_prior_bytes', async () => {
@@ -131,7 +131,7 @@ const canonicalLine = (event) => JSON.stringify({
   event_id: event.id, event_type: event.type, parents: [...event.parents].sort(),
   payload: event.payload, payload_refs: [...event.payloadRefs].sort(), stream_id: event.stream,
 }) + '\n'
-const commonDir = () => join(mkdtempSync(join(tmpdir(), 'wxs-segment-law-')), '.git')
+const commonDir = () => join(mkdtempSync(join(tmpdir(), 'wxs-segment-law-')), '.Herdchestra')
 const eventsDir = (dir) => join(dir, 'wanxiangshu', 'events')
 
 test('WHAT[durable-events-005] append_continues_the_highest_segment_instead_of_opening_a_suffixless_file', async () => {
@@ -207,7 +207,7 @@ const lineOf = (n, totalBytes, parents = []) => {
 const withRepo = async (fn) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-segcap-'))
   execFileSync('git', ['init', '-q', root])
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   try { await fn(root, commonDir) } finally { rmSync(root, { recursive: true, force: true }) }
 }
 const eventsDir = (commonDir) => join(commonDir, 'wanxiangshu', 'events')
@@ -335,7 +335,7 @@ test('WHAT[durable-events-005] materialization_reorganizes_an_oversized_legacy_f
     const legacy = writeLegacy(commonDir, 'reorg-law', events)
     const original = readFileSync(legacy)
 
-    const snap = await retention.syncAtWithSegmentCap(repo, commonDir, null, Date.now(), CAP)
+    const snap = await retention.reorganizeWithSegmentCap(commonDir, CAP)
     assert.equal(snap.ok, true, JSON.stringify(snap.error))
     assert.equal(existsSync(legacy), false,
       'the legacy file is removed only after every segment has landed')
@@ -356,20 +356,19 @@ test('WHAT[durable-events-005] materialization_reorganizes_an_oversized_legacy_f
   })
 })
 
-test('WHAT[durable-events-005] reorganization_is_idempotent_across_repeated_syncs', async () => {
+test('WHAT[durable-events-005] local_reorganization_is_idempotent', async () => {
   await withRepo(async (repo, commonDir) => {
     const events = chain(6, CAP / 4)
     const legacy = writeLegacy(commonDir, 'reorg-idem-law', events)
     const now = Date.now()
 
-    const first = await retention.syncAtWithSegmentCap(repo, commonDir, null, now, CAP)
+    const first = await retention.reorganizeWithSegmentCap(commonDir, CAP)
     assert.equal(first.ok, true, JSON.stringify(first.error))
     const segmentZero = join(eventsDir(commonDir), 'reorg-idem-law-0000.ndjson')
     const statBefore = statSync(segmentZero)
 
-    const second = await retention.syncAtWithSegmentCap(repo, commonDir, first.root, now, CAP)
+    const second = await retention.reorganizeWithSegmentCap(commonDir, CAP)
     assert.equal(second.ok, true, JSON.stringify(second.error))
-    assert.equal(second.root, first.root, 'an already-reorganized store re-materializes to the identical root')
     assert.equal(statSync(segmentZero).mtimeMs, statBefore.mtimeMs,
       'repeat sync must not touch reorganized segment bytes or stats')
     assert.equal(existsSync(legacy), false)
@@ -385,7 +384,7 @@ test('WHAT[durable-events-005] an_interrupted_reorganization_recovers_by_prefix_
     const partial = join(eventsDir(commonDir), 'reorg-recover-law-0000.ndjson')
     writeFileSync(partial, events.slice(0, 4).map(canonicalLine).join(''))
 
-    const snap = await retention.syncAtWithSegmentCap(repo, commonDir, null, Date.now(), CAP)
+    const snap = await retention.reorganizeWithSegmentCap(commonDir, CAP)
     assert.equal(snap.ok, true, JSON.stringify(snap.error))
     assert.equal(existsSync(legacy), false, 'recovery completes the interrupted reorganization')
     const names = readdirSync(eventsDir(commonDir)).sort()
@@ -405,7 +404,7 @@ test('WHAT[durable-events-005] divergent_partial_segments_fail_closed_without_to
     writeFileSync(divergentPath, divergent.slice(0, 4).map(canonicalLine).join(''))
     const partialBytes = readFileSync(divergentPath)
 
-    const snap = await retention.syncAtWithSegmentCap(repo, commonDir, null, Date.now(), CAP)
+    const snap = await retention.reorganizeWithSegmentCap(commonDir, CAP)
     assert.equal(snap.ok, false, 'coexisting forms without a prefix relation must fail closed')
     assert.equal(readFileSync(legacy).equals(original), true,
       'fail-closed must not silently delete or rewrite the legacy file')
@@ -428,7 +427,7 @@ test('WHAT[durable-events-005] line_continuation_convergence_appends_legacy_line
     writeFileSync(legacy, bChain.map(canonicalLine).join(''))
     const legacyBytes = readFileSync(legacy)
 
-    const snap = await retention.syncAtWithSegmentCap(repo, commonDir, null, Date.now(), CAP)
+    const snap = await retention.reorganizeWithSegmentCap(commonDir, CAP)
     assert.equal(snap.ok, true, JSON.stringify(snap.error))
     assert.equal(existsSync(legacy), false, 'line-continuation convergence removes the legacy name')
     assert.deepEqual(readdirSync(eventsDir(commonDir)).sort(), ['continuation-law-0000.ndjson'],
@@ -462,7 +461,7 @@ test('WHAT[durable-events-005] line_continuation_with_a_half_line_still_fails_cl
     writeFileSync(legacy, halfLine)
     const segmentBytes = readFileSync(segmentPath)
 
-    const snap = await retention.syncAtWithSegmentCap(repo, commonDir, null, Date.now(), CAP)
+    const snap = await retention.reorganizeWithSegmentCap(commonDir, CAP)
     assert.equal(snap.ok, false, 'a half line is not a line continuation and must fail closed')
     assert.equal(readFileSync(legacy, 'utf8'), halfLine, 'fail-closed must not touch the legacy file')
     assert.equal(readFileSync(segmentPath).equals(segmentBytes), true, 'fail-closed must not touch the series')
@@ -481,7 +480,7 @@ test('WHAT[durable-events-005] line_continuation_with_overlapping_ids_still_fail
     const legacyBytes = readFileSync(legacy)
     const segmentBytes = readFileSync(segmentPath)
 
-    const snap = await retention.syncAtWithSegmentCap(repo, commonDir, null, Date.now(), CAP)
+    const snap = await retention.reorganizeWithSegmentCap(commonDir, CAP)
     assert.equal(snap.ok, false, 'overlapping event ids are divergence, not continuation')
     assert.equal(readFileSync(legacy).equals(legacyBytes), true)
     assert.equal(readFileSync(segmentPath).equals(segmentBytes), true)
@@ -516,29 +515,23 @@ test('WHAT[durable-events-005] readStreams_reads_line_continuation_as_series_plu
   })
 })
 
-test('WHAT[durable-events-005] rolling_a_new_segment_only_blobs_the_new_segment', async () => {
+test('WHAT[durable-events-005] rolling_a_new_segment_preserves_sealed_local_bytes_without_git_objects', async () => {
   await withRepo(async (repo, commonDir) => {
     const store = eventStore.createWithSegmentCap(commonDir, 'blob-reuse-law', CAP)
     try {
       for (const e of chain(8, CAP / 8)) {
         assert.equal((await eventStore.append(store, [e])).ok, true)
       }
-      const now = Date.now()
-      const first = await retention.syncAtWithSegmentCap(repo, commonDir, null, now, CAP)
-      assert.equal(first.ok, true, JSON.stringify(first.error))
+      const sealed = join(eventsDir(commonDir), 'blob-reuse-law-0000.ndjson')
+      const before = readFileSync(sealed)
+      const refsBefore = execFileSync('git', ['-C', repo, 'for-each-ref'], { encoding: 'utf8' })
 
       for (const e of chain(10, CAP / 8).slice(8)) {
         assert.equal((await eventStore.append(store, [e])).ok, true)
       }
-      const second = await retention.syncAtWithSegmentCap(repo, commonDir, first.root, now, CAP)
-      assert.equal(second.ok, true, JSON.stringify(second.error))
-
-      const blobOid = (root, name) =>
-        execFileSync('git', ['-C', repo, 'rev-parse', root + ':writers/' + name], { encoding: 'utf8' }).trim()
-      assert.equal(
-        blobOid(second.root, 'blob-reuse-law-0000.ndjson'),
-        blobOid(first.root, 'blob-reuse-law-0000.ndjson'),
-        'durable-convergence-010: the sealed segment blob OID is reused; only the new segment is blobbed')
+      assert.deepEqual(readFileSync(sealed), before)
+      assert.equal(execFileSync('git', ['-C', repo, 'for-each-ref'], { encoding: 'utf8' }), refsBefore)
+      assert.equal(existsSync(join(repo, '.git', 'wanxiangshu')), false)
     } finally {
       eventStore.dispose(store)
     }

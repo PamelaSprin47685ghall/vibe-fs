@@ -57,7 +57,7 @@ module PluginRecoveryWiring =
 
         let gitCommonDir =
             workspace
-            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
             |> Option.defaultValue ""
 
         for KeyValue(sessionId, projection) in snapshot.AgentProjections.Sessions do
@@ -233,7 +233,7 @@ module PluginRecoveryWiring =
         task {
             let gitCommonDir =
                 workspace
-                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
                 |> Option.defaultValue ""
 
             let sessions =

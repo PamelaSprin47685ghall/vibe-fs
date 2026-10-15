@@ -1160,14 +1160,6 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
-    module: 'Git/Hook/Surface.js',
-    owner: 'durable-events',
-    laws: ['DURABLE-EVENTS-018'],
-    source: 'src/Wanxiangshu/Git/Hook/Surface.fs',
-    representation: 'json',
-    kind: 'resource',
-  },
-  {
     module: 'OpenCode/Host/WorkspaceSharedJournal.js',
     owner: 'durable-events',
     laws: ['DURABLE-EVENTS-009', 'DURABLE-EVENTS-010'],

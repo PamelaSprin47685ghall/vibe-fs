@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -17,6 +19,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+      - name: Reject tracked tarballs and verify source dependency
+        run: node scripts/wanxiangli-source.mjs check
       - run: npm ci
       - run: dotnet tool restore
       - name: Run verification

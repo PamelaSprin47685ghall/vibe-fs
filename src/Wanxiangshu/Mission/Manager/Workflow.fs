@@ -30,7 +30,7 @@ module ManagerWorkflow =
     let private lifecycleWork (directory: string option) (sessionId: string) =
         directory
         |> Option.bind (fun workspace ->
-            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId)
 
     /// The iteration ordinal as the provider reads it: "1" for the first
@@ -184,7 +184,7 @@ module ManagerWorkflow =
         if System.String.IsNullOrWhiteSpace root then
             invalidOp "Manager lifecycle opening failed: Git did not identify a worktree root"
 
-        let gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir root
+        let gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot root
 
         match
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ensureOpened

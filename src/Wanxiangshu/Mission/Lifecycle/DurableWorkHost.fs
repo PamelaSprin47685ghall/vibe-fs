@@ -36,6 +36,37 @@ module DurableWorkHost =
     [<Import("mkdirSync", "node:fs")>]
     let private mkdirSync (path: string) (options: obj) : unit = jsNative
 
+    [<Import("resolve", "node:path")>]
+    let private resolvePath (path: string) : string = jsNative
+
+    [<Import("existsSync", "node:fs")>]
+    let private pathExists (path: string) : bool = jsNative
+
+    [<Import("realpathSync", "node:fs")>]
+    let private physicalPath (path: string) : string = jsNative
+
+    [<Import("dirname", "node:path")>]
+    let private directoryOf (path: string) : string = jsNative
+
+    let private rejectGitPath (path: string) =
+        let isGit (value: string) =
+            value.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
+            |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase))
+
+        if isGit path then
+            invalidArg "stateRoot" "Lifecycle persistence cannot read or write inside .git"
+
+        // 文件尚未存在时也核对已有父目录，防止通过链接回到旧 .git。
+        let rec checkExisting candidate =
+            if pathExists candidate then
+                if physicalPath candidate |> isGit then
+                    invalidArg "stateRoot" "Lifecycle persistence cannot follow a link into .git"
+            else
+                let parent = directoryOf candidate
+                if parent <> candidate then checkExisting parent
+
+        checkExisting path
+
     let private ensureDir (path: string) =
         mkdirSync path (createObj [ "recursive" ==> true ])
 
@@ -58,10 +89,15 @@ module DurableWorkHost =
     [<Emit("Array.isArray($0) ? $0 : []")>]
     let private asArray (_value: obj) : obj array = jsNative
 
-    /// Sibling of `.git/wanxiangshu/events/`, not inside it. The library takes a
+    /// Sibling of `.Herdchestra/wanxiangshu/events/`, not inside it. The library takes a
     /// connection, not a path; this file is the host-owned journal for new work.
-    let journalPath (gitCommonDir: string) : string =
-        gitCommonDir.TrimEnd('/') + "/wanxiangshu/work.sqlite"
+    let journalPath (stateRoot: string) : string =
+        if String.IsNullOrWhiteSpace stateRoot then
+            invalidArg "stateRoot" "A local state root is required"
+        rejectGitPath stateRoot
+        let path = resolvePath (stateRoot.TrimEnd('/', '\\') + "/wanxiangshu/work.sqlite")
+        rejectGitPath path
+        path
 
     type HostReceipt =
         { RequestId: string

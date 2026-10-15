@@ -13,7 +13,7 @@ import test from 'node:test'
   for (const scenario of ['mkdir-eacces', 'mkdir-eio', 'busy-success', 'busy-eacces']) {
     test(`WHAT[durable-events-006] actual_lock_${scenario}_distinguishes_contention_from_unattempted_io`, async t => {
       const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'append-lock-acquire-')))
-      const commonDir = path.join(root, '.git')
+      const commonDir = path.join(root, '.Herdchestra')
       const sourceWriterId = randomUUID()
       const sourceFile = path.join(commonDir, 'wanxiangshu', 'events', `${sourceWriterId}-0000.ndjson`)
       const seed = { id: 'e'.repeat(40), stream: 'proof/lock-acquire/old', type: 'JobRequested',
@@ -107,7 +107,7 @@ import test from 'node:test'
   for (const scenario of ['gate-directory', 'before-directory', 'mixed-release', 'cut-release', 'validation-release', 'preparation-random']) {
     test(`WHAT[durable-events-006] actual_${scenario}_preserves_preparation_rejection_and_independent_cold_facts`, async t => {
       const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'append-boundary-')))
-      const commonDir = path.join(root, '.git')
+      const commonDir = path.join(root, '.Herdchestra')
       const writerId = randomUUID()
       const sourceFile = path.join(commonDir, 'wanxiangshu', 'events', `${writerId}-0000.ndjson`)
       const cut = scenario === 'cut-release'
@@ -216,7 +216,7 @@ import test from 'node:test'
   for (const scenario of ['initialization-release', 'business-release', 'initialization-fsync', 'business-fsync']) {
     test(`WHAT[durable-events-006] actual_journal_${scenario}_keeps_business_fate_poison_and_waiters_separate`, async t => {
       const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'journal-settlement-')))
-      const commonDir = path.join(root, '.git')
+      const commonDir = path.join(root, '.Herdchestra')
       const writerId = randomUUID()
       const sourceFile = path.join(commonDir, 'wanxiangshu', 'events', `${writerId}-0000.ndjson`)
       const env = { ...process.env }
@@ -332,7 +332,7 @@ const mustOk = (result, label) => {
 const withRepo = (writerId, fn) => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-journal-'))
   execFileSync('git', ['init', '--quiet', repo])
-  const commonDir = join(repo, '.git')
+  const commonDir = join(repo, '.Herdchestra')
   return fn(commonDir)
     .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
@@ -396,7 +396,7 @@ async function settlementChild(mode, commonDir, writerId, scenario, request, sig
 for (const scenario of ['normal', 'fresh-release', 'duplicate-release', 'empty-release', 'append', 'open', 'fsync', 'close', 'current-before', 'current-after', 'fsync-close-release']) {
   test(`WHAT[durable-events-006] actual_append_settlement_preserves_${scenario}_physical_facts_and_cause`, async t => {
     const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'append-settlement-')))
-    const commonDir = path.join(root, '.git')
+    const commonDir = path.join(root, '.Herdchestra')
     const writerId = randomUUID()
     const writerFile = path.join(commonDir, 'wanxiangshu', 'events', `${writerId}-0000.ndjson`)
     const request = { incoming, canonicalLine, sourceWriterId: writerId }

@@ -21,7 +21,6 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
-open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Persistence.EventStore
@@ -464,7 +463,7 @@ module PluginHostInterop =
         : ToolRegistration =
         let jsTransactionPersistence =
             workspaceDirectory
-            |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace))
+            |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.stateRoot workspace))
             |> Option.map JsToolsTransactionStore.createPersistence
 
         let quiescence = scope.Sessions.Quiescence :> ISessionQuiescenceGate

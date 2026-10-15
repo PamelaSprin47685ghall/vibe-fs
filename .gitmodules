@@ -1,0 +1,4 @@
+[submodule "wanxiangli"]
+	path = wanxiangli
+	url = git@github.com:PamelaSprin47685ghall/wanxiangli.git
+	branch = main

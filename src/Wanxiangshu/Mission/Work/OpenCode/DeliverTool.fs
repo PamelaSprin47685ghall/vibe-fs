@@ -62,7 +62,7 @@ module DeliverTool =
         (directory: string)
         (sessionId: string)
         : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
-        let commonDir = RuntimePath.gitCommonDir directory
+        let commonDir = RuntimePath.stateRoot directory
 
         if String.IsNullOrWhiteSpace commonDir then
             None
@@ -335,7 +335,7 @@ module DeliverTool =
         let confirmFirst () =
             task {
                 let directory = scope.WorkspaceDirectory
-                let commonDir = directory |> Option.map RuntimePath.gitCommonDir
+                let commonDir = directory |> Option.map RuntimePath.stateRoot
 
                 match commonDir with
                 | None -> return Error "lifecycle journal directory is unavailable"
