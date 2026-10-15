@@ -143,7 +143,7 @@ module NodeProcessHost =
         jsNative
 
     [<Emit("""
-        (async function(ProcessSession, executable, args, cwd, env, stdinText, onStdout, onStderr, onClose) {
+        (async function(ProcessSession, executable, args, cwd, env, stdinText, onStdout, onStderr, onClose, onFailure) {
             let session;
             try {
                 session = new ProcessSession({
@@ -151,9 +151,9 @@ module NodeProcessHost =
                     args: Array.from(args),
                     cwd,
                     env,
-                    tailBytes: 16777216,
+                    tailBytes: 0,
                     maxWriteBytes: 16777216,
-                });
+                }, 'Capture');
             } catch (err) {
                 return { ok: false, error: (err && err.message) ? String(err.message) : 'Failed to create ProcessSession' };
             }
@@ -164,23 +164,12 @@ module NodeProcessHost =
                     : ('Failed to spawn process: ' + executable);
                 return { ok: false, error: msg };
             }
-            let outOffset = 0;
-            let errOffset = 0;
-            const drainChannel = (channel, currentOffset, handler) => {
-                try {
-                    const slice = session.read(channel, currentOffset);
-                    if (slice && slice.bytes && slice.bytes.byteLength > 0) {
-                        const chunk = new Uint8Array(slice.bytes.buffer, slice.bytes.byteOffset, slice.bytes.byteLength);
-                        try { handler(chunk); } catch (_) {}
-                    }
-                    return (slice && typeof slice.to === 'number') ? slice.to : currentOffset;
-                } catch (_) {
-                    return currentOffset;
-                }
-            };
-            const drainBoth = () => {
-                outOffset = drainChannel('stdout', outOffset, onStdout);
-                errOffset = drainChannel('stderr', errOffset, onStderr);
+            const reportClose = state => {
+                const exitInfo = state && state.exit;
+                const code = (exitInfo && typeof exitInfo.code === 'number')
+                    ? exitInfo.code
+                    : ((exitInfo && exitInfo.signal) ? 137 : -1);
+                onClose(code);
             };
             (async () => {
                 try {
@@ -200,27 +189,35 @@ module NodeProcessHost =
             (async () => {
                 try {
                     while (true) {
-                        const waited = await session.wait(20);
-                        drainBoth();
-                        if (waited && waited.kind === 'Closed') {
-                            const exitInfo = waited.state && waited.state.exit;
-                            const code = (exitInfo && typeof exitInfo.code === 'number')
-                                ? exitInfo.code
-                                : ((exitInfo && exitInfo.signal) ? 137 : 0);
-                            onClose(code);
+                        const output = await session.takeOutput();
+                        if (output.kind === 'Chunk') {
+                            const handler = output.channel === 'stdout' ? onStdout : onStderr;
+                            handler(output.bytes);
+                        } else if (output.kind === 'Closed') {
+                            reportClose(output.state);
+                            break;
+                        } else {
+                            throw new Error(output.error ? output.error.message : 'Process output was discarded');
+                        }
+                    }
+                } catch (error) {
+                    onFailure(error && error.message ? String(error.message) : String(error));
+                    session.signal('SIGKILL');
+                    session.discardOutput();
+                    while (true) {
+                        const waited = await session.wait(1000);
+                        if (waited.kind === 'Closed') {
+                            reportClose(waited.state);
                             break;
                         }
                     }
-                } catch (_) {
-                    drainBoth();
-                    onClose(-1);
                 }
             })();
             const killFn = () => {
                 try { session.signal('SIGKILL'); } catch (_) {}
             };
             return { ok: true, session, kill: killFn };
-        })($0, $1, $2, $3, $4, $5, $6, $7, $8)
+        })($0, $1, $2, $3, $4, $5, $6, $7, $8, $9)
     """)>]
     let private startProcessSession
         (ctor: obj)
@@ -232,6 +229,7 @@ module NodeProcessHost =
         (onStdout: byte[] -> unit)
         (onStderr: byte[] -> unit)
         (onClose: int -> unit)
+        (onFailure: string -> unit)
         : Task<obj> =
         jsNative
 
@@ -247,7 +245,8 @@ module NodeProcessHost =
           Exit: TaskCompletionSource<int>
           Kill: unit -> unit
           Exited: bool ref
-          OnExited: (unit -> unit) ResizeArray }
+          OnExited: (unit -> unit) ResizeArray
+          Failure: string option ref }
 
     let private notifyExitedList (callbacks: (unit -> unit) ResizeArray) =
         let cbs = callbacks |> Seq.toList
@@ -305,6 +304,7 @@ module NodeProcessHost =
         (exitTcs: TaskCompletionSource<int>)
         (exitedRef: bool ref)
         (onExited: (unit -> unit) ResizeArray)
+        (failure: string option ref)
         (ct: CancellationToken)
         : Result<ChildProcess, string> =
         let ok = emitJsExpr started "Boolean($0 && $0.ok)"
@@ -324,7 +324,8 @@ module NodeProcessHost =
                   Exit = exitTcs
                   Kill = (fun () -> invokeKill killObj)
                   Exited = exitedRef
-                  OnExited = onExited }
+                  OnExited = onExited
+                  Failure = failure }
 
     let private launchExecutableSession
         (executable: string)
@@ -342,6 +343,7 @@ module NodeProcessHost =
             // DSL-MUTABLE: cancellation — child process exit flag.
             let exitedRef = ref false
             let onClose = markProcessClosed exitedRef exitTcs onExited
+            let failure = ref None
 
             let! started =
                 startProcessSession
@@ -354,8 +356,9 @@ module NodeProcessHost =
                     onStdout
                     onStderr
                     onClose
+                    (fun message -> failure.Value <- Some message)
 
-            return finalizeStartedSession started exitTcs exitedRef onExited ct
+            return finalizeStartedSession started exitTcs exitedRef onExited failure ct
         }
 
     let private spawnOrReject

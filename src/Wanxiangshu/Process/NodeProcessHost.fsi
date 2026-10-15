@@ -9,7 +9,8 @@ module NodeProcessHost =
           Exit: TaskCompletionSource<int>
           Kill: unit -> unit
           Exited: bool ref
-          OnExited: ResizeArray<unit -> unit> }
+          OnExited: ResizeArray<unit -> unit>
+          Failure: string option ref }
 
     val notifyExited: child: ChildProcess -> unit
 

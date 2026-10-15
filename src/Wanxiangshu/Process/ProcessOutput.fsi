@@ -9,9 +9,11 @@ module ProcessOutput =
           mutable Combined: List<byte array>
           mutable Spool: Spool.StreamingSpool option
           mutable BytesObserved: int64
+          mutable Discarded: bool
           OutputLimit: int64 }
 
     val create: estimate: ProcessEstimate -> OutputCollector
     val addStdout: collector: OutputCollector -> bytes: byte array -> unit
     val addStderr: collector: OutputCollector -> bytes: byte array -> unit
+    val discard: collector: OutputCollector -> unit
     val buildResult: collector: OutputCollector -> exitCode: int -> ProcessOutcome

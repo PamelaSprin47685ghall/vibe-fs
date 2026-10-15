@@ -183,3 +183,66 @@ test('WHAT[process-execution-009] PTY_SESSION_mutable_state_roundtrips', () => {
     assert.equal(runtime.outputThreshold(10), 10)
   })
 }
+
+{
+  const assert = (await import('node:assert/strict')).default
+  const fs = await import('node:fs')
+  const { createHash } = await import('node:crypto')
+  const { syncBuiltinESMExports } = await import('node:module')
+  const runtime = await import('../../../dist/Process/Surface.js')
+
+  test('WHAT[process-execution-009] CUT_02_capture_spools_every_byte_beyond_the_library_tail_capacity', { timeout: 30000 }, async () => {
+    const block = Buffer.alloc(65536, 97)
+    const count = 2048
+    const script = `const fs = require('node:fs'); const block = Buffer.alloc(65536, 97); for (let i = 0; i < ${count}; i++) fs.writeSync(i % 2 ? 2 : 1, block)`
+    const result = await runtime.run(
+      runtime.command(process.execPath, ['-e', script], process.cwd(), undefined),
+      runtime.estimate(10, 4096, 'medium'),
+      runtime.context(process.cwd(), 20000),
+      runtime.createCancellationToken(false),
+    )
+    assert.equal(result.ok, true)
+    assert.equal(result.value.kind, 'Spooled')
+    try {
+      assert.equal(result.value.exitCode, 0)
+      assert.equal(result.value.totalBytes, count * block.length)
+      const actual = createHash('sha256')
+      for await (const bytes of fs.createReadStream(result.value.spoolPath)) actual.update(bytes)
+      const expected = createHash('sha256')
+      for (let index = 0; index < count; index++) expected.update(block)
+      assert.equal(actual.digest('hex'), expected.digest('hex'))
+    } finally {
+      runtime.spoolDelete(result.value.spoolPath)
+    }
+  })
+
+  test('WHAT[process-execution-009] CUT_02_spool_failure_is_an_execution_failure_and_removes_partial_output', async () => {
+    const original = fs.default.appendFileSync
+    let failedPath
+    fs.default.appendFileSync = (path, ...args) => {
+      if (String(path).includes('/spool-')) {
+        failedPath = String(path)
+        throw Object.assign(new Error('capture disk is full'), { code: 'ENOSPC' })
+      }
+      return original(path, ...args)
+    }
+    syncBuiltinESMExports()
+    try {
+      const result = await runtime.run(
+        runtime.command(process.execPath, ['-e', 'process.stdout.write("capture-output"); setInterval(() => {}, 1000)'], process.cwd(), undefined),
+        runtime.estimate(2, 1, 'medium'),
+        runtime.context(process.cwd(), 1000),
+        runtime.createCancellationToken(false),
+      )
+      assert.equal(result.ok, false)
+      assert.equal(result.error.kind, 'ExecutionFailed')
+      assert.match(result.error.reason, /capture disk is full/)
+      assert.ok(failedPath)
+      assert.equal(fs.existsSync(failedPath), false)
+    } finally {
+      fs.default.appendFileSync = original
+      syncBuiltinESMExports()
+      if (failedPath) fs.rmSync(failedPath, { force: true })
+    }
+  })
+}

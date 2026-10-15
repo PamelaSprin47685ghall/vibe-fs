@@ -15,6 +15,7 @@ module ProcessOutput =
           mutable Combined: List<byte[]>
           mutable Spool: Spool.StreamingSpool option
           mutable BytesObserved: int64
+          mutable Discarded: bool
           OutputLimit: int64 }
 
     let create (estimate: ProcessEstimate) : OutputCollector =
@@ -23,6 +24,7 @@ module ProcessOutput =
           Combined = List<byte[]>()
           Spool = None
           BytesObserved = 0L
+          Discarded = false
           OutputLimit = ProcessEstimate.outputThreshold estimate.EstimatedOutput }
 
     /// 内存积压封顶：超过该预算即在到达 OutputLimit 之前切到 spool，避免跨过
@@ -31,6 +33,7 @@ module ProcessOutput =
 
     let private switchToSpool collector =
         let active = Spool.startStreamingSpool ()
+        collector.Spool <- Some active
 
         for previous in collector.Combined do
             Spool.appendStreamingSpool active previous
@@ -38,7 +41,14 @@ module ProcessOutput =
         collector.Combined.Clear()
         collector.Stdout.Clear()
         collector.Stderr.Clear()
-        collector.Spool <- Some active
+
+    let discard collector =
+        collector.Discarded <- true
+        collector.Spool |> Option.iter (fun active -> Spool.delete active.Path)
+        collector.Spool <- None
+        collector.Combined.Clear()
+        collector.Stdout.Clear()
+        collector.Stderr.Clear()
 
     let private appendNewMemory (collector: OutputCollector) (target: List<byte[]>) (bytes: byte[]) =
         let switchThreshold = min collector.OutputLimit MemoryBufferBudget
@@ -54,7 +64,7 @@ module ProcessOutput =
         | None -> appendNewMemory collector target bytes
 
     let private addChunk (collector: OutputCollector) (target: List<byte[]>) (bytes: byte[]) =
-        if not (isNull bytes) && bytes.Length > 0 then
+        if not collector.Discarded && not (isNull bytes) && bytes.Length > 0 then
             collector.BytesObserved <- collector.BytesObserved + int64 bytes.Length
             appendInMemory collector target bytes
 

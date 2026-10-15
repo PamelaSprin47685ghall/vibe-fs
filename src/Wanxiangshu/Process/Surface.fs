@@ -523,7 +523,8 @@ module ProcessSurface =
               Exit = exit
               Kill = kill
               Exited = exited
-              OnExited = callbacks },
+              OnExited = callbacks
+              Failure = ref None },
             (fun () -> killCount)
         )
         :> obj

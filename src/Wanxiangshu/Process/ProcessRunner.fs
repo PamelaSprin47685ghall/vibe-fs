@@ -109,9 +109,23 @@ module ProcessRunner =
             // TimeoutExceeded carrying a different duration than the deadline
             // that expired is a lie the operator cannot detect.
             let budget = budgetSpan estimate ctx
-            let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
-            killQuietly child
-            return outcomeAfterWait collector budget waited
+            try
+                let! waited = waitForExit child (Deadline.ofBudget (clock ()) budget) ct
+                killQuietly child
+
+                let result =
+                    match child.Failure.Value with
+                    | Some message -> Error(ProcessError.ExecutionFailed message)
+                    | None -> outcomeAfterWait collector budget waited
+
+                match result with
+                | Ok _ -> return result
+                | Error _ ->
+                    discard collector
+                    return result
+            with error ->
+                discard collector
+                return raise error
         }
 
     let private runAfterGate
@@ -230,7 +244,8 @@ module ProcessRunner =
                       Exit = exitTcs
                       Kill = kill
                       Exited = exited
-                      OnExited = onExited }
+                      OnExited = onExited
+                      Failure = ref None }
 
                 let finish (code: int) =
                     exited.Value <- true
