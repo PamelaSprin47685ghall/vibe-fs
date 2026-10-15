@@ -8,33 +8,13 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.AsyncSupport
 
-/// JS-host process adapter. All Node/Bun interop for child-process spawn and
-/// spool-file I/O lives here so the rest of the Process namespace stays pure.
+/// JS-host process adapter. Non-PTY child-process execution delegates to
+/// wanxiangli/process (ProcessSession); spool-file I/O stays here so the rest
+/// of the Process namespace remains free of raw Node interop.
 module NodeProcessHost =
 
-    [<Import("spawn", "node:child_process")>]
-    let private spawnChild (command: string) (args: string array) (options: obj) : obj = jsNative
-
-    [<Emit("Object.assign({}, process.env)")>]
-    let private processEnv () : obj = jsNative
-
-    [<Emit("((child, text) => { try { if (child && child.stdin) { child.stdin.write(text, 'utf8'); child.stdin.end(); } } catch (_) {} })($0, $1)")>]
-    let private writeStdinText (child: obj) (text: string) : unit = jsNative
-
-    [<Emit("((child) => { try { if (child && child.stdin) child.stdin.end(); } catch (_) {} })($0)")>]
-    let private closeStdin (child: obj) : unit = jsNative
-
-    [<Emit("(() => { try { if ($0 && $0.pid) { process.kill(-$0.pid, 'SIGKILL'); } } catch (_) { try { if ($0 && typeof $0.kill === 'function') $0.kill('SIGKILL'); } catch (_) {} } })()")>]
-    let private killProcessGroup (child: obj) : unit = jsNative
-
-    [<Emit("($0 && $0.stdout) || null")>]
-    let private stdoutOf (child: obj) : obj = jsNative
-
-    [<Emit("($0 && $0.stderr) || null")>]
-    let private stderrOf (child: obj) : obj = jsNative
-
-    [<Emit("new Uint8Array($0.buffer, $0.byteOffset, $0.byteLength)")>]
-    let private toBytes (chunk: obj) : byte[] = jsNative
+    [<Import("ProcessSession", "wanxiangli/process")>]
+    let private ProcessSessionCtor: obj = jsNative
 
     [<Import("join", "node:path")>]
     let private pathJoin (a: string) (b: string) : string = jsNative
@@ -66,6 +46,12 @@ module NodeProcessHost =
     [<Import("existsSync", "node:fs")>]
     let private existsSync (path: string) : bool = jsNative
 
+    [<Import("statSync", "node:fs")>]
+    let private statSync (path: string) : obj = jsNative
+
+    [<Import("accessSync", "node:fs")>]
+    let private accessSync (path: string) (mode: int) : unit = jsNative
+
     [<Emit("""
         (async function(stream, consume) {
             for await (const input of stream) {
@@ -79,15 +65,179 @@ module NodeProcessHost =
     """)>]
     let private consumeStreamAsync (stream: obj) (consume: byte[] -> Task<unit>) : Task<unit> = jsNative
 
+    [<Emit("""
+        ((envEntries) => {
+            const out = {};
+            if (process && process.env) {
+                for (const k of Object.keys(process.env)) {
+                    const v = process.env[k];
+                    if (typeof k === 'string' && k.length > 0 && !k.includes('=') && !k.includes('\0') && typeof v === 'string' && !v.includes('\0')) {
+                        out[k] = v;
+                    }
+                }
+            }
+            if (Array.isArray(envEntries)) {
+                for (const pair of envEntries) {
+                    const k = pair[0];
+                    const v = pair[1];
+                    if (typeof k === 'string' && k.length > 0 && !k.includes('=') && !k.includes('\0') && typeof v === 'string' && !v.includes('\0')) {
+                        out[k] = v;
+                    }
+                }
+            }
+            return out;
+        })($0)
+    """)>]
+    let private buildEnvSnapshot (entries: (string * string) array) : obj = jsNative
+
+    [<Emit("""
+        ((rawCwd, pathJoin) => {
+            const base = (typeof rawCwd === 'string' && rawCwd.length > 0) ? rawCwd : process.cwd();
+            return base.startsWith('/') ? base : pathJoin(process.cwd(), base);
+        })($0, $1)
+    """)>]
+    let private resolveAbsoluteCwd (rawCwd: obj) (joinFn: string -> string -> string) : string = jsNative
+
+    [<Emit("""
+        ((fileName, cwd, envObj, pathJoin, statSync, accessSync) => {
+            if (typeof fileName !== 'string' || fileName.length === 0 || fileName.includes('\0')) {
+                return null;
+            }
+            const isExecutableFile = (candidate) => {
+                try {
+                    const st = statSync(candidate);
+                    if (!st || typeof st.isFile !== 'function' || !st.isFile()) return false;
+                    accessSync(candidate, 1);
+                    return true;
+                } catch (_) {
+                    return false;
+                }
+            };
+            if (fileName.startsWith('/')) {
+                return fileName;
+            }
+            if (fileName.includes('/')) {
+                return pathJoin(cwd, fileName);
+            }
+            const pathText = (envObj && typeof envObj.PATH === 'string')
+                ? envObj.PATH
+                : ((process && process.env && typeof process.env.PATH === 'string') ? process.env.PATH : '');
+            for (const dir of pathText.split(':')) {
+                const folder = dir.length > 0 ? dir : cwd;
+                const candidate = pathJoin(folder, fileName);
+                if (isExecutableFile(candidate)) {
+                    return candidate;
+                }
+            }
+            return pathJoin('/nonexistent-wanxiang-bin', fileName);
+        })($0, $1, $2, $3, $4, $5)
+    """)>]
+    let private resolveExecutablePath
+        (fileName: string)
+        (cwd: string)
+        (envObj: obj)
+        (joinFn: string -> string -> string)
+        (statFn: string -> obj)
+        (accessFn: string -> int -> unit)
+        : string =
+        jsNative
+
+    [<Emit("""
+        (async function(ProcessSession, executable, args, cwd, env, stdinText, onStdout, onStderr, onClose) {
+            let session;
+            try {
+                session = new ProcessSession({
+                    executable,
+                    args: Array.from(args),
+                    cwd,
+                    env,
+                    tailBytes: 16777216,
+                    maxWriteBytes: 16777216,
+                });
+            } catch (err) {
+                return { ok: false, error: (err && err.message) ? String(err.message) : 'Failed to create ProcessSession' };
+            }
+            const startResult = await session.started();
+            if (!startResult || startResult.kind === 'Failed') {
+                const msg = (startResult && startResult.error && startResult.error.message)
+                    ? String(startResult.error.message)
+                    : ('Failed to spawn process: ' + executable);
+                return { ok: false, error: msg };
+            }
+            let outOffset = 0;
+            let errOffset = 0;
+            const drainChannel = (channel, currentOffset, handler) => {
+                try {
+                    const slice = session.read(channel, currentOffset);
+                    if (slice && slice.bytes && slice.bytes.byteLength > 0) {
+                        const chunk = new Uint8Array(slice.bytes.buffer, slice.bytes.byteOffset, slice.bytes.byteLength);
+                        try { handler(chunk); } catch (_) {}
+                    }
+                    return (slice && typeof slice.to === 'number') ? slice.to : currentOffset;
+                } catch (_) {
+                    return currentOffset;
+                }
+            };
+            const drainBoth = () => {
+                outOffset = drainChannel('stdout', outOffset, onStdout);
+                errOffset = drainChannel('stderr', errOffset, onStderr);
+            };
+            (async () => {
+                try {
+                    if (typeof stdinText === 'string' && stdinText.length > 0) {
+                        const encoded = new TextEncoder().encode(stdinText);
+                        for (let pos = 0; pos < encoded.byteLength; pos += 16777216) {
+                            const part = encoded.slice(pos, Math.min(pos + 16777216, encoded.byteLength));
+                            const w = await session.write(part);
+                            if (!w || w.kind !== 'Written') break;
+                        }
+                    }
+                    session.endInput();
+                } catch (_) {
+                    try { session.endInput(); } catch (_) {}
+                }
+            })();
+            (async () => {
+                try {
+                    while (true) {
+                        const waited = await session.wait(20);
+                        drainBoth();
+                        if (waited && waited.kind === 'Closed') {
+                            const exitInfo = waited.state && waited.state.exit;
+                            const code = (exitInfo && typeof exitInfo.code === 'number')
+                                ? exitInfo.code
+                                : ((exitInfo && exitInfo.signal) ? 137 : 0);
+                            onClose(code);
+                            break;
+                        }
+                    }
+                } catch (_) {
+                    drainBoth();
+                    onClose(-1);
+                }
+            })();
+            const killFn = () => {
+                try { session.signal('SIGKILL'); } catch (_) {}
+            };
+            return { ok: true, session, kill: killFn };
+        })($0, $1, $2, $3, $4, $5, $6, $7, $8)
+    """)>]
+    let private startProcessSession
+        (ctor: obj)
+        (executable: string)
+        (args: string array)
+        (cwd: string)
+        (envObj: obj)
+        (stdinText: obj)
+        (onStdout: byte[] -> unit)
+        (onStderr: byte[] -> unit)
+        (onClose: int -> unit)
+        : Task<obj> =
+        jsNative
+
     /// Handle returned by spawn.
     ///
-    /// `Exit` carries the real exit code and nothing else. It used to be
-    /// `int * bool`, where the bool meant "timed out" — but a process does not know
-    /// whether someone was waiting on a deadline, so that flag was the waiter's
-    /// knowledge stored on the process. It let the timeout path complete the cell
-    /// itself with a fabricated `(-1, true)` instead of waiting for the real exit,
-    /// which EXEC-011 requires.
-    ///
+    /// `Exit` carries the real exit code and nothing else.
     /// `Exited` is set ONLY by the close/error handlers. `Kill` must not set it:
     /// sending SIGKILL is not the process ending, and conflating the two makes
     /// "kill sent" look like "exit observed" to every waiter.
@@ -108,110 +258,105 @@ module NodeProcessHost =
 
     let notifyExited (child: ChildProcess) = notifyExitedList child.OnExited
 
-    let private assignEnvMap (jsEnv: obj) (envMap: Map<string, string>) =
-        for KeyValue(k, v) in envMap do
-            emitJsExpr (jsEnv, k, v) "$0[$1] = $2" |> ignore
-
     let private buildEnv (envOpt: Map<string, string> option) : obj =
-        let jsEnv = processEnv ()
+        let entries =
+            match envOpt with
+            | Some envMap -> envMap |> Map.toArray
+            | None -> [||]
 
-        match envOpt with
-        | Some envMap -> assignEnvMap jsEnv envMap
-        | None -> ()
+        buildEnvSnapshot entries
 
-        jsEnv
+    let private cwdValue (cmd: Command) (ctx: ProcessContext) : string =
+        let raw =
+            match cmd.WorkingDirectory |> Option.orElse ctx.WorkingDirectory with
+            | Some wd -> box wd
+            | None -> null
 
-    let private cwdValue (cmd: Command) (ctx: ProcessContext) : obj =
-        match cmd.WorkingDirectory |> Option.orElse ctx.WorkingDirectory with
-        | Some wd -> box wd
-        | None -> emitJsExpr () "process.cwd()"
+        resolveAbsoluteCwd raw pathJoin
 
-    let private tryChunkBytes (chunk: obj) : byte[] option =
-        let bytes = if isNull chunk then [||] else toBytes chunk
+    let private stdinValue (stdinOpt: string option) : obj =
+        match stdinOpt with
+        | Some text -> box text
+        | None -> null
 
-        if bytes.Length = 0 then None else Some bytes
-
-    let private recordChunk (handler: byte[] -> unit) (chunk: obj) =
+    let private invokeKill (killObj: obj) =
         try
-            tryChunkBytes chunk |> Option.iter handler
+            emitJsExpr killObj "$0()" |> ignore
         with _ ->
             ()
 
-    let private trySpawnChild (cmd: Command) (options: obj) =
-        try
-            spawnChild cmd.FileName (cmd.Arguments |> List.toArray) options
-        with _ ->
-            null
-
-    let private attachStream (stream: obj) (handler: byte[] -> unit) =
-        if not (isNull stream) then
-            emitJsExpr (stream, recordChunk handler) "$0.on('data', $1)" |> ignore
-
-    let private applyStdin (child: obj) (stdin: string option) =
-        match stdin with
-        | Some text -> writeStdinText child text
-        | None -> closeStdin child
-
-    let private killIfStillRunning (exitedRef: bool ref) (child: obj) =
+    let private killIfStillRunning (exitedRef: bool ref) (killObj: obj) =
         if not exitedRef.Value then
-            killProcessGroup child
+            invokeKill killObj
 
-    let private makeKill (child: obj) =
-        fun () ->
-            try
-                killProcessGroup child
-            with _ ->
-                ()
+    let private markProcessClosed
+        (exitedRef: bool ref)
+        (exitTcs: TaskCompletionSource<int>)
+        (onExited: (unit -> unit) ResizeArray)
+        (code: int)
+        =
+        if not exitedRef.Value then
+            exitedRef.Value <- true
+            trySetResult exitTcs code |> ignore
+            notifyExitedList onExited
 
-    let private wireExitHandlers
-        (child: obj)
+    let private finalizeStartedSession
+        (started: obj)
         (exitTcs: TaskCompletionSource<int>)
         (exitedRef: bool ref)
         (onExited: (unit -> unit) ResizeArray)
-        =
-        emitJsExpr
-            (child,
-             (fun (code: obj) ->
-                 let c = if isNull code then 0 else unbox<int> code
-                 exitedRef.Value <- true
-                 trySetResult exitTcs c |> ignore
-                 notifyExitedList onExited),
-             (fun _err ->
-                 exitedRef.Value <- true
-                 trySetResult exitTcs -1 |> ignore
-                 notifyExitedList onExited))
-            "if ($0) { $0.on('close', function(code) { $1(typeof code === 'number' ? code : 0); }); $0.on('error', function(err) { $2(err); }); }"
-        |> ignore
+        (ct: CancellationToken)
+        : Result<ChildProcess, string> =
+        let ok = emitJsExpr started "Boolean($0 && $0.ok)"
 
-    let private assembleChild
-        (child: obj)
+        if not ok then
+            let errText: string =
+                emitJsExpr started "String(($0 && $0.error) || 'Failed to spawn process')"
+
+            Error errText
+        else
+            let sessionObj: obj = emitJsExpr started "$0.session"
+            let killObj: obj = emitJsExpr started "$0.kill"
+            use _ = ct.Register(fun () -> killIfStillRunning exitedRef killObj)
+
+            Ok
+                { Process = sessionObj
+                  Exit = exitTcs
+                  Kill = (fun () -> invokeKill killObj)
+                  Exited = exitedRef
+                  OnExited = onExited }
+
+    let private launchExecutableSession
+        (executable: string)
+        (cwd: string)
+        (envObj: obj)
+        (cmd: Command)
         (onStdout: byte[] -> unit)
         (onStderr: byte[] -> unit)
-        (cmd: Command)
         (ct: CancellationToken)
-        =
-        let exitTcs = TaskCompletionSource<int>()
-        // DSL-MUTABLE: algorithm-scratch — exit callback list accumulator
-        let onExited = ResizeArray<unit -> unit>()
-        // DSL-MUTABLE: cancellation — child process exit flag.
-        let exitedRef = ref false
+        : Task<Result<ChildProcess, string>> =
+        task {
+            let exitTcs = TaskCompletionSource<int>()
+            // DSL-MUTABLE: algorithm-scratch — exit callback list accumulator
+            let onExited = ResizeArray<unit -> unit>()
+            // DSL-MUTABLE: cancellation — child process exit flag.
+            let exitedRef = ref false
+            let onClose = markProcessClosed exitedRef exitTcs onExited
 
-        attachStream (stdoutOf child) onStdout
-        attachStream (stderrOf child) onStderr
-        wireExitHandlers child exitTcs exitedRef onExited
-        applyStdin child cmd.Stdin
+            let! started =
+                startProcessSession
+                    ProcessSessionCtor
+                    executable
+                    (cmd.Arguments |> List.toArray)
+                    cwd
+                    envObj
+                    (stdinValue cmd.Stdin)
+                    onStdout
+                    onStderr
+                    onClose
 
-        use _ = ct.Register(fun () -> killIfStillRunning exitedRef child)
-
-        { Process = child
-          Exit = exitTcs
-          // EXEC-011: SIGKILL the whole process group, then let
-          // the close handler report the real exit. Marking the
-          // child exited here would let a waiter return before
-          // the process actually died.
-          Kill = makeKill child
-          Exited = exitedRef
-          OnExited = onExited }
+            return finalizeStartedSession started exitTcs exitedRef onExited ct
+        }
 
     let private spawnOrReject
         (cmd: Command)
@@ -221,19 +366,16 @@ module NodeProcessHost =
         (ct: CancellationToken)
         =
         task {
-            let options =
-                createObj
-                    [ "env" ==> buildEnv cmd.Environment
-                      "cwd" ==> cwdValue cmd ctx
-                      "detached" ==> true
-                      "stdio" ==> [| "pipe"; "pipe"; "pipe" |] ]
+            let envObj = buildEnv cmd.Environment
+            let cwd = cwdValue cmd ctx
 
-            let child = trySpawnChild cmd options
+            let executable =
+                resolveExecutablePath cmd.FileName cwd envObj pathJoin statSync accessSync
 
-            if isNull child then
+            if isNull executable then
                 return Error(sprintf "Failed to spawn process: %s" cmd.FileName)
             else
-                return Ok(assembleChild child onStdout onStderr cmd ct)
+                return! launchExecutableSession executable cwd envObj cmd onStdout onStderr ct
         }
 
     let spawn

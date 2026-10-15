@@ -110,3 +110,40 @@ test('WHAT[process-execution-010] EXEC_011_nonzero_exit_is_still_an_ok_outcome',
   assert.equal(result.value.exitCode, 3)
 })
 }
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { readFileSync } = await import("node:fs");
+const { dirname, join } = await import("node:path");
+const { default: test } = await import("node:test");
+const { fileURLToPath } = await import("node:url");
+const {
+  command,
+  context,
+  createCancellationToken,
+  estimate,
+  run,
+} = await import('../../../dist/Process/Surface.js')
+
+test('WHAT[process-execution-010] CUT_02_non_pty_host_wires_wanxiangli_process_session_and_retires_direct_child_process_spawn', async () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
+  const hostSrc = readFileSync(join(root, 'src/Wanxiangshu/Process/NodeProcessHost.fs'), 'utf8')
+  assert.match(hostSrc, /Import\("ProcessSession",\s*"wanxiangli\/process"\)/)
+  assert.doesNotMatch(hostSrc, /node:child_process/)
+
+  const outcome = await run(
+    command(process.execPath, ['-e', 'process.stdout.write("via-process-session"); process.stderr.write("err-stream"); process.exit(5)'], process.cwd(), undefined),
+    estimate(10, 4096, 'medium'),
+    context(process.cwd(), 60_000),
+    createCancellationToken(false),
+  )
+  assert.equal(outcome.ok, true)
+  assert.deepEqual(outcome.value, {
+    kind: 'Completed',
+    exitCode: 5,
+    stdout: 'via-process-session',
+    stderr: 'err-stream',
+    spooled: false,
+  })
+})
+}
