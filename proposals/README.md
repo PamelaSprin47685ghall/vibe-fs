@@ -1,5 +1,13 @@
 # 计划与提案入口
 
+## 多人抽吸的当前入口（2026-10-15）
+
+Lifecycle cutover 已进入 master。下一轮多人切刀从[保姆级施工指南](extraction-kanban/README.md)开始，在[唯一看板](extraction-kanban/BOARD.md)认领，再读[职责卡](extraction-kanban/CARDS.md)、[范围与旧计划对账](extraction-kanban/COVERAGE.md)和[可复制模板](extraction-kanban/TEMPLATES.md)。蓝图覆盖当前职责，分别记录独立库、主仓接线、旧实现退出，以及须先裁决的保留/删除项。
+
+下方旧队列和各 T/WP/GAP 继续保留原始证据与证明义务，不作为第二张抽吸排班表。已有 owner 的相同工作先交接、合并认领，不重复施工；计划不增减正式 WHAT。当前基线及净改进合并条件见 [cutover 收尾记录](lifecycle-cutover-closeout.md)。
+
+## 原有施工材料与历史队列
+
 最新全仓CI以[4f0原始收据](archive/2026-10-06/baselines/4f0-ci/vibe-fs-4f0-ci-receipt.txt)为准：format/check/build通过，原300秒截断791/821、006/008活动、28queued、无summary；ps终止查询超时及GitHub两个orphan清理单列，外组accepted不证明全部detached资源排空。M1实际worker pre-import已收，缺exit仍明确missing；下一N00先正式复现查询失败的清理边界，再按真实成本确定因果实验，不改预算/worker。下方1eb为前一输入证书。
 
 2026-10-06 当前接手从[总计划当前状态](TODO施工总计划-2026-10-03.md)开始。本轮A2-R0/R1/R2已落实真实恢复夹具、effect前lease/source交接和三producer20场景，旧宽匹配删除；相邻Unknown Root清理另按正式反例验收。[本轮记录](archive/2026-10-06/Sphinx真实恢复与资源前置-2026-10-06.md)保留红绿及最终证书。下一产品入口是[08真实Host接手卡](TODO施工分册-2026-10-03/08-Sphinx真实Host接手.md)，不重复装配或重做D0/D1；Sphinx实际Host/profile/结果/答案仍未闭合。
@@ -55,7 +63,7 @@ PR冲突后续又合入`fcfba389e`，现行合并裁决与验收见[最新同步
 
 | 文档 | 状态与用途 |
 |---|---|
-| [TODO 施工总计划](TODO施工总计划-2026-10-03.md)及其[分册目录](TODO施工分册-2026-10-03/) | 现行施工安排；包含逐项清单、依赖、验证要求和 GAP 补充清单 |
+| [TODO 施工总计划](TODO施工总计划-2026-10-03.md)及其[分册目录](TODO施工分册-2026-10-03/) | 既有工作与证明债务索引；保留逐项清单和收据，抽吸认领统一接入上方看板，不重复排班 |
 | [规范施工 Prompt](规范施工Prompt.md) | 通用整理方法；具体任务范围和顺序按现行总计划与用户指示确定 |
 | [Host 重试兼容性核查](38-Host重试兼容性核查-2026-09-26.md) | 未闭合调查，关联 GAP-144；旧版本的实测证据仍需后续核查 |
 | [Steward](Steward.md) | 尚未实施的长期提案，供讨论；不是当前施工任务书 |

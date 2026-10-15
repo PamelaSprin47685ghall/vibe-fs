@@ -202,6 +202,7 @@ artifacts/     中间产物与本地发布产物，不提交
 - 生产 F# 唯一根：`src/Wanxiangshu/`
 - 规范导航 [requirements/README.md](requirements/README.md)；历史 Clause 与变更工作流已归档（2026-08-14 cutover；git 历史可回溯）
 - 施工与提案导航 [proposals/README.md](proposals/README.md)；旧计划与已结束批次见[归档索引](proposals/archive/README.md)
+- 多人抽吸从[施工指南](proposals/extraction-kanban/README.md)和[唯一 Kanban 看板](proposals/extraction-kanban/BOARD.md)认领；39 张职责卡覆盖当前主仓，库就绪、实际接线和旧职责退出分别验收。
 - 测试全部包自有：`requirements/<package>/tests/`；共享 harness 在 `requirements/verification-system/tests/`（含 `support/`、unit runner、integration orchestrator、Long Stroke e2e）
 - 脚本：`scripts/build.mjs`、`scripts/check.mjs`、`scripts/checks/*`、`scripts/lib/walk.mjs`
 
