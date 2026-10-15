@@ -156,31 +156,6 @@ module CompletedTurnClassifier =
         // from parts alone — abort/error may still be racing the idle wake-up.
         | false, false, None -> box ReconcileProgram.TurnUnknown
 
-    let private isStopFinish (finish: string option) : bool =
-        match finish with
-        | Some value -> value.Equals("stop", StringComparison.OrdinalIgnoreCase)
-        | None -> false
-
-    let private isNeedsContinuation (outcome: ReconcileProgram.TurnOutcome) : bool =
-        match outcome with
-        | ReconcileProgram.TurnNeedsContinuation _ -> true
-        | _ -> false
-
-    let private classifiedNeedsContinuation (classified: obj) : bool =
-        match classified with
-        | :? ReconcileProgram.TurnOutcome as outcome -> isNeedsContinuation outcome
-        | _ -> false
-
-    /// planning-009: Plan is the only role whose empty stop is a natural stop
-    /// waiting for the next user prompt. finish=stop with unusable formal
-    /// text classifies as TurnNeedsContinuation; for Plan that outcome settles
-    /// as a completed turn instead of a repair occasion. Provider errors and
-    /// length truncation keep the shared recovery classification.
-    let isPlanEmptyStop (role: Role option) (finish: string option) (classified: obj) : bool =
-        role = Some Role.Plan
-        && isStopFinish finish
-        && classifiedNeedsContinuation classified
-
     /// ARCH-011: named for the typed occasion (unfinished interaction), not for any
     /// character feature of the repair payload. A normal `finish=tool-calls` turn is
     /// still owned by the Host provider/tool loop; its concrete tool/activity part is

@@ -39,6 +39,7 @@ module JsGeneratorSurface =
         | "BashHoneypot" -> Some ToolPermission.BashHoneypot
         | "JsPlan" -> Some ToolPermission.JsPlan
         | "Ask" -> Some ToolPermission.Ask
+        | "DevOpsConsultation" -> Some ToolPermission.DevOpsConsultation
         | "Deliver" -> Some ToolPermission.Deliver
         | "Review" -> Some ToolPermission.Review
         | _ -> None
@@ -66,6 +67,7 @@ module JsGeneratorSurface =
         | ToolPermission.BashHoneypot -> "BashHoneypot"
         | ToolPermission.JsPlan -> "JsPlan"
         | ToolPermission.Ask -> "Ask"
+        | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
 

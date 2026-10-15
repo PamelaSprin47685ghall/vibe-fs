@@ -22,7 +22,7 @@ const openWork = async (store, commonDir, workId) => {
   assert.equal(opened.ok, true, opened.error)
 }
 
-test('WHAT[work-028] ask delegates the intent to the bound DevOps and returns its work record', async () => {
+test('WHAT[work-028] devops delegates the intent to the bound DevOps and returns its work record', async () => {
   await withStore(async (store, _root, commonDir) => {
     await openWork(store, commonDir, 'work-ask-1')
     let delegatedIntent = null
@@ -43,7 +43,7 @@ test('WHAT[work-028] ask delegates the intent to the bound DevOps and returns it
   })
 })
 
-test('WHAT[work-028] a second ask is rejected while one delegation is pending', async () => {
+test('WHAT[work-028] a second devops investigation is rejected while one delegation is pending', async () => {
   await withStore(async (store, _root, commonDir) => {
     await openWork(store, commonDir, 'work-ask-2')
     const pendingDelegate = () => new Promise(() => {})

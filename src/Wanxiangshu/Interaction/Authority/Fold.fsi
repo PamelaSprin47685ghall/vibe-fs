@@ -16,6 +16,7 @@ type PromptAuthorityFoldRejection =
     | AuthorityRootSeedRejected of PromptAuthority.IdentitySeedValidationError
     | AuthorityRootLedgerRejected of string
     | AuthorityLogicalRunClosureRejected of string
+    | UserQuestionRejected of string
 
 [<RequireQualifiedAccess>]
 module PromptAuthorityFoldRejection =

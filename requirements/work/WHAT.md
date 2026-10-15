@@ -166,7 +166,7 @@ S4 两次调用之后，系统派发同一会话的后继。后继启动后，�
 
 当调度器识别到 CanonicalRole 为 `Plan`（Wire 标识为 `plan`）时，系统投影其专属权限与工具集。
 
-- 允许后果：Plan 角色且仅限 Plan 角色被赋予四个专属工具的访问权限：JS 编程面 `js-plan`，以及编排面工具 `ask`、`review`、`deliver`。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
+- 允许后果：Plan 的工作工具为 `js-plan`、`devops`、`ask`、`review`、`deliver`。`js-plan` 与 `devops` 只向 Plan 开放；`ask` 供 Manager 与 Plan 明确询问用户（[049]），不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
 - 禁止后果：Plan 角色禁止获得代码仓库与执行工具的权限，包括但不限于 `read`、`glob`、`grep`、`edit`、`write`、`mv`、`rm`、`run`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`fork`、`fission`、`commission`。严禁向 Plan 开放任何真实 shell 或命令执行通道。`resume` 与 `handoff` 不再属于 Plan 的工具面。
 - 失败后果：任何越权工具调用必须在 `ToolRegistry` 执行门禁被直接拦截（fail-closed），返回强类型拒绝错误，零副作用。
 
@@ -188,7 +188,7 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
   11. `DeliverySessionBound(operationId, execSessionId)`：真实执行 session 已创建且其身份已经 durable 绑定；不表示首 prompt 已被接受。
   12. `DeliveryRejected(operationId, reason)`：只有已确定 NotStarted 时结算该预留，使后续显式新尝试成为可能。
   同一事件的重复重放必须保持幂等。
-- 禁止后果：同一 workId 同时至多一个活跃任期（`Active`）。已退休任期列表（`Retired`）只增不减。`Reviewed` 每任至多一条；已评任期不得再次评。`Reopened` 清除投影中的 `Delivered`，并以同一笔追加开启一个新任期：沿用原 stage，交付授权重置为假，新 incumbencyId 由固定标记 `reopened-incumbency-v1` 确定性派生、与旧任期不同；`Retired` 列表中的历史记录不删除。`Relayed` 退休的任期严禁复活；`Delivered` 退休的任期仅可经 `Reopened` 触发一次重开，旧任期永不复活。禁止在这些事实之外引入旁路状态机、内存标记或外部计数器。禁止 `AskPending` 与 `AskResolved`（该挂起协议已由 [027] 自然停止语义取代）。
+- 禁止后果：同一 workId 同时至多一个活跃任期（`Active`）。已退休任期列表（`Retired`）只增不减。`Reviewed` 每任至多一条；已评任期不得再次评。`Reopened` 清除投影中的 `Delivered`，并以同一笔追加开启一个新任期：沿用原 stage，交付授权重置为假，新 incumbencyId 由固定标记 `reopened-incumbency-v1` 确定性派生、与旧任期不同；`Retired` 列表中的历史记录不删除。`Relayed` 退休的任期严禁复活；`Delivered` 退休的任期仅可经 `Reopened` 触发一次重开，旧任期永不复活。禁止在这些事实之外引入第二份工作阶段或任期账本。向用户提问的等待属于 PromptAuthority 的 `UserQuestionAsked` / `UserQuestionAnswered`（[049]），不改写工作阶段、评审或退休事实。
 - 失败后果：遇到同一身份但载荷不同的冲突事件（含同一任期的第二条不同 `Reviewed`），或检测到不合法的状态跃迁（如重复激活、幽灵任期、无 `Delivered` 时的 `Reopened`、`Reopened` 的 retirementId 与退休记录不匹配），系统必须抛出 `StorageInvalid` 并关闭，严禁跳过或猜测。
 
 ## [023] 阶段推进、授权与状态正交
@@ -204,13 +204,13 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 工具调用进入执行前，动作门必须基于当前任期、授权与工作状态进行单一判定。
 
 - 允许后果：
-  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `js-plan`、`ask`、`review`、`deliver`；
+  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `js-plan`、`devops`、`review`、`deliver`；`ask` 另需当前 Manager/Plan 权威与精确调用身份（[049]）；
   2. 每一任期在调用 `review` 工具之前，`js-plan` 工具是严格只读的（仅允许读操作 `read`）；若在此之前尝试写入（`edit`、`rewrite` 等修改操作），动作门与执行层均强制拦截拒绝，并向模型报错说明必须先完成 `review`。当前任期成功调用 `review` 工具之后方解锁写权限；接力（无权 deliver）开启的新任期在其成功调用 `review` 之前重新锁定为只读；
-  3. 工作处于 `delivered` 时，仅允许 `js-plan` 的 `read`，`ask`、`review`、`deliver` 一律拒绝（再次动作必须先经用户 reprompt 与 `Reopened` 回 active，见 [037]）；
+  3. 工作处于 `delivered` 时，仅允许 `js-plan` 的 `read`，`devops`、`ask`、`review`、`deliver` 一律拒绝（再次动作必须先经用户 reprompt 与 `Reopened` 回 active，见 [037]）；
   4. `review` 为硬门：本任已有 `Reviewed` 事实时拒绝再次调用（每任恰好一次，见 [038]）；
-  5. `ask` 在同一 work 已有一个未决委派时拒绝新委派（见 [028]）；
+  5. `devops` 在同一 work 已有一个未决委派时拒绝新委派（见 [028]）；`ask` 正在等待用户时，不准再启动其他工作工具；
   6. `deliver` 要求无活跃 blocker（递归 live 资源）；行为按授权分支：持权走交付（[026]），无权走接力（[025]）。
-- 禁止后果：stage 不作为动作门：任何 stage 下四个工具的许可判定一致，阶段推进完全由 review 硬门承担。禁止在未决 ask 委派悬空时开启新的外部动作。`handoff` 与 `resume` 不在许可矩阵中，任何调用一律拒绝。禁止在当前任期完成 review 之前向底稿 `P` 写入任何改动。
+- 禁止后果：stage 不作为动作门：各 stage 的工具许可判定一致，阶段推进完全由 review 硬门承担。禁止在未决 devops 委派悬空时开启新的外部动作。`handoff` 与 `resume` 不在 Plan 许可矩阵中。禁止在当前任期完成 review 之前向底稿 `P` 写入任何改动。
 - 失败后果：凡不满足许可矩阵条件的调用，一律返回强类型 typed 错误，并保持原状态不变。
 
 ## [025] 接力契约（deliver 无权路径）
@@ -235,20 +235,20 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 - 禁止后果：`P` 为空或不存在时严禁交付。无授权时严禁走本路径（走 [025] 接力）。`execSessionId` 严禁进入 provider 可见面。交付完成后，本任期内严禁再调用模型；再次 `deliver` 只可能由用户 reprompt 触发，且必须先经 `Reopened` 回 active（见 [037]），严禁绕过重开直接复用 delivered 投影。
 - 失败后果：预留前的文件读取/校验失败为零写入；预留提交失败为零启动。预留后的明确 NotStarted 可以追加拒绝事实，当前任期继续活跃；结果未知则保留 `DeliveryRequested` 作为未完成义务。任何路径都不得用“启动函数抛异常”本身证明外部效果没有发生。
 
-## [027] 自然停止
+## [027] 长程任务禁止静默停止
 
-当 Plan 跑者需要用户输入时，模型自然停止本轮输出并等待下一条用户 prompt。Plan 是唯一允许空停等用户 prompt 的 role。
+Manager 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾散文或进度小结均不证明目标完成。2026-10-15 的本条修订取代 Plan 的自然停止豁免。
 
-- 允许后果：Plan 会话的空停（finish = stop 且正式文本无效）收敛为普通回合完成（`TurnCompleted`），不触发 continuation、不触发 interaction repair、不占用重试预算。用户下一条 prompt 按普通新输入进入本任期。provider error、abort、length 截断等非空停失败仍走既有失败恢复路径，不受本条豁免。
-- 禁止后果：严禁为 Plan 空停发起 continuation 或 repair 请求。严禁引入两段式 ask 挂起状态机（`AskPending`/`AskResolved`）或 Continuation 回送协议——问用户就是自然停止。严禁对其它 role 的空停应用本豁免（其它 role 的空停行为保持字节不变）。
-- 失败后果：若实现把 Plan 空停误判为需要 continuation，或把其它 role 的空停误判为自然完成，均为违反本合同的缺陷，对应回归测试必须红。
+- 允许后果：没有有效交接/完成事实，也没有 [049] 的用户等待时，新的自然停机必须在真实 idle 许可上得到同运行 nudge。提示指出尚未解除的任务义务与下一步；Manager 保留当前评审/工作/收尾提示，并说明 `join` 可以临时等待后台工作。Plan 提醒 `devops`、`review`、`deliver` 的职责，以及 `ask` 是唯一自主暂停等用户的入口。
+- 禁止后果：不得先发布 Completed 或关闭逻辑运行，再尝试催促；不得以无后台句柄、有正式文本或缺工作投影当作目标已完成。相同终态重复通知幂等，后续新的偷停仍须提醒，不因之前已经 nudge 过一次而永久静默。无 idle 许可时等待真实闲置，不抢占正在运行的工具。
+- 边界：已退休 run、旧权威回执、已交付工作、显式用户取消不被复活。provider 故障仍交给既有失败 owner；提醒或存储失败必须可见，不能伪造已发送或已完成。其他非长程角色保留各自的完成合同。
 
-## [028] ask 契约（同步委派固定 DevOps）
+## [028] devops 契约（同步委派固定 DevOps）
 
-当跑者调用 `ask(intent)` 时，系统把调查意图同步委派给本 work 绑定的固定 DevOps。
+当 Plan 跑者调用 `devops(intent)` 时，系统把调查意图同步委派给本 work 绑定的固定 DevOps。原工具名 `ask` 不再是本能力的别名。
 
 - 允许后果：系统查询本规划任务绑定的唯一固定 DevOps 实例；若未绑定则由运行时 single-flight 创建并持久化 `DevOpsBound` 绑定事实。将 `intent` 作为调查目标投递给该 DevOps 做只读调查（含真实 bash 执行，只读约束由 office 提示词承担，不做运行时门）。等待本次调用的完成事实，确认收敛后把 DevOps 的生命周期工作记录（LWR，子→父方向，`includeOpening = false`）完整交回 Planner。
-- 禁止后果：模型在调用参数中只传 `intent`，不得传递 DevOps 的 id、role、model 等底层拓扑标识。系统严禁对 DevOps 的返回结果做二次模型摘要，必须完整交付。同一规划任务同时至多运行一个未决 ask 委派；已有未决委派时再次调用必须返回强类型拒绝。返回材料不得携带底层 id（SessionId/AgentId/PtyId）。
+- 禁止后果：模型在调用参数中只传 `intent`，不得传递 DevOps 的 id、role、model 等底层拓扑标识。系统严禁对 DevOps 的返回结果做二次模型摘要，必须完整交付。同一规划任务同时至多运行一个未决 devops 委派；已有未决委派时再次调用必须返回强类型拒绝。返回材料不得携带底层 id（SessionId/AgentId/PtyId）。
 - 失败后果：若固定 DevOps 处于忙碌状态或响应失败，返回强类型错误，不静默丢弃，不新建替代操作员。
 
 ## [029] P 路径推导与编程面工具
@@ -265,7 +265,7 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 
 系统启动时，必须显式注册 Plan 相关的工具与参数规范。
 
-- 允许后果：在 `ToolRegistry` 中登记 `js-plan`（作为 JS 编程面）、`ask`、`review`、`deliver`（作为编排面 ToolSpec）。在静态工具名单（`StaticTools.fs`）与投机调查分类器（`InvestigationEstimateContract.classifyTool`）中显式登记上述四个工具名称。`review` 与 Manager 共用同一 ToolSpec（共享壳按角色换目标，见 [038]）。
+- 允许后果：在 `ToolRegistry` 中登记 `js-plan`（JS 编程面）、`devops`、`ask`、`review`、`deliver`（编排面）。静态工具名单与投机调查分类显式登记五个名称；`ask` 参数为 `question`，`devops` 参数为 `intent`，能力映射不得混用。`review` 与 Manager 共用同一 ToolSpec（见 [038]）。
 - 禁止后果：严禁使用前缀匹配、通配符或模糊规则对工具进行分类或准入。未显式登记的工具不得进入 Plan 的工具列表。`handoff` 与 `resume` 不得作为 Plan 工具登记或注册。
 - 失败后果：若工具名称或分类缺失，系统在启动静态校验或工具构建期必须报错阻断。
 
@@ -280,6 +280,7 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
   - `resources/provider/planning/s3/`
   - `resources/provider/tool/js-plan/`
   - `resources/provider/tool/ask/`
+  - `resources/provider/tool/devops/`
   - `resources/provider/tool/review/`
   - `resources/provider/tool/deliver/`
   系统提示转换器在 `experimental.chat.system.transform` 挂钩中真正装配 Plan 提示：`catalogPrompt` 对 `Role.Plan` 返回 Plan 的 role law（`PlanSystemPrompt` 进入 PromptCatalog），`activeRoles` 包含 `Plan`，替换逻辑与其它 office 角色同规则（字节识别自己的段落、按当前全局语言本地化）。在 Plan 会话的系统提示中，按当前任期的 `stage` 以稳定字节幂等追加对应阶段的方法说明（S1 对应事实与取舍，S2 对应理解与路径，S3 对应 Knuth 伪代码）；stage 变化时下一次请求呈现新 stage 方法。
@@ -288,10 +289,10 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
 
 ## [032] 非 Plan 路径行为不变
 
-Plan 机制的引入不得对既有系统角色与流程产生任何侵入或行为改变。
+Plan 的阶段与任期机制不得污染其他角色；[027]、[049] 明确规定的 Manager 长程连续性与人类提问能力除外。
 
-- 允许后果：既有角色（Manager、Orchestrator、Engineer、DevOps、Blogger）的权限投影、工具注册、生命周期转换、消息变换逻辑保持字节级行为一致。Manager 的 `review` 字节行为不变（共享壳分派不改变 Manager 后端语义，见 [038]）。
-- 禁止后果：非 Plan 角色严禁获取 Plan 专属工具。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话的消息集。Plan 的自然停止豁免严禁应用于其它 role（见 [027]）。
+- 允许后果：Orchestrator、Engineer、DevOps、Blogger 的既有角色合同不变。Manager 新增 `ask` 与禁止静默停止，`review` 的业务判断不变。
+- 禁止后果：非 Plan 角色严禁获取 `js-plan` 或 `devops`。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
 - 失败后果：任何非 Plan 回归测试失败均表明破坏了全局不变量，改动必须判定为不合格。
 
 ## [033] wanxiangli record、SQLite 持久化与投影
@@ -339,7 +340,7 @@ work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规�
 - 允许后果：系统读取会话 sessionId，核验 owner role 为 `Plan`，以一条 durable record 原子追加两条事实：
   1. `WorkOpened(workId, root)`，其中 `workId = sessionId`，root 为 `<git-common-dir>/wanxiangshu`；
   2. `IncumbencyOpened(workId, incumbencyId, S1, openingCursor)`。openingCursor 取开立这一刻已观察到的 XTrace 头序号，不加一，不加十。缺这一序号则拒绝，不写空游标。
-  首任任期始于 `S1`。DevOpsBound 不属于开立，首次 ask 成功收敛时再按 [028]/[042] 绑定。若该 work 已存在且 root/sequence 相同，入口重读 durable work 后幂等成功，不因后到调用观察到不同 head 再开一次；并发开立收到 Conflict 或 Unknown 时也必须先重读，只有持久事实能证明同一 work 已开立才算成功。入口挂点在消息 transform pipeline 的 Plan 分支（`resolveTenure` 之前）。
+  首任任期始于 `S1`。DevOpsBound 不属于开立，首次 devops 调查成功收敛时再按 [028]/[042] 绑定。若该 work 已存在且 root/sequence 相同，入口重读 durable work 后幂等成功，不因后到调用观察到不同 head 再开一次；并发开立收到 Conflict 或 Unknown 时也必须先重读，只有持久事实能证明同一 work 已开立才算成功。入口挂点在消息 transform pipeline 的 Plan 分支（`resolveTenure` 之前）。
 - 禁止后果：非 Plan 会话严禁触发本入口。严禁凭同名物理会话或自然语言内容猜测已有 work。严禁在入口之外的位置追加首条 `WorkOpened` 或首个 `IncumbencyOpened`。
 - 失败后果：同一身份重放幂等；异载荷拒绝。若 store 不可得或写入失败，入口必须失败并保持零写入，严禁伪造 S1 兜底状态。
 
@@ -414,3 +415,15 @@ Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择�
 发现查询显式请求最多两条候选；返回满页时不能声称结果唯一，即使本地过滤后只剩一条。精确候选必须有有效 session identity 并明确属于 Manager；SDK 错误、非列表响应、缺身份和错误 agent 都是拒绝，不得静默丢行后推断唯一性。
 
 恢复以单个 work 为失败边界。初次读历史或等待 Host 之后再读历史发生错误时，诊断必须指明 workId，保留坏记录和未结算义务，继续恢复其他独立 work。不得把损坏记录解释为“没有工作”，也不得通过跳过记录修复该 work；正常业务读取仍拒绝这份历史。
+
+## [049] ask：向用户提问与显式暂停
+
+Manager 与 Plan 可以使用 `ask(question)` 请求继续目标所必需的用户输入。它不调用 DevOps，不假装拿到了用户回答，也不完成工作。
+
+- 真实呈现询问并成功登记 `UserQuestionAsked` 后，返回“你的询问已经发出”一类占位回执。事实绑定 session、logical run、authority root、提问所依据的物理输入、provider run、tool call 与原问题。占位回执不是用户原文，也不是完成报告。
+- 在 Host 已确认同一个 ask 工具结果的 `message.part.updated/completed` 上，立即调用 `InterruptAttempt`，不靠延时器猜测完成顺序，不在返回结果前销毁工具。不得使用逻辑终止、关闭 authority 或递归取消子资源替代。重复终态不重复中断；别的 call、别的会话或已回答提问的迟到事件不许中断新执行。
+- 等待只从 durable 问题事实派生，进程缓存不成为另一份权威。未回答期间不发工作 nudge、不继续其他工作工具；Host-native 工具的 before 门和插件执行门同样拒绝。`ask` 精确重放只返回原确认，不重复发问题；异载荷同身份、第二个未决问题、空问题、无可用通知或持久写入失败都明确失败。
+- 只有同一逻辑运行的新真实人类输入才追加 `UserQuestionAnswered` 并解除等待。导致 ask 的旧输入、内部提示、插件 continuation、通知和 provider 文本都不算答复。原提问者的终态即使晚于用户答复到达，仍不得关闭或重催新一轮。
+- 用户答复沿既有 HumanMessage 准入继续同一任务，不强制新建会话、不触发 `Reopened`、不重置评审资格，也不让用户另行调用恢复工具。若显示、存储或 interrupt 失败，必须明确报告实际完成到哪一步，不伪造“正在等待/已经继续”的事实。
+
+本轮仅静态修改实现与测试；[027]、[049] 的完整宿主行为尚未运行验收。尤其需复验工具结果先落地、再 interrupt 的实际顺序，以及用户回复与旧终态交错时的恢复行为。

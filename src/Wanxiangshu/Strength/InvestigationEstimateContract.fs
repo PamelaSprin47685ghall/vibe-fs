@@ -49,6 +49,7 @@ module InvestigationEstimateContract =
         | "fission"
         | "js-plan"
         | "ask"
+        | "devops"
         | "handoff"
         | "deliver"
         | "open-terminal"

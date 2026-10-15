@@ -129,6 +129,7 @@ module ToolRegistry =
           IsStrengthReplica: HostToolContext -> bool
           ManagerFactsFor: string -> ManagerCapabilityFacts
           IsRetirementFrozen: string -> bool
+          IsWaitingForUser: string -> bool
           BeginToolExecution: string -> unit
           EndToolExecution: string -> unit }
 
@@ -180,7 +181,7 @@ module ToolRegistry =
         )
 
     /// capability-enforcement-025: current Manager facts close the office gate.
-    /// A frozen retirement keeps only Join and Finality; the final incumbent
+    /// A frozen retirement keeps Join, Finality and the explicit human Ask; the final incumbent
     /// keeps the read/cleanup/close-out surface and loses every new-work
     /// capability.
     let private managerFactsStage
@@ -199,6 +200,7 @@ module ToolRegistry =
                 frozen
                 && permission <> ToolPermission.Join
                 && permission <> ToolPermission.Finality
+                && permission <> ToolPermission.Ask
                 ->
                 return denyTaskState ctx spec.Name
             | Some permission when not (OfficeCapability.isAllowedForManagerFacts managerFacts permission) ->
@@ -214,7 +216,10 @@ module ToolRegistry =
         (ctx: HostToolContext)
         (role: Role)
         : Task<string> =
-        if role = Role.Manager then
+        if gate.IsWaitingForUser ctx.SessionId && spec.Name <> "ask" then
+            Task.FromResult(ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId)
+                                "tool/ask-waiting" Map.empty)
+        elif role = Role.Manager then
             managerFactsStage gate spec managerPermission args ctx
         else
             spec.Execute args ctx
@@ -624,7 +629,7 @@ module ToolRegistry =
         let renderAskOutcome (outcome: Result<AskResult, string>) : string =
             match outcome with
             | Ok res -> res.WorkRecord
-            | Error err -> sprintf "ask failed: %s" err
+            | Error err -> sprintf "devops failed: %s" err
 
         let askGitCommonDir (directory: string option) =
             match directory with
@@ -640,7 +645,7 @@ module ToolRegistry =
                 let gitCommonDir = askGitCommonDir workspaceDirectory
 
                 if String.IsNullOrWhiteSpace gitCommonDir then
-                    return "ask failed: git common directory is missing"
+                    return "devops failed: git common directory is missing"
                 else
                     let delegateTo = devopsDelegateOf syncRuntime ctx
 
@@ -890,13 +895,30 @@ module ToolRegistry =
                         factory ]
                 Admission = planningAdmission
                 Execute = fun args ctx -> executeJsPlanTool args ctx }
-              { Name = "ask"
-                Description = ProviderProse.render providerLanguage "tool/ask" Map.empty
+              { Name = "devops"
+                Description = ProviderProse.render providerLanguage "tool/devops" Map.empty
                 Arguments =
                   [ "intent",
                     ToolHostCodec.stringSchemaDescribed "Investigation intent handed to the bound fixed DevOps" factory ]
                 Admission = planningAdmission
                 Execute = fun args ctx -> executeAskTool syncDelegateRuntime args ctx } ]
+
+        let askSpec: ToolSpec =
+            { Name = "ask"
+              Description = ProviderProse.render providerLanguage "tool/ask" Map.empty
+              Arguments =
+                [ "question", ToolHostCodec.stringSchemaDescribed
+                    (ProviderProse.render providerLanguage "tool/ask-question" Map.empty) factory ]
+              Admission = ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Ask)
+              Execute = fun args ctx ->
+                task {
+                    let! asked = runtime.AskUser(ctx, args.Text "question")
+                    let language = ProviderLanguageBinding.forSessionText ctx.SessionId
+                    return
+                        match asked with
+                        | Ok() -> ProviderProse.render language "tool/ask-sent" Map.empty
+                        | Error reason -> ProviderProse.render language "tool/ask-failed" (Map [ "reason", reason ])
+                } }
 
         /// Algorithm D/E: one `deliver` tool. The work's sequence decides the
         /// path — S4 is the two-stage Manager deliver, S1–S3 the one-shot Plan
@@ -938,6 +960,7 @@ module ToolRegistry =
               yield! PtyTool.specs factory ptyContext
               yield ForkTool.orchestratorSpec factory runtime
               yield JoinTool.spec runtime
+              yield askSpec
 
               let horizonContext: HorizonTool.HorizonRuntimeContext =
                   { RuntimeFor = runtime.RuntimeFor
@@ -982,6 +1005,7 @@ module ToolRegistry =
               IsStrengthReplica = isStrengthReplica
               ManagerFactsFor = (fun sessionId -> runtime.ManagerCapabilityFactsFor sessionId)
               IsRetirementFrozen = (fun sessionId -> runtime.IsRetirementFrozen sessionId)
+              IsWaitingForUser = runtime.IsWaitingForUser
               BeginToolExecution = beginToolExecution
               EndToolExecution = endToolExecution }
 

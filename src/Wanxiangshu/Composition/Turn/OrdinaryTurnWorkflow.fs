@@ -29,6 +29,47 @@ open Wanxiangshu.Resources
 /// Ordinary turn observation policy (INTERACTION-REPAIR / PROVIDER-RECOVERY / TERMINAL-REPORT).
 module OrdinaryTurnWorkflow =
 
+    type private LongWorkGate = Ordinary | Wait | Continue
+
+    let private longWorkGate (journal: AgentJournal option) (context: ReconciledTurnContext) =
+        let turn = context.Turn
+        match turn.Role with
+        | Some(Role.Manager | Role.Plan) ->
+            let authority =
+                journal
+                |> Option.bind (fun durable ->
+                    (AgentJournal.snapshot durable).AgentProjections.Sessions
+                    |> Map.tryFind turn.SessionId
+                    |> Option.bind (fun session -> session.PromptAuthority))
+            let explicitWaitOrOldTurn =
+                authority |> Option.exists (fun state ->
+                    let obsolete =
+                        match state.ActiveLogicalRun with
+                        | Some active -> active.AuthorityRootUserMessageId <> turn.AuthorityRootUserMessageId
+                        | None -> state.LastAuthorityProfile.IsSome
+                    obsolete
+                    || (state.UserQuestions |> Map.exists (fun _ question ->
+                        question.Request.AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                        && (question.Answer.IsNone || question.Request.ProviderRunId = turn.ProviderRun))))
+            if explicitWaitOrOldTurn then Wait
+            else
+                let settled =
+                    turn.Directory
+                    |> Option.bind (fun directory ->
+                        let commonDir = RuntimePath.gitCommonDir directory
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value turn.SessionId))
+                    |> Option.exists (fun work ->
+                        work.Delivered || List.contains (ProviderRunIdentity.value turn.ProviderRun) work.RetiredRuns)
+                if settled then Wait
+                else
+                    match context.Failure, turn.Observation, turn.Outcome with
+                    | None, None, ReconcileProgram.TurnCompleted -> Continue
+                    | None, None, ReconcileProgram.TurnNeedsContinuation _ when
+                        turn.Finish |> Option.exists (fun finish -> System.String.Equals(finish, "stop", System.StringComparison.OrdinalIgnoreCase)) ->
+                        Continue
+                    | _ -> Ordinary
+        | _ -> Ordinary
+
     let private bloggerReceiptKind (port: TurnObservationJournalPort) (turn: ReconciledTurn) =
         port.TryBloggerReceiptKind turn.SessionId turn.ProviderRun
 
@@ -87,8 +128,14 @@ module OrdinaryTurnWorkflow =
             || (observation
                 |> Option.exists (fun port -> port.IsFissionActive context.Turn.SessionId))
 
+        let workGate = if isFissionReplaced then Wait else longWorkGate journal context
+
         match isFissionReplaced, context.Turn.Observation, context.Turn.Outcome with
         | true, _, _ -> AsyncSupport.completedTask ()
+        | false, _, _ when workGate = Wait -> AsyncSupport.completedTask ()
+        | false, _, _ when workGate = Continue ->
+            InteractionRepairWorkflow.repairUnfinishedWork
+                quiescence context sessionPort rootWorkspace eventPort journal observer
         | false, Some ReconcileProgram.TurnUnknown, _ ->
             InteractionRepairWorkflow.repairMissingFinalReport
                 quiescence
@@ -416,8 +463,14 @@ module OrdinaryTurnWorkflow =
             FissionRuntime.isSilentInterrupt turn.SessionId
             || (observation |> Option.exists (fun port -> port.IsFissionActive turn.SessionId))
 
+        let workGate = if isFissionReplaced then Wait else longWorkGate journal context
+
         match isFissionReplaced, turn.Observation with
         | true, _ -> AsyncSupport.completedTask ()
+        | false, _ when workGate = Wait -> AsyncSupport.completedTask ()
+        | false, _ when workGate = Continue ->
+            InteractionRepairWorkflow.repairUnfinishedWork
+                quiescence context sessionPort rootWorkspace eventPort journal observer
         | false, Some ReconcileProgram.TurnUnknown ->
             InteractionRepairWorkflow.repairMissingFinalReport
                 quiescence

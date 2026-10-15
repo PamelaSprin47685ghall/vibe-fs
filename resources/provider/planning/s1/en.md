@@ -8,7 +8,7 @@ Write down the target state first: after planning completes, what state should t
 
 ## Facts
 
-Obtain repository facts through `ask`. Separate three kinds:
+Obtain repository facts through `devops`. Separate three kinds:
 
 - Verified facts: sourced and re-checkable.
 - Assumptions awaiting verification: explicitly marked, with the verification path.
@@ -24,7 +24,7 @@ For each problem, ask "why" until the answer runs out, or until you reach a boun
 
 List the options that actually exist and what each costs. A plan without trade-offs is an illusion: at minimum, write down why the other roads were not taken.
 
-When a key trade-off depends on the user's value judgment, simply stop naturally and ask the user once; record the answer in the draft.
+When a key trade-off depends on the user's value judgment, use `ask` to request that decision. The system pauses the attempt; after the user replies, record the answer in the draft and continue.
 
 ## Acceptance
 

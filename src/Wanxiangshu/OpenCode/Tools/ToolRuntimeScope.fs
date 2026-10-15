@@ -159,6 +159,9 @@ type ToolRuntimeScope
     /// Process-local join admission before join / publish consume.
     // DSL-MUTABLE: resource — current-process join admission callback attachment
     let mutable currentProcessJoin: (SessionId -> Task<FamilyRecovery>) option = None
+    let mutable questionNotifier: (string -> Task<Result<unit, string>>) option = None
+    let questionRequests = HashSet<SessionId>()
+    let questionInterrupts = HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
 
     /// EXEC-017 attempt-scoped join interrupt registry (PluginRuntimeScope or local default).
     // DSL-MUTABLE: resource — join attempt registry attachment
@@ -873,6 +876,84 @@ type ToolRuntimeScope
     member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
     member _.ActiveProfileFor(sessionId: SessionId) = activeProfileFor sessionId
+
+    member _.AttachQuestionNotifier(notify: string -> Task<Result<unit, string>>) =
+        questionNotifier <- Some notify
+
+    member _.IsWaitingForUser(sessionId: string) =
+        journal |> Option.bind (fun durable -> UserQuestionJournal.pending durable (SessionId.create sessionId))
+        |> Option.isSome
+
+    /// 先确认提问已经呈现，再登记同一逻辑运行的等待。工具只交回占位回执。
+    member _.AskUser(ctx: HostToolContext, question: string) : Task<Result<unit, string>> =
+        task {
+            let sid = SessionId.create ctx.SessionId
+            match journal, activeProfileFor sid, ctx.ProviderRunId, ctx.ToolCallId,
+                  currentPhysicalUserMessage ctx.SessionId, questionNotifier with
+            | Some durable, Some profile, Some run, Some call, Some physical, Some notify when
+                (profile.CanonicalRole = Role.Manager || profile.CanonicalRole = Role.Plan)
+                && not (String.IsNullOrWhiteSpace question) ->
+                let request: UserQuestionAskedPayload =
+                    { SessionId = sid
+                      LogicalRunId = profile.LogicalRunId
+                      AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+                      PhysicalUserMessageId = PhysicalUserMessageId.create physical
+                      ProviderRunId = run
+                      ToolCallId = call
+                      Question = question }
+                match UserQuestionJournal.tryFind durable sid call with
+                | Some previous when previous.Request = request -> return Ok()
+                | Some _ -> return Error "ask call identity conflicts with its recorded question"
+                | None when UserQuestionJournal.pending durable sid |> Option.isSome ->
+                    return Error "a question is already waiting for the user"
+                | None ->
+                    let work =
+                        lifecycleWorkOfDirectory
+                            (directoryFor ctx.SessionId |> Option.orElse workspaceDirectory)
+                            ctx.SessionId
+                    if not (work |> Option.exists (fun current -> current.ActiveId.IsSome && not current.Delivered)) then
+                        return Error "ask requires an unfinished work with an active incumbency"
+                    elif not (questionRequests.Add sid) then
+                        return Error "a question is already being sent for this session"
+                    else
+                        try
+                            // 旧请求的物理中断回执不占用下一次提问的进程内资源。
+                            for key in questionInterrupts |> Seq.filter (fun (owner, _, _) -> owner = sid) |> Seq.toArray do
+                                questionInterrupts.Remove key |> ignore
+                            let! shown = notify question
+                            match shown with
+                            | Error reason -> return Error reason
+                            | Ok() ->
+                                let! recorded = UserQuestionJournal.request durable request
+                                match recorded, currentPhysicalUserMessage ctx.SessionId with
+                                | Ok(), Some latest ->
+                                    // 用户可能在通知/落盘期间已回复；只有真实准入可以解除等待。
+                                    return! UserQuestionJournal.observeHumanInput durable sid (PhysicalUserMessageId.create latest)
+                                | _ -> return recorded
+                        finally
+                            questionRequests.Remove sid |> ignore
+            | _ -> return Error "ask requires active Manager/Plan authority, exact call evidence, a question, and user notification"
+        }
+
+    /// 只在宿主确认 ask 的工具结果后中断本次 attempt；不终结逻辑运行或取消子资源。
+    member _.InterruptForUserQuestion(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) : Task<Result<unit, string>> =
+        task {
+            match journal |> Option.bind (fun durable -> UserQuestionJournal.pending durable sessionId) with
+            | Some question when question.ToolCallId = callId && question.ProviderRunId = providerRun
+                                 && currentPhysicalUserMessage (SessionId.value sessionId)
+                                    = Some(PhysicalUserMessageId.value question.PhysicalUserMessageId) ->
+                let key = sessionId, question.ProviderRunId, callId
+                if questionInterrupts.Add key then
+                    try
+                        let! stopped = sessions.InterruptAttempt sessionId
+                        if Result.isError stopped then questionInterrupts.Remove key |> ignore
+                        return stopped
+                    with ex ->
+                        questionInterrupts.Remove key |> ignore
+                        return Error ex.Message
+                else return Ok()
+            | _ -> return Ok()
+        }
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member _.RunStarted = onStarted
 
@@ -1350,6 +1431,9 @@ type ToolRuntimeScope
                 reason
 
     member _.DisposeSession(sessionId: string) : Task =
+        let questionOwner = SessionId.create sessionId
+        for key in questionInterrupts |> Seq.filter (fun (owner, _, _) -> owner = questionOwner) |> Seq.toArray do
+            questionInterrupts.Remove key |> ignore
         let forkRuntimes, orchestrator =
             lock gate (fun () ->
                 // DSL-MUTABLE: algorithm-scratch — owned runtime accumulator for dispose

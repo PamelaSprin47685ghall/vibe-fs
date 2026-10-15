@@ -9,20 +9,20 @@ test('WHAT[work-021] Role catalog contains Plan and wire label is plan', () => {
   assert.ok(allPublicRoleLabels.includes('plan'), 'allPublicRoleLabels must contain "plan"')
 })
 
-test('WHAT[work-021] Plan role permission projection permits exactly js-plan, ask, review, deliver and denies repository and execution actions', () => {
+test('WHAT[work-021] Plan separates human ask from devops investigation and denies direct execution', () => {
   const allowed = permissions('plan')
   assert.ok(Array.isArray(allowed), 'permissions("plan") must return an array')
 
-  // WHAT[work-021]: the plan toolset is { js-plan, ask, review, deliver }.
+  // WHAT[work-021]: ask asks the human; devops delegates an investigation.
   // resume and handoff are no longer part of the plan surface.
-  const expectedPermissions = ['Ask', 'Deliver', 'JsPlan', 'Review']
+  const expectedPermissions = ['Ask', 'DevOpsConsultation', 'Deliver', 'JsPlan', 'Review']
   assert.deepEqual(
     [...allowed].sort(),
     expectedPermissions.sort(),
-    'Plan role must have exactly the 4 allowed permissions: ask, deliver, js-plan, review',
+    'Plan must expose distinct human-question and DevOps capabilities',
   )
 
-  // Must strictly allow the 4 designated capabilities
+  // Each designated capability is actually allowed.
   for (const perm of expectedPermissions) {
     assert.equal(isAllowed('plan', perm), true, `Plan must be allowed ${perm}`)
   }

@@ -340,7 +340,8 @@ module RuntimeSurface =
               AcceptedDispatches = acceptedDispatches
               PhysicalLandings = physicalLandings
               AcceptedContinuationIds = accepted
-              ClaimSequences = sequences }
+              ClaimSequences = sequences
+              UserQuestions = Map.empty }
 
     let internal projectionToJs (projection: PromptAuthority.PromptAuthorityProjection) : obj =
         box

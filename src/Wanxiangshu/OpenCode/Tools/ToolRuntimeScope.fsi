@@ -57,6 +57,11 @@ type ToolRuntimeScope =
     member EventPort: IEventObservationPort option
     member WorkspaceDirectory: string option
     member ActiveProfileFor: sessionId: SessionId -> PromptAuthority.AuthorityExecutionProfile option
+    member AttachQuestionNotifier: notify: (string -> Task<Result<unit, string>>) -> unit
+    member IsWaitingForUser: sessionId: string -> bool
+    member AskUser: ctx: HostToolContext * question: string -> Task<Result<unit, string>>
+    member InterruptForUserQuestion:
+        sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> Task<Result<unit, string>>
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member RunStarted: (SessionId -> Role -> string option -> unit)
 

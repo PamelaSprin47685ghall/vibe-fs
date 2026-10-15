@@ -14,6 +14,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-fallback-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-eventstore.fsproj"/>
     <Compile Include="Composition/Turn/OrdinaryTurnWorkflow.fsi"/>
     <Compile Include="Composition/Turn/OrdinaryTurnWorkflow.fs"/>
   </ItemGroup>

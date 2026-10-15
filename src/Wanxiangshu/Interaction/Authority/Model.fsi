@@ -92,6 +92,10 @@ module PromptAuthority =
           LogicalRunId: LogicalRunId option
           Count: int }
 
+    type UserQuestion =
+        { Request: UserQuestionAskedPayload
+          Answer: PhysicalUserMessageId option }
+
     type PromptAuthorityProjection =
         { LastAuthorityProfile: AuthorityExecutionProfile option
           ActiveLogicalRun: AuthorityExecutionProfile option
@@ -99,7 +103,8 @@ module PromptAuthority =
           AcceptedDispatches: Map<string, AcceptedDispatch>
           PhysicalLandings: Map<PhysicalUserMessageId, AcceptedDispatch>
           AcceptedContinuationIds: Map<PhysicalUserMessageId, ContinuationKind>
-          ClaimSequences: Map<string, ClaimSequenceCounter> }
+          ClaimSequences: Map<string, ClaimSequenceCounter>
+          UserQuestions: Map<ToolCallId, UserQuestion> }
 
     val empty: PromptAuthorityProjection
     val acceptedDispatchKey: sessionId: SessionId -> payloadDigest: string -> string

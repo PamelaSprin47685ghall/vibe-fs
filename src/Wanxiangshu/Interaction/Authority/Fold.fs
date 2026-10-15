@@ -16,6 +16,7 @@ type PromptAuthorityFoldRejection =
     | AuthorityRootSeedRejected of PromptAuthority.IdentitySeedValidationError
     | AuthorityRootLedgerRejected of string
     | AuthorityLogicalRunClosureRejected of string
+    | UserQuestionRejected of string
 
 [<RequireQualifiedAccess>]
 module PromptAuthorityFoldRejection =
@@ -26,6 +27,7 @@ module PromptAuthorityFoldRejection =
         | PromptAuthorityFoldRejection.AuthorityRootSeedRejected _
         | PromptAuthorityFoldRejection.AuthorityRootLedgerRejected _ -> "AuthorityRootAccepted"
         | PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected _ -> "AuthorityLogicalRunClosed"
+        | PromptAuthorityFoldRejection.UserQuestionRejected _ -> "UserQuestion"
 
     let message (rejection: PromptAuthorityFoldRejection) : string =
         match rejection with
@@ -34,6 +36,7 @@ module PromptAuthorityFoldRejection =
         | PromptAuthorityFoldRejection.AuthorityRootSeedRejected error -> sprintf "%A" error
         | PromptAuthorityFoldRejection.AuthorityRootLedgerRejected reason -> reason
         | PromptAuthorityFoldRejection.AuthorityLogicalRunClosureRejected reason -> reason
+        | PromptAuthorityFoldRejection.UserQuestionRejected reason -> reason
 
 module PromptFactFold =
 
@@ -134,6 +137,50 @@ module PromptFactFold =
                     "AuthorityLogicalRunClosed conflicts with the active logical run"
             )
 
+    let private foldUserQuestionAsked authorityOf (payload: UserQuestionAskedPayload) =
+        let current = authorityOf payload.SessionId |> Option.defaultValue PromptAuthority.empty
+        let reject reason = Error(PromptAuthorityFoldRejection.UserQuestionRejected reason)
+
+        match current.ActiveLogicalRun with
+        | Some active when
+            active.LogicalRunId = payload.LogicalRunId
+            && active.AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
+            && (active.CanonicalRole = Role.Manager || active.CanonicalRole = Role.Plan)
+            ->
+            if System.String.IsNullOrWhiteSpace payload.Question then
+                reject "ask requires a nonempty question"
+            else
+                match Map.tryFind payload.ToolCallId current.UserQuestions with
+                | Some existing when existing.Request = payload -> Ok []
+                | Some _ -> reject "ask call identity conflicts with its recorded question"
+                | None when current.UserQuestions |> Map.exists (fun _ question -> question.Answer.IsNone) ->
+                    reject "a question is already waiting for the user"
+                | None ->
+                    let question: PromptAuthority.UserQuestion = { Request = payload; Answer = None }
+                    let updated =
+                        { current with UserQuestions = Map.add payload.ToolCallId question current.UserQuestions }
+                    Ok [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, updated) ]
+        | _ -> reject "ask requires the exact active Manager or Plan authority"
+
+    let private foldUserQuestionAnswered authorityOf (payload: UserQuestionAnsweredPayload) =
+        let current = authorityOf payload.SessionId |> Option.defaultValue PromptAuthority.empty
+        let reject reason = Error(PromptAuthorityFoldRejection.UserQuestionRejected reason)
+
+        match Map.tryFind payload.ToolCallId current.UserQuestions with
+        | Some question when question.Request.LogicalRunId = payload.LogicalRunId ->
+            if payload.PhysicalUserMessageId = question.Request.PhysicalUserMessageId then
+                reject "the input that caused ask cannot answer its own question"
+            else
+                match question.Answer with
+                | Some answer when answer = payload.PhysicalUserMessageId -> Ok []
+                | Some _ -> reject "the question was answered by a different physical user input"
+                | None ->
+                    let answered = { question with Answer = Some payload.PhysicalUserMessageId }
+                    let updated =
+                        { current with UserQuestions = Map.add payload.ToolCallId answered current.UserQuestions }
+                    Ok [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, updated) ]
+        | _ -> reject "no matching question is waiting for this user input"
+
     let fold
         (authorityOf: SessionId -> PromptAuthority.PromptAuthorityProjection option)
         (runtimeStartCount: int)
@@ -195,3 +242,5 @@ module PromptFactFold =
         // ── closure ─────────────────────────────────────────────────────────
 
         | PromptFactCases.AuthorityLogicalRunClosed payload -> foldAuthorityLogicalRunClosed authorityOf payload
+        | PromptFactCases.UserQuestionAsked payload -> foldUserQuestionAsked authorityOf payload
+        | PromptFactCases.UserQuestionAnswered payload -> foldUserQuestionAnswered authorityOf payload

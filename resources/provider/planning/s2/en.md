@@ -8,7 +8,7 @@ Restate the problem in your own words: what the input is, what the output is, wh
 
 ## Exploration
 
-Generate multiple candidate paths. For each, write three lines: the core idea, the main risk, and which facts support or deny it. Fill the facts you still need through `ask`, not with imagination.
+Generate multiple candidate paths. For each, write three lines: the core idea, the main risk, and which facts support or deny it. Fill the facts you still need through `devops`, not with imagination.
 
 Do not delete rejected paths; keep one line of rejection reason for each. They are the evidence for "why not the other road" at review time.
 

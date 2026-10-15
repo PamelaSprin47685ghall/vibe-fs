@@ -3,7 +3,8 @@ import test from 'node:test'
 import { isAllowed } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 import * as completedTurn from '../../../dist/Interaction/Repair/CompletedTurnSurface.js'
 
-// WHAT[work-032] keeps every non-Plan path byte-identical. Two
+// WHAT[work-032] keeps unrelated offices unchanged. Manager shares human Ask;
+// it must not inherit Plan's DevOps consultation or draft capabilities. Two
 // observable faces are asserted here: non-Plan roles never receive the
 // Plan-only permission projection, and non-Plan empty stops keep requiring
 // interaction repair (the full classification suite lives in 027.test.mjs
@@ -16,7 +17,7 @@ import * as completedTurn from '../../../dist/Interaction/Repair/CompletedTurnSu
 // surface.
 
 test('WHAT[work-032] non-Plan roles never receive the Plan-only tool projection', () => {
-  const planOnlyPermissions = ['JsPlan', 'Ask', 'Deliver', 'Review']
+  const planOnlyPermissions = ['JsPlan', 'DevOpsConsultation', 'Deliver', 'Review']
   const nonPlanRoles = ['manager', 'engineer', 'devops', 'orchestrator', 'blogger']
   // Each role label must resolve to a real role, so the deny below is a
   // genuine projection fact and not an unknown-role fallback.
@@ -36,9 +37,15 @@ test('WHAT[work-032] non-Plan roles never receive the Plan-only tool projection'
 })
 
 test('WHAT[work-032] non-Plan empty stops keep requiring interaction repair', () => {
-  // Reference companion to work-027: the natural-stop exemption is
-  // granted to the plan role only; other roles keep their empty-stop repair
-  // behavior byte-for-byte.
+  // There is no Plan empty-stop exemption to propagate to another role.
   assert.equal(completedTurn.needsInteractionRepair('engineer', true, 'stop', []), true)
   assert.equal(completedTurn.needsInteractionRepair('manager', true, 'stop', []), true)
+})
+
+test('WHAT[work-032] only Manager and Plan may ask the human', () => {
+  for (const role of ['manager', 'plan']) assert.equal(isAllowed(role, 'Ask'), true)
+  for (const role of ['engineer', 'devops', 'orchestrator', 'blogger', 'coder', 'inspector']) {
+    assert.equal(isAllowed(role, 'Ask'), false, role)
+    assert.equal(isAllowed(role, 'DevOpsConsultation'), false, role)
+  }
 })

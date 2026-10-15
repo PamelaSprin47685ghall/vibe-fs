@@ -30,10 +30,7 @@ module CompletedTurnClassifier =
     val classifyOutcome:
         completed: bool -> finish: string option -> errorName: string option -> parts: MessagePart array -> obj
 
-    /// planning-009: Plan's empty stop (finish=stop, unusable formal text) is a
-    /// natural stop, never a repair occasion.
-    val isPlanEmptyStop: role: Role option -> finish: string option -> classified: obj -> bool
-
+    /// 空停没有角色豁免；显式 ask 等待由 durable 事实门单独判定。
     val needsInteractionRepair: role: Role option -> classified: obj -> parts: MessagePart array -> bool
 
     val retryContinuationSuppressesRepair:

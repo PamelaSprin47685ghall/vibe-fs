@@ -126,7 +126,8 @@ module ManagerWorkflow =
             sessionPort
             rootWorkspace
             turn.SessionId
-            (ProviderProse.documentFor turn.SessionId resourcePath substitutions)
+            (ProviderProse.documentFor turn.SessionId "work/manager-continue" Map.empty
+             + "\n\n" + ProviderProse.documentFor turn.SessionId resourcePath substitutions)
             PromptAuthority.ContinuationKind.ManagerGuard
             turn.Directory
             (Some journal)
@@ -143,13 +144,14 @@ module ManagerWorkflow =
         (turn: ReconciledTurn)
         =
         task {
-            match activeResourcePath turn.Directory turn.SessionId with
-            | Some resourcePath ->
-                // Durable PromptAuthority gate is the sole dedupe/source of truth:
-                // Sent/AlreadyAdmitted/Retired are settled no-op success, Failed stays nonfatal.
-                let! _ = sendNudge quiescence permit sessionPort rootWorkspace journal turn resourcePath
-                return ()
-            | None -> return ()
+            // 没读到工作不是完成证据；提醒继续核对任务，而不是悄悄放行自然结束。
+            let resourcePath = activeResourcePath turn.Directory turn.SessionId |> Option.defaultValue workPath
+            let! outcome = sendNudge quiescence permit sessionPort rootWorkspace journal turn resourcePath
+            match outcome with
+            | HostSessionNudge.IdleContinuationOutcome.Failed error
+            | HostSessionNudge.IdleContinuationOutcome.NotSent error ->
+                return invalidOp (sprintf "Manager continuation could not be delivered: %s" error)
+            | _ -> return ()
         }
         :> Task
 
@@ -318,6 +320,12 @@ module ManagerWorkflow =
         (context: ReconciledTurnContext)
         : Task =
         match journal, context.Failure, context.Turn.Outcome, context.Quiescence with
+        | Some durable, _, _, _ when
+            UserQuestionJournal.suppressesTurn durable context.Turn.SessionId
+                context.Turn.AuthorityRootUserMessageId context.Turn.ProviderRun -> Task.FromResult()
+        | _, _, _, _ when
+            isRetiredObservation context.Turn.Directory context.Turn.SessionId context.Turn.ProviderRun ->
+            Task.FromResult()
         | Some durable, None, ReconcileProgram.TurnCompleted, Some permit ->
             scheduleNudge quiescence permit sessionPort rootWorkspace durable context.Turn
         | _ -> Task.FromResult()

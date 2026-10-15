@@ -148,6 +148,7 @@ module PromptAuthorityRun =
                 { projection with
                     LastAuthorityProfile = Some canonical
                     ActiveLogicalRun = Some canonical
+                    UserQuestions = Map.empty
                     PendingClaims =
                         projection.PendingClaims
                         |> Map.filter (fun _ claim -> claim.LogicalRunId.IsNone)
@@ -171,6 +172,7 @@ module PromptAuthorityRun =
             Ok
                 { projection with
                     ActiveLogicalRun = None
+                    UserQuestions = Map.empty
                     PendingClaims =
                         projection.PendingClaims
                         |> Map.filter (fun _ claim -> claim.LogicalRunId.IsNone)

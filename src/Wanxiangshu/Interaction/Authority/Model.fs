@@ -207,6 +207,10 @@ module PromptAuthority =
 
     /// DSL-state-combination: domain — the two optional authority profiles
     /// represent durable before/active evidence; they are not stage latches.
+    type UserQuestion =
+        { Request: UserQuestionAskedPayload
+          Answer: PhysicalUserMessageId option }
+
     type PromptAuthorityProjection =
         {
             LastAuthorityProfile: AuthorityExecutionProfile option
@@ -242,6 +246,7 @@ module PromptAuthority =
             /// Run closure removes only counters owned by that run. Unlanded
             /// Root scopes belong to the session and keep their consumed count.
             ClaimSequences: Map<string, ClaimSequenceCounter>
+            UserQuestions: Map<ToolCallId, UserQuestion>
         }
 
     let empty: PromptAuthorityProjection =
@@ -251,7 +256,8 @@ module PromptAuthority =
           AcceptedDispatches = Map.empty
           PhysicalLandings = Map.empty
           AcceptedContinuationIds = Map.empty
-          ClaimSequences = Map.empty }
+          ClaimSequences = Map.empty
+          UserQuestions = Map.empty }
 
     /// Key of one logical dispatch's landing evidence: the session plus the
     /// payload digest both send paths derive identically (`sha256 text`).

@@ -254,7 +254,14 @@ module PluginHostWiring =
                 | Some work -> work.Delivered && activeRoot.IsNone
                 | None -> false
 
-            match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) (Some isLifecycleTerminated) with
+            let isUserQuestionWaiting sessionId =
+                boot.Journal
+                |> Option.bind (fun durable ->
+                    Wanxiangshu.Composition.Durable.UserQuestionJournal.pending durable sessionId)
+                |> Option.isSome
+
+            match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent)
+                      (Some isLifecycleTerminated) (Some isUserQuestionWaiting) with
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, snapshotOpt, terminalKey, sharedTerminalPort) ->
                 return! completeHost eventPort sessionPort snapshotOpt terminalKey sharedTerminalPort

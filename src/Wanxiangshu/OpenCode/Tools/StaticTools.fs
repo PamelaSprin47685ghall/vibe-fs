@@ -32,6 +32,7 @@ module StaticTools =
         | ToolPermission.Finality -> [ "deliver" ]
         | ToolPermission.JsPlan -> [ "js-plan" ]
         | ToolPermission.Ask -> [ "ask" ]
+        | ToolPermission.DevOpsConsultation -> [ "devops" ]
         | ToolPermission.Deliver -> [ "deliver" ]
         // planning-002: Plan's review shares the `review` verb with Manager's
         // ReviewAssessment. The reverse lookup decides by role, not by this order.
@@ -68,6 +69,7 @@ module StaticTools =
           ToolPermission.BashHoneypot
           ToolPermission.JsPlan
           ToolPermission.Ask
+          ToolPermission.DevOpsConsultation
           ToolPermission.Deliver
           ToolPermission.Review ]
 
@@ -166,6 +168,7 @@ module StaticTools =
           "js-bookkeeper"
           "js-plan"
           "ask"
+          "devops"
           "deliver" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
@@ -207,8 +210,8 @@ module StaticTools =
     let private permissionFor (registry: AblationRegistry) allowed role name =
         match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
-        // planning-002: the plan toolset is { js-plan, ask, review, deliver }.
-        | true, ("ask" | "review" | "deliver" | "js-plan"), Role.Plan -> "allow"
+        // 普通工具准入与可见性使用同一份能力映射。
+        | true, ("ask" | "devops" | "review" | "deliver" | "js-plan"), Role.Plan -> "allow"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
         | true, ("read" | "grep" | "glob"), Role.Manager -> "deny"

@@ -660,7 +660,21 @@ module HostSignalBootstrap =
                 | _ -> ()
 
                 FissionHostRequestProjection.projectPendingManaged hasPhysicalParent intent output
-                requireDurabilityActivation ()
+                task {
+                    let humanInput =
+                        match intent with
+                        | ChatAdmissionIntent.Decision.ExternalRootIntent evidence -> Some evidence.Key
+                        | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence -> Some evidence.Key
+                        | _ -> None
+                    match journal, humanInput with
+                    | Some durable, Some key ->
+                        let! resumed = UserQuestionJournal.observeHumanInput durable key.SessionId key.PhysicalUserMessageId
+                        match resumed with
+                        | Ok() -> ()
+                        | Error reason -> invalidOp ("Could not settle the user question: " + reason)
+                    | _ -> ()
+                    do! requireDurabilityActivation ()
+                }
 
             let observeVisibleChatMessage raw =
                 match HostEventEnvelope.tryVisibleUserMessage raw with

@@ -264,6 +264,27 @@ module PluginHooks =
                                 })
                             userNotify
 
+                    toolRegistration.Runtime.AttachQuestionNotifier(fun question ->
+                        task {
+                            try
+                                let available: bool =
+                                    emitJsExpr client "typeof $0?.tui?.showToast === 'function'"
+                                if not available then
+                                    return Error "the Host cannot present a question to the user"
+                                else
+                                    let title = ProviderProse.render
+                                                    (ProviderLanguageBinding.readGlobalPreference ())
+                                                    "tool/ask-title" Map.empty
+                                    let! response =
+                                        emitJsExpr (client, title, question)
+                                            "$0.tui.showToast({ body: { title: $1, message: $2, variant: 'info' } })"
+                                        |> unbox<Task<obj>>
+                                    if not (isNull response) && not (isNull response?error) then
+                                        return Error(string response?error)
+                                    else return Ok()
+                            with ex -> return Error ex.Message
+                        })
+
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
 
                     return toolRegistration
@@ -383,7 +404,7 @@ module PluginHooks =
                 else
                     names |> List.tryPick (fun name -> eventText carrier?(name))
 
-            let todoTerminalObservation rawInput =
+            let toolTerminalObservation expectedTool rawInput =
                 let raw = HostEventEnvelope.unwrap rawInput
                 let properties = if isNull raw then null else raw?properties
                 let part = if isNull properties then null else properties?part
@@ -403,11 +424,31 @@ module PluginHooks =
 
                 match HostEventEnvelope.eventTypeOf raw, sessionId, tool, callId, status with
                 | "message.part.updated", Some sessionId, Some tool, Some callId, Some status when
-                    String.Equals(tool, "todowrite", StringComparison.OrdinalIgnoreCase)
+                    String.Equals(tool, expectedTool, StringComparison.OrdinalIgnoreCase)
                     && (status = "completed" || status = "error")
                     ->
-                    Some(SessionId.value sessionId, ToolCallId.create callId, status)
+                    let providerRun = firstFieldText part [ "messageID"; "messageId" ] |> Option.map ProviderRunIdentity.create
+                    Some(SessionId.value sessionId, ToolCallId.create callId, status, providerRun)
                 | _ -> None
+
+            let todoTerminalObservation rawInput =
+                toolTerminalObservation "todowrite" rawInput
+                |> Option.map (fun (session, call, status, _) -> session, call, status)
+
+            let settleUserQuestion rawInput =
+                task {
+                    match toolTerminalObservation "ask" rawInput, toolRegistration with
+                    | Some(sessionId, callId, "completed", Some providerRun), Some registration ->
+                        // completed 工具部件是占位回执已被 Host 接受的因果边界；不靠定时器猜。
+                        let! result = registration.Runtime.InterruptForUserQuestion(SessionId.create sessionId, providerRun, callId)
+                        match result with
+                        | Ok() -> ()
+                        | Error reason ->
+                            invalidOp ("ask was sent, but its attempt interrupt failed: " + reason)
+                    | Some(sessionId, _, "completed", None), Some registration when registration.Runtime.IsWaitingForUser sessionId ->
+                        invalidOp "ask result is missing the exact provider message identity; no attempt was interrupted"
+                    | _ -> ()
+                }
 
             let requiredTodoJournal () =
                 journal
@@ -688,8 +729,9 @@ module PluginHooks =
                         do! prepareNewProtocolArguments owner toolName isDelegationActive toolInput toolOutput
                 }
 
-            // tool.execute.before 的具名 stage 序列。次序即合同（host-boundary-019），
-            // 不得重排。第 1 步无条件最先；第 2 步只对评审工具生效；第 3/4 步
+            // tool.execute.before 的既有 stage 序列。work-049 的显式用户等待在这些
+            // 工作步骤之前拒绝新动作；未等待时仍先 grounding，再评审和参数准备。
+            // 第 2 步只对评审工具生效；第 3/4 步
             // 服务参与工具的估计协议。任何一步抛错即中断本次 before。
             let beforeStageRequirementGrounding (toolInput: obj) (toolOutput: obj) =
                 Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.before
@@ -709,8 +751,14 @@ module PluginHooks =
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
-                    do! beforeStageRequirementGrounding toolInput toolOutput
+                    let sessionId = toolField toolInput "sessionID"
                     let toolName = toolField toolInput "tool"
+                    match toolRegistration with
+                    | Some registration when toolName <> "ask" && registration.Runtime.IsWaitingForUser sessionId ->
+                        invalidOp (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId)
+                                       "tool/ask-waiting" Map.empty)
+                    | _ -> ()
+                    do! beforeStageRequirementGrounding toolInput toolOutput
                     beforeStageReviewPermission toolName toolInput
 
                     do!
@@ -816,6 +864,7 @@ module PluginHooks =
             let observeEvent raw =
                 task {
                     do! settleTodoEvent raw
+                    do! settleUserQuestion raw
                     do! wired.ObserveEvent raw
                 }
 

@@ -33,6 +33,7 @@ type ToolPermission =
     /// planning-002: Plan's review hard gate. Shares the `review` tool name
     /// with Manager's ReviewAssessment; the label stays distinct.
     | Review
+    | DevOpsConsultation
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =
@@ -63,6 +64,7 @@ module OfficeCapability =
               ToolPermission.Grep
               ToolPermission.Horizon
               ToolPermission.Join
+              ToolPermission.Ask
               ToolPermission.Finality ]
 
     let permissions (role: Role) : ToolPermission Set =
@@ -70,6 +72,7 @@ module OfficeCapability =
         | Role.Manager ->
             set
                 [ ToolPermission.Fork
+                  ToolPermission.Ask
                   ToolPermission.Resume
                   ToolPermission.Join
                   ToolPermission.Horizon
@@ -110,11 +113,11 @@ module OfficeCapability =
                   ToolPermission.Horizon ]
         | Role.Distiller -> Set.empty
         | Role.Plan ->
-            // planning-002: the plan toolset is exactly { js-plan, ask,
-            // review, deliver }; resume and handoff are retired.
+            // devops 委派调查，ask 只提问用户；两者不是同一项能力。
             set
                 [ ToolPermission.JsPlan
                   ToolPermission.Ask
+                  ToolPermission.DevOpsConsultation
                   ToolPermission.Review
                   ToolPermission.Deliver ]
         // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
@@ -139,7 +142,7 @@ module OfficeCapability =
         elif facts.HasConfirmation && not facts.HasAssessment then
             Set.empty
         elif facts.CleanupBlockerDigest.IsSome then
-            set [ ToolPermission.Join; ToolPermission.Finality ]
+            set [ ToolPermission.Join; ToolPermission.Finality; ToolPermission.Ask ]
         elif facts.IsFinalIncumbent then
             managerFinishPermissions
         elif facts.HasAssessment then
@@ -176,6 +179,7 @@ module OfficeCapability =
         | ToolPermission.Ask -> "Ask"
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
+        | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
 
     /// Unknown labels are not a permission.
     let permissionOfLabel (label: string) : ToolPermission option =
@@ -203,4 +207,5 @@ module OfficeCapability =
         | "Ask" -> Some ToolPermission.Ask
         | "Deliver" -> Some ToolPermission.Deliver
         | "Review" -> Some ToolPermission.Review
+        | "DevOpsConsultation" -> Some ToolPermission.DevOpsConsultation
         | _ -> None

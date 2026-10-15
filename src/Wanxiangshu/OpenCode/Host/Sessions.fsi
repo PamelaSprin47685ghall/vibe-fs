@@ -21,7 +21,8 @@ type InjectedSessionPort =
         underlyingPort: IOpenCodePort option *
         eventPort: IEventObservationPort *
         ?familyParent: (SessionId -> SessionId option) *
-        ?isLifecycleTerminated: (SessionId -> bool) ->
+        ?isLifecycleTerminated: (SessionId -> bool) *
+        ?isUserQuestionWaiting: (SessionId -> bool) ->
             InjectedSessionPort
 
     interface ISessionHostPort

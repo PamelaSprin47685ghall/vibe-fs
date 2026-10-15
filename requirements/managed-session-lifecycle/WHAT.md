@@ -62,9 +62,11 @@ Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle �
 
 ## [016] Attempt Interrupt 与 Logical Cancel
 
-内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。正常生命周期内，自动化机制不得主动中断用户根会话；deliver 在任期退休事实落地后，可凭退休事实终止该 run 的残余尝试。
+内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。自动化机制不得任意中断用户根会话；deliver 可凭已落地的退休事实终止残余尝试。work-049 的已登记用户询问是另一项窄例外：同一 ask 的工具结果确认后，只暂停提问者的当前 attempt，不取消已入队的真实用户输入，也不影响子资源或逻辑运行。
 
 真实外部物理用户输入只允许打断 `join` 等待，不得中断当前 LLM 输出或其他工具，也不得调用 Host `AbortSession` / `InterruptAttempt` 排空当前 attempt。新输入作为下一次 LLM 请求的材料，由 Host 在当前输出或工具自然结束后纳入；当前物理 assistant 与工具结果仍须正常保存。
+
+work-049 的 `ask` 是模型主动请求的人类等待，不是“新用户输入到来即中断”。它在自身工具结果得到 Host 确认后中断当前 attempt，保留 logical run 与工作资源。用户随后回复仍走本条的普通人类输入准入，不再发一次 interrupt，也不因此注销任期。
 
 准入 owner 仍以 durable `Accepted` 和 owner-issued 的 `HumanRoot` / `HumanMessage` evidence 精确接纳新输入。已有同一 run 的活跃租约时，`HumanMessage` 与 `BusyAgentNudge` 先持久接纳并投影已有目标，保留旧 exact lease，供当前输出、工具及已经准备中的请求自然完成；Host 的下一次 provider 边界实际选择可见新输入后，才交接 exact lease 和原 capacity credit，不重新派工或抢占第二份容量。容量 owner 的 supersession 不授予物理中断权。
 
@@ -72,7 +74,7 @@ Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle �
 
 ## [017] 中断必须有后继
 
-内部中断发起物理 abort 前，必须已有唯一 successor；没有 successor 则形成明确 Failed 终态并唤醒父等待。Failed 携当前物理用户消息提升所得的 Authority Root；缺失则 fail closed，不退化成 session-scoped/rootless 终态。
+自动恢复的内部中断发起物理 abort 前，必须已有唯一 successor；没有 successor 则形成明确 Failed 终态并唤醒父等待。Failed 携当前物理用户消息提升所得的 Authority Root；缺失则 fail closed，不退化成 session-scoped/rootless 终态。work-049 不属于失败重试：用户等待事实就是当前暂停的依据，下一步来自真实用户回复；不得为它制造 Failed、重试 successor 或逻辑关闭。
 
 ## [018] Abandon 需要不可逆授权
 

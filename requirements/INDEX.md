@@ -88,7 +88,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `obligation-ledger` | 宿主待办由 OpenCode 原生 todowrite 执行；插件不改写工具定义与参数，只按 Host 终态追加压缩 checkpoint，不维护第二份 todo 真相。 |
-| `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，非首任注入一次 LWR_prev。Plan 的编程面、ask、自然停止、任期隔离、阶段资源、入口、review 门与持权交付同属本包。 |
+| `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，非首任注入一次 LWR_prev。Plan 的编程面、devops 调查、任期隔离、阶段资源、review 与持权交付，以及 Manager/Plan 禁止静默停止、ask 显式用户等待同属本包。 |
 
 
 ## 10. Feedback
@@ -169,7 +169,7 @@
 | 39 | `crash-reconciliation` | 21 | crash-reconciliation-001 ~ 019、crash-reconciliation-020（固定 DevOps 崩溃恢复单一逻辑权威与命令去重）、crash-reconciliation-021（进程本地表是缓存，durable 投影是存在性真源） |
 | 40 | `degeneration-guard` | 13 | degeneration-guard-001 ~ 013 |
 | 41 | `obligation-ledger` | 7 | obligation-ledger-001 ~ 007 |
-| 42 | `work` | 45 | work-001 ~ 045（011 起是内核证明；020 起是 Plan 编程面、ask、自然停止、任期隔离、阶段资源、入口、review 门与持权交付；040 起是唯一活跃任期、DevOps 绑定、findings pairs、资源交接与投影不转述工作区） |
+| 42 | `work` | 49 | work-001 ~ 049（011 起是内核合同；020 起是 Plan 编程面、devops 调查、任期隔离、阶段资源、review 与交付；027 禁止长程静默停止；040 起是唯一任期、DevOps 绑定、资源交接、durable 回执及恢复；049 是 ask 显式人类等待。新增测试为静态稿，未运行） |
 | 46 | `behavior-diagnosis` | 20 | behavior-diagnosis-001 ~ 020 |
 | 47 | `guidance-delivery` | 11 | guidance-delivery-001 ~ 009、011 ~ 012 |
 | 48 | institutional-learning（已退役） | 0 | 随 WP-036 整包退役，目录与条款已删除 |
