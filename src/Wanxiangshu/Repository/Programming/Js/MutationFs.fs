@@ -3,168 +3,65 @@ namespace Wanxiangshu.Repository.Programming.Js
 open Fable.Core
 open Fable.Core.JsInterop
 
-/// JS-013/015: the ephemeral staging, all-or-nothing commit and rollback
-/// adapter behind the js-* runtime bindings. Durable facts never live here;
-/// EventStore owns them (JS-012).
+/// Ephemeral staging, all-or-nothing commit and rollback, bridged to
+/// `wanxiangli/fs` (CUT-24). The write/rollback algorithm lives in the
+/// library; this module keeps the main-repo signature stable. Durable facts
+/// never live here; EventStore owns them (JS-012).
 module JsMutationFs =
 
-    type private ResolvedCommitMutation =
-        | ResolvedRewriteFile of path: string * resolvedPath: string * expectedCurrent: string * newText: string
-        | ResolvedCreateFile of path: string * resolvedPath: string * newText: string
+    [<Import("Filesystem", "wanxiangli/fs")>]
+    let private Filesystem: obj = jsNative
 
-    type private ResolvedRollbackMutation =
-        | ResolvedRestoreFile of resolvedPath: string * expectedCurrent: string * originalText: string
-        | ResolvedRemoveCreatedFile of resolvedPath: string * expectedCurrent: string
+    [<Emit("$0({ root: $1 })")>]
+    let private createFilesystem (factory: obj) (root: string): obj = jsNative
 
-    [<Import("writeFileSync", "node:fs")>]
-    let private writeFileSync (path: string) (data: string) : unit = jsNative
+    /// Commit-plan mutation as the library's staged shape: a rewrite's
+    /// originalText is the expectedCurrent content.
+    let private commitToJs (mutation: JsCommitMutation): obj =
+        match mutation with
+        | JsCommitMutation.RewriteFile(path, expectedCurrent, newText) ->
+            createObj [ "kind" ==> "rewrite"; "path" ==> path; "originalText" ==> expectedCurrent; "newText" ==> newText ]
+        | JsCommitMutation.CreateFile(path, newText) ->
+            createObj [ "kind" ==> "create"; "path" ==> path; "text" ==> newText ]
 
-    [<Import("writeFileSync", "node:fs")>]
-    let private writeFileWithOptions (path: string) (data: string) (options: obj) : unit = jsNative
+    /// Rollback-plan mutation as the library's staged shape: a restore maps
+    /// to Rewrite(originalText = text to restore, newText = expectedCurrent);
+    /// a removeCreated maps to Create(expectedCurrent).
+    let private rollbackToJs (mutation: JsRollbackMutation): obj =
+        match mutation with
+        | JsRollbackMutation.RestoreFile(path, expectedCurrent, originalText) ->
+            createObj [ "kind" ==> "rewrite"; "path" ==> path; "originalText" ==> originalText; "newText" ==> expectedCurrent ]
+        | JsRollbackMutation.RemoveCreatedFile(path, expectedCurrent) ->
+            createObj [ "kind" ==> "create"; "path" ==> path; "text" ==> expectedCurrent ]
 
-    [<Import("existsSync", "node:fs")>]
-    let private existsSync (path: string) : bool = jsNative
-
-    [<Import("unlinkSync", "node:fs")>]
-    let private unlinkSync (path: string) : unit = jsNative
-
-    [<Import("join", "node:path")>]
-    let private pathJoin (a: string) (b: string) : string = jsNative
-
-    [<Import("resolve", "node:path")>]
-    let private pathResolve (path: string) : string = jsNative
-
-    [<Import("isAbsolute", "node:path")>]
-    let private pathIsAbsolute (path: string) : bool = jsNative
+    let private ofResult (result: obj): Result<unit, JsFailure> =
+        if unbox<bool> (result?ok) then
+            Ok()
+        else
+            Error(JsFailure.ofWire (string (result?code)) (string (result?reason)))
 
     /// Resolve a tool path under root: relative paths join root; absolute
     /// paths resolve as-is (the bindings enforce the inside-root boundary).
-    let resolveToolPath (root: string) (path: string) : string =
-        if pathIsAbsolute path then
-            pathResolve path
-        else
-            pathResolve (pathJoin root path)
+    let resolveToolPath (root: string) (path: string): string =
+        let api = createFilesystem Filesystem root
+        unbox<string> (api?resolveToolPath(path))
 
-    /// Existence probe used by preflight (JS-013).
-    let existsPath (path: string) : bool =
-        try
-            existsSync path
-        with _ ->
-            false
+    /// Existence probe used by preflight (JS-013). Root-independent.
+    let existsPath (path: string): bool =
+        let rootlessApi = createFilesystem Filesystem ""
+        unbox<bool> (rootlessApi?existsPath(path))
 
-    let private removeIfPresent (full: string) : unit =
-        if existsSync full then
-            unlinkSync full
+    let undoIfMatches (root: string) (path: string) (expectedCurrent: string) (restoreTo: string option): unit =
+        let api = createFilesystem Filesystem root
+        let restore = match restoreTo with Some text -> box text | None -> null
+        api?undoIfMatches(path, expectedCurrent, restore)
 
-    let private applyRestore (full: string) (restoreTo: string option) : unit =
-        match restoreTo with
-        | Some text -> writeFileSync full text
-        | None -> removeIfPresent full
+    let commitPlan (root: string) (plan: JsCommitMutation list): Result<unit, JsFailure> =
+        let api = createFilesystem Filesystem root
+        let mutations = plan |> List.map commitToJs |> Array.ofList
+        ofResult (api?applyCommit(mutations))
 
-    let private undoMatchingFile (full: string) (restoreTo: string option) : unit =
-        try
-            applyRestore full restoreTo
-        with _ ->
-            ()
-
-    let private undoIfMatchesResolved (full: string) (expectedCurrent: string) (restoreTo: string option) : unit =
-        match JsUtf8Fs.readUtf8Classified full with
-        | Ok current when current = expectedCurrent -> undoMatchingFile full restoreTo
-        | _ -> ()
-
-    let undoIfMatches (root: string) (path: string) (expectedCurrent: string) (restoreTo: string option) : unit =
-        undoIfMatchesResolved (resolveToolPath root path) expectedCurrent restoreTo
-
-    let private rollbackResolved mutation =
-        match mutation with
-        | ResolvedRestoreFile(resolvedPath, expectedCurrent, originalText) ->
-            undoIfMatchesResolved resolvedPath expectedCurrent (Some originalText)
-        | ResolvedRemoveCreatedFile(resolvedPath, expectedCurrent) ->
-            undoIfMatchesResolved resolvedPath expectedCurrent None
-
-    let private validateRewrite path resolvedPath expectedCurrent =
-        match JsUtf8Fs.readUtf8Classified resolvedPath with
-        | Ok current when current = expectedCurrent -> None
-        | _ -> Some(JsFailure.FileChanged path)
-
-    let private validateOne mutation =
-        match mutation with
-        | ResolvedRewriteFile(path, resolvedPath, expectedCurrent, _) ->
-            validateRewrite path resolvedPath expectedCurrent
-        | ResolvedCreateFile(path, resolvedPath, _) when existsPath resolvedPath -> Some(JsFailure.FileChanged path)
-        | ResolvedCreateFile _ -> None
-
-    let private validatePlan plan =
-        plan
-        |> List.tryPick validateOne
-        |> function
-            | Some failure -> Error failure
-            | None -> Ok()
-
-    let private validateMutation mutation =
-        match validateOne mutation with
-        | Some failure -> Error failure
-        | None -> Ok mutation
-
-    let private writeRewrite resolvedPath expectedCurrent newText =
-        try
-            writeFileSync resolvedPath newText
-            Ok(ResolvedRestoreFile(resolvedPath, newText, expectedCurrent))
-        with _ ->
-            Error JsFailure.TransactionCommitFailed
-
-    let private writeCreate path resolvedPath newText =
-        try
-            writeFileWithOptions resolvedPath newText (createObj [ "encoding" ==> "utf8"; "flag" ==> "wx" ])
-
-            Ok(ResolvedRemoveCreatedFile(resolvedPath, newText))
-        with
-        | _ when existsPath resolvedPath -> Error(JsFailure.FileChanged path)
-        | _ -> Error JsFailure.TransactionCommitFailed
-
-    let private writeValidated mutation =
-        match mutation with
-        | ResolvedRewriteFile(_, resolvedPath, expectedCurrent, newText) ->
-            writeRewrite resolvedPath expectedCurrent newText
-        | ResolvedCreateFile(path, resolvedPath, newText) -> writeCreate path resolvedPath newText
-
-    let private writeOne mutation =
-        validateMutation mutation |> Result.bind writeValidated
-
-    let private writeOrRollback applied mutation =
-        match writeOne mutation with
-        | Ok rollback -> Ok rollback
-        | Error failure ->
-            applied |> List.iter rollbackResolved
-            Error failure
-
-    let private applyWrites plan =
-        let rec apply remaining applied =
-            match remaining with
-            | [] -> Ok()
-            | mutation :: rest ->
-                writeOrRollback applied mutation
-                |> Result.bind (fun rollback -> apply rest (rollback :: applied))
-
-        apply plan []
-
-    let private resolveCommitMutation root mutation =
-        match mutation with
-        | JsCommitMutation.RewriteFile(path, expectedCurrent, newText) ->
-            ResolvedRewriteFile(path, resolveToolPath root path, expectedCurrent, newText)
-        | JsCommitMutation.CreateFile(path, newText) -> ResolvedCreateFile(path, resolveToolPath root path, newText)
-
-    let private resolveRollbackMutation root mutation =
-        match mutation with
-        | JsRollbackMutation.RestoreFile(path, expectedCurrent, originalText) ->
-            ResolvedRestoreFile(resolveToolPath root path, expectedCurrent, originalText)
-        | JsRollbackMutation.RemoveCreatedFile(path, expectedCurrent) ->
-            ResolvedRemoveCreatedFile(resolveToolPath root path, expectedCurrent)
-
-    let commitPlan (root: string) (plan: JsCommitMutation list) : Result<unit, JsFailure> =
-        let resolvedPlan = plan |> List.map (resolveCommitMutation root)
-
-        validatePlan resolvedPlan |> Result.bind (fun () -> applyWrites resolvedPlan)
-
-    let rollbackPlan (root: string) (plan: JsRollbackMutation list) : unit =
-        plan |> List.map (resolveRollbackMutation root) |> List.iter rollbackResolved
+    let rollbackPlan (root: string) (plan: JsRollbackMutation list): unit =
+        let api = createFilesystem Filesystem root
+        let mutations = plan |> List.map rollbackToJs |> Array.ofList
+        api?applyRollback(mutations)

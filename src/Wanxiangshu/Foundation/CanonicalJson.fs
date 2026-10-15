@@ -1,49 +1,24 @@
 namespace Wanxiangshu.Foundation
 
 open Fable.Core
+open Fable.Core.JsInterop
 
+/// Canonical JSON identity protocol (§5.0). The single implementation lives in
+/// wanxiangli/events (CUT-18); this module is the typed F# projection of that
+/// contract and owns no encoding algorithm of its own.
 module CanonicalJson =
 
-    [<Emit("""
-    (function (value) {
-        function compareCodePoints(left, right) {
-            const leftPoints = Array.from(left, character => character.codePointAt(0));
-            const rightPoints = Array.from(right, character => character.codePointAt(0));
-            const length = Math.min(leftPoints.length, rightPoints.length);
-            for (let index = 0; index < length; index += 1) {
-                if (leftPoints[index] !== rightPoints[index]) {
-                    return leftPoints[index] - rightPoints[index];
-                }
-            }
-            return leftPoints.length - rightPoints.length;
-        }
+    [<Import("CanonicalEventCodec", "wanxiangli/events")>]
+    let private codecClass: obj = jsNative
 
-        function encode(current, arrayElement) {
-            if (Array.isArray(current)) {
-                return '[' + Array.from(current, item => encode(item, true) ?? 'null').join(',') + ']';
-            }
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
 
-            if (current !== null && typeof current === 'object') {
-                const fields = [];
-                for (const key of Object.keys(current).sort(compareCodePoints)) {
-                    const encoded = encode(current[key], false);
-                    if (encoded !== undefined) {
-                        fields.push(JSON.stringify(key) + ':' + encoded);
-                    }
-                }
-                return '{' + fields.join(',') + '}';
-            }
+    // Stateless library object; one shared instance.
+    let private codec: obj = construct codecClass
 
-            const encoded = JSON.stringify(current);
-            return encoded === undefined && arrayElement ? 'null' : encoded;
-        }
-
-        return encode(value, false);
-    })($0)
-    """)>]
-    let private encode (value: obj) : string = jsNative
-
-    let canonicalJson (value: obj) : string = encode value
+    let canonicalJson (value: obj) : string =
+        unbox<string> (codec?canonicalJson value)
 
     let equal (left: obj) (right: obj) : bool =
         canonicalJson left = canonicalJson right

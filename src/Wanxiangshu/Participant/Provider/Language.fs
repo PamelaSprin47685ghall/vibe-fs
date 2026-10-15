@@ -1,12 +1,31 @@
 namespace Wanxiangshu.Participant.Provider
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
 
-/// PROMPT-017 / HOST-026: provider-facing world language.
+/// PROMPT-017 / HOST-026: provider-facing world language. The closed algebra
+/// stays here as the host-side type; parsing, the preference ladder and the
+/// live global preference are owned by `wanxiangli/resources`.
 [<RequireQualifiedAccess>]
 type ProviderLanguage =
     | English
     | SimplifiedChinese
+
+[<AutoOpen>]
+module private ProviderLanguageLibrary =
+
+    [<Import("Resources", "wanxiangli/resources")>]
+    let private resourcesClass: obj = jsNative
+
+    // 0.7.0 起语言原语是 Resources 实例成员；惰性构造一次，共享包内资源根。
+    let mutable private instance: obj = null
+
+    let library () : obj =
+        if isNull instance then
+            instance <- emitJsExpr resourcesClass "new $0()"
+
+        instance
 
 [<RequireQualifiedAccess>]
 module ProviderLanguage =
@@ -39,69 +58,40 @@ module ProviderLanguage =
     /// Locale leaf filename under a semantic resource directory (§4.7.8).
     let resourceFileName language = (locale language).ResourceFileName
 
-    let private parseNormalized (normalized: string) : ProviderLanguage option =
-        match normalized with
-        | "en"
-        | "eng"
-        | "english" -> Some ProviderLanguage.English
-        | "zh-cn"
-        | "zh"
-        | "zh_cn"
-        | "chs"
-        | "chinese"
-        | "simplifiedchinese"
-        | "simplified-chinese"
-        | "cn" -> Some ProviderLanguage.SimplifiedChinese
-        | _ -> None
+    let private ofExternalName (name: string) : ProviderLanguage =
+        if name = "SimplifiedChinese" then
+            ProviderLanguage.SimplifiedChinese
+        else
+            ProviderLanguage.English
 
     let tryParse (raw: string) : ProviderLanguage option =
-        if String.IsNullOrWhiteSpace raw then
+        let found: obj = library()?tryParseLanguage (raw)
+
+        if isNull found then
             None
         else
-            raw.Trim().ToLowerInvariant() |> parseNormalized
+            Some(ofExternalName (unbox<string> found))
 
     let parse (raw: string) : ProviderLanguage =
-        match tryParse raw with
-        | Some language -> language
-        | None -> raise (ArgumentException(sprintf "unrecognized ProviderLanguage: %s (PROMPT-017)" raw))
+        ofExternalName (unbox<string> (library()?parseLanguage raw))
 
-    let private configuredPreference (raw: string) : Result<ProviderLanguage, string> =
-        match tryParse raw with
-        | Some language -> Ok language
-        | None -> Error(sprintf "WANXIANGSHU_PROVIDER_LANGUAGE unrecognized: %s (HOST-026)" raw)
+    let private observation (value: string option) : obj =
+        match value with
+        | Some raw -> box raw
+        | None -> null
 
     /// The sole policy for interpreting the raw provider-language preference.
     let fromPreferenceObservation (observation: string option) : Result<ProviderLanguage, string> =
         match observation with
         | None -> Ok ProviderLanguage.English
         | Some raw when String.IsNullOrWhiteSpace raw -> Ok ProviderLanguage.English
-        | Some raw -> configuredPreference raw
+        | Some raw ->
+            let resolved: obj = library()?resolvePreference(raw, null, null, null, null)
 
-    let private isChineseLocale (raw: string) : bool =
-        if String.IsNullOrWhiteSpace raw then
-            false
-        else
-            let lower = raw.ToLowerInvariant()
-
-            lower.StartsWith "zh"
-            || lower.Contains "zh-cn"
-            || lower.Contains "zh_cn"
-            || lower.Contains "zh-hans"
-            || lower.Contains "chs"
-            || lower.Contains "chinese"
-
-    let private tryExplicitPreference (explicit: string option) (hostConfig: string option) =
-        [ explicit; hostConfig ]
-        |> List.tryPick (function
-            | Some raw when not (String.IsNullOrWhiteSpace raw) -> Some raw
-            | _ -> None)
-
-    let private detectSystemLanguage (candidates: string option list) =
-        candidates
-        |> List.tryPick (function
-            | Some raw when isChineseLocale raw -> Some ProviderLanguage.SimplifiedChinese
-            | _ -> None)
-        |> Option.defaultValue ProviderLanguage.English
+            if unbox<bool> resolved?ok then
+                Ok(ofExternalName (unbox<string> resolved?value))
+            else
+                Error(unbox<string> resolved?error)
 
     /// Resolves global preference through the normative preference ladder:
     /// 1. Explicit environment variable (WANXIANGSHU_PROVIDER_LANGUAGE)
@@ -115,9 +105,18 @@ module ProviderLanguage =
         (posixLocale: string option)
         (intlLocale: string option)
         : Result<ProviderLanguage, string> =
-        match tryExplicitPreference explicit hostConfig with
-        | Some raw -> configuredPreference raw
-        | None -> Ok(detectSystemLanguage [ vscodeNls; posixLocale; intlLocale ])
+        let resolved: obj =
+            library()?resolvePreference(
+                observation explicit,
+                observation hostConfig,
+                observation vscodeNls,
+                observation posixLocale,
+                observation intlLocale)
+
+        if unbox<bool> resolved?ok then
+            Ok(ofExternalName (unbox<string> resolved?value))
+        else
+            Error(unbox<string> resolved?error)
 
     /// HOST-026: child / attached / InternalLeaf language = owner | commissioner.
     let inheritFrom (owner: ProviderLanguage) : ProviderLanguage = owner
@@ -128,11 +127,13 @@ module GlobalProviderLanguage =
     /// HOST-026: the live global preference is the only language authority.
     /// Every Class A render reads it, so changing the setting changes the
     /// language of the next request even mid-session.
-    // DSL-MUTABLE: resource — live global preference cache, replaced by host configuration refresh
-    let mutable private currentLanguage = ProviderLanguage.English
+    let refresh (resolve: unit -> ProviderLanguage) : unit =
+        library()?refreshGlobalLanguage(fun () -> ProviderLanguage.externalName (resolve ()))
 
-    /// Re-resolve the live global preference (env → host config → locale →
-    /// English). Called at startup and whenever the host preference changes.
-    let refresh (resolve: unit -> ProviderLanguage) : unit = currentLanguage <- resolve ()
+    let current () : ProviderLanguage =
+        let name: string = library()?currentGlobalLanguage ()
 
-    let current () : ProviderLanguage = currentLanguage
+        if name = "SimplifiedChinese" then
+            ProviderLanguage.SimplifiedChinese
+        else
+            ProviderLanguage.English
