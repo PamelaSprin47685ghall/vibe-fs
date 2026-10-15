@@ -32,14 +32,14 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 
 | ID | 职责 | 泳道 | 当前列 | 切换前置 | Owner | Reviewer |
 |---|---|---|---|---|---|---|
-| CUT-00 | 两仓准备、差异裁决与并行开工 | 协作 | READY | — | — | — |
+| CUT-00 | 两仓准备、差异裁决与并行开工 | 协作 | DONE | — | eng-cut00 | manager（[CUT-00](cards/CUT-00.md)） |
 | CUT-01 | 工作生命周期与原子日志接线 | 已交付 | DONE | — | 历史已合入 | 证据见收尾记录 |
-| CUT-02 | 非 PTY 进程执行 | 物理 | LIB_READY | CUT-00 | — | — |
-| CUT-03 | 原始轨迹与固定区间 | 上下文 | LIB_READY | CUT-00 | — | — |
-| CUT-04 | 唯一资源归属与关闭 | 执行 | LIB_READY | CUT-00, CUT-01 | — | — |
-| CUT-05 | 双语资源与包内定位 | 表达 | BACKLOG | CUT-00 | — | — |
+| CUT-02 | 非 PTY 进程执行 | 物理 | DONE | CUT-00 | eng-cut02 | manager |
+| CUT-03 | 原始轨迹与固定区间 | 上下文 | DONE | CUT-00 | eng-cut03 | manager |
+| CUT-04 | 唯一资源归属与关闭 | 执行 | DONE | CUT-00, CUT-01 | eng-cut04 | manager |
+| CUT-05 | 双语资源与包内定位 | 表达 | READY | CUT-00 | — | — |
 | CUT-06 | WorkRecord 取材与视图 | 上下文 | BACKLOG | CUT-03 | — | — |
-| CUT-07 | 参与者身份与执行绑定分离 | 权威 | BACKLOG | CUT-00 | — | — |
+| CUT-07 | 参与者身份与执行绑定分离 | 权威 | READY | CUT-00 | — | — |
 | CUT-08 | 能力事实与双侧门禁 | 权威 | BACKLOG | CUT-07 | — | — |
 | CUT-09 | 来源、逻辑根与关闭权威 | 权威 | BACKLOG | CUT-07 | — | — |
 | CUT-10 | 模型路由与精确容量许可 | 执行 | BACKLOG | CUT-07 | — | — |
@@ -50,15 +50,15 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-15 | 前缀世代与候选提交 | 上下文 | BACKLOG | CUT-03 | — | — |
 | CUT-16 | 压缩覆盖与 checkpoint | 上下文 | BACKLOG | CUT-03, CUT-06, CUT-15 | — | — |
 | CUT-17 | 请求投影与信息边界 | 表达 | BACKLOG | CUT-05, CUT-06, CUT-08, CUT-15, CUT-16 | — | — |
-| CUT-18 | 规范事实编码与校验 | 存储 | BACKLOG | CUT-00 | — | — |
+| CUT-18 | 规范事实编码与校验 | 存储 | READY | CUT-00 | — | — |
 | CUT-19 | 多 writer 存储与收敛 | 存储 | BACKLOG | CUT-18 | — | — |
 | CUT-20 | PTY 与完整输出外存 | 物理 | BACKLOG | CUT-02, CUT-04 | — | — |
-| CUT-21 | 显式时间与因果等待 | 物理 | BACKLOG | CUT-00 | — | — |
+| CUT-21 | 显式时间与因果等待 | 物理 | READY | CUT-00 | — | — |
 | CUT-22 | attention、concern 与邮箱归属 | 权威 | BACKLOG | CUT-09 | — | — |
 | CUT-23 | Git 工作树、委任与集成 | 仓库 | BACKLOG | CUT-12, CUT-13 | — | — |
-| CUT-24 | 文件读取、锚点与原子编辑 | 仓库 | BACKLOG | CUT-00 | — | — |
+| CUT-24 | 文件读取、锚点与原子编辑 | 仓库 | READY | CUT-00 | — | — |
 | CUT-25 | 受限 JS 编程面与执行组合 | 仓库 | BACKLOG | CUT-02, CUT-08, CUT-24 | — | — |
-| CUT-26 | 需求发现与材料溯源 | 仓库 | BACKLOG | CUT-00 | — | — |
+| CUT-26 | 需求发现与材料溯源 | 仓库 | READY | CUT-00 | — | — |
 | CUT-27 | Casebook / 知识复用去向 | 产品裁决 | DECISION | CUT-06, CUT-19, CUT-24 | — | — |
 | CUT-28 | Fission 多 lane 执行 | 执行 | BACKLOG | CUT-03, CUT-10, CUT-12, CUT-13 | — | — |
 | CUT-29 | Strength / 投机调查去向 | 产品裁决 | DECISION | CUT-06, CUT-10, CUT-13, CUT-19 | — | — |
@@ -107,7 +107,9 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 
 | 编辑面或精确路径 | 持有卡 | 当前修改者 | 起始 base | 释放条件 | 状态 |
 |---|---|---|---|---|---|
-| 无 | — | — | — | — | 空闲 |
+| `src/Wanxiangshu/Process/{ProcessRunner,NodeProcessHost,NodeProcessWait,Surface}.fs(.fsi)` | `CUT-02` | `eng-cut02` | `b322c180b` | `CUT-02 完成进程执行接线与 process-execution 测试回归`（2026-10-15 devops 构建/check/process-execution/009/025 全绿，证据见 cards/CUT-02.md） | `已释放` |
+| `src/Wanxiangshu/Context/Trace/*.fs(.fsi)` | `CUT-03` | `eng-cut03` | `b322c180b` | `CUT-03 完成确认轨迹子范围接线与 semantic-trace 测试回归`（2026-10-15 全套验证全绿含裁决后 005 重入段，证据见 cards/CUT-03.md） | `已释放` |
+| `src/Wanxiangshu/Execution/Session/Ownership.fs(.fsi), src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs(.fsi)` | `CUT-04` | `eng-cut04` | `b322c180b` | `CUT-04 完成资源归属接线与 session/work 测试回归`（2026-10-15 删除清单闭合与 work 009/044、025 全绿，证据见 cards/CUT-04.md） | `已释放` |
 
 ## 两仓集成队列
 
@@ -115,7 +117,9 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 
 | 排位 | 卡 | 库 commit / version / tarball SHA-256 | 主仓 base / candidate | Reviewer | 剩余门禁或历史例外 | 状态 |
 |---|---|---|---|---|---|---|
-| — | 无 | — | — | — | — | 空 |
+| 1 | CUT-02 | — | 4be1c4105 | manager | — | DONE 核验 |
+| 2 | CUT-03 | — | 042ae616a | manager | — | DONE 核验 |
+| 3 | CUT-04 | — | 6b5b71cc7 | manager | — | DONE 核验 |
 
 ## 边界修订与产品裁决登记
 
@@ -129,7 +133,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | D-04 | 18、19 | 单流 SQLite CAS 与多 writer 合法分叉不是同一承诺 | 两种协议分开，不用前者替代后者 | 待 CUT-18/19 |
 | D-05 | 27、29、30、31 | 新库草稿“不再建”与仍生效的产品功能冲突 | 默认暂留并维护；抽取/删除需逐卡裁决 | 待认领；不是删除批准 |
 | D-06 | 32、33、38 | 相对主线净改进与完整发布验收 | 合并可用净改进准入，验证结果仍原样报告 | 用户 2026-10-14T23:59:13Z 授权；[比较记录](../lifecycle-cutover-closeout.md) |
-| D-07 | 00、34、36 | 库规则仍写旧仓修改待授权、宿主名尚未确认 | 本计划不偷偷覆盖规则；各任务按当前授权更新过时范围，第二宿主先明确对象 | 待 CUT-00；不阻塞现有主仓继续维护 |
+| D-07 | 00、34、36 | 库规则仍写旧仓修改待授权、宿主名尚未确认 | 本计划不偷偷覆盖规则；各任务按当前授权更新过时范围，第二宿主先明确对象 | CUT-00 已落盘（cards/CUT-00.md）；主仓与 wanxiangli 按当前授权推进，CUT-36 保持 OPTIONAL |
 
 ## 更新纪律
 
