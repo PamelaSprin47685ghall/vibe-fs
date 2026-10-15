@@ -29,6 +29,9 @@ module ExecutorTool =
             val FinitePositive: string = "tool/run/finite-positive"
 
             [<Literal>]
+            val DeadlineOverLimit: string = "tool/run/deadline-over-limit"
+
+            [<Literal>]
             val FiniteNonNegativeInteger: string = "tool/run/finite-non-negative-integer"
 
             [<Literal>]
@@ -61,6 +64,11 @@ module ExecutorTool =
     /// Provider-visible bounded execution with raw, explicitly truncated output.
     [<Literal>]
     val RunToolName: string = "run"
+
+    /// Synchronous deadline ceiling for `run`; larger explicit requests are
+    /// rejected before spawn and redirected to open-terminal (process-execution-017).
+    [<Literal>]
+    val RunDeadlineLimitSeconds: float = 10.0
 
     type Request =
         { Command: string

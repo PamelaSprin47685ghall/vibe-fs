@@ -67,3 +67,7 @@ stdout/stderr 的内存缓冲有明确上限，超过阈值即切换外部流式
 ## [016] 大输出互斥与可取消排队
 
 预计产生大输出的执行须先取得唯一许可，其判定与输出估计一致。等待按 FIFO，支持按 Token 幂等取消；同一时刻只有一个大输出执行占用相应资源。
+
+## [017] run 同步时限政策
+
+`deadline_seconds` 缺省 1.0 秒。显式值严格大于 10 秒的请求在创建物理进程之前被拒绝，回执走 instruction-plane 并指引改用 `open-terminal` 持续终端通道（配合 `send-terminal` / `read-terminal` / `signal-terminal`）；未超限的值（含恰好 10）仍按 [004] 取运行预估与管理员硬顶的较小值。

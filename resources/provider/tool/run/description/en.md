@@ -19,6 +19,8 @@ exit, timeout, cancellation, or termination by themselves.
 
 deadline_seconds and output_budget_bytes express how much scarce time and
 attention you are willing to spend.
+deadline_seconds defaults to 1 second and is capped at 10 seconds; commands
+longer than 10 seconds must use open-terminal instead.
 world_lock expresses whether this execution should occupy the LargeGate.
 
 These are economic commitments, not runtime predictions.

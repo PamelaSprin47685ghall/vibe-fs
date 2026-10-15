@@ -1,0 +1,1 @@
+deadline_seconds of {{deadline}} seconds exceeds the 10-second synchronous limit of run. You must use the open-terminal persistent terminal channel for long-running commands (with send-terminal / read-terminal / signal-terminal); run only accepts bounded commands of up to 10 seconds.

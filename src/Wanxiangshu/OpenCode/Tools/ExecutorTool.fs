@@ -41,6 +41,9 @@ module ExecutorTool =
             let FinitePositive = "tool/run/finite-positive"
 
             [<Literal>]
+            let DeadlineOverLimit = "tool/run/deadline-over-limit"
+
+            [<Literal>]
             let FiniteNonNegativeInteger = "tool/run/finite-non-negative-integer"
 
             [<Literal>]
@@ -75,6 +78,11 @@ module ExecutorTool =
     [<Literal>]
     let RunToolName = "run"
 
+    /// Synchronous deadline ceiling for `run`; larger explicit requests are
+    /// rejected before spawn and redirected to open-terminal (process-execution-017).
+    [<Literal>]
+    let RunDeadlineLimitSeconds = 10.0
+
     type Request =
         { Command: string
           DeadlineSeconds: float
@@ -96,6 +104,17 @@ module ExecutorTool =
         else
             Ok value
 
+    let private deadlineWithinLimit language (value: float) =
+        finitePositive language "deadline_seconds" value
+        |> Result.bind (fun valid ->
+            if valid > RunDeadlineLimitSeconds then
+                Error(
+                    ProviderProse.render language Path.Run.DeadlineOverLimit
+                        (Map [ "deadline", string valid ])
+                )
+            else
+                Ok valid)
+
     let private finiteOutput language (name: string) (value: float) =
         if
             Double.IsNaN value
@@ -111,7 +130,7 @@ module ExecutorTool =
 
     let private decodeRun (language: ProviderLanguage) (args: HostToolArguments) =
         let command = args.Text "command"
-        let deadline = args.OptionalNumber "deadline_seconds" |> Option.defaultValue 30.0
+        let deadline = args.OptionalNumber "deadline_seconds" |> Option.defaultValue 1.0
 
         let budget =
             args.OptionalNumber "output_budget_bytes" |> Option.defaultValue 65536.0
@@ -125,7 +144,7 @@ module ExecutorTool =
             Error(prose language Path.Run.MissingCommand)
         else
             match
-                finitePositive language "deadline_seconds" deadline,
+                deadlineWithinLimit language deadline,
                 finiteOutput language "output_budget_bytes" budget,
                 worldLock
             with

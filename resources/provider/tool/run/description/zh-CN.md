@@ -13,6 +13,7 @@ command 是一次行动。
 前面的错误可能不在其中。进程结果单独读取，不能只凭文字片段判断退出、超时、取消或终结。
 
 deadline_seconds 与 output_budget_bytes 表达你愿意花费多少稀缺的时间与注意力。
+deadline_seconds 缺省 1 秒，上限 10 秒；超过 10 秒的命令必须改用 open-terminal。
 world_lock 表达这次执行是否应当占用 LargeGate。
 
 这些是经济承诺，不是 runtime 预测。
