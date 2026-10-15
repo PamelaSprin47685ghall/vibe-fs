@@ -34,7 +34,8 @@ type HostForkRuntime =
         ?sessionSnapshot: ISessionSnapshotPort *
         ?cancelSignals: (SessionId seq -> unit) *
         ?ownership: HandleOwnership *
-        ?drainChildPtys: (SessionId -> Task<unit>) ->
+        ?drainChildPtys: (SessionId -> Task<unit>) *
+        ?ownershipCommonDir: string ->
             HostForkRuntime
 
     member internal Runtime: ForkRuntime
@@ -153,13 +154,12 @@ type HostForkRuntime =
     member IsCancelled: bool
     member internal IsCancelling: bool
 
-    member TrackPtyRun: id: PtyId -> unit
     member RegisterPtySnapshot: id: PtyId -> command: string -> unit
-    member UntrackPtyRun: id: string -> unit
     member OwnsPty: id: PtyId -> bool
     member AwaitObservedWork: unit -> Task<unit>
     member DrainOwnedWork: unit -> Task<unit>
     member CloseOwnedPtys: ?graceMs: int -> Task<unit>
+    member ClosePty: id: PtyId * ?graceMs: int -> Task<unit>
     member IsPtyCompletion: runId: string -> bool
     member TryBindTerminalName: name: string * id: PtyId -> Result<unit, string>
     member TryPtyByName: name: string -> PtyId option

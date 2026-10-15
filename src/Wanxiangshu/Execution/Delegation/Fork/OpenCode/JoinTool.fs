@@ -156,14 +156,6 @@ module JoinTool =
         | JoinInterruptReason.DeadlineExpired ->
             JoinResultRenderer.renderInterrupted language JoinInterruptReason.DeadlineExpired
 
-    let private untrackJoinItem (runtime: HostForkRuntime) (item: JoinItem) =
-        match item with
-        | JoinItem.PtyItem ptyItem -> runtime.UntrackPtyRun(PtyJoinItem.ptyId ptyItem)
-        | JoinItem.AgentItem _ -> ()
-
-    let private releasePtyTracks (runtime: HostForkRuntime) (batch: NonEmptyBatch<JoinItem>) =
-        NonEmptyBatch.toList batch |> List.iter (untrackJoinItem runtime)
-
     let private bufferRemainingItems (runtime: HostForkRuntime) (remaining: JoinItem list) =
         match List.isEmpty remaining with
         | true -> ()
@@ -179,14 +171,6 @@ module JoinTool =
         let rendered, remaining =
             JoinResultRenderer.renderJoinItemBatchWithWindow language resolveName batch resolveLabel
 
-        let deliveredCount = NonEmptyBatch.length batch - List.length remaining
-
-        let deliveredItems =
-            NonEmptyBatch.toList batch
-            |> List.take deliveredCount
-            |> NonEmptyBatch.tryOfList
-
-        deliveredItems |> Option.iter (releasePtyTracks runtime)
         bufferRemainingItems runtime remaining
         rendered
 

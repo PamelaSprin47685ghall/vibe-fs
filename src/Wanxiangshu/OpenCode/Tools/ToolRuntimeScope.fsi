@@ -43,7 +43,8 @@ type ToolRuntimeScope =
         ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
         ?workRecordCapability: DelegationWorkRecordCapability *
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) *
-        ?eventPort: IEventObservationPort ->
+        ?eventPort: IEventObservationPort *
+        ?ptyPortFactory: (unit -> Wanxiangshu.Process.PtyPort) ->
             ToolRuntimeScope
 
     interface ISessionRuntimeOwner

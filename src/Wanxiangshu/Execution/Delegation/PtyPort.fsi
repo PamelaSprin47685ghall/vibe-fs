@@ -18,7 +18,7 @@ type DelegationPtyCapability =
         TryBindTerminalName: string * PtyId -> Result<unit, string>
 
         /// Clean up and unbind a PTY run by ID.
-        UntrackPtyRun: string -> unit
+        ClosePty: PtyId -> Task<unit>
 
         /// Send input or signals to a PTY, or read its output.
         SendPty: PtyId * string * PtySignal option -> Task<Result<PtyRead, string>>

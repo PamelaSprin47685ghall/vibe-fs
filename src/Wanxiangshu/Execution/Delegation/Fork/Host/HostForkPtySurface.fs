@@ -3,6 +3,7 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 open System
 open System.Text
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -14,6 +15,62 @@ open Wanxiangshu.Process
 
 [<RequireQualifiedAccess>]
 module HostForkPtySurface =
+    let private createOwnershipProbe (commonDir: string option) (sessionId: string) (port: PtyPort) : obj =
+        let runtime =
+            HostForkRuntime(
+                SessionId.create sessionId,
+                Unchecked.defaultof<ISessionHostPort>,
+                (fun _ _ _ -> Task.FromResult None),
+                CompletionMailboxRuntime.create,
+                NodeTiming.nodeClockPort (),
+                NodeTiming.raceExit,
+                ptyPort = port,
+                ?ownershipCommonDir = commonDir
+            )
+
+        createObj
+            [ "fork"
+              ==> (fun command ->
+                  task {
+                      match! runtime.ForkPty(command, ManagedAgent.make Role.DevOps) with
+                      | Ok id -> return createObj [ "ok" ==> true; "id" ==> id.Value ]
+                      | Error error -> return createObj [ "ok" ==> false; "error" ==> error ]
+                  })
+              "close"
+              ==> (fun (id: string, grace: int) -> runtime.ClosePty(PtyId.Create id, graceMs = grace))
+              "closeAll" ==> (fun grace -> runtime.CloseOwnedPtys(graceMs = grace))
+              "detach" ==> (fun () -> runtime.DetachAndDrain())
+              "outstanding"
+              ==> (fun () -> runtime.SnapshotOutstandingPtyRuns() |> List.toArray)
+              "owned" ==> (fun id -> runtime.OwnsPty(PtyId.Create id))
+              "bind"
+              ==> (fun (name, id) -> runtime.TryBindTerminalName(name, PtyId.Create id) |> Result.isOk)
+              "complete" ==> (fun id -> port.Complete(PtyId.Create id))
+              "registerExit"
+              ==> (fun (id, waiting: Task) -> port.RegisterExitTask(PtyId.Create id, waiting))
+              "failObservation"
+              ==> (fun (id, reason) -> port.FailExitObservation(PtyId.Create id, reason))
+              "exists" ==> (fun id -> port.Exists(PtyId.Create id))
+              "completions" ==> (fun () -> runtime.PendingCompletionCount) ]
+
+    let private commandKind =
+        function
+        | PtyCommand.Spawn _ -> "Spawn"
+        | PtyCommand.Write _ -> "Write"
+        | PtyCommand.Read -> "Read"
+        | PtyCommand.Signal _ -> "Signal"
+        | PtyCommand.Resize _ -> "Resize"
+
+    let ownershipProbe (commonDir: string option) (sessionId: string) (onCommand: obj) : obj =
+        let handler (id: PtyId) command =
+            emitJsExpr (onCommand, id.Value, commandKind command) "$0($1, $2)"
+            Task.FromResult(Ok())
+
+        createOwnershipProbe commonDir sessionId (PtyPort(handler = handler))
+
+    let realOwnershipProbe (commonDir: string option) (sessionId: string) : obj =
+        createOwnershipProbe commonDir sessionId (PtyBackend.createPort ())
+
     let private callView command =
         match command with
         | PtyCommand.Write bytes ->
@@ -93,6 +150,7 @@ module HostForkPtySurface =
 
                 match command, portRef with
                 | PtyCommand.Read, Some port -> port.ReadResult(id, "terminal text", true)
+                | PtyCommand.Spawn _, Some port when action = "synchronous-exit" -> port.Complete id
                 | _ -> ()
 
                 if String.IsNullOrEmpty failure then
@@ -102,6 +160,22 @@ module HostForkPtySurface =
 
             let port = PtyPort(handler = handler)
             portRef <- Some port
+
+            let completingPort () =
+                let mutable localPort: PtyPort option = None
+
+                let completeOnTerminate id command =
+                    let result = handler id command
+
+                    match command, localPort with
+                    | PtyCommand.Signal PtySignal.Terminate, Some ownedPort -> ownedPort.Complete id
+                    | _ -> ()
+
+                    result
+
+                let ownedPort = PtyPort(handler = completeOnTerminate)
+                localPort <- Some ownedPort
+                ownedPort
 
             let runtime =
                 HostForkRuntime(
@@ -117,6 +191,19 @@ module HostForkPtySurface =
             let agent = ManagedAgent.make Role.DevOps
 
             match action with
+            | "missing-durable-owner" ->
+                let production =
+                    HostForkRuntime(
+                        SessionId.create "unowned-pty",
+                        Unchecked.defaultof<ISessionHostPort>,
+                        (fun _ _ _ -> Task.FromResult None),
+                        CompletionMailboxRuntime.create,
+                        NodeTiming.nodeClockPort (),
+                        NodeTiming.raceExit
+                    )
+
+                let! outcome = production.ForkPty(input, agent)
+                return forkView (calls.ToArray()) production port outcome
             | "lookup-unknown" ->
                 return
                     box
@@ -127,11 +214,38 @@ module HostForkPtySurface =
                 let id = PtyId.Create "foreign"
                 let! outcome = runtime.SendPty(id, input, None)
                 return outcomeView (calls.ToArray()) (runtime.OwnsPty id) (port.Known id) outcome
-            | "track-untrack" ->
-                let id = PtyId.Create input
-                runtime.TrackPtyRun id
+            | "synchronous-exit"
+            | "close-without-exit" ->
+                let! opened = runtime.ForkPty("shell", agent)
+                let id = opened |> Result.defaultWith failwith
+
+                let! error =
+                    task {
+                        if action = "close-without-exit" then
+                            try
+                                do! runtime.CloseOwnedPtys(graceMs = 0)
+                                return ""
+                            with ex ->
+                                return ex.Message
+                        else
+                            return ""
+                    }
+
+                let _, snapshots = runtime.List()
+
+                return
+                    box
+                        {| owned = runtime.OwnsPty id
+                           live = port.Exists id
+                           completions = runtime.PendingCompletionCount
+                           snapshots = snapshots.Length
+                           bindAfter = runtime.TryBindTerminalName("instant", id) |> Result.isOk
+                           error = error |}
+            | "fork-complete" ->
+                let! opened = runtime.ForkPty("shell", agent)
+                let id = opened |> Result.defaultWith failwith
                 let ownedBefore = runtime.OwnsPty id
-                runtime.UntrackPtyRun id.Value
+                port.Complete id
 
                 return
                     box
@@ -181,7 +295,7 @@ module HostForkPtySurface =
                 // Setup child runtime representing DevOps session
                 let devopsSessionId = SessionId.create "devops-session"
                 let authorityRoot = devopsRoot durable devopsSessionId
-                let devopsPort = PtyPort(handler = handler)
+                let devopsPort = completingPort ()
 
                 let devopsRuntime =
                     HostForkRuntime(
@@ -203,7 +317,7 @@ module HostForkPtySurface =
 
                 // Another session (e.g. engineer session) opens its own PTY
                 let engineerSessionId = SessionId.create "engineer-session"
-                let engineerPort = PtyPort(handler = handler)
+                let engineerPort = completingPort ()
 
                 let engineerRuntime =
                     HostForkRuntime(

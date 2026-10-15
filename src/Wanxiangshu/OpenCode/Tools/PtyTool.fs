@@ -148,11 +148,13 @@ module PtyTool =
         (name: string)
         (id: PtyId)
         =
-        match pty.TryBindTerminalName(name, id) with
-        | Ok() -> Ok(instruction (namedProse language Path.OpenTerminal.IsOpen (name.Trim())))
-        | Error bindError ->
-            pty.UntrackPtyRun id.Value
-            Error bindError
+        task {
+            match pty.TryBindTerminalName(name, id) with
+            | Ok() -> return Ok(instruction (namedProse language Path.OpenTerminal.IsOpen (name.Trim())))
+            | Error bindError ->
+                do! pty.ClosePty id
+                return Error bindError
+        }
 
     /// Evidence → Decision: named PTY must already exist for send/read/signal.
     let private requirePtyByName

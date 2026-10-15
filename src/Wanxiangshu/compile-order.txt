@@ -1204,6 +1204,8 @@ Mission/Work/OpenCode/NarrativeTransform.fsi
 Mission/Work/OpenCode/NarrativeTransform.fs
 OpenCode/Tools/PtyTool.fsi
 OpenCode/Tools/PtyTool.fs
+OpenCode/Tools/PtyToolSurface.fsi
+OpenCode/Tools/PtyToolSurface.fs
 Execution/Session/OpenCode/HorizonTool.fsi
 Execution/Session/OpenCode/HorizonTool.fs
 Execution/Session/OpenCode/HorizonSurface.fsi

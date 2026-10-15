@@ -139,6 +139,21 @@ module AgentProjection =
     let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =
         Map.tryFind sessionId projection.Sessions
 
+    let tryParentOf (childSessionId: SessionId) (projection: AgentProjectionSet) : SessionId option =
+        projection.HandleByChildSession
+        |> Map.tryFind childSessionId
+        |> Option.filter (fun record -> record.Ownership = HandleOwnership.DurableParentHandle)
+        |> Option.bind (fun record ->
+            projection.Sessions
+            |> Map.toSeq
+            |> Seq.tryPick (fun (parentId, session) ->
+                session.Handles
+                |> Option.bind (HandleProjection.tryFind record.Handle)
+                |> Option.filter (fun owned -> owned.ChildSessionId = childSessionId)
+                |> Option.map (fun _ -> parentId)))
+        |> Option.orElseWith (fun () ->
+            SessionAssociationProjection.tryMainSessionOf childSessionId projection.Associations)
+
     /// Fork-child main is sealed for Blogger when its handle is joinable/retired.
     /// Human root (no handle) → false.
     let mainSealedForBlogger (mainSessionId: SessionId) (projection: AgentProjectionSet) : bool =

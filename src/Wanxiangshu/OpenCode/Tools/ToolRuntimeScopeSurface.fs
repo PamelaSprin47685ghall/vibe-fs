@@ -46,6 +46,36 @@ type private DummyObserver() =
                 member _.MarkExit _ = ()
                 member _.Dispose() = () }
 
+type private ControlledPtyPorts() =
+    let sessions = Dictionary<string, PtyPort * PtyId>()
+
+    member _.Create() =
+        let mutable portRef: PtyPort option = None
+
+        let handler id command =
+            let port =
+                portRef
+                |> Option.defaultWith (fun () -> invalidOp "PTY fixture is not initialized")
+
+            match command with
+            | PtyCommand.Spawn(label, _) -> sessions.[label] <- (port, id)
+            | PtyCommand.Signal PtySignal.Terminate -> port.Complete id
+            | _ -> ()
+
+            Task.FromResult(Ok())
+
+        let port = PtyPort(handler = handler)
+        portRef <- Some port
+        port
+
+    member _.Complete(label: string) =
+        let port, id = sessions.[label]
+        port.Complete id
+
+    member _.Id(label: string) =
+        let _, id = sessions.[label]
+        id.Value
+
 [<AbstractClass; Sealed; AttachMembers>]
 type ToolRuntimeScopeSurface =
     [<Emit("$0 === undefined")>]
@@ -114,6 +144,7 @@ type ToolRuntimeScopeSurface =
 
         let dummySessions = DummySessionHostPort() :> ISessionHostPort
         let dummyObserver = DummyObserver() :> IWaitObserver
+        let ptys = ControlledPtyPorts()
 
         let scope =
             new ToolRuntimeScope(
@@ -130,7 +161,8 @@ type ToolRuntimeScopeSurface =
                 None,
                 None,
                 None,
-                None
+                None,
+                ptyPortFactory = ptys.Create
             )
 
         let emptyContext sid =
@@ -168,29 +200,51 @@ type ToolRuntimeScopeSurface =
                 mgrRuntime.InstallRun("engineer-1", SessionId.create engId, Role.Engineer, authRoot)
                 |> ignore)
 
-        devopsChildSessionId
-        |> Option.iter (fun devopsId ->
-            let devopsRuntime =
-                match scope.RuntimeFor(emptyContext devopsId) with
-                | Ok r -> r
-                | Error err -> failwith err
-
-            for pty in devopsPtys do
-                devopsRuntime.TrackPtyRun(PtyId.Create pty))
-
-        engineerChildSessionId
-        |> Option.iter (fun engId ->
-            let engRuntime =
-                match scope.RuntimeFor(emptyContext engId) with
-                | Ok r -> r
-                | Error err -> failwith err
-
-            for pty in engineerPtys do
-                engRuntime.TrackPtyRun(PtyId.Create pty))
-
-        let blockers = scope.RetirementBlockersFor managerSessionId |> List.toArray
-
         task {
+            for devopsId in Option.toList devopsChildSessionId do
+                let devopsRuntime =
+                    scope.RuntimeFor(emptyContext devopsId) |> Result.defaultWith failwith
+
+                for command in devopsPtys do
+                    let! opened = devopsRuntime.ForkPty(command, ManagedAgent.make Role.DevOps)
+                    opened |> Result.defaultWith failwith |> ignore
+
+            for engId in Option.toList engineerChildSessionId do
+                let engRuntime = scope.RuntimeFor(emptyContext engId) |> Result.defaultWith failwith
+
+                for command in engineerPtys do
+                    let! opened = engRuntime.ForkPty(command, ManagedAgent.make Role.Engineer)
+                    opened |> Result.defaultWith failwith |> ignore
+
+            let blockers = scope.RetirementBlockersFor managerSessionId |> List.toArray
+            do! scope.DisposeAsync()
+            return blockers
+        }
+
+    [<CompiledName("coldRetirementBlockers")>]
+    static member coldRetirementBlockers
+        (journal: JournalHandle, workspace: string, managerSessionId: string)
+        : Task<string array> =
+        task {
+            let scope =
+                new ToolRuntimeScope(
+                    DummySessionHostPort(),
+                    DummyObserver(),
+                    { new IRootWorkspaceReader with
+                        member _.TryRead() = None },
+                    Some journal.Journal,
+                    Some workspace,
+                    Dictionary<string, string>(),
+                    (fun _ -> None),
+                    Dictionary<string, string>(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None
+                )
+
+            let blockers = scope.RetirementBlockersFor managerSessionId |> List.toArray
             do! scope.DisposeAsync()
             return blockers
         }
@@ -228,6 +282,7 @@ type ToolRuntimeScopeSurface =
 
             let dummySessions = DummySessionHostPort() :> ISessionHostPort
             let dummyObserver = DummyObserver() :> IWaitObserver
+            let ptys = ControlledPtyPorts()
 
             let scope =
                 new ToolRuntimeScope(
@@ -244,7 +299,8 @@ type ToolRuntimeScopeSurface =
                     None,
                     None,
                     None,
-                    None
+                    None,
+                    ptyPortFactory = ptys.Create
                 )
 
             let emptyContext sid =
@@ -271,10 +327,12 @@ type ToolRuntimeScopeSurface =
                 | Error err -> failwith err
 
             for pty in devopsPtys do
-                devopsRuntime.TrackPtyRun(PtyId.Create pty)
+                let! opened = devopsRuntime.ForkPty(pty, ManagedAgent.make Role.DevOps)
+                opened |> Result.defaultWith failwith |> ignore
 
             for pty in engineerPtys do
-                engRuntime.TrackPtyRun(PtyId.Create pty)
+                let! opened = engRuntime.ForkPty(pty, ManagedAgent.make Role.Engineer)
+                opened |> Result.defaultWith failwith |> ignore
 
             let devopsBefore = devopsRuntime.SnapshotOutstandingPtyRuns()
             let engineerBefore = engRuntime.SnapshotOutstandingPtyRuns()
@@ -358,6 +416,7 @@ type ToolRuntimeScopeSurface =
 
             let dummySessions = DummySessionHostPort() :> ISessionHostPort
             let dummyObserver = DummyObserver() :> IWaitObserver
+            let ptys = ControlledPtyPorts()
 
             let scope =
                 new ToolRuntimeScope(
@@ -374,7 +433,8 @@ type ToolRuntimeScopeSurface =
                     None,
                     None,
                     None,
-                    None
+                    None,
+                    ptyPortFactory = ptys.Create
                 )
 
             let emptyContext sid =
@@ -403,8 +463,10 @@ type ToolRuntimeScopeSurface =
             mgrRuntime.AdoptChild("devops", SessionId.create devopsSessionId)
             mgrRuntime.AdoptChild("engineer-1", SessionId.create engineerSessionId)
 
-            devopsRuntime.TrackPtyRun(PtyId.Create "devops-pty-1")
-            engRuntime.TrackPtyRun(PtyId.Create "eng-pty-1")
+            let! devopsOpened = devopsRuntime.ForkPty("devops-pty-1", ManagedAgent.make Role.DevOps)
+            devopsOpened |> Result.defaultWith failwith |> ignore
+            let! engineerOpened = engRuntime.ForkPty("eng-pty-1", ManagedAgent.make Role.Engineer)
+            engineerOpened |> Result.defaultWith failwith |> ignore
 
             let workWaiter =
                 TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -414,8 +476,7 @@ type ToolRuntimeScopeSurface =
             let blockersWithWorkAndPty =
                 scope.RetirementBlockersFor managerSessionId |> List.toArray
 
-            // CancelOwnedPtys requests cancellation on the engineer PTY without physical exit:
-            // the blocker must remain until real exit (UntrackPtyRun / onExit).
+            // Cancellation alone does not complete the controlled backend.
             engRuntime.CancelOwnedPtys()
 
             let blockersAfterCancelRequest =
@@ -434,9 +495,7 @@ type ToolRuntimeScopeSurface =
             let blockersAfterWorkEnded =
                 scope.RetirementBlockersFor managerSessionId |> List.toArray
 
-            // Physically end the engineer PTY: its Ended removes the engineer PTY blocker,
-            // while fixed DevOps PTY remains alive in its own scope and never blocked manager retirement.
-            engRuntime.UntrackPtyRun "eng-pty-1"
+            ptys.Complete "eng-pty-1"
 
             let blockersAfterEngineerPtyEnded =
                 scope.RetirementBlockersFor managerSessionId |> List.toArray
@@ -455,5 +514,7 @@ type ToolRuntimeScopeSurface =
                        frozenAfterUnfreeze = frozenAfterUnfreeze
                        blockersAfterWorkEnded = blockersAfterWorkEnded
                        blockersAfterEngineerPtyEnded = blockersAfterEngineerPtyEnded
+                       engineerPtyId = ptys.Id "eng-pty-1"
+                       devopsPtyId = ptys.Id "devops-pty-1"
                        devopsPtysSurviving = devopsPtysSurviving |}
         }

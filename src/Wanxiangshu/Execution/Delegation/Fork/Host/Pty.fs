@@ -29,7 +29,7 @@ module DelegationPtyAdapter =
         (tryPtyByName: string -> PtyId option)
         (forkPty: string * ManagedAgent * string option -> Task<Result<PtyId, string>>)
         (tryBindTerminalName: string * PtyId -> Result<unit, string>)
-        (untrackPtyRun: string -> unit)
+        (closePty: PtyId -> Task<unit>)
         (sendPty: PtyId * string * PtySignal option -> Task<Result<PtyRead, string>>)
         (ownsPty: PtyId -> bool)
         (tryPty: string -> PtyId option)
@@ -38,7 +38,7 @@ module DelegationPtyAdapter =
         { TryPtyByName = tryPtyByName
           ForkPty = forkPty
           TryBindTerminalName = tryBindTerminalName
-          UntrackPtyRun = untrackPtyRun
+          ClosePty = closePty
           SendPty = sendPty
           OwnsPty = ownsPty
           TryPty = tryPty

@@ -374,10 +374,10 @@ module PtySupervisor =
                 supervisor.Sessions.[id] <- live
                 placeholder.Pending |> Seq.toList)
 
+        term?onExit (fun (_event: obj) -> onSessionExit supervisor port id) |> ignore
+
         term?onData (fun (data: string) -> onSessionData supervisor port id data)
         |> ignore
-
-        term?onExit (fun (_event: obj) -> onSessionExit supervisor port id) |> ignore
 
         if not (port.Exists id) then
             killOrphanTerm term

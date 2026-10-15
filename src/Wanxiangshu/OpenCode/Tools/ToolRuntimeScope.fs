@@ -103,11 +103,16 @@ type ToolRuntimeScope
         ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>),
         ?workRecordCapability: DelegationWorkRecordCapability,
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
-        ?eventPort: IEventObservationPort
+        ?eventPort: IEventObservationPort,
+        ?ptyPortFactory: (unit -> PtyPort)
     ) =
 
     let gate = obj ()
     let ownedWorkGate = obj ()
+
+    let ownershipCommonDir =
+        workspaceDirectory
+        |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
     // DSL-MUTABLE: resource — per-owner fork runtime registry
     let runtimes = Dictionary<string, HostForkRuntime>()
     // DSL-MUTABLE: resource — per-session executor runtime registry
@@ -221,7 +226,7 @@ type ToolRuntimeScope
                         ("reserve:" + resId)
                         msg
 
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.mayStartResource receipt
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.mayStartInMemoryResource receipt
                 |> Option.map (startReservedOwnedWork seq resId)
             with _ ->
                 None)
@@ -366,6 +371,8 @@ type ToolRuntimeScope
             NodeTiming.nodeClockPort (),
             NodeTiming.raceExit,
             ?journal = journal,
+            ?ownershipCommonDir = ownershipCommonDir,
+            ?ptyPort = (ptyPortFactory |> Option.map (fun create -> create ())),
             onChildCreated = (fun _ role childId -> registerChild sid role childId),
             onChildCreatedDir =
                 (fun _ childId directory ->
@@ -1029,13 +1036,26 @@ type ToolRuntimeScope
                 let tenureScope = sprintf "tenure:%s:%s:%d" sessionId frozen gen
 
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipScopePhaseInMemory scopeOwnership tenureScope = Some
-                                                                                                                           "Draining")
+                    "Draining")
 
     member _.RetirementBlockersFor(sessionId: string) =
+        let persistedProjections =
+            journal
+            |> Option.map (fun durable -> (AgentJournal.snapshot durable).AgentProjections)
+
         let parentOf candidate =
-            match sessionParents.TryGetValue candidate with
-            | true, parent -> Some parent
-            | _ -> None
+            let persistedParent =
+                persistedProjections
+                |> Option.bind (fun projections ->
+                    AgentProjection.tryParentOf (SessionId.create candidate) projections)
+                |> Option.map SessionId.value
+
+            match persistedParent, sessionParents.TryGetValue candidate with
+            | Some parent, (true, current) when parent <> current ->
+                invalidOp (sprintf "Conflicting parent evidence for session %s" candidate)
+            | Some parent, _ -> Some parent
+            | None, (true, parent) -> Some parent
+            | None, _ -> None
 
         let rec belongsToRoot (candidate: string) visited =
             if candidate = sessionId then
@@ -1099,8 +1119,11 @@ type ToolRuntimeScope
                         sprintf "%s:%s:agent:%s:%s" prefix ownerKey handle (SessionId.value child))
 
                 let ptys =
-                    runtime.SnapshotOutstandingPtyRuns()
-                    |> List.map (fun pty -> sprintf "%s:%s:pty:%s" prefix ownerKey pty)
+                    match ownershipCommonDir with
+                    | Some _ -> []
+                    | None ->
+                        runtime.SnapshotOutstandingPtyRuns()
+                        |> List.map (fun pty -> sprintf "%s:%s:pty:%s" prefix ownerKey pty)
 
                 let pending =
                     [ if relevantAgents.Length > 0 then
@@ -1136,21 +1159,28 @@ type ToolRuntimeScope
                 lock ownedWorkGate (fun () ->
                     unsettledOwnedWork () |> List.map (fun blocker -> blocker.Lease.ResourceId))
 
-            let isNotDevOpsScope (scopeId: string) =
-                scopeId <> "devops"
-                && (devopsChildKeyOpt |> Option.forall (fun devopsKey -> scopeId <> devopsKey))
-
             let durableBlockers =
-                workspaceDirectory
-                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
-                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                ownershipCommonDir
                 |> Option.map (fun commonDir ->
-                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipBlockersDurable
-                        commonDir
-                        sessionId
-                        sessionId
-                    |> List.filter (fun b -> isNotDevOpsScope b.ScopeId)
-                    |> List.map (fun b -> sprintf "ownership:%s:%s:%s" b.ScopeId b.Kind b.Lease.ResourceId))
+                    let persistedSessions =
+                        journal
+                        |> Option.map (fun durable ->
+                            (AgentJournal.snapshot durable).AgentProjections.Sessions
+                            |> Map.toSeq
+                            |> Seq.map (fun (id, _) -> SessionId.value id)
+                            |> Seq.toList)
+                        |> Option.defaultValue []
+
+                    [ sessionId ] @ (sessionParents.Keys |> Seq.toList) @ persistedSessions
+                    |> List.distinct
+                    |> List.filter isRelevantSession
+                    |> List.collect (fun ownerId ->
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.tryOwnershipBlockersDurable
+                            commonDir
+                            ("fork-pty:" + ownerId)
+                            ownerId
+                        |> Option.defaultValue []
+                        |> List.map (fun b -> sprintf "ownership:%s:%s:%s" ownerId b.Kind b.Lease.ResourceId)))
                 |> Option.defaultValue []
 
             (forkBlockers @ executorBlockers @ toolOwned @ durableBlockers)
@@ -1224,6 +1254,8 @@ type ToolRuntimeScope
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
                         ?journal = journal,
+                        ?ownershipCommonDir = ownershipCommonDir,
+                        ?ptyPort = (ptyPortFactory |> Option.map (fun create -> create ())),
                         onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId),
                         // EXEC-014: host executor leaves are Host-owned and
                         // parent-invisible. A DurableParentHandle would leak every

@@ -57,6 +57,7 @@ module AgentProjection =
     val emptySession: SessionAgentProjection
     val empty: AgentProjectionSet
     val tryFind: sessionId: SessionId -> projection: AgentProjectionSet -> SessionAgentProjection option
+    val tryParentOf: childSessionId: SessionId -> projection: AgentProjectionSet -> SessionId option
     val mainSealedForBlogger: mainSessionId: SessionId -> projection: AgentProjectionSet -> bool
     val hasActiveOrchestratorJobs: projection: AgentProjectionSet -> bool
     val activeOrchestratorJobPairs: projection: AgentProjectionSet -> (ManagerJobId * SessionId) list

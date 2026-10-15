@@ -18,14 +18,28 @@ module PtyBackend =
         with _ ->
             ()
 
-    let private failPendingWrites (super: PtySupervisor) (port: PtyPort) (id: PtyId) (msg: string) : unit =
-        port.FailRead(id, msg)
-
+    let private failPendingCommands (super: PtySupervisor) (id: PtyId) (msg: string) =
         for (_, tcsOpt) in takePending super id do
             tcsOpt |> Option.iter (fun t -> t.SetResult(Error msg))
 
+    let private failPendingWrites (super: PtySupervisor) (port: PtyPort) (id: PtyId) (msg: string) : unit =
+        port.FailRead(id, msg)
+        failPendingCommands super id msg
         drop super id |> ignore
         port.Complete(id, Error msg)
+
+    let private spawnLoaded super (port: PtyPort) id cmd cwd exitTcs =
+        task {
+            try
+                let term = spawnSync super cmd cwd
+                attach super port id term exitTcs
+                return Ok()
+            with ex ->
+                let msg = sprintf "PTY startup outcome is unknown: %s" ex.Message
+                port.FailExitObservation(id, msg)
+                failPendingCommands super id msg
+                return Error msg
+        }
 
     let private spawnCommand
         (super: PtySupervisor)
@@ -38,16 +52,22 @@ module PtyBackend =
             let exitTcs = TaskCompletionSource<unit>()
             port.RegisterExitTask(id, exitTcs.Task)
 
-            try
-                do! ensureSpawn super
-                let term = spawnSync super cmd cwd
-                attach super port id term exitTcs
-                return Ok()
-            with ex ->
+            let! loaded =
+                task {
+                    try
+                        do! ensureSpawn super
+                        return Ok()
+                    with ex ->
+                        return Error ex.Message
+                }
+
+            match loaded with
+            | Error reason ->
                 completeExit exitTcs
-                let msg = sprintf "PTY spawn failed: %s" ex.Message
+                let msg = sprintf "PTY backend load failed before spawn: %s" reason
                 failPendingWrites super port id msg
                 return Error msg
+            | Ok() -> return! spawnLoaded super port id cmd cwd exitTcs
         }
 
     let private handle

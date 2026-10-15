@@ -10,7 +10,7 @@ type DelegationPtyCapability =
     { TryPtyByName: string -> PtyId option
       ForkPty: string * ManagedAgent * string option -> Task<Result<PtyId, string>>
       TryBindTerminalName: string * PtyId -> Result<unit, string>
-      UntrackPtyRun: string -> unit
+      ClosePty: PtyId -> Task<unit>
       SendPty: PtyId * string * PtySignal option -> Task<Result<PtyRead, string>>
       OwnsPty: PtyId -> bool
       TryPty: string -> PtyId option

@@ -125,7 +125,15 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
 
     // DSL-MUTABLE: resource — per-PtyId exit task registry for CloseAll drain
     let exitTasks = Dictionary<PtyId, Task>()
+    // DSL-MUTABLE: resource — failed startup observations that cannot prove exit.
+    let exitObservationFailures = Dictionary<PtyId, string>()
     do exitListener |> Option.iter exitListeners.Add
+
+    let requireExitObservation id =
+        lock gate (fun () ->
+            match exitObservationFailures.TryGetValue id with
+            | true, reason -> invalidOp reason
+            | false, _ -> ())
 
     let publishFirstClose (id: PtyId) (closed: bool ref) (item: PtyExitEvent) =
         let alreadyClosed = PtyPortSupport.claimClosedFlag closed
@@ -280,6 +288,10 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
     member this.RegisterExitTask(id: PtyId, task: Task) =
         lock gate (fun () -> exitTasks.[id] <- task)
 
+    member this.FailExitObservation(id: PtyId, reason: string) =
+        lock gate (fun () -> exitObservationFailures.[id] <- reason)
+        this.FailRead(id, reason)
+
     /// Complete from a backend exit (onExit). This is the ONLY path that
     /// publishes completion to exit listeners.
     /// If owner requested terminate (Close/CloseAll/TERM), emits Aborted;
@@ -290,6 +302,7 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
             lock gate (fun () ->
                 let marked = abortPending.Remove id
                 exitTasks.Remove id |> ignore
+                exitObservationFailures.Remove id |> ignore
                 marked)
 
         let item =
@@ -304,7 +317,8 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
     member this.CompleteAborted(id: PtyId, ?message: string) =
         lock gate (fun () ->
             abortPending.Remove id |> ignore
-            exitTasks.Remove id |> ignore)
+            exitTasks.Remove id |> ignore
+            exitObservationFailures.Remove id |> ignore)
 
         let msg = defaultArg message "PTY aborted"
         completeFromExit id (PtyExitEvent.Aborted(id, "PTY_ABORTED", msg))
@@ -323,6 +337,8 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
 
             if isLive then
                 requestTerminate id
+
+                requireExitObservation id
                 let exitTaskOpt = lock gate (fun () -> PtyPortSupport.findExitTask exitTasks id)
                 do! PtyPortSupport.awaitRegisteredExit handler exitTaskOpt grace id
                 lock gate (fun () -> exitTasks.Remove id |> ignore)
@@ -339,12 +355,7 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
 
         task {
             for id in ids do
-                requestTerminate id
-
-                let exitTaskOpt = lock gate (fun () -> PtyPortSupport.findExitTask exitTasks id)
-
-                do! PtyPortSupport.awaitRegisteredExit handler exitTaskOpt grace id
-                lock gate (fun () -> exitTasks.Remove id |> ignore)
+                do! this.ClosePty(id, graceMs = grace)
         }
 
     member _.List() : PtyHandle list =

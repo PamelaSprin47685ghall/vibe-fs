@@ -33,14 +33,6 @@ module SessionBindingRecovery =
         else
             byname
 
-    let private parentOwningHandle (projections: AgentProjectionSet) (handle: HandleId) : SessionId option =
-        projections.Sessions
-        |> Map.toList
-        |> List.tryPick (fun (parentSessionId, session) ->
-            match session.Handles with
-            | Some handles when HandleProjection.tryFind handle handles |> Option.isSome -> Some parentSessionId
-            | _ -> None)
-
     /// Durable evidence for one child session: its parent and its execution agent.
     /// Only parent-visible durable handles answer; Host-owned hidden leaves stay
     /// invisible to the parent's binding surface.
@@ -50,7 +42,7 @@ module SessionBindingRecovery =
         |> Map.tryFind childSessionId
         |> Option.filter (fun record -> record.Ownership = HandleOwnership.DurableParentHandle)
         |> Option.map (fun record ->
-            parentOwningHandle projections record.Handle
+            AgentProjection.tryParentOf childSessionId projections
             |> Option.map (fun parentSessionId -> SessionId.value parentSessionId, agentNameOf record)
             |> Option.defaultWith (fun () ->
                 // Fallback: child record exists in durable projection, resolve agent even if parent handle set is compacting

@@ -35,107 +35,107 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
 open Fable.Core
+open Wanxiangshu.Mission.Lifecycle
 
 
 [<RequireQualifiedAccess>]
 module private HostPtyOwnership =
-    [<Import("Ownership", "wanxiangli/ownership")>]
-    let private Ownership: obj = jsNative
+    type Owner =
+        { Execute: string -> obj -> DurableWorkHost.HostReceipt
+          MayStart: DurableWorkHost.HostReceipt -> DurableWorkHost.OwnershipLease option
+          Blockers: string -> DurableWorkHost.OwnershipBlocker list }
 
-    let create (registryId: string) : obj =
-        Fable.Core.JsInterop.createNew Ownership (registryId, ([||]: string array))
+    let create (commonDir: string option) (registryId: string) : Owner =
+        commonDir
+        |> Option.iter (fun directory ->
+            if String.IsNullOrWhiteSpace directory then
+                invalidArg (nameof commonDir) "PTY ownership common directory is required")
 
-    let openRoot (ownership: obj) (scopeId: string) : unit =
-        let msg =
-            Fable.Core.JsInterop.createObj [ "type", box "OpenScope"; "scopeId", box scopeId; "parentId", null ]
+        match commonDir with
+        | Some directory ->
+            { Execute = DurableWorkHost.executeOwnershipDurable directory registryId
+              MayStart = DurableWorkHost.mayStartResource
+              Blockers = DurableWorkHost.ownershipBlockersDurable directory registryId }
+        | None ->
+            let ownership = DurableWorkHost.createOwnership registryId [||]
 
-        ownership?execute ("open:" + scopeId, msg) |> ignore
+            { Execute = DurableWorkHost.executeOwnershipInMemory ownership
+              MayStart = DurableWorkHost.mayStartInMemoryResource
+              Blockers = DurableWorkHost.ownershipBlockersInMemory ownership }
 
-    let reserve (ownership: obj) (scopeId: string) (ptyId: string) : Result<obj, string> =
+    let private requireObserved (kind: string) (receipt: DurableWorkHost.HostReceipt) =
+        if
+            receipt.Kind <> kind
+            || not (List.contains receipt.Status [ "Committed"; "Applied"; "Observed"; "Replayed" ])
+        then
+            invalidOp (sprintf "PTY ownership %s was not acknowledged: %s %s" kind receipt.Status receipt.Reason)
+
+    let openScope (ownership: Owner) (scopeId: string) (parentId: string option) =
+        DurableWorkHost.ownershipMessage
+            "OpenScope"
+            [ "scopeId", box scopeId
+              "parentId", parentId |> Option.map box |> Option.defaultValue null ]
+        |> ownership.Execute("open:" + scopeId)
+        |> requireObserved "ScopeOpened"
+
+    let reserve (ownership: Owner) (scopeId: string) (ptyId: string) =
         try
-            let msg =
-                Fable.Core.JsInterop.createObj
-                    [ "type", box "Reserve"
-                      "resourceId", box ("pty:" + ptyId)
+            let receipt =
+                DurableWorkHost.ownershipMessage
+                    "Reserve"
+                    [ "resourceId", box ("pty:" + ptyId)
                       "scopeId", box scopeId
                       "kind", box "process" ]
+                |> ownership.Execute("reserve:pty:" + ptyId)
 
-            let reply: obj = ownership?execute ("reserve:pty:" + ptyId, msg)
-            Ok(reply?result?lease)
+            ownership.MayStart receipt
+            |> Option.map Ok
+            |> Option.defaultValue (
+                Error(sprintf "PTY reservation did not grant launch permission: %s %s" receipt.Status receipt.Reason)
+            )
         with ex ->
             Error ex.Message
 
-    let started (ownership: obj) (ptyId: string) (lease: obj) (incarnationId: string) : Result<unit, string> =
-        try
-            let binding =
-                Fable.Core.JsInterop.createObj [ "externalId", box ptyId; "incarnationId", box incarnationId ]
+    let drain (ownership: Owner) (scopeId: string) =
+        DurableWorkHost.ownershipMessage "Drain" [ "scopeId", box scopeId ]
+        |> ownership.Execute("drain:" + scopeId)
+        |> requireObserved "Draining"
 
-            let msg =
-                Fable.Core.JsInterop.createObj [ "type", box "Started"; "lease", lease; "binding", binding ]
+    let cancel (ownership: Owner) (ptyId: string) (lease: DurableWorkHost.OwnershipLease) =
+        let receipt =
+            DurableWorkHost.ownershipMessage "Cancel" [ "lease", DurableWorkHost.leaseObject lease ]
+            |> ownership.Execute("cancel:pty:" + ptyId)
 
-            ownership?execute ("started:pty:" + ptyId + ":" + incarnationId, msg) |> ignore
-            Ok()
-        with ex ->
-            Error ex.Message
+        requireObserved
+            (if receipt.Kind = "Settled" then
+                 "Settled"
+             else
+                 "CancellationRequested")
+            receipt
 
-    let private normalizeNotStartedReason (reason: string) : string =
-        if String.IsNullOrWhiteSpace reason then
-            "PTY not started"
-        else
-            reason
+    let ended
+        (ownership: Owner)
+        (ptyId: string)
+        (lease: DurableWorkHost.OwnershipLease)
+        (incarnationId: string)
+        (outcome: string)
+        =
+        DurableWorkHost.ownershipMessage
+            "Ended"
+            [ "lease", DurableWorkHost.leaseObject lease
+              "binding", DurableWorkHost.bindingObject ptyId incarnationId
+              "outcome", box outcome ]
+        |> ownership.Execute("ended:pty:" + ptyId + ":" + incarnationId)
+        |> requireObserved "Ended"
 
-    let notStarted (ownership: obj) (ptyId: string) (lease: obj) (reason: string) : unit =
-        let safeReason = normalizeNotStartedReason reason
-
-        try
-            let msg =
-                Fable.Core.JsInterop.createObj [ "type", box "NotStarted"; "lease", lease; "reason", box safeReason ]
-
-            ownership?execute ("not-started:pty:" + ptyId, msg) |> ignore
-        with _ ->
-            ()
-
-    let cancel (ownership: obj) (ptyId: string) (lease: obj) (reqSeq: int) : unit =
-        try
-            let msg = Fable.Core.JsInterop.createObj [ "type", box "Cancel"; "lease", lease ]
-
-            ownership?execute (sprintf "cancel:pty:%s:%d" ptyId reqSeq, msg) |> ignore
-        with _ ->
-            ()
-
-    let ended (ownership: obj) (ptyId: string) (lease: obj) (incarnationId: string) (outcome: string) : unit =
-        try
-            let binding =
-                Fable.Core.JsInterop.createObj [ "externalId", box ptyId; "incarnationId", box incarnationId ]
-
-            let msg =
-                Fable.Core.JsInterop.createObj
-                    [ "type", box "Ended"
-                      "lease", lease
-                      "binding", binding
-                      "outcome", box outcome ]
-
-            ownership?execute ("ended:pty:" + ptyId + ":" + incarnationId, msg) |> ignore
-        with _ ->
-            ()
-
-    let private blockerPtyId (item: obj) : string option =
-        let b: obj = item?binding
-        let resId = string (item?lease?resourceId)
-
-        if not (isNull b) && not (isNull (b?externalId)) then
-            Some(string b?externalId)
-        elif resId.StartsWith("pty:", StringComparison.Ordinal) then
-            Some(resId.Substring 4)
-        else
-            None
-
-    let unsettledIds (ownership: obj) (scopeId: string) : string list =
-        try
-            let items: obj array = unbox (ownership?blockers scopeId)
-            items |> Array.choose blockerPtyId |> Array.toList
-        with _ ->
-            []
+    let unsettledIds (ownership: Owner) (scopeId: string) : string list =
+        ownership.Blockers scopeId
+        |> List.map (fun item ->
+            match item.ExternalId with
+            | Some id -> id
+            | None when item.Lease.ResourceId.StartsWith("pty:", StringComparison.Ordinal) ->
+                item.Lease.ResourceId.Substring 4
+            | None -> invalidOp "PTY ownership contains an invalid resource identity")
 
 [<RequireQualifiedAccess>]
 module private PtyHostHelpers =
@@ -263,7 +263,8 @@ type HostForkRuntime
         /// children stay outside the parent's list/join/recovery surface.
         ?ownership: HandleOwnership,
         /// Optional capability to drain child PTYs upon run completion (e.g. for DevOps session).
-        ?drainChildPtys: SessionId -> Task<unit>
+        ?drainChildPtys: SessionId -> Task<unit>,
+        ?ownershipCommonDir: string
     ) as this =
     let clockPort = clock
     let runtime = ForkRuntimeBackend.create clockPort raceExit createMailbox
@@ -281,7 +282,7 @@ type HostForkRuntime
     let dormantChildren = Dictionary<string, SessionId>()
     // DSL-MUTABLE: resource — pending host run registry by agent id
     let pendingRuns = Dictionary<string, PendingHostRun>()
-    /// Provider TerminalName → PtyId. Occupied until Join delivers closure.
+    /// Provider TerminalName → PtyId. Occupied until backend exit.
     // DSL-MUTABLE: resource — terminal name to PtyId map
     let terminalByName = Dictionary<string, string>()
     let ptyCompletionObservers = ResizeArray<PtyJoinItem -> unit>()
@@ -518,18 +519,22 @@ type HostForkRuntime
     let ptyPortInstance = defaultArg ptyPort (PtyBackend.createPort ())
     let parentKey = SessionId.value parentId
 
-    let ptyScopeId =
-        if String.IsNullOrWhiteSpace parentKey then
-            "pty-root"
-        else
-            parentKey
+    let ptyRootScopeId = parentKey
+    let ptyScopeId = parentKey + ":runtime:" + Guid.NewGuid().ToString("N")
     // DSL-MUTABLE: resource — wanxiangli/ownership registry for PTY leases in this runtime
-    let ptyOwnership = HostPtyOwnership.create ("fork-pty:" + ptyScopeId)
+    let ptyOwnership =
+        HostPtyOwnership.create ownershipCommonDir ("fork-pty:" + ptyRootScopeId)
     // DSL-MUTABLE: resource — active PTY lease and incarnation binding by PtyId
-    let ptyLeases = Dictionary<string, obj * string>()
-    // DSL-MUTABLE: resource — monotonic sequence for PTY ownership requests
-    let mutable ptyOwnershipSeq = 0
-    do HostPtyOwnership.openRoot ptyOwnership ptyScopeId
+    let ptyLeases = Dictionary<string, DurableWorkHost.OwnershipLease * string>()
+    // DSL-MUTABLE: resource — exact exit observations awaiting an ownership acknowledgement.
+    let ptyExitObservations = Dictionary<string, PtyJoinItem * string>()
+    // DSL-MUTABLE: resource — prevents new local PTYs during a run's exit drain.
+    let mutable ptyClosing = false
+
+    do
+        HostPtyOwnership.openScope ptyOwnership ptyRootScopeId None
+        HostPtyOwnership.openScope ptyOwnership ptyScopeId (Some ptyRootScopeId)
+
     let handleOwnership = defaultArg ownership HandleOwnership.DurableParentHandle
 
     let sendChildPrompt =
@@ -595,8 +600,9 @@ type HostForkRuntime
         lock gate (fun () ->
             match ptyLeases.TryGetValue id with
             | true, (lease, inc) ->
-                ptyLeases.Remove id |> ignore
                 HostPtyOwnership.ended ptyOwnership id lease inc outcome
+                ptyLeases.Remove id |> ignore
+                ptyExitObservations.Remove id |> ignore
             | false, _ -> ()
 
             let stale =
@@ -619,8 +625,10 @@ type HostForkRuntime
             if owned then
                 // A PtyPort can be shared by multiple runtimes. Its sender fan-out
                 // must not turn another runtime's exit into this runtime's join.
+                let outcome = exitOutcomeOf exitEvent
+                lock gate (fun () -> ptyExitObservations.[id] <- (item, outcome))
                 runtime.PublishPtyCompletion item
-                settlePtyLease id (exitOutcomeOf exitEvent)
+                settlePtyLease id outcome
                 notifyPtyObservers item)
     // Cross-process recovery is not wired into ordinary HostForkRuntime lifecycle.
     // HostForkRestart remains a detached algorithm library for explicit resume flows.
@@ -642,13 +650,12 @@ type HostForkRuntime
             |> Seq.toList)
 
     member _.SnapshotOutstandingPtyRuns() =
-        lock gate (fun () -> HostPtyOwnership.unsettledIds ptyOwnership ptyScopeId)
+        lock gate (fun () -> HostPtyOwnership.unsettledIds ptyOwnership ptyRootScopeId)
 
     member _.CancelOwnedPtys() =
         lock gate (fun () ->
             for KeyValue(id, (lease, _)) in ptyLeases do
-                ptyOwnershipSeq <- ptyOwnershipSeq + 1
-                HostPtyOwnership.cancel ptyOwnership id lease ptyOwnershipSeq)
+                HostPtyOwnership.cancel ptyOwnership id lease)
 
     member _.SubscribePtyCompletion(listener: PtyJoinItem -> unit) : IDisposable =
         lock gate (fun () -> ptyCompletionObservers.Add listener)
@@ -802,9 +809,8 @@ type HostForkRuntime
                 dormantChildren.Clear()
                 deferredFirstPrompts.Clear()
 
-                for KeyValue(id, (lease, _)) in ptyLeases do
-                    ptyOwnershipSeq <- ptyOwnershipSeq + 1
-                    HostPtyOwnership.cancel ptyOwnership id lease ptyOwnershipSeq
+                HostPtyOwnership.drain ptyOwnership ptyScopeId
+                this.CancelOwnedPtys()
 
                 values)
 
@@ -1167,31 +1173,14 @@ type HostForkRuntime
     member _.IsCancelled = runtime.IsCancelled
     member internal _.IsCancelling = lock cancelGate (fun () -> cancelTask.IsSome)
 
-    member private _.RecordStartedPtyLease (id: string) (lease: obj) =
-        ptyOwnershipSeq <- ptyOwnershipSeq + 1
-        let inc = sprintf "inc-%s-%d" id ptyOwnershipSeq
-
-        if Result.isOk (HostPtyOwnership.started ptyOwnership id lease inc) then
-            ptyLeases.[id] <- (lease, inc)
-
-    member private this.TrackPtyIfAbsent(id: string) =
-        if not (ptyLeases.ContainsKey id) then
-            HostPtyOwnership.reserve ptyOwnership ptyScopeId id
-            |> Result.iter (this.RecordStartedPtyLease id)
-
-    member this.TrackPtyRun(id: PtyId) =
-        lock gate (fun () -> this.TrackPtyIfAbsent id.Value)
-
     member this.RegisterPtySnapshot (id: PtyId) (command: string) =
         runtime.RegisterPty
             { PtyId = id.Value
               Command = command
               StartedAt = this.Now() }
 
-    member this.UntrackPtyRun(id: string) = settlePtyLease id "Cancelled"
-
     member this.OwnsPty(id: PtyId) =
-        lock gate (fun () -> HostPtyOwnership.unsettledIds ptyOwnership ptyScopeId |> List.contains id.Value)
+        lock gate (fun () -> ptyLeases.ContainsKey id.Value)
 
     member this.AwaitObservedWork() : Task<unit> =
         let waiting =
@@ -1215,14 +1204,79 @@ type HostForkRuntime
             return ()
         }
 
-    member this.CloseOwnedPtys(?graceMs: int) : Task<unit> =
+    member private this.TryClosePty(id: PtyId, graceMs: int option) : Task<exn option> =
+        task {
+            try
+                do! this.ClosePty(id, ?graceMs = graceMs)
+                return None
+            with ex ->
+                return Some ex
+        }
+
+    member private this.DrainPtySnapshot(ids: PtyId list, graceMs: int option) : Task<unit> =
         task {
             this.CancelOwnedPtys()
-            let ids = this.SnapshotOutstandingPtyRuns() |> List.map PtyId.Create
+            let failures = ResizeArray<exn>()
 
             for id in ids do
+                let! failure = this.TryClosePty(id, graceMs)
+                failure |> Option.iter failures.Add
+
+            if failures.Count > 0 then
+                raise failures.[0]
+
+            let remaining = this.SnapshotOutstandingPtyRuns()
+
+            if not (List.isEmpty remaining) then
+                invalidOp (
+                    sprintf
+                        "PTY exit was not observed for resources without a local process binding: %s"
+                        (String.concat ", " remaining)
+                )
+        }
+
+    member this.CloseOwnedPtys(?graceMs: int) : Task<unit> =
+        task {
+            let ids =
+                lock gate (fun () ->
+                    if ptyClosing then
+                        invalidOp "PTY exit drain is already in progress"
+
+                    ptyClosing <- true
+                    ptyLeases.Keys |> Seq.map PtyId.Create |> Seq.toList)
+
+            try
+                do! this.DrainPtySnapshot(ids, graceMs)
+            finally
+                lock gate (fun () -> ptyClosing <- false)
+        }
+
+    member this.ClosePty(id: PtyId, ?graceMs: int) : Task<unit> =
+        task {
+            let observed =
+                lock gate (fun () ->
+                    match ptyExitObservations.TryGetValue id.Value with
+                    | true, value -> Some value
+                    | false, _ -> None)
+
+            match observed with
+            | Some(item, outcome) ->
+                settlePtyLease id.Value outcome
+                notifyPtyObservers item
+            | None -> ()
+
+            lock gate (fun () ->
+                match ptyLeases.TryGetValue id.Value with
+                | true, (lease, _) -> HostPtyOwnership.cancel ptyOwnership id.Value lease
+                | false, _ when this.SnapshotOutstandingPtyRuns() |> List.contains id.Value ->
+                    invalidOp (sprintf "PTY %s has no local process binding; exit was not observed" id.Value)
+                | false, _ -> ())
+
+            if this.OwnsPty id then
                 do! ptyPortInstance.ClosePty(id, ?graceMs = graceMs)
-                settlePtyLease id.Value "Cancelled"
+
+            if this.OwnsPty id then
+                invalidOp (sprintf "PTY %s exit was not observed; ownership remains unsettled" id.Value)
         }
 
     member this.IsPtyCompletion(runId: string) = this.OwnsPty(PtyId.Create runId)
@@ -1230,6 +1284,8 @@ type HostForkRuntime
     member this.TryBindTerminalName(name: string, id: PtyId) : Result<unit, string> =
         if String.IsNullOrWhiteSpace name then
             Error "Terminal name is required"
+        elif not (this.OwnsPty id) then
+            Error(sprintf "PTY %s has already exited or is not owned by this runtime" id.Value)
         else
             PtyHostHelpers.bindTerminalName gate terminalByName name id
 
@@ -1237,27 +1293,15 @@ type HostForkRuntime
         if String.IsNullOrWhiteSpace name then
             None
         else
-            PtyHostHelpers.ptyByName
-                gate
-                terminalByName
-                (fun id -> HostPtyOwnership.unsettledIds ptyOwnership ptyScopeId |> List.contains id)
-                ptyPortInstance.Known
-                name
+            PtyHostHelpers.ptyByName gate terminalByName (fun id -> ptyLeases.ContainsKey id) ptyPortInstance.Known name
 
     member private this.SpawnReservedPty
-        (id: PtyId, command: string, agent: ManagedAgent, cwd: string option, lease: obj, inc: string)
+        (id: PtyId, command: string, agent: ManagedAgent, cwd: string option)
         : Result<PtyId, string> =
         try
             ptyPortInstance.Fork(command, agent.Name, ptyId = id, ?cwd = cwd) |> ignore
-
-            lock gate (fun () ->
-                HostPtyOwnership.started ptyOwnership id.Value lease inc |> ignore
-                ptyLeases.[id.Value] <- (lease, inc))
-
-            this.RegisterPtySnapshot id command
             Ok id
         with ex ->
-            lock gate (fun () -> HostPtyOwnership.notStarted ptyOwnership id.Value lease ex.Message)
             Error ex.Message
 
     member private this.ReserveAndForkPty
@@ -1267,18 +1311,22 @@ type HostForkRuntime
 
         let reserved =
             lock gate (fun () ->
-                ptyOwnershipSeq <- ptyOwnershipSeq + 1
-                let inc = sprintf "inc-%s-%d" id.Value ptyOwnershipSeq
-
-                HostPtyOwnership.reserve ptyOwnership ptyScopeId id.Value
-                |> Result.map (fun lease -> lease, inc))
+                if ptyClosing then
+                    Error "PTY exit drain is in progress"
+                else
+                    HostPtyOwnership.reserve ptyOwnership ptyScopeId id.Value
+                    |> Result.map (fun lease ->
+                        ptyLeases.[id.Value] <- (lease, Guid.NewGuid().ToString("N"))
+                        this.RegisterPtySnapshot id command))
 
         reserved
-        |> Result.bind (fun (lease, inc) -> this.SpawnReservedPty(id, command, agent, cwd, lease, inc))
+        |> Result.bind (fun () -> this.SpawnReservedPty(id, command, agent, cwd))
 
     member this.ForkPty(command: string, agent: ManagedAgent, ?cwd: string) : Task<Result<PtyId, string>> =
         if String.IsNullOrWhiteSpace command then
             Task.FromResult(Error "PTY command is required")
+        elif ownershipCommonDir.IsNone && ptyPort.IsNone then
+            Task.FromResult(Error "Durable PTY ownership is unavailable")
         else
             Task.FromResult(this.ReserveAndForkPty(command, agent, cwd))
 
@@ -1319,7 +1367,7 @@ type HostForkRuntime
         { TryPtyByName = this.TryPtyByName
           ForkPty = fun (cmd, agent, cwd) -> this.ForkPty(cmd, agent, ?cwd = cwd)
           TryBindTerminalName = fun (name, id) -> this.TryBindTerminalName(name, id)
-          UntrackPtyRun = this.UntrackPtyRun
+          ClosePty = fun id -> this.ClosePty id
           SendPty = fun (id, prompt, sigOpt) -> this.SendPty(id, prompt, sigOpt)
           OwnsPty = this.OwnsPty
           TryPty = this.TryPty

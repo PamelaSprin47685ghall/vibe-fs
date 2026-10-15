@@ -113,4 +113,8 @@ module DurableWorkHost =
         gitCommonDir: string -> registryId: string -> requestId: string -> message: obj -> HostReceipt
 
     val mayStartResource: receipt: HostReceipt -> OwnershipLease option
+    val mayStartInMemoryResource: receipt: HostReceipt -> OwnershipLease option
     val ownershipBlockersDurable: gitCommonDir: string -> registryId: string -> scopeId: string -> OwnershipBlocker list
+
+    val tryOwnershipBlockersDurable:
+        gitCommonDir: string -> registryId: string -> scopeId: string -> OwnershipBlocker list option

@@ -7,5 +7,9 @@ open Wanxiangshu.Persistence.Journal
 [<AbstractClass; Sealed; AttachMembers>]
 type ToolRuntimeScopeSurface =
     static member evaluateRetirementBlockers: journal: JournalHandle * scenario: obj -> Task<string array>
+
+    static member coldRetirementBlockers:
+        journal: JournalHandle * workspace: string * managerSessionId: string -> Task<string array>
+
     static member verifyDevOpsReturnDrain: journal: JournalHandle * scenario: obj -> Task<obj>
     static member verifyOwnershipRetirementContract: scenario: obj -> Task<obj>

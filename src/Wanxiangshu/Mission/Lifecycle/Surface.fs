@@ -1396,6 +1396,29 @@ module LifecycleSurface =
                        modelTarget = target |> Option.toObj |})
             |> Option.defaultValue null
 
+    let createOwnership (registryId: string) (records: string array) : obj =
+        DurableWorkHost.createOwnership registryId records
+
+    let executeOwnershipInMemory (ownership: obj) (requestId: string) (message: obj) : DurableWorkHost.HostReceipt =
+        DurableWorkHost.executeOwnershipInMemory ownership requestId message
+
+    let mayStartInMemoryResource (receipt: DurableWorkHost.HostReceipt) : DurableWorkHost.OwnershipLease option =
+        DurableWorkHost.mayStartInMemoryResource receipt
+
+    let ownershipBlockersInMemory (ownership: obj) (scopeId: string) : DurableWorkHost.OwnershipBlocker array =
+        DurableWorkHost.ownershipBlockersInMemory ownership scopeId |> List.toArray
+
+    let ownershipScopePhaseInMemory (ownership: obj) (scopeId: string) : string option =
+        DurableWorkHost.ownershipScopePhaseInMemory ownership scopeId
+
+    let tryOwnershipBlockersDurable
+        (gitCommonDir: string)
+        (registryId: string)
+        (scopeId: string)
+        : DurableWorkHost.OwnershipBlocker array option =
+        DurableWorkHost.tryOwnershipBlockersDurable gitCommonDir registryId scopeId
+        |> Option.map List.toArray
+
     let executeOwnershipDurable
         (gitCommonDir: string)
         (registryId: string)

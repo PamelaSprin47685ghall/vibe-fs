@@ -13,6 +13,7 @@ type PtyPort =
     member CompleteAborted: id: PtyId * ?message: string -> unit
     member Exists: id: PtyId -> bool
     member FailRead: id: PtyId * reason: string -> unit
+    member FailExitObservation: id: PtyId * reason: string -> unit
     member Fork: command: string * agentName: string * ?ptyId: PtyId * ?cwd: string -> PtyId
     member Known: id: PtyId -> bool
     member List: unit -> PtyHandle list

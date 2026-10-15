@@ -99,11 +99,11 @@ test('WHAT[managed-session-lifecycle-012] HFP_fork_pty_tracks_registers_and_reso
   assert.equal(result.owned, true)
   assert.equal(result.known, true)
 })
-test('WHAT[managed-session-lifecycle-012] HFP_fork_pty_port_exception_untracks_and_errors', async () => {
+test('WHAT[managed-session-lifecycle-012] a backend exception reports error and retains unresolved ownership', async () => {
   const result = await HostForkPtySurface.scenario('fork-error', 'ls', 'pty spawn exploded')
   assert.equal(result.ok, false)
   assert.equal(result.error, 'pty spawn exploded')
-  assert.equal(result.owned, false)
+  assert.equal(result.owned, true)
 })
 test('WHAT[managed-session-lifecycle-012] HFP_try_pty_unknown_string_id_is_none', async () => {
   const result = await HostForkPtySurface.scenario('lookup-unknown', 'foreign', '')
@@ -141,8 +141,8 @@ test('WHAT[managed-session-lifecycle-012] HFP_send_pty_port_error_propagates', a
   assert.equal(result.ok, false)
   assert.equal(result.error, 'pty session ended')
 })
-test('WHAT[managed-session-lifecycle-012] HFP_track_untrack_pty_run_round_trip', async () => {
-  const result = await HostForkPtySurface.scenario('track-untrack', 'tracked-1', '')
+test('WHAT[managed-session-lifecycle-012] backend completion settles a reserved PTY run', async () => {
+  const result = await HostForkPtySurface.scenario('fork-complete', '', '')
   assert.equal(result.ok, true)
   assert.equal(result.ownedBefore, true)
   assert.equal(result.ownedAfter, false)

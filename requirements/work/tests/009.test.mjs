@@ -8,6 +8,7 @@ import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as scopeMod from '../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
+const ownershipHost = life
 const verifyOwnership =
   scopeMod.verifyOwnershipRetirementContract ||
   (scopeMod.ToolRuntimeScopeSurface && scopeMod.ToolRuntimeScopeSurface.verifyOwnershipRetirementContract)
@@ -35,12 +36,12 @@ test('WHAT[work-009] ToolRuntimeScope ownership tracks tool-owned-work and PTY l
     'active tool-owned-work lease must appear in RetirementBlockersFor',
   )
   assert.equal(
-    res.blockersWithWorkAndPty.includes('fork:engineer-009:pty:eng-pty-1'),
+    res.blockersWithWorkAndPty.includes(`fork:engineer-009:pty:${res.engineerPtyId}`),
     true,
     'active engineer PTY lease must appear in RetirementBlockersFor',
   )
   assert.equal(
-    res.blockersWithWorkAndPty.some((b) => b.includes('devops-pty-1')),
+    res.blockersWithWorkAndPty.some((b) => b.includes(res.devopsPtyId)),
     false,
     'fixed DevOps PTY belongs to DevOps scope and must not block Manager tenure retirement',
   )
@@ -64,14 +65,14 @@ test('WHAT[work-009] ToolRuntimeScope ownership tracks tool-owned-work and PTY l
     'settled tool-owned-work lease must be removed from blockers',
   )
   assert.equal(
-    res.blockersAfterWorkEnded.includes('fork:engineer-009:pty:eng-pty-1'),
+    res.blockersAfterWorkEnded.includes(`fork:engineer-009:pty:${res.engineerPtyId}`),
     true,
     'unsettled engineer PTY must remain a blocker until its own Ended',
   )
 
   // Ending engineer PTY clears the remaining tenure blocker while DevOps PTY survives
   assert.deepEqual(res.blockersAfterEngineerPtyEnded, [])
-  assert.deepEqual(res.devopsPtysSurviving, ['devops-pty-1'])
+  assert.deepEqual(res.devopsPtysSurviving, [res.devopsPtyId])
 })
 
 test('WHAT[work-009] durable ownership host commits Reserve before granting start permission and retains blockers across Cancel and Drain', () => {
@@ -134,6 +135,54 @@ test('WHAT[work-009] durable ownership host commits Reserve before granting star
     })
     assert.equal(ended.Status, 'Committed')
     assert.equal(life.ownershipBlockersDurable(commonDir, reg, reg).length, 0)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[work-009] a process-local reservation never grants durable launch permission', () => {
+  const registry = ownershipHost.createOwnership('local-work-009', [])
+  ownershipHost.executeOwnershipInMemory(registry, 'open-local', {
+    type: 'OpenScope', scopeId: 'callbacks', parentId: null,
+  })
+  const receipt = ownershipHost.executeOwnershipInMemory(registry, 'reserve-local', {
+    type: 'Reserve', resourceId: 'callback-1', scopeId: 'callbacks', kind: 'tool',
+  })
+
+  assert.equal(receipt.Status, 'Applied')
+  assert.equal(ownershipHost.mayStartResource(receipt), undefined)
+  assert.ok(ownershipHost.mayStartInMemoryResource(receipt))
+  const replay = ownershipHost.executeOwnershipInMemory(registry, 'reserve-local', {
+    type: 'Reserve', resourceId: 'callback-1', scopeId: 'callbacks', kind: 'tool',
+  })
+  assert.equal(ownershipHost.mayStartInMemoryResource(replay), undefined)
+})
+
+test('WHAT[work-009] an unknown ownership scope is an error rather than proof of no resources', () => {
+  const registry = ownershipHost.createOwnership('query-work-009', [])
+  assert.throws(() => ownershipHost.ownershipBlockersInMemory(registry, 'missing'), /scope/i)
+  assert.throws(() => ownershipHost.ownershipScopePhaseInMemory(registry, 'missing'), /scope/i)
+  ownershipHost.executeOwnershipInMemory(registry, 'open-known', {
+    type: 'OpenScope', scopeId: 'known', parentId: null,
+  })
+  assert.deepEqual(Array.from(ownershipHost.ownershipBlockersInMemory(registry, 'known')), [])
+  assert.equal(ownershipHost.ownershipScopePhaseInMemory(registry, 'known'), 'Open')
+})
+
+test('WHAT[work-009] durable blocker queries refuse a missing owner and a missing scope', () => {
+  assert.throws(() => ownershipHost.ownershipBlockersDurable('', 'registry', 'scope'), /common|directory/i)
+  const root = mkdtempSync(join(tmpdir(), 'wxs-ownership-query-009-'))
+  try {
+    assert.throws(() => ownershipHost.ownershipBlockersDurable(root, '', 'scope'), /registry/i)
+    assert.throws(() => ownershipHost.ownershipBlockersDurable(root, 'registry', 'scope'), /scope/i)
+    assert.equal(ownershipHost.tryOwnershipBlockersDurable(root, 'registry', 'scope'), undefined)
+    life.executeOwnershipDurable(root, 'registry', 'open-known', {
+      type: 'OpenScope', scopeId: 'known', parentId: null,
+    })
+    assert.throws(() => ownershipHost.ownershipBlockersDurable(root, 'registry', 'missing'), /scope/i)
+    assert.throws(() => ownershipHost.tryOwnershipBlockersDurable(root, 'registry', 'missing'), /scope/i)
+    assert.deepEqual(Array.from(ownershipHost.ownershipBlockersDurable(root, 'registry', 'known')), [])
+    assert.deepEqual(Array.from(ownershipHost.tryOwnershipBlockersDurable(root, 'registry', 'known')), [])
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

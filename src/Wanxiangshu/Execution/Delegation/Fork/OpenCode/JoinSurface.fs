@@ -325,18 +325,6 @@ module JoinSurface =
                       PhysicalUserMessageId.create physicalId
                   )) ]
 
-    // Production JoinTool.renderJoined releases PTY ownership tracks once a
-    // batch is delivered; the probe keeps the same discipline so PtyRuns
-    // returns to quiescence and a later empty join stays NothingToJoin.
-    let private releaseDeliveredTracks (runtime: HostForkRuntime) outcome =
-        match outcome with
-        | Ok(ResultsAvailable batch) ->
-            NonEmptyBatch.toList batch
-            |> List.iter (function
-                | PtyItem pty -> runtime.UntrackPtyRun(PtyJoinItem.ptyId pty)
-                | AgentItem _ -> ())
-        | _ -> ()
-
     let createJoinProbe () : obj =
         let parentId =
             SessionId.create (sprintf "join-probe-%s" (Guid.NewGuid().ToString("N")))
@@ -416,7 +404,6 @@ module JoinSurface =
             let wait = (unbox<JoinInterruptHandle> interrupt).Source.Task
             let! outcome = HostForkJoin.joinAvailable runtime maxCount wait
             let rendered = joinOutcomeObject outcome
-            releaseDeliveredTracks runtime outcome
             return rendered
         }
 
@@ -437,7 +424,6 @@ module JoinSurface =
                     (unbox<JoinInterruptHandle> interrupt).Source.Task
 
             let rendered = joinOutcomeObject outcome
-            releaseDeliveredTracks handle.Runtime outcome
             return rendered
         }
 

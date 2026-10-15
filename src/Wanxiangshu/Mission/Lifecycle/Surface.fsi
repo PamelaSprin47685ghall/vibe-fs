@@ -62,6 +62,15 @@ module LifecycleSurface =
     val bindDevOps: store: obj -> workId: string -> devopsId: string -> target: obj -> Task<obj>
     val roadDevOps: store: obj -> workId: string -> obj
 
+    val createOwnership: registryId: string -> records: string array -> obj
+    val executeOwnershipInMemory: ownership: obj -> requestId: string -> message: obj -> DurableWorkHost.HostReceipt
+    val mayStartInMemoryResource: receipt: DurableWorkHost.HostReceipt -> DurableWorkHost.OwnershipLease option
+    val ownershipBlockersInMemory: ownership: obj -> scopeId: string -> DurableWorkHost.OwnershipBlocker array
+    val ownershipScopePhaseInMemory: ownership: obj -> scopeId: string -> string option
+
+    val tryOwnershipBlockersDurable:
+        gitCommonDir: string -> registryId: string -> scopeId: string -> DurableWorkHost.OwnershipBlocker array option
+
     val executeOwnershipDurable:
         gitCommonDir: string -> registryId: string -> requestId: string -> message: obj -> DurableWorkHost.HostReceipt
 

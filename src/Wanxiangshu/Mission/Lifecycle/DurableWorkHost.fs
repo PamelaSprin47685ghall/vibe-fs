@@ -555,7 +555,6 @@ module DurableWorkHost =
     let executeOwnershipInMemory (ownership: obj) (requestId: string) (message: obj) : HostReceipt =
         let reply: obj = ownership?execute (requestId, message)
         let status = text (nested reply "status")
-        let normalized = if status = "Applied" then "Committed" else status
         let result = nested reply "result"
         let kind = if isRecord result then text (result?kind) else ""
         let revisionValue = nested reply "revision"
@@ -567,24 +566,18 @@ module DurableWorkHost =
                 unbox<float> revisionValue
 
         { RequestId = requestId
-          Status = normalized
+          Status = status
           Kind = kind
           Reason = ""
           Revision = revision
           Result = result }
 
     let ownershipBlockersInMemory (ownership: obj) (scopeId: string) : OwnershipBlocker list =
-        try
-            parseBlockers (ownership?blockers scopeId)
-        with _ ->
-            []
+        parseBlockers (ownership?blockers scopeId)
 
     let ownershipScopePhaseInMemory (ownership: obj) (scopeId: string) : string option =
-        try
-            let view: obj = ownership?scope scopeId
-            optionalText (text (nested view "phase"))
-        with _ ->
-            None
+        let view: obj = ownership?scope scopeId
+        optionalText (text (nested view "phase"))
 
     let private ownershipStream (registryId: string) : string = "ownership:" + registryId
 
@@ -723,13 +716,42 @@ module DurableWorkHost =
         else
             None
 
-    let ownershipBlockersDurable (gitCommonDir: string) (registryId: string) (scopeId: string) : OwnershipBlocker list =
-        if String.IsNullOrWhiteSpace gitCommonDir || String.IsNullOrWhiteSpace registryId then
-            []
+    let mayStartInMemoryResource (receipt: HostReceipt) : OwnershipLease option =
+        if receipt.Status = "Applied" && receipt.Kind = "Reserved" then
+            parseLease (nested receipt.Result "lease")
         else
-            let stream = ownershipStream registryId
+            None
 
-            useOwnershipJournal gitCommonDir (fun journal ->
-                let records: string array = unbox (journal?read stream)
+    let ownershipBlockersDurable (gitCommonDir: string) (registryId: string) (scopeId: string) : OwnershipBlocker list =
+        if String.IsNullOrWhiteSpace gitCommonDir then
+            invalidArg (nameof gitCommonDir) "Ownership common directory is required"
+
+        if String.IsNullOrWhiteSpace registryId then
+            invalidArg (nameof registryId) "Ownership registry is required"
+
+        let stream = ownershipStream registryId
+
+        useOwnershipJournal gitCommonDir (fun journal ->
+            let records: string array = unbox (journal?read stream)
+            let candidate = createOwnership registryId records
+            ownershipBlockersInMemory candidate scopeId)
+
+    let tryOwnershipBlockersDurable
+        (gitCommonDir: string)
+        (registryId: string)
+        (scopeId: string)
+        : OwnershipBlocker list option =
+        if String.IsNullOrWhiteSpace gitCommonDir then
+            invalidArg (nameof gitCommonDir) "Ownership common directory is required"
+
+        if String.IsNullOrWhiteSpace registryId then
+            invalidArg (nameof registryId) "Ownership registry is required"
+
+        useOwnershipJournal gitCommonDir (fun journal ->
+            let records: string array = unbox (journal?read (ownershipStream registryId))
+
+            if Array.isEmpty records then
+                None
+            else
                 let candidate = createOwnership registryId records
-                ownershipBlockersInMemory candidate scopeId)
+                Some(ownershipBlockersInMemory candidate scopeId))
