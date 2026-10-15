@@ -123,7 +123,7 @@ module NodeProcessHost =
                 ? envObj.PATH
                 : ((process && process.env && typeof process.env.PATH === 'string') ? process.env.PATH : '');
             for (const dir of pathText.split(':')) {
-                const folder = dir.length > 0 ? dir : cwd;
+                const folder = dir.startsWith('/') ? dir : pathJoin(cwd, dir);
                 const candidate = pathJoin(folder, fileName);
                 if (isExecutableFile(candidate)) {
                     return candidate;

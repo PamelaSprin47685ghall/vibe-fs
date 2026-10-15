@@ -130,3 +130,49 @@ test('WHAT[process-execution-011] RUN_spooled_output_family_blocked_surfaces_rec
   }
   test('WHAT[process-execution-011] run rejects invalid budgets before command side effects', () => rejectsBeforeSpawn(run))
 }
+
+{
+  const runtime = await import('../../../dist/Process/Surface.js')
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { spawnSync } = await import('node:child_process')
+
+  test('WHAT[process-execution-011] CUT_02_PATH_entries_resolve_from_target_cwd_in_search_order', async () => {
+    const originalCwd = process.cwd()
+    const originalPath = process.env.PATH
+    const directory = mkdtempSync(join(tmpdir(), 'wxs-path-'))
+    const host = join(directory, 'host')
+    const target = join(directory, 'target')
+    const absolute = join(directory, 'absolute')
+    const executable = 'path-probe'
+    try {
+      for (const [folder, label] of [[host, 'host'], [join(host, 'bin'), 'host-bin'], [target, 'target'], [join(target, 'bin'), 'target-bin'], [absolute, 'absolute']]) {
+        mkdirSync(folder, { recursive: true })
+        writeFileSync(join(folder, executable), `#!/bin/sh\nprintf '${label}'\n`, { mode: 0o755 })
+      }
+      process.chdir(host)
+      for (const [pathValue, expected] of [['.', 'target'], ['', 'target'], ['bin', 'target-bin'], ['missing:bin', 'target-bin'], ['bin:.', 'target-bin'], ['.:bin', 'target'], [':bin', 'target'], ['bin:', 'target-bin'], [`${absolute}:bin`, 'absolute'], [`bin:${absolute}`, 'target-bin']]) {
+        process.env.PATH = pathValue
+        const native = spawnSync(executable, [], { cwd: target, env: { ...process.env }, encoding: 'utf8' })
+        assert.equal(native.error, undefined, pathValue)
+        assert.equal(native.status, 0, pathValue)
+        assert.equal(native.stdout, expected, pathValue)
+        const result = await runtime.run(
+          runtime.command(executable, [], target, undefined),
+          runtime.estimate(2, 4096, 'medium'),
+          runtime.context(target, 5000),
+          runtime.createCancellationToken(false),
+        )
+        assert.equal(result.ok, true, `${pathValue}: ${JSON.stringify(result)}`)
+        assert.equal(result.value.exitCode, native.status, pathValue)
+        assert.equal(result.value.stdout, native.stdout, pathValue)
+      }
+    } finally {
+      process.chdir(originalCwd)
+      if (originalPath === undefined) delete process.env.PATH
+      else process.env.PATH = originalPath
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
