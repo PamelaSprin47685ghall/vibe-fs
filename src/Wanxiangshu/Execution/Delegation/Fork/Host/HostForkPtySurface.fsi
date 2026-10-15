@@ -7,6 +7,7 @@ open Wanxiangshu.Process
 [<RequireQualifiedAccess>]
 module HostForkPtySurface =
     val ownershipProbe: commonDir: string option -> sessionId: string -> onCommand: obj -> obj
+    val companionOwnershipProbe: journal: JournalHandle -> sessionId: string -> onCommand: obj -> obj
     val realOwnershipProbe: commonDir: string option -> sessionId: string -> obj
     val sharedOwnershipProbe: commonDir: string option -> sessionId: string -> onCommand: obj -> obj
     val realSharedOwnershipProbe: commonDir: string option -> sessionId: string -> obj

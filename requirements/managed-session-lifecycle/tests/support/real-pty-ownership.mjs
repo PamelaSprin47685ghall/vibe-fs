@@ -28,7 +28,7 @@ const pids = []
 const descendants = []
 const start = async (owner, label) => {
   const marker = join(directory, `${label}-pid`)
-  const program = `require('node:fs').writeFileSync(${JSON.stringify(marker)}, String(process.pid)); setInterval(() => {}, 1000)`
+  const program = `const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${marker}.tmp`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${marker}.tmp`)}, ${JSON.stringify(marker)}); setInterval(() => {}, 1000)`
   const opened = await owner.fork(`exec ${quote(process.execPath)} -e ${quote(program)}`)
   assert.equal(opened.ok, true, opened.error)
   await waitFor(() => existsSync(marker), `${label} PTY readiness`)
@@ -56,18 +56,18 @@ try {
     assert.equal(second.owned(other.id), true)
     assert.deepEqual(second.outstanding(), [other.id])
     assert.equal(second.completions(), 0)
-    assert.equal(second.exitListeners(), mode === 'shared-cancel' ? 2 : 1)
+    assert.equal(second.exitListeners(), 1)
     await second.detach()
     await waitFor(() => !alive(other.pid), 'the second owner process exit')
     assert.deepEqual(second.outstanding(), [])
-    assert.equal(second.exitListeners(), mode === 'shared-cancel' ? 1 : 0)
+    assert.equal(second.exitListeners(), 0)
     console.log(JSON.stringify({ mode, firstExited: true, otherSurvived: true, blockers: [] }))
   } else if (mode === 'leader-exit') {
     first = realOwnershipProbe(directory, 'leader-exit-owner')
     const parentMarker = join(directory, 'first-pid')
     const childMarker = join(directory, 'second-pid')
-    const child = `process.on('SIGHUP', () => {}); process.on('SIGTERM', () => {}); require('node:fs').writeFileSync(${JSON.stringify(childMarker)}, String(process.pid)); setInterval(() => {}, 1000)`
-    const parent = `const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(parentMarker)}, String(process.pid)); require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(child)}], {stdio: 'ignore'}); setInterval(() => {if (fs.existsSync(${JSON.stringify(childMarker)})) process.exit(0)}, 5)`
+    const child = `process.on('SIGHUP', () => {}); process.on('SIGTERM', () => {}); const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${childMarker}.tmp`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${childMarker}.tmp`)}, ${JSON.stringify(childMarker)}); setInterval(() => {}, 1000)`
+    const parent = `const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${parentMarker}.tmp`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${parentMarker}.tmp`)}, ${JSON.stringify(parentMarker)}); require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(child)}], {stdio: 'ignore'}); setInterval(() => {if (fs.existsSync(${JSON.stringify(childMarker)})) process.exit(0)}, 5)`
     const opened = await first.fork(`exec ${quote(process.execPath)} -e ${quote(parent)}`)
     assert.equal(opened.ok, true, opened.error)
     await waitFor(() => existsSync(parentMarker), 'the leader readiness')
@@ -101,7 +101,12 @@ try {
       assert.equal(first.owned(opened.id), false)
     }
     assert.deepEqual(first.outstanding(), action === 'close' ? [other.id] : [])
-    assert.equal(first.exitListeners(), action === 'detach' ? 0 : 1)
+    assert.equal(first.exitListeners(), action === 'detach' || action === 'cancel' ? 0 : 1)
+    if (action === 'detach' || action === 'cancel') {
+      const next = await first.fork('exit 0')
+      assert.equal(next.ok, false, 'a terminated runtime must not accept another physical command')
+      assert.deepEqual(first.outstanding(), [])
+    }
     if (action === 'close') {
       assert.equal(alive(other.pid), true)
       assert.equal(first.exists(other.id), true)

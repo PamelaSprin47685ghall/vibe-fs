@@ -532,7 +532,7 @@ type HostForkRuntime
     let mutable ptyClosing = false
     // DSL-MUTABLE: resource — permanent detach closes local admission even if its durable Drain fails.
     let mutable ptyDetachRequested = false
-    // DSL-MUTABLE: resource — local exit subscription retained until permanent detach has no leases.
+    // DSL-MUTABLE: resource — exit subscription retained until the terminal runtime has no leases.
     let mutable ptyExitSubscription: IDisposable option = None
 
     do
@@ -602,7 +602,7 @@ type HostForkRuntime
 
     let releasePtyExitSubscription () =
         lock gate (fun () ->
-            if ptyDetachRequested && ptyLeases.Count = 0 then
+            if (ptyDetachRequested || runtime.IsCancelled) && ptyLeases.Count = 0 then
                 ptyExitSubscription |> Option.iter (fun subscription -> subscription.Dispose())
                 ptyExitSubscription <- None)
 
@@ -976,6 +976,7 @@ type HostForkRuntime
                         (clockPort.UtcNow())
                     :> Task)
 
+            releasePtyExitSubscription ()
             lock cancelGate (fun () -> cancelTask <- None)
 
             match failure with
@@ -1356,6 +1357,8 @@ type HostForkRuntime
             lock gate (fun () ->
                 if ptyDetachRequested then
                     Error "PTY runtime detach has started"
+                elif runtime.IsCancelled then
+                    Error "PTY runtime is cancelled"
                 elif ptyClosing then
                     Error "PTY exit drain is in progress"
                 else

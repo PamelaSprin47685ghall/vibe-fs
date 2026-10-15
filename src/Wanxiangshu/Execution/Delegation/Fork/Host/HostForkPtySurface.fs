@@ -15,7 +15,12 @@ open Wanxiangshu.Process
 
 [<RequireQualifiedAccess>]
 module HostForkPtySurface =
-    let private createOwnershipProbe (commonDir: string option) (sessionId: string) (port: PtyPort) : obj =
+    let private createOwnershipProbe
+        (commonDir: string option)
+        (sessionId: string)
+        (port: PtyPort)
+        (journal: AgentJournal option)
+        : obj =
         let runtime =
             HostForkRuntime(
                 SessionId.create sessionId,
@@ -25,8 +30,14 @@ module HostForkPtySurface =
                 NodeTiming.nodeClockPort (),
                 NodeTiming.raceExit,
                 ptyPort = port,
+                ?journal = journal,
                 ?ownershipCommonDir = commonDir
             )
+
+        if journal.IsSome then
+            match runtime.TryChildFromDurable "devops" with
+            | Some(childId, _, _) -> runtime.AdoptChild("devops", childId)
+            | None -> invalidOp "Companion probe requires a durable child binding"
 
         createObj
             [ "fork"
@@ -71,15 +82,18 @@ module HostForkPtySurface =
         PtyPort(handler = handler)
 
     let ownershipProbe (commonDir: string option) (sessionId: string) (onCommand: obj) : obj =
-        createOwnershipProbe commonDir sessionId (controlledPort onCommand)
+        createOwnershipProbe commonDir sessionId (controlledPort onCommand) None
+
+    let companionOwnershipProbe (journal: JournalHandle) (sessionId: string) (onCommand: obj) : obj =
+        createOwnershipProbe None sessionId (controlledPort onCommand) (Some journal.Journal)
 
     let realOwnershipProbe (commonDir: string option) (sessionId: string) : obj =
-        createOwnershipProbe commonDir sessionId (PtyBackend.createPort ())
+        createOwnershipProbe commonDir sessionId (PtyBackend.createPort ()) None
 
     let private ownershipPair commonDir sessionId port =
         createObj
-            [ "first" ==> createOwnershipProbe commonDir sessionId port
-              "second" ==> createOwnershipProbe commonDir sessionId port ]
+            [ "first" ==> createOwnershipProbe commonDir sessionId port None
+              "second" ==> createOwnershipProbe commonDir sessionId port None ]
 
     let sharedOwnershipProbe (commonDir: string option) (sessionId: string) (onCommand: obj) : obj =
         ownershipPair commonDir sessionId (controlledPort onCommand)

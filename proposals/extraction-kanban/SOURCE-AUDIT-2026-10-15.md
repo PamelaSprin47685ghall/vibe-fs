@@ -4,6 +4,17 @@
 
 后续已开始实施，实际变更与验收见 [修复进度记录](REPAIR-PROGRESS-2026-10-15.md)。下文保留源码复核时的基线与结论，不用后续进度覆盖原始发现。
 
+<a id="terminal-cancellation-review"></a>
+## 追加复审：O-11 / P1 · 完全取消后的旧 PTY 入口仍能启动
+
+基线为已交付的主仓 `7d12e3462`，库仍为 `eef4825 / 0.6.2`。最后核对把两种取消分开后，确认第七项缺陷：固定 DevOps 被保留时，当前 mailbox 继续开放；没有保留者时，`ChildDispatch.cancelParent` 会永久取消 mailbox，核心 agent Fork 和 Join 均拒绝该旧实例，但 ForkPty 仍可 Reserve/Spawn。独立端口反例实际观察到新 Spawn，退出后的 completion 为 0。
+
+上一包 listener 正控把无保留者的完全取消也当成可复用取消，并将已取消 mailbox 的计数断言视作不适用。这一判断范围过宽。现将普通复用正控改为 closeAll，并恢复完成数量断言；另用真实 Journal 的 canonical fixed DevOps binding 验证保留分支的 cancel→新 PTY→完成通知。没有按方法名把所有 cancel 都改成永久关闭。
+
+修复只读核心已有的 `runtime.IsCancelled`：在现有准入锁内、Reserve 前拒绝已终结实例；订阅在永久 detach 或实际完全取消、且本地 lease 为空时释放。失败后还有 lease 就保留退出观察；若 abandon 在 mailbox 已关闭、ClosePtys 尚未调用时失败，CancelParentEpisode 的收束也会释放空订阅。未设置新的业务终态、未修改核心取消规则，固定 DevOps 保留路径继续复用。
+
+验收覆盖无/有初始 PTY 的完全取消、取消失败后的晚到退出、canonical DevOps 保留、真实 Bun Cancel/detach 丢回执后的新 fork 拒绝。它只关闭单进程旧 Runtime 的这个准入缺口，不代替 O-01 跨进程每轮准入、完整后代监管或重启接管。
+
 <a id="independent-review-fixes"></a>
 ## 独立复审：0.6.1 之后的修复与剩余 P1
 

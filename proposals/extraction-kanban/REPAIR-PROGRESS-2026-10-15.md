@@ -2,6 +2,31 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+<a id="terminal-cancellation-review"></a>
+## 第四批：完全取消后的 PTY 准入
+
+基线 `7d12e3462`；库及精确 vendor 包仍为已独立验证的 `eef4825 / 0.6.2`，字节未变。O-11 是第三批收尾时追加确认的问题，见[报告](SOURCE-AUDIT-2026-10-15.md#terminal-cancellation-review)。不覆盖第三批原始运行证据。
+
+`independent_pty_r2` 依据核心 mailbox 的永久 IsCancelled、Fork/Join 和 ToolRuntimeScope 重建行为，独立确认旧实例应拒绝新 PTY。其公开端口反例在无/有初始 PTY 两路均观察到取消后的实际新 Spawn 和 completion=0；失败取消后的晚到结束也留下订阅。日志 `/private/tmp/independent-pty-r4-cancel-contract-red.log`。
+
+新增四项先红：**4 tests / 1 pass / 3 fail**。三个拒绝/收尾反例失败；真实 Journal 固定 DevOps 保留分支的复用与 completion=2 正控通过，`r2-review-terminal-contract-red-final.log`。修复在 Reserve 前检查实际 `runtime.IsCancelled`，并在终结且 lease 空时释放订阅；CancelParentEpisode 捕获失败后的收束也覆盖空 lease 的早退。未把一次失败的取消尝试强行变成终态。
+
+原 listener 用例的可复用操作改为 closeAll，恢复 completion=2 断言；真正可复用的取消另用 canonical DevOps 的持久 binding 验证。两个正控都通过，明确纠正第三批对“所有 cancel 都可复用”的误判。新 fixture 通过真实 Journal 协议建立 binding，调用实际 Runtime 的收养消息，不改内部集合或伪造状态。
+
+`dotnet tool run fantomas --check src/Wanxiangshu` 与 `node scripts/check.mjs` 均 exit 0；`r2-review-terminal-format.log`、`r2-review-terminal-check.log`。实际 `node scripts/build.mjs` 为 focused **778 项 / generation 486**；018/025/delegation 003 合计 **78 tests / 76 pass / 0 fail / 2 TODO**，exit 0；`r2-review-terminal-build.log`、`r2-review-terminal-green.log`。025 新增四项后为 55 项；真实 Bun 故障矩阵还检查终结旧实例不能再次 fork。
+
+最终完整归属链使用第三批同一文件分组，**485 tests / 456 pass / 0 fail / 5 skip / 24 TODO**，exit 0；`r2-review-terminal-ownership-green-final.log`。新增四项均通过；025 为 **55 tests / 54 pass / 1 TODO**。未改的 process-execution、Trace 分别沿用第三批 **193 / 188 pass / 5 TODO** 与 **102 / 93 pass / 1 skip / 8 TODO**，三个互不重叠分组共 **780 tests / 737 pass / 0 fail / 6 skip / 37 TODO**；这不是重新跑过未改的两组。
+
+该归属链第一次执行有 1 个测试夹具失败：PID marker 已创建而内容尚未写入，`Number('')=0` 使 shared-detach 未进入行为断言，`r2-review-terminal-ownership-final.log`。将三个 PID marker 改为先写同目录临时文件、rename 后发布，保留 PID 有效性断言；没有重试业务或把失败转 skip。上述完整复验才是最终通过结果。
+
+非作者在 generation 486 独立运行 025 **54 pass / 1 TODO**、delegation 003 **13/13 pass**。原先独立反例原样重跑：无/有初始 PTY 两路 next.ok=false、newSpawns=0、listenerAfterCancel=0；失败取消的晚到退出使订阅从 1 降至 0。另建 actual Journal 的 canonical DevOps 正控，连续两次取消后仍可复用，完成计数 **1→2→3**，最终 detach 后订阅为 0。证据 `independent-pty-r4-gen486-025-final.log`、`independent-pty-r4-gen486-delegation003-final.log`、`independent-pty-r4-cancel-contract-green.log`、`independent-pty-r4-canonical-companion-green.log`。O-11 按这两个实际状态分支的限定范围复审通过；空 lease 的 abandon 提前失败支路仅静态核对，未单独注入该故障。
+
+PID 就绪修复也经非作者复审：三个写点均先写完整内容再发布 marker，原 PID 校验保留。独立并发运行 shared-detach **6/6**，helper 返回后另查 **12 个确切 PID 均已退出、12 个临时文件均不存在**；`/private/tmp/independent-pty-r4-marker-check.log`，脚本 `independent-pty-r4-marker-check.mjs`。没有重建或修改共享源码。
+
+文档收尾后的实际构建 generation **487**、174 surfaces / 836 modules 链接通过；`r2-review-terminal-build-delivery.log`。真实 `verify-package.mjs` 打包、解包、隔离 npm ci 和消费均 exit 0：**2073 members / 13,142,101 bytes**，tarball SHA-256 `040e22e71cc7f8d607bb417af263ea32b6341de2d2b64af9ae05657880e3c7d3`；`r2-review-terminal-package.log`。它替代第三批主包作为当前交付候选，库 0.6.2 的固定包摘要未变。
+
+R4 据独立复验和主包消费证据 DONE，主仓以本提交正常快进推送 master。提交后再核对 freshness、精确主包和远端一致性，最终身份在交付回复中报告。没有部署到运行中的 Host。T-01、O-01 和 GAP-133 状态不变，不将本地准入修复扩大为完整抽取完成。
+
 <a id="independent-review-fixes"></a>
 ## 第三批：独立复审与 0.6.2 修复
 

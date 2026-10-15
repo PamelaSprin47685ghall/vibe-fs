@@ -89,8 +89,9 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-04-R1](SOURCE-AUDIT-2026-10-15.md#repair-ownership) | PTY 真实终结、早到回执、持久预留/恢复、统一 blocker | DOING | O-02/O-03/O-04 已修；O-01 已持久保留/阻断，完整 PTY 后代监管有实证反例；跨重启接管与跨进程每轮准入未完 | root（剩余监管/恢复）；audit_ownership（已交接） | 交叉复审 |
 | [CUT-01-R2](SOURCE-AUDIT-2026-10-15.md#second-review-fixes) | J-01：原生 statement 释放及 Unknown 后即时恢复写入 | DONE | 0.6.2 源码及精确包的非作者复验、真实 get 释放 oracle 和去 finalize 突变通过；新发现另记 R3，不覆盖 0.6.1 历史 | root | independent_journal_r2、independent_boundaries_r2 |
 | [CUT-04-R2](SOURCE-AUDIT-2026-10-15.md#second-review-fixes) | O-05/06/07、B-01：收尾确认、共享端口隔离、永久准入关闭及依赖声明 | DONE | 非作者确认原限定范围成立；真实 focused 778 与 0.6.2 主仓包消费通过；收尾新反例记 R3，O-01/T-01 不销项 | root | independent_pty_r2、independent_boundaries_r2 |
-| [CUT-01-R3](SOURCE-AUDIT-2026-10-15.md#independent-review-fixes) | J-02/E-03/E-04：显式关闭重试、真实追加竞争与 Bun 释放 oracle | DONE | 库 eef4825 / 0.6.2 已交付，320 项及非作者 30 项、25 轮竞争和七种突变通过；主仓本提交固定包、隔离消费通过 | root | independent_journal_r2、independent_boundaries_r2 |
-| [CUT-04-R3](SOURCE-AUDIT-2026-10-15.md#independent-review-fixes) | O-08/09/10：Drain 退订、Cancel Unknown 后实际回收、共享端口订阅寿命 | DONE | 主仓本提交及 481 项归属链、193 项进程套件；最终候选 61 项由非作者复验，59 pass、2 TODO；O-01 活后代反例不计通过 | root | independent_pty_r2、independent_boundaries_r2 |
+| [CUT-01-R3](SOURCE-AUDIT-2026-10-15.md#independent-review-fixes) | J-02/E-03/E-04：显式关闭重试、真实追加竞争与 Bun 释放 oracle | DONE | 库 eef4825 / 0.6.2 已交付，320 项及非作者 30 项、25 轮竞争和七种突变通过；主仓 7d12e3462 固定包、隔离消费通过 | root | independent_journal_r2、independent_boundaries_r2 |
+| [CUT-04-R3](SOURCE-AUDIT-2026-10-15.md#independent-review-fixes) | O-08/09/10：Drain 退订、Cancel Unknown 后实际回收、共享端口订阅寿命 | DONE | 主仓 7d12e3462 及 481 项归属链、193 项进程套件；最终候选 61 项由非作者复验，59 pass、2 TODO；O-01 活后代反例不计通过 | root | independent_pty_r2、independent_boundaries_r2 |
+| [CUT-04-R4](SOURCE-AUDIT-2026-10-15.md#terminal-cancellation-review) | O-11：实际完全取消后拒绝旧 PTY 入口，保留 canonical DevOps 的可复用分支 | DONE | 主仓本提交；四项先红、实际 focused 778、485 项归属链及精确主包消费通过；非作者原反例零 Spawn、DevOps 连续复用和 12 个测试 PID 收尾通过 | root | independent_pty_r2 |
 
 P1 行为缺陷优先；PATH、PTY 提前清账/同步完成和 Proxy 测试可先形成独立小闭环。公共文件、两仓发布及主仓集成仍串行，不能用这些局部修复关闭整张关联卡。
 

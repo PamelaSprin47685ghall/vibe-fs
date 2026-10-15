@@ -240,7 +240,7 @@ for (const action of ['detach', 'cancel']) {
   }
 }
 
-test('WHAT[managed-session-lifecycle-025] permanent detach removes its shared port listener while reusable cancellation keeps its listener', async () => {
+test('WHAT[managed-session-lifecycle-025] permanent detach removes its shared port listener while reusable drain keeps its listener', async () => {
   let pair
   pair = PtySurface.sharedOwnershipProbe(undefined, 'listener-lifetime-owner', (id, kind) => {
     if (kind === 'Signal') pair.second.complete(id)
@@ -252,15 +252,73 @@ test('WHAT[managed-session-lifecycle-025] permanent detach removes its shared po
   assert.equal(pair.second.exitListeners(), 1)
   const cancelled = await pair.second.fork('first-command')
   assert.equal(cancelled.ok, true)
-  await pair.second.cancel()
+  await pair.second.closeAll(0)
   assert.equal(pair.second.exitListeners(), 1)
   const next = await pair.second.fork('next-command')
   assert.equal(next.ok, true)
   pair.second.complete(next.id)
+  assert.equal(pair.second.completions(), 2)
   assert.equal(pair.second.owned(next.id), false)
   assert.deepEqual(pair.second.outstanding(), [])
   await pair.second.detach()
   assert.equal(pair.second.exitListeners(), 0)
+})
+
+for (const hasInitial of [false, true]) {
+  test(`WHAT[managed-session-lifecycle-025] a terminated parent runtime ${hasInitial ? 'with' : 'without'} an initial PTY refuses new reserve or spawn and releases its listener`, async () => {
+    let spawns = 0
+    const owner = controlledOwner(undefined, 'terminated-admission-owner', (id, kind) => {
+      if (kind === 'Spawn') spawns += 1
+      if (kind === 'Signal') owner.complete(id)
+    })
+    if (hasInitial) assert.equal((await owner.fork('first-command')).ok, true)
+    await owner.cancel()
+    const next = await owner.fork('must-not-start')
+    if (next.ok) owner.complete(next.id)
+    assert.equal(next.ok, false)
+    assert.match(next.error, /cancelled/)
+    assert.equal(spawns, Number(hasInitial))
+    assert.deepEqual(owner.outstanding(), [])
+    assert.equal(owner.exitListeners(), 0)
+  })
+}
+
+test('WHAT[managed-session-lifecycle-025] cancellation that retains the canonical fixed DevOps keeps PTY reuse and completion delivery', async () => {
+  const parent = 'companion-listener-owner'
+  await withAdmittedChildren('companion-listener', parent, [
+    { agentId: 'devops', sessionId: 'devops-session', role: 'devops' },
+  ], async journal => {
+    const owner = PtySurface.companionOwnershipProbe(journal, parent, (id, kind) => {
+      if (kind === 'Signal') owner.complete(id)
+    })
+    try {
+      assert.equal((await owner.fork('first-command')).ok, true)
+      await owner.cancel()
+      assert.equal(owner.exitListeners(), 1)
+      const next = await owner.fork('next-command')
+      assert.equal(next.ok, true)
+      owner.complete(next.id)
+      assert.equal(owner.completions(), 2)
+      assert.deepEqual(owner.outstanding(), [])
+    } finally {
+      await owner.detach()
+    }
+    assert.equal(owner.exitListeners(), 0)
+  })
+})
+
+test('WHAT[managed-session-lifecycle-025] failed terminal cancellation retains observation until exit while keeping new PTY admission closed', async () => {
+  const owner = controlledOwner(undefined, 'failed-terminal-admission-owner')
+  const opened = await owner.fork('first-command')
+  await assert.rejects(owner.cancel(), /exit was not observed/)
+  assert.equal(owner.exitListeners(), 1)
+  const next = await owner.fork('must-not-start')
+  if (next.ok) owner.complete(next.id)
+  owner.complete(opened.id)
+  assert.equal(next.ok, false)
+  assert.match(next.error, /cancelled/)
+  assert.deepEqual(owner.outstanding(), [])
+  assert.equal(owner.exitListeners(), 0)
 })
 
 test('WHAT[managed-session-lifecycle-025] failed detach retains its exit listener until a late exit observation settles the last lease', async () => {
