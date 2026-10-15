@@ -2,7 +2,7 @@ namespace Wanxiangshu.Process
 
 open System
 
-type Deadline = private Deadline of expiresAt: DateTimeOffset
+type Deadline = private Deadline of libraryValue: obj
 
 module Deadline =
     val MaxTimerWaitMs: int

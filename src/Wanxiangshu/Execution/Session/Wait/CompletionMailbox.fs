@@ -1,145 +1,75 @@
 namespace Wanxiangshu.Execution.Session.Wait
 
 open System
-open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Foundation.Identity
 
-/// Dual-channel completion mailbox (GREEN-5 / ARCH-002).
-/// Agent channel: wake-only (HandleMayHaveChanged) — Journal is agent fact source.
-/// PTY channel: physical PtyJoinItem queue — backend onExit sole writer (EXEC-015).
+/// 实现唯一来源：wanxiangli/wait 的泛化 CompletionMailbox（CUT-21）。
+/// 此文件是主仓特化桥：AgentHandleId / PtyJoinItem 原样经库往返
+/// （F# 值即 JS 对象），唤醒原因在此转回主仓 MailboxWakeReason 词汇。
+module private MailboxLibrary =
+
+    [<Import("Wait", "wanxiangli/wait")>]
+    let library: obj = jsNative
+
 type CompletionMailbox(gate: obj) =
-    // DSL-MUTABLE: resource — agent wake queue
-    let agentWakes = Queue<AgentHandleId>()
-    // DSL-MUTABLE: resource — pty completion queue
-    let ptyCompletions = Queue<PtyJoinItem>()
-    // DSL-MUTABLE: resource — waiter queue
-    let waiters = Queue<TaskCompletionSource<MailboxWakeReason>>()
-    // DSL-MUTABLE: cancellation — mailbox cancelled latch
-    let mutable cancelled = false
 
-    let wakeAll (reason: MailboxWakeReason) =
-        [ while waiters.Count > 0 do
-              yield waiters.Dequeue() ]
-        |> List.iter (fun waiter -> AsyncSupport.trySetResult waiter reason |> ignore)
+    // gate 仅为生命周期锚（与主仓原语义一致）；库实例不消费它。
+    let view: obj = MailboxLibrary.library?completionMailbox()
 
-    let enqueueWaiter () =
-        let waiter =
-            TaskCompletionSource<MailboxWakeReason>(TaskCreationOptions.RunContinuationsAsynchronously)
+    let wakeOf (value: obj) : MailboxWakeReason =
+        match string value with
+        | "CompletionMayBeAvailable" -> MailboxWakeReason.CompletionMayBeAvailable
+        | "MailboxCancelled" -> MailboxWakeReason.MailboxCancelled
+        | _ ->
+            // { LocalInterrupt: "OperatorAbort" | ... }
+            let interrupt = string (emitJsExpr (value, "LocalInterrupt") "$0[$1]")
+            let reason =
+                match interrupt with
+                | "OperatorAbort" -> JoinInterruptReason.OperatorAbort
+                | "UserMessageArrived" -> JoinInterruptReason.UserMessageArrived
+                | _ -> JoinInterruptReason.DeadlineExpired
 
-        waiters.Enqueue waiter
-        waiter
+            MailboxWakeReason.LocalInterrupt reason
 
-    let hasQueued () =
-        agentWakes.Count > 0 || ptyCompletions.Count > 0
+    member _.PulseAgentHandle(handle: AgentHandleId) = view?pulseAgent(handle) |> ignore
 
-    let drainQueue (q: Queue<'T>) maxCount =
-        [ // DSL-MUTABLE: algorithm-scratch — queue drain counter
-          // DSL-MUTABLE: algorithm-scratch — counter for draining items
-          let mutable n = 0
+    member _.PublishPtyCompletion(item: PtyJoinItem) = view?publishPty(item) |> ignore
 
-          while n < maxCount && q.Count > 0 do
-              n <- n + 1
-              yield q.Dequeue() ]
+    member _.PulseWake() = view?pulseWake() |> ignore
 
-    /// Agent wake only — never carries completion payload.
-    member _.PulseAgentHandle(handle: AgentHandleId) =
-        lock gate (fun () ->
-            if not cancelled then
-                agentWakes.Enqueue handle
-                wakeAll CompletionMayBeAvailable)
-
-    /// PTY physical result (EXEC-015). Sole mailbox path for PTY facts.
-    member _.PublishPtyCompletion(item: PtyJoinItem) =
-        lock gate (fun () ->
-            if not cancelled then
-                ptyCompletions.Enqueue item
-                wakeAll CompletionMayBeAvailable)
-
-    /// Spurious wake: drop waiters so outer journal/user race does not pile them up.
-    /// Safe — callers always re-drain after wake.
-    member _.PulseWake() =
-        lock gate (fun () ->
-            if cancelled then
-                wakeAll MailboxCancelled
-            else
-                wakeAll CompletionMayBeAvailable)
-
-    /// Wait for Publish/Pulse/Cancel only (no user interrupt). HostForkRuntime races this
-    /// against journal change and local interrupt at the outer level.
     member _.WaitForWake() : Task<MailboxWakeReason> =
-        let pending =
-            lock gate (fun () ->
-                if cancelled then Choice1Of2 MailboxCancelled
-                elif hasQueued () then Choice1Of2 CompletionMayBeAvailable
-                else Choice2Of2(enqueueWaiter ()))
-
-        match pending with
-        | Choice1Of2 reason -> Task.FromResult reason
-        | Choice2Of2 waiter -> waiter.Task
-
-    /// EXEC-018: wait for completion signal, typed local interrupt, or
-    /// permanent cancel.
-    member this.WaitForSignal(interrupt: Task<JoinInterruptReason>) : Task<MailboxWakeReason> =
-        // Subscribe to wake before interrupt, preserving ready-signal priority.
-        let tagWake (reason: MailboxWakeReason) : Choice<MailboxWakeReason, JoinInterruptReason> = Choice1Of2 reason
-
-        let tagInterrupt (reason: JoinInterruptReason) : Choice<MailboxWakeReason, JoinInterruptReason> =
-            Choice2Of2 reason
-
-        let wakeChoice: Task<Choice<MailboxWakeReason, JoinInterruptReason>> =
-            emitJsExpr (this.WaitForWake(), tagWake) "$0.then($1)"
-
-        let interruptChoice: Task<Choice<MailboxWakeReason, JoinInterruptReason>> =
-            emitJsExpr (interrupt, tagInterrupt) "$0.then($1)"
-
-        let decideSignal (outcome: Choice<MailboxWakeReason, JoinInterruptReason>) : MailboxWakeReason =
-            match outcome with
-            | Choice1Of2 wakeReason -> wakeReason
-            | Choice2Of2 interruptReason ->
-                // Drop mailbox waiter if still pending (local interrupt won).
-                this.PulseWake()
-                LocalInterrupt interruptReason
-
+        let pending: Task<obj> = unbox<Task<obj>> (view?waitForWake())
         task {
-            let! (winner: Choice<MailboxWakeReason, JoinInterruptReason>) =
-                emitJsExpr (wakeChoice, interruptChoice) "Promise.race([$0, $1])"
-
-            return decideSignal winner
+            let! reason = pending
+            return wakeOf reason
         }
 
-    /// Drain agent wake tokens (no payload). Callers re-read Journal after wake.
+    member _.WaitForSignal(interrupt: Task<JoinInterruptReason>) : Task<MailboxWakeReason> =
+        let pending: Task<obj> = unbox<Task<obj>> (view?waitForSignal(interrupt))
+        task {
+            let! reason = pending
+            return wakeOf reason
+        }
+
     member _.DrainAgentWakes(maxCount: int) : AgentHandleId list =
-        if maxCount <= 0 then
-            []
-        else
-            lock gate (fun () -> drainQueue agentWakes maxCount)
+        (unbox<obj array> (view?drainAgents(maxCount))) |> Array.toList |> List.map unbox<AgentHandleId>
 
-    /// Bounded drain of queued PTY facts (EXEC-015).
     member _.DrainPtyCompletions(maxCount: int) : PtyJoinItem list =
-        if maxCount <= 0 then
-            []
-        else
-            lock gate (fun () -> drainQueue ptyCompletions maxCount)
+        (unbox<obj array> (view?drainPtys(maxCount))) |> Array.toList |> List.map unbox<PtyJoinItem>
 
-    /// Lifecycle termination only — not tool-call abort (EXEC-017).
-    member _.Cancel() =
-        lock gate (fun () ->
-            if cancelled then
-                false
-            else
-                cancelled <- true
-                wakeAll MailboxCancelled
-                true)
+    member _.Cancel() : bool = unbox<bool> (view?cancel())
 
-    member _.PendingCount = lock gate (fun () -> agentWakes.Count + ptyCompletions.Count)
+    member _.PendingCount: int = unbox<int> (view?pendingCount())
 
-    member _.PendingPtyCount = lock gate (fun () -> ptyCompletions.Count)
-    member _.PendingAgentWakeCount = lock gate (fun () -> agentWakes.Count)
-    member _.IsCancelled = lock gate (fun () -> cancelled)
+    member _.PendingPtyCount: int = unbox<int> (view?pendingPtyCount())
+
+    member _.PendingAgentWakeCount: int = unbox<int> (view?pendingAgentWakeCount())
+
+    member _.IsCancelled: bool = unbox<bool> (view?isCancelled())
 
     interface ICompletionMailbox<AgentHandleId, PtyJoinItem, JoinInterruptReason, MailboxWakeReason> with
         member this.PulseAgent handle = this.PulseAgentHandle handle
