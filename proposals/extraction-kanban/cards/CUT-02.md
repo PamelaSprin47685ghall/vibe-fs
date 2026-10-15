@@ -1,4 +1,6 @@
 
+**2026-10-15 修复轮：** 当前已接入完整 Capture、保留组长身份的监管及相对 PATH 修复；0.6.0 精确包、真实反例和剩余边界见[修复记录](../REPAIR-PROGRESS-2026-10-15.md)。下方保留历史接线和验证记录，不用它们替代本轮验收。
+
 - **正控**：`010.test.mjs`（真实命令执行收集 `stdout`/`stderr` 与非零退出码）、`013.test.mjs`—`015.test.mjs`（大输出 Spool 留尾、TOML 数据面隔离、UTF-8 多字节码点对齐）。
 - **反例**：`004.test.mjs`（慢进程超时强杀、不存在的二进制返回 `SpawnFailed`、Host 抛错返回 `ExecutionFailed`、`KillAckGraceMs` 未响应返回 `-1`）、`005.test.mjs` & `011.test.mjs`（非法预算在 spawn 前拒绝且零副作用）、`006.test.mjs`（取消立即返回且触发一次 Kill）、`016.test.mjs`（`LargeGate` FIFO 与 spawn 失败后释放许可）。
 - **接线证明**：`010.test.mjs` 新增对 `NodeProcessHost.fs` 接入 `wanxiangli/process` 且移除 `node:child_process` 直接导入的验证，并通过真实 `ExecutorToolSurface.run` 与 `Process/Surface.run` 证明端到端连通。

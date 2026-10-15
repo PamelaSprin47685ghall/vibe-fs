@@ -79,14 +79,14 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 
 复核基线：主仓 `7d8feff03`、独立库 `46d9c07 / 0.5.2`。[问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md) 已确认 CUT-02/03/04 仍有接线缺陷及未承接职责。上表 DONE 保留历史合入记录，**不再作为对应完整职责已闭合的证明**；后续依赖这些能力的卡须同时检查下列修复卡。CUT-01 的迁移边界未被推翻，新增的是独立套件的验证缺口。
 
-本轮只交付源码复核、报告及计划，未实施生产修复、未升级包、未关闭 GAP。以下均未认领，协议尚待细化；本轮文档交付不等于 READY 或实现完成。
+源码报告轮次仅交付复核与计划。2026-10-15 后续已获用户授权开始修复；以下认领只覆盖明确工作包，整卡须分别取得库、生产接线及旧职责退出证据。进度与原始命令摘要见 [修复记录](REPAIR-PROGRESS-2026-10-15.md)。
 
 | ID | 职责与范围 | 当前列 | 完成前置 | Owner | Reviewer |
 |---|---|---|---|---|---|
-| [CUT-01-R1](SOURCE-AUDIT-2026-10-15.md#repair-lifecycle) | Journal 测试关闭同步、构造锁竞争和 Process 平台证明 | BACKLOG | — | — | — |
-| [CUT-02-R1](SOURCE-AUDIT-2026-10-15.md#repair-process) | 无损输出、Draining 物理监管、相对 PATH；补 D-03 | BACKLOG | D-03 契约定稿 | — | — |
-| [CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) | 原件权威、完整 Opening、稳定 cut、Proxy 重入证明；补 D-02 | BACKLOG | D-02 契约及旧数据处置 | — | — |
-| [CUT-04-R1](SOURCE-AUDIT-2026-10-15.md#repair-ownership) | PTY 真实终结、早到回执、持久预留/恢复、统一 blocker | BACKLOG | 所选物理资源的身份与恢复证据契约 | — | — |
+| [CUT-01-R1](SOURCE-AUDIT-2026-10-15.md#repair-lifecycle) | Journal 测试关闭同步、构造锁竞争和 Process 平台证明 | DONE | 库完整候选与精确包 Node/Bun 验证通过；未测平台不扩张 | root；audit_process（复审） | 交叉复审 |
+| [CUT-02-R1](SOURCE-AUDIT-2026-10-15.md#repair-process) | 无损输出、Draining 物理监管、相对 PATH；补 D-03 | DONE | 所选非 PTY 生产接线、192 项需求及实际安装包验收；原有 5 TODO 保留 | audit_process；audit_trace（监管）；root（集成） | 交叉复审 |
+| [CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) | 原件权威、完整 Opening、稳定 cut、Proxy 重入证明；补 D-02 | DOING | T-02/T-03/E-01 已修；D-02 对账落盘，T-01 原件接管仍待下一包 | root（下一包）；audit_trace（已交接） | 交叉复审 |
+| [CUT-04-R1](SOURCE-AUDIT-2026-10-15.md#repair-ownership) | PTY 真实终结、早到回执、持久预留/恢复、统一 blocker | DOING | O-02/O-03/O-04 已修；O-01 已持久保留/阻断，跨重启接管与跨进程每轮准入未完 | root（剩余恢复）；audit_ownership（已交接） | 交叉复审 |
 
 P1 行为缺陷优先；PATH、PTY 提前清账/同步完成和 Proxy 测试可先形成独立小闭环。公共文件、两仓发布及主仓集成仍串行，不能用这些局部修复关闭整张关联卡。
 
@@ -144,8 +144,8 @@ P1 行为缺陷优先；PATH、PTY 提前清账/同步完成和 Proxy 测试可�
 | 决策号 | 影响卡 | 待判问题 | 当前处置 | 决策/证据 |
 |---|---|---|---|---|
 | D-01 | 07、09、11 | 草稿中的未知来源回退 human 与现行权威证据冲突 | 保留现行拒绝/明确未知；开工时裁定精确接口 | 待认领；不得先删权威闭包 |
-| D-02 | 03、06、15、16、28 | 单观察者 Trace 与并发捕获、推理、retry 排除、Fission 合流、Opening 范围不完全等价 | 描述符桥未完成原件迁移；完整/晚 Opening 与固定 cut 协议待定，不再以 CUT-03 历史 DONE 代替裁决 | [源码复核；CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) |
-| D-03 | 02、20、21 | 基础 pipe 留尾不等于主仓硬期限、完整外存及 PTY | 已确认完整输出及 Draining 取消接线失配；先补能力和契约，再替换所选生产 owner | [源码复核；CUT-02-R1](SOURCE-AUDIT-2026-10-15.md#repair-process) |
+| D-02 | 03、06、15、16、28 | 单观察者 Trace 与并发捕获、推理、retry 排除、Fission 合流、Opening 范围不完全等价 | Opening 与固定 cut 已修；推理/retry/并发/身份/Terminal/Fission/历史对账落盘，描述符桥原件接管尚未实现 | [本批范围与下一包](REPAIR-PROGRESS-2026-10-15.md) |
+| D-03 | 02、20、21 | 基础 pipe 留尾不等于主仓硬期限、完整外存及 PTY | 默认基础版保持留尾；显式 Capture/监管承接所选非 PTY 完整采集和同组期限/取消。PTY、脱组后代、宿主崩溃恢复不扩成已承接 | [精确包与真实反例](REPAIR-PROGRESS-2026-10-15.md) |
 | D-04 | 18、19 | 单流 SQLite CAS 与多 writer 合法分叉不是同一承诺 | 两种协议分开，不用前者替代后者 | 待 CUT-18/19 |
 | D-05 | 27、29、30、31 | 新库草稿“不再建”与仍生效的产品功能冲突 | 默认暂留并维护；抽取/删除需逐卡裁决 | 待认领；不是删除批准 |
 | D-06 | 32、33、38 | 相对主线净改进与完整发布验收 | 合并可用净改进准入，验证结果仍原样报告 | 用户 2026-10-14T23:59:13Z 授权；[比较记录](../lifecycle-cutover-closeout.md) |

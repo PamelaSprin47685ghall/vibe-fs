@@ -12,6 +12,8 @@
 
 ## 台账
 
+2026-10-15 四模块修复：GAP-133 仍为 PARTIAL。managed-session-lifecycle [025](managed-session-lifecycle/tests/025.test.mjs) 的实际生产 bun-pty TERM→等待→KILL→exit 已在 macOS/Bun 1.3.14 运行并通过；同文件覆盖持久预留、真实退出结清、同步回执和丢提交回执，work 009/044 验证 strict scope 与冷父关系。只关闭该具体 PTY 物理观察缺口，不冒称所有取消/fatal、跨重启接管、隐藏执行树或跨进程每轮代际准入已证明。完整命令、包摘要和剩余边界见[本批修复记录](../proposals/extraction-kanban/REPAIR-PROGRESS-2026-10-15.md)。GAP-101、GAP-108、GAP-092 等原 TODO 不因本轮局部证明销项。
+
 2026-10-06 接续075与upstream24c：GAP-077仍PARTIAL。本方保留完整physical/registered-transform与跨请求历史守门，R5已正式验证无committed lease在execution admission拒绝；upstream较早的R5 TODO描述仅属其旧输入。规范request释放合并后，live canonical frontier正控逐个保真正request至transform与原断言结束，exact释放第一个后才建第二隔离scope；其余hint用例的提前释放保留。gen197正式120/120、905pass/3fail与gen199104pass/4fail原记录保留。最终源码gen200运行器56/0、实际修改边界9/9及239/0、14skip/2TODO、group accepted=true；119宽选集却实际36drained/10active/73queued、原5秒静默及kill EPERM、accepted=false，无权威summary，不能由定向绿补成全仓通过。历史材料日期红及075 CI总预算截断分别保留，见[本次合并记录](../proposals/archive/2026-10-06/Upstream增量与施工续接-2026-10-06.md)与最终收据，不沿用gen196。
 
 2026-10-05 当前验收：N06-A真实创建与读取有限范围完成，见[Sphinx记录](../proposals/archive/2026-10-05/Sphinx持久创建与读取-2026-10-05.md)。gen142 Fable/check/format和前后freshness通过，正式73/73排空、437pass/0fail、24skip/29TODO、5.85s wall，group65775 accepted=true、17.144ms，exit1仅pending。唯一Current导出真实accepted trace、显式配置持久创建、native DTO、跨SDK/JS与冷进程重放已证；实际Host会话、claim/submit/amend、renderer及完整lease/model零effect仍缺。最新f0ead全仓CI原300s截断813/818、2active/3queued、无summary；[原artifact](../proposals/archive/2026-10-05/baselines/f0ead-ci/receipt.txt)已保存，下一步先量化Linux单016成本。下面d599/33dc等旧失败不凭此次选集归因，整体GAP-055/085/086/219保持PARTIAL。
