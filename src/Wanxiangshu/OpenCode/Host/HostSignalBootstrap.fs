@@ -900,8 +900,8 @@ module HostSignalBootstrap =
 
             let finishUnsettledAdmission intent output result =
                 match result with
-                | Ok(ChatAdmissionTransactionOutcome.Settled _) -> result
-                | _ -> completeAdmission intent output result
+                | Ok(ChatAdmissionTransactionOutcome.Settled _) -> ()
+                | _ -> completeAdmission intent output result |> ignore
 
             let startAdmissionFlight
                 durable
