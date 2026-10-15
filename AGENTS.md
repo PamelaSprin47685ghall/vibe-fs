@@ -36,5 +36,4 @@
   - 提交前确认没有残留的临时文件、调试打印、旧路径残骸或未跟踪的生成物。
 4. 修改纪律
   - 工作区可能包含用户的未提交改动。动手前先看 `git status` 与对应 diff，妥善保留无关改动。
-  - 多人切刀按 `proposals/extraction-kanban/README.md` 与唯一看板 `proposals/extraction-kanban/BOARD.md` 认领：每人独立工作树，只推自己的任务分支；只有当轮集成者在评审和候选验证后更新 `master`，库的 `main` 与打包也串行。不得在同一公共工作树重叠编辑。
-  - 不属于多人切刀的已授权日常修复，仍自动 git commit 并推送到 `master`；严禁对 `master` 执行 force push。提交成功、验证通过、已部署运行分别报告，不相互代替。
+  - 自动 git commit 并推送到 `master`；严禁对 `master` 执行 force push。提交成功、验证通过、已部署运行分别报告，不相互代替。
