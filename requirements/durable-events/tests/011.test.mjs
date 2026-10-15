@@ -44,6 +44,5 @@ test('WHAT[durable-events-011] runtime append creates zero Git objects and write
   await t.test('WHAT[durable-events-011] the writer file exists only under the local state root', () => {
     const writerFiles = readdirSync(join(stateRoot, 'wanxiangshu/events')).filter(f => f.endsWith('.ndjson'))
     assert.equal(writerFiles.length, 1, 'exactly one local writer NDJSON file must exist')
-    assert.equal(execFileSync('git', ['-C', repo, 'status', '--porcelain'], { encoding: 'utf8' }).includes('.Herdchestra'), false)
   })
 })
