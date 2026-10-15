@@ -256,6 +256,7 @@ module DurableWorkHost =
           ReviewOutcome: string option
           OpeningCursor: float option
           PredecessorRange: (float * float) option
+          LastRetirementCursor: float option
           DeliveryAuthorized: bool
           Delivered: bool
           PendingDelivery: bool
@@ -386,6 +387,13 @@ module DurableWorkHost =
         |> Array.tryLast
         |> Option.map hostRunFenceOf
 
+    let private lastRetirementCursorOf (rounds: obj array) : float option =
+        match rounds with
+        | [||] -> None
+        | rounds ->
+            let retirement = rounds.[rounds.Length - 1]?retirementCursor
+            if isNull retirement then None else Some(unbox<float> retirement)
+
     let private projectedWork (snapshot: obj) (work: obj) : InspectedWork =
         let active: obj = snapshot?active
         let pending: obj = snapshot?pendingDelivery
@@ -409,6 +417,7 @@ module DurableWorkHost =
           ReviewOutcome = outcome
           OpeningCursor = openingCursorOf active
           PredecessorRange = predecessorRangeOf activeId rounds
+          LastRetirementCursor = lastRetirementCursorOf rounds
           DeliveryAuthorized = unbox<bool> snapshot?deliveryAuthorized
           Delivered = isNull active && not (isNull snapshot?opened)
           PendingDelivery = not (isNull pending)

@@ -437,3 +437,50 @@ test('WHAT[work-034] successor projection strips earlier assistant and tool mess
   const currentIndex = ids(result.messages).indexOf('a-current')
   assert.equal(ids(result.messages)[currentIndex - 1], 'lwr-prev-inc-2')
 })
+
+test('WHAT[work-034] post-S3 projection strips all S3-and-earlier context and injects no LWR_prev', () => {
+  // The delivered Plan work carries no active tenure. Its isolation is keyed on
+  // the delivered retirement frontier: tenureForPostS3 sets OpeningCursor to
+  // frontier + 1 and PreviousRange to null (no predecessor record). So every
+  // assistant/tool exchange observed at-or-before the frontier is stripped, the
+  // historical user inputs survive, and — unlike a relay successor — no
+  // LWR_prev is injected.
+  const deliveredFrontier = 40n
+  const rawMessages = [
+    userText('u-history', 'Original user request'),
+    assistantText('a-s1', 'S1 tenure assistant'),
+    toolResult('t-s1', 'js-plan', 'S1 tool'),
+    assistantText('a-s2', 'S2 tenure assistant'),
+    assistantText('a-s3', 'S3 tenure assistant'),
+    userText('u-command', 'Please execute deliver now.'),
+    assistantText('a-post', 'post-S3 assistant', 'u-command'),
+  ]
+  const tenure = {
+    workId: 'work-post-s3',
+    incumbencyId: 'post-s3',
+    stage: 'S3',
+    openingCursor: deliveredFrontier + 1n,
+    previousRange: null,
+    isFreshHandover: false,
+  }
+  const result = assemble(
+    rawMessages,
+    tenure,
+    () => {
+      throw new Error('post-S3 must not materialize an LWR_prev')
+    },
+    cursors({ 'a-s1': 5n, 't-s1': 8n, 'a-s2': 20n, 'a-s3': 38n, 'u-command': 41n, 'a-post': 42n }),
+  )
+  const kept = ids(result.messages)
+  assert.equal(
+    result.messages.filter((m) => msgId(m).startsWith('lwr-prev-')).length,
+    0,
+    'post-S3 inherits no previous work record',
+  )
+  assert.ok(kept.includes('u-history'), 'historical user input is preserved verbatim')
+  assert.ok(kept.includes('u-command'), 'the post-S3 command survives')
+  assert.ok(kept.includes('a-post'), 'post-S3 assistant after the frontier stays')
+  for (const prior of ['a-s1', 't-s1', 'a-s2', 'a-s3']) {
+    assert.ok(!kept.includes(prior), `${prior} (S3-and-earlier) must be stripped`)
+  }
+})

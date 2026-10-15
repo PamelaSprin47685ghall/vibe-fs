@@ -751,11 +751,115 @@ module PluginTransforms =
                       HasSemanticParts = not (List.isEmpty message.Parts)
                       Raw = raw }))
 
-        // Stopped. inspect has no work sequence. Absence is not a plan tenure.
+        let isPlanSequence (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+            work.Sequence = [ "S1"; "S2"; "S3" ]
+
+        let tenureForActive
+            (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+            (epoch: Wanxiangshu.Context.Prefix.ActivePrefixEpoch)
+            (sid: string)
+            : Wanxiangshu.Mission.Planning.ActiveTenureInfo =
+            let incumbentId = work.ActiveId |> Option.defaultValue ""
+
+            { WorkId = sid
+              IncumbencyId = incumbentId
+              Stage = work.Stage
+              OpeningCursor = work.OpeningCursor |> Option.defaultValue 0. |> int64
+              PreviousRange =
+                  work.PredecessorRange
+                  |> Option.map (fun (start, ending) -> int64 start, int64 ending)
+              IsFreshHandover = not (PrefixEpochProjection.isTenureReanchored incumbentId epoch) }
+
+        // The delivered Plan work is post-S3: the tenure is over and the
+        // session waits for the user's execution command. It inherits nothing
+        // from S3 or earlier: every assistant/tool interaction at-or-before the
+        // delivered retirement frontier is stripped, with no LWR_prev.
+        let tenureForPostS3
+            (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+            (sid: string)
+            : Wanxiangshu.Mission.Planning.ActiveTenureInfo =
+            { WorkId = sid
+              IncumbencyId = "post-s3"
+              Stage = "S3"
+              OpeningCursor = work.LastRetirementCursor |> Option.defaultValue -1. |> int64 |> (+) 1L
+              PreviousRange = None
+              IsFreshHandover = false }
+
+        let previousTenureRecord
+            (durable: AgentJournal)
+            (sessionId: SessionId)
+            (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
+            =
+            match tenure.PreviousRange with
+            | Some(start, ending) ->
+                let range =
+                    XTraceRange.create
+                        (XTraceCursor.create start |> XTraceCursor.nextCursor)
+                        (XTraceCursor.create ending |> XTraceCursor.nextCursor)
+
+                Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshot
+                    durable
+                    (AgentJournal.snapshot durable)
+                    sessionId
+                    range
+            | None -> Task.FromResult None
+
+        let isolatePlanTenure
+            (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
+            (sid: string)
+            (outObj: obj)
+            =
+            task {
+                let durable =
+                    journal
+                    |> Option.defaultWith (fun () -> invalidOp "Plan journal is unavailable")
+
+                let sessionId = SessionId.create sid
+                do! restoreProtocolArguments outObj
+                let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
+
+                let! captured =
+                    rawMessages
+                    |> List.filter (ProviderWireCapture.isSyntheticMessage >> not)
+                    |> captureXTraceMessages (Some sid)
+
+                let trace =
+                    captured.Current
+                    |> Option.defaultWith (fun () -> invalidOp "Plan XTrace is unavailable")
+
+                do! capturePlanSessionOpening durable sessionId trace rawMessages
+
+                if tenure.OpeningCursor > XTraceCursor.sequence (XTraceProjection.headCursor trace) then
+                    invalidOp "Plan opening cursor exceeds the captured XTrace frontier"
+
+                let! previousRecord = previousTenureRecord durable sessionId tenure
+
+                let assembled =
+                    Wanxiangshu.Mission.Planning.TenureIsolation.assemble
+                        (tenureMessagesOf rawMessages)
+                        tenure
+                        (XTraceProjection.hostMessageFirstCursors trace)
+                        previousRecord
+
+                if assembled.ReanchorRequested then
+                    do! reanchorTenure durable sessionId tenure (tenureReanchorEpoch durable sessionId)
+
+                HostMessageProjection.replaceMessagesInPlace outObj assembled.Messages
+            }
+
+        let currentEpochOf (sid: string) : Wanxiangshu.Context.Prefix.ActivePrefixEpoch =
+            match journal with
+            | Some durable -> tenureReanchorEpoch durable (SessionId.create sid)
+            | None -> PrefixEpochProjection.empty
+
         let applyResolvedTenure (sid: string) (outObj: obj) =
             task {
-                let _ = sid, outObj
-                return ()
+                match tryReadLifecycleWork sid with
+                | Some work when isPlanSequence work && work.ActiveId.IsSome ->
+                    return! isolatePlanTenure (tenureForActive work (currentEpochOf sid) sid) sid outObj
+                | Some work when isPlanSequence work && work.Delivered ->
+                    return! isolatePlanTenure (tenureForPostS3 work sid) sid outObj
+                | _ -> return ()
             }
 
         let applyTenureIsolation (sidOpt: string option) (outObj: obj) : Task<unit> =

@@ -49,6 +49,7 @@ module DurableWorkHost =
           ReviewOutcome: string option
           OpeningCursor: float option
           PredecessorRange: (float * float) option
+          LastRetirementCursor: float option
           DeliveryAuthorized: bool
           Delivered: bool
           PendingDelivery: bool
