@@ -25,6 +25,12 @@ test('WHAT[managed-session-lifecycle-025] controlled PTY port completion clears 
   assert.equal(res.byNameAfter, undefined, 'TryPtyByName must be None after exit')
 })
 
+test('WHAT[managed-session-lifecycle-025] failed PTY spawn records NotStarted and leaves no phantom ownership lease', async () => {
+  const res = await PtySurface.scenario('fork-error', 'broken-cmd', 'spawn failed')
+  assert.equal(res.ok, false, 'fork-error scenario must report failure')
+  assert.equal(res.owned, false, 'failed spawn must not leave an unsettled PTY lease in SnapshotOutstandingPtyRuns')
+})
+
 test('WHAT[managed-session-lifecycle-025] DevOps run terminal settlement closes every PTY the DevOps child owns at the port boundary', async () => {
   // Observable boundary: the PTY backend port is where owner-initiated cleanup
   // becomes a physical effect. The DevOps child's own PTY must receive that

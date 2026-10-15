@@ -121,12 +121,11 @@ type private ForkRuntimeBackendState
 
     let mailbox = createMailbox lockObj
 
-    let cancelAllAgentsAndClearPtys () =
+    let cancelAllAgents () =
         lock lockObj (fun () ->
             for run in agents |> Map.toSeq |> Seq.map snd do
                 ChildRun.cancel run
 
-            ptys <- Map.empty
             agents |> Map.toSeq |> Seq.map fst |> Seq.toList)
 
     /// Start a new child run: create the ChildRun and return a thunk that
@@ -329,10 +328,11 @@ type private ForkRuntimeBackendState
     // Public API — Cancel / Close
     // -----------------------------------------------------------------------
 
-    /// Cancel all active runs and PTYs, drain pending waiters.
+    /// Cancel all active runs, drain pending waiters. PTY records remain until
+    /// physical exit settles their ownership lease (CUT-04).
     member _.Cancel() : unit =
         if mailbox.Cancel() then
-            cancelAllAgentsAndClearPtys () |> ForkRuntimeControl.cleanupAgentIds cleanupPort
+            cancelAllAgents () |> ForkRuntimeControl.cleanupAgentIds cleanupPort
 
     member this.Close() : unit = this.Cancel()
 

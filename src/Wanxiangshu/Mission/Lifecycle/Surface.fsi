@@ -61,3 +61,11 @@ module LifecycleSurface =
     /// First DevOps binding wins. A conflicting rebind writes nothing and keeps the stored target.
     val bindDevOps: store: obj -> workId: string -> devopsId: string -> target: obj -> Task<obj>
     val roadDevOps: store: obj -> workId: string -> obj
+
+    val executeOwnershipDurable:
+        gitCommonDir: string -> registryId: string -> requestId: string -> message: obj -> DurableWorkHost.HostReceipt
+
+    val mayStartResource: receipt: DurableWorkHost.HostReceipt -> DurableWorkHost.OwnershipLease option
+
+    val ownershipBlockersDurable:
+        gitCommonDir: string -> registryId: string -> scopeId: string -> DurableWorkHost.OwnershipBlocker array

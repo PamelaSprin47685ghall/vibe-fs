@@ -41,9 +41,10 @@ type HostForkRuntime =
     member internal Children: Dictionary<string, SessionId>
     member internal DormantChildren: Dictionary<string, SessionId>
     member internal PendingRuns: Dictionary<string, PendingHostRun>
-    member internal PtyRuns: HashSet<string>
+    member internal PtyRuns: ICollection<string>
     member SnapshotOutstandingAgentRuns: unit -> (string * SessionId) list
     member SnapshotOutstandingPtyRuns: unit -> string list
+    member CancelOwnedPtys: unit -> unit
     member SubscribePtyCompletion: listener: (PtyJoinItem -> unit) -> IDisposable
     member internal HandleOwnership: HandleOwnership
 

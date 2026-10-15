@@ -112,8 +112,16 @@ type ToolRuntimeScope
     let runtimes = Dictionary<string, HostForkRuntime>()
     // DSL-MUTABLE: resource — per-session executor runtime registry
     let executorRuntimes = Dictionary<string, HostForkRuntime>()
-    // DSL-MUTABLE: retirement admission fence — exact logical incumbency, never the reusable physical session.
-    let retirementFrozen = Dictionary<string, string>()
+
+    let scopeOwnershipId =
+        "tool-runtime-scope:" + Guid.NewGuid().ToString("N").Substring(0, 8)
+    // DSL-MUTABLE: resource — wanxiangli/ownership registry for scope-level owned work and tenure drain
+    let scopeOwnership =
+        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.createOwnership scopeOwnershipId [||]
+    // DSL-MUTABLE: resource — monotonic sequence for scope ownership requests
+    let mutable scopeOwnershipSeq = 0
+    // DSL-MUTABLE: resource — tenure scope index; the Drain fact itself lives in the Ownership registry
+    let tenureScopes = Dictionary<string, string * int>()
     // DSL-MUTABLE: resource — per-session orchestrator host registry
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
@@ -144,10 +152,6 @@ type ToolRuntimeScope
     let terminalPort = eventPort
     // DSL-MUTABLE: resource — tool runtime dispose latch
     let mutable disposed = false
-    // DSL-MUTABLE: resource — async tool-callback admission latch.
-    let mutable acceptingOwnedWork = true
-    // DSL-MUTABLE: resource — in-flight tool-owned callback count.
-    let mutable ownedWorkCount = 0
     // DSL-MUTABLE: single-flight — shared waiter for tool-owned callback drain.
     let mutable ownedWorkDrainWaiter: TaskCompletionSource<unit> option = None
     // DSL-MUTABLE: resource — first tool-owned callback failure for shutdown propagation.
@@ -161,11 +165,99 @@ type ToolRuntimeScope
     let mutable joinAttempts: IJoinAttemptRegistry =
         JoinAttemptRegistry() :> IJoinAttemptRegistry
 
-    let finishOwnedWork () =
-        lock ownedWorkGate (fun () ->
-            ownedWorkCount <- ownedWorkCount - 1
+    let ownedWorkScopeId = "tool-owned-work-scope"
 
-            if not acceptingOwnedWork && ownedWorkCount = 0 then
+    do
+        let openRoot =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipMessage
+                "OpenScope"
+                [ "scopeId", box ownedWorkScopeId; "parentId", null ]
+
+        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executeOwnershipInMemory
+            scopeOwnership
+            ("open:" + ownedWorkScopeId)
+            openRoot
+        |> ignore
+
+    let unsettledOwnedWork () =
+        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipBlockersInMemory scopeOwnership ownedWorkScopeId
+
+    let startReservedOwnedWork
+        (seq: int)
+        (resId: string)
+        (lease: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.OwnershipLease)
+        =
+        let inc = sprintf "inc-%d" seq
+
+        let startedMsg =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipMessage
+                "Started"
+                [ "lease", Wanxiangshu.Mission.Lifecycle.DurableWorkHost.leaseObject lease
+                  "binding", Wanxiangshu.Mission.Lifecycle.DurableWorkHost.bindingObject resId inc ]
+
+        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executeOwnershipInMemory
+            scopeOwnership
+            ("started:" + resId)
+            startedMsg
+        |> ignore
+
+        lease, resId, inc
+
+    let reserveOwnedWork () =
+        lock ownedWorkGate (fun () ->
+            scopeOwnershipSeq <- scopeOwnershipSeq + 1
+            let seq = scopeOwnershipSeq
+            let resId = sprintf "tool-owned-work:%d" seq
+
+            try
+                let msg =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipMessage
+                        "Reserve"
+                        [ "resourceId", box resId; "scopeId", box ownedWorkScopeId; "kind", box "tool" ]
+
+                let receipt =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executeOwnershipInMemory
+                        scopeOwnership
+                        ("reserve:" + resId)
+                        msg
+
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.mayStartResource receipt
+                |> Option.map (startReservedOwnedWork seq resId)
+            with _ ->
+                None)
+
+    let finishOwnedWork
+        (lease: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.OwnershipLease)
+        (resId: string)
+        (inc: string)
+        (outcome: string)
+        =
+        lock ownedWorkGate (fun () ->
+            try
+                let endedMsg =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipMessage
+                        "Ended"
+                        [ "lease", Wanxiangshu.Mission.Lifecycle.DurableWorkHost.leaseObject lease
+                          "binding", Wanxiangshu.Mission.Lifecycle.DurableWorkHost.bindingObject resId inc
+                          "outcome", box outcome ]
+
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executeOwnershipInMemory
+                    scopeOwnership
+                    ("ended:" + resId)
+                    endedMsg
+                |> ignore
+            with _ ->
+                ()
+
+            let phase =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipScopePhaseInMemory
+                    scopeOwnership
+                    ownedWorkScopeId
+
+            if
+                (phase = Some "Draining" || phase = Some "Closed")
+                && List.isEmpty (unsettledOwnedWork ())
+            then
                 ownedWorkDrainWaiter
                 |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
 
@@ -182,9 +274,23 @@ type ToolRuntimeScope
     let stopOwnedWorkAndDrain () : Task<exn option> =
         let waiting =
             lock ownedWorkGate (fun () ->
-                acceptingOwnedWork <- false
+                try
+                    scopeOwnershipSeq <- scopeOwnershipSeq + 1
 
-                if ownedWorkCount = 0 then
+                    let drainMsg =
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipMessage
+                            "Drain"
+                            [ "scopeId", box ownedWorkScopeId ]
+
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executeOwnershipInMemory
+                        scopeOwnership
+                        (sprintf "drain:%s:%d" ownedWorkScopeId scopeOwnershipSeq)
+                        drainMsg
+                    |> ignore
+                with _ ->
+                    ()
+
+                if List.isEmpty (unsettledOwnedWork ()) then
                     Task.FromResult(()) :> Task
                 else
                     ownedWorkDrainTask ())
@@ -206,11 +312,16 @@ type ToolRuntimeScope
                 return Some ex
         }
 
-    let observeOwnedWork (start: unit -> Task) : Task =
+    let observeOwnedWork
+        (lease: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.OwnershipLease)
+        (resId: string)
+        (inc: string)
+        (start: unit -> Task)
+        : Task =
         task {
             let! failure = captureOwnedWorkFailure start
             failure |> Option.iter recordOwnedWorkFailure
-            finishOwnedWork ()
+            finishOwnedWork lease resId inc (if failure.IsSome then "Failed" else "Completed")
         }
         :> Task
 
@@ -845,27 +956,80 @@ type ToolRuntimeScope
     member self.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts =
         managerFactsOfSession self.WorkspaceDirectory sessionId
 
-    member _.TryFreezeRetirement(sessionId: string, incumbentId: string) =
+    member private _.OpenAndDrainTenureScope (sessionId: string) (incumbentId: string) (gen: int) =
+        let rootScope = "session:" + sessionId
+        let tenureScope = sprintf "tenure:%s:%s:%d" sessionId incumbentId gen
+
+        try
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executeOwnershipInMemory
+                scopeOwnership
+                (sprintf "open-root:%s:%d" sessionId gen)
+                (Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipMessage
+                    "OpenScope"
+                    [ "scopeId", box rootScope; "parentId", null ])
+            |> ignore
+
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executeOwnershipInMemory
+                scopeOwnership
+                ("open-tenure:" + tenureScope)
+                (Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipMessage
+                    "OpenScope"
+                    [ "scopeId", box tenureScope; "parentId", box rootScope ])
+            |> ignore
+
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executeOwnershipInMemory
+                scopeOwnership
+                ("drain-tenure:" + tenureScope)
+                (Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipMessage "Drain" [ "scopeId", box tenureScope ])
+            |> ignore
+        with _ ->
+            ()
+
+    member private _.CloseTenureScope (sessionId: string) (incumbentId: string) (gen: int) =
+        let tenureScope = sprintf "tenure:%s:%s:%d" sessionId incumbentId gen
+
+        try
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.executeOwnershipInMemory
+                scopeOwnership
+                ("close-tenure:" + tenureScope)
+                (Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipMessage "Close" [ "scopeId", box tenureScope ])
+            |> ignore
+        with _ ->
+            ()
+
+    member this.TryFreezeRetirement(sessionId: string, incumbentId: string) =
         lock gate (fun () ->
-            match retirementFrozen.TryGetValue sessionId with
-            | true, current when current = incumbentId -> false
+            match tenureScopes.TryGetValue sessionId with
+            | true, (current, _) when current = incumbentId -> false
             | _ ->
-                retirementFrozen.[sessionId] <- incumbentId
+                scopeOwnershipSeq <- scopeOwnershipSeq + 1
+                let gen = scopeOwnershipSeq
+                this.OpenAndDrainTenureScope sessionId incumbentId gen
+                tenureScopes.[sessionId] <- (incumbentId, gen)
                 true)
 
-    member _.UnfreezeRetirement(sessionId: string) =
-        lock gate (fun () -> retirementFrozen.Remove sessionId |> ignore)
+    member this.UnfreezeRetirement(sessionId: string) =
+        lock gate (fun () ->
+            match tenureScopes.TryGetValue sessionId with
+            | false, _ -> ()
+            | true, (incumbentId, gen) ->
+                this.CloseTenureScope sessionId incumbentId gen
+                tenureScopes.Remove sessionId |> ignore)
 
     member _.IsRetirementFrozen(sessionId: string) =
         let activeIncumbency = activeIncumbencyOfSession workspaceDirectory sessionId
 
         lock gate (fun () ->
-            match retirementFrozen.TryGetValue sessionId, activeIncumbency with
+            match tenureScopes.TryGetValue sessionId, activeIncumbency with
             | (false, _), _ -> false
-            | (true, frozen), Some active when active <> frozen ->
-                retirementFrozen.Remove sessionId |> ignore
+            | (true, (frozen, _)), Some active when active <> frozen ->
+                tenureScopes.Remove sessionId |> ignore
                 false
-            | (true, _), _ -> true)
+            | (true, (frozen, gen)), _ ->
+                let tenureScope = sprintf "tenure:%s:%s:%d" sessionId frozen gen
+
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipScopePhaseInMemory scopeOwnership tenureScope = Some
+                                                                                                                           "Draining")
 
     member _.RetirementBlockersFor(sessionId: string) =
         let parentOf candidate =
@@ -934,9 +1098,6 @@ type ToolRuntimeScope
                     |> List.map (fun (handle, child) ->
                         sprintf "%s:%s:agent:%s:%s" prefix ownerKey handle (SessionId.value child))
 
-                if List.isEmpty agents then
-                    ignore (runtime.Runtime.DrainAgentWakes 32)
-
                 let ptys =
                     runtime.SnapshotOutstandingPtyRuns()
                     |> List.map (fun pty -> sprintf "%s:%s:pty:%s" prefix ownerKey pty)
@@ -972,12 +1133,29 @@ type ToolRuntimeScope
                 |> Seq.toList
 
             let toolOwned =
-                if ownedWorkCount > 0 then
-                    [ sprintf "tool-owned-work:%d" ownedWorkCount ]
-                else
-                    []
+                lock ownedWorkGate (fun () ->
+                    unsettledOwnedWork () |> List.map (fun blocker -> blocker.Lease.ResourceId))
 
-            (forkBlockers @ executorBlockers @ toolOwned) |> List.distinct |> List.sort)
+            let isNotDevOpsScope (scopeId: string) =
+                scopeId <> "devops"
+                && (devopsChildKeyOpt |> Option.forall (fun devopsKey -> scopeId <> devopsKey))
+
+            let durableBlockers =
+                workspaceDirectory
+                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                |> Option.map (fun commonDir ->
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipBlockersDurable
+                        commonDir
+                        sessionId
+                        sessionId
+                    |> List.filter (fun b -> isNotDevOpsScope b.ScopeId)
+                    |> List.map (fun b -> sprintf "ownership:%s:%s:%s" b.ScopeId b.Kind b.Lease.ResourceId))
+                |> Option.defaultValue []
+
+            (forkBlockers @ executorBlockers @ toolOwned @ durableBlockers)
+            |> List.distinct
+            |> List.sort)
 
     /// AGENT-013 + PROMPT-008: the managed agent a PTY is opened for.
     member _.ManagedAgentFor(ctx: HostToolContext) = managedAgentFor ctx
@@ -1085,18 +1263,11 @@ type ToolRuntimeScope
                 host)
 
     member _.RunOwnedWork(start: unit -> Task) : bool =
-        let admitted =
-            lock ownedWorkGate (fun () ->
-                if not acceptingOwnedWork then
-                    false
-                else
-                    ownedWorkCount <- ownedWorkCount + 1
-                    true)
-
-        if admitted then
-            observeOwnedWork start |> ignore
-
-        admitted
+        match reserveOwnedWork () with
+        | None -> false
+        | Some(lease, resId, inc) ->
+            observeOwnedWork lease resId inc start |> ignore
+            true
 
     member _.DisposeExecutorRuntime(sessionId: string) : Task =
         let runtime =

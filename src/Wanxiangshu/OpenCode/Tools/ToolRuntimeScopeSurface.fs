@@ -332,3 +332,128 @@ type ToolRuntimeScopeSurface =
                        engineerBefore = engineerBefore |> List.toArray
                        engineerAfter = engineerAfter |}
         }
+
+    [<CompiledName("verifyOwnershipRetirementContract")>]
+    static member verifyOwnershipRetirementContract(scenario: obj) : Task<obj> =
+        task {
+            let managerSessionId =
+                ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "managerSessionId")
+                |> Option.defaultValue "manager-road-1"
+
+            let incumbentId =
+                ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "incumbentId")
+                |> Option.defaultValue "tenure-1"
+
+            let devopsSessionId =
+                ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "devopsSessionId")
+                |> Option.defaultValue "devops-session-1"
+
+            let engineerSessionId =
+                ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "engineerSessionId")
+                |> Option.defaultValue "engineer-session-1"
+
+            let sessionParents = Dictionary<string, string>()
+            sessionParents.[devopsSessionId] <- managerSessionId
+            sessionParents.[engineerSessionId] <- managerSessionId
+
+            let dummySessions = DummySessionHostPort() :> ISessionHostPort
+            let dummyObserver = DummyObserver() :> IWaitObserver
+
+            let scope =
+                new ToolRuntimeScope(
+                    dummySessions,
+                    dummyObserver,
+                    { new IRootWorkspaceReader with
+                        member _.TryRead() = None },
+                    None,
+                    None,
+                    sessionParents,
+                    (fun _ -> None),
+                    Dictionary<string, string>(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None
+                )
+
+            let emptyContext sid =
+                { SessionId = sid
+                  Agent = None
+                  ToolCallId = None
+                  ProviderRunId = None
+                  PromptText = None
+                  AttachAbort = fun _ -> fun () -> () }
+
+            let mgrRuntime =
+                match scope.RuntimeFor(emptyContext managerSessionId) with
+                | Ok r -> r
+                | Error err -> failwith err
+
+            let devopsRuntime =
+                match scope.RuntimeFor(emptyContext devopsSessionId) with
+                | Ok r -> r
+                | Error err -> failwith err
+
+            let engRuntime =
+                match scope.RuntimeFor(emptyContext engineerSessionId) with
+                | Ok r -> r
+                | Error err -> failwith err
+
+            mgrRuntime.AdoptChild("devops", SessionId.create devopsSessionId)
+            mgrRuntime.AdoptChild("engineer-1", SessionId.create engineerSessionId)
+
+            devopsRuntime.TrackPtyRun(PtyId.Create "devops-pty-1")
+            engRuntime.TrackPtyRun(PtyId.Create "eng-pty-1")
+
+            let workWaiter =
+                TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let admittedWork = scope.RunOwnedWork(fun () -> workWaiter.Task :> Task)
+
+            let blockersWithWorkAndPty =
+                scope.RetirementBlockersFor managerSessionId |> List.toArray
+
+            // CancelOwnedPtys requests cancellation on the engineer PTY without physical exit:
+            // the blocker must remain until real exit (UntrackPtyRun / onExit).
+            engRuntime.CancelOwnedPtys()
+
+            let blockersAfterCancelRequest =
+                scope.RetirementBlockersFor managerSessionId |> List.toArray
+
+            // Freeze retirement via Ownership tenure Drain: frozen while active, cleared on Unfreeze.
+            let frozeFirst = scope.TryFreezeRetirement(managerSessionId, incumbentId)
+            let frozenWhileDraining = scope.IsRetirementFrozen managerSessionId
+            scope.UnfreezeRetirement managerSessionId
+            let frozenAfterUnfreeze = scope.IsRetirementFrozen managerSessionId
+
+            // Settle the owned-work callback: its Ended removes the tool-owned-work blocker.
+            workWaiter.SetResult(())
+            do! emitJsExpr () "new Promise(resolve => setImmediate(resolve))"
+
+            let blockersAfterWorkEnded =
+                scope.RetirementBlockersFor managerSessionId |> List.toArray
+
+            // Physically end the engineer PTY: its Ended removes the engineer PTY blocker,
+            // while fixed DevOps PTY remains alive in its own scope and never blocked manager retirement.
+            engRuntime.UntrackPtyRun "eng-pty-1"
+
+            let blockersAfterEngineerPtyEnded =
+                scope.RetirementBlockersFor managerSessionId |> List.toArray
+
+            let devopsPtysSurviving = devopsRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
+
+            do! scope.DisposeAsync()
+
+            return
+                box
+                    {| admittedWork = admittedWork
+                       blockersWithWorkAndPty = blockersWithWorkAndPty
+                       blockersAfterCancelRequest = blockersAfterCancelRequest
+                       frozeFirst = frozeFirst
+                       frozenWhileDraining = frozenWhileDraining
+                       frozenAfterUnfreeze = frozenAfterUnfreeze
+                       blockersAfterWorkEnded = blockersAfterWorkEnded
+                       blockersAfterEngineerPtyEnded = blockersAfterEngineerPtyEnded
+                       devopsPtysSurviving = devopsPtysSurviving |}
+        }

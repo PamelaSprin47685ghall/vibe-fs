@@ -82,3 +82,35 @@ module DurableWorkHost =
             Result<InspectedWork, string>
 
     val recover: gitCommonDir: string -> workId: string -> obj
+
+    type OwnershipLease =
+        { RegistryId: string
+          ResourceId: string
+          Token: string }
+
+    type OwnershipBlocker =
+        { Lease: OwnershipLease
+          ScopeId: string
+          Kind: string
+          Phase: string
+          ExternalId: string option
+          IncarnationId: string option
+          Outcome: string option
+          Reason: string option
+          CancellationRequested: bool }
+
+    val ownershipMessage: kind: string -> fields: (string * obj) list -> obj
+    val leaseObject: lease: OwnershipLease -> obj
+    val bindingObject: externalId: string -> incarnationId: string -> obj
+    val parseLease: value: obj -> OwnershipLease option
+    val parseBlockers: raw: obj -> OwnershipBlocker list
+    val createOwnership: registryId: string -> records: string array -> obj
+    val executeOwnershipInMemory: ownership: obj -> requestId: string -> message: obj -> HostReceipt
+    val ownershipBlockersInMemory: ownership: obj -> scopeId: string -> OwnershipBlocker list
+    val ownershipScopePhaseInMemory: ownership: obj -> scopeId: string -> string option
+
+    val executeOwnershipDurable:
+        gitCommonDir: string -> registryId: string -> requestId: string -> message: obj -> HostReceipt
+
+    val mayStartResource: receipt: HostReceipt -> OwnershipLease option
+    val ownershipBlockersDurable: gitCommonDir: string -> registryId: string -> scopeId: string -> OwnershipBlocker list

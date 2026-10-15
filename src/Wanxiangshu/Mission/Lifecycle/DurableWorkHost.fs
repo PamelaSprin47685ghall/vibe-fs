@@ -30,6 +30,9 @@ module DurableWorkHost =
     [<Import("Work", "wanxiangli/work")>]
     let private Work: obj = jsNative
 
+    [<Import("Ownership", "wanxiangli/ownership")>]
+    let private Ownership: obj = jsNative
+
     [<Import("mkdirSync", "node:fs")>]
     let private mkdirSync (path: string) (options: obj) : unit = jsNative
 
@@ -473,3 +476,260 @@ module DurableWorkHost =
 
     let recover (gitCommonDir: string) (workId: string) : obj =
         useWork gitCommonDir workId (fun work -> work?recover ())
+
+    type OwnershipLease =
+        { RegistryId: string
+          ResourceId: string
+          Token: string }
+
+    type OwnershipBlocker =
+        { Lease: OwnershipLease
+          ScopeId: string
+          Kind: string
+          Phase: string
+          ExternalId: string option
+          IncarnationId: string option
+          Outcome: string option
+          Reason: string option
+          CancellationRequested: bool }
+
+    let ownershipMessage (kind: string) (fields: (string * obj) list) : obj =
+        createObj (("type", box kind) :: fields)
+
+    let leaseObject (lease: OwnershipLease) : obj =
+        createObj
+            [ "registryId", box lease.RegistryId
+              "resourceId", box lease.ResourceId
+              "token", box lease.Token ]
+
+    let bindingObject (externalId: string) (incarnationId: string) : obj =
+        createObj [ "externalId", box externalId; "incarnationId", box incarnationId ]
+
+    let private buildLease (registryId: string) (resourceId: string) (token: string) : OwnershipLease option =
+        if registryId = "" || resourceId = "" || token = "" then
+            None
+        else
+            Some
+                { RegistryId = registryId
+                  ResourceId = resourceId
+                  Token = token }
+
+    let parseLease (value: obj) : OwnershipLease option =
+        if not (isRecord value) then
+            None
+        else
+            buildLease
+                (text (nested value "registryId"))
+                (text (nested value "resourceId"))
+                (text (nested value "token"))
+
+    let private bindingField (binding: obj) (name: string) : string option =
+        if isRecord binding then
+            optionalText (text (nested binding name))
+        else
+            None
+
+    let private parseBlockerItem (item: obj) : OwnershipBlocker option =
+        parseLease (nested item "lease")
+        |> Option.map (fun lease ->
+            let binding = nested item "binding"
+
+            { Lease = lease
+              ScopeId = text (nested item "scopeId")
+              Kind = text (nested item "kind")
+              Phase = text (nested item "phase")
+              ExternalId = bindingField binding "externalId"
+              IncarnationId = bindingField binding "incarnationId"
+              Outcome = optionalText (text (nested item "outcome"))
+              Reason = optionalText (text (nested item "reason"))
+              CancellationRequested =
+                not (isNull (nested item "cancellationRequested"))
+                && unbox<bool> (nested item "cancellationRequested") })
+
+    let parseBlockers (raw: obj) : OwnershipBlocker list =
+        asArray raw |> Array.choose parseBlockerItem |> Array.toList
+
+    let createOwnership (registryId: string) (records: string array) : obj =
+        createNew Ownership (registryId, records)
+
+    let executeOwnershipInMemory (ownership: obj) (requestId: string) (message: obj) : HostReceipt =
+        let reply: obj = ownership?execute (requestId, message)
+        let status = text (nested reply "status")
+        let normalized = if status = "Applied" then "Committed" else status
+        let result = nested reply "result"
+        let kind = if isRecord result then text (result?kind) else ""
+        let revisionValue = nested reply "revision"
+
+        let revision =
+            if isNull revisionValue then
+                0.
+            else
+                unbox<float> revisionValue
+
+        { RequestId = requestId
+          Status = normalized
+          Kind = kind
+          Reason = ""
+          Revision = revision
+          Result = result }
+
+    let ownershipBlockersInMemory (ownership: obj) (scopeId: string) : OwnershipBlocker list =
+        try
+            parseBlockers (ownership?blockers scopeId)
+        with _ ->
+            []
+
+    let ownershipScopePhaseInMemory (ownership: obj) (scopeId: string) : string option =
+        try
+            let view: obj = ownership?scope scopeId
+            optionalText (text (nested view "phase"))
+        with _ ->
+            None
+
+    let private ownershipStream (registryId: string) : string = "ownership:" + registryId
+
+    let private useOwnershipJournal (gitCommonDir: string) (body: obj -> 'a) : 'a =
+        let path = journalPath gitCommonDir
+        ensureDir (parentOf path)
+        let connection = openDatabase path
+        // DSL-MUTABLE: resource — the journal this call opened, closed exactly once in finally
+        let mutable journal: obj option = None
+
+        try
+            let opened: obj = createNew SqliteJournal connection
+            journal <- Some opened
+            body opened
+        finally
+            closeJournal journal connection
+
+    let private revisionOrDefault (fallback: float) (value: obj) : float =
+        if isNull value then fallback else unbox<float> value
+
+    let private resultKind (result: obj) : string =
+        if isRecord result then text (result?kind) else ""
+
+    let private defaultUnknownReason (ackReason: string) : string =
+        if ackReason = "" then
+            "Unknown journal acknowledgement"
+        else
+            ackReason
+
+    let private interpretOwnershipAck
+        (journal: obj)
+        (stream: string)
+        (registryId: string)
+        (requestId: string)
+        (message: obj)
+        (expected: float)
+        (revision: float)
+        (result: obj)
+        (kind: string)
+        (ack: obj)
+        : HostReceipt =
+        let ackStatus = text (nested ack "status")
+        let ackReason = text (nested ack "reason")
+        let committedRev = revisionOrDefault expected (nested ack "revision")
+
+        if ackStatus = "Committed" && committedRev = revision then
+            { RequestId = requestId
+              Status = "Committed"
+              Kind = kind
+              Reason = ""
+              Revision = revision
+              Result = result }
+        elif ackStatus = "Replayed" then
+            let reread: string array = unbox (journal?read stream)
+            let replay = createOwnership registryId reread
+            let replayed: obj = replay?execute (requestId, message)
+            let repResult = nested replayed "result"
+
+            { RequestId = requestId
+              Status = "Replayed"
+              Kind = resultKind repResult
+              Reason = ""
+              Revision = committedRev
+              Result = repResult }
+        elif ackStatus = "Conflict" || ackStatus = "NotWritten" then
+            { RequestId = requestId
+              Status = ackStatus
+              Kind = ""
+              Reason = ackReason
+              Revision = expected
+              Result = null }
+        else
+            { RequestId = requestId
+              Status = "Unknown"
+              Kind = ""
+              Reason = defaultUnknownReason ackReason
+              Revision = expected
+              Result = null }
+
+    let private commitOwnershipRecord
+        (journal: obj)
+        (stream: string)
+        (registryId: string)
+        (requestId: string)
+        (message: obj)
+        (revision: float)
+        (result: obj)
+        (kind: string)
+        (record: string)
+        : HostReceipt =
+        let expected = revision - 1.
+
+        try
+            let ack: obj = journal?append (stream, expected, requestId, record)
+            interpretOwnershipAck journal stream registryId requestId message expected revision result kind ack
+        with error ->
+            { RequestId = requestId
+              Status = "Unknown"
+              Kind = ""
+              Reason = error.Message
+              Revision = expected
+              Result = null }
+
+    let executeOwnershipDurable
+        (gitCommonDir: string)
+        (registryId: string)
+        (requestId: string)
+        (message: obj)
+        : HostReceipt =
+        let stream = ownershipStream registryId
+
+        useOwnershipJournal gitCommonDir (fun journal ->
+            let records: string array = unbox (journal?read stream)
+            let candidate = createOwnership registryId records
+            let proposal: obj = candidate?execute (requestId, message)
+            let status = text (nested proposal "status")
+            let result = nested proposal "result"
+            let kind = if isRecord result then text (result?kind) else ""
+            let revValue = nested proposal "revision"
+            let revision = if isNull revValue then 0. else unbox<float> revValue
+
+            if status <> "Applied" then
+                { RequestId = requestId
+                  Status = status
+                  Kind = kind
+                  Reason = ""
+                  Revision = revision
+                  Result = result }
+            else
+                let record = text (nested proposal "record")
+                commitOwnershipRecord journal stream registryId requestId message revision result kind record)
+
+    let mayStartResource (receipt: HostReceipt) : OwnershipLease option =
+        if receipt.Status = "Committed" && receipt.Kind = "Reserved" then
+            parseLease (nested receipt.Result "lease")
+        else
+            None
+
+    let ownershipBlockersDurable (gitCommonDir: string) (registryId: string) (scopeId: string) : OwnershipBlocker list =
+        if String.IsNullOrWhiteSpace gitCommonDir || String.IsNullOrWhiteSpace registryId then
+            []
+        else
+            let stream = ownershipStream registryId
+
+            useOwnershipJournal gitCommonDir (fun journal ->
+                let records: string array = unbox (journal?read stream)
+                let candidate = createOwnership registryId records
+                ownershipBlockersInMemory candidate scopeId)

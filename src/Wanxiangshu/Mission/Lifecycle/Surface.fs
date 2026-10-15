@@ -1395,3 +1395,22 @@ module LifecycleSurface =
                     {| devopsId = devopsId
                        modelTarget = target |> Option.toObj |})
             |> Option.defaultValue null
+
+    let executeOwnershipDurable
+        (gitCommonDir: string)
+        (registryId: string)
+        (requestId: string)
+        (message: obj)
+        : DurableWorkHost.HostReceipt =
+        DurableWorkHost.executeOwnershipDurable gitCommonDir registryId requestId message
+
+    let mayStartResource (receipt: DurableWorkHost.HostReceipt) : DurableWorkHost.OwnershipLease option =
+        DurableWorkHost.mayStartResource receipt
+
+    let ownershipBlockersDurable
+        (gitCommonDir: string)
+        (registryId: string)
+        (scopeId: string)
+        : DurableWorkHost.OwnershipBlocker array =
+        DurableWorkHost.ownershipBlockersDurable gitCommonDir registryId scopeId
+        |> List.toArray

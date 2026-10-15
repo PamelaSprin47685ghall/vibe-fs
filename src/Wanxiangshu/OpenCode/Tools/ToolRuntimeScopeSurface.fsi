@@ -8,3 +8,4 @@ open Wanxiangshu.Persistence.Journal
 type ToolRuntimeScopeSurface =
     static member evaluateRetirementBlockers: journal: JournalHandle * scenario: obj -> Task<string array>
     static member verifyDevOpsReturnDrain: journal: JournalHandle * scenario: obj -> Task<obj>
+    static member verifyOwnershipRetirementContract: scenario: obj -> Task<obj>

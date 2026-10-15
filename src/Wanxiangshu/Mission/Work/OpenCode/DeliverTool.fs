@@ -200,60 +200,6 @@ module DeliverTool =
                "confirmation_required", ToolHostCodec.TBool true ]
              @ optionalFields)
 
-    let private runBlocked (prepared: PreparedRetirement) blockers =
-        ignore prepared
-        ignore blockers
-        Task.FromResult(Error "blocked retirement is written only by the lifecycle append")
-
-    /// ATTENTION-005: a completed retirement consumes this life's remaining
-    /// deferred work and leaves a durable consumption receipt, so a replayed
-    /// `DeferredWorkRecorded` cannot resurrect it after restart.
-    let private consumePendingDeferred (prepared: PreparedRetirement) =
-        task {
-            let port = AttentionConcernJournalAdapter.forAttention prepared.Bound.Journal
-            let pending = AttentionProjection.pending prepared.SessionId (port.Read())
-
-            match pending with
-            | [] -> return ()
-            | items ->
-                let fact =
-                    AttentionFactCases.DeferredWorkConsumed
-                        {| SessionId = prepared.SessionId
-                           OccurrenceIds = (items |> List.map (fun item -> item.OccurrenceId)) |}
-
-                let! _ = port.Append prepared.SessionId (Some prepared.Bound.ProviderRun) fact
-                return ()
-        }
-
-    let private runRetirement (prepared: PreparedRetirement) =
-        Task.FromResult(Error "retirement is written only by the lifecycle append")
-
-    // ATTENTION-005: the completed retirement consumes this life's
-    // remaining deferred work. An append failure leaves the outcome
-    // unchanged; `RetirementCommitted` stays durable either way.
-    let private completeRetirement (prepared: PreparedRetirement) =
-        task {
-            let! outcome = runRetirement prepared
-
-            match outcome with
-            | Ok value ->
-                do! consumePendingDeferred prepared
-                return Ok value
-            | Error error -> return Error error
-        }
-
-    let private runRetirementOrBlocked
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        (prepared: PreparedRetirement)
-        =
-        let blockers = scope.RetirementBlockersFor context.SessionId
-
-        if List.isEmpty blockers then
-            completeRetirement prepared
-        else
-            runBlocked prepared blockers
-
     /// The confirmed path of the two-stage deliver. The committed confirmation
     /// fence names the run and call that confirmed; this call either replays
     /// that exact confirmation to its recorded state, or is the different call
