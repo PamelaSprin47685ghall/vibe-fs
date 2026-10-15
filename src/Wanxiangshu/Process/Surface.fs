@@ -839,32 +839,35 @@ module ProcessSurface =
     /// Register an additional JS callback for physical PTY completion.
     /// The callback receives the same plain completion object as the optional
     /// constructor sender; the underlying port remains an opaque capability.
-    let portAddMailboxSender (port: obj) (sender: obj) : unit =
-        (ptyPortOf port)
-            .AddExitListener(fun (event: PtyExitEvent) ->
-                let item =
-                    match event with
-                    | PtyExitEvent.Exited(id, outcome) ->
-                        PtyExited
-                            { PtyId = id.Value
-                              Outcome = outcome
-                              Closed = true }
-                    | PtyExitEvent.Failed(id, code, msg) ->
-                        PtyFailed
-                            { PtyId = id.Value
-                              Outcome = msg
-                              Closed = true
-                              Code = code
-                              Message = msg }
-                    | PtyExitEvent.Aborted(id, code, msg) ->
-                        PtyAborted
-                            { PtyId = id.Value
-                              Outcome = msg
-                              Closed = true
-                              Code = code
-                              Message = msg }
+    let portAddMailboxSender (port: obj) (sender: obj) : unit -> unit =
+        let subscription =
+            (ptyPortOf port)
+                .AddExitListener(fun (event: PtyExitEvent) ->
+                    let item =
+                        match event with
+                        | PtyExitEvent.Exited(id, outcome) ->
+                            PtyExited
+                                { PtyId = id.Value
+                                  Outcome = outcome
+                                  Closed = true }
+                        | PtyExitEvent.Failed(id, code, msg) ->
+                            PtyFailed
+                                { PtyId = id.Value
+                                  Outcome = msg
+                                  Closed = true
+                                  Code = code
+                                  Message = msg }
+                        | PtyExitEvent.Aborted(id, code, msg) ->
+                            PtyAborted
+                                { PtyId = id.Value
+                                  Outcome = msg
+                                  Closed = true
+                                  Code = code
+                                  Message = msg }
 
-                call1 sender (completionViewItem item) |> ignore)
+                    call1 sender (completionViewItem item) |> ignore)
+
+        fun () -> subscription.Dispose()
 
     let portFork (port: obj) (command: string) (agentName: string) (ptyId: obj) (cwd: obj) : obj =
         match agentOf agentName with

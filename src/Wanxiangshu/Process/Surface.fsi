@@ -118,7 +118,7 @@ module ProcessSurface =
 
     val createPtyPort: options: obj -> obj
     val backendCreatePort: unit -> obj
-    val portAddMailboxSender: port: obj -> sender: obj -> unit
+    val portAddMailboxSender: port: obj -> sender: obj -> (unit -> unit)
     val portFork: port: obj -> command: string -> agentName: string -> ptyId: obj -> cwd: obj -> obj
     val portExists: port: obj -> id: obj -> bool
     val portKnown: port: obj -> id: obj -> bool

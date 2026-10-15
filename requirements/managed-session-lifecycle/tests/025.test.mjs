@@ -11,6 +11,7 @@ import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as PtyToolSurface from '../../../dist/OpenCode/Tools/PtyToolSurface.js'
 import { DatabaseSync } from 'node:sqlite'
 import { withAdmittedChildren } from './support/admitted-child-work.mjs'
+import { loseOwnershipCommit } from './support/ownership-commit.mjs'
 
 const devopsReturnDrain = label => withAdmittedChildren(label, 'manager-session', [
   { agentId: 'devops', sessionId: 'devops-session', role: 'devops' },
@@ -100,6 +101,47 @@ test('WHAT[managed-session-lifecycle-025] a failed startup observation cannot pu
   assert.deepEqual(owner.outstanding(), [])
   assert.equal(owner.completions(), 1)
 })
+
+for (const action of ['closeAll', 'detach', 'cancel', 'close']) {
+  for (const afterCommit of [false, true]) {
+    test(`WHAT[managed-session-lifecycle-025] ${action} Cancel receipt loss ${afterCommit ? 'after' : 'before'} COMMIT still closes each exact local process`, async () => {
+      const directory = mkdtempSync(join(tmpdir(), 'wxs-pty-cancel-failure-025-'))
+      let owner
+      try {
+        const signalled = []
+        owner = controlledOwner(directory, 'cancel-failure-owner', (id, kind) => {
+          if (kind !== 'Signal') return
+          signalled.push(id)
+          owner.complete(id)
+        })
+        const first = await owner.fork('first-command')
+        const second = await owner.fork('second-command')
+        const close = () => action === 'close'
+          ? owner.close([first.id, 0])
+          : action === 'closeAll' ? owner.closeAll(0) : owner[action]()
+        await loseOwnershipCommit(DatabaseSync, 'Cancel', afterCommit, () =>
+          assert.rejects(close(), /CancellationRequested was not acknowledged: Unknown/))
+        const closed = action === 'close' ? [first.id] : [first.id, second.id]
+        assert.deepEqual(signalled, closed)
+        for (const id of closed) {
+          assert.equal(owner.exists(id), false)
+          assert.equal(owner.owned(id), false)
+        }
+        assert.deepEqual(owner.outstanding(), action === 'close' ? [second.id] : [])
+        if (action === 'close') {
+          assert.equal(owner.exists(second.id), true)
+          owner.complete(second.id)
+        }
+      } finally {
+        if (owner) {
+          for (const id of owner.outstanding()) owner.complete(id)
+          await owner.closeAll(0)
+        }
+        rmSync(directory, { recursive: true, force: true })
+      }
+    })
+  }
+}
 
 for (const afterCommit of [false, true]) {
   test(`WHAT[managed-session-lifecycle-025] Reserve receipt loss ${afterCommit ? 'after' : 'before'} COMMIT never authorizes Spawn`, async () => {
@@ -198,6 +240,41 @@ for (const action of ['detach', 'cancel']) {
   }
 }
 
+test('WHAT[managed-session-lifecycle-025] permanent detach removes its shared port listener while reusable cancellation keeps its listener', async () => {
+  let pair
+  pair = PtySurface.sharedOwnershipProbe(undefined, 'listener-lifetime-owner', (id, kind) => {
+    if (kind === 'Signal') pair.second.complete(id)
+  })
+  assert.equal(pair.first.exitListeners(), 2)
+  await pair.first.detach()
+  assert.equal(pair.second.exitListeners(), 1)
+  await pair.first.detach()
+  assert.equal(pair.second.exitListeners(), 1)
+  const cancelled = await pair.second.fork('first-command')
+  assert.equal(cancelled.ok, true)
+  await pair.second.cancel()
+  assert.equal(pair.second.exitListeners(), 1)
+  const next = await pair.second.fork('next-command')
+  assert.equal(next.ok, true)
+  pair.second.complete(next.id)
+  assert.equal(pair.second.owned(next.id), false)
+  assert.deepEqual(pair.second.outstanding(), [])
+  await pair.second.detach()
+  assert.equal(pair.second.exitListeners(), 0)
+})
+
+test('WHAT[managed-session-lifecycle-025] failed detach retains its exit listener until a late exit observation settles the last lease', async () => {
+  const owner = controlledOwner(undefined, 'late-listener-owner')
+  const opened = await owner.fork('external-command')
+  await assert.rejects(owner.detach(), /exit was not observed/)
+  assert.equal(owner.exitListeners(), 1)
+  assert.equal(owner.owned(opened.id), true)
+  owner.complete(opened.id)
+  assert.equal(owner.owned(opened.id), false)
+  assert.deepEqual(owner.outstanding(), [])
+  assert.equal(owner.exitListeners(), 0)
+})
+
 test('WHAT[managed-session-lifecycle-025] detach rejects when the exact Ended observation still cannot be committed', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-pty-detach-failure-025-'))
   const original = DatabaseSync.prototype.exec
@@ -217,10 +294,12 @@ test('WHAT[managed-session-lifecycle-025] detach rejects when the exact Ended ob
     assert.equal(owner.exists(opened.id), false)
     assert.equal(owner.owned(opened.id), true)
     assert.deepEqual(owner.outstanding(), [opened.id])
+    assert.equal(owner.exitListeners(), 1)
     DatabaseSync.prototype.exec = original
     await owner.closeAll(0)
     assert.equal(owner.owned(opened.id), false)
     assert.deepEqual(owner.outstanding(), [])
+    assert.equal(owner.exitListeners(), 0)
   } finally {
     DatabaseSync.prototype.exec = original
     rmSync(directory, { recursive: true, force: true })
@@ -437,8 +516,17 @@ test('WHAT[managed-session-lifecycle-025] real bun-pty TERM waits for exit and e
   completed = true
 })
 
-for (const mode of ['ended-before', 'ended-after', 'shared-detach', 'shared-cancel']) {
-  test(`WHAT[managed-session-lifecycle-025] real bun-pty ${mode} preserves ownership and confirms physical exit`, async t => {
+for (const mode of [
+  'ended-before', 'ended-after', 'shared-detach', 'shared-cancel',
+  'cancel-close-before', 'cancel-close-after',
+  'cancel-closeAll-before', 'cancel-closeAll-after',
+  'cancel-detach-before', 'cancel-detach-after',
+  'cancel-cancel-before', 'cancel-cancel-after',
+  'leader-exit',
+]) {
+  test(`WHAT[managed-session-lifecycle-025] real bun-pty ${mode} preserves ownership and confirms physical exit`, {
+    todo: mode === 'leader-exit' ? 'O-01: the PTY leader exit still releases ownership with a live same-group descendant' : undefined,
+  }, async t => {
     if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) {
       t.skip('Bun is required to run the production bun-pty backend')
       return
@@ -461,15 +549,19 @@ for (const mode of ['ended-before', 'ended-after', 'shared-detach', 'shared-canc
     })
     const helper = fileURLToPath(new URL('./support/real-pty-ownership.mjs', import.meta.url))
     const { stdout } = await promisify(execFile)('bun', [helper, directory, mode], { timeout: 20000 })
+    completed = true
     const evidence = JSON.parse(stdout.trim())
     assert.deepEqual(evidence.blockers, [])
-    if (mode.startsWith('shared-')) {
+    if (mode === 'leader-exit') {
+      assert.equal(evidence.leaderExited, true)
+      assert.equal(evidence.descendantAlive, false, 'physical cleanup must include the live same-group descendant')
+    } else if (mode.startsWith('shared-')) {
       assert.equal(evidence.firstExited, true)
       assert.equal(evidence.otherSurvived, true)
     } else {
       assert.equal(evidence.injected, true)
       assert.equal(evidence.processExited, true)
+      if (mode.startsWith('cancel-')) assert.equal(evidence.failureReported, true)
     }
-    completed = true
   })
 }

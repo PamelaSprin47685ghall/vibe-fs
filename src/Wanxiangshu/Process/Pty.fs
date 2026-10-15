@@ -180,7 +180,17 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
         | Some(_handle, closed) -> publishFirstClose id closed item
 
     member _.AddExitListener(listener: PtyExitEvent -> unit) =
+        let mutable subscribed = true
         lock gate (fun () -> exitListeners.Add listener)
+
+        { new IDisposable with
+            member _.Dispose() =
+                lock gate (fun () ->
+                    if subscribed then
+                        subscribed <- false
+                        exitListeners.Remove listener |> ignore) }
+
+    member internal _.ExitListenerCount = lock gate (fun () -> exitListeners.Count)
 
     member _.ExitListener = exitListener
     member _.Handler = handler

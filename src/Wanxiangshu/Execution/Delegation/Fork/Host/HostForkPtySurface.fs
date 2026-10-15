@@ -52,6 +52,7 @@ module HostForkPtySurface =
               "failObservation"
               ==> (fun (id, reason) -> port.FailExitObservation(PtyId.Create id, reason))
               "exists" ==> (fun id -> port.Exists(PtyId.Create id))
+              "exitListeners" ==> (fun () -> port.ExitListenerCount)
               "completions" ==> (fun () -> runtime.PendingCompletionCount) ]
 
     let private commandKind =

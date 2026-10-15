@@ -1,8 +1,28 @@
 # 四模块源码复核：问题报告与修复计划
 
-日期：2026-10-15。状态和认领以 [BOARD.md](BOARD.md#source-audit-repairs) 为准。本报告记录复核结果、修复顺序和验收条件；本轮没有修改生产实现或测试，也没有关闭 GAP。
+日期：2026-10-15。状态和认领以 [BOARD.md](BOARD.md#source-audit-repairs) 为准。本报告记录复核结果、修复顺序和验收条件；首次报告轮次没有修改生产实现或测试，后续授权修复分别记录在下文和进度文件中。
 
 后续已开始实施，实际变更与验收见 [修复进度记录](REPAIR-PROGRESS-2026-10-15.md)。下文保留源码复核时的基线与结论，不用后续进度覆盖原始发现。
+
+<a id="independent-review-fixes"></a>
+## 独立复审：0.6.1 之后的修复与剩余 P1
+
+本次从干净的主仓 `bb9a811cf`、库 `f6cd8c3 / 0.6.1` 开始。三名未参与本批实现的审查者分别检查 Journal、PTY 清理和跨包边界：`independent_journal_r2`、`independent_pty_r2`、`independent_boundaries_r2`。他们先给出独立反例，再复验修复；源码修改由 root 串行完成。新反例在看板关联 R3 卡中记录，不抹去 R1/R2 的历史证据。
+
+| ID / 优先级 | 独立发现与原因 | 修复与验收条件 |
+|---|---|---|
+| O-09 / P1 | Cancel 提交前/后丢回执后，单项关闭和批量清理在发送 TERM 前抛错；真实 Bun 的 closeAll/detach/cancel 六组合均留下两个进程与 blocker。detach 是 R2 收尾路径的回退 | 每个本地实例分别记录 Cancel 错误，继续物理关闭和确切 Ended 确认，最后仍报告原 Unknown；批量继续尝试其它实例。受控与真实 Bun 各覆盖 close/closeAll/detach/cancel × COMMIT 前后；单项不能波及另一进程 |
+| O-08 / P2 | DetachPendingObservers 在退订前提交 Drain，Unknown 会跳过本地 Host listener.Dispose；两种提交切点独立反例均留下 1 个监听器 | 先完成本地退订，再在独立收尾阶段请求 Drain；仍保留错误、不写逻辑 Abandoned、不 abort 持久 Active 子会话 |
+| J-02 / P2 | Unknown 后原生 close 第一次失败，旧代码先置 closed，后续显式 close 直接返回，旧连接可能一直持锁 | 分开业务封存与物理关闭确认；只允许显式重试 close，禁止恢复 read/append 或重发未知提交。Node/Bun 的正常关闭失败、Unknown 后关闭失败均须实测 |
+| O-10 / P2 | 共享 PtyPort 只有添加监听器，没有退订能力；永久 detach 后仍保留 Runtime 闭包。原实现的注册计数反例先红 | 返回可幂等释放的订阅；Runtime 只在永久 detach 且全部本地 lease 确认结束后退订。失败后保留观察，晚到退出/显式确认后释放；可复用 cancel 保留订阅 |
+| E-03 / P2 | 001 的两个 worker 同时初始化，在 busy_timeout=0 下偶发 SQLITE_BUSY，测试尚未进入所要验证的 append CAS | 分别等待初始化就绪，再并发发送两个 go；不串行 append、不改等待或重试规则。非作者连续 25 轮复验和真实持锁竞争均须保留 |
+| E-04 / P3 | Bun 默认 connection.close 后 statement.run 报 closed，但 get/all 仍可能执行；旧关闭断言不能证明 finalize | 包裹故障方法前保存原生 get，用 finalized 断言检验；临时去 finalize 突变必须杀死此前误通过的 close/initialize/commit-after 场景 |
+
+**职责判断：** 四组库没有新增反向依赖或同级对象互调。Journal 拥有连接与 statement；Work/Ownership 只作领域判断，持久化和物理操作顺序由 Host/Durable 组合者安排。订阅由端口创建、Runtime 持有并归还，没有把业务账复制到端口。B-01 的真实 Host 聚焦构建由非作者运行，通过 778 项编译；不靠篡改 manifest 伪造聚焦输入。
+
+**仍未闭合的 P1：** T-01 的原件权威迁移、O-01 的完整 PTY 后代监管、跨重启物理接管和跨进程每轮准入。PTY 后代缺口本次已有实际反例：主进程退出后，同组后代忽略 HUP/TERM 仍活着，但 port.Exists=false、owned=false、blockers=[]；closeAll/detach 返回后后代仍活着。该路径在本轮前已存在，不能记为 R2 新回退，也不能再仅写“未证明”。独立反例日志 `/private/tmp/independent-pty-r2-live-descendant.log`，精确清理后确认后代已退出。现已保留在 `requirements/managed-session-lifecycle/tests/025.test.mjs` 的明确 TODO，调用真实 Bun `leader-exit` helper，实际断言因后代仍活着而失败；不计入 pass。非作者另行确认 helper 返回后两个确切 PID 均已退出。
+
+O-01 下一包先为 PTY 增加可保持实例身份的物理监管，再让终态代表受监管范围确已结束；验收须包括 leader 先退出、同组后代忽略 TERM、取消升级与同端口另一实例隔离。不能在 leader 已退出后拿缓存 PID/PGID 盲杀，也不能改 Ownership 的 lease 规则掩盖物理监管缺失。本次只修复表内局部缺陷，GAP-133 及整卡验收仍不通过。
 
 <a id="second-review-fixes"></a>
 ## 0. 修复后再次检查：合理性与新增问题

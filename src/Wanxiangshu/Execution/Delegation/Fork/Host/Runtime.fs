@@ -532,6 +532,8 @@ type HostForkRuntime
     let mutable ptyClosing = false
     // DSL-MUTABLE: resource — permanent detach closes local admission even if its durable Drain fails.
     let mutable ptyDetachRequested = false
+    // DSL-MUTABLE: resource — local exit subscription retained until permanent detach has no leases.
+    let mutable ptyExitSubscription: IDisposable option = None
 
     do
         HostPtyOwnership.openScope ptyOwnership ptyRootScopeId None
@@ -598,6 +600,12 @@ type HostForkRuntime
         | PtyExitEvent.Failed _ -> "Failed"
         | PtyExitEvent.Aborted _ -> "Cancelled"
 
+    let releasePtyExitSubscription () =
+        lock gate (fun () ->
+            if ptyDetachRequested && ptyLeases.Count = 0 then
+                ptyExitSubscription |> Option.iter (fun subscription -> subscription.Dispose())
+                ptyExitSubscription <- None)
+
     let settlePtyLease (id: string) (outcome: string) =
         lock gate (fun () ->
             match ptyLeases.TryGetValue id with
@@ -617,6 +625,7 @@ type HostForkRuntime
                 terminalByName.Remove name |> ignore)
 
         runtime.UnregisterPty id
+        releasePtyExitSubscription ()
 
     let settleObservedPty (id: string) =
         let observed =
@@ -632,19 +641,22 @@ type HostForkRuntime
         | None -> ()
 
     do
-        ptyPortInstance.AddExitListener(fun exitEvent ->
-            let item = mapExitEvent exitEvent
-            let id = PtyJoinItem.ptyId item
-            let owned = lock gate (fun () -> ptyLeases.ContainsKey id)
+        ptyExitSubscription <-
+            Some(
+                ptyPortInstance.AddExitListener(fun exitEvent ->
+                    let item = mapExitEvent exitEvent
+                    let id = PtyJoinItem.ptyId item
+                    let owned = lock gate (fun () -> ptyLeases.ContainsKey id)
 
-            if owned then
-                // A PtyPort can be shared by multiple runtimes. Its sender fan-out
-                // must not turn another runtime's exit into this runtime's join.
-                let outcome = exitOutcomeOf exitEvent
-                lock gate (fun () -> ptyExitObservations.[id] <- (item, outcome))
-                runtime.PublishPtyCompletion item
-                settlePtyLease id outcome
-                notifyPtyObservers item)
+                    if owned then
+                        // A PtyPort can be shared by multiple runtimes. Its sender fan-out
+                        // must not turn another runtime's exit into this runtime's join.
+                        let outcome = exitOutcomeOf exitEvent
+                        lock gate (fun () -> ptyExitObservations.[id] <- (item, outcome))
+                        runtime.PublishPtyCompletion item
+                        settlePtyLease id outcome
+                        notifyPtyObservers item)
+            )
     // Cross-process recovery is not wired into ordinary HostForkRuntime lifecycle.
     // HostForkRestart remains a detached algorithm library for explicit resume flows.
 
@@ -823,8 +835,6 @@ type HostForkRuntime
                 children.Clear()
                 dormantChildren.Clear()
                 deferredFirstPrompts.Clear()
-
-                HostPtyOwnership.drain ptyOwnership ptyScopeId
 
                 values)
 
@@ -1013,6 +1023,11 @@ type HostForkRuntime
             do!
                 release (fun () ->
                     this.DetachPendingObservers()
+                    AsyncSupport.completedTask ())
+
+            do!
+                release (fun () ->
+                    HostPtyOwnership.drain ptyOwnership ptyScopeId
                     AsyncSupport.completedTask ())
 
             do! release (fun () -> this.ClosePtys(ptyScopeId, None) :> Task)
@@ -1230,7 +1245,6 @@ type HostForkRuntime
 
     member private this.DrainPtySnapshot(ids: PtyId list, blockerScopeId: string, graceMs: int option) : Task<unit> =
         task {
-            this.CancelOwnedPtys()
             let failures = ResizeArray<exn>()
 
             for id in ids do
@@ -1265,28 +1279,47 @@ type HostForkRuntime
                 do! this.DrainPtySnapshot(ids, blockerScopeId, graceMs)
             finally
                 lock gate (fun () -> ptyClosing <- false)
+                releasePtyExitSubscription ()
         }
 
     member this.CloseOwnedPtys(?graceMs: int) : Task<unit> = this.ClosePtys(ptyRootScopeId, graceMs)
+
+    member private this.RequestPtyCancellation(id: PtyId) =
+        lock gate (fun () ->
+            match ptyLeases.TryGetValue id.Value with
+            | true, (lease, _) -> HostPtyOwnership.cancel ptyOwnership id.Value lease
+            | false, _ when this.SnapshotOutstandingPtyRuns() |> List.contains id.Value ->
+                invalidOp (sprintf "PTY %s has no local process binding; exit was not observed" id.Value)
+            | false, _ -> ())
 
     member this.ClosePty(id: PtyId, ?graceMs: int) : Task<unit> =
         task {
             settleObservedPty id.Value
 
-            lock gate (fun () ->
-                match ptyLeases.TryGetValue id.Value with
-                | true, (lease, _) -> HostPtyOwnership.cancel ptyOwnership id.Value lease
-                | false, _ when this.SnapshotOutstandingPtyRuns() |> List.contains id.Value ->
-                    invalidOp (sprintf "PTY %s has no local process binding; exit was not observed" id.Value)
-                | false, _ -> ())
+            let cancellationFailure =
+                try
+                    this.RequestPtyCancellation id
+                    None
+                with ex ->
+                    Some ex
 
-            if this.OwnsPty id then
-                do! ptyPortInstance.ClosePty(id, ?graceMs = graceMs)
+            let! closeFailure =
+                captureOwnedWorkFailure (fun () ->
+                    task {
+                        if this.OwnsPty id then
+                            do! ptyPortInstance.ClosePty(id, ?graceMs = graceMs)
 
-            settleObservedPty id.Value
+                        settleObservedPty id.Value
 
-            if this.OwnsPty id then
-                invalidOp (sprintf "PTY %s exit was not observed; ownership remains unsettled" id.Value)
+                        if this.OwnsPty id then
+                            invalidOp (sprintf "PTY %s exit was not observed; ownership remains unsettled" id.Value)
+                    }
+                    :> Task)
+
+            match cancellationFailure, closeFailure with
+            | Some failure, _
+            | None, Some failure -> return raise failure
+            | None, None -> return ()
         }
 
     member this.IsPtyCompletion(runId: string) = this.OwnsPty(PtyId.Create runId)

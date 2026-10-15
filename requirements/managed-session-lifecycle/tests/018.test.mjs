@@ -8,6 +8,8 @@ import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/Tool
 import * as status from '../../../dist/Execution/Session/ChatExecution/StatusSurface.js'
 import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { DatabaseSync } from 'node:sqlite'
+import { loseOwnershipCommit } from './support/ownership-commit.mjs'
 import { withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const schemaNode = (kind, extra = {}) => ({
@@ -30,6 +32,29 @@ const journalBytes = directory => {
   const names = readdirSync(events).filter(name => name.endsWith('.ndjson')).sort()
   assert.ok(names.length > 0, 'the original Fork journal has event files')
   return names.map(name => ({ name, bytes: readFileSync(join(events, name)) }))
+}
+
+for (const afterCommit of [false, true]) {
+  test(`WHAT[managed-session-lifecycle-018] Drain receipt loss ${afterCommit ? 'after' : 'before'} COMMIT cannot skip local child observer release`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'wxs-fork-drain-observers-'))
+    const owner = 'manager-drain-observers'
+    const runtime = await forkTool.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
+    try {
+      forkTool.acceptNextPrompt(runtime)
+      await forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'KEEP-DURABLE-WORK')
+      const work = forkTool.workSnapshot(runtime, owner)
+      assert.equal(forkTool.terminalListenerCount(runtime), 1)
+      await loseOwnershipCommit(DatabaseSync, 'Drain', afterCommit, () =>
+        assert.rejects(forkTool.detachToolRuntime(runtime), /Draining was not acknowledged: Unknown/))
+      assert.equal(forkTool.terminalListenerCount(runtime), 0)
+      assert.equal(forkTool.abortCount(runtime), 0)
+      assert.deepEqual(forkTool.workSnapshot(runtime, owner), work)
+      assert.deepEqual(await forkTool.coldWorkSnapshot(directory, owner), work)
+    } finally {
+      await forkTool.disposeRuntime(runtime).catch(() => {})
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
 }
 
 test('WHAT[managed-session-lifecycle-018] Fork disposal waits for runtime detach before the caller releases the journal directory', async () => {

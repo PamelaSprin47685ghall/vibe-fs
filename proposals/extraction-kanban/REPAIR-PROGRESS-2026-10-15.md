@@ -2,6 +2,46 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+<a id="independent-review-fixes"></a>
+## 第三批：独立复审与 0.6.2 修复
+
+复审基线为主仓 `bb9a811cf`、库 `f6cd8c3 / 0.6.1`，两仓起点干净。审查者不编辑共享源码：`independent_journal_r2` 复核 Journal，`independent_pty_r2` 复核 PTY，`independent_boundaries_r2` 复核跨包边界与实际构建。发现、优先级和后续计划见[报告独立复审段](SOURCE-AUDIT-2026-10-15.md#independent-review-fixes)。
+
+O-09、O-08、J-02、O-10、E-03、E-04 的局部实现已完成。库 `eef482506f4ea65cad0a88d3a8c5769a8ca9adbb / 0.6.2` 已正常推送原交付分支；主仓固定 `vendor/wanxiangli-0.6.2.tgz`，SHA-256 `d8909bebb92b01e0cd0cfa28cfdc14d0d1d89f467b7afe5e94a99efd96b0038e`。0.6.1 留在 Git 历史，没有覆盖同版本内容。
+
+### 反例与局部复验
+
+- Cancel/Drain 十项新用例首次 **10 tests / 0 pass / 10 fail**；`/private/tmp/r2-review-cleanup-red.log`。真实 Bun 旧 Cancel 反例为 closeAll/detach/cancel × 提交前后六组合：无 Signal、两个 PID 均存活、两个 blocker。修复逐项保留 Cancel 错误、继续真实清理；没有返回假成功。
+- Journal 关闭失败矩阵首次 **17 tests / 13 pass / 4 fail**，修复后 Journal **30/30**；`r2-review-journal-close-red.log`、`r2-review-journal-green.log`。独立关闭失败探针在 Node/Bun × COMMIT 前后四组合也通过。
+- Listener 三项先红，**3 tests / 0 pass / 3 fail**；`r2-review-listener-red.log`。原生订阅可释放后，025 验证永久 detach、可复用 cancel、失败后的晚到退出与持续 Unknown 后显式确认；Process 003 验证同一公开 JS sender 多注册、重复 Dispose 只移除自己的注册。Surface 每次生成不同的底层闭包，此用例不直接证明底层函数引用相同的情况。第一次候选错误地用已 cancel mailbox 的 PendingCompletionCount 作 oracle，2 项不通过；改为实际订阅计数与 lease/blocker，未改生产语义。当时 018/025/Process 003：**83 tests / 82 pass / 0 fail / 1 既有 TODO**；`r2-review-listener-green-final.log`。其中 025 为 50 项，含受控与真实 Bun 各八项 Cancel 故障矩阵。
+- 非作者先独立复验 Host 清理：真实 `node scripts/build.mjs`，focused 778、generation 477、174 surfaces / 836 modules，exit 0；随后 plan no-op。018/025 当时 **50 tests / 49 pass / 0 fail / 1 既有 TODO**；真实 Bun COMMIT 前后丢 Cancel 回执均保留 Unknown，同时 PID 退出、port/lease 清除、blocker 为空。日志 `r2-independent-host-build.log`、`r2-independent-host-tests.log`、`r2-independent-host-real-cancel.log`。此后订阅契约变更的真实聚焦构建为 generation 479、1532 项，exit 0；`r2-review-listener-build.log`。
+- 库完整构建和七入口全部源码、真实组合、隔离编译及安装包套件：**320 tests / 319 pass / 0 fail / 1 skip / 0 TODO**；`r2-review-library-build.log`、`r2-review-library-tests.log`。skip 仍是 Linux 限定的基础 Process 安装用例。
+- 非作者 Journal 复验 **30/30**；当前双写者用例连续 **25/25**。临时去 finalize 突变在 Bun 七种模式全部被拒绝，Node 七种仍通过；原 close/initialize/commit-after 假阳性已被保存的原生 get 断言捕获。严格 TypeScript、独立回滚/重入和显式 close 重试均通过。原始材料 `/private/tmp/journal-independent-r2.BRvunK/recheck/`；没有共享源码突变或 GC。
+- 非作者对确切 0.6.2 tarball 另建隔离消费者：清除 NODE_PATH/NODE_OPTIONS 后，Node **7/7**、Bun **7/7** 和 strict TypeScript 均通过；22 个包文件逐字节等于库交付目录与实际安装内容。证据 `/private/tmp/r2-independent-exact-062-J4mBvW/`，含 `node-matrix.json`、`bun-matrix.json`；未重建共享 dist 或借用主仓依赖。
+
+### 最终集成门禁与剩余范围
+
+环境 macOS、Node 26.6.0、Bun 1.3.14。实际构建 generation 480 为 full impact 1532 项，接口与 836 模块链接通过。以下三个分组无重叠文件，均 exit 0；完整命令沿用第二批相同分组，没有跑无关全仓套件。
+
+| 分组 | tests / pass / fail / skip / TODO | 日志（`/private/tmp/`） |
+|---|---|---|
+| Work、managed-session-lifecycle、session-ontology 及原相邻归属链 | 481 / 452 / 0 / 5 / 24 | `r2-review-main-ownership-final.log` |
+| process-execution 全包 | 193 / 188 / 0 / 0 / 5 | `r2-review-main-process-final.log` |
+| Trace 与原 WorkRecord/Prefix 相邻链 | 102 / 93 / 0 / 1 / 8 | `r2-review-main-trace-final.log` |
+| 合计 | **776 / 733 / 0 / 6 / 37** | 零 cancelled；TODO/skip 不计通过 |
+
+37 个 TODO 包含原 36 个及新增 O-01 的真实 leader-exit 反例。该项实际运行并因后代仍存活失败，绝不是新能力已通过。025 当前为 **51 tests / 50 pass / 1 TODO**。helper 在 finally 中只按测试持有的确切子 PID 清理，并等待真实退出；非作者另行读取两个 marker，确认两个 PID 均已不存在。`independent-pty-r3-025.log`、`independent-pty-r3-process003.log`、`independent-pty-r3-helper-check.log` 留存独立运行结果。外层夹具在 helper 成功返回后即记录已清理，避免预期断言失败后再次使用旧 PGID。
+
+最终静态门禁首次发现 ClosePty 的 try→match 嵌套违反 fsharp-control-pyramid，未计通过。提取同一同步 Cancel 请求为私有成员后，`dotnet tool run fantomas --check src/Wanxiangshu`、`node scripts/check.mjs` 均 exit 0；日志 `r2-review-main-format-final2.log`、`r2-review-main-check-final2.log`。没有放宽门禁或改业务顺序。真实 Host 聚焦重编 generation **481 / 778 项** 后，018/025 再验 **61 tests / 59 pass / 0 fail / 2 TODO**；`r2-review-main-build-focused-final.log`、`r2-review-main-host-focused-final.log`。其它两组对应未改的实现，未把该定向重验冒作重新跑过全部 776 项。
+
+`independent_pty_r2` 对最终 generation 481 独立运行 018/025，得到同样的 **61 / 59 pass / 0 fail / 2 TODO**，确认 O-08/O-09/O-10 及原 O-05/O-06/O-07 的限定范围成立，未发现新增问题；`/private/tmp/independent-pty-r3-gen481-host-final.log`。再次运行 helper 并读取 marker，两个确切 PID 均已退出；`independent-pty-r3-gen481-helper-check.log`。本批与 R2 的局部卡据此 DONE，原 R1 不被代替。
+
+文档收尾后的 `node scripts/build.mjs` generation **482**，exit 0；`r2-review-main-build-delivery.log`。`npm_config_cache=/private/tmp/module-improvement-npm-cache node scripts/verify-package.mjs`，exit 0，已真实打包、解包、隔离 npm ci 并消费主包：2073 members、13,141,126 bytes，SHA-256 `856615c21f7798151c96b0b9f2b72ffd7778009d5193eb81cbda4c5e4dbce78e`；`r2-review-main-package.log`。该门禁检查主包内实际 bundled wanxiangli 版本 0.6.2，不借顶层依赖掩盖缺包。
+
+两仓均采用正常提交与正常推送：库交付分支已到 `eef4825`；主仓本提交在 master，不强推、不改写历史。提交后再执行 freshness 与主包消费门禁，结果与包身份核对后记录在交付回复。没有部署到运行中的 Host。
+
+T-01 / O-01 仍 DOING，GAP-133 仍 PARTIAL。本次独立真实反例确认：PTY leader 自然退出后，同组后代仍活着，而本地与持久 blocker 已空；这是完整物理监管的既有未完成能力，不能借 Cancel 回执修复关闭。下一包须保持可安全监管的确切实例，覆盖 leader 先退出与忽略 TERM 的后代；不拿缓存旧 PGID 盲杀。报告已写明验收条件。
+
 <a id="second-review-fixes"></a>
 ## 第二批：0.6.1 收尾与准入改进
 
@@ -15,7 +55,7 @@
 | O-07 / P1 | 永久 detach 开始时锁住本地准入，Drain 丢回执也不重新允许 fork；新运行时的独立 scope 仍可使用 | 没有据此宣称跨进程、每业务轮次的代际准入已经实现 |
 | B-01 / P2 | Host 项目补充 DurableWorkHost 所在直接引用；随后只改 Host 文件的真实聚焦编译通过 | 没有改构建器、隐式借用全仓源码或放宽检查 |
 
-局部实现和自验完成；两张 R2 卡按看板进入 REVIEW，尚无本批非作者复审证据。CUT-03-R1 的 T-01、CUT-04-R1 的 O-01 仍未闭合。本批没有发布到正在运行的 Host。
+本段保留 0.6.1 交付时的证据：当时局部实现和自验完成，两张 R2 卡进入 REVIEW。后续非作者复审、关联缺陷及修复见上方第三批，不把原 316/754 项追写为新增证明。CUT-03-R1 的 T-01、CUT-04-R1 的 O-01 仍未闭合。本批没有发布到正在运行的 Host。
 
 ### 先红与纠正
 
@@ -41,7 +81,7 @@
 
 - `node scripts/build.mjs`：generation 474，exit 0；`/private/tmp/module-improvement-main-build-delivery.log`。此前全量及只改 Host 文件后的聚焦编译分别证明直接引用与所选闭包成立。
 - `npm_config_cache=/private/tmp/module-improvement-npm-cache node scripts/verify-package.mjs`：exit 0，真实打包、解包及隔离 npm ci 后消费，不借主仓 node_modules。2073 members、13,137,717 bytes，主项目 tarball SHA-256 `cfe28196f51118aa3038b3d0ab00f1e5a5846854c8b2f3cc5dda3b8b6809d610`；`/private/tmp/module-improvement-main-package.log`。最初沙箱网络导致 ENOTFOUND，未计为通过；允许网络后同一门禁通过，原记录在 `module-improvement-main-package-sandbox.log`。
-- 主仓按正常提交、正常 push 交付 master；独立库留在既有交付分支，代码提交 `93a7173`，后续规则证明更新 `f6cd8c3`，没有改库 main 或强推。R2 的非作者复审仍待补；这里只交付已验证代码，没有部署到实际 Host。
+- 主仓按正常提交、正常 push 交付 master；独立库留在既有交付分支，代码提交 `93a7173`，后续规则证明更新 `f6cd8c3`，没有改库 main 或强推。该次交付时 R2 的非作者复审尚待补，当前结果见上方第三批；这里只交付已验证代码，没有部署到实际 Host。
 
 ## 第一批交付：0.6.0（历史证据）
 

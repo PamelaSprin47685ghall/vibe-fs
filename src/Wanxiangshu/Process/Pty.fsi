@@ -1,11 +1,13 @@
 namespace Wanxiangshu.Process
 
+open System
 open System.Threading.Tasks
 
 type PtyPort =
     new: ?exitListener: (PtyExitEvent -> unit) * ?handler: PtyBackendHandler -> PtyPort
 
-    member AddExitListener: listener: (PtyExitEvent -> unit) -> unit
+    member AddExitListener: listener: (PtyExitEvent -> unit) -> IDisposable
+    member internal ExitListenerCount: int
     member Close: id: PtyId * ?outcome: Result<string, string> -> unit
     member ClosePty: id: PtyId * ?graceMs: int -> Task<unit>
     member CloseAll: ?graceMs: int -> Task<unit>

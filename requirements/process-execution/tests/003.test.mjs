@@ -167,6 +167,18 @@ test('WHAT[process-execution-003] PORT_AddMailboxSender_reaches_every_registered
   portComplete(port, pid, { ok: true, value: 'done' })
   assert.deepEqual(got, ['PtyExited', 'PtyExited'])
 })
+test('WHAT[process-execution-003] removing an exit listener is idempotent and preserves the other listeners', () => {
+  const port = createPtyPort({})
+  const got = []
+  const listener = () => got.push('active')
+  const remove = portAddMailboxSender(port, listener)
+  portAddMailboxSender(port, listener)
+  remove()
+  remove()
+  const pid = forkDefault(port, 'pty-unsubscribed')
+  portComplete(port, pid, { ok: true, value: 'done' })
+  assert.deepEqual(got, ['active'])
+})
 test('WHAT[process-execution-003] PORT_send_plain_signal_does_not_abort_the_completion', async () => {
   const port = createPtyPort({})
   const got = []
