@@ -6,6 +6,8 @@
 
 这是后续抽吸工作的共同蓝图，不是全系统已经审计完毕的声明。目录与需求包已经纳入分工；每卡开工仍需追踪实际调用者、在途状态和持久数据。包名、接口与删除清单中的待定项必须在该卡准备阶段落实，不用想象填空。
 
+**最新复核：** [四模块源码复核、问题报告与修复计划（2026-10-15）](SOURCE-AUDIT-2026-10-15.md)。主仓 `7d8feff03` 的 CUT-02/03/04 有已确认的接线缺陷；历史合入记录保留，未闭合范围见 [关联修复卡](BOARD.md#source-audit-repairs)。
+
 ## 入口：五份文件，各管一件事
 
 | 文件 | 用途 | 谁改 |
@@ -24,7 +26,7 @@
 
 Lifecycle 已通过 `wanxiangli/work`、`eventstore`、`durable-work` 接回主仓，对应旧 Facts/Fold/Kernel/Codec 等已退出。这是 CUT-01 的完成范围，不代表整个应用或全部 GAP 已完成。[合并比较与收尾证据](../lifecycle-cutover-closeout.md)
 
-`wanxiangli/process`、`trace`、`ownership` 有独立实现与测试，但当前主仓生产 F# 只从 `Mission/Lifecycle/DurableWorkHost.fs` 导入前三个生命周期入口。CUT-02、03、04 的起点是“库就绪，接线未完成”，不是已抽干。不得仅因 tarball 带着这些文件就记为接线成功。
+建板基线中，`wanxiangli/process`、`trace`、`ownership` 已有独立实现与测试，主仓尚只接入前三个生命周期入口。随后 CUT-02/03/04 已合入接线；本次完整源码复核发现部分产品义务尚未承接，状态与反例以最新看板和上述报告为准。导入包、基础测试通过或历史 DONE 均不能单独证明职责已迁完。
 
 主仓锁定并跟踪 `vendor/wanxiangli-0.5.2.tgz`。旁边的 `wanxiangli/` 是另一 Git 仓，不是主仓源码依赖；新成员只克隆主仓也必须能构建。位置变化不应影响 npm 消费。[分发要求](../../requirements/distribution/WHAT.md)
 

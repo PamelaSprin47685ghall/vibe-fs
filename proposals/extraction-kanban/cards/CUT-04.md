@@ -1,3 +1,5 @@
+**2026-10-15 源码复核更正：** 下方“kill/wait 交接、超时升级全部通过”不能作为真实进程证据。`requirements/managed-session-lifecycle/tests/025.test.mjs` 的真实 TERM→等待→KILL→exit 仍为 GAP-133 TODO；受控端口及直接 Untrack 不等于物理退出。另已确认生产持久预留未接通、提前清账、同步完成丢失和 blocker 查询吞错。历史计数保留，后续见 [源码报告](../SOURCE-AUDIT-2026-10-15.md) 与 [CUT-04-R1](../BOARD.md#source-audit-repairs)。本轮只纠正文档，未修复实现或关闭 GAP。
+
 ## 验证
 - 正控与反例：`requirements/work/tests/009.test.mjs`、`044.test.mjs`、`requirements/managed-session-lifecycle/tests/025.test.mjs`。
 - 验证命令（交由 `devops` 执行）：

@@ -32,7 +32,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 
 | ID | 职责 | 泳道 | 当前列 | 切换前置 | Owner | Reviewer |
 |---|---|---|---|---|---|---|
-| CUT-00 | 两仓准备、差异裁决与并行开工 | 协作 | DONE | — | eng-cut00 | manager（[CUT-00](cards/CUT-00.md)） |
+| CUT-00 | 两仓准备、差异裁决与并行开工 | 协作 | DONE | — | eng-cut00 | manager（历史登记；原 `cards/CUT-00.md` 当前缺失） |
 | CUT-01 | 工作生命周期与原子日志接线 | 已交付 | DONE | — | 历史已合入 | 证据见收尾记录 |
 | CUT-02 | 非 PTY 进程执行 | 物理 | DONE | CUT-00 | eng-cut02 | manager |
 | CUT-03 | 原始轨迹与固定区间 | 上下文 | DONE | CUT-00 | eng-cut03 | manager |
@@ -73,6 +73,22 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-38 | 全仓残余职责与终局交账 | 收尾 | BACKLOG | CUT-00, CUT-01, CUT-02, CUT-03, CUT-04, CUT-05, CUT-06, CUT-07, CUT-08, CUT-09, CUT-10, CUT-11, CUT-12, CUT-13, CUT-14, CUT-15, CUT-16, CUT-17, CUT-18, CUT-19, CUT-20, CUT-21, CUT-22, CUT-23, CUT-24, CUT-25, CUT-26, CUT-27, CUT-28, CUT-29, CUT-30, CUT-31, CUT-32, CUT-33, CUT-34, CUT-35, CUT-37 | — | — |
 
 CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所需的补足在各卡内执行。完成 CUT-00 和本卡接线准备后，可认领并直接进入 INTEGRATING；发现基础协议不成立时回退 DOING，不用历史测试成绩代替新需求。
+
+<a id="source-audit-repairs"></a>
+## 2026-10-15 源码复核后的关联修复
+
+复核基线：主仓 `7d8feff03`、独立库 `46d9c07 / 0.5.2`。[问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md) 已确认 CUT-02/03/04 仍有接线缺陷及未承接职责。上表 DONE 保留历史合入记录，**不再作为对应完整职责已闭合的证明**；后续依赖这些能力的卡须同时检查下列修复卡。CUT-01 的迁移边界未被推翻，新增的是独立套件的验证缺口。
+
+本轮只交付源码复核、报告及计划，未实施生产修复、未升级包、未关闭 GAP。以下均未认领，协议尚待细化；本轮文档交付不等于 READY 或实现完成。
+
+| ID | 职责与范围 | 当前列 | 完成前置 | Owner | Reviewer |
+|---|---|---|---|---|---|
+| [CUT-01-R1](SOURCE-AUDIT-2026-10-15.md#repair-lifecycle) | Journal 测试关闭同步、构造锁竞争和 Process 平台证明 | BACKLOG | — | — | — |
+| [CUT-02-R1](SOURCE-AUDIT-2026-10-15.md#repair-process) | 无损输出、Draining 物理监管、相对 PATH；补 D-03 | BACKLOG | D-03 契约定稿 | — | — |
+| [CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) | 原件权威、完整 Opening、稳定 cut、Proxy 重入证明；补 D-02 | BACKLOG | D-02 契约及旧数据处置 | — | — |
+| [CUT-04-R1](SOURCE-AUDIT-2026-10-15.md#repair-ownership) | PTY 真实终结、早到回执、持久预留/恢复、统一 blocker | BACKLOG | 所选物理资源的身份与恢复证据契约 | — | — |
+
+P1 行为缺陷优先；PATH、PTY 提前清账/同步完成和 Proxy 测试可先形成独立小闭环。公共文件、两仓发布及主仓集成仍串行，不能用这些局部修复关闭整张关联卡。
 
 ## 波次：什么时候拉哪张卡
 
@@ -128,12 +144,12 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | 决策号 | 影响卡 | 待判问题 | 当前处置 | 决策/证据 |
 |---|---|---|---|---|
 | D-01 | 07、09、11 | 草稿中的未知来源回退 human 与现行权威证据冲突 | 保留现行拒绝/明确未知；开工时裁定精确接口 | 待认领；不得先删权威闭包 |
-| D-02 | 03、06、15、16、28 | 单观察者 Trace 与并发捕获、推理、retry 排除、Fission 合流、Opening 范围不完全等价 | 先做差异表与最小闭合子范围 | 待 CUT-03 |
-| D-03 | 02、20、21 | 基础 pipe 留尾不等于主仓硬期限、完整外存及 PTY | 暂留未覆盖 owner；分别切换 | 待 CUT-02/20 |
+| D-02 | 03、06、15、16、28 | 单观察者 Trace 与并发捕获、推理、retry 排除、Fission 合流、Opening 范围不完全等价 | 描述符桥未完成原件迁移；完整/晚 Opening 与固定 cut 协议待定，不再以 CUT-03 历史 DONE 代替裁决 | [源码复核；CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) |
+| D-03 | 02、20、21 | 基础 pipe 留尾不等于主仓硬期限、完整外存及 PTY | 已确认完整输出及 Draining 取消接线失配；先补能力和契约，再替换所选生产 owner | [源码复核；CUT-02-R1](SOURCE-AUDIT-2026-10-15.md#repair-process) |
 | D-04 | 18、19 | 单流 SQLite CAS 与多 writer 合法分叉不是同一承诺 | 两种协议分开，不用前者替代后者 | 待 CUT-18/19 |
 | D-05 | 27、29、30、31 | 新库草稿“不再建”与仍生效的产品功能冲突 | 默认暂留并维护；抽取/删除需逐卡裁决 | 待认领；不是删除批准 |
 | D-06 | 32、33、38 | 相对主线净改进与完整发布验收 | 合并可用净改进准入，验证结果仍原样报告 | 用户 2026-10-14T23:59:13Z 授权；[比较记录](../lifecycle-cutover-closeout.md) |
-| D-07 | 00、34、36 | 库规则仍写旧仓修改待授权、宿主名尚未确认 | 本计划不偷偷覆盖规则；各任务按当前授权更新过时范围，第二宿主先明确对象 | CUT-00 已落盘（cards/CUT-00.md）；主仓与 wanxiangli 按当前授权推进，CUT-36 保持 OPTIONAL |
+| D-07 | 00、34、36 | 库规则仍写旧仓修改待授权、宿主名尚未确认 | 本计划不偷偷覆盖规则；各任务按当前授权更新过时范围，第二宿主先明确对象 | 历史登记称 CUT-00 已落盘，但 `cards/CUT-00.md` 当前缺失；主仓与 wanxiangli 按当前授权推进，CUT-36 保持 OPTIONAL |
 
 ## 更新纪律
 
