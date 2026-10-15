@@ -4,6 +4,30 @@
 
 后续已开始实施，实际变更与验收见 [修复进度记录](REPAIR-PROGRESS-2026-10-15.md)。下文保留源码复核时的基线与结论，不用后续进度覆盖原始发现。
 
+<a id="second-review-fixes"></a>
+## 0. 修复后再次检查：合理性与新增问题
+
+基线：主仓 `5dd9dec9c`，库 `3ad5b88 / 0.6.0`。本节来自后续复核与本轮实现，不属于下文首次调查的“未修改代码”范围。状态见看板 CUT-01-R2 / CUT-04-R2，修复及实际验收见进度记录的同名段落。
+
+| 模块 | 判断 | 后续取舍 |
+|---|---|---|
+| Work / Journal / DurableWork | 领域、存储与提交顺序分开是合理边界；无需重写状态机 | 日志须自己管理原生 statement，不能把连接寿命留给 GC；本轮修复 J-01 |
+| Process / Supervision | 基础有界进程对象与更强的监管组合各有明确承诺，完整字节由主仓写 Spool | 保持两种契约，不合并成万能进程框架；本轮复跑完整进程需求 |
+| Trace | 独立库的追加记录、字节与稳定 cut 成立；主仓仍主要使用派生描述符桥 | T-01 仍为优先后续包：先冻结真实材料协议，再切捕获、恢复和消费者，最后删除桥；本轮不把再次捕获当作接管 |
+| Ownership / Host | lease 与 blocker 由库维护，Host 保存物理绑定和待确认退出，这种分工合理 | Host 必须完成“本实例物理退出→同一事实持久确认”的合作；本轮修复 O-05/O-06/O-07，跨重启物理接管仍待实现 |
+
+新增反例及修改点：
+
+| ID / 优先级 | 已证实的反例 | 修复边界与验收条件 |
+|---|---|---|
+| J-01 / P1 | Bun 1.3.14 在 COMMIT 入口抛错后，Journal 返回 Unknown，但未 finalize 的 prepare statement 令旧连接继续持写锁；重开后的追加为 NotWritten，直到 GC | 每次 statement 操作在 finally 中释放；Node 由 connection.close 释放其 statement。仍返回 Unknown、封存实例，不重发外部效果。Node/Bun 源码和安装包都须在保留原生引用、不调用 GC 的条件下重开并立即写入 |
+| O-05 / P1 | 真实 PTY 在 detach 内退出，Ended 提交前/后丢回执；旧 detach 只等待端口 CloseAll，返回成功时本地 lease 仍未确认，提交前丢失还保留 durable blocker | 单项关闭后核对已缓存的确切退出，以原 request/lease/incarnation 确认；仍 Unknown 时 detach 必须失败并保留义务；不重复发布进程退出 |
+| O-06 / P2 | 两个运行时共享端口时，空运行时 detach 也会经端口 CloseAll 终止另一个实例的实际进程；父取消有同一路径 | 只按本实例 lease 发物理关闭，并核对其独立 scope；业务 CloseOwnedPtys 的根范围 blocker 检查保留。真实 Bun 同端口、同 durable root 的 detach/cancel 均须保全另一实例 |
+| O-07 / P1 | Drain 在 COMMIT 前丢回执，detach 已失败，同一个运行时却仍可 fork 新 PTY | 永久 detach 开始时关闭本地准入，不能依赖 durable Drain 一定提交；失败后保持关闭，新运行时可按新 scope 正常启动；不扩大为跨进程每轮准入已证明 |
+| B-01 / P2 | 只改 Host/Runtime.fs 的聚焦构建缺少 Mission/Lifecycle，原项目未声明 DurableWorkHost 所在引用；全量构建可通过 | 补直接 ProjectReference，不修改构建器或放宽门禁；全量与随后聚焦构建均须通过 |
+
+驱动依据也作了核对：Node 22.13 的 [DatabaseSync 原生实现](https://github.com/nodejs/node/blob/v22.13.0/src/node_sqlite.cc) 在关闭时 finalize statement；Bun 的 [Statement.finalize](https://bun.com/reference/bun/sqlite/Statement/finalize) 释放原生资源。Bun 当前 close 文档不能替代 1.3.14 的实际行为；本轮使用明确的 statement.finalize，不依赖新版 close(true) 或补调 GC。
+
 ## 1. 结论与本次纠正
 
 **独立库的基础边界大体成立，但 CUT-02、CUT-03、CUT-04 的主仓接线没有兑现全部原定职责。** 此前发现的大输出缺失、Draining 后取消失效、Opening 截断和固定 cut 失效、PTY 提前清账与同步完成丢失，均得到完整源码支持。不能据此笼统断言四个库都实现错误。

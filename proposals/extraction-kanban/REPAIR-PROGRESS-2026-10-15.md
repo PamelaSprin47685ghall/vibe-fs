@@ -2,7 +2,48 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
-## 本批交付
+<a id="second-review-fixes"></a>
+## 第二批：0.6.1 收尾与准入改进
+
+基线为主仓 `5dd9dec9c`、库 `3ad5b88 / 0.6.0`。本批问题及合理性分析见[报告第 0 节](SOURCE-AUDIT-2026-10-15.md#second-review-fixes)。独立库代码提交 `93a717316b376f94db7a7f4b8916d5e58d73eb8e` 已正常推送到原交付分支；主仓升级固定包 `vendor/wanxiangli-0.6.1.tgz`，SHA-256 `c998f59aa1934fcfe915e24fec750c7da6276825c9ac8c91b558a5f8925277ed`。旧包留在 Git 历史，不重写同版本字节。
+
+| 问题 | 实现与本批验收 | 保留边界 |
+|---|---|---|
+| J-01 / P1 | Journal 对每个原生 statement 用 try/finally 释放；Node 仍由 connection.close 负责最终释放。新增 SqliteStatement 声明和自定义连接义务 | Unknown、零等待 CAS、历史格式不变；未证明断电、任意自定义驱动或原生 close 自身失败后的恢复 |
+| O-05 / P1 | detach/cancel 改走当前实例逐项关闭；ClosePty 在物理等待后确认缓存的同一退出事实；仍提交未知就明确失败并保留 lease/blocker | 只重放同一 Ended 事实，不再次启动或假造 NotStarted；跨重启缺失的物理终态仍不能猜测 |
+| O-06 / P2 | 物理清理按本实例 lease，detach/cancel 核对独立 scope；同端口、同 durable root 的其它实例继续存活 | CloseOwnedPtys 仍作根范围 blocker 检查，不能把本实例 detach 当作整个逻辑 owner 已可退休 |
+| O-07 / P1 | 永久 detach 开始时锁住本地准入，Drain 丢回执也不重新允许 fork；新运行时的独立 scope 仍可使用 | 没有据此宣称跨进程、每业务轮次的代际准入已经实现 |
+| B-01 / P2 | Host 项目补充 DurableWorkHost 所在直接引用；随后只改 Host 文件的真实聚焦编译通过 | 没有改构建器、隐式借用全仓源码或放宽检查 |
+
+局部实现和自验完成；两张 R2 卡按看板进入 REVIEW，尚无本批非作者复审证据。CUT-03-R1 的 T-01、CUT-04-R1 的 O-01 仍未闭合。本批没有发布到正在运行的 Host。
+
+### 先红与纠正
+
+- Journal 新矩阵首次 13 tests / 11 pass / 2 fail：Bun 的读取失败后 statement 未释放、COMMIT 入口未知后重开写入被锁；`/private/tmp/module-improvement-journal-red.log`。其余新增场景是回归，未冒称也曾失败。
+- Host 的两个 Ended 丢回执、两个共享端口 detach 和两个共享端口 cancel 场景首次 6/6 失败；`/private/tmp/module-improvement-host-red.log`。
+- Drain 未提交后仍允许 fork 的新增反例先红；COMMIT 后丢回执的正控原本通过，2 项合计 1 pass / 1 fail；`/private/tmp/module-improvement-drain-red.log`。
+- 中间候选仍消费 0.6.0 时，真实 Bun 的 Ended-before 场景明确报告 `database is locked`；换入 0.6.1 后同一入口通过。detach 时 mailbox 已取消，PendingCompletionCount 不能作为 Ended 落盘 oracle；这里用实际 PID、lease、durable blocker 和重开读取，原有正常退出恰好一次测试继续保留。
+- 一次聚焦构建暴露缺引用；另一次 Fable 编译虽完成，但我在编译期间更新了报告，改变生成输入，主构建以 `Mid-build mutation detected` 拒绝。两次均不计通过。补引用并冻结输入后，全量构建 generation 472 和聚焦构建 generation 473 均 exit 0；聚焦从原来缺依赖的 624 项扩为含所需依赖的 778 项。日志：`/private/tmp/module-improvement-main-build-final.log`、`module-improvement-main-build-dependency.log`、`module-improvement-main-build-stable.log`、`module-improvement-main-build-focused.log`。
+
+### 验收结果
+
+环境 macOS、Node 26.6.0、Bun 1.3.14。以下命令以相同 0.6.1 代码和已声明依赖运行；TODO、skip 仍不算证明。
+
+- 独立库：`node scripts/build.mjs`；全部七入口源码、组合、隔离编译及安装包套件 **316 tests / 315 pass / 0 fail / 1 skip / 0 TODO**，日志 `/private/tmp/module-improvement-library-build.log`、`module-improvement-library-tests.log`。Journal 单独为 **26/26**，包含 Node/Bun 各五种真实资源收尾场景；`module-improvement-journal-green.log`。
+- 精确 vendor 包另装入 `/private/tmp/module-improvement-exact/consumer`；清除 NODE_PATH/NODE_OPTIONS 后，在 Node/Bun 各跑正常关闭、初始化失败、读取失败、COMMIT 前/后丢回执，十次均成功，并通过 strict TypeScript。helper 来自已提交的 `src/eventstore/tests/recovery-consumer.mjs`；没有借主仓 node_modules，未调用 GC。SHA-256 与上述固定包相同。
+- 主仓归属及相邻链：`TMPDIR=/private/tmp node --test requirements/work/tests/*.test.mjs requirements/managed-session-lifecycle/tests/*.test.mjs requirements/session-ontology/tests/*.test.mjs requirements/crash-reconciliation/tests/020.test.mjs requirements/delegation/tests/{003,004,006,024,026,027,032}.test.mjs requirements/participant-horizon/tests/{009,010,011}.test.mjs`：**460 tests / 432 pass / 0 fail / 5 skip / 23 TODO**，exit 0；`/private/tmp/module-improvement-main-ownership-final.log`。025 共 32 项，含四个新增真实 Bun Ended-before/after、shared-detach/cancel 场景，以及原真实 TERM→等待→KILL。
+- 主仓进程：`TMPDIR=/private/tmp node --test requirements/process-execution/tests/*.test.mjs`：**192 tests / 187 pass / 0 fail / 0 skip / 5 TODO**，exit 0；`/private/tmp/module-improvement-main-process-final.log`。最初两项因沙箱禁止 ps 观察而未取得结论，获得对应权限后原套件复跑通过，未改 oracle 或转 skip。
+- Trace 及相邻取材：`TMPDIR=/private/tmp node --test requirements/semantic-trace/tests/*.test.mjs requirements/work-record/tests/{002,005,008,014}.test.mjs requirements/prefix-stability/tests/{009,012,014}.test.mjs`：**102 tests / 93 pass / 0 fail / 1 skip / 8 TODO**，exit 0；`/private/tmp/module-improvement-main-trace.log`。后续只改 Host 准入标记、参数名和项目引用，没有更改 Trace 实现。
+- 三个主仓分组没有重叠文件：合计 **754 tests / 712 pass / 0 fail / 6 skip / 36 TODO / 0 cancelled**。`dotnet tool run fantomas --check src/Wanxiangshu` 和 `node scripts/check.mjs` 均 exit 0，日志 `/private/tmp/module-improvement-format-final2.log`、`module-improvement-check-final2.log`。shard-edge-audit 的既有 report-only 提示没有改成通过证明。
+- 文档收尾后的构建与主项目安装包验证单独记录在交付门禁段；不以这次源码回归代替包消费或部署证明。
+
+### 交付门禁
+
+- `node scripts/build.mjs`：generation 474，exit 0；`/private/tmp/module-improvement-main-build-delivery.log`。此前全量及只改 Host 文件后的聚焦编译分别证明直接引用与所选闭包成立。
+- `npm_config_cache=/private/tmp/module-improvement-npm-cache node scripts/verify-package.mjs`：exit 0，真实打包、解包及隔离 npm ci 后消费，不借主仓 node_modules。2073 members、13,137,717 bytes，主项目 tarball SHA-256 `cfe28196f51118aa3038b3d0ab00f1e5a5846854c8b2f3cc5dda3b8b6809d610`；`/private/tmp/module-improvement-main-package.log`。最初沙箱网络导致 ENOTFOUND，未计为通过；允许网络后同一门禁通过，原记录在 `module-improvement-main-package-sandbox.log`。
+- 主仓按正常提交、正常 push 交付 master；独立库留在既有交付分支，代码提交 `93a7173`，后续规则证明更新 `f6cd8c3`，没有改库 main 或强推。R2 的非作者复审仍待补；这里只交付已验证代码，没有部署到实际 Host。
+
+## 第一批交付：0.6.0（历史证据）
 
 主仓代码提交 `ffe028797`（包含前序独立修复），库交付分支 [codex/repair-four-modules-20261015](https://github.com/dyx13/wanxiangli/tree/codex/repair-four-modules-20261015) 已推送至 `3ad5b88`。主仓固定 `0.6.0` tarball，不更改独立库远端 `main`。这里只报告代码与验证，没有部署到运行中的宿主。
 

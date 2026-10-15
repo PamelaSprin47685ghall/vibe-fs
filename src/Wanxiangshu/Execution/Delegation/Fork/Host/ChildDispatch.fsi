@@ -51,7 +51,7 @@ module HostForkChildDispatch =
         cancelSignals: (SessionId seq -> unit) ->
         drainCancelledCallbacks: (string list -> string list -> Task<unit>) ->
         runtime: ForkRuntime ->
-        ptyPort: PtyPort ->
+        closeOwnedPtys: (unit -> Task<unit>) ->
         parentKey: string ->
         parentAbortToken: int ->
         gate: obj ->

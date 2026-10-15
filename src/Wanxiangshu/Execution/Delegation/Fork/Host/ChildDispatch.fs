@@ -376,7 +376,7 @@ module HostForkChildDispatch =
         (cancelSignals: SessionId seq -> unit)
         (drainCancelledCallbacks: string list -> string list -> Task<unit>)
         (runtime: ForkRuntime)
-        (ptyPort: PtyPort)
+        (closeOwnedPtys: unit -> Task<unit>)
         (parentKey: string)
         (parentAbortToken: int)
         (gate: obj)
@@ -440,7 +440,7 @@ module HostForkChildDispatch =
 
             requireOk "Parent handle abandon failed" cancelResult
 
-            do! ptyPort.CloseAll()
+            do! closeOwnedPtys ()
             Pty.unregisterParentAbort parentKey parentAbortToken
             settlePendingAbandoned gate pendingRuns settleAbandoned (activeToAbandon |> List.map fst)
 

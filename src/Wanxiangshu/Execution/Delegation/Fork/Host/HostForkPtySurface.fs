@@ -40,6 +40,7 @@ module HostForkPtySurface =
               ==> (fun (id: string, grace: int) -> runtime.ClosePty(PtyId.Create id, graceMs = grace))
               "closeAll" ==> (fun grace -> runtime.CloseOwnedPtys(graceMs = grace))
               "detach" ==> (fun () -> runtime.DetachAndDrain())
+              "cancel" ==> (fun () -> runtime.CancelAndDrain())
               "outstanding"
               ==> (fun () -> runtime.SnapshotOutstandingPtyRuns() |> List.toArray)
               "owned" ==> (fun id -> runtime.OwnsPty(PtyId.Create id))
@@ -61,15 +62,29 @@ module HostForkPtySurface =
         | PtyCommand.Signal _ -> "Signal"
         | PtyCommand.Resize _ -> "Resize"
 
-    let ownershipProbe (commonDir: string option) (sessionId: string) (onCommand: obj) : obj =
+    let private controlledPort (onCommand: obj) =
         let handler (id: PtyId) command =
             emitJsExpr (onCommand, id.Value, commandKind command) "$0($1, $2)"
             Task.FromResult(Ok())
 
-        createOwnershipProbe commonDir sessionId (PtyPort(handler = handler))
+        PtyPort(handler = handler)
+
+    let ownershipProbe (commonDir: string option) (sessionId: string) (onCommand: obj) : obj =
+        createOwnershipProbe commonDir sessionId (controlledPort onCommand)
 
     let realOwnershipProbe (commonDir: string option) (sessionId: string) : obj =
         createOwnershipProbe commonDir sessionId (PtyBackend.createPort ())
+
+    let private ownershipPair commonDir sessionId port =
+        createObj
+            [ "first" ==> createOwnershipProbe commonDir sessionId port
+              "second" ==> createOwnershipProbe commonDir sessionId port ]
+
+    let sharedOwnershipProbe (commonDir: string option) (sessionId: string) (onCommand: obj) : obj =
+        ownershipPair commonDir sessionId (controlledPort onCommand)
+
+    let realSharedOwnershipProbe (commonDir: string option) (sessionId: string) : obj =
+        ownershipPair commonDir sessionId (PtyBackend.createPort ())
 
     let private callView command =
         match command with

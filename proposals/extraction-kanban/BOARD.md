@@ -87,6 +87,8 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-02-R1](SOURCE-AUDIT-2026-10-15.md#repair-process) | 无损输出、Draining 物理监管、相对 PATH；补 D-03 | DONE | 所选非 PTY 生产接线、192 项需求及实际安装包验收；原有 5 TODO 保留 | audit_process；audit_trace（监管）；root（集成） | 交叉复审 |
 | [CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) | 原件权威、完整 Opening、稳定 cut、Proxy 重入证明；补 D-02 | DOING | T-02/T-03/E-01 已修；D-02 对账落盘，T-01 原件接管仍待下一包 | root（下一包）；audit_trace（已交接） | 交叉复审 |
 | [CUT-04-R1](SOURCE-AUDIT-2026-10-15.md#repair-ownership) | PTY 真实终结、早到回执、持久预留/恢复、统一 blocker | DOING | O-02/O-03/O-04 已修；O-01 已持久保留/阻断，跨重启接管与跨进程每轮准入未完 | root（剩余恢复）；audit_ownership（已交接） | 交叉复审 |
+| [CUT-01-R2](SOURCE-AUDIT-2026-10-15.md#second-review-fixes) | J-01：原生 statement 释放及 Unknown 后即时恢复写入 | REVIEW | 0.6.1 代码与 Node/Bun 源码、精确安装包矩阵已通过；待本批非作者复审 | root | 待独立复审 |
+| [CUT-04-R2](SOURCE-AUDIT-2026-10-15.md#second-review-fixes) | O-05/06/07、B-01：收尾确认、共享端口隔离、永久准入关闭及依赖声明 | REVIEW | 32 项 PTY、460 项归属相邻链与真实聚焦构建已通过；原 O-01/T-01 边界不变；待非作者复审 | root | 待独立复审 |
 
 P1 行为缺陷优先；PATH、PTY 提前清账/同步完成和 Proxy 测试可先形成独立小闭环。公共文件、两仓发布及主仓集成仍串行，不能用这些局部修复关闭整张关联卡。
 

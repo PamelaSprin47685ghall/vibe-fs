@@ -530,6 +530,8 @@ type HostForkRuntime
     let ptyExitObservations = Dictionary<string, PtyJoinItem * string>()
     // DSL-MUTABLE: resource — prevents new local PTYs during a run's exit drain.
     let mutable ptyClosing = false
+    // DSL-MUTABLE: resource — permanent detach closes local admission even if its durable Drain fails.
+    let mutable ptyDetachRequested = false
 
     do
         HostPtyOwnership.openScope ptyOwnership ptyRootScopeId None
@@ -615,6 +617,19 @@ type HostForkRuntime
                 terminalByName.Remove name |> ignore)
 
         runtime.UnregisterPty id
+
+    let settleObservedPty (id: string) =
+        let observed =
+            lock gate (fun () ->
+                match ptyExitObservations.TryGetValue id with
+                | true, value -> Some value
+                | false, _ -> None)
+
+        match observed with
+        | Some(item, outcome) ->
+            settlePtyLease id outcome
+            notifyPtyObservers item
+        | None -> ()
 
     do
         ptyPortInstance.AddExitListener(fun exitEvent ->
@@ -810,7 +825,6 @@ type HostForkRuntime
                 deferredFirstPrompts.Clear()
 
                 HostPtyOwnership.drain ptyOwnership ptyScopeId
-                this.CancelOwnedPtys()
 
                 values)
 
@@ -937,7 +951,7 @@ type HostForkRuntime
                         cancelSignals
                         (fun cancelled retained -> this.DrainCancelledCallbacks(cancelled, retained))
                         runtime
-                        ptyPortInstance
+                        (fun () -> this.ClosePtys(ptyScopeId, None))
                         parentKey
                         parentAbortToken
                         gate
@@ -1001,7 +1015,7 @@ type HostForkRuntime
                     this.DetachPendingObservers()
                     AsyncSupport.completedTask ())
 
-            do! release (fun () -> ptyPortInstance.CloseAll() :> Task)
+            do! release (fun () -> this.ClosePtys(ptyScopeId, None) :> Task)
 
             do!
                 release (fun () ->
@@ -1030,6 +1044,7 @@ type HostForkRuntime
             match detachTask with
             | Some drain -> drain
             | None ->
+                lock gate (fun () -> ptyDetachRequested <- true)
                 let drain = this.DetachObserversAfter cancelTask
                 detachTask <- Some drain
                 drain)
@@ -1213,7 +1228,7 @@ type HostForkRuntime
                 return Some ex
         }
 
-    member private this.DrainPtySnapshot(ids: PtyId list, graceMs: int option) : Task<unit> =
+    member private this.DrainPtySnapshot(ids: PtyId list, blockerScopeId: string, graceMs: int option) : Task<unit> =
         task {
             this.CancelOwnedPtys()
             let failures = ResizeArray<exn>()
@@ -1225,7 +1240,8 @@ type HostForkRuntime
             if failures.Count > 0 then
                 raise failures.[0]
 
-            let remaining = this.SnapshotOutstandingPtyRuns()
+            let remaining =
+                lock gate (fun () -> HostPtyOwnership.unsettledIds ptyOwnership blockerScopeId)
 
             if not (List.isEmpty remaining) then
                 invalidOp (
@@ -1235,7 +1251,7 @@ type HostForkRuntime
                 )
         }
 
-    member this.CloseOwnedPtys(?graceMs: int) : Task<unit> =
+    member private this.ClosePtys(blockerScopeId: string, graceMs: int option) : Task<unit> =
         task {
             let ids =
                 lock gate (fun () ->
@@ -1246,24 +1262,16 @@ type HostForkRuntime
                     ptyLeases.Keys |> Seq.map PtyId.Create |> Seq.toList)
 
             try
-                do! this.DrainPtySnapshot(ids, graceMs)
+                do! this.DrainPtySnapshot(ids, blockerScopeId, graceMs)
             finally
                 lock gate (fun () -> ptyClosing <- false)
         }
 
+    member this.CloseOwnedPtys(?graceMs: int) : Task<unit> = this.ClosePtys(ptyRootScopeId, graceMs)
+
     member this.ClosePty(id: PtyId, ?graceMs: int) : Task<unit> =
         task {
-            let observed =
-                lock gate (fun () ->
-                    match ptyExitObservations.TryGetValue id.Value with
-                    | true, value -> Some value
-                    | false, _ -> None)
-
-            match observed with
-            | Some(item, outcome) ->
-                settlePtyLease id.Value outcome
-                notifyPtyObservers item
-            | None -> ()
+            settleObservedPty id.Value
 
             lock gate (fun () ->
                 match ptyLeases.TryGetValue id.Value with
@@ -1274,6 +1282,8 @@ type HostForkRuntime
 
             if this.OwnsPty id then
                 do! ptyPortInstance.ClosePty(id, ?graceMs = graceMs)
+
+            settleObservedPty id.Value
 
             if this.OwnsPty id then
                 invalidOp (sprintf "PTY %s exit was not observed; ownership remains unsettled" id.Value)
@@ -1311,7 +1321,9 @@ type HostForkRuntime
 
         let reserved =
             lock gate (fun () ->
-                if ptyClosing then
+                if ptyDetachRequested then
+                    Error "PTY runtime detach has started"
+                elif ptyClosing then
                     Error "PTY exit drain is in progress"
                 else
                     HostPtyOwnership.reserve ptyOwnership ptyScopeId id.Value
