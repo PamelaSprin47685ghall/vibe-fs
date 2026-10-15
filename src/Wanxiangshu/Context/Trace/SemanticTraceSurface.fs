@@ -55,6 +55,12 @@ module SemanticTraceSurface =
             {| start = XTraceRange.startInclusive range |> cursorView
                endExclusive = XTraceRange.endExclusive range |> cursorView |}
 
+    let private cutView (cut: XTraceCut) : obj =
+        box
+            {| traceId = cut.TraceId
+               cursor = cut.Cursor
+               digest = cut.Digest |}
+
     let private semanticPartView part : obj =
         match part with
         | SemanticText value -> box {| kind = "text"; text = value |}
@@ -330,6 +336,33 @@ module SemanticTraceSurface =
         |> List.map partView
         |> List.toArray
 
+    let traceHeadCut projection : obj =
+        XTraceProjection.traceHeadCut (stateOf projection) |> cutView
+
+    let traceCutAt cursor projection : obj =
+        XTraceProjection.traceCutAt (cursorOf cursor) (stateOf projection) |> cutView
+
+    let traceIntervalOfRange range projection : obj =
+        let afterCut, throughCut =
+            XTraceProjection.traceIntervalOfRange (rangeOf range) (stateOf projection)
+
+        box
+            {| after = cutView afterCut
+               through = cutView throughCut |}
+
+    let traceIntervalAfterCoverage cursor projection : obj =
+        let coverage = RecordCoverage.create (cursorOf cursor)
+
+        let afterCut, throughCut =
+            XTraceProjection.traceIntervalAfterCoverage coverage (stateOf projection)
+
+        box
+            {| after = cutView afterCut
+               through = cutView throughCut |}
+
+    let traceRecords projection : string array =
+        XTraceProjection.traceRecords (stateOf projection) |> List.toArray
+
     let latestTerminalEvidence projection =
         XTraceProjection.latestTerminalEvidence (stateOf projection)
         |> Option.map terminalView
@@ -444,6 +477,14 @@ module SemanticTraceSurface =
 
     let item value = value |> itemOf |> itemView
 
+    let sliceBetween start endExclusive values =
+        arrayOf values
+        |> Array.toList
+        |> List.map itemOf
+        |> XTrace.sliceBetween (cursorOf start) (cursorOf endExclusive)
+        |> List.map itemView
+        |> List.toArray
+
     let sliceFrom start values =
         arrayOf values
         |> Array.toList
@@ -451,6 +492,10 @@ module SemanticTraceSurface =
         |> XTrace.sliceFrom (cursorOf start)
         |> List.map itemView
         |> List.toArray
+
+    let inspectBridge (traceId: string) openingText range values : obj =
+        let items = arrayOf values |> Array.toList |> List.map itemOf
+        WanxiangliTrace.inspectItemsBridge traceId (optionalText openingText) (rangeOf range) items
 
     let forOpening values =
         arrayOf values

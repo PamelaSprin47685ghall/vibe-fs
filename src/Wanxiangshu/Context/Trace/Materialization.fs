@@ -130,6 +130,8 @@ module XTraceMaterialization =
         (range: XTraceRange)
         (xTrace: XTraceProjectionState)
         : Task<Result<ProviderProjection.ProviderSemanticProjection, string>> =
+        XTraceProjection.traceIntervalOfRange range xTrace |> ignore
+
         XTraceProjection.currentGenerationParts (XTraceProjection.parts xTrace)
         |> List.filter (fun part -> XTraceRange.contains part.Cursor range)
         |> projectionFromParts journal
@@ -152,9 +154,16 @@ module XTraceMaterialization =
         (range: XTraceRange)
         (xTrace: XTraceProjectionState)
         : Task<Result<XTraceItem list, string>> =
-        XTraceProjection.parts xTrace
-        |> List.filter (fun part -> XTraceRange.contains part.Cursor range)
-        |> TaskResultList.traverseM (readItem journal)
+        task {
+            XTraceProjection.traceIntervalOfRange range xTrace |> ignore
+
+            let selected =
+                XTraceProjection.parts xTrace
+                |> List.filter (fun part -> XTraceRange.contains part.Cursor range)
+
+            let! resolved = selected |> TaskResultList.traverseM (readItem journal)
+            return resolved |> Result.map (WanxiangliTrace.materializeItemsInRange range)
+        }
 
     let materializeWorkRecordRange
         (journal: AgentJournal)

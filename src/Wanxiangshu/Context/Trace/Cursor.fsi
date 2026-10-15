@@ -4,6 +4,12 @@ type XTraceCursor
 type RecordCoverage
 type XTraceRange
 
+/// Fixed cut boundary from the underlying wanxiangli/trace instance.
+type XTraceCut =
+    { TraceId: string
+      Cursor: int
+      Digest: string }
+
 type XTraceOpeningEvidence =
     { AssignmentText: string
       AuthoritativeRequirements: string list
@@ -18,6 +24,7 @@ module XTraceCursor =
     val isAfter: next: XTraceCursor -> previous: XTraceCursor -> bool
     val isAtOrAfter: cursor: XTraceCursor -> lowerBound: XTraceCursor -> bool
     val isBefore: cursor: XTraceCursor -> upperBound: XTraceCursor -> bool
+    val maxCursor: left: XTraceCursor -> right: XTraceCursor -> XTraceCursor
 
 [<RequireQualifiedAccess>]
 module XTraceRange =
@@ -26,9 +33,11 @@ module XTraceRange =
     val endExclusive: range: XTraceRange -> XTraceCursor
     val contains: cursor: XTraceCursor -> range: XTraceRange -> bool
     val isEmpty: range: XTraceRange -> bool
+    val afterCoverage: coverage: RecordCoverage -> openingFloor: XTraceCursor -> head: XTraceCursor -> XTraceRange
 
 [<RequireQualifiedAccess>]
 module RecordCoverage =
     val create: ingestedThrough: XTraceCursor -> RecordCoverage
     val ingestedThrough: coverage: RecordCoverage -> XTraceCursor
     val covers: cursor: XTraceCursor -> coverage: RecordCoverage -> bool
+    val firstUncoveredCursor: coverage: RecordCoverage -> XTraceCursor

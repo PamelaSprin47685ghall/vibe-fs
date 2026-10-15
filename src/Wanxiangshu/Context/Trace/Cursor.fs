@@ -15,6 +15,12 @@ type RecordCoverage = private RecordCoverage of XTraceCursor
 /// evidence; cursor representation remains owned by `XTraceCursor`.
 type XTraceRange = private XTraceRange of startInclusive: XTraceCursor * endExclusive: XTraceCursor
 
+/// Fixed cut boundary from the underlying wanxiangli/trace instance.
+type XTraceCut =
+    { TraceId: string
+      Cursor: int
+      Digest: string }
+
 /// Stable copied Opening proof. Defined with the foundational trace vocabulary
 /// so WorkRecord can consume it without a Projection/WorkRecord compile cycle.
 type XTraceOpeningEvidence =
@@ -46,6 +52,21 @@ module XTraceCursor =
 
     let isBefore (cursor: XTraceCursor) (upperBound: XTraceCursor) = sequence cursor < sequence upperBound
 
+    let maxCursor (left: XTraceCursor) (right: XTraceCursor) =
+        if isAfter left right then left else right
+
+[<RequireQualifiedAccess>]
+module RecordCoverage =
+    let create (ingestedThrough: XTraceCursor) : RecordCoverage = RecordCoverage ingestedThrough
+
+    let ingestedThrough (RecordCoverage ingestedThrough) = ingestedThrough
+
+    let covers (cursor: XTraceCursor) (coverage: RecordCoverage) =
+        not (XTraceCursor.isAfter cursor (ingestedThrough coverage))
+
+    let firstUncoveredCursor (coverage: RecordCoverage) : XTraceCursor =
+        XTraceCursor.nextCursor (ingestedThrough coverage)
+
 [<RequireQualifiedAccess>]
 module XTraceRange =
     let create (startInclusive: XTraceCursor) (endExclusive: XTraceCursor) : XTraceRange =
@@ -65,11 +86,14 @@ module XTraceRange =
     let isEmpty (range: XTraceRange) =
         startInclusive range = endExclusive range
 
-[<RequireQualifiedAccess>]
-module RecordCoverage =
-    let create (ingestedThrough: XTraceCursor) : RecordCoverage = RecordCoverage ingestedThrough
+    let afterCoverage (coverage: RecordCoverage) (openingFloor: XTraceCursor) (head: XTraceCursor) : XTraceRange =
+        let rawStart =
+            XTraceCursor.maxCursor (RecordCoverage.ingestedThrough coverage) openingFloor
 
-    let ingestedThrough (RecordCoverage ingestedThrough) = ingestedThrough
+        let clampedStart =
+            if XTraceCursor.isAfter rawStart head then
+                head
+            else
+                rawStart
 
-    let covers (cursor: XTraceCursor) (coverage: RecordCoverage) =
-        not (XTraceCursor.isAfter cursor (ingestedThrough coverage))
+        create clampedStart head

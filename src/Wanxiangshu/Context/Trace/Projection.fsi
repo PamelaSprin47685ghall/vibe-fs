@@ -8,7 +8,8 @@ type XTraceProjectionState =
     private
         { Opening: XTraceOpeningEvidence option
           Parts: XTracePartRef list
-          Terminals: XTraceTerminalRef list }
+          Terminals: XTraceTerminalRef list
+          Bridge: WanxiangliTrace.ProjectionBridge }
 
 and internal XTracePartRef =
     { Cursor: XTraceCursor
@@ -116,6 +117,12 @@ module XTraceProjection =
         providerRun: ProviderRunIdentity ->
         state: XTraceProjectionState ->
             Result<XTraceProjectionState, XTraceFoldRejection>
+
+    val traceHeadCut: state: XTraceProjectionState -> XTraceCut
+    val traceCutAt: cursor: XTraceCursor -> state: XTraceProjectionState -> XTraceCut
+    val traceIntervalOfRange: range: XTraceRange -> state: XTraceProjectionState -> XTraceCut * XTraceCut
+    val traceIntervalAfterCoverage: coverage: RecordCoverage -> state: XTraceProjectionState -> XTraceCut * XTraceCut
+    val traceRecords: state: XTraceProjectionState -> string list
 
     val internal currentGenerationParts: parts: XTracePartRef list -> XTracePartRef list
     val currentGenerationSemanticParts: state: XTraceProjectionState -> XTraceSemanticPartView list

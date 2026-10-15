@@ -9,6 +9,57 @@ type XTraceItem =
       Part: SemanticPart }
 
 [<RequireQualifiedAccess>]
+module internal WanxiangliTrace =
+    [<Literal>]
+    val MaxPartChunkBytes: int = 524288
+
+    type ProjectionBridge =
+        { TraceId: string
+          Records: string list
+          OpeningCutCursor: int
+          PartCuts: (int64 * int) list
+          RecordCount: int }
+
+    val emptyBridge: traceId: string -> ProjectionBridge
+
+    val appendOpeningToBridge:
+        assignment: string ->
+        requirements: string list ->
+        hasExistingEntries: bool ->
+        rebuildWithOpening: (ProjectionBridge -> ProjectionBridge) ->
+        bridge: ProjectionBridge ->
+            ProjectionBridge
+
+    val appendPartDescriptorToBridge:
+        cursorSequence: int64 ->
+        role: string ->
+        provenance: string ->
+        kind: string ->
+        toolName: string option ->
+        textRef: string ->
+        textDigest: string ->
+        bridge: ProjectionBridge ->
+            ProjectionBridge
+
+    val appendTerminalDescriptorToBridge:
+        providerRun: string ->
+        textRef: string ->
+        textDigest: string ->
+        frontierSequence: int64 ->
+        bridge: ProjectionBridge ->
+            ProjectionBridge
+
+    val headCutOfBridge: bridge: ProjectionBridge -> XTraceCut
+    val cutAtSequenceOfBridge: sequence: int64 -> bridge: ProjectionBridge -> XTraceCut
+    val intervalOfRangeOnBridge: range: XTraceRange -> bridge: ProjectionBridge -> XTraceCut * XTraceCut
+    val intervalAfterCoverageOnBridge: coverage: RecordCoverage -> bridge: ProjectionBridge -> XTraceCut * XTraceCut
+    val verifyAndReadIntervalOnBridge: range: XTraceRange -> bridge: ProjectionBridge -> obj array
+    val materializeItemsInRange: range: XTraceRange -> items: XTraceItem list -> XTraceItem list
+
+    val inspectItemsBridge:
+        traceId: string -> openingText: string option -> range: XTraceRange -> items: XTraceItem list -> obj
+
+[<RequireQualifiedAccess>]
 module XTrace =
     val sliceBetween: start: XTraceCursor -> endExclusive: XTraceCursor -> items: XTraceItem list -> XTraceItem list
     val sliceFrom: start: XTraceCursor -> items: XTraceItem list -> XTraceItem list

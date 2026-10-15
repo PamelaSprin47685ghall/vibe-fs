@@ -45,6 +45,11 @@ module SemanticTraceSurface =
     val rangeFrom: start: 'a -> projection: SemanticTraceProjection -> obj
     val rangeOfPart: value: 'a -> obj
     val slice: range: 'a -> projection: SemanticTraceProjection -> obj array
+    val traceHeadCut: projection: SemanticTraceProjection -> obj
+    val traceCutAt: cursor: 'a -> projection: SemanticTraceProjection -> obj
+    val traceIntervalOfRange: range: 'a -> projection: SemanticTraceProjection -> obj
+    val traceIntervalAfterCoverage: cursor: 'a -> projection: SemanticTraceProjection -> obj
+    val traceRecords: projection: SemanticTraceProjection -> string array
     val latestTerminalEvidence: projection: SemanticTraceProjection -> obj option
     val terminalEvidenceForProviderRun: providerRun: string -> projection: SemanticTraceProjection -> obj option
     val providerRunParts: providerRun: string -> projection: SemanticTraceProjection -> obj array
@@ -75,7 +80,9 @@ module SemanticTraceSurface =
     val rangeContains: value: 'a -> range: 'b -> bool
     val rangeIsEmpty: range: 'a -> bool
     val item: value: 'a -> obj
+    val sliceBetween: start: 'a -> endExclusive: 'b -> values: 'c -> obj array
     val sliceFrom: start: 'a -> values: 'b -> obj array
+    val inspectBridge: traceId: string -> openingText: 'a -> range: 'b -> values: 'c -> obj
     val forOpening: values: 'a -> obj array
     val forWorkRecord: values: 'a -> obj array
     val render: values: 'a -> string
