@@ -8,7 +8,9 @@
 - 007 实际追加后关闭并重开同一磁盘日志，核对原文及重复捕获；有界物化也调用生产入口。各下游真实消费链同源仍 TODO，flatten 的次序测试只证明转换本身。
 - 008 原导出成员不存在和源码扫描不能证明推测未入史，改为待补真实候选/探测反例。失败本身可以是真实观察，不能把未生效的候选变更记成事实。
 - 009 现有用例只追加标有新 generation 的部件，没有执行 Host compaction 或重锚；保留局部证据，完整链标 TODO。
-- 010 对比纯裁决与真实捕获，覆盖相同重放、任务正文冲突、权威要求冲突及拒绝后状态不变。
+- 010 对比纯裁决与真实捕获，覆盖相同重放、任务正文冲突、权威要求冲突及拒绝后状态不变；另核对大 Opening 全字节及等长异尾、晚 Opening 追加前后的固定 cut，以及 Part/Terminal 在先的真实旧格式 journal 关闭重开。
 - 011/012 原 Surface 内自行排序数组、每次游标加十的模型已撤下；它们没有执行 Fission 或 Resume。真实汇聚、区间和消费者证据仍须分别在相应生命周期补齐，GAP-101 记录缺口。
 
 完成节点先运行正式构建，再通过 `requirements/verification-system/tests/run.mjs` 的 `TESTS_MJS_FILES` 指定本包及受影响调用方。TODO 不计通过；发布节点已同步保留未完成状态。
+
+CUT-03-R1 的本轮边界是大/晚 Opening 与 Proxy 重入反例。主仓仍从既有 `OpeningPromptCaptured` / `XTracePartAppended` / `TerminalOutputCaptured` 恢复，Bridge records 和 raw cut 未写入现有持久格式；生产取材只即算即用这些区间。小且首条的 Opening 保留原记录编码。旧坏版本为大/晚 Opening 派生的 raw records/cut 不会自动转换成新边界，外部若另存它们，须保留相应旧 records 并明确迁移身份，不能用新重放结果冒充原前缀。描述符索引及旧原件 owner 的整体迁移（T-01）仍未完成。

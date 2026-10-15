@@ -25,8 +25,6 @@ module internal WanxiangliTrace =
     val appendOpeningToBridge:
         assignment: string ->
         requirements: string list ->
-        hasExistingEntries: bool ->
-        rebuildWithOpening: (ProjectionBridge -> ProjectionBridge) ->
         bridge: ProjectionBridge ->
             ProjectionBridge
 

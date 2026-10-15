@@ -136,17 +136,11 @@ module internal WanxiangliTrace =
                 let endOffset = min total (startOffset + MaxPartChunkBytes)
                 sliceBytes encoded startOffset endOffset)
 
-    let private boundedOpeningBytes (raw: string) : obj =
-        let encoded = utf8ToBytes raw
-        let total = bytesLength encoded
+    let private obsOpening (bytes: obj) : obj =
+        createObj [ "type", box "Opening"; "bytes", bytes ]
 
-        if total <= MaxPartChunkBytes then
-            encoded
-        else
-            sliceBytes encoded 0 MaxPartChunkBytes
-
-    let private obsOpening (raw: string) : obj =
-        createObj [ "type", box "Opening"; "bytes", boundedOpeningBytes raw ]
+    let private obsOpeningBound (messageId: string) : obj =
+        createObj [ "type", box "OpeningBound"; "messageId", box messageId ]
 
     let private obsRunStarted (runId: string) : obj =
         createObj [ "type", box "RunStarted"; "runId", box runId ]
@@ -182,6 +176,31 @@ module internal WanxiangliTrace =
     let private obsRunFinished (runId: string) (outcome: string) : obj =
         createObj [ "type", box "RunFinished"; "runId", box runId; "outcome", box outcome ]
 
+    let private captureObsRecord (trace: obj) (obs: obj) : string =
+        let result = captureObs trace obs
+        string (getField result "record")
+
+    let private captureOpeningRecords (trace: obj) (payload: string) : string list =
+        let chunks = chunkBytes payload
+
+        if rawInspectCursor trace = 0 && chunks.Length = 1 then
+            [ captureObsRecord trace (obsOpening chunks.[0]) ]
+        else
+            let messageId = "xopening"
+
+            let observed =
+                captureObsRecord trace (obsMessageObserved messageId "system" "host-internal" None)
+
+            let parts =
+                chunks
+                |> Array.mapi (fun index chunk ->
+                    captureObsRecord trace (obsPartConfirmed messageId (sprintf "opening:%d" index) index "binary" chunk))
+                |> Array.toList
+
+            let finished = captureObsRecord trace (obsMessageFinished messageId chunks.Length)
+            let bound = captureObsRecord trace (obsOpeningBound messageId)
+            observed :: (parts @ [ finished; bound ])
+
     let emptyBridge (traceId: string) : ProjectionBridge =
         let trace = createEmptyTrace traceCtor traceId
 
@@ -198,52 +217,22 @@ module internal WanxiangliTrace =
         let reqJoined = String.concat "\n" requirements
         sprintf "assignment:%d:%s\n%s" assignment.Length assignment reqJoined
 
-    let private appendOpeningToEmptyOrReplayedBridge (payload: string) (bridge: ProjectionBridge) : ProjectionBridge =
-        let trace = acquireWritableTrace bridge
-        let result = captureObs trace (obsOpening payload)
-        let record = string (getField result "record")
-        let cursor = rawInspectCursor trace
-
-        let nextRecords =
-            if bridge.RecordCount = 0 then
-                [ record ]
-            else
-                bridge.Records
-
-        let updated =
-            { bridge with
-                Records = nextRecords
-                OpeningCutCursor = cursor
-                RecordCount = cursor }
-
-        attachCachedTrace traceCache updated trace
-
     let appendOpeningToBridge
         (assignment: string)
         (requirements: string list)
-        (hasExistingEntries: bool)
-        (rebuildWithOpening: ProjectionBridge -> ProjectionBridge)
         (bridge: ProjectionBridge)
         : ProjectionBridge =
-        let payload = openingEnvelope assignment requirements
+        let trace = acquireWritableTrace bridge
+        let records = captureOpeningRecords trace (openingEnvelope assignment requirements)
+        let cursor = rawInspectCursor trace
 
-        if hasExistingEntries then
-            let freshTrace = createEmptyTrace traceCtor bridge.TraceId
-            let result = captureObs freshTrace (obsOpening payload)
-            let record = string (getField result "record")
-            let cursor = rawInspectCursor freshTrace
+        let updated =
+            { bridge with
+                Records = bridge.Records @ records
+                OpeningCutCursor = if bridge.RecordCount = 0 then cursor else bridge.OpeningCutCursor
+                RecordCount = cursor }
 
-            let seeded =
-                { TraceId = bridge.TraceId
-                  Records = [ record ]
-                  OpeningCutCursor = cursor
-                  PartCuts = []
-                  RecordCount = cursor }
-
-            let attached = attachCachedTrace traceCache seeded freshTrace
-            rebuildWithOpening attached
-        else
-            appendOpeningToEmptyOrReplayedBridge payload bridge
+        attachCachedTrace traceCache updated trace
 
     let private wireRoleAndOrigin (role: string) (kind: string) (runId: string) : string * string * string option =
         match kind, role with
@@ -263,10 +252,6 @@ module internal WanxiangliTrace =
         | "tool_result"
         | "tool-result" -> "tool-result"
         | _ -> "binary"
-
-    let private captureObsRecord (trace: obj) (obs: obj) : string =
-        let res = captureObs trace obs
-        string (getField res "record")
 
     let private captureChunkedMessage
         (trace: obj)
@@ -542,8 +527,8 @@ module internal WanxiangliTrace =
         let openingRecords, openingCutCursor =
             match openingText with
             | Some text ->
-                let recStr = captureObsRecord trace (obsOpening text)
-                [ recStr ], rawInspectCursor trace
+                let records = captureOpeningRecords trace text
+                records, rawInspectCursor trace
             | None -> [], 0
 
         let itemsArray = List.toArray items

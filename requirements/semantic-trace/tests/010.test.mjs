@@ -1,4 +1,42 @@
 import test from 'node:test'
+import { withReopenableJournal } from './support/journal.mjs'
+
+test('WHAT[semantic-trace-010] legacy journal order restores parts and terminal before a complete late Opening', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  const { Trace } = await import('wanxiangli/trace')
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'late-opening-recovery'
+    const messages = [{ role: 'assistant', parts: [trace.semanticText('prior material')] }]
+    assert.equal((await trace.captureProjection(handle, session, { messages })).ok, true)
+    assert.equal((await trace.captureTerminalText(handle, session, 'prior completion', 'run-before-opening')).ok, true)
+    const before = trace.snapshot(handle, session)
+    const oldRecords = trace.traceRecords(before)
+    const oldHead = trace.traceHeadCut(before)
+    const original = new Trace(oldHead.traceId, oldRecords)
+    const frozen = original.materialize(original.cut(0), oldHead)
+
+    const continued = await reopen()
+    assert.deepEqual(trace.traceRecords(trace.snapshot(continued, session)), oldRecords)
+    const assignment = '\ufeff\u0000\r\n' + '界'.repeat(210000) + 'exact tail'
+    const requirements = ['keep exact material']
+    const receipt = await trace.captureOpening(continued, session, assignment, requirements)
+    assert.equal(receipt.ok, true, receipt.error)
+    const expectedRecords = trace.traceRecords(trace.snapshot(continued, session))
+
+    const recovered = await reopen()
+    const snapshot = trace.snapshot(recovered, session)
+    assert.deepEqual(trace.traceRecords(snapshot), expectedRecords)
+    assert.equal(trace.openingEvidence(snapshot).assignmentText, assignment)
+    assert.deepEqual(await trace.currentProjection(recovered, session), { messages })
+    const restored = new Trace(oldHead.traceId, expectedRecords)
+    assert.deepEqual(restored.materialize(restored.cut(0), oldHead), frozen)
+    const payload = `assignment:${assignment.length}:${assignment}\n${requirements.join('\n')}`
+    assert.deepEqual(restored.materialize(restored.cut(0), restored.head()).opening.bytes, new TextEncoder().encode(payload))
+    assert.equal((await trace.captureOpening(recovered, session, assignment, requirements)).openingCaptured, false)
+    assert.deepEqual(trace.traceRecords(trace.snapshot(recovered, session)), expectedRecords)
+  })
+})
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -74,5 +112,50 @@ test('WHAT[semantic-trace-010] conflicting opening is rejected', () => {
   const rejected = trace.appendOpening(projection, 'second task', [])
   assert.equal(rejected.ok, false)
   assert.equal(rejected.error, 'opening-already-captured')
+})
+
+test('WHAT[semantic-trace-010] large Opening preserves the complete bytes and distinguishes equal-length tails', async () => {
+  const { Trace } = await import('wanxiangli/trace')
+  const assignment = '\ufeff\u0000\r\n' + '界'.repeat(210000)
+  const requirements = ['first\r\nrequirement', 'second\u0000requirement']
+  const first = unwrap(trace.appendOpening(trace.emptyProjection(), assignment + 'A', requirements))
+  const second = unwrap(trace.appendOpening(trace.emptyProjection(), assignment + 'B', requirements))
+  const head = trace.traceHeadCut(first)
+  const restored = new Trace(head.traceId, trace.traceRecords(first))
+  const payload = `assignment:${assignment.length + 1}:${assignment}A\n${requirements.join('\n')}`
+  assert.deepEqual(restored.materialize(restored.cut(0), head).opening.bytes, new TextEncoder().encode(payload))
+  assert.notDeepEqual(trace.traceHeadCut(second), head)
+  assert.equal(trace.traceRecords(first).every(record => Buffer.byteLength(record) <= 1048576), true)
+  assert.equal(JSON.parse(trace.traceRecords(first).at(-1)).observation.type, 'OpeningBound')
+  assert.deepEqual(trace.traceRecords(unwrap(trace.appendOpening(first, assignment + 'A', requirements))), trace.traceRecords(first))
+})
+
+test('WHAT[semantic-trace-010] late Opening appends without changing old cuts or old semantic ranges', async () => {
+  const { Trace } = await import('wanxiangli/trace')
+  let before = unwrap(trace.appendPart(trace.emptyProjection(), part(1)))
+  before = unwrap(trace.appendTerminal(before, { textRef: 'terminal', textDigest: 'terminal-digest', providerRun: 'run-1' }))
+  const oldHead = trace.traceHeadCut(before)
+  const oldRecords = trace.traceRecords(before)
+  const original = new Trace(oldHead.traceId, oldRecords)
+  const oldWindow = original.materialize(original.cut(0), oldHead)
+  const range = trace.createRange(trace.cursor(1), trace.cursor(2))
+  const interval = trace.traceIntervalOfRange(range, before)
+  const after = unwrap(trace.appendOpening(before, 'confirmed later', ['requirement']))
+  const restored = new Trace(oldHead.traceId, trace.traceRecords(after))
+  assert.deepEqual(restored.records().slice(0, oldRecords.length), oldRecords)
+  assert.deepEqual(restored.materialize(restored.cut(0), oldHead), oldWindow)
+  assert.deepEqual(trace.traceIntervalOfRange(range, after), interval)
+  assert.equal(restored.materialize(restored.cut(0), restored.head()).opening.text, 'assignment:15:confirmed later\nrequirement')
+})
+
+test('WHAT[semantic-trace-010] small first Opening retains the original record protocol', async () => {
+  const { Trace } = await import('wanxiangli/trace')
+  const projection = unwrap(trace.appendOpening(trace.emptyProjection(), 'task', ['requirement']))
+  const records = trace.traceRecords(projection)
+  assert.equal(records.length, 1)
+  assert.equal(JSON.parse(records[0]).observation.type, 'Opening')
+  const legacy = new Trace('xtrace-projection')
+  legacy.capture({ type: 'Opening', bytes: new TextEncoder().encode('assignment:4:task\nrequirement') })
+  assert.deepEqual(records, legacy.records())
 })
 }

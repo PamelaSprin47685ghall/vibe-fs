@@ -262,14 +262,6 @@ module XTraceProjection =
             (XTraceCursor.sequence terminal.Frontier)
             bridge
 
-    let private rebuildBridgeEntries (state: XTraceProjectionState) (seeded: WanxiangliTrace.ProjectionBridge) =
-        let withParts =
-            parts state
-            |> List.fold (fun current part -> appendPartRefToBridge part current) seeded
-
-        List.rev state.Terminals
-        |> List.fold (fun current terminal -> appendTerminalRefToBridge terminal current) withParts
-
     /// COMPANION-003: capture the opening task verbatim. Idempotent: replaying
     /// the same text changes nothing; a DIFFERENT text is refused (PERSIST-010).
     let applyOpening
@@ -285,16 +277,8 @@ module XTraceProjection =
             Ok state
         | Some _ -> Error XTraceFoldRejection.OpeningAlreadyCaptured
         | None ->
-            let hasExisting =
-                not (List.isEmpty state.Parts) || not (List.isEmpty state.Terminals)
-
             let nextBridge =
-                WanxiangliTrace.appendOpeningToBridge
-                    assignment
-                    requirements
-                    hasExisting
-                    (rebuildBridgeEntries state)
-                    state.Bridge
+                WanxiangliTrace.appendOpeningToBridge assignment requirements state.Bridge
 
             Ok
                 { state with

@@ -158,10 +158,7 @@ test('WHAT[semantic-trace-005] opaque projection and wanxiangli/trace reject sta
     /Observation identity conflict/,
   )
 
-  // 重入不变量在 wanxiangli/trace 0.5.2 是结构性保证：decode 经 field()
-  // 只接受 data property（accessor 一律拒绝），公共方法同步原子，
-  // busy==true 时没有用户代码可达窗口；guard 是纵深防线，无外部可观察触发点。
-  // 这里验证真实可红的成因事实——accessor 注入面在读取前被拒。
+  // 访问器拒绝与 Proxy 重入是不同的公开边界，分别验证。
   const reentrantPayload = {}
   Object.defineProperty(reentrantPayload, 'type', {
     enumerable: true,
@@ -174,6 +171,20 @@ test('WHAT[semantic-trace-005] opaque projection and wanxiangli/trace reject sta
     () => rawTrace.capture(reentrantPayload),
     /Missing field or accessor: type/,
   )
+  let entered = false
+  const guardedPayload = new Proxy({ type: 'Opening', bytes: bytesA }, {
+    getOwnPropertyDescriptor(target, key) {
+      if (key === 'type') {
+        entered = true
+        assert.throws(() => rawTrace.inspect(), /Trace does not allow reentrant messages/)
+        assert.throws(() => rawTrace.capture({ type: 'Opening', bytes: bytesB }), /Trace does not allow reentrant messages/)
+      }
+      return Reflect.getOwnPropertyDescriptor(target, key)
+    },
+  })
+  assert.equal(rawTrace.capture(guardedPayload).status, 'Replayed')
+  assert.equal(entered, true)
+  assert.equal(rawTrace.inspect().cursor, first.cursor)
 })
 
 integrationTest('WHAT[semantic-trace-005] independently compile a consumer and reject access to opaque trace state, cursor and append refs', async () => {
