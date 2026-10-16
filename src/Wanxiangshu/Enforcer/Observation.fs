@@ -28,7 +28,7 @@ module ObservationProjection =
         | None -> []
         | Some state ->
             EnforcementProjection.recentTips state
-            |> List.map (fun tip -> tip.FieldName, tip.CycleId)
+            |> List.map (fun tip -> tip.TipName, tip.CycleId)
 
     /// Zip Enforcement RecentTips with Blog frames into domain WorkLogObservations.
     ///

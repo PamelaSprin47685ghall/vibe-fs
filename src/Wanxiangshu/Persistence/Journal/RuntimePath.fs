@@ -43,7 +43,10 @@ module RuntimePath =
     let private outsideGit (path: string) =
         let segments = path.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
 
-        if segments |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase)) then
+        if
+            segments
+            |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase))
+        then
             invalidArg "workspace" "Runtime persistence cannot be placed inside .git"
 
         path
@@ -90,7 +93,11 @@ module RuntimePath =
         let target = joinPath primary ".Herdchestra"
         let existing = lstat target (createObj [ "throwIfNoEntry" ==> false ])
 
-        if not (isNull existing) && (unbox<bool> (existing?isSymbolicLink ()) || not (unbox<bool> (existing?isDirectory ()))) then
+        if
+            not (isNull existing)
+            && (unbox<bool> (existing?isSymbolicLink ())
+                || not (unbox<bool> (existing?isDirectory ())))
+        then
             invalidArg "workspace" ".Herdchestra must be a real directory, not a link or file"
 
         target
@@ -105,10 +112,13 @@ module RuntimePath =
             writeFile ignore "*\n" (createObj [ "flag" ==> "wx"; "encoding" ==> "utf8" ])
         with error when alreadyExists error ->
             let entry = lstat ignore (createObj [ "throwIfNoEntry" ==> false ])
-            if isNull entry
-               || unbox<bool> (entry?isSymbolicLink ())
-               || not (unbox<bool> (entry?isFile ()))
-               || (readFile ignore "utf8").Trim() <> "*" then
+
+            if
+                isNull entry
+                || unbox<bool> (entry?isSymbolicLink ())
+                || not (unbox<bool> (entry?isFile ()))
+                || (readFile ignore "utf8").Trim() <> "*"
+            then
                 invalidOp ".Herdchestra/.gitignore must be a regular file excluding all runtime data"
 
         target

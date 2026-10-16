@@ -163,8 +163,9 @@ module WorkRecordSurface =
                    TextDigest = BlobDigest.create (text (payload?textDigest))
                    ProviderRun = ProviderRunIdentity.create (text providerRun)
                    ToolCallIds = toolCallIds
-                   TipRuleId = text (payload?tipRuleId)
-                   FieldNameAtCommit = optionalText payload?fieldNameAtCommit
+                   TipName = text (payload?tipName)
+                   TipTextRef = optionalText payload?tipTextRef |> Option.map BlobRef.create
+                   TipTextDigest = optionalText payload?tipTextDigest |> Option.map BlobDigest.create
                    EvidenceRef = optionalText payload?evidenceRef |> Option.map BlobRef.create
                    ObservedPrefixEpochId = PrefixEpochId.create (int64 (text (payload?observedPrefixEpoch))) |}
 

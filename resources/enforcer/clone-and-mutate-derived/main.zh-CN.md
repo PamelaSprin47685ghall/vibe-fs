@@ -3,7 +3,7 @@
 ## 现在该做什么
 先写清 source 与 derived value 的 semantic relation，然后用 constructor/record transformation 显式表达哪些 facts 保留、哪些重算、哪些丢弃。不要让 source 的完整 future shape 自动成为继承政策。
 
-## 为什么这很重要
+## 为什么重要
 Clone-by-default 把未来字段默认为“应该传播”。这会让新增字段绕过 review：security token、lifecycle marker、ownership metadata、cache state 都可能无声进入一个从未打算拥有它的 derived concept。
 
 显式 construction 则反过来：新字段出现时，compiler 或 constructor 会迫使作者做决定。
@@ -14,6 +14,11 @@ Clone-by-default 把未来字段默认为“应该传播”。这会让新增字
 - state-specific data 由 target constructor 拥有；
 - local mutation 若用于性能，封闭在 constructor 内；
 - source 新增字段时要求 explicit keep/drop/recompute decision。
+
+## 决策分支
+- 若 derivation 是 clone 一个 mutable prototype 再 patch，改用基于预期 facts 的 constructor；
+- 若 source 与 derived 是同一值类型、所有字段都有意保留，用 constructor-safe 的 record copy，而不是 mutable clone；
+- 若 source 出现新字段，要求在 derivation 里显式作出 keep/drop/recompute 决定。
 
 ## 常见假修复
 - 换更安全的 deep clone library。

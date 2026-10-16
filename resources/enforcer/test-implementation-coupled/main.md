@@ -1,5 +1,7 @@
 # test-implementation-coupled — Main
 
+## What To Do Now
+
 Move assertions outward until they land on a promise.
 
 For every private/internal assertion, ask what real behavior it was trying to protect. Rewrite the test in terms of supported input, observable result, durable state, or truly contractual external interaction.
@@ -22,6 +24,18 @@ Examples:
 
 The replacement may still observe interactions, but only where interaction itself is the contract: no network call under rejection, exactly-once effect, ordering required for durability, stable idempotency identity, protocol handshake, etc.
 
+## Why This Matters
+
+A good suite becomes **less sensitive to irrelevant implementation change and more sensitive to meaningful behavioral change**. This two-sided check prevents the easy mistake of merely weakening tests.
+
+## Repair Strategy
+
+Keep diagnostic unit tests where they protect real local laws. A pure parser function can have direct tests because that function's result is itself its supported contract. The smell is not proximity to implementation; it is asserting details no conforming consumer is entitled to rely on.
+
+## Decision Branches
+
+## Common Wrong Fixes
+
 Common fake repairs:
 
 - delete all white-box tests without adding behavioral evidence;
@@ -29,7 +43,9 @@ Common fake repairs:
 - expose internals permanently because old tests are inconvenient to rewrite;
 - mock fewer helpers but still assert call choreography that callers never see;
 - keep exact call counts where batching/caching would be a legal optimization;
-- claim “this sequence is important” without identifying which public/durable invariant makes it important.
+- claim "this sequence is important" without identifying which public/durable invariant makes it important.
+
+## Verification
 
 Verification has two sides.
 
@@ -37,9 +53,7 @@ First, perform a semantics-preserving refactor: rename/inlining helpers, change 
 
 Second, break the promise while keeping much of the old internal choreography intact: return wrong identity, publish twice, skip authorization, expose stale state. The rewritten tests must turn red.
 
-This two-sided check prevents the easy mistake of merely weakening tests. A good suite becomes **less sensitive to irrelevant implementation change and more sensitive to meaningful behavioral change**.
-
-Keep diagnostic unit tests where they protect real local laws. A pure parser function can have direct tests because that function's result is itself its supported contract. The smell is not proximity to implementation; it is asserting details no conforming consumer is entitled to rely on.
+## Done When
 
 You are done when the suite allows multiple correct implementations of the same promise and rejects incorrect ones, instead of demanding imitation of yesterday's decomposition.
 

@@ -2,15 +2,15 @@
 
 ## [001] Frontier 与 Coverage 独立
 
-TipDeliveryFrontier 按 TipOccurrence 记录已向该 Main 首次交付的事实，持久、单调，重锚不重置。TipSemanticCoverage 按 TipName 记录完整处置手册在当前 provider horizon 的可恢复性，重锚时清空。两者不得合为单一标志。
+TipDeliveryFrontier 按 TipOccurrence 记录已向该 Main 首次交付的事实，持久、单调，重锚不重置。TipSemanticCoverage 按 `normalize(tipName)` 记录已交付的处置正文在当前 provider horizon 的可恢复性，重锚时清空。两者不得合为单一标志。
 
 ## [002] Full 与首次交付
 
-occurrence 未交付或规则全文已不在当前 Coverage 时，呈现 Full：规则提示标题、TipName 和按 owner 语言选择的完整处置正文。首次交付须原子记录 TipGuidanceDelivered 并推进 Frontier；语义恢复遵守 [005]。
+occurrence 未交付或其处置正文已不在当前 Coverage 时，呈现 Full：规则提示标题、`tipName` 原串和该 occurrence 绑定的处置正文（撰写语言）。首次交付须原子记录 TipGuidanceDelivered 并推进 Frontier；语义恢复遵守 [005]。
 
 ## [003] IdentityOnly
 
-occurrence 已交付且规则全文仍在当前 Coverage 时，仅呈现稳定的 `tip: <name>`，不重复正文、不推进 Frontier，不把简写当成全文可永久恢复的事实。
+occurrence 已交付且其处置正文仍在当前 Coverage 时，仅呈现稳定的 `tip: <name>`，不重复正文、不推进 Frontier，不把简写当成处置正文可永久恢复的事实。
 
 ## [004] Durable Facts 决定交付
 
@@ -18,11 +18,11 @@ occurrence 已交付且规则全文仍在当前 Coverage 时，仅呈现稳定�
 
 ## [005] 重锚后的语义恢复
 
-ContextReanchored 仅清空 Coverage、保留 Frontier。再次遇到已交付规则时恢复 Full，不新增 occurrence、不推进 Frontier，不留下只有身份而无正文的引用。
+ContextReanchored 仅清空 Coverage、保留 Frontier。再次遇到已交付的处置正文时恢复 Full，不新增 occurrence、不推进 Frontier，不留下只有身份而无正文的引用。
 
 ## [006] Owner 解析与缺失
 
-Main 或其 Blogger ID 通过会话关联解析到 owner Main，使用其最近已提交 tip。无关联、无 tip 或无对应规则时返回 None，不编造 guidance。
+Main 或其 Blogger ID 通过会话关联解析到 owner Main，使用其最近已提交 tip；处置正文按该 occurrence 载荷携带的 ref 读回并校验 digest。无关联、无 tip，或取不回处置正文（记录缺失、ref 为空、读回失败或 digest 不符）时返回 None，不编造 guidance。
 
 ## [007] 历史别名等价
 
@@ -30,7 +30,7 @@ latestTipNudge 与 latestTipGuidance 对相同输入返回相同字节，不增�
 
 ## [008] Audience 隔离
 
-检测正文只供 Blogger system prompt，处置正文只供 Main guidance；两端共用 TipName，不混用正文。Blogger 的历史 tip 是低信任观察，不得成为 Main Authority。
+检测正文仅进 Blogger system prompt、不进交付；库处置正文作为格式样板同样进入 Blogger system prompt，但不作交付正文来源；交付正文（撰写七节）只供 Main guidance。三段正文不互相混用。Blogger 的历史 tip 是低信任观察，不得成为 Main Authority。
 
 ## [009] 交付不创建 Authority
 

@@ -3,7 +3,7 @@
 ## 现在该做什么
 画出 rule prerequisite graph。依赖链用 sequential short-circuit；可在同一输入上独立成立的 constraints 用 accumulation（必要时并行）。不要让一个 generic pipeline 替 domain 决定 logical dependence。
 
-## 为什么这很重要
+## 为什么重要
 错误的 composition 会制造两种相反的谎言：
 
 - cascading nonsense：前提不存在，却继续报告后续“错误”；
@@ -17,6 +17,10 @@
 - 同层独立 constraints 形成 `collectAll`；
 - error algebra 保留 prerequisite failure 与 independent violation 的区别；
 - operational staging（成本/安全）若影响 composition，要明确记录为 policy，而不是偷偷等同逻辑依赖。
+
+## 决策分支
+若规则 B 需要 A 确立的事实，顺序执行，A 失败即短路。
+若规则在同一份输入上彼此独立，累积它们的结果，而不是在第一次失败就停止。
 
 ## 常见假修复
 - 全项目统一 fail-fast。

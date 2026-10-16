@@ -14,7 +14,8 @@ module InteractionRepairWorkflow =
         rootWorkspace: IRootWorkspaceReader ->
         eventPort: IEventObservationPort ->
         journal: AgentJournal option ->
-        observer: ContinuationAcceptanceObserver option -> Task
+        observer: ContinuationAcceptanceObserver option ->
+            Task
 
     val repairBloggerProtocol:
         host: IBloggerRuntimeHost ->

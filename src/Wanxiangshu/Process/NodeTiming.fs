@@ -13,7 +13,8 @@ module NodeTiming =
     [<Import("Time", "wanxiangli/time")>]
     let private library: obj = jsNative
 
-    let private call (name: string) (args: obj) : obj = emitJsExpr (library, name, args) "$0[$1].apply(null, $2)"
+    let private call (name: string) (args: obj) : obj =
+        emitJsExpr (library, name, args) "$0[$1].apply(null, $2)"
 
     let timerTask (milliseconds: int) : Task<unit> =
         unbox<Task<unit>> (call "timerTask" (box [| box milliseconds |]))
@@ -32,9 +33,11 @@ module NodeTiming =
                 { new IDeadlineHandle with
                     member _.Delay = unbox<Task<unit>> delayTask
 
-                    member _.Cancel() = emitJsExpr handle "if (typeof $0.Cancel === 'function') $0.Cancel()" |> ignore }
+                    member _.Cancel() =
+                        emitJsExpr handle "if (typeof $0.Cancel === 'function') $0.Cancel()" |> ignore }
 
-            member _.Dispose() = emitJsExpr port "$0.Dispose()" |> ignore }
+            member _.Dispose() =
+                emitJsExpr port "$0.Dispose()" |> ignore }
 
     let nodeClockPort () : IClockPort =
         let port = call "nodeClockPort" (box [||])

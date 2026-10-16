@@ -1,5 +1,7 @@
 # race-first-wins-semantics — Enforcer
 
+## Definition
+
 Race-first-wins semantics appear when the scheduler, network, or runtime accidentally gets to answer a business question.
 
 The signature defect is this:
@@ -8,7 +10,11 @@ The signature defect is this:
 
 If no domain rule says arrival order is meaningful, the system has outsourced semantics to latency.
 
-This often hides behind performance code that “takes the first successful result,” `Promise.race`, `Task.WhenAny`, competing callbacks, redundant requests, speculative execution, or parallel workers. Those mechanisms are not inherently wrong. They become wrong when **physical completion order substitutes for a declared selection rule**.
+## Governing Principle
+
+This often hides behind performance code that "takes the first successful result," `Promise.race`, `Task.WhenAny`, competing callbacks, redundant requests, speculative execution, or parallel workers. Those mechanisms are not inherently wrong. They become wrong when **physical completion order substitutes for a declared selection rule**.
+
+## Trigger When
 
 Examples of accidental semantics:
 
@@ -16,11 +22,15 @@ Examples of accidental semantics:
 - two candidate fixes race and the first completed patch is published without comparing correctness;
 - concurrent discoveries compete to initialize shared state, and the first caller silently defines the canonical value;
 - a fallback path and primary path race; whichever finishes first wins even though one result is semantically preferred;
-- an asynchronous cache fill races a fresher source, and “first visible” becomes “authoritative.”
+- an asynchronous cache fill races a fresher source, and "first visible" becomes "authoritative."
+
+## Do Not Trigger When
 
 Do not fire when timing is genuinely part of the protocol. Leader election, lease acquisition, auction close, explicit first-writer-wins registers, lowest-latency replica selection, or hedged reads can all use time/order legitimately **if the protocol defines identity, freshness, quorum, cancellation, and tie behavior**. In that case timing is not an accident; it is one of the inputs.
 
-Also do not confuse this with “concurrency exists.” Parallel work can finish in any order while a deterministic join later applies the real rule. Concurrency is fine. Undeclared scheduler sovereignty is not.
+Also do not confuse this with "concurrency exists." Parallel work can finish in any order while a deterministic join later applies the real rule. Concurrency is fine. Undeclared scheduler sovereignty is not.
+
+## Distinguish From
 
 Nearby rules:
 
@@ -28,6 +38,8 @@ Nearby rules:
 - `shared-mutable-concurrency` — several actors share mutation authority;
 - `serial-when-parallel` — independent work is needlessly serialized;
 - `flaky-test-tolerated` — unstable verdicts have been normalized.
+
+## Decision Procedure
 
 Use this rule when the sharpest statement is: **arrival order is choosing an outcome that should be chosen by domain facts.**
 
@@ -38,6 +50,12 @@ The repair is one of two things:
 1. remove arrival order from the decision and apply a deterministic merge/selection law over the required information; or
 2. admit that first-wins is truly the protocol and make that law explicit, including stable identity, freshness, cancellation of losers, and conflict/tie behavior.
 
-Do not paper over the race with tiny sleeps, task priorities, “primary usually finishes first,” or retries. Those merely tune the probability distribution of an undeclared policy.
+Do not paper over the race with tiny sleeps, task priorities, "primary usually finishes first," or retries. Those merely tune the probability distribution of an undeclared policy.
+
+## Examples
+
+Two replicas return different versions and the first response becomes truth. Two candidate fixes race and the first completed patch is published without comparing correctness. A fallback path and primary path race; whichever finishes first wins even though one result is semantically preferred.
+
+## Nudge
 
 > The scheduler may decide **when** facts arrive. It should not decide **what those facts mean** unless the domain explicitly gave it that authority.

@@ -3,7 +3,7 @@
 ## 现在该做什么
 把 observation 移到 shell，把 decision 留在 core。先读取 clock、random choice、configuration、storage result、provider response 等事实，再用明确数据调用 policy；core 返回 decision / command / event，由 shell 执行 effects。
 
-## 为什么这很重要
+## 为什么重要
 隐藏 effect 最贵的后果是“无法完整重放理由”。同一 command 重放时，core 又读了一次新的世界，于是 replay 不是重放过去，而是在今天重新裁决昨天。
 
 这也会污染测试：测试不再给 policy 输入，而是布置一个假的宇宙，祈祷 core 从里面读取到预期事实。
@@ -15,6 +15,10 @@
 4. 必须持续观察的能力做成窄 port，并把 effectful orchestration 留在 shell；
 5. core 输出 typed decision，而不是自己执行 DB/network/process side effects；
 6. 需要 replay 的随机/时间结果要持久化 provenance。
+
+## 决策分支
+- 若函数决定业务结果，它必须把观察到的事实作为输入、返回一个值；
+- 若函数的工作是观察或执行，把它留在 shell，不要让它拥有 policy。
 
 ## 常见假修复
 - 把 `Date.now()` 包成 `Clock.now()`，但 core 仍自己调用它；依赖只是换了名字。

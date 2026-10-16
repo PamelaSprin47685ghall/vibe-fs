@@ -3,7 +3,7 @@
 ## 现在该做什么
 先把 policy 用 domain sentences 写出来，再把句子映射成 named predicates、closed cases 或小型 decision table。让 control flow 服务规则，而不是让规则藏在 control flow 里。
 
-## 为什么这很重要
+## 为什么重要
 当 policy 只能靠执行轨迹理解，维护者会开始“局部修 branch”。每个局部 patch 都可能改变另一条隐藏路径，久而久之规则本身没人能完整复述，只剩 tests 与 comments 在外围猜测。
 
 可读 policy 缩短 proof：读者直接看到 proposition 与 composition，而不必保存临时变量和路径历史。
@@ -15,6 +15,11 @@
 - 对稳定 rule algebra 用小 combinators；
 - orchestration/effects 留在 policy 外；
 - 保持简单，不为几条规则引入通用 rules engine。
+
+## 决策分支
+- 若 policy 仍只存在于嵌套分支里，抽出命名的 propositions 并组合它们；
+- 若 propositions 已经命名却被 mutable flags 粘在一起，用 combinators 或 cases 替换 flags；
+- 若组合已经存在但用了错误的失败法则，那是 `wrong-rule-composition`——修 combinator，不是改名字。
 
 ## 常见假修复
 - 每个 `if` 抽成 helper，但顶层仍是同一个迷宫。

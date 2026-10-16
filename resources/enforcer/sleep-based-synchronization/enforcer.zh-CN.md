@@ -1,5 +1,7 @@
 # sleep-based-synchronization — Enforcer
 
+## 定义
+
 Sleep-based synchronization 的病，是把**时间过去了**偷换成**前置事实已经成立**。
 
 代码真正想说的是“等 X ready”，实现却写成“等 500ms，希望到时候 X 大概 ready”。这整个替换本身就是缺陷。
@@ -13,6 +15,16 @@ Sleep-based synchronization 的病，是把**时间过去了**偷换成**前置�
 
 同一个 sleep 同时太长又太短。
 
+## 支配原则
+
+区分标准很精确：
+
+> **如果下一步之所以被允许，只因为 clock expired，问问你真正需要的是不是一个事实。**
+
+如果 success 仍由 event/state 决定，clock 只是 “N 秒后放弃”，那它是 policy，不是 synchronization。
+
+## 何时触发
+
 以下情况触发：
 
 - 启动 writer 后 `sleep(500)` 再断言 file exists；
@@ -22,13 +34,11 @@ Sleep-based synchronization 的病，是把**时间过去了**偷换成**前置�
 - retry loop 只等时间，不检查真实 state；
 - UI/agent workflow 插 pause 避 race，而不是等待 completion / ownership signal。
 
+## 不应触发
+
 不要看到 sleep 就触发。Rate limiting、protocol backoff、jitter、scheduled cadence、animation/human pacing、fault injection、真正 time-domain product behavior 都可能合法依赖 elapsed time。Timeout 也可以给 causal wait 设上限，而不成为 success signal。
 
-区分标准很精确：
-
-> **如果下一步之所以被允许，只因为 clock expired，问问你真正需要的是不是一个事实。**
-
-如果 success 仍由 event/state 决定，clock 只是 “N 秒后放弃”，那它是 policy，不是 synchronization。
+## 与相邻规则区分
 
 邻近规则：
 
@@ -36,6 +46,8 @@ Sleep-based synchronization 的病，是把**时间过去了**偷换成**前置�
 - `time-dependent-test`：test 更广泛依赖真实 wall-clock/calendar；
 - `blocking-event-loop`：等待时霸占 shared executor；
 - `repeat-until-pass`：不断采样直到出现 green。
+
+## 判定程序
 
 本规则只在 elapsed duration 正在冒充 causality 时触发。
 
@@ -51,5 +63,11 @@ Sleep-based synchronization 的病，是把**时间过去了**偷换成**前置�
 - event identity X committed。
 
 然后等**这个事实**。如果无法提供 event，poll authoritative state 也可以，但必须有 bounded timeout，timeout 只意味着失败/未知，不能意味着“算成功吧”。
+
+## 例子
+
+启动 writer 后 `sleep(500)` 再断言 file exists。“等两秒让 server 起好”而没有 readiness observation。test teardown sleep，给 child process “时间退出”。
+
+## Nudge
 
 > 不要在你真正想等因果时去等时间。

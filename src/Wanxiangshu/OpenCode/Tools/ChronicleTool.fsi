@@ -3,7 +3,8 @@ namespace Wanxiangshu.OpenCode
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 
 /// docs/what/enforcer.md — the `chronicle` tool (ENFORCER-010/020/040/041/061 tip v2).
-/// Provider schema: required charge/occurrence/settlement/consequence + optional evidence + required tip.
+/// Provider schema: required charge/occurrence/settlement/consequence, a free tipName
+/// and seven lesson sections, plus optional evidence.
 module ChronicleTool =
 
     [<RequireQualifiedAccess>]
@@ -27,7 +28,28 @@ module ChronicleTool =
         val ArgEvidence: string = "tool/chronicle/arg-evidence"
 
         [<Literal>]
-        val ArgTip: string = "tool/chronicle/arg-tip"
+        val ArgTipName: string = "tool/chronicle/arg-tip-name"
+
+        [<Literal>]
+        val ArgWhatToDoNow: string = "tool/chronicle/arg-what-to-do-now"
+
+        [<Literal>]
+        val ArgWhyThisMatters: string = "tool/chronicle/arg-why-this-matters"
+
+        [<Literal>]
+        val ArgRepairStrategy: string = "tool/chronicle/arg-repair-strategy"
+
+        [<Literal>]
+        val ArgDecisionBranches: string = "tool/chronicle/arg-decision-branches"
+
+        [<Literal>]
+        val ArgCommonWrongFixes: string = "tool/chronicle/arg-common-wrong-fixes"
+
+        [<Literal>]
+        val ArgVerification: string = "tool/chronicle/arg-verification"
+
+        [<Literal>]
+        val ArgDoneWhen: string = "tool/chronicle/arg-done-when"
 
         [<Literal>]
         val Remembered: string = "tool/chronicle/remembered"
@@ -36,7 +58,7 @@ module ChronicleTool =
         val NothingToRemember: string = "tool/chronicle/nothing-to-remember"
 
         [<Literal>]
-        val MissingTip: string = "tool/chronicle/missing-tip"
+        val InvalidTip: string = "tool/chronicle/invalid-tip"
 
     [<Literal>]
     val EmptyTextError: string = "CHRONICLE_EMPTY_ENFORCER_061"

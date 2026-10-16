@@ -34,7 +34,7 @@ module CompanionProjectionBuilder =
         | CompanionRequestKind.Squash _ -> "squash"
 
     /// ENFORCER-071: one low-trust previous tip message.
-    /// Domain shape is (FieldName, CycleId); Journal maps RecentTips into this.
+    /// Domain shape is (TipName, CycleId); Journal maps RecentTips into this.
     let private tipMessage
         (sha256: string -> string)
         (bloggerSessionId: SessionId)

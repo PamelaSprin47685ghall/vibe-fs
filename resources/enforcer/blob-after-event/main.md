@@ -1,12 +1,18 @@
 # blob-after-event — Main
 
+## What To Do Now
+
 Reverse the publication order or make it truly atomic.
 
 If blob and reference are separate commits, persist the blob first, wait for the blob store's **recovery-grade durability guarantee**, verify identity as required, and only then append the event/manifest/index record that makes the reference part of history.
 
+## Why This Matters
+
 The desired invariant is:
 
 > **Every committed reference resolves to a durably readable referent under the same recovery contract.**
+
+## Repair Strategy
 
 A safe two-step protocol therefore looks like:
 
@@ -18,10 +24,6 @@ append history reference H
 publish consequences
 ```
 
-If the process dies after blob commit but before event append, you may leave an orphan blob. That is usually acceptable: garbage collection can later remove unreferenced content according to a retention policy.
-
-If the process dies after event append, replay must be able to read H. There should be no normal semantic branch for “history says content existed, but maybe upload had not finished.” Correct ordering removes that world.
-
 If the underlying store offers a real atomic transaction spanning blob and reference, use it — but verify the guarantee instead of simulating atomicity by issuing two async writes close together.
 
 For content-addressed storage:
@@ -30,6 +32,14 @@ For content-addressed storage:
 - ensure replay validates digest if corruption/substitution matters;
 - retries must reuse the same content identity rather than publishing a new reference before the old one is resolved;
 - garbage collection must never delete blobs still reachable from retained history.
+
+## Decision Branches
+
+If the process dies after blob commit but before event append, you may leave an orphan blob. That is usually acceptable: garbage collection can later remove unreferenced content according to a retention policy.
+
+If the process dies after event append, replay must be able to read H. There should be no normal semantic branch for “history says content existed, but maybe upload had not finished.” Correct ordering removes that world.
+
+## Common Wrong Fixes
 
 Common fake repairs:
 
@@ -41,6 +51,8 @@ Common fake repairs:
 - catch blob upload failure after the event is already committed and emit another “blob missing” event — history is still internally contradictory at the earlier point;
 - make the event mutable so the blob reference can be filled in later.
 
+## Verification
+
 Verification should inject crashes at each boundary:
 
 1. before blob durability — no committed reference;
@@ -50,6 +62,8 @@ Verification should inject crashes at each boundary:
 5. during garbage collection — reachable content survives.
 
 Also test blob-store acknowledgement loss if relevant. Unknown blob outcome should be resolved by content identity/status before deciding whether the reference may publish.
+
+## Done When
 
 You are done when a replay engine can treat every committed reference as a fact rather than as a request to participate in storage archaeology.
 

@@ -25,7 +25,7 @@ const records = directory => readdirSync(directory, { withFileTypes: true }).fla
   return readFileSync(path, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line))
 })
 
-export const facts = (directory, name) => records(join(directory, '.git')).map(value => payload(value, name)).filter(Boolean)
+export const facts = (directory, name) => records(join(directory, '.Herdchestra')).map(value => payload(value, name)).filter(Boolean)
 export const state = (runtime, sessionID) => Journal.JournalSurface_snapshot(runtime.journal).sessionProjections[sessionID]
 export const prefixHistory = directory => ({
   rebases: facts(directory, 'PrefixRebaseCommitted'),
@@ -37,7 +37,7 @@ export const observeFact = async (directory, name, action) => {
   const observed = Promise.withResolvers()
   const before = facts(directory, name).length
   const append = fs.appendFileSync
-  const eventRoot = realpathSync(join(directory, '.git', 'wanxiangshu', 'events')) + sep
+  const eventRoot = realpathSync(join(directory, '.Herdchestra', 'wanxiangshu', 'events')) + sep
   fs.appendFileSync = (path, content, ...options) => {
     append(path, content, ...options)
     if (typeof path === 'string' && path.startsWith(eventRoot) && String(content).includes(`"${name}"`)) {
@@ -116,7 +116,7 @@ export const coveredSession = async (hooks, runtime, directory, sessionID, testC
     push(structuredClone(messages.at(-1)))
     push(running)
     await transform()
-    const entry = { charge: 'Record the completed read.', occurrence: 'The source was read.', settlement: 'The read is complete.', consequence: 'Later work retains the result.', tip: Enforcer.fieldNames()[0] }
+    const entry = { charge: 'Record the completed read.', occurrence: 'The source was read.', settlement: 'The read is complete.', consequence: 'Later work retains the result.', tipName: Enforcer.fieldNames()[0], whatToDoNow: 'Carry the recorded material into the next step.', whyThisMatters: 'The durable frame preserves the outcome for later context.', repairStrategy: 'Re-read the source when the outcome is disputed.', decisionBranches: 'Continue when coverage matches; otherwise settle the request.', commonWrongFixes: 'Never re-commit the same observation or invent an owner.', verification: 'Expect exactly one committed frame per call.', doneWhen: 'Observation and coverage advance together.', }
     const recorded = await hooks.tool.chronicle.execute(entry, { sessionID: blogger, agent: 'blogger', messageID: 'msg-blog-run', callID: 'call-blog' })
     bloggerMessages = [
       { info: { ...bloggerPhysical, sessionID: blogger }, parts: bloggerPhysical.parts },
@@ -144,7 +144,7 @@ export const commitPendingBlogger = async (hooks, runtime, directory, session) =
   const request = facts(directory, 'BloggerRequestMaterialized').at(-1)
   assert.equal(request.PreviousIngestedThroughSequence, '4')
   assert.equal(request.NextIngestedThroughSequence, '6')
-  const entry = { charge: 'Record the completed checkpoint.', occurrence: 'The checkpoint completed.', settlement: 'The checkpoint is durable.', consequence: 'Later work retains the checkpoint.', tip: Enforcer.fieldNames()[0] }
+  const entry = { charge: 'Record the completed checkpoint.', occurrence: 'The checkpoint completed.', settlement: 'The checkpoint is durable.', consequence: 'Later work retains the checkpoint.', tipName: Enforcer.fieldNames()[0], whatToDoNow: 'Carry the recorded material into the next step.', whyThisMatters: 'The durable frame preserves the outcome for later context.', repairStrategy: 'Re-read the source when the outcome is disputed.', decisionBranches: 'Continue when coverage matches; otherwise settle the request.', commonWrongFixes: 'Never re-commit the same observation or invent an owner.', verification: 'Expect exactly one committed frame per call.', doneWhen: 'Observation and coverage advance together.', }
   const recorded = await hooks.tool.chronicle.execute(entry, { sessionID: session.blogger, agent: 'blogger', messageID: session.bloggerNext.info.id, callID: 'call-blog-second' })
   session.bloggerNext.info.finish = 'tool-calls'
   session.bloggerNext.info.time.completed = 5

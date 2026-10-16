@@ -6,15 +6,14 @@ const { default: test } = await import("node:test");
 const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 const observation = await import("../../../dist/Enforcer/ObservationSurface.js");
 
-const cycle = ({ run = 'msg-e1', tipRuleId = 'enforcement-tip-1', fieldNameAtCommit = 'field-tip-1', toolCalls = [], evidenceRef } = {}) => ({
+const cycle = ({ run = 'msg-e1', tipName = 'enforcement-tip-1', toolCalls = [], evidenceRef } = {}) => ({
   mainSessionId: 'ses-main',
   bloggerSessionId: 'ses-blogger',
   run,
   toolCallIds: toolCalls,
   textRef: 'blob-e1',
   textDigest: 'sha-e1',
-  tipRuleId,
-  fieldNameAtCommit,
+  tipName,
   evidenceRef,
   observedPrefixEpoch: 0,
 })
@@ -66,8 +65,7 @@ const cycleRecord = (n, field) => ({
   toolCallIds: [`call-${n}`],
   textRef: `blob-t${n}`,
   textDigest: `sha-t${n}`,
-  tipRuleId: field,
-  fieldNameAtCommit: field,
+  tipName: field,
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })
@@ -75,7 +73,7 @@ const cycleRecord = (n, field) => ({
 test('WHAT[behavior-diagnosis-014] ENFORCER_TIP_08_each_committed_cycle_records_exactly_one_tip', () => {
   const applied = observation.applyEnforcementCycle(observation.emptyEnforcement, cycleRecord(1, fields[0]))
   assert.equal(applied.ok, true, applied.ok ? '' : applied.error)
-  assert.deepEqual(observation.recentTips(applied.value), [{ ruleId: fields[0], fieldName: fields[0], cycleId: 'msg_tip_1' }])
+  assert.deepEqual(observation.recentTips(applied.value), [{ tipName: fields[0], cycleId: 'msg_tip_1' }])
 })
 test('WHAT[behavior-diagnosis-014] ENFORCER_TIP_09_replay_preserves_tip', () => {
   const state = observation.applyEnforcementCycle(observation.emptyEnforcement, cycleRecord(1, fields[2])).value

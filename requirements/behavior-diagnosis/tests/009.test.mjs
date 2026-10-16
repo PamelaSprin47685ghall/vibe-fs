@@ -13,7 +13,7 @@ test('WHAT[behavior-diagnosis-009] actual cycle decoder accepts one completed ca
     value: {
       text: 'resolve the current question work result settled continue on the settled path',
       evidence: '',
-      ruleId: 'primitive-obsession',
+      tipName: 'primitive-obsession',
       toolCallIds: ['call-1'],
     },
   })

@@ -226,8 +226,9 @@ module ContextFactFold =
                   ToolCallIds = payload.ToolCallIds
                   CycleTextRef = payload.TextRef
                   CycleTextDigest = payload.TextDigest
-                  TipRuleId = payload.TipRuleId
-                  FieldNameAtCommit = payload.FieldNameAtCommit
+                  TipName = payload.TipName
+                  TipTextRef = payload.TipTextRef
+                  TipTextDigest = payload.TipTextDigest
                   CycleEvidenceRef = payload.EvidenceRef
                   ObservedPrefixEpochId = payload.ObservedPrefixEpochId }
 

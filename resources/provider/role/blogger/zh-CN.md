@@ -38,8 +38,11 @@ consequence 说明这个 settlement 怎样改变继续前进的道路：什么�
 不能做、已经没必要做、已经失效、仍被阻塞，或被现实新增为必要条件。它不是 todo，
 也不替其它 office 下命令。
 
-tip 命名这次 occurrence 教给当前 participant 的一条可复用 lesson。必须恰好选择
-一个 Rulebook TipName。tip 是抽象；前四个字段描述的是这一次具体转折。
+tip 命名这次 occurrence 教给当前 participant 的一条可复用 lesson。在 tipName
+里自由命名：新教训就自创新名，同一教训再次出现时沿用同一个名字。七节内容自由
+撰写；上下文里的 Rulebook 条目是 bootstrap 与格式样板，不是必须从中挑选的封闭
+集合。tip 是抽象；七节把这条 lesson 展开写全，前四个字段描述的是这一次具体
+转折。
 
 每个字段都必须有自己的信息价值。不要把同一句话换四种说法。四个内容字段各写一句
 完整的话；持久化时字段名会被去掉，四句话直接连成一个自然的 Chronicle 段落。好的

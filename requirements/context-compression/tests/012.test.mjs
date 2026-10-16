@@ -477,8 +477,8 @@ test('WHAT[context-compression-012] ENFORCER_071_normal_interleaves_tips_with_fr
     frames: frames(2),
     delta: { messageId: 'msg_delta', items: dataItems },
     previousTips: [
-      { field: 'primitive-obsession', cycleId: 'msg_c1' },
-      { field: 'ignored-tdd', cycleId: 'msg_c2' },
+      { tipName: 'primitive-obsession', cycleId: 'msg_c1' },
+      { tipName: 'ignored-tdd', cycleId: 'msg_c2' },
     ],
   })
 
@@ -505,8 +505,8 @@ test('WHAT[context-compression-012] ENFORCER_071_unpaired_tips_or_frames_append_
     frames: frames(1),
     delta: { messageId: 'msg_d', items: dataItems },
     previousTips: [
-      { field: 'primitive-obsession', cycleId: 'c1' },
-      { field: 'ignored-tdd', cycleId: 'c2' },
+      { tipName: 'primitive-obsession', cycleId: 'c1' },
+      { tipName: 'ignored-tdd', cycleId: 'c2' },
     ],
   })
   assert.deepEqual(
@@ -520,7 +520,7 @@ test('WHAT[context-compression-012] ENFORCER_071_unpaired_tips_or_frames_append_
     kind: proj.normal,
     frames: frames(2),
     delta: { messageId: 'msg_d', items: dataItems },
-    previousTips: [{ field: 'primitive-obsession', cycleId: 'c1' }],
+    previousTips: [{ tipName: 'primitive-obsession', cycleId: 'c1' }],
   })
   assert.deepEqual(
     extraFrame.texts.map((t) => (isPreviousTip(t) ? 'tip' : isHistoricFrame(t) ? 'frame' : 'delta')),
@@ -582,7 +582,7 @@ test('WHAT[context-compression-012] PROJ_008_Companion_owner_normal_rows_render_
     { digest: 'sha-f0', body: 'frame body 0' },
     { digest: 'sha-f1', body: 'frame body 1' },
   ]
-  const previousTips = [{ field: 'progress', cycleId: 'cycle-1' }]
+  const previousTips = [{ tipName: 'progress', cycleId: 'cycle-1' }]
   const delta = { messageId: 'msg_delta', toml: '[[new_work_to_record]]\nuser = "work"' }
   const input = { blogger: 'ses_y', epoch: 0, kind: 'normal', frames, delta, previousTips }
 

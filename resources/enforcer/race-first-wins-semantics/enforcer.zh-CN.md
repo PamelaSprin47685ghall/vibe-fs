@@ -1,5 +1,7 @@
 # race-first-wins-semantics — Enforcer
 
+## 定义
+
 Race-first-wins 的本质，是 scheduler、network 或 runtime 偶然替 domain 回答了一个本该由业务事实回答的问题。
 
 最锋利的判定方式只有一句：
@@ -8,7 +10,11 @@ Race-first-wins 的本质，是 scheduler、network 或 runtime 偶然替 domain
 
 如果规范说不出“为什么先到本身有业务意义”，系统就把 semantics 外包给 latency 了。
 
+## 支配原则
+
 它经常藏在这些现代写法后面：`Promise.race`、`Task.WhenAny`、hedged request、speculative execution、多个 callback、并行 worker、“first successful result wins”。这些机制本身没有罪。问题出在**physical completion order 被拿来替代真正的 selection rule**。
+
+## 何时触发
 
 典型 accidental semantics：
 
@@ -18,9 +24,13 @@ Race-first-wins 的本质，是 scheduler、network 或 runtime 偶然替 domain
 - primary 与 fallback 赛跑，谁先完成谁赢，但 domain 明明偏好其中一种来源；
 - cache fill 与 fresher source 并发，“first visible” 被当成 “authoritative”。
 
+## 不应触发
+
 不要误杀真正 timing-based protocol。Leader election、lease acquisition、auction close、明确 first-writer-wins register、lowest-latency replica、hedged read 都可能合法依赖时序，前提是 protocol 真正定义了 identity、freshness、quorum、loser cancellation、tie/conflict behavior。那时 timing 是显式输入，不是 accidental scheduler authority。
 
 也不要因为“并发完成顺序不固定”就触发。并发完全可以乱序结束，最后由 deterministic join/merge 决定真实 outcome。Concurrency 没问题；**未声明的 scheduler sovereignty** 才有问题。
+
+## 与相邻规则区分
 
 邻近规则：
 
@@ -28,6 +38,8 @@ Race-first-wins 的本质，是 scheduler、network 或 runtime 偶然替 domain
 - `shared-mutable-concurrency`：多个 actor 共享 mutation authority；
 - `serial-when-parallel`：独立工作被无谓串行；
 - `flaky-test-tolerated`：不稳定 verdict 被组织正常化。
+
+## 判定程序
 
 只有当这一句最准确时才用本规则：**arrival order 正在替 domain fact 选择答案。**
 
@@ -39,5 +51,11 @@ Race-first-wins 的本质，是 scheduler、network 或 runtime 偶然替 domain
 2. 承认 first-wins 就是 protocol，并把 stable identity、freshness、loser handling、tie/conflict、durable winner 全部写成正式规则。
 
 不要用微小 sleep、task priority、“primary 通常更快”、或者 retry 去调概率。这些只是让未声明 policy 更少暴露。
+
+## 例子
+
+两个 replica 返回不同 version，谁先回谁就成 truth。两个 candidate fix 并行生成，先结束的 patch 直接 publish，没有比较 correctness。primary 与 fallback 赛跑，谁先完成谁赢，但 domain 明明偏好其中一种来源。
+
+## Nudge
 
 > Scheduler 可以决定事实**什么时候到**；除非 domain 明确授权，它不该决定这些事实**是什么意思**。

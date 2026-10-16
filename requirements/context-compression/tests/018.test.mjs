@@ -690,7 +690,7 @@ test('WHAT[context-compression-018] COMPANION_018_first_turn_shape_is_false_when
     kind: proj.normal,
     frames: [],
     delta: { messageId: 'msg_d', items: dataItems },
-    previousTips: [{ field: 'primitive-obsession', cycleId: 'c1' }],
+    previousTips: [{ tipName: 'primitive-obsession', cycleId: 'c1' }],
   })
   assert.equal(withTip.isFirstTurnShape, false)
 })

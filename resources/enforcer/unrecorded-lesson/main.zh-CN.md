@@ -3,11 +3,15 @@
 ## 现在该做什么
 把 reusable discovery 放进未来人自然会查的 artifact：regression test、runbook、RuleBook、contract doc、troubleshooting guide。记录 causal lesson，不要只 dump 调试过程。
 
-## 为什么这很重要
+## 为什么重要
 未外部化的经验会让团队重复支付搜索成本：同样的 provider surprise、错误 hypothesis、诊断顺序一遍遍被重新发现。人的经验增长了，system knowledge 却没有增长。
 
 ## 修复策略
 至少记录四件事：symptom、underlying fact、如何验证、它要求/禁止什么行动。能由 test/gate 保存的知识优先 executable preservation。
+
+## 决策分支
+- 若未来工程师遇到同样 symptom 能因此缩小搜索空间，写一个他们真正会查的最小 durable artifact；
+- 若事实已经在 test、runbook 或 rule 里，指向它，而不是再造第二份副本。
 
 ## 常见假修复
 - 保存整段 session/log，没人知道结论在哪。

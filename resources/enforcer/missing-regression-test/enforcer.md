@@ -1,8 +1,16 @@
 # missing-regression-test — Enforcer
 
+## Definition
+
 A missing regression test means the team paid to discover a real defect, fixed the code, and then failed to preserve the **new knowledge about reachable bad behavior**.
 
 A bug report is not merely a request to change lines. It is evidence that the system's state space contains a counterexample nobody expected or nobody had encoded. The implementation fix removes today's symptom. A regression test turns the discovery into repository memory.
+
+## Governing Principle
+
+The important distinction from `failure-path-untested` is provenance: this rule starts from **a known concrete defect**. `failure-path-untested` can fire before any incident because a failure policy has never been exercised. A known bug deserves a test even if its path was nominally “covered” before — because coverage clearly failed to distinguish the actual defect.
+
+## Trigger When
 
 Fire this rule when:
 
@@ -13,9 +21,13 @@ Fire this rule when:
 - an incident postmortem describes the failure, but no test/property/canary prevents the same mechanism from returning;
 - a one-off manual reproduction was used to verify the fix and then discarded.
 
+## Do Not Trigger When
+
 Do not fire when an existing test already caught the defect and remains in the suite. That test is already the regression memory. Do not demand a regression test for documentation-only errors or operational mistakes outside the product's behavioral contract unless product behavior is changed to prevent recurrence.
 
-The important distinction from `failure-path-untested` is provenance: this rule starts from **a known concrete defect**. `failure-path-untested` can fire before any incident because a failure policy has never been exercised. A known bug deserves a test even if its path was nominally “covered” before — because coverage clearly failed to distinguish the actual defect.
+## Distinguish From
+
+## Decision Procedure
 
 A strong regression test has three properties:
 
@@ -30,5 +42,9 @@ For concurrency/nondeterministic incidents, preserve the causal schedule determi
 For property bugs, a found minimal counterexample may belong both as a fixed example and as evidence strengthening the general generator/property.
 
 A decisive check is to temporarily restore or simulate the old defect. If the new test remains green, it is not regression memory; it is ceremony added after the fact.
+
+## Examples
+
+## Nudge
 
 > A bug that changed code but did not change the repository's executable knowledge is only waiting to become expensive twice.

@@ -19,25 +19,25 @@ module GroundingCatalog =
           Rules: ScopeRule list }
 
     [<Emit("$0.discover($1)")>]
-    let private rawDiscover (_api: obj) (_workspace: string): obj = jsNative
+    let private rawDiscover (_api: obj) (_workspace: string) : obj = jsNative
 
     [<Emit("$0.resolve($1, $2)")>]
-    let private rawResolve (_api: obj) (_workspace: string) (_path: string): obj = jsNative
+    let private rawResolve (_api: obj) (_workspace: string) (_path: string) : obj = jsNative
 
     [<Emit("$0.materialize($1, $2)")>]
-    let private rawMaterialize (_api: obj) (_workspace: string) (_packageName: string): obj = jsNative
+    let private rawMaterialize (_api: obj) (_workspace: string) (_packageName: string) : obj = jsNative
 
     [<Emit("$0.snapshotsForPaths($1, $2)")>]
-    let private rawSnapshotsForPaths (_api: obj) (_workspace: string) (_paths: obj): obj = jsNative
+    let private rawSnapshotsForPaths (_api: obj) (_workspace: string) (_paths: obj) : obj = jsNative
 
     [<Emit("$0.canonicalWorkspace($1)")>]
-    let private rawCanonicalWorkspace (_api: obj) (_workspace: string): string = jsNative
+    let private rawCanonicalWorkspace (_api: obj) (_workspace: string) : string = jsNative
 
     [<Emit("$0.workspaceRelativePath($1, $2)")>]
-    let private rawWorkspaceRelativePath (_api: obj) (_workspace: string) (_path: string): obj = jsNative
+    let private rawWorkspaceRelativePath (_api: obj) (_workspace: string) (_path: string) : obj = jsNative
 
     [<Emit("Array.from($0)")>]
-    let private toArray (_value: obj): obj array = jsNative
+    let private toArray (_value: obj) : obj array = jsNative
 
     let private text (value: obj) (key: string) = unbox<string> (value?(key))
 
@@ -46,10 +46,7 @@ module GroundingCatalog =
           Pattern = text rule "pattern" }
 
     let private decodePackage (entry: obj) : PackageDescriptor =
-        let rules =
-            toArray (entry?("rules"))
-            |> Array.map decodeRule
-            |> Array.toList
+        let rules = toArray (entry?("rules")) |> Array.map decodeRule |> Array.toList
 
         { Name = text entry "name"
           Root = text entry "root"
@@ -68,18 +65,26 @@ module GroundingCatalog =
           Digest = text snapshot "digest"
           Materials = materials }
 
-    let canonicalWorkspace (workspace: string) = rawCanonicalWorkspace grounding workspace
+    let canonicalWorkspace (workspace: string) =
+        rawCanonicalWorkspace grounding workspace
 
     let workspaceRelativePath (workspace: string) (path: string) : string option =
         let relative = rawWorkspaceRelativePath grounding workspace path
 
-        if isNull relative then None else Some(unbox<string> relative)
+        if isNull relative then
+            None
+        else
+            Some(unbox<string> relative)
 
     let discover (workspace: string) : PackageDescriptor list =
-        rawDiscover grounding workspace |> toArray |> Array.map decodePackage |> Array.toList
+        rawDiscover grounding workspace
+        |> toArray
+        |> Array.map decodePackage
+        |> Array.toList
 
     let resolve (workspace: string) (path: string) : PackageDescriptor list =
-        let names = rawResolve grounding workspace path |> toArray |> Array.map (unbox<string>)
+        let names =
+            rawResolve grounding workspace path |> toArray |> Array.map (unbox<string>)
 
         discover workspace
         |> List.filter (fun package -> Array.contains package.Name names)
@@ -90,6 +95,7 @@ module GroundingCatalog =
 
     let snapshotsForPaths (workspace: string) (paths: string list) : GroundingSnapshot list =
         let encoded = paths |> List.toArray |> box
+
         rawSnapshotsForPaths grounding workspace encoded
         |> toArray
         |> Array.map decodeSnapshot

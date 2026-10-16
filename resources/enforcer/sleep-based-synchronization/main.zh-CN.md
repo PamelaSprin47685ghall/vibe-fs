@@ -1,5 +1,7 @@
 # sleep-based-synchronization — Main
 
+## 现在该做什么
+
 把 duration 换回事实。
 
 先写清楚这个 sleep 假装在建立什么。如果答案是 readiness、completion、visibility、shutdown、propagation、lock release、ownership transfer，就暴露一个真正能证明该条件的 observation。
@@ -13,6 +15,8 @@
 
 无论哪种，timeout 只有一个职责：**限制 uncertainty 可以持续多久**。Clock expiry 不能把 uncertainty 变成 success。
 
+## 为什么重要
+
 Process startup 要等真实 readiness：health endpoint（且语义正确）、port + protocol handshake、ready event，而不是“process 存在两秒了”。
 
 Process shutdown 要等 exit/termination 与 resource release，而不是“发了 SIGTERM，再睡一下”。
@@ -20,6 +24,21 @@ Process shutdown 要等 exit/termination 与 resource release，而不是“发�
 Storage/replication 要等能证明目标事实 visible 的 generation/version/commit identity，而不是“eventual consistency 应该差不多了”。
 
 Test 中如果 timing source 本身不是被测对象，优先 deterministic fake / controllable scheduler。一个本地 state transition 要靠 30 秒 wall-clock patience 才能证明，通常已经把 scheduler 一起测进去了。
+
+## 修复策略
+
+Polling 要同时验证两面：
+
+- condition 成真后 promptly 继续；
+- timeout expiry 明确失败/unknown，绝不伪造 success。
+
+Event wait 还要测 missed-event race：subscription 是否早于 event 发生，或者是否用 current-state check 关闭 gap。把 sleep 换成 callback，却引入 subscribe-after-complete，并没有更正确。
+
+## 决策分支
+
+把 producer 人为拖得远超旧 sleep：consumer 绝不能提前继续。再让 producer 立即完成：consumer 应立即前进，不再支付固定 delay。
+
+## 常见假修复
 
 常见假修复：
 
@@ -30,14 +49,11 @@ Test 中如果 timing source 本身不是被测对象，优先 deterministic fak
 - sleep 后再 retry，让 flake 少一点但 missing synchronization 仍在；
 - timeout callback 因“暂时没出错”就把 operation 标 success。
 
+## 验证
+
 验证要主动攻击 scheduler assumption。把 producer 人为拖得远超旧 sleep：consumer 绝不能提前继续。再让 producer 立即完成：consumer 应立即前进，不再支付固定 delay。
 
-Polling 要同时验证两面：
-
-- condition 成真后 promptly 继续；
-- timeout expiry 明确失败/unknown，绝不伪造 success。
-
-Event wait 还要测 missed-event race：subscription 是否早于 event 发生，或者是否用 current-state check 关闭 gap。把 sleep 换成 callback，却引入 subscribe-after-complete，并没有更正确。
+## 完成条件
 
 完成时，每个 wait 都应该能写成：
 

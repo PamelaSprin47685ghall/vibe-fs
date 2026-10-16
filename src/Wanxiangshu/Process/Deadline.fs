@@ -23,17 +23,17 @@ module Deadline =
     /// Build a deadline from the current clock and a time budget, clamping to
     /// DateTimeOffset.MaxValue so the calculation cannot overflow.
     let ofBudget (now: DateTimeOffset) (budget: TimeSpan) : Deadline =
-        Deadline(library?deadlineCreate(isoOf now, budget.TotalMilliseconds))
+        Deadline(library?deadlineCreate (isoOf now, budget.TotalMilliseconds))
 
     let remaining (clock: unit -> DateTimeOffset) (Deadline value: Deadline) : TimeSpan =
-        let milliseconds = library?deadlineRemainingMs(isoOf (clock ()), value)
+        let milliseconds = library?deadlineRemainingMs (isoOf (clock ()), value)
         TimeSpan.FromMilliseconds(unbox<float> milliseconds)
 
     let isExpired (clock: unit -> DateTimeOffset) (Deadline value: Deadline) : bool =
-        unbox<bool> (library?deadlineIsExpired(isoOf (clock ()), value))
+        unbox<bool> (library?deadlineIsExpired (isoOf (clock ()), value))
 
     /// Next wait duration in milliseconds against the absolute deadline, capped at
     /// the JS timer ceiling. A huge legal estimate (tens of days) therefore returns
     /// the cap instead of overflowing int, so the caller can wait in segments.
     let nextWaitMs (clock: unit -> DateTimeOffset) (Deadline value: Deadline) : int =
-        unbox<int> (library?deadlineNextWaitMs(isoOf (clock ()), value))
+        unbox<int> (library?deadlineNextWaitMs (isoOf (clock ()), value))

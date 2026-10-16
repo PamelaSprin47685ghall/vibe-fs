@@ -3,7 +3,7 @@
 ## 现在该做什么
 把 correctness-critical ordering 从 ambient convention 搬到显式 workflow、phase type、ordered composition 或 causal event contract 中。让一个 owner 能回答：A 为什么必须先于 B、违反时会怎样、谁验证这条关系。
 
-## 为什么这很重要
+## 为什么重要
 隐式时序最容易制造“每个局部都对、整体却错”的系统。A 单看合法，B 单看也合法；只有 A/B 顺序是隐藏前提。这样的 bug 往往在升级 framework、并行化 startup、调整 import、增加第三个 hook 时出现，而且代码 diff 看不出业务协议被改了。
 
 ## 修复策略
@@ -11,6 +11,10 @@
 - 若是 extensible hooks，用 phase/priority contract 表达真正必要的 ordering，并机械拒绝非法组合；
 - 若是 event protocol，用 durable/typed causal fact 表达 prerequisites；
 - 若顺序其实无意义，删除不必要的 order assumption，让 handlers 可交换。
+
+## 决策分支
+- 若顺序是真实的领域协议，把它编码成由单一 sequencer 拥有的命名 phases 或直接调用；
+- 若 framework 已经机械地守护顺序，保留那份 contract，不要再加第二套隐藏顺序。
 
 ## 常见假修复
 - 在 README 写“不要调整这两个 registration 的顺序”。

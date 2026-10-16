@@ -7,7 +7,8 @@ const observation = {
   frameEpoch: 0, previousIngestedThroughSequence: 0, nextIngestedThroughSequence: 1,
   previousCoverableTurnCutoffExclusive: 0, nextCoverableTurnCutoffExclusive: 1,
   nextCoveredPrefixDigest: 'prefix', textRef: 'blobs/text', textDigest: 'text-digest',
-  run: 'provider-run', toolCallIds: ['tool-call'], tipRuleId: 'sample-rule', fieldNameAtCommit: 'sample-rule',
+  run: 'provider-run', toolCallIds: ['tool-call'], tipName: 'sample-rule',
+  tipTextRef: 'blobs/tip-text', tipTextDigest: 'tip-text-digest',
   evidenceRef: 'blobs/evidence', observedPrefixEpoch: 0,
 }
 const squash = {

@@ -1,8 +1,16 @@
 # missing-regression-test — Enforcer
 
+## 定义
+
 Missing regression test 的意思，不是“bug fix 后少了一个 test 文件”，而是团队已经付出成本发现了一个真实 defect，修了代码，却没有把这份**关于 reachable bad behavior 的新知识**留进 repository。
 
 Bug report 不是一张改代码工单，而是一个 counterexample：系统 state space 里存在一个过去没人预料、没人编码的坏世界。Implementation fix 只消掉今天的 symptom；regression test 才把这次发现变成项目记忆。
+
+## 支配原则
+
+与 `failure-path-untested` 最大区别是 provenance：本规则起点是**已经知道的 concrete defect**。`failure-path-untested` 可以在事故前触发，因为 failure policy 从未被执行。Known bug 即使以前“有 coverage”，仍值得 regression，因为事实已经证明原 coverage 没能区分这个缺陷。
+
+## 何时触发
 
 以下情形触发：
 
@@ -13,9 +21,13 @@ Bug report 不是一张改代码工单，而是一个 counterexample：系统 st
 - incident postmortem 写得很完整，却没有 test/property/canary 阻止同一 mechanism 回来；
 - manual repro 用过一次验证 fix，之后就丢了。
 
+## 不应触发
+
 如果已有 test 本来就抓到了 defect 并继续留在 suite，不触发；它已经是 regression memory。Documentation-only error 或纯 operational misconfiguration 若不属于 product behavior，也不要机械造 regression，除非产品真的新增了防复发行为。
 
-与 `failure-path-untested` 最大区别是 provenance：本规则起点是**已经知道的 concrete defect**。`failure-path-untested` 可以在事故前触发，因为 failure policy 从未被执行。Known bug 即使以前“有 coverage”，仍值得 regression，因为事实已经证明原 coverage 没能区分这个缺陷。
+## 与相邻规则区分
+
+## 判定程序
 
 一条强 regression test 至少有三点：
 
@@ -30,5 +42,9 @@ Concurrency/nondeterministic incident 不要写“跑 1000 次看看 race 会不
 如果是 property bug，shrunk counterexample 可以既保留为 concrete regression，也用来强化 general property/generator。
 
 决定性检查：临时恢复或模拟 old defect。新 test 如果仍 green，它就不是 regression memory，只是事后 ceremony。
+
+## 例子
+
+## Nudge
 
 > 一个只改变了代码、却没改变 repository executable knowledge 的 bug，只是在等第二次变贵。

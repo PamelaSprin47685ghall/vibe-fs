@@ -266,22 +266,29 @@ module PluginHooks =
                     toolRegistration.Runtime.AttachQuestionNotifier(fun question ->
                         task {
                             try
-                                let available: bool =
-                                    emitJsExpr client "typeof $0?.tui?.showToast === 'function'"
+                                let available: bool = emitJsExpr client "typeof $0?.tui?.showToast === 'function'"
+
                                 if not available then
                                     return Error "the Host cannot present a question to the user"
                                 else
-                                    let title = ProviderProse.render
-                                                    (ProviderLanguageBinding.readGlobalPreference ())
-                                                    "tool/ask-title" Map.empty
+                                    let title =
+                                        ProviderProse.render
+                                            (ProviderLanguageBinding.readGlobalPreference ())
+                                            "tool/ask-title"
+                                            Map.empty
+
                                     let! response =
-                                        emitJsExpr (client, title, question)
+                                        emitJsExpr
+                                            (client, title, question)
                                             "$0.tui.showToast({ body: { title: $1, message: $2, variant: 'info' } })"
                                         |> unbox<Task<obj>>
+
                                     if not (isNull response) && not (isNull response?error) then
                                         return Error(string response?error)
-                                    else return Ok()
-                            with ex -> return Error ex.Message
+                                    else
+                                        return Ok()
+                            with ex ->
+                                return Error ex.Message
                         })
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
@@ -426,7 +433,10 @@ module PluginHooks =
                     String.Equals(tool, expectedTool, StringComparison.OrdinalIgnoreCase)
                     && (status = "completed" || status = "error")
                     ->
-                    let providerRun = firstFieldText part [ "messageID"; "messageId" ] |> Option.map ProviderRunIdentity.create
+                    let providerRun =
+                        firstFieldText part [ "messageID"; "messageId" ]
+                        |> Option.map ProviderRunIdentity.create
+
                     Some(SessionId.value sessionId, ToolCallId.create callId, status, providerRun)
                 | _ -> None
 
@@ -439,20 +449,29 @@ module PluginHooks =
                     match toolTerminalObservation "ask" rawInput, toolRegistration with
                     | Some(sessionId, callId, "completed", Some providerRun), Some registration ->
                         // completed 工具部件是占位回执已被 Host 接受的因果边界；不靠定时器猜。
-                        let! result = registration.Runtime.InterruptForUserQuestion(SessionId.create sessionId, providerRun, callId)
+                        let! result =
+                            registration.Runtime.InterruptForUserQuestion(
+                                SessionId.create sessionId,
+                                providerRun,
+                                callId
+                            )
+
                         match result with
                         | Ok() -> ()
-                        | Error reason ->
-                            invalidOp ("ask was sent, but its attempt interrupt failed: " + reason)
-                    | Some(sessionId, _, "completed", None), Some registration when registration.Runtime.IsWaitingForUser sessionId ->
-                        invalidOp "ask result is missing the exact provider message identity; no attempt was interrupted"
+                        | Error reason -> invalidOp ("ask was sent, but its attempt interrupt failed: " + reason)
+                    | Some(sessionId, _, "completed", None), Some registration when
+                        registration.Runtime.IsWaitingForUser sessionId
+                        ->
+                        invalidOp
+                            "ask result is missing the exact provider message identity; no attempt was interrupted"
                     | _ -> ()
                 }
 
             let requirePostS3Interrupted (result: Result<unit, string>) =
                 match result with
                 | Ok() -> ()
-                | Error reason -> invalidOp ("post-S3 deliver was recorded, but its attempt interrupt failed: " + reason)
+                | Error reason ->
+                    invalidOp ("post-S3 deliver was recorded, but its attempt interrupt failed: " + reason)
 
             let settlePostS3Deliver rawInput =
                 task {
@@ -464,9 +483,13 @@ module PluginHooks =
                                 providerRun,
                                 callId
                             )
+
                         requirePostS3Interrupted result
-                    | Some(sessionId, _, "completed", None), Some registration when registration.Runtime.HasPendingPostS3Interrupt sessionId ->
-                        invalidOp "post-S3 deliver result is missing the exact provider message identity; no attempt was interrupted"
+                    | Some(sessionId, _, "completed", None), Some registration when
+                        registration.Runtime.HasPendingPostS3Interrupt sessionId
+                        ->
+                        invalidOp
+                            "post-S3 deliver result is missing the exact provider message identity; no attempt was interrupted"
                     | _ -> ()
                 }
 
@@ -773,11 +796,17 @@ module PluginHooks =
                 task {
                     let sessionId = toolField toolInput "sessionID"
                     let toolName = toolField toolInput "tool"
+
                     match toolRegistration with
                     | Some registration when toolName <> "ask" && registration.Runtime.IsWaitingForUser sessionId ->
-                        invalidOp (ProviderProse.render (ProviderLanguageBinding.forSessionText sessionId)
-                                       "tool/ask-waiting" Map.empty)
+                        invalidOp (
+                            ProviderProse.render
+                                (ProviderLanguageBinding.forSessionText sessionId)
+                                "tool/ask-waiting"
+                                Map.empty
+                        )
                     | _ -> ()
+
                     do! beforeStageRequirementGrounding toolInput toolOutput
                     beforeStageReviewPermission toolName toolInput
 

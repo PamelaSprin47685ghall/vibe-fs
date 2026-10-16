@@ -13,3 +13,14 @@ test('WHAT[guidance-delivery-001] a new occurrence of the same tip has its own f
     assert.equal((await guidance.resolve(journal, main)).presentation, 'Full')
   })
 })
+
+test('WHAT[guidance-delivery-001] case/space variants of the same tip name deduplicate to identity-only (G4.5)', async () => {
+  await withJournal(async ({ journal }) => {
+    await link(journal)
+    await observe(journal, 1, 'Primitive-Obsession')
+    assert.equal((await guidance.resolve(journal, main)).presentation, 'Full')
+    await observe(journal, 2, ' primitive-obsession ')
+    assert.equal((await guidance.resolve(journal, main)).presentation, 'Full')
+    assert.equal((await guidance.resolve(journal, main)).presentation, 'IdentityOnly')
+  })
+})

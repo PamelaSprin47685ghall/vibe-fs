@@ -103,16 +103,20 @@ module UserQuestionJournal =
                 state.UserQuestions
                 |> Map.toSeq
                 |> Seq.tryPick (fun (_, question) ->
-                    if question.Answer.IsNone
-                       && question.Request.LogicalRunId = active.LogicalRunId
-                       && question.Request.AuthorityRootUserMessageId = active.AuthorityRootUserMessageId then
+                    if
+                        question.Answer.IsNone
+                        && question.Request.LogicalRunId = active.LogicalRunId
+                        && question.Request.AuthorityRootUserMessageId = active.AuthorityRootUserMessageId
+                    then
                         Some question.Request
-                    else None)))
+                    else
+                        None)))
 
     let suppressesTurn journal sessionId authorityRoot providerRun =
         authority journal sessionId
         |> Option.exists (fun state ->
-            state.UserQuestions |> Map.exists (fun _ question ->
+            state.UserQuestions
+            |> Map.exists (fun _ question ->
                 question.Request.AuthorityRootUserMessageId = authorityRoot
                 && (question.Answer.IsNone || question.Request.ProviderRunId = providerRun)))
 
@@ -124,6 +128,7 @@ module UserQuestionJournal =
                     (Some question.ProviderRunId)
                     (AgentFact.Prompt(PromptFactCases.UserQuestionAsked question))
                     journal
+
             return result |> Result.map ignore |> Result.mapError (sprintf "%A")
         }
 
@@ -131,7 +136,9 @@ module UserQuestionJournal =
     let observeHumanInput (journal: AgentJournal) sessionId physicalId =
         task {
             let key: Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionKey =
-                { SessionId = sessionId; PhysicalUserMessageId = physicalId }
+                { SessionId = sessionId
+                  PhysicalUserMessageId = physicalId }
+
             let accepted =
                 (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
                 |> Wanxiangshu.Execution.Session.ChatExecution.ChatExecutionProjection.byKey key
@@ -142,17 +149,21 @@ module UserQuestionJournal =
                 input.LogicalRunId = question.LogicalRunId
                 && input.PhysicalUserMessageId <> question.PhysicalUserMessageId
                 && (input.Origin = PromptOrigin.AuthorityRoot PromptRootAuthorityKind.HumanRoot
-                    || input.Origin = PromptOrigin.Continuation PromptContinuationKind.HumanMessage) ->
+                    || input.Origin = PromptOrigin.Continuation PromptContinuationKind.HumanMessage)
+                ->
                 let! result =
                     AgentJournal.appendAgent
                         (StreamId.Session sessionId)
                         None
-                        (AgentFact.Prompt(PromptFactCases.UserQuestionAnswered
-                            { SessionId = sessionId
-                              LogicalRunId = question.LogicalRunId
-                              ToolCallId = question.ToolCallId
-                              PhysicalUserMessageId = physicalId }))
+                        (AgentFact.Prompt(
+                            PromptFactCases.UserQuestionAnswered
+                                { SessionId = sessionId
+                                  LogicalRunId = question.LogicalRunId
+                                  ToolCallId = question.ToolCallId
+                                  PhysicalUserMessageId = physicalId }
+                        ))
                         journal
+
                 return result |> Result.map ignore |> Result.mapError (sprintf "%A")
             | _ -> return Ok()
         }

@@ -38,7 +38,8 @@ module CanonicalEventCodec =
               "parents", box (envelope.Parents |> List.map EventId.value |> Array.ofList)
               "payload", box envelope.Payload
               "payloadRefs", box (envelope.PayloadRefs |> List.map PayloadRef.value |> Array.ofList) ]
-            @ payloads)
+            @ payloads
+        )
 
     let private payloadsOfJs (value: obj) : Map<PayloadRef, byte[]> =
         if isNull value then
@@ -54,7 +55,10 @@ module CanonicalEventCodec =
           EventType = unbox<string> value?``type``
           Parents = (unbox<string array> value?parents) |> Array.toList |> List.map EventId.create
           Payload = value?payload
-          PayloadRefs = (unbox<string array> value?payloadRefs) |> Array.toList |> List.map PayloadRef.create
+          PayloadRefs =
+            (unbox<string array> value?payloadRefs)
+            |> Array.toList
+            |> List.map PayloadRef.create
           Payloads = payloadsOfJs value?payloads }
 
     let private errorText (value: obj) : string =
@@ -78,12 +82,18 @@ module CanonicalEventCodec =
     /// Distinct EventIds are not a collision (Ok).
     let checkIdentity (left: EventEnvelope) (right: EventEnvelope) : Result<unit, StorageInvalid> =
         let outcome: obj = codec?checkIdentity (eventToJs left, eventToJs right)
-        if unbox<bool> outcome?ok then Ok() else Error(invalidOf outcome?error)
+
+        if unbox<bool> outcome?ok then
+            Ok()
+        else
+            Error(invalidOf outcome?error)
 
     /// Set-union by EventId with identity dedupe. Collision → fail closed.
     /// This is a pure identity utility; writer-stream ordering belongs to EventKWayMerge.
     let mergeByIdentity (events: EventEnvelope list) : Result<EventEnvelope list, StorageInvalid> =
-        let outcome: obj = codec?mergeByIdentity (events |> List.map eventToJs |> Array.ofList)
+        let outcome: obj =
+            codec?mergeByIdentity (events |> List.map eventToJs |> Array.ofList)
+
         if unbox<bool> outcome?ok then
             Ok((unbox<obj array> outcome?events) |> Array.toList |> List.map eventOfJs)
         else
@@ -92,12 +102,24 @@ module CanonicalEventCodec =
     /// Decode canonical JSON+LF into EventEnvelope. Re-encode must match (§5.0).
     let tryDecode (text: string) : Result<EventEnvelope, StorageInvalid> =
         let outcome: obj = codec?tryDecode text
-        if unbox<bool> outcome?ok then Ok(eventOfJs outcome?event) else Error(invalidOf outcome?error)
+
+        if unbox<bool> outcome?ok then
+            Ok(eventOfJs outcome?event)
+        else
+            Error(invalidOf outcome?error)
 
     let tryDecodeUtf8Text (bytes: byte[]) : Result<string, StorageInvalid> =
         let outcome: obj = codec?tryDecodeUtf8Text bytes
-        if unbox<bool> outcome?ok then Ok(unbox<string> outcome?text) else Error(invalidOf outcome?error)
+
+        if unbox<bool> outcome?ok then
+            Ok(unbox<string> outcome?text)
+        else
+            Error(invalidOf outcome?error)
 
     let tryDecodeUtf8 (bytes: byte[]) : Result<EventEnvelope, StorageInvalid> =
         let outcome: obj = codec?tryDecodeUtf8 bytes
-        if unbox<bool> outcome?ok then Ok(eventOfJs outcome?event) else Error(invalidOf outcome?error)
+
+        if unbox<bool> outcome?ok then
+            Ok(eventOfJs outcome?event)
+        else
+            Error(invalidOf outcome?error)

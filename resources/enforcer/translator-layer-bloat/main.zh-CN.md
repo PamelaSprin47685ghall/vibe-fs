@@ -3,7 +3,7 @@
 ## 现在该做什么
 逐层标注每个 hop 唯一拥有的 invariant。没有 invariant 的 forwarding layer 删除；有真实 contract 的层保留，并以它保护的语义命名，而不是继续叫 `Manager/Service/Coordinator`。
 
-## 为什么这很重要
+## 为什么重要
 每一层都有长期税：多一个文件、接口、mock、stack frame、constructor dependency、修改点和“policy 到底在哪”的搜索空间。只有当这层真正减少另一侧必须知道的东西时，这笔税才值得。
 
 空转发尤其危险，因为它制造虚假的架构感。图看起来整齐，实际所有层知道的是同一套事实。
@@ -14,6 +14,10 @@
 - DTO mirror 若没有边界语义，删除；
 - surviving layer 用其 invariant 命名；
 - 删除随空层产生的无意义 mocks/interfaces/tests。
+
+## 决策分支
+若移除这层不会失去任何 invariant、information boundary 或 failure model，删除它。
+若这层拥有真实的翻译或 policy，把那个 invariant 命名出来，让它成为这层可见的 contract。
 
 ## 常见假修复
 - 把 `Manager` 改名 `Facade`。

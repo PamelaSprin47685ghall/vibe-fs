@@ -1,8 +1,26 @@
 # repeated-known-mistake — Main
 
+## 现在该做什么
+
 把现有 lesson 当作 active premise 重新读一遍，然后做两种诚实选择之一：遵守，或正式 supersede。
 
 先定位 prior record 真正保护的 invariant/failure mechanism，而不是只看标题。确认它当时依赖哪些环境条件、external version、architecture assumptions。若这些 premises 仍成立，当前实现必须尊重 lesson；若已变化，收集能区分新旧世界的 evidence，并在 owning documentation/test/contract 中更新结论。
+
+## 为什么重要
+
+已记录的 failure 是预付的 reasoning。忽略它等于再付一次同样的 debugging cost，还教会 contributor：repository 知识是装饰品，不是操作性的。时间长了这会摧毁记录 lesson 的动机。
+
+## 修复策略
+
+把当前 symptom 链到 prior record，应用记录的 constraint；只有当新 evidence 真正改变其 scope 或 conclusion 时才更新记录。
+
+## 决策分支
+
+- 如果 prior lesson 的 premises 仍成立，遵守它，停止重复失败路径。
+- 如果 premises 变了，写下带新 evidence 的显式 superseding decision，然后继续。
+- 如果没有 authoritative record，修 defect 并捕获 lesson，不要把沉默当作随意走动的许可。
+
+## 常见假修复
 
 常见假修复：
 
@@ -12,11 +30,15 @@
 - 只改当前 code，不把新 evidence 写回知识 owner，下一次又重复争论；
 - 把近似 symptom 当同一 root cause，机械套旧修法。
 
+## 验证
+
 验证要比较 mechanism，而不是表面形状。能重现 old counterexample 时，新设计仍应保护对应 invariant；若声称环境已变，让新的 contract/canary 明确证明旧 failure 不再可能或语义已变化。
 
 如果 prior lesson 本身 stale，就更新它，不要要求 contributor 一边遵守“当前事实”，一边被历史文档反向审判。Repository memory 需要可修订，但修订必须有 provenance。
 
 理想情况下，最重要的 known mistake 不只存在 prose：能做 regression/architecture gate/contract test 的地方，把 lesson 变 executable memory；只能靠 judgment 的部分才留成 RuleBook/decision note。
+
+## 完成条件
 
 完成时当前 choice 能清楚回答：过去发生过什么、那条 lesson 今天是否仍有效、如果无效是什么新 evidence 让它失效。
 

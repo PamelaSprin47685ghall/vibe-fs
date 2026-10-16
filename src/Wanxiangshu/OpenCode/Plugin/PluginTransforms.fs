@@ -766,8 +766,8 @@ module PluginTransforms =
               Stage = work.Stage
               OpeningCursor = work.OpeningCursor |> Option.defaultValue 0. |> int64
               PreviousRange =
-                  work.PredecessorRange
-                  |> Option.map (fun (start, ending) -> int64 start, int64 ending)
+                work.PredecessorRange
+                |> Option.map (fun (start, ending) -> int64 start, int64 ending)
               IsFreshHandover = not (PrefixEpochProjection.isTenureReanchored incumbentId epoch) }
 
         // The delivered Plan work is post-S3: the tenure is over and the
@@ -804,11 +804,7 @@ module PluginTransforms =
                     range
             | None -> Task.FromResult None
 
-        let isolatePlanTenure
-            (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
-            (sid: string)
-            (outObj: obj)
-            =
+        let isolatePlanTenure (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo) (sid: string) (outObj: obj) =
             task {
                 let durable =
                     journal
@@ -949,7 +945,8 @@ module PluginTransforms =
 
                     // External human messages and internal recovery/guard continuations
                     // admitted into ChatExecutions belong to this active iteration.
-                    let acceptedSuccessorRequest = acceptedSuccessorRequestFor sidOpt physicalUserMessageId
+                    let acceptedSuccessorRequest =
+                        acceptedSuccessorRequestFor sidOpt physicalUserMessageId
 
                     let handleInterruptionError (error: string) : unit =
                         if error.Contains "MANAGED-SESSION-016" then

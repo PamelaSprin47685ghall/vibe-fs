@@ -108,10 +108,7 @@ module ExecutorTool =
         finitePositive language "deadline_seconds" value
         |> Result.bind (fun valid ->
             if valid > RunDeadlineLimitSeconds then
-                Error(
-                    ProviderProse.render language Path.Run.DeadlineOverLimit
-                        (Map [ "deadline", string valid ])
-                )
+                Error(ProviderProse.render language Path.Run.DeadlineOverLimit (Map [ "deadline", string valid ]))
             else
                 Ok valid)
 
@@ -144,9 +141,7 @@ module ExecutorTool =
             Error(prose language Path.Run.MissingCommand)
         else
             match
-                deadlineWithinLimit language deadline,
-                finiteOutput language "output_budget_bytes" budget,
-                worldLock
+                deadlineWithinLimit language deadline, finiteOutput language "output_budget_bytes" budget, worldLock
             with
             | Ok deadlineSeconds, Ok outputBytes, Ok lock ->
                 Ok

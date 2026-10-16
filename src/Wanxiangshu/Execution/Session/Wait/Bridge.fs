@@ -124,7 +124,9 @@ module CausalWaitBridge =
 
     let private writeSnapshotUnsafe (workspace: string) (snapshot: DiagnosticWaitSnapshot) =
         try
-            let stateRoot = Wanxiangshu.Persistence.Journal.RuntimePath.initializeStateRoot workspace
+            let stateRoot =
+                Wanxiangshu.Persistence.Journal.RuntimePath.initializeStateRoot workspace
+
             let diagnosticsDir = pathJoin (stateRoot, "diagnostics")
             mkdirSync (diagnosticsDir, {| recursive = true |})
             let filePath = pathJoin (diagnosticsDir, "causal-waits.json")

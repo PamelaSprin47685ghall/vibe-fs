@@ -50,8 +50,9 @@ type ContextFactCases =
            TextDigest: BlobDigest
            ProviderRun: ProviderRunIdentity
            ToolCallIds: ToolCallId list
-           TipRuleId: string
-           FieldNameAtCommit: string option
+           TipName: string
+           TipTextRef: BlobRef option
+           TipTextDigest: BlobDigest option
            EvidenceRef: BlobRef option
            ObservedPrefixEpochId: PrefixEpochId |}
     | BlogObservationsSquashed of

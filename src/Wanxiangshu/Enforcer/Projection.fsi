@@ -9,15 +9,13 @@ type EnforcementCycleRecord =
       ToolCallIds: ToolCallId list
       CycleTextRef: BlobRef
       CycleTextDigest: BlobDigest
-      TipRuleId: string
-      FieldNameAtCommit: string option
+      TipName: string
+      TipTextRef: BlobRef option
+      TipTextDigest: BlobDigest option
       CycleEvidenceRef: BlobRef option
       ObservedPrefixEpochId: PrefixEpochId }
 
-type RecentTip =
-    { RuleId: string
-      FieldName: string
-      CycleId: string }
+type RecentTip = { TipName: string; CycleId: string }
 
 type EnforcementProjectionState =
     { ByProviderRun: Map<ProviderRunIdentity, EnforcementCycleRecord>

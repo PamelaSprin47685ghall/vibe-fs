@@ -46,7 +46,7 @@ test('WHAT[managed-session-lifecycle-022] CASE_SETTLE_uncommitted_finalize_does_
     assert.equal(settled.ok, false)
     assert.match(String(settled.error), /bookkeeper runtime unavailable/)
 
-    const handle = eventStore.create(join(dir, '.git'), 'insp-settle-uncommitted-read')
+    const handle = eventStore.create(dir, 'insp-settle-uncommitted-read')
     try {
       const fetched = await casebook.fetchCase(handle, 10, key)
       assert.equal(fetched.ok, true)
@@ -74,7 +74,7 @@ test('WHAT[managed-session-lifecycle-022] archive commits once and duplicate fin
     assert.equal(first.ok, true)
     assert.equal(createCalls.length, 1)
 
-    const handle = eventStore.create(join(dir, '.git'), 'insp-settle-read')
+    const handle = eventStore.create(dir, 'insp-settle-read')
     try {
       const fetched = await casebook.fetchCase(handle, 10, key)
       assert.equal(fetched.ok, true)
@@ -90,7 +90,7 @@ test('WHAT[managed-session-lifecycle-022] archive commits once and duplicate fin
     assert.match(String(second.error), /already finalized/)
     assert.equal(createCalls.length, 1)
 
-    const reread = eventStore.create(join(dir, '.git'), 'insp-settle-reread')
+    const reread = eventStore.create(dir, 'insp-settle-reread')
     try {
       const still = await casebook.fetchCase(reread, 10, key)
       assert.equal(still.ok, true)

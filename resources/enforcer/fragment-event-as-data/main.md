@@ -1,8 +1,16 @@
 # fragment-event-as-data — Main
 
+## What To Do Now
+
 Separate notification from truth.
 
 If the transport does not promise durable complete ordered facts, use each fragment only to decide **when/what to refresh**, then obtain the authoritative object/state/version from the source of record.
+
+## Why This Matters
+
+This turns coalescing, duplication, and intermediate omission into latency/efficiency concerns instead of correctness failures.
+
+## Repair Strategy
 
 A common healthy pattern is:
 
@@ -18,8 +26,6 @@ replace local canonical state
 derive UI/workflow consequences
 ```
 
-This turns coalescing, duplication, and intermediate omission into latency/efficiency concerns instead of correctness failures.
-
 If full snapshot reads are too expensive and incremental state is required, strengthen the protocol rather than adding client heuristics. A safe incremental protocol may need:
 
 - stable event/delta identity;
@@ -31,7 +37,11 @@ If full snapshot reads are too expensive and incremental state is required, stre
 - snapshot/resync escape hatch when a gap cannot be repaired;
 - documented guarantee about whether every semantic transition appears as an event.
 
+## Decision Branches
+
 Without those guarantees, buffering and reordering logic in the client is usually an attempt to manufacture a stronger protocol locally than the provider actually offers.
+
+## Common Wrong Fixes
 
 Common fake repairs:
 
@@ -44,11 +54,15 @@ Common fake repairs:
 - merge patches onto whatever local base happens to exist;
 - add retries for missing fragments when the provider never promised individual fragment replay.
 
+## Verification
+
 Verification should attack the delivery contract deliberately. Drop, duplicate, coalesce, and reorder **non-authoritative** notifications. After refresh/resync, local domain state must converge to the authoritative source.
 
 For a true event protocol, test the opposite: a missing event must be detectable and replay/recovery must restore the exact event history semantics promised by the source. Do not silently fall back to “probably current” behavior.
 
 Also test reconnect and stale-base patches. A delta against version N must never be applied blindly to version N+2 unless the delta contract proves that operation valid.
+
+## Done When
 
 The completion criterion is easy to state:
 

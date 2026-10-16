@@ -137,8 +137,12 @@ module PromptFactFold =
                     "AuthorityLogicalRunClosed conflicts with the active logical run"
             )
 
-    let private appendQuestionAsked (current: PromptAuthority.PromptAuthorityProjection) (payload: UserQuestionAskedPayload) =
-        let reject reason = Error(PromptAuthorityFoldRejection.UserQuestionRejected reason)
+    let private appendQuestionAsked
+        (current: PromptAuthority.PromptAuthorityProjection)
+        (payload: UserQuestionAskedPayload)
+        =
+        let reject reason =
+            Error(PromptAuthorityFoldRejection.UserQuestionRejected reason)
 
         match Map.tryFind payload.ToolCallId current.UserQuestions with
         | Some existing when existing.Request = payload -> Ok []
@@ -147,13 +151,19 @@ module PromptFactFold =
             reject "a question is already waiting for the user"
         | None ->
             let question: PromptAuthority.UserQuestion = { Request = payload; Answer = None }
+
             let updated =
-                { current with UserQuestions = Map.add payload.ToolCallId question current.UserQuestions }
+                { current with
+                    UserQuestions = Map.add payload.ToolCallId question current.UserQuestions }
+
             Ok [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, updated) ]
 
     let private foldUserQuestionAsked authorityOf (payload: UserQuestionAskedPayload) =
-        let current = authorityOf payload.SessionId |> Option.defaultValue PromptAuthority.empty
-        let reject reason = Error(PromptAuthorityFoldRejection.UserQuestionRejected reason)
+        let current =
+            authorityOf payload.SessionId |> Option.defaultValue PromptAuthority.empty
+
+        let reject reason =
+            Error(PromptAuthorityFoldRejection.UserQuestionRejected reason)
 
         match current.ActiveLogicalRun with
         | Some active when
@@ -172,8 +182,11 @@ module PromptFactFold =
         | _ -> reject "ask requires the exact active Plan authority"
 
     let private foldUserQuestionAnswered authorityOf (payload: UserQuestionAnsweredPayload) =
-        let current = authorityOf payload.SessionId |> Option.defaultValue PromptAuthority.empty
-        let reject reason = Error(PromptAuthorityFoldRejection.UserQuestionRejected reason)
+        let current =
+            authorityOf payload.SessionId |> Option.defaultValue PromptAuthority.empty
+
+        let reject reason =
+            Error(PromptAuthorityFoldRejection.UserQuestionRejected reason)
 
         match Map.tryFind payload.ToolCallId current.UserQuestions with
         | Some question when
@@ -181,14 +194,22 @@ module PromptFactFold =
             && payload.PhysicalUserMessageId = question.Request.PhysicalUserMessageId
             ->
             reject "the input that caused ask cannot answer its own question"
-        | Some question when question.Request.LogicalRunId = payload.LogicalRunId && question.Answer = Some payload.PhysicalUserMessageId ->
+        | Some question when
+            question.Request.LogicalRunId = payload.LogicalRunId
+            && question.Answer = Some payload.PhysicalUserMessageId
+            ->
             Ok []
         | Some question when question.Request.LogicalRunId = payload.LogicalRunId && question.Answer.IsSome ->
             reject "the question was answered by a different physical user input"
         | Some question when question.Request.LogicalRunId = payload.LogicalRunId ->
-            let answered = { question with Answer = Some payload.PhysicalUserMessageId }
+            let answered =
+                { question with
+                    Answer = Some payload.PhysicalUserMessageId }
+
             let updated =
-                { current with UserQuestions = Map.add payload.ToolCallId answered current.UserQuestions }
+                { current with
+                    UserQuestions = Map.add payload.ToolCallId answered current.UserQuestions }
+
             Ok [ PromptAuthorityProjectionChange.PromptAuthoritySet(payload.SessionId, updated) ]
         | _ -> reject "no matching question is waiting for this user input"
 

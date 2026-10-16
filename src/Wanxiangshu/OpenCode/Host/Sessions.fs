@@ -494,9 +494,11 @@ type InjectedSessionPort
             else
                 let terminated =
                     isLifecycleTerminated |> Option.exists (fun check -> check sessionId)
+
                 if not (managedChild sessionId) && not terminated then
                     Task.FromResult(
-                        Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user"
+                        Error
+                            "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user"
                     )
                 else
                     interruptManagedAttempt sessionId

@@ -1,8 +1,16 @@
 # fragment-event-as-data — Main
 
+## 现在该做什么
+
 把 notification 与 truth 拆开。
 
 如果 transport 没承诺 durable / complete / ordered facts，就只用 fragment 决定**什么时候、该刷新什么**，然后从真正 source of record 读取 authoritative object/state/version。
+
+## 为什么重要
+
+这样 coalescing、duplication、intermediate omission 最多影响 latency/efficiency，不再直接破坏 correctness。
+
+## 修复策略
 
 一个健康模式：
 
@@ -18,8 +26,6 @@ replace local canonical state
 derive UI/workflow consequence
 ```
 
-这样 coalescing、duplication、intermediate omission 最多影响 latency/efficiency，不再直接破坏 correctness。
-
 如果 full snapshot 太贵而必须 incremental，不要在 client 堆 heuristic，要强化 protocol。一个安全 incremental protocol 往往需要：
 
 - stable event/delta identity；
@@ -31,7 +37,11 @@ derive UI/workflow consequence
 - gap 无法修时可 snapshot/resync；
 - provider 明确说明每个 semantic transition 是否一定出现为 event。
 
+## 决策分支
+
 没有这些 guarantee，client 自己做 buffering/reordering，通常是在本地制造一个 provider 根本没提供的更强协议。
+
+## 常见假修复
 
 常见假修复：
 
@@ -44,11 +54,15 @@ derive UI/workflow consequence
 - patch 直接叠到当前 local base，不验证 base version；
 - provider 从未承诺 fragment replay，却为“missing fragment”加 retry。
 
+## 验证
+
 验证要主动攻击 delivery contract。对**非 authoritative notification**执行 drop、duplicate、coalesce、reorder。Refresh/resync 后 local domain state 必须收敛到 authoritative source。
 
 如果是真 event protocol，则反过来测：missing event 必须可检测，replay/recovery 必须恢复 source 承诺的 exact history semantics，不能退回 “大概 current” 的模糊状态。
 
 还要测 reconnect 与 stale-base patch。针对 version N 的 delta，不能盲目应用到 N+2，除非 delta contract 能证明这样仍然合法。
+
+## 完成条件
 
 完成条件很简单：
 

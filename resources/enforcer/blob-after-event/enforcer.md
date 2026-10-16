@@ -1,5 +1,7 @@
 # blob-after-event — Enforcer
 
+## Definition
+
 `blob-after-event` is a temporal referential-integrity failure: durable history names content before that content has crossed its own durability boundary.
 
 A reference is not just an identifier. Once a journal/event/manifest commits `blob = H`, it has made a promise to every future replay:
@@ -10,6 +12,12 @@ If the blob upload/write is still pending, only buffered in memory, only present
 
 That creates dangling history rather than merely a missing cache entry.
 
+## Governing Principle
+
+The ordering choice is deliberately asymmetric. An unreferenced durable blob is usually recoverable garbage; a referenced missing blob is a contradiction in history. Therefore referent-first ordering deliberately prefers harmless orphan possibility over unrecoverable dangling reference.
+
+## Trigger When
+
 Fire this rule when:
 
 - an event/journal row containing a blob/content reference commits before the blob store confirms durable availability;
@@ -19,11 +27,23 @@ Fire this rule when:
 - cleanup can remove a temp blob after its durable reference already exists;
 - replay has a normal branch for “event exists but blob missing” even though the domain never intended dangling references as a legal state.
 
+## Do Not Trigger When
+
 Do not fire when blob and reference commit atomically under one real transaction whose recovery guarantee covers both. Do not fire when the reference points to content already durably present under content-addressed semantics. Inline content also has no separate referent ordering problem.
+
+## Distinguish From
 
 The relevant distinction from `memory-before-disk` is that both sides here may be durable artifacts. The defect is **ordering between durable referent and durable reference**, not volatile memory outrunning persistence.
 
 `partial-write-assumption` asks whether recovery invented an unsupported storage state. `blob-after-event` is different: a perfectly valid event can become a real committed dangling pointer because application ordering allowed it.
+
+## Decision Procedure
+
+The repair must use the **actual durability success condition** of the blob store. “Upload request returned” is not enough if the storage API only guarantees availability after commit/quorum/finalize. Verify the boundary the replay path relies on.
+
+For content-addressed stores, also verify hash identity from the bytes actually persisted, not only from the caller's pre-upload buffer. The durable reference should identify what recovery will read.
+
+## Examples
 
 A useful crash table:
 
@@ -33,10 +53,6 @@ blob durable, before event append → orphan blob is acceptable/collectable
 after event append                → blob must be readable forever per retention policy
 ```
 
-Notice the asymmetry. An unreferenced durable blob is usually recoverable garbage; a referenced missing blob is a contradiction in history. Therefore referent-first ordering deliberately prefers harmless orphan possibility over unrecoverable dangling reference.
-
-The repair must use the **actual durability success condition** of the blob store. “Upload request returned” is not enough if the storage API only guarantees availability after commit/quorum/finalize. Verify the boundary the replay path relies on.
-
-For content-addressed stores, also verify hash identity from the bytes actually persisted, not only from the caller's pre-upload buffer. The durable reference should identify what recovery will read.
+## Nudge
 
 > Make the content real before making its name historical.

@@ -91,6 +91,29 @@ module TipSurface =
     let disposeJournal (journal: obj) : unit =
         JournalSurface.dispose (journalHandleOf journal)
 
+    /// Materialize one authored tip body through the journal's local payload
+    /// owner (Algorithm I5.2). Returns the real blob ref/digest pair so the
+    /// delivery read path can read it back on the same journal.
+    let writeTipBody (journal: obj) (content: string) : Task<obj> =
+        task {
+            if isNullish journal then
+                return
+                    box
+                        {| ok = false
+                           error = "journal required" |}
+            else
+                let! result = (agentJournalOf journal).Writer.BlobWriter.Write content
+
+                return
+                    match result with
+                    | Ok receipt ->
+                        box
+                            {| ok = true
+                               blobRef = BlobRef.value receipt.BlobRef
+                               blobDigest = BlobDigest.value receipt.BlobDigest |}
+                    | Error error -> box {| ok = false; error = error |}
+        }
+
     /// Link a Main session to its Blogger companion.
     let appendCompanionLink (journal: obj) (value: obj) : Task<obj> =
         let session = text value?session
@@ -115,6 +138,9 @@ module TipSurface =
 
         let evidenceRef = optionalText value?evidenceRef |> Option.map BlobRef.create
 
+        let tipTextRef = optionalText value?tipTextRef |> Option.map BlobRef.create
+        let tipTextDigest = optionalText value?tipTextDigest |> Option.map BlobDigest.create
+
         let fact =
             ContextFact.BlogObservationCommitted
                 {| SessionId = SessionId.create session
@@ -130,8 +156,9 @@ module TipSurface =
                    TextDigest = BlobDigest.create (text value?textDigest)
                    ProviderRun = providerRun
                    ToolCallIds = toolCallIds
-                   TipRuleId = text value?tipRuleId
-                   FieldNameAtCommit = optionalText value?fieldNameAtCommit
+                   TipName = text value?tipName
+                   TipTextRef = tipTextRef
+                   TipTextDigest = tipTextDigest
                    EvidenceRef = evidenceRef
                    ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedPrefixEpoch) |}
 

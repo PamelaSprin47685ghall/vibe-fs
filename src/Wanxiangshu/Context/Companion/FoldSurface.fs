@@ -49,6 +49,9 @@ module ContextFoldSurface =
     let private optionalBlobRef (value: obj) =
         if isNull value then None else Some(blobRef value)
 
+    let private optionalBlobDigest (value: obj) =
+        if isNull value then None else Some(blobDigest value)
+
     let private optionalProviderRun (value: obj) =
         if isNull value then None else Some(providerRun value)
 
@@ -145,8 +148,9 @@ module ContextFoldSurface =
                        TextDigest = blobDigest (payload?TextDigest)
                        ProviderRun = providerRun (payload?ProviderRun)
                        ToolCallIds = toolCallList (payload?ToolCallIds)
-                       TipRuleId = text (payload?TipRuleId)
-                       FieldNameAtCommit = optionalText (payload?FieldNameAtCommit)
+                       TipName = text (payload?TipName)
+                       TipTextRef = optionalBlobRef (payload?TipTextRef)
+                       TipTextDigest = optionalBlobDigest (payload?TipTextDigest)
                        EvidenceRef = optionalBlobRef (payload?EvidenceRef)
                        ObservedPrefixEpochId = prefixEpoch (payload?ObservedPrefixEpochId) |}
             )
@@ -378,15 +382,14 @@ module ContextFoldSurface =
                         {| providerRun = ProviderRunIdentity.value providerRun
                            mainSessionId = SessionId.value record.MainSessionId
                            bloggerSessionId = SessionId.value record.BloggerSessionId
-                           tipRuleId = record.TipRuleId
+                           tipName = record.TipName
                            toolCallCount = List.length record.ToolCallIds |})
                 |> List.toArray
                recentTips =
                 state.RecentTips
                 |> List.map (fun tip ->
                     box
-                        {| ruleId = tip.RuleId
-                           fieldName = tip.FieldName
+                        {| tipName = tip.TipName
                            cycleId = tip.CycleId |})
                 |> List.toArray |}
 

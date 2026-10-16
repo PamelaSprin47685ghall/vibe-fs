@@ -1,5 +1,7 @@
 # status-announcement-noise — Main
 
+## 现在该做什么
+
 把 update cadence 绑定到**信息变化**，不要绑定到 tool-call 数量。
 
 值得主动播报的节点通常只有几类：
@@ -13,6 +15,20 @@
 
 其他低层动作可以安静执行，最终在下一个 meaningful update 一起总结。
 
+## 为什么重要
+
+沟通 channel 的人类带宽有限。Low-information update 稀释 high-information 事件，训练 recipient 去 skim——这正是让后来的 failure 或 decision 容易被错过的行为。
+
+## 修复策略
+
+定义 meaningful phase boundaries，在这些 boundary 上报 concise evidence，优先报最终结果而不是叙述每个内部动作。对机器消费用 structured telemetry，而不是会话式噪声。
+
+## 决策分支
+
+如果 message 改变了一个 decision、fact、failure、uncertainty 或 required action，保留它。如果它只叙述 routine motion，删除它或聚合到下一个真实 phase boundary。
+
+## 常见假修复
+
 常见假修复：
 
 - 把每条 update 缩短成一句，但频率完全不变；
@@ -21,9 +37,13 @@
 - 为显得透明，提前宣布所有即将调用的文件/命令；
 - 反过来完全不更新，长时间任务直到 final 才暴露早已发现的 blocker。
 
+## 验证
+
 验证从 reader 角度看 transcript：每条 update 是否带来新的 finding、decision、risk、milestone 或 actionability？相邻几条若能无损合并，说明 cadence 仍太细。
 
 对真正 material finding 要及时，不必等整项任务结束。让用户能够在方向尚可改变时纠偏，这是 update 的价值，不是“证明 agent 一直有在工作”。
+
+## 完成条件
 
 完成时 status channel 信噪比高：消息数量可能少，但每一条都足以改变协作者对当前状态的理解。
 

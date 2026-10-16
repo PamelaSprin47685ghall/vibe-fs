@@ -1,8 +1,12 @@
 # optimistic-retry-assumption — Main
 
+## What To Do Now
+
 Give `UnknownOutcome` first-class status.
 
 Do not let timeout/disconnect/crash paths fall through the same branch as a known pre-effect failure. Separate them in the type/control flow and require a recovery protocol before another externally visible effect may be issued.
+
+## Why This Matters
 
 The recovery order should be:
 
@@ -12,9 +16,15 @@ The recovery order should be:
 4. if known not committed, retry if policy allows;
 5. if still unknown, either retry under a protocol that guarantees same-intent idempotency or keep the outcome unknown and escalate/reconcile later.
 
+## Repair Strategy
+
 Possible resolving mechanisms include provider idempotency lookup, transaction status, business-key query, durable command inbox, externally observable state, or a domain-specific reconciliation operation.
 
 If the provider gives no way to identify or query an attempt and duplicate effect is unacceptable, automatic retry is not safe. That limitation belongs in the product/operation contract, not behind “best effort” optimism.
+
+## Decision Branches
+
+## Common Wrong Fixes
 
 Common fake repairs:
 
@@ -27,11 +37,15 @@ Common fake repairs:
 - catching `Cancelled`/`Timeout` and mapping both to `NotExecuted`;
 - querying a stale cache and treating absence there as proof of remote non-commit.
 
+## Verification
+
 Verification must make uncertainty real. Build a fault where the remote effect commits but the acknowledgement is lost. Recovery must not create a second logical effect. Then test known pre-effect rejection separately and prove that it can retry without unnecessary reconciliation.
 
 Also test the unresolved case: status lookup fails or provider is unavailable. The system should remain in an honest unknown state rather than inventing success or failure merely to make the state machine terminal.
 
 This matters for operator UX too. “Failed” invites users to repeat an action. If the real state is “we do not yet know whether your payment/order/publication committed,” say that. A false failure label can itself trigger the duplicate effect the backend was trying to avoid.
+
+## Done When
 
 You are done when every retry decision can cite evidence for one of two claims:
 

@@ -1,5 +1,7 @@
 # permit-leak — Enforcer
 
+## 定义
+
 Permit leak 不是普通意义上的“忘记 cleanup”，而是有限 capacity 的守恒被破坏了。
 
 Semaphore slot、lock token、lease、gate entry、pool permit 这类东西不是普通数据。`acquire` 一次，就等于从系统的总容量里拿走一份线性权利；这份权利必须最终**恰好归还一次**，或者被显式 transfer 给唯一的新 owner。
@@ -14,6 +16,12 @@ release permit
 
 代码看起来成对，但只要 `work` throw、cancel、timeout、early return，后面的 release 就可能永远到不了。更糟的是“补救式 cleanup”还可能制造 double-release：success path 放一次，timeout callback 又放一次，结果系统凭空多出 capacity。
 
+## 支配原则
+
+Permit 是线性资源：一次 acquisition 创造恰好一个 release 义务。任何有多个 exit 的 control flow 都在威胁这条守恒律，除非 lifetime 被结构性编码。手工 acquire/release 成对之所以脆弱，不是因为开发者常常忘记，而是因为 exception、cancellation、early return 不断创造必须保持同一 accounting identity 的新路径。
+
+## 何时触发
+
 以下情况触发：
 
 - acquire 与 release 是手工分开的两个 statement；
@@ -24,9 +32,17 @@ release permit
 - 单次失败不会挂系统，但累积失败最终把并发度耗成 0；
 - 测试只证明 happy path 会 release，没有强制 fault/cancel。
 
+## 不应触发
+
 不要把它扩大成“所有 resource 都是 permit”。File/socket/process 属 `resource-not-scoped` 的更一般 lifetime；permit 的特殊性在于它代表**有限并发/容量权利**，泄漏会让系统越来越不能开始新工作，而不是只留下一个孤儿资源。
 
 也不要误杀真正 scoped/linear transfer。`using/defer/finally/bracket` 若机械保证每次 acquisition 正好一次 release，就是正确形状；显式 ownership transfer 若能证明旧 owner 失去释放义务，也可以合法逃出 lexical scope。
+
+## 与相邻规则区分
+
+与 `resource-not-scoped` 区分：那条管一般 acquire/dispose 资源。与 `lost-update` 区分：那条管并发写。如果有限并发/容量权利能跨 exit path 泄漏，用本规则；如果任何 disposable resource 缺 scoped lifetime，用 `resource-not-scoped`；如果并发写丢版本，用 `lost-update`。
+
+## 判定程序
 
 最决定性的 invariant 不是“release 被调用过”，而是：
 
@@ -35,5 +51,13 @@ capacity_after = capacity_before
 ```
 
 无论 success、throw、cancel、timeout、partial initialization、ownership transfer，完成后守恒都必须成立。
+
+## 例子
+
+- positive：`sem.acquire()` 后 `await work()` 再 `sem.release()`，一个 throw 让 slot 永远不还。
+- near-miss：`await using lease = await pool.acquire()` 在 throw、cancel、return 时都 release。
+- counterexample：mutex 用 `with lock:` / `defer unlock`，没有手工配对。
+
+## Nudge
 
 > Permit 是线性 capacity，不是一个随手拿、以后记得还的 boolean。一次 acquire，就产生一份必须且只能 discharge 一次的债。

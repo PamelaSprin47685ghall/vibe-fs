@@ -1,5 +1,7 @@
 # optimistic-retry-assumption — Enforcer
 
+## 定义
+
 Optimistic retry assumption 的核心错误，是把“没有收到 acknowledgement”偷偷解释成“effect 没发生”。
 
 真正的 epistemic jump 是：
@@ -22,7 +24,11 @@ known failure-before-effect
 unknown outcome
 ```
 
+## 支配原则
+
 把 `unknown` 压成 failure，就制造 duplicate-history risk。
+
+## 何时触发
 
 以下情形触发：
 
@@ -33,7 +39,11 @@ unknown outcome
 - crash/restart 仅因 success ack 缺失就 replay command；
 - comment 写 “timeout 可安全 retry”，却说不出 idempotency/reconciliation protocol。
 
+## 不应触发
+
 不要误杀真正 known-pre-effect failure。Local validation reject、协议可证明 request bytes 尚未被接受的 connection failure、transaction 明确 abort、provider 返回 typed pre-effect rejection，都可以直接判失败。Read-only / naturally idempotent / stable dedupe identity 的 operation 也不是本规则。
+
+## 与相邻规则区分
 
 这条规则与 `retry-not-idempotent` 邻近但不同：
 
@@ -43,6 +53,8 @@ unknown outcome
 两者常常连着发生：timeout 先制造 unknown，non-idempotent retry 再把 unknown 变成 duplicate effect。
 
 `partial-write-assumption` 则是反方向错误：它发明 boundary 没暴露的 partial state；本规则发明“uncertain attempt 已失败”的确定性。
+
+## 判定程序
 
 决定性场景就是 acknowledgement loss：
 
@@ -56,5 +68,9 @@ Step 4 时真正知道什么？如果唯一 evidence 只是“我没收到 succe
 正确 protocol 要么根据 original identity 查询/resolve，要么在同一 idempotency identity 下安全 retry，要么保留 `UnknownOutcome` 并拒绝自动制造第二个 effect。
 
 Backoff 解决不了。等更久只改变 load 与 retry timing，不会改变 first effect 是否已经发生。
+
+## 例子
+
+## Nudge
 
 > Silence 不是 negative acknowledgement。Unknown 是真实状态，直到 evidence 把它解决之前，都应该保持 unknown。

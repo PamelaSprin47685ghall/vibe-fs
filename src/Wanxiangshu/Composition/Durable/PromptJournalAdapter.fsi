@@ -12,19 +12,24 @@ module UserQuestionJournal =
         sessionId: Wanxiangshu.Foundation.Identity.SessionId ->
         callId: Wanxiangshu.Foundation.Identity.ToolCallId ->
             Wanxiangshu.Interaction.Authority.PromptAuthority.UserQuestion option
+
     val pending:
         journal: AgentJournal ->
         sessionId: Wanxiangshu.Foundation.Identity.SessionId ->
             Wanxiangshu.Interaction.Authority.UserQuestionAskedPayload option
+
     val request:
         journal: AgentJournal ->
         question: Wanxiangshu.Interaction.Authority.UserQuestionAskedPayload ->
             System.Threading.Tasks.Task<Result<unit, string>>
+
     val suppressesTurn:
         journal: AgentJournal ->
         sessionId: Wanxiangshu.Foundation.Identity.SessionId ->
         authorityRoot: Wanxiangshu.Foundation.Identity.AuthorityRootUserMessageId ->
-        providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity -> bool
+        providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+            bool
+
     val observeHumanInput:
         journal: AgentJournal ->
         sessionId: Wanxiangshu.Foundation.Identity.SessionId ->

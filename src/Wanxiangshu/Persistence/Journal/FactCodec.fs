@@ -32,7 +32,7 @@ module FactCodec =
     /// become a single tip (ties, empties, multi-high scores). Refuse — never invent
     /// a tip from max score.
     let tipV2CleanBreakMessage =
-        "Wanxiangshu tip v2 requires BlogObservationCommitted.TipRuleId; ScoreVectorRef-era entries are not supported (ENFORCER-072 / PERSIST-005).\nArchive or remove the old Wanxiangshu runtime journal before starting."
+        "Wanxiangshu tip v2 requires BlogObservationCommitted.TipName (or legacy TipRuleId); ScoreVectorRef-era entries are not supported (ENFORCER-072 / PERSIST-005).\nArchive or remove the old Wanxiangshu runtime journal before starting."
 
     /// Field and case names that only a pre-0.5.0 journal can contain.
     ///
@@ -97,9 +97,10 @@ module FactCodec =
         |> Array.exists (fun marker -> json.IndexOf(marker, StringComparison.Ordinal) >= 0)
 
     /// ENFORCER-072: BlogObservationCommitted / legacy BlogEntryCommitted carrying
-    /// ScoreVectorRef, or lacking TipRuleId, is a pre-tip-v2 shape. Explicit refuse
-    /// — no max-score migration. Check both tags so old journals still fail closed.
-    // retention horizon: tip-v2 clean break compatibility decode-only (rejecting legacy score vectors or missing TipRuleId); delete when external census proves 0 legacy journals exist
+    /// ScoreVectorRef, or lacking both TipName and legacy TipRuleId, is a pre-tip-v2
+    /// shape. Explicit refuse — no max-score migration. Check both tags so old
+    /// journals still fail closed.
+    // retention horizon: tip-v2 clean break compatibility decode-only (rejecting legacy score vectors or missing TipName/TipRuleId); delete when external census proves 0 legacy journals exist
     let containsLegacyScoreVectorEntry (json: string) =
         let isObservationCommit =
             json.IndexOf("\"BlogObservationCommitted\"", StringComparison.Ordinal) >= 0
@@ -111,8 +112,11 @@ module FactCodec =
             let hasScoreVector =
                 json.IndexOf("\"ScoreVectorRef\"", StringComparison.Ordinal) >= 0
 
-            let hasTipRuleId = json.IndexOf("\"TipRuleId\"", StringComparison.Ordinal) >= 0
-            hasScoreVector || not hasTipRuleId
+            let hasTipName =
+                json.IndexOf("\"TipName\"", StringComparison.Ordinal) >= 0
+                || json.IndexOf("\"TipRuleId\"", StringComparison.Ordinal) >= 0
+
+            hasScoreVector || not hasTipName
 
     /// HOST-013 anchored replay clean break: the legacy unanchored
     /// `PairProgrammingGuidelineAppended` carried only Ordinal / CallId /

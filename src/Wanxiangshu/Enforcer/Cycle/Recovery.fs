@@ -108,7 +108,7 @@ module EnforcerFrameRecovery =
             session.Enforcement
             |> Option.map EnforcementProjection.recentTips
             |> Option.defaultValue []
-            |> List.map (fun tip -> tip.FieldName, tip.CycleId)
+            |> List.map (fun tip -> tip.TipName, tip.CycleId)
         | None -> []
 
     let private hostSourceLabel isPhysical =

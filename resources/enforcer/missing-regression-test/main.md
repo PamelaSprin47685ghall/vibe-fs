@@ -1,8 +1,12 @@
 # missing-regression-test — Main
 
+## What To Do Now
+
 Turn the defect into executable memory.
 
 Reproduce the smallest scenario that still contains the causal ingredients of the original failure, enter through the owning behavioral boundary, and assert the caller-visible wrong/right outcome.
+
+## Why This Matters
 
 Do not start from the patch. Start from the incident:
 
@@ -13,9 +17,19 @@ what actually happened,
 and what observable would distinguish the two?
 ```
 
+Preserve the cause, not the noise. A production incident may involve large logs, many services, timing, unrelated retries, and historical residue. Reduce those only after identifying which facts were load-bearing. A tiny test that no longer reproduces the cause is worse than a larger faithful one.
+
+## Repair Strategy
+
 Then prove the test would have caught the old behavior. If production is already fixed, temporarily revert/mutate the relevant mechanism or construct the old outcome in a controlled branch. The regression is not established until the test demonstrably turns red under the defect.
 
-Preserve the cause, not the noise. A production incident may involve large logs, many services, timing, unrelated retries, and historical residue. Reduce those only after identifying which facts were load-bearing. A tiny test that no longer reproduces the cause is worse than a larger faithful one.
+For boundary defects, keep the regression at the boundary that failed. For serializer/protocol bugs, make the incompatible bytes/identity part of the fixture. For recovery bugs, crash/fault at the real transition. For concurrency bugs, encode the causal ordering with barriers. For timezone/calendar bugs, freeze the exact instant/zone. For duplicate-delivery bugs, replay the same identity twice.
+
+If the defect revealed a broader law, add the regression **and** strengthen the property/contract. The concrete counterexample remains valuable because it records what humans actually paid to learn; the property protects the surrounding space.
+
+## Decision Branches
+
+## Common Wrong Fixes
 
 Common fake repairs:
 
@@ -27,11 +41,11 @@ Common fake repairs:
 - keep only a manual repro command in a ticket;
 - write a stress loop that occasionally hits the old race instead of controlling the schedule deterministically.
 
-For boundary defects, keep the regression at the boundary that failed. For serializer/protocol bugs, make the incompatible bytes/identity part of the fixture. For recovery bugs, crash/fault at the real transition. For concurrency bugs, encode the causal ordering with barriers. For timezone/calendar bugs, freeze the exact instant/zone. For duplicate-delivery bugs, replay the same identity twice.
-
-If the defect revealed a broader law, add the regression **and** strengthen the property/contract. The concrete counterexample remains valuable because it records what humans actually paid to learn; the property protects the surrounding space.
+## Verification
 
 Verification is straightforward: old defect red, repaired behavior green. Also perform a semantics-preserving refactor to ensure the test does not depend on the exact patch decomposition.
+
+## Done When
 
 You are done when the repository can no longer recreate the same material failure without a test turning red before delivery.
 

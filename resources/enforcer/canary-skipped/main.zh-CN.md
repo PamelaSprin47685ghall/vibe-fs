@@ -1,8 +1,16 @@
 # canary-skipped — Main
 
+## 现在该做什么
+
 把不可由内部证明的 external premise 写成一条最小 falsifiable canary。
 
 先明确谁拥有事实：Host、provider、deployment runtime、OS、external service。然后设计最小真实 interaction，只观察那条 assumption 本身，避免用巨大 E2E 把十种风险混在一起。
+
+## 为什么重要
+
+Mock 证明的是我们让它做的事。Canary 证明的是另一个系统真正做的事。如果行为未文档化，这两句话之间的差距就是全部风险。内部测试可以全绿，却仍建立在关于 framing、ordering、identity、lifecycle 的错误 premise 上。
+
+## 修复策略
 
 好的 canary 应回答：
 
@@ -11,6 +19,14 @@
 - 什么结果会明确证明 assumption false；
 - 依赖哪个 external version/environment；
 - 是否安全、可重复、成本可控。
+
+## 决策分支
+
+- 如果 premise 是未文档化的 Host 行为，release 前加一条窄真实 canary。
+- 如果稳定 declared contract 已有等价的可失败测试，不要为同一 declared fact 重复 live canary。
+- 如果 change 永远到不了 Host boundary，跳过 canary；empirical premise 不在场。
+
+## 常见假修复
 
 常见假修复：
 
@@ -21,11 +37,15 @@
 - canary 太大、依赖太多 unrelated setup，失败后无法知道哪条 premise 被打破；
 - external upgrade 后沿用旧 observation，不重新跑 relevant premise。
 
+## 验证
+
 Canary 不替代 local proof。Pure logic、codec、contract、replay 应先在更窄层证明；live check 只承担**下面各层无法拥有的那一点 empirical uncertainty**。
 
 验证 canary 自己也要 mutation thinking：如果真实 Host 把关键 behavior 改成相反值，这条 canary 会不会可靠变红？若只是仍然得到 200/“completed”，它不够具体。
 
 如果 external side 终于发布稳定 contract，且本地 contract test 能 faithful exercise，可以降低 live canary 频率或移除；证据策略应跟风险所有权走，不是永久 ritual。
+
+## 完成条件
 
 完成时 release 不再依赖 “Host 应该这样吧”，而有一条真实 observation 能让这个 premise 随时被否证。
 

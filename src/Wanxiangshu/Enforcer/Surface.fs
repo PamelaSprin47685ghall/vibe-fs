@@ -51,43 +51,50 @@ module EnforcerSurface =
         | Ok value -> box {| ok = true; value = ok value |}
         | Error error -> box {| ok = false; error = error |}
 
-    let private tipToJs (tip: EnforcerTip) : obj =
-        box
-            {| ruleId = tip.RuleId
-               fieldName = tip.FieldName
-               lexicalOrder = tip.LexicalOrder |}
+    let private tipSectionsToJs (call: EnforcerCodec.CanonicalBlogCall) : (string * obj) list =
+        [ "tipName", box call.TipName
+          "whatToDoNow", box call.WhatToDoNow
+          "whyThisMatters", box call.WhyThisMatters
+          "repairStrategy", box call.RepairStrategy
+          "decisionBranches", box call.DecisionBranches
+          "commonWrongFixes", box call.CommonWrongFixes
+          "verification", box call.Verification
+          "doneWhen", box call.DoneWhen ]
 
     let private callToJs (call: EnforcerCodec.CanonicalBlogCall) : obj =
         match call.Content with
         | EnforcerCodec.ChronicleContent.Structured record ->
-            createObj
+            createObj (
                 [ "charge", box record.Charge
                   "occurrence", box record.Occurrence
                   "settlement", box record.Settlement
                   "consequence", box record.Consequence
-                  "evidence", record.Evidence |> Option.map box |> Option.defaultValue null
-                  "tip", tipToJs call.Tip ]
+                  "evidence", record.Evidence |> Option.map box |> Option.defaultValue null ]
+                @ tipSectionsToJs call
+            )
         | EnforcerCodec.ChronicleContent.Legacy(text, evidence) ->
-            createObj
+            createObj (
                 [ "text", box text
-                  "evidence", evidence |> Option.map box |> Option.defaultValue null
-                  "tip", tipToJs call.Tip ]
+                  "evidence", evidence |> Option.map box |> Option.defaultValue null ]
+                @ tipSectionsToJs call
+            )
 
     let private cycleToJs (cycle: EnforcerCycle.CanonicalCycle) : obj =
         box
             {| mergedText = cycle.MergedText
-               mergedEvidence = cycle.MergedEvidence
-               tip = tipToJs cycle.CanonicalTip |}
+               tipName = cycle.TipName
+               tipSectionsText = cycle.TipSectionsText
+               mergedEvidence = cycle.MergedEvidence |}
 
+    /// JS call arguments → the codec's map shape. The object carries tipName
+    /// and the seven sections directly; no tip alias is synthesized.
     let private rawArgs (value: obj) : Map<string, obj> =
-        let tipValue = if isNullish value?tip then value?tipField else value?tip
         let keys: string array = emitJsExpr value "Object.keys($0)"
 
         keys
         |> Array.map (fun key -> key, emitJsExpr (value, key) "$0[$1]")
         |> Array.toList
         |> Map.ofList
-        |> Map.add "tip" tipValue
 
     /// Packaged English rulebook, in lexical order.
     let rules () : obj array = ruleArray (rulebook ())
@@ -150,29 +157,17 @@ module EnforcerSurface =
 
     /// Decode chronicle arguments against the packaged tip catalog.
     let decodeCall (value: obj) : obj =
-        EnforcerCodec.decodeCall (rulebook ()) (rawArgs value) |> resultToJs callToJs
-
-    let missingTipError = EnforcerCodec.MissingTipError
+        EnforcerCodec.decodeCall (rawArgs value) |> resultToJs callToJs
 
     let hasValidText (value: obj) : bool =
-        let rawTip = value?tip
-
-        let tip =
-            if isNullish rawTip then rawTip
-            elif isNullish rawTip?fieldName then rawTip
-            else rawTip?fieldName
-
-        let args = rawArgs value |> Map.add "tip" tip
-        let decoded = EnforcerCodec.decodeCall (rulebook ()) args
-
-        match decoded with
+        match EnforcerCodec.decodeCall (rawArgs value) with
         | Ok call -> EnforcerCodec.hasValidText call
         | Error _ -> false
 
     /// Canonicalize one already-decoded call. Invalid tip input is returned as
     /// the same stable `{ ok: false, error }` envelope as `decodeCall`.
     let canonicalCycle (value: obj) : obj =
-        let decoded = EnforcerCodec.decodeCall (rulebook ()) (rawArgs value)
+        let decoded = EnforcerCodec.decodeCall (rawArgs value)
 
         match decoded with
         | Ok call -> call |> EnforcerCycle.ofCall |> cycleToJs
@@ -203,10 +198,16 @@ module EnforcerSurface =
 
         EnforcerCatalogResource.loadFor lang |> ruleArray
 
-    /// UTF-8 byte limits enforced before a cycle can be committed.
+    /// UTF-8 byte limits enforced before a cycle can be committed. This JS face
+    /// keeps the canonical text and legacy evidence axes; the production path
+    /// additionally bounds the tip sections text (D4.2).
     let validateBounds (textValue: string) (evidenceValue: string option) : obj =
         match
-            EnforcerCycle.validateContentBounds LlmFacing.byteCount textValue (evidenceValue |> Option.defaultValue "")
+            EnforcerCycle.validateContentBounds
+                LlmFacing.byteCount
+                textValue
+                ""
+                (evidenceValue |> Option.defaultValue "")
         with
         | Error rejection ->
             box
@@ -217,11 +218,3 @@ module EnforcerSurface =
                 {| ok = true
                    textBytes = bounds.TextBytes
                    evidenceBytes = bounds.EvidenceBytes |}
-
-    let resolveField (field: string) (rules: obj array) : obj =
-        rules
-        |> Array.map ruleOfJs
-        |> Array.toList
-        |> EnforcerCatalog.resolveByField field
-        |> Option.map ruleToJs
-        |> Option.toObj

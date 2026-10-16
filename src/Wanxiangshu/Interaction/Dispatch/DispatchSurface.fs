@@ -1117,8 +1117,11 @@ module DispatchSurface =
         |> Map.tryFind (SessionId.create session)
         |> Option.bind (fun state -> state.PromptAuthority)
         |> Option.map (fun authority ->
-            authority.UserQuestions |> Map.toArray |> Array.map (fun (_, question) ->
+            authority.UserQuestions
+            |> Map.toArray
+            |> Array.map (fun (_, question) ->
                 let requested = question.Request
+
                 box
                     {| logicalRun = LogicalRunId.value requested.LogicalRunId
                        authorityRoot = AuthorityRootUserMessageId.value requested.AuthorityRootUserMessageId
@@ -1126,7 +1129,10 @@ module DispatchSurface =
                        sourceInput = PhysicalUserMessageId.value requested.PhysicalUserMessageId
                        toolCall = ToolCallId.value requested.ToolCallId
                        question = requested.Question
-                       answer = question.Answer |> Option.map PhysicalUserMessageId.value |> Option.defaultValue null |}))
+                       answer =
+                        question.Answer
+                        |> Option.map PhysicalUserMessageId.value
+                        |> Option.defaultValue null |}))
         |> Option.defaultValue [||]
 
     let private watermarkText (value: obj) =

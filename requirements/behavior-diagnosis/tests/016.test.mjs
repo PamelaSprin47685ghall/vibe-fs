@@ -26,8 +26,9 @@ const cycleRecord = (n, field) => ({
   toolCallIds: [],
   textRef: `blob-cycle-${n}`,
   textDigest: `sha-cycle-${n}`,
-  tipRuleId: field,
-  fieldNameAtCommit: field,
+  tipName: field,
+  tipTextRef: `blobs/tip-cycle-${n}`,
+  tipTextDigest: `sha-tip-cycle-${n}`,
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })
@@ -106,7 +107,7 @@ const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const TIP_X = 'primitive-obsession'
-const TIP_Y = 'ignored-tdd'
+const TIP_Y = 'tool-error-ignored'
 const WORK_LOG_A = readFileSync(join(FIXTURES, 'observation-a-work-log.txt'), 'utf8').trim()
 const WORK_LOG_B = readFileSync(join(FIXTURES, 'observation-b-work-log.txt'), 'utf8').trim()
 const structuredCall = (occurrence, tip) => ({
@@ -114,7 +115,14 @@ const structuredCall = (occurrence, tip) => ({
   occurrence,
   settlement: 'The observation remains part of the durable paired history.',
   consequence: 'Later selection may compare new material against this established transition.',
-  tip,
+  tipName: tip,
+  whatToDoNow: 'Take the next concrete step.',
+  whyThisMatters: 'The boundary decides later work.',
+  repairStrategy: 'Repair the boundary first.',
+  decisionBranches: 'Follow the branch that fits.',
+  commonWrongFixes: 'Skipping the boundary fails.',
+  verification: 'The check must catch a wrong fix.',
+  doneWhen: 'The boundary holds under the check.',
 })
 const NEW_MATERIAL_SIMILAR_TO_A = `[[new_work_to_record]]
 assistant = "Coder 修改 /src/tenancy/bind.ts：userId 与 tenantId 均声明为 string，绑定函数可互换两个标识。"
@@ -132,8 +140,9 @@ const cycle = (n, tip, run) => ({
   toolCallIds: [`call-paired-${n}`],
   textRef: `blob-paired-${n}`,
   textDigest: `sha-obs-${n === 1 ? 'a' : 'b'}`,
-  tipRuleId: tip,
-  fieldNameAtCommit: tip,
+  tipName: tip,
+  tipTextRef: `blobs/tip-paired-${n}`,
+  tipTextDigest: `sha-tip-paired-${n}`,
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })
@@ -183,8 +192,8 @@ const isHistoricFrame = (text) => text.includes('historic_frame')
 
 test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_001_eval_loads_120_tip_catalog_from_owner_surface', () => {
   const rules = enforcer.rules()
-  assert.equal(rules.length, 120)
-  assert.equal(enforcer.ruleCount(), 120)
+  assert.equal(rules.length, enforcer.fieldNames().length)
+  assert.equal(enforcer.ruleCount(), enforcer.fieldNames().length)
   assert.deepEqual(enforcer.fieldNames(), rules.map((r) => r.fieldName))
 
   const x = enforcer.tryFindByField(TIP_X)
@@ -210,19 +219,19 @@ test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_002_observations_a_and_b_c
 
   const tips = observation.recentTips(projected.enforcement)
   assert.deepEqual(
-    tips.map((t) => ({ field: t.fieldName, ruleId: t.ruleId, cycleId: t.cycleId })),
+    tips.map((t) => ({ tipName: t.tipName, cycleId: t.cycleId })),
     [
-      { field: TIP_X, ruleId: TIP_X, cycleId: 'run-obs-a' },
-      { field: TIP_Y, ruleId: TIP_Y, cycleId: 'run-obs-b' },
+      { tipName: TIP_X, cycleId: 'run-obs-a' },
+      { tipName: TIP_Y, cycleId: 'run-obs-b' },
     ],
   )
 
   const decodedX = enforcer.decodeCall(structuredCall(WORK_LOG_A, TIP_X))
   assert.equal(decodedX.ok, true)
-  assert.equal(decodedX.value.tip.fieldName, TIP_X)
+  assert.equal(decodedX.value.tipName, TIP_X)
   const decodedY = enforcer.decodeCall(structuredCall(WORK_LOG_B, TIP_Y))
   assert.equal(decodedY.ok, true)
-  assert.equal(decodedY.value.tip.fieldName, TIP_Y)
+  assert.equal(decodedY.value.tipName, TIP_Y)
 })
 test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_003_selection_path_sees_tip_x_when_new_material_resembles_a', () => {
   const projected = foldPairedHistory()
@@ -230,7 +239,7 @@ test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_003_selection_path_sees_ti
   assert.equal(observations[0].tipName, TIP_X)
 
   const previousTips = observation.recentTips(projected.enforcement).map((t) => ({
-    tipName: t.fieldName,
+    tipName: t.tipName,
     cycleId: t.cycleId,
   }))
   assert.equal(previousTips[0].tipName, TIP_X)
@@ -308,8 +317,9 @@ const cycleRecord = (n, field) => ({
   toolCallIds: [`call-${n}`],
   textRef: `blob-t${n}`,
   textDigest: `sha-t${n}`,
-  tipRuleId: field,
-  fieldNameAtCommit: field,
+  tipName: field,
+  tipTextRef: `blobs/tip-cycle-${n}`,
+  tipTextDigest: `sha-tip-cycle-${n}`,
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })

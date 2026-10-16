@@ -1,6 +1,10 @@
 # failure-path-untested — Enforcer
 
+## Definition
+
 A failure path is untested when the code contains policy for what happens under failure, cancellation, rollback, malformed input, conflict, timeout, retry, or recovery — but no test has ever forced the condition that gives that policy meaning.
+
+## Governing Principle
 
 The dangerous illusion is readability. Failure code often *looks* obviously correct:
 
@@ -13,6 +17,8 @@ catch
 
 But these branches are where ownership, partial effects, cleanup ordering, idempotency, stale state, and secondary failure interact. They are often the least exercised code in production until the moment correctness matters most.
 
+## Trigger When
+
 Fire this rule when a change adds or materially changes failure semantics and no test deliberately produces the real precondition. Examples:
 
 - new rollback branch never runs under test;
@@ -24,13 +30,19 @@ Fire this rule when a change adds or materially changes failure semantics and no
 - recovery branch is “covered” only by manually constructing post-failure internal state;
 - error mapping is tested without the external/inner failure that production maps.
 
+## Do Not Trigger When
+
 Do not fire when an existing test already induces the exact failure through the same owning boundary and observes the same externally relevant semantics. Do not demand a bespoke test for unreachable dead code; delete the dead branch. Property/exhaustive tests may already provide sufficient failure evidence if they genuinely generate the condition and assert cleanup/state, not merely lines executed.
+
+## Distinguish From
 
 This differs from `missing-regression-test`: that rule starts from a **known defect that already escaped or was observed** and asks whether the repository preserved executable memory of it. `failure-path-untested` applies even before any incident: newly important failure policy has never been exercised.
 
 It also differs from `coverage-theater`. A failure line can show as covered because a broad test passed through it, yet the test may never assert the guarantee that matters. The question is not “did the branch execute?” but:
 
 > Did a test deliberately create this failure and prove the required result, cleanup, state preservation, and forbidden side effects?
+
+## Decision Procedure
 
 A useful failure-test specification has four parts:
 
@@ -42,5 +54,9 @@ forbid: what must not happen despite the failure?
 ```
 
 The “forbid” column is often where the real contract lives: no duplicate charge, no stale publish, no leaked permit, no state advance, no second retry, no swallowed error.
+
+## Examples
+
+## Nudge
 
 > Failure handling is executable policy. Code that has never been forced to fail is not yet evidence that failure is handled.

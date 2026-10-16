@@ -14,19 +14,19 @@ module JsAnchorFs =
     let private Filesystem: obj = jsNative
 
     [<Emit("$0({ root: $1 })")>]
-    let private createFilesystem (factory: obj) (root: string): obj = jsNative
+    let private createFilesystem (factory: obj) (root: string) : obj = jsNative
 
     let private api = createFilesystem Filesystem ""
 
-    let private specToJs (spec: AnchorSpec): obj =
+    let private specToJs (spec: AnchorSpec) : obj =
         match spec with
         | AnchorSpec.Exact text -> createObj [ "kind" ==> "exact"; "text" ==> text ]
         | AnchorSpec.Regex text -> createObj [ "kind" ==> "regex"; "text" ==> text ]
 
-    let private failureOf (result: obj): JsFailure =
+    let private failureOf (result: obj) : JsFailure =
         JsFailure.ofWire (string (result?code)) (string (result?reason))
 
-    let private spanOf (result: obj): Result<int * int, JsFailure> =
+    let private spanOf (result: obj) : Result<int * int, JsFailure> =
         if unbox<bool> (result?ok) then
             let value = unbox<obj array> (result?value)
             Ok(unbox<int> (value.[0]), unbox<int> (value.[1]))
@@ -45,16 +45,18 @@ module JsAnchorFs =
 
     /// JS-020: Host grep over gitignore-selected UTF-8 files. Full result —
     /// no internal bound; the Host tool-result bound tail-keeps the tail.
-    let grep (root: string) (spec: AnchorSpec) (pattern: string): Task<Result<JsGrepListing, JsFailure>> =
+    let grep (root: string) (spec: AnchorSpec) (pattern: string) : Task<Result<JsGrepListing, JsFailure>> =
         let rootApi = createFilesystem Filesystem root
+
         task {
-            let! (result: obj) = unbox<Task<obj>> (rootApi?grep(specToJs spec, pattern))
+            let! (result: obj) = unbox<Task<obj>> (rootApi?grep (specToJs spec, pattern))
 
             if not (unbox<bool> (result?ok)) then
                 return Error(failureOf result)
             else
                 let value = result?value
                 let matches = unbox<obj array> (value?matches)
+
                 let hits =
                     matches
                     |> Array.map (fun hit ->
@@ -65,6 +67,7 @@ module JsAnchorFs =
                     |> Array.toList
 
                 let snapshots = unbox<obj array> (value?readSnapshots)
+
                 let readSnapshots =
                     snapshots
                     |> Array.map (fun snapshot ->
@@ -72,15 +75,18 @@ module JsAnchorFs =
                           Text = string (snapshot?text) })
                     |> Array.toList
 
-                return Ok { Matches = hits; ReadSnapshots = readSnapshots }
+                return
+                    Ok
+                        { Matches = hits
+                          ReadSnapshots = readSnapshots }
         }
 
     /// JS-006: ordered string/RegExp anchor matching. `occurrence` is 1-based.
     /// Returns (start, end); zero-width matches yield start = end.
-    let findAnchor (text: string) (spec: AnchorSpec) (occurrence: int): Result<int * int, JsFailure> =
-        spanOf (api?findAnchor(text, specToJs spec, float occurrence))
+    let findAnchor (text: string) (spec: AnchorSpec) (occurrence: int) : Result<int * int, JsFailure> =
+        spanOf (api?findAnchor (text, specToJs spec, float occurrence))
 
     /// JS-006: uniqueness refusal — when no occurrence is declared, the anchor
     /// must match exactly once.
-    let requireUnique (text: string) (spec: AnchorSpec): Result<int * int, JsFailure> =
-        spanOf (api?requireUnique(text, specToJs spec))
+    let requireUnique (text: string) (spec: AnchorSpec) : Result<int * int, JsFailure> =
+        spanOf (api?requireUnique (text, specToJs spec))

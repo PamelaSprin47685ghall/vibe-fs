@@ -21,15 +21,19 @@ module RetentionSurface =
     /// 测试边界只调用已有的本机段整理，不创建 Git snapshot，也不读取远端。
     let reorganizeWithSegmentCap (stateRoot: string) (capBytes: int) : Task<obj> =
         task {
-            if capBytes <= 0 then invalidArg "capBytes" "segment cap must be positive"
+            if capBytes <= 0 then
+                invalidArg "capBytes" "segment cap must be positive"
 
             let! outcome =
                 ProcessEventLog.withStoreLock stateRoot (fun () ->
                     ProcessEventLog.withSegmentCap capBytes (fun () ->
                         ProcessEventLog.writerPhysicalMetadata stateRoot
-                        |> List.fold (fun result writer ->
-                            result |> Result.bind (fun () ->
-                                ProcessEventLog.convergeWriterFiles stateRoot writer.WriterId)) (Ok()))
+                        |> List.fold
+                            (fun result writer ->
+                                result
+                                |> Result.bind (fun () ->
+                                    ProcessEventLog.convergeWriterFiles stateRoot writer.WriterId))
+                            (Ok()))
                     |> Task.FromResult)
 
             return

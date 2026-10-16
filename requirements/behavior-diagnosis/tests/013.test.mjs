@@ -6,15 +6,14 @@ const { default: test } = await import("node:test");
 const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 const observation = await import("../../../dist/Enforcer/ObservationSurface.js");
 
-const cycle = ({ run = 'msg-e1', tipRuleId = 'enforcement-tip-1', fieldNameAtCommit = 'field-tip-1', toolCalls = [], evidenceRef } = {}) => ({
+const cycle = ({ run = 'msg-e1', tipName = 'enforcement-tip-1', toolCalls = [], evidenceRef } = {}) => ({
   mainSessionId: 'ses-main',
   bloggerSessionId: 'ses-blogger',
   run,
   toolCallIds: toolCalls,
   textRef: 'blob-e1',
   textDigest: 'sha-e1',
-  tipRuleId,
-  fieldNameAtCommit,
+  tipName,
   evidenceRef,
   observedPrefixEpoch: 0,
 })

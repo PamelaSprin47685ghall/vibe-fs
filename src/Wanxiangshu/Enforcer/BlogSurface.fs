@@ -604,6 +604,8 @@ module BlogSurface =
     let private observationPayload (value: obj) : ContextFactCases =
         let toolCalls = arrayOf value?toolCallIds |> Array.map id
         let evidence = optionText value?evidenceRef
+        let tipTextRef = optionText value?tipTextRef |> Option.map BlobRef.create
+        let tipTextDigest = optionText value?tipTextDigest |> Option.map BlobDigest.create
 
         ContextFactCases.BlogObservationCommitted
             {| SessionId = SessionId.create (text value?sessionId)
@@ -619,8 +621,9 @@ module BlogSurface =
                TextDigest = BlobDigest.create (text value?textDigest)
                ProviderRun = ProviderRunIdentity.create (text value?run)
                ToolCallIds = toolCalls |> Array.toList |> List.map ToolCallId.create
-               TipRuleId = text value?tipRuleId
-               FieldNameAtCommit = optionText value?fieldNameAtCommit
+               TipName = text value?tipName
+               TipTextRef = tipTextRef
+               TipTextDigest = tipTextDigest
                EvidenceRef = evidence |> Option.map BlobRef.create
                ObservedPrefixEpochId = PrefixEpochId.create (int64 (text value?observedPrefixEpoch)) |}
 
@@ -869,7 +872,7 @@ module BlogSurface =
                         box
                             {| text = cycle.MergedText
                                evidence = cycle.MergedEvidence
-                               ruleId = cycle.CanonicalTip.RuleId
+                               tipName = cycle.TipName
                                toolCallIds = identities |> List.map ToolCallId.value |> List.toArray |})
                     box
 

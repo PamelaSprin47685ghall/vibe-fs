@@ -27,7 +27,20 @@ module ToolSurface =
     let chronicleContract () : obj =
         box
             {| name = "chronicle"
-               argumentNames = [| "charge"; "occurrence"; "settlement"; "consequence"; "evidence"; "tip" |]
+               argumentNames =
+                [| "charge"
+                   "occurrence"
+                   "settlement"
+                   "consequence"
+                   "tipName"
+                   "whatToDoNow"
+                   "whyThisMatters"
+                   "repairStrategy"
+                   "decisionBranches"
+                   "commonWrongFixes"
+                   "verification"
+                   "doneWhen"
+                   "evidence" |]
                tipCount = ChronicleTool.tipFieldNames () |> List.length |}
 
     let reviewToolNames () : string array =

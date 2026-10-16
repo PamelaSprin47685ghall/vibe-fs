@@ -183,10 +183,10 @@ module EnforcerCycleCommit =
                 let! result =
                     taskResult {
                         let! textBlob = writeBlobOrNotCommitted journal merged.MergedText
+                        let! tipSectionsBlob = writeBlobOrNotCommitted journal merged.TipSectionsText
                         let! evidenceRef = writeOptionalEvidence journal merged.MergedEvidence
                         let latestBlog = liveBlogOf (AgentJournal.snapshot journal) mainSessionId
                         do! requireClear (refuseStaleAfterBlob coverage latestBlog)
-                        let tip = merged.CanonicalTip
 
                         let fact =
                             ContextFact.BlogObservationCommitted
@@ -203,8 +203,9 @@ module EnforcerCycleCommit =
                                    TextDigest = textBlob.BlobDigest
                                    ProviderRun = providerRun
                                    ToolCallIds = toolCallIds
-                                   TipRuleId = tip.RuleId
-                                   FieldNameAtCommit = Some tip.FieldName
+                                   TipName = merged.TipName
+                                   TipTextRef = Some tipSectionsBlob.BlobRef
+                                   TipTextDigest = Some tipSectionsBlob.BlobDigest
                                    EvidenceRef = evidenceRef |> Option.map (fun blob -> blob.BlobRef)
                                    ObservedPrefixEpochId = epoch |}
 

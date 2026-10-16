@@ -162,8 +162,12 @@ type ToolRuntimeScope
     let mutable questionNotifier: (string -> Task<Result<unit, string>>) option = None
     let questionRequests = HashSet<SessionId>()
     let questionInterrupts = HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
-    let postS3PendingInterrupts = HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
-    let postS3SettledInterrupts = HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
+
+    let postS3PendingInterrupts =
+        HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
+
+    let postS3SettledInterrupts =
+        HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
 
     /// EXEC-017 attempt-scoped join interrupt registry (PluginRuntimeScope or local default).
     // DSL-MUTABLE: resource — join attempt registry attachment
@@ -879,31 +883,46 @@ type ToolRuntimeScope
     member _.WorkspaceDirectory = workspaceDirectory
     member _.ActiveProfileFor(sessionId: SessionId) = activeProfileFor sessionId
 
-    member _.AttachQuestionNotifier(notify: string -> Task<Result<unit, string>>) =
-        questionNotifier <- Some notify
+    member _.AttachQuestionNotifier(notify: string -> Task<Result<unit, string>>) = questionNotifier <- Some notify
 
     member _.IsWaitingForUser(sessionId: string) =
-        journal |> Option.bind (fun durable -> UserQuestionJournal.pending durable (SessionId.create sessionId))
+        journal
+        |> Option.bind (fun durable -> UserQuestionJournal.pending durable (SessionId.create sessionId))
         |> Option.isSome
 
     member private _.ClearQuestionInterrupts(sid: SessionId) =
-        let stale = questionInterrupts |> Seq.filter (fun (owner, _, _) -> owner = sid) |> Seq.toArray
+        let stale =
+            questionInterrupts
+            |> Seq.filter (fun (owner, _, _) -> owner = sid)
+            |> Seq.toArray
+
         Array.iter (questionInterrupts.Remove >> ignore) stale
 
-    member private _.RecordShownQuestion(durable: AgentJournal, sid: SessionId, sessionIdText: string, request: UserQuestionAskedPayload) =
+    member private _.RecordShownQuestion
+        (durable: AgentJournal, sid: SessionId, sessionIdText: string, request: UserQuestionAskedPayload)
+        =
         task {
             let! recorded = UserQuestionJournal.request durable request
+
             match recorded, currentPhysicalUserMessage sessionIdText with
             | Ok(), Some latest ->
                 return! UserQuestionJournal.observeHumanInput durable sid (PhysicalUserMessageId.create latest)
             | _ -> return recorded
         }
 
-    member private this.SendFreshQuestion(durable: AgentJournal, sid: SessionId, sessionIdText: string, notify: string -> Task<Result<unit, string>>, request: UserQuestionAskedPayload) =
+    member private this.SendFreshQuestion
+        (
+            durable: AgentJournal,
+            sid: SessionId,
+            sessionIdText: string,
+            notify: string -> Task<Result<unit, string>>,
+            request: UserQuestionAskedPayload
+        ) =
         task {
             try
                 this.ClearQuestionInterrupts sid
                 let! shown = notify request.Question
+
                 match shown with
                 | Error reason -> return Error reason
                 | Ok() -> return! this.RecordShownQuestion(durable, sid, sessionIdText, request)
@@ -911,19 +930,38 @@ type ToolRuntimeScope
                 questionRequests.Remove sid |> ignore
         }
 
-    member private this.DispatchValidatedQuestion(durable: AgentJournal, sid: SessionId, sessionIdText: string, notify: string -> Task<Result<unit, string>>, request: UserQuestionAskedPayload) =
+    member private this.DispatchValidatedQuestion
+        (
+            durable: AgentJournal,
+            sid: SessionId,
+            sessionIdText: string,
+            notify: string -> Task<Result<unit, string>>,
+            request: UserQuestionAskedPayload
+        ) =
         let work =
-            lifecycleWorkOfDirectory
-                (directoryFor sessionIdText |> Option.orElse workspaceDirectory)
-                sessionIdText
-        if not (work |> Option.exists (fun current -> current.ActiveId.IsSome && not current.Delivered)) then
+            lifecycleWorkOfDirectory (directoryFor sessionIdText |> Option.orElse workspaceDirectory) sessionIdText
+
+        if
+            not (
+                work
+                |> Option.exists (fun current -> current.ActiveId.IsSome && not current.Delivered)
+            )
+        then
             Task.FromResult(Error "ask requires an unfinished work with an active incumbency")
         elif not (questionRequests.Add sid) then
             Task.FromResult(Error "a question is already being sent for this session")
         else
             this.SendFreshQuestion(durable, sid, sessionIdText, notify, request)
 
-    member private this.ResolveOrSendQuestion(durable: AgentJournal, sid: SessionId, sessionIdText: string, call: ToolCallId, notify: string -> Task<Result<unit, string>>, request: UserQuestionAskedPayload) =
+    member private this.ResolveOrSendQuestion
+        (
+            durable: AgentJournal,
+            sid: SessionId,
+            sessionIdText: string,
+            call: ToolCallId,
+            notify: string -> Task<Result<unit, string>>,
+            request: UserQuestionAskedPayload
+        ) =
         match UserQuestionJournal.tryFind durable sid call with
         | Some previous when previous.Request = request -> Task.FromResult(Ok())
         | Some _ -> Task.FromResult(Error "ask call identity conflicts with its recorded question")
@@ -935,11 +973,18 @@ type ToolRuntimeScope
     member this.AskUser(ctx: HostToolContext, question: string) : Task<Result<unit, string>> =
         task {
             let sid = SessionId.create ctx.SessionId
-            match journal, activeProfileFor sid, ctx.ProviderRunId, ctx.ToolCallId,
-                  currentPhysicalUserMessage ctx.SessionId, questionNotifier with
+
+            match
+                journal,
+                activeProfileFor sid,
+                ctx.ProviderRunId,
+                ctx.ToolCallId,
+                currentPhysicalUserMessage ctx.SessionId,
+                questionNotifier
+            with
             | Some durable, Some profile, Some run, Some call, Some physical, Some notify when
-                profile.CanonicalRole = Role.Plan
-                && not (String.IsNullOrWhiteSpace question) ->
+                profile.CanonicalRole = Role.Plan && not (String.IsNullOrWhiteSpace question)
+                ->
                 let request: UserQuestionAskedPayload =
                     { SessionId = sid
                       LogicalRunId = profile.LogicalRunId
@@ -948,15 +993,21 @@ type ToolRuntimeScope
                       ProviderRunId = run
                       ToolCallId = call
                       Question = question }
+
                 return! this.ResolveOrSendQuestion(durable, sid, ctx.SessionId, call, notify, request)
-            | _ -> return Error "ask requires active Plan authority, exact call evidence, a question, and user notification"
+            | _ ->
+                return
+                    Error "ask requires active Plan authority, exact call evidence, a question, and user notification"
         }
 
     member private _.RunQuestionInterrupt(sessionId: SessionId, key: SessionId * ProviderRunIdentity * ToolCallId) =
         task {
             try
                 let! stopped = sessions.InterruptAttempt sessionId
-                if Result.isError stopped then questionInterrupts.Remove key |> ignore
+
+                if Result.isError stopped then
+                    questionInterrupts.Remove key |> ignore
+
                 return stopped
             with ex ->
                 questionInterrupts.Remove key |> ignore
@@ -964,13 +1015,23 @@ type ToolRuntimeScope
         }
 
     /// 只在宿主确认 ask 的工具结果后中断本次 attempt；不终结逻辑运行或取消子资源。
-    member this.InterruptForUserQuestion(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) : Task<Result<unit, string>> =
+    member this.InterruptForUserQuestion
+        (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId)
+        : Task<Result<unit, string>> =
         task {
-            match journal |> Option.bind (fun durable -> UserQuestionJournal.pending durable sessionId) with
-            | Some question when question.ToolCallId = callId && question.ProviderRunId = providerRun
-                                 && currentPhysicalUserMessage (SessionId.value sessionId)
-                                    = Some(PhysicalUserMessageId.value question.PhysicalUserMessageId)
-                                 && questionInterrupts.Add(sessionId, question.ProviderRunId, callId) ->
+            match
+                journal
+                |> Option.bind (fun durable -> UserQuestionJournal.pending durable sessionId)
+            with
+            | Some question when
+                question.ToolCallId = callId
+                && question.ProviderRunId = providerRun
+                && currentPhysicalUserMessage (SessionId.value sessionId) = Some(
+                                                                                PhysicalUserMessageId.value
+                                                                                    question.PhysicalUserMessageId
+                                                                            )
+                && questionInterrupts.Add(sessionId, question.ProviderRunId, callId)
+                ->
                 return! this.RunQuestionInterrupt(sessionId, (sessionId, question.ProviderRunId, callId))
             | _ -> return Ok()
         }
@@ -981,12 +1042,14 @@ type ToolRuntimeScope
         task {
             try
                 let! stopped = sessions.InterruptAttempt sessionId
+
                 lock gate (fun () ->
                     let _ =
-                        Result.isError stopped
-                        && postS3SettledInterrupts.Remove key
+                        Result.isError stopped && postS3SettledInterrupts.Remove key
                         || postS3PendingInterrupts.Remove key
+
                     ())
+
                 return stopped
             with ex ->
                 lock gate (fun () -> postS3SettledInterrupts.Remove key |> ignore)
@@ -994,23 +1057,25 @@ type ToolRuntimeScope
         }
 
     member _.RegisterPostS3Interrupt(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) =
-        lock gate (fun () ->
-            postS3PendingInterrupts.Add(sessionId, providerRun, callId) |> ignore)
+        lock gate (fun () -> postS3PendingInterrupts.Add(sessionId, providerRun, callId) |> ignore)
 
     member _.HasPendingPostS3Interrupt(sessionId: string) =
         let sid = SessionId.create sessionId
-        lock gate (fun () ->
-            postS3PendingInterrupts |> Seq.exists (fun (owner, _, _) -> owner = sid))
+        lock gate (fun () -> postS3PendingInterrupts |> Seq.exists (fun (owner, _, _) -> owner = sid))
 
-    member this.InterruptForPostS3Deliver(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) : Task<Result<unit, string>> =
+    member this.InterruptForPostS3Deliver
+        (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId)
+        : Task<Result<unit, string>> =
         let key = sessionId, providerRun, callId
+
         let shouldInterrupt =
-            lock gate (fun () ->
-                postS3PendingInterrupts.Contains key && postS3SettledInterrupts.Add key)
+            lock gate (fun () -> postS3PendingInterrupts.Contains key && postS3SettledInterrupts.Add key)
+
         if shouldInterrupt then
             this.RunPostS3InterruptAttempt(sessionId, key)
         else
             Task.FromResult(Ok())
+
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member _.RunStarted = onStarted
 
@@ -1492,13 +1557,26 @@ type ToolRuntimeScope
 
     member _.DisposeSession(sessionId: string) : Task =
         let questionOwner = SessionId.create sessionId
-        for key in questionInterrupts |> Seq.filter (fun (owner, _, _) -> owner = questionOwner) |> Seq.toArray do
+
+        for key in
+            questionInterrupts
+            |> Seq.filter (fun (owner, _, _) -> owner = questionOwner)
+            |> Seq.toArray do
             questionInterrupts.Remove key |> ignore
+
         lock gate (fun () ->
-            for key in postS3PendingInterrupts |> Seq.filter (fun (owner, _, _) -> owner = questionOwner) |> Seq.toArray do
+            for key in
+                postS3PendingInterrupts
+                |> Seq.filter (fun (owner, _, _) -> owner = questionOwner)
+                |> Seq.toArray do
                 postS3PendingInterrupts.Remove key |> ignore
-            for key in postS3SettledInterrupts |> Seq.filter (fun (owner, _, _) -> owner = questionOwner) |> Seq.toArray do
+
+            for key in
+                postS3SettledInterrupts
+                |> Seq.filter (fun (owner, _, _) -> owner = questionOwner)
+                |> Seq.toArray do
                 postS3SettledInterrupts.Remove key |> ignore)
+
         let forkRuntimes, orchestrator =
             lock gate (fun () ->
                 // DSL-MUTABLE: algorithm-scratch — owned runtime accumulator for dispose

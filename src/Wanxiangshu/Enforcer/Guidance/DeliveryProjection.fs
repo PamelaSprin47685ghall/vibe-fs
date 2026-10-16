@@ -10,12 +10,20 @@ type TipDeliveryProjectionState =
         /// received their first Full delivery in this Main session. Persistent
         /// and monotonic; reanchor never resets it.
         DeliveredOccurrences: Set<string>
-        /// TipSemanticCoverage: TipNames whose full manual.md is recoverable in
-        /// the current provider horizon. ContextReanchored clears it.
+        /// TipSemanticCoverage: normalized TipNames whose authored tip body is
+        /// recoverable in the current provider horizon. ContextReanchored clears it.
         CoveredTipNames: Set<string>
     }
 
 module TipDeliveryProjection =
+
+    /// C3.1/C3.2: trim + simple case fold (.NET ToLowerInvariant). Comparison
+    /// key only — the stored/displayed TipName keeps its authored bytes (C3.4).
+    let normalizeTipName (tipName: string) : string =
+        if isNull tipName then
+            ""
+        else
+            tipName.Trim().ToLowerInvariant()
 
     let empty: TipDeliveryProjectionState =
         { DeliveredOccurrences = Set.empty
@@ -23,20 +31,22 @@ module TipDeliveryProjection =
 
     /// WHAT[003]: IdentityOnly only when this occurrence already has its first
     /// delivery AND the full text is still covered in the current horizon.
+    /// Coverage membership compares by normalize(tipName) (G4.1); the occurrence
+    /// axis stays exact.
     let isIdentityOnly (occurrence: string) (tipName: string) (state: TipDeliveryProjectionState) : bool =
         (not (isNull occurrence))
         && occurrence.Trim().Length > 0
         && (not (isNull tipName))
         && Set.contains occurrence state.DeliveredOccurrences
-        && Set.contains tipName state.CoveredTipNames
+        && Set.contains (normalizeTipName tipName) state.CoveredTipNames
 
-    /// Coverage query for the JS surface: is the full manual.md for this
+    /// Coverage query for the JS surface: is the authored tip body for this
     /// TipName recoverable in the current horizon?
     let hasFullDelivered (tipName: string) (state: TipDeliveryProjectionState) : bool =
         if isNull tipName then
             false
         else
-            Set.contains tipName state.CoveredTipNames
+            Set.contains (normalizeTipName tipName) state.CoveredTipNames
 
     /// Absorb one TipGuidanceDelivered.
     ///
@@ -53,7 +63,7 @@ module TipDeliveryProjection =
             if isNull tipName || tipName.Trim().Length = 0 then
                 None
             else
-                Some(tipName.Trim())
+                Some(normalizeTipName tipName)
 
         let normalizedOccurrence =
             match occurrence with

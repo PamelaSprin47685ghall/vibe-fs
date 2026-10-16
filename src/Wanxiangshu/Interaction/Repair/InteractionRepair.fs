@@ -160,12 +160,24 @@ module InteractionRepairWorkflow =
         (observer: ContinuationAcceptanceObserver option)
         : Task =
         let path =
-            if context.Turn.Role = Some Role.Manager then "work/manager-continue"
-            else "work/plan-continue"
+            if context.Turn.Role = Some Role.Manager then
+                "work/manager-continue"
+            else
+                "work/plan-continue"
+
         let prompt =
             ProviderProse.render (ProviderProse.languageOf context.Turn.SessionId) path Map.empty
-        trySendIdleRepair quiescence context sessionPort rootWorkspace eventPort journal
-            prompt "unfinished-long-work" observer
+
+        trySendIdleRepair
+            quiescence
+            context
+            sessionPort
+            rootWorkspace
+            eventPort
+            journal
+            prompt
+            "unfinished-long-work"
+            observer
 
     let private continuationKindOf (journal: AgentJournal option) (turn: ReconciledTurn) =
         journal
@@ -405,8 +417,7 @@ module InteractionRepairWorkflow =
 
         if fissionReplaced || retryAttemptSuppressesRepair journal observation turn then
             AsyncSupport.completedTask ()
-        elif CompletedTurnClassifier.needsInteractionRepair turn.Role (box turn.Outcome) turn.Parts
-        then
+        elif CompletedTurnClassifier.needsInteractionRepair turn.Role (box turn.Outcome) turn.Parts then
             repairDefect
                 quiescence
                 context

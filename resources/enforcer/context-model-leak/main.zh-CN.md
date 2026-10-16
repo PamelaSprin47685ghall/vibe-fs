@@ -3,7 +3,7 @@
 ## 现在该做什么
 从每个 bounded context 的问题与 invariant 重新定义 local model，只通过明确 boundary contract 传递真正共享的 facts。不要从现有 master object 的字段列表出发拆 DTO。
 
-## 为什么这很重要
+## 为什么重要
 Universal model 会制造“semantic coupling disguised as reuse”。一个字段为了 Billing 加入后，Auth/Session/UI 全部开始知道它；很快 nullable、context flags、conditional validation 堆积起来，因为类型已经无法说明哪个解释现在有效。
 
 ## 修复策略
@@ -13,6 +13,11 @@ Universal model 会制造“semantic coupling disguised as reuse”。一个字�
 - crossing facts 通过 explicit contract 翻译；
 - 删除在某 context 中永远“not applicable”的 foreign fields；
 - persistence schema 不直接决定 domain model 边界。
+
+## 决策分支
+- 若一个类型回答不同 context 的问题，拆开它，只翻译真正共享的 facts；
+- 若某字段在一个 context 里没有意义，它在那里必须无法表示，而不是在 master object 上 nullable；
+- 若一个 tiny value object 处处含义真正相同，共享它不是 leak。
 
 ## 常见假修复
 - 把 master model 复制到每个 package，但字段仍一模一样、同步演化。

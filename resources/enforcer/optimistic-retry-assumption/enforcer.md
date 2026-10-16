@@ -1,5 +1,7 @@
 # optimistic-retry-assumption — Enforcer
 
+## Definition
+
 An optimistic retry assumption appears when lack of acknowledgement is silently reinterpreted as proof that the effect never happened.
 
 The key epistemic error is:
@@ -22,7 +24,11 @@ known failure-before-effect
 unknown outcome
 ```
 
+## Governing Principle
+
 Collapsing `unknown` into failure creates duplicate-history risk.
+
+## Trigger When
 
 Fire this rule when:
 
@@ -33,7 +39,11 @@ Fire this rule when:
 - a crash/restart path replays commands solely because their success acknowledgement was absent;
 - code comments say “safe to retry on timeout” without naming the idempotency/reconciliation protocol that makes it safe.
 
+## Do Not Trigger When
+
 Do not fire when failure is genuinely known to precede the effect: validation rejected locally, connection establishment failed before any request bytes could be accepted under the protocol, transaction explicitly aborted, provider returned a typed rejection known to be pre-effect. Also do not fire for read-only/naturally idempotent operations or operations protected by a stable deduplication identity.
+
+## Distinguish From
 
 This rule is adjacent to, but not the same as, `retry-not-idempotent`.
 
@@ -43,6 +53,8 @@ This rule is adjacent to, but not the same as, `retry-not-idempotent`.
 They often co-occur. A timeout may create unknown; a non-idempotent retry then turns that unknown into duplicate effect.
 
 `partial-write-assumption` goes the opposite direction: it invents an internal partial state not exposed by the boundary. This rule invents certainty that an uncertain external attempt failed.
+
+## Decision Procedure
 
 The decisive scenario is acknowledgement loss:
 
@@ -56,5 +68,9 @@ Ask what recovery knows at step 4. If its only evidence is “we did not receive
 A correct protocol either resolves the original identity (status lookup/reconciliation), safely retries under the same idempotency identity, or preserves `UnknownOutcome` and refuses to create another effect automatically.
 
 Backoff does not solve this. Waiting longer changes load and retry timing; it does not change whether the first effect already happened.
+
+## Examples
+
+## Nudge
 
 > Silence is not a negative acknowledgement. Unknown is a real state and deserves to remain one until evidence resolves it.

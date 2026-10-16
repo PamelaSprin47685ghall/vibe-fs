@@ -216,8 +216,9 @@ module ToolRegistry =
         (role: Role)
         : Task<string> =
         if gate.IsWaitingForUser ctx.SessionId && spec.Name <> "ask" then
-            Task.FromResult(ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId)
-                                "tool/ask-waiting" Map.empty)
+            Task.FromResult(
+                ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId) "tool/ask-waiting" Map.empty
+            )
         elif role = Role.Manager then
             managerFactsStage gate spec managerPermission args ctx
         else
@@ -332,7 +333,8 @@ module ToolRegistry =
           "signal-terminal", PtyTool.admission
           "join", JoinTool.admission
           "ask", ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Ask)
-          "devops", ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.DevOpsConsultation)
+          "devops",
+          ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.DevOpsConsultation)
           "horizon", HorizonTool.admission
           "fission", FissionTool.admission
           "review", ReviewShell.admission
@@ -683,7 +685,10 @@ module ToolRegistry =
             if res.Relayed then
                 res.Message
             elif res.RetirementOutcome = "PostS3" then
-                sprintf "%s The plan artifact is ready at %s; nudges are permanently disabled and this session is now in post-S3 state." res.Message res.Path
+                sprintf
+                    "%s The plan artifact is ready at %s; nudges are permanently disabled and this session is now in post-S3 state."
+                    res.Message
+                    res.Path
             elif res.Delivered then
                 sprintf "%s The plan artifact is at %s; an execution session has been started." res.Message res.Path
             else
@@ -926,7 +931,8 @@ module ToolRegistry =
                 | Some work when
                     work.Delivered
                     && work.Sequence = [ "S1"; "S2"; "S3" ]
-                    && String.IsNullOrWhiteSpace gitCommonDir ->
+                    && String.IsNullOrWhiteSpace gitCommonDir
+                    ->
                     return "deliver failed: git common directory is missing"
                 | Some work when work.Delivered && work.Sequence = [ "S1"; "S2"; "S3" ] ->
                     return! deliverPostS3 root runtime ctx gitCommonDir
@@ -969,18 +975,22 @@ module ToolRegistry =
             { Name = "ask"
               Description = ProviderProse.render providerLanguage "tool/ask" Map.empty
               Arguments =
-                [ "question", ToolHostCodec.stringSchemaDescribed
-                    (ProviderProse.render providerLanguage "tool/ask-question" Map.empty) factory ]
+                [ "question",
+                  ToolHostCodec.stringSchemaDescribed
+                      (ProviderProse.render providerLanguage "tool/ask-question" Map.empty)
+                      factory ]
               Admission = ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Ask)
-              Execute = fun args ctx ->
-                task {
-                    let! asked = runtime.AskUser(ctx, args.Text "question")
-                    let language = ProviderLanguageBinding.forSessionText ctx.SessionId
-                    return
-                        match asked with
-                        | Ok() -> ProviderProse.render language "tool/ask-sent" Map.empty
-                        | Error reason -> ProviderProse.render language "tool/ask-failed" (Map [ "reason", reason ])
-                } }
+              Execute =
+                fun args ctx ->
+                    task {
+                        let! asked = runtime.AskUser(ctx, args.Text "question")
+                        let language = ProviderLanguageBinding.forSessionText ctx.SessionId
+
+                        return
+                            match asked with
+                            | Ok() -> ProviderProse.render language "tool/ask-sent" Map.empty
+                            | Error reason -> ProviderProse.render language "tool/ask-failed" (Map [ "reason", reason ])
+                    } }
 
         /// Algorithm D/E: one `deliver` tool. The work's sequence decides the
         /// path — S4 is the two-stage Manager deliver, S1–S3 the one-shot Plan

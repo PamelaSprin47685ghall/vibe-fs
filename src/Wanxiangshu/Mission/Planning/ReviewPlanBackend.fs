@@ -92,6 +92,7 @@ module ReviewPlanBackend =
         : Task<Result<PlanReviewResult, PlanReviewError>> =
         task {
             let outcome = reviewOutcome gaps
+
             let target =
                 if outcome = PlanReviewOutcome.Promoted then
                     reviewTargetFor stageBeforeReview

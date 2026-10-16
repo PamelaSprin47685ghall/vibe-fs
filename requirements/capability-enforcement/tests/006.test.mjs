@@ -304,14 +304,15 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { installDefaultResources } = await import("../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js");
 const { chronicleContract } = await import("../../../dist/OpenCode/Tools/ToolSurface.js");
+const enforcer = await import("../../../dist/Enforcer/Surface.js");
 
 installDefaultResources()
 
 test('WHAT[capability-enforcement-006] CHRONICLE_spec_exposes_identity_and_argument_surface', () => {
   const contract = chronicleContract()
   assert.equal(contract.name, 'chronicle')
-  assert.deepEqual(contract.argumentNames, ['charge', 'occurrence', 'settlement', 'consequence', 'evidence', 'tip'])
-  assert.equal(contract.tipCount, 120)
+  assert.deepEqual(contract.argumentNames, ['charge', 'occurrence', 'settlement', 'consequence', 'tipName', 'whatToDoNow', 'whyThisMatters', 'repairStrategy', 'decisionBranches', 'commonWrongFixes', 'verification', 'doneWhen', 'evidence'])
+  assert.equal(contract.tipCount, enforcer.fieldNames().length)
 })
 }
 

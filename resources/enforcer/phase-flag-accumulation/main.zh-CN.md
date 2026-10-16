@@ -3,7 +3,7 @@
 ## 现在该做什么
 列出真实 lifecycle states 与合法 transitions，用 closed state model 或局部 structured control flow 替代 flag product。状态特有数据放进对应 case，不再靠 nullable sibling fields 配合 boolean。
 
-## 为什么这很重要
+## 为什么重要
 Flag model 把构造非法世界的成本推给每个 reader。每段代码都要重新证明“如果 retrying 就一定 started、如果 done 就不能 waiting”。一个强状态模型只需在 transition owner 证明一次。
 
 ## 修复策略
@@ -13,6 +13,10 @@ Flag model 把构造非法世界的成本推给每个 reader。每段代码都�
 4. 迁移 readers/writers 到新 state；
 5. 删除旧 flags，不做 mirror；
 6. 对所有 finite transitions 做 exhaustive test。
+
+## 决策分支
+- 若这些 flag 编码同一个 lifecycle，用命名状态与合法 transitions 替代 product；
+- 若它们是可自由组合的独立 predicates，保持原样；它们不是隐藏的自动机。
 
 ## 常见假修复
 - 加一个 `phase` enum，却继续维护原有 flags；这变成 `duplicated-truth`。

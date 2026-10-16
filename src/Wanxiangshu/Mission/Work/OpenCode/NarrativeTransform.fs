@@ -148,6 +148,7 @@ module RelayNarrativeTransform =
         match journal, sessionId, lifecycle with
         | Some durable, Some value, Some work when not (String.IsNullOrWhiteSpace value) ->
             let messages = ProviderWireDecode.messagesFromTransformOutput outObj
+
             staleRetirement durable (SessionId.create value) work acceptedRequest messages
             |> Option.isSome
         | _ -> false

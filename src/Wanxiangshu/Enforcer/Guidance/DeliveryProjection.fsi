@@ -7,6 +7,7 @@ type TipDeliveryProjectionState =
       CoveredTipNames: Set<string> }
 
 module TipDeliveryProjection =
+    val normalizeTipName: tipName: string -> string
     val empty: TipDeliveryProjectionState
 
     val isIdentityOnly: occurrence: string -> tipName: string -> state: TipDeliveryProjectionState -> bool

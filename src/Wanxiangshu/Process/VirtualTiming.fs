@@ -32,23 +32,26 @@ module VirtualTiming =
                 { new IDeadlineHandle with
                     member _.Delay = unbox<Task<unit>> delayTask
 
-                    member _.Cancel() = emitJsExpr handle "if (typeof $0.Cancel === 'function') $0.Cancel()" |> ignore }
+                    member _.Cancel() =
+                        emitJsExpr handle "if (typeof $0.Cancel === 'function') $0.Cancel()" |> ignore }
 
-            member _.Dispose() = emitJsExpr port "$0.Dispose()" |> ignore }
+            member _.Dispose() =
+                emitJsExpr port "$0.Dispose()" |> ignore }
 
     let createVirtualTimerPort () : VirtualTimerPort =
-        let instance = library?virtualTimerPort()
+        let instance = library?virtualTimerPort ()
 
         { Port = timerPortOf (unbox<obj> instance?port)
-          Advance = fun ms -> instance?advance(ms) |> ignore<obj>
-          NowMs = fun () -> unbox<int> (instance?nowMs()) }
+          Advance = fun ms -> instance?advance (ms) |> ignore<obj>
+          NowMs = fun () -> unbox<int> (instance?nowMs ()) }
 
     let createVirtualClockPort () : VirtualClockPort =
-        let instance = library?virtualClockPort()
+        let instance = library?virtualClockPort ()
         let rawPort = unbox<obj> instance?port
 
         { Port =
             { new IClockPort with
-                member _.UtcNow() = unbox<DateTimeOffset> (emitJsExpr rawPort "$0.UtcNow()") }
-          AdvanceMs = fun ms -> instance?advanceMs(ms)
-          Set = fun value -> instance?set(value.ToString("O")) }
+                member _.UtcNow() =
+                    unbox<DateTimeOffset> (emitJsExpr rawPort "$0.UtcNow()") }
+          AdvanceMs = fun ms -> instance?advanceMs (ms)
+          Set = fun value -> instance?set (value.ToString("O")) }

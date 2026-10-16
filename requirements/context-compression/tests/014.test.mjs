@@ -110,8 +110,8 @@ test('WHAT[context-compression-014] CTX_012_squash_pairs_tips_with_covered_frame
     frames: frames(4),
     delta: undefined,
     previousTips: [
-      { field: 'primitive-obsession', cycleId: 'c1' },
-      { field: 'ignored-tdd', cycleId: 'c2' },
+      { tipName: 'primitive-obsession', cycleId: 'c1' },
+      { tipName: 'ignored-tdd', cycleId: 'c2' },
     ],
   })
 
@@ -181,7 +181,7 @@ test('WHAT[context-compression-014] CTX_012_squash_plan_has_zero_physical_messag
     kind: proj.squash(2),
     frames: frames(3),
     delta: { messageId: 'msg_should_not_appear', items: dataItems },
-    previousTips: [{ field: 'ignored-tdd', cycleId: 'c1' }],
+    previousTips: [{ tipName: 'ignored-tdd', cycleId: 'c1' }],
   })
 
   assert.equal(squashPlan.isFirstTurnShape, false)

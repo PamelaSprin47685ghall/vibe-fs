@@ -223,8 +223,10 @@ module ProcessEventLog =
     // 所有读写入口都经过此处；不能只在 writer 创建时拒绝旧目录。
     let private localPath (value: string) =
         let rejectGit (candidate: string) =
-            if candidate.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
-               |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase)) then
+            if
+                candidate.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
+                |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase))
+            then
                 invalidArg "stateRoot" "Runtime persistence cannot read or write inside .git"
 
         if String.IsNullOrWhiteSpace value then
@@ -233,9 +235,11 @@ module ProcessEventLog =
         rejectGit value
         let resolved: string = nodePath?resolve value
         rejectGit resolved
+
         if unbox<bool> (nodeFs?existsSync resolved) then
             let physical: string = nodeFs?realpathSync resolved
             rejectGit physical
+
         resolved
 
     let private wanxiangDirectory commonDir =

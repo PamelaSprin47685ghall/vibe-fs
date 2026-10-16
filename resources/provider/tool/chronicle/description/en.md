@@ -7,14 +7,13 @@ real-world condition was changed).
 
 Fill one causal spine:
 
-charge → occurrence → settlement → consequence → tip
+charge → occurrence → settlement → consequence → tipName + seven sections
 
 Write one complete sentence in each of the four content fields. They must carry
 different information and will later be joined, in order and without labels, as
 one natural Chronicle paragraph. Do not summarize tool steps, repeat one sentence
-four ways, or manufacture closure. tip is required:
-choose exactly one of the {{rule_count}} Rulebook TipNames for the reusable
-lesson this concrete transition teaches.
+four ways, or manufacture closure.
+tipName and seven sections are required: name this reusable lesson freely and write the seven sections; the {{rule_count}} Rulebook entries are format samples to borrow from, not a closed set.
 
 Use precise, sharp, self-contained language. State concrete entities, protocols,
 conditions, breakpoints, observable effects, and conclusions directly. Do not

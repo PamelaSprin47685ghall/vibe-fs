@@ -47,66 +47,77 @@ module JsTransaction =
     let private Filesystem: obj = jsNative
 
     [<Emit("$0({ root: '' })")>]
-    let private createFilesystem (factory: obj): obj = jsNative
+    let private createFilesystem (factory: obj) : obj = jsNative
 
     let private api = createFilesystem Filesystem
 
-    let private failureOf (result: obj): JsFailure =
+    let private failureOf (result: obj) : JsFailure =
         JsFailure.ofWire (string (result?code)) (string (result?reason))
 
-    let private unitOf (result: obj): Result<unit, JsFailure> =
-        if unbox<bool> (result?ok) then Ok() else Error(failureOf result)
+    let private unitOf (result: obj) : Result<unit, JsFailure> =
+        if unbox<bool> (result?ok) then
+            Ok()
+        else
+            Error(failureOf result)
 
-    let private mutationToJs (mutation: JsStagedMutation): obj =
+    let private mutationToJs (mutation: JsStagedMutation) : obj =
         match mutation with
         | JsStagedMutation.Rewrite(path, originalText, newText) ->
-            createObj [ "kind" ==> "rewrite"; "path" ==> path; "originalText" ==> originalText; "newText" ==> newText ]
-        | JsStagedMutation.Create(path, text) ->
-            createObj [ "kind" ==> "create"; "path" ==> path; "text" ==> text ]
+            createObj
+                [ "kind" ==> "rewrite"
+                  "path" ==> path
+                  "originalText" ==> originalText
+                  "newText" ==> newText ]
+        | JsStagedMutation.Create(path, text) -> createObj [ "kind" ==> "create"; "path" ==> path; "text" ==> text ]
 
-    let private mutationsToJs (mutations: JsStagedMutation list): obj array =
+    let private mutationsToJs (mutations: JsStagedMutation list) : obj array =
         mutations |> List.map mutationToJs |> Array.ofList
 
-    let private commitOf (value: obj): JsCommitMutation =
+    let private commitOf (value: obj) : JsCommitMutation =
         match string (value?kind) with
-        | "rewrite" -> JsCommitMutation.RewriteFile(string (value?path), string (value?originalText), string (value?newText))
+        | "rewrite" ->
+            JsCommitMutation.RewriteFile(string (value?path), string (value?originalText), string (value?newText))
         | "create" -> JsCommitMutation.CreateFile(string (value?path), string (value?text))
         | other -> invalidArg "kind" (sprintf "unknown commit mutation kind: %s" other)
 
-    let private rollbackOf (value: obj): JsRollbackMutation =
+    let private rollbackOf (value: obj) : JsRollbackMutation =
         match string (value?kind) with
-        | "restore" -> JsRollbackMutation.RestoreFile(string (value?path), string (value?expectedCurrent), string (value?originalText))
+        | "restore" ->
+            JsRollbackMutation.RestoreFile(
+                string (value?path),
+                string (value?expectedCurrent),
+                string (value?originalText)
+            )
         | "removeCreated" -> JsRollbackMutation.RemoveCreatedFile(string (value?path), string (value?expectedCurrent))
         | other -> invalidArg "kind" (sprintf "unknown rollback mutation kind: %s" other)
 
-    let private existingOf (exists: string -> bool) (mutations: JsStagedMutation list): string array =
+    let private existingOf (exists: string -> bool) (mutations: JsStagedMutation list) : string array =
         mutations
         |> List.map JsStagedMutation.path
         |> List.filter exists
         |> Array.ofList
 
-    let private currentOf (readCurrent: string -> string option) (paths: string list): obj =
+    let private currentOf (readCurrent: string -> string option) (paths: string list) : obj =
         let fields =
             paths
-            |> List.choose (fun path ->
-                readCurrent path
-                |> Option.map (fun text -> path, box text))
+            |> List.choose (fun path -> readCurrent path |> Option.map (fun text -> path, box text))
+
         createObj fields
 
-    let private readSnapshotsToJs (snapshots: JsReadSnapshot list): obj array =
+    let private readSnapshotsToJs (snapshots: JsReadSnapshot list) : obj array =
         snapshots
         |> List.map (fun snapshot -> createObj [ "path" ==> snapshot.Path; "text" ==> snapshot.Text ])
         |> Array.ofList
 
     /// JS-026 same-path-once: one program may mutate each path exactly once.
     let validateSingleIntent (mutations: JsStagedMutation list) : Result<JsStagedMutation list, JsFailure> =
-        match unitOf (api?validateSingleIntent(mutationsToJs mutations)) with
+        match unitOf (api?validateSingleIntent (mutationsToJs mutations)) with
         | Ok() -> Ok mutations
         | Error failure -> Error failure
 
     /// JS-008/009: rewrite targets must exist, create targets must not.
     let validateTargets (exists: string -> bool) (mutations: JsStagedMutation list) : Result<unit, JsFailure> =
-        unitOf (api?validateTargets(existingOf exists mutations, mutationsToJs mutations))
+        unitOf (api?validateTargets (existingOf exists mutations, mutationsToJs mutations))
 
     /// JS-014: a rewrite whose original text no longer matches the current
     /// file content is a conflict; no implicit retry. Create targets have no
@@ -116,7 +127,7 @@ module JsTransaction =
         (mutations: JsStagedMutation list)
         : Result<unit, JsFailure> =
         let paths = mutations |> List.map JsStagedMutation.path
-        unitOf (api?validateFreshness(currentOf readCurrent paths, mutationsToJs mutations))
+        unitOf (api?validateFreshness (currentOf readCurrent paths, mutationsToJs mutations))
 
     /// JS-013: full preflight — every rule must pass before any file effect.
     let preflight
@@ -126,26 +137,31 @@ module JsTransaction =
         (mutations: JsStagedMutation list)
         : Result<unit, JsFailure> =
         let snapshotPaths = readSnapshots |> List.map (fun snapshot -> snapshot.Path)
-        let paths = List.distinct (snapshotPaths @ (mutations |> List.map JsStagedMutation.path))
-        unitOf
-            (api?preflight(
+
+        let paths =
+            List.distinct (snapshotPaths @ (mutations |> List.map JsStagedMutation.path))
+
+        unitOf (
+            api?preflight (
                 existingOf exists mutations,
                 currentOf readCurrent paths,
                 readSnapshotsToJs readSnapshots,
-                mutationsToJs mutations))
+                mutationsToJs mutations
+            )
+        )
 
     /// JS-013: the commit plan — one write per mutation, in declaration order.
     /// The adapter applies this plan; a failure anywhere rolls the whole plan
     /// back (rollback restores each original text).
     let commitPlan (mutations: JsStagedMutation list) : JsCommitMutation list =
-        let result = api?commitPlan(mutationsToJs mutations)
+        let result = api?commitPlan (mutationsToJs mutations)
         unbox<obj array> (result?value) |> Array.toList |> List.map commitOf
 
     /// JS-015: rollback plan — restore every original text (rewrites only;
     /// creates are removed by the adapter). Order is reversed so a partial
     /// commit unwinds last-write-first.
     let rollbackPlan (mutations: JsStagedMutation list) : JsRollbackMutation list =
-        let result = api?rollbackPlan(mutationsToJs mutations)
+        let result = api?rollbackPlan (mutationsToJs mutations)
         unbox<obj array> (result?value) |> Array.toList |> List.map rollbackOf
 
 /// DSL-class: DurableFact — JS-015: one mutation as persisted in a prepared

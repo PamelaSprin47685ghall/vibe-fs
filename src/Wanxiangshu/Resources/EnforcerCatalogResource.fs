@@ -8,8 +8,10 @@ open Wanxiangshu.Participant.Provider
 
 /// Loads the localized Enforcer Rulebook from `resources/enforcer/<tip>/`.
 /// English leaves are `enforcer.md` + `main.md`; zh-CN leaves are
-/// `enforcer.zh-CN.md` + `main.zh-CN.md`. Directory basename = TipName =
-/// provider enum = durable RuleId. Missing / empty / invalid → throw
+/// `enforcer.zh-CN.md` + `main.zh-CN.md`. Directory basename = RuleId =
+/// FieldName; the localized texts bootstrap the Blogger prompt (detection
+/// folios + remediation templates), while provider-side tipName is freely
+/// named and no longer chosen from an enum. Missing / empty / invalid → throw
 /// (fail-fast); there is no locale fallback. `catalog.json` is not runtime SSOT.
 module EnforcerCatalogResource =
 
@@ -23,8 +25,9 @@ module EnforcerCatalogResource =
         | ProviderLanguage.English -> "enforcer.md", "main.md"
         | ProviderLanguage.SimplifiedChinese -> "enforcer.zh-CN.md", "main.zh-CN.md"
 
-    /// Effective Blogger system prompt: localized base + localized detection folios.
-    /// Deterministic projection only — never written back to the repository.
+    /// Effective Blogger system prompt: localized base + localized detection and
+    /// remediation folios. Deterministic projection only — never written back to the
+    /// repository.
     let composeBloggerSystemPromptFor
         (lang: ProviderLanguage)
         (baseInstructions: string list)
@@ -38,7 +41,8 @@ module EnforcerCatalogResource =
             | ProviderLanguage.SimplifiedChinese -> "Enforcer RuleBook（规则书）"
 
         let ruleInstructions =
-            ordered |> List.collect (fun rule -> [ rule.Name; rule.EnforcerText.Trim() ])
+            ordered
+            |> List.collect (fun rule -> [ rule.Name; rule.EnforcerText.Trim(); rule.MainText.Trim() ])
 
         LlmFacing.renderInstructions (baseInstructions @ [ heading ] @ ruleInstructions)
 

@@ -18,7 +18,7 @@ module private MailboxLibrary =
 type CompletionMailbox(gate: obj) =
 
     // gate 仅为生命周期锚（与主仓原语义一致）；库实例不消费它。
-    let view: obj = MailboxLibrary.library?completionMailbox()
+    let view: obj = MailboxLibrary.library?completionMailbox ()
 
     let wakeOf (value: obj) : MailboxWakeReason =
         match string value with
@@ -27,6 +27,7 @@ type CompletionMailbox(gate: obj) =
         | _ ->
             // { LocalInterrupt: "OperatorAbort" | ... }
             let interrupt = string (emitJsExpr (value, "LocalInterrupt") "$0[$1]")
+
             let reason =
                 match interrupt with
                 | "OperatorAbort" -> JoinInterruptReason.OperatorAbort
@@ -35,41 +36,47 @@ type CompletionMailbox(gate: obj) =
 
             MailboxWakeReason.LocalInterrupt reason
 
-    member _.PulseAgentHandle(handle: AgentHandleId) = view?pulseAgent(handle) |> ignore
+    member _.PulseAgentHandle(handle: AgentHandleId) = view?pulseAgent (handle) |> ignore
 
-    member _.PublishPtyCompletion(item: PtyJoinItem) = view?publishPty(item) |> ignore
+    member _.PublishPtyCompletion(item: PtyJoinItem) = view?publishPty (item) |> ignore
 
-    member _.PulseWake() = view?pulseWake() |> ignore
+    member _.PulseWake() = view?pulseWake () |> ignore
 
     member _.WaitForWake() : Task<MailboxWakeReason> =
-        let pending: Task<obj> = unbox<Task<obj>> (view?waitForWake())
+        let pending: Task<obj> = unbox<Task<obj>> (view?waitForWake ())
+
         task {
             let! reason = pending
             return wakeOf reason
         }
 
     member _.WaitForSignal(interrupt: Task<JoinInterruptReason>) : Task<MailboxWakeReason> =
-        let pending: Task<obj> = unbox<Task<obj>> (view?waitForSignal(interrupt))
+        let pending: Task<obj> = unbox<Task<obj>> (view?waitForSignal (interrupt))
+
         task {
             let! reason = pending
             return wakeOf reason
         }
 
     member _.DrainAgentWakes(maxCount: int) : AgentHandleId list =
-        (unbox<obj array> (view?drainAgents(maxCount))) |> Array.toList |> List.map unbox<AgentHandleId>
+        (unbox<obj array> (view?drainAgents (maxCount)))
+        |> Array.toList
+        |> List.map unbox<AgentHandleId>
 
     member _.DrainPtyCompletions(maxCount: int) : PtyJoinItem list =
-        (unbox<obj array> (view?drainPtys(maxCount))) |> Array.toList |> List.map unbox<PtyJoinItem>
+        (unbox<obj array> (view?drainPtys (maxCount)))
+        |> Array.toList
+        |> List.map unbox<PtyJoinItem>
 
-    member _.Cancel() : bool = unbox<bool> (view?cancel())
+    member _.Cancel() : bool = unbox<bool> (view?cancel ())
 
-    member _.PendingCount: int = unbox<int> (view?pendingCount())
+    member _.PendingCount: int = unbox<int> (view?pendingCount ())
 
-    member _.PendingPtyCount: int = unbox<int> (view?pendingPtyCount())
+    member _.PendingPtyCount: int = unbox<int> (view?pendingPtyCount ())
 
-    member _.PendingAgentWakeCount: int = unbox<int> (view?pendingAgentWakeCount())
+    member _.PendingAgentWakeCount: int = unbox<int> (view?pendingAgentWakeCount ())
 
-    member _.IsCancelled: bool = unbox<bool> (view?isCancelled())
+    member _.IsCancelled: bool = unbox<bool> (view?isCancelled ())
 
     interface ICompletionMailbox<AgentHandleId, PtyJoinItem, JoinInterruptReason, MailboxWakeReason> with
         member this.PulseAgent handle = this.PulseAgentHandle handle

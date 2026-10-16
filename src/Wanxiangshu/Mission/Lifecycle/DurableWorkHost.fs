@@ -63,7 +63,9 @@ module DurableWorkHost =
                     invalidArg "stateRoot" "Lifecycle persistence cannot follow a link into .git"
             else
                 let parent = directoryOf candidate
-                if parent <> candidate then checkExisting parent
+
+                if parent <> candidate then
+                    checkExisting parent
 
         checkExisting path
 
@@ -94,6 +96,7 @@ module DurableWorkHost =
     let journalPath (stateRoot: string) : string =
         if String.IsNullOrWhiteSpace stateRoot then
             invalidArg "stateRoot" "A local state root is required"
+
         rejectGitPath stateRoot
         let path = resolvePath (stateRoot.TrimEnd('/', '\\') + "/wanxiangshu/work.sqlite")
         rejectGitPath path
@@ -392,7 +395,11 @@ module DurableWorkHost =
         | [||] -> None
         | rounds ->
             let retirement = rounds.[rounds.Length - 1]?retirementCursor
-            if isNull retirement then None else Some(unbox<float> retirement)
+
+            if isNull retirement then
+                None
+            else
+                Some(unbox<float> retirement)
 
     let private projectedWork (snapshot: obj) (work: obj) : InspectedWork =
         let active: obj = snapshot?active

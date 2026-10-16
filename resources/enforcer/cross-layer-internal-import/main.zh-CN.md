@@ -1,8 +1,16 @@
 # cross-layer-internal-import — Main
 
+## 现在该做什么
+
 把 dependency 拉回 owner 正式发布的 contract。
 
 先别急着“换 import path”。问 foreign layer 真正需要的是什么：query、command、stable value、event、capability、adapter result，还是只为了方便拿了一个 internal helper？让 owner 发布**最小 semantic surface**，然后删掉对 private representation 的依赖。
+
+## 为什么重要
+
+Internal imports 制造架构文档不记录的义务。Provider 看起来可以自由 refactor，其实不能；consumer 看起来只依赖 interface，其实知道 storage layout、helper structure 或 lifecycle detail。这是没有诚实 contract 的耦合。
+
+## 修复策略
 
 常见 repair：
 
@@ -17,6 +25,14 @@
 
 也不要为了消除一条 internal import 造一层 forwarding-only translator；如果新层不改变 knowledge/representation/authority，会落入 `translator-layer-bloat`。
 
+## 决策分支
+
+- 如果 consumer 需要 provider 已拥有的稳定 fact，发布承载该 fact 的最小 public contract，删除 internal import。
+- 如果 consumer 需要 implementation detail 来执行 policy，ownership 可能放错了；把 policy 搬到 owning layer，而不是把 internals 向外泄漏。
+- 如果 import 是同层 private wiring，留下；本规则不管 intra-module structure。
+
+## 常见假修复
+
 常见假修复：
 
 - 给 internal symbol 加 `public` / export，就说 contract 已建立；
@@ -26,11 +42,15 @@
 - test facade 直接暴露 compiler-emitted internals，导致 compiler upgrade 变成业务 breaking change；
 - 把所有 shared internals 塞进 `common` package，原 ownership 问题只是换了地址。
 
+## 验证
+
 验证应做 owner-side refactor：保持 declared contract 完全不变，重命名 internal module、换 storage representation、升级 compiler-generated shape、移动 helper。Foreign layer 应继续编译/运行。
 
 再做 dependency scan：跨 layer 的 imports 只应指向正式 supported entry，禁止 deep path/private generated detail。机械 gate 可以保护这条**代码边界**，因为它检查的是 executable dependency，不是 free-form prose。
 
 如果 foreign layer 真正需要某个 internal fact 才能正确工作，别把它叫 internal；重新设计 contract 并明确 owner。这比长期偷偷 import 更诚实。
+
+## 完成条件
 
 完成时，source dependency graph 与 architecture 声称的 boundary 一致；private change 不再通过 hidden import 产生远距离破坏。
 

@@ -1,1619 +1,727 @@
-# 万象术 Manager 与 Plan 统一重组
-
-## 0. 任务缘起与用户意图
-
-用户原话（U，2026-10-11）：
-
-> 目前 Manager 和 Plan 模式有着极为相似的结构，Plan 是后加入的，更加简单也更符合逻辑。Manager 模式的隔离和用词还有实现都偏旧。与其 backport，不如直接重组——用 Plan 模式的升维后同时服务 Plan 和 Manager。Plan 本身就有 3 Phases，Manager 其实可以认为是特殊的第四 Phase，只是独立 session 而且高频使用。或者你有什么更好的主意？
-
-- 用户已否决：backport（把 Plan 语义搬回 Manager）。
-- 用户倾向：Plan 升维统一，Manager 视为特殊第四 Phase（独立 session、高频）。
-- 用户开放：征求更好的主意。
-
-用户第二段 prompt（2026-10-11，对 R1-R8 的裁决）：
-
-> 不，Manager 完整保留物理历史是错误的历史决策，要和 Plan 模式对齐。Manager 就是 S4，是恰好只有一个 Stage 的退化情况。全部重命名成 Plan 的词汇风格。持久化迁移到 DRY 以 Plan 为底稿重新设计。证书也不要了，向 Plan 看齐。R6 真的各自保留，因为 Manager 是自动工作，Plan 是交互工作。R7 使用 KISS & DRY 原则重新设计。R8 允许重新设计。最终目标：仿佛是从一开始就设计好了 DRY 版本的基础设施，Manager 和 Plan 都是基础设施的实例化或者受益者，要看不出发展历程和痕迹。
-
-（逐条裁决入档见第 4 节「用户裁决」。）
-
-用户第三段 prompt（2026-10-12，在 S1 覆核期间）：
-
-> 最后要保留 manager 的两段式 deliver 语义，plan 仍为一段式。这是两者不同风险偏好的体现。
-
-这条裁决入档为 R9。它关掉了 G2 里「两段式退休确认的去留交给 S2」那一半。WorkspaceSnapshot 的去留已在第 9 节 P1 裁定：不留字段、不留类型名、不留独立模块。不再交给后续阶段。
-
-用户第四段纠正（2026-10-12）：
-
-> P 是空的，plan.md 是手写的。应该用 P，plan.md 只是材料。
-
-因此：本规划任务的活底稿只是 js-plan 读写的 P。仓库根 `plan.md` 是材料，不是活底稿，也不是第二份规范。执行时不要改它来「同步规划」，也不要把它当成现行合同。
-
-本底稿事实来源分三层，不要并成一层。
-
-材料层：2026-10-11 经 ask 委派固定 DevOps 的只读调查，文字落在仓库根 `plan.md`（提交 `2d9f81549418708050028eb04570bb1b02049217`，2026-10-12 09:06:33 +0800，212 行、23141 字节）。仓库根 `plan.md` 是材料，不是活底稿。
-
-HEAD 层：现行 HEAD 是 `650850eabe78fa6b1f0ddabd4bf5cac8725e2dd8`（2026-10-12 11:37:37 +0800，`fix: reuse the shared JS anchor tutorial for js-plan`）。修复本棒的这次 ask：`git rev-parse HEAD` 是这个哈希；`4b9ef101dbaa7e9d1068850f08e3d356bf2c1ff1` 是祖先，不是现行 HEAD；该祖先之后只有这一笔。上一任把生命周期坐标锚在 `4b9ef101d`，并把 js-plan 教程改动写成未提交工作区。那笔改动已经进了 `650850ea`。这次 ask 对六处坐标文件的 `git diff HEAD` 为空，`git status --short` 无输出。没有重跑 `Mission/Planning`、`Relay`、`Manager` 相对 `4b9ef101d` 的目录 diff，不把「描述提交没碰生命周期」写成新的目录级证据。
-
-工作区层：现行工作区干净。上一任两次 ask 读到的脏树（js-plan / js-program 资源、`ToolRegistry`、`Description`、`ToolHost`、未跟踪 `ultra-plan/`，以及后一次 diff 里的 `requirements/planning/WHAT.md` 与 `011.test.mjs`）不再是未提交事实。那些观察留在 2.13，当作已被 `650850ea` 收进去的前态，不删，也不再当成现行脏树。
-
-下文标〔F〕的坐标：这次 ask 重读过的行号，以 `650850ea` 为准。上一任读过、这次没有重读的行号，不自动升级成这次新核。材料里被推翻的旧坐标继续标失效。
-
-本任接手时，js-plan 读到的活槽对任意子串（包括 `#`）都无法锚到。用户确认活槽本来就是空的。材料经本任 ask 核对标题、事实来源句和 `assembleAskContinuation` 两处行号后，迁入本活底稿，并做下面的订正。
-
-## 1. 目标状态（可判定）
-
-重组完成后，仓库应处于以下状态：
-
-- G1 单一生命周期基础设施：唯一活跃任期、退休不可逆、每任恰好一次 findings-pairs 评审（禁自证）、接力不推进阶段、固定 DevOps 绑定、LWR 交接——六项核心机制只有一套实现。统一模型为一条生命周期：S1 事实 → S2 理解 → S3 流程 → S4 执行；Plan work 从 S1 起走，Manager work 是恰好只有一个 Stage（S4）的退化情况。结束动作同名 deliver。确认次数不是第二套生命周期，也不是可以和序列打架的自由字段。序列写在开立事件上。序列为 S4 则两段，序列为 S1、S2、S3 则一段（R9）。
-- G2 Manager 特有能力裁决：fork/resume/join 委派、Orchestrator commission、Continue 自动派发（自动工作语义）保留；QualityCertificate 退役；完整历史保留退役，对齐 Plan 的任期隔离（剥除前任消息、注入 LWR_prev）。结束确认按 R9 分叉：Manager/S4 保留两段式 deliver（第一次调用不结束，只落下 durable 确认；第二次以不同调用才结束）；Plan 的 deliver 保持一段式。名称用 deliver，不恢复证书。两段式保留的是现有 Manager 确认语义，不是另发明一套两段。第二次的结果族在证书退役后的载荷形态由第 9 节定，确认次数不许并成一段。WorkspaceSnapshot 不留字段、不留类型名、不留独立模块，与 P1 同一裁定，不再交给后续阶段。保留项各有新锚点验收。
-- G3 Plan 特有能力保留：S1/S2/S3 stage 递进、js-plan 编程面（写前 review 硬门、禁路径参数）、任期隔离+前缀重锚、自然停止（交互工作语义）、底稿 P、deliver 一段式双路径+spawn——全部保留，各有测试锚点。
-- G4 高频路径重设计许可：用户不经 Plan 直接创建 manager 会话的路径允许随统一重新设计（不要求行为不变）；「自动工作」语义（Continue 循环、无需用户逐步驱动）保留，新行为有新锚点验收。
-- G5 术语归一为 Plan 风格：同一概念在全仓（代码+需求+资源）只用一套词，以 Plan 词汇为唯一风格；relay 旧词（Road、iteration、assessment、suicide、certificate 等）无残迹。两段确认不靠保留 suicide 这个名字来保留。
-- G6 持久化 DRY 统一：以 Plan 的 EventStore+底稿设计为底稿重新设计持久化，AgentJournal durable facts 双轨消除；WorkspaceSnapshot 不留字段、不留类型名、不留独立模块，与第 9 节 P1 同一裁定。Manager 的第一次确认必须是这个统一模型里的 durable 事实，不能只活在内存里。
-- G7 测试资产 KISS & DRY 重设计：两套平行测试（planning 测试与 relay 约 30 文件）按统一后的契约重新设计，消除同构重复；无悬空锚点、无两套词指同一行为。确认次数分叉要有各自的锚点，不能只用一套 deliver 测试覆盖两种语义。
-- G8 无考古痕迹：最终形态读起来像从一开始就设计好的 DRY 基础设施——Manager 与 Plan 都是它的实例化或受益者；目录、命名、需求条款不携带「先 Manager 后 Plan 再统一」的发展痕迹。不引入兼容层，不留过渡命名。风险偏好差异（一段 / 两段）是设计，不是痕迹。
-
-## 2. 事实
-
-标注：〔F〕已核实（附出处）；〔I〕推断（附依据）；〔U〕不可核实/未穷尽（附原因）。
-
-### 2.1 文件与组织〔F〕
-
-Plan：`src/Wanxiangshu/Mission/Planning/` 14 个实现模块（各有 `.fsi`，14 不含 `.fsi`）。2026-10-12 覆核 `wc -l`：Surface(999)、Fold(503)、PlanTools(508)、TenureIsolation(122)、Facts(167)、EventCodec(207)、PlanWorkOpen(142)、ActionGate(111)、ReviewPlanBackend(107)、Recovery(98)、Store(88)、PlanPath(120)、IntegrationRules(23)、EventVocabulary(21)。材料里的 TenureIsolation(390) 已失效：`4b9ef101d` 把装配重写后缩到 122 行。现行装配函数是 `TenureIsolation.assemble`；`Surface.fsi` 仍导出 `assembleTenureMessages`，实现转给 `assemble`。模块内已没有名为 `assembleTenureMessages` 的函数。需求 `requirements/planning/WHAT.md` 这次 ask 数到 20 条标题，不是材料里的 22。编号：001、002、003、004、005、007、008、009、010、011、013、014、015、016、017、018、020、021、022、023。没有 006、012、019。标题行号：3、11、19、35、43、57、69、80、88、96、106、114、131、139、147、160、174、186、194、202。资源路径 `resources/provider/{role/plan, planning/s1|s2|s3, tool/{js-plan,ask,review,deliver}}` 沿用材料，这次未重列目录。
-
-Manager：`Mission/Manager/`（Workflow 477、WorkflowSurface 47）+ `Mission/Relay/`（Fold 890、OpenCode/SuicideTool 466、OpenCode/ReviewBackendManager 460、Surface 285、OpenCode/NarrativeTransform 180、OpenCode/ReviewShell 154、OpenCode/WorkspaceSnapshot 52、Retirement/Surface 66、Assessment/{Model 76,Surface 23}、Contract 116、Facts 99、ProjectionSurface 42）。这些行数在 2026-10-12 覆核中与 `wc -l` 一致。`src/Wanxiangshu/Mission/Manager` 自 `9fcc15824` 之后零提交。需求 `requirements/relay-{incumbency,retirement,assessment,context-projection}/`，资源 `role/manager` 与 `tool/{suicide,review,resume,fork,…}`。
-
-已共享的代码（两模式已经在合用的部分）：`Mission/WorkRecord/`（LWR 物化，两边共用）；`Relay/OpenCode/ReviewShell.fs:13-19,144-154`（review 共享壳，按 role 分派 Plan/Manager 双后端；2026-10-12 覆核 13–18 与 144–148 行仍是这个分派，文件 154 行）；`OpenCode/Plugin/PluginTransforms.fs`（同一 transform 管线。材料坐标 1147-1180「按 owner role 互斥分支」这次重读对不上：1147-1151 是 `begin-physical-provider-attempt`；1164-1174 与 1179-1186 是顺序两个 stage，不是 if/else。角色判定在处理函数里：`planSessionOf` 658-661 只认 `Role.Plan`；`applyTenureIsolation` 837-847 不是 Plan 就返回；`ApplyRelayProjection` 871-874 才调用 `ensureManagerRoadOpened`）；`OpenCode/Host/ProviderSystemTransform.fs`（同一系统提示装配器，Plan 与 Manager 同表注册）；`OpenCode/Tools/{ToolRegistry,StaticTools,ToolRuntimeScope}.fs`（同一注册表）。上一任在当时工作区读到的注册点现已随 `650850ea` 入库。这次 ask 没有重读 `ToolRegistry.fs` 行号，不把那些行号升级成这次新核。材料坐标 ToolRegistry.fs:601-602、714-735、737-759 已漂移，不再当现行行号。
-
-### 2.2 五维结构对比〔F〕
-
-| 维度 | Plan | Manager |
-|---|---|---|
-| prompt | stage 方法行的字节幂等替换这次重读仍在 ProviderSystemTransform.fs:58-83。`PlanSystemPrompt` 不在这段，在第 94 行 `Role.Plan` 分支。材料把这两处并成一个坐标，第 94 行是这次补上的 | manager-assess/work/finish 三段路径这次重读仍在 Workflow.fs:22-29。76-90 的注释仍写从不可变事实推导，不从程序计数器来。分支：有任期无评审走 assess；有绑定证书走 finish；有评审无绑定证书走 work；无任期返回 None |
-| session | 用户显式创建 plan 会话沿用先前读法，这次未重读创建入口。`workId = sessionId` 这次读到在 PluginTransforms.fs:663-674 的 `tryReadActivePlanState`。材料坐标 773-784 作废：现行 773 行是 `Task.FromResult()`，775-784 是 `tenureMessagesOf` 填 `TenureMessage`，不是入口 | 三来源（用户直建、Orchestrator commission、Plan spawn）是先前契约读法，不因一处坏行号撤回；但 Workflow.fs:277-302 不是这三来源的位置。现行 277-302 是 `decideInitialOpening`：没有 road view 且 `CanonicalRole = Role.Manager` 时做 `IncumbencyOpening.initial`，这段没有读到 commission 或 Plan spawn。无 parent 执行会话仍在 ToolRuntimeScope.fs:747-785；agent 是参数，不是写死的 `manager`。`spawn "manager"` 在 PlanTools.fs:150。Continue 的材料坐标 Workflow.fs:329-369 对不上整条后继路径，见本表下的重读注 |
-| 工具面 | 工作区 `planningSpecs()`（ToolRegistry.fs:836-856）注册 js-plan、ask、deliver。review 不在这个列表里，在 baseSpecs 的 ReviewShell.spec（约 882-887 行），与 Manager 共用同一 ToolSpec。材料坐标 601-602、714-735 已漂移 | 工作区静态准入（约 321-333 行）仍有 fork、resume、join、horizon、suicide、review。baseSpecs 仍 yield 这些规格，再 `yield! generatedJsSpecs ()` 与 `yield! planningSpecs ()`。材料坐标 737-759 已漂移。`ToolRegistry.fs` 没有字面量 js-manager；`generatedJsSpecs` 本任未展开，不能写成未注册，也不能把材料里的「评审期只读 js-manager」升为本任新核。本任核对过的这些名字相对 HEAD 没有增删。PTY 不在这次贴出的准入片段里，材料里的 PTY 未重核，不写成已删除 |
-| 生命周期 | 7 事件名沿用材料，这次未重读事件定义。deliver 无权接力、持权交付：这次重读双路径在 PlanTools.fs:60-64 与 304-316；`spawn "manager"` 在 144-150。322-341 不是双路径，作废 | 现行两段式仍以 2.12 已读的 SuicideTool.fs:352-393 为准；表内旧坐标 80-126 这次未重读，不再当现行位置。Continue 不用 Workflow.fs:329-369 冒充整段自动派发。目标态见 R9：名称改为 deliver，两段确认保留，证书退役 |
-| 持久化 | EventStore ndjson（.git/wanxiangshu/events/<WriterId>.ndjson，canonical JSON 键 Unicode 升序）+ 底稿（plan/<work-key>/plan.md，排他临时文件原子替换） | AgentJournal durable facts（RelayTransaction 原子提交）+ WorkspaceSnapshot（git 状态快照）+ QualityCertificate |
-
-本表目标态句与现行实现句要分开读。工具面行的行号是上一任在当时工作区读到的，现已随 `650850ea` 入库；这次 ask 没有重读 `ToolRegistry.fs`，那些行号不是这次新核。现行工作区干净，所以「相对现行 HEAD 的未提交 diff」为空；这不证明三个 Mission 目录相对 `4b9ef101d` 零差异，那次目录 diff 这次没重跑。
-
-这次重读推翻或钉住的坐标：
-
-- PlanTools.fs:322-341 已漂移。现行 318-337 是 `activeOfDecision` 与 `runCheckedDeliver` 的游标检查，339 行起是 `executeDeliver` 签名。双路径仍在 60-64 与 304-316。144-150 仍是 `spawn "manager" planContent`。
-- Workflow.fs:329-369 是 `deliverLoopPrompt`，发送的资源路径是 `runtime/manager-assess`（341 行），经 `HostSessionNudge.trySendGateContinuation`，`ContinuationKind.ManagerGuard`。后继开任在 371-406 的 `deliverLoopContext`。`continueAfterRetiredAttempt` 在 422-441。`RetirementOutcome.Continue` 出现在第 184 行和第 264 行；第 264 行是 `Continue -> None`。第 228 行 `decideLoopContext` 的函数体这次没有展开，不把「Continue 一定自动派发」写成这次读到的句子。R6 的目标语义不因此重开。
-- PluginTransforms.fs:773-784 不是 plan 入口。入口侧这次只钉住 663-674 的 `workId = sessionId`。
-
-### 2.3 骨架对照〔F〕（九项里八项责任同构已核实；第 6 项已读到不同构）
-
-1. 唯一活跃任期：relay-incumbency-001 ≈ planning-003。
-2. 评审门：relay-assessment-001/006 ≈ planning-022（findings pairs、每任一次、禁自证、非空即修复义务）。
-3. 接力不推进阶段：relay-incumbency-004 ≈ planning-007。
-4. 固定 DevOps 绑定：relay-incumbency-010/011/012 ≈ planning-010。
-5. stale 请求拦截：两边都有「过期尝试不得改后继状态」这一族责任，但机制已不对齐。Manager 侧 NarrativeTransform 的 cut 仍只决定请求身份，不过滤 provider 消息集（覆核仍成立，注释仍在 135–138 行）。Plan 侧现行 [017] 不再以 Host 消息上的 cursor / openingCursor 归属任期——那个字段在 Host 消息上并不存在。`4b9ef101d` 改成稳定 XTrace 身份，退休游标是 consumed-through 的物理交互边界。材料把二者写成 openingCursor 同构，该坐标已失效。同构的是责任，不是那个已废弃的字段。
-6. 崩溃恢复不猜测：同构已读到不成立。Planning/Recovery.fs 全文 98 行。公开入口是 planRecoveryPosition（67）与 evaluateRecoveryEffects（94）。输入是已经折好的 PlanWorkView，外加一个「底稿文件在不在」的函数，不是一次还没落盘的工具调用，也不直接读事件流。Delivered 与活跃任期同时在，返回 Conflict（68-69）。只有交付且摘要、路径都在，返回 Delivered；缺摘要或路径也是 Conflict（20-31）。只有活跃任期返回 Active，授权缺省当 false（64）；底稿不存在仍是 Active，不改口成已交付（58-59）。两者都没有返回 Nothing（75）。evaluateRecoveryEffects 只把位置变成效果：交付是 DeliveredIdempotent，活跃是 ActiveRebound，冲突是 Conflict，Nothing 不产生效果（77-84）。文件里没有「不猜测」这三个字。对应句子在 requirements/planning/WHAT.md [018]（160-172）：恢复只依据持久化视图与底稿存在性，绝对不按底稿正文猜测阶段；既无活跃任期亦未交付时不猜测；底稿未创建绝对不得假定已交付；冲突必须 fail-closed。Relay 与 Manager 没有同构函数。Relay 里读到的是折叠重放：Fold.tryReplayAssessment（168）、replayedRetirement（466）、ReviewBackendManager 的 ReplayCandidate（392）。Manager 只在 Workflow.fs:471 有一条 provider 恢复注释。planRecoveryPosition 不读确认事件。Recovery.fs 对 Confirmation、RetirementConfirmation、WorkspaceSnapshot、QualityCertificate 零命中。relay 四包 WHAT 没有「不猜测」这句。relay-retirement [007] 第 25 行写崩溃后不得永久处于已退休但缺 outcome/cut。relay-incumbency [012] 第 47 行写崩溃恢复保持 DevOps 绑定唯一与幂等，接收未知不盲目重发。上一笔「同构未证实」到此改成已读到的不同构。选定位置表在第 9 节，不在这里重写。
-7. LWR 交接：同一 LifecycleWorkRecord.materialize 两边共用。
-8. 双语资源成对 fail-fast：provider-language-006 一体适用。
-9. 原子事务写、幂等重放、异载荷拒绝：事件写入纪律同构。
-
-### 2.4 独有能力〔F〕
-
-Manager 现行独有：委派面（fork 仅 Engineer、resume 固定 DevOps、join、horizon）；Orchestrator commission 上游（delegation-004：commission 只委任 Manager）；两段式退休确认（目标态保留为 deliver 的两段，R9，不再叫 suicide）；QualityCertificate（目标态退役，R5）；WorkspaceSnapshot（目标态不留字段、不留类型名、不留独立模块，见第 9 节 P1）；AuthorityRevision；Continue 自动派发（manager-assess loop prompt + gate nudge）；完整物理历史保留（目标态退役，R2）；评审期只读 js-manager 与评审接纳前禁派工（capability-enforcement-025/026）。「js-manager」这一句沿用材料。本任在工作区 `ToolRegistry.fs` 没有读到这个字面量，也没有展开 `generatedJsSpecs`，不把它改写成未注册，也不升为本任新核过的注册事实。后续核对见第 9 节 P4：字面量不在 `ToolRegistry.generatedJsSpecs` 的函数体里；生产点在 `ManagerReviewTools` 与 `StaticTools`。两道门的义务进主路径，不停留在这句材料。
-
-Plan 独有：3 Stage 递进（review 晋级是唯一推进器）；js-plan（写前 review 硬门、禁路径参数）；ask 同步委派（单未决）；任期隔离+前缀重锚（planning-017、TenureReanchored 事件）；工作底稿（唯一可写产物）；自然停止（planning-009 空停豁免，Plan 是唯一允许空停等用户 prompt 的 role）；reprompt 重开（PlanReopened 沿用原任期）；明令禁止质量证书（planning-008）；deliver 一段式（一次调用即接力或交付，R9）。
-
-planning-017 现行机制（`requirements/planning/WHAT.md` 第 152–155 行是先前读到的位置，这次没有重读；材料写的 145–155 被已经入库的 [011] 条文挤过，不再当现行行号，也不是未提交增量）：上一任期及更早任期的全部 assistant 消息与 tool 消息必须全部剥除；非首任由 `LifecycleWorkRecord.materialize` 且 `includeOpening = false` 渲染 `LWR_prev`，在首条本任期物理消息之前插入一次。同一条款已被 `4b9ef101d` 改成按稳定 XTrace 身份归属，禁止依赖 Host 消息上并不存在的 `cursor` 字段。剥除与注入 `LWR_prev` 仍成立；材料里的 message-cursor 归属已失效。本任读的是 HEAD 条文，没有对调查日做逐字节 diff，不能声称 [017] 其余句子与调查日逐字相同。
-
-### 2.5 语义分歧〔F〕（契约级，非实现惰性）
-
-- 历史语义相反：Manager 完整保留物理历史给后继（relay-context-projection-001；NarrativeTransform.fs:135-138 注释「it never filters the provider message set」）；Plan 剥除前任 assistant/tool 消息、注入 LWR_prev（planning-017；现行装配是 `TenureIsolation.assemble`）。这是现行代码。R2 已裁决目标态全局剥除。
-- 收尾语义：截至 HEAD，代码仍是 Manager 两段式 suicide + 证书收尾，Plan deliver 一段、双路径。目标态（R5+R9）改成：两边都叫 deliver；证书退役；确认次数保持分叉——Manager/S4 两段，Plan 一段。分叉是风险偏好，不是还没统一完的残留。
-- 等待语义：Manager 无空停豁免；Plan 自然停止。R6 裁决各自保留。
-- 派发语义：Manager Continue 自动派发后继 prompt；Plan 接力不派发，靠下一次请求自然装配。R6 裁决各自保留。
-- 质量凭证：Manager 有证书；Plan 明令禁止。R5 裁决证书退役。
-
-### 2.6 git 史〔F〕
-
-Manager/Relay：2026-08-14 起 → 2026-09-04 relay 重构三部曲（382d162b0 wip → e175b3fc6 clean break → a19309ff long-stroke）→ 09-05/06 suicide lifecycle、pure loop → 09-07/08 架构切分 → 09-13 收尾 → findings pairs（30f53445e）→ 两段式 suicide（694750f00）。
-
-Plan：2026-10-10 20:28 `9fcc15824` 一次性全新引入整个 Mission/Planning（非复制，此前仓库无此目录）→ f0bfd802f ask 两段式挂起（后废弃，019 条款已删）→ 24babfac8 重接（四工具真实现；handoff 并入 deliver、resume 从 Plan 退役）→ ad50ddc15 js-plan 重构+写前 review 硬门 → 4f34d54e1 等修复 → 3d327213d 提示词重写。
-
-2026-10-11 之后、本任覆核前，碰到 Planning 或 relay-assessment / ReviewShell 的提交：`24babfac8`、`8af4fc11c`、`ad50ddc15`、`4b9ef101d`。`4b9ef101d` 只动 Planning 与 `requirements/planning`，没动 Relay、Manager、`requirements/relay-*`。`ad50ddc15` 改了 `ReviewShell.fs`，没有拆掉双后端。`requirements/relay-incumbency`、`relay-retirement`、`relay-context-projection` 自 `9fcc15824` 后没有被路径过滤到的提交。
-
-统一重构先例：无。仅 8af4fc11c 合并重复条款（006→017、012→018）；无任何「统一两模式」的 commit 或 TODO。2026-10-12 覆核：`src/Wanxiangshu/Mission/{Planning,Relay,Manager}` 搜 TODO / FIXME / 统一 / WIP 没有命中。仓库根 `plan.md` 是手写材料，不是源码上的统一改动，也不是本任务的活底稿。
-
-### 2.7 术语对照〔F〕
-
-| 概念 | Manager 侧（2026-09 relay 词汇；目标态见右注） | Plan 侧（2026-10 新词） |
-|---|---|---|
-| 任务载体 | Road | Work |
-| 任期 | Incumbency / iteration（序号 ordinal） | Incumbency / tenure（任期、一棒） |
-| 评审 | assessment（工具名已统一 review，后端仍叫 AssessmentCommitted） | review（PlanReviewed） |
-| 评审结果 | PERFECT/REVISE（已退役）→ findings 空/非空 | Promoted / Stayed |
-| 结束动作 | 现行代码仍叫 suicide（两段式）。目标态改名为 deliver，两段确认保留（R9） | deliver（一段式，R9 明确保留） |
-| 退休结果 | Continue / Accepted certificateId | Relayed / Delivered |
-| 质量凭证 | QualityCertificate（目标态退役，R5） | 无（planning-008 禁止） |
-| 接力材料 | 完整物理历史 + 快照（目标态改为剥除 + LWR_prev，R2） | LWR_prev + U + 当前任交互（剥除前任） |
-| 阶段 | assess → work → finish（事实推导循环） | S1 → S2 → S3（显式 stage，review 推进） |
-| 交接工具 | fork / resume / commission | 无（deliver 双路径内嵌） |
-
-同一个「每任一次评审门」在需求里一处叫 relay-assessment-002，一处叫 planning-022——两套词汇指同一族概念。
-
-### 2.8 调用关系与频率〔F+I〕
-
-〔F〕Manager session 三来源：用户直建；Orchestrator commission（delegation-004）；Plan 持权 deliver spawn 无 parent manager 会话（planning-023，PlanTools.fs spawn "manager"，覆核位置 144–150 行）。Plan session 唯一来源：用户显式创建（agent=plan）。Plan 的交付产物必须交给 Manager 会话执行。
-
-〔F〕用户在 U 中断言 Manager「高频使用」，并在 R8 允许这条路径重新设计。这是用户裁决，不是仓库测量。
-
-〔I〕从调用拓扑可以支持这个断言的方向：Manager 是执行主干、Plan 无任何自动入口、Orchestrator 只委任 Manager。仓库无明文「默认走 Manager」。README 无 Plan 使用说明，CHANGELOG 把 Plan 列在 Unreleased。仓库测不到「高频」这两个字。规划不再把这一点留成待用户确认。
-
-### 2.9 测试覆盖〔F〕
-
-这次 ask 在现行 HEAD `650850ea`、干净工作区里重数。不是沿用材料。
-
-planning 需求：20 条，见 2.1。缺 006、012、019。
-
-planning 测试：`requirements/planning/tests/` 有 24 个 `*.test.mjs`：001、002、003、004、005、007、008、009、010、011、013、014、015、016、017、018、020、021、022、023、024、025、026、027。没有 006、012、019，也没有 `host-canary-plan-relay.test.mjs`。材料里的「25 个 + host-canary」作废。024 的标题锚点是 `WHAT[planning-018]`，不是 024。025、026、027 的锚点是 `WHAT[planning-017]`。`011.test.mjs:250` 仍是 `WHAT[planning-011] js-plan tool description reuses the shared anchor tutorial with pathless signatures`。各文件 `WHAT[planning-` 命中行这次有清单，不在这里逐行再抄；下一任要复查时从 `git grep -n 'WHAT\[planning-' -- requirements/planning/tests/*.test.mjs` 重跑即可，这次不是零命中。
-
-support 三文件路径与无锚点沿用上一任已读结论，这次没有重开那三份文件。
-
-relay 四包，这次逐个读了 WHAT 标题行和测试文件名：
-
-- `requirements/relay-incumbency/WHAT.md` 12 条：3 [001]、7 [002]、11 [003]、15 [004]、19 [005]、23 [006]、29 [008]、33 [009]、37 [010]、41 [011]、45 [012]、49 [013]。缺 [007]。测试 001-006、008-013，同样缺 007。
-- `requirements/relay-retirement/WHAT.md` 8 条：3 [001]、7 [002]、11 [003]、15 [004]、19 [005]、23 [007]、31 [008]、37 [009]。缺 [006]。测试 001-005、007-009，同样缺 006。
-- `requirements/relay-assessment/WHAT.md` 11 条，001-011 连续，标题行 3、7、11、15、19、23、27、31、35、39、43。测试文件只有 001-010。WHAT 有 [011]，`011.test.mjs` 不存在。这一条材料没写，是这次新读到的缺口。
-- `requirements/relay-context-projection/WHAT.md` 9 条，001-009 连续，标题行 3、7、11、15、19、23、27、31、35。测试 001-009，编号齐。
-
-GAP-192、GAP-193、GAP-197 不是零命中，也不只是材料里的三句概括。源码目录没有这些字符串。登记行：`requirements/GAP.md:251` GAP-192 relay-incumbency PARTIAL；`252` GAP-193 relay-assessment PARTIAL；`256` GAP-197 relay-retirement PARTIAL。`253` 的 GAP-194 句子里也出现 GAP-193。测试 todo 仍在：incumbency `001.test.mjs:20`、`003.test.mjs:17`、`005.test.mjs:40`、`010.test.mjs:19`、`011.test.mjs:23`、`012.test.mjs:18`、`013.test.mjs:77`，以及该包 `tests/README.md:9`；assessment `003.test.mjs:22`、`005.test.mjs:28`、`008.test.mjs:114`、`010.test.mjs:58`，以及该包 `tests/README.md:8`；retirement `001.test.mjs:3`、`002.test.mjs:24`、`003.test.mjs:19`、`004.test.mjs:22`、`007.test.mjs:109`，以及该包 `tests/README.md:12`。材料里的三句概括仍然对得上这些句子的方向，但「本任未重开」那句作废。
-
-### 2.10 `assembleAskContinuation` 已退役〔F〕
-
-材料写它仍由 `Surface.fsi:62` 导出、`TenureIsolation.fs:378-390` 实现、源码无调用方。该坐标已失效，不是待清理残留。
-
-2026-10-12 覆核：`src/` 下 `git grep` 零命中。`TenureIsolation.fs` 只有 122 行，没有这个函数。`Surface.fsi` 第 61 行是 `executeDeliver` 的 `retirementCursor` 参数，第 62 行是返回类型 `Task<obj>`，不是那个导出。`4b9ef101d` 的 CHANGELOG 第 12 行写明退役 `TenureIsolation.assembleAskContinuation`。现存提及只在 CHANGELOG、仓库根材料 `plan.md`，以及 `proposals/archive/feat-PLANNER/001.md`。统一重组的模块清单不得再把它列成活代码清理项。
-
-### 2.11 不可核实/未穷尽〔U〕
-
-- `proposals/` 归档目录未逐个展开搜索统一重构提案（本次仅确认 manager-review canary 相关日志存在，以及归档里还有 `assembleAskContinuation` 的提及）。
-- 「Manager 高频」无仓库明文。用户已在 U 中断言，见 2.8。仓库仍测不到频率数字。
-- support 三文件的路径与锚点状态已核实，见 2.9，不再是〔U〕。
-
-### 2.12 2026-10-12 覆核仍成立的负载〔F〕
-
-这些结论被本任 ask 直接读到，不是沿用材料坐标：
-
-- 历史语义仍然相反。`requirements/relay-context-projection/WHAT.md` 第 3–5 行标题仍是「[001] 完整物理历史」，要求物理 transcript、durable audit 与后继 provider projection 均保留前任全部物理消息。
-- QualityCertificate 仍是 Relay 活类型。`Contract.fs` 91–104 行定义记录，`RetirementOutcome.Accepted` 携带 `QualityCertificateId`。需求用中文「证书」，不常出现英文标识。planning-008 仍写「禁止引入质量证书（QualityCertificate）或事后复核机制。」现行 `requirements/planning/WHAT.md` 第 77 行就是这一句，已在 `650850ea` 提交正文里。本任评审前的 ask：`git diff HEAD -- requirements/planning/WHAT.md` 为空，相对 HEAD 无差异，不是工作区多出来的增量。`[011]` 标题在第 96 行，第 101 行共享教程句也在同一份已提交正文里。证书禁令这一句不在 `4b9ef101d` CHANGELOG 点名的改写清单里，没有把它和调查日原文做逐字节对照。
-- Suicide 仍是两段式。`requirements/relay-retirement/WHAT.md` 第 21–23 行 [005]：第一次调用不退休，追加 durable `RetirementConfirmationCommitted`；第二次以不同 `toolCall` 调用才进入正常退休流程。`SuicideTool.fs` 352–393 行实现这一点，文件 466 行，自 `9fcc15824` 后无提交。
-- Plan deliver 仍是无权接力、持权交付并 spawn manager。见 2.2 的覆核行号。退休游标不再按旧的 `openingCursor + 10` 伪造。
-- ReviewShell 仍是共享壳，按 role 分派。需求锚点 `requirements/relay-assessment/WHAT.md` 第 45 行 [011]。
-
-### 2.13 工作区前态已经进 HEAD〔F〕
-
-现行事实：HEAD 是 `650850eabe78fa6b1f0ddabd4bf5cac8725e2dd8`（2026-10-12 11:37:37 +0800，`fix: reuse the shared JS anchor tutorial for js-plan`）。本任评审前的 ask：`git status --short` 无输出；`git diff HEAD -- requirements/planning/WHAT.md` 无输出，WHAT.md 相对 HEAD 无差异。`4b9ef101dbaa7e9d1068850f08e3d356bf2c1ff1` 是该 HEAD 的祖先。`[011]` 已在提交正文：标题第 96 行，共享教程句第 101 行。`[008]` 证书禁令在第 77 行，也在提交正文。下面列出的文件是更早两次 ask 看见的脏树前态，不是现行未提交改动。那些改动已经进了 `650850ea`。统一重组不得把这笔记当成还摊在工作区里的另一笔活去「避开覆盖」，也不得把它当成自己的迁移去改写或回退。生命周期事件没有新证据说被这笔记改掉；目录级 diff 相对 `4b9ef101d` 没重跑，不补写一条没读到的「源码零差异」。
-
-上一任看见的清单留在这里，作为那笔记提交收进去的前态，不删：
-
-第一次 `git status --short` 的已修改文件：`resources/provider/tool/js-plan/en.md`、`zh-CN.md`；`resources/provider/tool/js-program/` 下 contract-edit-recommendation、edit-prelude、edit-structural-guidance、rules-edit、rules-read 的 en/zh-CN；`src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs`、`ToolRegistrySurface.fs`、`ToolRegistrySurface.fsi`；`src/Wanxiangshu/Repository/Programming/Js/Description.fs`、`Description.fsi`、`OpenCode/ToolHost.fs`。未跟踪：`resources/provider/tool/js-program/ultra-plan/`。
-
-第二次 diff 额外见到、第一次 status 没有列出的：`requirements/planning/WHAT.md`（+2）、`requirements/planning/tests/011.test.mjs`（+51）。`git diff HEAD --` Mission/Planning、Relay、Manager 源码目录为空。四个 relay 需求包没有出现在这次非空 diff 里。
-
-工具名未改。`planningSpecs()` 仍是 js-plan、ask、deliver。review 仍是 ReviewShell.spec。manager 侧 fork、resume、join、horizon、suicide 仍在。`ToolRegistry.fs` 的 diff 只把 js-plan 的 Description 从单独的 `ProviderProse.render` 换成 `JsCanonicalDescription.renderPlan` 包住同一段 prose。没有新工具名、新角色名、新阶段名、新事件名。
-
-`js-manager` 字面量没有出现在 `ToolRegistry.fs`。js 工具经 `yield! generatedJsSpecs ()` 进入规格表。本任没有展开这个生成函数，不能把「文件里没有这个字符串」写成「工作区没有注册 js-manager」。
-
-上一任当时读到、现已随 `650850ea` 入库的 [011] 条文要点（不是现行未提交增量；标题第 96 行，共享教程句第 101 行）：交给模型的 `js-plan` 描述复用其它 `js-*` 的同一套教程面（有序锚点、`text(from, to)`、精确 `edit`、结构重组、按底稿职责成形的样例）；教程按无路径签名填写，`file(matches = [])`、`edit(changes)`、`rewrite(newText)`；`P` 的单一作用域、禁路径和写前评审只作为作用域约束放在教程前面。禁止另写精简教程，禁止在教程或样例里教路径参数，禁止把运行时内部对象暴露给模型。新增测试标题：`WHAT[planning-011] js-plan tool description reuses the shared anchor tutorial with pathless signatures`。新表面函数名：`jsPlanDescription`。
-
-`js-plan` 的 en/zh-CN 正文被收成作用域前言，原先整段教程删掉，改由共享教程面填写。共享 `js-program` 的 md 把写死的 `file(path, ...)` / `edit(path, ...)` / `rewrite(path, ...)` 换成 `{{fileCall}}`、`{{editCall}}`、`{{rewriteCall}}` 一类占位符。这是描述装配，不是生命周期。
-
-`ultra-plan/` 两份文件各 17 行，是 `class Js extends JsProgram` 的样例，调用已有的 `file`、`text`、`rewrite`。英文锚点 `## Facts`、`## Target`，中文锚点 `## 事实`、`## 目标`。不是新工具，不是新角色，不是新阶段。已跟踪代码里新增的是路径字符串 `tool/js-program/ultra-plan` 和 `UltraPlan` 字段；`ultraExample` 分支用的是已有角色名 `plan`。
-
-执行约束（按现行 HEAD 改写）：上述文件不再是未提交文件。它们在 `650850ea` 里。统一重组不回退这笔记的 js-plan 描述装配，也不把它收成生命周期迁移。上一任写「不改生命周期事件」时，依据是当时的 diff 没改事件名；这次没有重开那份 diff，不把那句升级成对 `650850ea` 全文的新审计。
+# 规划底稿：blogger tip 自由化（S3 · 流程与伪代码）
+
+阶段：S3（流程与伪代码）。本稿为接力底稿，逐棒累积；未决处用 ◇ 标注，随裁决收敛。
+S1 结账：目标形式化（§1）、事实（§2，含 §2.5 清零）、根因（§3）、取舍与裁决（§4/§5）齐备；末任空集评审通过（关键事实经两轮独立只读复核）。
+S2 结账：§7 理解、§8 探索、§9 主路径、§10 反事实检验齐备；末次评审（本任）以空集通过，评审前经 devops 独立抽样四项承重事实（compose 注入公式与 loadFor 双写；zh 节名分布与 9 份英文标题清单；Surface resolveField 包装与签名；chronicle 10 组资源键与显式键机制），全部属实。
+历史（已交棒）：修复 §1 语言维度、§4 悬置（1 条 GAP）；修复 §2.6-e en 侧陈述、§8.6 条款清单、§7 ◇（3 条 GAP）；修复 resolveByField 调用点漏记、§8.6 gd [003]/[005]「保留」与原文不符、provider-language 分类裁定点缺失（3 条 GAP）；修复 016 记述（第 184 行为标题串、186/187 行方为断言）、resolveField 写点漏记（Surface.fsi:34 与 007 测试消费点）、§2.2 cyclic-dependency 归类与 §2.6-e 收敛、013/003 测试归属补记（4 条 GAP）；修复 §9.1/§9.3 M3 依赖单一化（1 条 GAP）；修复 gd [004]/[007]/[009]/[011]/[012] 条款处置、§9.2 durable 载荷面缺项、bd-008 锚点归属、bd [015] 族类归属（4 条 GAP）。
+上一棒：只读检验判出 4 条 GAP（§9.2 触碰文件族缺 Surface.fs / Surface.fsi；M5 未记录 9 份「英文标题＋中文正文」文件的处置与断言口径；七字段描述文案未入文案资源清单；退役措辞漏「不要误判」）；经 devops 只读核实（zh 节名分布、chronicle 字段描述资源键机制、英文标题 zh 文件形态、Surface 公开面）后修订 §2.2/§2.6-e/§8.1/§8.5/§9.1/§9.2；S2 评审通过（本任空集确认）。
+上一棒：S3 首段——写入 S3.0 算法索引与执行顺序、S3.1 Algorithm C [契约定案]；评审留任后续写 S3.2–S3.13 全部十二段（A/S/D/L/K/P/I/B/R/G/F/V），S3.0 索引状态全部更新；评审前独立抽查三项事实（016 三处 120、101 目录与 404 份、ChronicleTool 150–200 行），写作前经 devops 复核 durable 载荷与解码先例（TipGuidanceDelivered.OccurrenceId 手写 decoder 先例、Journal 单条 append、provider-language 四条原文）。
+上一棒：只读检验判出 5 条 GAP（G4 同名比较点落点不全；bd-018 测试无处置；F/C7 对 duplicated-control-flow 的覆盖口径不自洽；Codec 协议检测集与 [017]/006 落点缺失；§9.2 最后一项待裁决点未结断）；经两轮 devops 只读核实（比较点行号与集合键、018/017 现状断言、Codec 检测常量、006/001/015/gd-001 断言敏感度）后评审留任修订：G4 扩为同名比较点清单、C3.3/C3.4 注记、C4.1/S6 补细节、C6.4 与 L5.1 补 018、C7.7 与 F1.3–F1.5 口径修正、D5.1/D5.2 补协议检测集与 006 同步、R5.1 结断公开面、§2.2/§7/§8.5/§9.1 数字同步。
+上一棒：只读检验判出 4 条 GAP（七节拼装正文的字节界收口缺失；R 读路径形态偏离既有先例且 digest 校验未具体化；tipName「原样保留」字节语义未钉死；V4 的 120 残骸口径与 A2.2/A4 冲突）；经一轮 devops 只读核实（AgentJournal 与读链装配、validateContentBounds 调用点与超限形态、tryCanonicalText/renderStructured 的 trim 语义、FactCodec 现状、016 的 120 位点）后评审留任修订：D4.2 补字节界收口、K3 补写前前提、C2.2/C2.7 措辞精确化、R1/R2 收敛为既有读形态并具体化 digest 校验、R5.1 与 §9.2 同步、D2/D5.2/G3/G4.3/C3.4 统一 tipName 字节语义、V4 口径对齐。
+上一棒：只读检验判出 6 条 GAP（解码错误值与 006 L76 更新指引冲突；CanonicalBlogCall/CanonicalCycle 新结构与 EnforcerTip 处置未定；renderTipSections 与注入拼接的字节形态未钉死；「刀口」「提醒」的 canonical 落点未给；casefold 措辞未收敛；V1 前置门语义空转）；经四轮 devops 只读核实（006/018/007 断言与访问面、Surface 输出形状、ChronicleContent 与 evidence 去向、CanonicalCycle 装配链与语言可得性、语言服务公开面、rule.Name 与渲染机制、刀口/提醒节语义）后评审留任修订：D1 定载荷结构、D4.1 定拼装调用点与语言权威、D4.2/D5/D5.3 补类型级收敛与 Surface 形状、D4/I1/C6.1 定字节形态、D2/D5.2/C4.2 定错误面分层、C7.6/F1.3 补刀口/提醒落点、casefold 措辞全稿收敛（§1/§4/§6/§8.3/§9.1/§10.1/S3.0；C3.2 加收敛注记）、V1 改写、§2.6-h 补记。
+上一棒：只读检验（经一轮 devops 只读核实：016 的 120 断言与 compose 包含式形态、004 comment 两段镜像、006 八种输入单串全等与 schema 六键、101 目录 en 568085 B / zh 490789 B 字节统计、DeliveryProjection/Tip.fs 行号比对）判出 2 条 GAP（§10.2 的 M3 体积失败分支未落 S3；B5 与 D5.4 对 016 提示词面断言的指令矛盾）；评审留任修订：Algorithm I 增 I6 体积异常步骤（原 I6 顺延为 I7）、B5 收敛为 D5.4 口径。
+上一棒：只读检验（经三轮 devops 只读核实：006 八种输入循环与错误串、EnforcementCycleRecord/ByProviderRun/tryFindByProviderRun 与 Tip.fs 访问面、001/008/015/017 测试消费面、ProviderRunIdentity 构造、测试运行入口；并入 §2.6-i）判出 5 条 GAP（006 八格落位未裁；R2 的「CycleId → 投影记录」机制未指名；M2 测试同步覆盖不全——bd-008、bd-017 无处置步骤、bd-015 未点名、bd-001 缺「保留」结论；C3.3 括注措辞与 P2/G4.1 不齐；I6 的异常呈报措辞超出执行者工具面）；评审留任修订：D2 增空值读法裁决（D2.1）与八格落位表（D5.2）、S4 判定序同步；P1/P1.1 补 ByProviderRun 事实、R1/R2 写深取机制（ProviderRunIdentity.create + tryFindByProviderRun）；新增 D5.5/D5.6、K6 补 bd-015、新增 C6.5；C3.3 与 G4.1 注记措辞收敛；I6 呈报语义改写（C8.5 属 M1 规划期、ask 有效、不改）。
+上一棒：只读检验（四轮 devops 独立抽样：006/016 断言与 120 三处、投影与深取链、文案资源与 Path 机制、008/015/017/001/003 锚点、观察视图两文件与 016 六块消费面及 observationPayload）判出 3 条 GAP（观察视图承载文件 Observation.fs/ObservationSurface.fs 未入触碰文件族与任何算法落点；观察视图字段面同步（tipIdentities、cycleRecordOfJs）未落步骤、bd [015] 配对视图缺实现挂点；D5.4 仅点名第二块 fixture、未逐块处置 016）；评审留任修订：§2.6 增 (j)；§9.2 文件族补录两文件；K6 精确化（JS 键 camelCase、observationPayload 同 K2 口径）并新增 K6.1/K6.2；D5.4 扩为六块逐块清单（三处同形 fixture）；C6.1 bd [015] 增实现挂点。
+上一棒：只读检验（四轮 devops 独立抽样：previousTips 链源码事实（Recovery/ProjectionSurface/BlogSurface/Builder/Prompt/Toml）、gd-008 全文与 composer/resolver/audience 断言、cc 套件键名消费与 WHAT 条款、msl-007 载荷面与两个 JS 构造面、HOST-026 编号）判出 5 条 GAP（previousTips 链未落任何算法与文件族；gd-008 三块处置口径缺失与 bd/gd-008 编号错位；gd [008] 重述与 Q1 双灌入兼容未裁定；K6 的 observationPayload 兜底口径与 K6.2 矛盾；D4.1 的 HOST-026 引用不可定位）；评审留任修订：§2.6 增 (k)；§9.2 文件族补录（BlogSurface.fs、Recovery.fs、Context/Companion 四文件、cc 测试）；Algorithm P 增 P6–P11（previousTips 链）与标题同步；I5 拆 I5.1–I5.4（gd-008 三块口径）；§9.4 的 M2/M3 标注修正；C6.1 gd [008] 三分语义定稿；K6 observationPayload 口径对齐 K6.2；D4.1 语言权威引用修正；S3.0 表行同步。
+上一棒：只读检验（两轮 devops 独立核实：① 007.test.mjs 全文与执行期校验可达面——resultForTip 私有、requirements 零命中、bd support 仅达解码面；② tryFindByField 归属与消费面——Catalog 公开函数、016:190/191、018:9、008:27 断言自洽；③ MissingTipError 消费面——Codec 字符串常量、Surface 死导出、bd-006:76 字面量唯一消费）判出 4 条 GAP（L5「既有工具调用面」空指不可执行；C8.5「调用 ask」超出 S4 执行者工具面；旧错误面符号 MissingTipError/missingTipError 退役未处置；006 标题「same error」与分组断言失实）；评审留任修订：L5 改锚 enforcer.decodeCall 并注记执行期不可达边界、C8.5 改 I6 同口径、新增 D2.2 旧错误面退役、D5.2 补标题更新句、V4 清单补入该符号、§2.6 增 (l)。
+上一棒：只读检验（两轮 devops 独立抽查：承重事实四项——016 的 184/186/187/188 行逐行性质、blob 读接口 IBlobWriter.Read（Writer.fsi:14）与 Wire.fs:85–96 读回+digest 先例、DeliveryProjection 精确匹配形态、Recovery.fs:111 的 tip.FieldName 映射；边界一致性四项——ChronicleExecution.fs 校验族与路径、两套 tests/support 文件现状（cycle.mjs 默认 tip 键、journal.mjs 仅假 blob 引用）、TomlSurface.fs:53–54 纯转发形态、Catalog.fsi/Codec.fsi/Projection.fsi 存在与签名）判出 2 条 GAP（§9.2「不触碰」段把 bd [015] 列为「与自由化无关条款」，与 C6.1/C6.6 的改写及 K6 的实现同步矛盾；§9.2 触碰文件族缺列 ChronicleExecution.fs/.fsi 与两套 tests/support 文件）；评审留任修订：§9.2「不触碰」段移出 [015] 并新增「[015] 处置」行、触碰文件族补录 ChronicleExecution.fs 与 ChronicleExecution.fsi、requirements/behavior-diagnosis/tests/support/cycle.mjs、requirements/guidance-delivery/tests/support/journal.mjs。
+
+本棒：只读检验（四组 devops 抽查：ChronicleExecution 校验族与计量先例、两套 support 文件与 009 blob port 先例、101 目录族谱与 23 无节抽查、016 第 184–188 行；另两轮补充：guidance support journal 实为真 journal 不透明盒、TipSurface 公开面与 Persistence blob 写读对先例）判出 3 条 GAP（tipName 200 界计量单位未裁决；I5.2 的 blob 物化接线缺口——port/替身路线类型层不可行、最小接线为 TipSurface 新增写入助手；S4/D3 的「missing-tip-field: 节名」与 C4.1 的 camelCase 字段名裁决不齐）；评审留任修订：C2.4/C2.5/S4/D2/L5 定计量单位（String.Length）、S4/D3 指代词统一、I5.2 修正为 TipSurface 写入助手路线并注记与 009 异同、§9.2 触碰文件族补录 Guidance/TipSurface（fsi 同步）、§2.6 增 (m)。
+
+## 0. 任务
+
+用户委托摘要：blogger 的提意见目前主要走 tip，但 tip 必须从已有库中选择，限制了发挥。改为：仍然把全部已有库灌入 blogger 上下文（bootstrap + 格式样板），但 blogger 写 tip 时自由发挥。为此，参考所有 enforcer tip 的格式确定字段们的名字，然后用这些文本字段替代 tip 这个离散字段。
+
+解读：把 chronicle 工具中名为 tip 的离散枚举字段替换为一组自由文本字段；字段名参考 enforcer tip 文本的格式确定；库仍全量注入 blogger 上下文，但角色从「可选值域」变为「bootstrap 与格式样板」；blogger 不再受「必须从库中选择」约束。
+
+## 1. 目标状态（形式化）
+
+改造完成后，可判定地应满足：
+
+1. chronicle 工具的 provider-facing schema 中不再存在离散枚举字段 tip；代之以一组自由文本字段，字段名取自 main.md 七节格式（Q1 裁决 = A1）：What To Do Now / Why This Matters / Repair Strategy / Decision Branches / Common Wrong Fixes / Verification / Done When（已定：camelCase 拼写、全部必填，见 §8.1）；另设一个自由文本「名」字段承担身份与去重（Q2 裁决 = B2；已定：trim + 简单大小写折叠（.NET ToLowerInvariant），见 §8.3 与 C3.2）。
+2. blogger system prompt 全量注入全部库文本：每条规则注入 enforcer.md（检测文本）与 main.md（处置文本）两种文本全文（Q1 裁决：A1+A2 双灌入；按会话语言单语装载、不合并双语，双语全灌已在 §8.2 淘汰），当前 101 条；文案中「必须恰好选择一个 Rulebook TipName」类约束被替换为「参照样板格式自由撰写、可自由命名」的语义。
+3. 执行期与解码期不再存在「任何非空 tip 串被归一化映射到库内某条规则」的行为（resolveByField / Levenshtein 家族退役，调用点全列表见 §2.1）；名字作为身份键保留（按名去重），已定其规范化为 trim + 简单大小写折叠（.NET ToLowerInvariant，见 §8.3 与 C3.2）；新文本字段沿用既有内容字段的准入校验族（trim 非空、字符/字节界等，见 §2.5-C）。
+4. 落库、投影、Main 交付按 Q2 裁决改造：交付链骨架保留（首次 Full、之后 identity-only、按名去重）；Full 正文以 blogger 自由撰写的文本字段为主体（库 main.md 退出交付正文来源）。换源触发面已核实（§2.5-C）：owner 语言选择（gd [002]）、Coverage 身份单位（gd [001]/[003]/[005]）、Audience 隔离（gd [008]）需重设；冻结机制可原样复用；设计路径已展开（正文走新 blob 通道落库、交付读回 + digest 校验，见 §8.4 与 §9.1 M4；残余 ◇ 见 §10.1 假设 A）。
+5. 101 条 tip 统一格式（Q1 裁决新增工作包）：全体规则文件对齐主流标准结构——enforcer.md 八节（Definition / Governing Principle / Trigger When / Do Not Trigger When / Distinguish From / Decision Procedure / Examples / Nudge）、main.md 七节（A1）。现状基线已全量测得（§2.2）：en 侧 78/23 二分；zh 侧与主流同构者仅 enforcer 20 / main 21，待对齐范围远大于 23 个无小节文件；精确标准与验收方式已展开（canonical 中文节名草案见 §2.6-e，对齐 + 结构断言 + 内容覆盖见 §8.5、§10.4）。
+6. 规范与测试同步：behavior-diagnosis 与 guidance-delivery 中与「tip 必然归一到 TipName」绑定的条款与测试锚点全部更新，不留条款-实现矛盾（条款见 §2.3，锚点见 §2.4）。
+
+## 2. 已核实事实
+
+出处：本任两次 devops 只读调查（含真实 bash 静态读取）。行号为调查记录，标「约」者为区间引用，以当前 HEAD 为准。未标「待核实」者均为已核实。
+
+### 2.1 现状链路（blogger 产出 → 校验 → 落库 → 交付）
+
+- blogger 提示词：resources/provider/role/blogger/en.md（zh-CN 成对）；因果脊 charge → occurrence → settlement → consequence → tip；tip 约束「恰好一个 Rulebook TipName」（约 50–52 行）。
+- 工具 schema：src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs；tip 为枚举，值域 = 全部 TipName（约 186–187 行；清单由 tipFieldNames() 生成，约 160 行）；charge/occurrence/settlement/consequence 为必填 string（约 174–181 行）；evidence 为可选 string（约 183–185 行）。
+- 执行校验：resultForTip（约 100–106 行）：空 tip → missing-tip；resolveByField 命中 → remembered。内容字段过 tryCanonicalText（trim 非空；ChronicleExecution.fs 约 17–23 行）。
+- 归一解析：EnforcerCatalog.resolveByField（Catalog.fs 约 130–140 行）：trim → 精确命中 → Levenshtein 最近 → 并列取 LexicalOrder 最小；任何非空串必解析、无 UnknownTip 逃逸（behavior-diagnosis [007]）。调用点、写点全列表（经本任 devops 独立复核）：Catalog.fs:130（定义）、Codec.fs:80、ChronicleTool.fs:104、Surface.fs:221–227（resolveField，JS 语义面包装，接 caller 提供的规则数组做解析）、Surface.fsi:34（resolveField 公开签名）、Catalog.fsi:22（签名）；另有测试消费点 007.test.mjs:19/24/25/27（该 JS 面的既有行为锚，随 Levenshtein 家族退役处置，见 §2.4、§8.6）——此前「两处调用点」的记载据此更正。
+- 解码校验：Enforcer/Codec.fs decodeCall（约 159–165 行）：tip 缺失/非串/空白 → MissingTipError；CanonicalBlogCall = { Content; Tip }（约 24–26 行）。
+- 落库：Enforcer/Cycle/Commit.fs：BlogObservationCommitted 携 TipRuleId、FieldNameAtCommit（约 191–209 行），与 blob/coverage/provider run 原子提交。
+- 投影：Enforcer/Projection.fs：EnforcementCycleRecord（约 7–17 行）；RecentTip { RuleId; FieldName; CycleId }（约 21–24 行），容量上界 8。
+- 交付：Enforcer/Guidance/Tip.fs：resolveTipGuidance（约 181–186 行）→ owner 最近 tip → tryFindByField → Full 形态（「# Enforcer Tip」+「tip = "<name>"」+ main.md 正文，约 37–43 行）或 IdentityOnly（「tip: <name>」，约 30 行）；首次 Full 原子写 TipGuidanceDelivered（约 84–109 行；payload 见 Host/Facts.fs 约 36–40 行）；注入点 OpenCode/Host/PairProgrammingThoughtTransform.fs composeMarkerDocument（约 1325–1346 行）。
+- Coverage/Frontier：Enforcer/Guidance/DeliveryProjection.fs；重锚清 Coverage、保 Frontier（Context/Companion/Blogger/ContextFactFold.fs 约 133 行）。
+- 库与装载：resources/enforcer/<TipName>/{enforcer.md, main.md, enforcer.zh-CN.md, main.zh-CN.md}；目录 basename = TipName = RuleId = FieldName（单一真相；behavior-diagnosis [001]）；当前 HEAD 实测 101 个规则目录（文档与测试标题中出现过 120、334 等历史数字）。装载层整文件读入、不解析小节结构（EnforcerCatalogResource.fs 约 51–104 行；composeBloggerSystemPromptFor 约 28–43 行）。
+- 注入点：RuntimeResourceAssembly（启动预载）；ProviderSystemTransform.fs 约 101–108 行（请求期按语言重拼，Blogger 分支）；Enforcer/Surface.fs 约 186 行（测试面）。
+- 文案资源：resources/provider/tool/chronicle/ 10 组 × 中英：description（含 {{rule_count}} 占位）、arg-tip、missing-tip、remembered、nothing-to-remember、arg-charge/occurrence/settlement/consequence/evidence；{{rule_count}} 由实测条数填充（ChronicleTool.fs 约 160–167 行）。
+
+### 2.2 格式统计（字段名单的事实基础；本棒全量复核）
+
+- en 侧复核（确认）：enforcer.md —— 78/101 文件共享固定顺序的 8 个小节：Definition / Governing Principle / Trigger When / Do Not Trigger When / Distinguish From / Decision Procedure / Examples / Nudge；23 个文件无任何「## 」小节（仅 H1 与散文）。main.md —— 同批 78/101 共享固定顺序的 7 个小节：What To Do Now / Why This Matters / Repair Strategy / Decision Branches / Common Wrong Fixes / Verification / Done When；无小节者同为那 23 个文件。目录总数三口径复核 = 101。
+- 23 个无小节文件清单（与既有记录逐名核对一致）：behavioral-boundary-untested、blob-after-event、cancellation-not-propagated、contract-test-missing、failure-path-untested、fragment-event-as-data、log-as-recovery-protocol、lost-update、memory-before-disk、missing-regression-test、optimistic-retry-assumption、order-dependent-test、overwrite-history、partial-write-assumption、property-test-missing、race-first-wins-semantics、recovery-by-filesystem-state、resource-not-scoped、retry-not-idempotent、sleep-based-synchronization、snapshot-as-truth、test-implementation-coupled、time-dependent-test。
+- zh 侧全量分布（本棒实测；按「enforcer.md / enforcer.zh-CN.md / main.md / main.zh-CN.md」节数分组，各组数量之和 = 101）：
+  - 0/0/0/0：23 个（即上述清单；zh 两侧亦无小节）。
+  - 8/0/7/0：20 个（en 两侧完整；zh 两侧小节骨架整个丢失）：big-batch-intent、blind-edit、blocking-event-loop、boundary-collapse、canary-skipped、catch-all-swallows-future、cross-layer-internal-import、ephemeral-verification、guessed-migration、manual-toil-repeat、mutable-public-state、permit-leak、random-source-in-logic、release-ladder-skipped、repeated-known-mistake、serial-when-parallel、status-announcement-noise、time-source-in-logic、tool-error-ignored、unbounded-fanout。
+  - 8/5/7/5：24 个（zh 用 5 节变体：enforcer 缺 Governing Principle/Decision Procedure 且自创「刀口/提醒」；main 缺 Repair Strategy/Decision Branches）：commented-out-code、dead-code-delivered、debug-print-left、destructive-without-authorization、dirty-hack、domain-language-drift、leftover-scaffolding、legacy-cruft-retained、misleading-name、missing-architecture-gate、missing-invariant-documentation、mock-hidden-state、premature-optimization、premature-unification、scope-creep、secret-in-code、spike-not-cleaned、stale-documentation、todo-bomb、truncation-skips-damaged、unrecorded-decision、unversioned-schema、weak-boundary-parsing、wholesale-rewrite。
+  - 8/7/7/6：12 个（zh enforcer 7 节变体；zh main 缺「决策分支」；其中 cyclic-dependency 的 zh main 为「分支判断」六节变体、非普通缺节，见 §2.6-e）：clone-and-mutate-derived、command-event-confusion、context-model-leak、cyclic-dependency、duplicated-truth、implicit-control-flow、impure-core、mixed-side-effect-boundaries、phase-flag-accumulation、rule-spaghetti、translator-layer-bloat、wrong-rule-composition。
+  - 8/5/7/6：1 个（unrecorded-lesson）；8/7/7/7：1 个（duplicated-control-flow，「分支判断」替「决策分支」）；8/8/7/7：20 个（唯一完全同构组）：boolean-blindness、compatibility-cruft、coverage-theater、facade-hides-mess、false-gate、flaky-test-tolerated、guess-based-fix、guessed-not-verified、half-finished-refactor、illegal-state-representable、incidental-complexity-dominates、non-exhaustive-transition、null-ambiguity、primitive-obsession、repeat-until-pass、stringly-typed-error、timeout-inflated-to-pass、type-erosion-at-boundary、unverified-completion-claim、weakened-test-to-pass。
+- zh 与英文主流结构同构计数：enforcer 20（16 个中文映射 + 4 个英文标题原文）、main 21（15 个中文映射 + 5 个英文标题原文 + 1 个「分支判断」变体按角色映射）；同构 = 语义映射后节名一一对应且顺序一致。
+- 「en 有节而 zh 无节」20 例；「en 无节而 zh 有节」0 例。
+- 混合形态：9 个 zh 文件为「英文标题＋中文正文」（enforcer：illegal-state-representable、non-exhaustive-transition、stringly-typed-error、type-erosion-at-boundary；main：上述 + null-ambiguity）。中文措辞分叉：「为什么重要」与「为什么这很重要」并存；自创节名「刀口」「提醒」为英文结构所无。
+- 中英不同构（此前单点观测 domain-language-drift）现已知为普遍现象：正文按语言整文件选取，无逐节映射。
+- 小节词汇当前非契约：guidance-delivery/tests/008 标题即「Blogger composer takes detection source regardless of section vocabulary」；behavior-diagnosis [008] 视 Nudge 类桥接字段为禁物（「## Nudge」仅是小节名，不装载为字段）。
+- 待重写规模（统一格式工作包基线）：en 侧 23 个目录的两份 en 文件（46 份）+ zh 侧非同构 enforcer 81 份 / main 80 份（161 份）+ 9 份「英文标题＋中文正文」文件（enforcer 4 / main 5；清单与处置见下行）+ duplicated-control-flow 的 zh main（「分支判断」措辞替换 1 份；见 §2.6-e）；合计 217 份。
+- 「所有 tip 的格式」无法字面满足——Q1 裁决以「统一格式」工作包消解此边界：23 条无小节文件、全部双语不同构者、以及 10 份标题/措辞待替换 zh 文件（9 份「英文标题＋中文正文」：enforcer 4 = illegal-state-representable、non-exhaustive-transition、stringly-typed-error、type-erosion-at-boundary，main 5 = 上述 4 加 null-ambiguity；另 duplicated-control-flow 的 main）一并对齐主流标准，后者的处置为标题/措辞替换为 canonical 中文名（见 §1 第 5 条、§8.5）。
+
+### 2.3 规范锁定（须逐条面对的条款）
+
+- behavior-diagnosis/WHAT.md（全量 [001]–[019] 连续 19 条，本任 devops 全量清单复核）：涉 tip 语义者——[001] 身份恒等与唯一真相（TipName = RuleId = FieldName；禁平行清单）；[004] 检测语料全量注入；[005] 多语言本地化叶子完整性（正文非空且 TipName / RuleId / FieldName 恒等）；[006]「tip 必须可归一到 TipName」、缺失/空白/非串稳定错误面；[007] trim → 精确 → Levenshtein → LexicalOrder、无 UnknownTip 逃逸；[008] 离散单条 tip、禁数值评分与桥接字段；[009] 每 run 恰一次 chronicle；[011] fail-closed 内容硬界（新协议四句正文渲染后 ≤512 KiB）；[012] 单一 TipRuleId/FieldName 原子提交；[014] RecentTip 容量 8；[015] tip↔frame 配对、禁假 tip；[016] 历史压缩协同裁剪 min(K, tips) 条 RecentTips、不新增 tip、不触发新交付；[017] 无效 terminal 含缺 tip；[018] RulebookRevision 冻结「chronicle.tip 枚举、解码映射表、Main 处置索引」。与改造无关者——[002] 规则装载 fail-fast、[010] Cycle provider-run 身份门禁、[013] Coverage 出生门、[019] Enforcer fatal typed incident（四者均不涉 chronicle tip 字段语义，本任 devops 逐条正文核对）。
+- guidance-delivery/WHAT.md：[001] Frontier 按 occurrence、Coverage 按 TipName；[002] Full = 标题 + TipName + main.md 正文（owner 语言）；[003] IdentityOnly =「tip: <name>」；[005] 重锚清 Coverage、保 Frontier；[006] 最近已提交 tip；无关联/无 tip/无对应规则 → None；[008] 两端共用 TipName，检测正文仅 Blogger、处置正文仅 Main。（gd 全集 11 条、编号无 [010]；清单外 [004]/[007]/[009]/[011]/[012] 经复核与改造无文本冲突，处置见 §8.6。）
+
+### 2.4 测试锚点（tip 语义相关）
+
+- behavior-diagnosis/tests：001、003、006、007、008、009、012、013、014、015、016、017、018。其中 007 为 Levenshtein 行为锁；014 为单 tip/RecentTips；016 的 120 断言位于第 186、187 行（rules.length 与 ruleCount 等于 120），第 184 行为测试标题字符串（含 120 字样、非断言），第 188 行为动态派生先例；120 是历史硬编码（commit 8f9485c12 时 resources/enforcer 实为 120 目录，HEAD 为 101），当前静态推定必红、未实跑（见 §2.5）；018 为枚举冻结。归属补记（本任 devops 独立复核）：013 属 [013] Coverage 出生门，与 tip 语义无涉（fixture 的 tip 字段未被任何已执行测试调用，无须改动）；003 覆盖 TipName 身份三元组与目录校验（第 46–57 行动态 N 写法可作 M0 修复 016 的对照先例），保留作身份面回归。
+- guidance-delivery/tests：001、002、003、005、006、007、008、012（004/009/011 与 tip 正文解耦，处置见 §8.6）；002 按 locale 直接读库 main 正文文件并断言 first Full 包含其全文（换源后需改）；005 断言重锚后恢复 Full 正文一次（换源后恢复路径须保持；frontier 断言为 todo GAP-115）；007 为 latestTipNudge/latestTipGuidance 别名字节相等的锚（别名结构保持即自动保绿）；008 锁定「小节词汇不参与合成」。
+- 测试全走 JS surface 行为名断言，不直调 F# 标识符（改造可借力此隔离层）。
+
+### 2.5 待核实项的清零结果（本棒 devops 只读调查；三项均可复跑）
+
+- 016 的「120」：断言位于 016.test.mjs 第 186、187 行（rules.length 与 ruleCount 等于 120）；第 184 行为测试标题字符串（含 120 字样，非断言）；第 188 行为动态派生先例——经本任 devops 独立复核摘录原文确认。证据：commit 8f9485c12 时 resources/enforcer 实为 120 个目录（含现已不存在的 abbreviation-anxiety），其后裁剪至 HEAD 的 101 个，断言未同步。按 Surface.rules → EnforcerCatalogResource → PackageResources → 仓库根/resources 的读取路径，静态推定该断言当前失败；未实跑（边界如实标注）。
+- zh 全量小节分布：见 §2.2（全量分组、同构计数、清单）。en 侧复核一致；「en 有节而 zh 无节」20 例、「en 无节而 zh 有节」0 例。
+- 字节预算与冻结契约（结论）：
+  (a) 字节界——MaxBlogTextBytes=512KiB、MaxEvidenceBytes=128KiB（Cycle/Model.fs 约 8–12 行；validateContentBounds 约 77–91 行）与解码期 MaxInlineEvidenceChars=1024（Codec.fs 约 55–58、104–111 行）均作用在 Blogger chronicle 提交/解码层；超限行为是 fail-closed 拒绝，不是截断（bd [011]）。Main 交付侧（Guidance/Tip.fs 全 197 行、PairProgrammingCalibration、Host marker 写入路径）在已读范围内无字节界与截断——「已读范围内未发现」，非全仓证明。
+  (b) 冻结与重锚——交付冻结靠 PairProgrammingGuidelineAnchored.MarkerText 按 occurrence 落盘（Host/Facts.fs 约 16–23 行），commitPairInjection 判重后原字节回放（PairProgrammingThoughtTransform.fs 约 1067–1100 行）；重锚只清 Coverage、保 Frontier（DeliveryProjection.applyReanchor）；Full 正文的 owner 语言经 languageOf + rulesFor 查库选择（Tip.fs 约 156–158 行）；重复交付走 IdentityOnly。条款：gd [011]、prefix-stability [010]/[014]、time-capability [007]。
+  (c) 换源触发面——若 Full 正文改为 blogger 自由文本：owner 语言选择机制失效（gd [002]）；Coverage 身份单位需从 TipName 重设（gd [001]），gd [003]/[005] 措辞级改写（原文「规则全文」「已交付规则」的指称物失效，双轴语义保留，见 §8.6）；Audience 隔离与「Blogger 历史为低信任观察」定性需处理（gd [008]）；枚举映射与处置索引族重写（bd [001]/[007]/[018]）；provider-language 无条款点名交付正文（[006] 资源文件门禁不覆盖；Tip.fs:32–35 标题串为代码常量、本就不在资源机制内），但 [005]「完成文案」与 [013]「进入模型的 Class A 文本」字面可覆盖交付 marker 文本，分类裁定见 §8.6；冻结机制本身可原样复用。测试触发清单：gd-002（第 7–28 行）、gd-008（第 58–61 行）、gd-003、gd-006、bd-016（第 184–203 行）、bd-007、bd-018、bd-012。
+- 不可核实项：无（三项均静态核实完成；动态行为归后续测试覆盖）。
+
+### 2.6 接口事实补足（多轮 devops 只读调查）
+
+（a）chronicle 文案与校验链：
+- 文案面 10 组 × 中英成对：description、arg-charge、arg-occurrence、arg-settlement、arg-consequence、arg-evidence、arg-tip、missing-tip、remembered、nothing-to-remember。
+- description en（15–17 行）：「tip is required: choose exactly one of the {{rule_count}} Rulebook TipNames for the reusable lesson this concrete transition teaches」；zh（13–14 行）同义。arg-tip（单行）：en「Exactly one Rulebook TipName naming the reusable lesson carried by this concrete transition. Choose the best lesson, not a diverse or novel label.」；zh「恰好一个 Rulebook TipName，用来命名这次具体转折携带的可复用 lesson。选择最贴切的教训，不要为了多样或新奇而换标签。」。missing-tip：en「Choose exactly one Rulebook lesson for this transition.」；zh「请为这次转折恰好选择一条 Rulebook lesson。」。remembered / nothing-to-remember 不涉 tip 语义。
+- schema 装配：ChronicleTool.fs 160–161 行 fields = tipFieldNames () / ruleCount = List.length fields；167 行 description 渲染填 {{rule_count}}；174–181 行四个内容字段为必填 string（stringSchemaDescribed）；182–185 行 evidence 为可选 string；186–187 行 tip = enumSchemaDescribed fields（值域 = 全表）。tipFieldNames = EnforcerCatalog.fieldNames（75–76 行）。
+- 执行期校验：resultForTip（100–106 行）：空白 → missing-tip；否则 resolveByField 命中 → remembered（返回值丢弃）。
+- 解码期校验：Codec.fs decodeCall 159–165（缺键 → Error；null → Error）；decodeTip 87–94（非 string → Error）；decodeTipString 70–85（trim 空 → Error；非空 → resolveByField 必中 → EnforcerTip.ofRule；Option.defaultValue Error 分支实际不可达）。两处生产校验点并存：工具执行期 + transform 解码期（resolveByField 调用点全列表含 Surface.fs:221–227 的 JS 语义面包装，见 §2.1）。
+
+（b）装载 / 合成 / 重拼：
+- localizedFiles（EnforcerCatalogResource.fs 21–24）：English → enforcer.md / main.md；zh-CN → enforcer.zh-CN.md / main.zh-CN.md；单语言成对选择，双语各装载一次、互不合并。
+- loadFor（51–104）：两份叶子均读入记录（82–83 行读入，94–95 行 EnforcerText / MainText 写入 EnforcerRule）。
+- composeBloggerSystemPromptFor（28–43）：只对每条注入 rule.Name + rule.EnforcerText.Trim()（40–41 行）——**MainText 已读入记录但未进 prompt**；改造即在此处加注入。标题 en「Enforcer Rulebook」/ zh「Enforcer RuleBook（规则书）」，按 LexicalOrder 排序。
+- RuntimeResourceAssembly 8–37：启动时双语各预载一次（11–14），安装 BloggerSystemPrompt（23–29），RuntimeResources 同时持有三份列表（32–34）。ProviderSystemTransform 101–108：请求期对 Blogger 重拼同一公式。
+- blogger 角色提示词 en.md 50–52：「tip names the one reusable lesson this occurrence teaches the participant. Choose exactly one Rulebook TipName. The tip is the abstraction; the other four fields describe this concrete turn.」
+
+（c）交付与投影：
+- Tip.fs：tipIdentityText 30（tip: %s）；tipHeading 32–35；tipFullText 37–43（# Enforcer Tip + tip = "%s" + 正文；正文空 → fallback identity）；tryOwnerMainSession 45–51；latestOwnerTip 53–63；isTipIdentityOnly 65–79；recordFullTipDelivered 84–109（TipGuidanceDelivered 写入，失败仅诊断）；guidanceForRule 117–147（130–136 IdentityOnly；137–146 Full，138 行正文来源 = rule.MainText）；guidanceForField 149–161（156 行语言 = languageOf mainSessionId；158 行 tryFindByField 查库）；resolveTipGuidance 181–186；latestTipGuidance 189–193。
+- Facts.fs：TipPresentation 10–13（Full / IdentityOnly）；PairProgrammingGuidelineAnchored 16–23（MarkerText 第 20 行）；TipGuidanceDelivered 36–40（SessionId / TipName / OccurrenceId / Presentation）。
+- DeliveryProjection.fs：State 7–16（DeliveredOccurrences 单调、重锚不清；CoveredTipNames 重锚清空）；isIdentityOnly 26–31；apply 46–73（Full + occurrence → Frontier；Full + tip → Coverage；IdentityOnly / None → 状态不变）；applyReanchor 77–79（保 Frontier、清 Coverage）。
+
+（d）条款关键句补充：
+- bd [004]（15–17 行）：「有效的 Blogger effective system prompt 由基础 Blogger prompt、# Enforcer Rulebook 标题、live Rulebook 全部 ## <TipName> 及其对应当前语言的 EnforcerText 全文按 LexicalOrder 确定性拼接而成」。
+- prefix-stability [010]（41–45 行）：「guidance 只能附在本次请求最新一条真实消息上……同一未重锚 horizon 按 durable occurrence 原位、原字节回放，不删除、过滤、去重、搬移或叠加第二后缀……ContextReanchored 退休旧 occurrence 的可见性」。
+- prefix-stability [014]（62–64 行）：「guidance 后缀正文只参与 provider 呈现，不进入 XTrace、Companion decode、Blogger delta、WorkRecord 或 compaction 输入」。
+- gd [011]（39–41 行）：「每个自动注入 occurrence 持久记录序号、CallId、放置点与实际 wire payload 原文字节。历史重放使用这些字节，不随规则版本改写」。
+
+（e）zh 标题全量族谱（M5 统一格式的依据）：
+- en 侧：78 × 2 文件与标准节名全等（八节 / 七节，顺序一致），零例外；另 23 × 2 文件无任何「## 」小节（与 §2.2 同批的 23 个目录，双侧一致；本棒 devops 实测复核）。
+- zh enforcer 五族：无 43（= §2.2 的 23 双侧无节 + 20 zh 无节）；「定义 / 何时触发 / 不要误判 / 刀口 / 提醒」25；「定义 / 支配原则 / 何时触发 / 不应触发 / 与相邻规则区分 / 判定程序 / 例子 / Nudge」16；「定义 / 何时触发 / 不要误判 / 刀口 / 与近邻区分 / 例子 / 提醒」13；英文八节 4。
+- zh main 七族：无 43（同批）；「现在该做什么 / 为什么这很重要 / 常见假修复 / 验证 / 完成条件」24；「现在该做什么 / 为什么重要 / 修复策略 / 决策分支 / 常见假修复 / 验证 / 完成条件」15；「现在该做什么 / 为什么这很重要 / 修复策略 / 常见假修复 / 验证 / 完成条件」12；英文七节 5；「分支判断」六节 1（cyclic-dependency）；「分支判断」七节 1（duplicated-control-flow）。
+- 更正（对 §2.2）：8/7/7/6 组中 cyclic-dependency 的 zh main 实为「分支判断」六节变体（非普通缺节）；unrecorded-lesson 与之无关，其 zh main 为含「修复策略」的普通六节（8/5/7/6 组合不变）。null-ambiguity 为混合形态：zh 检测叶 = 中文八节，zh 处置叶 = 英文七节。
+- canonical 中文节名草案（取唯一完整翻译族的用词）：enforcer = 定义 / 支配原则 / 何时触发 / 不应触发 / 与相邻规则区分 / 判定程序 / 例子 / Nudge；main = 现在该做什么 / 为什么重要 / 修复策略 / 决策分支 / 常见假修复 / 验证 / 完成条件。退役措辞：「刀口」「提醒」「不要误判」「分支判断」「为什么这很重要」「与近邻区分」（「不要误判」经核实存在于全部 38 个有节 zh 检测叶：25 个五节族 + 13 个七节族，canonical 对应「不应触发」）。英文标题的 9 份 zh 文件（enforcer 4 + main 5）与 duplicated-control-flow 的 zh main（「分支判断」措辞替换）按「标题/措辞替换为 canonical 中文名」入 M5 对齐集合（见 §8.5）。
+
+（f）落库载荷与 blob 通道：
+- BlogObservationCommitted（Context/Companion/Facts.fsi 36–54）：TextRef: BlobRef + TextDigest: BlobDigest；TipRuleId: string + FieldNameAtCommit: string option；EvidenceRef: BlobRef option。
+- 构建（Cycle/Commit.fs 185–209）：四个内容字段先经 EnforcerCycle.ofCall → renderStructured 合并为单一自然段（MergedText），写 Blob（185–186 行）；fact 携 ref / digest（202–203 行）与 TipRuleId / FieldNameAtCommit（206–207 行）。evidence 的 MergedEvidence 恒空，writeOptionalEvidence 实际返回 None——evidence blob 通道空置可复用其模式。
+- 接口：WriteBlob → BlobWriteReceipt { BlobRef; BlobDigest }（AgentJournal.fsi 42；Writer.fsi 8–14）；读 IBlobWriter.Read: BlobRef → Task<Result<string, string>>（Writer.fsi）。消费样例：Wire.fs 91–96 readFrameBody（ReadBlob + sha256 digest 校验，不符即拒绝）。
+
+（g）交付侧读取路径：不存在（新工作量确认）：
+- Tip.fs 内无任何 blob / 正文读取——数据源只有 RecentTip 投影与 TipGuidanceDelivered fold；正文来自库文件 rule.MainText（138 行）。
+- 系统别处有通用读能力（IBlobWriter.Read；Prefix 的 readFrameBody 带 digest 校验），但未接入交付链。改造需在交付侧新增「RecentTip → Cycle 载荷 → 新 blob ref（tip 处置正文，见 §8.4-4d）→ Read + digest 校验」调用（读能力经 journal.Writer.BlobWriter.Read 既有可达，无需新穿线；S3 设计伪代码见 Algorithm R）。
+
+（h）S3 收尾轮补充核实（语言穿线、渲染链与载荷现状；本棒 devops 只读调查）：
+- 语言服务（Language.fs:125、Language.fsi:29–36；SessionLanguage.fs:11–16；ProviderLanguageBinding.fs:15/64–70）：GlobalProviderLanguage.current: unit -> ProviderLanguage 为唯一权威（live global preference，启动与偏好变更时 refresh）；SessionProviderLanguage.languageOf 与 ProviderLanguageBinding.forSession/forSessionText 均接参弃参、恒返回 current ()。语言取用零上下文门槛；交付期 Tip.fs:156 即经 languageOf(mainSessionId)。
+- 解码/落库链现状：Continuation.fs 与 BlogSurface.fs 全文件无语言符号；Context（Continuation.fs:59–70）持有 BloggerSessionId/Owner/Previous.MessageId；ofCall（Model.fs:50–59）签名 (call) -> cycle 无语言参数、validateBounds（Decode.fs:235–244）/validateSingleCall（:250）同样不接语言；BlogSurface.decodeCycle（:858–866）无语言。语言未穿线但零门槛可得（上条），ofCall 拼装点由此在函数内取全局权威（D4.1）。
+- Surface 输出形状（Surface.fs:54–80）：tipToJs → { ruleId; fieldName; lexicalOrder }；callToJs（Structured）→ { charge/occurrence/settlement/consequence/evidence/tip }、（Legacy）→ { text/evidence/tip }；cycleToJs → { mergedText; mergedEvidence; tip }；decodeCall/canonicalCycle 经 resultToJs 包 { ok; value }/{ ok; error }。
+- 解码载荷现状（Codec.fs:11–20）：ChronicleRecord = { Charge; Occurrence; Settlement; Consequence; Evidence: string option }；ChronicleContent = Structured of ChronicleRecord | Legacy of text * evidence option；decodeCall（:159–165）先查 tip（None/Some null 均 → MissingTipError）、再 decodeContent、再 decodeTip；evidence 经 decodeEvidence（:104–111）读取、入 ChronicleRecord（:128/:139），由 renderStructured（Model.fs:47）内联进 MergedText；MergedEvidence 恒空、writeOptionalEvidence 恒 None（独立通道空置）。
+- 注入渲染链（EnforcerCatalogResource.fs:40–43/93–98；LlmFacing.fs:29/51–53/63；SyntheticToml.fs:103–107/205–215）：rule.Name 为裸目录名；每元素经 comment 渲染为 `# ` 注释块（空行为裸 `#`）、元素间单换行、末尾单换行；bd [004] 条款文字「## <TipName>」与实际字节的偏差随 I1/C6.1 修正。bd-004 以本地 comment 镜像固化该形态（004.test.mjs:5/13–18/20–21）。
+- EnforcerTip（Catalog.fs:23–33）：{ RuleId; FieldName; LexicalOrder }，ofRule 唯一生产调用 Codec.fs:84；消费链 CanonicalBlogCall.Tip → CanonicalCycle.CanonicalTip → fact（Commit.fs:206–207）→ Projection；Surface 经 tipToJs 暴露。随 D1/D4.2 退役。
+- 路径更正：ApplyEnforcerContinuation 在 OpenCode/Plugin/PluginTransforms.fs:963–973、调用点 :1235–1242（步骤 12）；管线层持有 languageFor（:161–162）未传入续作链（applyContinuation 只收 projectionSessionIdOpt/outObj）。
+（i）S3 本棒补充核实（测试消费面、投影深取链与运行入口；三轮 devops 只读调查，行号以当前 HEAD 为准）：
+- 006 现状（L72–78）：八种输入（undefined、null、''、'  '、1、false、{}、[]）循环断言同一错误串 'missing required argument: tip'，测试标题含「same error」；L44–49 四内容字段缺失循环断言 match(name)；L80–93 legacy 用例（tip 必带、entry/evidence 形态）；L131 schema 六键 deepEqual（charge/occurrence/settlement/consequence/evidence/tip、entry 缺席）；L95–126 合并渲染断言。
+- 投影深取链：EnforcementProjectionState = { ByProviderRun: Map<ProviderRunIdentity, EnforcementCycleRecord>; RecentTips: RecentTip list }（Projection.fsi:22–24）；applySquash 只裁 RecentTips、不裁剪 ByProviderRun；tryFindByProviderRun: run → state → record option（Projection.fsi:39–40；impl Projection.fs:103–104），现状消费点仅 Continuation.fs:627 与 Commit.fs:242；Tip.fs 现状经 AgentJournal.snapshot → session.Enforcement → EnforcementProjection.recentTips → List.tryLast 取值（Tip.fs:55–63），无 ByProviderRun 直接访问；guidanceForOwner（Tip.fs:163–168）已携带 tip.CycleId。
+- ProviderRunIdentity：private 单 case union（Foundation/Identity.fs:91；Identity.fsi:19），create / value 为唯一构造与取值（fs:281–283；fsi:110–112），无校验；RecentTip.CycleId = ProviderRunIdentity.value（Projection.fs:71）。
+- Projection.fsi 公开面：三类型（EnforcementCycleRecord / RecentTip / EnforcementProjectionState）+ 六 val（RecentTipLimit = 8、empty、applyFromEntry、applySquash、tryFindByProviderRun、recentTips），无其它成员。
+- 测试消费面：bd-001 仅目录打包身份（L12–17：rules.map(name) / fieldNames() / ruleId / fieldName = basename），不涉 tip；bd-008 三段消费（decodeCall/facade 的 tip 对象 L36/41、L227/230–231；fact fixture 键 L66–67/156–157/215–216；旧 journal 字面与匹配 L105/122/131）；bd-015 两处 cycleRecord fixture（L111–122、L162–173，键 tipRuleId/fieldNameAtCommit）；bd-017 末段解码器用例（L676–697）与 support/cycle.mjs 的 call()（默认 input 带 tip: 'primitive-obsession'）。
+- 运行入口：npm run format-build-test → scripts/verify.mjs → unit 步骤 → requirements/verification-system/tests/run.mjs（build 陈旧门、TESTS_MJS_FILES 定向、固定 WANXIANGSHU_PROVIDER_LANGUAGE='en'）；behavior-diagnosis / guidance-delivery / prefix-stability 各套件均经该 runner 执行。
+
+（j）S3 留任修订轮补充核实（观察视图承载文件、016 六块消费面与 observationPayload；本棒 devops 只读调查）：
+- 观察视图域面（src/Wanxiangshu/Enforcer/Observation.fs，52 行，模块 ObservationProjection）：tipIdentities（26–31 行）从 recentTips 取 `(tip.FieldName, tip.CycleId)` 对（取 FieldName、非 RuleId）；observationsOf（37–41）＝RulebookObservation.ofTipsAndFrames(tipIdentities, frameDigests)；observationsAfterSquash（45–52）先 applySquash 再 observationsOf；文件头注释（6–13）声明配对折叠不拥有第二存储。P2 收敛（RecentTip 删 FieldName）后 31 行必改。
+- 观察视图 JS 面（src/Wanxiangshu/Enforcer/ObservationSurface.fs，310 行；fsi:16/27/28 为 obj 签名）：workLogToJs（39–43）输出观察视图三键 { tipName; cycleId; frameDigest }；tipToJs（99–103）输出 recentTips 面 { ruleId; fieldName; cycleId }；cycleRecordOfJs（168–181）逐字段读 10 键（tipRuleId 在 178、fieldNameAtCommit 在 179，另含 run/textRef/textDigest 等）；applyEnforcementCycle（231–233）＝stateOfJs + cycleRecordOfJs → applyFromEntry；observationsOf（294–305）、observationsAfterSquash（307–310）。
+- 类型面（src/Wanxiangshu/Enforcer/Rulebook.fs:12–30）：ObservationUnit = { TipName option; FrameDigest option; FrameBody option }；WorkLogObservation = { TipName; CycleId; FrameDigest option }——观察视图三键与之一一对应。
+- 016 六块消费面（本棒逐块核实）：块 1（L53 OBS_PROJ_003，L3–95）fixture L22–33 经 applyEnforcementCycle，readObs/observationsAfterSquash/applyEnforcementSquash 读三键，断言 L73/L88–90/L92–93，不碰 recentTips；块 2（L184 A42_001）L190–198/L200–202 不动，L186/187 已由 M0 动态派生；块 3（L204 A42_002）L212–218 recentTips 映射、L222/L225；块 4（L227 A42_003）L232–236、L268–273、L277–278；块 5（L280 A42_004）L283–293 经 readObservations（L175–180）读 tipName/cycleId；块 6（L317 ENFORCER_TIP_12）fixture L304–315、L320、L324–327 只读 t.cycleId。三处 fixture（L22–33、L128–139、L304–315）字段同形（10 键）。
+- BlogSurface.observationPayload（src/Wanxiangshu/Enforcer/BlogSurface.fs:604–625，private，17 键；tipRuleId 在 622、fieldNameAtCommit 在 623）：经 factOfJs（640–642）与 serializeFact/deserializeFact/deserializeEnvelope（fsi:75/78/86）触达；测试不按其名引用，间接消费于 008.test.mjs:103/129/180、012.test.mjs:21–22/30–33；managed-session-lifecycle/tests/007.test.mjs:272–273/284 经同类 HandleSurface 面触达（非 BlogSurface 面）。
+
+（k）S3 留任修订轮补充核实（previousTips 链与 gd-008 / cc 套件；本棒 devops 只读调查）：
+- previousTips 链：生产映射 Recovery.fs:105–112（精确落点 L111 的 tip.FieldName 须改取 tip.TipName；消费点 L189/L203–212 的传参位不变）；JS 输入面 ProjectionSurface.fs:131–169（ProjectionInput 的 PreviousTips L137；L169 读键 field）与 BlogSurface.fs:712–737（buildProjectionPlan；L737 读键 tipName）；渲染与转发层 Builder.fs:37/70–86、Prompt.fs:28–29、Toml.fs:117–125（键 kind/tip/cycle 硬编码、值取参数）、TomlSurface.fs:53–54。
+- previousTips 测试消费面：gd-008:35/41；cc-012:480/481/508/509/523/585；cc-014:113/114/184；cc-018:693；bd-016:232–253（自 recentTips 映射 tipName/cycleId）。断言形态（本棒复核）：序列映射 deepEqual + regex 包含 + 布尔全等，键名字面替换不触断言逻辑。cc 套件 WHAT 无 previousTips 专条，最近条款为 [019]（X→Y 冷边界辅助注入归零）。
+- gd-008 全文（71 行）：L11–19 composer 面（L18 的否定包含断言钉死 REMEDIATION SOURCE 不进 composer，双灌入后必红）；L22–30 resolver 面与 L49–68 audience 面（L28/L60 断言含库正文；support/journal.mjs 的 observe 直接种 observation 事实、textRef 为假引用、不写 blob；无「chronicle→读回」完整先例，最近先例为 prefix-stability 009 的受控 blob port L206–208）；L33–46 previous tip 低信任身份；L71 todo（GAP-116）。
+- HOST-026：requirements 下零命中；host-boundary [026] 为「Host Contract/Runtime 编译分界」同号异义；语言权威的规范落点为 provider-language [002]/[003]，代码侧锚点见 ProviderLanguageBinding.fs:8 等 9 处注释。
+
+（l）S3 本任补充核实（007 可达面与执行期校验面、MissingTipError 消费面；两轮 devops 只读调查，行号以当前 HEAD 为准）：
+- 007.test.mjs 现状（36 行）：三处用例——L18–20 精确+trim（resolveField ' cat ' 命中 rules[0]）；L22–28 Levenshtein 决胜（'cot'/'ct'/'caut' → rules[1]、'coat' → rules[0]）；L30–36 远距必中（decodeCall('completely-unknown-name') ok、tip.fieldName 与 tryFindByField 一致）；四处 resolveField 消费点在 L19/24/25/27（此前记载属实）。007 改写锚既有可达解码面（enforcer.decodeCall）；§9.4 的 M2 行经核对无需改动。
+- 执行期 tip 校验无 JS 可达面：resultForTip（ChronicleTool.fs:100）与 executeValidChronicle/executeChronicle 均为私有；Surface 唯一 tip 相关导出为常量 missingTipError（Surface.fs:155 = EnforcerCodec.MissingTipError），不执行判定；requirements 下 resultForTip/executeValidChronicle/missingTip 零命中；bd support 三文件（blogger-recovery.mjs、cycle.mjs、resource-package.mjs）中 cycle.mjs:6 仅构造 chronicle part 喂 decodeCycle（解码面）；最接近的真实执行路径为 bd-006 的 withExecutablePlugin + hooks.tool.chronicle.execute（L151–173），断言只达 NoLiveCycle 分支（L170）。
+- MissingTipError 消费面：Codec.fs:28–30 [<Literal>] let MissingTipError = "missing required argument: tip"（Codec.fsi:22 签名）；五处产生点 decodeTipString L77–78/L85、decodeTip L94、decodeCall L161/L162；Surface.fs:155 转存为 missingTipError（Surface.fsi:26）、全仓无消费者（死导出）；测试面唯一消费为 bd-006:76 字面量（requirements 下该符号零命中、该字面串唯一命中）。
+
+（m）S3 修复轮补充核实（TipSurface 与真 journal、计量单位与 blob 写读先例；本任 devops 只读调查，行号以当前 HEAD 为准）：
+- TipSurface（src/Wanxiangshu/Enforcer/Guidance/TipSurface.fs，190 行；TipSurface.fsi 23 行）：公开面 8 val——createJournal（L76–89，经 JournalSurface.boot 起真 journal）/ disposeJournal / appendCompanionLink / appendObservation（L109–138，构造 BlogObservationCommitted，TextRef / TextDigest 取入参 L129–130、不写 blob）/ appendContextReanchored / resolve / latest / latestNudge（fsi L10–23）；文件内无任何 blob 写/读函数（blob 仅以类型构造出现于 L116/L129–130）；handle 链 = JournalHandleBox（私有，L20–21）→ journalHandleOf（unbox，L23）→ agentJournalOf（.Journal，L24）。
+- guidance-delivery support 的 journal 实为真 journal 的不透明盒：journal.mjs 的 withJournal → guidance.createJournal；textRef/textDigest 为合成假引用（blob-${ordinal} / sha-${ordinal}，L24）、无 blob 物化；JS 假对象无法通过 journalHandleOf 的 unbox——port/替身路线不可行；009/cc-016 的受控 port 由 xwire.candidateFromJournal 消费（wire 候选链），与本交付读链非同一条。
+- 计量单位两族并存：512 KiB / 128 KiB 族经 LlmFacing.byteCount → SyntheticToml.byteCount 手工 UTF-8 字节计数；MaxInlineEvidenceChars=1024 族为 .Length 字符语义（Codec.fs:58 定义、L109 判定）；ChronicleExecution.tryCanonicalText（L17–23）仅 trim 非空、无长度检查。
+- Persistence JournalSurface 的 writePayload（Surface.fs:613–625）/ readPayload（:628–636；fsi:33–34）为真 journal 上的 blob 写读对；调用形态先例 durable-events-012:31–43（boot → writePayload → blobRef 为 blobs/<64 位 hex> 形态 → readPayload 读回）；I5.2 的 TipSurface 助手与其同形。
 
 ## 3. 根因
 
-本节记录裁决前追出来的根因。R2、R5、R6、R9 已经把对应分岔裁完。不要把本节里「必须裁决」的句子再读成未决问题。
+- 症状：blogger 只能从库中选 tip，发挥受限。
+- 三层机制叠加：① schema 层——tip 是枚举字段，值域 = 全部 TipName；② 归一化层——resolveByField 把任何非空串确定性映射到既有规则（自创新名也被吸附到最近邻，无逃逸）；③ 身份层——TipName 是下游全链的身份锚：落库 TipRuleId、RecentTips、Frontier/Coverage、交付查找、配对观察。
+- 设计动机（不可改的边界）：确定性交付、反数值评分漂移、反假造规则、字节与前缀稳定（[007][008][015]、gd [006] 等的严格性皆服务于这些目标）。
+- 真实冲突：自由创作必然把「不可预测文本」引入交付链；改造实质不是改 schema，而是把确定性从名字空间迁移到别处，并明确定义 Main 收到什么。Q2 裁决（B2）的迁移方式：确定性留在名字上（按名去重、identity-only 保留），但名字的解释权从库（枚举与归一）转为 blogger 自定与精确同名匹配；库退为样板。
 
-Q1 为什么两套结构并存？
-时序根因：Manager/Relay 于 2026-09 relay 重构先成型；Plan 于 2026-10-10 由 9fcc15824 全新引入在后。引入时没有复制 Manager 代码（无共同文件祖先），但语义上大量借用 relay 词汇与合同（Incumbency/Retirement/Relayed/findings pairs/固定 DevOps）——概念同源、实现分叉。
+## 4. 裁决与取舍记录（本棒由用户裁决）
+
+A. 字段名单来源 —— 裁决：A1（字段名取 main.md 七节）+ A1/A2 双灌入 blogger 上下文 + 101 条统一格式。
+  - 未选 A2 独用、A3：八节保留为 blogger 上下文样板（与 A1 并灌），不作工具字段名；统一格式工作包负责让全体文件符合两套标准结构。
+  - 已知代价：统一格式工作包的真实规模已测得（§2.2）——en 侧 23 个无小节目录、zh 侧 enforcer 81 / main 80 个非同构文件（含 20 个「en 有节而 zh 无节」），重写范围远大于 23 条；统一后的验收方式已展开（结构断言 + 内容覆盖，见 §8.5、§10.4）。
+B. tip 身份与交付去向 —— 裁决：B2（自由命名；同名仍然去重）。
+  - 未选 B1（放弃名字）与 B3（不交付 Main）。交付链骨架（按名去重、identity-only）保留；名字不再映射到库，归一化（resolveByField/Levenshtein）退役。
+  - 已知代价：名字稳定性由 blogger 自担；同名判定的规范化已定为 trim + 简单大小写折叠（.NET ToLowerInvariant；完整 Unicode casefold 经 C3.2 淘汰，见 §8.3）。
+C. 消费者侧目录角色：main.md 退出交付正文来源（正文以 blogger 自由撰写的字段为主体）；MainText/tryFindByField 查库路径的处置已展开：退役，交付正文改为读回 blogger 撰写的落库字节（见 §8.4、§9.1 M4）。本棒已核实触发面（§2.5-C）：owner 语言选择（gd [002]）、Coverage 身份单位（gd [001]/[003]/[005]）、Audience 隔离（gd [008]）需重设；冻结机制可原样复用；交付侧无字节界（已读范围内）。
+D. 新字段验证强度（已定：全部必填，见 §8.1）：trim 非空与字节界沿用既有族（tryCanonicalText、1024 字符、512KiB；作用层见 §2.5-C）；过重必填与「单 turn 单 lesson」简洁性有张力。
 
-Q2 平行重复从哪里来？
-Plan 全新成域时，把已核实同构的骨架机制（状态机、评审门、接力、DevOps 绑定）各自重新实现了一遍；LWR 例外，直接共用。重复不是复制粘贴，是同一语义的两份独立实现。恢复不在这份已核实清单里：Plan 有 Recovery.fs 的判定，Relay/Manager 这次搜索没有同构判定函数。不能把「两边都重写了恢复」写成根因。
+## 5. 用户裁决记录（本棒已回填）
 
-Q3 哪些已自然合流、哪些没有、为什么？
-已合流：review 工具壳（relay-assessment-011，共享壳+按 role 分派双后端——这是本仓库已有的统一先例）、LWR、PluginTransforms 管线（同一管线里顺序两个 stage，角色判定在处理函数里，不是 if/else 双分支）、PromptCatalog、ToolRegistry。未合流：状态机（Relay/Fold 890 行 vs Planning/Fold 503 行）、持久化（AgentJournal vs EventStore+底稿）、术语、退休动作的名字（suicide vs deliver）、历史语义。
-为什么：合流都发生在「外围工具与装配层」——改动局部、风险低；未合流的都在「状态与语义核心」。历史语义已由 R2 裁决。确认次数由 R9 裁决为保留分叉，不是合流对象。
+- Q1：A1 格式（字段名取 main.md 七节）；灌入 blogger 上下文时 A1+A2 都灌入；另外把 101 条 tip 统一格式。
+- Q2：B2——允许 blogger 自由命名；同名的仍然会去重。
+- 裁决引入的新工作面：统一格式工作包（§1 第 5 条）；双文本注入（§1 第 2 条）；交付正文换源（§1 第 4 条、§4-C）。
+
+## 6. 继任者工作方位
+
+- S2 成果：全部三节——探索（§8）、主路径（§9）、反事实检验（§10）；接口事实经多轮 devops 只读调查补足（§2.6），并由本轮全仓条款扫描复核（§8.6）；§1 与 §7 经修复与 S2 结论完全闭合（语言维度单语、悬置注记全部回填）。
+- S1/S2 现状：S1 已由空集评审确认；S2 待下一任（未写过字的干净任期）空集评审确认后晋级 S3。接力不换阶段。
+- S3 入口（按 §9 主路径）：M1 契约定案落实为可执行定义（字段表 / 必填性 / 校验族 / 规范化 / 错误面文案 / 条款改写文本）；M2–M4 的函数级伪代码（Codec / ChronicleTool / Catalog / Commit / Projection / compose / Tip.fs / 新增读路径）；M5 统一格式的批次表与结构断言脚本设计；M0（016 修复）的具体改动。
+- 遗留 ◇（S3 须处置）：交付「恢复 Full」的精确实现路径（blob 重读 vs anchor 回放，见 §10.1）；provider-language 分类裁定（§8.6）；{{rule_count}} 去留与语义；资源键改名（arg-tip → 新名）；中文节名对照表终稿（§2.6-e 草案）；「Nudge」是否保留英文；七字段拼装的分隔形态（小标题 vs 合并段）；身份规范化实现细节（大小写折叠算法）；旧 journal 数据与旧字段名兼容性评估。
+- 未实跑边界：016 的「红」仍为静态推定；交付侧无字节界为已读范围内未发现；「重锚后恢复 Full」的源码实现细节未走到。若 S3 需要，可实跑确认。
+
+## 7. S2 · 理解（问题重述）
 
-Q4 「隔离与用词偏旧」的根因？
-用词偏旧：Manager 侧词汇冻结在 2026-09 relay 重构期；Plan 引入时换了新词，两边各说各话。这是词汇演化时差，属惰性重复，可归一。R3 已裁。
-隔离偏旧：Manager 的「隔离」是四件真实契约（评审信息时域隔离 relay-assessment-008、stale cut 拦截、评审期只读+禁派工、固定 DevOps 控制权）加一条与 Plan 相反的历史语义（完整保留 vs 剥除）。前四件是真实责任差异，统一时应保留；历史语义已由 R2 裁为剥除。
+**输入（现状）**：一条封闭的值域链——chronicle 的 tip 是枚举，值域恰为 101 条规则的 TipName；执行期任何非空串经归一化（trim → 精确 → Levenshtein → LexicalOrder）确定性吸附到库内某条规则，无逃逸（bd [007]）；库以「值域」身份全量注入 blogger 上下文（每条贡献 Name + enforcer.md 全文；按会话语言装载，双语不合并）；TipName = RuleId = FieldName = 目录名，是贯穿落库、RecentTips、Frontier/Coverage、交付查找与 Main 处置索引的身份锚。
 
-结论：重复分两类。惰性重复（状态机双实现、术语分岔、退休动作的名字）可以统一。恢复不在这份惰性重复里：Plan 有 Recovery.fs 判定，Relay/Manager 没有同构判定函数，已读到不同构，见 2.3 第 6 项。曾经被当成「待裁决语义分歧」的四条，现在都有了裁决：历史保留 vs 剥除 → 剥除（R2）；证书 vs 无证书 → 无证书（R5）；自动派发 vs 自然停止 → 按工作性质各自保留（R6）；一段确认 vs 两段确认 → 按风险偏好各自保留（R9）。R9 不是惰性重复。把它并成一次调用，会抹掉用户明确留下的风险差异。
+**输出（改造后）**：同一个 blogger 不再「选」tip，而是「写」tip——一组自由文本字段（名取 main.md 七节 A1：What To Do Now / Why This Matters / Repair Strategy / Decision Branches / Common Wrong Fixes / Verification / Done When）＋一个自由命名「名」字段（按名去重）替代离散枚举；归一化家族退役；库文本留在上下文但退为 bootstrap 与格式样板（A1+A2 双灌入）；Main 交付骨架保留（首次 Full / 之后 identity-only / 按名去重）而 Full 正文换源为 blogger 自由撰写的文本；101 条规则文件统一为标准格式。
 
-## 4. 取舍
+**本质张力（约束的核心）**：改造不是「打开一个字段」，而是把确定性重新安置。旧确定性由三件事承载：①名字空间封闭（枚举值域）；②任何输入归一化到闭集（resolveByField，无逃逸）；③交付正文随时可回查（来自库 main.md）。改造后 ①②退役，③改为「首次交付冻结字节、之后按名回放」——确定性从「名字的解释权」迁移到「名字的身份键 + 冻结回放」。凡依附旧宿主的机制（owner 语言选择 gd [002]、Coverage 身份单位 gd [001]/[003]/[005]、Audience 隔离 gd [008]、双语资源门禁覆盖面）都要显式重设，不能默认延续。
+
+**难点**：
+- （a）自由文本第一次成为交付正文主体：Main 收到的 Full 不再有库中正文可查，冻结回放与身份键是唯一保障。收敛（§8.4、§10.1-B）：identity-only 与旧机制同构——名字是字符串身份键兼 Main 的记忆锚（首次 Full 后同名 occurrence 只发「tip: <name>」提醒），形态与机制保留，无需新语义设计。
+- （b）注入面改造同时触及装载（loadFor 单语言列表）、合成（compose 只取 EnforcerText）、请求期重拼（ProviderSystemTransform）三处。收敛（§8.2、§1 第 2 条）：维持按会话语言单语装载，每条注入 EnforcerText + MainText 双文档；双语全灌已淘汰。
+- （c）统一格式工作包规模 217 份（en 46 + zh 171）。收敛（§2.6-e、§8.5）：canonical 中文映射为对齐目标，验收 = 结构断言 + 内容覆盖，批次方向已列；残余（「Nudge」保留英文与否等）移入 §6 遗留。
+- （d）016 的 120 断言（第 186–187 行）与 101 目录失配。收敛（§9.1 M0）：独立先行修复，改为动态派生（同文件 188 行已有先例）。
 
-### 选项 A：Plan 升维为统一生命周期，Manager 作为执行段的宿主（用户倾向方向）
+**S2 必须回答的问题集**（§6 的展开）：
+1. schema 与文案：七字段＋名字字段的标识化拼写、必填/可选、校验族（tryCanonicalText / 字节界）；chronicle 文案重写。
+2. 双文本注入：装载/合成/重拼三层改动与语言策略。
+3. 归一化退役：resultForTip / resolveByField / Levenshtein / decodeCall 的替代校验；落库与投影身份单位（BlogObservationCommitted、RecentTips、Coverage）。
+4. 交付换源：Full 正文形态、identity-only 语义、语言选择、Audience、冻结复用。
+5. 统一格式工作包：标准、验收、批次。
+6. 规范与测试同步：bd / guidance-delivery 条款与锚点、016 处置。
 
-形态：把「任务生命周期」统一为一条阶段流水——S1 事实 → S2 理解 → S3 流程 → S4 执行。S1-S3 同 session、任期隔离、剥除历史、review 晋级；S4 即现在的 Manager：独立 session、委派循环。入口两个：S1 入口（显式规划）与 S4 直入口（高频执行，即现在的直接开 manager 会话）。
+## 8. S2 · 探索（候选路径）
 
-本段最初在材料里写成「S4 完整历史」。那是选项评估当时的描述，已被 R2 否决。S4 目标态是剥除历史、注入 LWR_prev，同时保留两段式 deliver（R9）。
+按 §7 问题集六个工作面。每条候选：思路 / 风险 / 事实依据（§ 引用）。淘汰项附一行理由。§4/§5 已裁决边界不再重开。
 
-与事实的相容点：
-- Plan S3 持权交付已 spawn 无 parent manager 会话（planning-023）——「S3 毕业 → S4 入学」的接缝已经存在，A 只是把它升格为显式模型。
-- ReviewShell 已是「共享契约 + 按 role 分派后端」的先例——统一生命周期可沿用同一模式。
-- 骨架对照里八项责任同构提供语义对齐表。第 5 项的字段级同构已失效，责任级同构还在。第 6 项崩溃恢复已读到不同构，见 2.3。
+### 8.1 工作面一：schema 与文案
 
-冲突点与代价：
-- Manager 无 stage 递进语义（assess/work/finish 是事实推导的循环，非 stage）。用户 R1 的修正比这里更彻底：不做「执行段+宿主」的区分建模。Manager 就是 S4，是恰好只有一个 Stage 的退化情况。
-- 历史语义已由 R2 裁决为全局剥除。
-- 两套持久化要统一重设计，不是桥接（R4）。
-- relay 约 30 个测试锚点按 KISS & DRY 重设计（R7）。
-- 高频路径允许重新设计（R8）。
-- 确认次数不许被统一压平（R9）。
+- **候选 1a（采纳）**：七个自由文本字段 + 一个 tipName 字段，全部必填 string；字段名 camelCase：whatToDoNow / whyThisMatters / repairStrategy / decisionBranches / commonWrongFixes / verification / doneWhen + tipName；校验沿既有族（tryCanonicalText trim 非空 + 内容字节界）。
+  - 风险：七字段必填加大单轮撰写负担（§4-D 已记录的张力）；字段名一旦发布即为消费者契约。
+  - 事实：旧 tip 必填（§2.1）；四内容字段必填、evidence 可选（§2.6-a）；字段名来源 = 用户裁决 A1（§5-Q1）。条款落点：bd [006] / [008] / [017]（错误面与离散措辞随本工作面改写，见 §8.6）。
+- **候选 1b（淘汰）**：单一大文本字段承载全部教训。理由：丢失节结构，交付拼装无锚、测试不可锚定、样板对齐价值消失（§2.2 的格式基线本身即「按节」组织）。
+- **候选 1c（淘汰）**：七字段可选、缺省跳过。理由：正文残缺，与旧 tip 必填强度不对等；缺节时 Full 正文无法成形（§2.6-c tipFullText 只处理整体空体）。
+- 文案侧：description / arg-tip / missing-tip 三组必须重写（现文案均以「从库中选择」为语义，§2.6-a）；另需新增七字段与 tipName 的 schema 描述文案——机制为逐字段显式键 + 成对叶子（Path 常量，无自动派生；缺失由上游库严格拒绝），七条新键各配 en/zh-CN 叶子，tipName 可用改名后的 arg-tip 键；{{rule_count}} 语义从「值域大小」改为「样板库规模」或删除（◇）；资源键 arg-tip 是否改名（◇，S3 定）。
 
-### 选项 B：backport（把 Plan 的隔离/deliver/新词搬回 Manager）
+### 8.2 工作面二：双文本注入
 
-用户已否决。代价备档：当时 Manager 完整历史保留契约与剥除冲突；relay 测试资产大改；Plan 的 stage 模型对 Manager 无意义；方向是让新的向旧的看齐。R2 之后，历史语义代价已经不构成否决理由，因为保留契约本身被判定为错误决策。否决理由剩下的是：方向是让新的向旧的看齐，且不产生单一基础设施。
+- **候选 2a（采纳）**：维持「按会话语言单语」装载，每条注入 Name + EnforcerText + MainText（双文档全文）。
+  - 风险：prompt 体积增加（main 全文首次入场）；注入字节变化触及冻结与测试（§2.6-d）。
+  - 事实：compose 现只注入 EnforcerText（§2.6-b，关键边界）；loadFor 已读入 MainText（§2.6-b）；用户裁决 A1+A2 双灌入（§5-Q1）。
+- **候选 2b（淘汰）**：双语全灌（en + zh 四文档）。理由：体积翻倍；混合语言样板干扰；需重构单语言装载机制，风险大于收益。
+- 语言一致性说明：blogger 子会话跟随 owner 语言，撰写字节即交付语言——gd [002] 的「按 owner 语言查库」由此消解（§2.6-c、§2.6-g）。
 
-### 选项 C：抽共享核心层，两模式保留各自外壳
+### 8.3 工作面三：归一化退役与身份
 
-形态：已核实同构的骨架抽成 Mission 核心层（任期状态机、评审门、接力、DevOps 绑定），Manager/Plan 各留 session 拓扑、工具面、术语。恢复不进这份清单：Plan 有 Recovery.fs 判定，Relay/Manager 没有同构判定函数，已读到不同构，见 2.3。
-代价：只修实现重复，不修术语与语义分岔；两套需求包继续并存；核心层若两边 invariant 必须一起改，形式分层就是假边界。为什么不是它：用户要的是重组，不是分层。R9 的确认次数分叉不是这条选项里的「各自外壳」；它由同一 deliver 机制按开立事件上的序列导出。用外壳分叉来承载它，会把风险偏好写成两套结束动作。
+- **候选 3a（采纳）**：resolveByField / Levenshtein 家族整体退役（调用点全列表见 §2.1：Catalog.fs:130 定义、Codec.fs:80、ChronicleTool.fs:104、Surface.fs:221–227 的 JS 语义面 resolveField 包装、Catalog.fsi:22 签名）；替换为「trim 非空 + 身份规范化」；落库 / 投影身份收敛为 TipName。resolveField 处置方向：随家族退役；测试面若需新的 trim/规范化校验语义，由 M2 一并设计，不保留独立解析包装。
+  - 风险：旧保证「任何非空格必解析」消失，错误面语义变化；身份字段改名波及落库、投影、交付、条款、测试五面。
+  - 事实：调用点全列表已核实（§2.1，含 Surface.fs:221–227 的 JS 语义面包装）；「default 分支不可达」为现状（§2.6-a）；用户裁决 B2（§5-Q2）。条款落点：bd [001] / [007] / [012] / [014] / [015] / [018]（身份与归一化族，见 §8.6）。
+- **候选 3b（淘汰）**：保留归一化作「相似规则提示」。理由：无消费者、引入第二语义与第二真相源。
+- **候选 3c（淘汰）**：保留 Levenshtein 防误拼。理由：与自由命名直接冲突（自创名被吸附到库名），违背 B2。
+- **规范化强度 3d**：采纳 trim + 大小写折叠；原样精确（大小写差异导致重复投递）与空白折叠（边界模糊、过度设计）淘汰；完整 Unicode casefold 亦经 C3.1/C3.2 淘汰，最终实现为简单折叠（.NET ToLowerInvariant）。实现细节（算法与实现载体）见 C3.1/C3.2。
 
-### 选项 D：维持两套，继续点状合流（现状惯性）
+### 8.4 工作面四：交付换源
 
-代价：术语分岔扩大、双份状态机维护、每次改骨架机制要改两处。收益：零迁移风险。为什么不是它：用户已明确要重组；惰性重复会继续累积。
+- **候选 4a（采纳）**：Full = 标题 + tip = "<name>" + 七节拼装正文（blogger 撰写；落库拼装字节；交付读回 + digest 校验）；IdentityOnly = tip: <name> 保留；owner 语言选择退役（正文 = 撰写字节）；Coverage 身份 = 自由 tipName；冻结机制（anchor MarkerText 原字节回放）原样复用。
+  - 风险：交付侧读路径为新增（§2.6-g 确认无既有路径）；「重锚后恢复 Full」的精确实现（blob 重读 vs anchor 回放）需 S3 确认（§10.1 假设 A）。
+  - 事实：Full 现源 = rule.MainText（§2.6-c，138 行）；TipGuidanceDelivered / 锚点 / fold 机制齐备（§2.6-c）；blob 写读接口与 digest 校验样例存在（§2.6-f）；裁决 B2 与 §4-C。条款落点：gd [001] / [002] / [003] / [005] / [006] / [008]（交付族，见 §8.6）。
+- **候选 4b（淘汰）**：Full 附库参考正文。理由：第二真相源；与「库退出交付正文来源」冲突；owner 语言选择机制被迫保留。
+- **候选 4c（淘汰）**：回放原始工具调用文本。理由：形态不受控（无稳定节结构），无法承担 marker 的稳定呈现与冻结回放。
+- **落库通道 4d**：七字段在落库时拼装为「tip 处置正文」字节，走新 blob 通道（可仿 evidence 通道模式，§2.6-f），fact 携 ref / digest；交付读回以 digest 校验。不选「与四字段共用同一 blob」：因果主干段落与处置正文是两个语义体，合并后交付侧无法分离。
 
-### 对用户提议「Manager 作为特殊第四 Phase」的评估
+### 8.5 工作面五：统一格式工作包
 
-与事实相符：Plan 的终点已是 Manager 的起点（spawn 接缝存在）；Manager 独立 session、高频直入，与前三段的同 session 模式确实构成「特殊」。
-材料里曾写「更准确的建模是执行段+宿主角色」。R1 否决了这个区分。以用户裁决为准：Manager 就是 S4，恰好只有一个 Stage。
+- **候选 5a（采纳）**：全量对齐——en 侧 23 个无小节目录补八 / 七节（46 份）；zh 侧全部非同构文件对齐（161 份）另加 10 份标题/措辞待替换文件（9 份「英文标题＋中文正文」+ duplicated-control-flow 的 main「分支判断」；161→171），标题采用 canonical 中文映射（§2.6-e 草案）；验收 = 结构断言（节名序列全等，只读脚本）+ 内容覆盖（每节非空且实质）。断言口径：en 文件按英文规范序列、zh 文件按 canonical 中文序列检查，脚本按文件语言选择序列表。
+  - 风险：规模 217 份；「结构对齐」若沦为「加标题」会成格式剧场（验收必须能红，见 §10.4）；重写中信息可能丢失。
+  - 事实：全量族谱与基线（§2.2、§2.6-e）；用户裁决「101 条统一格式」（§5-Q1）。
+- **候选 5b（淘汰）**：只补缺节、不动措辞变体。理由：「统一」不彻底；「为什么这很重要 / 分支判断 / 刀口」等变体残留，违反同一 context 词与概念稳定对应。
+- **候选 5c（淘汰）**：程序化批量改写。理由：内容性重写质量不可控（仓库纪律：禁止自动化批量增删改）。
+- 批次方向（S3 展开）：先 23 个双侧无节（结构最缺）→ 20 个 zh 无节 → 变体族归一（zh enforcer 38 份 = 25 + 13；zh main 37 份 = 24 + 12 + 1）→ 标题/措辞替换 10 份（9 份英文标题 + duplicated-control-flow 的 main）。
 
-### 用户裁决（2026-10-11 第二段 prompt，八条全答；2026-10-12 补第九条）
+### 8.6 工作面六：规范与测试同步
+
+- **候选 6a（采纳）**：随各工作面同步更新条款与测试锚点（每步原子闭环）；016 的 120 断言独立先行修复（改为动态派生，同文件 188 行已有先例）。
+  - 风险：条款改写文本量大（bd 7 条 + gd 6 条）；「退役断言」（如 bd-007 的 Levenshtein 行为锁）需明确删除而非留空。
+  - 事实：条款与锚点清单（§2.3 / §2.4）；016 硬编码现状（§2.6-e、D3）。
+- **候选 6b（淘汰）**：代码先行、条款测试后置集中改。理由：中间态条款-实现矛盾，验收不可锚定。
+- 改写清单（草案；逐条覆盖 §2.3 全量 19 条（[001]–[019]），无静默遗漏；条款面完整性经本轮 devops 全仓扫描复核——53 套件中五类语义落点仅在 bd/gd，无第三套件）：bd [001]（身份语义）、[004]（注入内容）、[005]（本地化叶子身份三元组——与 [003] 同类的库内合同，库结构不动，不改文本、作身份面回归）、[006]（校验与错误面）、[007]（Levenshtein 退役）、[008]（「离散的单条 tip 选定」重述为单条 lesson 的字段组）、[009]（不涉及——每 run 恰一次 chronicle 与 tip 语义无关）、[011]（内容硬界文本扩展：512 KiB 界覆盖对象由「四句正文」扩为「因果主干合并段与七节拼装正文」，见 C2.2/C6.1）、[012] / [014]（身份字段收敛）、[015]（tip 指代更新为七字段 + 名称组；配对视图与「禁假 tip」语义保留）、[016]（RecentTips 协同裁剪语义在 P2 字段收敛下保留；文本评估与 G5/G1 关系注明，见 C6.1）、[017]（无效 terminal 条件清单更新：缺 tipName、七字段任一缺失/空白、新旧协议混用判定）、[018]（冻结对象重设）；gd [001]（Coverage 身份）、[002]（正文来源与语言）、[003] / [005]（措辞级改写：原文「规则全文」（[003] 第 13 行）「已交付规则」（[005] 第 21 行）的指称物改为「该 occurrence 绑定的处置正文」一类表述；Frontier/Coverage 双轴与重锚恢复语义保留）、[006]（载荷读取替代查库）、[008]（Audience 重述）；gd 全集 11 条（编号无 [010]）经复核评估为不需改文本的：[004]（通用交付判定——新方案仍只依赖持久事实投影；测试 004 仅断言 presentation 恢复与 owner 隔离）、[007]（latestTipNudge → latestTipGuidance 纯委托结构（Tip.fs:197）保证字节相等，与正文来源无关）、[009]（权限语义与正文来源无关；测试 009 仅锚注入通道机械不变量）、[011]（marker 通道字节冻结机制原样复用，与正文来源解耦）、[012]（动态材料合成与冻结语义仍适用；附 M4 交互点——tip 材料单次读取在 PairProgrammingThoughtTransform.fs:1336、冻结点 1089–1098、重放不重渲染分支 1081–1085，「恢复 Full」若走 blob 重读必须落在单次读取内；行为证明为既有 todo GAP-116）。落点：schema 族（bd [006] / [008] / [017]）→ §8.1；身份族（bd [001] / [007] / [012] / [014] / [015] / [018]）→ §8.3；注入族（bd [004]）→ §8.2；交付族（gd 各条）→ §8.4。
+- provider-language 处置（本轮 devops 核实；分类裁定点，非自动改写）：[005]/[006]/[008] 无条款点名交付正文（[006] 资源文件门禁不覆盖；Tip.fs:32–35 标题串为代码常量、本就不在资源机制内）；但 [005]「完成文案」与 [013]「进入模型的 Class A 文本」字面可覆盖交付 marker 文本。裁定两分支：属 Class A → [009]「所有 Class A 文本通过统一资源机制装载」与 [013]「全局设置变化立即生效于下一次渲染」需补充/修订（与冻结回放的冲突消解）；不属 → 整套保留。裁定点列入 §9.2 边界待裁决点（S3）。
+- 全仓扫描结论（本轮 devops，53 个套件 WHAT.md）：五类语义（tip 归一化、TipName 三元组、Full 正文来源、owner 语言、冻结对象）的条款落点仅在 behavior-diagnosis 与 guidance-delivery；cognitive-environment 的「Rulebook」为 Office Library 分类词，无关。
 
-- R1 统一深度：采纳 A 并更彻底——Manager 就是 S4，是恰好只有一个 Stage 的退化情况；不做「执行段+宿主」的区分建模。统一对象是单一生命周期模型本身，Manager 与 Plan 都是它的实例。
-- R2 历史语义：全局统一为剥除。Manager 完整保留物理历史被判定为「错误的历史决策」，与 Plan 对齐（剥除前任消息、注入 LWR_prev）；relay-context-projection-001 契约推翻。Plan 侧现行剥除机制以 HEAD 的稳定 XTrace 身份为准，不以材料里的 message-cursor 模型为准。
-- R3 术语：全部重命名成 Plan 的词汇风格。
-- R4 持久化：迁移到 DRY，以 Plan 为底稿重新设计（统一重设计，非桥接）。
-- R5 证书：退役，向 Plan 看齐（planning-008 禁令全局化）。
-- R6 等待/派发语义：各自保留——Manager 是自动工作（Continue 自动派发），Plan 是交互工作（自然停止）。按工作性质保留，非按历史保留。
-- R7 测试迁移：KISS & DRY 原则重新设计。
-- R8 高频路径：允许重新设计。
-- R9 结束确认次数（2026-10-12）：Manager 保留两段式 deliver 语义，Plan 仍为一段式。用户原话：「这是两者不同风险偏好的体现。」解读边界：保留的是现有 Manager 两段确认（第一次调用不结束，落 durable 确认事实；第二次以不同调用才结束）。名称改为 deliver。不恢复 QualityCertificate。不把两段并成 Plan 的一段，也不把 Plan 拉成两段。确认次数由开立事件上的序列导出，不是单独字段。第二次在无证书之后产出什么结果族载荷，S2 再设计；确认次数本身不再是 S2 的开放项。
+## 9. S2 · 主路径（分解、边界、顺序）
 
-总目标（用户原话）：「仿佛从一开始就设计好了 DRY 版本的基础设施，Manager 和 Plan 都是基础设施的实例化或者受益者，要看不出发展历程和痕迹。」
+**主路径**：契约先行、双链并行。线 A（代码与契约）：契约定案 → 后端契约落地 → 提示面与交付面 → 收尾；线 B（资源）：统一格式工作包与线 A 并行；016 独立先行修复。确定性从「名字解释权」迁至「名字身份键 + 冻结回放」，库文本退为 bootstrap 与样板。
 
-R9 与这个总目标不冲突。DRY 统一的是生命周期基础设施，不是把两种风险偏好压成同一次确认。从一开始就设计好的版本里，S4 本来就是两段确认，Plan 本来就是一段。
+### 9.1 分解（步骤与依赖）
 
-规划者推荐与用户裁决的差异（记录在案）：材料形成时，当时的规划者推荐过保守方案（按段裁决历史语义、持久化先桥接、relay 锚点改名不重写、高频路径行为不变）；用户裁决全部取彻底方向（全局剥除、统一重设计、测试重设计、路径可重设计）。以用户裁决为准。
+- **M0. 016 先行修复**（独立小修）：硬编码 120 改为动态派生，恢复绿。无依赖。
+- **M1. 契约定案**（设计产出，不落码）：字段表（七 camelCase + tipName，含各自描述文案键）、必填性与校验族、tipName 规范化（trim + 简单大小写折叠，C3.2）、错误面文案、文案稿（description / arg-tip（或改名后的 tipName 键）/ missing-tip / 七字段描述键，中英）、条款改写文本草案。依赖：无（§7/§8 已就位）。
+- **M2. 后端契约落地**：Codec（decodeCall / decodeTip → 七字段 + tipName 解码与校验）；ChronicleTool（schema 替换 enum → 七 string + tipName；resultForTip 替换）；Catalog（resolveByField / Levenshtein 退役，含 Surface.fs:221–227 / Surface.fsi:34 的 resolveField 包装处置，见 §8.3）；Commit（TipName 字段 + tip 处置正文 blob 通道）；Projection（RecentTip 字段收敛）；chronicle 文案资源重写与新增（三组改写 + 七字段描述叶子）。依赖：M1。
+- **M3. 提示面落地**（与 M4 可并行）：compose 双文档注入；blogger role 提示词改写（自由撰写与自由命名语义）。依赖：设计输入取自 M1（契约定案）；执行起点在 M2 之后，与 M4 同为 M2 后的独立分支（M3 ∥ M4 自 M2 落地起成立）。
+- **M4. 交付面落地**（与 M3 可并行）：新读取路径（RecentTip → fact → 新 blob ref（tip 处置正文，见 §8.4-4d）→ Read + digest）；Tip.fs Full 组装改源；语言选择退役；gd 条款与测试更新。依赖：M2。
+- **M5. 统一格式工作包**（线 B，与 M2–M4 并行）：canonical 对照表定稿 → 217 份对齐（46 + 171）→ 结构断言 + 内容验收（断言口径见 §8.5）。依赖：M1（对照表细节；实质独立）。
+- **M6. 收尾**：全链测试（bd / gd 两套 + prefix-stability 相关）；条款一致性复查；残留清理。依赖：M2–M5。
 
-2026-10-12 本任覆核曾把「两段式退休确认的去留」留到 S2。用户当轮否决了这个推迟：两段式留下，作为 Manager/S4 的 deliver，不是待裁的开放项。
+### 9.2 边界（每步触碰与不触碰）
+
+- 触碰文件族：src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs；src/Wanxiangshu/Enforcer/{Codec, Catalog, Cycle/Decode, Cycle/Model, Cycle/Commit, Projection, Guidance/Tip, Guidance/TipSurface（新增 blob 写入助手；fsi 同步新增 val，见 Algorithm I 的 I5.2）, Guidance/DeliveryProjection, Surface}.fs（resolveField 包装实现 221–227 行）及 src/Wanxiangshu/Enforcer/Surface.fsi（公开签名 34 行；包装退役，见 §8.3；新读路径暴露与否留在边界待裁决点）；src/Wanxiangshu/Enforcer/ChronicleExecution.fs 与 ChronicleExecution.fsi（校验族扩展：tipName 判定序与 C4.1 错误标识，见 Algorithm S 的 S4/S6）；src/Wanxiangshu/Enforcer/Observation.fs 与 src/Wanxiangshu/Enforcer/ObservationSurface.fs（观察视图两文件：域面 tipIdentities 26–31、observationsOf 37–41、observationsAfterSquash 45–52；JS 面 cycleRecordOfJs 168–181、tipToJs 99–103、recentTips 238–242、observationsOf 294–305；ObservationSurface.fsi 为 obj 签名、不变）；src/Wanxiangshu/Enforcer/BlogSurface.fs（observationPayload 604–625、buildProjectionPlan 712–737）；src/Wanxiangshu/Enforcer/Cycle/Recovery.fs（previousTipsOf 105–112）；src/Wanxiangshu/Context/Companion/{ProjectionSurface.fs（projectionInput 139–169 的 previousTips 键）、Builder.fs（L37 注释随动）、Prompt.fs（28–29 转发）、Blogger/Toml.fs 与 Blogger/TomlSurface.fs（随动评估）}；src/Wanxiangshu/Resources/EnforcerCatalogResource.fs；src/Wanxiangshu/OpenCode/Host/ProviderSystemTransform.fs（仅当合成变化所需）；durable 载荷面（新 blob 通道与身份字段）：src/Wanxiangshu/Context/Companion/Facts.fsi / Facts.fs（BlogObservationCommitted 定义；包装 Composition/Durable/CompanionFact.fs）；其序列化/采集链——Persistence/Journal/EventStoreJournalWriter.fs（blob ref/digest 采集点，154–157 行，新增字段须进入）、Envelope.fs（类型形状驱动的自动解码）、FactCodec.fs（legacy 检查）随字段形态评估；resources/provider/tool/chronicle/**；resources/provider/role/blogger/**；resources/enforcer/**（M5）；requirements/behavior-diagnosis/WHAT.md、requirements/guidance-delivery/WHAT.md；behavior-diagnosis 与 guidance-delivery 两套 tests/*.test.mjs 及其 support 支撑文件（requirements/behavior-diagnosis/tests/support/cycle.mjs，见 Algorithm D 的 D5.6；requirements/guidance-delivery/tests/support/journal.mjs 增补 blob 物化能力，见 Algorithm I 的 I5.2）；requirements/context-compression/tests/{012,014,018}.test.mjs（previousTips 键字面替换，见 Algorithm P 的 P9）。
+- 不触碰：冻结机制语义（PairProgrammingGuidelineAnchored / MarkerText 回放原样复用）；DeliveryProjection 双轴结构；evidence 字段与通道；bd [009]（每 run 恰一次）等与自由化无关条款；不引入第二真相源；不引入数值评分；AgentJournal.fsi/fs 本体（读能力经既有 Writer.BlobWriter.Read，见 R1）；旧运行数据不做迁移（兼容性仅评估，◇）。
+- [015] 处置：配对视图与禁假 tip 语义保留；文本与实现随字段收敛同步（tip 指代更新、Observation.fs 与 ObservationSurface.fs 收敛、bd-015 两处 fixture），见 C6.1、C6.6 与 K6.1/K6.2。
+- 边界待裁决点（S3）：ProviderSystemTransform 是否随合成变化改动（compose 签名不变则不动）；Surface.fs 测试面是否需暴露新读路径（另见 §8.3 resolveField 包装退役）；durable 载荷承载点（BlogObservationCommitted 新 ref/digest 字段 vs 新 fact 类型）；旧 journal 数据兼容处置；provider-language 分类裁定（交付 marker 文本是否属 Class A，两分支后果见 §8.6）。
+
+### 9.3 顺序（串行与并行）
+
+- 串行主链：M1 → M2 →（M3 ∥ M4）→ M6。
+- 并行线 B：M5 自 M1 后随时可起，在 M6 前完成。
+- 独立先行：M0。
+- 理由：M1 是字段 / 文案 / 条款的单一契约源（防并行漂移）；M2 是 M3 执行测试面与 M4 接口的共同底座；M3 与 M4 文件族不重叠、依赖已满足；M5 只动资源内容，与代码无依赖，验收在 M6 统一；M0 与一切无耦合，先绿为净。
+
+### 9.4 验收面（步骤 ↔ 锚点）
+
+- M0：bd-016。
+- M1：设计评审（S3 输入）。
+- M2：bd-001/003/006/007/008/012/014/015/017/018（改后语义；含 Surface.fs resolveField 包装退役的测试面影响；008 的 Codec/解码断言面在此）+ chronicle 文案断言 + cc-012/014/018（previousTips 键字面替换，见 Algorithm P 的 P9）。
+- M3：bd-004/009/016（注入面）+ gd-008（装载/composer 面，逐块口径见 Algorithm I 的 I5.1–I5.3）。
+- M4：gd-001/002/003/005/006/007/008/012 + prefix-stability [010]/[011]/[014] 相关测试（004/009/011 与正文来源解耦，见 §8.6）；gd [003]/[005] 措辞级改写后核对对应断言（重锚恢复语义见 §8.6）。
+- M5：结构断言 + 内容覆盖（新验收面）。
+- M6：两套全链。
+
+## 10. S2 · 检验与反思（反事实与目标核验）
+
+### 10.1 关键假设与证伪条件
+
+- **假设 A（冻结回放承载自由文本足够）**：证伪条件——重锚或重启后，同一 occurrence 的 Full 字节不可得或不一致。论据：anchor MarkerText 按 occurrence 落盘、原字节回放（§2.6-c）；gd [011]「历史重放使用这些字节，不随规则版本改写」（§2.6-d）。残余风险 ◇：「重锚后恢复 Full」（gd [005]）的精确实现路径未走到——若它需重新组装正文而非回放旧字节，则 blob 重读路径是硬的；两分支都不改变路径成立，但影响 M4 细节（S3 确认）。若证伪：「每次重新拼装」破坏原字节冻结（[010]）不可接受；备选为「首次注入时把正文字节同时写入 anchor 与档案，恢复以 anchor 为准」。
+- **假设 B（按名去重对自由命名足够）**：证伪条件——blogger 频繁发明新名导致 Coverage 永不命中、重复 Full。影响面：重复注入体积与语义噪声（正确性不损）。缓解：注入样板提供命名参照（M3）；大小写折叠归一（M1，C3.2）。若证伪严重：接受重复 Full；或在 role 提示词加「优先复用已有名字」语句（可选，S3 定）。
+- **假设 C（双文本注入不破坏前缀稳定）**：证伪条件——注入字节变化引发 revision 冻结不一致或前缀断裂。论据：注入公式固定、内容经 RulebookRevision 冻结（bd [018] 需重设冻结对象）；prefix-stability [010] 只管 guidance 回放、不管 prompt 内容。残余风险 ◇：[018] 的冻结对象重设范围（枚举退役后为何物）S3 定。
+
+### 10.2 步骤失败分支
+
+- M2 若发现 resolveByField 的第三处消费者：暂停退役，先全仓只读扫描（devops）列全调用点，再调整 M2 范围。已触发并结清（本轮 devops 核实第三处为 Surface.fs:221–227 的 resolveField 包装；处置方向见 §8.3）。
+- M2 若身份字段改名引发旧 journal 读失败（回放 / 投影）：评估向后兼容；若不可行，如实记录兼容边界（本机运行数据、无跨机承诺）并交用户裁决。
+- M3 若 prompt 体积超预算：退为「MainText 抽样注入」违背「全量灌入」裁决，需用户裁决而非自行降级。
+- M4 若 blob 读路径在交付侧装配不可达：备选「首次 Full 时把正文写入 anchor 档案，恢复以 anchor 为准」（见假设 A 备选）。
+- M5 若重写中信息不变量与结构对齐冲突：先按 C7.6 的拆分/归并规则消解（以信息不丢失为前提）；无法消解的个案记录待审并由 V 复核，结构断言不放宽、不豁免。
+- M6 若全链测试暴露条款-实现矛盾（如 gd [008] Audience 与双灌入的紧张）：回 M1 契约表重新裁决该条并同步。
+
+### 10.3 目标状态核验（§1 逐条）
+
+1. schema 去枚举、七文本 + tipName → M1 / M2。
+2. 全量注入（双文本；语言单语为设计决定，注记于 §8.2）→ M3。
+3. 归一化退役、身份按名 → M2。
+4. 交付链骨架保留、正文换源 → M4。
+5. 101 条统一格式 → M5。
+6. 条款与测试同步 → 各步内嵌 + M6 复查；另含 provider-language 分类裁定（§8.6）。
+
+### 10.4 表象反思
+
+- 本路径是否只治「字段替换」的表象？否：确定性迁移（名字身份键 + 冻结回放 + digest 校验）与新读路径是结构性改动；库的角色转变（值域 → 样板）在 M3 / M5 落为字节。
+- 最危险的「新表象」：M5 若只加标题不改内容，将得到格式剧场——验收必须以「结构断言 + 内容覆盖」双门禁，且断言须对 known-bad 变体变红。
+- 本路径不解决的（如实记录）：自由撰写的质量下限（用户已接受 B2 的代价）；旧运行数据的迁移；命名稳定性的长期统计。
+
+# S3 · 流程与伪代码
+
+本节把 §9 主路径写成可执行流程。算法头给出输入与输出；步骤以字母加数字标号；▷ 为裁决点，结论与理由就地在案；异常路径写成步骤。本节逐段累积，未写段落见 S3.0 索引。
+
+## S3.0 算法索引与执行顺序
+
+算法与里程碑的映射（算法字母已定，后续段不再改名；S3.k 编号为写作顺序）：
+
+| 里程碑 | 算法 | 内容 | 状态 |
+|---|---|---|---|
+| M0 | Algorithm A | 016 测试硬编码修复 | 已写 |
+| M1 | Algorithm C | 契约定案（字段 / 校验 / 规范化 / 错误面 / 文案 / 条款验收 / 对照表） | 已写 |
+| M2 | Algorithm S | ChronicleTool：schema 替换与执行期校验 | 已写 |
+| M2 | Algorithm D | Codec：八字段解码与校验 | 已写 |
+| M2 | Algorithm L | Catalog：归一化退役与 Surface 包装处置 | 已写 |
+| M2 | Algorithm K | Commit：TipName 落库与处置正文 blob 通道 | 已写 |
+| M2 | Algorithm P | Projection：RecentTip 字段收敛与 previousTips 链 | 已写 |
+| M3 | Algorithm I | composeBloggerSystemPromptFor 双文档注入 | 已写 |
+| M3 | Algorithm B | blogger role 提示词改写 | 已写 |
+| M4 | Algorithm R | 交付读路径：载荷 → blob 重读 + digest 校验 | 已写 |
+| M4 | Algorithm G | Tip.fs Full 组装、语言选择退役、冻结交互 | 已写 |
+| M5 | Algorithm F | 统一格式工作包：批次与结构断言 | 已写 |
+| M6 | Algorithm V | 收尾验收：全链测试与条款一致性复查 | 已写 |
+
+执行顺序：Algorithm A 独立先行；Algorithm C 是其余算法的契约源；M2 五算法按 S → D → L → K → P 落地；M3 与 M4 在 M2 落地后并行（Algorithm I 与 Algorithm R/G 并行，M4 内 R 先于 G）；Algorithm F 与代码线并行、在 V 前完成；Algorithm V 最后。写作按里程碑顺序推进，一段可含同一里程碑内的一至多个算法。
+
+遗留 ◇ 归属（§6 清单）：恢复 Full 实现路径 → Algorithm R/G 的 ▷；provider-language 分类裁定 → Algorithm G 的 ▷；{{rule_count}} 去留、arg-tip 改名、拼装分隔形态、Nudge 保留英文、对照表终稿、大小写折叠实现 → 本段 Algorithm C（已结断）；旧 journal 数据兼容 → Algorithm C 定原则（C8.3）、Algorithm R/G 落行为。
+§9.2「边界待裁决点（S3）」五条全部结断（其中三条不在 §6 清单）：ProviderSystemTransform 是否随合成变化改动 → I4（不动，compose 签名不变）；Surface.fs 测试面是否需暴露新读路径 → R5.1（不新增公开符号）；durable 载荷承载点 → K1.1（改既有 fact，非新 fact 类型）；旧 journal 数据兼容处置 → C8.3（不迁移原则）+ K2（兼容读）+ G5（identity-only 行为）；provider-language 分类裁定 → G7（不属 Class A，整套保留）。
+
+## S3.1 Algorithm C [契约定案]
+
+输入：用户裁决（Q1：字段名取 main.md 七节；A1+A2 双灌入；101 条统一格式。Q2：自由命名、同名去重）；S2 六工作面结论与主路径（§8/§9）；仓库事实（§2，本任评审前经 devops 抽样复核）；S3 遗留 ◇ 清单（§6）。
+输出：定义 C1–C8，作为 M2–M5 各算法与条款改写的单一契约源。
+
+C1. [字段表]
+C1.1. 定八个字段名 ← ⟨whatToDoNow, whyThisMatters, repairStrategy, decisionBranches, commonWrongFixes, verification, doneWhen, tipName⟩。
+C1.2. 定七节字段与 main.md 标准节名一一对应：whatToDoNow ↔ What To Do Now；whyThisMatters ↔ Why This Matters；repairStrategy ↔ Repair Strategy；decisionBranches ↔ Decision Branches；commonWrongFixes ↔ Common Wrong Fixes；verification ↔ Verification；doneWhen ↔ Done When。 # 字段名是节名的 camelCase 化；标准节名见 C7.4。
+C1.3. [命名形态] ▷ 候选：camelCase；kebab-case。结论：camelCase。理由：与 chronicle 现有字段（charge / occurrence / settlement / consequence / evidence）风格一致；provider 工具的 JSON 参数名惯用 camelCase。
+C1.4. [名字字段命名] ▷ 候选：tipName；name；tip。结论：tipName。理由：tip 与旧枚举字段同名会造成新旧混淆；name 语义过泛；tipName 在「tip 的自由名」语义上唯一。
+C1.5. [必填性] ▷ 候选：八字段全部必填；部分必填。结论：全部必填。理由：与旧 tip 必填对等；Full 正文由七节拼装，缺节即残缺，且库已退为样板、无法补全。已知代价（接受）：单轮撰写负担增大（§4-D 已记录）。
+C1.6. 旧 tip 枚举字段退役：新 schema 不含枚举 tip；执行期与解码期不再把任何非空 tip 串归一化映射到库内规则（resolveByField / Levenshtein 家族退役，步骤见 Algorithm L）。 # 八字段与旧 tip 无并存期。
+C1.7. [字段顺序] 定 schema 字段顺序 ← charge、occurrence、settlement、consequence、tipName、whatToDoNow、whyThisMatters、repairStrategy、decisionBranches、commonWrongFixes、verification、doneWhen、evidence。理由：因果脊 → 教训命名 → 七节内容 → 证据；evidence 沿用现状（可选 string），不参与本次改造。
+
+C2. [校验族]
+C2.1. 定单字段校验 ← trim 后非空（沿用 tryCanonicalText 现族），适用七节字段与 tipName。
+C2.2. 定正文界 ← MaxBlogTextBytes = 512 KiB（沿用）；校验对象 = 因果主干合并段（MergedText）与七节拼装正文（TipSectionsText）两者；承载 = validateContentBounds/validateBounds 扩展（Decode.fs:242 生产调用点、Surface.fs:209 JS 面包装同步）；超限 = fail-closed 拒绝（沿用 contentBoundsError 字符串错误；cycle 不成立、不落 blob；不映射 invalid-tip 工具文案，见 D4.2、K3）。 # 界为 fail-closed 拒绝，不是截断。
+C2.3. 排除 MaxInlineEvidenceChars = 1024（evidence 专属）；不新增七节单字段字符界（现状内容字段亦无）。
+C2.4. [tipName 界] ▷ 候选：不设界（仅非空）；设「单行、200 字符」界。结论：设界；「字符」计量单位 = .NET String.Length（UTF-16 code units；与 MaxInlineEvidenceChars=1024 同族——Codec.fs:58 定义、L109 判定；与 512 KiB / 128 KiB 族的 UTF-8 字节计数相区分，后者经 SyntheticToml.byteCount 链用于正文体量）。理由：tipName 以原串进入交付 marker（「tip: <name>」与「tip = "<name>"」）与投影展示面；换行破坏行结构，200 字符封住病态超长名；与「名字应短」的语义相称。
+C2.5. 定校验顺序：先 trim；再查不含 \n 与 \r；再查字符数（String.Length）≤ 200；最后取非空。
+C2.6. 定类型校验：八字段均须为 string；非串在解码期拒绝（沿用现状语义，见 Algorithm D）。
+C2.7. 若任一字段级校验失败，则转 C4 错误面；字节界（C2.2）失败走 decode 阶段 contentBoundsError（D4.2），不进 C4；两类均不截断、不静默跳过。 # fail-closed。
+
+C3. [身份与规范化]
+C3.1. 定 normalize(s) ← trim(s) 后做大小写折叠（.NET ToLowerInvariant，不变文化）。
+C3.2. [规范化实现] ▷ 候选：完整 Unicode casefold（含 ß→ss 等展开）；简单大小写折叠；原样精确。结论：简单大小写折叠 + 首尾 trim（§8.3 的「Unicode casefold」由此收敛为本条的简单折叠）；不做 NFKC、不做空白折叠、不做重音折叠。理由：命名以 ASCII 与中文为主，大小写是唯一实际风险；完整 casefold 引入数据表与 Unicode 版本敏感行为，超出收益；空白与重音折叠无证据支持（过度设计）。
+C3.3. 定存储与比较分离：落库、投影、交付一律存与展示 tipName 原串（decode 期 trim 后的撰写字节，见 C3.4/D2）；一切同名比较点（Coverage 判定、交付同名判定——消费最近 tip 的场合）经 normalize 后比较；RecentTips 列表层不去重（P2），集合型落点的键形态见 G4.2。
+C3.4. [存原串还是规范形] ▷ 候选：存规范化名；存原串。结论：存原串。原串 = decode 期 trim 后的撰写字节（保留大小写与内部空白；不做枚举归一与大小写变换；见 D2）。理由：展示忠实于撰写者；规范化函数演进时历史字节不漂移（与 gd [011] 历史字节精神一致）；normalize 是纯函数，无存储成本。Coverage 集合为内部比较结构、以规范化键存储（G4.2），不属本条展示面。
+C3.5. 定同名语义：normalize(a) = normalize(b) 即同名；同名时交付走 identity-only。 # 大小写或首尾空白之差视为同名。
+
+C4. [错误面]
+C4.1. 定内部错误标识 ← ⟨missing-tip-name, missing-tip-field:<field>, tip-name-too-long, tip-name-multiline, tip-field-not-a-string⟩；测试锚定。产生面分层（与 S4.1 的读取原语裁决一致）：missing-tip-name / missing-tip-field:<field> / tip-name-too-long / tip-name-multiline 由执行期与解码期两期产生；tip-field-not-a-string 仅由解码期产生（执行期读取面 HostToolArguments.Text 把非 string 归 ""、落 missing-tip-name，见 S4.1）。<field> ▷ 候选：camelCase 字段名；本地化节名。结论：camelCase 字段名（与 C1.1 同源，如 missing-tip-field:repairStrategy）。理由：与 provider 字段名同源、测试锚定不随会话语言漂移；内部标识无展示消费者。
+C4.2. [文案面] ▷ 候选：每个标识各配文案键；单一键覆盖全部无效 tip。结论：单一键。理由：blogger 是唯一消费者，修复动作相同（补齐名字与七节）；文案面最小。invalid-tip 文案只作用于工具执行期的 blogger 面；解码期返回 C4.1 内部标识本身、不映射文案（D2/D5.2）。
+C4.3. [键名] ▷ 候选：保留 missing-tip；改名 invalid-tip。结论：invalid-tip。理由：错误面从「缺失」扩为「缺失或不合规（缺节、超长、含换行）」，键名与语义对齐；旧键无外部消费者（§2.6-a 已核实引用面）。
+C4.4. 定 invalid-tip 文案：en「The tip is invalid: give it a short name and write all seven sections.」；zh「这条 tip 无效：请给出简短的名字，并写全七节内容。」。
+C4.5. 保留 remembered 与 nothing-to-remember 两键原义（§2.6-a 已核实不涉 tip 语义）。
+
+C5. [文案资源]
+C5.1. 新增七键（en + zh-CN 成对叶子）：tool/chronicle/arg-what-to-do-now、arg-why-this-matters、arg-repair-strategy、arg-decision-branches、arg-common-wrong-fixes、arg-verification、arg-done-when。
+C5.2. 改名 arg-tip → arg-tip-name；退役旧键 arg-tip。 # 键无外部消费者。
+C5.3. 定七节描述文案（en；落资源文件时允许风格级微调，语义不得变更）：
+  arg-what-to-do-now:「The action to take now: what this lesson asks the reader to do in the same situation, stated concretely.」
+  arg-why-this-matters:「Why it matters: the cost of the wrong action and the value of the right one.」
+  arg-repair-strategy:「The repair strategy: how to carry the action out, step by step.」
+  arg-decision-branches:「The decision branches: which variant fits which situation.」
+  arg-common-wrong-fixes:「Common wrong fixes: plausible repairs that fail, and why they fail.」
+  arg-verification:「How to verify the fix holds: the checks that would catch a wrong fix.」
+  arg-done-when:「The done condition: what must be true for this lesson to be satisfied.」
+  arg-tip-name:「A short free-form name for this tip. Reuse the same name when the same lesson recurs; names equal up to case and surrounding spaces are the same name.」
+C5.4. 定七节描述文案（zh-CN；与 C5.3 一一对应，同微调约定）：
+  arg-what-to-do-now:「现在该做什么：这条教训要求读者在同样处境下采取的具体行动。」
+  arg-why-this-matters:「为什么重要：做错要付出什么代价，做对有什么价值。」
+  arg-repair-strategy:「修复策略：怎样一步步把这个行动落到实处。」
+  arg-decision-branches:「决策分支：什么情形下走哪一条路。」
+  arg-common-wrong-fixes:「常见假修复：看着像修复却会失败的做法，以及它们为什么失败。」
+  arg-verification:「验证：怎样核验修复真正成立，哪些检查能抓住错的修复。」
+  arg-done-when:「完成条件：必须满足什么，这条教训才算被遵守。」
+  arg-tip-name:「为这条 tip 自由命名，保持简短。同一教训再次出现时沿用同一个名字；只有大小写或首尾空白不同的名字视为同名。」
+C5.5. 改写 description：en「tipName and seven sections are required: name this reusable lesson freely and write the seven sections; the {{rule_count}} Rulebook entries are format samples to borrow from, not a closed set.」；zh「tipName 与七节内容均为必填：请自由命名这条可复用教训并写全七节；上下文中的 {{rule_count}} 条 Rulebook 条目是格式样板，不是必须选择的封闭集合。」
+C5.6. [{{rule_count}}] ▷ 候选：删除；保留并改语义为「样板库规模」。结论：保留。理由：数值真实（当前 101）；对 blogger 是样板规模的有用信号；语义更新只在文案内完成，无机制改动。
+C5.7. [blogger role 提示词] 定改写要点（文本随 Algorithm B 落地）：① 删除「Choose exactly one Rulebook TipName」类措辞；② 明确 tipName 自由命名、可自创新名、同名沿用；③ 明确七节自由撰写、库为 bootstrap 与格式样板；④ 保留「tip 是可复用教训、具体字段描述这次具体转折」的因果脊语义（原「the other four fields」措辞随字段拆分更新）。
+C5.8. 定资源契约：新增字段文案须新增显式 Path 常量与成对叶子；缺键导致资源读取失败（上游严格配对，无 fallback）。 # 启动期契约，非错误面。
+
+C6. [条款改写验收]
+C6.1. 逐条改写要点（文本按 C6.6 落点表随对应算法同步定稿；以下为验收标准）：
+  bd [001]：保留目录 basename = RuleId = FieldName 的库内单一真相；删除「tip 必归一到 TipName」；新增「tip 身份 = blogger 自由命名 + normalize 比较」。
+  bd [003]：不改（库内身份三元组与目录校验保留，作身份面回归）。
+  bd [005]：不改（本地化叶子完整性合同——正文非空且 TipName / RuleId / FieldName 恒等——不随改造变化；库文件结构不动，作身份面回归，与 bd [003] 同列）。
+  bd [004]：注入内容改为「基础 Blogger prompt、# Enforcer Rulebook 标题、全部规则的 Name、EnforcerText 与 MainText 三段按 LexicalOrder 拼接（渲染沿用既有注释机制：逐元素 `# ` 前缀、元素间单换行；rule.Name 为裸目录名元素）」。
+  bd [006]：校验与错误面改为 C2 校验族与 C4 单一 invalid-tip 文案；删除「无逃逸、必解析」表述。
+  bd [007]：归一化映射条款整体删除（resolveByField、Levenshtein 最近邻、并列取最小）；不保留同义条款；不误伤 LexicalOrder 的排序用途。 # 排序用途与归一化无关。
+  bd [008]：「离散的单条 tip」重述为「单条 lesson 的八字段组同批提交」；数值评分与桥接字段禁令保留。
+  bd [011]：内容硬界文本扩展——原文「新协议四句正文」的 512 KiB 界覆盖对象更新为「因果主干合并段（MergedText）与七节拼装正文（TipSectionsText）」，与 C2.2 的 validateBounds 扩展一致；inline evidence 1024 字符界与「独立 evidence 通道为空」不变。
+  bd [009]：不改。
+  bd [012]：原子提交对象改为「TipName 原串 + 处置正文 ref/digest」（字段细节见 Algorithm K）。
+  bd [014]：RecentTip 容量 8 保留；字段收敛为 ⟨TipName, CycleId⟩（见 Algorithm P）。
+  bd [016]：RecentTips 协同裁剪语义保留——squash 时按 1:1 共同裁剪最老 min(K, tips) 条 RecentTips、不新增 tip、不触发新交付；P2 字段收敛后裁剪单位随 ⟨TipName, CycleId⟩；文本不涉字段名故可不改，但须注明「无处置正文 ref 的旧 occurrence 不触发新 Full（G5 identity-only）」与「不新增 tip、不触发新交付」同向。
+  bd [015]：tip 指代更新为「八字段组 + normalize 同名判定」；配对视图与禁假 tip 语义保留；配对视图实现随字段收敛同步（Observation.fs:26–31 改取 TipName、ObservationSurface.fs:168–181 输入面与 99–103 输出面收敛，见 K6.1/K6.2）。
+  bd [017]：无效 terminal 条件更新为「缺 tipName、任一节空白、tipName 超长或含换行、新旧协议混用」。
+  bd [018]：冻结对象重设为 ⟨字段表与必填性、校验族版本、normalize 算法版本、库目录集与文本⟩；删除旧三项（chronicle.tip 枚举、解码映射表、Main 处置索引）。
+  gd [001]：Coverage 身份单位改为 normalize(tipName)；Frontier 按 occurrence 保留。
+  gd [002]：Full = 标题 + tipName 原串 + 处置正文（撰写语言）；删除 owner 语言查库选择。
+  gd [003]/[005]：措辞级——「规则全文」→「该 occurrence 绑定的处置正文」；「已交付规则」→「已交付处置」；双轴与重锚恢复语义保留。
+  gd [006]：载荷读取改为「从 occurrence 载荷取处置正文 ref 读回」，删除 tryFindByField 查库。
+  gd [008]：Audience 按三分语义重述——检测文本（库 enforcer）仅进 Blogger 上下文、不进交付；库处置文本（main.md）作为样板进 Blogger 上下文（Q1 裁决 A1+A2）、退出交付正文来源；交付正文（撰写七节）仅 Main；「Blogger 历史为低信任观察」定性保留（previousTips 注入面语义见 Algorithm P 的 P6–P10）。 # 「处置正文」指称物由库 main.md 更新为撰写正文；双灌入的样板例外据此容纳。
+  gd [004]/[007]/[009]/[011]/[012]：不改文本；其中 [011] 冻结机制与 [012] 动态材料语义原样复用。
+C6.2. provider-language 分类裁定（交付 marker 文本是否属 Class A）转 Algorithm G 的 ▷；两分支的改文本范围已定：属 Class A → 修订 provider-language [009]/[013]；不属 → 整套保留。 # 本算法唯一转出项。
+C6.3. 全仓条款检索验收：改造后对五类语义（tip 归一化、TipName 三元组、Full 正文来源、owner 语言、冻结对象）做只读扫描，确认落点仅在 bd 与 gd 两套。 # 复核 §8.6 结论。
+C6.4. [018 锚点] 定 bd-018 测试锚点改造要点：018.test.mjs 现断言（fieldNames == rules.map、tryFindByField 一致性、decodeCall 携带 tip 的一致性）改为——① 目录身份与字段表一致性断言保留；② enum 冻结视图断言改为新语义：新八字段下 decodeCall 合规（tipName 保留 trim 后原串、七节解码）与缺 tipName/旧形态的稳定拒绝；③ tryFindByField 保留作身份面回归（与 bd [003] 一致），其一致性断言沿用。 # RulebookRevision 在代码中不存在（本任已复核，仅需求文本两处）；「冻结视图」由 RuntimeResources 承载，「BIRTH 不改视图」沿用既有 todo（GAP-112），不新开工作面。落点：L5.1。
+C6.5. [bd-001 保留] 001.test.mjs 只断言库目录打包身份（rules.map(name) / fieldNames() / ruleId / fieldName = basename，L12–17），不消费 chronicle tip、不含归一化符号（本任 devops 已核实，见 §2.6-i）；改造后原样保留、按改后语义重跑（与 §2.4 的 003 保留同列）。
+
+C6.6. [条款落地落点表] 每条须改写条款的唯一归属落点如下（改写对象 = requirements/behavior-diagnosis/WHAT.md 或 requirements/guidance-delivery/WHAT.md 的对应条目；改写口径见 C6.1 对应行）：
+  - bd [001] / bd [007]：Algorithm L 的 L6（整体改写 / 整体删除；落点已写）。
+  - bd [004]：Algorithm I 的 I1 落地同批（整体改写）。
+  - bd [006]：Algorithm S 的 S4/S5 与 Algorithm D 的 D2/D5 落地同批（整体改写）。
+  - bd [008]：Algorithm S 的 S2 落地同批（整体改写）。
+  - bd [011]：Algorithm D 的 D4.2 落地同批（文本扩展：硬界覆盖对象含七节拼装正文）。
+  - bd [012]：Algorithm K 的 K1/K3 落地同批（整体改写）。
+  - bd [014]：Algorithm P 的 P1/P2 落地同批（整体改写）。
+  - bd [016]：Algorithm P 的 P2 落地同批（语义核对；文本不涉字段名，处置见 C6.1 的 bd [016] 行）。
+  - bd [015]：Algorithm K 的 K6.1/K6.2 落地同批（整体改写）。
+  - bd [017]：Algorithm D 的 D5.1/D5.6 落地同批（整体改写）。
+  - bd [018]：Algorithm L 的 L5.1 落地同批（整体改写）。
+  - gd [001]：Algorithm G 的 G4 落地同批（整体改写）。
+  - gd [002]：Algorithm G 的 G1/G2 落地同批（整体改写）。
+  - gd [003]/[005]：Algorithm G 的 G8 落地同批（措辞级）。
+  - gd [006]：Algorithm R 的 R5（整体改写；落点已写）。
+  - gd [008]：Algorithm I 的 I5.1–I5.3 与 Algorithm G 的 G8 落地同批（整体改写；三分语义）。
+  不改文本者（bd [003]/[005]/[009]、gd [004]/[007]/[009]/[011]/[012]）不设落点。 # 本表为条款改写落点的唯一权威；执行者随对应算法落地，V1 按本表逐条核查。
+
+C7. [M5 对照表定稿]
+C7.1. canonical 中文节名（enforcer）：定义 / 支配原则 / 何时触发 / 不应触发 / 与相邻规则区分 / 判定程序 / 例子 / Nudge。
+C7.2. canonical 英文节名（enforcer）：Definition / Governing Principle / Trigger When / Do Not Trigger When / Distinguish From / Decision Procedure / Examples / Nudge。
+C7.3. canonical 中文节名（main）：现在该做什么 / 为什么重要 / 修复策略 / 决策分支 / 常见假修复 / 验证 / 完成条件。
+C7.4. canonical 英文节名（main）：What To Do Now / Why This Matters / Repair Strategy / Decision Branches / Common Wrong Fixes / Verification / Done When。
+C7.5. [Nudge] ▷ 候选：保留英文；译为「提醒」。结论：保留英文。理由：唯一完整翻译族已用 Nudge；与英文标准逐字一致便于结构断言；「提醒」已被五节变体占用为退役措辞，复用会造新歧义。
+C7.6. 退役措辞与 canonical 落点（对齐后旧词不得出现）：刀口 → 内容归并「判定程序」（可执行判据与处置指引；若个别文件混有理念性内容，拆分至「支配原则」）；提醒 → 「Nudge」（格言式恒久事实；Nudge 保留英文）；不要误判 → 不应触发；分支判断 → 决策分支；为什么这很重要 → 为什么重要；与近邻区分 → 与相邻规则区分。个别文件无法唯一归并时按 F2 内容不变量优先、记 §10.2 待审。
+C7.7. 对齐集合与断言口径：en 侧 46 份（23 个双侧无节目录 × 2）；zh 侧 171 份（非同构 161 + 待替换 10：英文标题 9 + 「分支判断」1）。结构断言对全部 404 份文件执行（en 202 + zh 202），按文件语言选择序列表：en 文件按 C7.2 / C7.4 序列，zh 文件按 C7.1 / C7.3 序列；10 份待替换文件（9 份英文标题 + duplicated-control-flow 的 main）先替换为 canonical 中文名再入 zh 检查。
+C7.8. [七字段拼装分隔形态] ▷ 候选：带小标题拼装；合并段。结论：带小标题。理由：与现状 Full（main.md 正文含节标题）形态同构；让 Main 端按节引用稳定；样板意图在交付侧延续。拼装标题按会话（撰写）语言取 C7.3 / C7.4 的 main 集。 # 与 C1.2 的节名映射共用同一真相。
+
+C8. [遗留处置与异常]
+C8.1. 本算法结断：字段与命名（C1）、校验（C2）、规范化（C3）、错误面（C4）、文案键与文案（C5）、条款改写验收（C6，provider-language 除外）、对照表与拼装形态（C7）。
+C8.2. 转出：恢复 Full 实现路径 → Algorithm R/G；provider-language 分类裁定 → Algorithm G；旧数据行为 → Algorithm R/G（原则见 C8.3）。
+C8.3. [旧数据原则] ▷ 候选：迁移旧事实；按「历史已消费」处理。结论：不迁移、不重建 Full、不报错；旧事实的 TipRuleId 按 TipName 语义继承（字符串身份不变），其无处置正文 ref 的 occurrence 不触发新 Full；冻结 marker 字节回放不受影响。理由：本机数据、无跨机承诺；旧 Full 的交付记录（TipGuidanceDelivered）与 marker 已冻结在案；重建 Full 会引入第二真相源或不可得字节。精确行为（跳过或 identity-only）在 Algorithm G 的 ▷ 结断。 # 与 gd-005 断言的潜在冲突留给 Algorithm G。
+C8.4. [异常] 若 C1–C8 任一定义与 §2 已核实事实冲突，则暂停结案，记录冲突全文，回退该条重裁；不得带冲突进入 M2。
+C8.5. [异常] 若某裁决涉及用户偏好且无法从既有裁决推导，则停，把该裁决的事实与候选呈报用户裁决、等待用户决定；执行者（S4 Manager）禁用 ask，呈报 = 停并明确呈现阻塞（与 I6 同口径）；本段已结断项均不属此类。
+
+C9. 返回 C1–C8 定稿。算法终止。
+
+## S3.2 Algorithm A [016 测试硬编码修复]
+
+输入：016.test.mjs 当前文本（第 184–188 行；本任 devops 已复核：184 行为标题串、186/187 行为断言、188 行为动态派生先例）；owner surface 读回的规则集合。
+输出：016.test.mjs 第 186–187 行修改后的断言文本；重跑绿的确认。
+
+A1. [锁定断言] 读第 186–187 行：rules.length 与 ruleCount() 两条断言均等于 120。
+A2. [定派生源] 期望值 ← 由 owner surface 读回的规则集合长度派生（同文件第 188 行先例）。
+A2.1. [裁决] ▷ 候选：写死 101；动态派生。结论：动态派生。理由：120 的病因是写死值随目录裁剪失效；101 仅为当刻事实，会随目录集变化再红；动态派生同时断言断言基数与加载基数同源。
+A2.2. [裁决] ▷ 候选：一并改写第 184 行标题串；保留。结论：保留。理由：标题串非断言（§2.5 已核实）；改动破坏测试锚点标识稳定性，收益为零。
+A3. [替换] 以派生表达式替换 186/187 两处常量 120。
+A4. [清扫] 只读检索同文件 120，确认仅余第 184 行标题串。
+A4.1. [异常] 若发现第三条 120 落点：逐处按 A2/A3 口径处置，处置后转 A5。
+A5. [重跑] 重跑 016 测试。
+A5.1. [红] 若失败：回 A1 复核派生源，不得回写常量。
+A6. [绿] 通过则返回修改后文本。算法终止。
+
+## S3.3 Algorithm S [ChronicleTool：schema 替换与执行期校验]
+
+输入：C1、C2、C4、C5 定稿（Algorithm C）；ChronicleTool.fs 现状（150–200 行，本任已复核）；ChronicleExecution 校验族（tryCanonicalText）。
+输出：ChronicleTool.fs 的 spec 装配与执行期校验修改后文本；ChronicleExecution 的校验族扩展。
+
+S1. [字段重排] spec 的 Arguments 顺序 ← charge、occurrence、settlement、consequence、tipName、whatToDoNow、whyThisMatters、repairStrategy、decisionBranches、commonWrongFixes、verification、doneWhen、evidence（C1.7）。
+S1.1. [裁决] ▷ 候选：evidence 保持现状位置；移到末位。结论：移末位。理由：C1.7 既定序把七节正文集中在 tipName 之后；evidence 为可选证据殿后，不插入正文段。
+S2. [schema 替换] 删除 tip 的 enumSchemaDescribed 字段；tipName 与七节 ← stringSchemaDescribed，逐字段 description ← ProviderProse.render(language, Path.ArgTipName 与七个新键)（C5.1/C5.2）。
+S3. [描述] catalogDescription ← C5.5 文本；rule_count 占位由实测条数保留填充（C5.6）。
+S4. [校验族] 于 ChronicleExecution 扩展：tryCanonicalText 沿用（trim 非空）；新增 tipName 检查，判定序（此列序即判定序）：读取 tipName 值（读取原语见 S4.1）→ trim 空（含缺失/undefined/非 string 经读取面归并者）→ missing-tip-name；含换行或回车 → tip-name-multiline；字符数（String.Length）大于 200 → tip-name-too-long；七节逐节缺失或空白 → missing-tip-field:<camelCase 字段名>（C2.5/C2.6/C4.1，如 missing-tip-field:repairStrategy）。evidence 不入族（C2.3）。
+S4.1. [读取原语裁决] ▷ 候选：沿用 args.Text（执行期只判缺失/空白/换行/超长，类型分层交解码期）；新增字符串面区分读取原语（Result<string option, unit> 形，仿 HostToolArguments.OptionalNonNegativeInteger）；经 HostToolArguments.Raw 自解析。结论：沿用 args.Text。理由：HostToolArguments.Text（ToolHostCodec.fs:233–240）把「键缺失」与「非 string」同归 ""，无法承担 D2 的 None/非 string 分家；执行期目的（给 blogger invalid-tip 文案，C4.2 单一文案）已由缺失/空白/换行/超长四类判足，非 string 经 Text 归 "" 后落 missing-tip-name、与 D2 的 None 分支一致；类型层分家由解码期 decodeTipName（D2.1）承担，C2.6「非串在解码期拒绝」即此分层；新增原语会把 ToolHostCodec 拉入触碰面、违反 L4/R5.1 的最小公开面原则。已知代价（接受）：执行期对非 string tipName 返回 missing-tip-name 而非 tip-field-not-a-string，两期内部标识在类型面上分层——C4.1 措辞据此收窄。 # 读取面事实：ChronicleTool 现状三处 args.Text 调用（L111 四字段、L116 evidence、L123 tip），无区分类型读法；数值面 OptionalNonNegativeInteger 与 Raw 为仓内区分/原始解析先例（本任 devops 复核）。
+S5. [执行期调用] 以新校验替换 resultForTip：取 args 的 tipName 与七节值逐个过 S4；任一失败 → 以 invalid-tip 文案返回（C4.3/C4.4，语言按会话）；全部通过 → remembered（C4.5）。删除 resolveByField 调用。
+S5.1. [失败路径] 失败不落库、不投影、不改状态；错误面走既有工具错误通道。
+S6. [文案键] 确认 Path 常量与 en/zh-CN 成对叶子：七字段键、arg-tip-name、invalid-tip（新增；文案见 C4.4）；退役 arg-tip 与 missing-tip 键（C5.1/C5.2/C5.8）。
+S7. 返回修改后文本。算法终止。
+
+## S3.4 Algorithm D [Codec：八字段解码与校验]
+
+输入：C1、C2、C4、C7.3/C7.4、C7.8 定稿；Codec.fs 现状（CanonicalBlogCall 约 24–26 行、decodeCall 约 159–165 行、decodeTip 约 87–94 行、decodeTipString 约 70–85 行）。
+输出：Codec.fs 的解码、校验与载荷构造修改后文本；七节拼装函数。
+
+D1. [载荷形态] CanonicalBlogCall ← { Content: ChronicleContent（现状容器保留：Structured 携 Charge/Occurrence/Settlement/Consequence/Evidence option，Legacy 携 text/evidence option）；TipName: string（decode 期 trim 后原串）；WhatToDoNow / WhyThisMatters / RepairStrategy / DecisionBranches / CommonWrongFixes / Verification / DoneWhen: string（七节，decode 期 trim 后文本，同 tryCanonicalText 族） }。
+D1.1. [裁决] ▷ 候选：平铺 tipName 与七节字段；打包为子记录。结论：平铺（与 C1.7 schema 顺序平行，测试访问形如 decoded.value.tipName）。 # 旧 Tip: EnforcerTip 字段退役。
+D1.2. EnforcerTip 类型与 EnforcerTip.ofRule 随旧 Tip 字段退役（唯一生产调用在 Codec.fs:84 decodeTipString 内，随 D2 重写删除）；Surface 的 tipToJs/callToJs/cycleToJs 形状同步（D5.3）。
+D2. [tipName 解码] 以 decodeTipName 替换 decodeTip/decodeTipString。判定序（此列序即判定序）：None（键缺失或值 undefined，读取层同归）→ missing-tip-name；非 string（含 null）→ tip-field-not-a-string；trim 空 → missing-tip-name；含换行或回车 → tip-name-multiline；超 200 字符（String.Length）→ tip-name-too-long（C4.1）。返回值 = trim 后原串（保留大小写与内部字节；不做枚举归一与大小写变换；沿用 tryStringArg/tryCanonicalText 返回值语义），该返回值即落库值。错误值为 C4.1 内部标识字符串、作 Error 载荷；不映射 C4.4 invalid-tip 文案（该文案仅用于工具执行期，见 S5）。
+D2.1. [空值读法] ▷ 候选：None 与 Some null 同归 missing-tip-name（延续现状，§2.6-h）；分家（None → missing-tip-name、Some null → tip-field-not-a-string）。结论：分家（读法见 D2）。理由：判定序的类型层以「值是否 string」为准，null 是显式非 string 值，归类型层使「缺失」与「类型错」两分、C4.1 两组标识各得其位；现状同归是旧单一错误面的遗留（改造后错误面已扩为五类）。已知代价（接受）：null 值的错误标识相对现状变化，006 L73 八格分组随 D5.2 落位表更新。
+D2.2. [旧错误面退役] MissingTipError 常量（Codec.fs:28–30、Codec.fsi:22）与其 Surface 转存导出 missingTipError（Surface.fs:155、Surface.fsi:26）随新判定序退役：五处产生点（decodeTipString L77–78/L85、decodeTip L94、decodeCall L161/L162）全部由 D2/D3 的新错误值替换；常量、fsi 签名与 Surface 转存一并退役删除。 # 消费面已核实（见 §2.6-l）：Surface 导出全仓无消费者；测试面唯一消费为 bd-006:76 字面量（随 D5.2 更新）；其余套件零引用。
+D3. [七节解码] 逐节：键缺失或 trim 空 → missing-tip-field:<camelCase 字段名>；非 string → tip-field-not-a-string。
+D4. [拼装] 定义 renderTipSections(language, 七节值)：按撰写语言取 C7.3/C7.4 节名集，按节序拼装为「## <节名> + 空行 + 节文」段（节标题与 main.md 的 H2 形态同构）、段间空行、单一文本、无尾随换行（C7.8）；纯函数（language 为参数）。
+D4.1. [裁决] ▷ 候选：拼装在解码期；落库期。结论：拼装函数 renderTipSections(language, 七节值) 定义在 Enforcer 层（与 renderStructured 同层，Model.fs 的 EnforcerCycle 模块）；结果随载荷传递（CanonicalCycle.TipSectionsText，见 Algorithm K）；调用点在 ofCall 内——ofCall 增携 TipName/TipSectionsText，从 call 取七节值与语言后拼装。语言取用遵循全局唯一语言权威：拼装时刻的全局当前偏好 GlobalProviderLanguage.current ()（规范落点 provider-language [002]/[003]；代码注释锚点 ProviderLanguageBinding.fs:8 的 HOST-026 在 requirements 无对应编号；与交付期 SessionProviderLanguage.languageOf 同源；会话 id 不参与裁决）——现状解码/落库链未穿线语言（Continuation.fs/BlogSurface.fs 无语言符号），该函数零上下文可得，不新增签名链。理由：落库层（Commit）不接触语言；语言服务为 unit → ProviderLanguage 零门槛；renderTipSections 保持纯函数（language 为参数）便于测试。 # 已核实事实见 §2.6-h。
+D4.2. [字节界] 七节拼装文本随载荷进入 decode 校验：CanonicalCycle 字段收敛为 { MergedText: string; TipName: string; TipSectionsText: string; MergedEvidence: string }（CanonicalTip: EnforcerTip 退役，见 D1.2）；validateBounds（Decode.fs:235–244）扩展为对 MergedText 与 TipSectionsText 分别执行 C2.2 界（validateContentBounds 的签名与两个既有调用点——Decode.fs:242 生产路径、Surface.fs:209 JS 面包装——同步更新）。超限 → 沿用 contentBoundsError 字符串错误、cycle 不成立（fail-closed、不落 blob）；不映射 invalid-tip 工具文案。
+D5. [调用点] decodeCall 装配新载荷（D1）：Content 容器保留，Tip 字段替换为 TipName 与七节值；删除旧 Content/Tip 形态与 resolveByField 调用（Codec.fs:80）。
+D5.1. [协议检测集] structuredFieldNames（Codec.fs:96–97）与 decodeContent（:142–150）维持现状语义不变：形态互斥按「四内容字段 vs entry/text」两族判定——两族各至少一名同现 → MixedChronicleProtocolError；仅四字段 → Structured；仅 entry/text → Legacy；decodeStructured（:113–132）仍独立读取四字段、不消费检测集（现状）。tipName 与七节是形态无关的顶层必填字段（D1），不参与形态判别、不入检测集；其解码在 decodeCall/D2/D3 完成（tip 键在 decodeCall:160 单独处理，改名只触 decodeCall 与 decodeTip 族）。改造后 legacy 形态的完整行为：带 tipName/七节的 entry/text 调用走 Legacy 成功路径（006 L81–88 入参更新后断言保持）；不带 tipName/七节的历史调用在 decodeCall 首关稳定拒绝（missing-tip-name）。 # bd [017]「新旧协议混用」= 内容形态两族同现，与 tip 字段无关。
+D5.2. [测试] bd-006 同步（解码面；执行期分层见 S4.1——tip-field-not-a-string 仅解码期产生）：schema 键集断言（006.test.mjs L131）更新为 C1.7 新字段序；tip 解码形态断言（L33/L40）改为 tipName 的 trim 后原串保留（大小写与内部字节不变，口径同 D2）；错误面精确串（L76）更新为 C4.1 内部标识的分组断言（判定序见 D2）；测试标题描述半句随之更新（保留 WHAT[behavior-diagnosis-006] 锚点前缀，不再宣称「same error」）；L73 循环现状八种输入按 D2 判定序逐格落位、分组断言（不再单串全等）：undefined → missing-tip-name；null → tip-field-not-a-string；'' → missing-tip-name；'  ' → missing-tip-name；1 → tip-field-not-a-string；false → tip-field-not-a-string；{} → tip-field-not-a-string；[] → tip-field-not-a-string（两组：missing-tip-name = {undefined, '', '  '}，tip-field-not-a-string = {null, 1, false, {}, []}）；legacy 用例（L80–93）按 D5.1 的形态语义处置：L81–84 入参更新为 tipName + 七节（entry/evidence 保留），ok/text/evidence 断言保持；L86–88 同形更新 canonicalCycle 用例，mergedText/mergedEvidence 断言保持；L90–92 混合用例以含新字段的 structured() 基底重建、/cannot be mixed/ 断言保留；合并渲染断言（L95–126）在四内容字段保留前提下核对（不改语义）。
+D5.3. [Surface 形状] callToJs/cycleToJs 同步：退役 tip 对象（tipToJs: ruleId/fieldName/lexicalOrder），callToJs 增 tipName 与七节键（Structured 与 Legacy 两分支）、cycleToJs 增 tipName 与 tipSectionsText 键；测试访问形态随之更新（006 L33/L40 → decoded.value.tipName；018 L18 → decoded.value.tipName，见 D5.2/C6.4）。
+D5.4. [016 同步] 016.test.mjs 按六个测试块逐块处置（行号经 devops 逐块核实；三处同形 fixture 统一口径）：
+  块 1（L53 OBS_PROJ_003，L3–95）：fixture L22–33 随 K6 观察载荷同步（tipRuleId → tipName、删 fieldNameAtCommit、按输入面补 tipTextRef/tipTextDigest 或 None）；L58 applyEnforcementCycle 入参同形更新；断言 L73、L88–90（tipName 'field-3'、cycleId 'msg_tip_3'）、L92–93 保持（值不变）。
+  块 2（L184 A42_001）：L190–198（tryFindByField 规则身份）与 L200–202（compose 包含）不动；L186/187 的 120 断言已由 M0（Algorithm A）处置为动态派生。
+  块 3（L204 A42_002）：L212–218 recentTips 映射改为新 RecentTip 形状（t.tipName/t.cycleId，随 P2/K6 口径）；L222/L225 decoded.value.tip.fieldName → decoded.value.tipName。
+  块 4（L227 A42_003）：L232–236 的 t.fieldName 取新名；L268–273 投影消息正则随 fixture 修正保持；L277–278 decodeCall 入参更新为 tipName + 七节后保持 ok（精确名 TIP_X）。
+  块 5（L280 A42_004）：L283–293 经 readObservations（L175–180）读观察视图 tipName/cycleId；断言值不变、不涉及 FieldName。
+  块 6（L317 ENFORCER_TIP_12）：fixture L304–315 同块 1 口径同步（tipRuleId/fieldNameAtCommit 在 L311–312）；L320 applyEnforcementCycle 入参更新；L324–327 recentTips(...).map(t.cycleId) 只读 cycleId、断言保持。
+  三处 fixture（L22–33、L128–139、L304–315）字段同形（10 键，含 tipRuleId/fieldNameAtCommit），逐处点名、同一同步口径，不再以「等」字省略。 # 与 P5 的 014/012 口径一致。
+D5.5. [bd-008 同步] 008.test.mjs 涉 tip 三面逐段更新（行号经本任 devops 核实，见 §2.6-i）：① decodeCall / facade 面——L29–42 用例的入参（L36 的 tip）按 D5.4 口径改为 tipName + 七节，L41 的 result.value.tip.fieldName 改为 result.value.tipName；L221–231 facade 用例的 L227 入参同形更新、L230–231 的 sample.value.tip.{ruleId,fieldName} 改为 sample.value.tipName 与七节键（D5.3）；② fact fixture 键——L66–67、L156–157、L215–216 的 tipRuleId/fieldNameAtCommit 随 K6 的观察载荷同步（TipName 与 TipTextRef/TipTextDigest）；③ 旧 journal 段——L105/L122/L131 的 ScoreVectorRef 用例按 K2 兼容读口径核对（ScoreVectorRef 条目拒绝语义不变；「缺键 → 拒绝」的条件核对为「TipName 与 TipRuleId 皆缺」）；L11–18 桥接字段禁令不涉 tip、不动。重跑 008。
+D5.6. [bd-017 同步] 017.test.mjs 末段解码器用例（L676–697）与 support/cycle.mjs：call() 默认 input 的 tip 键替换为 tipName + 七节（精确名；随 D2/S5 口径）；L679–689 负例的期望保持（completed 但无 tipName/七节 → decodedCalls 0 且 decision.ok false）；L696 正例随 call() 修复自动成立；其余修复链测试不涉 tip、不动。重跑 017。
+D6. [失败] 任一错误 → Error 拒绝本次调用；不归一化、不重试、不 fallback（C2.7）。
+D7. 返回修改后文本。算法终止。
+
+## S3.5 Algorithm L [Catalog：归一化退役与 Surface 包装处置]
+
+输入：C6.1 bd [001]/[007] 改写要点；§8.3 退役方向；调用点全列表（Catalog.fs:130 定义、Codec.fs:80、ChronicleTool.fs:104、Surface.fs:221–227、Surface.fsi:34、Catalog.fsi:22、007 测试第 19/24/25/27 行消费点）。
+输出：Catalog/Surface 退役修改后文本；007 测试处置。
+
+L1. [定义退役] 删除 Catalog.fs 的 resolveByField 与 Levenshtein 最近邻族；保留 LexicalOrder 与目录/身份校验（bd [003] 不减）。
+L2. [签名退役] Catalog.fsi 删除 resolveByField 签名。
+L3. [调用点退役] 逐点处置：Codec.fs:80 随 D2 删除；ChronicleTool.fs:104 随 S5 删除；Surface.fs:221–227 的 resolveField 包装退役；Surface.fsi:34 公开签名删除。
+L4. [测试面裁决] ▷ 候选：Surface 面暴露 normalize 包装；不暴露。结论：不暴露。理由：最小公开面；同名判定的真实消费者在交付与投影侧（见 Algorithm G/P），测试从消费面锚定；避免为纯函数再造平行 API。
+L5. [007 处置] 将 007 测试由 Levenshtein 行为锁改写为「自由名原样保留、不再吸附」的行为锁，锚 enforcer.decodeCall（既有可达解码面；原 L19/24/25/27 四处 resolveField 消费点随本步改写移除）：① ' cat ' → tipName 'cat'（trim 后原串，不再解析到库内规则）；② 'cot'/'ct'/'caut'/'coat' 各自原样保留、互不吸附（不再映射到 'cut'/'cat'）；③ 'completely-unknown-name' 解码成功且 tipName 原样（不再与库绑定）；另补超长（String.Length > 200）与含换行名 → tip-name-too-long / tip-name-multiline（八格判定序由 006 承接，见 D5.2）。不新增 Surface 符号；执行期文案（invalid-tip/remembered）在现有 JS 面不可达（resultForTip 私有、Surface 仅常量 missingTipError、bd support 仅达解码面），不新建触达面、不新增导出，该现状边界如实注记（与 L4 一致）。
+L5.1. [018 处置] 按 C6.4 改写 018.test.mjs 并重跑。 # 与 L5 同类：退役行为锁的语义替换。
+L6. [条款] bd [001] 改为「tip 身份 = blogger 自由命名 + normalize 比较」；bd [007] 归一化映射条款整体删除，不保留同义条款（C6.1）。
+L7. 返回修改后文本。算法终止。
+
+## S3.6 Algorithm K [Commit：TipName 落库与处置正文 blob 通道]
+
+输入：C1.7、C2、C3、C6.1 bd [012]、C8.3；§8.4-4d；BlogObservationCommitted 现状（Facts.fsi 36–54）；commitWithCoverage 写序（Commit.fs 120–280，本任已复核）；Journal 接口（AppendAgent 单条 fact、WriteBlob）；TipGuidanceDelivered.OccurrenceId 演进先例（Envelope.fs 240–340）；观察视图现状（§2.6-j：Observation.fs / ObservationSurface.fs 字段面）。
+输出：fact 载荷、解码兼容与写序的修改后文本；同步点清单。
+
+K1. [字段演进] BlogObservationCommitted 载荷：TipRuleId 改名 TipName（canonical 名）；新增 TipTextRef: BlobRef option 与 TipTextDigest: BlobDigest option（成对）；FieldNameAtCommit 退役（不再构造）。
+K1.1. [裁决] ▷ 候选：改既有 fact 加字段；新增独立 fact。结论：改既有 fact。理由：bd [012] 的单一原子提交对象（TipName 原串 + ref/digest）；Journal 无批量 append（单条 fact 接口）；投影 1:1 假设（每 occurrence 一条 observation fact）；TipGuidanceDelivered 的 OccurrenceId 是同类演进先例。
+K1.2. [裁决] ▷ 候选：保留字段名 TipRuleId；改 TipName。结论：改名。理由：canonical 词为 TipName（交付与投影侧既定用词）；避免 RuleId 承载自由名语义的概念漂移。
+K2. [解码兼容] contextFactDecoder 由纯 auto 改为分流：BlogObservationCommitted → 手写载荷 decoder（仿 hostFactDecoder 的 TipGuidanceDelivered 分支）：TipName 读键 TipName 优先、TipRuleId 兜底（两者皆缺 → 拒绝，与 tip v2 语义一致）；FieldNameAtCommit 不读；TipTextRef/TipTextDigest 用可选读法（旧字节 → None）；其余字段保持现状必填；其余 case 仍走 auto。
+K2.1. [裁决] ▷ 候选：依赖 auto 对 option 字段缺失的容忍；手写分流。结论：手写分流。理由：Envelope 注释既定 auto 缺字段给 opaque Thoth error；先例同法；兼容逻辑显式且可测。
+K3. [写序] 前提：载荷已过 D4.2 的字节界校验（本函数不重复校验，界在 decode 收口）。commitWithCoverage 内：textBlob（四字段合并正文，现状）→ tipSectionsBlob（TipSectionsText，新）→ evidence（现状）→ refuseStaleAfterBlob（现状）→ 构造 fact（TipName 与两个新 ref/digest）→ appendOrClassify（现状）。
+K3.1. [失败路径] 任一 blob 写失败 → KnownNotCommitted（不 append；fail-closed）；孤儿 blob 不可达、无害。
+K4. [语言边界] 拼装正文在 ofCall 内按全局当前语言（GlobalProviderLanguage.current；D4.1）拼装、随 CanonicalCycle.TipSectionsText 传递；落库层（Commit）不接触语言。
+K5. [旧事实语义] 旧字节的 TipName（原 TipRuleId 值）照旧进入投影；TipTextRef 为 None 的 occurrence 不触发新 Full（C8.3；行为在 Algorithm G 结断）。
+K6. [同步点] FactCodec 的 tip 校验句同步为合法键 TipName 或 TipRuleId（旧 ScoreVectorRef 条目拒绝语义不变）；BlogSurface.observationPayload（BlogSurface.fs:604–625，private，经 factOfJs:640–642 与 serializeFact/deserializeFact/deserializeEnvelope 触达）的载荷字段面：读 JS 键 tipName（新形状；该面为 JS 构造面、无旧字节来源，不做兜底——与 K6.2 的 cycleRecordOfJs 同口径），fieldNameAtCommit 不读，tipTextRef/tipTextDigest 可选读（缺省 None）；# 旧字节兼容在 FactCodec/Envelope 解码侧（K2），不在本面；EventStoreJournalWriter 的 blob ref/digest 采集点纳入两个新字段；bd-015 的两处 cycleRecord fixture（L111–122、L162–173，键 tipRuleId/fieldNameAtCommit）随记录字段收敛同步（JS 键 tipRuleId → tipName、删 fieldNameAtCommit；按该输入面的形状补 tipTextRef/tipTextDigest 或 None；F# 面字段名 TipName/TipTextRef/TipTextDigest），015 的 tipName 字符串配对与投影视图断言不动。
+K6.1. [观察视图域面] Observation.fs:31 的 tipIdentities 从 tip.FieldName 改取 tip.TipName（decode 期 trim 后原串；与 G3 的展示/比较口径一致，不做大小写折叠）；observationsOf（37–41）与 observationsAfterSquash（45–52）的配对语义与顺序不变。
+K6.2. [观察视图 JS 面] ObservationSurface.fs 的 cycleRecordOfJs（168–181）：tipRuleId 读法改读 JS 键 tipName（新形状；JS 面构造器无旧字节来源、不做兜底，fixture 同步见 D5.4）、fieldNameAtCommit 读取删除、按输入面补 tipTextRef/tipTextDigest 可选读法；tipToJs（99–103）输出收敛为 { tipName; cycleId }（ruleId/fieldName 键退役）；workLogToJs（39–43）的观察视图三键 { tipName; cycleId; frameDigest } 保持（015 的配对断言与 016 块 1/5/6 的观察断言因此保持原值）。
+K7. 返回修改后文本。算法终止。
+
+## S3.7 Algorithm P [Projection：RecentTip 字段收敛与 previousTips 链]
+
+输入：C6.1 bd [014]；§2.6-c；Projection.fs 现状（EnforcementCycleRecord、RecentTip、RecentTipLimit = 8、fieldNameAtCommit、applyFromEntry）；previousTips 链现状（§2.6-k：Recovery.fs:105–112、ProjectionSurface.fs:131–169、BlogSurface.fs:712–737、Builder.fs:37/70–86、Prompt.fs:28–29、Toml.fs:117–125、TomlSurface.fs:53–54；cc-012/014/018 与 gd-008:34/41 的 field 键消费）。
+输出：投影字段、previousTips 链与派生逻辑的修改后文本。
+
+P1. [记录收敛] EnforcementCycleRecord：TipRuleId 改名 TipName；FieldNameAtCommit 删除；新增 TipTextRef: BlobRef option 与 TipTextDigest: BlobDigest option（承接 fact 的处置正文 ref）。承载 = 现状 ByProviderRun: Map<ProviderRunIdentity, EnforcementCycleRecord>（Projection.fsi:22–24；applySquash 只裁 RecentTips、不裁剪它，本任已复核，见 §2.6-i）；新字段随记录进入该 map。
+P1.1. [裁决] ▷ 候选：投影不存 ref/digest，交付侧另寻数据源；存。结论：存。理由：交付读路径（R）以投影为唯一 occurrence 索引；None 值对应无处置正文的旧 occurrence。访问面（本任已复核，见 §2.6-i）：Projection.fsi 公开面含 tryFindByProviderRun（run → state → record option）与 recentTips；交付侧现状仅经 recentTips 访问（Tip.fs:61），深取机制落 R2。
+P2. [RecentTip 收敛] RecentTip ← TipName、CycleId；删除 FieldName；容量 8 与追加语义保留；同名判定不在本层去重，由消费点承担（C3.5，见 Algorithm G）。 # 消费点全表（含 previousTips 链）见 P6–P10。
+P3. [应用] applyFromEntry：由 fact 新字段面组装记录；重复 ProviderRun 语义不变（ENFORCER-154）；RecentTips 保留最近 8（ENFORCER-070）。
+P4. [旧数据] 旧 fact 无 TipTextRef → 记录该字段为 None；TipName 来自 K2 兼容读。
+P5. [测试] bd-014 锚点同步：RecentTip 形状与容量断言更新；bd-012 断言更新为 TipName 与新 ref/digest。
+P6. [previousTips 生产映射] Recovery.fs:111 的 (tip.FieldName, tip.CycleId) 改取 (tip.TipName, tip.CycleId)；L105–112 定义体与 L189/L203–212 的传参位不变。 # RecentTip 删 FieldName 后的编译级必改点。
+P7. [JS 输入面统一] ▷ 候选：统一读 tipName；保持两处现状（ProjectionSurface 用 field、BlogSurface 用 tipName）。结论：统一为 tipName。理由：tipName 为 canonical 名（C1.4）；K6.2 已把 ObservationSurface 输出收敛为 tipName；field 与退役的 FieldName 同源，残留即旧同义词漂移；改动为纯键名替换、断言逻辑不动。落地：ProjectionSurface.fs:169 的 `text tip?field` 改为 `text tip?tipName`；BlogSurface.fs:734–737 已是 tipName、不变。
+P8. [透明层结论] Builder.fs:37 注释「(FieldName, CycleId)」更新为「(TipName, CycleId)」；Builder.fs:70–86 的 build 参数、Prompt.fs:28–29 的转发、Toml.fs:117–125 的渲染参数名与 TOML 输出键（kind/tip/cycle）不动。理由：TipName 值语义与旧值同形；TOML 键为面向模型的数据面命名、非身份字段名，改键将扰注入字节且无裁决依据。
+P9. [测试面] 三套 cc 测试与 gd-008 的 previousTips 键字面替换（断言为序列 deepEqual / regex 包含 / 布尔全等，均非键名敏感逻辑）：cc-012:480/481/508/509/523/585、cc-014:113/114/184、cc-018:693 的 `field:` 改 `tipName:`；gd-008:41 的 `{ field, cycleId }` 改 `{ tipName, cycleId }`。
+P10. [补录与条款核对] §9.2 触碰文件族与 §9.4 验收面随本算法同步补录；cc 套件 WHAT 无 previousTips 专条、最近条款为 [019]（冷边界辅助注入归零），本次改动不触 [019] 语义。
+P11. 返回修改后文本。算法终止。
+
+## S3.8 Algorithm I [composeBloggerSystemPromptFor 双文档注入]
+
+输入：§8.2（双文档单语注入）；C6.1 bd [004]；§2.6-m（TipSurface 与真 journal 事实；I5.2）；§2.6-b（localizedFiles、loadFor、composeBloggerSystemPromptFor 28–43、RuntimeResourceAssembly、ProviderSystemTransform 101–108）。
+输出：装载/合成/重拼修改后文本。
+
+I1. [注入面] composeBloggerSystemPromptFor：每条注入三段元素——rule.Name（裸目录名）、EnforcerText.Trim()、MainText.Trim()（现状只注入前两段）；排序仍按 LexicalOrder；渲染沿用 LlmFacing/SyntheticToml 既有机制（逐元素 `# ` 注释、元素间单换行、末尾单换行）。
+I1.1. [裁决] ▷ 候选：两文本加来源标注；不加标注、逐元素相接。结论：不加标注。理由：库文本原样呈现（样板意图）；额外标注污染文本且无消费者；分隔由既有渲染机制（Name 元素、`# ` 注释与文本自带空行）承担、不插额外空元素。
+I2. [单语保持] localizedFiles 与 loadFor 的单语言成对装载不变；不合并双语（§8.2 淘汰 2b）。
+I3. [预载] RuntimeResourceAssembly 的双语预载不变。
+I4. [请求期重拼] ProviderSystemTransform 不动；重拼公式仅内容增长，签名不变。
+I5. [测试] bd-004 注入内容断言按三段元素镜像更新（segment = comment(rule.name) + 单换行 + comment(EnforcerText.Trim()) + 单换行 + comment(MainText.Trim())，与渲染器逐字节同构）。
+I5.1. [gd-008 composer 面] L11–19：L18 的 `prompt.includes('REMEDIATION SOURCE') === false` 按 Q1 双灌入裁决翻转为正面包含；L16/L17 包含式保留。
+I5.2. [gd-008 resolver/audience 面] L22–30 与 L49–68：L27 的 body('main') 读取删除（不再作正文来源）；L28/L60 改为断言包含夹具物化的撰写正文；support/journal.mjs 增补 blob 物化能力——本套件 journal 为真 journal 的不透明盒（TipSurface.createJournal → JournalSurface.boot；journalHandleOf 做 unbox，JS 假对象无法通过），port/替身路线类型层不可行（009/cc-016 的受控 port 由 xwire.candidateFromJournal 消费、属 wire 候选链，与本交付读链非同一条）；最小接线 = F# TipSurface 新增写入助手，与 Persistence JournalSurface.writePayload 同形（unbox JournalHandleBox → handle.Journal.Writer.BlobWriter.Write content → 回传 { ok; blobRef; blobDigest }；TipSurface.fs 与 TipSurface.fsi 同步新增），support 用它物化正文、将真实 ref/digest（blobs/<sha256> 形态）交给 observe；读回由生产读路径（Algorithm R2 的 journal.Writer.BlobWriter.Read）在同一真 journal 上完成；L29/L61 的检测正文不进交付的否定断言保留。依赖 Algorithm R/G 的读回形态，随 M4 落地。
+I5.3. [gd-008 低信任面] L33–46 的 previousTips 键名随 Algorithm P 的 P9（tipName），随 M2 落地。
+I5.4. [边界] bd-008 无装载/composer 面（本任 devops 复核零命中），本步不涉；§9.4 的 M3 标注同步修正（见 §9.4）。
+I6. [体积异常] 若按 I1 组装后的 Blogger system prompt 超出所部署模型可支持的上下文上限，则停，把体积超限的事实与候选（维持全量 / 降级）呈报用户裁决，等待用户决定；不自行抽样、截断或降级（全量灌入为 A1+A2 裁决，降级须用户裁决，见 §10.2）。触发时装载与合成结果不变，不写任何持久事实。 # 执行者（S4 Manager）禁用 ask；呈报 = 停并明确呈现阻塞、等待用户裁决。
+I7. 返回修改后文本。算法终止。
+
+## S3.9 Algorithm B [blogger role 提示词改写]
+
+输入：C5.7 改写要点；§2.6-b（en.md 50–52 约束句）；语言成对约定。
+输出：resources/provider/role/blogger/ en.md 与 zh-CN.md 修改后文本。
+
+B1. [删除] 删除「恰好一个 Rulebook TipName / Choose exactly one」类措辞及其因果脊句中的对应半句。
+B2. [替换] 写入：tipName 自由命名（可自创新名；同一教训再次出现时沿用同名）；七节自由撰写（库为 bootstrap 与格式样板，不是封闭值域）。
+B3. [保留] tip 是可复用教训、具体字段描述这次具体转折的因果脊语义；原「the other four fields」措辞随字段拆分更新为七节指代。
+B4. [成对] en 与 zh-CN 同步改写、语义等价；不改机制。
+B5. [测试] bd-016 提示词面断言按 D5.4 口径处置：016 的 compose 断言为包含式、双文档注入后仍绿，不作改动；M3 面仅跑核对（§9.4）。
+B6. 返回修改后文本。算法终止。
+
+## S3.10 Algorithm R [交付读路径]
+
+输入：§8.4-4a/4d；§10.1 假设 A；C6.1 gd [002]/[006]；投影记录（含 TipTextRef/TipTextDigest）；Journal 的 blob 读能力（IBlobWriter.Read，经 journal.Writer.BlobWriter.Read 既有可达、10+ 处先例；AgentJournal 本体无读成员）；readFrameBody/ensureFrameDigest 的 sha256 校验样例（Wire.fs:85–96）。
+输出：读路径修改后文本。
+
+R1. [接口] 投影侧：不新增公开符号，深取经既有 Projection 公开面——tryFindByProviderRun（Projection.fsi:39–40；消费点现状仅 Continuation.fs:627 / Commit.fs:242，本任已复核，见 §2.6-i）；交付侧现状已访问同一模块（EnforcementProjection.recentTips，Tip.fs:61），深取属同类既有访问、不构成新穿线。journal 侧：不新增成员、不新增穿线——读回经既有 journal.Writer.BlobWriter.Read（BlobRef → Task<Result<string, string>>；Tip.fs 已持有 journal；与 Enforcer/Cycle/Recovery.fs、Mission/WorkRecord/Materialize.fs 等 10+ 处先例同形）。理由：最小公开面（与 L4/R5.1 同调）；AgentJournal 本体保持只有 WriteBlob。
+R2. [读路径] 交付解析（机制指名）：latestOwnerTip 链上已取到 session.Enforcement（Tip.fs:55–60）；按 CycleId 深取——ProviderRunIdentity.create cycleId（Foundation/Identity.fs:282 的透明构造；CycleId 即 ProviderRunIdentity.value，Projection.fs:71）→ Projection.tryFindByProviderRun run state（Projection.fsi:39–40）得 EnforcementCycleRecord → 取 TipName、TipTextRef、TipTextDigest → journal.Writer.BlobWriter.Read(ref) → 对读回字节求 sha256、与 TipTextDigest 比对（对照 Wire.fs:85–96 的 ensureFrameDigest 模式）→ 相符则返回正文文本。落点：guidanceForOwner（Tip.fs:163–168）已携带 tip.CycleId，深取与既有单次读取同段完成。
+R3. [失败路径] 三种情形同归「无处置正文」：记录缺失；TipTextRef 为 None；读回失败或 digest 不符（不采用错字节，诊断记录）。
+R4. [恢复路径裁决] ▷ 候选：blob 重读；anchor 回放。结论：blob 重读，且落在既有单次读取（latestTipGuidance 一次调用）内；已有 placement 的重放分支保持原字节回放、不重读（冻结点与重放不重渲染分支原样复用）。
+R5. [条款] gd [006] 改写为「从 occurrence 载荷取处置正文 ref 读回」（C6.1）。
+R5.1. [公开面] ▷ 候选：交付读路径新增 Surface 公开符号；不新增。结论：不新增。理由：最小公开面（与 L4 同调）；测试全走 JS surface 行为名断言（§2.4），正文读回结果经既有 resolve 行为面观测；R1 的读回为交付侧既有内部调用（journal.Writer.BlobWriter.Read）、不入 Surface。 # §9.2 边界待裁决点（Surface.fs 测试面是否需暴露新读路径）由此结断。
+R6. 返回修改后文本。算法终止。
+
+## S3.11 Algorithm G [Tip.fs Full 组装、语言选择退役、冻结交互]
+
+输入：C6.1 gd [001]/[002]/[003]/[005]/[008]、C8.3；§8.4-4a；Tip.fs 现状（本任已读全文）；Algorithm R 读路径；provider-language [005]/[006]/[009]/[013] 原文（本任已复核）。
+输出：Tip.fs 修改后文本。
+
+G1. [组装] tipFullText ← 标题（tipHeading 现状常量，按会话语言）+「tip = "名字"」+ 处置正文（R2 读回字节）；正文为空则回退 identity 文本。Full 分支才记录交付（recordFullTipDelivered）；identity 分支不记录、不推进 Frontier。
+G2. [退役] 删除 guidanceForField 的 tryFindByField 查库路径与 languageOf 的查库用途；正文来源改为 R2 读回；标题语言沿用 owner 会话语言。
+G3. [身份] tipName 直接取 RecentTip.TipName（decode 期 trim 后原串；不再经规则名派生）；occurrence ← RecentTip.CycleId。
+G4. [同名比较点] 交付同名比较的落点清单与处置（行号经本任 devops 核实）：
+G4.1. [比较点] normalize 比较适用于：① TipDeliveryProjection.isIdentityOnly 的 tipName 包含判定（DeliveryProjection.fs:26–31）；② hasFullDelivered 的同名包含判定（:35–39）；③ CoveredTipNames 的写入与查询（:52–56 规范化入口、:71–73 写入点）；④ occurrence 轴（DeliveredOccurrences）保持精确、不规范化。 # C3.3 比较点对应：Coverage 判定 ①②③、交付同名判定 ①；RecentTip 层不去重（P2），同名判定统一落在 G4.1。
+G4.2. [集合键形态] ▷ 候选：CoveredTipNames 存原串、查询时逐元素 normalize；存规范化键（写入与查询两侧都过 normalize）。结论：存规范化键。理由：Set 包含语义要求键与查询同构；C3.4「存原串」约束落库/投影/交付展示面（RecentTip.TipName 与 fact TipName），Coverage 集合为内部比较结构、不参与展示。
+G4.3. [展示与比较拆分] 定 tipNameOf（Tip.fs:111–116）的名字派生路径随 G3 退役（名字一律取 RecentTip.TipName，即 decode 期 trim 后原串）；展示名不做大小写折叠、也不改写内部字节；normalize（trim + ToLowerInvariant；trim 为幂等防御）只在比较点调用；tipIdentityText（:134）与「tip = "<name>"」（:138）展示该原串，不因比较规范化而变小写。 # 比较键与显示名分离。
+G4.4. [实现载体] normalize 单一实现于 Enforcer 层（C3.1/C3.2），供 DeliveryProjection 与 Tip.fs 消费；测试从消费面锚定。
+G4.5. [测试锚定] gd-001 现仅 presentation 断言（本任已复核），同名去重的验收锚定由此扩展：同一 tipName 的大小写/首尾空白变体在第二次交付时必须仍为 IdentityOnly、不产生新 Full（并入 G8 的 gd-001 项）。
+G5. [旧数据行为裁决] ▷ 候选：跳过（None）；identity-only；空体回退 Full。结论：identity-only（产出 identity 文本，不记录 Full 交付）。理由：Frontier 语义不应被无正文的伪 Full 推进；IdentityOnly 在投影上状态不变、幂等；既有冻结 marker 字节回放不受影响（C8.3）。
+G6. [冻结交互] 重锚后恢复路径：R2 读回 + G1 组装，落在既有单次读取内；已有 placement 原字节回放不变（§2.6-d 冻结点与重放不重渲染分支原样复用）。
+G7. [provider-language 裁定] ▷ 候选：交付 marker 文本属 Class A（改 [009]/[013]）；不属（整套保留）。结论：不属，整套保留。理由：Provider Prose 列举语境为资源族（提示词/角色规范/工具描述/执行后果/完成文案），交付标题与框架是代码常量（已核实不在资源机制内）、正文是 durable 撰写字节；[009] 的统一资源机制装载对动态字节不可满足；[013] 的全局语言即时生效与冻结回放（gd [011]、prefix-stability [010]）结构性冲突。裁定后 C6.2 转出项闭环。
+G8. [测试] gd-002（Full 断言改按拼装形态：经 chronicle 提交的七节拼装正文与 tipName 出现于交付文本，含节标题）/003/005/006/008 断言面同步（§9.4）；gd-001 增补同名变体（大小写/首尾空白）去重断言（G4.5）。
+G9. 返回修改后文本。算法终止。
+
+## S3.12 Algorithm F [统一格式工作包：批次与结构断言]
+
+输入：C7（对照表、退役措辞、集合与断言口径）；§2.2/§2.6-e 族谱与基线；§8.5 批次方向；§10.4 格式剧场防范。
+输出：批次表、结构断言与内容覆盖设计、脚本形态（F3.1）。
+
+F1. [批次表] 按结构最缺到形态个例四批推进（每批：集合 → 文件数 → 改法）：
+F1.1. 批一：23 个双侧无小节目录的全部 92 份（en 46 + zh 46）补八节/七节骨架。
+F1.2. 批二：20 个「en 完整、zh 无节」目录的 zh 文件（40 份）补节骨架。
+F1.3. 批三：变体族归一——zh enforcer 五节/七节变体族（25 + 13 = 38 份）与 zh main 变体族（24 + 12 + 1 = 37 份；含 24 个 8/5/7/5 目录、12 个 8/7/7/6 目录（含 cyclic-dependency）与 unrecorded-lesson 的 zh 文件）；退役措辞按 C7.6 落点处置：「刀口」「提醒」为节归并（内容分别归入「判定程序」与「Nudge」），「不要误判」「分支判断」「为什么这很重要」「与近邻区分」为用词替换。
+F1.4. 批四：标题/措辞替换 10 份——9 份「英文标题＋中文正文」文件（enforcer 4：illegal-state-representable、non-exhaustive-transition、stringly-typed-error、type-erosion-at-boundary；main 5：上述 4 加 null-ambiguity）替换标题为 canonical 中文名；另 duplicated-control-flow 的 zh main（「分支判断」→「决策分支」）。 # 原「混合形态个例」归口：null-ambiguity 在本批（其 main）；cyclic-dependency 在批三（随 12 个 8/7/7/6 目录）；duplicated-control-flow 的 main 在本批。
+F1.5. [边界] 批次覆盖合计 217 份 = 批一 92（en 46 + zh 46）+ 批二 40 + 批三 75 + 批四 10；已同构且 canonical 的 31 份 zh 文件不动（enforcer 16 + main 15）。
+F2. [改写口径] 每文件：按语言序列表补齐/对齐节名与节序；只动结构与措辞，不丢原文实质信息（信息不变量）；归并歧义按 C7.6 拆分/归并消解，消解不掉的个案记录待审（见 §10.2 与 F6）。
+F3. [结构断言] 只读脚本对全部 404 份执行：en 文件按 C7.2/C7.4 序列、zh 文件按 C7.1/C7.3 序列断言节名序列全等；known-bad 变体（缺节、错名、乱序、退役措辞残留）必须变红。
+F3.1. [脚本形态] ▷ 候选：一次性只读脚本（输出记录留档）；持久测试文件（按 NNN.test.mjs 命名与 WHAT 锚点）。结论：一次性只读脚本。理由：格式统一为一次性整理目标，无配套需求条款可锚定持久测试（NNN 编号与 WHAT 锚点规范），避免引入无条款的测试文件与长期门禁维护面；断言口径与 known-bad 清单以输出记录留档，供 V1 核查。落点：脚本不入 Git（置工作树外或忽略目录），只读遍历 resources/enforcer 全部 404 份文件；输出记录留存于本机运行数据区（.Herdchestra/，不进 Git），随 M5 执行记录供 V1 核查「已跑」；交付前确认工作树无未跟踪新增。 # 若将来要求持久门禁，另立条款与测试文件，不在本工作包。
+F4. [内容覆盖] 每节非空且实质（非占位标题）；抽查加关键词覆盖；对「只加标题不改内容」的格式剧场变体必须变红（§10.4）。
+F5. [顺序] 与代码线并行；V 前完成。
+F6. [失败] 断言红 → 回该批次重改；不放宽断言、不豁免文件。
+F7. 返回批次表、断言设计与脚本形态。算法终止。
+
+## S3.13 Algorithm V [收尾验收：全链测试与条款一致性复查]
+
+输入：§9.4 验收面；C6.3 五类语义；两套测试命令与套件。
+输出：验收执行记录与残留清单。
+
+V1. [前置] 逐里程碑核查 M0–M5 的执行落地：M0 的 016 断言修改已改且绿；M1 契约（C1–C8）已由后续各步落实；M2–M4 的代码、文案、提示词与条款文本修改已实施（条款逐条对照 C6.6 落点表）且各自测试面已跑；M5 的 217 份对齐已完成且结构断言与内容覆盖已跑（脚本形态与输出记录按 F3.1）。凭执行记录核查（测试结果与产物），S3.0 索引仅作算法对照、不作落地凭据。任一未落地 → 停，报告缺口，不开始验收。
+V2. [全链] 执行 bd 与 gd 两套测试及其 prefix-stability 相关锚点（§9.4 清单）。
+V3. [条款扫描] 对五类语义（tip 归一化、TipName 三元组、Full 正文来源、owner 语言、冻结对象）做全仓只读扫描，确认落点仅在 bd 与 gd 两套（C6.3）。
+V4. [残留清理] 检查退役残骸：arg-tip/missing-tip 旧键、MissingTipError/missingTipError 符号、resolveField 符号、Levenshtein 族、FieldNameAtCommit、120 硬编码断言（除 016 第 184 行标题串外；见 A2.2/A4）；无残留生成物与临时文件。
+V5. [失败] 任一红 → 定位到对应算法与里程碑，修复后重跑；不豁免、不跳过。
+V6. [绿] 全绿且残留清零 → 返回验收记录。算法终止。
 
-## 5. 本棒记录与移交
-
-本节不是验收声明。2026-10-12 覆核表明，材料把三处已失效坐标写成了〔F〕：`assembleAskContinuation` 的存续、`TenureIsolation` 的行数与函数名、planning-017 的 message-cursor 归属。这些已在上文订正。R9 已入档。仓库根 `plan.md` 与本活底稿不是同一个槽。下一任自行判断 S1 离 S2 还有没有差距。本任不自证。
-
-写出 2.13 的那一任只订正了两处：事实基线拆成 HEAD 与工作区；support 三文件的路径和锚点状态。那一任不自证 S1 已满。
-
-评审后的这一笔只补三处事实标注，外加 HEAD 从 `4b9ef101d` 挪到 `650850ea`、脏树已入库。条款与测试清单改成本次 ask 的出处。七处材料行号按重读改写或作废。2.3 第 6 项不再把没读到的 Relay 恢复判定写成同构〔F〕。这一笔同样不自证 S1 已满。再后一笔只改互相否定：根因不再把恢复写成两边各实现一遍，不再把 PluginTransforms 写成双分支；2.3 标题改为八项已核实、第 6 项同构未证实；2.12 与 2.13 对 WHAT.md 只留一个现行答案，相对 `650850ea` 无差异，[011] 已在提交正文。这一笔同样不自证 S1 已满。
-
-下列五问的选定答案在第 9 节。这里只留索引，不重开：
-
-- Q-S2-1 S4 单 Stage 退化模型的形态：统一生命周期的 Stage 语义（review 晋进）对 S4 意味着什么；Manager 的 assess/work/finish 事实推导循环在单 Stage 模型里如何表达；Plan work（S1→S3，交付 spawn）与 Manager work（直接 S4）在统一事件词表下如何同构；「Manager 恰好只有一个 Stage」与「S4 是四段流水的第四段」两种读法如何统一（候选：Stage 是 work 的属性序列，Plan work = S1,S2,S3，Manager work = S4；Plan 交付 spawn 的 Manager work 从 S4 开始）。确认次数已由 R9 裁死，不在这个形态问题里重开。
-- Q-S2-2 剥除语义对 Manager 侧的推翻清单：relay-context-projection-001 及其 9 个测试锚点重写；NarrativeTransform 的 stale cut（「never filters the provider message set」前提消失，cut 只剩请求身份判定）；恢复逻辑；Continue 自动派发与剥除装配的相互作用——后继不再看到前任消息、靠 LWR_prev 接力，自动循环在新语义下如何保持连贯。Plan 侧现行剥除以 `4b9ef101d` / planning-017 HEAD 为底：稳定 XTrace 身份，consumed-through 退休游标，禁止依赖 Host 上并不存在的 cursor。不得拿材料里的 message-cursor 模型当现行契约。
-- Q-S2-3 持久化统一设计：以 Plan EventStore+底稿为底稿吸收 Manager 侧事实；WorkspaceSnapshot、AuthorityRevision 的去留与载荷形态；证书退役后事件族裁剪；统一事件词表（Plan 7 事件 + Relay 事件族 → 一套）。Manager 第一次确认必须落进这套词表，不能成内存态。
-- Q-S2-4 术语映射落地：Road→Work、iteration→tenure、assessment→review、suicide→deliver、Continue/Accepted→Relayed/Delivered。Accepted 去掉 certificateId 之后叫什么，并入 Q-S2-3 的结果族载荷，不在这里先起名。需求包收敛形态（relay-* 四包 + planning 一包 → 统一包）；资源目录归一。suicide 这个词不保留为「两段式」的别名。
-- Q-S2-5 测试重设计锚点方案：统一契约的锚点编号空间；两套平行测试合并去重清单；GAP-192/193/197 处置。一段 deliver 与两段 deliver 各自要有锚点。planning 与四包 relay 的条款数、测试文件名、GAP-192/193/197 的登记行，已由修复本棒的 ask 重数，见 2.9，不再是未重数缺口。support 三文件这次没有重开，仍用上一任已读结论：路径在 `requirements/planning/tests/support/`，没有 `WHAT[planning-` 锚点。
-- Q-S2-6 模块级迁移路径：合并/重写/退役模块清单；迁移顺序（先核心后外围）；每步验收门。`assembleAskContinuation` 已在 `4b9ef101d` 退役，不是清单上的活代码清理项。文档残留只在 CHANGELOG 已记录的退役句、归档提案，以及仓库根材料 `plan.md`。那份材料不是第二份规范。迁移不得把 `650850ea` 里的 js-plan 描述装配当成未提交脏文件去覆盖或回退。详见 2.13。那笔记不是本规划的迁移载荷。
-
-S2 继任者注意：用户已把「无考古痕迹」定为最终判据——不引入兼容层、不留过渡命名、不为旧测试保留旧语义入口。
-
-已关掉、不许再当成开放价值问题的：历史全局剥除（R2）；术语用 Plan 风格（R3）；证书退役（R5）；Manager 自动派发、Plan 自然停止（R6）；高频路径允许重设计（R8）；Manager/S4 deliver 两段、Plan deliver 一段（R9）；活底稿是 P，仓库根 `plan.md` 只是材料。工作区快照字段不留，不再留给下一次核对，见第 9 节 P1。权威推进改名保留为 AdvanceCommitted，不并进 epoch；这是规划者推荐，不是未裁的价值问题，见第 9 节 P1。工作区在 `650850ea` 上是干净的；上一任看见的脏树已入库，见 2.13。support 三文件路径与无锚点沿用上一任已读，这次未重开。Relay 与 Plan 的恢复不同构，已读到，见 2.3 第 6 项。统一位置表已选定，见第 9 节「恢复位置」。不在本节重写。
-
-## 6. S2 第一段：Stage 是 work 的序列属性
-
-本段只钉一个读法。不写路径，不动 Q-S2-2 到 Q-S2-6。
-
-Stage 不是全局枚举里的一格，是 work 的一个属性，取值是一段序列。Plan work 的序列是 S1、S2、S3。Manager work 的序列是 S4。S4 标记的是「执行」这个性质，不是「前面排着三段」。没有「四段流水的第四段」这个对象。Manager work 的序列长度是 1，这就是用户原话里的「恰好只有一个 Stage 的退化情况」。
-
-依据是 R1。用户否决了「执行段加宿主角色」的区分建模，裁的是「Manager 就是 S4」。第 5 节 Q-S2-1 列出的两种读法，按这条裁决收成上面这一种，不再并列。
-
-Plan 持权 deliver spawn 出来的会话，序列也是 S4，不从 S1 再走一遍。接缝在现行代码里已经有：planning-023，`PlanTools.fs:144-150` 的 `spawn "manager"`（2.2 这次重读钉住，2.8 复核同一行号）。统一之后这条接缝还在，变的是它有了名字。
-
-评审追加事实。投影是否换成下一个元素，只看序列里还有没有下一个。S4 的 review 仍是每任一次、禁自证、非空即修复义务（2.3 第 2 项：relay-assessment-001/006 与 planning-022）。序列长度是 1，没有下一个元素，投影留在 S4。S4 里没有「晋级」这个对象。deliver 不按这个投影跳转。
-
-assess、work、finish 留在 S4 里面，是任期事实推出来的分支，不升成 Stage。依据是 `Workflow.fs:76-90`，注释写从不可变事实推导，不从程序计数器来（2.2 这次重读）。四个分支里，「有绑定证书走 finish」在证书退役后失去事实来源。换什么来源见第 9 节 P4 的五支表。证书不再是事实来源。
-
-确认次数不在本段。R9 已裁：S4 两段，Plan 一段。
-
-本段未写的五项，选定答案在第 9 节。候选、主路径与反事实在第 8–10 节。读法本身由 R1 钉住，后文不重开。
-
-## 7. 理解
-
-要改的是两套已经在跑的生命周期实现。一套是 Plan：同会话换任期，序列 S1、S2、S3，事件进 EventStore，后继看不到前任消息。一套是 Manager：独立会话，序列长度是 1、取值 S4，事实进另一套 Relay 事件，后继仍带着全部物理消息。结束动作都要叫 deliver。Plan 调用一次就结束。S4 第一次只落下确认，第二次另一次调用才结束。
-
-做完之后，六项骨架只有一套实现：唯一活跃任期、退休不可逆、每任一次评审且禁自证、接力不改序列、固定 DevOps、LWR 交接。Plan work 与 Manager work 都是这条生命周期的实例。差别只剩工作性质：Plan 等用户，S4 自己派发后继；以及确认次数：一段或两段。
-
-已裁死、不许重开的：全局剥除、术语用 Plan 风格、证书退役、自动与交互各自保留、高频路径可以重设计、两段与一段、活底稿是 P、仓库根 plan.md 只是材料、Stage 是 work 的序列属性。工作区快照比较这次已经读过，不再开着：没有「不等就专门拒绝」，快照字段不留，见第 9 节 P1。权威推进不并进前缀 epoch：Relay/Fold.fs:393-402 与 Prefix/Epoch.fs:151-160 不是同一函数，见第 9 节 P1。这是规划者推荐，不是未裁的价值问题。
-
-难点不在换目录名。难在把两套事实收成一套，同时不把「一段 / 两段」和「自动 / 交互」抹平。剥除不会拆掉现行自动循环：后继派发不读物理消息，开后继也不拷贝消息。要钉死的是这条依赖，不是另造一条消息通道。
-
-## 8. 候选路径
-
-### 选定：一套事件内核，副作用由序列导出
-
-核心思路：以 Plan 的事件存储和折叠为唯一事实面。S4 不另设状态机。序列写在 WorkOpened。确认次数、是否自动派发、持权 Delivered 是否 spawn，都从这条序列导出，不是可以互相打架的字段，也不是第二套事件名。
-
-主要风险：同一个结果名会带出不同副作用。Plan 的 Relayed 不派发；S4 的 Relayed 派发后继。Plan 持权的 Delivered 才 spawn；S4 的 Delivered 不 spawn。读代码的人会把同名当成同副作用。
-
-事实：提示函数 deliverLoopPrompt（Workflow.fs:329）不读消息，不读 LWR，参数是序号、退休 id、ProjectionCut.ProviderRunId。开后继是另一个函数 deliverLoopContext（Workflow.fs:371）：退休之后另一次事务，383 行 captureSnapshot，载荷含 snapshotId，不拷贝消息。统一后提示函数仍不读消息、不读 LWR；开后继不再抓快照，不把 snapshotId 写进开任载荷。评审在终元素上只把授权置真，不改写阶段字段（Fold.fs:236-239、254-262）。当前阶段是折叠投影。「结果不换序列」已经有先例。
-
-### 淘汰：两套事件族，上面加翻译层
-
-否掉。R4 要的是以 Plan 为底稿重设计，不是桥接。翻译层是兼容层，撞 G8。
-
-### 淘汰：剥除之后给自动循环补一条消息摘要
-
-否掉。提示函数 deliverLoopPrompt（Workflow.fs:329）不读物理消息，不读 LWR。开后继在 Workflow.fs:398-403 写 IncumbencyOpened，不拷贝消息。补摘要是在修一个不存在的断裂。开后继现行会抓工作区快照，那不构成消息通道，统一后删掉这次捕获，见 P1。context-projection-006 还禁止合成消息，这条义务剥除后仍留。
-
-### 淘汰：S4 也走评审晋级，空 findings 当结束
-
-否掉。序列长度是 1，没有下一元素（第 6 节，R1）。结束靠第二次 deliver（R9），不靠评审。
-
-### 淘汰：保留 suicide 作为两段式的别名
-
-否掉。R3 与 G5 要一套词。两段是确认次数，不是另一个工具名。
-
-### 权威计数不并进前缀重锚
-
-已读到权威比较与前缀重锚不是同一函数。不并。
-若实现时发现二者是同一判定且同一调用方，则停止并退回规划。
-不授权实现删 AdvanceCommitted。不授权实现改词表。
-这不是交给执行者的取舍。
-## 9. 主路径
-
-副作用由开立时写下的序列导出，不由结果名决定。Relayed 与 Delivered 两个名字两边共用。派发、spawn、确认次数不从名字里读，也不另存字段。
-
-### P1 事件内核
-
-依赖：无。必须先于 P2–P7。串行。
-
-触碰：Plan 的事件名、事实、折叠、存储。Manager 的 Relay 事件停写，不留第二套词表。
-
-不触碰：工具的名字与注册规格、资源正文、XTrace 捕获、前缀 epoch 的折叠实现。工具文件里追加事件的那一处要改。P1 的「不触碰工具注册表」不得被读成「文件里的追加点也不许动」。
-
-词表按这次读到的两份判别联合逐条处置，不用材料短名。Plan 在 Planning/Facts.fs:101-120，七个 case 都带 Plan 前缀。Relay 在 Relay/Facts.fs:4-24，九个 case。留下的名字去掉 Plan 前缀和 Road 前缀：两套实例共用一套词，前缀会把词表写成某一侧的私货。
-
-留下的 case：
-
-- WorkOpened。PlanWorkOpened 改名并入。RoadOpened 并入后删除。载荷是 workId、root、sequence、权威初值。sequence 是这条 work 的阶段序列，开立时写死，后继不改写。Plan work 写 S1、S2、S3。Manager work 与持权交付 spawn 出来的执行会话都写 S4。RoadOpened 上的 PhysicalUserMessageId 不进开立载荷，随 R2 作废。过期请求的身份由退休上的 cut 承担，不由开立时的消息 id 承担。权威初值是 WorkOpened 的必含字段。构造只在 Algorithm A 的 A3：固定标记 authority-initial-v1 加 workId 的确定性摘要。不依赖物理用户消息标识。不是 0。不是空串。这半条不再与推荐同进退。确认次数、是否自动派发、持权 Delivered 是否 spawn，不进载荷。它们从 sequence 导出：序列为 S4，则确认次数为 2、自动派发、Delivered 不 spawn；序列为 S1、S2、S3，则确认次数为 1、自然停止、仅持权 Delivered 才 spawn。不另留字段。序列长度不是 1 也不是 3，拒绝开立。
-- DevOpsBound。PlanDevOpsBound 与 RoadDevOpsBound 并入这一个。载荷是 workId、devopsId、target。不留 Road 前缀。
-- IncumbencyOpened。PlanIncumbencyOpened 与 Relay 的 IncumbencyOpened 并入这一个。载荷是 workId、incumbencyId、起始投影、openingCursor。阶段序列不在这里，只在 WorkOpened。首任的起始投影是序列的第一个元素。接力开出的下一任，起始投影等于退休当时的折叠投影，开任不另算下一步。S4 只有一个元素，起始投影写 S4。不含 snapshotId。无权接力同一笔里，序列为 S1、S2、S3 时，下一任 openingCursor 等于这笔退休载荷里名为 retirementCursor 的字段。序列为 S4 时，下一任 openingCursor 来自本次调用已观察到的 XTrace 头序号，不从退休载荷读取名为 retirementCursor 的字段。两种序列的值都是本次 deliver 的 XTrace CurrentHead.sequence，不加一、不加十。剥除比较是 sequence > OpeningCursor。出处：PlanTools.fs:256-274 把同一个 retirementCursor 写进退休和下一任开任；ToolRegistry.resolveDeliverRetirementCursor:755-771 取的是 receipt.CurrentHead 的序号；TenureIsolation.keepsInteraction:44-46。Planning 源码已无 openingCursor + 10。后继的新 id 仍由上一笔退休 id 派生，不拷贝消息。现行 Relay 开后继在 Workflow.fs:398-403，事件是 IncumbencyOpened(incumbencyId, snapshotId)，并且是退休之后的另一次事务。统一后 snapshotId 不进载荷，开任与这笔退休同一笔追加，见下面的交付形状。
-- ConfirmationCommitted。RetirementConfirmationCommitted 改名并入。只允许确认次数为 2 的实例写入。载荷是 incumbencyId、providerRunId、toolCallId。现行是 SuicideTool.fs:377-386 的 confirmFirst，身份门在 361-368。Plan 不写这一笔。
-- IncumbencyRetired。PlanIncumbencyRetired 改名并入。RetirementCommitted 并入后删除。结果只有 Relayed 与 Delivered。Continue 收成 Relayed：派发后继，不改序列。Accepted 收成 Delivered：收束，不 spawn。证书退役后，这两条不再由证书选出。确认次数为 2 时，第二次 deliver 读折叠上的评审 outcome：Promoted 写 Delivered，Stayed 写 Relayed。见 P4。序列为 S1、S2、S3 时，载荷是退休 id、incumbencyId、outcome、ProviderRunId、ToolCallId、名为 retirementCursor 的字段，外加它所声明的期望推进值，不带 ProjectionCut。序列为 S4 时，载荷是退休 id、incumbencyId、outcome、ProjectionCut，外加它所声明的期望推进值，不带名为 retirementCursor 的字段。身份摘要的字段次序两种序列相同：固定标记、workId、ProviderRunId、ToolCallId、outcome，外加入口读到的 work 计数。确认次数为 1 的标记是 oneshot-retirement-v1。确认次数为 2 的标记是 retirement-v1。两个标记不合并。retirementCursor 不进身份。ProjectionCut 进 S4 载荷，不重复进身份。不从活跃任期算这个 id。不把每次重捕的 XTrace 头序号算进身份。期望推进值从 work 上的同一计数读出，写进这笔退休，只是声明，不是第二个 writer。计数不挂在活跃任期上。与折叠上的当前值不符则拒绝。开立留下权威初值而退休载荷缺期望推进值，同样拒绝。不写 IncumbencyRetired，也不写 RetirementBlocked。四格的后继只在 Algorithm D 的 D3 与 Algorithm E 的 E6。AdvanceCommitted 是这一计数的唯一推进事件；退休事件不改计数，推进事件也不另带一套 expected 来和这笔声明竞赛。AuthorityRevision 这个词不留在统一事件里。RetirementSummary 在 Contract.fs:110-116，字段是 Id、IncumbencyId、SnapshotId、AuthorityRevision、ProjectionCut、Outcome。SnapshotId 默认不留。ProjectionCut 只留在序列为 S4 的退休载荷上：context-projection-002 的义务是 cut 只识别退休尝试，这条没被 R2 推翻，所以 cut 写在 S4 这笔退休上，不另设事件。序列为 S1、S2、S3 的退休载荷不带 ProjectionCut。幂等用退休 id，不靠证书。id 不从活跃任期算，也不把 XTrace 头序号算进去。
-- Reviewed。PlanReviewed 改名并入。AssessmentCommitted 并入后删除。结果是 Promoted 或 Stayed。载荷是 incumbencyId、stage、outcome，不含 findings 对。Plan 现行就是这样：PlanReviewed（Planning/Facts.fs:119）只有这三项；对列表在返回值 PlanReviewResult.Gaps（ReviewPlanBackend.fs:9-11、82-106），不追加成事件；折叠只存 outcome（Planning/Fold.fs:55）。空与非空由 outcome 表达：Promoted 是空，Stayed 是非空。Relay 的 AssessmentFindings 不带进统一事件。Promoted 不改写阶段字段，也不推动计数器。它只追加一条 Reviewed 事实。当前阶段是折叠从 WorkOpened.sequence 和已落盘的评审事实投影出来的，不是存在字段里的下一步。序列里还有下一个元素，且 outcome 为 Promoted 时，投影换成下一个元素，对象仍是这一任。现行 promoteTenure（Planning/Fold.fs:232-239）做的就是这件事：S1 的投影变成 S2，S2 的投影变成 S3，同一 active。那是事实投影，不是程序计数器。序列已到最后一个元素时，投影留在该元素。交付授权只在这里置真，而且只在确认次数为 1：投影已是序列末元素，且 outcome 为 Promoted。S3 现行只把 Authorized 置真，投影留在 S3；确认次数为 1，对得上。确认次数为 2 时，终元素上的 Promoted 不置交付授权，投影也不换元素，只记下这一任已评。S4 序列长度是 1，走这一句。空 outcome 不结束，也不生证书。Stayed 不换投影，也不置交付授权。
-
-时序判定的允许形与禁止形只写在这里。失败点七只引用这一处。
-
-允许形，条款原文，本棒 ask，HEAD 650850eabe78fa6b1f0ddabd4bf5cac8725e2dd8，工作区干净：
-
-[001] 第 5 行：「业务流程直接使用宿主语言的顺序、分支、调用、资源作用域与有界递归。调用栈承载执行位置，不得把“下一步走向”保存为长期字段或枚举。」
-
-[002] 第 9 行：「领域 DSL 采用直接执行的 CE 与具名领域操作，不得构造业务 AST 再解释执行，或用 Command/Reply 总线、continuation 状态树及调用序列回放器调度业务。外部协议解码与物理命令的强类型表示不受此限。」
-
-生命周期投影是对已落盘事件的折叠。现行折叠是对已落盘事实的穷尽 match，走到一支就停，返回一次结果。穷尽 match 是现行折叠写法，不是条款命令。阶段序列只出现在 WorkOpened 载荷里，那是这条 work 的序列属性，不是「下一步走向」。deliver 匹配任期、评审、确认、阻塞、授权，不按阶段跳转。
-
-先前调查读过、本棒未重读，不写成这一棒的〔F〕：requirements/planning/WHAT.md 第 23 行、第 186 行标题「工作状态机」。若那两处仍在，指的是事件投影，不是第二套机器。本棒没有重读那两行。
-
-禁止形，仍是上面的条款，不另造句子：
-
-不得把“下一步走向”保存为长期字段或枚举（[001] 第 5 行后半）。不得构造业务 AST 再解释执行，或用 Command/Reply 总线、continuation 状态树及调用序列回放器调度业务（[002] 第 9 行）。这句上不添这次检索没有的词。
-
-[003] 本棒读到的原文。第 13 行：「DU 与字段只表达封闭的领域词汇、已发生事实的持久证据或单次返回结果。不得在 record、DU、可变存储或跨模块接口中保存、发布执行位置、下一步指令或多个状态的正交乘积；改名、搬移和恢复用途不构成例外。」第 15 行：「Stage、Phase、Lease、Owner、Generation 不得作为流程程序计数器或伪领域状态；除真实物理归属和资源世代外，也不得用于业务状态机命名。」第 17 行：「恢复从 Journal fold 的事实和当前物理观察重新证明未完成义务，再进入普通业务流程；不得恢复 continuation、临时中间状态或把“最新 case”当作恢复地址。Reconcile 只稳定观察，不接管业务调度；协议 Phase 只能作为只读诊断投影。」
-
-本棒读到的另两条禁止句。crash-reconciliation WHAT 第 17 行：「恢复过程遵循 Journal facts → Fold → 纯恢复决策 → 普通 workflow 合法入口。严禁恢复 Program 节点、continuation 或执行步数，严禁引入 RecoveryStage 等第二状态机。」delegation WHAT 第 95 行：「复用 participant 的每个新工作是独立 direct-CE invocation，不建立 durable Stage/Phase/ActiveWorkUnit 或第二状态机。」
-
-先前调查读过、本棒未重读，不写成这一棒的〔F〕：relay-incumbency WHAT 第 9 行「另设状态机」；planning WHAT 第 32 行「旁路状态机、内存标记或外部计数器」，第 85 行「两段式 ask 挂起状态机」。
-
-未找到的整话：用户原句「本仓库不允许“状态机”，只允许 F# DSL 来处理时序逻辑」在这次检索里没有。不升成条款。「计算表达式」四个字这次检索没有。条款写的是直接执行的 CE，不是那四个字。「转移表」这次检索没有，不升成条款。Program.fs:7-9 是文件头注释，写控制流是 plain let!/do!/match/task，不是状态机。它是注释，不是条款。
-
-能证伪，只在这一处：实现把下一步走向存成长期字段或枚举；或构造业务 AST 再解释执行；或用 Command/Reply 总线、continuation 状态树、调用序列回放器调度；或把 Stage、Phase、Lease、Owner、Generation 当流程程序计数器或业务状态机的名字。观察到任一条，允许形作废。
-
-一次 deliver 的过程顺序只写在 Algorithm D 与 Algorithm E。这里不另留一张活调用表。P3、P4 引用这两处，不另起一套门。
-
-交付授权不是确认次数为 2 的锁。确认次数从 sequence 导出，不另存字段。
-
-确认次数为 1 只走 Algorithm D。确认次数为 2 只走 Algorithm E。入口先按本次 Host 上下文的 ProviderRunId 与 ToolCallId 查已落盘退休，再谈无任期。现行 ToolRegistry.fs:819-820 与 PlanTools.fs:34-42 在更早一层返回 no active incumbency 失败字符串，这一层作废。围栏还在，不得先于查找返回。
-
-一段式不写 ConfirmationCommitted。无评审放行。投影复制、阻塞写事件、持权先启动后写，都只按 Algorithm D。两段式的确认、同一调用冲突、第二次入口，都只按 Algorithm E。现行 SuicideTool.runFrozen（370–393）的无评审拒绝不套到一段式。用户没裁要给一段式加评审门。
-
-能证伪的破坏：确认次数为 2 且已评 Stayed，第一次 deliver 因缺交付授权被拒；确认次数为 2 的 Promoted 仍置交付授权，并用该位放行或拒绝第一次确认；无评审却写了 ConfirmationCommitted。一段式：无评审的 deliver 被拒；S1 Promoted 之后的 deliver 被拒或写成 Delivered；遇阻塞只返回字符串、不写 RetirementBlocked。Relayed 不换投影。下一任开立载荷上的起始投影等于退休当时的折叠投影。现行 buildRelayTransition（PlanTools.fs:272）复制的是这次 deliver 看见的投影；需求 [004] 写接力不推进、下一任沿用退休时的投影。评审之后解锁写是许可（[005]），不是必须先写下一段才能接力的代码不变量。提示词方法行读这个投影，那是诊断，不是下一跳调度。评审事实落在这一任，所以下一次装配读到的是新投影。这次没有重读装配器行号，不补坐标。AssessmentBinding 类型不进统一事件。Contract.fs:74-82 的八个字段这次没有打开哪些是不等就拒绝，列进载荷就会把没读到的比较写成事实。Reviewed 载荷只留 incumbencyId、stage、outcome。钉住所裁那一次尝试的义务，由 Plan 现行这三项承担，不由那八个字段承担。AssessmentCommitted 元组里的 WorkspaceSnapshotId 不带上。findings 对仍不进事件。
-- Reopened。PlanReopened 改名留下。Relay 没有对等 case。载荷是 incumbencyId。S4 不写这一笔。生产路径这次没有读到写入点：PlanEventStore.append 的生产调用不含 reopened；测试是直接 applyWorkEvent。条款写系统追加，调用方未读到。不发明函数名。折叠义务不抄现行硬编码。Fold.applyReopened（372-381）进 restoreDeliveredTenure（347-370）时，现行把 Authorized 写成 true，和条款「沿用原授权」对不上。目标是：同一任期 id，不生成新 id；阶段从已交付记录复制；评审整份留下；授权从那笔记得读，读不到就拒绝，不许补 true。没有 Delivered 退休、任期 id 不符、或授权读不到，都拒绝，不猜。
-- AdvanceCommitted。AuthorityRevisionAdvanced 改名留下，不留 AuthorityRevision 这个词。载荷是 incumbencyId、expected、next。PhysicalUserMessageId 不带，随 R2。WorkspaceSnapshotId 默认不带。生产写入只有一条：已有 Manager job 再 commission。continueManagerJobCore（Change/Host/Host.fs:547-571）调用 advanceAuthorityRevision（507-544）。证书有效挡住推进（requireActiveWorkOwnedIncumbent:496-505，Valid = true 就拒绝）。证书失效不推这个计数；QualityCertificateInvalidated 的折叠不改 revision。证书退役后，这道有效证书门作废。缺评审仍拒绝：现行还要求 AcceptedAssessmentTransport 非空。没有这次再 commission，就不写 AdvanceCommitted，不另造推进动作。checkRetirementAuthority（Relay/Fold.fs:393-402）只比较，不推进。findAuthorityAdvanceViolation（302-318）管的是 expected/next 是否过期、是否没变、消息 id 是否用过。PhysicalUserMessageId 与 WorkspaceSnapshotId 不进载荷。证书失效不随这条留下。保留第二计数器、不并进 epoch，仍是规划者推荐，不是用户裁决。已读到它和前缀 epoch 不是同一函数：Relay/Fold.fs:393-402 与 826 行钉的是推进，Prefix/Epoch.fs:151-160 的 applyTenureReanchor 钉的是前缀。不并。若实现时发现二者是同一判定且同一调用方，则停止并退回规划。不并进 epoch。不删第二计数器。不改词表。
-- RetirementBlocked。RetirementCleanupBlocked 改名留下。不并进 IncumbencyRetired，因为退休没有发生。载荷是 incumbencyId、blockerDigest。定义在 Relay/Facts.fs:22。写入在 SuicideTool.fs:128-129 与 Relay/Fold.fs:875-876。义务是 relay-retirement 的 [003]：唯一业务 blocker 是当前任期直接或递归拥有的 live child、background job、PTY/process、active tool、side-effect/execution lease、同步 descendant provider work，以及尚未观察到 terminal 的 cancel/join。清理之后可以再调用 deliver 走关闭。[007] 那句「CleanupBlocked 的通过任期可在清理后重试 Accepted」收成重试 Delivered，不留 Accepted 这个名。这不是用户裁决。没有哪条裁决把阻塞义务作废。
-
-删除、义务另有着落的：
-
-- PlanDelivered 删除。它不再既是结果名又是事件。结果名是 Delivered。execSessionId、digest、path 写进 IncumbencyRetired，仅当结果是 Delivered 且该实例的 spawn 参数为真。S4 的 Delivered 不填这三项，不 spawn。持权才 spawn，门在 runDeliverDecision（PlanTools.fs:313-316）的 AuthorizedDelivery。workId 已经在工作上，不重复写。
-
-一段式交付的现行形状不是同一事务。appendRetireAndOpen（PlanTools.fs:90-100）先追加退休，成功后再追加开任。第一笔成功、第二笔失败，不回滚。appendRetireAndDeliver（113-123）同样，先退休再追加 PlanDelivered。持权路径是 spawnAndCommitDelivery（195-220）：先启动执行会话，失败则零 Plan 事件，成功后才写。
-
-统一裁定：无权交付的退休与后继开任放进同一次 Append 的列表。这次调用不是整批原子屏障。AppendDurable 才算两笔都落地。AppendNotAttempted 才是两笔都未提交。CommitUnknown 不报告已落地，也不报告未落地。序列为 S1、S2、S3 时，下一任 openingCursor 等于这笔退休载荷里名为 retirementCursor 的字段。序列为 S4 时，下一任 openingCursor 来自本次调用已观察到的 XTrace 头序号，不从退休载荷读取名为 retirementCursor 的字段。两种序列的值都是本次 deliver 的 XTrace CurrentHead.sequence，不加一、不加十。持权仍先启动会话，失败零写；成功后只写退休，不再单独写 PlanDelivered。不把现行两笔 append 说成已经是同一事务。S4 的 Relayed 同样：开后继不再是退休之后的另一次事务，也不再 captureSnapshot。
-- QualityCertificateInvalidated 删除。证书类型在 Contract.fs:91-99，字段是 Id、AssessmentId、IncumbencyId、SnapshotId、AuthorityRevision、Binding、Valid、InvalidationReason。随 R5 整个作废，没有留下的事实承接失效。
-
-不并进这套的：TenureReanchored 仍在前缀（Companion/Facts.fs:105-110，写入 PluginTransforms.fs:707-712）。
-
-工作区快照 id：这次只读已经打开比较点。相等检查嵌在精确重放谓词里，不是单独的「哈希不等就拒绝」分支。isExactAssessment（Relay/Fold.fs:147-159）只返回布尔。tryReplayAssessment（168-182）合取不成立，包括快照 id 不同，返回 AssessmentReplayConflict，错误名不写快照不符。decideStoredAssessment（185-199）精确相同（含快照 id）返回原状态；id 或 tool call 相同但快照不同，同样是 AssessmentReplayConflict。isExactAuthorityReplay（290-300）含快照相等；调用方 authorityReplay（276-280）精确重放失败返回 AuthorityRevisionReplayConflict，不是快照不符。decideIncumbencyOpen（608-613）同一 id 且同一快照返回原状态；同一 id、不同快照掉进 ActiveIncumbencyAlreadyExists，不是单独的快照拒绝。validateFreshAssessment（201-220）参数里有 snapshotId，函数体不比它。findAuthorityAdvanceViolation（302-318）比 revision 和 message id，不比快照。checkRetirementAuthority（393-404）只比 AuthorityRevision。Manager 目录没有把两个 snapshot id 拿来比的函数。搜过 SnapshotId 相等与不等、SnapshotMismatch、workspace hash、content hash，后一组零命中，没有读到 SnapshotId <> 这种直接不等比较。默认不留这个字段，不留 WorkspaceSnapshot 这个类型名，不留独立模块，是因为这次读到没有「不等就专门拒绝」，不是因为还没搜。上面凡是写「默认不带」的 snapshot id，都服从这一句。不把字段加回来，不新造 SnapshotMismatch。这不是用户裁决。
-
-这一步答 Q-S2-3。证书退役后的结果族就是 Relayed 与 Delivered，不再有 Accepted certificateId。第一次确认是 ConfirmationCommitted，不是内存态。PlanDelivered 不再是独立事件。
-
-写入点只列这次读到的生产构造。折叠里的 match 不算写入。停写之后这些函数不再持有第二套事实。统一事件只有一条追加口。没有读到的跳转不补函数名。
-
-- RoadOpened 只在 IncumbencyOpening.initial（Relay/Facts.fs:68-69）与 IncumbencyOpened 同一笔事务。调用方是 Workflow.decideInitialOpening（Manager/Workflow.fs:295），条件是该 session 还没有 road view，且角色是 Manager，且没有 Algorithm A 的 spawn 标记。有这一标记的开立不走 Manager 直接开立。入口判别只在 Algorithm A。提交在 ensureManagerRoadOpened（同文件 316 行起）。Change/Host/Host.fs 不写 RoadOpened。统一后这一笔改成 WorkOpened（sequence 为 S4）加 IncumbencyOpened，不带 snapshotId。不开第二笔 work。
-- RoadDevOpsBound 的事件字面量只出现在 Relay/Fold.fs 的 bindRoadDevOps（836、838、842）。生产侧 resume（Tool.fs:688）与 horizon（HorizonTool.fs:168）调用 scope.EnsureRoadDevOpsBound；函数体在 ToolRuntimeScope.fs:693，只转到 obtainRoadDevOpsTask。这一跳有没有落到 bindRoadDevOps，这次没有读完，不写函数名。S4 的绑定触发仍是 resume 与 horizon，不搬到开任。事件名改成 DevOpsBound。不发明中间函数。
-- IncumbencyOpened 有三处「下一任」生产构造，不能用一处盖住另外两处。IncumbencyOpening.next（Relay/Facts.fs:88）只含这一条事件。deliverLoopContext（Workflow.fs:399）沿用上面已写的裁定：退休与后继开任同一笔追加，不抓快照，不写证书失效。过程不在本节。tryBuildAcceptedOpening（Workflow.fs:260）与 activateNextIfAbsent（Change/Host/Host.fs:270）只转 Algorithm Q。无活跃任期时零写、拒绝。不写 IncumbencyOpened。不并进一笔并不存在的退休。首任只来自 Algorithm A。后任只来自 Algorithm D 的 D8，或 Algorithm E 的 E11。deliverLoopContext 与这两处都停写 QualityCertificateInvalidated。
-- AssessmentCommitted 的构造在 ReviewBackendManager.fs:210-228 的 assessmentTransaction。这个窗口没有 append，调用方这一轮没追到，所以还不是已证实的生产写入。Decision.assess（Fold.fs:851）这次没读到生产直接调用。统一后改写 Reviewed。不把 Surface 包装、也没打开的 append 调用方，当成已证实的生产写入点。
-- AuthorityRevisionAdvanced 的唯一生产构造是 advanceAuthorityRevision（Change/Host/Host.fs:533）。调用链是 ContinueManagerJob，再是 continueExistingCommission（Fork/OpenCode/Tool.fs:797）。这是 commission 续做已有 Manager job，不是 fork，不新开 work。统一后仍只写 AdvanceCommitted。
-- QualityCertificateInvalidated 随 R5 停写，事件删除。读到的构造：tryBuildAcceptedOpening（Workflow.fs:256）、deliverLoopContext（Workflow.fs:395），原因字符串都是 ContinuousSessionAdvancesRoad，仅当证书仍 Valid；SuicideTool.fs:123，原因 RetirementBindingChanged，与退休同一事务。Change/Host/Host.fs:218 另有一处构造，调用方这次没再往上追，不发明调用方。停写，不留事实。
-- RetirementCleanupBlocked 的生产构造在 SuicideTool.fs:129。Decision 第 876 行也有构造，生产调用方这次没读到，不把它写成第二生产源。统一后改写 RetirementBlocked。
-- RetirementConfirmationCommitted 的生产构造在 SuicideTool.fs:381。统一后改写 ConfirmationCommitted。
-- RetirementCommitted 的生产构造在 SuicideTool.fs:126。统一后改写 IncumbencyRetired。
-- fork 工具本体不写这九个事件。executeManagerAfterGuards 与 executeManagerNewCalling 这次搜索没有 RelayEvent。不改 fork 的写入。ForkHarness 上的 injectAcceptedAssessment（ToolSurface.fs:1429）与 injectAuditPendingIncumbency（1526）会写 RoadOpened、IncumbencyOpened、AssessmentCommitted，那是注入，不是生产路径。随 P6、P7 停写旧事件，不保留为第二生产源。join 这次搜索没有 RelayEvent，不改。
-
-### 恢复位置
-
-依赖：P1 的折叠视图。不新造模块，不新造事件。Relay 与 Manager 没有同构恢复函数，不发明函数名。现行 Planning/Recovery.fs 的 planRecoveryPosition（67）与 evaluateRecoveryEffects（94）改成读 Algorithm F。折叠重放（Fold.tryReplayAssessment 168、replayedRetirement 466）不是这张表，不拿来当恢复入口。
-
-输入只两样：已经折好的统一视图，以及底稿文件在不在。不读还没落盘的工具调用，不读底稿正文，不读确认事件去发明退休。ConfirmationCommitted 只决定视图里有没有活跃任期，不单独变成一个恢复位置。
-
-格子不在本节。恢复位置的唯一正文是 Algorithm F。输出还有 PairIncomplete 与拒绝，以及 F2、F3、F4、F5 已经命名的那些。F4.1 不可达，不是输出格。本节不另写一套格子。第 10 节只列破坏观察，也不另写格子。
-不要把「只有 Delivered」读成不含历史 Relayed。不要把「看不到交付、也看不到活跃任期」读成 Relayed-only 的 Nothing。
-
-### P2 历史投影
-
-依赖：P1 的退休事实已经是后继唯一的交接事实。与 P4 并行，不与 P3 抢同一处写入。
-
-触碰：Manager 后继的 provider 投影。后继装配时新接 LWR，复用 Plan 已有的 previousTenureRecord（PluginTransforms.fs:719-736），不在 Manager 再写一份 materialize。
-
-不触碰：XTrace 捕获、前缀折叠、Plan 自己的剥除比较。
-
-剥除依据与 Plan 相同：稳定消息身份的首次观察序，晚于本任 OpeningCursor 才留。比较单位是 XTrace 观察序（TenureIsolation.fs:46，Fold.fs 存的是 XTraceCursor）。不用退休工具调用的下标。无稳定身份则拒绝装配，不猜测。NarrativeTransform.fs:135-138 那句「never filters the provider message set」作废。projectActive 原样写回作废。
-
-Manager 侧现行没有 LWR materialize 调用。统一后的注入是新接线，不是改一个已有参数。
-
-context-projection 九条，按义务本身拆，不按「改名就能留」拆：
-
-- 001、003、004、005、007、008、009 的义务是保留完整物理历史。剥除后改写义务，不是改名。
-- 002 仍成立：cut 只判定请求身份，不当成新任的活跃请求。
-- 006 仍成立：不生成合成消息，不概括前任。
-
-这一步答 Q-S2-2。恢复不在 P2。位置表在上面「恢复位置」，不在这里新造模块。relay-assessment [008] 不在这一步。剥除历史覆盖不了提示时域，见 P4。
-
-### P3 结束动作
-
-依赖：P1 的确认事件与退休事件。串行于 P1。工具改名可与 P2、P4 并行，因为不写投影、不写派发。
-
-触碰：结束工具的名字与资源目录 tool/suicide。
-
-不触碰：确认次数的判定本身。次数从 WorkOpened.sequence 导出，不在工具里分叉成两个工具，也不另存字段。
-
-名字只留 deliver。一次调用的过程顺序只在 Algorithm D 与 Algorithm E，这里不另写一套。确认次数为 2 的身份门只跳到 Algorithm E，不在这里另写谓词。无评审转 E3。无确认转 E4。同一调用转 E5。第二次入口转 E7。E7 的谓词是本次 toolCallId 与已确认的不同，且 providerRunId 在，且 toolCallId 在，且本次已有 XTrace 头序号。缺头序号按 E7 拒绝。零写。不进入 E8。确认次数为 1 不套这步，顺序只引 Algorithm D。现行 runFrozen（370–393）先看有没有评审，再进 runConfirmed（361–368）。把 E7 收成拒绝，两段式就死掉。
-
-折叠侧管再写一笔确认事件，现行在 Relay/Fold.fs:674-695 的 confirmRetirement。两支：精确同一对返回原状态；已有确认但这对不完全相同，一律 RetirementConfirmationReplayConflict。这道宽拒绝不套到 deliver 调用上。第二次 deliver 不是再写确认事件，走身份门的第四支。
-
-身份门与折叠重放门仍是两道比较，不并成一道。无任期、无评审那两步在它们前面，顺序以 Algorithm E 为准。围栏查找先于无任期失败字符串。Plan 一次调用直接退休，不写确认事件。不留 suicide 别名。
-
-### P4 派发
-
-依赖：P1 的 Relayed。与 P2 并行。
-
-触碰：S4 后继 prompt 的装配。
-
-不触碰：Plan 的自然停止；提示函数的资源正文可以重写，但提示函数的参数仍只来自序号、退休 id、ProjectionCut.ProviderRunId。开后继不再抓工作区快照。
-
-S4 的 Relayed 之后自动派发。提示函数是 deliverLoopPrompt（Workflow.fs:329），文本来自 runtime 资源，不读物理消息，不读 LWR，不把 LWR 当控制输入。LWR 只进后继的交接材料（P2）。「不读消息」只描述这个提示函数，不描述开后继。开后继现行会抓快照，统一后删掉，见 P1。Plan 的 Relayed 不派发，等下一次请求。空停只属于 Plan。
-
-这一步把 R6 落成序列导出：sequence 为 S4 则自动派发，否则自然停止。不是事件名差异，也不是单独字段。
-
-确认次数为 2 的活任，提示词选择是一个互斥且穷尽的 match。读折叠投影，不读工具返回值，不读证书。读三样：有没有任期、评审 outcome（Promoted 或 Stayed）、确认位。确认位是折叠上的 RetirementConfirmation（Fold.fs:12-23 的 ActiveIncumbency.Confirmation，投影在 785-789）。现行 resourceForCurrentAction（Workflow.fs:86-90）不读这个位，只读 ActiveIncumbency、AcceptedAssessmentTransport、Certificate。finish 只由 88 行那一支选出，调用方 isBoundCertificate 在 80–88。换成五支是新接线，不是把现有分支改个名。选择器正文只在 Algorithm H。这里列出的格子与 H3 到 H7、H4.1 是同一套，不是第二份过程。H7.1 只留这两支没有命名的残格。拒绝格不在这里用通配补上。relay-assessment [008]（requirements/relay-assessment/WHAT.md:31-33）要的是提示与指令的时域，不被剥除历史代替，也不被「findings 不进事件」代替。评审前只给当前独立只读评估要求，不泄露低分接责、满分退场或后继循环。评审后供给者每次只看见一条指令。R9 下，Stayed 不是立刻结束，Promoted 也不是第一次 deliver 就退场：评审后的那一条指令按确认位分开，第一次只写确认，第二次才收束。自动循环机制不进这些正文。三份资源正文这一轮没打开，不写成现行正文已经满足或不满足。资源路径是现行的 runtime/manager-assess、runtime/manager-work、runtime/manager-finish，常量在 Workflow.fs:23、26、29。名字可以随 P5 改，事实来源不能改回证书，也不能改成工具进程内存。工具放行仍只引 Algorithm D 与 Algorithm E，不在这里另写一把锁。
-
-- 无任期：不选资源。现行是 None。不允许 deliver。
-- 有任期、无评审、无确认：选出 assess。不允许 deliver。这一格的正文只在 Algorithm H 的 H4。
-- 有任期、无评审、已有确认：拒绝。不选 assess。零写。这一格的正文只在 Algorithm H 的 H4.1。
-- Stayed 且尚无确认：选出 work。这是修复义务，不是工具拒绝。允许第一次 deliver：写 ConfirmationCommitted，返回，不收束。已有确认之后不再命中这一支，改走已确认那一支，不落回 work。Promoted 不走这一句。不读 findings 对，对不在事件里。
-- Promoted 且尚无确认：选出 finish，参数是尚无确认。允许第一次 deliver：写 ConfirmationCommitted，返回，不结束。不要把现行「证书已绑定、可以结束」的正文发给这一支，否则模型会被教成一次调用就结束。这一支不读交付授权，放行不是因为授权解锁了它。
-- 已有确认、未退休：选出 finish，参数是已有确认。Stayed 且已确认只命中这一支，不再选 work。第一次确认落地之后不能落回 work。这一支允许第二次 deliver。收束不写在提示词选择里。
-
-收束选择器与这五支分开。只在已确认之后的另一次调用上读折叠上的评审 outcome 与确认位：Promoted 写 Delivered，不派发、不 spawn，工作收束；Stayed 写 Relayed，派发后继。不读证书，不读工具返回值，不读交付授权。S4 走到 Delivered 的路是已确认且 Promoted，不是提示词选了 finish。
-
-确认次数为 1 的实例不走这五支。过程顺序只引 Algorithm D，这里不另写一把锁。无任期不放行。无评审放行，走无权 Relayed。终元素 Promoted 才置交付授权，解锁一次持权 deliver，持权才 spawn。Stayed 与非终元素 Promoted 不置持权，同任 deliver 是无权接力，不是拒绝。有活跃 blocker 在授权分支之前写 RetirementBlocked，不放行。
-
-后继提示单独成段，不与这五支共用入口。它只在 Relayed 之后发出，不读这五支的正文当控制输入。参数仍只来自序号、退休 id、cut 的 provider run。
-
-Stayed 这一支的出处：Manager 同任再评被 requirements/relay-assessment/WHAT.md [002]、[006] 拒绝，Relay/Fold.fs decideStoredAssessment 194–199 行两支都是错误，不是只拒绝精确重放。非空 findings 之后，SuicideTool.runFrozen 370–393 行的「没评审」门不挡，因为已有一次已提交的 assessment；无证书时 retirementTransaction 80–86 行结果是 Continue，不是拒绝。Plan 的 Stayed 不置 Authorized，PlanTools.fs decisionOfAuthorization 60–64 行走 RelayToSuccessor；requirements/planning/WHAT.md [022] 禁止的是第二评审和自证，不是同任 deliver。所以「选出 work」只是提示词路径，不是工具拒绝。
-
-后继开任的写入点不止 deliverLoopContext。tryBuildAcceptedOpening 与 activateNextIfAbsent 的命运写在 P1，这里不另裁。
-
-评审期两道门挂在 P4 下面，不新开事件，也不并进 P1 的 deliver 顺序。两道门都是对已落盘事实的穷尽 match，走到一支就停。这是现行折叠写法，不是条款命令。不是第三套生命周期，也不是解释执行的下一跳调度。
-
-capability-enforcement [025] 是工具执行门，条款在 requirements/capability-enforcement/WHAT.md:111-113。禁的是工具执行，不是派工。`js-manager` 在 Schema 里固定可见，名字留下。它已经是 js- 工具名，不是 Road、suicide、certificate 那一类旧词。P5 不改这个名字，不删这个工具。运行时按统一事实收口，不读证书，也不读事件里没有的 findings 对。执行门正文只在 Algorithm I。已评、Stayed、尚无确认，放行修复派工，不是拒绝执行。清理阻塞指 I1 已落盘阻塞摘要那一格。退任冻结不单列，不保留。终元素 Promoted 的末任保留只读收尾：可读、清理、收口，不开新工作。原生 read、grep、glob，以及对 Manager 的跨角色 js-engineer、js-devops，仍然拒绝。现行落点是 PluginHooks.assertReviewPermitted（PluginHooks.fs:351-359）和 OfficeCapability.permissionsForManagerFacts（OfficeCapability.fs:133-143）。事实现在来自 AcceptedAssessmentTransport 与 AcceptedAssessmentFindings（ToolRuntimeScope.fs:466-477），不是证书。证书退役后改读：有没有评审、Promoted 或 Stayed、确认位、清理阻塞。ToolRegistry.generatedJsSpecs（ToolRegistry.fs:561-572）的函数体没有 `js-manager` 这个字面量。JsToolGenerator.generate 这一轮没打开，不写成已注册，也不写成未注册。字面量读到的生产点是 ManagerReviewTools.fs:11、16，StaticTools.fs:151、187，InvestigationEstimateContract.fs:34。退任冻结不保留。不补函数名。与 Algorithm I 同一句。
-
-capability-enforcement [026] 是派工门，条款在同文件 115-117。没写 `js-manager`。与 deliver 不是同一把锁，不写进 P1 的调用顺序。评审接纳前禁止向绑定的固定 DevOps 派任何任务。拦截在任何持久化副作用之前。已有只读 Engineer 的合法 resume 与 fork 只读调查不受误伤。现行派工拒绝读到的是 executeManagerResumeAfterGuards（Tool.fs:677-708）：续做名字是 devops 且 HasAssessment 为假时返回 AssessmentPendingForDevOps。读的是评审传输是否存在，不是证书。证书退役后仍读「有没有评审」，不改去读证书。fork 路径这一轮没打开对应拒绝函数。[026] 的只读例外只按条款放，不写成已经在代码里核过。
-
-能证伪：S3 还得自己决定 `js-manager` 去留；把禁派工写进 deliver 顺序；让这两道门改读证书。
-
-### P5 术语与包
-
-依赖：P1 的词表已定，否则包名会跟着旧词走。可与 P2–P4 的实现并行起草，但不能先于 P1 合并进仓库。
-
-触碰：需求五包、资源里的 suicide 工具目录、代码与需求里的 Road、iteration、assessment、suicide、certificate、Continue、Accepted。
-
-不触碰：role/plan 与 role/manager 两个角色目录。R6 的工作性质不同，方法行不同。留两个 role 是实例差异，不是考古。
-
-映射：Road 改 Work，iteration 改 tenure，assessment 改 review，suicide 改 deliver。Continue 与 Accepted 不另起结果名，读成 Relayed 与 Delivered 的派发含义。certificate 删除，不改名保留。五包收成一包，条款按统一契约重编号，不留 relay- 前缀。tool/suicide 并入 deliver 的资源，两段写在实例说明里。
-
-这一步答 Q-S2-4。Accepted 去掉 certificateId 之后不另起名，就是 Delivered。
-
-### P6 测试
-
-依赖：P5 的契约条文，否则新锚点会把旧义务抄进去。串行于 P5。
-
-触碰：planning 与四包 relay 的测试。统一一个编号空间。一段 deliver 与两段 deliver 各有锚点，不能用一条 deliver 测试覆盖两种语义。
-
-不触碰：把旧锚点改名后继续断言旧义务。
-
-GAP-192、193、197 的登记行已核，测试正文这次未读。默认不继承旧锚点语义。写测试之前若要引用其中一条的现行断言，先重读那条测试。不在这里宣布它们作废或保留。
-
-support 三文件这次仍未重开，沿用上一任已读：路径在 requirements/planning/tests/support/，没有 WHAT[planning- 锚点。不把它们写成已重读。
-
-这一步答 Q-S2-5。
-
-### P7 删除旧轨
-
-依赖：P1–P6 的验收门都过了。最后做。串行。写入点的命运只引用 P1 那一段，这里不另列。
-
-触碰：Relay 事件类型、AgentJournal 上的生命周期事实、证书类型、suicide 名字、仓库里把完整物理历史写成现行义务的句子。
-
-不触碰：650850ea 里已经入库的 js-plan 描述装配，不把它当脏文件回退。仓库根 plan.md 不改。assembleAskContinuation 已退役，不是活清理项。
-
-既有 AgentJournal 与 Relay 事件文件不读取、不转换、不写兼容层。新 work 只写统一事件轨。仓库根 plan.md 不改。不留兼容层，不留过渡名。
-
-### 顺序
-
-P1 先做完。验收门：两个实例都能开任、评审、退休；确认次数为 2 的实例，确认事件可重放，重放不第二次结束。
-
-然后 P2 与 P4 并行，P3 的工具改名也可并行。三处写入点不同：投影、派发、工具名。
-
-P5 在 P1 词表定了之后起草，合并晚于 P2–P4，早于 P6。P6 晚于 P5。P7 最后。
-
-没有真依赖的不串成一队。P2 不等 P3，P4 不等 P2。
-
-这一步答 Q-S2-6。
-
-## 10. 检验
-
-这条路径要解决的是 G1–G8，不是把目录和用词换掉。判据：六项骨架只剩一套实现；确认次数是参数；历史只剩剥除；术语只剩一套；持久化只剩一条事件轨。若实现做完仍有两套折叠、或 suicide 还在当别名，路径没有走完，不加适配器收场。
-
-失败点一：第一次确认若只活在内存，G6 失败。调用在确认事件落地之前不得返回已确认。写盘失败则调用方看到未确认，可以再发，不得当成结束。
-
-失败点二：原先担心剥除会打断自动循环。提示函数不支持这个担心。deliverLoopPrompt（Workflow.fs:329）不读消息，不读 LWR。所以不补消息通道。若实现时有人把提示函数改成拼接前任消息，P4 作废，回到只读退休事实。这是禁令，不是待补设计。开后继现行会抓工作区快照，那是另一件事，见失败点三。
-
-失败点三：开后继现行在退休之后另一次事务里 captureSnapshot（Workflow.fs:371、383）。统一后删掉这次捕获，不把 snapshotId 写进开任载荷。若实现仍抓快照，就和默认不留工作区快照打架，P1 的默认不留作废。这次已经读到：没有「不等就专门拒绝」，相等只嵌在精确重放谓词里。不留。
-
-失败点四：现行一段式交付是两笔 append。第一笔成功、第二笔失败，重放会看到已退休、无后继，G6 失败。无权交付必须把退休与开任放进同一次 Append 的列表。这次调用不是整批原子屏障。AppendDurable 才算两笔都落地。AppendNotAttempted 才是两笔都未提交。CommitUnknown 不报告已落地，也不报告未落地。持权路径若先写事件再启动会话，会话失败就留下没有执行会话的 Delivered。先启动，失败零写。
-
-被证伪则停止并退回规划：若实现时发现前缀 epoch 与权威推进是同一判定、同一调用方，不授权实现并进 epoch，也不授权实现删第二计数器。工作区快照字段不在这一句里：这次读到没有不等就专门拒绝，默认不留，不新造模块，也不再留给下一次核对加回来。
-
-失败点五：若实现去读取或转换既有 AgentJournal 与 Relay 事件文件，G8 失败。旧账不是新轨的输入。新 work 只写统一事件轨。
-
-失败点六：若第二次 deliver 的结果仍从证书或工具返回值读，P4 作废。选择器只读折叠上的评审 outcome 与确认位。Promoted 已确认写 Delivered，Stayed 已确认写 Relayed。读不到这两样就拒绝写入，不猜测，不恢复证书。
-
-失败点七：若实现走了第 9 节时序判定禁止形，或把那里标成未找到的整话升成条款，这条路径作废。允许形与禁止形只在第 9 节，这里不另写。
-
-失败点八：若评审期工具门或禁派工改读证书，或把禁派工写进 P1 的 deliver 顺序，或删掉 `js-manager`，P4 下面那两道门作废。[025] 按统一事实拒绝执行，[026] 在副作用之前拒绝派工。两道门不是同一把锁。
-
-失败点九：若把 relay-assessment [008] 当成 P2 已经答完，或把五支正文一起发给模型，或把「空 findings 即关闭退场」写回第一次 Promoted 调用，P4 作废。五支只选出一条可见指令。第一次确认不是退场。
-
-失败点十：若 S4 成功收束因缺 digest 或 path 被判成 Conflict，或已确认未退休被判成已退休或 Delivered，或底稿不存在被改口成已交付，或崩溃后新造一个 DevOps 绑定，或读不到授权位时补 true，Algorithm F 作废。格子是 PairIncomplete、拒绝，以及 F2、F3、F4、F5。F4.1 不可达，不是输出格。第 9 节不另写格子。这里不另写。不新造 Recovery 模块，不新造事件。
-
-这条路径不假装已经打开三份 manager 资源正文。不把它们写成已经满足 [008]。
-
-## 11. 流程
-
-执行只按本节。第 0–10 节是裁决记录，不是第二套过程。两处说法冲突时，以本节算法为准。
-
-步骤标号是给实现者读的次序，不是运行时要保存的程序计数器。实现用宿主语言的顺序、分支与调用。不得把步骤标号存成枚举，不得构造转移表再解释执行，不得另开一套事件词表。
-
-生命周期事件只有这一套：WorkOpened、DevOpsBound、IncumbencyOpened、ConfirmationCommitted、IncumbencyRetired、Reviewed、Reopened、AdvanceCommitted、RetirementBlocked。TenureReanchored 不是这一套里的事件，也不属于第二套生命周期账。不删除它。不把它并进这一套。不改前缀 epoch 的折叠。结果名只有 Relayed 与 Delivered。评审结果只有 Promoted 与 Stayed。追加口只有一个。一次调用可以交出按步骤次序排好的多笔信封。调用方把这些信封放进同一次 Append 的列表。列表次序就是步骤次序。宿主把这一次调用拼成连续多行，一次写出：一行一个信封，一行写完整才算落地。不得把同一笔拆成两次追加口调用。不得循环调用现行只收一笔的 append。不得把两笔信封并进一个 JSON 对象。不另造第二种编码。不借用 Sphinx 的 events 数组。不新造提交标记。这次写入没有整批全可见或全不可见的保证。一次 Append 调用只是落地形状，不是整批原子屏障。统一追加口返回三支，不把这三支压成 string。AppendDurable：列出的信封已落地。AppendNotAttempted：已知未提交，可以再发。CommitUnknown：既不报告已落地，也不报告未落地，不补另一笔，不截断，不另开一任。下一次打开才分类。下一次打开若文件不以换行结尾，读者整份返回 StorageInvalid。不进入 Algorithm F。不裁残行。不折被拒绝的前缀。下一次打开若只折出必成对两笔中的一笔，按 Algorithm F 返回 PairIncomplete。必成对只有两处：WorkOpened 与首任 IncumbencyOpened；Relayed 的 IncumbencyRetired 与后任 IncumbencyOpened。Delivered 单笔不套这格。不另开第二本生命周期账。
-▷ 一行仍是一笔信封。理由：现行根对象的键是 event_id、stream_id、event_type、parents、payload、payload_refs，有内嵌载荷时再加 payloads。判别在 event_type。Planning 没有多事件一行编码。把多笔塞进一个对象，就是第二套编码。
-
-没有 Algorithm P。无活跃任期时不另开一任，见 Algorithm Q。
-
-权威计数挂在 work 上，不挂在活跃任期上。WorkOpened 写下权威初值，之后只有 AdvanceCommitted 改它。Delivered 取消任期、Relayed 换后任、后任 IncumbencyOpened、J2 重开，都不把它打回初值，也不另起一份。期望推进值是本次算法入口从 work 折叠读出的当前计数。不是开立初值的第二份拷贝。不是从活跃任期读出的字段。读不到这一计数，重放路径与写入路径各自拒绝、零写、终止。不回退到活跃任期。
-
-### Algorithm A 开立一件 work
-
-输入：workId、root，以及这次是不是用户创建的 Plan 会话、是不是 Manager 直接开立、是不是持权交付 spawn 出来的执行会话。
-输出：AppendDurable 时两笔都落地；AppendNotAttempted 时返回未开立；CommitUnknown 时既不报告已开立也不报告未开立。写前拒绝则零写。
-
-A1. [三个入口]
-进入本步之前先走 A1.1。A1.1 拒绝则本算法不再继续。A1.1 通过才执行下面各句。
-spawn 标记只由 Algorithm D 的 D6 在启动执行会话时置上。
-载体只有一种：子会话的初始 prompt 首行，逐字节是固定标记 spawn-from-authorized-delivery-v1。
-标记不进 WorkOpened 载荷。不进 Metadata。不从物理父标识推断。
-开立这一刻只读这一行。读不到，则持权交付 spawn 入口不成立。不得降级成 Manager 直接开立。零写。算法终止。
-若有这一标记，则 Manager 直接开立不成立，commission 新开不成立。
-若这次同时命中两个入口，则拒绝。零写。算法终止。
-有标记又被当成 Manager 直接开立或 commission 新开，是双重命中。按上一句拒绝。零写。算法终止。
-若这次是已有 work 的再 commission，则不走本算法。它只走 Algorithm K。不新开 work。现行链是 continueExistingCommission 到 ContinueManagerJob。算法终止。
-若这次是用户创建的 Plan 会话，则 sequence ← S1、S2、S3。转 A2。
-commission 新开与 Manager 直接开立是同一入口，不是第四个标志。现行链是 commissionNewCalling 到 ForkManagerJob。不另起第四种序列。不写未读到的 RoadOpened 写入点。
-若这次是 Manager 直接开立，或是 commission 新开，则 sequence ← S4。转 A2。
-若这次是持权交付 spawn 出来的执行会话，则 sequence ← S4。转 A2。
-若三者都不是，则拒绝。零写。不采用调用方另给的 sequence。不得从 S1 再走一遍。算法终止。
-▷ 三个入口各自写死序列，命中后转入 A2。理由：赋值后若继续落到「三者都不是」，合法入口会被拒绝。
-▷ S4 标记执行，不是前面排着三段。理由：序列长度是 1，这就是恰好只有一个 Stage。
-
-A1.1. [已开立]
-若折叠里该 workId 已有 WorkOpened，则拒绝。零写。不写第二笔 WorkOpened。不返回已开立。不转 Algorithm K。不转 Algorithm Q。算法终止。
-若没有 WorkOpened，则回到 A1 的入口判定。
-▷ 重复开立不是再 commission，也不是无任期补任。理由：再 commission 只走 K。无任期不另开一任只走 Q。本算法只开还没有的 work。
-# 能证伪：同一 workId 第二次进入本算法仍写出第二笔 WorkOpened。
-
-A2. [再查长度]
-若 sequence 是 S4，则确认次数是 2，后继由系统派发，Delivered 不 spawn。
-若 sequence 是 S1、S2、S3，则确认次数是 1，后继不派发，只有交付授权已置真时 Delivered 才 spawn。
-若 sequence 长度不是 1，也不是 3，则拒绝开立。零写。算法终止。
-若 sequence 被写成 S1、S2、S3、S4，则拒绝开立。零写。算法终止。
-▷ 确认次数、派发与 spawn 不写入载荷。理由：三者由 sequence 导出，另存字段会和序列打架。
-# 能证伪：开立载荷里出现确认次数、自动派发或 spawn 字段。
-
-A3. [组装载荷]
-权威初值 ← 对固定标记 authority-initial-v1 与 workId 做确定性摘要。
-不把物理用户消息标识、消息 id、root、sequence 或空串放进这一摘要。
-不是 0。不是空串。同一 workId 再算，必须得到同一个初值。
-WorkOpened 载荷 ← workId、root、sequence、权威初值。
-不写入消息 id。不写入 snapshotId。不写入证书。
-不并进前缀重锚。
-若实现时发现权威比较与前缀重锚是同一判定且同一调用方，则停止。不删本字段。不改词表。退回规划。
-这一初值不是工具参数。开立之后不再有「没有初值」的活分支。
-期望推进值只在后来的 deliver 开始时，从这同一个计数读出。
-▷ 初值有唯一构造。理由：执行者不另选 0、空串或物理用户消息标识。
-
-A4. [首任]
-incumbencyId ← 新标识。
-起始投影 ← sequence 的第一个元素。
-若开立这一刻没有已观察到的 XTrace 头序号，则拒绝。零写。不追加 WorkOpened。不追加 IncumbencyOpened。不写空游标。不加一。不加十。算法终止。
-openingCursor ← 开立这一刻已经观察到的 XTrace 头序号。不加一。不加十。
-IncumbencyOpened 载荷 ← workId、incumbencyId、起始投影、openingCursor。
-不写入 snapshotId。
-▷ 缺头序号与 E7 同一口径。理由：游标是后任剥除的边界。没有观察到的序号，就没有可写的边界。Algorithm Q 不写游标。
-
-A5. [一次追加]
-同一笔追加 WorkOpened 与 IncumbencyOpened。
-落地形状在第 11 节开头：同一次追加口调用，按步骤次序交出多笔信封，宿主落成连续多行。本步不另写一套。
-若返回 AppendDurable，则两笔都已落地。返回已开立。不在这一笔里绑定 DevOps。不在这一笔里写 Reviewed。算法终止。
-若返回 AppendNotAttempted，则两笔都未提交。返回未开立。可以再发。算法终止。
-若返回 CommitUnknown，则既不报告已开立，也不报告未开立。不补另一笔。不截断。不另开一任。下一次打开才分类。算法终止。
-否则拒绝。不把未分类的返回收成已开立。算法终止。
-▷ 绑定不搬到开任。理由：S4 的绑定触发仍是 resume 与 horizon。
-
-### Algorithm B 绑定 DevOps
-
-输入：已开立的 workId、devopsId、target，以及触发动作。
-输出：AppendDurable 时已绑定；AppendNotAttempted 时返回未绑定；CommitUnknown 时既不报告已绑定也不报告未绑定。写前拒绝则零写。
-
-B1. [门]
-若 work 尚未 WorkOpened，则拒绝。零写。算法终止。
-不从开任调用本算法。
-若 sequence 是 S4：
-若触发不是 resume，也不是 horizon，则拒绝。零写。算法终止。
-ask 不是本支的触发。
-若 sequence 是 S1、S2、S3：
-若触发不是 ask 绑定，则拒绝。零写。算法终止。
-resume 与 horizon 不是本支的触发。
-若 sequence 既不是 S4，也不是 S1、S2、S3，则拒绝。零写。算法终止。
-▷ 两段不共用同一个触发名。理由：S4 的绑定仍由 resume 与 horizon 留下。一段式的绑定由 ask 留下。开任都不写绑定。
-
-B2. [追加]
-若该 work 已有 DevOpsBound，则返回原状态。不写第二笔。不在本算法里更换 target。算法终止。
-否则载荷 ← workId、devopsId、target。
-追加一笔 DevOpsBound。
-若返回 AppendDurable，则已绑定。算法终止。
-若返回 AppendNotAttempted，则返回未绑定。可以再发。算法终止。
-若返回 CommitUnknown，则既不报告已绑定，也不报告未绑定。不补另一笔。不截断。下一次打开才分类。算法终止。
-否则拒绝。不把未分类的返回收成已绑定。算法终止。
-# 崩溃后不得新造另一个绑定。
-
-### Algorithm C 追加评审并投影
-
-输入：incumbencyId、outcome、当前折叠视图。outcome 只许是 Promoted 或 Stayed。
-输出：AppendDurable 时给出新投影；AppendNotAttempted 时返回未评审；CommitUnknown 时既不报告已评审也不报告未评审。写前拒绝则零写。
-
-C1. [不变量的唯一正文]
-下一步走向不得写入长期字段、枚举、record 或跨模块接口。
-不得构造业务 AST 再解释执行。
-不得用 Command/Reply 总线、continuation 状态树或调用序列回放器调度本流程。
-Stage、Phase、Lease、Owner、Generation 不得当流程程序计数器或业务状态机的名字。
-▷ 阶段只是 WorkOpened.sequence 加上已落盘 Reviewed 折出来的投影。理由：这一次调用走到哪，由调用栈承载。投影不是下一步指令。
-# 能证伪：下一阶段被存成可重放字段，或 deliver 按阶段枚举跳转。观察到任一条，本节作废。
-其他算法不另写这份禁令。
-
-C2. [任期门]
-若视图里没有这个 incumbencyId 的活跃任期，则拒绝。零写。算法终止。
-若这一任已经有 Reviewed，则拒绝。零写。算法终止。
-▷ 每任恰好一次。理由：第二评审是自证，不是修复。
-
-C3. [载荷]
-若 outcome 既不是 Promoted，也不是 Stayed，则拒绝。零写。不追加 Reviewed。算法终止。
-stage ← 视图里这一任的当前投影。
-追加 Reviewed。载荷只含 incumbencyId、stage、outcome。
-不写入 findings 对。不写入 snapshotId。不写入证书。
-Promoted 表示 findings 为空。Stayed 表示 findings 非空。
-对列表只留在本次调用的返回值里，不追加成事件。
-若返回 AppendDurable，则转 C4。
-若返回 AppendNotAttempted，则投影不变，授权位不变。返回未评审。可以再发。算法终止。
-若返回 CommitUnknown，则既不报告已评审，也不报告未评审。不补另一笔。不截断。下一次打开才分类。算法终止。
-否则拒绝。零写。不把未分类的返回收成已评。算法终止。
-
-C4. [非终元素]
-若不是从 C3 的 AppendDurable 转入，则拒绝。零写。不改投影。算法终止。
-设 i 为 stage 在 sequence 里的位置。
-若 outcome 是 Stayed，则投影留在 stage。交付授权保持假。返回已评。算法终止。
-若 outcome 是 Promoted，且 i 后面还有元素，则投影 ← sequence 的下一个元素。对象仍是这一任。交付授权保持假。返回已评。算法终止。
-若 outcome 是 Promoted，且 i 已是 sequence 最后一元，则转 C5。
-▷ 这是折叠投影，不是程序计数器。理由：换的是已落盘事实的读法，不是保存的下一步。
-
-C5. [终元素]
-若 outcome 是 Promoted，且 i 已是 sequence 最后一元：
-若 sequence 是 S1、S2、S3，则投影留在该元素。交付授权 ← 真。返回已评。算法终止。
-若 sequence 是 S4，则投影留在 S4。交付授权保持假。只记下这一任已评。返回已评。算法终止。
-否则拒绝。不进入 Algorithm D。算法终止。
-▷ S4 不靠评审置授权。理由：序列长度是 1，结束靠第二次 deliver。
-# 能证伪：S4 的 Promoted 把交付授权置真。
-# 能证伪：S1、S2 或 S3 的终元素 Promoted 未把交付授权置真；C4 在转入 C5 之前拒绝终元素 Promoted。
-
-### Algorithm D 确认次数为 1 的 deliver
-
-输入：workId、本次 Host 上下文的 ProviderRunId、本次 Host 上下文的 ToolCallId、本次 deliver 的 XTrace 头序号（可能没有）、当前折叠视图、活跃 blocker 集合。
-workId 与一段式写入用同一来源，现行是 ctx.SessionId。
-头序号缺失不在入口发明。拒绝在 D7 与 D8，写游标之前。
-ProviderRunId 与 ToolCallId 不是工具参数。活跃任期消失之后，这对围栏仍在本次上下文里。
-输出：拒绝、RetirementBlocked、持权 Delivered，或无权 Relayed。AppendDurable 才算写出的信封已落地。CommitUnknown 不报告已落地，也不报告未落地。本算法不写 ConfirmationCommitted。
-
-D1. [入口]
-调用方只在 sequence 是 S1、S2、S3 时进入本算法。
-若 sequence 不是这三段，则拒绝。零写。不调度另一套过程。算法终止。
-更早一层不得因没有活跃任期拦掉本算法。重放判定在无任期拒绝之前。
-入口先读 work 计数。读不到，则拒绝。零写。不进入 D1.1。不进入 D2。不写退休。算法终止。
-读到了，这一读数记在本次调用里。D1.1、D3、D7、D8 只用这一读数。不从活跃任期再读一份。
-
-D1.1. [重放]
-更早一层不得先返回 no active incumbency 失败字符串。
-fence ← 本次 Host 上下文的 ProviderRunId 与 ToolCallId。
-workId 与写入侧用同一来源。不从活跃任期读取。
-若 fence 缺一，则重放不命中。不另造 id。转入 D2。
-在折叠里按 workId 加 fence 查找已落盘退休。载荷上的 ProviderRunId 与 ToolCallId 必须与 fence 相同。
-若没查到，则重放不命中。不另造 id。不计算 retirementId。不比较闭集。转入 D2。
-若查到，则 outcome ← 那笔已写下的结果名。
-retirementId ← 对固定标记 oneshot-retirement-v1 与本次写入字段做确定性摘要。
-字段次序固定为 workId、ProviderRunId、ToolCallId、outcome。
-摘要再加入入口读出的期望推进值。开立必有初值，这一项不省略。
-不把 retirementCursor、incumbencyId、digest、path、execSessionId、snapshotId、证书或本次 XTrace 头序号放进摘要输入。
-同一组字段必须得到同一个 retirementId。这与 D7、D8 是同一个公式。
-若算出的 id 与那笔已写下的 id 不同，则拒绝。零写。返回 RetirementReplayConflict。算法终止。
-比较字段是闭集。不比闭集以外的字段。
-outcome 从已落盘退休读。必须等于这次重算 id 时用的结果名。
-期望推进值从已落盘退休读。必须等于这次入口读到的 work 计数。不从活跃任期读。
-ProviderRunId 与 ToolCallId 从本次 Host 上下文读。必须与已落盘退休相同。
-若那笔结果是 Delivered：path 由 workId 导出，必须与已落盘载荷的 path 相同。execSessionId 按 workId 问宿主。问到一台，且标识与已落盘载荷的 execSessionId 相同，才算相同。问不到，问到零台，问到两台及以上，或标识不同，都算不同。
-若那笔结果是 Relayed：不比 path。不比 execSessionId。无权载荷没有这两项。
-不比 retirementCursor。不比本次 XTrace 头序号。不比 incumbencyId。不比 digest。不读底稿字节。
-闭集每一项都相同，则返回原状态。零写。不启动第二台。算法终止。
-闭集有一项不同，则拒绝。零写。返回 RetirementReplayConflict。算法终止。
-否则拒绝。零写。不转入 D2。算法终止。查到之后不得再走没查到。
-▷ 重放先于无任期拒绝。理由：持权 Delivered 成功之后，活跃任期已经没了。现行入口会先返回失败字符串。围栏还在，任期不在。
-# 能证伪：无活跃任期时，同一围栏重入返回 no active incumbency；身份摘要含有 XTrace 头序号。
-
-D2. [无任期]
-若重放未命中，且视图没有活跃任期，则拒绝。零写。不写退休。不写 RetirementBlocked。算法终止。
-不在这一步计算 retirementId。
-▷ 无任期不是重放，只在重放判定未命中之后。理由：没有活跃任期，就没有这次退休可写。不引用尚未算出的 id。
-
-D3. [期望推进]
-开立必有权威初值。不再留「开立没有初值」的活分支。
-若见到没有初值的开立，则拒绝。零写。不转 D4。算法终止。
-期望推进值不是工具参数，也不是第二个写入者。
-入口读数已在本算法开头记下。本步不再做第一次读取。
-若读不到计数，则拒绝。零写。不写 IncumbencyRetired。不写 RetirementBlocked。不转 D4。算法终止。
-转入 D4 之前再读一次同一计数。
-若这一次与入口读数不符，则拒绝。零写。不写 IncumbencyRetired。不写 RetirementBlocked。不转 D4。算法终止。
-不符表示入口之后、追加之前，计数已经变了。
-若相符，则转 D4。
-▷ 声明从同一计数读出。理由：调用方不另给一个期望值。另给就会变成第二个写入者。
-# 能证伪：相符时被拒绝或不转 D4；开立有初值但写出时没带上这一声明，仍继续写退休。
-
-D4. [阻塞]
-若活跃 blocker 为空，则转入 D5。
-blocker 只计当前任期直接或递归拥有的 live child、background job、PTY 或 process、active tool、side-effect 或 execution lease、同步 descendant provider work，以及尚未观察到 terminal 的 cancel 或 join。
-Digest 标识这组 blocker。不是工作区快照。不写入 snapshotId。
-按 workId 问宿主已经留下的执行会话。
-若问不到，则拒绝。零写。不写 RetirementBlocked。不启动第二台。不撤销看不见的会话。不报告已交付。算法终止。
-若返回一台，且该台记下的 workId 与本次 work 相同，则转 D4.1。
-若返回两台及以上，则拒绝。零写。不按到达先后挑一台。不撤销。算法终止。
-若返回零台，则转 D4.2。
-否则拒绝。零写。不写 RetirementBlocked。算法终止。
-
-D4.1. [已有一台]
-拒绝。零写。不写 RetirementBlocked。不启动第二台。不撤销这一台。不报告已交付。
-若交付授权已置真，则清理之后从本算法入口重跑，由 D6 认领该台。不得把 D6 或 D7 当成恢复地址。
-若交付授权未置真，则不认领、不启动、不撤销。
-▷ 认领只在授权已置真之后。理由：授权未置真不启动执行会话。D6 不在这条路上。
-算法终止。
-
-D4.2. [零台]
-追加 RetirementBlocked。载荷是 incumbencyId 与 blockerDigest。
-不写 IncumbencyRetired。不 spawn。
-若返回 AppendNotAttempted，则调用方看到未阻塞，可以再发。不得返回已退休。算法终止。
-若返回 CommitUnknown，则既不报告已阻塞，也不报告未阻塞。不补另一笔。不截断。不得返回已退休。下一次打开才分类。算法终止。
-若返回 AppendDurable，则返回未退休。清理之后可以再调用本算法。算法终止。
-否则拒绝。不得返回已退休。不把未分类的返回收成已阻塞。算法终止。
-
-D5. [持权底稿]
-若交付授权未置真，则转 D8。
-读这一件 work 的底稿。
-若底稿缺失，或读到的内容为空，则拒绝。零写。不启动执行会话。算法终止。
-digest ← 对底稿字节做确定性摘要。
-path ← 这一件 work 的底稿路径。
-摘要输入只有底稿字节。不把 path、执行会话标识、snapshotId 或证书放进摘要输入。
-同一份底稿字节必须得到同一个 digest。算法不另造第二种摘要。
-▷ 摘要与路径在启动之前定下。理由：它们是这次交付的载荷，不是启动成功之后才发明的名字。
-# 能证伪：持权路径没有读底稿就启动；底稿缺失或为空仍启动。
-
-D6. [已有会话]
-按 workId 问宿主已经留下的执行会话。不凭工具返回值、不凭未落盘的猜测。
-若问不到，则返回未交付。不启动另一台。不撤销看不见的会话。算法终止。
-若返回零台，才启动执行会话。启动参数只有两个字符串：角色 manager，以及子会话初始 prompt。
-初始 prompt 的首行逐字节是固定标记 spawn-from-authorized-delivery-v1，随后才是底稿正文。
-这是 Algorithm A 的唯一 spawn 标记。不另造字段。不写进生命周期事件。不置 Manager 直接开立。不置 commission 新开。
-若启动失败，则零写。返回未交付。算法终止。
-若启动成功，则 execSessionId ← 这次启动返回的标识。转 D7。
-若返回一台，且该台记下的 workId 与本次 work 相同，则 execSessionId ← 那一台的标识。不启动第二台。转 D7。
-若返回一台，且该台记下的 workId 与本次 work 不同，则拒绝。零写。不启动。不撤销。算法终止。
-若返回两台及以上，则拒绝。零写。不启动。不按到达先后挑一台。不撤销看不见的会话。算法终止。
-若返回一台，且该台没有记下可比较的 workId，则拒绝。零写。不启动。不撤销。不转 D7。算法终止。
-否则拒绝。零写。不启动。不转 D7。不把未分类的返回收成持权写入。算法终止。
-▷ 启动不是「上次没记下」的替代。理由：上次已经启动、或 CommitUnknown 尚未分类时，会话可能已经在外面。再启动一台，同一 work 会有两台执行会话。按到达先后挑一台，等于用钟表裁事实。
-# 能证伪：上次已经启动，或 CommitUnknown 尚未分类，再次进入本算法又启动了第二台；核对返回两台时按到达先后留下一台。
-
-D7. [持权写入]
-若本次没有已观察到的 XTrace 头序号，则拒绝。零写。不追加 IncumbencyRetired。不开后任。不写 RetirementBlocked。算法终止。
-▷ 缺头序号与 A4、E7 同一口径。理由：游标是后任剥除的边界。没有观察到的序号，就没有可写的边界。
-# 能证伪：一段式 deliver 在缺头序号时仍写出 retirementCursor，或写成 Relayed 或 Delivered。
-outcome ← Delivered。
-retirementCursor ← 本次已观察到的 XTrace 头序号。
-retirementId ← 对固定标记 oneshot-retirement-v1 与本次写入字段做确定性摘要。
-字段次序固定为 workId、ProviderRunId、ToolCallId、outcome。
-摘要再加入入口读出的期望推进值。开立必有初值，这一项不省略。
-不把 retirementCursor、incumbencyId、digest、path、execSessionId、snapshotId、证书或本次 XTrace 头序号放进摘要输入。
-同一组字段必须得到同一个 retirementId。这与 D1.1 是同一个公式。不在重放时另造一个 id。
-写出时必须带上入口读出的期望推进值。没带上则拒绝。零写。不追加。算法终止。
-然后只追加 IncumbencyRetired。
-载荷 ← retirementId、incumbencyId、outcome、ProviderRunId、ToolCallId、execSessionId、digest、path、retirementCursor。
-载荷再含入口读出的期望推进值。开立必有初值，这一项不省略。
-不写 ConfirmationCommitted。不另写一笔交付事件。不启动第二台。不撤销这一台。
-若返回 AppendNotAttempted，则不得向调用方报告已交付。不撤销这一台。不把这次启动当成没发生。下一次调用从本算法入口重跑。不得把 D6 或 D7 当成恢复地址。算法终止。
-若返回 CommitUnknown，则既不报告已交付，也不报告未交付。不撤销这一台。不启动第二台。不补另一笔。不截断。下一次打开才分类。算法终止。
-若返回 AppendDurable，则返回 Delivered。算法终止。
-否则拒绝。不得报告已交付。不启动第二台。不撤销这一台。算法终止。
-▷ 先启动，后写。理由：先写再启动，启动失败会留下没有执行会话的 Delivered。
-▷ 身份只从留下的字段来。理由：digest、path 与执行会话标识是这次交付的载荷，不是身份的来源。
-
-D8. [无权]
-若交付授权已置真，则拒绝。零写。不写退休。不另开一任。算法终止。
-若交付授权未置真，则按下列各句写完这一支。
-若本次没有已观察到的 XTrace 头序号，则拒绝。零写。不追加 IncumbencyRetired。不开后任。不写 RetirementBlocked。算法终止。
-▷ 缺头序号与 A4、E7 同一口径。理由：游标是后任剥除的边界。没有观察到的序号，就没有可写的边界。
-# 能证伪：一段式 deliver 在缺头序号时仍写出 retirementCursor，或写成 Relayed 或 Delivered。
-outcome ← Relayed。
-retirementCursor ← 本次已观察到的 XTrace 头序号。
-retirementId ← 对固定标记 oneshot-retirement-v1 与本次写入字段做确定性摘要。
-字段次序固定为 workId、ProviderRunId、ToolCallId、outcome。
-摘要再加入入口读出的期望推进值。开立必有初值，这一项不省略。
-不把 retirementCursor、incumbencyId、digest、path、execSessionId、snapshotId、证书或本次 XTrace 头序号放进摘要输入。
-同一组字段必须得到同一个 retirementId。这与 D1.1 是同一个公式。不在重放时另造一个 id。
-写出时必须带上入口读出的期望推进值。没带上则拒绝。零写。不追加。算法终止。
-然后同一笔追加 IncumbencyRetired 与下一任 IncumbencyOpened。
-落地形状在第 11 节开头：同一次追加口调用，按步骤次序交出多笔信封，宿主落成连续多行。本步不另写一套。
-退休载荷 ← retirementId、incumbencyId、outcome、ProviderRunId、ToolCallId、retirementCursor。
-退休载荷再含入口读出的期望推进值。开立必有初值，这一项不省略。
-下一任 openingCursor ← 同一个 retirementCursor。不加一。不加十。
-下一任 incumbencyId 由这一笔 retirementId 派生。不拷贝消息。
-work 计数不打回初值。不另起一份。
-下一任起始投影 ← 退休当时的折叠投影。
-这是复制已有事实，不是按阶段选出的分支。
-不因没有评审拒绝。不因不是终元素拒绝。
-不派发后继提示。等待下一次请求。
-若返回 AppendDurable，则退休与开任都已落地。返回 Relayed。算法终止。
-若返回 AppendNotAttempted，则两笔都未提交。返回未退休。可以再发。算法终止。
-若返回 CommitUnknown，则既不报告已退休，也不报告未退休。不补开任。不截断。不另开一任。下一次打开才分类。算法终止。
-否则拒绝。不把未分类的返回收成 Relayed。算法终止。
-▷ 无评审放行。理由：这段的写前评审只管改底稿。另一段的无评审拒绝不套到这里。
-# 能证伪：无评审的本算法被拒绝；S1 的 Promoted 落盘后，下一次 deliver 被拒绝或写成 Delivered。
-
-D9. [重放已前移]
-重放判定只在 D1.1。本步不再执行。不得把本步当成第二套重放。算法终止。
-
-### Algorithm E 确认次数为 2 的 deliver
-
-输入：workId、本次 Host 上下文的 ProviderRunId、本次 Host 上下文的 ToolCallId、本次调用已观察到的 XTrace 头序号、当前折叠视图、活跃 blocker 集合。
-workId 与写入侧用同一来源。活跃任期消失之后，围栏仍在本次上下文里。incumbencyId 只在写入新退休时从当前活跃任期读，不进重放身份。
-输出：拒绝、已完成未退休、确认已落地、幂等确认、RetirementConfirmationReplayConflict、RetirementReplayConflict、RetirementBlocked、Delivered 或 Relayed。AppendDurable 才算写出的信封已落地。CommitUnknown 不报告已落地，也不报告未落地。
-
-E1. [入口]
-调用方只在 sequence 是 S4 时进入本算法。
-若 sequence 不是 S4，则拒绝。零写。算法终止。
-交付授权不是本算法的锁。不读证书。不读工具返回值。
-入口先读 work 计数。读不到，则拒绝。零写。不进入 E1.1。不进入 E2。不写退休。算法终止。
-读到了，这一读数记在本次调用里。E1.1、E6、E8、E10、E11 只用这一读数。不从活跃任期再读一份。
-
-E1.1. [重放]
-更早一层不得先返回 no active incumbency 失败字符串。
-fence ← 本次 Host 上下文的 ProviderRunId 与 ToolCallId。
-workId 与写入侧用同一来源。不从活跃任期读取。
-若 fence 缺一，则重放不命中。不另造 id。转入 E2。
-在折叠里按 workId 加 fence 查找已落盘退休。S4 载荷上的 ProjectionCut 必须与 fence 相同。
-不比较一个不存在的 retirementCursor 字段。
-若没查到，则重放不命中。不另造 id。不计算 retirementId。不比较闭集。转入 E2。
-若查到，则 outcome ← 那笔已写下的结果名。
-这个 outcome 只许是 Relayed 或 Delivered。不得用评审名重算。
-retirementId ← 对固定标记 retirement-v1 与本次写入字段做确定性摘要。
-字段次序固定为 workId、ProviderRunId、ToolCallId、outcome。
-摘要再加入入口读出的期望推进值。开立必有初值，这一项不省略。
-不把 incumbencyId、ProjectionCut、snapshotId、证书、digest、path、execSessionId 或本次 XTrace 头序号放进摘要输入。
-同一组字段必须得到同一个 retirementId。这与 E8 是同一个公式。
-若算出的 id 与那笔已写下的 id 不同，则拒绝。零写。返回 RetirementReplayConflict。算法终止。
-比较字段是闭集。不比闭集以外的字段。
-outcome 从已落盘退休读。必须等于这次重算 id 时用的结果名。
-期望推进值从已落盘退休读。必须等于这次入口读到的 work 计数。不从活跃任期读。
-ProjectionCut 从已落盘退休读。必须与本次 fence 相同。
-不比 incumbencyId。不比本次 XTrace 头序号。S4 载荷没有名为 retirementCursor 的字段，不比它。不比 digest。不读底稿字节。
-闭集每一项都相同，则返回原状态。零写。算法终止。
-闭集有一项不同，则拒绝。零写。返回 RetirementReplayConflict。算法终止。
-否则拒绝。零写。不转入 E2。算法终止。查到之后不得再走没查到。
-▷ 重放先于无任期与无评审。理由：Delivered 成功后没有活跃任期。Relayed 成功后新任还没有评审。现行入口会先绑到后任，或先返回失败字符串。围栏还在。
-# 能证伪：无活跃任期时，同一围栏重入返回 no active incumbency；身份摘要含有 XTrace 头序号。
-
-E2. [无任期]
-若重放未命中，且视图没有活跃任期，则拒绝。零写。不写确认。不退休。算法终止。
-不在这一步计算 retirementId。
-
-E3. [无评审]
-若这一任没有 Reviewed，且已有确认，则拒绝。零写。不返回已完成未退休。不返回错误字符串。不写 ConfirmationCommitted。不退休。算法终止。
-▷ 确认不得先于评审落地。理由：返回已完成未退休会把非法确认藏起来。
-若这一任没有 Reviewed，且无确认，则返回已完成的未退休结果。
-finished ← 假。
-assessment_required ← 真。
-零写。不返回错误字符串。不写 ConfirmationCommitted。不退休。算法终止。
-▷ 无评审不得落成确认。理由：第一次确认不是代替评审。无确认才走这一句。
-
-E4. [第一次]
-若已有评审，且已有确认，则不构造。不拒绝。不写确认。不退休。转 E5。
-若已有评审，且尚无确认，则构造 ConfirmationCommitted。载荷只含 incumbencyId、providerRunId、toolCallId。不写 retirementCursor。不写 ProjectionCut。不读交付授权。不区分 Promoted 与 Stayed。不写 IncumbencyRetired。
-若已有评审，且尚无确认，且构造失败，则零写。调用方看到未确认。可以再发。不得返回已确认。算法终止。
-若已有评审，且尚无确认，且返回 AppendDurable，则返回已确认。不结束。算法终止。
-若已有评审，且尚无确认，且返回 AppendNotAttempted，则调用方看到未确认。可以再发。不得返回已确认。算法终止。
-若已有评审，且尚无确认，且返回 CommitUnknown，则既不报告已确认，也不报告未确认。不补另一笔。不截断。不得返回已确认。下一次打开才分类。算法终止。
-若已有评审，且尚无确认，且返回不是以上三支，则拒绝。不把未分类的返回收成已确认。算法终止。
-若没有评审，则拒绝。零写。不转 E5。算法终止。无评审的正路只在 E3。
-▷ 第一次只落确认。理由：两段是风险偏好。收成一段，这段就没了。
-# 能证伪：已评 Stayed 的第一次调用因缺交付授权被拒；无评审却写下了 ConfirmationCommitted；无评审且无确认时返回错误字符串；无评审且已有确认时返回已完成未退休。
-
-E5. [同一调用]
-若已有确认，且 toolCallId 相同，且 providerRunId 相同，则返回原确认。不退休。不写第二笔确认。算法终止。
-若已有确认，且 toolCallId 相同，且 providerRunId 不同，则返回 RetirementConfirmationReplayConflict。不退休。算法终止。
-若已有确认，且本次 toolCallId 与已确认的 toolCallId 不同，则转 E6。
-若已有确认，且本次 toolCallId 缺失，则拒绝。零写。不退休。不返回 RetirementConfirmationReplayConflict。不转 E6。算法终止。
-若已有确认，且本次 toolCallId 与已确认的 toolCallId 相同，且 providerRunId 缺失，则拒绝。零写。不退休。不返回 RetirementConfirmationReplayConflict。不转 E6。算法终止。
-若没有确认，则拒绝。零写。不转 E6。算法终止。确认只在 E4 写下。没有确认不是第二次写入的入口。
-▷ 缺一半围栏没有第二身份。理由：这不是重放冲突，也不是第二次写入的入口。
-不在本步写退休。不写确认。不得靠步骤次序掉进 E6。
-
-E6. [期望推进]
-本步不写 E8。写入只从 E7 进入 E8。
-开立必有权威初值。不再留「开立没有初值」的活分支。
-若见到没有初值的开立，则拒绝。零写。不转 E7。不转 E8。算法终止。
-期望推进值不是工具参数，也不是第二个写入者。
-入口读数已在本算法开头记下。本步不再做第一次读取。
-若读不到计数，则拒绝。零写。不写 IncumbencyRetired。不写 RetirementBlocked。不转 E7。不转 E8。算法终止。
-转入 E7 之前再读一次同一计数。
-若这一次与入口读数不符，则拒绝。零写。不写 IncumbencyRetired。不写 RetirementBlocked。不转 E7。不转 E8。算法终止。
-不符表示入口之后、追加之前，计数已经变了。
-若相符，则转 E7。
-▷ 声明从同一计数读出。理由：与 Algorithm D 的 D3 同一来源。两段式的后继是 E7，不是 E8。
-# 能证伪：相符时仍写入 E8；开立有初值但写出时没带上这一声明，仍继续写退休。
-
-E7. [来源]
-第二次写入只有一个谓词：本次 toolCallId 与已确认的 toolCallId 不同，且 providerRunId 在，且 toolCallId 在，且本次调用已有 XTrace 头序号。
-若谓词不成立，则拒绝。零写。不写 RetirementBlocked。不写 IncumbencyRetired。不转 E8。算法终止。
-不得靠步骤次序掉进 E8。
-若谓词成立，则这是第二次 deliver 的唯一入口。不得把这一支收成拒绝。
-ProjectionCut ← providerRunId 与 toolCallId。
-后任开任游标的来源 ← 本次调用已观察到的 XTrace 头序号。
-这两个来源不是同一个字段。
-不从现行 Relay 摘要读取名为 retirementCursor 的字段。那边没有这个字段。
-同一 toolCallId 的重放留在 E5。本步不把它们收成第二次写入。
-▷ cut 管请求身份，游标管后任剥除。理由：把游标写成 Relay 已有字段，是把一段式的名字安到没有该字段的摘要上。
-▷ 谓词不成立不写。理由：写入去路只有转 E8 这一条。
-转 E8。
-
-E8. [第二次写入]
-若活跃 blocker 非空，则追加 RetirementBlocked。载荷与 Algorithm D 的 D4.2 相同：incumbencyId 与 blockerDigest。不把 blocker 集合本身写进事件。不写 IncumbencyRetired。
-若活跃 blocker 非空，且返回 AppendDurable，则返回未退休。清理之后可以再调用。算法终止。
-若活跃 blocker 非空，且返回 AppendNotAttempted，则调用方看到未阻塞。可以再发。不返回已退休。算法终止。
-若活跃 blocker 非空，且返回 CommitUnknown，则既不报告已阻塞，也不报告未阻塞。不补另一笔。不截断。不返回已退休。下一次打开才分类。算法终止。
-若活跃 blocker 非空，且返回不是这三支，则拒绝。不把未分类的返回收成已阻塞。算法终止。
-若活跃 blocker 为空，则只读折叠上的评审 outcome 与确认位。
-若读不到其中一样，则拒绝写入。不猜测。不恢复证书。算法终止。
-workId 与 E1.1 用同一来源。不从已消失的任期读取。
-若折叠上的 workId 与这个来源不同，则拒绝。零写。算法终止。
-reviewOutcome ← 折叠上的评审 outcome。
-若 reviewOutcome 既不是 Promoted，也不是 Stayed，则拒绝。零写。算法终止。
-若 reviewOutcome 是 Promoted，则 outcome ← Delivered。
-若 reviewOutcome 是 Stayed，则 outcome ← Relayed。
-retirementId ← 对固定标记 retirement-v1 与本次写入字段做确定性摘要。
-字段次序固定为 workId、ProviderRunId、ToolCallId、outcome。
-这里的 outcome 只许是结果名 Relayed 或 Delivered。不许是评审名 Promoted 或 Stayed。
-摘要再加入入口读出的期望推进值。开立必有初值，这一项不省略。
-不把 incumbencyId、ProjectionCut、snapshotId、证书、digest、path、execSessionId 或本次 XTrace 头序号放进摘要输入。
-同一组字段必须得到同一个 retirementId。这与 E1.1 是同一个公式。不在重放时另造一个 id。
-▷ 身份只从围栏和结果名来。理由：活跃任期会消失或换成后任。头序号重捕不保证相同。snapshot 与证书已经退役。评审名不是结果名。先定结果名，再算身份。
-若 reviewOutcome 是 Promoted，则转 E10。
-若 reviewOutcome 是 Stayed，则转 E11。
-
-E9. [重放已前移]
-重放判定只在 E1.1。本步不再执行。不得把本步当成第二套重放。
-若执行到达本步，则拒绝。零写。不继续写。不进入 E10。算法终止。
-
-E10. [Promoted]
-写出时必须带上入口读出的期望推进值。没带上则拒绝。零写。不追加。算法终止。
-若 reviewOutcome 是 Promoted，且已确认，则追加 IncumbencyRetired。
-载荷 ← retirementId、incumbencyId、outcome、ProjectionCut。
-outcome 已是 Delivered。不得在写入之后改写 outcome，也不得用评审名重算 retirementId。
-载荷再含入口读出的期望推进值。开立必有初值，这一项不省略。
-不写 snapshotId。不写证书。不填 digest。不填 path。不填 execSessionId。
-不写名为 retirementCursor 的字段。
-不 spawn。不派发。
-若返回 AppendDurable，则返回 Delivered。算法终止。
-若返回 AppendNotAttempted，则不得报告已结束。可以再发。算法终止。
-若返回 CommitUnknown，则既不报告已结束，也不报告未结束。不补另一笔。不截断。下一次打开才分类。算法终止。
-否则拒绝。不把未分类的返回收成 Delivered。算法终止。
-
-E11. [Stayed]
-写出时必须带上入口读出的期望推进值。没带上则拒绝。零写。不追加。算法终止。
-若 reviewOutcome 是 Stayed，且已确认，则同一笔追加 IncumbencyRetired 与下一任 IncumbencyOpened。
-落地形状在第 11 节开头：同一次追加口调用，按步骤次序交出多笔信封，宿主落成连续多行。本步不另写一套。
-退休载荷的字段与 E10 相同。outcome 已是 Relayed。不得在写入之后改写 outcome，也不得用评审名重算 retirementId。
-下一任 openingCursor ← E7 记下的 XTrace 头序号。不加一。不加十。
-这不是从退休载荷读取名为 retirementCursor 的字段。
-下一任起始投影 ← 退休当时的折叠投影。
-下一任 incumbencyId 由这一笔 retirementId 派生。不拷贝消息。
-work 计数不打回初值。不另起一份。
-不 spawn。
-若返回 AppendDurable，则退休与开任都已落地。返回 Relayed。转入 H8 的入口一。本步不在转入之前终止。
-若返回 AppendNotAttempted，则两笔都未提交。不派发。不得报告已结束。可以再发。算法终止。
-若返回 CommitUnknown，则既不报告已结束，也不报告未结束。不派发。不补开任。不截断。不另开一任。下一次打开才分类。算法终止。
-否则拒绝。不派发。不把未分类的返回收成 Relayed。算法终止。
-▷ 第二次的结果只从折叠读。理由：证书已退役，工具返回值不是事实。
-# 能证伪：S4 退休载荷出现名为 retirementCursor 的字段；同一 retirementId 不同载荷仍写成第二笔；写入摘要用 Promoted 或 Stayed，重放用 Delivered 或 Relayed，同一围栏同一载荷重入返回 RetirementReplayConflict。
-
-E12. [不要并门]
-第二次调用不是再写一笔确认。
-折叠上「已有确认但这对不完全相同就宽拒绝」不套到本支。
-无任期与无评审只拦截折叠尚未出现该 retirementId 的调用。
-重放在 E1.1，不得跳过。不得把无任期拒绝用在已经命中重放的调用上。
-若执行到达本步，则不得掉进 Algorithm F。算法终止。
-
-### Algorithm F 恢复位置
-
-输入：已经折好的统一视图，以及底稿文件是否存在。
-输出：PairIncomplete、拒绝、Conflict、DeliveredIdempotent、ActiveRebound 或 Nothing。不新造事件。不新造模块。
-本节是恢复位置的唯一正文。第 9 节与第 10 节不另写格子。
-三个谓词只在本节定义。别的算法说当前 Delivered、当前 Relayed、活跃任期，都跳到这里，不另写一套。
-
-F0. [三个谓词]
-从空视图起，按已落盘事件的次序改写。不读还没落盘的调用。
-WorkOpened 加上首任 IncumbencyOpened：活跃任期成立。当前 Delivered 不成立。当前 Relayed 不成立。
-无权 Relayed 同一笔里，退休与后任一起落地：当前 Relayed 成立，活跃任期改成后任。当前 Delivered 不成立。
-持权 Delivered 落地，且没有后任：当前 Delivered 成立，活跃任期取消。
-ConfirmationCommitted 只给当前活跃任期加上确认位。不取消活跃任期。不成立当前 Delivered。不成立当前 Relayed。
-Reopened 落地：当前 Delivered 取消。同一任期恢复为活跃。那笔记得只留下作复制来源，不与活跃任期并存。当前 Relayed 不因这一笔成立。
-RetirementBlocked 不改这三个谓词。
-Reviewed、DevOpsBound、AdvanceCommitted 也不改这三个谓词。
-▷ 成功重开之后不得同时成立当前 Delivered 与活跃任期。理由：J2 把同一任期恢复为活跃。并存只属于没重开的残页。
-# 能证伪：Reopened 已落地，恢复仍把那笔历史 Delivered 读成当前 Delivered，并返回 Conflict。
-一次调用写出的连续多行，没有整批不可见的保证。下一次打开若文件不以换行结尾，读者整份返回 StorageInvalid。不进入本算法。不裁残行。不折被拒绝的前缀。
-下一次打开若只折出必成对两笔中的一笔，则位置 ← PairIncomplete。不改写三个谓词。不补另一笔。不截断。不另开一任。不把它收成 Conflict、Nothing、DeliveredIdempotent 或 ActiveRebound。转 F7。
-若一次已落地的追加，整次对不上上面任何一句改写，也不是这两处必成对的缺一笔，则位置 ← 拒绝。不改写三个谓词。不进入 F2 到 F5。不跳过这一次调用。不把它收成 PairIncomplete、Conflict、Nothing、DeliveredIdempotent 或 ActiveRebound。转 F7。
-▷ 只见前行、不见后任，返回 PairIncomplete。理由：读者已经折出一笔完整行。这不是没恢复位置，也不是冲突。补后任会把未知写成成功。
-F4.1 不可达。
-▷ 对不上的返回拒绝。理由：这是已折出的完整行对不上改写。不是待修的恢复位置。不得用通配保持上一视图。不得补后任。
-# 能证伪：只见 Relayed 退休、不见后任时，恢复返回 Conflict、Nothing、DeliveredIdempotent 或 ActiveRebound，或停着不返回 PairIncomplete。
-
-F1. [输入边界]
-不读还没落盘的工具调用。不读底稿正文。
-不读 ConfirmationCommitted 去发明退休。
-确认事件只影响视图里有没有活跃任期。它自己不是一个恢复位置。
-
-F2. [并存]
-只读 F0 的当前谓词。不把历史 Delivered 当成当前 Delivered。
-若当前 Delivered 成立，且活跃任期成立，则位置 ← Conflict。不猜谁对。转 F7。
-若当前 Delivered 成立，且活跃任期不成立，则转 F3。
-不得在这一支转 F4。F4 的入口要求当前 Delivered 不成立。
-若当前 Delivered 不成立，且活跃任期成立，则转 F4。
-这一支含成功追加 Reopened 之后，也含只有历史 Delivered。
-当前 Delivered 已取消，不得命中上一支 Conflict。不得把历史 Delivered 读成当前 Delivered。
-若当前 Delivered 不成立，且活跃任期不成立，则转 F5。不转 F4.1。F4.1 不可达。理由：只见 Relayed、不见后任的追加已在 F0 返回 PairIncomplete，不改写三个谓词。这一格到不了折叠视图。
-以上四支都不命中，则拒绝。不转 F3。不转 F4。不转 F5。算法终止。
-
-F3. [有交付且没有活跃任期]
-若当前 Delivered 成立，且活跃任期不成立，则进入本步。更早的 Relayed 不算冲突。不因同时有 Relayed 掉出表外。先按 sequence 检查该序列实际写入的字段。缺项先于幂等返回。
-若 sequence 是 S1、S2、S3，且缺 outcome、名为 retirementCursor 的字段、期望推进值、execSessionId、摘要或路径中的任一项，则位置 ← Conflict。转 F7。
-若 sequence 是 S1、S2、S3，且 outcome、名为 retirementCursor 的字段、期望推进值、execSessionId、摘要与路径都在，则位置 ← DeliveredIdempotent。转 F7。
-若 sequence 是 S1、S2、S3，则位置 ← Conflict。转 F7。不得返回 DeliveredIdempotent。
-若 sequence 是 S4，且缺 outcome，或缺 ProjectionCut，或缺期望推进值，则位置 ← Conflict。转 F7。
-若 sequence 是 S4，且载荷出现名为 retirementCursor 的字段，则位置 ← Conflict。转 F7。
-若 sequence 是 S4，则缺 digest、path 或 execSessionId 不是 Conflict。
-若 sequence 是 S4，且 outcome、ProjectionCut 与期望推进值都在，且没有名为 retirementCursor 的字段，则位置 ← DeliveredIdempotent。转 F7。
-若 sequence 是 S4，且以上三支都不命中，则位置 ← Conflict。不返回 DeliveredIdempotent。转 F7。
-# 能证伪：缺期望推进值的已落盘 Delivered，恢复返回 DeliveredIdempotent。
-若 sequence 缺失，或既不是 S1、S2、S3，也不是 S4，则位置 ← Conflict。不落到 F6。不另造输出。转 F7。
-▷ 摘要和路径盖不住缺字段。理由：走到本步就终止。字段检查若留在后面，缺 retirementCursor 的已退休会当成幂等。
-▷ S4 不填 digest、path、execSessionId。理由：S4 的 Delivered 不 spawn。
-
-F4. [活跃且没有交付]
-若当前 Delivered 不成立，且活跃任期成立，则位置 ← ActiveRebound。
-成功追加 Reopened 之后必须落到本步。不得把位置改成 Conflict。
-历史 Delivered 只是复制来源，不把本步改判 Conflict。
-当前 Relayed 成立，位置仍是 ActiveRebound。不得掉出表外。不得因当前 Relayed 改判 Conflict。
-已落盘确认且尚未退休，落在本步。不是已退休。也不是 Delivered。
-底稿不存在，仍是 ActiveRebound。不改口成已交付。
-S4 没有底稿，同样落在本步。
-授权位按视图里已存的值读。S4 上的假是正常活跃，不是冲突。
-若读不到授权位，则位置 ← Conflict。不补 true。不补 false。不新造第五种输出。转 F7。
-若授权位可读，则位置保持 ActiveRebound。不写第二笔 DevOpsBound。不把确认位改成退休。不重发未知接收。转 F7。
-
-F4.1. [不可达]
-本步不再执行。不得把本步当成恢复位置。
-只见 Relayed、不见后任的追加在 F0 返回 PairIncomplete。不改写三个谓词。不把它收成 Conflict。
-因此「当前 Relayed 成立，当前 Delivered 不成立，且活跃任期不成立」构造不出来。
-若执行到达本步，则停。不返回 Conflict。不返回 Nothing。不另开一任。算法终止。
-▷ 不可达由 F0 证明。理由：没有后任的 Relayed 追加进不了折叠视图。
-
-F5. [都没有]
-若当前 Delivered 不成立，当前 Relayed 不成立，且活跃任期不成立，则位置 ← Nothing。转 F7。
-否则拒绝。算法终止。只见 Relayed、不见后任已在 F0 返回 PairIncomplete，到不了本步。
-不猜测阶段。不假定已交付。
-
-F6. [缺项已并入]
-字段检查只在 F3，返回 DeliveredIdempotent 之前。本步不再执行。不得把本步当成第二套检查。
-# 能证伪：S4 成功收束因缺 digest 或 path 被判成 Conflict；已确认未退休被判成已退休；底稿不存在被改口成已交付；崩溃后新造绑定；读不到授权位时补 true；有 Delivered、无活跃任期、sequence 缺失或不是这两段序列时未返回 Conflict。
-
-F7. [下一步]
-位置只活在这一次调用里。不写入事件。不存成长期字段。
-若位置是 PairIncomplete，则停。不补另一笔。不另开一任。不派发。算法终止。
-若位置是拒绝，则停。不跳过这一次追加。不派发。不另开一任。算法终止。
-若位置是 Conflict，则停。不猜谁对。不派发。不重开。不补 true。不新造绑定。算法终止。
-若位置是 DeliveredIdempotent，则停在已交付。不派发。不 spawn。不另开一任。不启动第二台。不撤销已经问到的那一台。算法终止。
-若位置是 Nothing，则停。不转 Algorithm A。不转 Algorithm Q。算法终止。
-若位置是 ActiveRebound，且 sequence 是 S1、S2、S3，则等待下一次用户 prompt。不派发后继提示。不在恢复里绑定 DevOps。算法终止。
-若位置是 ActiveRebound，且 sequence 是 S4，且当前 Relayed 成立，且后任尚未 Reviewed，则转入 H8 的入口二。不转 H2。不转 H4。不把后任送进 assess。本步不在转入之前终止。
-若位置是 ActiveRebound，且 sequence 是 S4，且当前 Relayed 不成立，则转入 H2。不转 H8。本步不在转入之前终止。
-若位置是 ActiveRebound，且 sequence 是 S4，且后任已经 Reviewed，则转入 H2。不转 H8。不发第二套后继提示。本步不在转入之前终止。
-否则拒绝。不派发。算法终止。
-▷ 六个位置各有下一步。理由：返回一个名字之后停住，执行者会自己发明下一步。
-▷ 后任尚未评审不走 H4。理由：第一条可见指令必须是后继提示。assess 会把自动循环改成评审前只读。
-# 能证伪：恢复停在位置名上，没有下一句；S4 后任尚未评审却转入 H4。
-
-### Algorithm G 历史投影
-
-输入：后继 OpeningCursor、provider 消息序列、上一任退休事实、上一任 sequence、上一任 LWR。
-输出：后继可见的消息，以及注入的 LWR。无稳定身份则拒绝装配，零猜测。
-
-G1. [剥除]
-逐条看消息。
-若没有稳定身份，则拒绝装配。不猜测。算法终止。
-若该身份的首次观察序晚于 OpeningCursor，则留下。
-否则剥除。
-比较单位是 XTrace 观察序。不用退休工具调用的下标。
-
-G2. [不合成]
-不生成合成消息。不概括前任。不把剥除前的物理历史原样写回。
-
-G3. [交接]
-把上一任 LWR 注入后继交接材料。
-复用已有的 previousTenureRecord 接线。不另写一份 materialize。
-LWR 不是派发的控制输入。
-
-G4. [cut]
-若上一任 sequence 缺失，则拒绝装配。不猜。算法终止。
-若上一任 sequence 是 S1、S2、S3，则不查找 ProjectionCut。过期请求只由 G1 的 openingCursor 与稳定身份比较承担。算法终止。
-若上一任 sequence 是 S4，且退休载荷没有 ProjectionCut，则拒绝装配。不猜。算法终止。
-若上一任 sequence 是 S4，且退休载荷已有 ProjectionCut，则 cut 只判定过期请求的身份。不当成新任的活跃请求。算法终止。
-否则拒绝装配。不猜。不进入 Algorithm H。算法终止。
-
-### Algorithm H 派发选择
-
-输入：sequence，以及折叠视图里的任期、评审 outcome、确认位。
-输出：零条或一条可见指令。确认次数为 2 且 Relayed 已落盘时，另发一条后继提示。
-
-H1. [一段式]
-若 sequence 不是 S1、S2、S3，也不是 S4，则拒绝。不选资源。算法终止。
-若 sequence 是 S4，则转 H2。
-S1、S2、S3 不走 H3 到 H7。
-Relayed 之后不派发后继提示。
-若本次没有要发出的工具调用，则这是空停。
-不派发后继提示。不把沉默当失败。不写事件。等待下一次用户 prompt。
-退休过程只按 Algorithm D。本算法不另写一把锁。
-算法终止。
-# 能证伪：S4 在空停句之后终止，且未转入 H2。
-
-H2. [读什么]
-若 sequence 是 S4，则只读折叠上的三样：有没有任期、outcome、确认位。
-不读工具返回值。不读证书。不读交付授权。
-可见指令互斥。只选出一条。不得把几支正文一起发出。
-其余格子是拒绝，或已证明不可达。不用通配落下去。
-写法是直接分支。不造状态表。不把下一步存成长期字段。
-
-H3. [无任期]
-若没有任期，则不选资源。不允许 deliver。算法终止。
-若有任期，则不选资源。不在本步终止。转 H4。
-
-H4. [无评审]
-若当前 Relayed 成立，且这一任尚未 Reviewed，则拒绝。不选 assess。后任第一条指令只从 H8 来。算法终止。
-若有任期，且无评审，且无确认，则选出 assess 这一条。正文只写当前这一次的独立只读评估要求。不写低分如何接责。不写满分如何退场。不写后继循环。不允许 deliver。算法终止。
-若不命中以上两句，则不选 assess。不写评估正文。不在本步终止。转 H4.1。
-
-H4.1. [有确认无评审]
-若有任期，且无评审，且已有确认，则拒绝。不选资源。算法终止。
-▷ 这一格拒绝。理由：确认不得先于评审落地。落到 assess 会把非法确认藏起来。
-若不命中上一句，则不在本步终止。转 H5。
-
-H5. [Stayed 未确认]
-若 outcome 是 Stayed，且尚无确认，则选出 work 这一条。正文写修复义务。不写工具拒绝。允许第一次 deliver。那一次只写确认并返回，不收束。算法终止。
-若已有确认，则不得命中本支。不写 work 正文。不在本步终止。转 H6。
-若 outcome 不是 Stayed，则不写 work 正文。不在本步终止。转 H6。
-
-H6. [Promoted 未确认]
-若 outcome 是 Promoted，且尚无确认，则选出 finish 这一条。参数是尚无确认。正文必须写明：这一次调用只落下确认，不结束。不得写入「可以结束」或「证书已绑定」。本支不读交付授权。算法终止。
-▷ 第一次确认不是退场。理由：结束是另一个 toolCallId 的另一次调用。
-若不命中上一句，则不写本支正文。不在本步终止。转 H7。
-
-H7. [已确认]
-若已有确认，且未退休，且 outcome 是 Promoted 或 Stayed，则选出 finish 这一条。参数是已有确认。Stayed 且已确认只命中本支。不落回 work。本支允许第二次 deliver。收束不写在本选择里。收束只发生在 Algorithm E 的第二次入口。算法终止。
-若不命中上一句，则不写 finish 正文。不在本步终止。转 H7.1。
-
-H7.1. [残格]
-若这一任已经退休，仍被读成当前任期，则拒绝。不选资源。不进入 H8。不发后继提示。算法终止。
-若已有评审，且 outcome 既不是 Promoted，也不是 Stayed，则拒绝。不选资源。不进入 H8。算法终止。
-▷ 这两格不在 H3 到 H7。理由：已退休不是当前任期。Delivered 之后没有活跃任期。Relayed 之后当前任期是后任。非法评审名不是 Promoted，也不是 Stayed。后继提示只从 Algorithm E 的 Relayed 成功进入 H8。
-不重列 H3 到 H7。不写未命中则拒绝。
-不得因为已有 Relayed 就发出后继提示。
-若以上各格都不命中，则拒绝。不选资源。不发后继提示。算法终止。
-
-H8. [后继提示]
-两个入口，一套正文。
-入口一：E11 在 AppendDurable 之后跳转。退休与后任已经落盘。本次调用还在。
-入口二：F7 在 ActiveRebound、sequence 为 S4、当前 Relayed 成立、后任尚未 Reviewed 时转入。
-若不是这两个入口，则拒绝。不选资源。不转 H4。算法终止。
-按后任 incumbencyId 问宿主：这一任有没有已经留下的 provider 运行。
-若问不到，则既不报告已发出，也不报告未发出。不发。不把「也许已经发出」收成不发。不把「也许没发出」收成再发一套。不转 H2。不转 H4。下一次打开仍按 F7 同一句判定。算法终止。
-若返回一次及以上，则不发第二套。不转 H2。不转 H4。已有运行继续。算法终止。
-若返回零次，且提示被改成拼接前任消息，则停止这条派发，回到只读退休事实。不得补一条消息摘要。不发后继提示。算法终止。
-若返回零次，则发一次后继提示。参数只来自序号、退休 id、cut 的 provider run。不读消息。不读 LWR。不读 H3 到 H7 的正文当控制输入。不抓工作区快照。不把 snapshotId 写入开任载荷。发出一次之后，算法终止。
-否则拒绝。零写。不发后继提示。算法终止。
-▷ 问不到就停在未知。理由：提示发出没有生命周期事件。没有宿主观察，发出与否分不清。
-▷ 不补摘要。理由：提示函数不读消息。补摘要是在修一个不存在的断裂。
-# 能证伪：问不到仍发出后继提示；问到已有运行仍再发一套；后任尚未评审却转入 H4。
-
-### Algorithm I 评审期两道门
-
-输入：统一折叠视图，以及这次要执行的工具或要派的任务。
-折叠视图里活跃任期的阻塞摘要有没有，从这张视图读。不另给一份现场列表。
-输出：放行或拒绝。不新开事件。不插入 Algorithm D 或 Algorithm E 的步骤。
-
-I0. [两次入口]
-review、js-manager、deliver、原生 read、grep、glob、跨角色 js-engineer、跨角色 js-devops，只走 I1。
-ask、resume、fork、horizon、join、向绑定的固定 DevOps 派任务，只走 I2。
-一次调用只属于上面一份名单。命中两份，或两份都不属于，则拒绝。零副作用。算法终止。
-属于 I1 的调用不落入 I2。属于 I2 的调用不先走 I1。
-I1 每支的终止不得使 I2 不可达。
-▷ 名单先于两门。理由：fork 既像工具又像派工。不先钉死，执行者会让它走两门。
-
-I1. [执行门]
-若本次是 deliver，且 sequence 是 S4，且有活跃任期，且尚未评审，且已有确认，则拒绝。零写。不进入 Algorithm D。不进入 Algorithm E。不返回已完成未退休。不放行写入。不放行只读评估。算法终止。
-▷ 确认不得先于评审落地。理由：无条件放行会让后文拒绝变成死句。已完成未退休会把这一格藏起来。
-若本次是 deliver，则放行。不写事件。不进入后面的读写门。调用方进入 Algorithm D 或 Algorithm E。一段式无评审仍进 D8。两段式无评审且无确认仍进 E3，零写，返回已完成未退休，不返回错误字符串。不得把 deliver 收成改底稿写入。不得收成 S4 的不放行写入。算法终止。
-▷ 这一句必须写在本门。理由：I0 把工具执行只转到这里。I2 的不裁 deliver 到不了工具执行。上一句已经裁掉的那一格，不进本句。
-# 能证伪：S4 无评审且无确认的 deliver 被本门当成写入拒绝；一段式无评审的 deliver 被改底稿门拒绝；S4 无评审且已有确认的 deliver 仍放行并进入 Algorithm E。
-名字 js-manager 留在 Schema 里，固定可见。不删除。不改名。
-一段式不读确认位。确认次数为 1，没有确认事件。
-S4 的 Stayed 要读确认位，用来分开修复与收口。
-提示词选择仍只在 Algorithm H。本门不选出资源正文。
-不读证书。不读 findings 对。
-写法是直接分支。不造状态表。不把下一步存成长期字段。
-▷ 不单列退任冻结。不保留这一格。理由：没读到落点。条款名不是观察。不补函数名。第 9 节同一句。
-
-若 sequence 是 S1、S2、S3：
-若本任尚未 Reviewed，则放行读与只读调查。放行本次 review 的工具执行。review 只进入 Algorithm C。拒绝改底稿写入。这一句不得扩大成拒绝 review。算法终止。
-# 能证伪：一段式尚未评审时，review 被改底稿门拒绝。
-若本任已经 Reviewed，则放行修底稿写入。Stayed 的修复义务不拒绝写入。算法终止。
-若 sequence 是 S1、S2、S3，且上面两支都不命中，则拒绝。零副作用。不放行读。不放行写入。不得继续读 S4 句。算法终止。
-一段式的写门只看本任是否已 Reviewed。
-原生 read、grep、glob 不因评审窗在这一段拒绝。
-对 Manager 的跨角色 js-engineer、js-devops 不套到这一段。
-▷ 本门禁的是执行，不是派工，也不是退休。理由：三件事不是同一把锁。
-
-若 sequence 是 S4：
-若没有活跃任期，则拒绝。零副作用。不放行只读评估。不把缺任期读成尚未评审。算法终止。
-若尚未评审，且已有确认，则拒绝。不放行只读评估。不放行写入。拒绝对 Manager 的跨角色 js-engineer、js-devops。零副作用。算法终止。
-deliver 已在本门开头裁掉。join 在 I2 裁。本句不再裁这两次入口。
-▷ 本句只裁还能走进本句的非 deliver 工具。理由：deliver 在本门开头已经终止。join 不进 I1。
-# 能证伪：有阻塞摘要、无评审、已有确认，非 deliver 工具仍放行。
-若折叠视图里这一任已有阻塞摘要，则本门只放行 deliver。join 不进本门，只在 I2。拒绝原生 read、grep、glob。拒绝对 Manager 的跨角色 js-engineer、js-devops。不在本门写派工结论。不拒绝 deliver。算法终止。
-▷ 谓词是已落盘的阻塞摘要。理由：现场列表非空是另一道门。摘要已在时，deliver 仍要能进 Algorithm E。本支不覆盖上一句已经拒绝的非法确认。
-这不是现场列表判定。现场列表非空仍只由 Algorithm D 与 Algorithm E 写 RetirementBlocked。
-未落盘阻塞事件时，不因现场列表非空走进本支。
-若尚未评审，且无确认，则只放行两样：本次 review 的工具执行，以及 js-manager 的只读取。review 的唯一副作用是进入 Algorithm C。这不是改底稿。不是修复派工。不是向绑定 DevOps 派任务。js-manager 只读，不写事件。除此以外不放行写入。拒绝原生 read、grep、glob。拒绝对 Manager 的跨角色 js-engineer、js-devops。算法终止。
-# 能证伪：S4 第一次 review 因为写事件被执行门拒绝，或 js-manager 在这一格被拒绝。
-# 能证伪：有任期、无评审、已有确认，仍放行只读评估。
-若已评，且 outcome 是 Stayed，且尚无确认，则本门不裁 fork，也不裁向绑定 DevOps 派任务。那两格只在 I2。本门不放行、也不拒绝这两次入口。拒绝原生 read、grep、glob。拒绝对 Manager 的跨角色 js-engineer、js-devops。不得把本支收成拒绝执行。算法终止。
-▷ 修复义务的派工不在本门。理由：H5 选出 work。本门再写一句放行，就和 I2 变成两套结论。
-若已评，且 outcome 是 Stayed，且已有确认，则只放行清理与收口。不开新工作。fork 与向绑定 DevOps 派任务只在 I2 拒绝。本门不另写一句。拒绝原生 read、grep、glob。拒绝对 Manager 的跨角色 js-engineer、js-devops。算法终止。
-若 outcome 是 Promoted，且尚无确认，则放行第一次 deliver。该次只写 ConfirmationCommitted，不收束。放行清理与收口。不开新工作。拒绝原生 read、grep、glob。拒绝对 Manager 的跨角色 js-engineer、js-devops。算法终止。
-若 outcome 是 Promoted，且已有确认，则放行第二次 deliver。收口走 Algorithm E。放行清理与收口。不开新工作。拒绝原生 read、grep、glob。拒绝对 Manager 的跨角色 js-engineer、js-devops。算法终止。
-▷ 第一次 deliver 不是收束。理由：E4 只写确认。第二次才走 E10。
-若已评，且 outcome 既不是 Promoted，也不是 Stayed，则拒绝。算法终止。
-若 sequence 是 S4，且本分支以上各句都不命中，则拒绝。零副作用。不放行只读评估。不放行写入。算法终止。
-
-若 sequence 既不是 S1、S2、S3，也不是 S4，则拒绝。算法终止。
-
-I2. [派工门]
-若 sequence 是 S1、S2、S3，且本次是 ask，则放行。ask 是绑定触发，不是 S4 的派工。算法终止。
-若 sequence 是 S4，且本次是已有只读调查的合法 resume，则放行。算法终止。
-若 sequence 是 S4，且本次是 fork 的只读调查，则放行。算法终止。
-修复 fork 不是只读调查。不并进上一句。不并进向绑定 DevOps 派任务。
-不把没打开的函数写成已经核过。
-若 sequence 不是 S4，且本次是 resume 或 fork，则拒绝。算法终止。
-若本次是 horizon，则本门不把 horizon 当成派工放行。绑定走 Algorithm B。转 Algorithm B。转入之后算法终止。不得靠步骤次序掉进 join。不得落到 deliver。不得落到向绑定 DevOps 派任务。
-若本次是 join，且 sequence 是 S4，且有活跃任期，且尚未评审，且已有确认，则拒绝。零写。不因阻塞摘要放行。不进 Algorithm E。不返回已完成未退休。算法终止。
-▷ 与 I1 开头同一格。理由：join 不进 I1。阻塞摘要不得把这一格改放行。
-若本次是 join，且 sequence 是 S4，且折叠视图里已有阻塞摘要，则放行。算法终止。
-若本次是 join，则拒绝。算法终止。
-若本次是 deliver，则本门不裁。不拒绝 deliver。不把跳过写成派工放行。算法终止。
-若 sequence 是 S4，且要向绑定的固定 DevOps 派任务，且尚无评审，则在任何持久化副作用之前拒绝。算法终止。
-若 sequence 是 S4，且本次是修复 fork，且已评，且 outcome 是 Stayed，且尚无确认，则放行。算法终止。
-若 sequence 是 S4，且要向绑定的固定 DevOps 派任务，且已评，且 outcome 是 Stayed，且尚无确认，则放行。算法终止。
-第 9 节把修复派工写在执行门下面。过程以本算法为准。放行只在上面两句。
-若 sequence 是 S4，且本次是修复 fork，且已评，且 outcome 是 Promoted，则拒绝。零写。不因为已有评审放行。算法终止。
-若 sequence 是 S4，且本次是修复 fork，且已评，且 outcome 是 Stayed，且已有确认，则拒绝。零写。不因为已有评审放行。算法终止。
-若 sequence 是 S4，且要向绑定的固定 DevOps 派新任务，且已评，且 outcome 是 Promoted，则拒绝。零写。不因为已有评审放行。算法终止。
-若 sequence 是 S4，且要向绑定的固定 DevOps 派新任务，且已评，且 outcome 是 Stayed，且已有确认，则拒绝。零写。不因为已有评审放行。算法终止。
-若本次不是 ask，不是 resume，不是 fork，不是 horizon，不是 join，不是 deliver，也不是向绑定的固定 DevOps 派任务，则拒绝。算法终止。
-若以上各格都不命中，则拒绝。零写。不放行。算法终止。
-这是未点名的新种类。不与上面各格混写。
-不读证书。
-不写入 Algorithm D 或 Algorithm E 的步骤。
-▷ 不写入 deliver 的步骤。理由：没评审时派工要停，没评审时一段式 deliver 并不停。本门不裁 deliver。
-▷ 不在步骤末尾默认放行。理由：没命名的格子不是放行。
-# 能证伪：S4 尚无评审时，resume 或 fork 的只读调查被这道拒绝挡住；一段式 deliver 被这道派工门拒绝；未命中的派工因落到步骤末尾而被放行。
-# 能证伪：修复窗的 fork 因为不是只读而被本门末尾拒绝；收口窗的 DevOps 派工因为已有评审被放行。
-
-### Algorithm J 重开
-
-输入：incumbencyId，以及已落盘的 Delivered 退休。
-输出：AppendDurable 时已重开；AppendNotAttempted 时保持已交付；CommitUnknown 时既不报告已重开也不报告未重开。写前拒绝则零写。
-
-J1. [谁能写]
-若 sequence 是 S4，则拒绝。零写。不写 Reopened。算法终止。
-若视图已有活跃任期，则拒绝。零写。不写 Reopened。不把 Delivered 加活跃任期收成重开。算法终止。
-若没有 outcome 为 Delivered 的退休，且有 outcome 为 Relayed 的退休，则拒绝。零写。不写 Reopened。不另开一任。算法终止。
-若没有 outcome 为 Delivered 的退休，则拒绝。零写。不写 Reopened。算法终止。
-若任期 id 与这笔记得不符，则拒绝。零写。算法终止。
-只有 Delivered、没有活跃任期、任期 id 相符、序列不是 S4，才转 J2。
-# 能证伪：Delivered 与活跃任期并存时仍追加 Reopened；只有 Relayed 时重开或另开一任。
-
-J2. [复制]
-若不是从 J1 的通过格转入，则拒绝。零写。不写 Reopened。算法终止。
-不生成新任期 id。
-work 计数延续。不重置。不另起一份。
-阶段从已交付记录复制。不从 sequence 重新推下一步。
-评审整份留下。
-授权从那笔记得读。
-若授权读不到，则拒绝。不补 true。不补 false。算法终止。
-追加 Reopened。载荷只含 incumbencyId。
-若返回 AppendDurable，则返回已重开。算法终止。
-若返回 AppendNotAttempted，则保持已交付。返回未重开。可以再发。算法终止。
-若返回 CommitUnknown，则既不报告已重开，也不报告未重开。不补另一笔。不截断。不得把已交付改口。下一次打开才分类。算法终止。
-否则拒绝。不把未分类的返回收成已重开。算法终止。
-
-### Algorithm K 权威推进
-
-输入：一次对已有 work 的再 commission、expected、next、当前折叠视图。
-输出：AppendDurable 时已推进；AppendNotAttempted 时计数不变；CommitUnknown 时既不报告已推进也不报告未推进。写前拒绝则零写。
-
-K1. [并或不并]
-权威比较与前缀重锚，默认不是同一判定。
-▷ 默认留下 AdvanceCommitted，不并进前缀重锚。理由：已读到的两处不是同一函数。
-不并进前缀重锚。
-若实现时发现二者是同一判定且同一调用方，则停止。不删 AdvanceCommitted。不改词表。退回规划。
-
-K2. [何时写]
-若这次不是已有 work 的再 commission，则零写。返回未推进。不返回成功。算法终止。
-incumbencyId ← 折叠视图的当前活跃任期。
-若没有活跃任期，则拒绝。零写。不追加 AdvanceCommitted。不采用调用方另给的任期号。算法终止。
-若这一任没有评审，则拒绝。零写。算法终止。
-不因证书有效而拒绝。不因证书失效而推进。证书不参与本算法。
-
-K3. [载荷]
-若 expected 与折叠当前值不符，则拒绝。零写。返回未推进。不报告已推进。算法终止。
-若 next 为空，则拒绝。零写。返回未推进。不报告已推进。算法终止。
-若 next 等于 expected，则拒绝。零写。返回未推进。不报告已推进。算法终止。
-若 next 已出现在这一 work 的推进历史上，则拒绝。零写。返回未推进。不报告已推进。算法终止。
-折叠只做这四次比较。不在折叠里哈希。不比较消息 id。
-▷ 没有前进就是这四次比较。理由：空、与 expected 相同、与折叠当前值不符、或已经出现过，都不是一次推进。现行谓词里的消息标识分支随 R2 去掉，不留在这一步。
-追加 AdvanceCommitted。载荷 ← incumbencyId、expected、next。
-不写入消息 id。不写入 snapshotId。
-若返回 AppendDurable，则返回已推进。算法终止。
-若返回 AppendNotAttempted，则计数不变。返回未推进。可以再发。算法终止。
-若返回 CommitUnknown，则既不报告已推进，也不报告未推进。不补另一笔。不截断。下一次打开才分类。算法终止。
-否则拒绝。不把未分类的返回收成已推进。算法终止。
-退休事件不改这个计数。本事件不另带一套 expected 去和退休声明竞赛。
-计数挂在 work 上。没有活跃任期时它仍在。本算法因没有任期而拒绝，是因为载荷没有 incumbencyId 可写，不是因为计数消失。
-
-### Algorithm L 术语与需求包
-
-输入：代码、需求与资源里的旧词。
-输出：一套词，一个需求包，两个留下的角色目录。
-
-L1. [映射]
-Road 改为 Work。
-iteration 改为 tenure。
-assessment 改为 review。
-suicide 改为 deliver。
-Continue 不另起名。它就是 Relayed 的派发含义。
-Accepted 不另起名。它就是 Delivered。
-certificate 删除。不改名保留。
-▷ 不留 suicide 当别名。理由：两段是确认次数，不是另一个工具名。
-
-L2. [包]
-五个需求包收成一个目录 requirements/work/。
-条款锚点写成 WHAT[work-NNN]。
-不留 relay- 前缀。不留 planning- 前缀。
-▷ 包名用 work。理由：Work 是两边共用的载体。用 planning 或 relay 会把来路写进目录。
-
-L3. [留下]
-role/plan 与 role/manager 留下。方法行不同。
-这是一段式交互与两段式自动的实例差，不是旧词。
-tool/suicide 的资源并入 deliver。两段写在 S4 实例说明里。一段写在 Plan 实例说明里。
-js-manager 不改名。不删除。算法终止。
-
-### Algorithm M 测试
-
-输入：本节算法已写死的契约。旧测试只作材料，不是现行义务。
-输出：一个编号空间下的测试。一段 deliver 与两段 deliver 各有锚点。
-
-M1. [不抄旧义务]
-不把旧锚点改名后继续断言旧义务。
-若要引用 GAP-192、GAP-193 或 GAP-197 的现行断言，先重读那条测试正文。
-本算法不宣布它们作废，也不宣布保留。
-support 文件没有 WHAT 锚点。不把它们写成条款测试。
-
-M2. [分叉锚点]
-确认次数为 1 至少一条锚点：一次调用结束，且不存在 ConfirmationCommitted。
-确认次数为 2 至少一条锚点：第一次只落确认；同一对重放不第二次结束；另一个 toolCallId 才写退休。
-不得用一条 deliver 测试覆盖两种语义。
-无评审却写下确认，必须红。
-S4 的 Promoted 把交付授权置真，必须红。
-S4 因缺 digest 或 path 被判成 Conflict，必须红。
-无活跃任期时，同一围栏重入必须命中已落盘退休，不得返回 no active incumbency。
-
-M3. [契约]
-追加口写出的真实字节，交给折叠读取。
-一段式退休载荷必须保留 retirementId、incumbencyId、outcome、ProviderRunId、ToolCallId、名为 retirementCursor 的字段与期望推进值。持权 Delivered 还要保留 execSessionId、digest、path。不得重新生成身份。
-两段式退休载荷必须保留 retirementId、incumbencyId、outcome、ProjectionCut 与期望推进值。不得重新生成身份。
-retirementId 的输入是固定标记、workId、ProviderRunId、ToolCallId、outcome，外加入口读到的 work 计数。
-确认次数为 1 的标记是 oneshot-retirement-v1。确认次数为 2 的标记是 retirement-v1。
-两个标记不合并。用另一个标记重算，必须红。
-身份里的 outcome 只许是 Relayed 或 Delivered。不许是 Promoted 或 Stayed。
-不得把 cursor 当成两种退休共用的一个字段名。
-不得把 retirementCursor、活跃任期标识或 XTrace 头序号放进身份。
-同一围栏重算必须得到同一个 id。
-缺名为 retirementCursor 的字段的合法 S4 载荷不得判红。
-S4 载荷里出现这个字段，必须判红。
-一段式退休载荷缺期望推进值，必须判红。持权 Delivered 缺 execSessionId、digest 或 path，必须判红。
-两段式退休载荷缺期望推进值，必须判红。
-改标签、改身份或改因果顺序，另一侧未改时，测试必须红。
-不把键序或空白锁进契约。
-不只断言写成功。下列四支各有一条锚点，缺一条就红：AppendNotAttempted、CommitUnknown、只见必成对前一行的 PairIncomplete、文件不以换行结尾的 StorageInvalid。
-AppendNotAttempted：已知未提交，调用方可以再发。不得把这次写成已落地。
-CommitUnknown：既不得写成已提交，也不得写成未提交。不得补另一笔。不得截断。不得另开一任。
-下一次打开只见必成对的前一行：必须得到 PairIncomplete。不得补后任。不得收成 Conflict、Nothing、DeliveredIdempotent 或 ActiveRebound。
-文件不以换行结尾：必须整份 StorageInvalid。不得裁残行。不得折被拒绝的前缀。不得进入 Algorithm F。
-
-M4. [不变量只记一处]
-Algorithm C 的不变量写入 work 条款一处。
-不在别的条款里再抄一遍。
-若这句话不能低噪地机械判定，则不新增正则脚本，不新增扫空目录的门，不新增无人运行的本地脚本。
-若已有检查覆盖同一句，则加一个 known-bad fixture：长期字段里存了下一步时必须变红。
-不新造第二份散文。算法终止。
-
-### Algorithm N 删除旧轨
-
-输入：Algorithm A 到 Algorithm M 的验收都已通过。
-输出：仓库里不再有第二套生命周期事实，也没有旧账转换。
-
-N1. [门]
-若 A 到 M 有任一验收未过，则不进入本算法。算法终止。
-
-N2. [旧账]
-不读取既有 AgentJournal。
-不读取既有 Relay 事件文件。
-不转换。不写兼容层。
-新 work 只写统一事件轨。
-▷ 旧账不是新轨的输入。理由：转换层就是发展痕迹。
-
-N3. [删除]
-删除第二套生命周期事件类型、证书类型、suicide 这个名字，以及把完整物理历史写成现行义务的句子。
-删除 WorkspaceSnapshot 这个类型名。删除它的独立模块。统一事件载荷不得含 snapshotId。不新造 SnapshotMismatch。不把这个模块留成无人调用的残留。
-TenureReanchored 不是第二套生命周期事件。不删除它。不并进统一词表。不改前缀 epoch 折叠。
-不改仓库根 plan.md。
-不回退已经入库的 js-plan 描述装配。
-已退役的 ask 挂起导出不是活清理项。不把它再删一遍当验收。
-不留过渡名。不留别名。
-若删完仍有两套折叠，或 suicide 还在当别名，则本路径没有走完。不加适配器收场。算法终止。
-
-### Algorithm O 施工顺序
-
-输入：Algorithm A 到 Algorithm N、Algorithm Q。
-输出：当前可以开工的集合。本算法不是运行时调度，不得实现成程序计数器。
-
-O1. [内核]
-先做完同一套事件与折叠，使 A、B、C、D、E、F、J、K、Q 能跑。
-验收：S1、S2、S3 与 S4 都能开任、评审、退休。
-确认次数为 2 的确认事件可重放，重放不第二次结束。
-未过此门，不做 O2。
-
-O2. [并行]
-O1 过后，G、H、I 与 deliver 改名可以同时做。
-三处写入不同：投影、派发、工具名。
-G 不等 H。H 不等工具改名。
-
-O3. [后段]
-L 在事件名已定后起草。合并晚于 O2，早于 M。
-M 晚于 L。
-N 最后。算法终止。
-
-### Algorithm Q 无活跃任期时不另开一任
-
-输入：已有 WorkOpened 的折叠视图，以及调用方是否持有一笔尚未落盘的退休。
-输出：拒绝且零写。不追加 IncumbencyOpened。
-
-Q1. [调用方]
-调用方只有两处。Workflow.fs 的 tryBuildAcceptedOpening。Change/Host/Host.fs 的 activateNextIfAbsent。
-两处都进本算法。都不另写一套开任。
-别的入口不调用本算法。
-第 9 节写明过程不在本节。过程只在本节。
-首任只来自 Algorithm A。后任只来自 Algorithm D 的 D8，或 Algorithm E 的 E11。
-恢复位置为 Nothing 时，也不调用本算法去补一任。
-
-Q2. [没有合法追加格]
-若视图已有活跃任期，则拒绝。零写。算法终止。
-若按 Algorithm F 的 F0，当前 Delivered 成立，则拒绝。零写。不另开一任。算法终止。
-历史 Delivered 已经重开、当前 Delivered 不成立，不按这一支拒绝。
-若按同一处 F0，当前 Relayed 成立，则拒绝。零写。不另开一任。算法终止。
-若调用方同时持有一笔尚未落盘的退休，则拒绝。零写。算法终止。
-那一笔必须由 Algorithm D 或 Algorithm E 同一笔追加退休与开任。不得拆到本算法。
-若视图没有活跃任期，也没有退休，则拒绝。零写。不猜 sequence 的第一元。不追加 IncumbencyOpened。算法终止。
-否则拒绝。零写。算法终止。
-▷ 没有可达的合法追加格。理由：同一笔开立已经带上首任。Relayed 的后任与退休同一笔追加。剩下的无任期视图不是另开一任的入口。
-# 能证伪：两处调用方在无活跃任期时追加了 IncumbencyOpened。

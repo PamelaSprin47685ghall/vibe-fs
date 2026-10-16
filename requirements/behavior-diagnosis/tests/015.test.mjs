@@ -115,8 +115,9 @@ const cycleRecord = (n, field) => ({
   toolCallIds: [],
   textRef: `blob-cycle-${n}`,
   textDigest: `sha-cycle-${n}`,
-  tipRuleId: field,
-  fieldNameAtCommit: field,
+  tipName: field,
+  tipTextRef: `blobs/tip-cycle-${n}`,
+  tipTextDigest: `sha-tip-cycle-${n}`,
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })
@@ -166,8 +167,9 @@ const cycleRecord = (n, field) => ({
   toolCallIds: [`call-${n}`],
   textRef: `blob-t${n}`,
   textDigest: `sha-t${n}`,
-  tipRuleId: field,
-  fieldNameAtCommit: field,
+  tipName: field,
+  tipTextRef: `blobs/tip-cycle-${n}`,
+  tipTextDigest: `sha-tip-cycle-${n}`,
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })

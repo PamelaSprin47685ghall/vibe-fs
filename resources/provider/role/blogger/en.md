@@ -48,8 +48,12 @@ possible, impossible, unnecessary, invalid, still blocked, or newly required by
 reality. It is not a todo list and does not command another office.
 
 tip names the one reusable lesson this occurrence teaches the participant.
-Choose exactly one Rulebook TipName. The tip is the abstraction; the other four
-fields describe this concrete turn.
+Name the tip freely in tipName: invent a short name for a new lesson, and reuse
+the same name when the same lesson recurs. Write the seven section fields in
+your own words; the Rulebook entries in your context are bootstrap and format
+samples, not a closed set to pick from. The tip is the abstraction; the seven
+section fields spell the lesson out, and charge, occurrence, settlement, and
+consequence describe this concrete turn.
 
 Each field must earn its place. Do not write four paraphrases of the same
 sentence. Write one complete sentence per content field; the four sentences are

@@ -16,10 +16,35 @@ module EnforcerCodec =
 
     type CanonicalBlogCall =
         { Content: ChronicleContent
-          Tip: EnforcerTip }
+          TipName: string
+          WhatToDoNow: string
+          WhyThisMatters: string
+          RepairStrategy: string
+          DecisionBranches: string
+          CommonWrongFixes: string
+          Verification: string
+          DoneWhen: string }
 
     [<Literal>]
-    val MissingTipError: string = "missing required argument: tip"
+    val MissingTipNameError: string = "missing-tip-name"
+
+    [<Literal>]
+    val TipNameTooLongError: string = "tip-name-too-long"
+
+    [<Literal>]
+    val TipNameMultilineError: string = "tip-name-multiline"
+
+    [<Literal>]
+    val TipFieldNotAStringError: string = "tip-field-not-a-string"
+
+    [<Literal>]
+    val MissingTipFieldPrefix: string = "missing-tip-field:"
+
+    [<Literal>]
+    val MaxTipNameChars: int = 200
+
+    /// D3：七节字段名，顺序即 schema 与解码顺序。
+    val tipSectionNames: string list
 
     [<Literal>]
     val MissingChargeError: string = "missing required argument: charge"
@@ -48,5 +73,5 @@ module EnforcerCodec =
     [<Literal>]
     val MaxInlineEvidenceChars: int = 1024
 
-    val decodeCall: Wanxiangshu.Enforcer.EnforcerRule list -> Map<string, obj> -> Result<CanonicalBlogCall, string>
+    val decodeCall: Map<string, obj> -> Result<CanonicalBlogCall, string>
     val hasValidText: CanonicalBlogCall -> bool

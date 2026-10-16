@@ -1,8 +1,16 @@
 # catch-all-swallows-future — Enforcer
 
+## 定义
+
 Catch-all swallows future 的病，不是“代码里出现 `_` / `default`”，而是一个 **closed 或受控扩展的 case set** 在今天新增成员时，旧代码无需重新作出 semantic decision，就自动把它塞进昨天的 fallback。
 
 这相当于给未来 ontology 写了一张空白授权书：无论以后增加什么 case，都默认“和目前这些剩余情况一样处理”。Compiler/build 本来有机会把新 case 变成 review obligation，catch-all 却把这份压力吞掉了。
+
+## 支配原则
+
+Exhaustiveness 是一台维护警报。在有限 domain 里，新 case 应该在每个含义可能改变的地方制造 compile-time 或 test-time 压力。Wildcard 通过断言——通常是无意的——所有未知未来在语义上等价，把这份压力静音。这个 branch 不只处理今天的剩余，它给自己授予了对明天 case 的权威。
+
+## 何时触发
 
 以下情形触发：
 
@@ -12,12 +20,26 @@ Catch-all swallows future 的病，不是“代码里出现 `_` / `default`”�
 - recovery 新 state 自动被 “unknown → continue” 处理；
 - test 只证明现在 cases 都能跑，却无法在新增 case 时迫使 policy 更新。
 
+## 不应触发
+
 不要误杀真正 open-world boundary。Vendor extension、unknown JSON field、versioned protocol extension 若 contract 明确规定“未知 case 按 X 处理”，catch-all 就是在执行**正式 unknown-case law**。关键是世界是否真的开放，以及 fallback 是否就是那个开放协议的 stable semantics。
 
 也不要误杀经过前置 typed narrowing 后的 unreachable remainder；如果 type system 已证明 `_` 只覆盖一个被正式等价化的集合，并且新增 case 会迫使 narrowing 更新，就不属于本规则。
 
+## 与相邻规则区分
+
 与 `non-exhaustive-transition` 区分：那条专门审 finite `state × event` relation 的未决 cell；本规则更广，任何 closed vocabulary 都可能被 catch-all 吞掉 future obligation。
 
+## 判定程序
+
 决定性 experiment：临时新增一个 plausible case。若 code 仍 compile/test green，而且没人被迫回答“这个新 case 在这里意味着什么”，fallback 正在替未来作政策决定。
+
+## 例子
+
+- positive：closed domain 上写 `switch (kind) { case A: …; default: ignore }`，明天的 `B` 因此继承 ignore。
+- near-miss：versioned protocol 文档写明“未知字段必须保留”，fallback 就是这个 contract。
+- counterexample：closed type 上穷尽列举 case，新增 variant 在语义被选定前无法编译。
+
+## Nudge
 
 > Catch-all 可以处理已知的“其余”，不能替尚未出生的 case 提前签署语义。

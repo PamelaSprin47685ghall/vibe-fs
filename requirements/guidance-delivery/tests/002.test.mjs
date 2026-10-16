@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
 import * as language from '../../../dist/Participant/Provider/LanguageSurface.js'
-import { guidance, link, observe, withJournal, main, tip } from './support/journal.mjs'
+import { guidance, link, observe, withJournal, main, tip, authoredBody } from './support/journal.mjs'
 
 for (const [locale, suffix] of [['English', ''], ['SimplifiedChinese', '.zh-CN']]) {
   test(`WHAT[guidance-delivery-002] ${locale} first Full contains the entire authored Main body`, async () => {
@@ -14,10 +13,9 @@ for (const [locale, suffix] of [['English', ''], ['SimplifiedChinese', '.zh-CN']
         await link(journal)
         await observe(journal)
         const result = await guidance.resolve(journal, main)
-        const body = readFileSync(new URL(`../../../resources/enforcer/${tip}/main${suffix}.md`, import.meta.url), 'utf8').trim()
         assert.equal(result.presentation, 'Full')
         assert.equal(result.tipName, tip)
-        assert.ok(result.text.includes(body))
+        assert.ok(result.text.includes(authoredBody))
       })
     } finally {
       if (previous === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE

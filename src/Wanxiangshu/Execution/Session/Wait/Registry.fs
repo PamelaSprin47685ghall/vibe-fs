@@ -113,26 +113,35 @@ module private WaitCodec =
           Wait = waitOf (property value "wait")
           Exit =
             let exit = property value "exit"
-            (if isNullish exit then None else Some(exitOf (stringOf exit))) }
+
+            (if isNullish exit then
+                 None
+             else
+                 Some(exitOf (stringOf exit))) }
 
     let private transitionObject (transition: WaitTransition) : obj =
         createObj
             [ "sequence", box transition.Sequence
               "kind",
-              box
-                (match transition.Kind with
-                 | WaitTransitionKind.Entered -> "Entered"
-                 | WaitTransitionKind.Left -> "Left")
+              box (
+                  match transition.Kind with
+                  | WaitTransitionKind.Entered -> "Entered"
+                  | WaitTransitionKind.Left -> "Left"
+              )
               "wait", box (waitObject transition.Wait)
               "exit",
-              box
-                (match transition.Exit with
-                 | Some exit -> box (exitName exit)
-                 | None -> null) ]
+              box (
+                  match transition.Exit with
+                  | Some exit -> box (exitName exit)
+                  | None -> null
+              ) ]
 
     let snapshotOf (value: obj) : DiagnosticWaitSnapshot =
         { Active = (unbox<obj array> (property value "active")) |> Array.toList |> List.map waitOf
-          History = (unbox<obj array> (property value "history")) |> Array.toList |> List.map transitionOf
+          History =
+            (unbox<obj array> (property value "history"))
+            |> Array.toList
+            |> List.map transitionOf
           Sequence = int64 (unbox<int> (property value "sequence")) }
 
     let snapshotObject (snapshot: DiagnosticWaitSnapshot) : obj =
@@ -155,25 +164,28 @@ type CausalWaitRegistry private (libraryRegistry: obj) =
             | Some value -> box value
             | None -> null
 
-        CausalWaitRegistry(WaitLibrary.library?createRegistry(capacity))
+        CausalWaitRegistry(WaitLibrary.library?createRegistry (capacity))
 
-    member _.HistoryCapacity: int = unbox<int> (WaitLibrary.library?historyCapacity(libraryRegistry))
+    member _.HistoryCapacity: int =
+        unbox<int> (WaitLibrary.library?historyCapacity (libraryRegistry))
 
     interface IWaitObserver with
         member _.Enter(wait: DiagnosticWait) : IWaitLease =
-            let observer = WaitLibrary.library?observerCapability(libraryRegistry)
-            let lease: obj = WaitLibrary.library?observerEnter(observer, WaitCodec.waitObject wait)
+            let observer = WaitLibrary.library?observerCapability (libraryRegistry)
+
+            let lease: obj =
+                WaitLibrary.library?observerEnter (observer, WaitCodec.waitObject wait)
 
             { new IWaitLease with
                 member _.MarkExit(exit: DiagnosticWaitExit) : unit =
-                    WaitLibrary.library?markExit(lease, WaitCodec.exitName exit) |> ignore
+                    WaitLibrary.library?markExit (lease, WaitCodec.exitName exit) |> ignore
 
                 member _.Dispose() : unit =
-                    WaitLibrary.library?dispose(lease) |> ignore }
+                    WaitLibrary.library?dispose (lease) |> ignore }
 
     interface IWaitSnapshotReader with
         member _.Snapshot() : DiagnosticWaitSnapshot =
-            WaitCodec.snapshotOf (WaitLibrary.library?snapshot(libraryRegistry))
+            WaitCodec.snapshotOf (WaitLibrary.library?snapshot (libraryRegistry))
 
 type CausalWaitRuntime(?historyCapacity: int) =
     // 库 registry 只创建一次：Observer / SnapshotReader / BindDiagnosticTarget
@@ -183,39 +195,40 @@ type CausalWaitRuntime(?historyCapacity: int) =
         | Some value -> box value
         | None -> null
 
-    let libraryRegistry: obj = WaitLibrary.library?createRegistry(capacity)
+    let libraryRegistry: obj = WaitLibrary.library?createRegistry (capacity)
 
     let observer =
         { new IWaitObserver with
             member _.Enter(wait: DiagnosticWait) : IWaitLease =
-                let observerCapability = WaitLibrary.library?observerCapability(libraryRegistry)
-                let lease: obj = WaitLibrary.library?observerEnter(observerCapability, WaitCodec.waitObject wait)
+                let observerCapability = WaitLibrary.library?observerCapability (libraryRegistry)
+
+                let lease: obj =
+                    WaitLibrary.library?observerEnter (observerCapability, WaitCodec.waitObject wait)
 
                 { new IWaitLease with
                     member _.MarkExit(exit: DiagnosticWaitExit) : unit =
-                        WaitLibrary.library?markExit(lease, WaitCodec.exitName exit) |> ignore
+                        WaitLibrary.library?markExit (lease, WaitCodec.exitName exit) |> ignore
 
                     member _.Dispose() : unit =
-                        WaitLibrary.library?dispose(lease) |> ignore } }
+                        WaitLibrary.library?dispose (lease) |> ignore } }
 
     let reader =
         { new IWaitSnapshotReader with
             member _.Snapshot() : DiagnosticWaitSnapshot =
-                WaitCodec.snapshotOf (WaitLibrary.library?snapshot(libraryRegistry)) }
+                WaitCodec.snapshotOf (WaitLibrary.library?snapshot (libraryRegistry)) }
 
     member _.BindDiagnosticTarget(target: IWaitDiagnosticSink) : bool =
         let sink: obj =
-            createObj
-                [ "Publish",
-                  box (fun (snapshot: obj) -> target.Publish(WaitCodec.snapshotOf snapshot)) ]
+            createObj [ "Publish", box (fun (snapshot: obj) -> target.Publish(WaitCodec.snapshotOf snapshot)) ]
 
-        unbox<bool> (WaitLibrary.library?bindDiagnosticTarget(libraryRegistry, sink))
+        unbox<bool> (WaitLibrary.library?bindDiagnosticTarget (libraryRegistry, sink))
 
     member _.Observer: IWaitObserver = observer
 
     member _.SnapshotReader: IWaitSnapshotReader = reader
 
-    member _.HistoryCapacity: int = unbox<int> (WaitLibrary.library?historyCapacity(libraryRegistry))
+    member _.HistoryCapacity: int =
+        unbox<int> (WaitLibrary.library?historyCapacity (libraryRegistry))
 
 /// 进程内单例运行时（与主仓原语义一致）。
 module CausalWaitProcess =

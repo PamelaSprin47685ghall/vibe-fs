@@ -33,12 +33,19 @@ test('WHAT[behavior-diagnosis-008] ENFORCER_024_extra_numeric_properties_are_ign
     occurrence: 'The decisive fact was established.',
     settlement: 'The uncertainty is now settled.',
     consequence: 'The future path now rests on that fact.',
-    tip: field,
+    tipName: field,
+    whatToDoNow: 'Take the next concrete step.',
+    whyThisMatters: 'The boundary decides later work.',
+    repairStrategy: 'Repair the boundary first.',
+    decisionBranches: 'Follow the branch that fits.',
+    commonWrongFixes: 'Skipping the boundary fails.',
+    verification: 'The check must catch a wrong fix.',
+    doneWhen: 'The boundary holds under the check.',
     'primitive-obsession': 7,
     some_other_number: 3,
   })
   assert.equal(result.ok, true)
-  assert.equal(result.value.tip.fieldName, field)
+  assert.equal(result.value.tipName, field)
   assert.equal(result.value.evidence, null)
 })
 }
@@ -63,8 +70,9 @@ const observationFact = () => ({
   textDigest: 'sha-obs',
   run: 'run-obs',
   toolCallIds: [],
-  tipRuleId: 'rule-obs',
-  fieldNameAtCommit: 'field-obs',
+  tipName: 'rule-obs',
+  tipTextRef: 'blobs/tip-obs',
+  tipTextDigest: 'tip-obs-digest',
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })
@@ -153,8 +161,9 @@ const observation = (overrides = {}) => ({
   textDigest: 'sha-obs',
   run: 'run-obs',
   toolCallIds: [],
-  tipRuleId: 'rule-obs',
-  fieldNameAtCommit: 'field-obs',
+  tipName: 'rule-obs',
+  tipTextRef: 'blobs/tip-obs',
+  tipTextDigest: 'tip-obs-digest',
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
   ...overrides,
@@ -212,8 +221,9 @@ const cycleRecord = (n, field) => ({
   toolCallIds: [`call-${n}`],
   textRef: `blob-t${n}`,
   textDigest: `sha-t${n}`,
-  tipRuleId: field,
-  fieldNameAtCommit: field,
+  tipName: field,
+  tipTextRef: `blobs/tip-${n}`,
+  tipTextDigest: `sha-tip-${n}`,
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })
@@ -224,11 +234,18 @@ test('WHAT[behavior-diagnosis-008] ENFORCER_TIP_03_04_facade_surface_has_tip_not
     occurrence: 'A meaningful transition happened.',
     settlement: 'The resulting state is established.',
     consequence: 'The continuing road changed.',
-    tip: fields[0],
+    tipName: fields[0],
+    whatToDoNow: 'Take the next concrete step.',
+    whyThisMatters: 'The boundary decides later work.',
+    repairStrategy: 'Repair the boundary first.',
+    decisionBranches: 'Follow the branch that fits.',
+    commonWrongFixes: 'Skipping the boundary fails.',
+    verification: 'The check must catch a wrong fix.',
+    doneWhen: 'The boundary holds under the check.',
   })
   assert.equal(sample.ok, true)
-  assert.equal(typeof sample.value.tip.ruleId, 'string')
-  assert.equal(sample.value.tip.fieldName in Object.fromEntries(fields.map((f) => [f, true])), true)
+  assert.equal(typeof sample.value.tipName, 'string')
+  assert.equal(typeof sample.value.whatToDoNow, 'string')
   assert.equal(sample.value.Scores, undefined)
 })
 }

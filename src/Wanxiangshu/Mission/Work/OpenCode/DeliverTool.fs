@@ -229,7 +229,9 @@ module DeliverTool =
         task {
             if kind = "Relayed" then
                 let! continued = scope.ContinueManagerLoop(prepared.SessionId, prepared.Bound.Directory)
-                continued |> Result.defaultWith (fun error -> raise (InvalidOperationException error))
+
+                continued
+                |> Result.defaultWith (fun error -> raise (InvalidOperationException error))
         }
 
     let private deliverFrozenCursor

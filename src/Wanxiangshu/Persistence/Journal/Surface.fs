@@ -255,15 +255,14 @@ module JournalSurface =
                         {| providerRun = ProviderRunIdentity.value providerRun
                            mainSessionId = SessionId.value record.MainSessionId
                            bloggerSessionId = SessionId.value record.BloggerSessionId
-                           tipRuleId = record.TipRuleId
+                           tipName = record.TipName
                            toolCallCount = List.length record.ToolCallIds |})
                 |> List.toArray
                recentTips =
                 state.RecentTips
                 |> List.map (fun tip ->
                     box
-                        {| ruleId = tip.RuleId
-                           fieldName = tip.FieldName
+                        {| tipName = tip.TipName
                            cycleId = tip.CycleId |})
                 |> List.toArray |}
 

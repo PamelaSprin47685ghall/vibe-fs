@@ -1,10 +1,14 @@
 # log-as-recovery-protocol — Enforcer
 
+## Definition
+
 A diagnostic log becomes a false recovery protocol when restart logic treats **something written for human observation** as though it were the authoritative record of what committed.
 
 The word “log” is overloaded, so classify by semantics, not filename.
 
 A real event journal may also be append-only text or JSON and may literally be called a log. If it has a schema, durability guarantee, ordering model, identity, atomic commit semantics, and replay contract — and the system intentionally writes business facts there — then it is a durable fact store, not the smell this rule describes.
+
+## Governing Principle
 
 The defect is promoting **diagnostic commentary** into machine truth.
 
@@ -20,6 +24,8 @@ Diagnostic channels routinely have weaker guarantees:
 
 None of those properties are necessarily defects for observability. They are fatal if recovery depends on exact presence/order/wording.
 
+## Trigger When
+
 Fire this rule when:
 
 - restart scans `INFO order committed` to decide which orders exist;
@@ -30,7 +36,11 @@ Fire this rule when:
 - operator-visible messages are frozen because recovery parsers depend on them;
 - a metrics/tracing event is treated as the durable source of business completion.
 
+## Do Not Trigger When
+
 Do not fire when logs merely explain already-established facts to humans. Do not fire when an observability event is intentionally also the durable event journal **and carries the full commit contract**; in that case name it as the journal and stop treating durability as an incidental property of logging.
+
+## Distinguish From
 
 Nearby rules:
 
@@ -39,8 +49,14 @@ Nearby rules:
 - `memory-before-disk` — runtime state advances before durable fact;
 - `unrecorded-decision` — a necessary decision has no durable record at all.
 
+## Decision Procedure
+
 A decisive experiment is to suppress diagnostic output entirely while preserving the actual business effects and durable store. If recovery changes, observability has been granted authority it should not have.
 
 The reverse experiment matters too: emit the same diagnostic line without committing the underlying effect. If recovery now believes the effect happened, the log line has become counterfeit testimony.
+
+## Examples
+
+## Nudge
 
 > Diagnostics can describe history. They must not be the only reason history is believed.

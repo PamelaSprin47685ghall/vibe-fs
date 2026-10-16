@@ -98,8 +98,7 @@ module ObservationSurface =
 
     let private tipToJs (tip: RecentTip) : obj =
         box
-            {| ruleId = tip.RuleId
-               fieldName = tip.FieldName
+            {| tipName = tip.TipName
                cycleId = tip.CycleId |}
 
     let private cycleToJs (record: EnforcementCycleRecord) : obj =
@@ -110,8 +109,9 @@ module ObservationSurface =
                toolCallIds = record.ToolCallIds |> List.map ToolCallId.value |> List.toArray
                textRef = BlobRef.value record.CycleTextRef
                textDigest = BlobDigest.value record.CycleTextDigest
-               tipRuleId = record.TipRuleId
-               fieldNameAtCommit = optionalObj record.FieldNameAtCommit
+               tipName = record.TipName
+               tipTextRef = record.TipTextRef |> Option.map BlobRef.value |> optionalObj
+               tipTextDigest = record.TipTextDigest |> Option.map BlobDigest.value |> optionalObj
                evidenceRef = record.CycleEvidenceRef |> Option.map BlobRef.value |> optionalObj
                observedPrefixEpoch = int (PrefixEpochId.value record.ObservedPrefixEpochId) |}
 
@@ -141,8 +141,9 @@ module ObservationSurface =
                     |> List.map (fun callId -> ToolCallId.create (text callId))
                   CycleTextRef = BlobRef.create (text item?textRef)
                   CycleTextDigest = BlobDigest.create (text item?textDigest)
-                  TipRuleId = text item?tipRuleId
-                  FieldNameAtCommit = optionalText item?fieldNameAtCommit
+                  TipName = text item?tipName
+                  TipTextRef = optionalText item?tipTextRef |> Option.map BlobRef.create
+                  TipTextDigest = optionalText item?tipTextDigest |> Option.map BlobDigest.create
                   CycleEvidenceRef = optionalText item?evidenceRef |> Option.map BlobRef.create
                   ObservedPrefixEpochId = PrefixEpochId.create (int64 (text item?observedPrefixEpoch)) })
             |> Map.ofList
@@ -151,8 +152,7 @@ module ObservationSurface =
             arrayOf value?recentTips
             |> Array.toList
             |> List.map (fun item ->
-                { RuleId = text item?ruleId
-                  FieldName = text item?fieldName
+                { TipName = text item?tipName
                   CycleId = text item?cycleId })
 
         { ByProviderRun = records
@@ -175,8 +175,9 @@ module ObservationSurface =
             |> List.map (fun callId -> ToolCallId.create (text callId))
           CycleTextRef = BlobRef.create (text value?textRef)
           CycleTextDigest = BlobDigest.create (text value?textDigest)
-          TipRuleId = text value?tipRuleId
-          FieldNameAtCommit = optionalText value?fieldNameAtCommit
+          TipName = text value?tipName
+          TipTextRef = optionalText value?tipTextRef |> Option.map BlobRef.create
+          TipTextDigest = optionalText value?tipTextDigest |> Option.map BlobDigest.create
           CycleEvidenceRef = optionalText value?evidenceRef |> Option.map BlobRef.create
           ObservedPrefixEpochId = PrefixEpochId.create (int64 (text value?observedPrefixEpoch)) }
 

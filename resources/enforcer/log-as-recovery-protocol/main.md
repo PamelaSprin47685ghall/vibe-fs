@@ -1,5 +1,7 @@
 # log-as-recovery-protocol — Main
 
+## What To Do Now
+
 Move restart authority to a channel designed to carry commitment.
 
 For each recovery question, identify the source that can answer it with the required guarantees:
@@ -12,7 +14,17 @@ For each recovery question, identify the source that can answer it with the requ
 
 That source might be an event journal, transaction table, durable command inbox/outbox, provider status endpoint, authoritative database row, or another typed store. It must own the semantics recovery needs; it cannot merely have printed something nearby.
 
+## Why This Matters
+
 Then demote diagnostic logs back to their proper role: explanation, correlation, debugging, operator context. They may include IDs that help humans locate the authoritative fact, but they must not *become* that fact.
+
+## Repair Strategy
+
+If the current diagnostic channel truly needs to become the recovery store, promote it deliberately: define typed schema, stable identities, commit boundary, durability, ordering, retention, replay, corruption semantics, and migration. At that point it is no longer “just logging”; it is the journal. Rename ownership accordingly so future code does not depend on accidental observability guarantees.
+
+## Decision Branches
+
+## Common Wrong Fixes
 
 Common fake repairs:
 
@@ -24,7 +36,7 @@ Common fake repairs:
 - keep logs as a fallback recovery source “just in case the real store is missing,” thereby masking loss/corruption of the actual authority;
 - parse stdout from child processes to reconstruct business state when the child has a status/result protocol available.
 
-If the current diagnostic channel truly needs to become the recovery store, promote it deliberately: define typed schema, stable identities, commit boundary, durability, ordering, retention, replay, corruption semantics, and migration. At that point it is no longer “just logging”; it is the journal. Rename ownership accordingly so future code does not depend on accidental observability guarantees.
+## Verification
 
 Verification should prove independence from diagnostics:
 
@@ -37,6 +49,8 @@ Verification should prove independence from diagnostics:
 For structured observability, test sampling explicitly. If a tracing backend drops 10% of spans, no business fact should become unrecoverable.
 
 Also inspect retention. Recovery truth cannot live in a channel whose normal operations delete old records on a schedule unrelated to business retention.
+
+## Done When
 
 You are done when every recovery decision cites a typed durable authority, and every log line could disappear without changing machine belief.
 

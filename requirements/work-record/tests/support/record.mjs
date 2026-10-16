@@ -12,7 +12,7 @@ export async function commitFrame(handle, session, { from, through, body, id }) 
     previousIngestedThroughSequence: from, nextIngestedThroughSequence: through,
     previousCoverableTurnCutoffExclusive: 0, nextCoverableTurnCutoffExclusive: 0,
     nextCoveredPrefixDigest: '', textRef: written.blobRef, textDigest: written.blobDigest,
-    toolCallIds: [], tipRuleId: `tip-${id}`, fieldNameAtCommit: `field-${id}`, observedPrefixEpoch: 0,
+    toolCallIds: [], tipName: `tip-${id}`, observedPrefixEpoch: 0,
   })
   assert.equal(result.ok, true, result.error)
   return written

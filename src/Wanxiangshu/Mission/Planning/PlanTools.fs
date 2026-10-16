@@ -539,7 +539,12 @@ module PlanTools =
             || receipt.Status = "NotWritten"
             || receipt.Status = "Conflict"
         then
-            Error(if receipt.Reason = "" then receipt.Status else receipt.Reason)
+            Error(
+                if receipt.Reason = "" then
+                    receipt.Status
+                else
+                    receipt.Reason
+            )
         elif receipt.Kind = "DeliveryRequested" then
             let operationId =
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "operationId"
@@ -552,14 +557,7 @@ module PlanTools =
 
             bindObservedExecutionSession gitCommonDir workId operationId sessionId
             |> Result.bind (fun () ->
-                settleAcceptedDelivery
-                    gitCommonDir
-                    workId
-                    operationId
-                    sessionId
-                    digest
-                    path
-                    (retirementBlockers ()))
+                settleAcceptedDelivery gitCommonDir workId operationId sessionId digest path (retirementBlockers ()))
             |> Result.map (fun settled ->
                 { settled with
                     ExecSessionId = ""
@@ -576,7 +574,10 @@ module PlanTools =
                   Delivered = receipt.Kind = "Delivered"
                   RetiredIncumbencyId = ""
                   RetirementOutcome =
-                    if receipt.Kind = "Delivered" then "PostS3" else receipt.Kind
+                    if receipt.Kind = "Delivered" then
+                        "PostS3"
+                    else
+                        receipt.Kind
                   Digest = ""
                   Path = ""
                   ExecSessionId = ""
@@ -759,9 +760,7 @@ module PlanTools =
         : Task<Result<DeliverResult, string>> =
         task {
             let operationId =
-                HostDigest.sha256Hex (
-                    String.concat "\n" [ "post-s3-execution-v1"; workId; providerRunId; toolCallId ]
-                )
+                HostDigest.sha256Hex (String.concat "\n" [ "post-s3-execution-v1"; workId; providerRunId; toolCallId ])
 
             match! createSession operationId "manager" with
             | Error reason -> return Error reason
@@ -866,11 +865,7 @@ module PlanTools =
                   "blockers", box blockers ]
 
         let reopened =
-            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute
-                gitCommonDir
-                workId
-                (requestId + ":reopen")
-                reopenCmd
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId (requestId + ":reopen") reopenCmd
 
         if reopened.Status <> "Committed" && reopened.Status <> "Replayed" then
             Error(receiptRefusal reopened)

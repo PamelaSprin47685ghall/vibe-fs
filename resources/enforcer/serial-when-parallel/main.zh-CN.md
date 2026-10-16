@@ -1,5 +1,7 @@
 # serial-when-parallel — Main
 
+## 现在该做什么
+
 把 schedule 改成真实 dependency graph，而不是代码书写顺序。
 
 先把 operation 分成几类：
@@ -11,6 +13,12 @@
 
 只有最后一类应该 overlap。给它们一个明确 bounded map / worker pool / semaphore / task group，然后用 deterministic join 聚合结果，让 completion order 只影响 latency，不影响 semantics。
 
+## 为什么重要
+
+Artificial serialization 拉长 critical path，同时传达一个不存在的 dependency。正确并发是架构压缩：让 elapsed time 反映最长的真实 dependency chain，而不是无关 waits 的总和。
+
+## 修复策略
+
 不要把并行仅理解成 `Promise.all`。真正修复还要处理：
 
 - cancellation：parent 失败/取消时 running 与 queued children 怎么结束；
@@ -19,6 +27,14 @@
 - capacity：bound 来自 socket/provider/CPU/worker 等真实资源；
 - side effects：independent read 可以并发，共享 mutable write 不一定可以；
 - retry：每个 child 的 retry 不应把 active concurrency 悄悄乘上去。
+
+## 决策分支
+
+- 如果 operations 不共享 data 或 owner，在 finite bound 下 overlap，并 deterministic join。
+- 如果 later work 需要 earlier results 或 protocol order，保留那条 serial edge。
+- 如果当前代码已经无界 overlap，那是 `unbounded-fanout`——加 capacity，不要把所有东西重新 serial。
+
+## 常见假修复
 
 常见假修复：
 
@@ -29,12 +45,16 @@
 - bound 写一个巨大魔法常数，只为看起来“有限”；
 - parallelize 后忘了对 cancellation/failure 做整体 ownership。
 
+## 验证
+
 验证要证明两件事同时成立：
 
 1. independent work 真正在 overlap，elapsed time 不再等于所有 waits 之和；
 2. 任意合法 completion permutation 都给出同一个 logical result，并且 active count 永不超过 declared bound。
 
 然后故意找一条真实 dependency：让 B 需要 A 的 output。System 必须仍然保留这条 serial edge，证明优化没有把 causality 一起删掉。
+
+## 完成条件
 
 正确完成状态不是“并发度越高越好”，而是 schedule 能准确读出系统的两类事实：
 

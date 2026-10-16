@@ -166,7 +166,7 @@ module CompanionProjectionSurface =
           PreviousTips =
             tipValues
             |> Array.toList
-            |> List.map (fun tip -> text tip?field, text tip?cycleId) }
+            |> List.map (fun tip -> text tip?tipName, text tip?cycleId) }
 
     /// Build one normal or squash request from durable frame bodies and the
     /// physical delta. Squash intentionally ignores `delta` in production.

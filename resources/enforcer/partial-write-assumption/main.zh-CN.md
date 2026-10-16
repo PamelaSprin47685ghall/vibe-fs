@@ -1,8 +1,12 @@
 # partial-write-assumption — Main
 
+## 现在该做什么
+
 删掉你无法观察的 recovery state。
 
 从 storage/effect boundary 的真实 contract 出发，而不是从你想象的底层物理实现出发。把 caller 真正能区分的 outcome 全部列出来，recovery 只围绕这组状态设计。
+
+## 为什么重要
 
 很多 boundary 的诚实 state space 比工程师直觉里小：
 
@@ -13,6 +17,8 @@ unknown
 ```
 
 `Unknown` 不是建模失败，反而经常是 timeout、process death、transport loss 后最准确的事实。保留它，直到 authoritative lookup、idempotency protocol、transaction query、checksum、commit marker 等 boundary-owned evidence 把它解决。
+
+## 修复策略
 
 如果 torn/partial data 真的可能出现，就建模**证明 partial 的证据**，例如：
 
@@ -25,6 +31,12 @@ unknown
 
 如果 abstraction 已承诺 atomicity，就不要根据“发生过 crash”、elapsed time、可疑 file size、或者底层 folklore 自己推断 partial。
 
+## 决策分支
+
+特别警惕 destructive recovery。Truncate/delete/rewrite 必须有 positive corruption evidence 或 owner 明确规则。**“我不确定”不是“这条 history 可以删”的证据。**
+
+## 常见假修复
+
 常见假修复：
 
 - 任意 crash 后“保险起见”truncate 最后一次 append；
@@ -35,11 +47,13 @@ unknown
 - test mock 出 impossible outcome，再把支持这些 mock 当 resilience；
 - 因为不喜欢 `Unknown`，就把它压成某个 guessed physical state。
 
-验证也应从 contract 推导。Fault-inject 每一个**documented outcome**，证明 committed / not-committed / unknown / 明确 partial/corrupt 状态都能正确恢复。
+## 验证
+
+验证也应从 contract 推导。Fault-inject 每一个**documented outcome**，把 committed / not-committed / unknown / 明确 partial/corrupt 状态都证明一遍。
 
 还要做 abstraction boundary 检查：caller 不应越过 store 去看 contract 故意隐藏的 implementation residue。如果 recovery 真需要那条信息，就让 abstraction 正式暴露 typed fact；否则就是 caller 越权。
 
-特别警惕 destructive recovery。Truncate/delete/rewrite 必须有 positive corruption evidence 或 owner 明确规则。**“我不确定”不是“这条 history 可以删”的证据。**
+## 完成条件
 
 完成时应形成一一对应：
 

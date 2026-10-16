@@ -1,5 +1,7 @@
 # order-dependent-test — Main
 
+## What To Do Now
+
 Make each test own its premises.
 
 For every mutable input the case relies on, choose one of three honest models:
@@ -7,6 +9,8 @@ For every mutable input the case relies on, choose one of three honest models:
 1. **local ownership** — the test creates it and cleans it up;
 2. **isolated lease/namespace** — expensive infrastructure is shared, but each test gets independent keys/schema/transaction/state;
 3. **one explicit scenario** — the steps truly depend on one lifecycle, so they belong in one ordered test instead of several fake-independent cases.
+
+## Why This Matters
 
 Start by inventorying hidden state:
 
@@ -20,9 +24,19 @@ Start by inventorying hidden state:
 - ports/processes/subscriptions;
 - stateful mocks and captured call cursors.
 
+## Repair Strategy
+
 Then scope or reset each one at the test boundary. Prefer fresh identity over “reset everything” when isolation is cheaper and safer: unique session IDs, per-test temp dirs, transactions rolled back after each case, namespaced keys, fresh runtime instances.
 
 If a global must be mutated, save/restore it in a `try/finally`/scoped helper so failure itself cannot leak the mutation into the next test.
+
+## Decision Branches
+
+Serial execution may be a legitimate resource choice, but it is not proof of test independence. If a case's semantics require another case to run first, the proposition is still non-local even when the runner hides the problem deterministically.
+
+When two cases truly form one causal story, merge them and make that order explicit inside the scenario. A longer honest test is better than two short tests connected by invisible residue.
+
+## Common Wrong Fixes
 
 Common fake repairs:
 
@@ -34,7 +48,7 @@ Common fake repairs:
 - reset only the obvious database while caches, env, current directory, static registries, or fake clocks still leak;
 - call order dependence “integration realism” when the actual product does not require those cases to share one lifecycle.
 
-Serial execution may be a legitimate resource choice, but it is not proof of test independence. If a case's semantics require another case to run first, the proposition is still non-local even when the runner hides the problem deterministically.
+## Verification
 
 Verification should be adversarial:
 
@@ -49,9 +63,9 @@ fail a neighbor halfway through setup/cleanup
 
 The case must keep the same meaning and verdict under every ordering that the suite claims is legal.
 
-When two cases truly form one causal story, merge them and make that order explicit inside the scenario. A longer honest test is better than two short tests connected by invisible residue.
-
 Also inspect failure isolation. A case that throws halfway through should still release/restore everything it owns; otherwise one failing test can create a cascade of misleading red cases after it.
+
+## Done When
 
 You are done when every test can explain its premises without the phrase “assuming test X already ran,” and suite scheduling affects throughput only — never semantics.
 
