@@ -1,4 +1,28 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { verifyPtyScope } from './support/pty-scope.mjs'
+import { ptyMembershipRows } from '../../../dist/Process/Surface.js'
+
+for (const text of ['', '222 111 R', '111 111', '111 111 Ss\n333 333', '111 111 Z', '111 111 Ss\n111 333 S']) {
+  test(`WHAT[process-execution-003] an incomplete PTY observation cannot claim an empty scope (${JSON.stringify(text)})`, () => {
+    assert.equal(ptyMembershipRows(111, 222, text), null)
+  })
+}
+
+test('WHAT[process-execution-003] a complete PTY observation requires its live owner and keeps other live members', () => {
+  assert.deepEqual(ptyMembershipRows(111, 222, '111 111 Ss\n222 111 R\n333 333 S+\n444 333 Z'), [{ pid: 333, group: 333, state: 'S+' }])
+  assert.deepEqual(ptyMembershipRows(111, 222, '111 111 Ss\n222 111 R'), [])
+})
+
+for (const mode of ['leader-kill', 'leader-natural']) {
+  test(`WHAT[process-execution-003] the real PTY scope retains a live descendant after target exit (${mode})`, t =>
+    verifyPtyScope(t, mode, evidence => {
+      assert.equal(evidence.retainedAfterTargetExit, true)
+      assert.equal(evidence.descendantExited, true)
+      assert.equal(evidence.siblingSurvived, true)
+      assert.deepEqual(evidence.exit, { code: 23, signal: null })
+    }))
+}
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -375,6 +399,7 @@ const fakeTerm = (pid) => {
     resizes: [],
     onData: (cb) => { term.dataCb = cb },
     onExit: (cb) => { term.exitCb = cb },
+    onFault: (cb) => { term.faultCb = cb },
     write: (text) => term.writes.push(text),
     resize: (width, height) => term.resizes.push([width, height]),
   }
@@ -459,5 +484,21 @@ test('WHAT[process-execution-003] SUPERVISOR_attach_onExit_noop_when_session_alr
   term.exitCb({ exitCode: 0 })
   assert.equal(completions.length, 0)
   assert.notEqual(supervisorTryGet(supervisor, id('pty-ec')), null)
+})
+
+test('WHAT[process-execution-003] a lost scope witness rejects an already waiting drain without publishing completion', async () => {
+  const { portCloseAll, portExists } = await import('../../../dist/Process/Surface.js')
+  const supervisor = supervisorCreate()
+  const term = fakeTerm(9999)
+  const completions = []
+  const p = portWith('scope-unknown')
+  portAddMailboxSender(p, item => completions.push(item))
+  supervisorAttach(supervisor, p, id('scope-unknown'), term)
+  const closing = portCloseAll(p, 100)
+  term.faultCb('lost scope witness')
+  await assert.rejects(closing, /lost scope witness/)
+  assert.equal(portExists(p, id('scope-unknown')), true)
+  assert.notEqual(supervisorTryGet(supervisor, id('scope-unknown')), null)
+  assert.deepEqual(completions, [])
 })
 }

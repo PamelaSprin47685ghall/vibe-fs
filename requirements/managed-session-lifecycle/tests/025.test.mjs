@@ -622,11 +622,9 @@ for (const mode of [
   'cancel-closeAll-before', 'cancel-closeAll-after',
   'cancel-detach-before', 'cancel-detach-after',
   'cancel-cancel-before', 'cancel-cancel-after',
-  'leader-exit',
+  'leader-exit', 'leader-natural', 'owner-lost',
 ]) {
-  test(`WHAT[managed-session-lifecycle-025] real bun-pty ${mode} preserves ownership and confirms physical exit`, {
-    todo: mode === 'leader-exit' ? 'O-01: the PTY leader exit still releases ownership with a live same-group descendant' : undefined,
-  }, async t => {
+  test(`WHAT[managed-session-lifecycle-025] real bun-pty ${mode} preserves ownership until scope exit is known`, async t => {
     if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) {
       t.skip('Bun is required to run the production bun-pty backend')
       return
@@ -651,9 +649,16 @@ for (const mode of [
     const { stdout } = await promisify(execFile)('bun', [helper, directory, mode], { timeout: 20000 })
     completed = true
     const evidence = JSON.parse(stdout.trim())
+    if (mode === 'owner-lost') {
+      assert.equal(evidence.ownerLost, true)
+      assert.equal(evidence.unknownRetained, true)
+      assert.equal(evidence.blockers.length, 1)
+      return
+    }
     assert.deepEqual(evidence.blockers, [])
-    if (mode === 'leader-exit') {
+    if (mode === 'leader-exit' || mode === 'leader-natural') {
       assert.equal(evidence.leaderExited, true)
+      assert.equal(evidence.retainedBeforeClose, true)
       assert.equal(evidence.descendantAlive, false, 'physical cleanup must include the live same-group descendant')
     } else if (mode.startsWith('shared-')) {
       assert.equal(evidence.firstExited, true)

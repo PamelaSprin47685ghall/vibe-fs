@@ -12,6 +12,8 @@
 
 ## 台账
 
+2026-10-16 PTY 监管补充：原 leader-exit 反例已在实际生产适配器转正，目标先退时保留 port/lease/blocker，控制终端会话内的后代和其他作业组退出后才结清；owner 丢失继续 Unknown。新增成员表空输出、缺活 owner、残行和冲突行负控，补真实编译型宿主启动及环境隔离。完整相关套件 705 项中 672 pass / 0 fail / 5 skip / 28 TODO，Linux 物理口四项通过。主动脱离控制终端、跨进程每轮准入和跨重启接管没有被这些证据覆盖，GAP-133 仍为 PARTIAL；见 [PTY 原型、试制问题和最终验收](../proposals/extraction-kanban/PTY-SUPERVISION-2026-10-16.md)。
+
 2026-10-15 四模块修复：GAP-133 仍为 PARTIAL。managed-session-lifecycle [025](managed-session-lifecycle/tests/025.test.mjs) 的实际生产 bun-pty TERM→等待→KILL→exit 已在 macOS/Bun 1.3.14 运行并通过；同文件覆盖持久预留、真实退出结清、同步回执和丢提交回执，work 009/044 验证 strict scope 与冷父关系。只关闭该具体 PTY 物理观察缺口，不冒称所有取消/fatal、跨重启接管、隐藏执行树或跨进程每轮代际准入已证明。完整命令、包摘要和剩余边界见[本批修复记录](../proposals/extraction-kanban/REPAIR-PROGRESS-2026-10-15.md)。GAP-101、GAP-108、GAP-092 等原 TODO 不因本轮局部证明销项。
 
 同日 0.6.1 复验补充：025 新增真实 Bun 在 detach 中 Ended 提交前/后丢回执、同端口同 durable root 下 detach/cancel 保全另一实例；Node 反例还覆盖持续 Unknown 时不报成功，以及 Drain 未提交后永久关闭当前实例准入。Journal 在 Node/Bun 不依赖 GC 释放原生 statement，重开后立即追加。完整源码归属链 460 项中 432 pass、0 fail、5 skip、23 TODO；没有用这些局部证据关闭 GAP-133 的跨重启接管等剩余范围，状态仍 PARTIAL。

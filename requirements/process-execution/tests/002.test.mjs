@@ -129,6 +129,8 @@ const fakeTerm = (pid) => {
     resizes: [],
     onData: (cb) => { term.dataCb = cb },
     onExit: (cb) => { term.exitCb = cb },
+    onFault: () => {},
+    signal: (signal) => process.kill(pid, signal),
     write: (text) => term.writes.push(text),
     resize: (width, height) => term.resizes.push([width, height]),
   }
@@ -144,7 +146,7 @@ test('WHAT[process-execution-002] SUPERVISOR_applyLive_signal_kills_the_real_pro
   const process = child()
   try {
     const supervisor = supervisorCreate()
-    supervisorAdd(supervisor, id('pty-k'), sessionCreate('pty-k', { pid: process.pid }))
+    supervisorAdd(supervisor, id('pty-k'), sessionCreate('pty-k', fakeTerm(process.pid)))
     assert.deepEqual(await supervisorApplyLive(supervisor, port(), id('pty-k'), ptyCommandSignal('KILL')), resultOk)
     await waitExit(process)
     assert.ok(died(process), 'child was killed')
@@ -152,7 +154,7 @@ test('WHAT[process-execution-002] SUPERVISOR_applyLive_signal_kills_the_real_pro
 })
 test('WHAT[process-execution-002] SUPERVISOR_applyLive_signal_unknown_pid_becomes_error', async () => {
   const supervisor = supervisorCreate()
-  supervisorAdd(supervisor, id('pty-ku'), sessionCreate('pty-ku', { pid: 2_147_483_647 }))
+  supervisorAdd(supervisor, id('pty-ku'), sessionCreate('pty-ku', fakeTerm(2_147_483_647)))
   const result = await supervisorApplyLive(supervisor, port(), id('pty-ku'), ptyCommandSignal('TERM'))
   assert.equal(result.ok, false)
   assert.match(result.error, /ESRCH/)

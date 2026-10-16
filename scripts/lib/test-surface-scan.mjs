@@ -1383,7 +1383,8 @@ export const SURFACE_MANIFEST = [
   {
     module: 'Process/Surface.js',
     owner: 'time-capability',
-    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-005', 'TIME-006', 'TIME-007', 'TIME-008'],
+    laws: ['TIME-001', 'TIME-002', 'TIME-003', 'TIME-005', 'TIME-006', 'TIME-007', 'TIME-008', 'PROC-001', 'PROC-003', 'PROC-006', 'PROC-010'],
+    lawOwners: { 'PROC-001': 'process-execution', 'PROC-003': 'process-execution', 'PROC-006': 'process-execution', 'PROC-010': 'process-execution' },
     source: 'src/Wanxiangshu/Process/Surface.fs',
     representation: 'opaque-capability',
     kind: 'resource',

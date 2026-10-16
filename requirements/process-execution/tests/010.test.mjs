@@ -1,4 +1,14 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { verifyPtyScope } from './support/pty-scope.mjs'
+
+test('WHAT[process-execution-010] the supervised PTY preserves a real terminal, input, resize and target exit code', t =>
+  verifyPtyScope(t, 'basic', evidence => {
+    assert.equal(evidence.tty, true)
+    assert.equal(evidence.input, true)
+    assert.equal(evidence.resize, true)
+    assert.deepEqual(evidence.exit, { code: 37, signal: null })
+  }))
 
 {
 const { default: assert } = await import("node:assert/strict");

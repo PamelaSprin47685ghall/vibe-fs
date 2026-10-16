@@ -2,6 +2,18 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第七批：PTY 监管原型与生产接线（2026-10-16）
+
+CUT-04-R6-A 已先重现原 leader-exit，再完成真实原型并接入 F# 生产物理口。目标退出与监管会话结束分开；本次 owner 的 scope-ended 和原生退出都确认后才发布完成。Host/Ownership 继续持久确认 Ended，不改库及 0.6.2 vendor。实现、试制错误归因、命令及平台边界见 [PTY 监管报告](PTY-SUPERVISION-2026-10-16.md)。
+
+原型通过后接入生产，并把每组常驻 Bun 改为小型 shell。并发复验发现一次成员观测解析缺陷，结果保留 Unknown 却阻塞自然结束；归本轮试制候选，已修正并补空表/残行/缺 owner 等负控，原 O-01 结论不变。generation **501** 的完整 Process **209 / 204 pass / 0 fail / 5 TODO**，归属链 **494 / 466 pass / 0 fail / 5 skip / 23 TODO**；025 **64/64**，六个并发 leader-natural 复验全部通过。format/check exit 0，Linux 最终物理口四项再次通过。精确包消费及交付身份随后记入监管报告。R6-A 进入 REVIEW，未冒称非作者复审；R6-B/C、主动脱离控制终端的守护进程及 O-01/GAP-133 整体仍未关闭。
+
+编译型宿主补验前的 clean 候选为 **generation 502**，174 surfaces / 837 modules。精确主包 **2074 members / 13,189,411 bytes**，SHA-256 `5d154a651a50adfbd5e319ed917f85ae31e6c73c64c65d84882fe09b6ee3c786`；实际隔离 npm ci/默认入口消费及包外 Bun 的真实 PTY worker、后代排空均通过，`/private/tmp/r7-package-delivery.log`。这些只属于该候选；没有部署运行中的 Host。
+
+交付前又补真实编译型 OpenCode 的启动模式与环境隔离：内部 worker 使用当前可执行文件的 Bun CLI 模式，目标恢复原环境。两项实际宿主证明转绿；初版夹具仅改 JS 键的限制也已在报告分开说明。最终源码 generation **504**，Process **211 / 206 pass / 0 fail / 5 TODO**、归属链 **494 / 466 pass / 0 fail / 5 skip / 23 TODO**，合计 **705 / 672 / 0 / 5 / 28**；Linux 四项及 format/check 再通过。502 的包保留为前一候选，不当作新环境协议的最终包。
+
+最终 clean **generation 505** 及交付 check 均 exit 0。精确包 **2074 members / 13,190,294 bytes**，SHA-256 `2e9d79e61516fdd699a0f5d78bd4eabfed43eaac93b87c2f354cdbf9dd76657d`，默认入口和隔离依赖消费通过；同一包分别在普通 Bun、真实 OpenCode 可执行文件下通过真实 PTY、环境隔离与后代排空证明，`/private/tmp/r7-package-compiled-final.log`。文档收尾后只刷新元数据并复核同一包摘要，正常提交推送 master；R6-A 保持 REVIEW，待非作者审查，不扩张 O-01 的完成边界。
+
 ## 第六批：剩余问题分级与小项直接修复（2026-10-16）
 
 输入主仓 `c1ed871be`、库 `eef4825`，两仓起点干净。用户要求简单的直接修，较难的先定计划。[剩余问题和施工计划](REMAINING-REPAIRS-2026-10-16.md) 把四项 P1（后代监管、持久每轮准入、重启接管、Trace 原件迁移）分开，另登记 Process 编译边界、完整 wire 预算和 Bun 平台验收三个 P2 包；没有开始这些复杂包的生产实现，也不把 37 项 TODO 当成 37 个已确认缺陷。

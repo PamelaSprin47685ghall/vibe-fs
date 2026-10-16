@@ -62,11 +62,29 @@ try {
     assert.deepEqual(second.outstanding(), [])
     assert.equal(second.exitListeners(), 0)
     console.log(JSON.stringify({ mode, firstExited: true, otherSurvived: true, blockers: [] }))
-  } else if (mode === 'leader-exit') {
+  } else if (mode === 'owner-lost') {
+    first = realOwnershipProbe(directory, 'owner-lost-owner')
+    const own = await start(first, 'first')
+    const { dlopen } = await import('bun:ffi')
+    const native = dlopen(process.platform === 'darwin' ? '/usr/lib/libSystem.B.dylib' : 'libc.so.6', {
+      getsid: { args: ['i32'], returns: 'i32' },
+    }).symbols
+    const owner = native.getsid(own.pid)
+    assert.ok(owner > 1 && owner !== own.pid)
+    process.kill(owner, 'SIGKILL')
+    await assert.rejects(first.closeAll(100), /PTY scope exit is unknown/)
+    assert.equal(first.exists(own.id), true)
+    assert.equal(first.owned(own.id), true)
+    assert.equal(first.completions(), 0)
+    assert.deepEqual(first.outstanding(), [own.id])
+    await waitFor(() => !alive(own.pid), 'the target exit after owner loss')
+    console.log(JSON.stringify({ mode, ownerLost: true, unknownRetained: true, blockers: first.outstanding() }))
+  } else if (mode === 'leader-exit' || mode === 'leader-natural') {
     first = realOwnershipProbe(directory, 'leader-exit-owner')
     const parentMarker = join(directory, 'first-pid')
     const childMarker = join(directory, 'second-pid')
-    const child = `process.on('SIGHUP', () => {}); process.on('SIGTERM', () => {}); const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${childMarker}.tmp`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${childMarker}.tmp`)}, ${JSON.stringify(childMarker)}); setInterval(() => {}, 1000)`
+    const release = join(directory, 'release-descendant')
+    const child = `process.on('SIGHUP', () => {}); process.on('SIGTERM', () => {}); const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${childMarker}.tmp`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${childMarker}.tmp`)}, ${JSON.stringify(childMarker)}); setInterval(() => {if(fs.existsSync(${JSON.stringify(release)})) process.exit(0)}, 5)`
     const parent = `const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${parentMarker}.tmp`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${parentMarker}.tmp`)}, ${JSON.stringify(parentMarker)}); require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(child)}], {stdio: 'ignore'}); setInterval(() => {if (fs.existsSync(${JSON.stringify(childMarker)})) process.exit(0)}, 5)`
     const opened = await first.fork(`exec ${quote(process.execPath)} -e ${quote(parent)}`)
     assert.equal(opened.ok, true, opened.error)
@@ -77,11 +95,19 @@ try {
     const childPid = Number(readFileSync(childMarker, 'utf8'))
     descendants.push(childPid)
     await waitFor(() => !alive(parentPid), 'the leader exit')
-    await waitFor(() => !first.exists(opened.id), 'the leader exit observation')
-    await first.closeAll(100)
+    assert.equal(first.exists(opened.id), true)
+    assert.equal(first.owned(opened.id), true)
+    assert.deepEqual(first.outstanding(), [opened.id])
+    assert.equal(first.completions(), 0)
+    if (mode === 'leader-natural') {
+      const { writeFileSync } = await import('node:fs')
+      writeFileSync(release, 'release')
+    } else await first.closeAll(100)
+    await waitFor(() => !alive(childPid), 'the descendant exit')
+    await waitFor(() => !first.exists(opened.id), 'the supervised scope exit observation')
     await first.detach()
     console.log(JSON.stringify({
-      mode, leaderExited: true, descendantAlive: alive(childPid),
+      mode, leaderExited: true, retainedBeforeClose: true, descendantAlive: alive(childPid),
       owned: first.owned(opened.id), blockers: first.outstanding(),
     }))
   } else if (mode.startsWith('cancel-')) {

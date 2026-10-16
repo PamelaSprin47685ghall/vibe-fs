@@ -833,6 +833,19 @@ module ProcessSurface =
     let backendCreatePort () : obj =
         PtyPortHandle(PtyBackend.createPort ()) :> obj
 
+    let ptyMembershipRows (owner: int) (sampler: int) (text: string) : obj =
+        PtyScope.membershipRows owner sampler text
+
+    let ptyScopeOpen (command: string) (cwd: string) : Task<obj> =
+        task {
+            let! factory = PtyScope.load () |> unbox<Task<obj>>
+
+            let options =
+                createObj [ "name", box "xterm-256color"; "cols", box 80; "rows", box 24; "cwd", box cwd ]
+
+            return emitJsExpr (factory, command, options) "$0($1, $2)"
+        }
+
     let private ptyPortOf (value: obj) = (value :?> PtyPortHandle).Port
     let private ptyIdOf (value: obj) = (value :?> PtyIdHandle).Id
 
@@ -1050,6 +1063,7 @@ module ProcessSurface =
     /// the terminal handle. The supervisor owns the full exit lifecycle.
     let supervisorAttach (supervisor: obj) (port: obj) (id: obj) (term: obj) : unit =
         let exitTcs = TaskCompletionSource<unit>()
+        (ptyPortOf port).RegisterExitTask(ptyIdOf id, exitTcs.Task)
         PtySupervisor.attach (supervisorOf supervisor) (ptyPortOf port) (ptyIdOf id) term exitTcs
 
     let spoolReadPath (path: string) : Task<obj array> =

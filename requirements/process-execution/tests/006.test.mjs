@@ -1,4 +1,21 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { verifyPtyScope } from './support/pty-scope.mjs'
+
+test('WHAT[process-execution-006] a real PTY keeps job control and drains a separate background group', t =>
+  verifyPtyScope(t, 'job-control', evidence => {
+    assert.equal(evidence.ctrlZ, true)
+    assert.equal(evidence.foregroundResume, true)
+    assert.equal(evidence.ctrlC, true)
+    assert.equal(evidence.backgroundGroupExited, true)
+  }))
+
+test('WHAT[process-execution-006] short job groups can disappear while the live PTY owner drains', t =>
+  verifyPtyScope(t, 'churn', evidence => {
+    assert.equal(evidence.shortGroupRace, true)
+    assert.equal(evidence.allExited, true)
+    assert.deepEqual(evidence.exit, { code: null, signal: 'SIGKILL' })
+  }))
 
 test('WHAT[process-execution-006] cancellation terminates the group after the target exits while a descendant holds stdout', { timeout: 15000 }, async t => {
   const { verifyDrainingStop } = await import('./support/draining.mjs')
@@ -253,6 +270,8 @@ const fakeTerm = (pid) => {
     resizes: [],
     onData: (cb) => { term.dataCb = cb },
     onExit: (cb) => { term.exitCb = cb },
+    onFault: () => {},
+    signal: (signal) => process.kill(pid, signal),
     write: (text) => term.writes.push(text),
     resize: (width, height) => term.resizes.push([width, height]),
   }
@@ -277,7 +296,7 @@ test('WHAT[process-execution-006] SUPERVISOR_cancelAll_kills_live_sessions_and_s
   const process = child()
   try {
     const supervisor = supervisorCreate()
-    const live = sessionCreate('pty-l1', { pid: process.pid })
+    const live = sessionCreate('pty-l1', fakeTerm(process.pid))
     const closed = sessionCreate('pty-l2', { pid: 2_147_483_647 })
     sessionSetClosed(closed, true)
     supervisorAdd(supervisor, id('pty-l1'), live)

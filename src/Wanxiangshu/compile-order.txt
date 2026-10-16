@@ -740,6 +740,8 @@ Process/PtySession.fsi
 Process/PtySession.fs
 Process/Pty.fsi
 Process/Pty.fs
+Process/PtyScope.fsi
+Process/PtyScope.fs
 Process/PtySupervisor.fsi
 Process/PtySupervisor.fs
 Process/PtyBackend.fsi

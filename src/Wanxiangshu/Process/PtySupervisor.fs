@@ -73,24 +73,8 @@ module PtySupervisor =
         | PtySignal.User1 -> "SIGUSR1"
         | PtySignal.User2 -> "SIGUSR2"
 
-    [<Emit("(() => { try { process.kill(-$0.pid, $1); } catch (_) { process.kill($0.pid, $1); } })()")>]
-    let private killProcessTree (term: obj) (signal: string) : unit = jsNative
-
-    [<Emit("""
-        (async () => {
-          const candidates = ['bun-pty', process.cwd() + '/node_modules/bun-pty'];
-          let lastErr;
-          for (const spec of candidates) {
-            try {
-              const m = await import(spec);
-              const spawn = m.spawn || (m.default && m.default.spawn) || m;
-              if (typeof spawn === 'function') return spawn;
-            } catch (err) { lastErr = err; }
-          }
-          throw lastErr || new Error('bun-pty spawn not found');
-        })()
-    """)>]
-    let private loadSpawn () : JS.Promise<obj> = jsNative
+    [<Emit("$0.signal($1)")>]
+    let private signalScope (term: obj) (signal: string) : unit = jsNative
 
     [<Emit("$0.then((spawn) => $1(spawn)).catch((err) => $2(String(err && err.message || err)))")>]
     let private runLoader (loader: JS.Promise<obj>) (onOk: obj -> unit) (onErr: string -> unit) : unit = jsNative
@@ -103,7 +87,7 @@ module PtySupervisor =
             supervisor.LoadTask <- Some tcs.Task
 
             runLoader
-                (loadSpawn ())
+                (PtyScope.load ())
                 (fun spawn ->
                     supervisor.SpawnFn <- Some(unbox spawn)
                     tcs.SetResult(()))
@@ -116,7 +100,7 @@ module PtySupervisor =
         | Some _ -> Task.FromResult(())
         | None -> startSpawnLoad supervisor
 
-    [<Emit("$0('sh', ['-lc', $1], $2)")>]
+    [<Emit("$0($1, $2)")>]
     let private invokeSpawn (spawn: obj) (command: string) (options: obj) : obj = jsNative
 
     let private resolveCwd (cwd: string) : obj =
@@ -226,7 +210,7 @@ module PtySupervisor =
     let private signalBackend (session: PtySession) (signal: PtySignal) =
         task {
             try
-                killProcessTree session.Backend (signalName signal)
+                signalScope session.Backend (signalName signal)
                 return Ok()
             with ex ->
                 return Error ex.Message
@@ -326,6 +310,11 @@ module PtySupervisor =
         else
             residual
 
+    let private completeExitOnce (session: PtySession) =
+        if not session.ExitCompleted then
+            session.ExitCompleted <- true
+            session.ExitCompletion.SetResult(())
+
     let private onSessionExit (supervisor: PtySupervisor) (port: PtyPort) (id: PtyId) =
         match tryGet supervisor id with
         | None -> ()
@@ -334,16 +323,27 @@ module PtySupervisor =
             s.Closed <- true
             let residual = s.OutputBuffer.ToString()
             s.OutputBuffer.Clear() |> ignore
-            s.ExitCompleted <- true
-            s.ExitCompletion.SetResult(())
+
+            completeExitOnce s
+
             let pending = drop supervisor id
             failPending pending "PTY exited before command was applied"
             port.FailRead(id, "PTY exited before read completed")
             port.Complete(id, Ok(residualOrClosed residual))
 
+    let private onSessionFault (supervisor: PtySupervisor) (port: PtyPort) (id: PtyId) reason =
+        port.FailExitObservation(id, reason)
+        failPending (takePending supervisor id) reason
+
+        match tryGet supervisor id with
+        | Some session when not session.ExitCompleted ->
+            session.ExitCompleted <- true
+            session.ExitCompletion.SetException(InvalidOperationException reason)
+        | _ -> ()
+
     let private killOrphanTerm (term: obj) =
         try
-            killProcessTree term (signalName PtySignal.Kill)
+            signalScope term (signalName PtySignal.Kill)
         with _ ->
             ()
 
@@ -375,6 +375,7 @@ module PtySupervisor =
                 placeholder.Pending |> Seq.toList)
 
         term?onExit (fun (_event: obj) -> onSessionExit supervisor port id) |> ignore
+        term?onFault (onSessionFault supervisor port id) |> ignore
 
         term?onData (fun (data: string) -> onSessionData supervisor port id data)
         |> ignore

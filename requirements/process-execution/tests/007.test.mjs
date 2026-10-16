@@ -188,6 +188,7 @@ const fakeTerm = (pid) => {
     resizes: [],
     onData: (cb) => { term.dataCb = cb },
     onExit: (cb) => { term.exitCb = cb },
+    onFault: () => {},
     write: (text) => term.writes.push(text),
     resize: (width, height) => term.resizes.push([width, height]),
   }

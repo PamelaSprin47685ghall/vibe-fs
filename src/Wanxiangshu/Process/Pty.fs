@@ -7,6 +7,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 module private PtyPortSupport =
+    [<Emit("$0.catch(() => {})")>]
+    let observeExitFailure (_task: Task) : unit = jsNative
+
     let invokeTerminate (handler: PtyBackendHandler) (id: PtyId) =
         try
             handler id (PtyCommand.Signal PtySignal.Terminate) |> ignore
@@ -299,6 +302,7 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
     /// Bridges a backend per-process exit task into the port so CloseAll can
     /// await process exit without the backend reaching into port dicts.
     member this.RegisterExitTask(id: PtyId, task: Task) =
+        PtyPortSupport.observeExitFailure task
         lock gate (fun () -> exitTasks.[id] <- task)
 
     member this.FailExitObservation(id: PtyId, reason: string) =

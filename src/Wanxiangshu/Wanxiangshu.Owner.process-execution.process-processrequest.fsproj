@@ -31,6 +31,8 @@
     <Compile Include="Process/PtySession.fs"/>
     <Compile Include="Process/Pty.fsi"/>
     <Compile Include="Process/Pty.fs"/>
+    <Compile Include="Process/PtyScope.fsi"/>
+    <Compile Include="Process/PtyScope.fs"/>
     <Compile Include="Process/PtySupervisor.fsi"/>
     <Compile Include="Process/PtySupervisor.fs"/>
     <Compile Include="Process/PtyBackend.fsi"/>

@@ -1,4 +1,10 @@
 import test from 'node:test'
+import { verifyCompiledPtyScope } from './support/pty-scope.mjs'
+
+for (const original of ['unset', 'original-value']) {
+  test(`WHAT[process-execution-001] the compiled OpenCode Host starts PTY workers and preserves the target environment (${original})`, t =>
+    verifyCompiledPtyScope(t, original))
+}
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -392,6 +398,7 @@ const fakeTerm = (pid) => {
     resizes: [],
     onData: (cb) => { term.dataCb = cb },
     onExit: (cb) => { term.exitCb = cb },
+    onFault: () => {},
     write: (text) => term.writes.push(text),
     resize: (width, height) => term.resizes.push([width, height]),
   }
@@ -420,26 +427,25 @@ test('WHAT[process-execution-001] SUPERVISOR_ensureSpawn_reuses_one_loader_and_f
 test('WHAT[process-execution-001] SUPERVISOR_spawnSync_fails_fast_when_loader_never_ran', () => {
   assert.throws(() => supervisorSpawnSync(supervisorCreate(), 'echo hi', ''), /bun-pty is not loaded/)
 })
-test('WHAT[process-execution-001] SUPERVISOR_spawnSync_invokes_sh_lc_with_fixed_options', () => {
+test('WHAT[process-execution-001] SUPERVISOR_spawnSync_invokes_the_scope_factory_with_fixed_options', () => {
   const supervisor = supervisorCreate()
   let seen
-  supervisorSetSpawn(supervisor, (shell, args, options) => {
-    seen = [shell, args, options]
+  supervisorSetSpawn(supervisor, (command, options) => {
+    seen = [command, options]
     return { pid: 4242 }
   })
   const term = supervisorSpawnSync(supervisor, 'echo hi', '/tmp/work')
   assert.equal(term.pid, 4242)
-  assert.equal(seen[0], 'sh')
-  assert.deepEqual(seen[1], ['-lc', 'echo hi'])
-  assert.equal(seen[2].name, 'xterm-256color')
-  assert.equal(seen[2].cols, 80)
-  assert.equal(seen[2].rows, 24)
-  assert.equal(seen[2].cwd, '/tmp/work')
+  assert.equal(seen[0], 'echo hi')
+  assert.equal(seen[1].name, 'xterm-256color')
+  assert.equal(seen[1].cols, 80)
+  assert.equal(seen[1].rows, 24)
+  assert.equal(seen[1].cwd, '/tmp/work')
 })
 test('WHAT[process-execution-001] SUPERVISOR_spawnSync_defaults_cwd_to_process_cwd', () => {
   const supervisor = supervisorCreate()
   let seenCwd
-  supervisorSetSpawn(supervisor, (_shell, _args, options) => {
+  supervisorSetSpawn(supervisor, (_command, options) => {
     seenCwd = options.cwd
     return {}
   })
