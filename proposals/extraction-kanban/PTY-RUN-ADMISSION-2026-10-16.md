@@ -89,4 +89,39 @@ TMPDIR=/private/tmp node /private/tmp/r6b-package-proof.mjs
 
 R6-C 的跨重启物理接管尚未实现；新进程不能凭 PID、名称、空快照或历史回执接管实例。没有绑定的已提交未知预留仍阻止完成，不能把它从账上抹掉。主动脱离控制终端的守护进程、Trace、原 O-01/GAP-133 整体、Process GAP-091/092 及其他旧 TODO 均未销项。
 
-本轮为作者施工与自检，尚未进行非作者独立复审；看板已进入 REVIEW，不能写成非作者复审通过。主仓本提交按门禁正常提交并推送 master，不强推；未部署线上 Host。
+以上为 `5a9e51e44` 的作者施工与自检记录，当时看板进入 REVIEW。后续独立复审见下节；未部署线上 Host。
+
+## 独立复审与修正（2026-10-16）
+
+从干净的 `5a9e51e44` 出发，三名非作者分别复审准入与 CAS（`r6b_admission_review`）、Unknown 与生命周期（`r6b_unknown_review`）、AGENTS.md、组合和证据（`r6b_requirements_review`），对照修复前 `c659f9b33`，独立库仍为干净的 `b6984d9 / 0.6.2`。
+
+| 编号与归因 | 反例、修正与验收边界 |
+|---|---|
+| R10-01 / P1，本轮 R6-B 新增回退 | 本地已有 PTY 时，新增的 openRun/Drain 先抛 Unknown 或 Conflict，跳过 TERM/等待退出。独立真实 Bun 反例观察到终态后的确切 PID 仍为 `S+ sleep`；同 revision 的真实双进程竞争也留下本地和外国两个 blocker。现在分别完成停止准入与本地清理两项义务，保留第一个停止错误，继续关闭确切本轮本地实例，仍拒绝完成；外国及无绑定 blocker 不被删除。 |
+| R10-02 / P2，本轮 R6-B 新增回退 | 初始化失败且首次 native close 抛错时，删除 Host 外层回收使连接遗留；Node/Bun 的 Work、Ephemeral、Ownership 三入口均重现，`c659f9b33` 原算法可再次关闭。现在只有构造失败时再尝试回收原连接，并保留构造抛出的错误；构造成功后仍由 Journal 关闭。验证原生连接确已关闭和成功关闭一次，不把调用次数当资源安全证明。永久 native close 失败仍不能保证释放，也没有声称修复库构造时原有的错误取舍。 |
+| R10-03 / P1，既有恢复出口遗漏 | 启动恢复直接写 ChildWorkVoided，未停止旧轮准入。两个真实进程中，恢复方 canonical active 已为 null，旧进程仍由过期快照新开 PTY。现在恢复算法要求显式的 admitted-work drain 能力，Load 组合用相同 commonDir 的冷排空入口；确认停止且无 blocker 才可作废。不能仅刷新快照，刷新与 Reserve 之间仍会竞争。没有因此添加物理接管。 |
+
+R10-01/02 由本轮修复引入，不能归给原拆分；R10-03 是既有生产恢复出口未被本轮覆盖。复审未把以下候选判为新缺陷：合法 DevOps 不能 Fission；生产 journal 与 workspace 同源；既有 ownedWorkFailure 保留会继续暴露旧错，但重复终态仍可完成真实 run；后者不等于终态永不可恢复。新增测试初稿误把 Bun 对已闭连接的 close 正常返回算作第二次实际关闭，非作者在候选复查中指出，已改用原生 SELECT 1 观测开放到关闭的转变；这是测试判断修正，不是产品回退。
+
+修复前正式反例：本地 Unknown/Conflict **0/3**，`/private/tmp/r6b-review-drain-red.log`；真实 Bun 本地 PTY **0/2**，`r6b-review-real-drain-red.log`；Node/Bun 构造清理 **0/2**（各在首个 close-before 反例处失败，三入口另有独立反例），`r6b-review-journal-red.log`；恢复出口 **0/4**，`r6b-review-void-red.log`。独立探针另有 `r6b-review-local-drain-real.mjs`、`r6b-review-drain-conflict.mjs`、`r10-sqlite-init-cleanup*.mjs` 和 `r6b-review-voided-admission.mjs`。原候选完整 025 **81/81** 仍通过，`r6b-review-baseline-025.log`，说明原测试遗漏了上述切点，不能用既有全绿反驳反例。
+
+候选 generation 522 已编译，三位非作者分别确认：准入/CAS/恢复 **10/10**（`r6b-review-admission-fixed.log`），原 void 探针恢复后旧进程 **零 Spawn**（`r6b-review-voided-admission-fixed.log`）；真实 Bun 的 Drain Unknown 前后、日志初始化失败及双进程 Conflict 均完成确切本地回收并保留失败/外国 blocker（`r6b-review-independent-{real,init,conflict}-clean.log`）；Node/Bun 三构造入口原生连接均关闭（`r10-sqlite-init-cleanup{-bun}-fixed.log`）。永久 close 失败的六场景实证仍保留原错误并拒绝命令，但连接未释放，临时注入解除后由测试清理；`r10-sqlite-permanent-close-{node,bun}.log`。
+
+首轮 check 指出新增分支嵌套与测试 deep-dist import，已展平并改用注册的 Lifecycle Surface，没有放宽门禁。generation 522 正式 focused 为 **117 / 110 pass / 2 fail / 2 skip / 3 TODO**；两个普通失败来自新构造测试误要求 Surface.encodeOpening 抛错，该公开入口实际把失败返回为精确 `REFUSE`。已按原契约核对返回的拒绝与原错误，其他入口仍检查同一错误对象；失败日志 `r6b-review-focused.log` 与 `r6b-review-check.log` 保留，不计产品回退或改产品迁就测试。
+
+最终 clean **523**，174 surfaces / 837 modules；`/private/tmp/r6b-review-build-clean.log`，exit 0。生产源码与非作者复验的 522 相同。修正测试 oracle 后，非作者在 523 另复验 Work-033 **2/2**、Node/Bun 三入口三故障共 **18 场景**，`r10-033-independent-final.log`。最终冻结输入期间的完整相关回归：
+
+| 套件 | total / pass / 普通 fail / skip / TODO | 日志 |
+|---|---|---|
+| Work、managed-session、session-ontology、crash 018/020 与相关 delegation/horizon | **530 / 501 / 0 / 5 / 24** | `/private/tmp/r6b-review-ownership-clean.log` |
+| managed-chat、execution-model-routing、capability-enforcement | **430 / 401 / 0 / 11 / 18** | `/private/tmp/r6b-review-provider-clean.log` |
+| Process | **215 / 210 / 0 / 0 / 5** | `/private/tmp/r6b-review-process-clean.log` |
+| 不重叠合计 | **1175 / 1112 / 0 / 16 / 47** | skip、TODO 及 TODO 内失败断言未算通过 |
+
+正式 025 现在 **90/90**，覆盖新增恢复出口、本地 Unknown/Conflict 和两个真实 Bun 故障切点。format/check exit 0（`r6b-review-format-check.log`、`r6b-review-check-2.log`），`git diff --check` 通过；没有使用 dotnet build、修改独立库、vendor 或放宽门禁。
+
+精确包为 `.fable-build/verify-logs/r6b-review-package/wanxiangshu-0.9.0.tgz`，**2074 members / 13,224,524 bytes**，SHA-256 **`edc4c842c8c5fd8c73f925f3fd6ea3c56d6db5d0e5a780ba381f3f319c975bbd`**。真实 pack/解包、隔离 npm ci、默认入口，以及同一包在包外普通 Bun 和已安装 OpenCode 可执行文件中的 PTY/输入/resize、目标原生退出及后代排空均通过；`/private/tmp/r6b-review-package.log`，脚本 `r6b-review-package-proof.mjs`。包物理证明仍沿用公开 Surface，不扩大为完整 OpenCode 双进程 R6-B 全链。
+
+复验沿用上文命令，但归属链的 crash 文件增加 `requirements/crash-reconciliation/tests/{018,020}.test.mjs`；包命令为 `TMPDIR=/private/tmp node /private/tmp/r6b-review-package-proof.mjs`。所有正式新增测试沿用编号文件和 WHAT 锚点，构造探针只使用已注册 Lifecycle Surface。非作者最终未发现声明范围内仍未修正的新回退；R6-B 进入 DONE。
+
+恢复只接入当前生产 Load 出口；冷入口不取得本地物理绑定，任何 blocker 都拒绝 void，不能据此断言整个激活阶段尚无 ToolRuntimeScope。Historical 无 AdmittedWork，保留历史隔离边界；尚未接回生产的 HostForkRestart/ChildRecoveryWorkflow 在接回前同样须提供停止准入能力。R6-C、完整 Bootstrap 排序和强杀接管、主动脱组、Trace 和 O-01/GAP-133 整体仍未闭合。主仓本提交正常交付 master，不强推；验证通过不等于部署，未改运行中的线上 Host。

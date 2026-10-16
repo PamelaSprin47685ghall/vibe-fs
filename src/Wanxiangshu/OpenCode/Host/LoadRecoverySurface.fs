@@ -7,6 +7,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Handle
+open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
@@ -44,8 +45,11 @@ module LoadRecoverySurface =
         )
         |> List.toArray
 
-    let settleChildRuns (handle: JournalHandle) : Task<unit> =
-        ChildWorkRecovery.settleOrphanedChildRuns handle.Journal
+    let settleChildRuns (handle: JournalHandle) (commonDir: string) : Task<unit> =
+        let drainPtys work =
+            task { HostForkRuntime.CloseUnboundPtyRun(commonDir, work) }
+
+        ChildWorkRecovery.settleOrphanedChildRuns drainPtys handle.Journal
 
     let private handlesOf state parent =
         (stateOf state).Projection.AgentProjections.Sessions

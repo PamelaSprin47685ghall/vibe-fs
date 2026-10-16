@@ -103,11 +103,8 @@ module ChildWorkRecovery =
     let orphanedChildRuns (projections: AgentProjectionSet) : OrphanedChildRun list =
         activeChildRuns projections |> List.choose (handleFor projections)
 
-    /// The interrupted run produced nothing, so it owes nothing: closing the
-    /// child's logical run is the whole settlement. Marking a completion here
-    /// would leave an unreported delivery that horizon never shows and join is
-    /// asked to collect — the child stays reusable and both views stay empty,
-    /// exactly as a fresh process should look.
+    /// A void is not a completion or join delivery. Admitted resources must be
+    /// drained before the child work can be voided.
     let settlementFact (orphaned: OrphanedChildRun) : ExecutionFactCases =
         match orphaned with
         | Admitted(parentSessionId, work) ->
@@ -139,11 +136,18 @@ module ChildWorkRecovery =
                OwnerSessionId = group.OwnerSessionId
                Reason = OrphanedFissionReason |}
 
-    let settleOrphanedChildRuns (journal: AgentJournal) : Task<unit> =
+    let private drainAdmittedPtys (drainPtys: AdmittedWork -> Task<unit>) =
+        function
+        | Admitted(_, work) -> drainPtys work
+        | Historical _ -> Task.FromResult(())
+
+    let settleOrphanedChildRuns (drainPtys: AdmittedWork -> Task<unit>) (journal: AgentJournal) : Task<unit> =
         task {
             let projections = (AgentJournal.snapshot journal).AgentProjections
 
             for orphaned in orphanedChildRuns projections do
+                do! drainAdmittedPtys drainPtys orphaned
+
                 match!
                     AgentJournal.appendAgent
                         (StreamId.Session(parentOf orphaned))

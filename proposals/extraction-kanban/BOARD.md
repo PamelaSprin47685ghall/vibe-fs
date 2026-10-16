@@ -86,7 +86,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-01-R1](SOURCE-AUDIT-2026-10-15.md#repair-lifecycle) | Journal 测试关闭同步、构造锁竞争和 Process 平台证明 | DONE | 库完整候选与精确包 Node/Bun 验证通过；未测平台不扩张 | root；audit_process（复审） | 交叉复审 |
 | [CUT-02-R1](SOURCE-AUDIT-2026-10-15.md#repair-process) | 无损输出、Draining 物理监管、相对 PATH；补 D-03 | DONE | 所选非 PTY 生产接线、192 项需求及实际安装包验收；原有 5 TODO 保留 | audit_process；audit_trace（监管）；root（集成） | 交叉复审 |
 | [CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) | 原件权威、完整 Opening、稳定 cut、Proxy 重入证明；补 D-02 | DOING | T-02/T-03/E-01 已修；D-02 对账落盘，T-01 原件接管仍待下一包 | root（下一包）；audit_trace（已交接） | 交叉复审 |
-| [CUT-04-R1](SOURCE-AUDIT-2026-10-15.md#repair-ownership) | PTY 真实终结、早到回执、持久预留/恢复、统一 blocker | DOING | O-02/O-03/O-04 已修；R6-A 已补会话内后代与作业组终结；脱离控制终端、跨重启接管及跨进程每轮准入未完 | root（剩余监管/恢复）；audit_ownership（已交接） | 交叉复审 |
+| [CUT-04-R1](SOURCE-AUDIT-2026-10-15.md#repair-ownership) | PTY 真实终结、早到回执、持久预留/恢复、统一 blocker | DOING | O-02/O-03/O-04 已修；R6-A/B 已独立复审，覆盖会话内终结及每轮准入；脱离控制终端和跨重启接管未完 | root（剩余监管/恢复）；audit_ownership（已交接） | 交叉复审 |
 | [CUT-01-R2](SOURCE-AUDIT-2026-10-15.md#second-review-fixes) | J-01：原生 statement 释放及 Unknown 后即时恢复写入 | DONE | 0.6.2 源码及精确包的非作者复验、真实 get 释放 oracle 和去 finalize 突变通过；新发现另记 R3，不覆盖 0.6.1 历史 | root | independent_journal_r2、independent_boundaries_r2 |
 | [CUT-04-R2](SOURCE-AUDIT-2026-10-15.md#second-review-fixes) | O-05/06/07、B-01：收尾确认、共享端口隔离、永久准入关闭及依赖声明 | DONE | 非作者确认原限定范围成立；真实 focused 778 与 0.6.2 主仓包消费通过；收尾新反例记 R3，O-01/T-01 不销项 | root | independent_pty_r2、independent_boundaries_r2 |
 | [CUT-01-R3](SOURCE-AUDIT-2026-10-15.md#independent-review-fixes) | J-02/E-03/E-04：显式关闭重试、真实追加竞争与 Bun 释放 oracle | DONE | 库 eef4825 / 0.6.2 已交付，320 项及非作者 30 项、25 轮竞争和七种突变通过；主仓 7d12e3462 固定包、隔离消费通过 | root | independent_journal_r2、independent_boundaries_r2 |
@@ -96,7 +96,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-04-R5](REGRESSION-REVIEW-2026-10-16.md) | O-13/O-14 修复引入的回退；O-12 原真实回调漏清理及冷无绑定防错 | DONE | 真实 fd、实际 terminal、held/retry/cancel/旧token及冷 guard 正反对照通过；492 项归属链、主包消费通过；主仓本提交，O-01 不销项 | root | regression_ownership_r5、regression_process_r5 |
 | [CUT-02-R6-V](REMAINING-REPAIRS-2026-10-16.md) | Capture 的 Bun 错误事件注入夹具 | DONE | 库 b6984d9；Node Process/Supervision 69/69、Bun Capture/Supervision 19/19；生产包未变，Bun 另四项不销项 | root | 本轮自检；未另作非作者复审 |
 | [CUT-04-R6-A](PTY-SUPERVISION-2026-10-16.md) | O-01 活监管实例与控制终端会话内后代终结 | DONE | 本提交修正独立复审发现的两项 P1 和一项 P2；709 项相关测试 676 pass / 0 fail / 5 skip / 28 TODO；clean 509 精确包 Bun/OpenCode 消费、Linux 物理口九项通过；仅关闭声明的会话范围，脱组及 R6-B/C 不销项 | root | pty_scope_review_r8、pty_integration_review_r8、pty_host_evidence_review_r8 |
-| [CUT-04-R6-B](PTY-RUN-ADMISSION-2026-10-16.md) | O-01 跨进程每轮 PTY 准入 | REVIEW | 主仓本提交；clean 518，1156 项相关测试 1094 pass / 0 fail / 16 skip / 46 TODO；真实双进程 CAS、Bun PTY、精确包隔离消费通过；R6-C/O-01 整体未闭合 | root | 待非作者复审 |
+| [CUT-04-R6-B](PTY-RUN-ADMISSION-2026-10-16.md) | O-01 跨进程每轮 PTY 准入 | DONE | 本提交修正两项新增回退和既有 Load void 遗漏；clean 523，1175 项相关测试 1112 pass / 0 fail / 16 skip / 47 TODO；非作者反例、真实双进程 CAS/Bun PTY、精确包隔离消费通过；R6-C/O-01 整体未闭合 | root | r6b_admission_review、r6b_unknown_review、r6b_requirements_review |
 | [CUT-04-R6-C](REMAINING-REPAIRS-2026-10-16.md) | O-01 跨重启物理接管 | BACKLOG | 依赖 A/B；必须有可验证 incarnation、连接及终态，真实强杀切点不重发命令 | root（计划） | 待非作者复审 |
 | [CUT-03-R6](REMAINING-REPAIRS-2026-10-16.md) | T-01 原件捕获、冷恢复、消费者切换和旧路径退出 | READY | 先冻结 D-02 与旧数据/cut 处置，再完成一条真实单 owner 捕获链；不把描述符或双写算完成 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-A](REMAINING-REPAIRS-2026-10-16.md) | GAP-091 纯契约及编译/消费者边界 | READY | 真实正反编译与注入能力证明，不能只改目录或外观入口 | root（计划） | 待非作者复审 |

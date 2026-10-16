@@ -8,6 +8,7 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Delegation
+open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Mission.Planning
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.EventStore
@@ -321,7 +322,16 @@ module PluginRecoveryWiring =
 
                     match boot.Journal with
                     | Some journal ->
-                        do! ChildWorkRecovery.settleOrphanedChildRuns journal
+                        let drainPtys work =
+                            task {
+                                let workspace =
+                                    boot.WorkspaceDirectory
+                                    |> Option.defaultWith (fun () -> invalidOp "PTY recovery requires a workspace")
+
+                                HostForkRuntime.CloseUnboundPtyRun(RuntimePath.gitCommonDir workspace, work)
+                            }
+
+                        do! ChildWorkRecovery.settleOrphanedChildRuns drainPtys journal
                         do! settleAbandonedStaleBloggerSessions journal
 
                         do!

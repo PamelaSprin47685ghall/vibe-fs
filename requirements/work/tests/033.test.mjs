@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -11,8 +11,20 @@ import { Work } from 'wanxiangli/work'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import { verifyFailedConstruction } from './support/journal-construction.mjs'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
+
+test('WHAT[work-033] failed journal construction reclaims the exact native connection and preserves its error on Node', () => {
+  assert.equal(verifyFailedConstruction(DatabaseSync).length, 9)
+})
+
+test('WHAT[work-033] failed journal construction reclaims the exact native connection and preserves its error on Bun', t => {
+  if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for its native SQLite connection')
+  const evidence = JSON.parse(execFileSync('bun', [new URL('./support/journal-construction.mjs', import.meta.url).pathname, '--bun'], { encoding: 'utf8', timeout: 10000 }))
+  assert.equal(evidence.length, 9)
+  assert.ok(evidence.every(item => item.closed === 1))
+})
 
 const framesOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
 const eventsOf = (text) => framesOf(text).flatMap((frame) => frame.events ?? [])

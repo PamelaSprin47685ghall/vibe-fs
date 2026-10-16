@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as PtySurface from '../../../dist/Execution/Delegation/Fork/Host/HostForkPtySurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import * as loadRecovery from '../../../dist/OpenCode/Host/LoadRecoverySurface.js'
 import * as PtyToolSurface from '../../../dist/OpenCode/Tools/PtyToolSurface.js'
 import { DatabaseSync } from 'node:sqlite'
 import { withAdmittedChildren, withSharedAdmittedChildren } from './support/admitted-child-work.mjs'
@@ -28,6 +30,67 @@ test('WHAT[managed-session-lifecycle-025] another process cannot reserve a PTY a
     assert.deepEqual(await producer.call('blockers'), [])
   })
 })
+
+const withRecoveryJournal = async (workspace, action) => {
+  const opened = await journalSurface.JournalSurface_acquireSharedForWorkspace(workspace, process.pid, '2026-10-16T00:00:00Z')
+  assert.equal(opened.ok, true, JSON.stringify(opened.error))
+  const active = () => journalSurface.JournalSurface_snapshot(opened.journal).sessionProjections['devops-pty'].promptAuthority.activeLogicalRun
+  try {
+    return await action(opened.journal, active)
+  } finally {
+    journalSurface.JournalSurface_dispose(opened.journal)
+  }
+}
+
+test('WHAT[managed-session-lifecycle-025] load recovery stops old round admission before voiding canonical work in another process', { timeout: 20000 }, async () => {
+  await withAdmissionWorkers('void-stops-admission', async (producer, _other, workspace) => {
+    await withRecoveryJournal(workspace, async (journal, active) => {
+      assert.ok(active())
+      await loadRecovery.settleChildRuns(journal, join(workspace, '.git'))
+      assert.equal(active(), null)
+      assert.equal((await producer.call('open', 'late-after-void')).ok, false)
+      assert.equal(await producer.call('spawns'), 0)
+    })
+  })
+})
+
+test('WHAT[managed-session-lifecycle-025] load recovery preserves canonical work and an unbound PTY until its producer proves Ended', { timeout: 20000 }, async () => {
+  await withAdmissionWorkers('void-retains-pty', async (producer, _other, workspace) => {
+    const opened = await producer.call('open', 'foreign-before-void')
+    assert.equal(opened.ok, true, opened.error)
+    await withRecoveryJournal(workspace, async (journal, active) => {
+      const before = active()
+      await assert.rejects(() => loadRecovery.settleChildRuns(journal, join(workspace, '.git')), /local process binding/)
+      assert.deepEqual(active(), before)
+      assert.deepEqual(await producer.call('blockers'), [opened.id])
+      assert.equal((await producer.call('open', 'late-before-ended')).ok, false)
+      await producer.call('complete', 'foreign-before-void')
+      await loadRecovery.settleChildRuns(journal, join(workspace, '.git'))
+      assert.equal(active(), null)
+      assert.equal((await producer.call('open', 'late-after-ended')).ok, false)
+    })
+  })
+})
+
+for (const afterCommit of [false, true]) {
+  test(`WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost ${afterCommit ? 'after' : 'before'} COMMIT`, { timeout: 20000 }, async () => {
+    await withAdmissionWorkers(`void-unknown-${afterCommit}`, async (producer, _other, workspace) => {
+      await withRecoveryJournal(workspace, async (journal, active) => {
+        const before = active()
+        await loseOwnershipCommit(DatabaseSync, 'Drain', afterCommit, () => assert.rejects(
+          () => loadRecovery.settleChildRuns(journal, join(workspace, '.git')), /Draining was not acknowledged: Unknown/,
+        ))
+        assert.deepEqual(active(), before)
+        const late = await producer.call('open', 'after-unknown-void')
+        assert.equal(late.ok, !afterCommit)
+        if (late.ok) await producer.call('complete', 'after-unknown-void')
+        await loadRecovery.settleChildRuns(journal, join(workspace, '.git'))
+        assert.equal(active(), null)
+        assert.equal((await producer.call('open', 'after-confirmed-void')).ok, false)
+      })
+    })
+  })
+}
 
 test('WHAT[managed-session-lifecycle-025] a foreign committed reservation prevents premature terminal settlement', { timeout: 20000 }, async () => {
   await withAdmissionWorkers('reserve-first', async (producer, stopper, _workspace, start) => {
@@ -184,9 +247,51 @@ for (const afterCommit of [false, true]) {
       assert.equal((await retry.call('stop')).finished, true)
     })
   })
+
+  test(`WHAT[managed-session-lifecycle-025] Drain acknowledgement lost ${afterCommit ? 'after' : 'before'} COMMIT still closes exact local PTYs and retains foreign blockers`, { timeout: 20000 }, async () => {
+    await withAdmissionWorkers(`local-drain-unknown-${afterCommit}`, async (producer, other, _workspace, start) => {
+      const local = await producer.call('open', 'local-at-terminal')
+      const foreign = await other.call('open', 'foreign-at-terminal')
+      assert.equal(local.ok, true, local.error)
+      assert.equal(foreign.ok, true, foreign.error)
+      const { result } = await producer.call('stop', null, { lose: { command: 'Drain', afterCommit } })
+      assert.equal(result.finished, false)
+      assert.match(result.failure, /Draining was not acknowledged: Unknown/)
+      assert.deepEqual(await other.call('blockers'), [foreign.id], 'the controlled local process exits only after TERM; the foreign instance must remain')
+      await other.call('complete', 'foreign-at-terminal')
+      const retry = await start()
+      assert.equal((await retry.call('stop')).finished, true)
+    })
+  })
 }
 
-test('WHAT[managed-session-lifecycle-025] failed ownership journal initialization closes its connection once and grants no launch', async () => {
+test('WHAT[managed-session-lifecycle-025] a conflicting round Drain still closes local PTYs without clearing the winning foreign reservation', { timeout: 30000 }, async () => {
+  await withAdmissionWorkers('local-drain-conflict', async (producer, other, workspace, start) => {
+    await prepareConcurrentRound(producer, other)
+    const local = await producer.call('open', 'local-before-conflict')
+    assert.equal(local.ok, true, local.error)
+    const reserveRelease = join(workspace, 'release-foreign')
+    const drainRelease = join(workspace, 'release-local-stop')
+    const reserving = other.call('open', 'winning-foreign', { pause: { name: 'foreign', release: reserveRelease } })
+    const reserve = await other.barrier('foreign')
+    const stopping = producer.call('stop', null, { pause: { name: 'stop', release: drainRelease } })
+    const drain = await producer.barrier('stop')
+    assert.equal(reserve.revision, drain.revision)
+    writeFileSync(reserveRelease, '')
+    const foreign = await reserving
+    assert.equal(foreign.ok, true, foreign.error)
+    writeFileSync(drainRelease, '')
+    const stopped = await stopping
+    assert.equal(stopped.finished, false)
+    assert.match(stopped.failure, /Conflict/)
+    assert.deepEqual(await other.call('blockers'), [foreign.id])
+    await other.call('complete', 'winning-foreign')
+    const retry = await start()
+    assert.equal((await retry.call('stop')).finished, true)
+  })
+})
+
+test('WHAT[managed-session-lifecycle-025] failed ownership journal initialization preserves its error, closes its native connection and grants no launch', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-pty-init-025-'))
   let spawns = 0
   const owner = controlledOwner(directory, 'init-owner', (_id, kind) => { if (kind === 'Spawn') spawns++ })
@@ -202,14 +307,16 @@ test('WHAT[managed-session-lifecycle-025] failed ownership journal initializatio
     return execute.call(this, sql)
   }
   DatabaseSync.prototype.close = function () {
+    const result = close.call(this)
     if (this === failedConnection) closes++
-    return close.call(this)
+    return result
   }
   try {
     const result = await owner.fork('must-not-launch')
     assert.equal(result.ok, false)
     assert.match(result.error, /ownership initialization was locked/)
     assert.equal(closes, 1)
+    assert.equal(failedConnection.isOpen, false)
     assert.equal(spawns, 0)
   } finally {
     DatabaseSync.prototype.exec = execute
@@ -218,6 +325,53 @@ test('WHAT[managed-session-lifecycle-025] failed ownership journal initializatio
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+const awaitPtyTarget = async marker => {
+  const deadline = Date.now() + 5000
+  while (!existsSync(marker)) {
+    assert.ok(Date.now() < deadline, 'the real PTY target must publish its actual PID')
+    await new Promise(resolve => setTimeout(resolve, 10))
+  }
+  const pid = Number(readFileSync(marker, 'utf8'))
+  assert.ok(Number.isInteger(pid) && pid > 1)
+  process.kill(pid, 0)
+  return pid
+}
+
+const requirePtyTargetReaped = async pid => {
+  const deadline = Date.now() + 2000
+  while (true) {
+    try { process.kill(pid, 0) } catch (error) {
+      if (error.code !== 'ESRCH') throw error
+      return
+    }
+    const status = spawnSync('ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8' })
+    assert.ok(status.status === 1 || /^Z/.test(status.stdout.trim()), `target must be exited before Ended: ${status.stdout} ${status.stderr}`)
+    assert.ok(Date.now() < deadline, 'the exact exited target PID must be reaped')
+    await new Promise(resolve => setTimeout(resolve, 5))
+  }
+}
+
+for (const afterCommit of [false, true]) {
+  test(`WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost ${afterCommit ? 'after' : 'before'} COMMIT`, { timeout: 25000 }, async t => {
+    if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+    await withAdmissionWorkers(`real-local-unknown-${afterCommit}`, async (producer, other, workspace) => {
+      const marker = join(workspace, 'target-pid')
+      const opened = await producer.call('open', `printf '%s' "$$" > '${marker}.pending'; mv '${marker}.pending' '${marker}'; exec sleep 30`)
+      assert.equal(opened.ok, true, opened.error)
+      try {
+        const pid = await awaitPtyTarget(marker)
+        const { result } = await producer.call('stop', null, { lose: { command: 'Drain', afterCommit } })
+        assert.equal(result.finished, false)
+        assert.match(result.failure, /Draining was not acknowledged: Unknown/)
+        await requirePtyTargetReaped(pid)
+        assert.deepEqual(await other.call('blockers'), [])
+      } finally {
+        await producer.call('close', opened.id)
+      }
+    }, { realBackend: true })
+  })
+}
 
 for (const order of ['stop-first', 'reserve-first']) {
   test(`WHAT[managed-session-lifecycle-025] two Bun processes enforce ${order} admission with the real PTY backend`, { timeout: 25000 }, async t => {
@@ -234,32 +388,13 @@ for (const order of ['stop-first', 'reserve-first']) {
       const opened = await producer.call('open', command)
       assert.equal(opened.ok, true, opened.error)
       try {
-        const deadline = Date.now() + 5000
-        while (!existsSync(marker)) {
-          assert.ok(Date.now() < deadline, 'the real PTY target must publish its actual PID')
-          await new Promise(resolve => setTimeout(resolve, 10))
-        }
-        const pid = Number(readFileSync(marker, 'utf8'))
-        assert.ok(Number.isInteger(pid) && pid > 1)
-        process.kill(pid, 0)
+        const pid = await awaitPtyTarget(marker)
         const stopped = await stopper.call('stop')
         assert.equal(stopped.finished, false)
         assert.match(stopped.failure, /local process binding/)
         assert.deepEqual(await stopper.call('blockers'), [opened.id])
         await producer.call('close', opened.id)
-        const reapingDeadline = Date.now() + 2000
-        let present = true
-        while (present) {
-          try { process.kill(pid, 0) } catch (error) {
-            if (error.code !== 'ESRCH') throw error
-            present = false
-            break
-          }
-          const status = spawnSync('ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8' })
-          assert.ok(status.status === 1 || /^Z/.test(status.stdout.trim()), `target must be exited before Ended: ${status.stdout} ${status.stderr}`)
-          assert.ok(Date.now() < reapingDeadline, 'the exact exited target PID must be reaped')
-          await new Promise(resolve => setTimeout(resolve, 5))
-        }
+        await requirePtyTargetReaped(pid)
         assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' })
         const retry = await start()
         assert.equal((await retry.call('stop')).finished, true)

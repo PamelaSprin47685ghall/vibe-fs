@@ -39,6 +39,6 @@ module ChildWorkRecovery =
     /// Exact FissionFailed fact closing an orphaned open Fission group at load.
     val fissionSettlementFact: group: FissionGroupProjection -> FissionFactCases
 
-    /// Append one settlement per orphaned child run. Load Phase; no dispatch, no
-    /// provider call, no command replay.
-    val settleOrphanedChildRuns: journal: AgentJournal -> Task<unit>
+    /// Stop exact admitted PTY work before voiding it. Failed drain preserves
+    /// the active work. No provider call or command replay.
+    val settleOrphanedChildRuns: drainPtys: (AdmittedWork -> Task<unit>) -> journal: AgentJournal -> Task<unit>

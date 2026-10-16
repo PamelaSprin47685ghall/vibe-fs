@@ -125,11 +125,25 @@ module DurableWorkHost =
         let slash = path.LastIndexOf('/')
         if slash <= 0 then path else path.Substring(0, slash)
 
+    let private closeUnreturnedConnection (connection: obj) =
+        try
+            connection?close ()
+        with _ ->
+            ()
+
+    let private openJournal (path: string) : obj =
+        let connection = openDatabase path
+
+        try
+            createNew SqliteJournal connection
+        with error ->
+            closeUnreturnedConnection connection
+            raise error
+
     let useWork (gitCommonDir: string) (workId: string) (body: obj -> 'a) : 'a =
         let path = journalPath gitCommonDir
         ensureDir (parentOf path)
-        let connection = openDatabase path
-        let opened: obj = createNew SqliteJournal connection
+        let opened = openJournal path
 
         try
             let work: obj = createNew DurableWork (workId, opened)
@@ -151,8 +165,7 @@ module DurableWorkHost =
     /// Test/probe host for canonical records. It uses the same runtime-specific
     /// SQLite selection as the durable path and does not expose the connection.
     let useEphemeralWork (workId: string) (records: string array) (body: obj -> 'a) : 'a =
-        let connection = openDatabase ":memory:"
-        let opened: obj = createNew SqliteJournal connection
+        let opened = openJournal ":memory:"
 
         try
             records |> Array.fold (appendSeed opened workId) 0. |> ignore
@@ -569,8 +582,7 @@ module DurableWorkHost =
     let private useOwnershipJournal (gitCommonDir: string) (body: obj -> 'a) : 'a =
         let path = journalPath gitCommonDir
         ensureDir (parentOf path)
-        let connection = openDatabase path
-        let opened: obj = createNew SqliteJournal connection
+        let opened = openJournal path
 
         try
             body opened

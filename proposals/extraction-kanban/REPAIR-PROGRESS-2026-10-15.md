@@ -2,6 +2,14 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第十批：R6-B 的非作者独立复审（2026-10-16）
+
+三名非作者从干净的 `5a9e51e44` 对照 `c659f9b33` 复审 AGENTS.md、准入、Reserve/Drain 与 Unknown，确认并修正三项：**R10-01/P1** 是本轮新增的停止失败跳过确切本地 PTY 清理；**R10-02/P2** 是本轮删除构造失败回收后遗留 native SQLite 连接；**R10-03/P1** 是既有 Load void 出口未停止旧轮准入。两项新增回退不归给原拆分；恢复遗漏不冒称本轮引入。停止准入失败现在仍尝试本地回收并保留原错误；恢复必须先确认同一 Ownership 轮次 Drain 且无 blocker，再写 void。库与 vendor 未改。[报告的独立复审节](PTY-RUN-ADMISSION-2026-10-16.md#独立复审与修正2026-10-16)保留反例、归因与全部证据。
+
+正式新增反例修复前 **0/11**；非作者修后确认旧 worker 零 Spawn，真实 Bun 的 Unknown/初始化失败都回收确切 PID，Conflict 仅留下外国 blocker，Node/Bun 三入口十八构造场景通过。试制测试对 Bun 幂等 close 和 Surface 的 REFUSE 返回曾误判，已按原契约修正并保留失败，不改变产品迁就断言。
+
+最终 clean **523**，相关套件不重叠合计 **1175 / 1112 pass / 0 普通 fail / 16 skip / 47 TODO**，正式 025 **90/90**；format/check 和 diff 检查通过。精确包 **2074 members / 13,224,524 bytes**，SHA-256 `edc4c842c8c5fd8c73f925f3fd6ea3c56d6db5d0e5a780ba381f3f319c975bbd`，隔离安装及包外 Bun/OpenCode 的真实 PTY 消费通过。非作者未发现声明范围内仍未修正的新回退，R6-B 进入 DONE；R6-C、Historical 无 admitted-work 的历史隔离、完整启动排序/强杀接管、主动脱组和 O-01/GAP-133 整体仍未闭合。永久 native close 失败仍只能显式失败，不保证释放。正常提交推送 master，无强推，未部署线上 Host。
+
 ## 第九批：每轮 PTY 跨进程准入（2026-10-16）
 
 CUT-04-R6-B 已实现 canonical admitted work → run scope → runtime 子范围的接线；真实终态先持久停止该轮准入，再处理本地实例并核对整个轮次。工具捕获自己的 exact execution，稳定 tool-call 资源身份防止跨进程重放启动；冷空轮次也停止准入，未安装 drain 能力则拒绝完成。另修既有 SQLite 初始化失败重复 close，不改独立库或 vendor。

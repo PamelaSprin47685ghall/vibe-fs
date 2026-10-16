@@ -304,6 +304,8 @@ work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规�
 - 禁止后果：规则校验失败不得进入 SQLite append。严禁让旧 EventStore envelope、CanonicalIntegrator 投影或进程内缓存成为第二份 lifecycle 权威；严禁自动修复、跳过损坏 record 或把 Conflict/Unknown 当成功。
 - 失败后果：非法命令在 append 前拒绝且零写；revision/request 冲突显式返回 Conflict；已知未写返回 NotWritten；COMMIT 结果不明返回 Unknown 并要求重开后核对。读到损坏历史时整份拒绝。
 
+宿主打开原生连接后，Journal 构造失败也须回收该连接；首次关闭失败仍保留确切连接的回收机会。回收异常不得盖掉构造已经抛出的错误，构造失败不得执行 work 或 ownership 命令。
+
 ## [034] 任期隔离与前缀重锚（openingCursor 形式）
 
 当为处于活跃任期的会话组装 Provider 请求消息集时，系统应用通用的 Baton 隔离策略。

@@ -1374,8 +1374,16 @@ type HostForkRuntime
                 invalidArg (nameof work) "PTY work belongs to another session"
 
             let runId = AdmittedWork.logicalRunId work
-            let scopeId = HostPtyOwnership.openRun ptyOwnership ptyRootScopeId runId
-            HostPtyOwnership.drain ptyOwnership scopeId
+            let scopeId = HostPtyOwnership.runScopeId ptyRootScopeId runId
+
+            let stopFailure =
+                try
+                    HostPtyOwnership.openRun ptyOwnership ptyRootScopeId runId
+                    |> HostPtyOwnership.drain ptyOwnership
+
+                    None
+                with error ->
+                    Some error
 
             let ids =
                 lock gate (fun () ->
@@ -1387,7 +1395,14 @@ type HostForkRuntime
                             None)
                     |> Seq.toList)
 
-            do! this.DrainPtySnapshot(ids, [ scopeId ], None)
+            let! closeFailure =
+                captureOwnedWorkFailure (fun () -> this.DrainPtySnapshot(ids, [ scopeId ], None) :> Task)
+
+            match stopFailure, closeFailure with
+            | Some failure, _
+            | None, Some failure -> raise failure
+            | None, None -> ()
+
             HostPtyOwnership.requireRunSettled ptyOwnership ptyRootScopeId runId
         }
 

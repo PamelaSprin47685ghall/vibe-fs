@@ -173,7 +173,7 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement persists
     for (const child of ['engineer', 'devops']) {
       assert.deepEqual(dispatch.projectionObservation(handle, child).activeLogicalRun, profiles.get(child))
     }
-    await recovery.settleChildRuns(handle)
+    await recovery.settleChildRuns(handle, commonDir)
     for (const child of ['engineer', 'devops']) {
       assert.equal(dispatch.projectionObservation(handle, child).activeLogicalRun, null)
     }
@@ -198,7 +198,7 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement persists
       assert.equal(dispatch.projectionObservation(reopened, child).activeLogicalRun, null)
     }
     const settled = await durableEvents(commonDir)
-    await recovery.settleChildRuns(reopened)
+    await recovery.settleChildRuns(reopened, commonDir)
     assert.deepEqual(await durableEvents(commonDir), settled, 'settled runs produce no duplicate facts')
   })
 })
@@ -226,7 +226,7 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement propagat
     for (const writer of stashed) renameSync(writer.live, writer.held)
     for (const writer of stashed) mkdirSync(writer.live)
     try {
-      await assert.rejects(() => recovery.settleChildRuns(handle), /append outcome unknown/i)
+      await assert.rejects(() => recovery.settleChildRuns(handle, commonDir), /append outcome unknown/i)
       assert.deepEqual(['engineer', 'devops'].map(active), initial, 'failed durability cannot close either run')
     } finally {
       for (const writer of stashed) rmSync(writer.live, { recursive: true, force: true })
@@ -234,12 +234,12 @@ integrationTest('WHAT[crash-reconciliation-020] actual child settlement propagat
       rmSync(saved, { recursive: true, force: true })
     }
     assert.deepEqual(await durableEvents(commonDir), before, 'the refused append publishes no durable fact')
-    await assert.rejects(() => recovery.settleChildRuns(handle), /append not attempted.*writer poisoned/i)
+    await assert.rejects(() => recovery.settleChildRuns(handle, commonDir), /append not attempted.*writer poisoned/i)
     assert.deepEqual(['engineer', 'devops'].map(active), initial)
     assert.deepEqual(await durableEvents(commonDir), before, 'the poisoned writer must not retry physical append')
     const reopened = await reopen()
     assert.deepEqual(['engineer', 'devops'].map(child => dispatch.projectionObservation(reopened, child).activeLogicalRun), initial)
-    await recovery.settleChildRuns(reopened)
+    await recovery.settleChildRuns(reopened, commonDir)
     for (const child of ['engineer', 'devops']) {
       assert.equal(dispatch.projectionObservation(reopened, child).activeLogicalRun, null)
     }
