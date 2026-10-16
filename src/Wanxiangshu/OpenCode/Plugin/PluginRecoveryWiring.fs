@@ -328,7 +328,7 @@ module PluginRecoveryWiring =
                                     boot.WorkspaceDirectory
                                     |> Option.defaultWith (fun () -> invalidOp "PTY recovery requires a workspace")
 
-                                HostForkRuntime.CloseUnboundPtyRun(RuntimePath.gitCommonDir workspace, work)
+                                do! HostForkRuntime.CloseUnboundPtyRun(RuntimePath.gitCommonDir workspace, work)
                             }
 
                         do! ChildWorkRecovery.settleOrphanedChildRuns drainPtys journal

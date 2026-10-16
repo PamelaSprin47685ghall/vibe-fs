@@ -84,7 +84,7 @@ type private ControlledPtyPorts() =
                 |> Option.defaultWith (fun () -> invalidOp "PTY fixture is not initialized")
 
             match command with
-            | PtyCommand.Spawn(label, _) ->
+            | PtyCommand.Spawn(label, _, _) ->
                 spawns <- spawns + 1
                 sessions.[label] <- (port, id)
             | PtyCommand.Signal PtySignal.Terminate ->

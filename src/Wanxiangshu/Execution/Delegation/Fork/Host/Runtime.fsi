@@ -160,7 +160,7 @@ type HostForkRuntime =
     member DrainOwnedWork: unit -> Task<unit>
     member CloseOwnedPtys: ?graceMs: int -> Task<unit>
     member internal ClosePtyRun: work: AdmittedWork -> Task<unit>
-    static member internal CloseUnboundPtyRun: commonDir: string * work: AdmittedWork -> unit
+    static member internal CloseUnboundPtyRun: commonDir: string * work: AdmittedWork -> Task<unit>
     member ClosePty: id: PtyId * ?graceMs: int -> Task<unit>
     member IsPtyCompletion: runId: string -> bool
     member TryBindTerminalName: name: string * id: PtyId -> Result<unit, string>

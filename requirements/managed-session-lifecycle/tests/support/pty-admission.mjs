@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { withSharedAdmittedChildren } from './admitted-child-work.mjs'
 import { ToolRuntimeScopeSurface } from '../../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
 
-export const withAdmissionWorkers = (label, action, { realBackend = false } = {}) => withSharedAdmittedChildren(
+export const withAdmissionWorkers = (label, action, { realBackend = false, runtime = realBackend ? 'bun' : undefined } = {}) => withSharedAdmittedChildren(
   label, 'manager-pty', [{ agentId: 'devops', sessionId: 'devops-pty', role: 'devops' }],
   async (journal, _profiles, workspace) => {
     await ToolRuntimeScopeSurface.startPtyExecution(journal, 'devops-pty', `physical-${label}-devops`, 'pty-admission-provider')
@@ -12,7 +12,7 @@ export const withAdmissionWorkers = (label, action, { realBackend = false } = {}
     const start = () => new Promise((resolve, reject) => {
       const process = fork(fileURLToPath(new URL(realBackend ? './pty-admission-real-worker.mjs' : './pty-admission-worker.mjs', import.meta.url)), [workspace, 'devops-pty', `physical-${label}-devops`], {
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-        ...(realBackend ? { execPath: 'bun' } : {}),
+        ...(runtime ? { execPath: runtime } : {}),
       })
       let stderr = ''
       process.stderr.on('data', chunk => { stderr += chunk })
@@ -67,7 +67,7 @@ export const withAdmissionWorkers = (label, action, { realBackend = false } = {}
       return await action(producer, stopper, workspace, start)
     } finally {
       await Promise.all(workers.map(worker => new Promise(resolve => {
-        if (worker.process.exitCode !== null) return resolve()
+        if (worker.process.exitCode !== null || worker.process.signalCode !== null) return resolve()
         worker.process.once('exit', resolve)
         if (worker.process.connected) worker.process.disconnect()
       })))

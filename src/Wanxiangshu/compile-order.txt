@@ -742,6 +742,8 @@ Process/Pty.fsi
 Process/Pty.fs
 Process/PtyScope.fsi
 Process/PtyScope.fs
+Process/PtyRecovery.fsi
+Process/PtyRecovery.fs
 Process/PtySupervisor.fsi
 Process/PtySupervisor.fs
 Process/PtyBackend.fsi

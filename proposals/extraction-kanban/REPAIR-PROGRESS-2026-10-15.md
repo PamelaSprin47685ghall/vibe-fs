@@ -2,6 +2,18 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第十一批：跨重启物理接管 R6-C（2026-10-16）
+
+输入干净主仓 `81cb278a5`、库 `b6984d9 / 0.6.2`。先以真实 PtyScope 验证独立 owner 原型，再接回 Process/Host/ToolRuntimeScope/Load；没有修改独立库或 vendor。不可覆盖的准备记录绑定 exact lease/incarnation，私有连接只允许一个控制者；creator 才可首次启动和交互，恢复端仅查询与 TERM/KILL。重启不重发命令或输入，只有原生退出且监管范围结束的确切回执、或物理 owner 明确封存的 NotStarted，才尝试持久清账。
+
+原产物两个真实重启反例 **0/2**，证明原 O-01 缺物理 binding；本轮候选的 TCS.TrySet 调用和恢复 signal 权限遗漏另记 **R11-01/02**，交付前已修，不归给原拆分。[报告](PTY-RESTART-RECOVERY-2026-10-16.md)保留红/绿、编译失败、测试夹具与工具失败的归因。正式 025 **103/103**，新增十三项涵盖 Node/Bun/冷 Load、Ended COMMIT 前后 SIGKILL、Reserve 后尚无准备、creator/custodian 同失；证据不够时保持原 blocker，不以 PID 消失清账。物理口七场景还验证认证、旧 incarnation、活控制连接、禁止重放、普通信号拒绝、proof 破坏、正常交互及 custodian 真正退出。
+
+最终 clean **529**，相关不重叠回归 **1189 / 1126 pass / 0 普通 fail / 16 skip / 47 TODO**，format/check 通过。精确包 **2075 members / 13,264,745 bytes**，SHA-256 `e0764eb324842a545c0a9292b1f3b88a0153892d2fc46b30446eafb0e23b1b14`，真实打包/隔离安装、默认入口及包外 Node/Bun/OpenCode 可执行宿主通过。Linux x64/Bun 1.4.2 也用相同正式 helper 通过七场景；只证明物理口，不冒称 Linux 完整 Host/SQLite。详细命令、原始日志路径和精确字节身份见本包报告。
+
+收尾扫描另发现 owner-lost 旧负控夹具没有清理新增 custodian；补齐确切测试 PID 的清理与等待，再跑正式 025。未改生产 Unknown 语义，也不将夹具遗漏归给原拆分。两次遗留测试进程已核对命令行后清理；包摘要复核的沙箱 npm 缓存写入失败另留日志，获原测试所需权限后同字节复核通过。
+
+本轮为作者施工自验，R6-C 进入 REVIEW，待非作者复审；历史无准备记录、owner/回执同失、完整 Bootstrap、脱组进程、大规模容量和记录回收仍有明确边界。O-01/GAP-133 整体、Trace 和其他 P2 未销项。正常提交并推送 master，无强推；未部署用户运行中的 Host。
+
 ## 第十批：R6-B 的非作者独立复审（2026-10-16）
 
 三名非作者从干净的 `5a9e51e44` 对照 `c659f9b33` 复审 AGENTS.md、准入、Reserve/Drain 与 Unknown，确认并修正三项：**R10-01/P1** 是本轮新增的停止失败跳过确切本地 PTY 清理；**R10-02/P2** 是本轮删除构造失败回收后遗留 native SQLite 连接；**R10-03/P1** 是既有 Load void 出口未停止旧轮准入。两项新增回退不归给原拆分；恢复遗漏不冒称本轮引入。停止准入失败现在仍尝试本地回收并保留原错误；恢复必须先确认同一 Ownership 轮次 Drain 且无 blocker，再写 void。库与 vendor 未改。[报告的独立复审节](PTY-RUN-ADMISSION-2026-10-16.md#独立复审与修正2026-10-16)保留反例、归因与全部证据。

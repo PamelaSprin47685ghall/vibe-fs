@@ -2,6 +2,19 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { verifyPtyScope } from './support/pty-scope.mjs'
 import { ptyMembershipRows } from '../../../dist/Process/Surface.js'
+import { execFile, spawnSync } from 'node:child_process'
+import { promisify } from 'node:util'
+import { fileURLToPath } from 'node:url'
+
+test('WHAT[process-execution-003] a durable PTY owner survives Host SIGKILL, refuses input replay and seals only its exact native outcome', { timeout: 30000 }, async t => {
+  if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the PTY owner')
+  const helper = fileURLToPath(new URL('./support/pty-recovery-probe.mjs', import.meta.url))
+  const { stdout } = await promisify(execFile)(process.execPath, [helper], { timeout: 25000 })
+  const evidence = stdout.trim().split('\n').map(line => JSON.parse(line))
+  assert.equal(evidence.length, 7)
+  assert.ok(evidence.every(item => item.ownerExited))
+  assert.deepEqual(evidence.map(item => item.commands), [1, 1, 1, 0, 1, 1, 1])
+})
 
 for (const text of ['', '222 111 R', '111 111', '111 111 Ss\n333 333', '111 111 Z', '111 111 Ss\n111 333 S']) {
   test(`WHAT[process-execution-003] an incomplete PTY observation cannot claim an empty scope (${JSON.stringify(text)})`, () => {

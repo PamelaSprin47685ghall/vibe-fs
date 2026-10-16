@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { Database } from 'bun:sqlite'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { realOwnershipProbe, realSharedOwnershipProbe } from '../../../../dist/Execution/Delegation/Fork/Host/HostForkPtySurface.js'
@@ -26,6 +26,7 @@ const waitFor = async (predicate, label) => {
 }
 const pids = []
 const descendants = []
+const custodians = []
 const start = async (owner, label) => {
   const marker = join(directory, `${label}-pid`)
   const program = `const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${marker}.tmp`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${marker}.tmp`)}, ${JSON.stringify(marker)}); setInterval(() => {}, 1000)`
@@ -65,6 +66,12 @@ try {
   } else if (mode === 'owner-lost') {
     first = realOwnershipProbe(directory, 'owner-lost-owner')
     const own = await start(first, 'first')
+    const records = join(directory, 'wanxiangshu', 'pty')
+    const keys = readdirSync(records)
+    assert.equal(keys.length, 1)
+    const custodian = JSON.parse(readFileSync(join(records, keys[0], 'available'), 'utf8')).owner
+    assert.ok(Number.isInteger(custodian) && custodian > 1)
+    custodians.push(custodian)
     const { dlopen } = await import('bun:ffi')
     const native = dlopen(process.platform === 'darwin' ? '/usr/lib/libSystem.B.dylib' : 'libc.so.6', {
       getsid: { args: ['i32'], returns: 'i32' },
@@ -159,6 +166,10 @@ try {
     console.log(JSON.stringify({ mode, injected, processExited: true, blockers: [] }))
   }
 } finally {
+  for (const pid of custodians) {
+    if (alive(pid)) process.kill(pid, 'SIGKILL')
+    await waitFor(() => !alive(pid), 'the faulted test custodian cleanup')
+  }
   for (const pid of descendants) {
     if (alive(pid)) process.kill(pid, 'SIGKILL')
     await waitFor(() => !alive(pid), 'the test descendant cleanup')

@@ -46,9 +46,19 @@ module PtySignal =
         | User2Name -> Ok PtySignal.User2
         | _ -> Error(sprintf "Unsupported PTY signal: %s" value)
 
+type PtyRecoveryBinding =
+    { Directory: string
+      Key: string
+      IncarnationId: string }
+
+[<RequireQualifiedAccess>]
+type PtyRecoveryExit =
+    | Ended of incarnationId: string * stopped: bool * code: int option * signal: string option
+    | NotStarted of incarnationId: string * reason: string
+
 [<RequireQualifiedAccess>]
 type PtyCommand =
-    | Spawn of command: string * cwd: string
+    | Spawn of command: string * cwd: string * recovery: PtyRecoveryBinding option
     | Write of bytes: byte[]
     | Read
     | Signal of signal: PtySignal

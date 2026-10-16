@@ -120,6 +120,8 @@ PTY 准入绑定已持久接纳的确切工作及 LogicalRunId；不同进程对
 
 关闭只针对该轮，不能永久关闭可复用 Session 或影响其他 owner、下一轮。工具能力捕获确切轮次；旧轮请求不得借用当前轮身份。同一物理工具调用的重复预留、未知提交及丢失回执均不授予再次启动许可；只有首次已确认的预留可启动。
 
+Host 重启后，恢复只能连接该预留的确切物理 owner 或接纳其确切终态，不重发原命令或 PTY 输入。旧 Host 的控制连接仍在时不得抢占；端点缺失、owner 失联、实例或凭据不匹配均保留 blocker。清账须持久确认该 incarnation 的真实终结，或由物理 owner 明确封存的 NotStarted；PID 消失和空本地表都不是证据。
+
 ## [026] Main 收束级联 Attached InternalLeaf 的 execution 结算
 
 Main session 收束（宿主 `SessionDeleted` 事件，且存在 durable Attached Companion 关联 `CompanionBloggerLinked` 作为 linked InternalLeaf 证据）时，lifecycle owner 除排空 Main 自身已准入 execution 外，还必须对每个 linked Attached InternalLeaf（Blogger）名下全部已准入 execution 逐一完成 typed terminal 与 exact capacity 归还：

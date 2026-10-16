@@ -199,7 +199,9 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
     member _.Handler = handler
 
     /// Open a PTY for a managed agent.
-    member this.Fork(command: string, agentName: string, ?ptyId: PtyId, ?cwd: string) : PtyId =
+    member this.Fork
+        (command: string, agentName: string, ?ptyId: PtyId, ?cwd: string, ?recovery: PtyRecoveryBinding)
+        : PtyId =
         let id =
             defaultArg ptyId (PtyId("pty-" + Guid.NewGuid().ToString("N").Substring(0, 8)))
 
@@ -216,7 +218,7 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
             closedIds.Remove id |> ignore
             active.[id] <- (handle, ref false))
 
-        handler id (PtyCommand.Spawn(command, defaultArg cwd "")) |> ignore
+        handler id (PtyCommand.Spawn(command, defaultArg cwd "", recovery)) |> ignore
         id
 
     member this.Exists(id: PtyId) =

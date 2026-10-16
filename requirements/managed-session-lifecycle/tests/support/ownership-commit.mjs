@@ -32,3 +32,32 @@ export async function loseOwnershipCommit(Database, command, afterCommit, action
     Database.prototype.exec = execute
   }
 }
+
+export async function crashOwnershipCommit(Database, command, afterCommit, action) {
+  const prepare = Database.prototype.prepare
+  const execute = Database.prototype.exec
+  let matching = false
+  Database.prototype.prepare = function (sql) {
+    const statement = prepare.call(this, sql)
+    if (!sql.startsWith('INSERT INTO journal_entries')) return statement
+    const run = statement.run
+    statement.run = function (...parameters) {
+      matching = JSON.parse(new TextDecoder().decode(parameters[3])).message?.type === command
+      return run.apply(this, parameters)
+    }
+    return statement
+  }
+  Database.prototype.exec = function (sql) {
+    if (matching && /^COMMIT\b/i.test(sql.trim())) {
+      if (afterCommit) execute.call(this, sql)
+      process.kill(process.pid, 'SIGKILL')
+      throw new Error('The crash fixture must not return after SIGKILL')
+    }
+    return execute.call(this, sql)
+  }
+  try { return await action() }
+  finally {
+    Database.prototype.prepare = prepare
+    Database.prototype.exec = execute
+  }
+}

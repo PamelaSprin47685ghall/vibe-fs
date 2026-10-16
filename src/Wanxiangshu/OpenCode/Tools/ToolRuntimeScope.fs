@@ -350,6 +350,11 @@ type ToolRuntimeScope
         | true, path when System.IO.Directory.Exists path -> Some path
         | _ -> None
 
+    let drainUnboundChildPtys work =
+        match ownershipCommonDir with
+        | Some commonDir -> HostForkRuntime.CloseUnboundPtyRun(commonDir, work)
+        | None -> Task.FromResult(())
+
     let drainChildPtysFor (work: AdmittedWork) : Task<unit> =
         task {
             let childId = (AdmittedWork.id work).ChildSessionId
@@ -362,9 +367,7 @@ type ToolRuntimeScope
 
             match childRuntimeOpt with
             | Some r -> do! r.ClosePtyRun work
-            | None ->
-                ownershipCommonDir
-                |> Option.iter (fun commonDir -> HostForkRuntime.CloseUnboundPtyRun(commonDir, work))
+            | None -> do! drainUnboundChildPtys work
         }
 
     let createRuntime sid =

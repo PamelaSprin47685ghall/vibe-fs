@@ -120,6 +120,11 @@ module ProcessSurface =
     val backendCreatePort: unit -> obj
     val ptyMembershipRows: owner: int -> sampler: int -> text: string -> obj
     val ptyScopeOpen: command: string -> cwd: string -> Task<obj>
+
+    val ptyRecoveryOpen:
+        directory: string -> key: string -> incarnationId: string -> command: string -> cwd: string -> obj
+
+    val ptyRecoveryDrain: directory: string -> key: string -> incarnationId: string option -> graceMs: int -> Task<obj>
     val portAddMailboxSender: port: obj -> sender: obj -> (unit -> unit)
     val portFork: port: obj -> command: string -> agentName: string -> ptyId: obj -> cwd: obj -> obj
     val portExists: port: obj -> id: obj -> bool

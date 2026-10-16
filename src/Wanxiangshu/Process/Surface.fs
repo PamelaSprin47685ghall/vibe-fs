@@ -643,7 +643,7 @@ module ProcessSurface =
         | Error error -> box {| ok = false; error = error |}
 
     let commandSpawn (command: string) (cwd: string) : obj =
-        PtyCommandHandle(PtyCommand.Spawn(command, cwd)) :> obj
+        PtyCommandHandle(PtyCommand.Spawn(command, cwd, None)) :> obj
 
     let commandWrite (value: obj) : obj =
         PtyCommandHandle(PtyCommand.Write(bytesOf value)) :> obj
@@ -662,7 +662,7 @@ module ProcessSurface =
 
     let ptyCommandView (value: obj) : obj =
         match ptyCommandOf value with
-        | PtyCommand.Spawn(command, cwd) ->
+        | PtyCommand.Spawn(command, cwd, _) ->
             box
                 {| kind = "Spawn"
                    command = command
@@ -844,6 +844,35 @@ module ProcessSurface =
                 createObj [ "name", box "xterm-256color"; "cols", box 80; "rows", box 24; "cwd", box cwd ]
 
             return emitJsExpr (factory, command, options) "$0($1, $2)"
+        }
+
+    let ptyRecoveryOpen directory key incarnationId command cwd =
+        PtyRecovery.start
+            { Directory = directory
+              Key = key
+              IncarnationId = incarnationId }
+            command
+            cwd
+
+    let ptyRecoveryDrain directory key incarnationId graceMs =
+        task {
+            let! result = PtyBackend.recover directory key incarnationId graceMs
+
+            return
+                match result with
+                | PtyRecoveryExit.Ended(incarnation, stopped, code, signal) ->
+                    box
+                        {| kind = "Ended"
+                           incarnation = incarnation
+                           stopped = stopped
+                           exit =
+                            {| code = code |> Option.map box |> Option.defaultValue null
+                               signal = signal |> Option.map box |> Option.defaultValue null |} |}
+                | PtyRecoveryExit.NotStarted(incarnation, reason) ->
+                    box
+                        {| kind = "NotStarted"
+                           incarnation = incarnation
+                           reason = reason |}
         }
 
     let private ptyPortOf (value: obj) = (value :?> PtyPortHandle).Port

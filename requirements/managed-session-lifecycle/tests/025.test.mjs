@@ -352,6 +352,137 @@ const requirePtyTargetReaped = async pid => {
   }
 }
 
+for (const runtime of ['node', 'bun']) {
+ for (const mode of ['running', 'exited', 'cold-load']) {
+  test(`WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (${runtime}, ${mode})`, { timeout: 30000 }, async t => {
+    if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+    await withAdmissionWorkers(`restart-${runtime}-${mode}`, async (producer, _other, workspace, start) => {
+      const marker = join(workspace, 'restart-target')
+      const launches = join(workspace, 'restart-launches')
+      const release = join(workspace, 'restart-release')
+      const command = `printf 'launched\\n' >> '${launches}'; printf '%s' "$$" > '${marker}.pending'; mv '${marker}.pending' '${marker}'; while [ ! -f '${release}' ]; do sleep 0.05; done; exit 23`
+      const opened = await producer.call('open', command)
+      assert.equal(opened.ok, true, opened.error)
+      const pid = await awaitPtyTarget(marker)
+      const terminal = spawnSync('ps', ['-p', String(pid), '-o', 'tty='], { encoding: 'utf8' }).stdout.trim()
+      const members = spawnSync('ps', ['-t', terminal, '-o', 'pid='], { encoding: 'utf8' }).stdout.trim().split(/\s+/).map(Number)
+      try {
+        const exited = new Promise(resolve => producer.process.once('exit', resolve))
+        producer.process.kill('SIGKILL')
+        await exited
+        if (mode === 'exited') {
+          writeFileSync(release, '')
+          const deadline = Date.now() + 5000
+          while (true) {
+            const status = spawnSync('ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8' })
+            if (status.status === 1 || /^Z/.test(status.stdout.trim())) break
+            assert.ok(Date.now() < deadline, 'the original target must exit before the new Host starts')
+            await new Promise(resolve => setTimeout(resolve, 10))
+          }
+        }
+        if (mode === 'cold-load') {
+          await withRecoveryJournal(workspace, async (journal, active) => {
+            await loadRecovery.settleChildRuns(journal, join(workspace, '.git'))
+            assert.equal(active(), null)
+          })
+        } else {
+          const restarted = await start()
+          const stopped = await restarted.call('stop')
+          assert.equal(stopped.finished, true, stopped.failure)
+          assert.deepEqual(await restarted.call('blockers'), [])
+        }
+        await requirePtyTargetReaped(pid)
+        assert.equal(readFileSync(launches, 'utf8'), 'launched\n', 'recovery must not execute the interrupted command again')
+      } finally {
+        writeFileSync(release, '')
+        for (const member of members) {
+          if (!Number.isInteger(member) || member <= 1) continue
+          try { process.kill(member, 'SIGKILL') } catch (error) {
+            if (error.code !== 'ESRCH') throw error
+          }
+        }
+      }
+    }, { realBackend: true, runtime })
+  })
+ }
+}
+
+for (const runtime of ['node', 'bun']) {
+  for (const afterCommit of [false, true]) {
+    test(`WHAT[managed-session-lifecycle-025] SIGKILL ${afterCommit ? 'after' : 'before'} Ended COMMIT recovers the same native exit without replay (${runtime})`, { timeout: 30000 }, async t => {
+      if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+      await withAdmissionWorkers(`ended-crash-${runtime}-${afterCommit}`, async (producer, other, workspace, start) => {
+        const marker = join(workspace, 'ended-target')
+        const launches = join(workspace, 'ended-launches')
+        const opened = await producer.call('open', `printf 'launched\\n' >> '${launches}'; printf '%s' "$$" > '${marker}.pending'; mv '${marker}.pending' '${marker}'; exec sleep 60`)
+        assert.equal(opened.ok, true, opened.error)
+        const pid = await awaitPtyTarget(marker)
+        await assert.rejects(() => producer.call('close', opened.id, { crash: { command: 'Ended', afterCommit } }), /worker exited/)
+        assert.equal((await other.call('blockers')).length, afterCommit ? 0 : 1)
+        const restarted = await start()
+        const stopped = await restarted.call('stop')
+        assert.equal(stopped.finished, true, stopped.failure)
+        assert.deepEqual(await restarted.call('blockers'), [])
+        await requirePtyTargetReaped(pid)
+        assert.equal(readFileSync(launches, 'utf8'), 'launched\n')
+      }, { realBackend: true, runtime })
+    })
+  }
+}
+
+test('WHAT[managed-session-lifecycle-025] SIGKILL after Reserve COMMIT before physical preparation preserves its unknown obligation and never launches on restart', { timeout: 20000 }, async t => {
+  if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+  await withAdmissionWorkers('reserve-before-prepare', async (producer, other, workspace, start) => {
+    const marker = join(workspace, 'must-not-launch')
+    await assert.rejects(() => producer.call('open', `touch '${marker}'`, { crash: { command: 'Reserve', afterCommit: true } }), /worker exited/)
+    assert.equal((await other.call('blockers')).length, 1)
+    const restarted = await start()
+    const stopped = await restarted.call('stop')
+    assert.equal(stopped.finished, false)
+    assert.match(stopped.failure, /no local process binding/)
+    assert.equal((await restarted.call('blockers')).length, 1)
+    assert.equal(existsSync(marker), false)
+  }, { realBackend: true, runtime: 'node' })
+})
+
+for (const runtime of ['node', 'bun']) {
+  test(`WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (${runtime})`, { timeout: 30000 }, async t => {
+    if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+    await withAdmissionWorkers(`both-lost-${runtime}`, async (producer, _other, workspace, start) => {
+      const marker = join(workspace, 'lost-target')
+      const launches = join(workspace, 'lost-launches')
+      const opened = await producer.call('open', `printf 'launched\\n' >> '${launches}'; printf '%s' "$$" > '${marker}.pending'; mv '${marker}.pending' '${marker}'; exec sleep 60`)
+      assert.equal(opened.ok, true, opened.error)
+      const pid = await awaitPtyTarget(marker)
+      const terminal = spawnSync('ps', ['-p', String(pid), '-o', 'tty='], { encoding: 'utf8' }).stdout.trim()
+      const members = spawnSync('ps', ['-t', terminal, '-o', 'pid='], { encoding: 'utf8' }).stdout.trim().split(/\s+/).map(Number)
+      const { readdirSync } = await import('node:fs')
+      const root = join(workspace, '.git', 'wanxiangshu', 'pty')
+      const [entry] = readdirSync(root)
+      const available = JSON.parse(readFileSync(join(root, entry, 'available'), 'utf8'))
+      try {
+        const exited = new Promise(resolve => producer.process.once('exit', resolve))
+        producer.process.kill('SIGKILL')
+        await exited
+        process.kill(available.owner, 'SIGKILL')
+        const restarted = await start()
+        const stopped = await restarted.call('stop')
+        assert.equal(stopped.finished, false)
+        assert.match(stopped.failure, /no local process binding/)
+        assert.deepEqual(await restarted.call('blockers'), [opened.id])
+        assert.equal(readFileSync(launches, 'utf8'), 'launched\n')
+      } finally {
+        for (const member of members) {
+          if (!Number.isInteger(member) || member <= 1) continue
+          try { process.kill(member, 'SIGKILL') } catch (error) {
+            if (error.code !== 'ESRCH') throw error
+          }
+        }
+      }
+    }, { realBackend: true, runtime })
+  })
+}
+
 for (const afterCommit of [false, true]) {
   test(`WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost ${afterCommit ? 'after' : 'before'} COMMIT`, { timeout: 25000 }, async t => {
     if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')

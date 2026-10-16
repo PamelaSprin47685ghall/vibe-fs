@@ -16,7 +16,10 @@ type PtyPort =
     member Exists: id: PtyId -> bool
     member FailRead: id: PtyId * reason: string -> unit
     member FailExitObservation: id: PtyId * reason: string -> unit
-    member Fork: command: string * agentName: string * ?ptyId: PtyId * ?cwd: string -> PtyId
+
+    member Fork:
+        command: string * agentName: string * ?ptyId: PtyId * ?cwd: string * ?recovery: PtyRecoveryBinding -> PtyId
+
     member Known: id: PtyId -> bool
     member List: unit -> PtyHandle list
     member Read: id: PtyId -> Task<Result<string * bool, string>>

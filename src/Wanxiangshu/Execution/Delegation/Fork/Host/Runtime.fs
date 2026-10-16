@@ -146,18 +146,78 @@ module private HostPtyOwnership =
         openScope ownership scopeId (Some root)
         scopeId
 
-    let requireRunSettled (ownership: Owner) root runId =
+    let runBlockers (ownership: Owner) root runId =
         let scopeId = runScopeId root runId
 
-        let remaining =
-            ownership.Blockers root
-            |> List.filter (fun blocker ->
-                blocker.ScopeId = scopeId
-                || blocker.ScopeId.StartsWith(scopeId + ":runtime:", StringComparison.Ordinal)
-                || not (blocker.ScopeId.StartsWith(root + ":run:", StringComparison.Ordinal)))
+        ownership.Blockers root
+        |> List.filter (fun blocker ->
+            blocker.ScopeId = scopeId
+            || blocker.ScopeId.StartsWith(scopeId + ":runtime:", StringComparison.Ordinal)
+            || not (blocker.ScopeId.StartsWith(root + ":run:", StringComparison.Ordinal)))
 
-        if not (List.isEmpty remaining) then
+    let requireRunSettled ownership root runId =
+        if not (List.isEmpty (runBlockers ownership root runId)) then
             invalidOp "PTY ownership has no local process binding for unsettled resources; exit was not observed"
+
+    let recoveryBinding (commonDir: string) (lease: DurableWorkHost.OwnershipLease) incarnation : PtyRecoveryBinding =
+        let key =
+            [| lease.RegistryId; lease.ResourceId; lease.Token |]
+            |> JS.JSON.stringify
+            |> HostDigest.sha256Hex
+
+        { Directory = commonDir.TrimEnd('/') + "/wanxiangshu/pty/" + key
+          Key = key
+          IncarnationId = incarnation }
+
+    let private settleRecovered ownership id lease result =
+        match result with
+        | PtyRecoveryExit.Ended(incarnation, stopped, _, _) ->
+            ended ownership id lease incarnation (if stopped then "Cancelled" else "Completed")
+        | PtyRecoveryExit.NotStarted(incarnation, reason) ->
+            DurableWorkHost.ownershipMessage
+                "NotStarted"
+                [ "lease", DurableWorkHost.leaseObject lease; "reason", box reason ]
+            |> ownership.Execute("not-started:pty:" + id + ":" + incarnation)
+            |> requireObserved "NotStarted"
+
+    let private recoverBlocker ownership commonDir (blocker: DurableWorkHost.OwnershipBlocker) =
+        task {
+            try
+                if
+                    blocker.Kind <> "process"
+                    || not (blocker.Lease.ResourceId.StartsWith("pty:", StringComparison.Ordinal))
+                then
+                    invalidOp "PTY recovery requires its exact process resource"
+
+                let id = blocker.Lease.ResourceId.Substring 4
+                let binding = recoveryBinding commonDir blocker.Lease ""
+
+                let! result =
+                    PtyBackend.recover binding.Directory binding.Key blocker.IncarnationId PtyOutcome.termToKillGraceMs
+
+                settleRecovered ownership id blocker.Lease result
+                return None
+            with error ->
+                return
+                    Some(
+                        InvalidOperationException(
+                            "PTY ownership has no local process binding or verifiable exit: "
+                            + error.Message
+                        )
+                        :> exn
+                    )
+        }
+
+    let recoverRun ownership commonDir root runId =
+        task {
+            let failures = ResizeArray<exn>()
+
+            for blocker in runBlockers ownership root runId do
+                let! failure = recoverBlocker ownership commonDir blocker
+                failure |> Option.iter failures.Add
+
+            failures |> Seq.tryHead |> Option.iter raise
+        }
 
 type private OwnedPty =
     { Lease: DurableWorkHost.OwnershipLease
@@ -1314,9 +1374,7 @@ type HostForkRuntime
                 return Some ex
         }
 
-    member private this.DrainPtySnapshot
-        (ids: PtyId list, blockerScopeIds: string list, graceMs: int option)
-        : Task<unit> =
+    member private this.ClosePtySnapshot(ids: PtyId list, graceMs: int option) : Task<unit> =
         task {
             let failures = ResizeArray<exn>()
 
@@ -1326,6 +1384,13 @@ type HostForkRuntime
 
             if failures.Count > 0 then
                 raise failures.[0]
+        }
+
+    member private this.DrainPtySnapshot
+        (ids: PtyId list, blockerScopeIds: string list, graceMs: int option)
+        : Task<unit> =
+        task {
+            do! this.ClosePtySnapshot(ids, graceMs)
 
             let remaining =
                 lock gate (fun () -> blockerScopeIds |> List.collect (HostPtyOwnership.unsettledIds ptyOwnership))
@@ -1359,14 +1424,17 @@ type HostForkRuntime
         this.ClosePtys([ ptyRootScopeId ], graceMs)
 
     static member internal CloseUnboundPtyRun(commonDir: string, work: AdmittedWork) =
-        let root = AdmittedWork.id work |> fun work -> SessionId.value work.ChildSessionId
-        let runId = AdmittedWork.logicalRunId work
-        let ownership = HostPtyOwnership.create (Some commonDir) ("fork-pty:" + root)
+        task {
+            let root = AdmittedWork.id work |> fun work -> SessionId.value work.ChildSessionId
+            let runId = AdmittedWork.logicalRunId work
+            let ownership = HostPtyOwnership.create (Some commonDir) ("fork-pty:" + root)
 
-        HostPtyOwnership.openRun ownership root runId
-        |> HostPtyOwnership.drain ownership
+            HostPtyOwnership.openRun ownership root runId
+            |> HostPtyOwnership.drain ownership
 
-        HostPtyOwnership.requireRunSettled ownership root runId
+            do! HostPtyOwnership.recoverRun ownership commonDir root runId
+            HostPtyOwnership.requireRunSettled ownership root runId
+        }
 
     member internal this.ClosePtyRun(work: AdmittedWork) : Task<unit> =
         task {
@@ -1374,7 +1442,6 @@ type HostForkRuntime
                 invalidArg (nameof work) "PTY work belongs to another session"
 
             let runId = AdmittedWork.logicalRunId work
-            let scopeId = HostPtyOwnership.runScopeId ptyRootScopeId runId
 
             let stopFailure =
                 try
@@ -1395,13 +1462,16 @@ type HostForkRuntime
                             None)
                     |> Seq.toList)
 
-            let! closeFailure =
-                captureOwnedWorkFailure (fun () -> this.DrainPtySnapshot(ids, [ scopeId ], None) :> Task)
+            let! closeFailure = captureOwnedWorkFailure (fun () -> this.ClosePtySnapshot(ids, None) :> Task)
 
             match stopFailure, closeFailure with
             | Some failure, _
             | None, Some failure -> raise failure
             | None, None -> ()
+
+            match ownershipCommonDir with
+            | Some directory -> do! HostPtyOwnership.recoverRun ptyOwnership directory ptyRootScopeId runId
+            | None -> ()
 
             HostPtyOwnership.requireRunSettled ptyOwnership ptyRootScopeId runId
         }
@@ -1464,7 +1534,16 @@ type HostForkRuntime
         (id: PtyId, command: string, agent: ManagedAgent, cwd: string option)
         : Result<PtyId, string> =
         try
-            ptyPortInstance.Fork(command, agent.Name, ptyId = id, ?cwd = cwd) |> ignore
+            let owned = lock gate (fun () -> ptyLeases.[id.Value])
+
+            let recovery =
+                ownershipCommonDir
+                |> Option.map (fun directory ->
+                    HostPtyOwnership.recoveryBinding directory owned.Lease owned.IncarnationId)
+
+            ptyPortInstance.Fork(command, agent.Name, ptyId = id, ?cwd = cwd, ?recovery = recovery)
+            |> ignore
+
             Ok id
         with ex ->
             Error ex.Message

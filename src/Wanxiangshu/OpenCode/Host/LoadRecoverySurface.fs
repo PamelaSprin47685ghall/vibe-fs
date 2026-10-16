@@ -47,7 +47,7 @@ module LoadRecoverySurface =
 
     let settleChildRuns (handle: JournalHandle) (commonDir: string) : Task<unit> =
         let drainPtys work =
-            task { HostForkRuntime.CloseUnboundPtyRun(commonDir, work) }
+            HostForkRuntime.CloseUnboundPtyRun(commonDir, work)
 
         ChildWorkRecovery.settleOrphanedChildRuns drainPtys handle.Journal
 

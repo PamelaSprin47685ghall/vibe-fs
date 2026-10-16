@@ -67,6 +67,9 @@ module private PtyScopeNative =
     [<Emit("({...$0, env: {...process.env, BUN_BE_BUN: '1'}})")>]
     let workerOptions (_options: obj) : obj = jsNative
 
+    [<Emit("Object.hasOwn($0, 'originalBunMode') ? $0.originalBunMode : process.env.BUN_BE_BUN")>]
+    let originalBunMode (_options: obj) : obj = jsNative
+
     [<Emit("""
       (() => {
         const key = Buffer.from('BUN_BE_BUN\0');
@@ -622,7 +625,7 @@ module internal PtyScope =
     let private openScope spawn command options =
         let directory = N.createDirectory ()
         let incarnation = N.identity ()
-        let mode: obj = N.runtime?env?BUN_BE_BUN
+        let mode = N.originalBunMode options
         let originalMode = if N.absent mode then null else mode
 
         N.publish

@@ -28,10 +28,20 @@ module PtyBackend =
         drop super id |> ignore
         port.Complete(id, Error msg)
 
-    let private spawnLoaded super (port: PtyPort) id cmd cwd exitTcs =
+    let private spawnTerm super cmd cwd recovery =
+        match recovery with
+        | Some binding -> PtyRecovery.start binding cmd cwd
+        | None -> spawnSync super cmd cwd
+
+    let private loadForSpawn super recovery =
+        match recovery with
+        | Some _ -> Task.FromResult(())
+        | None -> ensureSpawn super
+
+    let private spawnLoaded super (port: PtyPort) id cmd cwd recovery exitTcs =
         task {
             try
-                let term = spawnSync super cmd cwd
+                let term = spawnTerm super cmd cwd recovery
                 attach super port id term exitTcs
                 return Ok()
             with ex ->
@@ -47,6 +57,7 @@ module PtyBackend =
         (id: PtyId)
         (cmd: string)
         (cwd: string)
+        (recovery: PtyRecoveryBinding option)
         : Task<Result<unit, string>> =
         task {
             let exitTcs = TaskCompletionSource<unit>()
@@ -55,7 +66,7 @@ module PtyBackend =
             let! loaded =
                 task {
                     try
-                        do! ensureSpawn super
+                        do! loadForSpawn super recovery
                         return Ok()
                     with ex ->
                         return Error ex.Message
@@ -67,7 +78,7 @@ module PtyBackend =
                 let msg = sprintf "PTY backend load failed before spawn: %s" reason
                 failPendingWrites super port id msg
                 return Error msg
-            | Ok() -> return! spawnLoaded super port id cmd cwd exitTcs
+            | Ok() -> return! spawnLoaded super port id cmd cwd recovery exitTcs
         }
 
     let private handle
@@ -78,7 +89,7 @@ module PtyBackend =
         : Task<Result<unit, string>> =
         task {
             match command with
-            | PtyCommand.Spawn(cmd, cwd) -> return! spawnCommand super port id cmd cwd
+            | PtyCommand.Spawn(cmd, cwd, recovery) -> return! spawnCommand super port id cmd cwd recovery
             | other -> return! applyLive super port id other
         }
 
@@ -97,3 +108,6 @@ module PtyBackend =
         let port = PtyPort(handler = handler)
         portRef <- Some port
         port
+
+    let recover directory key incarnationId graceMs =
+        PtyRecovery.drain directory key incarnationId graceMs
