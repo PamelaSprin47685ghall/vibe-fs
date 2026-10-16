@@ -12,19 +12,19 @@ Blogger 提交的 tip 不再从库内选取：`tipName` 经 trim 后的撰写原
 
 ## [003] live union Domain 校验合同
 
-`EnforcerCatalog.validate` 对 built-in live Rulebook 的校验要求：`schemaVersion = 1`；至少存在一条规则；Name / RuleId / FieldName 各自唯一且三者两两恒等；LexicalOrder 连续 `1..N`；EnforcerText / MainText（及双语对应正文）经 trim 后非空。LexicalOrder 是集合的确定性派生序。
+`EnforcerCatalog.validate` 对 built-in live Rulebook 的校验要求：`schemaVersion = 1`；至少存在一条规则；Name / RuleId / FieldName 各自唯一且三者两两恒等；LexicalOrder 连续 `1..N`；LessonText（及双语对应正文）经 trim 后非空。LexicalOrder 是集合的确定性派生序。
 
 ## [004] 检测与处置语料全量、确定性进入 Blogger system prompt
 
-有效的 Blogger effective system prompt 由基础 Blogger prompt、`# Enforcer Rulebook` 标题、live Rulebook 全部规则（每条三段元素：Name（裸目录名）、对应当前语言的 EnforcerText 全文与 MainText 全文）按 LexicalOrder 确定性拼接而成；渲染沿用既有注释机制（逐元素 `# ` 前缀、元素间单换行）。同一 live union 集合合成完全一致的字节。合成结果为内存派生产物，严禁写回文件系统或作为第三份规则真源。
+有效的 Blogger effective system prompt 由基础 Blogger prompt、`# Enforcer Rulebook` 标题、live Rulebook 全部规则（每条两段元素：Name（裸目录名）与对应当前语言的 LessonText 全文）按 LexicalOrder 确定性拼接而成；渲染沿用既有注释机制（逐元素 `# ` 前缀、元素间单换行）。同一 live union 集合合成完全一致的字节。合成结果为内存派生产物，严禁写回文件系统或作为第三份规则真源。
 
 ## [005] 多语言本地化叶子完整性合同
 
-built-in rule 的本地化语言叶子遵循同一合同进入 live Rulebook：正文非空且 TipName / RuleId / FieldName 恒等。投影层按 provider 语言选择对应正文，无跨语言 fallback。
+built-in rule 的本地化语言叶子收敛为单叶（English→lesson.md、zh-CN→lesson.zh-CN.md），遵循同一合同进入 live Rulebook：正文非空且 Name / RuleId / FieldName 恒等。投影层按 provider 语言选择对应正文，无跨语言 fallback。
 
 ## [006] chronicle 结构化判词合同与 NoLiveCycle 协议结果
 
-当前 provider-facing `chronicle` 必须完整提供 `charge`、`occurrence`、`settlement`、`consequence`、`tipName` 与七节内容字段（`whatToDoNow`、`whyThisMatters`、`repairStrategy`、`decisionBranches`、`commonWrongFixes`、`verification`、`doneWhen`），并可选提供 `evidence`。前四个字段均为 trim 后非空 string，分别表达“为什么这轮必须发生”“真正发生了什么”“现在什么已经成立”“后续道路因此怎样改变”，并应各自写成一条可独立阅读的完整判词；`tipName` 与七节字段均为 trim 后非空 string，`tipName` 另须为单行且不超过 200 字符。任一必填字段缺失、空白或不满足校验，均不得形成有效 cycle，必须稳定返回错误面。
+当前 provider-facing `chronicle` 必须完整提供 `charge`、`occurrence`、`settlement`、`consequence`、`tipName` 与两节内容字段（`opinion`、`advice`），并可选提供 `evidence`。前四个字段均为 trim 后非空 string，分别表达“为什么这轮必须发生”“真正发生了什么”“现在什么已经成立”“后续道路因此怎样改变”，并应各自写成一条可独立阅读的完整判词；`tipName` 与两节字段均为 trim 后非空 string，`tipName` 另须为单行且不超过 200 字符。任一必填字段缺失、空白或不满足校验，均不得形成有效 cycle，必须稳定返回错误面。
 
 `evidence` 只允许作为最小决定性**原文摘录**：可摘 code、data、wire、log 或其它 raw source，必须保持摘录原文，不得改写、总结或搬运大段上下文；没有实质增强判词的原文证物就省略。它必须是 string，空白等价于省略，长度不得超过 1024 字符。
 
@@ -40,7 +40,7 @@ evidence **不得**另写独立 evidence blob：所有新 materialize 的 Chroni
 
 ## [008] 彻底剔除数值评分路径与桥接字段
 
-解码与运行时表面不暴露任何 `Scores`、`parseScore` 或数值严重度字段；输入中的额外数值属性被安全忽略且不得复活评分路径；`ScoreWhen`、`Nudge`、`Family`、`CatalogOrdinal` 等桥接字段在装载后均不存在。诊断语义是单条 lesson 的八字段组同批提交，而非数值积分向量。
+解码与运行时表面不暴露任何 `Scores`、`parseScore` 或数值严重度字段；输入中的额外数值属性被安全忽略且不得复活评分路径；`ScoreWhen`、`Nudge`、`Family`、`CatalogOrdinal` 等桥接字段在装载后均不存在。诊断语义是单条 lesson 的三字段组（tipName 与 opinion、advice）同批提交，而非数值积分向量。
 
 ## [009] 每个 provider run 必须且仅能调用一次 chronicle
 
@@ -52,7 +52,7 @@ evidence **不得**另写独立 evidence blob：所有新 materialize 的 Chroni
 
 ## [011] fail-closed 内容硬界约束
 
-单 cycle 内容硬界约束（违背则 fail-closed 并报 `enforcer-cycle-failed`）：因果主干合并段（MergedText）与七节拼装正文（TipSectionsText）的 UTF-8 文本各自不得超过 512 KiB；其中 inline evidence 在 decode 时另有 1024 字符硬上限。所有新 cycle 的独立 evidence 通道为空，不得产生 EvidenceRef。历史兼容代码仍能识别旧 evidence 字段与旧 durable EvidenceRef，但不会把 legacy evidence 重新物化为新 blob。阈值、计量结果与拒绝分支必须由 owner 的纯 decision 拥有；提交解码器与 semantic surface 只能消费该 decision，严禁复制业务判定公式。硬界属于安全防线，严禁演化为启发式评分参数。
+单 cycle 内容硬界约束（违背则 fail-closed 并报 `enforcer-cycle-failed`）：因果主干合并段（MergedText）与两节拼装正文（TipSectionsText）的 UTF-8 文本各自不得超过 512 KiB；其中 inline evidence 在 decode 时另有 1024 字符硬上限。所有新 cycle 的独立 evidence 通道为空，不得产生 EvidenceRef。历史兼容代码仍能识别旧 evidence 字段与旧 durable EvidenceRef，但不会把 legacy evidence 重新物化为新 blob。阈值、计量结果与拒绝分支必须由 owner 的纯 decision 拥有；提交解码器与 semantic surface 只能消费该 decision，严禁复制业务判定公式。硬界属于安全防线，严禁演化为启发式评分参数。
 
 ## [012] BlogObservationCommitted 是唯一原子 cycle 事实
 
@@ -68,7 +68,7 @@ Coverage 出生门：若待覆盖区间的 Next ≤ Prev 或 NextCursor 无法�
 
 ## [015] tip 与 frame 是不可拆分的配对观察视图
 
-Observation 历史是诊断 tip 与 Blog frame 的不可拆心配对视图：前向 zip（tipᵢ ↔ frameᵢ），剩余侧 unpaired 追加；tip 锚定视图丢弃无 tip 的 frame，严禁发明假 tip，严禁维护平行独立的 tips 与 frames 数组作为权威历史。这里的 tip 指一次提交的八字段组（tipName 与七节内容）；其身份为 tipName 原串，同名判定按 normalize 后比较。
+Observation 历史是诊断 tip 与 Blog frame 的不可拆心配对视图：前向 zip（tipᵢ ↔ frameᵢ），剩余侧 unpaired 追加；tip 锚定视图丢弃无 tip 的 frame，严禁发明假 tip，严禁维护平行独立的 tips 与 frames 数组作为权威历史。这里的 tip 指一次提交的三字段组（tipName 与 opinion、advice）；其身份为 tipName 原串，同名判定按 normalize 后比较。
 
 ## [016] 历史压缩协同裁剪，不创造新 occurrence
 
@@ -76,7 +76,7 @@ Observation 历史是诊断 tip 与 Blog frame 的不可拆心配对视图：前
 
 ## [017] 无效 cycle 的有界协议修复与 AABB 状态恢复
 
-未形成有效 cycle 的 terminal（0 次调用、多调用、缺 tipName、四内容字段与七节任一缺失/空白、tipName 超长或含换行、evidence 非 string/超长、或新旧 chronicle 内容协议混用）进入有界协议修复流程：
+未形成有效 cycle 的 terminal（0 次调用、多调用、缺 tipName、四内容字段或 opinion/advice 任一缺失/空白、tipName 超长或含换行、evidence 非 string/超长、或新旧 chronicle 内容协议混用）进入有界协议修复流程：
 1. 首发 Nudge 必须且仅能由处于完全静止的 idle terminal 发起，禁止在 transform 阶段发送。
 2. 每个 `BloggerRequestId` 至多获得一次 Nudge 修复机会；同一 terminal run 重放保持幂等。
 3. 纯文本 terminal 不得依赖后续 transform 唤醒，由 `SessionIdle` 触发专用 nudge。

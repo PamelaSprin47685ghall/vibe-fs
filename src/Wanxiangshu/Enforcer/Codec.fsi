@@ -17,13 +17,8 @@ module EnforcerCodec =
     type CanonicalBlogCall =
         { Content: ChronicleContent
           TipName: string
-          WhatToDoNow: string
-          WhyThisMatters: string
-          RepairStrategy: string
-          DecisionBranches: string
-          CommonWrongFixes: string
-          Verification: string
-          DoneWhen: string }
+          Opinion: string
+          Advice: string }
 
     [<Literal>]
     val MissingTipNameError: string = "missing-tip-name"
@@ -43,7 +38,7 @@ module EnforcerCodec =
     [<Literal>]
     val MaxTipNameChars: int = 200
 
-    /// D3：七节字段名，顺序即 schema 与解码顺序。
+    /// D3：内容字段名，顺序即 schema 与解码顺序。
     val tipSectionNames: string list
 
     [<Literal>]

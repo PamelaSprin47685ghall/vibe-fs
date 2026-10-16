@@ -10,13 +10,8 @@ const call = (tipName) => ({
   settlement: 'The uncertainty is now settled.',
   consequence: 'The road can proceed on that fact.',
   tipName,
-  whatToDoNow: 'Take the next concrete step on that fact.',
-  whyThisMatters: 'Later work rests on the settled uncertainty.',
-  repairStrategy: 'Restore the rule at its owner rather than downstream.',
-  decisionBranches: 'If the evidence holds, proceed; otherwise stop.',
-  commonWrongFixes: 'Do not paper over the symptom downstream.',
-  verification: 'Re-run the failing check after the repair.',
-  doneWhen: 'The check is green and the boundary holds again.',
+  opinion: 'Later work rests on the settled uncertainty.',
+  advice: 'Restore the rule at its owner rather than downstream.',
 })
 
 const decodeName = (tipName) => {

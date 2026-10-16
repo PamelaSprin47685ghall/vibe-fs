@@ -33,13 +33,8 @@ module ToolSurface =
                    "settlement"
                    "consequence"
                    "tipName"
-                   "whatToDoNow"
-                   "whyThisMatters"
-                   "repairStrategy"
-                   "decisionBranches"
-                   "commonWrongFixes"
-                   "verification"
-                   "doneWhen"
+                   "opinion"
+                   "advice"
                    "evidence" |]
                tipCount = ChronicleTool.tipFieldNames () |> List.length |}
 

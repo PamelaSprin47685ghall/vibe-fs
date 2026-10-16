@@ -18,6 +18,8 @@ S2 结账：§7 理解、§8 探索、§9 主路径、§10 反事实检验齐备
 
 本棒：只读检验（四组 devops 抽查：ChronicleExecution 校验族与计量先例、两套 support 文件与 009 blob port 先例、101 目录族谱与 23 无节抽查、016 第 184–188 行；另两轮补充：guidance support journal 实为真 journal 不透明盒、TipSurface 公开面与 Persistence blob 写读对先例）判出 3 条 GAP（tipName 200 界计量单位未裁决；I5.2 的 blob 物化接线缺口——port/替身路线类型层不可行、最小接线为 TipSurface 新增写入助手；S4/D3 的「missing-tip-field: 节名」与 C4.1 的 camelCase 字段名裁决不齐）；评审留任修订：C2.4/C2.5/S4/D2/L5 定计量单位（String.Length）、S4/D3 指代词统一、I5.2 修正为 TipSurface 写入助手路线并注记与 009 异同、§9.2 触碰文件族补录 Guidance/TipSurface（fsi 同步）、§2.6 增 (m)。
 
+本棒：用户裁决 Q3/Q4——tip 内容字段收敛为 opinion 与 advice 两个（opinion 填对当前操作的主观批判性评价、advice 提出分析经验教训后的建设性意见；tipName 身份键与按名去重保留，Q2 未被推翻）；resources/enforcer 每规则只留中英两文件 lesson.md / lesson.zh-CN.md，不再分检测（enforcer.md）/处置（main.md）两套。实施背景（补录于 §2.6-n）：七字段方案（tipName + whatToDoNow/whyThisMatters/repairStrategy/decisionBranches/commonWrongFixes/verification/doneWhen）已在此前实施棒中全链落地；M5 统一格式已完成——resources/enforcer 404 份文件节序列零变体（en 侧 101×enforcer 八节 + 101×main 七节，zh 侧同构 canonical 中文）。本棒为纯文档修订，就地改写契约面：§1 第 1/2/5 条、§4/§5 补 Q3/Q4 裁决、§7 输出形态、§8.1/§8.2/§8.5、§9 主路径 M1–M5、S3.0 注记、S3.1（C1/C2/C4/C5/C6/C7）、S3.3（S1/S2/S4/S6）、S3.4（D1/D3/D4 及连带）、S3.8（I1/I2/I5）、S3.9（B2/B3）、S3.12 整体改写为库重组工作包、S3.13 残留清单扩充；§8.4/§8.6/§9.4/§10 的失效指称做最小同步。代码与资源未动；未选路线（单一大文本字段、恢复七节）的理由在 §4-E 在案。
+
 ## 0. 任务
 
 用户委托摘要：blogger 的提意见目前主要走 tip，但 tip 必须从已有库中选择，限制了发挥。改为：仍然把全部已有库灌入 blogger 上下文（bootstrap + 格式样板），但 blogger 写 tip 时自由发挥。为此，参考所有 enforcer tip 的格式确定字段们的名字，然后用这些文本字段替代 tip 这个离散字段。
@@ -28,11 +30,11 @@ S2 结账：§7 理解、§8 探索、§9 主路径、§10 反事实检验齐备
 
 改造完成后，可判定地应满足：
 
-1. chronicle 工具的 provider-facing schema 中不再存在离散枚举字段 tip；代之以一组自由文本字段，字段名取自 main.md 七节格式（Q1 裁决 = A1）：What To Do Now / Why This Matters / Repair Strategy / Decision Branches / Common Wrong Fixes / Verification / Done When（已定：camelCase 拼写、全部必填，见 §8.1）；另设一个自由文本「名」字段承担身份与去重（Q2 裁决 = B2；已定：trim + 简单大小写折叠（.NET ToLowerInvariant），见 §8.3 与 C3.2）。
-2. blogger system prompt 全量注入全部库文本：每条规则注入 enforcer.md（检测文本）与 main.md（处置文本）两种文本全文（Q1 裁决：A1+A2 双灌入；按会话语言单语装载、不合并双语，双语全灌已在 §8.2 淘汰），当前 101 条；文案中「必须恰好选择一个 Rulebook TipName」类约束被替换为「参照样板格式自由撰写、可自由命名」的语义。
+1. chronicle 工具的 provider-facing schema 中不再存在离散枚举字段 tip；内容字段收敛为两个自由文本字段（Q3 裁决；第一轮实施的七字段 whatToDoNow/whyThisMatters/repairStrategy/decisionBranches/commonWrongFixes/verification/doneWhen 随之收敛，见 §2.6-n）：opinion（对当前操作的主观批判性评价）与 advice（分析经验教训后的建设性意见），camelCase 拼写、必填 string、trim 非空（见 §8.1）；另设一个自由文本「名」字段承担身份与去重（Q2 裁决 = B2；已定：trim 非空、单行、String.Length ≤ 200，比较经 trim + 简单大小写折叠（.NET ToLowerInvariant），见 §8.3 与 C3.2）。
+2. blogger system prompt 全量注入全部库文本：每条规则注入两段元素——Name（裸目录名）与 LessonText 全文（Q4 后库为每规则单文档 lesson，EnforcerRule 以单一 LessonText 取代 EnforcerText/MainText；按会话语言单语装载、不合并双语），当前 101 条；文案中「必须恰好选择一个 Rulebook TipName」类约束被替换为「参照样板格式自由撰写、可自由命名」的语义。
 3. 执行期与解码期不再存在「任何非空 tip 串被归一化映射到库内某条规则」的行为（resolveByField / Levenshtein 家族退役，调用点全列表见 §2.1）；名字作为身份键保留（按名去重），已定其规范化为 trim + 简单大小写折叠（.NET ToLowerInvariant，见 §8.3 与 C3.2）；新文本字段沿用既有内容字段的准入校验族（trim 非空、字符/字节界等，见 §2.5-C）。
-4. 落库、投影、Main 交付按 Q2 裁决改造：交付链骨架保留（首次 Full、之后 identity-only、按名去重）；Full 正文以 blogger 自由撰写的文本字段为主体（库 main.md 退出交付正文来源）。换源触发面已核实（§2.5-C）：owner 语言选择（gd [002]）、Coverage 身份单位（gd [001]/[003]/[005]）、Audience 隔离（gd [008]）需重设；冻结机制可原样复用；设计路径已展开（正文走新 blob 通道落库、交付读回 + digest 校验，见 §8.4 与 §9.1 M4；残余 ◇ 见 §10.1 假设 A）。
-5. 101 条 tip 统一格式（Q1 裁决新增工作包）：全体规则文件对齐主流标准结构——enforcer.md 八节（Definition / Governing Principle / Trigger When / Do Not Trigger When / Distinguish From / Decision Procedure / Examples / Nudge）、main.md 七节（A1）。现状基线已全量测得（§2.2）：en 侧 78/23 二分；zh 侧与主流同构者仅 enforcer 20 / main 21，待对齐范围远大于 23 个无小节文件；精确标准与验收方式已展开（canonical 中文节名草案见 §2.6-e，对齐 + 结构断言 + 内容覆盖见 §8.5、§10.4）。
+4. 落库、投影、Main 交付按 Q2 裁决改造：交付链骨架保留（首次 Full、之后 identity-only、按名去重）；Full 正文以 blogger 自由撰写的文本字段为主体（库文本退出交付正文来源）。换源触发面已核实（§2.5-C）：owner 语言选择（gd [002]）、Coverage 身份单位（gd [001]/[003]/[005]）、Audience 隔离（gd [008]）需重设；冻结机制可原样复用；设计路径已展开（正文走新 blob 通道落库、交付读回 + digest 校验，见 §8.4 与 §9.1 M4；残余 ◇ 见 §10.1 假设 A）。
+5. 库重组为两文件制（Q4 裁决，取代已完成的 Q1 统一格式工作包，完成基线见 §2.6-n）：resources/enforcer/<TipName>/{lesson.md, lesson.zh-CN.md} 共 202 份，不再分检测（enforcer.md）/处置（main.md）两套；H1 = 「# <TipName> — Lesson」（en/zh 同）；顶层两节 en =「## Opinion」「## Advice」、zh =「## 评价」「## 建议」；子节为原节内容降级为 ### 搬移——en Opinion 收 enforcer.md 的 Definition / Governing Principle / Trigger When / Do Not Trigger When / Distinguish From / Decision Procedure / Examples 七节原序，Advice 收 main.md 七节原序 + enforcer.md 的 Nudge 殿后，zh 同构且子节保留原中文名；节正文原样搬运、零改写、零丢失；旧 4 文件全部退役删除。结构与验收方式已展开（§8.5、Algorithm F）。
 6. 规范与测试同步：behavior-diagnosis 与 guidance-delivery 中与「tip 必然归一到 TipName」绑定的条款与测试锚点全部更新，不留条款-实现矛盾（条款见 §2.3，锚点见 §2.4）。
 
 ## 2. 已核实事实
@@ -176,6 +178,10 @@ S2 结账：§7 理解、§8 探索、§9 主路径、§10 反事实检验齐备
 - 计量单位两族并存：512 KiB / 128 KiB 族经 LlmFacing.byteCount → SyntheticToml.byteCount 手工 UTF-8 字节计数；MaxInlineEvidenceChars=1024 族为 .Length 字符语义（Codec.fs:58 定义、L109 判定）；ChronicleExecution.tryCanonicalText（L17–23）仅 trim 非空、无长度检查。
 - Persistence JournalSurface 的 writePayload（Surface.fs:613–625）/ readPayload（:628–636；fsi:33–34）为真 journal 上的 blob 写读对；调用形态先例 durable-events-012:31–43（boot → writePayload → blobRef 为 blobs/<64 位 hex> 形态 → readPayload 读回）；I5.2 的 TipSurface 助手与其同形。
 
+（n）Q3/Q4 修订轮补充核实（实施现状；本棒补录，来源 = 实施棒交付记录与 M5 执行记录；Model.fs 一处经本会话文件片段证实，其余未在本棒重新独立核实）：
+- 七字段方案已全链实施：ChronicleTool schema 为 tipName + whatToDoNow/whyThisMatters/repairStrategy/decisionBranches/commonWrongFixes/verification/doneWhen 八字段（字段序按 C1.7）；Codec 含 decodeTipName 与内容字段解码、错误面含 missing-tip-field:<field> 参数化标识；Model.renderTipSections 位于 src/Wanxiangshu/Enforcer/Cycle/Model.fs:52–70（tipSectionTitles 七节名表 zh/en 同处证实）；ChronicleExecution 校验族含 tipName 单行/String.Length ≤ 200 与内容字段 trim 非空；bd WHAT.md 的 [004]/[006]/[008]/[011]/[015]/[017] 与 006/007/008/011/012/014/015/016/017 测试均已按七字段语义更新。
+- M5 统一格式已完成：resources/enforcer 404 份文件节序列零变体（en 侧 101×enforcer 八节 + 101×main 七节；zh 侧同构 canonical 中文——enforcer = 定义/支配原则/何时触发/不应触发/与相邻规则区分/判定程序/例子/Nudge，main = 现在该做什么/为什么重要/修复策略/决策分支/常见假修复/验证/完成条件）；§2.2 的 217 份对齐口径已按此结清，结构断言与内容覆盖已跑。
+
 ## 3. 根因
 
 - 症状：blogger 只能从库中选 tip，发挥受限。
@@ -193,12 +199,21 @@ B. tip 身份与交付去向 —— 裁决：B2（自由命名；同名仍然去
   - 已知代价：名字稳定性由 blogger 自担；同名判定的规范化已定为 trim + 简单大小写折叠（.NET ToLowerInvariant；完整 Unicode casefold 经 C3.2 淘汰，见 §8.3）。
 C. 消费者侧目录角色：main.md 退出交付正文来源（正文以 blogger 自由撰写的字段为主体）；MainText/tryFindByField 查库路径的处置已展开：退役，交付正文改为读回 blogger 撰写的落库字节（见 §8.4、§9.1 M4）。本棒已核实触发面（§2.5-C）：owner 语言选择（gd [002]）、Coverage 身份单位（gd [001]/[003]/[005]）、Audience 隔离（gd [008]）需重设；冻结机制可原样复用；交付侧无字节界（已读范围内）。
 D. 新字段验证强度（已定：全部必填，见 §8.1）：trim 非空与字节界沿用既有族（tryCanonicalText、1024 字符、512KiB；作用层见 §2.5-C）；过重必填与「单 turn 单 lesson」简洁性有张力。
+E. tip 内容字段收敛（Q3）——裁决：内容字段收敛为 opinion 与 advice 两个。opinion 填对当前操作的主观批判性评价；advice 提出分析经验教训后的建设性意见。tipName 身份键与按名去重保留（B 未被推翻）；tipName 校验（trim 非空、单行、String.Length ≤ 200）与规范化（normalize 比较）沿用已实施面不变。
+  - 未选单一大文本字段：丢失评价/建议的语义分离（opinion 与 advice 各有明确的评价对象与时间指向，合并即不可判别）。
+  - 未选保留七节（whatToDoNow…doneWhen）：违背用户简明裁决；第一轮实施的七字段（main.md 七节 camelCase 化）随本裁决收敛退役。
+  - 已知代价（接受）：已落地的 schema、文案、条款与测试面（006/007/008/011/012/014/015/016/017）随本裁决二次改写。
+F. 库文件结构（Q4）——裁决：resources/enforcer 每规则只留中英两文件 lesson.md / lesson.zh-CN.md，不再分检测（enforcer.md）/处置（main.md）两套。
+  - 未选保持四文件制：检测/处置分套随 Q3 字段收敛失去承载者（内容字段已收敛为评价/建议两节，库不再按检测与处置分文档）。
+  - 已知代价（接受）：库 404 份重组为 202 份；装载与注入面随单叶映射与单一 LessonText 同步（§8.2、Algorithm I）；旧 4 文件退役删除。
 
 ## 5. 用户裁决记录（本棒已回填）
 
 - Q1：A1 格式（字段名取 main.md 七节）；灌入 blogger 上下文时 A1+A2 都灌入；另外把 101 条 tip 统一格式。
 - Q2：B2——允许 blogger 自由命名；同名的仍然会去重。
-- 裁决引入的新工作面：统一格式工作包（§1 第 5 条）；双文本注入（§1 第 2 条）；交付正文换源（§1 第 4 条、§4-C）。
+- Q3：tip 内容字段收敛为 opinion 与 advice 两个——opinion 填对当前操作的主观批判性评价，advice 提出分析经验教训后的建设性意见；tipName 身份键与按名去重保留（Q2 未被推翻）。
+- Q4：resources/enforcer 每规则只留中英两文件（lesson.md / lesson.zh-CN.md），不再分检测（enforcer.md）/处置（main.md）两套。
+- 裁决引入的新工作面：统一格式工作包（§1 第 5 条，Q1 引入、已实施完成，经 Q4 由库重组取代）；双文本注入（§1 第 2 条，Q1 引入、已实施，经 Q4 由单文档两段元素注入取代）；交付正文换源（§1 第 4 条、§4-C，已实施）；内容字段收敛（§1 第 1 条、§8.1，Q3）；库重组为两文件制（§1 第 5 条、§8.5，Q4）；七字段符号、arg-what-to-do-now 族键与旧 4 文件退役（§8.6、Algorithm F/V）。
 
 ## 6. 继任者工作方位
 
@@ -212,13 +227,13 @@ D. 新字段验证强度（已定：全部必填，见 §8.1）：trim 非空与
 
 **输入（现状）**：一条封闭的值域链——chronicle 的 tip 是枚举，值域恰为 101 条规则的 TipName；执行期任何非空串经归一化（trim → 精确 → Levenshtein → LexicalOrder）确定性吸附到库内某条规则，无逃逸（bd [007]）；库以「值域」身份全量注入 blogger 上下文（每条贡献 Name + enforcer.md 全文；按会话语言装载，双语不合并）；TipName = RuleId = FieldName = 目录名，是贯穿落库、RecentTips、Frontier/Coverage、交付查找与 Main 处置索引的身份锚。
 
-**输出（改造后）**：同一个 blogger 不再「选」tip，而是「写」tip——一组自由文本字段（名取 main.md 七节 A1：What To Do Now / Why This Matters / Repair Strategy / Decision Branches / Common Wrong Fixes / Verification / Done When）＋一个自由命名「名」字段（按名去重）替代离散枚举；归一化家族退役；库文本留在上下文但退为 bootstrap 与格式样板（A1+A2 双灌入）；Main 交付骨架保留（首次 Full / 之后 identity-only / 按名去重）而 Full 正文换源为 blogger 自由撰写的文本；101 条规则文件统一为标准格式。
+**输出（改造后，按 Q3/Q4 收敛）**：同一个 blogger 不再「选」tip，而是「写」tip——两个自由文本字段 opinion（对当前操作的主观批判性评价）与 advice（从经验教训得出的建设性意见）＋一个自由命名「名」字段 tipName（按名去重）替代离散枚举；归一化家族退役；库文本留在上下文但退为 bootstrap 与格式样板（每规则单文档 lesson、两段元素注入）；Main 交付骨架保留（首次 Full / 之后 identity-only / 按名去重）而 Full 正文换源为 blogger 自由撰写的 opinion/advice 两节拼装正文；resources/enforcer 每规则重组为 lesson.md / lesson.zh-CN.md 两文件。
 
 **本质张力（约束的核心）**：改造不是「打开一个字段」，而是把确定性重新安置。旧确定性由三件事承载：①名字空间封闭（枚举值域）；②任何输入归一化到闭集（resolveByField，无逃逸）；③交付正文随时可回查（来自库 main.md）。改造后 ①②退役，③改为「首次交付冻结字节、之后按名回放」——确定性从「名字的解释权」迁移到「名字的身份键 + 冻结回放」。凡依附旧宿主的机制（owner 语言选择 gd [002]、Coverage 身份单位 gd [001]/[003]/[005]、Audience 隔离 gd [008]、双语资源门禁覆盖面）都要显式重设，不能默认延续。
 
 **难点**：
 - （a）自由文本第一次成为交付正文主体：Main 收到的 Full 不再有库中正文可查，冻结回放与身份键是唯一保障。收敛（§8.4、§10.1-B）：identity-only 与旧机制同构——名字是字符串身份键兼 Main 的记忆锚（首次 Full 后同名 occurrence 只发「tip: <name>」提醒），形态与机制保留，无需新语义设计。
-- （b）注入面改造同时触及装载（loadFor 单语言列表）、合成（compose 只取 EnforcerText）、请求期重拼（ProviderSystemTransform）三处。收敛（§8.2、§1 第 2 条）：维持按会话语言单语装载，每条注入 EnforcerText + MainText 双文档；双语全灌已淘汰。
+- （b）注入面改造同时触及装载（loadFor 单语言列表）、合成（compose 只取 EnforcerText）、请求期重拼（ProviderSystemTransform）三处。收敛（§8.2、§1 第 2 条）：维持按会话语言单语装载，每条注入库文本全文（Q1 期为 EnforcerText + MainText 双文档，Q4 后为 LessonText 单文档两段元素，见 §8.2 收敛记录）；双语全灌已淘汰。
 - （c）统一格式工作包规模 217 份（en 46 + zh 171）。收敛（§2.6-e、§8.5）：canonical 中文映射为对齐目标，验收 = 结构断言 + 内容覆盖，批次方向已列；残余（「Nudge」保留英文与否等）移入 §6 遗留。
 - （d）016 的 120 断言（第 186–187 行）与 101 目录失配。收敛（§9.1 M0）：独立先行修复，改为动态派生（同文件 188 行已有先例）。
 
@@ -236,18 +251,20 @@ D. 新字段验证强度（已定：全部必填，见 §8.1）：trim 非空与
 
 ### 8.1 工作面一：schema 与文案
 
-- **候选 1a（采纳）**：七个自由文本字段 + 一个 tipName 字段，全部必填 string；字段名 camelCase：whatToDoNow / whyThisMatters / repairStrategy / decisionBranches / commonWrongFixes / verification / doneWhen + tipName；校验沿既有族（tryCanonicalText trim 非空 + 内容字节界）。
-  - 风险：七字段必填加大单轮撰写负担（§4-D 已记录的张力）；字段名一旦发布即为消费者契约。
-  - 事实：旧 tip 必填（§2.1）；四内容字段必填、evidence 可选（§2.6-a）；字段名来源 = 用户裁决 A1（§5-Q1）。条款落点：bd [006] / [008] / [017]（错误面与离散措辞随本工作面改写，见 §8.6）。
+- **候选 1a（采纳；经 Q3 裁决收敛）**：两个自由文本内容字段 + 一个 tipName 字段，全部必填 string；字段名 camelCase：opinion / advice / tipName；校验沿既有族（tryCanonicalText trim 非空 + 内容字节界；tipName 另有单行与 String.Length ≤ 200 界，已实施面不变，见 §2.6-n）。
+  - 收敛记录：第一轮实施取七字段（main.md 七节 camelCase 化：whatToDoNow…doneWhen）并已全链落地（§2.6-n）；Q3 裁决把内容字段收敛为 opinion / advice 两个——opinion 填对当前操作的主观批判性评价，advice 提出分析经验教训后的建设性意见。未选单一大文本字段（丢失评价/建议的语义分离，§4-E）；未选保留七节（违背用户简明裁决）。
+  - 风险：两字段必填加大单轮撰写负担（§4-D 已记录的张力）；字段名一旦发布即为消费者契约。
+  - 事实：旧 tip 必填（§2.1）；四内容字段必填、evidence 可选（§2.6-a）；字段名来源 = 用户裁决 Q3（§5-Q3，原 A1 七节来源随收敛退役）。条款落点：bd [006] / [008] / [017]（错误面与离散措辞随本工作面改写，见 §8.6）。
 - **候选 1b（淘汰）**：单一大文本字段承载全部教训。理由：丢失节结构，交付拼装无锚、测试不可锚定、样板对齐价值消失（§2.2 的格式基线本身即「按节」组织）。
-- **候选 1c（淘汰）**：七字段可选、缺省跳过。理由：正文残缺，与旧 tip 必填强度不对等；缺节时 Full 正文无法成形（§2.6-c tipFullText 只处理整体空体）。
-- 文案侧：description / arg-tip / missing-tip 三组必须重写（现文案均以「从库中选择」为语义，§2.6-a）；另需新增七字段与 tipName 的 schema 描述文案——机制为逐字段显式键 + 成对叶子（Path 常量，无自动派生；缺失由上游库严格拒绝），七条新键各配 en/zh-CN 叶子，tipName 可用改名后的 arg-tip 键；{{rule_count}} 语义从「值域大小」改为「样板库规模」或删除（◇）；资源键 arg-tip 是否改名（◇，S3 定）。
+- **候选 1c（淘汰）**：内容字段可选、缺省跳过。理由：正文残缺，与旧 tip 必填强度不对等；缺节时 Full 正文无法成形（§2.6-c tipFullText 只处理整体空体）。
+- 文案侧：description / arg-tip / missing-tip 三组必须重写（现文案均以「从库中选择」为语义，§2.6-a）；内容字段与 tipName 的 schema 描述文案为逐字段显式键 + 成对叶子（Path 常量，无自动派生；缺失由上游库严格拒绝）——Q3 后新增 arg-opinion / arg-advice 两键（第一轮实施的 arg-what-to-do-now 族七键随字段收敛退役，见 §4-E），tipName 用改名后的 arg-tip-name 键（arg-tip 已退役）；{{rule_count}} 语义已结断为「样板库规模」、保留（C5.6）。
 
 ### 8.2 工作面二：双文本注入
 
-- **候选 2a（采纳）**：维持「按会话语言单语」装载，每条注入 Name + EnforcerText + MainText（双文档全文）。
-  - 风险：prompt 体积增加（main 全文首次入场）；注入字节变化触及冻结与测试（§2.6-d）。
-  - 事实：compose 现只注入 EnforcerText（§2.6-b，关键边界）；loadFor 已读入 MainText（§2.6-b）；用户裁决 A1+A2 双灌入（§5-Q1）。
+- **候选 2a（采纳；经 Q4 裁决收敛）**：维持「按会话语言单语」装载，每条注入 Name + LessonText 两段元素（单文档全文；EnforcerRule 以单一 LessonText 取代 EnforcerText/MainText，localizedFiles 单叶映射）。
+  - 收敛记录：第一轮实施按 Q1 双灌入（Name + EnforcerText + MainText 三段元素）落地；Q4 裁决把库重组为每规则中英两文件 lesson.md / lesson.zh-CN.md，检测/处置分套失去承载者，双文档注入随之为两段元素注入（lesson 全文承载原 enforcer+main 两侧内容，注入体积与原双文档相当）。
+  - 风险：注入字节变化触及冻结与测试（§2.6-d）。
+  - 事实：compose 现注入两段元素（§2.6-n 实施现状）；用户裁决 Q4（§5-Q4）。
 - **候选 2b（淘汰）**：双语全灌（en + zh 四文档）。理由：体积翻倍；混合语言样板干扰；需重构单语言装载机制，风险大于收益。
 - 语言一致性说明：blogger 子会话跟随 owner 语言，撰写字节即交付语言——gd [002] 的「按 owner 语言查库」由此消解（§2.6-c、§2.6-g）。
 
@@ -262,21 +279,21 @@ D. 新字段验证强度（已定：全部必填，见 §8.1）：trim 非空与
 
 ### 8.4 工作面四：交付换源
 
-- **候选 4a（采纳）**：Full = 标题 + tip = "<name>" + 七节拼装正文（blogger 撰写；落库拼装字节；交付读回 + digest 校验）；IdentityOnly = tip: <name> 保留；owner 语言选择退役（正文 = 撰写字节）；Coverage 身份 = 自由 tipName；冻结机制（anchor MarkerText 原字节回放）原样复用。
+- **候选 4a（采纳）**：Full = 标题 + tip = "<name>" + 内容字段拼装正文（Q3 后为 opinion/advice 两节；blogger 撰写；落库拼装字节；交付读回 + digest 校验）；IdentityOnly = tip: <name> 保留；owner 语言选择退役（正文 = 撰写字节）；Coverage 身份 = 自由 tipName；冻结机制（anchor MarkerText 原字节回放）原样复用。
   - 风险：交付侧读路径为新增（§2.6-g 确认无既有路径）；「重锚后恢复 Full」的精确实现（blob 重读 vs anchor 回放）需 S3 确认（§10.1 假设 A）。
   - 事实：Full 现源 = rule.MainText（§2.6-c，138 行）；TipGuidanceDelivered / 锚点 / fold 机制齐备（§2.6-c）；blob 写读接口与 digest 校验样例存在（§2.6-f）；裁决 B2 与 §4-C。条款落点：gd [001] / [002] / [003] / [005] / [006] / [008]（交付族，见 §8.6）。
 - **候选 4b（淘汰）**：Full 附库参考正文。理由：第二真相源；与「库退出交付正文来源」冲突；owner 语言选择机制被迫保留。
 - **候选 4c（淘汰）**：回放原始工具调用文本。理由：形态不受控（无稳定节结构），无法承担 marker 的稳定呈现与冻结回放。
-- **落库通道 4d**：七字段在落库时拼装为「tip 处置正文」字节，走新 blob 通道（可仿 evidence 通道模式，§2.6-f），fact 携 ref / digest；交付读回以 digest 校验。不选「与四字段共用同一 blob」：因果主干段落与处置正文是两个语义体，合并后交付侧无法分离。
+- **落库通道 4d**：内容字段在落库时拼装为「tip 处置正文」字节（Q3 后为 opinion/advice 两节拼装），走新 blob 通道（可仿 evidence 通道模式，§2.6-f），fact 携 ref / digest；交付读回以 digest 校验。不选「与四字段共用同一 blob」：因果主干段落与处置正文是两个语义体，合并后交付侧无法分离。
 
-### 8.5 工作面五：统一格式工作包
+### 8.5 工作面五：库重组为两文件制（原统一格式工作包，经 Q4 取代）
 
-- **候选 5a（采纳）**：全量对齐——en 侧 23 个无小节目录补八 / 七节（46 份）；zh 侧全部非同构文件对齐（161 份）另加 10 份标题/措辞待替换文件（9 份「英文标题＋中文正文」+ duplicated-control-flow 的 main「分支判断」；161→171），标题采用 canonical 中文映射（§2.6-e 草案）；验收 = 结构断言（节名序列全等，只读脚本）+ 内容覆盖（每节非空且实质）。断言口径：en 文件按英文规范序列、zh 文件按 canonical 中文序列检查，脚本按文件语言选择序列表。
-  - 风险：规模 217 份；「结构对齐」若沦为「加标题」会成格式剧场（验收必须能红，见 §10.4）；重写中信息可能丢失。
-  - 事实：全量族谱与基线（§2.2、§2.6-e）；用户裁决「101 条统一格式」（§5-Q1）。
-- **候选 5b（淘汰）**：只补缺节、不动措辞变体。理由：「统一」不彻底；「为什么这很重要 / 分支判断 / 刀口」等变体残留，违反同一 context 词与概念稳定对应。
-- **候选 5c（淘汰）**：程序化批量改写。理由：内容性重写质量不可控（仓库纪律：禁止自动化批量增删改）。
-- 批次方向（S3 展开）：先 23 个双侧无节（结构最缺）→ 20 个 zh 无节 → 变体族归一（zh enforcer 38 份 = 25 + 13；zh main 37 份 = 24 + 12 + 1）→ 标题/措辞替换 10 份（9 份英文标题 + duplicated-control-flow 的 main）。
+- **候选 5a（采纳；经 Q4 裁决取代）**：Q1 统一格式工作包已实施完成（404 份零变体，§2.6-n）；Q4 裁决把库重组为每规则中英两文件——resources/enforcer/<TipName>/{lesson.md, lesson.zh-CN.md} 共 202 份，不再分检测（enforcer.md）/处置（main.md）两套。结构：H1 = 「# <TipName> — Lesson」（en/zh 同）；顶层两节 en =「## Opinion」「## Advice」、zh =「## 评价」「## 建议」；子节为原节内容降级为 ### 搬移（映射见 C7.2）；节正文原样搬运、零改写、零丢失；旧 4 文件全部退役删除。
+  - 风险：搬移中的信息丢失或改写（验收须断言零丢失）；旧文件删除后装载/注入面必须同步切换，否则断链。
+  - 事实：M5 完成后的库基线（§2.2、§2.6-n、§2.6-e 族谱）；用户裁决 Q4（§5-Q4）。
+- **候选 5b（淘汰）**：保持四文件制、lesson 内嵌两套原文。理由：检测/处置分套随 Q3 字段收敛失去承载者；四文件并存即第二真相源。
+- **变换性质（与内容性重写的区别）**：重组是确定性结构变换（标题降级 ## → ### 与内容搬移），非内容性重写——与仓库「严禁自动化程序批量增删改查程序代码」纪律不冲突：对象是资源文件、正文零改写由 program 自校验断言保证（Algorithm F 的 F2）。
+- 验收与批次（S3 展开，Algorithm F）：确定性结构变换规则 → program 自校验（结构断言 + 零丢失覆盖）→ 装载面切换 → 旧 4 文件删除 → 抽样复核。
 
 ### 8.6 工作面六：规范与测试同步
 
@@ -284,7 +301,7 @@ D. 新字段验证强度（已定：全部必填，见 §8.1）：trim 非空与
   - 风险：条款改写文本量大（bd 7 条 + gd 6 条）；「退役断言」（如 bd-007 的 Levenshtein 行为锁）需明确删除而非留空。
   - 事实：条款与锚点清单（§2.3 / §2.4）；016 硬编码现状（§2.6-e、D3）。
 - **候选 6b（淘汰）**：代码先行、条款测试后置集中改。理由：中间态条款-实现矛盾，验收不可锚定。
-- 改写清单（草案；逐条覆盖 §2.3 全量 19 条（[001]–[019]），无静默遗漏；条款面完整性经本轮 devops 全仓扫描复核——53 套件中五类语义落点仅在 bd/gd，无第三套件）：bd [001]（身份语义）、[004]（注入内容）、[005]（本地化叶子身份三元组——与 [003] 同类的库内合同，库结构不动，不改文本、作身份面回归）、[006]（校验与错误面）、[007]（Levenshtein 退役）、[008]（「离散的单条 tip 选定」重述为单条 lesson 的字段组）、[009]（不涉及——每 run 恰一次 chronicle 与 tip 语义无关）、[011]（内容硬界文本扩展：512 KiB 界覆盖对象由「四句正文」扩为「因果主干合并段与七节拼装正文」，见 C2.2/C6.1）、[012] / [014]（身份字段收敛）、[015]（tip 指代更新为七字段 + 名称组；配对视图与「禁假 tip」语义保留）、[016]（RecentTips 协同裁剪语义在 P2 字段收敛下保留；文本评估与 G5/G1 关系注明，见 C6.1）、[017]（无效 terminal 条件清单更新：缺 tipName、七字段任一缺失/空白、新旧协议混用判定）、[018]（冻结对象重设）；gd [001]（Coverage 身份）、[002]（正文来源与语言）、[003] / [005]（措辞级改写：原文「规则全文」（[003] 第 13 行）「已交付规则」（[005] 第 21 行）的指称物改为「该 occurrence 绑定的处置正文」一类表述；Frontier/Coverage 双轴与重锚恢复语义保留）、[006]（载荷读取替代查库）、[008]（Audience 重述）；gd 全集 11 条（编号无 [010]）经复核评估为不需改文本的：[004]（通用交付判定——新方案仍只依赖持久事实投影；测试 004 仅断言 presentation 恢复与 owner 隔离）、[007]（latestTipNudge → latestTipGuidance 纯委托结构（Tip.fs:197）保证字节相等，与正文来源无关）、[009]（权限语义与正文来源无关；测试 009 仅锚注入通道机械不变量）、[011]（marker 通道字节冻结机制原样复用，与正文来源解耦）、[012]（动态材料合成与冻结语义仍适用；附 M4 交互点——tip 材料单次读取在 PairProgrammingThoughtTransform.fs:1336、冻结点 1089–1098、重放不重渲染分支 1081–1085，「恢复 Full」若走 blob 重读必须落在单次读取内；行为证明为既有 todo GAP-116）。落点：schema 族（bd [006] / [008] / [017]）→ §8.1；身份族（bd [001] / [007] / [012] / [014] / [015] / [018]）→ §8.3；注入族（bd [004]）→ §8.2；交付族（gd 各条）→ §8.4。
+- 改写清单（草案；逐条覆盖 §2.3 全量 19 条（[001]–[019]），无静默遗漏；条款面完整性经本轮 devops 全仓扫描复核——53 套件中五类语义落点仅在 bd/gd，无第三套件）：bd [001]（身份语义）、[004]（注入内容）、[003]/[005]（Q4 后随库结构改写：[003] 目录与单叶装载校验、[005] 单叶完整性——每规则恰中英两叶、每叶 LessonText trim 非空；身份三元组保留，落点 Algorithm F）、[006]（校验与错误面）、[007]（Levenshtein 退役）、[008]（「离散的单条 tip 选定」重述为单条 lesson 的字段组）、[009]（不涉及——每 run 恰一次 chronicle 与 tip 语义无关）、[011]（内容硬界文本扩展：512 KiB 界覆盖对象为「因果主干合并段与两节拼装正文」，见 C2.2/C6.1）、[012] / [014]（身份字段收敛）、[015]（tip 指代更新为三字段组 tipName + opinion + advice + normalize 同名判定；配对视图与「禁假 tip」语义保留）、[016]（RecentTips 协同裁剪语义在 P2 字段收敛下保留；文本评估与 G5/G1 关系注明，见 C6.1）、[017]（无效 terminal 条件清单更新：缺 tipName、opinion/advice 任一缺失/空白、tipName 超长或含换行、新旧协议混用判定）、[018]（冻结对象重设）；gd [001]（Coverage 身份）、[002]（正文来源与语言）、[003] / [005]（措辞级改写：原文「规则全文」（[003] 第 13 行）「已交付规则」（[005] 第 21 行）的指称物改为「该 occurrence 绑定的处置正文」一类表述；Frontier/Coverage 双轴与重锚恢复语义保留）、[006]（载荷读取替代查库）、[008]（Audience 重述）；gd 全集 11 条（编号无 [010]）经复核评估为不需改文本的：[004]（通用交付判定——新方案仍只依赖持久事实投影；测试 004 仅断言 presentation 恢复与 owner 隔离）、[007]（latestTipNudge → latestTipGuidance 纯委托结构（Tip.fs:197）保证字节相等，与正文来源无关）、[009]（权限语义与正文来源无关；测试 009 仅锚注入通道机械不变量）、[011]（marker 通道字节冻结机制原样复用，与正文来源解耦）、[012]（动态材料合成与冻结语义仍适用；附 M4 交互点——tip 材料单次读取在 PairProgrammingThoughtTransform.fs:1336、冻结点 1089–1098、重放不重渲染分支 1081–1085，「恢复 Full」若走 blob 重读必须落在单次读取内；行为证明为既有 todo GAP-116）。落点：schema 族（bd [006] / [008] / [017]）→ §8.1；身份族（bd [001] / [007] / [012] / [014] / [015] / [018]）→ §8.3；注入族（bd [004]）→ §8.2；交付族（gd 各条）→ §8.4。
 - provider-language 处置（本轮 devops 核实；分类裁定点，非自动改写）：[005]/[006]/[008] 无条款点名交付正文（[006] 资源文件门禁不覆盖；Tip.fs:32–35 标题串为代码常量、本就不在资源机制内）；但 [005]「完成文案」与 [013]「进入模型的 Class A 文本」字面可覆盖交付 marker 文本。裁定两分支：属 Class A → [009]「所有 Class A 文本通过统一资源机制装载」与 [013]「全局设置变化立即生效于下一次渲染」需补充/修订（与冻结回放的冲突消解）；不属 → 整套保留。裁定点列入 §9.2 边界待裁决点（S3）。
 - 全仓扫描结论（本轮 devops，53 个套件 WHAT.md）：五类语义（tip 归一化、TipName 三元组、Full 正文来源、owner 语言、冻结对象）的条款落点仅在 behavior-diagnosis 与 guidance-delivery；cognitive-environment 的「Rulebook」为 Office Library 分类词，无关。
 
@@ -295,11 +312,11 @@ D. 新字段验证强度（已定：全部必填，见 §8.1）：trim 非空与
 ### 9.1 分解（步骤与依赖）
 
 - **M0. 016 先行修复**（独立小修）：硬编码 120 改为动态派生，恢复绿。无依赖。
-- **M1. 契约定案**（设计产出，不落码）：字段表（七 camelCase + tipName，含各自描述文案键）、必填性与校验族、tipName 规范化（trim + 简单大小写折叠，C3.2）、错误面文案、文案稿（description / arg-tip（或改名后的 tipName 键）/ missing-tip / 七字段描述键，中英）、条款改写文本草案。依赖：无（§7/§8 已就位）。
-- **M2. 后端契约落地**：Codec（decodeCall / decodeTip → 七字段 + tipName 解码与校验）；ChronicleTool（schema 替换 enum → 七 string + tipName；resultForTip 替换）；Catalog（resolveByField / Levenshtein 退役，含 Surface.fs:221–227 / Surface.fsi:34 的 resolveField 包装处置，见 §8.3）；Commit（TipName 字段 + tip 处置正文 blob 通道）；Projection（RecentTip 字段收敛）；chronicle 文案资源重写与新增（三组改写 + 七字段描述叶子）。依赖：M1。
-- **M3. 提示面落地**（与 M4 可并行）：compose 双文档注入；blogger role 提示词改写（自由撰写与自由命名语义）。依赖：设计输入取自 M1（契约定案）；执行起点在 M2 之后，与 M4 同为 M2 后的独立分支（M3 ∥ M4 自 M2 落地起成立）。
-- **M4. 交付面落地**（与 M3 可并行）：新读取路径（RecentTip → fact → 新 blob ref（tip 处置正文，见 §8.4-4d）→ Read + digest）；Tip.fs Full 组装改源；语言选择退役；gd 条款与测试更新。依赖：M2。
-- **M5. 统一格式工作包**（线 B，与 M2–M4 并行）：canonical 对照表定稿 → 217 份对齐（46 + 171）→ 结构断言 + 内容验收（断言口径见 §8.5）。依赖：M1（对照表细节；实质独立）。
+- **M1. 契约定案**（设计产出，按 Q3/Q4 修订）：字段表（opinion / advice + tipName，含各自描述文案键）、必填性与校验族（opinion/advice trim 非空；tipName 校验沿用已实施面不变）、tipName 规范化（trim + 简单大小写折叠，C3.2）、错误面文案、文案稿（description / arg-opinion / arg-advice / arg-tip-name / invalid-tip，中英）、条款改写文本草案。依赖：无（§7/§8 已就位）。
+- **M2. 后端契约落地**（按 Q3/Q4 修订；归一化退役、身份与 blob 通道等已实施面沿用，见 §2.6-n）：ChronicleTool（schema 收敛为 tipName + opinion + advice + evidence；resultForTip 校验改两内容字段）；Codec（decodeCall 内容字段解码改 opinion/advice 两节；tipName 解码不变）；Model.renderTipSections（节名表改两节，见 C7.3）；Catalog/装载（EnforcerRule 单一 LessonText 取代 EnforcerText/MainText，localizedFiles 单叶映射）；chronicle 文案资源（新增 arg-opinion / arg-advice，退役 arg-what-to-do-now 族七键）。依赖：M1。
+- **M3. 提示面落地**（与 M4 可并行）：compose 两段元素注入（Name + LessonText）；EnforcerRule 装载面单叶化；blogger role 提示词与文案同步（自由命名与 opinion/advice 两节语义）。依赖：设计输入取自 M1（契约定案）；执行起点在 M2 之后，与 M4 同为 M2 后的独立分支（M3 ∥ M4 自 M2 落地起成立）。
+- **M4. 交付面落地**（与 M3 可并行；已实施，Q3/Q4 下增量 = gd-002 拼装断言随两节节名表同步）：新读取路径（RecentTip → fact → 新 blob ref（tip 处置正文，见 §8.4-4d）→ Read + digest）；Tip.fs Full 组装改源；语言选择退役；gd 条款与测试更新。依赖：M2。
+- **M5. 库重组工作包**（线 B，与 M2–M3 并行；原统一格式工作包已实施完成并由 Q4 取代）：确定性结构变换规则定稿（Algorithm F）→ 404 份旧文件变换为 202 份 lesson 文件 → program 自校验（结构断言 + 零丢失覆盖）→ 装载面切换 → 旧 4 文件退役删除 → 抽样复核。依赖：M1（lesson 结构契约；实质独立）。
 - **M6. 收尾**：全链测试（bd / gd 两套 + prefix-stability 相关）；条款一致性复查；残留清理。依赖：M2–M5。
 
 ### 9.2 边界（每步触碰与不触碰）
@@ -323,7 +340,7 @@ D. 新字段验证强度（已定：全部必填，见 §8.1）：trim 非空与
 - M2：bd-001/003/006/007/008/012/014/015/017/018（改后语义；含 Surface.fs resolveField 包装退役的测试面影响；008 的 Codec/解码断言面在此）+ chronicle 文案断言 + cc-012/014/018（previousTips 键字面替换，见 Algorithm P 的 P9）。
 - M3：bd-004/009/016（注入面）+ gd-008（装载/composer 面，逐块口径见 Algorithm I 的 I5.1–I5.3）。
 - M4：gd-001/002/003/005/006/007/008/012 + prefix-stability [010]/[011]/[014] 相关测试（004/009/011 与正文来源解耦，见 §8.6）；gd [003]/[005] 措辞级改写后核对对应断言（重锚恢复语义见 §8.6）。
-- M5：结构断言 + 内容覆盖（新验收面）。
+- M5：lesson 结构断言 + 零丢失覆盖 + 抽样复核（验收口径随 Algorithm F 更新为重组工作包）。
 - M6：两套全链。
 
 ## 10. S2 · 检验与反思（反事实与目标核验）
@@ -340,22 +357,22 @@ D. 新字段验证强度（已定：全部必填，见 §8.1）：trim 非空与
 - M2 若身份字段改名引发旧 journal 读失败（回放 / 投影）：评估向后兼容；若不可行，如实记录兼容边界（本机运行数据、无跨机承诺）并交用户裁决。
 - M3 若 prompt 体积超预算：退为「MainText 抽样注入」违背「全量灌入」裁决，需用户裁决而非自行降级。
 - M4 若 blob 读路径在交付侧装配不可达：备选「首次 Full 时把正文写入 anchor 档案，恢复以 anchor 为准」（见假设 A 备选）。
-- M5 若重写中信息不变量与结构对齐冲突：先按 C7.6 的拆分/归并规则消解（以信息不丢失为前提）；无法消解的个案记录待审并由 V 复核，结构断言不放宽、不豁免。
+- M5 若搬移中信息不变量与结构映射冲突：按 F1 的确定性映射消解（以零丢失为前提）；无法消解的个案记录待审并由 V 复核，断言不放宽、不豁免。
 - M6 若全链测试暴露条款-实现矛盾（如 gd [008] Audience 与双灌入的紧张）：回 M1 契约表重新裁决该条并同步。
 
 ### 10.3 目标状态核验（§1 逐条）
 
-1. schema 去枚举、七文本 + tipName → M1 / M2。
-2. 全量注入（双文本；语言单语为设计决定，注记于 §8.2）→ M3。
+1. schema 去枚举、opinion/advice + tipName → M1 / M2。
+2. 全量注入（每规则两段元素 Name + LessonText；语言单语为设计决定，注记于 §8.2）→ M3。
 3. 归一化退役、身份按名 → M2。
 4. 交付链骨架保留、正文换源 → M4。
-5. 101 条统一格式 → M5。
+5. 库重组为两文件制（202 份 lesson）→ M5。
 6. 条款与测试同步 → 各步内嵌 + M6 复查；另含 provider-language 分类裁定（§8.6）。
 
 ### 10.4 表象反思
 
 - 本路径是否只治「字段替换」的表象？否：确定性迁移（名字身份键 + 冻结回放 + digest 校验）与新读路径是结构性改动；库的角色转变（值域 → 样板）在 M3 / M5 落为字节。
-- 最危险的「新表象」：M5 若只加标题不改内容，将得到格式剧场——验收必须以「结构断言 + 内容覆盖」双门禁，且断言须对 known-bad 变体变红。
+- 最危险的「新表象」：重组若在搬移中改写或丢失内容，将得到失真的库——验收必须以「结构断言 + 零丢失覆盖 + 抽样复核」三重门禁（Algorithm F），断言对内容漂移变红。
 - 本路径不解决的（如实记录）：自由撰写的质量下限（用户已接受 B2 的代价）；旧运行数据的迁移；命名稳定性的长期统计。
 
 # S3 · 流程与伪代码
@@ -369,42 +386,44 @@ D. 新字段验证强度（已定：全部必填，见 §8.1）：trim 非空与
 | 里程碑 | 算法 | 内容 | 状态 |
 |---|---|---|---|
 | M0 | Algorithm A | 016 测试硬编码修复 | 已写 |
-| M1 | Algorithm C | 契约定案（字段 / 校验 / 规范化 / 错误面 / 文案 / 条款验收 / 对照表） | 已写 |
+| M1 | Algorithm C | 契约定案（字段 / 校验 / 规范化 / 错误面 / 文案 / 条款验收 / lesson 结构） | 已写 |
 | M2 | Algorithm S | ChronicleTool：schema 替换与执行期校验 | 已写 |
-| M2 | Algorithm D | Codec：八字段解码与校验 | 已写 |
+| M2 | Algorithm D | Codec：tipName 与内容字段解码与校验 | 已写 |
 | M2 | Algorithm L | Catalog：归一化退役与 Surface 包装处置 | 已写 |
 | M2 | Algorithm K | Commit：TipName 落库与处置正文 blob 通道 | 已写 |
 | M2 | Algorithm P | Projection：RecentTip 字段收敛与 previousTips 链 | 已写 |
-| M3 | Algorithm I | composeBloggerSystemPromptFor 双文档注入 | 已写 |
+| M3 | Algorithm I | composeBloggerSystemPromptFor 两段元素注入 | 已写 |
 | M3 | Algorithm B | blogger role 提示词改写 | 已写 |
 | M4 | Algorithm R | 交付读路径：载荷 → blob 重读 + digest 校验 | 已写 |
 | M4 | Algorithm G | Tip.fs Full 组装、语言选择退役、冻结交互 | 已写 |
-| M5 | Algorithm F | 统一格式工作包：批次与结构断言 | 已写 |
+| M5 | Algorithm F | 库重组工作包：确定性变换与自校验 | 已写 |
 | M6 | Algorithm V | 收尾验收：全链测试与条款一致性复查 | 已写 |
 
 执行顺序：Algorithm A 独立先行；Algorithm C 是其余算法的契约源；M2 五算法按 S → D → L → K → P 落地；M3 与 M4 在 M2 落地后并行（Algorithm I 与 Algorithm R/G 并行，M4 内 R 先于 G）；Algorithm F 与代码线并行、在 V 前完成；Algorithm V 最后。写作按里程碑顺序推进，一段可含同一里程碑内的一至多个算法。
+
+实施现状注记（Q3/Q4 修订轮）：上表 M1–M5 的七字段版与 M5 统一格式已全链实施（§2.6-n）；各算法按 Q3/Q4 裁决就地修订——C1/C2/C4/C5/C6/C7、S1/S2/S4/S6、D1/D3/D4/D5 连带、I1/I2/I5、B2/B3、F（整体改写为库重组工作包）、V1/V4 扩充；L/K/P/R/G 的已实施机制（归一化退役、身份与 blob 通道、previousTips 链、读路径、语言退役）不受 Q3/Q4 影响、维持原貌。
 
 遗留 ◇ 归属（§6 清单）：恢复 Full 实现路径 → Algorithm R/G 的 ▷；provider-language 分类裁定 → Algorithm G 的 ▷；{{rule_count}} 去留、arg-tip 改名、拼装分隔形态、Nudge 保留英文、对照表终稿、大小写折叠实现 → 本段 Algorithm C（已结断）；旧 journal 数据兼容 → Algorithm C 定原则（C8.3）、Algorithm R/G 落行为。
 §9.2「边界待裁决点（S3）」五条全部结断（其中三条不在 §6 清单）：ProviderSystemTransform 是否随合成变化改动 → I4（不动，compose 签名不变）；Surface.fs 测试面是否需暴露新读路径 → R5.1（不新增公开符号）；durable 载荷承载点 → K1.1（改既有 fact，非新 fact 类型）；旧 journal 数据兼容处置 → C8.3（不迁移原则）+ K2（兼容读）+ G5（identity-only 行为）；provider-language 分类裁定 → G7（不属 Class A，整套保留）。
 
 ## S3.1 Algorithm C [契约定案]
 
-输入：用户裁决（Q1：字段名取 main.md 七节；A1+A2 双灌入；101 条统一格式。Q2：自由命名、同名去重）；S2 六工作面结论与主路径（§8/§9）；仓库事实（§2，本任评审前经 devops 抽样复核）；S3 遗留 ◇ 清单（§6）。
+输入：用户裁决（Q1：字段名取 main.md 七节；A1+A2 双灌入；101 条统一格式——已被 Q3/Q4 收敛取代。Q2：自由命名、同名去重。Q3：内容字段收敛为 opinion/advice。Q4：库重组为每规则中英两文件 lesson）；S2 六工作面结论与主路径（§8/§9）；仓库事实（§2，本任评审前经 devops 抽样复核；实施现状见 §2.6-n）；S3 遗留 ◇ 清单（§6）。
 输出：定义 C1–C8，作为 M2–M5 各算法与条款改写的单一契约源。
 
 C1. [字段表]
-C1.1. 定八个字段名 ← ⟨whatToDoNow, whyThisMatters, repairStrategy, decisionBranches, commonWrongFixes, verification, doneWhen, tipName⟩。
-C1.2. 定七节字段与 main.md 标准节名一一对应：whatToDoNow ↔ What To Do Now；whyThisMatters ↔ Why This Matters；repairStrategy ↔ Repair Strategy；decisionBranches ↔ Decision Branches；commonWrongFixes ↔ Common Wrong Fixes；verification ↔ Verification；doneWhen ↔ Done When。 # 字段名是节名的 camelCase 化；标准节名见 C7.4。
+C1.1. 定内容字段名 ← ⟨opinion, advice⟩（加 tipName 共三字段）。 # 收敛记录：第一轮实施取八字段 ⟨whatToDoNow, whyThisMatters, repairStrategy, decisionBranches, commonWrongFixes, verification, doneWhen, tipName⟩ 并已全链落地（§2.6-n）；Q3 裁决把内容字段收敛为两个——opinion 填对当前操作的主观批判性评价、advice 提出分析经验教训后的建设性意见。未选单一大文本字段：丢失评价/建议的语义分离；未选保留七节：违背用户简明裁决。
+C1.2. 定内容字段与 lesson 顶层两节一一对应：opinion ↔ Opinion（zh 评价）；advice ↔ Advice（zh 建议）。 # 拼装节名表见 C7.3，同一真相。
 C1.3. [命名形态] ▷ 候选：camelCase；kebab-case。结论：camelCase。理由：与 chronicle 现有字段（charge / occurrence / settlement / consequence / evidence）风格一致；provider 工具的 JSON 参数名惯用 camelCase。
 C1.4. [名字字段命名] ▷ 候选：tipName；name；tip。结论：tipName。理由：tip 与旧枚举字段同名会造成新旧混淆；name 语义过泛；tipName 在「tip 的自由名」语义上唯一。
-C1.5. [必填性] ▷ 候选：八字段全部必填；部分必填。结论：全部必填。理由：与旧 tip 必填对等；Full 正文由七节拼装，缺节即残缺，且库已退为样板、无法补全。已知代价（接受）：单轮撰写负担增大（§4-D 已记录）。
+C1.5. [必填性] ▷ 候选：三字段全部必填；部分必填。结论：全部必填。理由：与旧 tip 必填对等；Full 正文由两节拼装，缺节即残缺，且库已退为样板、无法补全。已知代价（接受）：单轮撰写负担增大（§4-D 已记录）。
 C1.6. 旧 tip 枚举字段退役：新 schema 不含枚举 tip；执行期与解码期不再把任何非空 tip 串归一化映射到库内规则（resolveByField / Levenshtein 家族退役，步骤见 Algorithm L）。 # 八字段与旧 tip 无并存期。
-C1.7. [字段顺序] 定 schema 字段顺序 ← charge、occurrence、settlement、consequence、tipName、whatToDoNow、whyThisMatters、repairStrategy、decisionBranches、commonWrongFixes、verification、doneWhen、evidence。理由：因果脊 → 教训命名 → 七节内容 → 证据；evidence 沿用现状（可选 string），不参与本次改造。
+C1.7. [字段顺序] 定 schema 字段顺序 ← charge、occurrence、settlement、consequence、tipName、opinion、advice、evidence。理由：因果脊 → 教训命名 → 评价与建议两节 → 证据；evidence 沿用现状（可选 string），不参与本次改造。
 
 C2. [校验族]
-C2.1. 定单字段校验 ← trim 后非空（沿用 tryCanonicalText 现族），适用七节字段与 tipName。
-C2.2. 定正文界 ← MaxBlogTextBytes = 512 KiB（沿用）；校验对象 = 因果主干合并段（MergedText）与七节拼装正文（TipSectionsText）两者；承载 = validateContentBounds/validateBounds 扩展（Decode.fs:242 生产调用点、Surface.fs:209 JS 面包装同步）；超限 = fail-closed 拒绝（沿用 contentBoundsError 字符串错误；cycle 不成立、不落 blob；不映射 invalid-tip 工具文案，见 D4.2、K3）。 # 界为 fail-closed 拒绝，不是截断。
-C2.3. 排除 MaxInlineEvidenceChars = 1024（evidence 专属）；不新增七节单字段字符界（现状内容字段亦无）。
+C2.1. 定单字段校验 ← trim 后非空（沿用 tryCanonicalText 现族），适用内容字段（opinion/advice）与 tipName。
+C2.2. 定正文界 ← MaxBlogTextBytes = 512 KiB（沿用）；校验对象 = 因果主干合并段（MergedText）与两节拼装正文（TipSectionsText）两者；承载 = validateContentBounds/validateBounds 扩展（Decode.fs:242 生产调用点、Surface.fs:209 JS 面包装同步）；超限 = fail-closed 拒绝（沿用 contentBoundsError 字符串错误；cycle 不成立、不落 blob；不映射 invalid-tip 工具文案，见 D4.2、K3）。 # 界为 fail-closed 拒绝，不是截断。
+C2.3. 排除 MaxInlineEvidenceChars = 1024（evidence 专属）；不新增内容单字段字符界（现状内容字段亦无）。
 C2.4. [tipName 界] ▷ 候选：不设界（仅非空）；设「单行、200 字符」界。结论：设界；「字符」计量单位 = .NET String.Length（UTF-16 code units；与 MaxInlineEvidenceChars=1024 同族——Codec.fs:58 定义、L109 判定；与 512 KiB / 128 KiB 族的 UTF-8 字节计数相区分，后者经 SyntheticToml.byteCount 链用于正文体量）。理由：tipName 以原串进入交付 marker（「tip: <name>」与「tip = "<name>"」）与投影展示面；换行破坏行结构，200 字符封住病态超长名；与「名字应短」的语义相称。
 C2.5. 定校验顺序：先 trim；再查不含 \n 与 \r；再查字符数（String.Length）≤ 200；最后取非空。
 C2.6. 定类型校验：八字段均须为 string；非串在解码期拒绝（沿用现状语义，见 Algorithm D）。
@@ -418,72 +437,63 @@ C3.4. [存原串还是规范形] ▷ 候选：存规范化名；存原串。结�
 C3.5. 定同名语义：normalize(a) = normalize(b) 即同名；同名时交付走 identity-only。 # 大小写或首尾空白之差视为同名。
 
 C4. [错误面]
-C4.1. 定内部错误标识 ← ⟨missing-tip-name, missing-tip-field:<field>, tip-name-too-long, tip-name-multiline, tip-field-not-a-string⟩；测试锚定。产生面分层（与 S4.1 的读取原语裁决一致）：missing-tip-name / missing-tip-field:<field> / tip-name-too-long / tip-name-multiline 由执行期与解码期两期产生；tip-field-not-a-string 仅由解码期产生（执行期读取面 HostToolArguments.Text 把非 string 归 ""、落 missing-tip-name，见 S4.1）。<field> ▷ 候选：camelCase 字段名；本地化节名。结论：camelCase 字段名（与 C1.1 同源，如 missing-tip-field:repairStrategy）。理由：与 provider 字段名同源、测试锚定不随会话语言漂移；内部标识无展示消费者。
-C4.2. [文案面] ▷ 候选：每个标识各配文案键；单一键覆盖全部无效 tip。结论：单一键。理由：blogger 是唯一消费者，修复动作相同（补齐名字与七节）；文案面最小。invalid-tip 文案只作用于工具执行期的 blogger 面；解码期返回 C4.1 内部标识本身、不映射文案（D2/D5.2）。
+C4.1. 定内部错误标识 ← ⟨missing-tip-name, missing-tip-field:<field>, tip-name-too-long, tip-name-multiline, tip-field-not-a-string⟩；测试锚定。产生面分层（与 S4.1 的读取原语裁决一致）：missing-tip-name / missing-tip-field:<field> / tip-name-too-long / tip-name-multiline 由执行期与解码期两期产生；tip-field-not-a-string 仅由解码期产生（执行期读取面 HostToolArguments.Text 把非 string 归 ""、落 missing-tip-name，见 S4.1）。<field> ▷ 候选：camelCase 字段名；本地化节名。结论：camelCase 字段名（与 C1.1 同源，如 missing-tip-field:opinion / missing-tip-field:advice）。理由：与 provider 字段名同源、测试锚定不随会话语言漂移；内部标识无展示消费者。
+C4.2. [文案面] ▷ 候选：每个标识各配文案键；单一键覆盖全部无效 tip。结论：单一键。理由：blogger 是唯一消费者，修复动作相同（补齐名字与两节）；文案面最小。invalid-tip 文案只作用于工具执行期的 blogger 面；解码期返回 C4.1 内部标识本身、不映射文案（D2/D5.2）。
 C4.3. [键名] ▷ 候选：保留 missing-tip；改名 invalid-tip。结论：invalid-tip。理由：错误面从「缺失」扩为「缺失或不合规（缺节、超长、含换行）」，键名与语义对齐；旧键无外部消费者（§2.6-a 已核实引用面）。
-C4.4. 定 invalid-tip 文案：en「The tip is invalid: give it a short name and write all seven sections.」；zh「这条 tip 无效：请给出简短的名字，并写全七节内容。」。
+C4.4. 定 invalid-tip 文案：en「The tip is invalid: give it a short name and write both the opinion and the advice.」；zh「这条 tip 无效：请给出简短的名字，并写好评价与建议两节内容。」。
 C4.5. 保留 remembered 与 nothing-to-remember 两键原义（§2.6-a 已核实不涉 tip 语义）。
 
 C5. [文案资源]
-C5.1. 新增七键（en + zh-CN 成对叶子）：tool/chronicle/arg-what-to-do-now、arg-why-this-matters、arg-repair-strategy、arg-decision-branches、arg-common-wrong-fixes、arg-verification、arg-done-when。
+C5.1. 新增两键（en + zh-CN 成对叶子）：tool/chronicle/arg-opinion、arg-advice。 # 第一轮实施的新增七键 arg-what-to-do-now / arg-why-this-matters / arg-repair-strategy / arg-decision-branches / arg-common-wrong-fixes / arg-verification / arg-done-when 及其 Path 常量随 Q3 退役（退役面见 S6/V4）。
 C5.2. 改名 arg-tip → arg-tip-name；退役旧键 arg-tip。 # 键无外部消费者。
-C5.3. 定七节描述文案（en；落资源文件时允许风格级微调，语义不得变更）：
-  arg-what-to-do-now:「The action to take now: what this lesson asks the reader to do in the same situation, stated concretely.」
-  arg-why-this-matters:「Why it matters: the cost of the wrong action and the value of the right one.」
-  arg-repair-strategy:「The repair strategy: how to carry the action out, step by step.」
-  arg-decision-branches:「The decision branches: which variant fits which situation.」
-  arg-common-wrong-fixes:「Common wrong fixes: plausible repairs that fail, and why they fail.」
-  arg-verification:「How to verify the fix holds: the checks that would catch a wrong fix.」
-  arg-done-when:「The done condition: what must be true for this lesson to be satisfied.」
-  arg-tip-name:「A short free-form name for this tip. Reuse the same name when the same lesson recurs; names equal up to case and surrounding spaces are the same name.」
-C5.4. 定七节描述文案（zh-CN；与 C5.3 一一对应，同微调约定）：
-  arg-what-to-do-now:「现在该做什么：这条教训要求读者在同样处境下采取的具体行动。」
-  arg-why-this-matters:「为什么重要：做错要付出什么代价，做对有什么价值。」
-  arg-repair-strategy:「修复策略：怎样一步步把这个行动落到实处。」
-  arg-decision-branches:「决策分支：什么情形下走哪一条路。」
-  arg-common-wrong-fixes:「常见假修复：看着像修复却会失败的做法，以及它们为什么失败。」
-  arg-verification:「验证：怎样核验修复真正成立，哪些检查能抓住错的修复。」
-  arg-done-when:「完成条件：必须满足什么，这条教训才算被遵守。」
-  arg-tip-name:「为这条 tip 自由命名，保持简短。同一教训再次出现时沿用同一个名字；只有大小写或首尾空白不同的名字视为同名。」
-C5.5. 改写 description：en「tipName and seven sections are required: name this reusable lesson freely and write the seven sections; the {{rule_count}} Rulebook entries are format samples to borrow from, not a closed set.」；zh「tipName 与七节内容均为必填：请自由命名这条可复用教训并写全七节；上下文中的 {{rule_count}} 条 Rulebook 条目是格式样板，不是必须选择的封闭集合。」
+C5.3. 定内容字段描述文案（en；落资源文件时允许风格级微调，语义不得变更）：
+  arg-opinion:「Your critical opinion of the current operation: judge frankly what this concrete transition did well or badly, and why.」
+  arg-advice:「Constructive advice drawn from this transition's lesson: what to do differently next time, stated concretely.」
+  arg-tip-name:「A short free-form name for this tip. Reuse the same name when the same lesson recurs; names equal up to case and surrounding spaces are the same name.」 # 原义保留。
+C5.4. 定内容字段描述文案（zh-CN；与 C5.3 一一对应，同微调约定）：
+  arg-opinion:「对当前操作的批判性评价：坦率判断这次具体转折做得好在哪里、差在哪里，为什么。」
+  arg-advice:「从这次转折的经验教训中得出的建设性意见：下次具体该怎么做，要落到实处。」
+  arg-tip-name:「为这条 tip 自由命名，保持简短。同一教训再次出现时沿用同一个名字；只有大小写或首尾空白不同的名字视为同名。」 # 原义保留。
+C5.5. 改写 description：en「tipName, opinion and advice are required: name this reusable lesson freely, give your critical opinion of the current operation, and offer constructive advice from its lesson; the {{rule_count}} Rulebook entries are format samples to borrow from, not a closed set.」；zh「tipName、评价与建议均为必填：请自由命名这条可复用教训，对当前操作给出批判性评价，并从教训中提出建设性意见；上下文中的 {{rule_count}} 条 Rulebook 条目是格式样板，不是必须选择的封闭集合。」
 C5.6. [{{rule_count}}] ▷ 候选：删除；保留并改语义为「样板库规模」。结论：保留。理由：数值真实（当前 101）；对 blogger 是样板规模的有用信号；语义更新只在文案内完成，无机制改动。
-C5.7. [blogger role 提示词] 定改写要点（文本随 Algorithm B 落地）：① 删除「Choose exactly one Rulebook TipName」类措辞；② 明确 tipName 自由命名、可自创新名、同名沿用；③ 明确七节自由撰写、库为 bootstrap 与格式样板；④ 保留「tip 是可复用教训、具体字段描述这次具体转折」的因果脊语义（原「the other four fields」措辞随字段拆分更新）。
+C5.7. [blogger role 提示词] 定改写要点（文本随 Algorithm B 落地）：① 删除「Choose exactly one Rulebook TipName」类措辞；② 明确 tipName 自由命名、可自创新名、同名沿用；③ 明确 opinion 与 advice 两节自由撰写（评价与建议各司其职）、库为 bootstrap 与格式样板；④ 保留「tip 是可复用教训、具体字段描述这次具体转折」的因果脊语义（原「the other four fields」措辞随字段拆分更新为现字段指代）。
 C5.8. 定资源契约：新增字段文案须新增显式 Path 常量与成对叶子；缺键导致资源读取失败（上游严格配对，无 fallback）。 # 启动期契约，非错误面。
 
 C6. [条款改写验收]
 C6.1. 逐条改写要点（文本按 C6.6 落点表随对应算法同步定稿；以下为验收标准）：
   bd [001]：保留目录 basename = RuleId = FieldName 的库内单一真相；删除「tip 必归一到 TipName」；新增「tip 身份 = blogger 自由命名 + normalize 比较」。
-  bd [003]：不改（库内身份三元组与目录校验保留，作身份面回归）。
-  bd [005]：不改（本地化叶子完整性合同——正文非空且 TipName / RuleId / FieldName 恒等——不随改造变化；库文件结构不动，作身份面回归，与 bd [003] 同列）。
-  bd [004]：注入内容改为「基础 Blogger prompt、# Enforcer Rulebook 标题、全部规则的 Name、EnforcerText 与 MainText 三段按 LexicalOrder 拼接（渲染沿用既有注释机制：逐元素 `# ` 前缀、元素间单换行；rule.Name 为裸目录名元素）」。
-  bd [006]：校验与错误面改为 C2 校验族与 C4 单一 invalid-tip 文案；删除「无逃逸、必解析」表述。
+  bd [003]：改写（Q4）——目录打包与装载校验随库单叶化更新：localizedFiles 单叶映射（English → lesson.md、zh-CN → lesson.zh-CN.md）、每规则 LessonText trim 非空；目录 basename = TipName = RuleId 身份三元组保留，作身份面回归。
+  bd [005]：改写（Q4）——本地化叶子完整性改为单叶合同：每规则恰中英两叶、每叶 LessonText trim 非空；TipName / RuleId 身份保留（与 bd [001]/[003] 同列）。
+  bd [004]：注入内容改为「基础 Blogger prompt、# Enforcer Rulebook 标题、全部规则的 Name 与 LessonText 两段按 LexicalOrder 拼接（渲染沿用既有注释机制：逐元素 `# ` 前缀、元素间单换行；rule.Name 为裸目录名元素）」。
+  bd [006]：校验与错误面改为 C2 校验族与 C4 单一 invalid-tip 文案（字段列举随 C1.1 定稿：tipName、opinion、advice）；删除「无逃逸、必解析」表述。
   bd [007]：归一化映射条款整体删除（resolveByField、Levenshtein 最近邻、并列取最小）；不保留同义条款；不误伤 LexicalOrder 的排序用途。 # 排序用途与归一化无关。
-  bd [008]：「离散的单条 tip」重述为「单条 lesson 的八字段组同批提交」；数值评分与桥接字段禁令保留。
-  bd [011]：内容硬界文本扩展——原文「新协议四句正文」的 512 KiB 界覆盖对象更新为「因果主干合并段（MergedText）与七节拼装正文（TipSectionsText）」，与 C2.2 的 validateBounds 扩展一致；inline evidence 1024 字符界与「独立 evidence 通道为空」不变。
+  bd [008]：「离散的单条 tip」重述为「单条 lesson 的三字段组（tipName + opinion + advice）同批提交」；数值评分与桥接字段禁令保留。
+  bd [011]：内容硬界文本扩展——原文「新协议四句正文」的 512 KiB 界覆盖对象更新为「因果主干合并段（MergedText）与两节拼装正文（TipSectionsText）」，与 C2.2 的 validateBounds 扩展一致；inline evidence 1024 字符界与「独立 evidence 通道为空」不变。
   bd [009]：不改。
   bd [012]：原子提交对象改为「TipName 原串 + 处置正文 ref/digest」（字段细节见 Algorithm K）。
   bd [014]：RecentTip 容量 8 保留；字段收敛为 ⟨TipName, CycleId⟩（见 Algorithm P）。
   bd [016]：RecentTips 协同裁剪语义保留——squash 时按 1:1 共同裁剪最老 min(K, tips) 条 RecentTips、不新增 tip、不触发新交付；P2 字段收敛后裁剪单位随 ⟨TipName, CycleId⟩；文本不涉字段名故可不改，但须注明「无处置正文 ref 的旧 occurrence 不触发新 Full（G5 identity-only）」与「不新增 tip、不触发新交付」同向。
-  bd [015]：tip 指代更新为「八字段组 + normalize 同名判定」；配对视图与禁假 tip 语义保留；配对视图实现随字段收敛同步（Observation.fs:26–31 改取 TipName、ObservationSurface.fs:168–181 输入面与 99–103 输出面收敛，见 K6.1/K6.2）。
-  bd [017]：无效 terminal 条件更新为「缺 tipName、任一节空白、tipName 超长或含换行、新旧协议混用」。
+  bd [015]：tip 指代更新为「三字段组（tipName + opinion + advice）+ normalize 同名判定」；配对视图与禁假 tip 语义保留；配对视图实现随字段收敛同步（Observation.fs:26–31 改取 TipName、ObservationSurface.fs:168–181 输入面与 99–103 输出面收敛，见 K6.1/K6.2）。
+  bd [017]：无效 terminal 条件更新为「缺 tipName、opinion/advice 任一空白、tipName 超长或含换行、新旧协议混用」。
   bd [018]：冻结对象重设为 ⟨字段表与必填性、校验族版本、normalize 算法版本、库目录集与文本⟩；删除旧三项（chronicle.tip 枚举、解码映射表、Main 处置索引）。
   gd [001]：Coverage 身份单位改为 normalize(tipName)；Frontier 按 occurrence 保留。
   gd [002]：Full = 标题 + tipName 原串 + 处置正文（撰写语言）；删除 owner 语言查库选择。
   gd [003]/[005]：措辞级——「规则全文」→「该 occurrence 绑定的处置正文」；「已交付规则」→「已交付处置」；双轴与重锚恢复语义保留。
   gd [006]：载荷读取改为「从 occurrence 载荷取处置正文 ref 读回」，删除 tryFindByField 查库。
-  gd [008]：Audience 按三分语义重述——检测文本（库 enforcer）仅进 Blogger 上下文、不进交付；库处置文本（main.md）作为样板进 Blogger 上下文（Q1 裁决 A1+A2）、退出交付正文来源；交付正文（撰写七节）仅 Main；「Blogger 历史为低信任观察」定性保留（previousTips 注入面语义见 Algorithm P 的 P6–P10）。 # 「处置正文」指称物由库 main.md 更新为撰写正文；双灌入的样板例外据此容纳。
+  gd [008]：Audience 按三分语义重述（Q4 后）——库单文档（lesson）作为样板进 Blogger 上下文、退出交付正文来源（检测/处置分套已随库重组消失，lesson 内子节不再区分 audience）；交付正文（撰写 opinion/advice 两节）仅 Main；「Blogger 历史为低信任观察」定性保留（previousTips 注入面语义见 Algorithm P 的 P6–P10）。 # 「处置正文」指称物为撰写正文；双灌入的样板例外由单文档 lesson 容纳。
   gd [004]/[007]/[009]/[011]/[012]：不改文本；其中 [011] 冻结机制与 [012] 动态材料语义原样复用。
 C6.2. provider-language 分类裁定（交付 marker 文本是否属 Class A）转 Algorithm G 的 ▷；两分支的改文本范围已定：属 Class A → 修订 provider-language [009]/[013]；不属 → 整套保留。 # 本算法唯一转出项。
 C6.3. 全仓条款检索验收：改造后对五类语义（tip 归一化、TipName 三元组、Full 正文来源、owner 语言、冻结对象）做只读扫描，确认落点仅在 bd 与 gd 两套。 # 复核 §8.6 结论。
-C6.4. [018 锚点] 定 bd-018 测试锚点改造要点：018.test.mjs 现断言（fieldNames == rules.map、tryFindByField 一致性、decodeCall 携带 tip 的一致性）改为——① 目录身份与字段表一致性断言保留；② enum 冻结视图断言改为新语义：新八字段下 decodeCall 合规（tipName 保留 trim 后原串、七节解码）与缺 tipName/旧形态的稳定拒绝；③ tryFindByField 保留作身份面回归（与 bd [003] 一致），其一致性断言沿用。 # RulebookRevision 在代码中不存在（本任已复核，仅需求文本两处）；「冻结视图」由 RuntimeResources 承载，「BIRTH 不改视图」沿用既有 todo（GAP-112），不新开工作面。落点：L5.1。
+C6.4. [018 锚点] 定 bd-018 测试锚点改造要点：018.test.mjs 现断言（fieldNames == rules.map、tryFindByField 一致性、decodeCall 携带 tip 的一致性）改为——① 目录身份与字段表一致性断言保留；② enum 冻结视图断言改为新语义：新三字段（tipName + opinion + advice）下 decodeCall 合规（tipName 保留 trim 后原串、内容字段解码）与缺 tipName/旧形态的稳定拒绝；③ tryFindByField 保留作身份面回归（与 bd [003] 一致），其一致性断言沿用。 # RulebookRevision 在代码中不存在（本任已复核，仅需求文本两处）；「冻结视图」由 RuntimeResources 承载，「BIRTH 不改视图」沿用既有 todo（GAP-112），不新开工作面。落点：L5.1。
 C6.5. [bd-001 保留] 001.test.mjs 只断言库目录打包身份（rules.map(name) / fieldNames() / ruleId / fieldName = basename，L12–17），不消费 chronicle tip、不含归一化符号（本任 devops 已核实，见 §2.6-i）；改造后原样保留、按改后语义重跑（与 §2.4 的 003 保留同列）。
 
 C6.6. [条款落地落点表] 每条须改写条款的唯一归属落点如下（改写对象 = requirements/behavior-diagnosis/WHAT.md 或 requirements/guidance-delivery/WHAT.md 的对应条目；改写口径见 C6.1 对应行）：
   - bd [001] / bd [007]：Algorithm L 的 L6（整体改写 / 整体删除；落点已写）。
-  - bd [004]：Algorithm I 的 I1 落地同批（整体改写）。
-  - bd [006]：Algorithm S 的 S4/S5 与 Algorithm D 的 D2/D5 落地同批（整体改写）。
+  - bd [003] / bd [005]：Algorithm F 落地同批（库结构单叶化与 LessonText 单字段校验；整体改写）。
+  - bd [004]：Algorithm I 的 I1 落地同批（整体改写；两段元素）。
+  - bd [006]：Algorithm S 的 S4/S5 与 Algorithm D 的 D2/D3/D5 落地同批（整体改写）。
   - bd [008]：Algorithm S 的 S2 落地同批（整体改写）。
-  - bd [011]：Algorithm D 的 D4.2 落地同批（文本扩展：硬界覆盖对象含七节拼装正文）。
+  - bd [011]：Algorithm D 的 D4.2 落地同批（文本扩展：硬界覆盖对象含两节拼装正文）。
   - bd [012]：Algorithm K 的 K1/K3 落地同批（整体改写）。
   - bd [014]：Algorithm P 的 P1/P2 落地同批（整体改写）。
   - bd [016]：Algorithm P 的 P2 落地同批（语义核对；文本不涉字段名，处置见 C6.1 的 bd [016] 行）。
@@ -495,20 +505,17 @@ C6.6. [条款落地落点表] 每条须改写条款的唯一归属落点如下�
   - gd [003]/[005]：Algorithm G 的 G8 落地同批（措辞级）。
   - gd [006]：Algorithm R 的 R5（整体改写；落点已写）。
   - gd [008]：Algorithm I 的 I5.1–I5.3 与 Algorithm G 的 G8 落地同批（整体改写；三分语义）。
-  不改文本者（bd [003]/[005]/[009]、gd [004]/[007]/[009]/[011]/[012]）不设落点。 # 本表为条款改写落点的唯一权威；执行者随对应算法落地，V1 按本表逐条核查。
+  不改文本者（bd [009]、gd [004]/[007]/[009]/[011]/[012]）不设落点。 # 本表为条款改写落点的唯一权威；执行者随对应算法落地，V1 按本表逐条核查。
 
-C7. [M5 对照表定稿]
-C7.1. canonical 中文节名（enforcer）：定义 / 支配原则 / 何时触发 / 不应触发 / 与相邻规则区分 / 判定程序 / 例子 / Nudge。
-C7.2. canonical 英文节名（enforcer）：Definition / Governing Principle / Trigger When / Do Not Trigger When / Distinguish From / Decision Procedure / Examples / Nudge。
-C7.3. canonical 中文节名（main）：现在该做什么 / 为什么重要 / 修复策略 / 决策分支 / 常见假修复 / 验证 / 完成条件。
-C7.4. canonical 英文节名（main）：What To Do Now / Why This Matters / Repair Strategy / Decision Branches / Common Wrong Fixes / Verification / Done When。
-C7.5. [Nudge] ▷ 候选：保留英文；译为「提醒」。结论：保留英文。理由：唯一完整翻译族已用 Nudge；与英文标准逐字一致便于结构断言；「提醒」已被五节变体占用为退役措辞，复用会造新歧义。
-C7.6. 退役措辞与 canonical 落点（对齐后旧词不得出现）：刀口 → 内容归并「判定程序」（可执行判据与处置指引；若个别文件混有理念性内容，拆分至「支配原则」）；提醒 → 「Nudge」（格言式恒久事实；Nudge 保留英文）；不要误判 → 不应触发；分支判断 → 决策分支；为什么这很重要 → 为什么重要；与近邻区分 → 与相邻规则区分。个别文件无法唯一归并时按 F2 内容不变量优先、记 §10.2 待审。
-C7.7. 对齐集合与断言口径：en 侧 46 份（23 个双侧无节目录 × 2）；zh 侧 171 份（非同构 161 + 待替换 10：英文标题 9 + 「分支判断」1）。结构断言对全部 404 份文件执行（en 202 + zh 202），按文件语言选择序列表：en 文件按 C7.2 / C7.4 序列，zh 文件按 C7.1 / C7.3 序列；10 份待替换文件（9 份英文标题 + duplicated-control-flow 的 main）先替换为 canonical 中文名再入 zh 检查。
-C7.8. [七字段拼装分隔形态] ▷ 候选：带小标题拼装；合并段。结论：带小标题。理由：与现状 Full（main.md 正文含节标题）形态同构；让 Main 端按节引用稳定；样板意图在交付侧延续。拼装标题按会话（撰写）语言取 C7.3 / C7.4 的 main 集。 # 与 C1.2 的节名映射共用同一真相。
+C7. [lesson 结构与拼装节名表定稿]（Q4 后取代原「M5 对照表定稿」；原 canonical 节名对照已随 M5 完成沉淀为子节搬移映射的源侧依据，见 §2.6-e）
+C7.1. 定库文件结构：resources/enforcer/<TipName>/{lesson.md, lesson.zh-CN.md} 共 202 份；H1 = 「# <TipName> — Lesson」（en/zh 同）；顶层两节 en =「## Opinion」「## Advice」、zh =「## 评价」「## 建议」。
+C7.2. 定子节搬移映射（确定性；节正文原样搬运、零改写、零丢失）：en lesson 的 Opinion 收 enforcer.md 的 Definition / Governing Principle / Trigger When / Do Not Trigger When / Distinguish From / Decision Procedure / Examples 七节原序，各节降级为 ### 子节；Advice 收 main.md 的 What To Do Now / Why This Matters / Repair Strategy / Decision Branches / Common Wrong Fixes / Verification / Done When 七节原序（同降级），殿后收 enforcer.md 的 Nudge（### Nudge）。zh 同构：评价收 enforcer.zh-CN.md 的定义 / 支配原则 / 何时触发 / 不应触发 / 与相邻规则区分 / 判定程序 / 例子；建议收 main.zh-CN.md 的现在该做什么 / 为什么重要 / 修复策略 / 决策分支 / 常见假修复 / 验证 / 完成条件，殿后收 Nudge（### Nudge，英文名保留——原 C7.5 的 Nudge 裁决沿用）。 # 子节名即 M5 完成后的 canonical 节名（en 侧英文原节名、zh 侧原中文名）。
+C7.3. 定 renderTipSections 拼装节名表：en = [Opinion, Advice]、zh = [评价, 建议]；拼装形态沿用已实施现状——「## <节名> + 空行 + 节文」段、段间空行、单一文本、无尾随换行。 # 与 C1.2 的字段—节映射共用同一真相。
+C7.4. 定退役文件：每目录旧 4 文件（enforcer.md / main.md / enforcer.zh-CN.md / main.zh-CN.md）在 lesson 校验全绿后删除；最终库 = 101 目录 × 2 = 202 份。
+C7.5. [变换性质] ▷ 重组为确定性结构变换（标题降级与内容搬移），非内容性重写：与仓库「严禁自动化程序批量增删改查程序代码」纪律不冲突——对象是资源文件、变换是确定性搬移、正文零改写由 program 自校验断言保证（F2）。
 
 C8. [遗留处置与异常]
-C8.1. 本算法结断：字段与命名（C1）、校验（C2）、规范化（C3）、错误面（C4）、文案键与文案（C5）、条款改写验收（C6，provider-language 除外）、对照表与拼装形态（C7）。
+C8.1. 本算法结断：字段与命名（C1）、校验（C2）、规范化（C3）、错误面（C4）、文案键与文案（C5）、条款改写验收（C6，provider-language 除外）、lesson 结构与拼装节名表（C7）。
 C8.2. 转出：恢复 Full 实现路径 → Algorithm R/G；provider-language 分类裁定 → Algorithm G；旧数据行为 → Algorithm R/G（原则见 C8.3）。
 C8.3. [旧数据原则] ▷ 候选：迁移旧事实；按「历史已消费」处理。结论：不迁移、不重建 Full、不报错；旧事实的 TipRuleId 按 TipName 语义继承（字符串身份不变），其无处置正文 ref 的 occurrence 不触发新 Full；冻结 marker 字节回放不受影响。理由：本机数据、无跨机承诺；旧 Full 的交付记录（TipGuidanceDelivered）与 marker 已冻结在案；重建 Full 会引入第二真相源或不可得字节。精确行为（跳过或 identity-only）在 Algorithm G 的 ▷ 结断。 # 与 gd-005 断言的潜在冲突留给 Algorithm G。
 C8.4. [异常] 若 C1–C8 任一定义与 §2 已核实事实冲突，则暂停结案，记录冲突全文，回退该条重裁；不得带冲突进入 M2。
@@ -537,46 +544,46 @@ A6. [绿] 通过则返回修改后文本。算法终止。
 输入：C1、C2、C4、C5 定稿（Algorithm C）；ChronicleTool.fs 现状（150–200 行，本任已复核）；ChronicleExecution 校验族（tryCanonicalText）。
 输出：ChronicleTool.fs 的 spec 装配与执行期校验修改后文本；ChronicleExecution 的校验族扩展。
 
-S1. [字段重排] spec 的 Arguments 顺序 ← charge、occurrence、settlement、consequence、tipName、whatToDoNow、whyThisMatters、repairStrategy、decisionBranches、commonWrongFixes、verification、doneWhen、evidence（C1.7）。
-S1.1. [裁决] ▷ 候选：evidence 保持现状位置；移到末位。结论：移末位。理由：C1.7 既定序把七节正文集中在 tipName 之后；evidence 为可选证据殿后，不插入正文段。
-S2. [schema 替换] 删除 tip 的 enumSchemaDescribed 字段；tipName 与七节 ← stringSchemaDescribed，逐字段 description ← ProviderProse.render(language, Path.ArgTipName 与七个新键)（C5.1/C5.2）。
+S1. [字段重排] spec 的 Arguments 顺序 ← charge、occurrence、settlement、consequence、tipName、opinion、advice、evidence（C1.7）。
+S1.1. [裁决] ▷ 候选：evidence 保持现状位置；移到末位。结论：移末位。理由：C1.7 既定序把两节正文集中在 tipName 之后；evidence 为可选证据殿后，不插入正文段。
+S2. [schema 替换] 删除 tip 的 enumSchemaDescribed 字段；tipName、opinion、advice ← stringSchemaDescribed，逐字段 description ← ProviderProse.render(language, Path.ArgTipName / Path.ArgOpinion / Path.ArgAdvice)（C5.1/C5.2）。
 S3. [描述] catalogDescription ← C5.5 文本；rule_count 占位由实测条数保留填充（C5.6）。
-S4. [校验族] 于 ChronicleExecution 扩展：tryCanonicalText 沿用（trim 非空）；新增 tipName 检查，判定序（此列序即判定序）：读取 tipName 值（读取原语见 S4.1）→ trim 空（含缺失/undefined/非 string 经读取面归并者）→ missing-tip-name；含换行或回车 → tip-name-multiline；字符数（String.Length）大于 200 → tip-name-too-long；七节逐节缺失或空白 → missing-tip-field:<camelCase 字段名>（C2.5/C2.6/C4.1，如 missing-tip-field:repairStrategy）。evidence 不入族（C2.3）。
+S4. [校验族] 于 ChronicleExecution 扩展：tryCanonicalText 沿用（trim 非空）；新增 tipName 检查，判定序（此列序即判定序）：读取 tipName 值（读取原语见 S4.1）→ trim 空（含缺失/undefined/非 string 经读取面归并者）→ missing-tip-name；含换行或回车 → tip-name-multiline；字符数（String.Length）大于 200 → tip-name-too-long；内容字段逐个缺失或空白 → missing-tip-field:<camelCase 字段名>（C2.5/C2.6/C4.1，如 missing-tip-field:opinion）。evidence 不入族（C2.3）。
 S4.1. [读取原语裁决] ▷ 候选：沿用 args.Text（执行期只判缺失/空白/换行/超长，类型分层交解码期）；新增字符串面区分读取原语（Result<string option, unit> 形，仿 HostToolArguments.OptionalNonNegativeInteger）；经 HostToolArguments.Raw 自解析。结论：沿用 args.Text。理由：HostToolArguments.Text（ToolHostCodec.fs:233–240）把「键缺失」与「非 string」同归 ""，无法承担 D2 的 None/非 string 分家；执行期目的（给 blogger invalid-tip 文案，C4.2 单一文案）已由缺失/空白/换行/超长四类判足，非 string 经 Text 归 "" 后落 missing-tip-name、与 D2 的 None 分支一致；类型层分家由解码期 decodeTipName（D2.1）承担，C2.6「非串在解码期拒绝」即此分层；新增原语会把 ToolHostCodec 拉入触碰面、违反 L4/R5.1 的最小公开面原则。已知代价（接受）：执行期对非 string tipName 返回 missing-tip-name 而非 tip-field-not-a-string，两期内部标识在类型面上分层——C4.1 措辞据此收窄。 # 读取面事实：ChronicleTool 现状三处 args.Text 调用（L111 四字段、L116 evidence、L123 tip），无区分类型读法；数值面 OptionalNonNegativeInteger 与 Raw 为仓内区分/原始解析先例（本任 devops 复核）。
-S5. [执行期调用] 以新校验替换 resultForTip：取 args 的 tipName 与七节值逐个过 S4；任一失败 → 以 invalid-tip 文案返回（C4.3/C4.4，语言按会话）；全部通过 → remembered（C4.5）。删除 resolveByField 调用。
+S5. [执行期调用] 以新校验替换 resultForTip：取 args 的 tipName、opinion、advice 值逐个过 S4；任一失败 → 以 invalid-tip 文案返回（C4.3/C4.4，语言按会话）；全部通过 → remembered（C4.5）。删除 resolveByField 调用。
 S5.1. [失败路径] 失败不落库、不投影、不改状态；错误面走既有工具错误通道。
-S6. [文案键] 确认 Path 常量与 en/zh-CN 成对叶子：七字段键、arg-tip-name、invalid-tip（新增；文案见 C4.4）；退役 arg-tip 与 missing-tip 键（C5.1/C5.2/C5.8）。
+S6. [文案键] 确认 Path 常量与 en/zh-CN 成对叶子：arg-opinion、arg-advice、arg-tip-name、invalid-tip（文案见 C4.4）；退役 arg-what-to-do-now 族七键及其 Path 常量、arg-tip 与 missing-tip 键（C5.1/C5.2/C5.8）。
 S7. 返回修改后文本。算法终止。
 
 ## S3.4 Algorithm D [Codec：八字段解码与校验]
 
-输入：C1、C2、C4、C7.3/C7.4、C7.8 定稿；Codec.fs 现状（CanonicalBlogCall 约 24–26 行、decodeCall 约 159–165 行、decodeTip 约 87–94 行、decodeTipString 约 70–85 行）。
-输出：Codec.fs 的解码、校验与载荷构造修改后文本；七节拼装函数。
+输入：C1、C2、C4、C7.3 定稿；Codec.fs 现状（CanonicalBlogCall 约 24–26 行、decodeCall 约 159–165 行、decodeTip 约 87–94 行、decodeTipString 约 70–85 行）。
+输出：Codec.fs 的解码、校验与载荷构造修改后文本；两节拼装函数。
 
-D1. [载荷形态] CanonicalBlogCall ← { Content: ChronicleContent（现状容器保留：Structured 携 Charge/Occurrence/Settlement/Consequence/Evidence option，Legacy 携 text/evidence option）；TipName: string（decode 期 trim 后原串）；WhatToDoNow / WhyThisMatters / RepairStrategy / DecisionBranches / CommonWrongFixes / Verification / DoneWhen: string（七节，decode 期 trim 后文本，同 tryCanonicalText 族） }。
-D1.1. [裁决] ▷ 候选：平铺 tipName 与七节字段；打包为子记录。结论：平铺（与 C1.7 schema 顺序平行，测试访问形如 decoded.value.tipName）。 # 旧 Tip: EnforcerTip 字段退役。
+D1. [载荷形态] CanonicalBlogCall ← { Content: ChronicleContent（现状容器保留：Structured 携 Charge/Occurrence/Settlement/Consequence/Evidence option，Legacy 携 text/evidence option）；TipName: string（decode 期 trim 后原串）；Opinion / Advice: string（内容字段，decode 期 trim 后文本，同 tryCanonicalText 族） }。
+D1.1. [裁决] ▷ 候选：平铺 tipName 与内容字段；打包为子记录。结论：平铺（与 C1.7 schema 顺序平行，测试访问形如 decoded.value.tipName）。 # 旧 Tip: EnforcerTip 字段退役。
 D1.2. EnforcerTip 类型与 EnforcerTip.ofRule 随旧 Tip 字段退役（唯一生产调用在 Codec.fs:84 decodeTipString 内，随 D2 重写删除）；Surface 的 tipToJs/callToJs/cycleToJs 形状同步（D5.3）。
 D2. [tipName 解码] 以 decodeTipName 替换 decodeTip/decodeTipString。判定序（此列序即判定序）：None（键缺失或值 undefined，读取层同归）→ missing-tip-name；非 string（含 null）→ tip-field-not-a-string；trim 空 → missing-tip-name；含换行或回车 → tip-name-multiline；超 200 字符（String.Length）→ tip-name-too-long（C4.1）。返回值 = trim 后原串（保留大小写与内部字节；不做枚举归一与大小写变换；沿用 tryStringArg/tryCanonicalText 返回值语义），该返回值即落库值。错误值为 C4.1 内部标识字符串、作 Error 载荷；不映射 C4.4 invalid-tip 文案（该文案仅用于工具执行期，见 S5）。
 D2.1. [空值读法] ▷ 候选：None 与 Some null 同归 missing-tip-name（延续现状，§2.6-h）；分家（None → missing-tip-name、Some null → tip-field-not-a-string）。结论：分家（读法见 D2）。理由：判定序的类型层以「值是否 string」为准，null 是显式非 string 值，归类型层使「缺失」与「类型错」两分、C4.1 两组标识各得其位；现状同归是旧单一错误面的遗留（改造后错误面已扩为五类）。已知代价（接受）：null 值的错误标识相对现状变化，006 L73 八格分组随 D5.2 落位表更新。
 D2.2. [旧错误面退役] MissingTipError 常量（Codec.fs:28–30、Codec.fsi:22）与其 Surface 转存导出 missingTipError（Surface.fs:155、Surface.fsi:26）随新判定序退役：五处产生点（decodeTipString L77–78/L85、decodeTip L94、decodeCall L161/L162）全部由 D2/D3 的新错误值替换；常量、fsi 签名与 Surface 转存一并退役删除。 # 消费面已核实（见 §2.6-l）：Surface 导出全仓无消费者；测试面唯一消费为 bd-006:76 字面量（随 D5.2 更新）；其余套件零引用。
-D3. [七节解码] 逐节：键缺失或 trim 空 → missing-tip-field:<camelCase 字段名>；非 string → tip-field-not-a-string。
-D4. [拼装] 定义 renderTipSections(language, 七节值)：按撰写语言取 C7.3/C7.4 节名集，按节序拼装为「## <节名> + 空行 + 节文」段（节标题与 main.md 的 H2 形态同构）、段间空行、单一文本、无尾随换行（C7.8）；纯函数（language 为参数）。
-D4.1. [裁决] ▷ 候选：拼装在解码期；落库期。结论：拼装函数 renderTipSections(language, 七节值) 定义在 Enforcer 层（与 renderStructured 同层，Model.fs 的 EnforcerCycle 模块）；结果随载荷传递（CanonicalCycle.TipSectionsText，见 Algorithm K）；调用点在 ofCall 内——ofCall 增携 TipName/TipSectionsText，从 call 取七节值与语言后拼装。语言取用遵循全局唯一语言权威：拼装时刻的全局当前偏好 GlobalProviderLanguage.current ()（规范落点 provider-language [002]/[003]；代码注释锚点 ProviderLanguageBinding.fs:8 的 HOST-026 在 requirements 无对应编号；与交付期 SessionProviderLanguage.languageOf 同源；会话 id 不参与裁决）——现状解码/落库链未穿线语言（Continuation.fs/BlogSurface.fs 无语言符号），该函数零上下文可得，不新增签名链。理由：落库层（Commit）不接触语言；语言服务为 unit → ProviderLanguage 零门槛；renderTipSections 保持纯函数（language 为参数）便于测试。 # 已核实事实见 §2.6-h。
-D4.2. [字节界] 七节拼装文本随载荷进入 decode 校验：CanonicalCycle 字段收敛为 { MergedText: string; TipName: string; TipSectionsText: string; MergedEvidence: string }（CanonicalTip: EnforcerTip 退役，见 D1.2）；validateBounds（Decode.fs:235–244）扩展为对 MergedText 与 TipSectionsText 分别执行 C2.2 界（validateContentBounds 的签名与两个既有调用点——Decode.fs:242 生产路径、Surface.fs:209 JS 面包装——同步更新）。超限 → 沿用 contentBoundsError 字符串错误、cycle 不成立（fail-closed、不落 blob）；不映射 invalid-tip 工具文案。
-D5. [调用点] decodeCall 装配新载荷（D1）：Content 容器保留，Tip 字段替换为 TipName 与七节值；删除旧 Content/Tip 形态与 resolveByField 调用（Codec.fs:80）。
-D5.1. [协议检测集] structuredFieldNames（Codec.fs:96–97）与 decodeContent（:142–150）维持现状语义不变：形态互斥按「四内容字段 vs entry/text」两族判定——两族各至少一名同现 → MixedChronicleProtocolError；仅四字段 → Structured；仅 entry/text → Legacy；decodeStructured（:113–132）仍独立读取四字段、不消费检测集（现状）。tipName 与七节是形态无关的顶层必填字段（D1），不参与形态判别、不入检测集；其解码在 decodeCall/D2/D3 完成（tip 键在 decodeCall:160 单独处理，改名只触 decodeCall 与 decodeTip 族）。改造后 legacy 形态的完整行为：带 tipName/七节的 entry/text 调用走 Legacy 成功路径（006 L81–88 入参更新后断言保持）；不带 tipName/七节的历史调用在 decodeCall 首关稳定拒绝（missing-tip-name）。 # bd [017]「新旧协议混用」= 内容形态两族同现，与 tip 字段无关。
-D5.2. [测试] bd-006 同步（解码面；执行期分层见 S4.1——tip-field-not-a-string 仅解码期产生）：schema 键集断言（006.test.mjs L131）更新为 C1.7 新字段序；tip 解码形态断言（L33/L40）改为 tipName 的 trim 后原串保留（大小写与内部字节不变，口径同 D2）；错误面精确串（L76）更新为 C4.1 内部标识的分组断言（判定序见 D2）；测试标题描述半句随之更新（保留 WHAT[behavior-diagnosis-006] 锚点前缀，不再宣称「same error」）；L73 循环现状八种输入按 D2 判定序逐格落位、分组断言（不再单串全等）：undefined → missing-tip-name；null → tip-field-not-a-string；'' → missing-tip-name；'  ' → missing-tip-name；1 → tip-field-not-a-string；false → tip-field-not-a-string；{} → tip-field-not-a-string；[] → tip-field-not-a-string（两组：missing-tip-name = {undefined, '', '  '}，tip-field-not-a-string = {null, 1, false, {}, []}）；legacy 用例（L80–93）按 D5.1 的形态语义处置：L81–84 入参更新为 tipName + 七节（entry/evidence 保留），ok/text/evidence 断言保持；L86–88 同形更新 canonicalCycle 用例，mergedText/mergedEvidence 断言保持；L90–92 混合用例以含新字段的 structured() 基底重建、/cannot be mixed/ 断言保留；合并渲染断言（L95–126）在四内容字段保留前提下核对（不改语义）。
-D5.3. [Surface 形状] callToJs/cycleToJs 同步：退役 tip 对象（tipToJs: ruleId/fieldName/lexicalOrder），callToJs 增 tipName 与七节键（Structured 与 Legacy 两分支）、cycleToJs 增 tipName 与 tipSectionsText 键；测试访问形态随之更新（006 L33/L40 → decoded.value.tipName；018 L18 → decoded.value.tipName，见 D5.2/C6.4）。
+D3. [内容字段解码] 逐个：opinion / advice 键缺失或 trim 空 → missing-tip-field:<camelCase 字段名>（missing-tip-field:opinion / missing-tip-field:advice）；非 string → tip-field-not-a-string。
+D4. [拼装] 定义 renderTipSections(language, 内容字段值)：按撰写语言取 C7.3 拼装节名表（en = [Opinion, Advice]、zh = [评价, 建议]），按节序拼装为「## <节名> + 空行 + 节文」段、段间空行、单一文本、无尾随换行（C7.3）；纯函数（language 为参数）。
+D4.1. [裁决] ▷ 候选：拼装在解码期；落库期。结论：拼装函数 renderTipSections(language, 内容字段值) 定义在 Enforcer 层（与 renderStructured 同层，Model.fs 的 EnforcerCycle 模块）；结果随载荷传递（CanonicalCycle.TipSectionsText，见 Algorithm K）；调用点在 ofCall 内——ofCall 增携 TipName/TipSectionsText，从 call 取内容字段值与语言后拼装。语言取用遵循全局唯一语言权威：拼装时刻的全局当前偏好 GlobalProviderLanguage.current ()（规范落点 provider-language [002]/[003]；代码注释锚点 ProviderLanguageBinding.fs:8 的 HOST-026 在 requirements 无对应编号；与交付期 SessionProviderLanguage.languageOf 同源；会话 id 不参与裁决）——现状解码/落库链未穿线语言（Continuation.fs/BlogSurface.fs 无语言符号），该函数零上下文可得，不新增签名链。理由：落库层（Commit）不接触语言；语言服务为 unit → ProviderLanguage 零门槛；renderTipSections 保持纯函数（language 为参数）便于测试。 # 已核实事实见 §2.6-h。
+D4.2. [字节界] 两节拼装文本随载荷进入 decode 校验：CanonicalCycle 字段收敛为 { MergedText: string; TipName: string; TipSectionsText: string; MergedEvidence: string }（CanonicalTip: EnforcerTip 退役，见 D1.2）；validateBounds（Decode.fs:235–244）扩展为对 MergedText 与 TipSectionsText 分别执行 C2.2 界（validateContentBounds 的签名与两个既有调用点——Decode.fs:242 生产路径、Surface.fs:209 JS 面包装——同步更新）。超限 → 沿用 contentBoundsError 字符串错误、cycle 不成立（fail-closed、不落 blob）；不映射 invalid-tip 工具文案。
+D5. [调用点] decodeCall 装配新载荷（D1）：Content 容器保留，Tip 字段替换为 TipName 与内容字段值；删除旧 Content/Tip 形态与 resolveByField 调用（Codec.fs:80）。
+D5.1. [协议检测集] structuredFieldNames（Codec.fs:96–97）与 decodeContent（:142–150）维持现状语义不变：形态互斥按「四内容字段 vs entry/text」两族判定——两族各至少一名同现 → MixedChronicleProtocolError；仅四字段 → Structured；仅 entry/text → Legacy；decodeStructured（:113–132）仍独立读取四字段、不消费检测集（现状）。tipName 与内容字段是形态无关的顶层必填字段（D1），不参与形态判别、不入检测集；其解码在 decodeCall/D2/D3 完成（tip 键在 decodeCall:160 单独处理，改名只触 decodeCall 与 decodeTip 族）。改造后 legacy 形态的完整行为：带 tipName/内容字段的 entry/text 调用走 Legacy 成功路径（006 L81–88 入参更新后断言保持）；不带 tipName/内容字段的历史调用在 decodeCall 首关稳定拒绝（missing-tip-name）。 # bd [017]「新旧协议混用」= 内容形态两族同现，与 tip 字段无关。
+D5.2. [测试] bd-006 同步（解码面；执行期分层见 S4.1——tip-field-not-a-string 仅解码期产生）：schema 键集断言（006.test.mjs L131）更新为 C1.7 新字段序；tip 解码形态断言（L33/L40）改为 tipName 的 trim 后原串保留（大小写与内部字节不变，口径同 D2）；错误面精确串（L76）更新为 C4.1 内部标识的分组断言（判定序见 D2/D3；内容字段缺失/空白落 missing-tip-field:opinion / missing-tip-field:advice，Q3 后为两字段）；测试标题描述半句随之更新（保留 WHAT[behavior-diagnosis-006] 锚点前缀，不再宣称「same error」）；L73 循环现状八种输入按 D2 判定序逐格落位、分组断言（不再单串全等）：undefined → missing-tip-name；null → tip-field-not-a-string；'' → missing-tip-name；'  ' → missing-tip-name；1 → tip-field-not-a-string；false → tip-field-not-a-string；{} → tip-field-not-a-string；[] → tip-field-not-a-string（两组：missing-tip-name = {undefined, '', '  '}，tip-field-not-a-string = {null, 1, false, {}, []}）；legacy 用例（L80–93）按 D5.1 的形态语义处置：L81–84 入参更新为 tipName + opinion + advice（entry/evidence 保留），ok/text/evidence 断言保持；L86–88 同形更新 canonicalCycle 用例，mergedText/mergedEvidence 断言保持；L90–92 混合用例以含新字段的 structured() 基底重建、/cannot be mixed/ 断言保留；合并渲染断言（L95–126）在四内容字段保留前提下核对（不改语义）。
+D5.3. [Surface 形状] callToJs/cycleToJs 同步：退役 tip 对象（tipToJs: ruleId/fieldName/lexicalOrder），callToJs 增 tipName 与内容字段键（Structured 与 Legacy 两分支）、cycleToJs 增 tipName 与 tipSectionsText 键；测试访问形态随之更新（006 L33/L40 → decoded.value.tipName；018 L18 → decoded.value.tipName，见 D5.2/C6.4）。
 D5.4. [016 同步] 016.test.mjs 按六个测试块逐块处置（行号经 devops 逐块核实；三处同形 fixture 统一口径）：
   块 1（L53 OBS_PROJ_003，L3–95）：fixture L22–33 随 K6 观察载荷同步（tipRuleId → tipName、删 fieldNameAtCommit、按输入面补 tipTextRef/tipTextDigest 或 None）；L58 applyEnforcementCycle 入参同形更新；断言 L73、L88–90（tipName 'field-3'、cycleId 'msg_tip_3'）、L92–93 保持（值不变）。
   块 2（L184 A42_001）：L190–198（tryFindByField 规则身份）与 L200–202（compose 包含）不动；L186/187 的 120 断言已由 M0（Algorithm A）处置为动态派生。
   块 3（L204 A42_002）：L212–218 recentTips 映射改为新 RecentTip 形状（t.tipName/t.cycleId，随 P2/K6 口径）；L222/L225 decoded.value.tip.fieldName → decoded.value.tipName。
-  块 4（L227 A42_003）：L232–236 的 t.fieldName 取新名；L268–273 投影消息正则随 fixture 修正保持；L277–278 decodeCall 入参更新为 tipName + 七节后保持 ok（精确名 TIP_X）。
+  块 4（L227 A42_003）：L232–236 的 t.fieldName 取新名；L268–273 投影消息正则随 fixture 修正保持；L277–278 decodeCall 入参更新为 tipName + opinion + advice 后保持 ok（精确名 TIP_X）。
   块 5（L280 A42_004）：L283–293 经 readObservations（L175–180）读观察视图 tipName/cycleId；断言值不变、不涉及 FieldName。
   块 6（L317 ENFORCER_TIP_12）：fixture L304–315 同块 1 口径同步（tipRuleId/fieldNameAtCommit 在 L311–312）；L320 applyEnforcementCycle 入参更新；L324–327 recentTips(...).map(t.cycleId) 只读 cycleId、断言保持。
   三处 fixture（L22–33、L128–139、L304–315）字段同形（10 键，含 tipRuleId/fieldNameAtCommit），逐处点名、同一同步口径，不再以「等」字省略。 # 与 P5 的 014/012 口径一致。
-D5.5. [bd-008 同步] 008.test.mjs 涉 tip 三面逐段更新（行号经本任 devops 核实，见 §2.6-i）：① decodeCall / facade 面——L29–42 用例的入参（L36 的 tip）按 D5.4 口径改为 tipName + 七节，L41 的 result.value.tip.fieldName 改为 result.value.tipName；L221–231 facade 用例的 L227 入参同形更新、L230–231 的 sample.value.tip.{ruleId,fieldName} 改为 sample.value.tipName 与七节键（D5.3）；② fact fixture 键——L66–67、L156–157、L215–216 的 tipRuleId/fieldNameAtCommit 随 K6 的观察载荷同步（TipName 与 TipTextRef/TipTextDigest）；③ 旧 journal 段——L105/L122/L131 的 ScoreVectorRef 用例按 K2 兼容读口径核对（ScoreVectorRef 条目拒绝语义不变；「缺键 → 拒绝」的条件核对为「TipName 与 TipRuleId 皆缺」）；L11–18 桥接字段禁令不涉 tip、不动。重跑 008。
-D5.6. [bd-017 同步] 017.test.mjs 末段解码器用例（L676–697）与 support/cycle.mjs：call() 默认 input 的 tip 键替换为 tipName + 七节（精确名；随 D2/S5 口径）；L679–689 负例的期望保持（completed 但无 tipName/七节 → decodedCalls 0 且 decision.ok false）；L696 正例随 call() 修复自动成立；其余修复链测试不涉 tip、不动。重跑 017。
+D5.5. [bd-008 同步] 008.test.mjs 涉 tip 三面逐段更新（行号经本任 devops 核实，见 §2.6-i）：① decodeCall / facade 面——L29–42 用例的入参（L36 的 tip）按 D5.4 口径改为 tipName + opinion + advice，L41 的 result.value.tip.fieldName 改为 result.value.tipName；L221–231 facade 用例的 L227 入参同形更新、L230–231 的 sample.value.tip.{ruleId,fieldName} 改为 sample.value.tipName 与内容字段键（D5.3）；② fact fixture 键——L66–67、L156–157、L215–216 的 tipRuleId/fieldNameAtCommit 随 K6 的观察载荷同步（TipName 与 TipTextRef/TipTextDigest）；③ 旧 journal 段——L105/L122/L131 的 ScoreVectorRef 用例按 K2 兼容读口径核对（ScoreVectorRef 条目拒绝语义不变；「缺键 → 拒绝」的条件核对为「TipName 与 TipRuleId 皆缺」）；L11–18 桥接字段禁令不涉 tip、不动。重跑 008。
+D5.6. [bd-017 同步] 017.test.mjs 末段解码器用例（L676–697）与 support/cycle.mjs：call() 默认 input 的 tip 键替换为 tipName + opinion + advice（精确名；随 D2/S5 口径）；L679–689 负例的期望保持（completed 但无 tipName/内容字段 → decodedCalls 0 且 decision.ok false）；L696 正例随 call() 修复自动成立；其余修复链测试不涉 tip、不动。重跑 017。
 D6. [失败] 任一错误 → Error 拒绝本次调用；不归一化、不重试、不 fallback（C2.7）。
 D7. 返回修改后文本。算法终止。
 
@@ -633,16 +640,16 @@ P11. 返回修改后文本。算法终止。
 
 ## S3.8 Algorithm I [composeBloggerSystemPromptFor 双文档注入]
 
-输入：§8.2（双文档单语注入）；C6.1 bd [004]；§2.6-m（TipSurface 与真 journal 事实；I5.2）；§2.6-b（localizedFiles、loadFor、composeBloggerSystemPromptFor 28–43、RuntimeResourceAssembly、ProviderSystemTransform 101–108）。
+输入：§8.2（单文档单语注入）；C6.1 bd [004]；§2.6-m（TipSurface 与真 journal 事实；I5.2）；§2.6-b（localizedFiles、loadFor、composeBloggerSystemPromptFor 28–43、RuntimeResourceAssembly、ProviderSystemTransform 101–108）。
 输出：装载/合成/重拼修改后文本。
 
-I1. [注入面] composeBloggerSystemPromptFor：每条注入三段元素——rule.Name（裸目录名）、EnforcerText.Trim()、MainText.Trim()（现状只注入前两段）；排序仍按 LexicalOrder；渲染沿用 LlmFacing/SyntheticToml 既有机制（逐元素 `# ` 注释、元素间单换行、末尾单换行）。
+I1. [注入面] composeBloggerSystemPromptFor：每条注入两段元素——rule.Name（裸目录名）、LessonText.Trim()（EnforcerRule 以单一 LessonText 取代 EnforcerText/MainText）；排序仍按 LexicalOrder；渲染沿用 LlmFacing/SyntheticToml 既有机制（逐元素 `# ` 注释、元素间单换行、末尾单换行）。
 I1.1. [裁决] ▷ 候选：两文本加来源标注；不加标注、逐元素相接。结论：不加标注。理由：库文本原样呈现（样板意图）；额外标注污染文本且无消费者；分隔由既有渲染机制（Name 元素、`# ` 注释与文本自带空行）承担、不插额外空元素。
-I2. [单语保持] localizedFiles 与 loadFor 的单语言成对装载不变；不合并双语（§8.2 淘汰 2b）。
+I2. [单语保持] localizedFiles 单叶映射（English → lesson.md、zh-CN → lesson.zh-CN.md）与 loadFor 单叶装载（EnforcerRule.LessonText）；不合并双语（§8.2 淘汰 2b）。
 I3. [预载] RuntimeResourceAssembly 的双语预载不变。
 I4. [请求期重拼] ProviderSystemTransform 不动；重拼公式仅内容增长，签名不变。
-I5. [测试] bd-004 注入内容断言按三段元素镜像更新（segment = comment(rule.name) + 单换行 + comment(EnforcerText.Trim()) + 单换行 + comment(MainText.Trim())，与渲染器逐字节同构）。
-I5.1. [gd-008 composer 面] L11–19：L18 的 `prompt.includes('REMEDIATION SOURCE') === false` 按 Q1 双灌入裁决翻转为正面包含；L16/L17 包含式保留。
+I5. [测试] bd-004 注入内容断言按两段元素镜像更新（segment = comment(rule.name) + 单换行 + comment(LessonText.Trim())，与渲染器逐字节同构）。
+I5.1. [gd-008 composer 面] L11–19：夹具与断言随两段元素（Name + LessonText）与 lesson 两节结构更新；L18 的 REMEDIATION SOURCE 断言按 Q1 双灌入裁决已翻转为正面包含，Q4 后 lesson 单文档同时承载检测与处置内容（Opinion/Advice 子节），正面包含断言保持；L16/L17 包含式保留。
 I5.2. [gd-008 resolver/audience 面] L22–30 与 L49–68：L27 的 body('main') 读取删除（不再作正文来源）；L28/L60 改为断言包含夹具物化的撰写正文；support/journal.mjs 增补 blob 物化能力——本套件 journal 为真 journal 的不透明盒（TipSurface.createJournal → JournalSurface.boot；journalHandleOf 做 unbox，JS 假对象无法通过），port/替身路线类型层不可行（009/cc-016 的受控 port 由 xwire.candidateFromJournal 消费、属 wire 候选链，与本交付读链非同一条）；最小接线 = F# TipSurface 新增写入助手，与 Persistence JournalSurface.writePayload 同形（unbox JournalHandleBox → handle.Journal.Writer.BlobWriter.Write content → 回传 { ok; blobRef; blobDigest }；TipSurface.fs 与 TipSurface.fsi 同步新增），support 用它物化正文、将真实 ref/digest（blobs/<sha256> 形态）交给 observe；读回由生产读路径（Algorithm R2 的 journal.Writer.BlobWriter.Read）在同一真 journal 上完成；L29/L61 的检测正文不进交付的否定断言保留。依赖 Algorithm R/G 的读回形态，随 M4 落地。
 I5.3. [gd-008 低信任面] L33–46 的 previousTips 键名随 Algorithm P 的 P9（tipName），随 M2 落地。
 I5.4. [边界] bd-008 无装载/composer 面（本任 devops 复核零命中），本步不涉；§9.4 的 M3 标注同步修正（见 §9.4）。
@@ -655,10 +662,10 @@ I7. 返回修改后文本。算法终止。
 输出：resources/provider/role/blogger/ en.md 与 zh-CN.md 修改后文本。
 
 B1. [删除] 删除「恰好一个 Rulebook TipName / Choose exactly one」类措辞及其因果脊句中的对应半句。
-B2. [替换] 写入：tipName 自由命名（可自创新名；同一教训再次出现时沿用同名）；七节自由撰写（库为 bootstrap 与格式样板，不是封闭值域）。
-B3. [保留] tip 是可复用教训、具体字段描述这次具体转折的因果脊语义；原「the other four fields」措辞随字段拆分更新为七节指代。
+B2. [替换] 写入：tipName 自由命名（可自创新名；同一教训再次出现时沿用同名）；opinion 与 advice 两节自由撰写——评价与建议各司其职（库为 bootstrap 与格式样板，不是封闭值域）。
+B3. [保留] tip 是可复用教训、具体字段描述这次具体转折的因果脊语义；原「the other four fields」措辞随字段拆分更新为现字段指代（opinion/advice 两节）。
 B4. [成对] en 与 zh-CN 同步改写、语义等价；不改机制。
-B5. [测试] bd-016 提示词面断言按 D5.4 口径处置：016 的 compose 断言为包含式、双文档注入后仍绿，不作改动；M3 面仅跑核对（§9.4）。
+B5. [测试] bd-016 提示词面断言按 D5.4 口径处置：016 的 compose 断言为包含式，注入形态变化（双文档 → 两段元素单文档）后仍绿，不作改动；M3 面仅跑核对（§9.4）。
 B6. 返回修改后文本。算法终止。
 
 ## S3.10 Algorithm R [交付读路径]
@@ -691,37 +698,34 @@ G4.5. [测试锚定] gd-001 现仅 presentation 断言（本任已复核），�
 G5. [旧数据行为裁决] ▷ 候选：跳过（None）；identity-only；空体回退 Full。结论：identity-only（产出 identity 文本，不记录 Full 交付）。理由：Frontier 语义不应被无正文的伪 Full 推进；IdentityOnly 在投影上状态不变、幂等；既有冻结 marker 字节回放不受影响（C8.3）。
 G6. [冻结交互] 重锚后恢复路径：R2 读回 + G1 组装，落在既有单次读取内；已有 placement 原字节回放不变（§2.6-d 冻结点与重放不重渲染分支原样复用）。
 G7. [provider-language 裁定] ▷ 候选：交付 marker 文本属 Class A（改 [009]/[013]）；不属（整套保留）。结论：不属，整套保留。理由：Provider Prose 列举语境为资源族（提示词/角色规范/工具描述/执行后果/完成文案），交付标题与框架是代码常量（已核实不在资源机制内）、正文是 durable 撰写字节；[009] 的统一资源机制装载对动态字节不可满足；[013] 的全局语言即时生效与冻结回放（gd [011]、prefix-stability [010]）结构性冲突。裁定后 C6.2 转出项闭环。
-G8. [测试] gd-002（Full 断言改按拼装形态：经 chronicle 提交的七节拼装正文与 tipName 出现于交付文本，含节标题）/003/005/006/008 断言面同步（§9.4）；gd-001 增补同名变体（大小写/首尾空白）去重断言（G4.5）。
+G8. [测试] gd-002（Full 断言改按拼装形态：经 chronicle 提交的两节拼装正文（opinion/advice）与 tipName 出现于交付文本，含节标题）/003/005/006/008 断言面同步（§9.4）；gd-001 增补同名变体（大小写/首尾空白）去重断言（G4.5）。
 G9. 返回修改后文本。算法终止。
 
-## S3.12 Algorithm F [统一格式工作包：批次与结构断言]
+## S3.12 Algorithm F [库重组工作包：确定性变换与自校验]
 
-输入：C7（对照表、退役措辞、集合与断言口径）；§2.2/§2.6-e 族谱与基线；§8.5 批次方向；§10.4 格式剧场防范。
-输出：批次表、结构断言与内容覆盖设计、脚本形态（F3.1）。
+输入：C7（lesson 结构、子节搬移映射、拼装节名表、退役文件、变换性质）；M5 完成后的库基线（§2.2、§2.6-n：en 侧 101×enforcer 八节 + 101×main 七节零变体，zh 侧同构 canonical 中文）；§8.5 重组方向。
+输出：404 份旧文件 → 202 份 lesson 文件的变换结果与自校验记录；旧 4 文件退役删除的确认。
 
-F1. [批次表] 按结构最缺到形态个例四批推进（每批：集合 → 文件数 → 改法）：
-F1.1. 批一：23 个双侧无小节目录的全部 92 份（en 46 + zh 46）补八节/七节骨架。
-F1.2. 批二：20 个「en 完整、zh 无节」目录的 zh 文件（40 份）补节骨架。
-F1.3. 批三：变体族归一——zh enforcer 五节/七节变体族（25 + 13 = 38 份）与 zh main 变体族（24 + 12 + 1 = 37 份；含 24 个 8/5/7/5 目录、12 个 8/7/7/6 目录（含 cyclic-dependency）与 unrecorded-lesson 的 zh 文件）；退役措辞按 C7.6 落点处置：「刀口」「提醒」为节归并（内容分别归入「判定程序」与「Nudge」），「不要误判」「分支判断」「为什么这很重要」「与近邻区分」为用词替换。
-F1.4. 批四：标题/措辞替换 10 份——9 份「英文标题＋中文正文」文件（enforcer 4：illegal-state-representable、non-exhaustive-transition、stringly-typed-error、type-erosion-at-boundary；main 5：上述 4 加 null-ambiguity）替换标题为 canonical 中文名；另 duplicated-control-flow 的 zh main（「分支判断」→「决策分支」）。 # 原「混合形态个例」归口：null-ambiguity 在本批（其 main）；cyclic-dependency 在批三（随 12 个 8/7/7/6 目录）；duplicated-control-flow 的 main 在本批。
-F1.5. [边界] 批次覆盖合计 217 份 = 批一 92（en 46 + zh 46）+ 批二 40 + 批三 75 + 批四 10；已同构且 canonical 的 31 份 zh 文件不动（enforcer 16 + main 15）。
-F2. [改写口径] 每文件：按语言序列表补齐/对齐节名与节序；只动结构与措辞，不丢原文实质信息（信息不变量）；归并歧义按 C7.6 拆分/归并消解，消解不掉的个案记录待审（见 §10.2 与 F6）。
-F3. [结构断言] 只读脚本对全部 404 份执行：en 文件按 C7.2/C7.4 序列、zh 文件按 C7.1/C7.3 序列断言节名序列全等；known-bad 变体（缺节、错名、乱序、退役措辞残留）必须变红。
-F3.1. [脚本形态] ▷ 候选：一次性只读脚本（输出记录留档）；持久测试文件（按 NNN.test.mjs 命名与 WHAT 锚点）。结论：一次性只读脚本。理由：格式统一为一次性整理目标，无配套需求条款可锚定持久测试（NNN 编号与 WHAT 锚点规范），避免引入无条款的测试文件与长期门禁维护面；断言口径与 known-bad 清单以输出记录留档，供 V1 核查。落点：脚本不入 Git（置工作树外或忽略目录），只读遍历 resources/enforcer 全部 404 份文件；输出记录留存于本机运行数据区（.Herdchestra/，不进 Git），随 M5 执行记录供 V1 核查「已跑」；交付前确认工作树无未跟踪新增。 # 若将来要求持久门禁，另立条款与测试文件，不在本工作包。
-F4. [内容覆盖] 每节非空且实质（非占位标题）；抽查加关键词覆盖；对「只加标题不改内容」的格式剧场变体必须变红（§10.4）。
-F5. [顺序] 与代码线并行；V 前完成。
-F6. [失败] 断言红 → 回该批次重改；不放宽断言、不豁免文件。
-F7. 返回批次表、断言设计与脚本形态。算法终止。
+F1. [变换规则] 每规则目录（101 个）生成两份 lesson 文件；变换为确定性结构搬移（C7.5），正文零改写：
+F1.1. en lesson.md：H1 =「# <TipName> — Lesson」；「## Opinion」节按原序收 enforcer.md 的 Definition / Governing Principle / Trigger When / Do Not Trigger When / Distinguish From / Decision Procedure / Examples 七节——各节降级为 ### 子节（节标题与正文原样，仅 ## → ###）；「## Advice」节按原序收 main.md 的 What To Do Now / Why This Matters / Repair Strategy / Decision Branches / Common Wrong Fixes / Verification / Done When 七节（同降级搬移），殿后收 enforcer.md 的 Nudge（### Nudge）。
+F1.2. zh lesson.zh-CN.md：同构——H1 =「# <TipName> — Lesson」；「## 评价」收 enforcer.zh-CN.md 的定义 / 支配原则 / 何时触发 / 不应触发 / 与相邻规则区分 / 判定程序 / 例子 七节（### 子节保留原中文名）；「## 建议」收 main.zh-CN.md 的现在该做什么 / 为什么重要 / 修复策略 / 决策分支 / 常见假修复 / 验证 / 完成条件 七节，殿后收 Nudge（### Nudge，英文名保留）。
+F1.3. 节正文原样搬运、零改写、零丢失；子节顺序 = C7.2 映射序，不重排、不增删内容。
+F2. [program 自校验] 变换以 program 执行并自校验，全部通过才提交：① 结构断言——每份 lesson 恰含 H1 + 两顶层节（en = Opinion/Advice，zh = 评价/建议），子节数与顺序 = C7.2 映射（en Opinion 7 子节、Advice 8 子节；zh 同构）；② 零丢失断言——对每份 lesson 逐子节比对源文件对应节的正文（节标题行之外逐字节全等；搬运的标题降级不触正文）；③ 202 份全部通过。 # 与仓库「严禁自动化程序批量增删改查程序代码」纪律的相容性见 C7.5：对象为资源文件、变换为确定性搬移、零改写由本条断言保证。
+F3. [旧文件退役] 校验全绿后删除每目录旧 4 文件（enforcer.md / main.md / enforcer.zh-CN.md / main.zh-CN.md）；最终库 = 101 目录 × 2 文件 = 202 份。删除与装载面切换（Algorithm I2）须在同一验证循环内闭环——库先换、装载未切会红，装载先切、库未换也红；执行序：lesson 文件生成 → 自校验 → 装载面切换落地 → 旧文件删除 → 全链测试。
+F4. [抽样复核] program 自校验之外，抽样若干规则人工比对 lesson 与源文件（抽样集须含 cyclic-dependency、unrecorded-lesson、duplicated-control-flow 等历史变体目录）——确认零改写、零丢失、子节序正确。
+F5. [顺序] 与代码线（M2/M3）并行；V 前完成。
+F6. [失败] 任一断言红 → 回该规则重变换；不放宽断言、不豁免文件、不留下四文件与两文件并存的中间态入库。
+F7. 返回变换结果、自校验记录与删除确认。算法终止。
 
 ## S3.13 Algorithm V [收尾验收：全链测试与条款一致性复查]
 
 输入：§9.4 验收面；C6.3 五类语义；两套测试命令与套件。
 输出：验收执行记录与残留清单。
 
-V1. [前置] 逐里程碑核查 M0–M5 的执行落地：M0 的 016 断言修改已改且绿；M1 契约（C1–C8）已由后续各步落实；M2–M4 的代码、文案、提示词与条款文本修改已实施（条款逐条对照 C6.6 落点表）且各自测试面已跑；M5 的 217 份对齐已完成且结构断言与内容覆盖已跑（脚本形态与输出记录按 F3.1）。凭执行记录核查（测试结果与产物），S3.0 索引仅作算法对照、不作落地凭据。任一未落地 → 停，报告缺口，不开始验收。
+V1. [前置] 逐里程碑核查 M0–M5 的执行落地：M0 的 016 断言修改已改且绿；M1 契约（C1–C8）已由后续各步落实；M2–M4 的代码、文案、提示词与条款文本修改已实施（条款逐条对照 C6.6 落点表）且各自测试面已跑；M5 的库重组已完成——202 份 lesson 生成、program 自校验与抽样复核记录在案、旧 4 文件已删除（按 F2–F4）。凭执行记录核查（测试结果与产物），S3.0 索引仅作算法对照、不作落地凭据。任一未落地 → 停，报告缺口，不开始验收。
 V2. [全链] 执行 bd 与 gd 两套测试及其 prefix-stability 相关锚点（§9.4 清单）。
 V3. [条款扫描] 对五类语义（tip 归一化、TipName 三元组、Full 正文来源、owner 语言、冻结对象）做全仓只读扫描，确认落点仅在 bd 与 gd 两套（C6.3）。
-V4. [残留清理] 检查退役残骸：arg-tip/missing-tip 旧键、MissingTipError/missingTipError 符号、resolveField 符号、Levenshtein 族、FieldNameAtCommit、120 硬编码断言（除 016 第 184 行标题串外；见 A2.2/A4）；无残留生成物与临时文件。
+V4. [残留清理] 检查退役残骸：arg-tip/missing-tip 旧键、arg-what-to-do-now 族七键及其 Path 常量（arg-why-this-matters / arg-repair-strategy / arg-decision-branches / arg-common-wrong-fixes / arg-verification / arg-done-when）、whatToDoNow 等七字段符号（ChronicleTool schema、Codec 载荷、renderTipSections 节名表、测试 fixture）、旧 404 份库文件（enforcer.md / main.md / enforcer.zh-CN.md / main.zh-CN.md 及其任何装载/文档/测试引用）、MissingTipError/missingTipError 符号、resolveField 符号、Levenshtein 族、FieldNameAtCommit、120 硬编码断言（除 016 第 184 行标题串外；见 A2.2/A4）；无残留生成物与临时文件。
 V5. [失败] 任一红 → 定位到对应算法与里程碑，修复后重跑；不豁免、不跳过。
 V6. [绿] 全绿且残留清零 → 返回验收记录。算法终止。
 

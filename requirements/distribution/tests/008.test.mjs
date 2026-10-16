@@ -49,8 +49,8 @@ test('WHAT[distribution-008] DISTRIBUTION_enforcer_rulebook_closure_is_complete'
     .map((entry) => entry.name)
   assert.ok(tipDirs.length >= 1, 'rulebook must contain at least one tip directory')
   for (const tip of tipDirs) {
-    assert.ok(exists(`resources/enforcer/${tip}/enforcer.md`), `missing enforcer.md for ${tip}`)
-    assert.ok(exists(`resources/enforcer/${tip}/main.md`), `missing main.md for ${tip}`)
+    assert.ok(exists(`resources/enforcer/${tip}/lesson.md`), `missing lesson.md for ${tip}`)
+    assert.ok(exists(`resources/enforcer/${tip}/lesson.zh-CN.md`), `missing lesson.zh-CN.md for ${tip}`)
   }
 })
 

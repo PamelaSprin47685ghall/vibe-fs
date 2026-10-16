@@ -2,8 +2,7 @@ namespace Wanxiangshu.Enforcer
 
 type EnforcerRule =
     { Name: string
-      EnforcerText: string
-      MainText: string
+      LessonText: string
       RuleId: string
       FieldName: string
       LexicalOrder: int }

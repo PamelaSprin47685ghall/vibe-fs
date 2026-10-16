@@ -7,7 +7,7 @@ open Fable.Core
 ///
 /// raw JSON object → Result<CanonicalBlogCall, string>.
 /// tipName = the blogged free name (trimmed original; no catalog lookup);
-/// seven sections decode with the trim-nonempty family. No score map.
+/// the opinion and advice fields decode with the trim-nonempty family. No score map.
 module EnforcerCodec =
 
     type ChronicleRecord =
@@ -22,17 +22,12 @@ module EnforcerCodec =
         | Structured of ChronicleRecord
         | Legacy of text: string * evidence: string option
 
-    /// ENFORCER-004 / 026：领域闭合类型。TipName 与七节必填。
+    /// ENFORCER-004 / 026：领域闭合类型。TipName 与 opinion/advice 必填。
     type CanonicalBlogCall =
         { Content: ChronicleContent
           TipName: string
-          WhatToDoNow: string
-          WhyThisMatters: string
-          RepairStrategy: string
-          DecisionBranches: string
-          CommonWrongFixes: string
-          Verification: string
-          DoneWhen: string }
+          Opinion: string
+          Advice: string }
 
     /// ENFORCER-023 / behavior-diagnosis-006：执行期与解码期共用的内部标识。
     [<Literal>]
@@ -94,15 +89,8 @@ module EnforcerCodec =
     [<Emit("$0 === undefined")>]
     let private isUndefined (value: obj) : bool = jsNative
 
-    /// D3：七节字段名。字段顺序即 schema 与解码顺序。
-    let tipSectionNames =
-        [ "whatToDoNow"
-          "whyThisMatters"
-          "repairStrategy"
-          "decisionBranches"
-          "commonWrongFixes"
-          "verification"
-          "doneWhen" ]
+    /// D3：内容字段名。字段顺序即 schema 与解码顺序。
+    let tipSectionNames = [ "opinion"; "advice" ]
 
     let private missingTipFieldError (fieldName: string) = MissingTipFieldPrefix + fieldName
 
@@ -146,33 +134,11 @@ module EnforcerCodec =
                     Ok trimmed
             | _ -> Error TipFieldNotAStringError
 
-    let private decodeTipSections
-        (rawArgs: Map<string, obj>)
-        : Result<string * string * string * string * string * string * string, string> =
-        match
-            decodeTipField "whatToDoNow" rawArgs,
-            decodeTipField "whyThisMatters" rawArgs,
-            decodeTipField "repairStrategy" rawArgs,
-            decodeTipField "decisionBranches" rawArgs,
-            decodeTipField "commonWrongFixes" rawArgs,
-            decodeTipField "verification" rawArgs,
-            decodeTipField "doneWhen" rawArgs
-        with
-        | Ok whatToDoNow,
-          Ok whyThisMatters,
-          Ok repairStrategy,
-          Ok decisionBranches,
-          Ok commonWrongFixes,
-          Ok verification,
-          Ok doneWhen ->
-            Ok(whatToDoNow, whyThisMatters, repairStrategy, decisionBranches, commonWrongFixes, verification, doneWhen)
-        | (Error error), _, _, _, _, _, _ -> Error error
-        | _, (Error error), _, _, _, _, _ -> Error error
-        | _, _, (Error error), _, _, _, _ -> Error error
-        | _, _, _, (Error error), _, _, _ -> Error error
-        | _, _, _, _, (Error error), _, _ -> Error error
-        | _, _, _, _, _, (Error error), _ -> Error error
-        | _, _, _, _, _, _, (Error error) -> Error error
+    let private decodeTipSections (rawArgs: Map<string, obj>) : Result<string * string, string> =
+        match decodeTipField "opinion" rawArgs, decodeTipField "advice" rawArgs with
+        | Ok opinion, Ok advice -> Ok(opinion, advice)
+        | Error error, _ -> Error error
+        | _, Error error -> Error error
 
     let private structuredFieldNames =
         [ "charge"; "occurrence"; "settlement"; "consequence" ]
@@ -232,7 +198,7 @@ module EnforcerCodec =
 
     /// ENFORCER-020/021/023：解析一个 blog 调用。
     ///
-    /// 先解 tipName 与七节（形态无关的顶层必填字段），再解内容形态。
+    /// 先解 tipName 与 opinion/advice（形态无关的顶层必填字段），再解内容形态。
     /// 缺键/空白/非 string/超长/含换行 → C4.1 内部标识；不映射工具文案。
     /// 新协议必须完整提供 charge/occurrence/settlement/consequence，可选 evidence。
     /// entry/text 仅作为升级前 transcript 的 legacy recovery 身份，且不得与
@@ -240,19 +206,13 @@ module EnforcerCodec =
     /// 其它 property 忽略（ENFORCER-024）。不默认 tip。
     let decodeCall (rawArgs: Map<string, obj>) : Result<CanonicalBlogCall, string> =
         match decodeTipName rawArgs, decodeTipSections rawArgs with
-        | Ok tipName,
-          Ok(whatToDoNow, whyThisMatters, repairStrategy, decisionBranches, commonWrongFixes, verification, doneWhen) ->
+        | Ok tipName, Ok(opinion, advice) ->
             decodeContent rawArgs
             |> Result.map (fun content ->
                 { Content = content
                   TipName = tipName
-                  WhatToDoNow = whatToDoNow
-                  WhyThisMatters = whyThisMatters
-                  RepairStrategy = repairStrategy
-                  DecisionBranches = decisionBranches
-                  CommonWrongFixes = commonWrongFixes
-                  Verification = verification
-                  DoneWhen = doneWhen })
+                  Opinion = opinion
+                  Advice = advice })
         | Error error, _ -> Error error
         | _, Error error -> Error error
 

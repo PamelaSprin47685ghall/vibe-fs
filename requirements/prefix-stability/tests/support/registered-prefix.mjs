@@ -116,7 +116,7 @@ export const coveredSession = async (hooks, runtime, directory, sessionID, testC
     push(structuredClone(messages.at(-1)))
     push(running)
     await transform()
-    const entry = { charge: 'Record the completed read.', occurrence: 'The source was read.', settlement: 'The read is complete.', consequence: 'Later work retains the result.', tipName: Enforcer.fieldNames()[0], whatToDoNow: 'Carry the recorded material into the next step.', whyThisMatters: 'The durable frame preserves the outcome for later context.', repairStrategy: 'Re-read the source when the outcome is disputed.', decisionBranches: 'Continue when coverage matches; otherwise settle the request.', commonWrongFixes: 'Never re-commit the same observation or invent an owner.', verification: 'Expect exactly one committed frame per call.', doneWhen: 'Observation and coverage advance together.', }
+    const entry = { charge: 'Record the completed read.', occurrence: 'The source was read.', settlement: 'The read is complete.', consequence: 'Later work retains the result.', tipName: Enforcer.fieldNames()[0], opinion: 'The durable frame preserves the outcome for later context.', advice: 'Carry the recorded material into the next step.', }
     const recorded = await hooks.tool.chronicle.execute(entry, { sessionID: blogger, agent: 'blogger', messageID: 'msg-blog-run', callID: 'call-blog' })
     bloggerMessages = [
       { info: { ...bloggerPhysical, sessionID: blogger }, parts: bloggerPhysical.parts },
@@ -144,7 +144,7 @@ export const commitPendingBlogger = async (hooks, runtime, directory, session) =
   const request = facts(directory, 'BloggerRequestMaterialized').at(-1)
   assert.equal(request.PreviousIngestedThroughSequence, '4')
   assert.equal(request.NextIngestedThroughSequence, '6')
-  const entry = { charge: 'Record the completed checkpoint.', occurrence: 'The checkpoint completed.', settlement: 'The checkpoint is durable.', consequence: 'Later work retains the checkpoint.', tipName: Enforcer.fieldNames()[0], whatToDoNow: 'Carry the recorded material into the next step.', whyThisMatters: 'The durable frame preserves the outcome for later context.', repairStrategy: 'Re-read the source when the outcome is disputed.', decisionBranches: 'Continue when coverage matches; otherwise settle the request.', commonWrongFixes: 'Never re-commit the same observation or invent an owner.', verification: 'Expect exactly one committed frame per call.', doneWhen: 'Observation and coverage advance together.', }
+  const entry = { charge: 'Record the completed checkpoint.', occurrence: 'The checkpoint completed.', settlement: 'The checkpoint is durable.', consequence: 'Later work retains the checkpoint.', tipName: Enforcer.fieldNames()[0], opinion: 'The durable frame preserves the outcome for later context.', advice: 'Carry the recorded material into the next step.', }
   const recorded = await hooks.tool.chronicle.execute(entry, { sessionID: session.blogger, agent: 'blogger', messageID: session.bloggerNext.info.id, callID: 'call-blog-second' })
   session.bloggerNext.info.finish = 'tool-calls'
   session.bloggerNext.info.time.completed = 5

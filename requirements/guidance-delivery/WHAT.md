@@ -30,7 +30,7 @@ latestTipNudge 与 latestTipGuidance 对相同输入返回相同字节，不增�
 
 ## [008] Audience 隔离
 
-检测正文仅进 Blogger system prompt、不进交付；库处置正文作为格式样板同样进入 Blogger system prompt，但不作交付正文来源；交付正文（撰写七节）只供 Main guidance。三段正文不互相混用。Blogger 的历史 tip 是低信任观察，不得成为 Main Authority。
+库 lesson 单文档仅进 Blogger system prompt 作格式样板，不作交付正文来源；交付正文（blogger 撰写的 opinion 与 advice）只供 Main guidance。两类正文不互相混用。Blogger 的历史 tip 是低信任观察，不得成为 Main Authority。
 
 ## [009] 交付不创建 Authority
 

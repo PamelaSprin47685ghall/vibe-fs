@@ -174,10 +174,10 @@ async function verifyArtifacts(targetRoot = root) {
   if (fs.existsSync(catalogJson)) throw new Error(`catalog.json must be removed after folder cutover: ${catalogJson}`)
 
   for (const name of ['primitive-obsession', ruleDirs[0]]) {
-    const enforcerMd = path.join(enforcerRoot, name, 'enforcer.md')
-    const mainMd = path.join(enforcerRoot, name, 'main.md')
-    if (!fs.existsSync(enforcerMd)) throw new Error(`missing rulebook file: ${enforcerMd}`)
-    if (!fs.existsSync(mainMd)) throw new Error(`missing rulebook file: ${mainMd}`)
+    for (const locale of ['lesson.md', 'lesson.zh-CN.md']) {
+      const lessonPath = path.join(enforcerRoot, name, locale)
+      if (!fs.existsSync(lessonPath)) throw new Error(`missing rulebook file: ${lessonPath}`)
+    }
   }
 
   const providerRoles = [

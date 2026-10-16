@@ -1,15 +1,13 @@
 namespace Wanxiangshu.Enforcer
 
 /// Rulebook folder SSOT: directory basename = RuleId = FieldName (bd [003]/[005]).
-/// Rule payload is full enforcer.md + main.md texts; LexicalOrder is folder order 1..N.
+/// Rule payload is the full lesson.md text; LexicalOrder is folder order 1..N.
 type EnforcerRule =
     {
         /// Directory basename; library identity (= RuleId = FieldName), not a provider enum.
         Name: string
-        /// Full text of resources/enforcer/<name>/enforcer.md
-        EnforcerText: string
-        /// Full text of resources/enforcer/<name>/main.md
-        MainText: string
+        /// Full text of resources/enforcer/<name>/lesson.md
+        LessonText: string
         /// Durable tip id; clean break = Name (no enforcement-a01).
         RuleId: string
         /// Library field name; = Name. Blogger tipName is free-form: it may match
@@ -61,8 +59,7 @@ module EnforcerCatalog =
                 not (isNonEmpty r.Name)
                 || not (isNonEmpty r.RuleId)
                 || not (isNonEmpty r.FieldName)
-                || not (isNonEmpty r.EnforcerText)
-                || not (isNonEmpty r.MainText)
+                || not (isNonEmpty r.LessonText)
                 || r.Name <> r.RuleId
                 || r.Name <> r.FieldName)
         with

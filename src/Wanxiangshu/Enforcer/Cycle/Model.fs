@@ -55,17 +55,10 @@ module EnforcerCycle =
 
     let private tipSectionTitles =
         function
-        | ProviderLanguage.SimplifiedChinese -> [ "现在该做什么"; "为什么重要"; "修复策略"; "决策分支"; "常见假修复"; "验证"; "完成条件" ]
-        | ProviderLanguage.English ->
-            [ "What To Do Now"
-              "Why This Matters"
-              "Repair Strategy"
-              "Decision Branches"
-              "Common Wrong Fixes"
-              "Verification"
-              "Done When" ]
+        | ProviderLanguage.SimplifiedChinese -> [ "评价"; "建议" ]
+        | ProviderLanguage.English -> [ "Opinion"; "Advice" ]
 
-    /// C7.8 / D4：按撰写语言把七节拼装为「## <节名> + 空行 + 节文」段，
+    /// C7.8 / D4：按撰写语言把两节拼装为「## <节名> + 空行 + 节文」段，
     /// 段间空行、单一文本、无尾随换行。纯函数（language 为参数）。
     let renderTipSections (language: ProviderLanguage) (sections: string list) : string =
         List.zip (tipSectionTitles language) sections
@@ -74,15 +67,7 @@ module EnforcerCycle =
 
     let ofCall (call: CanonicalBlogCall) : CanonicalCycle =
         let tipSectionsText =
-            renderTipSections
-                (GlobalProviderLanguage.current ())
-                [ call.WhatToDoNow
-                  call.WhyThisMatters
-                  call.RepairStrategy
-                  call.DecisionBranches
-                  call.CommonWrongFixes
-                  call.Verification
-                  call.DoneWhen ]
+            renderTipSections (GlobalProviderLanguage.current ()) [ call.Opinion; call.Advice ]
 
         match call.Content with
         | ChronicleContent.Structured record ->

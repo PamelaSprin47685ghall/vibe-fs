@@ -311,7 +311,7 @@ installDefaultResources()
 test('WHAT[capability-enforcement-006] CHRONICLE_spec_exposes_identity_and_argument_surface', () => {
   const contract = chronicleContract()
   assert.equal(contract.name, 'chronicle')
-  assert.deepEqual(contract.argumentNames, ['charge', 'occurrence', 'settlement', 'consequence', 'tipName', 'whatToDoNow', 'whyThisMatters', 'repairStrategy', 'decisionBranches', 'commonWrongFixes', 'verification', 'doneWhen', 'evidence'])
+  assert.deepEqual(contract.argumentNames, ['charge', 'occurrence', 'settlement', 'consequence', 'tipName', 'opinion', 'advice', 'evidence'])
   assert.equal(contract.tipCount, enforcer.fieldNames().length)
 })
 }

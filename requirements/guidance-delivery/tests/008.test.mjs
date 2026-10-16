@@ -10,11 +10,10 @@ import { guidance, link, observe, withJournal, main, blogger, tip, authoredBody 
 
 integrationTest('WHAT[guidance-delivery-008] Blogger composer takes detection source regardless of section vocabulary', async () => {
   await withRulebookPackage(async ({ write, surface }) => {
-    write('sample-tip', 'enforcer.md', '## What To Do Now\nDETECTION SOURCE')
-    write('sample-tip', 'main.md', 'REMEDIATION SOURCE')
+    write('sample-tip', 'lesson.md', '## Opinion\nDETECTION SOURCE\n\n## Advice\nREMEDIATION SOURCE')
     const prompt = surface.composeBloggerSystemPrompt('base', 'en')
     assert.ok(prompt.includes('DETECTION SOURCE'))
-    assert.ok(prompt.includes('What To Do Now'))
+    assert.ok(prompt.includes('Opinion'))
     assert.ok(prompt.includes('REMEDIATION SOURCE'))
   })
 })
@@ -24,7 +23,7 @@ test('WHAT[guidance-delivery-008] real Main resolver uses the authored remediati
     await link(journal)
     await observe(journal)
     const result = await guidance.resolve(journal, main)
-    const detection = readFileSync(new URL(`../../../resources/enforcer/${tip}/enforcer.md`, import.meta.url), 'utf8').trim()
+    const detection = readFileSync(new URL(`../../../resources/enforcer/${tip}/lesson.md`, import.meta.url), 'utf8').trim()
     assert.ok(result.text.includes(authoredBody))
     assert.equal(result.text.includes(detection), false)
   })
@@ -55,7 +54,7 @@ test('WHAT[guidance-delivery-008] Main guidance resolution keeps Blogger detecti
     await observe(journal, 2)
 
     const resolved = await guidance.resolve(journal, main)
-    const detection = readFileSync(new URL(`../../../resources/enforcer/${tip}/enforcer.md`, import.meta.url), 'utf8').trim()
+    const detection = readFileSync(new URL(`../../../resources/enforcer/${tip}/lesson.md`, import.meta.url), 'utf8').trim()
     assert.ok(resolved.text.includes(authoredBody), 'Main guidance carries the authored remediation body')
     assert.equal(resolved.text.includes(detection), false, 'Blogger detection history must not be promoted into Main guidance')
 

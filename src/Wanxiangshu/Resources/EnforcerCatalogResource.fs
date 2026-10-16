@@ -7,10 +7,9 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider
 
 /// Loads the localized Enforcer Rulebook from `resources/enforcer/<tip>/`.
-/// English leaves are `enforcer.md` + `main.md`; zh-CN leaves are
-/// `enforcer.zh-CN.md` + `main.zh-CN.md`. Directory basename = RuleId =
-/// FieldName; the localized texts bootstrap the Blogger prompt (detection
-/// folios + remediation templates), while provider-side tipName is freely
+/// English leaf is `lesson.md`; zh-CN leaf is `lesson.zh-CN.md`. Directory
+/// basename = RuleId = FieldName; the localized lesson text bootstraps the
+/// Blogger prompt (format sample), while provider-side tipName is freely
 /// named and no longer chosen from an enum. Missing / empty / invalid → throw
 /// (fail-fast); there is no locale fallback. `catalog.json` is not runtime SSOT.
 module EnforcerCatalogResource =
@@ -22,8 +21,8 @@ module EnforcerCatalogResource =
 
     let private localizedFiles =
         function
-        | ProviderLanguage.English -> "enforcer.md", "main.md"
-        | ProviderLanguage.SimplifiedChinese -> "enforcer.zh-CN.md", "main.zh-CN.md"
+        | ProviderLanguage.English -> "lesson.md"
+        | ProviderLanguage.SimplifiedChinese -> "lesson.zh-CN.md"
 
     /// Effective Blogger system prompt: localized base + localized detection and
     /// remediation folios. Deterministic projection only — never written back to the
@@ -41,8 +40,7 @@ module EnforcerCatalogResource =
             | ProviderLanguage.SimplifiedChinese -> "Enforcer RuleBook（规则书）"
 
         let ruleInstructions =
-            ordered
-            |> List.collect (fun rule -> [ rule.Name; rule.EnforcerText.Trim(); rule.MainText.Trim() ])
+            ordered |> List.collect (fun rule -> [ rule.Name; rule.LessonText.Trim() ])
 
         LlmFacing.renderInstructions (baseInstructions @ [ heading ] @ ruleInstructions)
 
@@ -54,7 +52,7 @@ module EnforcerCatalogResource =
 
     let loadFor (lang: ProviderLanguage) : EnforcerRule list =
         let rootRel = "enforcer"
-        let enforcerFile, mainFile = localizedFiles lang
+        let lessonFile = localizedFiles lang
         let names = PackageResources.listChildDirectoryNames rootRel
 
         if List.isEmpty names then
@@ -74,29 +72,20 @@ module EnforcerCatalogResource =
                         )
                     )
 
-                let enforcerRel = sprintf "%s/%s/%s" rootRel name enforcerFile
-                let mainRel = sprintf "%s/%s/%s" rootRel name mainFile
+                let lessonRel = sprintf "%s/%s/%s" rootRel name lessonFile
 
-                if not (PackageResources.exists enforcerRel) then
-                    raise (InvalidOperationException(sprintf "package resource missing: resources/%s" enforcerRel))
+                if not (PackageResources.exists lessonRel) then
+                    raise (InvalidOperationException(sprintf "package resource missing: resources/%s" lessonRel))
 
-                if not (PackageResources.exists mainRel) then
-                    raise (InvalidOperationException(sprintf "package resource missing: resources/%s" mainRel))
+                let lessonText = PackageResources.readText(lessonRel).Trim()
 
-                let enforcerText = PackageResources.readText(enforcerRel).Trim()
-                let mainText = PackageResources.readText(mainRel).Trim()
-
-                if enforcerText.Length = 0 then
-                    raise (InvalidOperationException(sprintf "%s empty for rule %s" enforcerFile name))
-
-                if mainText.Length = 0 then
-                    raise (InvalidOperationException(sprintf "%s empty for rule %s" mainFile name))
+                if lessonText.Length = 0 then
+                    raise (InvalidOperationException(sprintf "%s empty for rule %s" lessonFile name))
 
                 let order = index + 1
 
                 { Name = name
-                  EnforcerText = enforcerText
-                  MainText = mainText
+                  LessonText = lessonText
                   RuleId = name
                   FieldName = name
                   LexicalOrder = order })

@@ -11,7 +11,7 @@ for (const locale of ['en', 'zh-CN']) {
     assert.ok(composed.includes(comment(base)))
     let previous = composed.indexOf(comment(base))
     for (const rule of enforcer.loadFor(locale)) {
-      const segment = `${comment(rule.name)}\n${comment(rule.enforcerText)}\n${comment(rule.mainText)}`
+      const segment = `${comment(rule.name)}\n${comment(rule.lessonText)}`
       const position = composed.indexOf(segment)
       assert.ok(position > previous, `missing or reordered ${rule.name}`)
       assert.equal(composed.indexOf(segment, position + 1), -1)

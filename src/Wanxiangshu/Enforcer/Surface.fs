@@ -27,16 +27,14 @@ module EnforcerSurface =
     let private ruleToJs (rule: EnforcerRule) : obj =
         box
             {| name = rule.Name
-               enforcerText = rule.EnforcerText
-               mainText = rule.MainText
+               lessonText = rule.LessonText
                ruleId = rule.RuleId
                fieldName = rule.FieldName
                lexicalOrder = rule.LexicalOrder |}
 
     let private ruleOfJs (value: obj) : EnforcerRule =
         { Name = text value?name
-          EnforcerText = text value?enforcerText
-          MainText = text value?mainText
+          LessonText = text value?lessonText
           RuleId = text value?ruleId
           FieldName = text value?fieldName
           LexicalOrder = int (text value?lexicalOrder) }
@@ -53,13 +51,8 @@ module EnforcerSurface =
 
     let private tipSectionsToJs (call: EnforcerCodec.CanonicalBlogCall) : (string * obj) list =
         [ "tipName", box call.TipName
-          "whatToDoNow", box call.WhatToDoNow
-          "whyThisMatters", box call.WhyThisMatters
-          "repairStrategy", box call.RepairStrategy
-          "decisionBranches", box call.DecisionBranches
-          "commonWrongFixes", box call.CommonWrongFixes
-          "verification", box call.Verification
-          "doneWhen", box call.DoneWhen ]
+          "opinion", box call.Opinion
+          "advice", box call.Advice ]
 
     let private callToJs (call: EnforcerCodec.CanonicalBlogCall) : obj =
         match call.Content with
@@ -87,7 +80,7 @@ module EnforcerSurface =
                mergedEvidence = cycle.MergedEvidence |}
 
     /// JS call arguments → the codec's map shape. The object carries tipName
-    /// and the seven sections directly; no tip alias is synthesized.
+    /// and the opinion/advice fields directly; no tip alias is synthesized.
     let private rawArgs (value: obj) : Map<string, obj> =
         let keys: string array = emitJsExpr value "Object.keys($0)"
 
@@ -106,8 +99,8 @@ module EnforcerSurface =
         [ "enforcer rulebook empty"
           "enforcer rule directory name must be lower-kebab-case"
           "package resource missing"
-          "enforcer.md empty"
-          "main.md empty"
+          "lesson.md empty"
+          "lesson.zh-CN.md empty"
           "enforcer rulebook invalid" ]
 
     let private rulebookFailureCode (message: string) : string =

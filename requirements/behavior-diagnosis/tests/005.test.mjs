@@ -12,29 +12,24 @@ integrationTest('WHAT[behavior-diagnosis-005] both locale views preserve authore
   assert.deepEqual(chinese.map((rule) => rule.name), english.map((rule) => rule.name))
   for (const [locale, rules] of [['', english], ['.zh-CN', chinese]]) {
     for (const rule of rules) {
-      for (const [leaf, field] of [['enforcer', 'enforcerText'], ['main', 'mainText']]) {
-        const expected = readFileSync(new URL(`../../../resources/enforcer/${rule.name}/${leaf}${locale}.md`, import.meta.url), 'utf8').trim()
-        assert.ok(expected.length > 0)
-        assert.equal(rule[field], expected)
-      }
+      const expected = readFileSync(new URL(`../../../resources/enforcer/${rule.name}/lesson${locale}.md`, import.meta.url), 'utf8').trim()
+      assert.ok(expected.length > 0)
+      assert.equal(rule.lessonText, expected)
     }
   }
 })
 
-integrationTest('WHAT[behavior-diagnosis-005] missing or blank Chinese leaves never fall back to valid English', async () => {
+integrationTest('WHAT[behavior-diagnosis-005] missing or blank Chinese leaf never falls back to valid English', async () => {
   await withRulebookPackage(async ({ rulebook, write, surface }) => {
-    write('sample-rule', 'enforcer.md', 'English detection')
-    write('sample-rule', 'main.md', 'English guidance')
+    write('sample-rule', 'lesson.md', 'English lesson body')
     assert.equal(surface.rules().length, 1)
-    assert.throws(() => surface.loadFor('zh-CN'), /enforcer.zh-CN.md/)
-    write('sample-rule', 'enforcer.zh-CN.md', '检测正文')
-    assert.throws(() => surface.loadFor('zh-CN'), /main.zh-CN.md/)
-    write('sample-rule', 'main.zh-CN.md', ' \n')
-    assert.throws(() => surface.loadFor('zh-CN'), /main.zh-CN.md empty/)
-    write('sample-rule', 'main.zh-CN.md', '处置正文')
-    assert.equal(surface.loadFor('zh-CN')[0].mainText, '处置正文')
-    rmSync(join(rulebook, 'sample-rule/enforcer.zh-CN.md'))
-    assert.throws(() => surface.loadFor('zh-CN'), /enforcer.zh-CN.md/)
+    assert.throws(() => surface.loadFor('zh-CN'), /lesson.zh-CN.md/)
+    write('sample-rule', 'lesson.zh-CN.md', ' \n')
+    assert.throws(() => surface.loadFor('zh-CN'), /lesson.zh-CN.md empty/)
+    write('sample-rule', 'lesson.zh-CN.md', '处置正文')
+    assert.equal(surface.loadFor('zh-CN')[0].lessonText, '处置正文')
+    rmSync(join(rulebook, 'sample-rule/lesson.zh-CN.md'))
+    assert.throws(() => surface.loadFor('zh-CN'), /lesson.zh-CN.md/)
   })
 })
 

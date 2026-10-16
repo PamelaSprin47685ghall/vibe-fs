@@ -7,13 +7,8 @@ import { bindManagedChild, withExecutablePlugin, withPlugin } from '../../verifi
 const field = enforcer.fieldNames()[0]
 const sections = () => ({
   tipName: field,
-  whatToDoNow: '  Act on the exact boundary.  ',
-  whyThisMatters: '  The boundary decides later work.  ',
-  repairStrategy: '  Take the smallest complete step.  ',
-  decisionBranches: '  Follow the branch that fits the situation.  ',
-  commonWrongFixes: '  Skipping the boundary fix fails.  ',
-  verification: '  The boundary check must catch a wrong fix.  ',
-  doneWhen: '  The boundary holds under the check.  ',
+  opinion: '  The boundary decides later work.  ',
+  advice: '  Take the smallest complete step.  ',
 })
 const structured = (overrides = {}) => ({
   charge: '  Resolve the exact boundary.  ',
@@ -147,8 +142,7 @@ test('WHAT[behavior-diagnosis-006] real chronicle provider schema exposes option
     const args = hooks.tool.chronicle.args
     assert.deepEqual(Object.keys(args), [
       'charge', 'occurrence', 'settlement', 'consequence', 'tipName',
-      'whatToDoNow', 'whyThisMatters', 'repairStrategy', 'decisionBranches',
-      'commonWrongFixes', 'verification', 'doneWhen', 'evidence',
+      'opinion', 'advice', 'evidence',
     ])
     for (const name of Object.keys(args)) {
       assert.ok(args[name].description?.trim().length > 0, `${name} must explain its distinct semantic role`)

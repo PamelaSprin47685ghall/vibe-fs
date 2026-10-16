@@ -39,8 +39,7 @@ module PromptSurface =
             if (!$0) return null;
             return {
                 name: $0.Name || $0.name || '',
-                enforcerText: $0.EnforcerText || $0.enforcerText || '',
-                mainText: $0.MainText || $0.mainText || '',
+                lessonText: $0.LessonText || $0.lessonText || '',
                 ruleId: $0.RuleId || $0.ruleId || '',
                 fieldName: $0.FieldName || $0.fieldName || '',
                 lexicalOrder: $0.LexicalOrder || $0.lexicalOrder || 0

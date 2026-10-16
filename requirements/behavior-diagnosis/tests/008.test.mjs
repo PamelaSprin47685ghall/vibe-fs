@@ -34,13 +34,8 @@ test('WHAT[behavior-diagnosis-008] ENFORCER_024_extra_numeric_properties_are_ign
     settlement: 'The uncertainty is now settled.',
     consequence: 'The future path now rests on that fact.',
     tipName: field,
-    whatToDoNow: 'Take the next concrete step.',
-    whyThisMatters: 'The boundary decides later work.',
-    repairStrategy: 'Repair the boundary first.',
-    decisionBranches: 'Follow the branch that fits.',
-    commonWrongFixes: 'Skipping the boundary fails.',
-    verification: 'The check must catch a wrong fix.',
-    doneWhen: 'The boundary holds under the check.',
+    opinion: 'The boundary decides later work.',
+    advice: 'Repair the boundary first.',
     'primitive-obsession': 7,
     some_other_number: 3,
   })
@@ -235,17 +230,12 @@ test('WHAT[behavior-diagnosis-008] ENFORCER_TIP_03_04_facade_surface_has_tip_not
     settlement: 'The resulting state is established.',
     consequence: 'The continuing road changed.',
     tipName: fields[0],
-    whatToDoNow: 'Take the next concrete step.',
-    whyThisMatters: 'The boundary decides later work.',
-    repairStrategy: 'Repair the boundary first.',
-    decisionBranches: 'Follow the branch that fits.',
-    commonWrongFixes: 'Skipping the boundary fails.',
-    verification: 'The check must catch a wrong fix.',
-    doneWhen: 'The boundary holds under the check.',
+    opinion: 'The boundary decides later work.',
+    advice: 'Repair the boundary first.',
   })
   assert.equal(sample.ok, true)
   assert.equal(typeof sample.value.tipName, 'string')
-  assert.equal(typeof sample.value.whatToDoNow, 'string')
+  assert.equal(typeof sample.value.advice, 'string')
   assert.equal(sample.value.Scores, undefined)
 })
 }

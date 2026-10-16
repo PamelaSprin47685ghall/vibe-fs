@@ -38,7 +38,7 @@ module ChronicleExecution =
         else
             Ok trimmed
 
-    /// C2.1 / S4：七节逐节检查；缺失或空白 → missing-tip-field:<camelCase 字段名>。
+    /// C2.1 / S4：内容字段逐节检查；缺失或空白 → missing-tip-field:<camelCase 字段名>。
     let tryTipField (fieldName: string) (rawText: string) : Result<string, string> =
         let trimmed = if isNull rawText then "" else rawText.Trim()
 

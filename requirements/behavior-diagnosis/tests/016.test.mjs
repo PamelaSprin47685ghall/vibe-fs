@@ -116,13 +116,8 @@ const structuredCall = (occurrence, tip) => ({
   settlement: 'The observation remains part of the durable paired history.',
   consequence: 'Later selection may compare new material against this established transition.',
   tipName: tip,
-  whatToDoNow: 'Take the next concrete step.',
-  whyThisMatters: 'The boundary decides later work.',
-  repairStrategy: 'Repair the boundary first.',
-  decisionBranches: 'Follow the branch that fits.',
-  commonWrongFixes: 'Skipping the boundary fails.',
-  verification: 'The check must catch a wrong fix.',
-  doneWhen: 'The boundary holds under the check.',
+  opinion: 'The boundary decides later work.',
+  advice: 'Repair the boundary first.',
 })
 const NEW_MATERIAL_SIMILAR_TO_A = `[[new_work_to_record]]
 assistant = "Coder 修改 /src/tenancy/bind.ts：userId 与 tenantId 均声明为 string，绑定函数可互换两个标识。"

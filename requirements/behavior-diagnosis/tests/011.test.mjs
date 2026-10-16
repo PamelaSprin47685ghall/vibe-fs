@@ -83,20 +83,15 @@ const cycleCall = (overrides = {}) =>
         settlement: 'result settled',
         consequence: 'continue on the settled path',
         tipName: 'primitive-obsession',
-        whatToDoNow: 'take the next concrete step',
-        whyThisMatters: 'the boundary decides later work',
-        repairStrategy: 'smallest complete repair first',
-        decisionBranches: 'follow the branch that fits',
-        commonWrongFixes: 'skipping the boundary fails later',
-        verification: 'the check must catch a wrong fix',
-        doneWhen: 'the boundary holds under the check',
+        opinion: 'the boundary decides later work',
+        advice: 'smallest complete repair first',
         ...overrides,
       },
     },
   })
 
 test('WHAT[behavior-diagnosis-011] production decode chain rejects tip sections text over 512KiB with its own message', () => {
-  const result = decode([cycleCall({ whatToDoNow: 'a'.repeat(MAX_BLOG_TEXT_BYTES + 1) })])
+  const result = decode([cycleCall({ opinion: 'a'.repeat(MAX_BLOG_TEXT_BYTES + 1) })])
   assert.equal(result.decodedCalls, 1, 'the codec puts no byte cap on a single section; the bounds gate rejects this call')
   assert.equal(result.decision.ok, false)
   assert.equal(
@@ -115,16 +110,11 @@ test('WHAT[behavior-diagnosis-011] production decode chain rejects merged text o
   )
 })
 
-test('WHAT[behavior-diagnosis-011] production decode chain accepts seven sections whose rendered text stays inside 512KiB', () => {
-  const boundedSection = 'a'.repeat(Math.floor((MAX_BLOG_TEXT_BYTES - 1024) / 7))
+test('WHAT[behavior-diagnosis-011] production decode chain accepts both sections whose rendered text stays inside 512KiB', () => {
+  const boundedSection = 'a'.repeat(Math.floor((MAX_BLOG_TEXT_BYTES - 1024) / 2))
   const result = decode([cycleCall({
-    whatToDoNow: boundedSection,
-    whyThisMatters: boundedSection,
-    repairStrategy: boundedSection,
-    decisionBranches: boundedSection,
-    commonWrongFixes: boundedSection,
-    verification: boundedSection,
-    doneWhen: boundedSection,
+    opinion: boundedSection,
+    advice: boundedSection,
   })])
   assert.equal(result.decodedCalls, 1)
   assert.equal(result.decision.ok, true)

@@ -6,8 +6,7 @@ const rule = (overrides = {}) => ({
   name: overrides.name ?? overrides.fieldName ?? overrides.ruleId ?? 'sample-field',
   ruleId: overrides.ruleId ?? overrides.name ?? overrides.fieldName ?? 'sample-field',
   fieldName: overrides.fieldName ?? overrides.name ?? overrides.ruleId ?? 'sample-field',
-  enforcerText: overrides.enforcerText ?? 'enforcer body',
-  mainText: overrides.mainText ?? 'main body',
+  lessonText: overrides.lessonText ?? 'lesson body',
   lexicalOrder: overrides.lexicalOrder ?? 1,
 })
 
@@ -102,17 +101,17 @@ test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_unknown_schema_
   assert.equal(result.error, 'enforcer catalog schemaVersion must be 1, got 2')
 })
 
-test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_empty_main_text', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_empty_lesson_text_blank', () => {
   const result = enforcer.validate(1, [
-    rule({ name: 'f1', mainText: '   ', lexicalOrder: 1 }),
+    rule({ name: 'f1', lessonText: '   ', lexicalOrder: 1 }),
   ])
   assert.equal(result.ok, false)
   assert.match(result.error, /empty text or identity mismatch on rule ordinal 1/)
 })
 
-test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_empty_enforcer_text', () => {
+test('WHAT[behavior-diagnosis-003] ENFORCER_170_validate_rejects_empty_lesson_text_empty', () => {
   const result = enforcer.validate(1, [
-    rule({ name: 'f1', enforcerText: '', lexicalOrder: 1 }),
+    rule({ name: 'f1', lessonText: '', lexicalOrder: 1 }),
   ])
   assert.equal(result.ok, false)
   assert.match(result.error, /empty text or identity mismatch on rule ordinal 1/)

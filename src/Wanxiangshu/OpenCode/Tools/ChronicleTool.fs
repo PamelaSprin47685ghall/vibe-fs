@@ -8,8 +8,8 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
 
 /// docs/what/enforcer.md — the `chronicle` tool (ENFORCER-010/020/040/041/061 tip v2).
-/// Provider schema: required charge/occurrence/settlement/consequence, a free tipName
-/// and seven lesson sections, plus optional evidence.
+/// Provider schema: required charge/occurrence/settlement/consequence, a free tipName,
+/// opinion and advice lesson fields, plus optional evidence.
 module ChronicleTool =
 
     [<RequireQualifiedAccess>]
@@ -36,25 +36,10 @@ module ChronicleTool =
         let ArgTipName = "tool/chronicle/arg-tip-name"
 
         [<Literal>]
-        let ArgWhatToDoNow = "tool/chronicle/arg-what-to-do-now"
+        let ArgOpinion = "tool/chronicle/arg-opinion"
 
         [<Literal>]
-        let ArgWhyThisMatters = "tool/chronicle/arg-why-this-matters"
-
-        [<Literal>]
-        let ArgRepairStrategy = "tool/chronicle/arg-repair-strategy"
-
-        [<Literal>]
-        let ArgDecisionBranches = "tool/chronicle/arg-decision-branches"
-
-        [<Literal>]
-        let ArgCommonWrongFixes = "tool/chronicle/arg-common-wrong-fixes"
-
-        [<Literal>]
-        let ArgVerification = "tool/chronicle/arg-verification"
-
-        [<Literal>]
-        let ArgDoneWhen = "tool/chronicle/arg-done-when"
+        let ArgAdvice = "tool/chronicle/arg-advice"
 
         [<Literal>]
         let Remembered = "tool/chronicle/remembered"
@@ -210,28 +195,10 @@ module ChronicleTool =
               ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgConsequence Map.empty) factory
               "tipName",
               ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgTipName Map.empty) factory
-              "whatToDoNow",
-              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgWhatToDoNow Map.empty) factory
-              "whyThisMatters",
-              ToolHostCodec.stringSchemaDescribed
-                  (ProviderProse.render language Path.ArgWhyThisMatters Map.empty)
-                  factory
-              "repairStrategy",
-              ToolHostCodec.stringSchemaDescribed
-                  (ProviderProse.render language Path.ArgRepairStrategy Map.empty)
-                  factory
-              "decisionBranches",
-              ToolHostCodec.stringSchemaDescribed
-                  (ProviderProse.render language Path.ArgDecisionBranches Map.empty)
-                  factory
-              "commonWrongFixes",
-              ToolHostCodec.stringSchemaDescribed
-                  (ProviderProse.render language Path.ArgCommonWrongFixes Map.empty)
-                  factory
-              "verification",
-              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgVerification Map.empty) factory
-              "doneWhen",
-              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgDoneWhen Map.empty) factory
+              "opinion",
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgOpinion Map.empty) factory
+              "advice",
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgAdvice Map.empty) factory
               "evidence",
               ToolHostCodec.optionalStringSchemaDescribed
                   (ProviderProse.render language Path.ArgEvidence Map.empty)

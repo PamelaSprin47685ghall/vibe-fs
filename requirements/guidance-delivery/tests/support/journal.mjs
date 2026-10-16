@@ -11,16 +11,11 @@ export const main = 'guidance-main'
 export const blogger = 'guidance-blogger'
 export const tip = 'primitive-obsession'
 
-/// Authored tip body fixture: seven sections joined with `## ` headings, the
+/// Authored tip body fixture: opinion and advice sections joined with `## ` headings, the
 /// shape the delivery chain now reads back from its blob (Algorithm R2/G1).
 export const authoredBody = [
-  '## What To Do Now', 'AUTHORED ACTION',
-  '## Why This Matters', 'AUTHORED WHY',
-  '## Repair Strategy', 'AUTHORED REPAIR',
-  '## Decision Branches', 'AUTHORED BRANCHES',
-  '## Common Wrong Fixes', 'AUTHORED WRONG FIXES',
-  '## Verification', 'AUTHORED VERIFICATION',
-  '## Done When', 'AUTHORED DONE',
+  '## Opinion', 'AUTHORED OPINION',
+  '## Advice', 'AUTHORED ADVICE',
 ].join('\n')
 
 export async function link(journal, owner = main, companion = blogger) {
