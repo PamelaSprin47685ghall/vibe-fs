@@ -2,6 +2,18 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第六批：剩余问题分级与小项直接修复（2026-10-16）
+
+输入主仓 `c1ed871be`、库 `eef4825`，两仓起点干净。用户要求简单的直接修，较难的先定计划。[剩余问题和施工计划](REMAINING-REPAIRS-2026-10-16.md) 把四项 P1（后代监管、持久每轮准入、重启接管、Trace 原件迁移）分开，另登记 Process 编译边界、完整 wire 预算和 Bun 平台验收三个 P2 包；没有开始这些复杂包的生产实现，也不把 37 项 TODO 当成 37 个已确认缺陷。
+
+已直接修 CUT-02-R6-V：库 Capture 006 错误注入夹具，提交 `b6984d9`。修复前 Bun 6 pass / 1 fail，停在 child.stdout；修复后从实际 stdout 的 read 取得原生流，再注入 error，验证生产监听器、失败结果、无假退出和无别名。Node Process/Supervision **69/69**、Bun Capture/Supervision **19/19**，日志 `/private/tmp/r6-node-process-green.log`、`r6-bun-capture-supervision-green.log`。仅改库测试和证明，不更换主仓锁/vendor，不重打 0.6.2。
+
+第一次候选沿用 destroy(EIO)，Node 7/7，但 Bun 超时；原生 Bun 对照证实 stdout 已 destroyed 却无 error，故改为明确的原生 error 事件注入。它不是实际设备 I/O 故障。原测试 child 未捕获的失败和第一次候选的失败均保留，不写成产品 bug 或通过。
+
+扩大 Bun Process/Supervision 为 **65 pass / 4 fail**，`r6-bun-process-green.log`，文件名不是成功标记。两条 env 失败和两条 stdin 断言单列 CUT-02-R6-C。原生 Node/Bun 对照分别证明 async/sync 的特殊 env 键不同、named spawn 拦截不成立、原生写回调 EPIPE/success 不同；见 `r6-native-{node,bun}.json`。未改这四条断言、未转 TODO/skip，也未宣称 Bun 全套通过。原生探针初版进程组清理失败；最终仅结束自己持有的子进程后得到上述结果，失败运行不计证据。
+
+主仓本轮只改计划、看板与证据，上一轮 790 项结果仍归原提交；没有借文档更新宣称重跑主仓行为套件。`node scripts/build.mjs` 文档候选构建 exit 0，174 surfaces / 836 modules 链接通过，`/private/tmp/r6-main-doc-build.log`；diff whitespace 核对通过。T-01/O-01/GAP-091/092/133 保持未闭合，真实 leader-exit TODO 保留。库修改正常推送既有交付分支，主仓文档正常推送 master；未部署运行中的 Host。
+
 <a id="regression-review-r5"></a>
 ## 第五批：全部修改的双版独立复审（2026-10-16）
 

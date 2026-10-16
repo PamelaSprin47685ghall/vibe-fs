@@ -94,6 +94,14 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-04-R4](SOURCE-AUDIT-2026-10-15.md#terminal-cancellation-review) | O-11：实际完全取消后拒绝旧 PTY 入口，保留 canonical DevOps 的可复用分支 | DONE | 主仓本提交；四项先红、实际 focused 778、485 项归属链及精确主包消费通过；非作者原反例零 Spawn、DevOps 连续复用和 12 个测试 PID 收尾通过 | root | independent_pty_r2 |
 | [CUT-02-R5](REGRESSION-REVIEW-2026-10-16.md) | 全部修改双版复审；P-04 首次 Spool 创建失败清理 | DONE | 原 lock 历史构建、双版实跑、首次写失败先红及非作者清理通过；最终 196 项进程、format/check、主包隔离消费通过；主仓本提交 | root | regression_process_r5、regression_trace_journal_r5 |
 | [CUT-04-R5](REGRESSION-REVIEW-2026-10-16.md) | O-13/O-14 修复引入的回退；O-12 原真实回调漏清理及冷无绑定防错 | DONE | 真实 fd、实际 terminal、held/retry/cancel/旧token及冷 guard 正反对照通过；492 项归属链、主包消费通过；主仓本提交，O-01 不销项 | root | regression_ownership_r5、regression_process_r5 |
+| [CUT-02-R6-V](REMAINING-REPAIRS-2026-10-16.md) | Capture 的 Bun 错误事件注入夹具 | DONE | 库 b6984d9；Node Process/Supervision 69/69、Bun Capture/Supervision 19/19；生产包未变，Bun 另四项不销项 | root | 本轮自检；未另作非作者复审 |
+| [CUT-04-R6-A](REMAINING-REPAIRS-2026-10-16.md) | O-01 活监管实例与真实 PTY 后代终结 | READY | 先验证 TTY/作业控制、leader 先退、后代 TERM/KILL 和 sibling 隔离原型，再定协议；物理 owner 未确认不 Ended | root（计划） | 待非作者复审 |
+| [CUT-04-R6-B](REMAINING-REPAIRS-2026-10-16.md) | O-01 跨进程每轮 PTY 准入 | READY | 对齐 A 的实例/结束语义；canonical work + run scope、两进程 Reserve/停止准入 CAS 与 Unknown 反例 | root（计划） | 待非作者复审 |
+| [CUT-04-R6-C](REMAINING-REPAIRS-2026-10-16.md) | O-01 跨重启物理接管 | BACKLOG | 依赖 A/B；必须有可验证 incarnation、连接及终态，真实强杀切点不重发命令 | root（计划） | 待非作者复审 |
+| [CUT-03-R6](REMAINING-REPAIRS-2026-10-16.md) | T-01 原件捕获、冷恢复、消费者切换和旧路径退出 | READY | 先冻结 D-02 与旧数据/cut 处置，再完成一条真实单 owner 捕获链；不把描述符或双写算完成 | root（计划） | 待非作者复审 |
+| [CUT-02-R6-A](REMAINING-REPAIRS-2026-10-16.md) | GAP-091 纯契约及编译/消费者边界 | READY | 真实正反编译与注入能力证明，不能只改目录或外观入口 | root（计划） | 待非作者复审 |
+| [CUT-02-R6-B](REMAINING-REPAIRS-2026-10-16.md) | GAP-092 完整 wire 总预算 | READY | 先明确最小可接纳预算和预执行拒绝通道，再以实际编码限制完整结果 | root（计划） | 待非作者复审 |
+| [CUT-02-R6-C](REMAINING-REPAIRS-2026-10-16.md) | Bun 特殊 env、参数证明及 stdin 四项失败 | READY | 原生对照已完成；分别处理能力与测试假设，不放宽断言，不标全套通过 | root（计划） | 待非作者复审 |
 
 P1 行为缺陷优先；PATH、PTY 提前清账/同步完成和 Proxy 测试可先形成独立小闭环。公共文件、两仓发布及主仓集成仍串行，不能用这些局部修复关闭整张关联卡。
 
