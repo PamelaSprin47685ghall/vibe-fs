@@ -6,6 +6,15 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
+// npm run 把全局 .npmrc 的 allow-scripts 以 npm_config_allow_scripts 形式导出给
+// 子进程；npm 12 在项目级安装里把它当 CLI 层配置并拒绝（EALLOWSCRIPTS）。
+// 子进程的安装策略应归属各项目自身的 package.json/.npmrc，与全局 shell 配置无关。
+function npmCommand(args, cwd) {
+  const env = { ...process.env }
+  delete env.npm_config_allow_scripts
+  return execFileSync(npm, args, { cwd, env, stdio: 'inherit' })
+}
+
 function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 }
@@ -50,9 +59,7 @@ export function updateSourceDependency(directory = root) {
   git(source, ['fetch', 'origin', 'main'])
   execFileSync('git', ['merge-base', '--is-ancestor', 'HEAD', 'origin/main'], { cwd: source })
   git(source, ['merge', '--ff-only', 'origin/main'])
-  execFileSync(npm, ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund'], {
-    cwd: directory, stdio: 'inherit',
-  })
+  npmCommand(['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund'], directory)
   console.log(`wanxiangli now follows origin/main at ${git(source, ['rev-parse', 'HEAD'])}; review and commit the gitlink and lockfile.`)
 }
 
@@ -62,7 +69,7 @@ export function buildSourceDependency(directory = root) {
   if (!fs.existsSync(installed) || fs.realpathSync(installed) !== fs.realpathSync(source)) {
     throw new Error('Run npm ci to replace the old installed tarball with the wanxiangli source link')
   }
-  execFileSync(npm, ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], { cwd: source, stdio: 'inherit' })
+  npmCommand(['ci', '--ignore-scripts', '--no-audit', '--no-fund'], source)
   execFileSync(process.execPath, ['scripts/build.mjs'], { cwd: source, stdio: 'inherit' })
 }
 
