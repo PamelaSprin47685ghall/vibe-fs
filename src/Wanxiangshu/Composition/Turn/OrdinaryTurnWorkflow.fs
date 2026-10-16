@@ -236,12 +236,15 @@ module OrdinaryTurnWorkflow =
         (joinGuardNudges: HashSet<string>)
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
-        =
+        : Task<bool> =
         task {
             let turn = context.Turn
 
             match context.Quiescence with
-            | None -> ()
+            // No idle permit: no reminder can be claimed on this occasion, and
+            // the reconcile pass dedupes the published turn — this terminal will
+            // not be re-offered. Only publishing now can still reach the parent.
+            | None -> return false
             | Some permit ->
                 match!
                     HostJoinGuard.nudge
@@ -261,7 +264,22 @@ module OrdinaryTurnWorkflow =
                         turn.SessionId
                         (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
                     |> ignore
-                | _ -> ()
+                    // The Failed terminal was published: the parent already
+                    // learns this occasion resolved. Do not publish again.
+                    return true
+                | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
+                | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding ->
+                    // A durable continuation claim exists on this session: the
+                    // woken run will report a fresh terminal occasion.
+                    return true
+                | HostJoinGuard.JoinGuardNudgeOutcome.NotSent
+                | HostJoinGuard.JoinGuardNudgeOutcome.Superseded
+                | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected _ ->
+                    // No durable claim exists for the reminder, and the reconcile
+                    // pass already consumed this published turn: nothing will
+                    // re-offer this terminal. Withholding it would strand every
+                    // parent waiting on this run.
+                    return false
         }
 
     /// ATTENTION-005: after an Engineer, DevOps or Orchestrator run reaches
@@ -358,11 +376,33 @@ module OrdinaryTurnWorkflow =
             let joinOutstanding =
                 TerminalPolicy.outstandingBackground terminalPolicyPort hasLivePty turn.Role turn.SessionId
 
+            // A withheld completion is only safe when a later pass is promised
+            // to re-offer this same terminal. When JoinGuard cannot make that
+            // promise (nudge unsent or superseded), the completed terminal is
+            // published instead — deferring would strand every parent waiting
+            // on a fact that already happened. (managed-session-lifecycle:
+            // terminal admission deferral)
             let! completion =
-                if joinOutstanding then
-                    Task.FromResult XTraceTerminalCompletion.RejectedEmptyOutput
-                else
+                if not joinOutstanding then
                     completeAgent ()
+                else
+                    task {
+                        let! deferred =
+                            applyJoinGuardNudge
+                                sessionPort
+                                rootWorkspace
+                                eventPort
+                                journal
+                                joinGuardNudges
+                                quiescence
+                                context
+
+                        return!
+                            if deferred then
+                                Task.FromResult XTraceTerminalCompletion.RejectedEmptyOutput
+                            else
+                                completeAgent ()
+                    }
 
             let terminalValid =
                 match completion with
@@ -376,9 +416,6 @@ module OrdinaryTurnWorkflow =
 
             if TerminalPolicy.sessionDead terminalPolicyPort turn.SessionId then
                 return ()
-            elif joinOutstanding then
-                return!
-                    applyJoinGuardNudge sessionPort rootWorkspace eventPort journal joinGuardNudges quiescence context
             elif terminalValid then
                 return! presentDeferredWorkForRole sessionPort rootWorkspace journal turn
             else

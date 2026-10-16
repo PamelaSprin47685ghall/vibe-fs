@@ -523,11 +523,18 @@ module ForkToolSurface =
             let sessions = sessionPort :> ISessionHostPort
 
             let childWorkRecordForRun sessionId range providerRun =
-                LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
-                    (Some journal)
-                    sessionId
-                    range
-                    providerRun
+                task {
+                    match beforeWorkRecord with
+                    | Some observe -> do! observe (SessionId.value sessionId)
+                    | None -> ()
+
+                    return!
+                        LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
+                            (Some journal)
+                            sessionId
+                            range
+                            providerRun
+                }
 
             let workRecordCapability: DelegationWorkRecordCapability =
                 { ParentWorkRecord =

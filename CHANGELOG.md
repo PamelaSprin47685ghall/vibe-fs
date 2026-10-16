@@ -1,5 +1,21 @@
 # Changelog — 版本历史
 
+## Unreleased — 终态投递必达：子完成不再被静默吞掉
+
+- 事故（2026-10-16，KTraderNew 会话 `ses_ebcc542feffeWWeVr6kxBLsBWW`）：DevOps 子会话 run 于 07:21:13 到达 `Terminal(Completed)`（journal 有事实），父侧却无任何 `HandleWorkCompleted` 落账；manager 的 join 永久等待，直到 07:35:28 关停才以 `Cancelled` 收场。前 5 次同类完成都在 0.2 秒内落账并唤醒父侧——第 6 次事件发生了，却没有触发正确的结果。
+- 根因一（join guard 扣留无出口）：`handleCompleted` 在 `outstandingBackground`（DevOps 有未 join 后台/活 PTY）时扣留完成、只发 JoinGuard nudge；但 nudge 的 `NotSent`/`Superseded`/`AdmissionRejected` 出口与无 idle permit 的场合都静默返回，而 reconcile pass 已把该 published turn 去重——此 terminal 永不再被重放，扣留即永久悬挂。修复（`OrdinaryTurnWorkflow`）：`applyJoinGuardNudge` 返回类型化决定，只有 `Sent`/`AlreadyOutstanding`（存在 durable continuation claim）或已发布 Failed 的场合才扣留；否则立即发布真实完成。
+- 根因二（完成结算故障吞 Source）：`installRun` 订阅回调里 work-record 读取抛错或 `complete()` 在 claim 前抛错时，异常被 `observeOwnedWork` 存进 `ownedWorkFailure` 只等关停重抛，`run.Source` 永不 settle——Fork await 与 join 双双悬挂。修复（`RunLifecycle`）：work-record 读取故障降级为空记录并记 `FORK-WORKRECORD` 诊断；`complete()` 故障走 `deliverFailedCompletion` 显式落账可 join 的失败，兜底 `trySetResult` 保证 claim 后 Source 必 settle；`startClaimDelivery` 整体 try/catch，结算路径自身故障也 settle 为 PERSIST 失败。`HostForkRuntime.Complete`（sync-delegate/Fission 入口）同样加固。
+- 根因三（capture 失败吞完成）：`TerminalReporter` 在 XTrace 终态捕获失败时直接返回 `CaptureFailed` 不发 `NotifyTerminal`——与同库其它 capture-error 语义（SyncDelegate `FailCall`、插件 fail-closed）相悖且父侧悬挂。修复：捕获失败发布诚实 `Failed("terminal trace capture failed")`，绝不静默。
+- 根因四（fan-out 无隔离）：`HostEventPort.notify` 同步循环派发，任一订阅者抛异常会饿死后续订阅者（含写完成单元的 Fork lifecycle）并把异常带回已提交终态的发布方。修复（`Events`）：逐监听器 try/catch 隔离，故障记 `EVENT-DISPATCH` 诊断，其余订阅者照常送达。
+- 回归：新增 `requirements/managed-session-lifecycle/tests/028.test.mjs`——(1) work-record 读取注入故障后完成仍落账为 `CompletedAwaitingJoin` 且 join 可消费；(2) 经物理 Notify 边界投递的 terminal 必产生可观察终态，join 必以显式结果终止。`createRuntimeWithWorkRecordRead` 钩子扩展到 child work-record 读取路径。managed-session-lifecycle（022 的 2 个失败为基线既有：其一为 `.git` 环境问题）、interaction-authority、delegation 全套件绿。
+
+## Unreleased — 接力 no-op 预案：背靠背无评审接力拒绝
+
+- 事故（2026-10-16，`ses_ebc92c052ffe3CaPXlX5vjq0ms`，22 条 record）：S1 Stayed 修复后模型连续 17 次 `deliver`，其中 13 任从未评审即接力（07:41 内 13 连跳，游标每跳 +5、阶段钉死 S1）。每次接力退休未评审任期、开同阶段继任；继任读到的 `LWR_prev` 是上一棒的交棒散文，宿主注入的 Plan Mode reminder 触发新回合，模型复判「义务已履行」再次交棒——接力自增强成 no-op 死循环，规划收束永不发生。根因：内核允许任意背靠背的无评审接力（[004]/[013] 只保护单笔不被拒），链长无上界。
+- 预案（内核硬门，`wanxiangli/src/lifecycle`）：`Work` 新增折叠派生 `LastRoundWasUnreviewedRelay`（读退休轮次的 `reviewOutcome`/`outcome`，不新增事实或第二账本）；Plan `Deliver` 在「本任未评审 且 上一笔已落盘退休是无评审接力」时返回 `ReviewRequired` 观察、零写、本任不退休。单笔无评审接力仍合法；背靠背第二笔被拒，runner 提交本任 `review` 后接力恢复、链长归零。S4 不受影响（本就要求评审）。
+- 宿主接线：`PlanTools.settlePostS3Transition` 补 `ReviewRequired → Error "assessment required"`（`interpretDeliverReceipt` 原已有同映射），Plan 接力路径经 `enterPostS3OrRelay` 的拒绝得以呈现；`tool/deliver` 双语提示词写明背靠背门与「先 review 再交棒」；`tool/deliver/assessment-required` 双语措辞由陈旧的「八维质量评分」改为三问 findings 语义（[038] 本就禁止八维必填）。
+- 契约同步：work WHAT [004]/[013] 的「无评审 deliver 不被拒」限定为单笔并交叉引用 [025]；[025] 接力契约写入背靠背门（折叠派生、不进事件载荷、拒绝为 ReviewRequired 零写）。wanxiangli lifecycle AGENTS.md SPEC 2 同步。测试：wanxiangli `002.test.mjs` 新增背靠背拒绝与评审恢复反例；work `025.test.mjs` 连跳夹具改为每任先评（Stayed 保持阶段），新增「第二笔连续无评审接力拒绝零写、评审后恢复」反例。
+
 ## Unreleased — lifecycle-cutover 合并前收口
 
 - Manager `deliver` 原子入队后继提示与禁用 `ask`：（1）Manager 两段式 `deliver` 的第二次调用以 `Relayed`（`Stayed`）退休时，`DeliverTool` 在工具返回前立即通过 `ContinueManagerLoop`（`ManagerWorkflow.maybeDeliverLoop`）把后继提示（`runtime/manager-assess`，「你是接手此任务的第 N 个 Manager...」）排进队列，随后才返回 `deliver` 结果，消除 `deliver` 返回与后继提示入队之间的空窗期（避免旧回合在后继提示入队前先把下一轮请求发到 LLM 侧）；`BeginPhysicalProviderAttempt` 同时跳过已被 `RelayNarrativeTransform.isStaleRetiredAttempt` 识别的旧任残余请求，交由 `relay-projection-cut` 直接清空并停止；（2）Manager 禁用 `ask`：从 `OfficeCapability` 的 Manager 权限集（含收尾与清理阻塞窗口）、`PromptFactFold.foldUserQuestionAsked`、`ToolRuntimeScope.AskUser` 以及 `role/manager`、`work/manager-continue`、`tool/ask` 双语资源中移除 Manager 的 `ask` 准入，`ask` 仅向 Plan 开放。

@@ -848,23 +848,40 @@ type HostForkRuntime
         // async tail so shutdown can drain it before releasing the Journal.
         startOwnedWork (fun () ->
             task {
-                match run.Role, drainChildPtys with
-                | Role.DevOps, Some drain -> do! drain run.ChildId
-                | _ -> ()
+                try
+                    match run.Role, drainChildPtys with
+                    | Role.DevOps, Some drain -> do! drain run.ChildId
+                    | _ -> ()
 
-                let! workRecord = workRecordForOutcome run outcome
+                    let! workRecord = workRecordForOutcome run outcome
 
-                do!
-                    HostForkRunLifecycle.complete
-                        gate
-                        pendingRuns
-                        journal
-                        parentId
-                        sessions
-                        handoffPort
-                        run
-                        outcome
-                        workRecord
+                    do!
+                        HostForkRunLifecycle.complete
+                            gate
+                            pendingRuns
+                            journal
+                            parentId
+                            sessions
+                            handoffPort
+                            run
+                            outcome
+                            workRecord
+                with error ->
+                    // A proven terminal must still resolve this run's only
+                    // completion promise even when settlement faulted: settle an
+                    // explicit joinable failure. deliverFailedCompletion is
+                    // claim-idempotent, so a run already settled is not
+                    // double-delivered.
+                    do!
+                        HostForkRunLifecycle.failRun
+                            gate
+                            pendingRuns
+                            journal
+                            parentId
+                            sessions
+                            handoffPort
+                            run
+                            (sprintf "completion settlement faulted: %s" error.Message)
             }
             :> Task)
         |> ignore
