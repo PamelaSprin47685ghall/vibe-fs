@@ -9,6 +9,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Process
@@ -335,7 +336,8 @@ module HostForkPtySurface =
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
-                        ptyPort = devopsPort
+                        ptyPort = devopsPort,
+                        journal = durable
                     )
                 // DevOps opens a PTY in its own session
                 let! devopsPtyResult = devopsRuntime.ForkPty("long-running-devops-task", agent)
@@ -368,10 +370,10 @@ module HostForkPtySurface =
                     | Error e -> failwith e
 
                 // Manager runtime configured with drainChildPtys capability
-                let drainChildPtys (sid: SessionId) =
+                let drainChildPtys (work: AdmittedWork) =
                     task {
-                        if sid = devopsSessionId then
-                            do! devopsRuntime.CloseOwnedPtys()
+                        if (AdmittedWork.id work).ChildSessionId = devopsSessionId then
+                            do! devopsRuntime.ClosePtyRun work
                     }
 
                 let dummySessions =

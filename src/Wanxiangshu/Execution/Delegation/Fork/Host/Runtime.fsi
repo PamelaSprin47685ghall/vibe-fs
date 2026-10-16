@@ -34,7 +34,7 @@ type HostForkRuntime =
         ?sessionSnapshot: ISessionSnapshotPort *
         ?cancelSignals: (SessionId seq -> unit) *
         ?ownership: HandleOwnership *
-        ?drainChildPtys: (SessionId -> Task<unit>) *
+        ?drainChildPtys: (AdmittedWork -> Task<unit>) *
         ?ownershipCommonDir: string ->
             HostForkRuntime
 
@@ -159,6 +159,8 @@ type HostForkRuntime =
     member AwaitObservedWork: unit -> Task<unit>
     member DrainOwnedWork: unit -> Task<unit>
     member CloseOwnedPtys: ?graceMs: int -> Task<unit>
+    member internal ClosePtyRun: work: AdmittedWork -> Task<unit>
+    static member internal CloseUnboundPtyRun: commonDir: string * work: AdmittedWork -> unit
     member ClosePty: id: PtyId * ?graceMs: int -> Task<unit>
     member IsPtyCompletion: runId: string -> bool
     member TryBindTerminalName: name: string * id: PtyId -> Result<unit, string>
@@ -168,3 +170,6 @@ type HostForkRuntime =
     member SendPty: id: PtyId * prompt: string * signal: PtySignal option -> Task<Result<PtyRead, string>>
     member TryTerminalNameByPtyId: ptyId: string -> string option
     member PtyCapability: DelegationPtyCapability
+
+    member internal PtyCapabilityForRun:
+        runId: LogicalRunId * providerRun: ProviderRunIdentity * toolCall: ToolCallId -> DelegationPtyCapability

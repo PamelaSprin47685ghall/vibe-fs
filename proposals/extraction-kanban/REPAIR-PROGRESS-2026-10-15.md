@@ -2,6 +2,14 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第九批：每轮 PTY 跨进程准入（2026-10-16）
+
+CUT-04-R6-B 已实现 canonical admitted work → run scope → runtime 子范围的接线；真实终态先持久停止该轮准入，再处理本地实例并核对整个轮次。工具捕获自己的 exact execution，稳定 tool-call 资源身份防止跨进程重放启动；冷空轮次也停止准入，未安装 drain 能力则拒绝完成。另修既有 SQLite 初始化失败重复 close，不改独立库或 vendor。
+
+修复前两个真实进程反例 **0/2**；同 revision 的 Reserve/Drain 双顺序、双 Reserve、COMMIT 前后丢回执、重复调用、旧轮与其他 owner、真实 Bun PTY 的正反验证已接入正式 025。最终 clean **518**，完整相关链 **1156 / 1094 pass / 0 fail / 16 skip / 46 TODO**；含冷空轮次与缺失 drain 能力正反证明。format/check 通过。精确包 **2074 members / 13,222,190 bytes**，SHA-256 `308c1d002404260e66a5ebbcc8040b7852eebf5b922aa280ceb611f34107144c`；隔离 npm ci、默认入口及包外 Bun/OpenCode 的真实 PTY 消费通过。[本包报告](PTY-RUN-ADMISSION-2026-10-16.md)保留命令、日志、试制错误、测试误判和沙箱失败，未将它们归给原拆分。
+
+本轮为作者施工自检，看板进入 REVIEW，待非作者复审；R6-C、脱组进程和 O-01/GAP-133 整体仍未完成。不会把“准入已停止”写成“已接管或已退出”。正常交付 master，无强推，未部署线上 Host。
+
 ## 第八批：PTY 修复的非作者独立复审（2026-10-16）
 
 起点为干净主仓 `fbd90f4d5`；三名非作者对照 `ec37ab8c2` 审查监管、接线、宿主和证据。确认本轮新实现的 **R8-01/P1**（owner 不响应使排空无界等）、**R8-02/P1**（直接目标 Ctrl-Z 连同 anchor 暂停，KILL 失效）、**R8-03/P2**（Darwin/Bun 将目标 USR1/USR2 错报 PWR/SYS），均已修正。另修 **R8-04：既有测试 marker 写读竞争**；不把它算成产品回退。原 leader-exit 缺陷仍属原 O-01，三项新实现问题不归给原拆分；未确认 review 误判。详见[独立复审、归因与证据](PTY-SUPERVISION-2026-10-16.md#独立复审与修正2026-10-16)。

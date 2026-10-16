@@ -114,6 +114,10 @@ Finalize 恒带 exact Inspector identity，commitment 闭合为 `Finalized | Not
 
 固定 DevOps 每次 run 终态结算，立即收束其拥有的全部 PTY：TERM 后等待真实退出，必要时升级 KILL，随后清除记账。不得留到下次 resume，不因 Manager 退休触发，不影响其他会话的资源和生命周期。
 
+PTY 准入绑定已持久接纳的确切工作及 LogicalRunId；不同进程对同一轮的预留和停止准入须在同一 Ownership 日志修订上仲裁。预留先确认时，该实例仍属于排空范围；停止准入先确认时，后到预留不得启动物理效果。没有本地绑定的未结清实例继续阻止该轮完成；未安装停止准入能力时也不得宣称完成。
+
+关闭只针对该轮，不能永久关闭可复用 Session 或影响其他 owner、下一轮。工具能力捕获确切轮次；旧轮请求不得借用当前轮身份。同一物理工具调用的重复预留、未知提交及丢失回执均不授予再次启动许可；只有首次已确认的预留可启动。
+
 ## [026] Main 收束级联 Attached InternalLeaf 的 execution 结算
 
 Main session 收束（宿主 `SessionDeleted` 事件，且存在 durable Attached Companion 关联 `CompanionBloggerLinked` 作为 linked InternalLeaf 证据）时，lifecycle owner 除排空 Main 自身已准入 execution 外，还必须对每个 linked Attached InternalLeaf（Blogger）名下全部已准入 execution 逐一完成 typed terminal 与 exact capacity 归还：

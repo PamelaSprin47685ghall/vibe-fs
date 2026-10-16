@@ -125,29 +125,17 @@ module DurableWorkHost =
         let slash = path.LastIndexOf('/')
         if slash <= 0 then path else path.Substring(0, slash)
 
-    let private closeConnection (connection: obj) : unit = connection?close ()
-
-    let private closeJournal (journal: obj option) (connection: obj) : unit =
-        match journal with
-        | Some opened -> opened?close ()
-        | None -> closeConnection connection
-
-    /// One open, one close. SqliteJournal.close closes the connection it was given.
-    /// If the journal is never constructed, this function closes the connection itself.
     let useWork (gitCommonDir: string) (workId: string) (body: obj -> 'a) : 'a =
         let path = journalPath gitCommonDir
         ensureDir (parentOf path)
         let connection = openDatabase path
-        // DSL-MUTABLE: resource — the journal this call opened, closed exactly once in finally
-        let mutable journal: obj option = None
+        let opened: obj = createNew SqliteJournal connection
 
         try
-            let opened: obj = createNew SqliteJournal connection
-            journal <- Some opened
             let work: obj = createNew DurableWork (workId, opened)
             body work
         finally
-            closeJournal journal connection
+            opened?close ()
 
     let private appendSeed (journal: obj) (workId: string) (revision: float) (record: string) : float =
         let frame: obj = emitJsExpr record "JSON.parse($0)"
@@ -164,16 +152,13 @@ module DurableWorkHost =
     /// SQLite selection as the durable path and does not expose the connection.
     let useEphemeralWork (workId: string) (records: string array) (body: obj -> 'a) : 'a =
         let connection = openDatabase ":memory:"
-        // DSL-MUTABLE: resource — the probe's one journal handle, closed exactly once in finally
-        let mutable journal: obj option = None
+        let opened: obj = createNew SqliteJournal connection
 
         try
-            let opened: obj = createNew SqliteJournal connection
-            journal <- Some opened
             records |> Array.fold (appendSeed opened workId) 0. |> ignore
             body (createNew DurableWork (workId, opened))
         finally
-            closeJournal journal connection
+            opened?close ()
 
     let execute (gitCommonDir: string) (workId: string) (requestId: string) (command: obj) : HostReceipt =
         useWork gitCommonDir workId (fun work ->
@@ -585,15 +570,12 @@ module DurableWorkHost =
         let path = journalPath gitCommonDir
         ensureDir (parentOf path)
         let connection = openDatabase path
-        // DSL-MUTABLE: resource — the journal this call opened, closed exactly once in finally
-        let mutable journal: obj option = None
+        let opened: obj = createNew SqliteJournal connection
 
         try
-            let opened: obj = createNew SqliteJournal connection
-            journal <- Some opened
             body opened
         finally
-            closeJournal journal connection
+            opened?close ()
 
     let private revisionOrDefault (fallback: float) (value: obj) : float =
         if isNull value then fallback else unbox<float> value

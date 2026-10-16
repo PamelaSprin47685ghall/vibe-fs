@@ -13,4 +13,12 @@ type ToolRuntimeScopeSurface =
 
     static member verifyDevOpsReturnDrain: journal: JournalHandle * scenario: obj -> Task<obj>
     static member coldDevOpsReturn: journal: JournalHandle * workspace: string -> Task<obj>
+    static member undrainedDevOpsReturn: journal: JournalHandle -> Task<obj>
+
+    static member ptyAdmissionProbe:
+        journal: JournalHandle * workspace: string * child: string * realBackend: bool -> obj
+
+    static member startPtyExecution:
+        journal: JournalHandle * child: string * physical: string * provider: string -> Task<unit>
+
     static member verifyOwnershipRetirementContract: scenario: obj -> Task<obj>

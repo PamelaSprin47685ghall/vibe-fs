@@ -137,6 +137,33 @@ module private HostPtyOwnership =
                 item.Lease.ResourceId.Substring 4
             | None -> invalidOp "PTY ownership contains an invalid resource identity")
 
+    let runScopeId root runId =
+        root + ":run:" + LogicalRunId.value runId
+
+    let openRun ownership root runId =
+        let scopeId = runScopeId root runId
+        openScope ownership root None
+        openScope ownership scopeId (Some root)
+        scopeId
+
+    let requireRunSettled (ownership: Owner) root runId =
+        let scopeId = runScopeId root runId
+
+        let remaining =
+            ownership.Blockers root
+            |> List.filter (fun blocker ->
+                blocker.ScopeId = scopeId
+                || blocker.ScopeId.StartsWith(scopeId + ":runtime:", StringComparison.Ordinal)
+                || not (blocker.ScopeId.StartsWith(root + ":run:", StringComparison.Ordinal)))
+
+        if not (List.isEmpty remaining) then
+            invalidOp "PTY ownership has no local process binding for unsettled resources; exit was not observed"
+
+type private OwnedPty =
+    { Lease: DurableWorkHost.OwnershipLease
+      IncarnationId: string
+      RunId: LogicalRunId option }
+
 [<RequireQualifiedAccess>]
 module private PtyHostHelpers =
     let bindTerminalName (gate: obj) (terminalByName: Dictionary<string, string>) (name: string) (id: PtyId) =
@@ -263,7 +290,7 @@ type HostForkRuntime
         /// children stay outside the parent's list/join/recovery surface.
         ?ownership: HandleOwnership,
         /// Optional capability to drain child PTYs upon run completion (e.g. for DevOps session).
-        ?drainChildPtys: SessionId -> Task<unit>,
+        ?drainChildPtys: AdmittedWork -> Task<unit>,
         ?ownershipCommonDir: string
     ) as this =
     let clockPort = clock
@@ -514,7 +541,13 @@ type HostForkRuntime
     let prepareCompletion (run: PendingHostRun) (outcome: TerminalOutcome) =
         task {
             match run.Role, drainChildPtys with
-            | Role.DevOps, Some drain -> do! drain run.ChildId
+            | Role.DevOps, Some drain ->
+                let work =
+                    run.Work
+                    |> Option.defaultWith (fun () -> invalidOp "DevOps PTY drain requires admitted work")
+
+                do! drain work
+            | Role.DevOps, None -> invalidOp "DevOps PTY round drain is unavailable"
             | _ -> ()
 
             return! HostForkRunLifecycle.workRecordForOutcome childWorkRecordOfRun xTraceHead run outcome
@@ -526,12 +559,15 @@ type HostForkRuntime
     let parentKey = SessionId.value parentId
 
     let ptyRootScopeId = parentKey
-    let ptyScopeId = parentKey + ":runtime:" + Guid.NewGuid().ToString("N")
+    let ptyRuntimeId = Guid.NewGuid().ToString("N")
+    let ptyScopeId = parentKey + ":runtime:" + ptyRuntimeId
+    // DSL-MUTABLE: resource — scopes owned by this runtime, including reservations with lost acknowledgements.
+    let ptyOwnedScopes = HashSet<string>([ ptyScopeId ])
     // DSL-MUTABLE: resource — wanxiangli/ownership registry for PTY leases in this runtime
     let ptyOwnership =
         HostPtyOwnership.create ownershipCommonDir ("fork-pty:" + ptyRootScopeId)
     // DSL-MUTABLE: resource — active PTY lease and incarnation binding by PtyId
-    let ptyLeases = Dictionary<string, DurableWorkHost.OwnershipLease * string>()
+    let ptyLeases = Dictionary<string, OwnedPty>()
     // DSL-MUTABLE: resource — exact exit observations awaiting an ownership acknowledgement.
     let ptyExitObservations = Dictionary<string, PtyJoinItem * string>()
     // DSL-MUTABLE: resource — prevents new local PTYs during a run's exit drain.
@@ -544,6 +580,51 @@ type HostForkRuntime
     do
         HostPtyOwnership.openScope ptyOwnership ptyRootScopeId None
         HostPtyOwnership.openScope ptyOwnership ptyScopeId (Some ptyRootScopeId)
+
+    let exactPtyRun expected work =
+        let runId = AdmittedWork.logicalRunId work
+
+        if runId = expected then
+            Ok(Some runId)
+        else
+            Error "PTY work does not match canonical authority"
+
+    let admittedPtyRun durable (profile: PromptAuthority.AuthorityExecutionProfile) =
+        let projection = (AgentJournal.snapshot durable).AgentProjections
+
+        match PromptIdentitySeed.owner profile.IdentitySeed, Map.tryFind parentId projection.HandleByChildSession with
+        | None, _ -> Ok(Some profile.LogicalRunId)
+        | Some(owner, _, _), Some binding ->
+            HandleProjection.tryAdmittedWork
+                { Handle = binding.Handle
+                  ChildSessionId = parentId
+                  AuthorityRoot = profile.AuthorityRootUserMessageId }
+                (AgentJournal.handleProjection durable owner)
+            |> Result.mapError (fun _ -> "Exact PTY work is not admitted")
+            |> Result.bind (exactPtyRun profile.LogicalRunId)
+        | _ -> Error "PTY child has no canonical handle binding"
+
+    let canonicalPtyRun durable (requestedRun: LogicalRunId option) =
+        PromptAuthorityProjectionQueries.activeProfile parentId (AgentJournal.snapshot durable).AgentProjections
+        |> Option.filter (fun profile -> requestedRun.IsNone || requestedRun = Some profile.LogicalRunId)
+        |> Option.map (admittedPtyRun durable)
+        |> Option.defaultValue (Error "PTY call does not belong to the active canonical work round")
+
+    let ptyRunFor (requestedRun: LogicalRunId option) =
+        match journal with
+        | None when requestedRun.IsNone -> Ok None
+        | None -> Error "Canonical PTY work is unavailable"
+        | Some durable -> canonicalPtyRun durable requestedRun
+
+    let ptyScopeForRun runId =
+        match runId with
+        | None -> ptyScopeId
+        | Some run ->
+            let runScope = HostPtyOwnership.openRun ptyOwnership ptyRootScopeId run
+            let scopeId = runScope + ":runtime:" + ptyRuntimeId
+            HostPtyOwnership.openScope ptyOwnership scopeId (Some runScope)
+            ptyOwnedScopes.Add scopeId |> ignore
+            scopeId
 
     let handleOwnership = defaultArg ownership HandleOwnership.DurableParentHandle
 
@@ -615,8 +696,8 @@ type HostForkRuntime
     let settlePtyLease (id: string) (outcome: string) =
         lock gate (fun () ->
             match ptyLeases.TryGetValue id with
-            | true, (lease, inc) ->
-                HostPtyOwnership.ended ptyOwnership id lease inc outcome
+            | true, owned ->
+                HostPtyOwnership.ended ptyOwnership id owned.Lease owned.IncarnationId outcome
                 ptyLeases.Remove id |> ignore
                 ptyExitObservations.Remove id |> ignore
             | false, _ -> ()
@@ -687,8 +768,8 @@ type HostForkRuntime
 
     member _.CancelOwnedPtys() =
         lock gate (fun () ->
-            for KeyValue(id, (lease, _)) in ptyLeases do
-                HostPtyOwnership.cancel ptyOwnership id lease)
+            for KeyValue(id, owned) in ptyLeases do
+                HostPtyOwnership.cancel ptyOwnership id owned.Lease)
 
     member _.SubscribePtyCompletion(listener: PtyJoinItem -> unit) : IDisposable =
         lock gate (fun () -> ptyCompletionObservers.Add listener)
@@ -948,7 +1029,7 @@ type HostForkRuntime
                         cancelSignals
                         (fun cancelled retained -> this.DrainCancelledCallbacks(cancelled, retained))
                         runtime
-                        (fun () -> this.ClosePtys(ptyScopeId, None))
+                        (fun () -> this.ClosePtys(Seq.toList ptyOwnedScopes, None))
                         parentKey
                         parentAbortToken
                         gate
@@ -1015,10 +1096,12 @@ type HostForkRuntime
 
             do!
                 release (fun () ->
-                    HostPtyOwnership.drain ptyOwnership ptyScopeId
+                    for scopeId in ptyOwnedScopes do
+                        HostPtyOwnership.drain ptyOwnership scopeId
+
                     AsyncSupport.completedTask ())
 
-            do! release (fun () -> this.ClosePtys(ptyScopeId, None) :> Task)
+            do! release (fun () -> this.ClosePtys(Seq.toList ptyOwnedScopes, None) :> Task)
 
             do!
                 release (fun () ->
@@ -1231,7 +1314,9 @@ type HostForkRuntime
                 return Some ex
         }
 
-    member private this.DrainPtySnapshot(ids: PtyId list, blockerScopeId: string, graceMs: int option) : Task<unit> =
+    member private this.DrainPtySnapshot
+        (ids: PtyId list, blockerScopeIds: string list, graceMs: int option)
+        : Task<unit> =
         task {
             let failures = ResizeArray<exn>()
 
@@ -1243,7 +1328,7 @@ type HostForkRuntime
                 raise failures.[0]
 
             let remaining =
-                lock gate (fun () -> HostPtyOwnership.unsettledIds ptyOwnership blockerScopeId)
+                lock gate (fun () -> blockerScopeIds |> List.collect (HostPtyOwnership.unsettledIds ptyOwnership))
 
             if not (List.isEmpty remaining) then
                 invalidOp (
@@ -1253,7 +1338,7 @@ type HostForkRuntime
                 )
         }
 
-    member private this.ClosePtys(blockerScopeId: string, graceMs: int option) : Task<unit> =
+    member private this.ClosePtys(blockerScopeIds: string list, graceMs: int option) : Task<unit> =
         task {
             let ids =
                 lock gate (fun () ->
@@ -1264,18 +1349,52 @@ type HostForkRuntime
                     ptyLeases.Keys |> Seq.map PtyId.Create |> Seq.toList)
 
             try
-                do! this.DrainPtySnapshot(ids, blockerScopeId, graceMs)
+                do! this.DrainPtySnapshot(ids, blockerScopeIds, graceMs)
             finally
                 lock gate (fun () -> ptyClosing <- false)
                 releasePtyExitSubscription ()
         }
 
-    member this.CloseOwnedPtys(?graceMs: int) : Task<unit> = this.ClosePtys(ptyRootScopeId, graceMs)
+    member this.CloseOwnedPtys(?graceMs: int) : Task<unit> =
+        this.ClosePtys([ ptyRootScopeId ], graceMs)
+
+    static member internal CloseUnboundPtyRun(commonDir: string, work: AdmittedWork) =
+        let root = AdmittedWork.id work |> fun work -> SessionId.value work.ChildSessionId
+        let runId = AdmittedWork.logicalRunId work
+        let ownership = HostPtyOwnership.create (Some commonDir) ("fork-pty:" + root)
+
+        HostPtyOwnership.openRun ownership root runId
+        |> HostPtyOwnership.drain ownership
+
+        HostPtyOwnership.requireRunSettled ownership root runId
+
+    member internal this.ClosePtyRun(work: AdmittedWork) : Task<unit> =
+        task {
+            if (AdmittedWork.id work).ChildSessionId <> parentId then
+                invalidArg (nameof work) "PTY work belongs to another session"
+
+            let runId = AdmittedWork.logicalRunId work
+            let scopeId = HostPtyOwnership.openRun ptyOwnership ptyRootScopeId runId
+            HostPtyOwnership.drain ptyOwnership scopeId
+
+            let ids =
+                lock gate (fun () ->
+                    ptyLeases
+                    |> Seq.choose (fun pair ->
+                        if pair.Value.RunId = Some runId then
+                            Some(PtyId.Create pair.Key)
+                        else
+                            None)
+                    |> Seq.toList)
+
+            do! this.DrainPtySnapshot(ids, [ scopeId ], None)
+            HostPtyOwnership.requireRunSettled ptyOwnership ptyRootScopeId runId
+        }
 
     member private this.RequestPtyCancellation(id: PtyId) =
         lock gate (fun () ->
             match ptyLeases.TryGetValue id.Value with
-            | true, (lease, _) -> HostPtyOwnership.cancel ptyOwnership id.Value lease
+            | true, owned -> HostPtyOwnership.cancel ptyOwnership id.Value owned.Lease
             | false, _ when this.SnapshotOutstandingPtyRuns() |> List.contains id.Value ->
                 invalidOp (sprintf "PTY %s has no local process binding; exit was not observed" id.Value)
             | false, _ -> ())
@@ -1336,10 +1455,8 @@ type HostForkRuntime
             Error ex.Message
 
     member private this.ReserveAndForkPty
-        (command: string, agent: ManagedAgent, cwd: string option)
+        (command: string, agent: ManagedAgent, cwd: string option, runId: LogicalRunId option, id: PtyId)
         : Result<PtyId, string> =
-        let id = Pty.newId ()
-
         let reserved =
             lock gate (fun () ->
                 if ptyDetachRequested then
@@ -1349,21 +1466,41 @@ type HostForkRuntime
                 elif ptyClosing then
                     Error "PTY exit drain is in progress"
                 else
-                    HostPtyOwnership.reserve ptyOwnership ptyScopeId id.Value
+                    let scopeId = ptyScopeForRun runId
+
+                    HostPtyOwnership.reserve ptyOwnership scopeId id.Value
                     |> Result.map (fun lease ->
-                        ptyLeases.[id.Value] <- (lease, Guid.NewGuid().ToString("N"))
+                        ptyLeases.[id.Value] <-
+                            { Lease = lease
+                              IncarnationId = Guid.NewGuid().ToString("N")
+                              RunId = runId }
+
                         this.RegisterPtySnapshot id command))
 
         reserved
         |> Result.bind (fun () -> this.SpawnReservedPty(id, command, agent, cwd))
 
+    member private this.ForkPtyForRun
+        (command: string, agent: ManagedAgent, cwd: string option, requestedRun: LogicalRunId option, id: PtyId)
+        : Task<Result<PtyId, string>> =
+        let valid =
+            if String.IsNullOrWhiteSpace command then
+                Error "PTY command is required"
+            elif ownershipCommonDir.IsNone && ptyPort.IsNone then
+                Error "Durable PTY ownership is unavailable"
+            else
+                Ok()
+
+        try
+            valid
+            |> Result.bind (fun () -> ptyRunFor requestedRun)
+            |> Result.bind (fun runId -> this.ReserveAndForkPty(command, agent, cwd, runId, id))
+            |> Task.FromResult
+        with error ->
+            Task.FromResult(Error error.Message)
+
     member this.ForkPty(command: string, agent: ManagedAgent, ?cwd: string) : Task<Result<PtyId, string>> =
-        if String.IsNullOrWhiteSpace command then
-            Task.FromResult(Error "PTY command is required")
-        elif ownershipCommonDir.IsNone && ptyPort.IsNone then
-            Task.FromResult(Error "Durable PTY ownership is unavailable")
-        else
-            Task.FromResult(this.ReserveAndForkPty(command, agent, cwd))
+        this.ForkPtyForRun(command, agent, cwd, None, Pty.newId ())
 
     member this.TryPty(id: string) =
         if String.IsNullOrWhiteSpace id then
@@ -1407,6 +1544,56 @@ type HostForkRuntime
           OwnsPty = this.OwnsPty
           TryPty = this.TryPty
           TryTerminalNameByPtyId = this.TryTerminalNameByPtyId }
+
+    member internal this.PtyCapabilityForRun
+        (runId: LogicalRunId, providerRun: ProviderRunIdentity, toolCall: ToolCallId)
+        =
+        let owns (id: PtyId) =
+            lock gate (fun () ->
+                match ptyLeases.TryGetValue id.Value with
+                | true, owned -> owned.RunId = Some runId
+                | _ -> false)
+
+        let id =
+            [| parentKey
+               LogicalRunId.value runId
+               ProviderRunIdentity.value providerRun
+               ToolCallId.value toolCall |]
+            |> JS.JSON.stringify
+            |> HostDigest.sha256Hex
+            |> fun digest -> PtyId.Create("pty-" + digest)
+
+        let unknown (id: PtyId) =
+            sprintf "Unknown PTY id for this work round: %s" id.Value
+
+        { TryPtyByName = fun name -> this.TryPtyByName name |> Option.filter owns
+          ForkPty = fun (command, agent, cwd) -> this.ForkPtyForRun(command, agent, cwd, Some runId, id)
+          TryBindTerminalName =
+            fun (name, id) ->
+                if owns id then
+                    this.TryBindTerminalName(name, id)
+                else
+                    Error(unknown id)
+          ClosePty =
+            fun id ->
+                if owns id then
+                    this.ClosePty id
+                else
+                    task { return invalidOp (unknown id) }
+          SendPty =
+            fun (id, prompt, signal) ->
+                if owns id then
+                    this.SendPty(id, prompt, signal)
+                else
+                    Task.FromResult(Error(unknown id))
+          OwnsPty = owns
+          TryPty = fun id -> this.TryPty id |> Option.filter owns
+          TryTerminalNameByPtyId =
+            fun id ->
+                if owns (PtyId.Create id) then
+                    this.TryTerminalNameByPtyId id
+                else
+                    None }
 
 
     member _.EnqueueBufferedJoinItems(items: JoinItem seq) =

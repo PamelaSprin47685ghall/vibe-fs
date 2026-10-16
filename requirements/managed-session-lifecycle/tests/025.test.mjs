@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { execFile, spawnSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
@@ -10,8 +10,266 @@ import * as PtySurface from '../../../dist/Execution/Delegation/Fork/Host/HostFo
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as PtyToolSurface from '../../../dist/OpenCode/Tools/PtyToolSurface.js'
 import { DatabaseSync } from 'node:sqlite'
-import { withAdmittedChildren } from './support/admitted-child-work.mjs'
+import { withAdmittedChildren, withSharedAdmittedChildren } from './support/admitted-child-work.mjs'
+import { Ownership } from 'wanxiangli/ownership'
 import { loseOwnershipCommit } from './support/ownership-commit.mjs'
+import { withAdmissionWorkers } from './support/pty-admission.mjs'
+import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { hostPort } from '../../interaction-authority/tests/support/authority.mjs'
+
+test('WHAT[managed-session-lifecycle-025] another process cannot reserve a PTY after the work round stops admission', { timeout: 20000 }, async () => {
+  await withAdmissionWorkers('stop-first', async (producer, stopper) => {
+    const stopped = await stopper.call('stop')
+    assert.equal(stopped.finished, true, stopped.failure)
+    const opened = await producer.call('open', 'late-pty')
+    assert.equal(opened.ok, false, 'a completed work round must reject a foreign process reservation')
+    assert.equal(await producer.call('spawns'), 0)
+    assert.deepEqual(await producer.call('blockers'), [])
+  })
+})
+
+test('WHAT[managed-session-lifecycle-025] a foreign committed reservation prevents premature terminal settlement', { timeout: 20000 }, async () => {
+  await withAdmissionWorkers('reserve-first', async (producer, stopper, _workspace, start) => {
+    const opened = await producer.call('open', 'running-pty')
+    assert.equal(opened.ok, true, opened.error)
+    const stopped = await stopper.call('stop')
+    assert.equal(stopped.finished, false)
+    assert.match(stopped.failure, /local process binding/)
+    assert.deepEqual(await stopper.call('blockers'), [opened.id])
+    await producer.call('complete', 'running-pty')
+    assert.deepEqual(await stopper.call('blockers'), [])
+    const late = await producer.call('open', 'after-drain')
+    assert.equal(late.ok, false)
+    const retry = await start()
+    assert.equal((await retry.call('stop')).finished, true, 'the exact stopped round can settle after the producer proves Ended')
+  })
+})
+
+const prepareConcurrentRound = async (producer, stopper) => {
+  for (const [worker, name] of [[producer, 'warm-producer'], [stopper, 'warm-stopper']]) {
+    const opened = await worker.call('open', name)
+    assert.equal(opened.ok, true, opened.error)
+    await worker.call('complete', name)
+  }
+}
+
+for (const winner of ['reserve', 'drain']) {
+  test(`WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with ${winner} first`, { timeout: 30000 }, async () => {
+    await withAdmissionWorkers(`cas-${winner}`, async (producer, stopper, workspace, start) => {
+      await prepareConcurrentRound(producer, stopper)
+      const reserveRelease = join(workspace, 'release-reserve')
+      const drainRelease = join(workspace, 'release-drain')
+      const reserving = producer.call('open', 'concurrent-pty', { pause: { name: 'reserve', release: reserveRelease } })
+      const reserve = await producer.barrier('reserve')
+      const draining = stopper.call('stop', null, { pause: { name: 'drain', release: drainRelease } })
+      const drain = await stopper.barrier('drain')
+      assert.equal(reserve.revision, drain.revision, 'both candidates must have read the exact same durable revision')
+      if (winner === 'reserve') {
+        writeFileSync(reserveRelease, '')
+        assert.equal((await reserving).ok, true)
+        writeFileSync(drainRelease, '')
+        const stopped = await draining
+        assert.equal(stopped.finished, false)
+        assert.match(stopped.failure, /Conflict/)
+        const retry = await start()
+        assert.equal((await retry.call('stop')).finished, false, 'a confirmed stop must retain the foreign live resource')
+        assert.equal((await producer.call('open', 'after-confirmed-stop')).ok, false)
+        await producer.call('complete', 'concurrent-pty')
+        const settled = await start()
+        assert.equal((await settled.call('stop')).finished, true)
+      } else {
+        writeFileSync(drainRelease, '')
+        assert.equal((await draining).finished, true)
+        writeFileSync(reserveRelease, '')
+        const opened = await reserving
+        assert.equal(opened.ok, false)
+        assert.match(opened.error, /Conflict/)
+        assert.equal(await producer.call('spawns'), 1, 'the losing Reserve must add no physical Spawn')
+      }
+      assert.deepEqual(await producer.call('blockers'), [])
+    })
+  })
+}
+
+test('WHAT[managed-session-lifecycle-025] two concurrent process reservations can grant only one first launch at the same revision', { timeout: 30000 }, async () => {
+  await withAdmissionWorkers('reserve-reserve', async (producer, other, workspace) => {
+    await prepareConcurrentRound(producer, other)
+    const firstRelease = join(workspace, 'release-first')
+    const secondRelease = join(workspace, 'release-second')
+    const first = producer.call('open', 'first-concurrent', { pause: { name: 'first', release: firstRelease } })
+    const arrived = (worker, name, operation) => Promise.race([
+      worker.barrier(name),
+      operation.then(value => { throw new Error(`Candidate did not reach ${name} barrier: ${JSON.stringify(value)}`) }),
+    ])
+    const a = await arrived(producer, 'first', first)
+    const second = other.call('open', 'second-concurrent', { pause: { name: 'second', release: secondRelease } })
+    const b = await arrived(other, 'second', second)
+    assert.equal(a.revision, b.revision)
+    writeFileSync(firstRelease, '')
+    assert.equal((await first).ok, true)
+    writeFileSync(secondRelease, '')
+    const lost = await second
+    assert.equal(lost.ok, false)
+    assert.match(lost.error, /Conflict/)
+    assert.equal(await producer.call('spawns') + await other.call('spawns'), 3)
+    await producer.call('complete', 'first-concurrent')
+  })
+})
+
+test('WHAT[managed-session-lifecycle-025] duplicate tool calls across processes never grant another launch, including after Ended', { timeout: 20000 }, async () => {
+  await withAdmissionWorkers('duplicate', async (producer, other) => {
+    assert.equal((await producer.call('open', 'same-tool-call')).ok, true)
+    assert.equal((await other.call('open', 'same-tool-call')).ok, false)
+    await producer.call('complete', 'same-tool-call')
+    assert.equal((await other.call('open', 'same-tool-call')).ok, false)
+    assert.equal(await producer.call('spawns'), 1)
+    assert.equal(await other.call('spawns'), 0)
+  })
+})
+
+test('WHAT[managed-session-lifecycle-025] detaching one runtime closes only its round subtree and keeps the other process eligible', { timeout: 20000 }, async () => {
+  await withAdmissionWorkers('run-detach', async (producer, other) => {
+    assert.equal((await producer.call('open', 'detached-pty')).ok, true)
+    const kept = await other.call('open', 'kept-pty')
+    assert.equal(kept.ok, true, kept.error)
+    await producer.call('detachChild')
+    assert.deepEqual(await other.call('blockers'), [kept.id])
+    assert.equal((await producer.call('openCaptured', 'detached-late')).ok, false)
+    assert.equal((await producer.call('open', 'replacement-runtime')).ok, true)
+    assert.equal((await other.call('open', 'kept-next')).ok, true)
+    await other.call('complete', 'kept-pty')
+    await other.call('complete', 'kept-next')
+    await producer.call('complete', 'replacement-runtime')
+    assert.equal((await other.call('stop')).finished, true)
+  })
+})
+
+test('WHAT[managed-session-lifecycle-025] a later Host-observed assistant run shares the admitted physical execution while an unknown run cannot borrow it', { timeout: 20000 }, async () => {
+  await withAdmissionWorkers('later-provider', async producer => {
+    assert.equal((await producer.call('openUnknown', 'unknown-provider')).ok, false)
+    assert.equal(await producer.call('spawns'), 0)
+    assert.equal((await producer.call('openLater', 'later-tool-call')).ok, true)
+    await producer.call('complete', 'later-tool-call')
+  })
+})
+
+for (const afterCommit of [false, true]) {
+  test(`WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost ${afterCommit ? 'after' : 'before'} COMMIT cannot launch in either process`, { timeout: 20000 }, async () => {
+    await withAdmissionWorkers(`reserve-unknown-${afterCommit}`, async (producer, other) => {
+      const { result } = await producer.call('open', 'unknown-reserve', { lose: { command: 'Reserve', afterCommit } })
+      assert.equal(result.ok, false)
+      assert.equal(await producer.call('spawns'), 0)
+      const blockers = await other.call('blockers')
+      assert.equal(blockers.length, afterCommit ? 1 : 0)
+      if (afterCommit) {
+        assert.equal((await other.call('open', 'unknown-reserve')).ok, false)
+        assert.equal((await other.call('stop')).finished, false)
+        assert.equal(await other.call('spawns'), 0)
+      } else {
+        assert.equal((await other.call('stop')).finished, true)
+      }
+    })
+  })
+
+  test(`WHAT[managed-session-lifecycle-025] Drain acknowledgement lost ${afterCommit ? 'after' : 'before'} COMMIT never reports terminal success`, { timeout: 20000 }, async () => {
+    await withAdmissionWorkers(`drain-unknown-${afterCommit}`, async (producer, stopper, _workspace, start) => {
+      const { result } = await stopper.call('stop', null, { lose: { command: 'Drain', afterCommit } })
+      assert.equal(result.finished, false)
+      assert.match(result.failure, /Unknown/)
+      const late = await producer.call('open', 'after-unknown-drain')
+      assert.equal(late.ok, !afterCommit)
+      if (late.ok) await producer.call('complete', 'after-unknown-drain')
+      const retry = await start()
+      assert.equal((await retry.call('stop')).finished, true)
+    })
+  })
+}
+
+test('WHAT[managed-session-lifecycle-025] failed ownership journal initialization closes its connection once and grants no launch', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-pty-init-025-'))
+  let spawns = 0
+  const owner = controlledOwner(directory, 'init-owner', (_id, kind) => { if (kind === 'Spawn') spawns++ })
+  const execute = DatabaseSync.prototype.exec
+  const close = DatabaseSync.prototype.close
+  let failedConnection
+  let closes = 0
+  DatabaseSync.prototype.exec = function (sql) {
+    if (!failedConnection && sql.startsWith('PRAGMA busy_timeout=0;')) {
+      failedConnection = this
+      throw new Error('ownership initialization was locked')
+    }
+    return execute.call(this, sql)
+  }
+  DatabaseSync.prototype.close = function () {
+    if (this === failedConnection) closes++
+    return close.call(this)
+  }
+  try {
+    const result = await owner.fork('must-not-launch')
+    assert.equal(result.ok, false)
+    assert.match(result.error, /ownership initialization was locked/)
+    assert.equal(closes, 1)
+    assert.equal(spawns, 0)
+  } finally {
+    DatabaseSync.prototype.exec = execute
+    DatabaseSync.prototype.close = close
+    await owner.detach()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+for (const order of ['stop-first', 'reserve-first']) {
+  test(`WHAT[managed-session-lifecycle-025] two Bun processes enforce ${order} admission with the real PTY backend`, { timeout: 25000 }, async t => {
+    if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+    await withAdmissionWorkers(`real-${order}`, async (producer, stopper, workspace, start) => {
+      const marker = join(workspace, 'target-pid')
+      const command = `printf '%s' "$$" > '${marker}.pending'; mv '${marker}.pending' '${marker}'; exec sleep 30`
+      if (order === 'stop-first') {
+        assert.equal((await stopper.call('stop')).finished, true)
+        assert.equal((await producer.call('open', command)).ok, false)
+        assert.equal(existsSync(marker), false)
+        return
+      }
+      const opened = await producer.call('open', command)
+      assert.equal(opened.ok, true, opened.error)
+      try {
+        const deadline = Date.now() + 5000
+        while (!existsSync(marker)) {
+          assert.ok(Date.now() < deadline, 'the real PTY target must publish its actual PID')
+          await new Promise(resolve => setTimeout(resolve, 10))
+        }
+        const pid = Number(readFileSync(marker, 'utf8'))
+        assert.ok(Number.isInteger(pid) && pid > 1)
+        process.kill(pid, 0)
+        const stopped = await stopper.call('stop')
+        assert.equal(stopped.finished, false)
+        assert.match(stopped.failure, /local process binding/)
+        assert.deepEqual(await stopper.call('blockers'), [opened.id])
+        await producer.call('close', opened.id)
+        const reapingDeadline = Date.now() + 2000
+        let present = true
+        while (present) {
+          try { process.kill(pid, 0) } catch (error) {
+            if (error.code !== 'ESRCH') throw error
+            present = false
+            break
+          }
+          const status = spawnSync('ps', ['-p', String(pid), '-o', 'stat='], { encoding: 'utf8' })
+          assert.ok(status.status === 1 || /^Z/.test(status.stdout.trim()), `target must be exited before Ended: ${status.stdout} ${status.stderr}`)
+          assert.ok(Date.now() < reapingDeadline, 'the exact exited target PID must be reaped')
+          await new Promise(resolve => setTimeout(resolve, 5))
+        }
+        assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' })
+        const retry = await start()
+        assert.equal((await retry.call('stop')).finished, true)
+        assert.deepEqual(await retry.call('blockers'), [])
+      } finally {
+        await producer.call('close', opened.id)
+      }
+    }, { realBackend: true })
+  })
+}
 
 const devopsReturnDrain = label => withAdmittedChildren(label, 'manager-session', [
   { agentId: 'devops', sessionId: 'devops-session', role: 'devops' },
@@ -531,7 +789,7 @@ test('WHAT[managed-session-lifecycle-025] registered production terminal callbac
   const res = await withAdmittedChildren('scope-devops-drain', 'manager-road-1', [
     { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
     { agentId: 'engineer-1', sessionId: 'engineer-session-1', role: 'engineer' },
-  ], journal => verify(journal, {
+  ], (journal, _profiles, _directory, _reopen, owner) => verify(journal, {
     managerSessionId: 'manager-road-1',
     devopsChildSessionId: 'devops-session-1',
     engineerChildSessionId: 'engineer-session-1',
@@ -539,6 +797,14 @@ test('WHAT[managed-session-lifecycle-025] registered production terminal callbac
     engineerPtys: ['eng-pty-1'],
     completeRole: 'devops',
     lateTerminal: true,
+    admitNextRound: async () => {
+      const seed = authority.issueInheritedIdentitySeed('devops', owner)
+      assert.equal(seed.ok, true, seed.error)
+      const sent = await dispatch.sendAgentOwnerRootAwait(hostPort(async () => dispatch.admittedWithReceipt('next-run')), journal, 'devops-session-1', 'NEXT', seed.value)
+      assert.equal(sent.ok, true, JSON.stringify(sent.error))
+      const accepted = await dispatch.acceptAgentOwnerRoot(journal, 'devops-session-1', sent.key, 'physical-next-run')
+      assert.equal(accepted.ok, true, JSON.stringify(accepted.error))
+    },
   }))
 
   assert.equal(res.devopsBefore.length, 1, 'DevOps child must have outstanding PTY before return')
@@ -549,6 +815,7 @@ test('WHAT[managed-session-lifecycle-025] registered production terminal callbac
   assert.equal(res.terminationsAfterFirst, 1, 'concurrent duplicate delivery must prepare only once')
   assert.equal(res.terminationsAfterRetry, 1, 'the disposed run callback must not kill a later PTY')
   assert.equal(res.devopsAfterRetry.length, 1)
+  assert.deepEqual(res.lateProof, { forked: false, sent: false, seesNext: false, seesNextName: false })
 })
 
 for (const terminalKind of ['Aborted', 'Missing', 'Empty', 'ForeignRoot', 'ForeignChild', 'Failed']) {
@@ -585,6 +852,43 @@ test('WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget d
     const blockers = Array.from(ownershipHost.ownershipBlockersDurable(directory, registry, child))
     assert.equal(blockers.length, 1)
     assert.equal(blockers[0].Lease.ResourceId, 'pty:cold')
+  })
+})
+
+test('WHAT[managed-session-lifecycle-025] a DevOps terminal cannot silently bypass a missing round-drain capability', async () => {
+  const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+  await withAdmittedChildren('missing-drain-capability', 'manager-road-1', [
+    { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
+  ], async journal => {
+    const result = await ToolRuntimeScopeSurface.undrainedDevOpsReturn(journal)
+    assert.equal(result.finished, false)
+    assert.match(result.failure, /DevOps PTY round drain is unavailable/)
+  })
+})
+
+test('WHAT[managed-session-lifecycle-025] a cold return with zero known PTYs still durably stops admission for the exact round', async () => {
+  const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+  await withSharedAdmittedChildren('cold-empty-round', 'manager-road-1', [
+    { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
+  ], async (journal, profiles, workspace) => {
+    const result = await ToolRuntimeScopeSurface.coldDevOpsReturn(journal, workspace)
+    assert.equal(result.finished, true, result.failure)
+    const registry = 'fork-pty:devops-session-1'
+    const database = new DatabaseSync(join(workspace, '.git', 'wanxiangshu', 'work.sqlite'))
+    try {
+      const records = database.prepare('SELECT body FROM journal_entries WHERE stream=? ORDER BY revision').all(`ownership:${registry}`)
+        .map(row => new TextDecoder().decode(row.body))
+      const restored = new Ownership(registry, records)
+      const run = `devops-session-1:run:${profiles.get('devops').logicalRun}`
+      assert.equal(restored.scope(run).phase, 'Draining')
+      assert.deepEqual(restored.blockers(run), [])
+      assert.equal(restored.scope('devops-session-1').phase, 'Open', 'the reusable session must stay open')
+      assert.throws(() => ownershipHost.executeOwnershipDurable(join(workspace, '.git'), registry, 'late-cold-reserve', {
+        type: 'Reserve', scopeId: run, resourceId: 'pty:late-cold', kind: 'process',
+      }), error => error.message === 'Scope admission is closed')
+    } finally {
+      database.close()
+    }
   })
 })
 

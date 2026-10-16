@@ -13,8 +13,13 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Execution.Delegation.Fork.Host
+open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Process
+open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Session.ChatExecution
+open Wanxiangshu.Context.Prefix
+open Wanxiangshu.Participant.Provider.Attempt
 
 type private DummySessionHostPort() =
     let terminals =
@@ -65,8 +70,10 @@ type private DummyObserver() =
 type private ControlledPtyPorts() =
     let sessions = Dictionary<string, PtyPort * PtyId>()
     let mutable terminations = 0
+    let mutable spawns = 0
 
     member _.Terminations = terminations
+    member _.Spawns = spawns
 
     member _.Create() =
         let mutable portRef: PtyPort option = None
@@ -77,7 +84,9 @@ type private ControlledPtyPorts() =
                 |> Option.defaultWith (fun () -> invalidOp "PTY fixture is not initialized")
 
             match command with
-            | PtyCommand.Spawn(label, _) -> sessions.[label] <- (port, id)
+            | PtyCommand.Spawn(label, _) ->
+                spawns <- spawns + 1
+                sessions.[label] <- (port, id)
             | PtyCommand.Signal PtySignal.Terminate ->
                 terminations <- terminations + 1
                 port.Complete id
@@ -444,11 +453,41 @@ type ToolRuntimeScopeSurface =
                 ToolRuntimeScopeSurface.tryGetProperty<bool> (scenario, "lateTerminal")
                 |> Option.defaultValue false
 
-            if lateTerminal then
-                let! opened = devopsRuntime.ForkPty("next-run-pty", ManagedAgent.make Role.DevOps)
-                opened |> Result.defaultWith failwith |> ignore
-                emitDevops (TerminalOutcome.Completed result)
-                do! mgrRuntime.AwaitObservedWork()
+            let oldCapability =
+                devopsRuntime.PtyCapabilityForRun(
+                    AdmittedWork.logicalRunId devopsRun.Work.Value,
+                    ProviderRunIdentity.create "old-provider",
+                    ToolCallId.create "late-old-call"
+                )
+
+            let! lateProof =
+                if lateTerminal then
+                    task {
+                        let admitNext =
+                            ToolRuntimeScopeSurface.tryGetProperty<unit -> Task<unit>> (scenario, "admitNextRound")
+                            |> Option.defaultWith (fun () -> invalidOp "Next-round proof requires canonical admission")
+
+                        do! admitNext ()
+                        let! opened = devopsRuntime.ForkPty("next-run-pty", ManagedAgent.make Role.DevOps)
+                        let id = opened |> Result.defaultWith failwith
+
+                        devopsRuntime.TryBindTerminalName("next-round", id)
+                        |> Result.defaultWith failwith
+
+                        let! lateOpen = oldCapability.ForkPty("late-old-round", ManagedAgent.make Role.DevOps, None)
+                        let! lateSend = oldCapability.SendPty(id, "must-not-write", None)
+                        emitDevops (TerminalOutcome.Completed result)
+                        do! mgrRuntime.AwaitObservedWork()
+
+                        return
+                            Some
+                                {| forked = Result.isOk lateOpen
+                                   sent = Result.isOk lateSend
+                                   seesNext = oldCapability.TryPty(id.Value).IsSome
+                                   seesNextName = oldCapability.TryPtyByName("next-round").IsSome |}
+                    }
+                else
+                    Task.FromResult None
 
             let devopsAfterRetry = devopsRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
             let terminationsAfterRetry = ptys.Terminations
@@ -464,8 +503,260 @@ type ToolRuntimeScopeSurface =
                        terminationsAfterFirst = terminationsAfterFirst
                        terminationsAfterRetry = terminationsAfterRetry
                        devopsAfterRetry = devopsAfterRetry
+                       lateProof = lateProof
                        engineerBefore = engineerBefore |> List.toArray
                        engineerAfter = engineerAfter |}
+        }
+
+    [<CompiledName("startPtyExecution")>]
+    static member startPtyExecution(journal: JournalHandle, child: string, physical: string, provider: string) =
+        task {
+            let childId = SessionId.create child
+
+            let profile =
+                PromptAuthorityProjectionQueries.activeProfile
+                    childId
+                    (AgentJournal.snapshot journal.Journal).AgentProjections
+                |> Option.defaultWith (fun () -> invalidOp "PTY fixture requires canonical authority")
+
+            let evidence =
+                ManagedChatAcceptance.evidenceFromIntent
+                    profile
+                    (PhysicalUserMessageId.create physical)
+                    (PromptOrigin.AuthorityRoot profile.AuthorityKind)
+
+            let key: ChatExecutionKey =
+                { SessionId = childId
+                  PhysicalUserMessageId = evidence.PhysicalUserMessageId }
+
+            let! accepted = Wanxiangshu.Composition.Durable.ManagedChatAcceptance.accept journal.Journal key evidence
+            accepted |> Result.defaultWith (fun error -> failwithf "%A" error) |> ignore
+
+            let! started =
+                Wanxiangshu.Composition.Durable.ManagedChatProviderLifecycle.providerStarted
+                    journal.Journal
+                    key
+                    evidence
+                    (ProviderRunIdentity.create provider)
+                    ProviderRequestKind.WorkMain
+                    XProjectionChoice.UseCommittedEpoch
+
+            started |> Result.defaultWith (fun error -> failwithf "%A" error) |> ignore
+
+            ModelRouting.rememberProviderStepIdentity
+                childId
+                evidence.PhysicalUserMessageId
+                (ProviderRunIdentity.create provider)
+        }
+
+    [<CompiledName("ptyAdmissionProbe")>]
+    static member ptyAdmissionProbe(journal: JournalHandle, workspace: string, child: string, realBackend: bool) : obj =
+        let childId = SessionId.create child
+
+        let profile =
+            AgentJournal.snapshot journal.Journal
+            |> fun snapshot -> Map.find childId snapshot.AgentProjections.Sessions
+            |> fun session -> session.PromptAuthority.Value.ActiveLogicalRun.Value
+
+        let owner, _, _ = PromptIdentitySeed.owner profile.IdentitySeed |> Option.get
+        let sessions = DummySessionHostPort()
+        let ptys = ControlledPtyPorts()
+
+        let scope =
+            new ToolRuntimeScope(
+                sessions,
+                DummyObserver(),
+                { new IRootWorkspaceReader with
+                    member _.TryRead() = None },
+                Some journal.Journal,
+                Some workspace,
+                Dictionary<string, string>(),
+                (fun _ -> None),
+                Dictionary<string, string>(),
+                None,
+                None,
+                None,
+                None,
+                None,
+                ptyPortFactory = (if realBackend then PtyBackend.createPort else ptys.Create)
+            )
+
+        let context sid =
+            { SessionId = sid
+              Agent = None
+              ToolCallId = None
+              ProviderRunId = None
+              PromptText = None
+              AttachAbort = fun _ -> fun () -> () }
+
+        let childRuntime = scope.RuntimeFor(context child) |> Result.defaultWith failwith
+
+        let manager =
+            scope.RuntimeFor(context (SessionId.value owner)) |> Result.defaultWith failwith
+
+        let binding =
+            (AgentJournal.snapshot journal.Journal)
+                .AgentProjections.HandleByChildSession.[childId]
+
+        let run =
+            manager.InstallRun(
+                binding.Handle |> HandleId.tryAgent |> Option.get |> AgentHandleId.value,
+                childId,
+                Role.DevOps,
+                profile.AuthorityRootUserMessageId
+            )
+
+        let capabilityFor provider call =
+            let context =
+                { context child with
+                    ProviderRunId = Some(ProviderRunIdentity.create provider)
+                    ToolCallId = Some(ToolCallId.create call) }
+
+            if realBackend then
+                Ok(
+                    childRuntime.PtyCapabilityForRun(
+                        profile.LogicalRunId,
+                        context.ProviderRunId.Value,
+                        context.ToolCallId.Value
+                    )
+                )
+            else
+                scope.PtyCapabilityFor context
+
+        let forkPty capability command =
+            task {
+                let! result =
+                    match capability with
+                    | Ok capability -> capability.ForkPty(command, ManagedAgent.make Role.DevOps, None)
+                    | Error error -> Task.FromResult(Error error)
+
+                return
+                    match result with
+                    | Ok id ->
+                        box
+                            {| ok = true
+                               id = id.Value
+                               error = "" |}
+                    | Error error -> box {| ok = false; id = ""; error = error |}
+            }
+
+        let openPty provider command =
+            forkPty (capabilityFor provider command) command
+
+        let capturedCapability = capabilityFor "pty-admission-provider" "captured-tool-call"
+
+        let stop () =
+            task {
+                sessions.CaptureTerminal
+                    childId
+                    (TerminalOutcome.Completed
+                        { SessionId = childId
+                          Role = Role.DevOps
+                          ProviderRun = ProviderRunIdentity.create "pty-admission-provider"
+                          AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+                          Directory = None
+                          TerminalText = "finished"
+                          TurnFormalText = "finished" })
+
+                let! failure =
+                    task {
+                        try
+                            do! manager.AwaitObservedWork()
+                            return None
+                        with error ->
+                            return Some error.Message
+                    }
+
+                return
+                    box
+                        {| finished = run.Finished
+                           failure = failure |}
+            }
+
+        createObj
+            [ "open", box (openPty "pty-admission-provider")
+              "openCaptured", box (forkPty capturedCapability)
+              "openUnknown", box (openPty "unobserved-provider")
+              "openLater",
+              box (fun command ->
+                  let session, physical =
+                      ModelRouting.tryProviderStepIdentity (ProviderRunIdentity.create "pty-admission-provider")
+                      |> Option.get
+
+                  ModelRouting.rememberProviderStepIdentity
+                      session
+                      physical
+                      (ProviderRunIdentity.create "pty-later-provider")
+
+                  openPty "pty-later-provider" command)
+              "stop", box stop
+              "complete", box ptys.Complete
+              "close", box (fun id -> childRuntime.ClosePty(PtyId.Create id))
+              "detachChild", box (fun () -> childRuntime.DetachAndDrain())
+              "spawns", box (fun () -> ptys.Spawns)
+              "blockers", box (fun () -> childRuntime.SnapshotOutstandingPtyRuns() |> List.toArray)
+              "dispose", box (fun () -> scope.DisposeAsync()) ]
+
+    [<CompiledName("undrainedDevOpsReturn")>]
+    static member undrainedDevOpsReturn(journal: JournalHandle) =
+        let observeFailure (work: Task) =
+            task {
+                try
+                    do! work
+                    return None
+                with error ->
+                    return Some error.Message
+            }
+
+        task {
+            let child = SessionId.create "devops-session-1"
+            let projection = (AgentJournal.snapshot journal.Journal).AgentProjections
+
+            let profile =
+                PromptAuthorityProjectionQueries.activeProfile child projection |> Option.get
+
+            let parent, _, _ = PromptIdentitySeed.owner profile.IdentitySeed |> Option.get
+            let binding = projection.HandleByChildSession.[child]
+            let sessions = DummySessionHostPort()
+
+            let runtime =
+                HostForkRuntime(
+                    parent,
+                    sessions,
+                    (fun _ _ _ -> Task.FromResult None),
+                    CompletionMailboxRuntime.create,
+                    NodeTiming.nodeClockPort (),
+                    NodeTiming.raceExit,
+                    journal = journal.Journal
+                )
+
+            let run =
+                runtime.InstallRun(
+                    binding.Handle |> HandleId.tryAgent |> Option.get |> AgentHandleId.value,
+                    child,
+                    Role.DevOps,
+                    profile.AuthorityRootUserMessageId
+                )
+
+            sessions.CaptureTerminal
+                child
+                (TerminalOutcome.Completed
+                    { SessionId = child
+                      Role = Role.DevOps
+                      ProviderRun = ProviderRunIdentity.create "undrained-provider"
+                      AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+                      Directory = None
+                      TerminalText = "finished"
+                      TurnFormalText = "finished" })
+
+            let! failure = observeFailure (runtime.AwaitObservedWork())
+            let finished = run.Finished
+            let! _ = observeFailure (runtime.DetachAndDrain())
+
+            return
+                box
+                    {| finished = finished
+                       failure = failure |}
         }
 
     [<CompiledName("coldDevOpsReturn")>]

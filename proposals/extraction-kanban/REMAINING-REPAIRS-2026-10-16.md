@@ -51,6 +51,8 @@ CUT-02-R6-V：库 Capture 错误注入夹具。旧测试在 Bun 下不能通过 
 
 ### 2. CUT-04-R6-B：持久关闭同一轮的准入
 
+已按本节施工，具体实现、真实两进程反例、试制修正和最终验收见[每轮 PTY 跨进程准入报告](PTY-RUN-ADMISSION-2026-10-16.md)；当前状态只在看板维护。以下保留原计划作为验收依据，不据此关闭 R6-C 或 O-01 整体。
+
 先确定 canonical admitted work 与 PTY run scope 的精确绑定，再实现 Reserve / 停止准入的同 revision 仲裁。每轮 scope 唯一，上一轮关闭不影响下一轮或另一 owner；不把整个 Session 永久关掉，也不把 scope 名称猜成业务身份。
 
 用两个独立进程和屏障验证两种先后：Reserve 先确认时，排空必须包含该实例；停止准入先确认时，第二进程不得 Spawn。COMMIT 前后丢回执、重复请求、旧轮晚到消息都保持原确切身份与 Unknown 义务。只有首次持久确认才给物理启动许可。

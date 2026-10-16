@@ -2,10 +2,18 @@ import assert from 'node:assert/strict'
 import * as authority from '../../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as journal from '../../../../dist/Persistence/Journal/Surface.js'
-import { withJournal, acceptOwner, hostPort } from '../../../interaction-authority/tests/support/authority.mjs'
+import { withJournal, withSharedJournal, acceptOwner, hostPort } from '../../../interaction-authority/tests/support/authority.mjs'
 
 export const withAdmittedChildren = async (label, parent, children, run) => {
-  return withJournal(label, async (handle, reopen, directory) => {
+  return withChildJournal(withJournal, label, parent, children, run)
+}
+
+export const withSharedAdmittedChildren = async (label, parent, children, run) => {
+  return withChildJournal(withSharedJournal, label, parent, children, run)
+}
+
+const withChildJournal = async (open, label, parent, children, run) => {
+  return open(label, async (handle, reopen, directory) => {
     const owner = await acceptOwner(handle, parent)
     const profiles = new Map()
     const port = hostPort(async () => dispatch.admittedWithReceipt(`child-work:${label}`))
@@ -27,6 +35,6 @@ export const withAdmittedChildren = async (label, parent, children, run) => {
       assert.equal(accepted.ok, true, JSON.stringify(accepted.error))
       profiles.set(agentId, accepted.profile)
     }
-    return run(handle, profiles, directory, reopen)
+    return run(handle, profiles, directory, reopen, owner)
   })
 }

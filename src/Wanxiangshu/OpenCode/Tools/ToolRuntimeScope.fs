@@ -14,6 +14,7 @@ open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Execution.Session.Wait
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -349,23 +350,10 @@ type ToolRuntimeScope
         | true, path when System.IO.Directory.Exists path -> Some path
         | _ -> None
 
-    let requireNoUnboundChildPtys (childId: SessionId) =
-        let ownerId = SessionId.value childId
-
-        let blockers =
-            ownershipCommonDir
-            |> Option.bind (fun commonDir ->
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.tryOwnershipBlockersDurable
-                    commonDir
-                    ("fork-pty:" + ownerId)
-                    ownerId)
-            |> Option.defaultValue []
-
-        if not (List.isEmpty blockers) then
-            invalidOp (sprintf "PTY ownership for child %s has no local process binding" ownerId)
-
-    let drainChildPtysFor (childId: SessionId) : Task<unit> =
+    let drainChildPtysFor (work: AdmittedWork) : Task<unit> =
         task {
+            let childId = (AdmittedWork.id work).ChildSessionId
+
             let childRuntimeOpt =
                 lock gate (fun () ->
                     match runtimes.TryGetValue(SessionId.value childId) with
@@ -373,8 +361,10 @@ type ToolRuntimeScope
                     | false, _ -> None)
 
             match childRuntimeOpt with
-            | Some r -> do! r.CloseOwnedPtys()
-            | None -> requireNoUnboundChildPtys childId
+            | Some r -> do! r.ClosePtyRun work
+            | None ->
+                ownershipCommonDir
+                |> Option.iter (fun commonDir -> HostForkRuntime.CloseUnboundPtyRun(commonDir, work))
         }
 
     let createRuntime sid =
@@ -1245,7 +1235,27 @@ type ToolRuntimeScope
             |> getOrCreateRuntime
 
     member this.PtyCapabilityFor(ctx: HostToolContext) : Result<DelegationPtyCapability, string> =
-        this.RuntimeFor ctx |> Result.map (fun r -> r.PtyCapability)
+        match journal, ctx.ProviderRunId, ctx.ToolCallId with
+        | Some durable, Some providerRun, Some toolCall when not (String.IsNullOrWhiteSpace ctx.SessionId) ->
+            let projection = (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+
+            let execution =
+                ModelRouting.tryProviderStepIdentity providerRun
+                |> Option.filter (fun (sessionId, _) -> SessionId.value sessionId = ctx.SessionId)
+                |> Option.bind (fun (sessionId, physical) ->
+                    ChatExecutionProjection.byKey
+                        { SessionId = sessionId
+                          PhysicalUserMessageId = physical }
+                        projection)
+
+            execution
+            |> Option.filter (fun execution -> execution.startedEvidence.IsSome && execution.terminalDisposition.IsNone)
+            |> Option.map (fun execution ->
+                this.RuntimeFor ctx
+                |> Result.map (fun runtime ->
+                    runtime.PtyCapabilityForRun(execution.acceptedEvidence.LogicalRunId, providerRun, toolCall)))
+            |> Option.defaultValue (Error "PTY call has no active admitted provider execution")
+        | _ -> Error "PTY call requires an admitted provider execution and tool call identity"
 
     /// crash-reconciliation-018: process-local adoption for explicit /continue. The durable
     /// handle stays byte-for-byte as it was at the crash boundary; a later LLM

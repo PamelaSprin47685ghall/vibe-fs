@@ -96,7 +96,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-04-R5](REGRESSION-REVIEW-2026-10-16.md) | O-13/O-14 修复引入的回退；O-12 原真实回调漏清理及冷无绑定防错 | DONE | 真实 fd、实际 terminal、held/retry/cancel/旧token及冷 guard 正反对照通过；492 项归属链、主包消费通过；主仓本提交，O-01 不销项 | root | regression_ownership_r5、regression_process_r5 |
 | [CUT-02-R6-V](REMAINING-REPAIRS-2026-10-16.md) | Capture 的 Bun 错误事件注入夹具 | DONE | 库 b6984d9；Node Process/Supervision 69/69、Bun Capture/Supervision 19/19；生产包未变，Bun 另四项不销项 | root | 本轮自检；未另作非作者复审 |
 | [CUT-04-R6-A](PTY-SUPERVISION-2026-10-16.md) | O-01 活监管实例与控制终端会话内后代终结 | DONE | 本提交修正独立复审发现的两项 P1 和一项 P2；709 项相关测试 676 pass / 0 fail / 5 skip / 28 TODO；clean 509 精确包 Bun/OpenCode 消费、Linux 物理口九项通过；仅关闭声明的会话范围，脱组及 R6-B/C 不销项 | root | pty_scope_review_r8、pty_integration_review_r8、pty_host_evidence_review_r8 |
-| [CUT-04-R6-B](REMAINING-REPAIRS-2026-10-16.md) | O-01 跨进程每轮 PTY 准入 | READY | 对齐 A 的实例/结束语义；canonical work + run scope、两进程 Reserve/停止准入 CAS 与 Unknown 反例 | root（计划） | 待非作者复审 |
+| [CUT-04-R6-B](PTY-RUN-ADMISSION-2026-10-16.md) | O-01 跨进程每轮 PTY 准入 | REVIEW | 主仓本提交；clean 518，1156 项相关测试 1094 pass / 0 fail / 16 skip / 46 TODO；真实双进程 CAS、Bun PTY、精确包隔离消费通过；R6-C/O-01 整体未闭合 | root | 待非作者复审 |
 | [CUT-04-R6-C](REMAINING-REPAIRS-2026-10-16.md) | O-01 跨重启物理接管 | BACKLOG | 依赖 A/B；必须有可验证 incarnation、连接及终态，真实强杀切点不重发命令 | root（计划） | 待非作者复审 |
 | [CUT-03-R6](REMAINING-REPAIRS-2026-10-16.md) | T-01 原件捕获、冷恢复、消费者切换和旧路径退出 | READY | 先冻结 D-02 与旧数据/cut 处置，再完成一条真实单 owner 捕获链；不把描述符或双写算完成 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-A](REMAINING-REPAIRS-2026-10-16.md) | GAP-091 纯契约及编译/消费者边界 | READY | 真实正反编译与注入能力证明，不能只改目录或外观入口 | root（计划） | 待非作者复审 |
