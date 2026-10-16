@@ -36,6 +36,7 @@ type HostForkRunLifecycleHandle
               Work = None
               Source = HostPendingRun.completionSource ()
               Subscription = None
+              CompletionInFlight = false
               Finished = false }
 
         // DSL-MUTABLE: resource — pending host run registry by agent id
@@ -116,11 +117,10 @@ module HostForkRunLifecycleSurface =
             typed.PendingRuns
             None
             typed.ParentId
-            Unchecked.defaultof<ISessionHostPort>
             None
+            (fun _ _ -> Task.FromResult None)
             typed.Run
             (terminal typed outcome)
-            None
 
     /// Read only lifecycle facts needed by the semantic contract.
     let observe (handle: obj) : obj =

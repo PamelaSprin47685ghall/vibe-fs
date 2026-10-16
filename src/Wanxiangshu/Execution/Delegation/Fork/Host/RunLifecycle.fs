@@ -501,23 +501,62 @@ module HostForkRunLifecycle =
             (TerminalEvidence.failed run.AgentId handle childId body)
             agentOutcome
 
+    let private prepareCurrentCompletion
+        gate
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (run: PendingHostRun)
+        (prepare: unit -> Task<string option>)
+        (deliver: string option -> Task)
+        =
+        let isCurrent () =
+            match pendingRuns.TryGetValue run.AgentId with
+            | true, current -> obj.ReferenceEquals(current.Token, run.Token) && not run.Finished
+            | _ -> false
+
+        let accepted =
+            lock gate (fun () ->
+                if isCurrent () && not run.CompletionInFlight then
+                    run.CompletionInFlight <- true
+                    true
+                else
+                    false)
+
+        let deliverIfCurrent workRecord =
+            if lock gate isCurrent then
+                deliver workRecord
+            else
+                Task.FromResult(()) :> Task
+
+        let prepareAndDeliver () =
+            task {
+                try
+                    let! workRecord = prepare ()
+                    do! deliverIfCurrent workRecord
+                finally
+                    lock gate (fun () -> run.CompletionInFlight <- false)
+            }
+            :> Task
+
+        if accepted then
+            prepareAndDeliver ()
+        else
+            Task.FromResult(()) :> Task
+
     let complete
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
         (journal: AgentJournal option)
         (parentId: SessionId)
-        (sessions: ISessionHostPort)
         (handoffPort: ReusableHandoffPort option)
+        (prepareCompletion: PendingHostRun -> TerminalOutcome -> Task<string option>)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
-        (workRecord: string option)
         : Task =
         // EXEC-006 / COMPANION-003: the completion's work record is the child's
         // final LifecycleWorkRecord only — Opening + frames + gap + terminal,
         // materialised by the same port as parent background. No TerminalText
         // or session-A fallback: a missing LWR is an empty work_record, not a
         // second channel.
-        let completedWorkRecord = workRecord
         let runId = "run-" + run.AgentId
         let childId = run.ChildId
         let handle = HandleController.agentHandle run.AgentId
@@ -535,38 +574,39 @@ module HostForkRunLifecycle =
             Task.FromResult(())
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
         | Completed result ->
-            task {
-                // delegation-031: settlement is attempted before delivery, but the
-                // proven completion is delivered whatever the commitment says —
-                // neither announced early (this await precedes the SetResult
-                // below) nor forgotten. Only PhaseConflict escalates, after
-                // which no delivery can follow.
-                do! settleCompletedHandoff handoffPort parentId run
+            prepareCurrentCompletion gate pendingRuns run (fun () -> prepareCompletion run outcome) (fun workRecord ->
+                task {
+                    // delegation-031: settlement is attempted before delivery, but the
+                    // proven completion is delivered whatever the commitment says —
+                    // neither announced early (this await precedes the SetResult
+                    // below) nor forgotten. Only PhaseConflict escalates, after
+                    // which no delivery can follow.
+                    do! settleCompletedHandoff handoffPort parentId run
 
-                let agentOutcome =
-                    AgentCompletion.completed
-                        run.AgentId
-                        childId
-                        runId
-                        run.Role
-                        result.AuthorityRootUserMessageId
-                        result.ProviderRun
-                        (completedWorkRecord |> Option.defaultValue "")
-                        result.Directory
+                    let agentOutcome =
+                        AgentCompletion.completed
+                            run.AgentId
+                            childId
+                            runId
+                            run.Role
+                            result.AuthorityRootUserMessageId
+                            result.ProviderRun
+                            (workRecord |> Option.defaultValue "")
+                            result.Directory
 
-                let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+                    let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
 
-                do!
-                    deliverProvenCompletion
-                        gate
-                        pendingRuns
-                        journal
-                        parentId
-                        run
-                        (TerminalEvidence.completed run.AgentId handle childId body)
-                        agentOutcome
-            }
-            :> Task
+                    do!
+                        deliverProvenCompletion
+                            gate
+                            pendingRuns
+                            journal
+                            parentId
+                            run
+                            (TerminalEvidence.completed run.AgentId handle childId body)
+                            agentOutcome
+                }
+                :> Task)
         | Failed stop when not (stopBelongsToRun run stop) -> Task.FromResult(())
         | Failed stop when
             stop.Reason = "MISSING_FINAL_REPORT"
@@ -579,7 +619,9 @@ module HostForkRunLifecycle =
             // last effort (the same reason the `Aborted` branch observes only).
             // Observation only — keep pending run Active for a later proven terminal.
             Task.FromResult(())
-        | Failed stop -> deliverFailedCompletion gate pendingRuns journal parentId run stop.Reason
+        | Failed stop ->
+            prepareCurrentCompletion gate pendingRuns run (fun () -> prepareCompletion run outcome) (fun _ ->
+                deliverFailedCompletion gate pendingRuns journal parentId run stop.Reason)
 
     let installRun
         (gate: obj)
@@ -587,7 +629,7 @@ module HostForkRunLifecycle =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
+        (prepareCompletion: PendingHostRun -> TerminalOutcome -> Task<string option>)
         (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
         (handoffPort: ReusableHandoffPort option)
@@ -615,6 +657,7 @@ module HostForkRunLifecycle =
               Work = Some work
               Source = HostPendingRun.completionSource ()
               Subscription = None
+              CompletionInFlight = false
               Finished = false }
 
         lock gate (fun () -> pendingRuns.[agentId] <- run)
@@ -624,11 +667,7 @@ module HostForkRunLifecycle =
                 childId,
                 (fun _ outcome ->
                     trackOwnedWork (fun () ->
-                        task {
-                            let! workRecord = workRecordForOutcome childWorkRecordForRun xTraceHead run outcome
-                            do! complete gate pendingRuns journal parentId sessions handoffPort run outcome workRecord
-                        }
-                        :> Task))
+                        complete gate pendingRuns journal parentId handoffPort prepareCompletion run outcome))
             )
 
         let disposeImmediately =

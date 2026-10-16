@@ -85,7 +85,7 @@ type HostForkRuntime =
     member internal ChildCreatedDir: (string -> SessionId -> string option -> unit)
     member internal ParentWorkRecordOf: (SessionId -> Task<string option>)
     member internal ChildWorkRecordOf: (SessionId -> Task<string option>)
-    member internal ChildWorkRecordOfRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
+    member internal PrepareCompletion: (PendingHostRun -> TerminalOutcome -> Task<string option>)
     member internal XTraceHead: (SessionId -> XTraceCursor)
     member internal HandoffPort: ReusableHandoffPort option
     member internal PrepareHandoff: route: DelegationHandoffRoute -> Task<Result<PreparedDelegationHandoff, string>>

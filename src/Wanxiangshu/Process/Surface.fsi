@@ -127,6 +127,7 @@ module ProcessSurface =
     val portReadResult: port: obj -> id: obj -> output: string -> closed: bool -> unit
     val portFailRead: port: obj -> id: obj -> reason: string -> unit
     val portRegisterExitTask: port: obj -> id: obj -> taskValue: obj -> unit
+    val portFailExitObservation: port: obj -> id: obj -> reason: string -> unit
     val ptyRaceExit: exitTask: obj -> milliseconds: int -> Task<bool>
     val portComplete: port: obj -> id: obj -> outcome: obj -> unit
     val portCompleteAborted: port: obj -> id: obj -> message: obj -> unit

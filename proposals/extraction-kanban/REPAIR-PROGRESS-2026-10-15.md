@@ -2,6 +2,46 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+<a id="regression-review-r5"></a>
+## 第五批：全部修改的双版独立复审（2026-10-16）
+
+起点为干净主仓 `86c0c9b8c`、库 `eef4825 / 0.6.2`。修复前为主仓 `7d8feff03`、库 `46d9c07 / 0.5.2`；覆盖全部 14 / 10 个后续提交。三名非作者只读审查：`regression_process_r5`、`regression_ownership_r5`、`regression_trace_journal_r5`。历史主仓使用原依赖独立构建成功，不能以当前产物冒充历史行为。详细归因和双版结果保存在[独立回归报告](REGRESSION-REVIEW-2026-10-16.md)。
+
+| 工作包 | 本轮实现 | 验收和剩余边界 |
+|---|---|---|
+| CUT-02-R5 / P-04 | Spool 创建者在首次写失败时删除路径并重抛，不等 collector 得到句柄 | 新 writeFileSync 先实写再抛错用例先红：2 项 1 pass / 1 fail，append 对照通过；独立复验残留 true→false。未改变输出预算或摘要语义 |
+| CUT-04-R5 / O-13、O-14 | CloseAll 逐项尝试后报首错；active ID 在 Spawn 前拒绝覆盖，见证退出后允许复用 | 非作者真实 fd 反例两路通过，未知 ID 保留、无假完成；不同 ID 健康 shell 已死；同 ID 第二次 Spawn=0。旧覆盖测试已纠正，WHAT003 明确未收尾物理实例不能覆盖 |
+| CUT-04-R5 / O-12 | 真正 installRun 订阅和首 fork/reuse 均使用同一 preparation；有效性/exact token 在前，drain/物化在后，失败可重投；冷无绑定时读持久 blocker，拒绝假完成 | 非作者 held/retry/cancel/replacement/foreign Failed 及真实 Bun 通过；generation 490 冷 guard 四条独立对照通过。不是完整后代监管或重启接管 |
+
+本轮施工失败如实保留：`r5-main-build.log` 首候选签名/返回类型错误；`r5-main-check.log` 嵌套控制门禁 4 项；`r5-main-ownership-tests.log` 新增矩阵因错误静态导出失败 6 项。没有把这些运行写成通过。fixture 还经非作者指出 DrainOwnedWork 会永久封准入，已改 AwaitObservedWork，7 项真实回调矩阵随后全部通过（`r5-terminal-matrix.log`）。
+
+首个可运行候选 generation **489**，focused **1532 项 / 174 surfaces / 836 modules**。Process **196 tests / 191 pass / 0 fail / 5 TODO**；日志 `r5-main-process-tests.log`，含真实进程组观察，沙箱外运行避免 `/bin/ps` EPERM。`r5-main-build-fixed.log`。此后只做控制流展开、冷无绑定防错及文档收尾，最终候选须重新构建和验证，不能沿用此处旧候选身份。
+
+当前库非作者定向复验为 Trace/Journal 85/85、Ownership 57/57、Process/Capture/Supervision 69/69、安装 Supervision/拆除增强 5/5；主 Trace integration 消费者 1/1。双版比较来自另行隔离安装的 exact 包探针，不是两版都运行上述新增套件。0.6.2 vendor 及库源码未修改，精确包 SHA-256 仍为 `d8909bebb92b01e0cd0cfa28cfdc14d0d1d89f467b7afe5e94a99efd96b0038e`。
+
+最终源码构建 **generation 490**，focused **1532 项 / 174 surfaces / 836 modules**，`r5-final-build-fixed.log`。此前冷 fixture 的 Task 类型错误在 `r5-final-build.log` 留痕；拍快照改在 Dispose 前，completion 由真实 task continuation 观察，没有使用 Promise 的同步完成属性。`r5-delivery-format.log`、`r5-delivery-check.log` 均 exit 0，未放宽任何门禁。
+
+| 完整相关需求分组 | tests / pass / fail / skip / TODO | 日志（均在 `/private/tmp/`，exit 0） |
+|---|---|---|
+| Work / lifecycle / session-ontology 及相邻归属链 | 492 / 463 / 0 / 5 / 24 | `r5-final-ownership-tests.log` |
+| process-execution 全部 | 196 / 191 / 0 / 0 / 5 | `r5-final-process-tests.log` |
+| Trace / WorkRecord / Prefix 相邻链 | 102 / 93 / 0 / 1 / 8 | `r5-final-trace-tests.log` |
+| 不重叠文件合计 | **790 / 747 / 0 / 6 / 37** | 新增十项全通过；既有 TODO / skip 不算通过 |
+
+复跑命令与前四批相同，仅测试数量增加：
+
+```sh
+TMPDIR=/private/tmp node --test requirements/work/tests/*.test.mjs requirements/managed-session-lifecycle/tests/*.test.mjs requirements/session-ontology/tests/*.test.mjs requirements/crash-reconciliation/tests/020.test.mjs requirements/delegation/tests/{003,004,006,024,026,027,032}.test.mjs requirements/participant-horizon/tests/{009,010,011}.test.mjs
+TMPDIR=/private/tmp node --test requirements/process-execution/tests/*.test.mjs
+TMPDIR=/private/tmp node --test requirements/semantic-trace/tests/*.test.mjs requirements/work-record/tests/{002,005,008,014}.test.mjs requirements/prefix-stability/tests/{009,012,014}.test.mjs
+```
+
+非作者冷恢复反例在 generation 489：实际 Scope 结算成功，却留 `pty:unbound-cold-resource`。generation 490 同探针拒绝，Finished=false / InFlight=false / delivered=0，订阅和原 blocker 保留；无遗留 stream 的正控正常完成。仓内 coldDevOpsReturn 入口也分别核对一致，四条全部 exit 0。日志 `ownership-r5-o12-cold-{before,after,empty-after,surface-after,surface-empty}.log`；没有 OS 进程，不把它算物理接管。
+
+文档收尾后构建 **generation 491**，174 surfaces / 836 modules 链接通过；`r5-delivery-build.log`。实际 `node scripts/verify-package.mjs` 打包、解包、隔离 npm ci 和消费者全部 exit 0：**2073 members / 13,153,599 bytes**，tarball SHA-256 `4463c91e1c308880c9a4e1f13b63e2bfbf29fa9039cf7db56a74def7459fe987`；`r5-delivery-package.log`。本轮全部审查者的最终结论及措辞修订已纳入报告，没有把当前 85 项当成两版都通过，也没有把旧坏 raw cut 的自动升级写成已证。
+
+CUT-02-R5 / CUT-04-R5 按上述限定范围 DONE，随本提交正常快进推送 master。提交后重新核对 freshness、主包摘要和远端身份；不使用 force push。历史临时 checkout 在确认无源文件改动后移除，运行日志仍在 `/private/tmp/`；没有把临时探针当成交付门禁。T-01、O-01 及 GAP-133 未闭合，没有部署到运行中的 Host。
+
 <a id="terminal-cancellation-review"></a>
 ## 第四批：完全取消后的 PTY 准入
 

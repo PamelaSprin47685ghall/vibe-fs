@@ -69,11 +69,10 @@ module HostForkRunLifecycle =
         pendingRuns: Dictionary<string, PendingHostRun> ->
         journal: AgentJournal option ->
         parentId: SessionId ->
-        sessions: ISessionHostPort ->
         handoffPort: ReusableHandoffPort option ->
+        prepareCompletion: (PendingHostRun -> TerminalOutcome -> Task<string option>) ->
         run: PendingHostRun ->
         outcome: TerminalOutcome ->
-        workRecord: string option ->
             Task
 
     val installRun:
@@ -82,7 +81,7 @@ module HostForkRunLifecycle =
         journal: AgentJournal option ->
         parentId: SessionId ->
         sessions: ISessionHostPort ->
-        childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) ->
+        prepareCompletion: (PendingHostRun -> TerminalOutcome -> Task<string option>) ->
         xTraceHead: (SessionId -> XTraceCursor) ->
         trackOwnedWork: ((unit -> Task) -> unit) ->
         handoffPort: ReusableHandoffPort option ->

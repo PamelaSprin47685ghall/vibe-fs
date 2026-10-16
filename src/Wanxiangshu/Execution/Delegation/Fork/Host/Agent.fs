@@ -343,7 +343,7 @@ module HostForkAgent =
                         runtime.Journal
                         runtime.ParentId
                         runtime.Sessions
-                        runtime.ChildWorkRecordOfRun
+                        runtime.PrepareCompletion
                         runtime.XTraceHead
                         runtime.TrackOwnedWork
                         runtime.Runtime
@@ -458,7 +458,7 @@ module HostForkAgent =
                         runtime.Journal
                         runtime.ParentId
                         runtime.Sessions
-                        runtime.ChildWorkRecordOfRun
+                        runtime.PrepareCompletion
                         runtime.XTraceHead
                         runtime.TrackOwnedWork
                         runtime.Runtime

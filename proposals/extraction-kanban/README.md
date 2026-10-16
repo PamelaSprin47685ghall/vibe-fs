@@ -28,7 +28,7 @@ Lifecycle 已通过 `wanxiangli/work`、`eventstore`、`durable-work` 接回主�
 
 建板基线中，`wanxiangli/process`、`trace`、`ownership` 已有独立实现与测试，主仓尚只接入前三个生命周期入口。随后 CUT-02/03/04 已合入接线；本次完整源码复核发现部分产品义务尚未承接，状态与反例以最新看板和上述报告为准。导入包、基础测试通过或历史 DONE 均不能单独证明职责已迁完。
 
-主仓锁定并跟踪 `vendor/wanxiangli-0.5.2.tgz`。旁边的 `wanxiangli/` 是另一 Git 仓，不是主仓源码依赖；新成员只克隆主仓也必须能构建。位置变化不应影响 npm 消费。[分发要求](../../requirements/distribution/WHAT.md)
+主仓当前锁定并跟踪 `vendor/wanxiangli-0.6.2.tgz`，0.5.2 是建板历史基线。旁边的 `wanxiangli/` 是另一 Git 仓，不是主仓源码依赖；新成员只克隆主仓也必须能构建。位置变化不应影响 npm 消费。[分发要求](../../requirements/distribution/WHAT.md)。全部修复的双版比较、归因及剩余边界见[2026-10-16 独立复审](REGRESSION-REVIEW-2026-10-16.md)。
 
 ### 第一批怎么分人
 

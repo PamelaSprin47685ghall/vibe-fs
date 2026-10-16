@@ -19,6 +19,7 @@ type PendingHostRun =
       Work: AdmittedWork option
       Source: TaskCompletionSource<AgentCompletionOutcome>
       mutable Subscription: IDisposable option
+      mutable CompletionInFlight: bool
       mutable Finished: bool }
 
 module HostPendingRun =

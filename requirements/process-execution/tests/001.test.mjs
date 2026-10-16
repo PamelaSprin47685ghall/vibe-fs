@@ -224,12 +224,12 @@ test('WHAT[process-execution-001] PORT_fork_honors_explicit_id_and_cwd', async (
   assert.equal(ptyIdView(pid), 'pty-custom')
   assert.deepEqual(seen, [['pty-custom', 'ls -la', '/srv']])
 })
-test('WHAT[process-execution-001] PORT_fork_twice_on_same_id_replaces_the_handle', () => {
+test('WHAT[process-execution-001] PORT_active_id_cannot_replace_its_unfinished_physical_instance', () => {
   const port = createPtyPort({})
   forkDefault(port, 'pty-rf', 'first')
-  forkDefault(port, 'pty-rf', 'second')
+  assert.throws(() => forkDefault(port, 'pty-rf', 'second'), /PTY id is still active/)
   assert.equal(portList(port).ptys.length, 1)
-  assert.equal(portList(port).ptys[0].command, 'second')
+  assert.equal(portList(port).ptys[0].command, 'first')
 })
 test('WHAT[process-execution-001] PORT_exists_and_known_track_active_and_closed', () => {
   const port = createPtyPort({})

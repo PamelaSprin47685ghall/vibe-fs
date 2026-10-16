@@ -162,7 +162,7 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
+        (prepareCompletion: PendingHostRun -> TerminalOutcome -> Task<string option>)
         (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
@@ -201,7 +201,7 @@ module HostForkChildDispatch =
                         journal
                         parentId
                         sessions
-                        childWorkRecordForRun
+                        prepareCompletion
                         xTraceHead
                         trackOwnedWork
                         handoffPort
@@ -228,7 +228,7 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
+        (prepareCompletion: PendingHostRun -> TerminalOutcome -> Task<string option>)
         (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
@@ -263,7 +263,7 @@ module HostForkChildDispatch =
                         journal
                         parentId
                         sessions
-                        childWorkRecordForRun
+                        prepareCompletion
                         xTraceHead
                         trackOwnedWork
                         runtime
@@ -293,7 +293,7 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
+        (prepareCompletion: PendingHostRun -> TerminalOutcome -> Task<string option>)
         (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
@@ -339,7 +339,7 @@ module HostForkChildDispatch =
                         journal
                         parentId
                         sessions
-                        childWorkRecordForRun
+                        prepareCompletion
                         xTraceHead
                         trackOwnedWork
                         runtime

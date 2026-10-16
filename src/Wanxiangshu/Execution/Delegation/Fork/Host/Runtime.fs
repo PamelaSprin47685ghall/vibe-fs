@@ -511,8 +511,14 @@ type HostForkRuntime
         |> Option.defaultValue XTraceProjection.empty
         |> XTraceProjection.headCursor
 
-    let workRecordForOutcome (run: PendingHostRun) (outcome: TerminalOutcome) =
-        HostForkRunLifecycle.workRecordForOutcome childWorkRecordOfRun xTraceHead run outcome
+    let prepareCompletion (run: PendingHostRun) (outcome: TerminalOutcome) =
+        task {
+            match run.Role, drainChildPtys with
+            | Role.DevOps, Some drain -> do! drain run.ChildId
+            | _ -> ()
+
+            return! HostForkRunLifecycle.workRecordForOutcome childWorkRecordOfRun xTraceHead run outcome
+        }
 
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
@@ -801,7 +807,7 @@ type HostForkRuntime
     member internal _.ChildCreatedDir = childCreatedDir
     member internal _.ParentWorkRecordOf = parentWorkRecordOf
     member internal _.ChildWorkRecordOf = childWorkRecordOf
-    member internal _.ChildWorkRecordOfRun = childWorkRecordOfRun
+    member internal _.PrepareCompletion = prepareCompletion
     member internal _.XTraceHead = xTraceHead
     member internal _.HandoffPort = handoffPort
 
@@ -877,26 +883,7 @@ type HostForkRuntime
         // Terminal delivery is a synchronous Host callback. The runtime owns the
         // async tail so shutdown can drain it before releasing the Journal.
         startOwnedWork (fun () ->
-            task {
-                match run.Role, drainChildPtys with
-                | Role.DevOps, Some drain -> do! drain run.ChildId
-                | _ -> ()
-
-                let! workRecord = workRecordForOutcome run outcome
-
-                do!
-                    HostForkRunLifecycle.complete
-                        gate
-                        pendingRuns
-                        journal
-                        parentId
-                        sessions
-                        handoffPort
-                        run
-                        outcome
-                        workRecord
-            }
-            :> Task)
+            HostForkRunLifecycle.complete gate pendingRuns journal parentId handoffPort prepareCompletion run outcome)
         |> ignore
 
     member this.InstallRun
@@ -918,7 +905,7 @@ type HostForkRuntime
                 journal
                 parentId
                 sessions
-                childWorkRecordOfRun
+                prepareCompletion
                 xTraceHead
                 (fun work -> startOwnedWork work |> ignore)
                 handoffPort

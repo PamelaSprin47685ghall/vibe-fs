@@ -349,6 +349,21 @@ type ToolRuntimeScope
         | true, path when System.IO.Directory.Exists path -> Some path
         | _ -> None
 
+    let requireNoUnboundChildPtys (childId: SessionId) =
+        let ownerId = SessionId.value childId
+
+        let blockers =
+            ownershipCommonDir
+            |> Option.bind (fun commonDir ->
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.tryOwnershipBlockersDurable
+                    commonDir
+                    ("fork-pty:" + ownerId)
+                    ownerId)
+            |> Option.defaultValue []
+
+        if not (List.isEmpty blockers) then
+            invalidOp (sprintf "PTY ownership for child %s has no local process binding" ownerId)
+
     let drainChildPtysFor (childId: SessionId) : Task<unit> =
         task {
             let childRuntimeOpt =
@@ -359,7 +374,7 @@ type ToolRuntimeScope
 
             match childRuntimeOpt with
             | Some r -> do! r.CloseOwnedPtys()
-            | None -> ()
+            | None -> requireNoUnboundChildPtys childId
         }
 
     let createRuntime sid =

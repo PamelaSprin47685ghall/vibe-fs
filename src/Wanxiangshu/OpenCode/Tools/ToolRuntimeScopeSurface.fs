@@ -17,14 +17,30 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Process
 
 type private DummySessionHostPort() =
+    let terminals =
+        Dictionary<SessionId, ResizeArray<SessionId -> TerminalOutcome -> unit>>()
+
+    member _.CaptureTerminal(childId: SessionId) =
+        let listeners = terminals.[childId] |> Seq.toArray
+
+        fun outcome ->
+            for listener in listeners do
+                listener childId outcome
+
     interface ISessionHostPort with
         member _.SubscribeTerminal(_, _) =
             { new IDisposable with
                 member _.Dispose() = () }
 
-        member _.SubscribeFutureTerminal(_, _) =
+        member _.SubscribeFutureTerminal(childId, listener) =
+            if not (terminals.ContainsKey childId) then
+                terminals.[childId] <- ResizeArray()
+
+            terminals.[childId].Add listener
+
             { new IDisposable with
-                member _.Dispose() = () }
+                member _.Dispose() =
+                    terminals.[childId].Remove listener |> ignore }
 
         member _.SendPrompt(_, _, _) =
             Task.FromResult(SendOutcome.Fatal "dummy")
@@ -48,6 +64,9 @@ type private DummyObserver() =
 
 type private ControlledPtyPorts() =
     let sessions = Dictionary<string, PtyPort * PtyId>()
+    let mutable terminations = 0
+
+    member _.Terminations = terminations
 
     member _.Create() =
         let mutable portRef: PtyPort option = None
@@ -59,7 +78,9 @@ type private ControlledPtyPorts() =
 
             match command with
             | PtyCommand.Spawn(label, _) -> sessions.[label] <- (port, id)
-            | PtyCommand.Signal PtySignal.Terminate -> port.Complete id
+            | PtyCommand.Signal PtySignal.Terminate ->
+                terminations <- terminations + 1
+                port.Complete id
             | _ -> ()
 
             Task.FromResult(Ok())
@@ -280,7 +301,8 @@ type ToolRuntimeScopeSurface =
             sessionParents.[devopsChildSessionId] <- managerSessionId
             sessionParents.[engineerChildSessionId] <- managerSessionId
 
-            let dummySessions = DummySessionHostPort() :> ISessionHostPort
+            let sessionHost = DummySessionHostPort()
+            let dummySessions = sessionHost :> ISessionHostPort
             let dummyObserver = DummyObserver() :> IWaitObserver
             let ptys = ControlledPtyPorts()
 
@@ -352,18 +374,44 @@ type ToolRuntimeScopeSurface =
             let engRun =
                 mgrRuntime.InstallRun("engineer-1", SessionId.create engineerChildSessionId, Role.Engineer, authRootEng)
 
+            let result =
+                { SessionId = SessionId.create devopsChildSessionId
+                  Role = Role.DevOps
+                  ProviderRun = ProviderRunIdentity.create "prov-run"
+                  AuthorityRootUserMessageId = authRootDevops
+                  Directory = None
+                  TerminalText = "devops finished"
+                  TurnFormalText = "devops finished" }
+
+            let terminalKind =
+                ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "terminalKind")
+                |> Option.defaultValue "Completed"
+
             let outcome =
-                TerminalOutcome.Completed
-                    { SessionId = SessionId.create devopsChildSessionId
-                      Role = Role.DevOps
-                      ProviderRun = ProviderRunIdentity.create "prov-run"
-                      AuthorityRootUserMessageId = authRootDevops
-                      Directory = None
-                      TerminalText = "devops finished"
-                      TurnFormalText = "devops finished" }
+                match terminalKind with
+                | "Aborted" -> TerminalOutcome.Aborted(TerminalStop.session "retry")
+                | "Missing" -> TerminalOutcome.Failed(TerminalStop.session "MISSING_FINAL_REPORT")
+                | "Failed" -> TerminalOutcome.Failed(TerminalStop.session "failed")
+                | "Empty" ->
+                    TerminalOutcome.Completed
+                        { result with
+                            TerminalText = ""
+                            TurnFormalText = "" }
+                | "ForeignRoot" ->
+                    TerminalOutcome.Completed
+                        { result with
+                            AuthorityRootUserMessageId = AuthorityRootUserMessageId.create "old-root" }
+                | "ForeignChild" ->
+                    TerminalOutcome.Completed
+                        { result with
+                            SessionId = SessionId.create "other-child" }
+                | _ -> TerminalOutcome.Completed result
+
+            let emitDevops = sessionHost.CaptureTerminal devopsRun.ChildId
 
             if completeRole = "devops" then
-                mgrRuntime.Complete(devopsRun, outcome)
+                emitDevops outcome
+                emitDevops outcome
             elif completeRole = "engineer" then
                 let engOutcome =
                     TerminalOutcome.Completed
@@ -375,20 +423,127 @@ type ToolRuntimeScopeSurface =
                           TerminalText = "eng finished"
                           TurnFormalText = "eng finished" }
 
-                mgrRuntime.Complete(engRun, engOutcome)
+                sessionHost.CaptureTerminal engRun.ChildId engOutcome
 
-            do! mgrRuntime.DrainOwnedWork()
+            do! mgrRuntime.AwaitObservedWork()
 
             let devopsAfter = devopsRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
             let engineerAfter = engRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
+            let finishedAfterFirst = devopsRun.Finished
+            let terminationsAfterFirst = ptys.Terminations
+
+            let followWithValid =
+                ToolRuntimeScopeSurface.tryGetProperty<bool> (scenario, "followWithValid")
+                |> Option.defaultValue false
+
+            if followWithValid then
+                emitDevops (TerminalOutcome.Completed result)
+                do! mgrRuntime.AwaitObservedWork()
+
+            let lateTerminal =
+                ToolRuntimeScopeSurface.tryGetProperty<bool> (scenario, "lateTerminal")
+                |> Option.defaultValue false
+
+            if lateTerminal then
+                let! opened = devopsRuntime.ForkPty("next-run-pty", ManagedAgent.make Role.DevOps)
+                opened |> Result.defaultWith failwith |> ignore
+                emitDevops (TerminalOutcome.Completed result)
+                do! mgrRuntime.AwaitObservedWork()
+
+            let devopsAfterRetry = devopsRuntime.SnapshotOutstandingPtyRuns() |> List.toArray
+            let terminationsAfterRetry = ptys.Terminations
+            let finishedAfterRetry = devopsRun.Finished
             do! scope.DisposeAsync()
 
             return
                 box
                     {| devopsBefore = devopsBefore |> List.toArray
                        devopsAfter = devopsAfter
+                       finishedAfterFirst = finishedAfterFirst
+                       finishedAfterRetry = finishedAfterRetry
+                       terminationsAfterFirst = terminationsAfterFirst
+                       terminationsAfterRetry = terminationsAfterRetry
+                       devopsAfterRetry = devopsAfterRetry
                        engineerBefore = engineerBefore |> List.toArray
                        engineerAfter = engineerAfter |}
+        }
+
+    [<CompiledName("coldDevOpsReturn")>]
+    static member coldDevOpsReturn(journal: JournalHandle, workspace: string) : Task<obj> =
+        let observeFailure (work: Task) =
+            task {
+                try
+                    do! work
+                    return None
+                with error ->
+                    return Some error.Message
+            }
+
+        task {
+            let sessions = DummySessionHostPort()
+
+            let scope =
+                new ToolRuntimeScope(
+                    sessions,
+                    DummyObserver(),
+                    { new IRootWorkspaceReader with
+                        member _.TryRead() = None },
+                    Some journal.Journal,
+                    Some workspace,
+                    Dictionary<string, string>(),
+                    (fun _ -> None),
+                    Dictionary<string, string>(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None
+                )
+
+            let manager =
+                scope.RuntimeFor
+                    { SessionId = "manager-road-1"
+                      Agent = None
+                      ToolCallId = None
+                      ProviderRunId = None
+                      PromptText = None
+                      AttachAbort = fun _ -> fun () -> () }
+                |> Result.defaultWith failwith
+
+            let root =
+                ToolRuntimeScopeSurface.childAuthorityRoot (journal, "devops-session-1", Role.DevOps)
+
+            let childId = SessionId.create "devops-session-1"
+            let run = manager.InstallRun("devops", childId, Role.DevOps, root)
+            let mutable delivered = false
+
+            task {
+                let! _ = run.Source.Task
+                delivered <- true
+            }
+            |> ignore
+
+            sessions.CaptureTerminal
+                childId
+                (TerminalOutcome.Completed
+                    { SessionId = childId
+                      AuthorityRootUserMessageId = root
+                      ProviderRun = ProviderRunIdentity.create "cold-provider"
+                      Role = Role.DevOps
+                      Directory = None
+                      TerminalText = "finished"
+                      TurnFormalText = "finished" })
+
+            let! failure = observeFailure (manager.AwaitObservedWork())
+            let finished = run.Finished
+            let deliveredBeforeDispose = delivered
+            let! _ = observeFailure (scope.DisposeAsync())
+
+            return
+                box
+                    {| failure = failure
+                       finished = finished
+                       delivered = deliveredBeforeDispose |}
         }
 
     [<CompiledName("verifyOwnershipRetirementContract")>]

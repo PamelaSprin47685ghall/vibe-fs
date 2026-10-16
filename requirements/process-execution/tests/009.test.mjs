@@ -216,12 +216,14 @@ test('WHAT[process-execution-009] PTY_SESSION_mutable_state_roundtrips', () => {
     }
   })
 
-  test('WHAT[process-execution-009] CUT_02_spool_failure_is_an_execution_failure_and_removes_partial_output', async () => {
-    const original = fs.default.appendFileSync
+  for (const operation of ['writeFileSync', 'appendFileSync']) {
+  test(`WHAT[process-execution-009] CUT_02_${operation}_failure_removes_output_even_after_the_native_write`, async () => {
+    const original = fs.default[operation]
     let failedPath
-    fs.default.appendFileSync = (path, ...args) => {
+    fs.default[operation] = (path, ...args) => {
       if (String(path).includes('/spool-')) {
         failedPath = String(path)
+        original(path, ...args)
         throw Object.assign(new Error('capture disk is full'), { code: 'ENOSPC' })
       }
       return original(path, ...args)
@@ -240,9 +242,10 @@ test('WHAT[process-execution-009] PTY_SESSION_mutable_state_roundtrips', () => {
       assert.ok(failedPath)
       assert.equal(fs.existsSync(failedPath), false)
     } finally {
-      fs.default.appendFileSync = original
+      fs.default[operation] = original
       syncBuiltinESMExports()
       if (failedPath) fs.rmSync(failedPath, { force: true })
     }
   })
+  }
 }

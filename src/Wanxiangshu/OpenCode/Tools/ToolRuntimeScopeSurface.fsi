@@ -12,4 +12,5 @@ type ToolRuntimeScopeSurface =
         journal: JournalHandle * workspace: string * managerSessionId: string -> Task<string array>
 
     static member verifyDevOpsReturnDrain: journal: JournalHandle * scenario: obj -> Task<obj>
+    static member coldDevOpsReturn: journal: JournalHandle * workspace: string -> Task<obj>
     static member verifyOwnershipRetirementContract: scenario: obj -> Task<obj>

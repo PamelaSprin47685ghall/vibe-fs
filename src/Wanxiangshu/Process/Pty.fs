@@ -207,6 +207,9 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
               Agent = agentName }
 
         lock gate (fun () ->
+            if active.ContainsKey id then
+                invalidOp (sprintf "PTY id is still active: %s" id.Value)
+
             closedIds.Remove id |> ignore
             active.[id] <- (handle, ref false))
 
@@ -363,9 +366,25 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
         let grace = max 0 (defaultArg graceMs PtyOutcome.termToKillGraceMs)
         let ids = lock gate (fun () -> active.Keys |> Seq.toList)
 
+        let tryClose id =
+            task {
+                try
+                    do! this.ClosePty(id, graceMs = grace)
+                    return None
+                with error ->
+                    return Some error
+            }
+
         task {
+            let mutable failure = None
+
             for id in ids do
-                do! this.ClosePty(id, graceMs = grace)
+                let! error = tryClose id
+                failure <- Option.orElse error failure
+
+            match failure with
+            | Some error -> return raise error
+            | None -> return ()
         }
 
     member _.List() : PtyHandle list =

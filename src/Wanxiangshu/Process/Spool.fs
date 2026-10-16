@@ -23,8 +23,13 @@ module Spool =
 
     let startStreamingSpool () : StreamingSpool =
         let path = NodeProcessHost.tempPath ()
-        NodeProcessHost.writeFile path [||]
-        { Path = path; BytesWritten = 0L }
+
+        try
+            NodeProcessHost.writeFile path [||]
+            { Path = path; BytesWritten = 0L }
+        with _ ->
+            NodeProcessHost.deleteFile path
+            reraise ()
 
     let appendStreamingSpool (spool: StreamingSpool) (bytes: byte[]) : unit =
         if not (isNull bytes) && bytes.Length > 0 then

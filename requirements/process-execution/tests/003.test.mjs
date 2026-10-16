@@ -131,6 +131,7 @@ const {
   portReadResult,
   portFailRead,
   portRegisterExitTask,
+  portFailExitObservation,
   portComplete,
   portCompleteAborted,
   portClose,
@@ -250,6 +251,40 @@ test('WHAT[process-execution-003] PORT_complete_removes_the_exit_task_entry', as
   portRegisterExitTask(port, pid, exit.promise)
   portComplete(port, pid, { ok: true, value: 'done' })
   await portCloseAll(port, 0)
+})
+test('WHAT[process-execution-003] unresolved startup cannot be overwritten by another spawn with the same PTY id', () => {
+  const calls = []
+  const port = createPtyPort({ handler: (pid, command) => { calls.push(command); return success } })
+  const pid = forkDefault(port, 'unresolved')
+  portFailExitObservation(port, pid, 'PTY startup outcome is unknown')
+  assert.throws(() => forkDefault(port, 'unresolved', 'another process'), /PTY id is still active/)
+  assert.equal(calls.length, 1, 'refusal must precede the second backend spawn')
+  assert.equal(portExists(port, pid), true)
+  portComplete(port, pid, success)
+  assert.doesNotThrow(() => forkDefault(port, 'unresolved', 'after witnessed exit'))
+  portComplete(port, pid, success)
+})
+test('WHAT[process-execution-003] unknown startup does not prevent TERM and KILL cleanup of another live PTY', async () => {
+  const calls = []
+  let port
+  const exit = exitSignal()
+  port = createPtyPort({ handler: (pid, command) => {
+    calls.push({ id: pid, ...command })
+    if (command.kind === 'Signal' && command.signal === 'SIGKILL' && pid === 'healthy') {
+      portComplete(port, id(pid), success)
+      exit.resolve()
+    }
+    return success
+  } })
+  const unknown = forkDefault(port, 'unknown')
+  portFailExitObservation(port, unknown, 'PTY startup outcome is unknown')
+  const healthy = forkDefault(port, 'healthy')
+  portRegisterExitTask(port, healthy, exit.promise)
+  await assert.rejects(portCloseAll(port, 0), /startup outcome is unknown/)
+  assert.equal(portExists(port, unknown), true)
+  assert.equal(portExists(port, healthy), false)
+  assert.deepEqual(calls.filter(call => call.id === 'healthy' && call.kind === 'Signal').map(call => call.signal), ['SIGTERM', 'SIGKILL'])
+  portComplete(port, unknown, success)
 })
 test('WHAT[process-execution-003] PORT_complete_aborted_forces_abort_without_terminate_mark', () => {
   const port = createPtyPort({})

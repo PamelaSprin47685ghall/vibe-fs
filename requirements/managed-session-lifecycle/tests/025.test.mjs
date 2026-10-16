@@ -523,7 +523,7 @@ test('WHAT[managed-session-lifecycle-025] fixed DevOps work return drains its PT
   assert.ok(res.engineerAfter.includes(res.engineerPtyId), 'Engineer PTY must not be affected by DevOps drain')
 })
 
-test('WHAT[managed-session-lifecycle-025] ToolRuntimeScope production wiring drains DevOps child PTYs on run complete', async () => {
+test('WHAT[managed-session-lifecycle-025] registered production terminal callback drains DevOps once and ignores a late callback after completion', async () => {
   const scopeMod = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
   const verify = scopeMod.verifyDevOpsReturnDrain || (scopeMod.ToolRuntimeScopeSurface && scopeMod.ToolRuntimeScopeSurface.verifyDevOpsReturnDrain)
   assert.equal(typeof verify, 'function', 'verifyDevOpsReturnDrain must be exported on ToolRuntimeScope surface')
@@ -538,12 +538,54 @@ test('WHAT[managed-session-lifecycle-025] ToolRuntimeScope production wiring dra
     devopsPtys: ['devops-pty-1'],
     engineerPtys: ['eng-pty-1'],
     completeRole: 'devops',
+    lateTerminal: true,
   }))
 
   assert.equal(res.devopsBefore.length, 1, 'DevOps child must have outstanding PTY before return')
   assert.equal(res.engineerBefore.length, 1, 'Engineer child must have outstanding PTY')
   assert.equal(res.devopsAfter.length, 0, 'DevOps child PTY must be drained on run complete via ToolRuntimeScope wiring')
   assert.deepEqual(res.engineerAfter, res.engineerBefore, 'Engineer child PTY must remain alive and unaffected')
+  assert.equal(res.finishedAfterFirst, true)
+  assert.equal(res.terminationsAfterFirst, 1, 'concurrent duplicate delivery must prepare only once')
+  assert.equal(res.terminationsAfterRetry, 1, 'the disposed run callback must not kill a later PTY')
+  assert.equal(res.devopsAfterRetry.length, 1)
+})
+
+for (const terminalKind of ['Aborted', 'Missing', 'Empty', 'ForeignRoot', 'ForeignChild', 'Failed']) {
+  test(`WHAT[managed-session-lifecycle-025] registered ${terminalKind} terminal preserves eligibility and can receive a later valid terminal`, async () => {
+    const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+    const res = await withAdmittedChildren(`terminal-${terminalKind}`, 'manager-road-1', [
+      { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
+      { agentId: 'engineer-1', sessionId: 'engineer-session-1', role: 'engineer' },
+    ], journal => ToolRuntimeScopeSurface.verifyDevOpsReturnDrain(journal, { terminalKind, followWithValid: true }))
+    const validFailure = terminalKind === 'Failed'
+    assert.equal(res.finishedAfterFirst, validFailure)
+    assert.equal(res.terminationsAfterFirst, validFailure ? 1 : 0)
+    assert.equal(res.devopsAfter.length, validFailure ? 0 : 1)
+    assert.equal(res.finishedAfterRetry, true)
+    assert.equal(res.terminationsAfterRetry, 1)
+    assert.equal(res.devopsAfterRetry.length, 0)
+    assert.deepEqual(res.engineerAfter, res.engineerBefore)
+  })
+}
+
+test('WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget durable PTYs without local physical bindings', async () => {
+  const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+  await withAdmittedChildren('cold-terminal-pty', 'manager-road-1', [
+    { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
+  ], async (journal, profiles, directory) => {
+    const child = 'devops-session-1'
+    const registry = `fork-pty:${child}`
+    ownershipHost.executeOwnershipDurable(directory, registry, 'open-cold', { type: 'OpenScope', scopeId: child, parentId: null })
+    ownershipHost.executeOwnershipDurable(directory, registry, 'reserve-cold', { type: 'Reserve', resourceId: 'pty:cold', scopeId: child, kind: 'process' })
+    const result = await ToolRuntimeScopeSurface.coldDevOpsReturn(journal, directory)
+    assert.match(result.failure, /no local process binding/)
+    assert.equal(result.finished, false)
+    assert.equal(result.delivered, false)
+    const blockers = Array.from(ownershipHost.ownershipBlockersDurable(directory, registry, child))
+    assert.equal(blockers.length, 1)
+    assert.equal(blockers[0].Lease.ResourceId, 'pty:cold')
+  })
 })
 
 test('WHAT[managed-session-lifecycle-025] real bun-pty TERM waits for exit and escalates to KILL before releasing ownership', async t => {
