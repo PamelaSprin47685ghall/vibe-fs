@@ -1,1 +1,1 @@
-Cannot finish without a quality assessment. Call the review tool first to complete the eight-dimension quality assessment.
+Cannot finish without a review. Call the review tool first: formalize the target state, state the current gap, and submit the findings pairs.

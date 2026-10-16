@@ -563,6 +563,8 @@ module PlanTools =
                     ExecSessionId = ""
                     RetirementOutcome = "PostS3"
                     Message = "Plan entered post-S3 state" })
+        elif receipt.Kind = "ReviewRequired" then
+            Error "assessment required"
         elif
             receipt.Kind = "Relayed"
             || receipt.Kind = "Blocked"

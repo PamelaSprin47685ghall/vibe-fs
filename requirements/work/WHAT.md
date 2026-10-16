@@ -30,7 +30,7 @@ Reviewed 的载荷只含 incumbencyId、stage、outcome。outcome 只是 Promote
 
 有任期且这一任还没有 Reviewed 时，只读与观察可用。写源码和向固定 DevOps 派工必须拒绝。
 
-- 允许后果：读、观察、以及不写源码、不派工的工具调用保持可用。review 本身可以调用。sequence 为 S1、S2、S3 时，无权 deliver 不因尚未 review 被拒。
+- 允许后果：读、观察、以及不写源码、不派工的工具调用保持可用。review 本身可以调用。sequence 为 S1、S2、S3 时，单笔无权 deliver 不因尚未 review 被拒；但紧接一笔无评审接力之后的再次无评审 deliver，依 [025] 的背靠背门以 assessment required 拒绝、零写。
 - 禁止后果：不得把本条收成「没有评审就拒绝一切工具」。不得在尚未 review 时写源码，也不得向固定 DevOps 派工。sequence 为 S4 时，尚未 review 且尚无确认的 deliver 不得写入 ConfirmationCommitted，也不得退休；返回已完成未退休，assessment_required 为真，零写。
 - 失败后果：越界写入或派工被拒绝，原状态不变。
 
@@ -100,11 +100,11 @@ S4 两次调用之后，系统在第二次 deliver 返回前原子排队同一�
 
 ## [013] 一段式内核退休
 
-一段式无评审的 deliver 不得写成 Delivered，也不得被拒绝。S4 退休载荷出现 retirementCursor 必须被拒。缺期望推进值的已落盘 Delivered 不得返回 DeliveredIdempotent。无活跃任期时调用方不得追加 IncumbencyOpened。
+一段式单笔无评审的 deliver 不得写成 Delivered，也不得被拒绝。紧接一笔无评审接力之后、本任仍未评审的再次 deliver，依 [025] 以 ReviewRequired 拒绝、零写。S4 退休载荷出现 retirementCursor 必须被拒。缺期望推进值的已落盘 Delivered 不得返回 DeliveredIdempotent。无活跃任期时调用方不得追加 IncumbencyOpened。
 
 - 允许后果：一段式 deliver 写入，明细为 relayed，事件名含 IncumbencyRetired 与 IncumbencyOpened，字节不含 Delivered。合法两段式 Relayed 写入后，读者才看见完整事件。
 - 禁止后果：一段式无评审不得写成 Delivered。S4 载荷不得携带 retirementCursor。缺期望推进值不得被读成 DeliveredIdempotent。无活跃任期不得追加 IncumbencyOpened。
-- 失败后果：带 retirementCursor 的 S4 读回位置是 StorageInvalid。无活跃任期的追加决定是 Refuse，事件名为空。
+- 失败后果：带 retirementCursor 的 S4 读回位置是 StorageInvalid。无活跃任期的追加决定是 Refuse，事件名为空。背靠背无评审接力的追加决定是 ReviewRequired 观察，事件名为空，本任不退休。
 
 ## [014] 两段式内核确认
 
@@ -217,13 +217,15 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 
 当跑者调用 `deliver` 且本任未获授权（`Authorized = false`）时，系统执行任期接力。`handoff` 不再是独立工具。
 
+接力不得成为 no-op：连续两笔都未评审的接力构成阶段永不推进的空转。系统以折叠派生的「上一笔已落盘退休是否为无评审接力」作门——本任未评审且上一笔退休也未评审时，本次 deliver 拒绝接力。该门只读退休轮次（`reviewOutcome` 与 `outcome`），不引入第二份工作阶段或任期账本，也不写进任何事件载荷。
+
 - 允许后果：系统首先核查当前任期的递归活跃资源（包括 child、后台作业、未决工具调用与租约）。确认无 blocker 后，以单个原子事务追加两条事件：
   1. `IncumbencyRetired(incumbencyId, Relayed)`；
   2. `IncumbencyOpened(workId, nextIncumbencyId, stage, openingCursor)`，其中 stage 等于退休时的 stage（接力不推进阶段）。
   退休游标取自当前 `deliver` 所属物理交互的真实 XTrace 边界，表示已消费到的最后一个语义 part；下一任的 `openingCursor` 等于该游标，首个新 part 从其后开始，不另加一。较新的用户输入或其它 provider run 不得扩大本次退休范围。
   当前活跃任期更新为新任期，阶段不变，下一次 Provider 请求触发前缀重锚并重启上下文（新任期按 [034] 过滤旧任交互、插入 `LWR_prev`，保留真实对话的因果顺序）。
-- 禁止后果：若存在活跃阻塞资源（blocker），禁止退休任期；系统必须记录 `RetirementBlocked` 并向模型返回 blocker 摘要。接力严禁改写 `stage`、严禁产生 `Reviewed`、严禁影响 `Delivered` 投影。禁止在未成功持久化新任期前注销当前任期。禁止使用固定增量、消息数组下标或缺省值伪造退休游标。
-- 失败后果：退休边界不可证明时，在追加事件之前拒绝接力；事务写入失败时，当前任期保持活跃，不产生状态漂移。
+- 禁止后果：若存在活跃阻塞资源（blocker），禁止退休任期；系统必须记录 `RetirementBlocked` 并向模型返回 blocker 摘要。接力严禁改写 `stage`、严禁产生 `Reviewed`、严禁影响 `Delivered` 投影。禁止在未成功持久化新任期前注销当前任期。禁止使用固定增量、消息数组下标或缺省值伪造退休游标。本任未评审且上一笔退休也未评审时，严禁再次接力开任。
+- 失败后果：退休边界不可证明时，在追加事件之前拒绝接力；事务写入失败时，当前任期保持活跃，不产生状态漂移。背靠背无评审接力的拒绝是 ReviewRequired 观察、零写，当前任期保持活跃，runner 提交本任 `review` 后方再次接力。
 
 ## [026] deliver 契约（持权交付路径）
 

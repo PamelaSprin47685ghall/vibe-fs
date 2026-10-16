@@ -96,21 +96,21 @@ test('WHAT[work-025] an unauthorised durable deliver relays instead of refusing 
   }
 })
 
-test('WHAT[work-025] continuous relay across a single work advances tenures at the same stage without spawning', () => {
+test('WHAT[work-025] continuous reviewed relay advances tenures at the same stage without spawning', () => {
   let text = life.encodeOpening('plan', 'work-ladder', '/repo/root', 0n)
-  const promoted = life.reviewProbe(text, openedActiveId(text), 'Promoted')
-  assert.equal(promoted.decision, 'Write', promoted.detail)
-  text = `${text}${promoted.bytes}`
-  let cursor = 10n
+  let cursor = 0n
   for (let step = 0; step < 3; step += 1) {
     cursor += 10n
+    const reviewed = life.reviewProbe(text, openedActiveId(text), 'Stayed')
+    assert.equal(reviewed.decision, 'Write', reviewed.detail)
+    text = `${text}${reviewed.bytes}`
     const relayed = life.deliverProbe(text, `run-ladder-${step}`, `call-ladder-${step}`, cursor)
     assert.equal(relayed.decision, 'Write', relayed.detail)
     assert.equal(relayed.detail, 'Relayed')
     assert.equal(relayed.names, 'IncumbencyRetired,IncumbencyOpened')
     const [retired, opened] = eventsOf(relayed.bytes)
     assert.equal(retired.outcome, 'Relayed')
-    assert.equal(opened.stage, 'S2')
+    assert.equal(opened.stage, 'S1', 'a stayed review keeps the stage')
     assert.equal(opened.openingCursor, retired.retirementCursor)
     assert.equal(opened.openingCursor, Number(cursor))
     text = `${text}${relayed.bytes}`
@@ -118,6 +118,34 @@ test('WHAT[work-025] continuous relay across a single work advances tenures at t
     assert.equal(folded.ok, true, folded.reason)
     assert.equal(folded.activeId, opened.incumbencyId)
   }
+})
+
+test('WHAT[work-025] a second consecutive unreviewed relay is refused with no write, and a review reopens the handoff', () => {
+  let text = life.encodeOpening('plan', 'work-noop', '/repo/root', 0n)
+  const promoted = life.reviewProbe(text, openedActiveId(text), 'Promoted')
+  assert.equal(promoted.decision, 'Write', promoted.detail)
+  text = `${text}${promoted.bytes}`
+  // First relay: the reviewed tenure hands off; the chain is not yet unreviewed.
+  const first = life.deliverProbe(text, 'run-1', 'call-1', 10n)
+  assert.equal(first.detail, 'Relayed', first.detail)
+  text = `${text}${first.bytes}`
+  // Second relay: an unreviewed successor, but the prior handoff was reviewed. Allowed once.
+  const second = life.deliverProbe(text, 'run-2', 'call-2', 20n)
+  assert.equal(second.detail, 'Relayed', second.detail)
+  text = `${text}${second.bytes}`
+  // Third relay: two consecutive unreviewed handoffs is the no-op chain. Refused, zero write.
+  const activeBefore = openedActiveId(text)
+  const refused = life.deliverProbe(text, 'run-3', 'call-3', 30n)
+  assert.equal(refused.decision, 'Done', refused.detail)
+  assert.equal(refused.detail, 'ReviewRequired')
+  assert.equal(refused.bytes, '', 'the refusal appends nothing')
+  const afterRefusal = life.readProbe(text)
+  assert.equal(afterRefusal.activeId, activeBefore, 'the tenure is not retired')
+  // The runner submits its review; the handoff resumes at the same stage.
+  const reviewed = life.reviewProbe(text, activeBefore, 'Stayed')
+  text = `${text}${reviewed.bytes}`
+  const resumed = life.deliverProbe(text, 'run-4', 'call-4', 40n)
+  assert.equal(resumed.detail, 'Relayed', resumed.detail)
 })
 
 test('WHAT[work-025] relay is blocked by live resources or a wrong incumbency id', async () => {
