@@ -73,18 +73,20 @@ type PtyId =
 
     static member Create(id: string) = PtyId id
 
-/// Physical PTY exit event delivered to listeners.
+/// Confirmed PTY exit or explicit no-start evidence delivered to listeners.
 [<RequireQualifiedAccess>]
 type PtyExitEvent =
     | Exited of id: PtyId * outcome: string
     | Failed of id: PtyId * code: string * message: string
     | Aborted of id: PtyId * code: string * message: string
+    | NotStarted of id: PtyId * reason: string
 
     member this.Id =
         match this with
         | Exited(id, _) -> id
         | Failed(id, _, _) -> id
         | Aborted(id, _, _) -> id
+        | NotStarted(id, _) -> id
 
 /// One live PTY.
 ///

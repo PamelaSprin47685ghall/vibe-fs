@@ -43,4 +43,5 @@ module PtySupervisor =
         exitTcs: TaskCompletionSource<unit> ->
             unit
 
+    val completeNotStarted: supervisor: PtySupervisor -> port: PtyPort -> id: PtyId -> reason: string -> unit
     val cancelAll: supervisor: PtySupervisor -> unit

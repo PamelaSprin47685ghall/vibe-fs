@@ -71,7 +71,7 @@ process.on('message', async ({ id, action, command, pause, lose }) => {
       : await perform()
     process.send({ id, value: value ?? null })
   } catch (error) {
-    process.send({ id, error: error.stack })
+    process.send({ id, error: error?.stack ?? error?.message ?? String(error) })
   }
 })
 process.on('disconnect', () => {

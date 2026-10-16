@@ -97,7 +97,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-02-R6-V](REMAINING-REPAIRS-2026-10-16.md) | Capture 的 Bun 错误事件注入夹具 | DONE | 库 b6984d9；Node Process/Supervision 69/69、Bun Capture/Supervision 19/19；生产包未变，Bun 另四项不销项 | root | 本轮自检；未另作非作者复审 |
 | [CUT-04-R6-A](PTY-SUPERVISION-2026-10-16.md) | O-01 活监管实例与控制终端会话内后代终结 | DONE | 本提交修正独立复审发现的两项 P1 和一项 P2；709 项相关测试 676 pass / 0 fail / 5 skip / 28 TODO；clean 509 精确包 Bun/OpenCode 消费、Linux 物理口九项通过；仅关闭声明的会话范围，脱组及 R6-B/C 不销项 | root | pty_scope_review_r8、pty_integration_review_r8、pty_host_evidence_review_r8 |
 | [CUT-04-R6-B](PTY-RUN-ADMISSION-2026-10-16.md) | O-01 跨进程每轮 PTY 准入 | DONE | 本提交修正两项新增回退和既有 Load void 遗漏；clean 523，1175 项相关测试 1112 pass / 0 fail / 16 skip / 47 TODO；非作者反例、真实双进程 CAS/Bun PTY、精确包隔离消费通过；R6-C/O-01 整体未闭合 | root | r6b_admission_review、r6b_unknown_review、r6b_requirements_review |
-| [CUT-04-R6-C](PTY-RESTART-RECOVERY-2026-10-16.md) | O-01 跨重启物理接管 | REVIEW | 原型后接生产；clean 529，1189 项相关回归 1126 pass / 0 fail / 16 skip / 47 TODO；真实强杀、Unknown、精确包与 macOS/Linux 物理口通过；无证据保留 blocker，不关闭 O-01 整体 | root | 待非作者复审 |
+| [CUT-04-R6-C](PTY-RESTART-RECOVERY-2026-10-16.md) | O-01 跨重启物理接管 | REVIEW | R12-01～05 已修且三名非作者复验通过；clean537/精确包/1214相关回归及Linux物理口通过；旧夹具R12-06已修并复验。R12-U1一次物理Unknown仍OPEN，40次有内层取证未复现，保留后续计划，不关闭O-01整体 | root | r6c_protocol_review、r6c_ownership_review、r6c_observation_review |
 | [CUT-03-R6](REMAINING-REPAIRS-2026-10-16.md) | T-01 原件捕获、冷恢复、消费者切换和旧路径退出 | READY | 先冻结 D-02 与旧数据/cut 处置，再完成一条真实单 owner 捕获链；不把描述符或双写算完成 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-A](REMAINING-REPAIRS-2026-10-16.md) | GAP-091 纯契约及编译/消费者边界 | READY | 真实正反编译与注入能力证明，不能只改目录或外观入口 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-B](REMAINING-REPAIRS-2026-10-16.md) | GAP-092 完整 wire 总预算 | READY | 先明确最小可接纳预算和预执行拒绝通道，再以实际编码限制完整结果 | root（计划） | 待非作者复审 |

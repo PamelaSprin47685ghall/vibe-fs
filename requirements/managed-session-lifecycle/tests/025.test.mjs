@@ -19,6 +19,7 @@ import { withAdmissionWorkers } from './support/pty-admission.mjs'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import { hostPort } from '../../interaction-authority/tests/support/authority.mjs'
+import { createHmac } from 'node:crypto'
 
 test('WHAT[managed-session-lifecycle-025] another process cannot reserve a PTY after the work round stops admission', { timeout: 20000 }, async () => {
   await withAdmissionWorkers('stop-first', async (producer, stopper) => {
@@ -444,6 +445,165 @@ test('WHAT[managed-session-lifecycle-025] SIGKILL after Reserve COMMIT before ph
     assert.equal(existsSync(marker), false)
   }, { realBackend: true, runtime: 'node' })
 })
+
+for (const runtime of ['node', 'bun']) {
+  for (const afterCommit of [false, true]) {
+    test(`WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost ${afterCommit ? 'after' : 'before'} COMMIT preserves failure and never replays (${runtime})`, { timeout: 30000 }, async t => {
+      if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+      await withAdmissionWorkers(`cold-ended-unknown-${runtime}-${afterCommit}`, async (producer, other, workspace, start) => {
+        const marker = join(workspace, 'recovered-target')
+        const launches = join(workspace, 'recovered-launches')
+        const release = join(workspace, 'recovered-release')
+        const opened = await producer.call('open', `printf 'launched\\n' >> '${launches}'; printf '%s' "$$" > '${marker}'; while [ ! -f '${release}' ]; do sleep 0.05; done; exit 23`)
+        assert.equal(opened.ok, true, opened.error)
+        const pid = await awaitPtyTarget(marker)
+        try {
+          const exited = new Promise(resolve => producer.process.once('exit', resolve))
+          producer.process.kill('SIGKILL')
+          await exited
+          const restarted = await start()
+          const { result, injected } = await restarted.call('stop', null, { lose: { command: 'Ended', afterCommit } })
+          assert.equal(injected, true)
+          assert.equal(result.finished, false)
+          assert.match(result.failure, /Ended was not acknowledged: Unknown/)
+          assert.equal((await other.call('blockers')).length, afterCommit ? 0 : 1)
+          await requirePtyTargetReaped(pid)
+          const retry = await start()
+          const stopped = await retry.call('stop')
+          assert.equal(stopped.finished, true, stopped.failure)
+          assert.deepEqual(await retry.call('blockers'), [])
+          assert.equal(readFileSync(launches, 'utf8'), 'launched\n')
+        } finally {
+          writeFileSync(release, '')
+          await requirePtyTargetReaped(pid)
+        }
+      }, { realBackend: true, runtime })
+    })
+  }
+}
+
+for (const runtime of ['node', 'bun']) {
+  for (const corruption of ['proof', 'instance']) {
+    test(`WHAT[managed-session-lifecycle-025] a foreign ${corruption} receipt preserves the exact blocker while another PTY drains (${runtime})`, { timeout: 30000 }, async t => {
+      if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+      await withAdmissionWorkers(`foreign-receipt-${runtime}-${corruption}`, async (producer, other, workspace, start) => {
+        const { readdirSync } = await import('node:fs')
+        const root = join(workspace, '.git', 'wanxiangshu', 'pty')
+        const locate = marker => readdirSync(root).map(key => join(root, key)).find(directory => JSON.parse(readFileSync(join(directory, 'request'), 'utf8')).command.includes(marker))
+        const launches = join(workspace, 'launches')
+        const prior = await producer.call('open', `printf 'prior\\n' >> '${launches}'; exit 23`)
+        assert.equal(prior.ok, true, prior.error)
+        const priorDirectory = locate('prior')
+        const deadline = Date.now() + 5000
+        while (!existsSync(join(priorDirectory, 'terminal'))) {
+          assert.ok(Date.now() < deadline, 'the prior physical instance must seal its actual exit first')
+          await new Promise(resolve => setTimeout(resolve, 10))
+        }
+        await producer.call('close', prior.id)
+        assert.deepEqual(await other.call('blockers'), [])
+        const oldReceipt = JSON.parse(readFileSync(join(priorDirectory, 'terminal'), 'utf8'))
+        const markers = ['unverifiable', 'drainable'].map(label => join(workspace, label))
+        const opened = []
+        const pids = []
+        let forged
+        try {
+          for (const marker of markers) {
+            const result = await producer.call('open', `printf '${marker.split('/').at(-1)}\\n' >> '${launches}'; printf '%s' "$$" > '${marker}.tmp'; mv '${marker}.tmp' '${marker}'; while [ ! -f '${marker}-release' ]; do sleep 0.05; done; exit 23`)
+            assert.equal(result.ok, true, result.error)
+            opened.push(result.id)
+            pids.push(await awaitPtyTarget(marker))
+          }
+          const directory = locate(markers[0])
+          const request = JSON.parse(readFileSync(join(directory, 'request'), 'utf8'))
+          forged = join(directory, 'terminal')
+          if (corruption === 'instance') oldReceipt.proof = createHmac('sha256', request.secret).update(JSON.stringify(oldReceipt.receipt)).digest('hex')
+          const exited = new Promise(resolve => producer.process.once('exit', resolve))
+          producer.process.kill('SIGKILL')
+          await exited
+          writeFileSync(forged, JSON.stringify(oldReceipt))
+          const restarted = await start()
+          const stopped = await restarted.call('stop')
+          assert.equal(stopped.finished, false)
+          assert.match(stopped.failure, corruption === 'proof' ? /proof mismatch/ : /instance mismatch/)
+          assert.deepEqual(await other.call('blockers'), [opened[0]])
+          assert.doesNotThrow(() => process.kill(pids[0], 0), 'the mismatched evidence must not authorize a signal')
+          await requirePtyTargetReaped(pids[1])
+          rmSync(forged)
+          forged = undefined
+          const retry = await start()
+          const finished = await retry.call('stop')
+          assert.equal(finished.finished, true, finished.failure)
+          assert.deepEqual(await retry.call('blockers'), [])
+          assert.equal(readFileSync(launches, 'utf8'), 'prior\nunverifiable\ndrainable\n')
+        } finally {
+          if (forged) rmSync(forged, { force: true })
+          for (const marker of markers) writeFileSync(`${marker}-release`, '')
+          for (const pid of pids) await requirePtyTargetReaped(pid)
+        }
+      }, { realBackend: true, runtime })
+    })
+  }
+}
+
+for (const runtime of ['node', 'bun']) {
+  for (const scenario of ['late-not-started', 'stream-loss', ...(runtime === 'node' ? ['missing-bun'] : [])]) {
+    test(`WHAT[managed-session-lifecycle-025] local ${scenario} preserves its exact evidence kind (${runtime})`, { timeout: 20000 }, async t => {
+      if (scenario !== 'missing-bun' && spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+      const helper = fileURLToPath(new URL('./support/pty-local-evidence.mjs', import.meta.url))
+      await promisify(execFile)(runtime, [helper, scenario], { timeout: 15000 })
+    })
+  }
+
+  test(`WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (${runtime})`, { timeout: 30000 }, async t => {
+    if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+    await withAdmissionWorkers(`mixed-recovery-${runtime}`, async (producer, restarted, workspace) => {
+      const { readdirSync } = await import('node:fs')
+      const root = join(workspace, '.git', 'wanxiangshu', 'pty')
+      const oldMarker = join(workspace, 'old-target')
+      const localMarker = join(workspace, 'local-target')
+      const launches = join(workspace, 'launches')
+      const release = join(workspace, 'old-release')
+      const old = await producer.call('open', `printf 'old\\n' >> '${launches}'; printf '%s' "$$" > '${oldMarker}.tmp'; mv '${oldMarker}.tmp' '${oldMarker}'; while [ ! -f '${release}' ]; do sleep 0.05; done; exit 23`)
+      assert.equal(old.ok, true, old.error)
+      const oldPid = await awaitPtyTarget(oldMarker)
+      const oldDirectory = readdirSync(root).map(key => join(root, key)).find(path => JSON.parse(readFileSync(join(path, 'request'), 'utf8')).command.includes(oldMarker))
+      let localMembers = []
+      try {
+        const exited = new Promise(resolve => producer.process.once('exit', resolve))
+        producer.process.kill('SIGKILL')
+        await exited
+        const local = await restarted.call('open', `printf 'local\\n' >> '${launches}'; printf '%s' "$$" > '${localMarker}.tmp'; mv '${localMarker}.tmp' '${localMarker}'; exec sleep 60`)
+        assert.equal(local.ok, true, local.error)
+        const localPid = await awaitPtyTarget(localMarker)
+        const tty = spawnSync('ps', ['-p', String(localPid), '-o', 'tty='], { encoding: 'utf8' }).stdout.trim()
+        assert.ok(tty && tty !== '??')
+        localMembers = spawnSync('ps', ['-t', tty, '-o', 'pid='], { encoding: 'utf8' }).stdout.trim().split(/\s+/).map(Number)
+        const directory = readdirSync(root).map(key => join(root, key)).find(path => JSON.parse(readFileSync(join(path, 'request'), 'utf8')).command.includes(localMarker))
+        const owner = JSON.parse(readFileSync(join(directory, 'available'), 'utf8')).owner
+        process.kill(owner, 'SIGKILL')
+        await new Promise(resolve => setTimeout(resolve, 100))
+        const stopped = await restarted.call('stop')
+        assert.equal(stopped.finished, false)
+        assert.match(stopped.failure, /PTY owner|PTY.*unknown|PTY.*unavailable/i)
+        assert.deepEqual(await restarted.call('blockers'), [local.id])
+        await assert.rejects(restarted.call('close', local.id), /PTY owner|PTY.*unknown|PTY.*unavailable/i)
+        await requirePtyTargetReaped(oldPid)
+        assert.equal(readFileSync(launches, 'utf8'), 'old\nlocal\n')
+      } finally {
+        writeFileSync(release, '')
+        for (const pid of localMembers) {
+          assert.ok(Number.isInteger(pid) && pid > 1)
+          try { process.kill(pid, 'SIGKILL') } catch (error) {
+            if (error.code !== 'ESRCH') throw error
+          }
+        }
+        const deadline = Date.now() + 5000
+        while (!existsSync(join(oldDirectory, 'terminal')) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 10))
+        await requirePtyTargetReaped(oldPid)
+      }
+    }, { realBackend: true, runtime })
+  })
+}
 
 for (const runtime of ['node', 'bun']) {
   test(`WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (${runtime})`, { timeout: 30000 }, async t => {

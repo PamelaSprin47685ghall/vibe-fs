@@ -45,8 +45,8 @@ export const withAdmissionWorkers = (label, action, { realBackend = false, runti
         const request = pending.get(message.id)
         if (!request) return
         pending.delete(message.id)
-        if (message.error) {
-          const error = new Error(message.error)
+        if (Object.hasOwn(message, 'error')) {
+          const error = new Error(message.error ?? 'PTY worker failed without a diagnostic')
           request.reject(error)
           for (const waiter of barrierWaiters.values()) waiter.reject(error)
         }

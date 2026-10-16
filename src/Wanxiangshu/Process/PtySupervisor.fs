@@ -347,6 +347,16 @@ module PtySupervisor =
         with _ ->
             ()
 
+    let completeNotStarted (supervisor: PtySupervisor) (port: PtyPort) (id: PtyId) reason =
+        match tryGet supervisor id with
+        | None -> ()
+        | Some session ->
+            session.Closed <- true
+            completeExitOnce session
+            failPending (drop supervisor id) reason
+            port.FailRead(id, reason)
+            port.CompleteNotStarted(id, reason)
+
     let private killUnlessClosed (session: PtySession) =
         if not session.Closed then
             killOrphanTerm session.Backend

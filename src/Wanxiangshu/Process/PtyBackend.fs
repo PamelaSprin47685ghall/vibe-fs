@@ -3,6 +3,7 @@ namespace Wanxiangshu.Process
 open System
 open System.Threading
 open System.Threading.Tasks
+open Fable.Core.JsInterop
 
 /// Production PTY backend: drives bun-pty under the OpenCode/Bun host.
 /// All per-PTY state lives in PtySession/PtySupervisor; this file keeps the
@@ -38,11 +39,18 @@ module PtyBackend =
         | Some _ -> Task.FromResult(())
         | None -> ensureSpawn super
 
+    let private observeNotStarted recovery super port id (term: obj) =
+        match recovery with
+        | Some _ -> term?onNotStarted (completeNotStarted super port id) |> ignore
+        | None -> ()
+
     let private spawnLoaded super (port: PtyPort) id cmd cwd recovery exitTcs =
         task {
             try
                 let term = spawnTerm super cmd cwd recovery
                 attach super port id term exitTcs
+
+                observeNotStarted recovery super port id term
                 return Ok()
             with ex ->
                 let msg = sprintf "PTY startup outcome is unknown: %s" ex.Message

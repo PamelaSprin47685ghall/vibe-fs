@@ -87,6 +87,9 @@ module private PtyRecoveryNative =
     [<Emit("$0.end()")>]
     let endSocket (_socket: obj) : unit = jsNative
 
+    [<Emit("$0.end($1)")>]
+    let finishSocket (_socket: obj) (_finished: unit -> unit) : unit = jsNative
+
     let objectOf fields = createObj fields
 
     let require condition reason =
@@ -234,7 +237,10 @@ module private PtyRecoveryNative =
             )
 
         on child "error" (fun error ->
-            receipt directory request (objectOf [ "kind", box "NotStarted"; "reason", box (message error) ]))
+            try
+                receipt directory request (objectOf [ "kind", box "NotStarted"; "reason", box (message error) ])
+            finally
+                removeEndpoint request)
 
         child?unref () |> ignore
 
@@ -265,23 +271,27 @@ module private PtyRecoveryWorker =
                 if not (N.absent controller) then
                     send controller frame
 
-            let endOwner result =
-                N.receipt directory request result
-                settled <- true
-                N.clearTimer stateTimer
-                notify (N.objectOf [ "kind", box "terminal"; "result", result ])
-
-                if not (N.absent controller) then
-                    N.endSocket controller
-
-                server?close () |> ignore
-
+            let exitOwnerSoon () =
                 N.timer
                     (fun () ->
                         N.removeEndpoint request
                         N.runtime?exit 0)
                     0
                 |> ignore
+
+            let endOwner result =
+                N.receipt directory request result
+                settled <- true
+                N.clearTimer stateTimer
+                notify (N.objectOf [ "kind", box "terminal"; "result", result ])
+                server?close () |> ignore
+                N.timer exitOwnerSoon 5000 |> ignore
+
+                if N.absent controller then
+                    exitOwnerSoon ()
+                else
+                    N.on controller "close" (fun _ -> exitOwnerSoon ())
+                    N.finishSocket controller exitOwnerSoon
 
             let fail reason =
                 N.publish directory "fault" (N.objectOf [ "incarnation", request?incarnation; "reason", box reason ])
@@ -449,6 +459,7 @@ module internal PtyRecovery =
 
     let private createClient directory (request: obj) mode =
         let exits = ResizeArray<obj -> unit>()
+        let unstarted = ResizeArray<string -> unit>()
         let faults = ResizeArray<string -> unit>()
         let data = ResizeArray<string -> unit>()
         let pending = Queue<int * float * obj>()
@@ -468,7 +479,10 @@ module internal PtyRecovery =
                 N.closeSocket socket
                 N.deliver faults reason
 
-        let complete result =
+        let acceptsTerminal (result: obj) =
+            mode = "recover" || result?kind = "Ended"
+
+        let completeStored result =
             let stored =
                 N.terminal directory request
                 |> Option.defaultWith (fun () -> invalidOp "PTY terminal is not durable")
@@ -476,15 +490,21 @@ module internal PtyRecovery =
             N.require (JS.JSON.stringify stored = JS.JSON.stringify result) "PTY terminal acknowledgement mismatch"
             N.clearTimer timer
 
-            if stored?kind = "NotStarted" then
-                fail ("PTY owner did not start the command: " + unbox<string> stored?reason)
-
             completion <- result
+
+            if stored?kind = "NotStarted" then
+                failure <- None
 
             N.closeSocket socket
 
-            if stored?kind = "Ended" then
+            if stored?kind = "NotStarted" && mode = "creator" then
+                N.deliver unstarted stored?reason
+            else
                 N.deliver exits result
+
+        let complete result =
+            if N.absent completion && (failure.IsNone || result?kind = "NotStarted") then
+                completeStored result
 
         let flushPending () =
             for _, _, frame in pending.ToArray() do
@@ -516,13 +536,23 @@ module internal PtyRecovery =
             if N.absent completion then
                 N.terminal directory request |> Option.iter complete
 
+        let readNotStarted () =
+            if mode = "creator" && N.absent completion then
+                N.terminal directory request
+                |> Option.filter (fun result -> result?kind = "NotStarted")
+                |> Option.iter complete
+
         let requireTerminal () =
             if N.absent completion then
                 fail "PTY owner connection was lost"
 
+        let readDisconnectedTerminal () =
+            if mode = "recover" then
+                readTerminal ()
+
         let disconnected _ =
             try
-                readTerminal ()
+                readDisconnectedTerminal ()
                 requireTerminal ()
             with error ->
                 fail error.Message
@@ -540,10 +570,16 @@ module internal PtyRecovery =
                 let _, requestedAt, _ = pending.Peek()
                 checkDeadline requestedAt
 
+        let readPolledTerminal () =
+            if mode = "recover" || N.absent socket then
+                readTerminal ()
+            else
+                readNotStarted ()
+
         let rec poll () =
             try
                 trimAcknowledged ()
-                readTerminal ()
+                readPolledTerminal ()
                 checkStartup ()
                 checkPending ()
             with error ->
@@ -601,6 +637,12 @@ module internal PtyRecovery =
 
             failure |> Option.iter invalidOp
 
+        let signal value =
+            readNotStarted ()
+
+            if N.absent completion || completion?kind <> "NotStarted" then
+                enqueue "signal" [ "signal", box value ]
+
         connect () |> ignore
         timer <- N.timer poll 10
 
@@ -609,8 +651,14 @@ module internal PtyRecovery =
               box (fun listener ->
                   exits.Add listener
 
-                  if not (N.absent completion) && completion?kind = "Ended" then
+                  if not (N.absent completion) && acceptsTerminal completion then
                       listener completion)
+              "onNotStarted",
+              box (fun listener ->
+                  unstarted.Add listener
+
+                  if mode = "creator" && not (N.absent completion) && completion?kind = "NotStarted" then
+                      listener completion?reason)
               "onFault",
               box (fun listener ->
                   faults.Add listener
@@ -618,7 +666,7 @@ module internal PtyRecovery =
               "onData", box (fun listener -> data.Add listener)
               "write", box (fun text -> enqueue "write" [ "text", box text ])
               "resize", N.function2 (fun width height -> enqueue "resize" [ "width", box width; "height", box height ])
-              "signal", box (fun signal -> enqueue "signal" [ "signal", box signal ])
+              "signal", box signal
               "inspect",
               box (fun () ->
                   N.objectOf

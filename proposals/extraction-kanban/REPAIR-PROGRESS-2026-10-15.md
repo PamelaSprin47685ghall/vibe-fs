@@ -2,6 +2,18 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第十二批：R6-C 复审与修正（2026-10-16）
+
+从干净 `9a89db96a` 对照 `81cb278a5` 复审，确认并修正五项：**R12-01/P1**（creator 越过未读输出完成）、**R12-02/P2**（恢复途中有效 NotStarted 误报 Unknown）、**R12-03/P2**（原 Host 无法收束即时或迟到的确切未启动）、**R12-04/P2**（一个本地失败阻断其他旧实例恢复）、**R12-05/P2**（真实 spawn 失败留下空端点）。均为 R6-C 新增问题，不归给原拆分。正常完成沿有序流交付输出；NotStarted 保留独立类型和原因；只有确认 Drain 才恢复无本地绑定的旧实例，本地输出故障和 Unknown 不被物理回执掩盖。命令不重发。
+
+三名获授权的非作者分别验证协议身份、Host/Ownership 和观察，536 的九个入口场景、十二例持久边界、三个端点/慢流探针通过，所审范围未留已确认 P1/P2。正式 003 原反例 **1 pass / 7 fail**、修后 **8/8**；本地/混合七项原 **2 pass / 5 fail** 转绿，另加两项 stalled TERM 负控。本次无界 await TERM 的草稿风险在构建前被独立指出，最终沿同一 grace deadline 有界等待，不归给原交付。
+
+另修 **R12-06，81cb 已有夹具缺陷**：Fable Exception 无 stack，worker 的失败被当 undefined 成功；新增真实 close 断言先 **0/2**，载荷和父端守卫修后独立 **2/2**。一次聚焦 **24/25** 的旧回执前置失败，已用实际 SQLite PRAGMA 锁与显式 exact close 重试定因；不增加超时或放宽 Unknown。相关夹具六项 **6/6**。Bun builtin 钩子、旧 onFault 预期、嵌套门禁和初版红测清理问题均单列，不冒充产品缺陷。
+
+最终生产 clean **537**；不重叠回归 **1214 / 1151 pass / 0 普通 fail / 16 skip / 47 TODO**，其中夹具修改后的完整 Ownership 链 537 **558 / 529 pass / 0 / 5 skip / 24 TODO**，Process/provider 在同生产字节 536 通过。精确包 **2075 members / 13,272,635 bytes**，摘要 `63de43ac854bf7958627cb1cbde66f51a3584e2ac9cd5c5989e82aa5c0c290b3`，隔离消费、Node/Bun/OpenCode 原监管及新观察均通过；537 重包字节相同。Linux 当前物理口七接管加八观察场景通过，未冒称完整 Host/SQLite。format/check 通过，独立库/vendor 未改。
+
+132 轮诊断另有一次缺少内层保全的物理 Unknown，blocker 保留；**R12-U1 保持 OPEN**。有内层观察的后续 Node/Bun 各 20 次均确切结束，但未复现不等于定因或修复，因此本包仍 REVIEW，报告已列保全、分层对照及正式反例验收计划。不关闭 O-01/GAP-133 整体、Trace 或其他剩余边界。[完整归因与验收证据](PTY-RESTART-RECOVERY-2026-10-16.md#独立复审与修正2026-10-16)。
+
 ## 第十一批：跨重启物理接管 R6-C（2026-10-16）
 
 输入干净主仓 `81cb278a5`、库 `b6984d9 / 0.6.2`。先以真实 PtyScope 验证独立 owner 原型，再接回 Process/Host/ToolRuntimeScope/Load；没有修改独立库或 vendor。不可覆盖的准备记录绑定 exact lease/incarnation，私有连接只允许一个控制者；creator 才可首次启动和交互，恢复端仅查询与 TERM/KILL。重启不重发命令或输入，只有原生退出且监管范围结束的确切回执、或物理 owner 明确封存的 NotStarted，才尝试持久清账。

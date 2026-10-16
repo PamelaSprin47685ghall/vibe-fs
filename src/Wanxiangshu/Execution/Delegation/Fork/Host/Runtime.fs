@@ -128,6 +128,20 @@ module private HostPtyOwnership =
         |> ownership.Execute("ended:pty:" + ptyId + ":" + incarnationId)
         |> requireObserved "Ended"
 
+    let notStarted (ownership: Owner) id lease incarnation reason =
+        DurableWorkHost.ownershipMessage
+            "NotStarted"
+            [ "lease", DurableWorkHost.leaseObject lease; "reason", box reason ]
+        |> ownership.Execute("not-started:pty:" + id + ":" + incarnation)
+        |> requireObserved "NotStarted"
+
+    let settleLocal ownership id lease incarnation =
+        function
+        | PtyExitEvent.NotStarted(_, reason) -> notStarted ownership id lease incarnation reason
+        | PtyExitEvent.Exited _ -> ended ownership id lease incarnation "Completed"
+        | PtyExitEvent.Failed _ -> ended ownership id lease incarnation "Failed"
+        | PtyExitEvent.Aborted _ -> ended ownership id lease incarnation "Cancelled"
+
     let unsettledIds (ownership: Owner) (scopeId: string) : string list =
         ownership.Blockers scopeId
         |> List.map (fun item ->
@@ -173,12 +187,7 @@ module private HostPtyOwnership =
         match result with
         | PtyRecoveryExit.Ended(incarnation, stopped, _, _) ->
             ended ownership id lease incarnation (if stopped then "Cancelled" else "Completed")
-        | PtyRecoveryExit.NotStarted(incarnation, reason) ->
-            DurableWorkHost.ownershipMessage
-                "NotStarted"
-                [ "lease", DurableWorkHost.leaseObject lease; "reason", box reason ]
-            |> ownership.Execute("not-started:pty:" + id + ":" + incarnation)
-            |> requireObserved "NotStarted"
+        | PtyRecoveryExit.NotStarted(incarnation, reason) -> notStarted ownership id lease incarnation reason
 
     let private recoverBlocker ownership commonDir (blocker: DurableWorkHost.OwnershipBlocker) =
         task {
@@ -208,11 +217,16 @@ module private HostPtyOwnership =
                     )
         }
 
-    let recoverRun ownership commonDir root runId =
+    let recoverRun ownership commonDir root runId localIds =
         task {
             let failures = ResizeArray<exn>()
+            let localResources = localIds |> List.map (fun id -> "pty:" + id)
 
-            for blocker in runBlockers ownership root runId do
+            let unbound =
+                runBlockers ownership root runId
+                |> List.filter (fun blocker -> not (List.contains blocker.Lease.ResourceId localResources))
+
+            for blocker in unbound do
                 let! failure = recoverBlocker ownership commonDir blocker
                 failure |> Option.iter failures.Add
 
@@ -629,7 +643,7 @@ type HostForkRuntime
     // DSL-MUTABLE: resource — active PTY lease and incarnation binding by PtyId
     let ptyLeases = Dictionary<string, OwnedPty>()
     // DSL-MUTABLE: resource — exact exit observations awaiting an ownership acknowledgement.
-    let ptyExitObservations = Dictionary<string, PtyJoinItem * string>()
+    let ptyExitObservations = Dictionary<string, PtyExitEvent>()
     // DSL-MUTABLE: resource — prevents new local PTYs during a run's exit drain.
     let mutable ptyClosing = false
     // DSL-MUTABLE: resource — permanent detach closes local admission even if its durable Drain fails.
@@ -733,6 +747,13 @@ type HostForkRuntime
                   Closed = true
                   Code = code
                   Message = msg }
+        | PtyExitEvent.NotStarted(id, reason) ->
+            PtyFailed
+                { PtyId = id.Value
+                  Outcome = reason
+                  Closed = true
+                  Code = "PTY_NOT_STARTED"
+                  Message = reason }
         | PtyExitEvent.Aborted(id, code, msg) ->
             PtyAborted
                 { PtyId = id.Value
@@ -741,23 +762,19 @@ type HostForkRuntime
                   Code = code
                   Message = msg }
 
-    let exitOutcomeOf (event: PtyExitEvent) =
-        match event with
-        | PtyExitEvent.Exited _ -> "Completed"
-        | PtyExitEvent.Failed _ -> "Failed"
-        | PtyExitEvent.Aborted _ -> "Cancelled"
-
     let releasePtyExitSubscription () =
         lock gate (fun () ->
             if (ptyDetachRequested || runtime.IsCancelled) && ptyLeases.Count = 0 then
                 ptyExitSubscription |> Option.iter (fun subscription -> subscription.Dispose())
                 ptyExitSubscription <- None)
 
-    let settlePtyLease (id: string) (outcome: string) =
+    let settlePtyLease (event: PtyExitEvent) =
+        let id = event.Id.Value
+
         lock gate (fun () ->
             match ptyLeases.TryGetValue id with
             | true, owned ->
-                HostPtyOwnership.ended ptyOwnership id owned.Lease owned.IncarnationId outcome
+                HostPtyOwnership.settleLocal ptyOwnership id owned.Lease owned.IncarnationId event
                 ptyLeases.Remove id |> ignore
                 ptyExitObservations.Remove id |> ignore
             | false, _ -> ()
@@ -782,9 +799,9 @@ type HostForkRuntime
                 | false, _ -> None)
 
         match observed with
-        | Some(item, outcome) ->
-            settlePtyLease id outcome
-            notifyPtyObservers item
+        | Some event ->
+            settlePtyLease event
+            notifyPtyObservers (mapExitEvent event)
         | None -> ()
 
     do
@@ -798,14 +815,11 @@ type HostForkRuntime
                     if owned then
                         // A PtyPort can be shared by multiple runtimes. Its sender fan-out
                         // must not turn another runtime's exit into this runtime's join.
-                        let outcome = exitOutcomeOf exitEvent
-                        lock gate (fun () -> ptyExitObservations.[id] <- (item, outcome))
+                        lock gate (fun () -> ptyExitObservations.[id] <- exitEvent)
                         runtime.PublishPtyCompletion item
-                        settlePtyLease id outcome
+                        settlePtyLease exitEvent
                         notifyPtyObservers item)
             )
-    // Cross-process recovery is not wired into ordinary HostForkRuntime lifecycle.
-    // HostForkRestart remains a detached algorithm library for explicit resume flows.
 
     member internal _.Runtime = runtime
     member internal _.Children = children
@@ -1432,7 +1446,7 @@ type HostForkRuntime
             HostPtyOwnership.openRun ownership root runId
             |> HostPtyOwnership.drain ownership
 
-            do! HostPtyOwnership.recoverRun ownership commonDir root runId
+            do! HostPtyOwnership.recoverRun ownership commonDir root runId []
             HostPtyOwnership.requireRunSettled ownership root runId
         }
 
@@ -1464,14 +1478,22 @@ type HostForkRuntime
 
             let! closeFailure = captureOwnedWorkFailure (fun () -> this.ClosePtySnapshot(ids, None) :> Task)
 
-            match stopFailure, closeFailure with
-            | Some failure, _
-            | None, Some failure -> raise failure
-            | None, None -> ()
+            let! recoveryFailure =
+                captureOwnedWorkFailure (fun () ->
+                    task {
+                        match stopFailure, ownershipCommonDir with
+                        | None, Some directory ->
+                            let localIds = lock gate (fun () -> ptyLeases.Keys |> Seq.toList)
+                            do! HostPtyOwnership.recoverRun ptyOwnership directory ptyRootScopeId runId localIds
+                        | _ -> ()
+                    }
+                    :> Task)
 
-            match ownershipCommonDir with
-            | Some directory -> do! HostPtyOwnership.recoverRun ptyOwnership directory ptyRootScopeId runId
-            | None -> ()
+            match stopFailure, closeFailure, recoveryFailure with
+            | Some failure, _, _
+            | None, Some failure, _
+            | None, None, Some failure -> raise failure
+            | None, None, None -> ()
 
             HostPtyOwnership.requireRunSettled ptyOwnership ptyRootScopeId runId
         }

@@ -12,6 +12,7 @@ type PtyPort =
     member ClosePty: id: PtyId * ?graceMs: int -> Task<unit>
     member CloseAll: ?graceMs: int -> Task<unit>
     member Complete: id: PtyId * ?outcome: Result<string, string> -> unit
+    member CompleteNotStarted: id: PtyId * reason: string -> unit
     member CompleteAborted: id: PtyId * ?message: string -> unit
     member Exists: id: PtyId -> bool
     member FailRead: id: PtyId * reason: string -> unit

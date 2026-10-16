@@ -7,14 +7,23 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 module private PtyPortSupport =
+    [<Emit("performance.now()")>]
+    let nowMilliseconds () : float = jsNative
+
+    [<Emit("Promise.race([$0, $1])")>]
+    let firstCompletion (first: Task) (second: Task) : Task = jsNative
+
     [<Emit("$0.catch(() => {})")>]
     let observeExitFailure (_task: Task) : unit = jsNative
 
     let invokeTerminate (handler: PtyBackendHandler) (id: PtyId) =
-        try
-            handler id (PtyCommand.Signal PtySignal.Terminate) |> ignore
-        with _ ->
-            ()
+        task {
+            try
+                let! _ = handler id (PtyCommand.Signal PtySignal.Terminate)
+                return ()
+            with _ ->
+                return ()
+        }
 
     let claimClosedFlag (closed: bool ref) =
         lock closed (fun () ->
@@ -84,6 +93,11 @@ module private PtyPortSupport =
         | true, t -> Some t
         | false, _ -> None
 
+    let terminationOrExit (termination: Task) exitTask failed =
+        match exitTask with
+        | Some witness when not failed -> firstCompletion termination witness
+        | _ -> termination
+
     let applyKill (handler: PtyBackendHandler) (exitTask: Task) (id: PtyId) =
         task {
             let! killResult = handler id (PtyCommand.Signal PtySignal.Kill)
@@ -108,7 +122,7 @@ module private PtyPortSupport =
         }
 
 /// Typed PTY lifecycle boundary. A backend receives commands; completion events
-/// are supplied by Complete and share every registered exit listener.
+/// are supplied by confirmed exit or no-start evidence to every listener.
 type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) as this =
     let handler = defaultArg handler (fun _ _ -> Task.FromResult(Ok()))
     // DSL-MUTABLE: resource — exit listener callback registry
@@ -152,8 +166,7 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
 
     /// Owner-initiated terminate: marks abort-pending + sends TERM. Does NOT
     /// remove from active, does NOT mark closed, does NOT FailRead, does NOT
-    /// publish completion. Completion belongs exclusively to the backend's
-    /// onExit → Complete path, which emits PtyAborted when abort-pending.
+    /// publish completion. The backend must confirm exit or explicit no-start.
     let requestTerminate (id: PtyId) =
         let live =
             lock gate (fun () ->
@@ -165,12 +178,10 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
 
         if live then
             PtyPortSupport.invokeTerminate handler id
+        else
+            Task.FromResult(())
 
-    /// Complete from a backend exit (onExit). This is the ONLY path that
-    /// publishes completion to exit listeners. Removes from active, marks
-    /// closed, fails any parked reader, then delivers the completion.
-    /// Physical abort (owner kill / parent cancel TERM|KILL) → Aborted;
-    /// natural exit → Exited; backend spawn/IO error → Failed.
+    /// Retire the local handle only after confirmed exit or explicit no-start.
     let completeFromExit (id: PtyId) (item: PtyExitEvent) =
         let target =
             lock gate (fun () ->
@@ -311,8 +322,7 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
         lock gate (fun () -> exitObservationFailures.[id] <- reason)
         this.FailRead(id, reason)
 
-    /// Complete from a backend exit (onExit). This is the ONLY path that
-    /// publishes completion to exit listeners.
+    /// Complete from a backend exit (onExit).
     /// If owner requested terminate (Close/CloseAll/TERM), emits Aborted;
     /// else Ok → Exited, Error → Failed. Tests may call CompleteAborted
     /// to force abort without the terminate mark.
@@ -332,6 +342,14 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
 
         completeFromExit id item
 
+    member this.CompleteNotStarted(id: PtyId, reason: string) =
+        lock gate (fun () ->
+            abortPending.Remove id |> ignore
+            exitTasks.Remove id |> ignore
+            exitObservationFailures.Remove id |> ignore)
+
+        completeFromExit id (PtyExitEvent.NotStarted(id, reason))
+
     /// Force Aborted (tests / callers that already know physical interrupt).
     member this.CompleteAborted(id: PtyId, ?message: string) =
         lock gate (fun () ->
@@ -343,9 +361,9 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
         completeFromExit id (PtyExitEvent.Aborted(id, "PTY_ABORTED", msg))
 
     /// Owner-initiated close: sends TERM only. Does NOT publish completion —
-    /// completion is delivered by the backend's onExit → Complete / CompleteAborted.
+    /// completion requires confirmed exit or explicit no-start from the backend.
     /// The caller must await the exit (via CloseAll or the registered exit task).
-    member this.Close(id: PtyId, ?outcome: Result<string, string>) : unit = requestTerminate id
+    member this.Close(id: PtyId, ?outcome: Result<string, string>) : unit = requestTerminate id |> ignore
 
     /// Async owner cleanup for a single PTY id: sends TERM, awaits exit with grace, then escalates to KILL if needed.
     member this.ClosePty(id: PtyId, ?graceMs: int) : Task<unit> =
@@ -355,11 +373,25 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
             let isLive = lock gate (fun () -> active.ContainsKey id)
 
             if isLive then
-                requestTerminate id
+                let deadline = PtyPortSupport.nowMilliseconds () + float grace
+                let termination = requestTerminate id :> Task
+
+                let dispatch =
+                    lock gate (fun () ->
+                        PtyPortSupport.terminationOrExit
+                            termination
+                            (PtyPortSupport.findExitTask exitTasks id)
+                            (exitObservationFailures.ContainsKey id))
+
+                let! _ = NodeTiming.raceExit dispatch grace
 
                 requireExitObservation id
                 let exitTaskOpt = lock gate (fun () -> PtyPortSupport.findExitTask exitTasks id)
-                do! PtyPortSupport.awaitRegisteredExit handler exitTaskOpt grace id
+
+                let remaining =
+                    max 0 (int (Math.Ceiling(deadline - PtyPortSupport.nowMilliseconds ())))
+
+                do! PtyPortSupport.awaitRegisteredExit handler exitTaskOpt remaining id
                 lock gate (fun () -> exitTasks.Remove id |> ignore)
         }
 
@@ -367,7 +399,7 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
     /// await exit for `termToKillGraceMs` (or the supplied override), then
     /// escalate to KILL. If KILL itself fails, propagate the error instead of
     /// waiting forever. The exitTask resolves via the backend's onExit, which
-    /// calls Complete (the only completion-publishing path). See SSOT §7.
+    /// confirms exit or explicit no-start. See SSOT §7.
     member this.CloseAll(?graceMs: int) : Task<unit> =
         let grace = max 0 (defaultArg graceMs PtyOutcome.termToKillGraceMs)
         let ids = lock gate (fun () -> active.Keys |> Seq.toList)

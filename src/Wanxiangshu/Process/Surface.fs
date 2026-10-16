@@ -805,6 +805,13 @@ module ProcessSurface =
                                   Closed = true
                                   Code = code
                                   Message = msg }
+                        | PtyExitEvent.NotStarted(id, reason) ->
+                            PtyFailed
+                                { PtyId = id.Value
+                                  Outcome = reason
+                                  Closed = true
+                                  Code = "PTY_NOT_STARTED"
+                                  Message = reason }
                         | PtyExitEvent.Aborted(id, code, msg) ->
                             PtyAborted
                                 { PtyId = id.Value
@@ -899,6 +906,13 @@ module ProcessSurface =
                                   Closed = true
                                   Code = code
                                   Message = msg }
+                        | PtyExitEvent.NotStarted(id, reason) ->
+                            PtyFailed
+                                { PtyId = id.Value
+                                  Outcome = reason
+                                  Closed = true
+                                  Code = "PTY_NOT_STARTED"
+                                  Message = reason }
                         | PtyExitEvent.Aborted(id, code, msg) ->
                             PtyAborted
                                 { PtyId = id.Value

@@ -6,6 +6,19 @@ import { execFile, spawnSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 
+for (const runtime of ['node', 'bun']) {
+  for (const scenario of ['paused-small', 'paused-large', 'truncated', ...(runtime === 'node' ? ['not-started-race', 'ended-race'] : [])]) {
+    test(`WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (${runtime}, ${scenario})`, { timeout: 15000 }, async t => {
+      if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the PTY owner')
+      const helper = fileURLToPath(new URL('./support/pty-recovery-observation.mjs', import.meta.url))
+      const { stdout } = await promisify(execFile)(runtime, [helper, scenario], { timeout: 12000 })
+      const evidence = JSON.parse(stdout.trim())
+      assert.equal(evidence.custodianExited, true)
+      assert.equal(evidence.commands, scenario === 'not-started-race' ? 0 : 1)
+    })
+  }
+}
+
 test('WHAT[process-execution-003] a durable PTY owner survives Host SIGKILL, refuses input replay and seals only its exact native outcome', { timeout: 30000 }, async t => {
   if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the PTY owner')
   const helper = fileURLToPath(new URL('./support/pty-recovery-probe.mjs', import.meta.url))
@@ -298,6 +311,34 @@ test('WHAT[process-execution-003] PORT_complete_removes_the_exit_task_entry', as
   portComplete(port, pid, { ok: true, value: 'done' })
   await portCloseAll(port, 0)
 })
+for (const mode of ['kill', 'exit']) {
+  test(`WHAT[process-execution-003] a stalled TERM handler cannot block confirmed exit or KILL (${mode})`, { timeout: 1500 }, async () => {
+    const signals = []
+    const exit = exitSignal()
+    let port
+    let pid
+    port = createPtyPort({ handler: (_id, command) => {
+      if (command.kind !== 'Signal') return success
+      signals.push(command.signal)
+      if (command.signal === 'SIGTERM') return new Promise(() => {})
+      if (command.signal === 'SIGKILL') {
+        portComplete(port, pid, success)
+        exit.resolve()
+      }
+      return success
+    } })
+    pid = forkDefault(port, `stalled-term-${mode}`)
+    portRegisterExitTask(port, pid, exit.promise)
+    const closing = portCloseAll(port, mode === 'exit' ? 5000 : 0)
+    if (mode === 'exit') {
+      portComplete(port, pid, success)
+      exit.resolve()
+    }
+    await closing
+    assert.equal(portExists(port, pid), false)
+    assert.deepEqual(signals, mode === 'exit' ? ['SIGTERM'] : ['SIGTERM', 'SIGKILL'])
+  })
+}
 test('WHAT[process-execution-003] unresolved startup cannot be overwritten by another spawn with the same PTY id', () => {
   const calls = []
   const port = createPtyPort({ handler: (pid, command) => { calls.push(command); return success } })
