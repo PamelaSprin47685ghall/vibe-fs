@@ -3,11 +3,16 @@ import { mkdtempSync, readFileSync, existsSync, writeFileSync, rmSync } from 'no
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { setTimeout as delay } from 'node:timers/promises'
+import { spawnSync } from 'node:child_process'
 import { dlopen } from 'bun:ffi'
-import { ptyScopeOpen } from '../../../../dist/Process/Surface.js'
+import {
+  ptyScopeOpen, supervisorCreate, supervisorAttach, createPtyPort, portFork,
+  ptyId, portCloseAll, portExists, portAddMailboxSender,
+} from '../../../../dist/Process/Surface.js'
 
 const native = dlopen(process.platform === 'darwin' ? '/usr/lib/libSystem.B.dylib' : 'libc.so.6', {
   getpgid: { args: ['i32'], returns: 'i32' },
+  getsid: { args: ['i32'], returns: 'i32' },
   setenv: { args: ['cstring', 'cstring', 'i32'], returns: 'i32' },
   unsetenv: { args: ['cstring'], returns: 'i32' },
 }).symbols
@@ -27,6 +32,22 @@ const waitFor = async (predicate, label) => {
 }
 const opened = []
 const targetPids = []
+const memberRows = owner => {
+  const sample = spawnSync('/bin/ps', ['-axo', 'pid=,ppid=,pgid=,stat='], { encoding: 'utf8' })
+  assert.equal(sample.status, 0)
+  return sample.stdout.trim().split('\n').map(line => {
+    const [pid, parent, group, state] = line.trim().split(/\s+/)
+    return { pid: Number(pid), parent: Number(parent), group: Number(group), state }
+  }).filter(row => row.pid === owner || row.parent === owner)
+}
+const anchorFor = scope => {
+  const target = scope.read('started').target
+  const anchors = memberRows(scope.term.pid).filter(row => row.parent === scope.term.pid && row.pid !== target)
+  assert.equal(anchors.length, 1)
+  assert.equal(anchors[0].group, target)
+  assert.equal(native.getsid(anchors[0].pid), scope.term.pid)
+  return anchors[0].pid
+}
 const open = async command => {
   const term = await ptyScopeOpen(command, process.cwd())
   const incarnation = term.inspect().incarnation
@@ -65,7 +86,75 @@ const open = async command => {
 
 const mode = process.argv[2]
 try {
-  if (mode === 'compiled-host') {
+  if (mode === 'stalled-owner' || mode === 'stalled-anchor') {
+    const scope = await open('printf STALL_READY; exec sleep 60')
+    await waitFor(() => scope.text().includes('STALL_READY'), 'stall target readiness')
+    const target = scope.read('started').target
+    const anchor = anchorFor(scope)
+    const paused = mode === 'stalled-owner' ? scope.term.pid : anchor
+    const id = ptyId(`pty-${mode}`)
+    const port = createPtyPort({ handler: async (_id, command) => {
+      if (command.kind === 'Signal') scope.term.signal(command.signal)
+      return { ok: true }
+    } })
+    portFork(port, 'unused', 'devops', id, undefined)
+    supervisorAttach(supervisorCreate(), port, id, scope.term)
+    const completions = []
+    portAddMailboxSender(port, value => completions.push(value))
+    try {
+      process.kill(paused, 'SIGSTOP')
+      await waitFor(() => memberRows(scope.term.pid).some(row => row.pid === paused && row.state.startsWith('T')), 'stopped supervisor')
+      let drain
+      const closing = portCloseAll(port, 100).then(() => { drain = 'resolved' }, error => { drain = error.message })
+      await waitFor(() => drain, 'bounded Unknown from an unresponsive supervisor')
+      await closing
+      assert.match(drain, /PTY .*timed out/)
+      assert.equal(scope.term.inspect().phase, 'Unknown')
+      assert.equal(portExists(port, id), true)
+      assert.equal(scope.exited(), undefined)
+      assert.deepEqual(completions, [])
+      assert.equal(alive(target), true)
+      if (mode === 'stalled-anchor') assert.ok(scope.term.inspect().forwardedSequence > 0)
+      console.log(JSON.stringify({ mode, boundedUnknown: true, portRetained: true, completions: 0 }))
+    } finally {
+      if (alive(paused)) process.kill(paused, 'SIGCONT')
+      await waitFor(() => !alive(scope.term.pid) && !alive(target) && !alive(anchor), 'stalled scope cleanup')
+    }
+  } else if (mode === 'direct-stop') {
+    const scope = await open('printf DIRECT_READY; exec sleep 60')
+    await waitFor(() => scope.text().includes('DIRECT_READY'), 'direct foreground readiness')
+    const target = scope.read('started').target
+    const anchor = anchorFor(scope)
+    try {
+      scope.term.write('\x1a')
+      await waitFor(() => memberRows(scope.term.pid).some(row => row.pid === target && row.state.startsWith('T')), 'direct target Ctrl-Z')
+      assert.equal(memberRows(scope.term.pid).find(row => row.pid === anchor).state.startsWith('T'), false, 'the group supervisor must remain runnable')
+      scope.signal('SIGKILL')
+      const ended = await scope.ended()
+      assert.deepEqual(ended.targetExit, { code: null, signal: 'SIGKILL' })
+      assert.equal(alive(target), false)
+      assert.equal(alive(anchor), false)
+      console.log(JSON.stringify({ mode, targetStopped: true, anchorRunnable: true, killed: true }))
+    } finally {
+      if (!scope.exited()) {
+        if (alive(anchor)) process.kill(anchor, 'SIGCONT')
+        scope.signal('SIGKILL')
+        await scope.ended()
+      }
+    }
+  } else if (mode === 'native-status') {
+    for (const signal of ['SIGUSR1', 'SIGUSR2', 'SIGQUIT', 'SIGTERM', 'SIGHUP', 'SIGINT', 'SIGKILL']) {
+      const scope = await open('ulimit -c 0; printf SIGNAL_READY; exec sleep 60')
+      await waitFor(() => scope.text().includes('SIGNAL_READY'), `${signal} readiness`)
+      scope.signal(signal)
+      assert.deepEqual((await scope.ended()).targetExit, { code: null, signal })
+    }
+    for (const code of [0, 130, 158, 159, 255]) {
+      const scope = await open(`exit ${code}`)
+      assert.deepEqual((await scope.ended()).targetExit, { code, signal: null })
+    }
+    console.log(JSON.stringify({ mode, nativeSignals: 7, distinctExitCodes: 5 }))
+  } else if (mode === 'compiled-host') {
     const expected = process.argv[3]
     if (expected === 'unset') delete process.env.BUN_BE_BUN
     else process.env.BUN_BE_BUN = expected

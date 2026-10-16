@@ -12,7 +12,9 @@
 
 ## 台账
 
-2026-10-16 PTY 监管补充：原 leader-exit 反例已在实际生产适配器转正，目标先退时保留 port/lease/blocker，控制终端会话内的后代和其他作业组退出后才结清；owner 丢失继续 Unknown。新增成员表空输出、缺活 owner、残行和冲突行负控，补真实编译型宿主启动及环境隔离。完整相关套件 705 项中 672 pass / 0 fail / 5 skip / 28 TODO，Linux 物理口四项通过。主动脱离控制终端、跨进程每轮准入和跨重启接管没有被这些证据覆盖，GAP-133 仍为 PARTIAL；见 [PTY 原型、试制问题和最终验收](../proposals/extraction-kanban/PTY-SUPERVISION-2026-10-16.md)。
+2026-10-16 PTY 独立复审补充：三名非作者确认并复验两项 P1（owner 无响应排空无界等、直接 Ctrl-Z 停 anchor）及一项 P2（Darwin 信号错名）的修正。宿主侧监督有限确认期限，转发或重复 KILL 不解除实际结束期限；组监管者保持可运行，目标退出由原生 waitpid 区分正常退出和本机信号。相关套件 **709 / 676 pass / 0 fail / 5 skip / 28 TODO**，精确包 Bun/OpenCode 隔离消费和 Linux 物理口九项通过；既有 marker 竞争单列测试夹具问题，不冒作产品回退。R6-A 仅在声明的控制终端会话范围进入 DONE；主动脱组、跨进程每轮准入和重启接管仍未覆盖，GAP-133 保持 PARTIAL。见 [PTY 原型、试制问题和独立验收](../proposals/extraction-kanban/PTY-SUPERVISION-2026-10-16.md)。
+
+2026-10-16 PTY 原修复证据：原 leader-exit 反例已在实际生产适配器转正，目标先退时保留 port/lease/blocker，控制终端会话内的后代和其他作业组退出后才结清；owner 丢失继续 Unknown。新增成员表空输出、缺活 owner、残行和冲突行负控，补真实编译型宿主启动及环境隔离。该轮相关套件 705 项中 672 pass / 0 fail / 5 skip / 28 TODO，Linux 物理口四项通过；成绩只属原交付 `fbd90f4d5`，不代替上述独立修正后的验收。
 
 2026-10-15 四模块修复：GAP-133 仍为 PARTIAL。managed-session-lifecycle [025](managed-session-lifecycle/tests/025.test.mjs) 的实际生产 bun-pty TERM→等待→KILL→exit 已在 macOS/Bun 1.3.14 运行并通过；同文件覆盖持久预留、真实退出结清、同步回执和丢提交回执，work 009/044 验证 strict scope 与冷父关系。只关闭该具体 PTY 物理观察缺口，不冒称所有取消/fatal、跨重启接管、隐藏执行树或跨进程每轮代际准入已证明。完整命令、包摘要和剩余边界见[本批修复记录](../proposals/extraction-kanban/REPAIR-PROGRESS-2026-10-15.md)。GAP-101、GAP-108、GAP-092 等原 TODO 不因本轮局部证明销项。
 

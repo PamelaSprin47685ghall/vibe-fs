@@ -43,9 +43,6 @@ module private PtyScopeNative =
     [<Emit("$0.once($1, $2)")>]
     let once1 (_source: obj) (_name: string) (_callback: obj -> unit) : unit = jsNative
 
-    [<Emit("$0.once('exit', $1)")>]
-    let onExit (_source: obj) (_callback: obj -> obj -> unit) : unit = jsNative
-
     [<Emit("""new Promise(resolve => $0.stdin.write($1 + '\n', error => resolve(!error)))""")>]
     let send (_child: obj) (_command: obj) : Task<bool> = jsNative
 
@@ -84,7 +81,7 @@ module private PtyScopeNative =
     [<Emit("new Promise(resolve => setTimeout(resolve, $0))")>]
     let delay (_milliseconds: int) : Task<unit> = jsNative
 
-    [<Emit("Date.now()")>]
+    [<Emit("performance.now()")>]
     let now () : float = jsNative
 
     [<Emit("setInterval(() => {}, 60000)")>]
@@ -94,8 +91,8 @@ module private PtyScopeNative =
       (async () => {
         if (!process.versions.bun || !['darwin', 'linux'].includes(process.platform))
           throw new Error('PTY supervision requires Bun on POSIX');
-        const { dlopen } = await import('bun:ffi');
-        return dlopen(process.platform === 'darwin' ? '/usr/lib/libSystem.B.dylib' : 'libc.so.6', {
+        const { dlopen, ptr } = await import('bun:ffi');
+        const library = dlopen(process.platform === 'darwin' ? '/usr/lib/libSystem.B.dylib' : 'libc.so.6', {
           getsid: { args: ['i32'], returns: 'i32' },
           setpgid: { args: ['i32', 'i32'], returns: 'i32' },
           tcsetpgrp: { args: ['i32', 'i32'], returns: 'i32' },
@@ -103,8 +100,11 @@ module private PtyScopeNative =
           signal: { args: ['i32', 'ptr'], returns: 'ptr' },
           setenv: { args: ['cstring', 'cstring', 'i32'], returns: 'i32' },
           unsetenv: { args: ['cstring'], returns: 'i32' },
+          posix_spawnp: { args: ['ptr', 'cstring', 'ptr', 'ptr', 'ptr', 'ptr'], returns: 'i32' },
+          waitpid: { args: ['i32', 'ptr', 'i32'], returns: 'i32' },
           execvp: { args: ['cstring', 'ptr'], returns: 'i32' }
-        }).symbols;
+        });
+        return { ...library.symbols, ptr };
       })()
     """)>]
     let loadNative () : JS.Promise<obj> = jsNative
@@ -119,6 +119,35 @@ module private PtyScopeNative =
       })()
     """)>]
     let execute (_native: obj) (_login: bool) (_command: string) : Task<unit> = jsNative
+
+    [<Emit("""
+      (() => {
+        const strings = [process.execPath, $1, '--wanxiangshu-pty', 'target', $2, '0', 'target'].map(value => Buffer.from(value + '\0'));
+        const environment = Object.entries(process.env).map(([key, value]) => Buffer.from(key + '=' + value + '\0'));
+        const args = new BigUint64Array([...strings.map(value => BigInt($0.ptr(value))), 0n]);
+        const env = new BigUint64Array([...environment.map(value => BigInt($0.ptr(value))), 0n]);
+        const pid = new Int32Array(1);
+        const error = $0.posix_spawnp($0.ptr(pid), strings[0], null, null, $0.ptr(args), $0.ptr(env));
+        if (error !== 0 || pid[0] <= 1) throw new Error('PTY target spawn failed: ' + error);
+        return pid[0];
+      })()
+    """)>]
+    let launchTarget (_native: obj) (_module: string) (_directory: string) : int = jsNative
+
+    [<Emit("""
+      (() => {
+        const status = new Int32Array(1);
+        const observed = $0.waitpid($1, $0.ptr(status), 1);
+        if (observed === 0) return null;
+        if (observed !== $1) throw new Error('PTY target exit observation failed');
+        const signal = status[0] & 127;
+        if (signal === 0) return { code: (status[0] >> 8) & 255, signal: null };
+        const named = Object.entries($2).find(([name, value]) => value === signal);
+        if (signal === 127 || !named) throw new Error('PTY target exit status is unknown');
+        return { code: null, signal: named[0] };
+      })()
+    """)>]
+    let targetStatus (_native: obj) (_pid: int) (_signals: obj) : obj = jsNative
 
     [<Emit("import('bun-pty').then(module => module.spawn)")>]
     let loadPty () : JS.Promise<obj> = jsNative
@@ -248,7 +277,15 @@ module private PtyScopeWorker =
             do! N.waitFor (fun () -> N.exists directory "execute")
             N.require (native?tcsetpgrp (0, N.runtime?pid) = 0) "PTY target foreground assignment failed"
 
-            for name in [ "SIGHUP"; "SIGINT"; "SIGQUIT"; "SIGPIPE"; "SIGTERM"; "SIGTTIN"; "SIGTTOU" ] do
+            for name in
+                [ "SIGHUP"
+                  "SIGINT"
+                  "SIGQUIT"
+                  "SIGPIPE"
+                  "SIGTERM"
+                  "SIGTSTP"
+                  "SIGTTIN"
+                  "SIGTTOU" ] do
                 native?signal (signals?(name), null) |> ignore
 
             N.restoreBunMode native request?bunMode
@@ -256,7 +293,7 @@ module private PtyScopeWorker =
         }
 
     let private anchorLoop =
-        """trap '' TERM INT HUP QUIT USR1 USR2 TTIN TTOU
+        """trap '' TERM INT HUP QUIT USR1 USR2 TSTP TTIN TTOU
 while IFS= read -r command
 do
   case "$command" in
@@ -270,6 +307,7 @@ done
     let private anchor native directory request group endpoint =
         task {
             N.require (native?getsid (0) = request?owner) "PTY anchor session mismatch"
+            native?signal ((N.signals ())?SIGTSTP, 1) |> ignore
             let joined: bool = native?setpgid (0, group) = 0
             let kind = if joined then "Ready" else "Unavailable"
 
@@ -384,6 +422,7 @@ done
     let private owner native directory request =
         task {
             N.ignoreSignals ()
+            native?signal ((N.signals ())?SIGTSTP, 1) |> ignore
             let owner: int = N.runtime?pid
             N.require (native?getsid (0) = owner) "PTY owner must be its session leader"
             request?owner <- owner
@@ -402,23 +441,30 @@ done
             let mutable requestedAt = 0.
             let mutable ended = false
 
-            let child =
-                N.launch "target" directory 0 "target" (N.objectOf [ "stdio", box "inherit" ])
+            let targetPid = N.launchTarget native (N.filePath N.moduleUrl) directory
 
-            N.once1 child "error" (fun error ->
-                N.receipt directory incarnation "fault" [ "message", box (N.message error) ])
+            let observeTargetExit () =
+                let status =
+                    if N.absent targetExit then
+                        N.targetStatus native targetPid (N.signals ())
+                    else
+                        null
 
-            N.onExit child (fun code signal ->
-                targetExit <- N.objectOf [ "code", code; "signal", signal ]
-                N.receipt directory incarnation "target-exit" [ "code", code; "signal", signal ])
+                if not (N.absent status) then
+                    targetExit <- status
+                    N.receipt directory incarnation "target-exit" [ "code", status?code; "signal", status?signal ]
 
-            do! N.waitFor (fun () -> N.exists directory "target-ready" || not (N.absent targetExit))
+            do!
+                N.waitFor (fun () ->
+                    observeTargetExit ()
+                    N.exists directory "target-ready" || not (N.absent targetExit))
+
             N.require (N.absent targetExit) "PTY target wrapper exited before readiness"
             let ready = N.read directory "target-ready"
-            N.require (ready?incarnation = incarnation && ready?pid = child?pid) "PTY target receipt mismatch"
-            let! initial = pin directory incarnation owner anchors child?pid
+            N.require (ready?incarnation = incarnation && ready?pid = targetPid) "PTY target receipt mismatch"
+            let! initial = pin directory incarnation owner anchors targetPid
             N.require (not (N.absent initial)) "PTY target group anchor failed"
-            N.receipt directory incarnation "started" [ "owner", box owner; "target", child?pid ]
+            N.receipt directory incarnation "started" [ "owner", box owner; "target", box targetPid ]
             N.publish directory "execute" (N.objectOf [])
 
             let armCommand number =
@@ -451,7 +497,7 @@ done
                         directory
                         incarnation
                         "scope-ended"
-                        [ "owner", box owner; "target", child?pid; "targetExit", targetExit ]
+                        [ "owner", box owner; "target", box targetPid; "targetExit", targetExit ]
 
             let finishIfEmpty (snapshot: obj array) =
                 task {
@@ -511,6 +557,7 @@ done
             let tick () =
                 task {
                     N.require (not (N.exists directory "fault")) "PTY physical observation failed"
+                    observeTargetExit ()
                     let command = nextCommand ()
                     let observing = stopping || not (N.absent command) || not (N.absent targetExit)
 
@@ -607,6 +654,9 @@ module internal PtyScope =
         let mutable stopped = false
         let mutable sequence = 0
         let mutable timer: obj = null
+        let openedAt = N.now ()
+        let pendingSignals = Queue<int * float>()
+        let mutable killRequestedAt: float option = None
 
         let deliverFault reason listener =
             try
@@ -644,11 +694,25 @@ module internal PtyScope =
             if N.exists directory "signal-forwarded" then
                 forwarded <- (readReceipt "signal-forwarded")?sequence
 
+            while pendingSignals.Count > 0 && fst (pendingSignals.Peek()) <= forwarded do
+                pendingSignals.Dequeue() |> ignore
+
             readFault ()
+
+        let checkAcknowledgement () =
+            let now = N.now ()
+
+            if N.absent startup && now - openedAt >= 5000. then
+                fail "PTY startup acknowledgement timed out"
+            elif pendingSignals.Count > 0 && now - snd (pendingSignals.Peek()) >= 5000. then
+                fail "PTY signal acknowledgement timed out"
+            elif killRequestedAt |> Option.exists (fun requested -> now - requested >= 5000.) then
+                fail "PTY scope termination observation timed out"
 
         let checkFault () =
             try
                 readState ()
+                checkAcknowledgement ()
             with error ->
                 fail ("PTY supervision is unknown: " + error.Message)
 
@@ -738,7 +802,13 @@ module internal PtyScope =
                       directory
                       incarnation
                       ("signal-" + string sequence)
-                      [ "sequence", box sequence; "signal", box signal ]) ]
+                      [ "sequence", box sequence; "signal", box signal ]
+
+                  let requestedAt = N.now ()
+                  pendingSignals.Enqueue(sequence, requestedAt)
+
+                  if signal = "SIGKILL" && killRequestedAt.IsNone then
+                      killRequestedAt <- Some requestedAt) ]
 
     let load () : JS.Promise<obj> =
         task {

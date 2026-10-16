@@ -31,8 +31,8 @@ export async function verifyDrainingStop(t, reason) {
   const readyFile = join(directory, 'grandchild.json')
   const token = runtime.createCancellationToken(false)
   let grandchild
-  const grandchildCode = `const fs = require('node:fs'); process.on('SIGTERM', () => {}); fs.writeFileSync(${JSON.stringify(readyFile)}, JSON.stringify({pid:process.pid})); setInterval(() => {}, 1000)`
-  const targetCode = `const {spawn}=require('node:child_process'); const fs=require('node:fs'); const child=spawn(process.execPath,['-e',${JSON.stringify(grandchildCode)}],{stdio:['ignore',1,2]}); fs.writeFileSync(${JSON.stringify(targetFile)},JSON.stringify({pid:process.pid})); child.unref(); process.exit(23)`
+  const grandchildCode = `const fs = require('node:fs'); process.on('SIGTERM', () => {}); fs.writeFileSync(${JSON.stringify(`${readyFile}.pending`)}, JSON.stringify({pid:process.pid})); fs.renameSync(${JSON.stringify(`${readyFile}.pending`)}, ${JSON.stringify(readyFile)}); setInterval(() => {}, 1000)`
+  const targetCode = `const {spawn}=require('node:child_process'); const fs=require('node:fs'); const child=spawn(process.execPath,['-e',${JSON.stringify(grandchildCode)}],{stdio:['ignore',1,2]}); fs.writeFileSync(${JSON.stringify(`${targetFile}.pending`)},JSON.stringify({pid:process.pid})); fs.renameSync(${JSON.stringify(`${targetFile}.pending`)},${JSON.stringify(targetFile)}); child.unref(); process.exit(23)`
   const running = runtime.run(
     runtime.command(process.execPath, ['-e', targetCode], directory, undefined),
     runtime.estimate(30, 1048576, 'medium'),

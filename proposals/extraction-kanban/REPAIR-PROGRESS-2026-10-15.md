@@ -2,6 +2,18 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第八批：PTY 修复的非作者独立复审（2026-10-16）
+
+起点为干净主仓 `fbd90f4d5`；三名非作者对照 `ec37ab8c2` 审查监管、接线、宿主和证据。确认本轮新实现的 **R8-01/P1**（owner 不响应使排空无界等）、**R8-02/P1**（直接目标 Ctrl-Z 连同 anchor 暂停，KILL 失效）、**R8-03/P2**（Darwin/Bun 将目标 USR1/USR2 错报 PWR/SYS），均已修正。另修 **R8-04：既有测试 marker 写读竞争**；不把它算成产品回退。原 leader-exit 缺陷仍属原 O-01，三项新实现问题不归给原拆分；未确认 review 误判。详见[独立复审、归因与证据](PTY-SUPERVISION-2026-10-16.md#独立复审与修正2026-10-16)。
+
+宿主侧单调期限覆盖启动、最早未转发请求和首次 KILL 后的实际结束确认；重复请求或转发回执不能解除期限。anchor 入组前忽略 TSTP，目标 exec 前恢复默认；仅目标由 posix_spawnp/waitpid 收取真实退出状态。Ownership、Host 持久协议及 `wanxiangli@0.6.2` vendor 未改。新正式反例先 **0/4**，发现者复验后转绿，并补启动暂停、重复 TERM/KILL 与确切 PID 收尾的独立反证。
+
+最终生产字节 clean **509**，174 surfaces / 837 modules；format/check exit 0。旧夹具两行原子发布修正后 metadata **510**：Process **215 / 210 pass / 0 fail / 5 TODO**；同生产源码的 509 归属链 **494 / 466 pass / 0 fail / 5 skip / 23 TODO**；不重叠合计 **709 / 676 / 0 / 5 / 28**。两项真实非 PTY deadline/cancel 与完整套件并行通过。509 首轮旧 marker 普通失败及伴随未定因 TypeError 的日志保留，不覆盖成成功；展平新增分支前的 check 失败也保留。
+
+精确包 **2074 members / 13,193,634 bytes**，SHA-256 `cba299600d29c24133acf111a14368924f7fd70154f82a72a72331fc0bd1a16b`；隔离 npm ci、默认入口以及包外 Bun/OpenCode 的真实 PTY、环境恢复与后代排空通过。Linux x64/Bun 1.4.2 复用正式 helper 和当前公开 Surface 胶囊，九项物理场景并发通过，零 worker，临时源文件已删。具体命令、摘要和非作者日志均见监管报告。
+
+R6-A 在声明的控制终端会话范围内进入 DONE；O-01/GAP-133 整体、脱组守护进程、R6-B/C 和旧工具退出码呈现仍不销项。没有声称无限并发、快照原子性或 Linux 完整 Host 已验收。本提交按门禁正常交付 master，不强推，未部署线上 Host。
+
 ## 第七批：PTY 监管原型与生产接线（2026-10-16）
 
 CUT-04-R6-A 已先重现原 leader-exit，再完成真实原型并接入 F# 生产物理口。目标退出与监管会话结束分开；本次 owner 的 scope-ended 和原生退出都确认后才发布完成。Host/Ownership 继续持久确认 Ended，不改库及 0.6.2 vendor。实现、试制错误归因、命令及平台边界见 [PTY 监管报告](PTY-SUPERVISION-2026-10-16.md)。

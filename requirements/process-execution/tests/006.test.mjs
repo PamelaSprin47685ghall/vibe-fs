@@ -2,6 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { verifyPtyScope } from './support/pty-scope.mjs'
 
+test('WHAT[process-execution-006] Ctrl-Z stops the direct target while its group supervisor can still apply KILL', t =>
+  verifyPtyScope(t, 'direct-stop', evidence => {
+    assert.equal(evidence.targetStopped, true)
+    assert.equal(evidence.anchorRunnable, true)
+    assert.equal(evidence.killed, true)
+  }))
+
 test('WHAT[process-execution-006] a real PTY keeps job control and drains a separate background group', t =>
   verifyPtyScope(t, 'job-control', evidence => {
     assert.equal(evidence.ctrlZ, true)

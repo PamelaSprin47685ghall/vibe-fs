@@ -24,6 +24,15 @@ for (const mode of ['leader-kill', 'leader-natural']) {
     }))
 }
 
+for (const mode of ['stalled-owner', 'stalled-anchor']) {
+  test(`WHAT[process-execution-003] an unresponsive PTY supervisor bounds drain with Unknown (${mode})`, t =>
+    verifyPtyScope(t, mode, evidence => {
+      assert.equal(evidence.boundedUnknown, true)
+      assert.equal(evidence.portRetained, true)
+      assert.equal(evidence.completions, 0)
+    }))
+}
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");

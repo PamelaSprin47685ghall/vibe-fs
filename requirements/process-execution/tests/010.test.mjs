@@ -2,6 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { verifyPtyScope } from './support/pty-scope.mjs'
 
+test('WHAT[process-execution-010] native signal exits remain distinct from normal high exit codes', t =>
+  verifyPtyScope(t, 'native-status', evidence => {
+    assert.equal(evidence.nativeSignals, 7)
+    assert.equal(evidence.distinctExitCodes, 5)
+  }))
+
 test('WHAT[process-execution-010] the supervised PTY preserves a real terminal, input, resize and target exit code', t =>
   verifyPtyScope(t, 'basic', evidence => {
     assert.equal(evidence.tty, true)
