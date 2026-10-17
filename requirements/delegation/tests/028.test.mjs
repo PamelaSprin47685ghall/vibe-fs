@@ -95,13 +95,10 @@ const SOURCE_BUDGETS = new Map([
 ])
 
 const ADAPTER_RATCHET = new Map([
-  // 312/312 on 2026-09-25 — the durable spine and prefix shards now declare the
-  // context-prefix-epoch vocabulary explicitly (Persistence/Journal, Composition/Durable and
-  // Context/Prefix/Wire consume ActivePrefixEpoch/PhaseWindow/PrefixEpochProjection), which
-  // carries Context/Prefix/{ProbeSelection,PhaseWindow,Projection,Epoch,Surface}.fs into this
-  // adapter closure; ratchet raised 307 → 312 as the explicit accounting required by
-  // WHAT[delegation-028]. The earlier 306 → 307 raise was the cognitive runtime surface.
-  ['delegation-host-adapter', 312],
+  // 2026-10-17: both the pre-review 97abafc4a plan and the reviewed plan contain
+  // the same 391 sources. Record the existing durable admission, supervision,
+  // and recovery closure; this review adds no source to the Host adapter.
+  ['delegation-host-adapter', 391],
   ['delegation-pty-adapter', 305],
   // 47 on 2026-09-14 — this batch hoisted Runtime.fs settleCompletedFromParts
   // into a module-internal SyncDelegateInternals module (namespace-scoped files

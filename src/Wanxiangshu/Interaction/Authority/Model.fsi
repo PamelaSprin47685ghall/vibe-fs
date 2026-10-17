@@ -105,6 +105,7 @@ module PromptAuthority =
     val acceptedDispatchKey: sessionId: SessionId -> payloadDigest: string -> string
     val originLabel: origin: PromptOrigin -> string
     val tryParseContinuationKind: value: string -> ContinuationKind option
+    val originFromLabel: label: string -> PromptOrigin
 
     [<RequireQualifiedAccess>]
     type AgentNameRejection =

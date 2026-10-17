@@ -99,7 +99,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-04-R6-B](PTY-RUN-ADMISSION-2026-10-16.md) | O-01 跨进程每轮 PTY 准入 | DONE | 本提交修正两项新增回退和既有 Load void 遗漏；clean 523，1175 项相关测试 1112 pass / 0 fail / 16 skip / 47 TODO；非作者反例、真实双进程 CAS/Bun PTY、精确包隔离消费通过；R6-C/O-01 整体未闭合 | root | r6b_admission_review、r6b_unknown_review、r6b_requirements_review |
 | [CUT-04-R6-C](PTY-RESTART-RECOVERY-2026-10-16.md#r12-u1-分层取证与本轮验收2026-10-17) | O-01 跨重启物理接管 | DONE | 已确认的发布缺陷已修；1232 项相关回归 0 普通失败，精确包 Node/Bun/OpenCode 消费通过，三名非作者复查完成。按用户决定验收本轮范围；R12-U1 单列待办，O-01/GAP-133 整体不销项 | root | r6c_protocol_review、r6c_ownership_review、r6c_observation_review |
 | [CUT-04-R12-U1](PTY-RESTART-RECOVERY-2026-10-16.md#r12-u1-分层取证与本轮验收2026-10-17) | 原自然 Unknown 追踪 | BACKLOG | 用户决定暂存；原 441 行没有内层现场，仍未唯一归因。已保全分层证据并实演 Unknown 捕获；有新现场或用户重启此包时再处理，不把未复现写成已修复 | root（后续） | 待重新认领 |
-| [CUT-03-R6](TRACE-ORIGINALS-2026-10-17.md) | T-01 原件捕获、冷恢复、消费者切换和旧路径退出 | DONE | 库 a636cbc/0.6.3；1290 项相关回归 0 普通失败、固定包 Node/Bun 实际 SIGKILL/冷恢复、独立编译及非作者复验通过。原拆分缺口、本轮候选回退和 oracle 误判分别留证；R12-U1、GAP-101 等独立边界不销项 | root | r6c_protocol_review、r6c_observation_review |
+| [CUT-03-R6](TRACE-ORIGINALS-2026-10-17.md) | T-01 原件捕获、冷恢复、消费者切换和旧路径退出 | DONE | 原 T-01 N3–N6、复审候选 N7–N9 及既有 T01-04/05/06 均已修并分开记录。库0.6.4、2270项0普通失败、两项integration、非作者Node/Bun及精确包仓外强杀恢复均通过；R12-U1、GAP-101 不销项，未部署用户Host | root | t01r_originals；capture/recovery 初审后参与修正 |
 | [CUT-02-R6-A](REMAINING-REPAIRS-2026-10-16.md) | GAP-091 纯契约及编译/消费者边界 | READY | 真实正反编译与注入能力证明，不能只改目录或外观入口 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-B](REMAINING-REPAIRS-2026-10-16.md) | GAP-092 完整 wire 总预算 | READY | 先明确最小可接纳预算和预执行拒绝通道，再以实际编码限制完整结果 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-C](REMAINING-REPAIRS-2026-10-16.md) | Bun 特殊 env、参数证明及 stdin 四项失败 | READY | 原生对照已完成；分别处理能力与测试假设，不放宽断言，不标全套通过 | root（计划） | 待非作者复审 |
@@ -160,7 +160,7 @@ P1 行为缺陷优先；PATH、PTY 提前清账/同步完成和 Proxy 测试可�
 | 决策号 | 影响卡 | 待判问题 | 当前处置 | 决策/证据 |
 |---|---|---|---|---|
 | D-01 | 07、09、11 | 草稿中的未知来源回退 human 与现行权威证据冲突 | 保留现行拒绝/明确未知；开工时裁定精确接口 | 待认领；不得先删权威闭包 |
-| D-02 | 03、06、15、16、28 | 单观察者 Trace 与并发捕获、推理、retry 排除、Fission 合流、Opening 范围不完全等价 | Opening 与固定 cut 已修；推理/retry/并发/身份/Terminal/Fission/历史对账落盘，描述符桥原件接管尚未实现 | [本批范围与下一包](REPAIR-PROGRESS-2026-10-15.md) |
+| D-02 | 03、06、15、16、28 | 单观察者 Trace 与并发捕获、推理、retry 排除、Fission 合流、Opening 范围不完全等价 | Opening、固定cut及原件接管按CUT-03-R6验收；来源/身份/canonical覆盖的独立复审与旧历史边界已补。Fission/Invocation完整产品链的GAP仍保留 | [本批范围与下一包](REPAIR-PROGRESS-2026-10-15.md) |
 | D-03 | 02、20、21 | 基础 pipe 留尾不等于主仓硬期限、完整外存及 PTY | 默认基础版保持留尾；显式 Capture/监管承接所选非 PTY 完整采集和同组期限/取消。PTY、脱组后代、宿主崩溃恢复不扩成已承接 | [精确包与真实反例](REPAIR-PROGRESS-2026-10-15.md) |
 | D-04 | 18、19 | 单流 SQLite CAS 与多 writer 合法分叉不是同一承诺 | 两种协议分开，不用前者替代后者 | 待 CUT-18/19 |
 | D-05 | 27、29、30、31 | 新库草稿“不再建”与仍生效的产品功能冲突 | 默认暂留并维护；抽取/删除需逐卡裁决 | 待认领；不是删除批准 |

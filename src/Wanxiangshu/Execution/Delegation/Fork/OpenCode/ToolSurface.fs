@@ -814,6 +814,7 @@ module ForkToolSurface =
           Completed = true
           IsCompaction = false
           PromptKey = None
+          Origin = None
           Parts = [| MessagePart.Text text |]
           PartIds = [| None |]
           ToolParts = [||] }

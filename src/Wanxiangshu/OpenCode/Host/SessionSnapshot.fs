@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
 
 /// One message as the Host transcript has it.
 ///
@@ -21,7 +22,7 @@ type SnapshotToolPartState =
     | Failed of errorCanonical: string
 
 type SessionToolPart =
-    { HostToolPartId: HostToolPartId
+    { HostToolPartId: HostToolPartId option
       ToolCallId: ToolCallId
       ToolName: string
       InputCanonical: string
@@ -42,6 +43,7 @@ type SessionMessage =
       Completed: bool
       IsCompaction: bool
       PromptKey: string option
+      Origin: PromptOrigin option
       Parts: MessagePart array
       PartIds: HostMessagePartId option array
       ToolParts: SessionToolPart array }
@@ -67,30 +69,14 @@ module SessionSnapshot =
         | Missing of toolCallId: ToolCallId
         | Ambiguous of toolCallId: ToolCallId
 
-    /// Evidence → Decision: tool part id matches the callback → location.
-    let private toolCallLocationOf
-        (toolCallId: ToolCallId)
-        (message: SessionMessage)
-        (part: SessionToolPart)
-        : ToolCallLocation option =
-        if part.ToolCallId <> toolCallId then
-            None
-        else
-            Some
-                { ProviderRun = ProviderRunIdentity.create message.Id
-                  HostToolPartId = part.HostToolPartId
-                  ToolCallId = part.ToolCallId
-                  ToolName = part.ToolName
-                  InputCanonical = part.InputCanonical
-                  State = part.State }
-
-    let private assistantToolLocations (toolCallId: ToolCallId) (message: SessionMessage) =
+    let private assistantToolCandidates (toolCallId: ToolCallId) (message: SessionMessage) =
         if message.Role <> "assistant" then
             []
         else
             message.ToolParts
             |> Array.toList
-            |> List.choose (toolCallLocationOf toolCallId message)
+            |> List.filter (fun part -> part.ToolCallId = toolCallId)
+            |> List.map (fun part -> message, part)
 
     /// Resolve one tool callback through the Host's persisted assistant message.
     /// `callID` alone is not a ProviderRun binding; the enclosing assistant
@@ -99,9 +85,17 @@ module SessionSnapshot =
         (toolCallId: ToolCallId)
         (messages: SessionMessage list)
         : Result<ToolCallLocation, ToolCallLocationError> =
-        let candidates = messages |> List.collect (assistantToolLocations toolCallId)
+        let candidates = messages |> List.collect (assistantToolCandidates toolCallId)
 
         match candidates with
-        | [ location ] -> Ok location
-        | [] -> Error(ToolCallLocationError.Missing toolCallId)
+        | [ (message, ({ HostToolPartId = Some partId } as part)) ] ->
+            Ok
+                { ProviderRun = ProviderRunIdentity.create message.Id
+                  HostToolPartId = partId
+                  ToolCallId = part.ToolCallId
+                  ToolName = part.ToolName
+                  InputCanonical = part.InputCanonical
+                  State = part.State }
+        | []
+        | [ _ ] -> Error(ToolCallLocationError.Missing toolCallId)
         | _ -> Error(ToolCallLocationError.Ambiguous toolCallId)

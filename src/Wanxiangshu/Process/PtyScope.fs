@@ -390,6 +390,7 @@ done
 
     let private sendSignal directory incarnation owner anchors (snapshot: obj array) command =
         task {
+            // DSL-MUTABLE: algorithm-scratch — collect physical signal acknowledgements
             let mutable delivered = true
 
             let groups =
@@ -437,11 +438,17 @@ done
             N.require (terminal <> "" && terminal <> "null") "PTY owner has no controlling terminal"
             let incarnation: string = request?incarnation
             let anchors = Dictionary<int, obj>()
+            // DSL-MUTABLE: resource — retain the native target exit status
             let mutable targetExit: obj = null
+            // DSL-MUTABLE: algorithm-scratch — number acknowledged signal requests
             let mutable sequence = 0
+            // DSL-MUTABLE: cancellation — continue the requested scope termination
             let mutable stopping = false
+            // DSL-MUTABLE: algorithm-scratch — identify the signal awaiting acknowledgement
             let mutable lastRequested = 0
+            // DSL-MUTABLE: resource — retain that signal's request time
             let mutable requestedAt = 0.
+            // DSL-MUTABLE: retirement admission fence — seal the confirmed empty scope
             let mutable ended = false
 
             let targetPid = N.launchTarget native (N.filePath N.moduleUrl) directory
@@ -649,16 +656,25 @@ module internal PtyScope =
 
         let exits = ResizeArray<obj -> unit>()
         let faults = ResizeArray<string -> unit>()
+        // DSL-MUTABLE: resource — retain the first physical supervision fault
         let mutable failure: string option = None
+        // DSL-MUTABLE: resource — retain the verified scope exit receipt
         let mutable completion: obj = null
+        // DSL-MUTABLE: resource — retain the verified startup receipt
         let mutable startup: obj = null
+        // DSL-MUTABLE: resource — retain the target's native exit status
         let mutable targetExit: obj = null
+        // DSL-MUTABLE: algorithm-scratch — track acknowledged signal sequence
         let mutable forwarded = 0
+        // DSL-MUTABLE: retirement admission fence — stop polling after owner exit
         let mutable stopped = false
+        // DSL-MUTABLE: algorithm-scratch — number outgoing physical signal requests
         let mutable sequence = 0
+        // DSL-MUTABLE: resource — own the physical supervision polling timer
         let mutable timer: obj = null
         let openedAt = N.now ()
         let pendingSignals = Queue<int * float>()
+        // DSL-MUTABLE: resource — retain the scope termination observation deadline
         let mutable killRequestedAt: float option = None
 
         let deliverFault reason listener =

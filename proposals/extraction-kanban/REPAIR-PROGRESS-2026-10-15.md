@@ -2,7 +2,17 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
-## 第十四批：T-01 原件接管与消费者切换（2026-10-17）
+## 第十五批：T-01 独立复审（2026-10-17，已修正并验收）
+
+以主仓 `97abafc4a`、库 `a636cbc / 0.6.3` 为基线，先由三位非作者分别复审，再由 root 与 capture/recovery 修正，最终由未编辑源码的 originals 独立复验。原 T-01 的 N3 身份限制、N4 双 facet 消费覆盖、N5 facet 碰撞及 N6 物理种类/归属护栏遗漏均已修正。本轮未交付候选的 N7 旧 kind 绕过、N8 wrapper 误计冲突及 N9 证据 DTO int64 缩窄分别记录并修正。既有 snapshot 来源/缺 ID 和分隔符编码问题分别记 T01-04/05/06；环境、旧夹具坐标误判与门禁漂移另记，不混同归因。
+
+库 `10bbb32 / 0.6.4` 已通过 Node/Bun 各68/68、独立构建2/2和精确包5/5并正常推送，主仓固定 SHA-256 `e24ee33d08cb12aabd0beb4af3da8fc91eacb64cd00b89ad558eef99cda9b5f5`。主仓行为编译556，174 surfaces / 838 modules；三个不重叠相关组 **2270 / 2119 pass / 0 普通 fail / 51 skip / 100 TODO**，另两项 integration 均1/1。非作者 Node/Bun 来源各13/13、tuple各6组、超2^31与2^53实际 journal DTO/cold 均通过；精确旧包对照保留。库仍是唯一原件内存 owner，EventStore 是唯一持久载体；新结构化身份不回填旧未知字段，v3 明确拒绝旧 raw cut，生产 Unknown 条件未改。
+
+收尾 Fable557、格式/静态门禁通过。精确主包 **2075 members / 13,320,592 bytes**，SHA-256 `add77b27a037d83d8fc2c8b95a10a19b601e8ca7720c7bd183122494bd764162`；隔离安装及 Node/Bun 仓外实际捕获→提交屏障→SIGKILL→新进程冷恢复的12条 records、head、原文、opaque身份和Terminal前沿一致。只加标注的六个PTY模块与精确旧包逐字节相同，未把 Unknown 调查混入本包。
+
+CUT-03-R6 按本轮限定范围记 DONE，主仓随本原子提交正常推送 master，不强推；未部署用户 Host。R12-U1 按用户决定保持 BACKLOG，GAP-101/108/109/111 不销项。完整证据、原始红例及兼容边界见 [T-01 报告](TRACE-ORIGINALS-2026-10-17.md)。
+
+## 第十四批：T-01 原件接管与消费者切换（2026-10-17，历史交付）
 
 按剩余计划处理下一个 P1，输入干净主仓 `84ba23b2d`、库 `b6984d9 / 0.6.2`，R12-U1 保持 BACKLOG。库 `a636cbc / 0.6.3` 新增已确认材料和明确 Terminal 绑定；主仓由当前 envelope 的已验证 payload 接回同步 fold，不补缺失 run/message/Completed。Materialization、WorkRecord、Y/prefix、Strength 及经 WorkRecord 的后续消费者共用实际原件，删除描述符追加与临时重捕获。EventStore 仍是唯一持久载体，既有语义游标与范围保留，新 raw identity 明确隔离旧描述符。
 

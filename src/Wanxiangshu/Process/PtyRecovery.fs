@@ -197,12 +197,14 @@ module private PtyRecoveryNative =
         value
 
     let frames socket receive failed =
+        // DSL-MUTABLE: resource — retain incomplete socket frame text
         let mutable pending = ""
         socket?setEncoding ("utf8") |> ignore
 
         let parse chunk =
             pending <- pending + unbox<string> chunk
             require (pending.Length <= 4194304) "PTY control frame exceeds its limit"
+            // DSL-MUTABLE: algorithm-scratch — scan complete frame delimiters
             let mutable delimiter = pending.IndexOf('\n')
 
             while delimiter >= 0 do
@@ -254,14 +256,23 @@ module private PtyRecoveryWorker =
             let _ =
                 (N.files?mkdirSync (N.join directory "claim", N.objectOf [ "mode", box 448 ]): unit)
 
+            // DSL-MUTABLE: resource — own the authenticated control socket
             let mutable controller: obj = null
+            // DSL-MUTABLE: resource — own the native PTY handle
             let mutable terminal: obj = null
+            // DSL-MUTABLE: single-flight — admit the creator once
             let mutable creatorSeen = false
+            // DSL-MUTABLE: retirement admission fence — seal the physical owner
             let mutable settled = false
+            // DSL-MUTABLE: cancellation — retain the explicit stop request
             let mutable stopped = false
+            // DSL-MUTABLE: resource — retain the authenticated controller mode
             let mutable attachedMode = ""
+            // DSL-MUTABLE: resource — own the native state polling timer
             let mutable stateTimer: obj = null
+            // DSL-MUTABLE: single-flight — publish startup acknowledgement once
             let mutable readySent = false
+            // DSL-MUTABLE: resource — retain exact native exit evidence
             let mutable ended: obj = null
             let server: obj = N.sockets?createServer ()
 
@@ -531,13 +542,21 @@ module internal PtyRecovery =
         let faults = ResizeArray<string -> unit>()
         let data = ResizeArray<string -> unit>()
         let pending = Queue<int * float * obj>()
+        // DSL-MUTABLE: resource — own the PTY control connection
         let mutable socket: obj = null
+        // DSL-MUTABLE: resource — retain the authenticated attach acknowledgement
         let mutable attached = false
+        // DSL-MUTABLE: resource — retain the native startup acknowledgement
         let mutable started = false
+        // DSL-MUTABLE: resource — retain the first control connection fault
         let mutable failure: string option = None
+        // DSL-MUTABLE: resource — retain the verified durable exit receipt
         let mutable completion: obj = null
+        // DSL-MUTABLE: algorithm-scratch — number pending control requests
         let mutable sequence = 0
+        // DSL-MUTABLE: algorithm-scratch — trim acknowledged control requests
         let mutable acknowledged = 0
+        // DSL-MUTABLE: resource — own the receipt polling timer
         let mutable timer: obj = null
         let openedAt = N.now ()
 

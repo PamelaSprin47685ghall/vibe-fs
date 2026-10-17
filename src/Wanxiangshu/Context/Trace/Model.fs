@@ -3,6 +3,7 @@ namespace Wanxiangshu.Context.Trace
 open System
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Host
 open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 
@@ -240,6 +241,14 @@ module internal WanxiangliTrace =
         | "reasoning" -> "reasoning"
         | kind -> invalidOp ("Unknown confirmed material kind: " + kind)
 
+    [<Emit("JSON.stringify($0)")>]
+    let private encodeIdentity (_value: string) : string = jsNative
+
+    let private identity scope value =
+        scope + ":" + HostDigest.sha256Hex (encodeIdentity value)
+
+    let traceIdentity session = identity "xtrace-material-v3" session
+
     let private captureMaterialRecords trace identity role kind toolName providerRun body =
         let chunks = chunkBytes body
 
@@ -271,7 +280,7 @@ module internal WanxiangliTrace =
         let trace = acquireWritableTrace bridge
 
         let addedRecords =
-            captureMaterialRecords trace ("part:" + provenance) role (materialKind kind) toolName providerRun body
+            captureMaterialRecords trace (identity "part" provenance) role (materialKind kind) toolName providerRun body
 
         let afterCursor = rawInspectCursor trace
 
@@ -290,7 +299,7 @@ module internal WanxiangliTrace =
         (bridge: ProjectionBridge)
         : ProjectionBridge =
         let trace = acquireWritableTrace bridge
-        let identity = "terminal:" + providerRun
+        let identity = identity "terminal" providerRun
 
         let frontierCursor =
             bridge.PartCuts
@@ -338,10 +347,10 @@ module internal WanxiangliTrace =
         unbox<string> text
 
     let partText provenance bridge =
-        readMaterialText ("part:" + provenance) bridge
+        readMaterialText (identity "part" provenance) bridge
 
     let terminalText providerRun bridge =
-        readMaterialText ("terminal:" + providerRun) bridge
+        readMaterialText (identity "terminal" providerRun) bridge
 
     let headCutOfBridge (bridge: ProjectionBridge) : XTraceCut =
         let trace = acquireReadableTrace bridge

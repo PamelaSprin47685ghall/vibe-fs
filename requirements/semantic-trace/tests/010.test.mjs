@@ -155,7 +155,7 @@ test('WHAT[semantic-trace-010] small first Opening retains the original record p
   const records = trace.traceRecords(projection)
   assert.equal(records.length, 1)
   assert.equal(JSON.parse(records[0]).observation.type, 'Opening')
-  const legacy = new Trace('xtrace-material-v2/projection')
+  const legacy = new Trace(trace.traceHeadCut(projection).traceId)
   legacy.capture({ type: 'Opening', bytes: new TextEncoder().encode('assignment:4:task\nrequirement') })
   assert.deepEqual(records, legacy.records())
 })

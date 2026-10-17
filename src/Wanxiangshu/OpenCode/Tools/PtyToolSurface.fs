@@ -19,6 +19,7 @@ module PtyToolSurface =
         task {
             let exits = Dictionary<PtyId, TaskCompletionSource<unit>>()
             let terminated = TaskCompletionSource<PtyId>()
+            // DSL-MUTABLE: resource — controlled backend exit-observation port
             let mutable portRef: PtyPort option = None
 
             let handler id command =
@@ -51,6 +52,7 @@ module PtyToolSurface =
                 )
 
             let capability = runtime.PtyCapability
+            // DSL-MUTABLE: algorithm-scratch — count concurrent fixture openings
             let mutable openings = 0
             let openedBoth = TaskCompletionSource<unit>()
 
@@ -80,6 +82,7 @@ module PtyToolSurface =
             let registered = PtyTool.openSpec factory context |> ToolHostCodec.register factory
             let args = createObj [ "name" ==> "same"; "command" ==> "long-running" ]
             let host = createObj [ "sessionID" ==> "terminal-name-race" ]
+            // DSL-MUTABLE: algorithm-scratch — count concurrent fixture replies
             let mutable returned = 0
 
             let openOnce () =

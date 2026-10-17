@@ -10,6 +10,7 @@ import * as Journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as Enforcer from '../../../dist/Enforcer/Surface.js'
 import * as Dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import { acceptAuthorityRoot, awaitPrompted, configureManagedPlugin, withRestartablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { candidateEvidence, checkpointEvidence, coveredSession, commitOfferedFrame } from '../../prefix-stability/tests/support/registered-prefix.mjs'
 
 const sha256 = (text) => createHash('sha256').update(text, 'utf8').digest('hex')
 const journalFacts = (directory) => readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
@@ -168,6 +169,8 @@ const productionDigest = async (callId, path) => {
     await hooks['tool.execute.after']({ ...checkpointInput, args: checkpointOutput.args }, { title: 'todowrite', output: 'Todos updated', metadata: {} })
     await hooks.event({ event: { type: 'message.part.updated', properties: { sessionID, part: { type: 'tool', tool: 'todowrite', callID: checkpointInput.callID, state: { status: 'completed' } } } } })
     assert.equal(Journal.JournalSurface_snapshot(runtime.journal).todoCheckpoints[0].checkpoints[0].callId, checkpointInput.callID)
+    assert.deepEqual(checkpointEvidence(runtime, sessionID, checkpointInput.callID), { checkpointTurn: 4, desiredCutoff: 4 })
+    assert.deepEqual(await candidateEvidence(runtime, sessionID, 2), { ok: false, reason: 'NoCoverage' })
     const nextPhysical = 'msg-prefix-next-user'
     const continuation = await Dispatch.sendContinuation({
       SubscribeTerminal: () => ({ Dispose: () => {} }),
@@ -187,13 +190,13 @@ const productionDigest = async (callId, path) => {
       parts: [],
     }
     runtime.pushHostMessage(sessionID, solvingRun)
+    await hooks['chat.params']({ sessionID, message: nextUser.message, agent: 'manager', model: { providerID: 'provider', id: 'manager-model', capabilities: {} } }, {})
     const tentative = { messages: structuredClone(messages) }
     await hooks['experimental.chat.messages.transform']({ sessionID }, tentative)
-    // CTX-029 (requirements/context-compression/WHAT.md): the single Blogger frame
-    // covers turns through 4 while the phase window still keeps turns from 2 raw.
-    // No verifiable complete-material subset ends at the desired boundary, so the
-    // ordinary request must not advance and no synthetic memory may appear.
-    assert.ok(!tentative.messages.some(message => message.info?.source === 'companion-memory'), 'CTX-029: a frame crossing the desired boundary must not advance')
+    assert.ok(tentative.messages.some(message => message.info?.source === 'companion-memory'), 'the frame ends exactly at the canonical checkpoint boundary')
+    const started = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'ProviderStarted')).filter(Boolean).find(fact => fact.Key.PhysicalUserMessageId[1] === nextPhysical)
+    assert.equal(started.Evidence.ProjectionChoice[0], 'UsePrefixProbe')
+    assert.equal(started.Evidence.ProjectionChoice[1].Candidate.CutoffExclusive, 4)
     solvingRun.info.finish = 'tool-calls'
     solvingRun.info.time.completed = 9
     solvingRun.parts = [{ type: 'tool-call', tool: 'read', callID: 'call-prefix-tail', args: { path: 'tail' } }]
@@ -208,7 +211,10 @@ const productionDigest = async (callId, path) => {
     })
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: structuredClone(messages) })
     const rebases = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
-    assert.equal(rebases.length, 0, 'CTX-029: a boundary-crossing prefix must stay uncommitted')
+    assert.equal(rebases.length, 1)
+    assert.equal(rebases[0].CutoffExclusive, 4)
+    assert.equal(rebases[0].CoveredPrefixDigest, observationDigest)
+    assert.deepEqual(rebases[0].SolvingProviderRun, ['ProviderRunIdentity', solvingRun.info.id])
   }
   await withRestartablePlugin(async (start, directory, host) => {
     const hooks = await start()
@@ -219,9 +225,11 @@ const productionDigest = async (callId, path) => {
     await configureManagedPlugin(reopened)
     await host.withRuntime(async (runtime) => {
       const state = Journal.JournalSurface_snapshot(runtime.journal).sessionProjections[sessionID]
-      assert.equal(state.prefixEpoch ?? null, null, 'CTX-029: no committed epoch may exist without a promotable probe')
+      assert.deepEqual(state.prefixEpoch, { epochId: 1n, snapshotPresent: true })
       const rebases = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
-      assert.deepEqual(rebases, [], 'CTX-029: reopening must not resurrect an uncommitted boundary-crossing prefix')
+      assert.equal(rebases.length, 1)
+      assert.equal(rebases[0].CutoffExclusive, 4)
+      assert.equal(rebases[0].CoveredPrefixDigest, observationDigest)
       const replayed = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'BlogObservationCommitted')).filter(Boolean)
       assert.equal(replayed[0].NextCoveredPrefixDigest, observationDigest, 'the durable coverage digest survives reopen unchanged')
     })
@@ -241,6 +249,56 @@ test('WHAT[provider-projection-011] real argument changes alter the durable prod
   assert.notEqual(first, changed)
 })
 
+test('WHAT[provider-projection-011] registered production boundary proof rejects crossing material', async () => {
+  await withRestartablePlugin(async (start, directory, host) => {
+    const hooks = await start()
+    await configureManagedPlugin(hooks)
+    await host.withRuntime(async journalRuntime => {
+      const runtime = { ...journalRuntime, ...host }
+      const sessionID = 'ses-real-crossing-candidate'
+      await coveredSession(hooks, runtime, directory, sessionID)
+      assert.deepEqual(await candidateEvidence(runtime, sessionID, 2), { ok: false, reason: 'NoCoverage' }, 'CTX-029: a frame crossing the desired boundary must not advance')
+      assert.deepEqual(await candidateEvidence(runtime, sessionID, 4), { ok: true, cutoff: 4 })
+    })
+  })
+})
+
+test('WHAT[provider-projection-011] phase and failure-recovery candidates reject a changed confirmed prefix after a real frame commit', async () => {
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  const record = await import('../../../dist/Mission/WorkRecord/Surface.js')
+  const { withReopenableJournal } = await import('../../semantic-trace/tests/support/journal.mjs')
+  await withReopenableJournal(async (handle, reopen) => {
+    const sessionID = 'ses-real-cutoff-proof-failure'
+    await record.captureOpening(handle, sessionID, 'task', [])
+    const observed = extra => [
+      { hostMessageId: 'user', message: { info: { role: 'user' }, parts: [{ id: 'user-part', type: 'text', text: 'task' }] } },
+      { hostMessageId: 'assistant', message: { info: { id: 'assistant', role: 'assistant' }, parts: [
+        { id: 'body', type: 'text', text: 'confirmed body' },
+        ...(extra ? [{ id: 'late-reasoning', type: 'reasoning', text: 'late confirmed reasoning' }] : []),
+      ] } },
+    ]
+    assert.equal((await trace.captureObservedMessages(handle, sessionID, observed(false))).ok, true)
+    const original = await trace.currentProjection(handle, sessionID)
+    const frame = await commitOfferedFrame({ journal: handle }, sessionID, 'confirmed-prefix')
+    assert.equal(frame.nextCoverableTurnCutoffExclusive, 2)
+    const originalDigest = Projection.cutoffDigest(sha256, Projection.projectionSnapshot(Projection.semanticProjection(original.messages)), 2)
+    assert.equal(frame.nextCoveredPrefixDigest, originalDigest)
+    assert.equal((await trace.captureObservedMessages(handle, sessionID, observed(true))).ok, true)
+    assert.equal((await trace.captureObservedMessages(handle, sessionID, [{ hostMessageId: 'tail', message: { info: { role: 'user' }, parts: [{ id: 'tail-part', type: 'text', text: 'later request' }] } }])).ok, true)
+    const current = await trace.currentProjection(handle, sessionID)
+    const currentDigest = Projection.cutoffDigest(sha256, Projection.projectionSnapshot(Projection.semanticProjection(current.messages)), 2)
+    assert.notEqual(currentDigest, originalDigest)
+    const phase = await candidateEvidence({ journal: handle }, sessionID, 2)
+    const retry = await candidateEvidence({ journal: handle }, sessionID)
+    assert.equal(phase.ok, false)
+    assert.match(phase.reason, /^CutoffProofFailed/)
+    assert.deepEqual(retry, phase, 'failure recovery must retain the actual cutoff proof')
+    const cold = await reopen()
+    assert.deepEqual(await candidateEvidence({ journal: cold }, sessionID, 2), phase)
+    assert.deepEqual(await candidateEvidence({ journal: cold }, sessionID), retry)
+  })
+})
+
 test('WHAT[provider-projection-011] the registered production proof detects a boundary-crossing prefix promotion', async () => {
   // CTX-029 (requirements/context-compression/WHAT.md): a frame that crosses the
   // desired boundary must not advance. The earlier digest-wiring mutants produced
@@ -255,7 +313,7 @@ test('WHAT[provider-projection-011] the registered production proof detects a bo
   await assert.rejects(
     () => run(process.execPath, [
       '--experimental-loader', join(import.meta.dirname, 'support/prefix-digest-mutation-loader.mjs'),
-      '--test', '--test-name-pattern', 'registered production transforms persist and replay', import.meta.filename,
+      '--test', '--test-name-pattern', 'registered production boundary proof rejects crossing material', import.meta.filename,
     ], { env }),
     error => {
       assert.equal(error.code, 1)

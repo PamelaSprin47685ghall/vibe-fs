@@ -79,6 +79,7 @@ type XTraceStableCaptureEligibility =
 type XTraceMessageObservation =
     { Message: ProviderWireCapture.CapturedWireMessage
       HostMessageId: string option
+      PromptKey: PromptKey option
       Origin: PromptAuthority.PromptOrigin option }
 
 type XTraceMessageCapture =
@@ -278,8 +279,8 @@ module XTraceCapture =
 
     /// COMPANION-003 / EXEC-009: capture the terminal output verbatim as the
     /// XTrace's last segment. Idempotent replay (same text) is a no-op;
-    /// a different text overwrites — subagent reuse produces a new terminal
-    /// per work unit on the same child session.
+    /// different text for the same ProviderRun is refused. Another actual
+    /// ProviderRun creates a new occurrence in a reused child session.
     let captureTerminal (journal: AgentJournal option) (turn: ReconciledTurn) =
         // COMPANION-003: TerminalOutputRaw = formal text + host-visible
         // reasoning only. partsSessionText drops tool call/result so
@@ -330,7 +331,9 @@ module XTraceCapture =
           PartIndex: int
           Source: TraceSourcePart
           Provenance: string
+          PhysicalHostIdentity: (string * string) option
           LegacyPhysicalProvenance: string option
+          LegacyFacetProvenance: string option
           LegacyStableProvenance: string option }
 
     let private enumeratePositionalCaptureWork
@@ -346,14 +349,16 @@ module XTraceCapture =
                   PartIndex = partIndex
                   Source = source
                   Provenance = sprintf "g:%d/turn:%d/part:%d" generation turnIndex partIndex
+                  PhysicalHostIdentity = None
                   LegacyPhysicalProvenance = None
+                  LegacyFacetProvenance = None
                   LegacyStableProvenance = None }))
         |> List.concat
 
     let private toolFacet (part: SemanticPart) =
         match part with
-        | SemanticToolCall _ -> "/tool-call"
-        | SemanticToolResult _ -> "/tool-result"
+        | SemanticToolCall _ -> "tool-call"
+        | SemanticToolResult _ -> "tool-result"
         | _ -> ""
 
     let private enumerateStableCaptureWork
@@ -365,23 +370,48 @@ module XTraceCapture =
         |> List.mapi (fun turnIndex (messageId, message) ->
             message.Parts
             |> List.mapi (fun partIndex source ->
+                let physicalIdentity =
+                    source.HostPartId
+                    |> Option.map (fun partId -> messageId, HostMessagePartId.value partId)
+
                 let physicalProvenance =
-                    match source.HostPartId with
-                    | Some partId ->
-                        Some(sprintf "g:%d/msg:%s/host-part:%s" generation messageId (HostMessagePartId.value partId))
-                    | None -> None
+                    physicalIdentity
+                    |> Option.map (fun (rawMessageId, partId) ->
+                        sprintf "g:%d/msg:%s/host-part:%s" generation rawMessageId partId)
 
                 let provenance =
-                    physicalProvenance
-                    |> Option.map (fun identity -> identity + toolFacet source.Part)
-                    |> Option.defaultWith (fun () -> sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex)
+                    let kind, _, _ = partShape source.Part
+                    let facet = if toolFacet source.Part = "" then "content" else kind
+
+                    match source.HostPartId, source.ToolCallId with
+                    | Some partId, _ ->
+                        XTraceProjection.materialProvenance
+                            generation
+                            "physical"
+                            messageId
+                            (HostMessagePartId.value partId)
+                            facet
+                    | None, Some callId ->
+                        XTraceProjection.materialProvenance
+                            generation
+                            "call"
+                            messageId
+                            (ToolCallId.value callId)
+                            facet
+                    | None, None ->
+                        XTraceProjection.materialProvenance generation "position" messageId (string partIndex) facet
 
                 { Message = message
                   TurnIndex = turnIndex
                   PartIndex = partIndex
                   Source = source
                   Provenance = provenance
+                  PhysicalHostIdentity = physicalIdentity
                   LegacyPhysicalProvenance = physicalProvenance
+                  LegacyFacetProvenance =
+                    match toolFacet source.Part with
+                    | "" -> None
+                    | facet -> physicalProvenance |> Option.map (fun identity -> identity + "/" + facet)
                   LegacyStableProvenance = Some(sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex) }))
         |> List.concat
 
@@ -471,7 +501,7 @@ module XTraceCapture =
             let existing = xTraceOf durable sessionId
 
             XTraceProjection.parts existing
-            |> List.forall (fun part -> part.Provenance.Contains("/msg:", StringComparison.Ordinal))
+            |> List.forall (XTraceProjection.tryHostMessageId >> Option.isSome)
 
     let private classifyStableHostIds (hostMessageIds: string option list) =
         let ids = hostMessageIds |> List.choose id
@@ -544,11 +574,103 @@ module XTraceCapture =
         sameMaterial work part && part.HostToolPartId = work.Source.HostToolPartId
 
     let private legacyPhysicalReplay (work: PartCaptureWork) (part: XTracePartRef) =
-        work.LegacyPhysicalProvenance = Some part.Provenance
+        (work.LegacyPhysicalProvenance = Some part.Provenance
+         || work.LegacyFacetProvenance = Some part.Provenance)
         && part.HostToolPartId.IsNone
         && sameMaterial work part
 
-    let private stablePartAlreadyCaptured (existing: XTracePartRef list) (work: PartCaptureWork) =
+    let private physicalAddress (work: PartCaptureWork) =
+        work.PhysicalHostIdentity |> Option.map snd
+
+    let private knownToolCallScope (work: PartCaptureWork) =
+        let kind, _, _ = partShape work.Source.Part
+
+        match work.Message.ProviderRun, work.Source.ToolCallId with
+        | Some run, Some call when
+            not (String.IsNullOrWhiteSpace(ProviderRunIdentity.value run))
+            && not (String.IsNullOrWhiteSpace(ToolCallId.value call))
+            ->
+            Some(run, call, kind)
+        | _ -> None
+
+    let private callCandidates (existing: XTracePartRef list) (run, call, kind) =
+        existing
+        |> List.filter (fun part -> part.ProviderRun = Some run && part.ToolCallId = Some call && part.Kind = kind)
+
+    let private isCallOnlyPart (part: XTracePartRef) =
+        match part.HostToolPartId, part.ToolCallId, XTraceProjection.tryMaterialProvenance part.Provenance with
+        | None, Some call, Some("call", _, address, facet) -> address = ToolCallId.value call && facet = part.Kind
+        | _ -> false
+
+    let private legacyPhysicalBase (part: XTracePartRef) =
+        let provenance = part.Provenance
+
+        let suffix =
+            match part.Kind with
+            | "tool_call" -> "/tool-call"
+            | "tool_result" -> "/tool-result"
+            | _ -> ""
+
+        match part.HostToolPartId with
+        | Some partId when provenance.EndsWith("/host-part:" + HostToolPartId.value partId, StringComparison.Ordinal) ->
+            Some provenance
+        | Some partId when
+            suffix <> ""
+            && provenance.EndsWith("/host-part:" + HostToolPartId.value partId + suffix, StringComparison.Ordinal)
+            ->
+            Some(provenance.Substring(0, provenance.Length - suffix.Length))
+        | None when suffix = "" || not (provenance.EndsWith(suffix, StringComparison.Ordinal)) -> Some provenance
+        | _ -> None
+
+    let private physicalBaseOfPart (part: XTracePartRef) =
+        let generation = sprintf "g:%d" part.Generation
+
+        let provenance = part.Provenance
+
+        match provenance with
+        | _ when isCallOnlyPart part -> None
+        | _ when not (provenance.Contains("/host-part:", StringComparison.Ordinal)) -> None
+        | _ when not (provenance.StartsWith(generation + "/msg:", StringComparison.Ordinal)) -> None
+        | _ -> legacyPhysicalBase part
+
+    let private areToolFacets firstKind secondKind =
+        (firstKind = "tool_call" && secondKind = "tool_result")
+        || (firstKind = "tool_result" && secondKind = "tool_call")
+
+    let private samePhysicalIdentity (work: PartCaptureWork) (part: XTracePartRef) =
+        match XTraceProjection.tryPhysicalHostIdentity part, XTraceProjection.tryMaterialProvenance part.Provenance with
+        | Some physical, _ ->
+            part.Generation = XTraceProjection.provenanceGeneration work.Provenance
+            && work.PhysicalHostIdentity = Some physical
+        | None, Some _ -> false
+        | None, None -> work.LegacyPhysicalProvenance = physicalBaseOfPart part
+
+    let private physicalPartConflict (existing: XTracePartRef list) (work: PartCaptureWork) =
+        let kind, _, _ = partShape work.Source.Part
+
+        work.PhysicalHostIdentity
+        |> Option.bind (fun _ ->
+            existing
+            |> List.tryFind (fun part ->
+                let otherToolFacet =
+                    areToolFacets part.Kind kind
+                    && part.Role = work.Message.Role
+                    && part.ProviderRun = work.Message.ProviderRun
+                    && part.ToolCallId = work.Source.ToolCallId
+
+                samePhysicalIdentity work part && not (sameMaterial work part || otherToolFacet))
+            |> Option.map (fun _ -> "Confirmed Host physical material identity conflict"))
+
+    let private toolAliasMatch (work: PartCaptureWork) (part: XTracePartRef) =
+        knownToolCallScope work
+        |> Option.exists (fun (run, call, kind) ->
+            work.Source.HostToolPartId.IsSome
+            && part.Kind = kind
+            && part.ProviderRun = Some run
+            && part.HostToolPartId = work.Source.HostToolPartId
+            && part.ToolCallId = Some call)
+
+    let private stablePhysicalPartAlreadyCaptured (existing: XTracePartRef list) (work: PartCaptureWork) =
         let kind, _, _ = partShape work.Source.Part
 
         let matching =
@@ -556,11 +678,8 @@ module XTraceCapture =
             |> List.tryFind (fun part ->
                 part.Provenance = work.Provenance
                 || (work.LegacyPhysicalProvenance = Some part.Provenance && part.Kind = kind)
-                || (work.Source.HostToolPartId.IsSome
-                    && part.Kind = kind
-                    && part.ProviderRun = work.Message.ProviderRun
-                    && part.HostToolPartId = work.Source.HostToolPartId
-                    && part.ToolCallId = work.Source.ToolCallId)
+                || (work.LegacyFacetProvenance = Some part.Provenance && part.Kind = kind)
+                || toolAliasMatch work part
                 || (work.LegacyStableProvenance = Some part.Provenance
                     && legacySemanticMatch work part))
 
@@ -569,20 +688,88 @@ module XTraceCapture =
         | Some part when legacySemanticMatch work part || legacyPhysicalReplay work part -> Ok true
         | Some _ -> Error "Confirmed Host material identity conflict"
 
-    let private workSignature (work: PartCaptureWork) =
+    let private stablePartAlreadyCaptured (existing: XTracePartRef list) (work: PartCaptureWork) =
+        let candidates =
+            knownToolCallScope work
+            |> Option.map (callCandidates existing)
+            |> Option.defaultValue []
+
+        match physicalPartConflict existing work, candidates with
+        | Some error, _ -> Error error
+        | None, [ part ] when ((physicalAddress work).IsNone || isCallOnlyPart part) && sameMaterial work part ->
+            Ok true
+        | None, [ part ] when (physicalAddress work).IsNone || isCallOnlyPart part ->
+            Error "Confirmed Host material identity conflict"
+        | None, _ :: _ :: _ when (physicalAddress work).IsNone ->
+            Error "Confirmed Host tool call identity is ambiguous without a physical part"
+        | _ -> stablePhysicalPartAlreadyCaptured existing work
+
+    let private materialSignature (work: PartCaptureWork) =
         let kind, toolName, body = partShape work.Source.Part
 
-        work.Message.Role,
-        work.Message.ProviderRun,
-        kind,
-        toolName,
-        body,
-        work.Source.ToolCallId,
-        work.Source.HostToolPartId
+        work.Message.Role, work.Message.ProviderRun, kind, toolName, body, work.Source.ToolCallId
+
+    let private workSignature (work: PartCaptureWork) =
+        materialSignature work, work.Source.HostToolPartId
+
+    let private compatiblePhysicalWorks (first: PartCaptureWork) (second: PartCaptureWork) =
+        let firstKind, _, _ = partShape first.Source.Part
+        let secondKind, _, _ = partShape second.Source.Part
+
+        materialSignature first = materialSignature second
+        || (areToolFacets firstKind secondKind
+            && first.Message.Role = second.Message.Role
+            && first.Message.ProviderRun = second.Message.ProviderRun
+            && first.Source.ToolCallId = second.Source.ToolCallId)
+
+    let private conflictingPhysicalGroups works =
+        works
+        |> List.choose (fun work -> work.PhysicalHostIdentity |> Option.map (fun physical -> physical, work))
+        |> List.groupBy fst
+        |> List.exists (fun (_, group) ->
+            let copies =
+                group
+                |> Seq.map snd
+                |> Seq.distinctBy materialSignature
+                |> Seq.truncate 3
+                |> Seq.toList
+
+            match copies with
+            | []
+            | [ _ ] -> false
+            | [ first; second ] -> not (compatiblePhysicalWorks first second)
+            | _ -> true)
 
     let private conflictingMaterialGroups groups =
         groups
         |> List.exists (fun (_, group) -> group |> List.map workSignature |> List.distinct |> List.length > 1)
+
+    let private conflictingCallEvidence existing works =
+        works
+        |> List.choose (fun work -> knownToolCallScope work |> Option.map (fun scope -> scope, work))
+        |> List.groupBy fst
+        |> List.exists (fun (scope, scopedWorks) ->
+            let group = scopedWorks |> List.map snd
+            let prior = callCandidates existing scope
+
+            let missingAddress =
+                group |> List.exists (fun work -> (physicalAddress work).IsNone)
+
+            if not missingAddress && not (prior |> List.exists isCallOnlyPart) then
+                false
+            else
+                let changed =
+                    group |> List.map materialSignature |> List.distinct |> List.length > 1
+
+                let physical = group |> List.choose physicalAddress |> List.distinct
+
+                let newPhysical =
+                    group
+                    |> List.filter (fun work -> stablePartAlreadyCaptured existing work = Ok false)
+                    |> List.choose physicalAddress
+                    |> List.distinct
+
+                changed || physical.Length > 1 || prior.Length + newPhysical.Length > 1)
 
     let private validateStableBatch existing works =
         let conflict =
@@ -597,13 +784,22 @@ module XTraceCapture =
 
         let conflictingToolAliases =
             works
-            |> List.filter (fun work -> work.Source.HostToolPartId.IsSome)
+            |> List.filter (fun work -> work.Source.HostToolPartId.IsSome && (knownToolCallScope work).IsSome)
             |> List.groupBy (fun work ->
                 let kind, _, _ = partShape work.Source.Part
                 kind, work.Message.ProviderRun, work.Source.HostToolPartId, work.Source.ToolCallId)
             |> conflictingMaterialGroups
 
-        match conflict, conflictingCopies || conflictingToolAliases with
+        let conflictingCalls = conflictingCallEvidence existing works
+        let conflictingPhysical = conflictingPhysicalGroups works
+
+        match
+            conflict,
+            conflictingCopies
+            || conflictingToolAliases
+            || conflictingCalls
+            || conflictingPhysical
+        with
         | Some error, _ -> Error error
         | None, true -> Error "Confirmed Host material identity conflict within capture batch"
         | None, false -> Ok()
@@ -820,10 +1016,6 @@ module XTraceCapture =
         |> captureSourcesStable journal sessionId messageIds
 
     let private toCapturedWire (message: SessionMessage) : ProviderWireCapture.CapturedWireMessage =
-        let hostToolByCall =
-            message.ToolParts
-            |> Array.fold (fun acc part -> Map.add (ToolCallId.value part.ToolCallId) part.HostToolPartId acc) Map.empty
-
         { Role = message.Role
           ProviderRun =
             if message.Role = "assistant" && not (String.IsNullOrWhiteSpace message.Id) then
@@ -854,55 +1046,16 @@ module XTraceCapture =
                           HostPartId = hostPartId
                           HostToolPartId = None }
                 | MessagePart.ToolCall(callId, name, args) ->
-                    let hostToolPartId = Map.tryFind callId hostToolByCall
-
                     Some
                         { WirePart = WireToolCall(ToolCallId.create callId, name, args)
-                          HostPartId =
-                            hostPartId
-                            |> Option.orElseWith (fun () ->
-                                hostToolPartId |> Option.map (HostToolPartId.value >> HostMessagePartId.create))
-                          HostToolPartId = hostToolPartId }
+                          HostPartId = hostPartId
+                          HostToolPartId = hostPartId |> Option.map (HostMessagePartId.value >> HostToolPartId.create) }
                 | MessagePart.ToolResult(callId, result) ->
-                    let hostToolPartId = Map.tryFind callId hostToolByCall
-
                     Some
                         { WirePart = WireToolResult(ToolCallId.create callId, result)
-                          HostPartId =
-                            hostPartId
-                            |> Option.orElseWith (fun () ->
-                                hostToolPartId |> Option.map (HostToolPartId.value >> HostMessagePartId.create))
-                          HostToolPartId = hostToolPartId }
+                          HostPartId = hostPartId
+                          HostToolPartId = hostPartId |> Option.map (HostMessagePartId.value >> HostToolPartId.create) }
                 | MessagePart.Activity _ -> None) }
-
-    /// Synchronise XTrace with the Host snapshot (after-hook / ensureReview).
-    /// Idempotent with messages.transform via the same stable or positional provenance.
-    let private captureStableSessionMessages journal sessionId ids captured =
-        task {
-            let! result = captureMessageViewStable journal sessionId ids captured
-            return result |> Result.map ignore
-        }
-
-    let private capturePositionalSessionMessages journal sessionId captured =
-        task {
-            let! _ = captureMessageView journal sessionId captured
-            return Ok()
-        }
-
-    let captureSessionMessages
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (messages: SessionMessage list)
-        : Task<Result<unit, string>> =
-        task {
-            let captured = messages |> List.map toCapturedWire
-            let observedIds = messages |> List.map (fun message -> Some message.Id)
-
-            match stableCaptureEligibility journal sessionId observedIds with
-            | XTraceStableCaptureEligibility.Eligible ids when List.length ids = List.length captured ->
-                return! captureStableSessionMessages journal sessionId ids captured
-            | _ -> return! capturePositionalSessionMessages journal sessionId captured
-        }
 
     let private captureReceipt
         (identity: XTraceCaptureIdentity)
@@ -1082,8 +1235,21 @@ module XTraceCapture =
                 return ()
             })
 
-    let private capturedObservationMessage (observation: XTraceMessageObservation) =
-        match observation.Origin with
+    let private observationOrigin sessionId agentProjections (observation: XTraceMessageObservation) =
+        let durableOrigin =
+            if observation.Message.Role = "user" then
+                PromptAuthorityProjectionQueries.recordedOrigin
+                    sessionId
+                    (observation.HostMessageId |> Option.map PhysicalUserMessageId.create)
+                    observation.PromptKey
+                    agentProjections
+            else
+                None
+
+        durableOrigin |> Option.orElse observation.Origin
+
+    let private capturedObservationMessage sessionId agentProjections (observation: XTraceMessageObservation) =
+        match observationOrigin sessionId agentProjections observation with
         | Some(PromptAuthority.PromptOrigin.Continuation PromptAuthority.ContinuationKind.ProviderRetryAttempt) ->
             { observation.Message with Parts = [] }
         | _ -> observation.Message
@@ -1131,7 +1297,10 @@ module XTraceCapture =
 
     let private captureObservedDurable journal durable sessionId observations =
         let before = xTraceOf durable sessionId
-        let captured = observations |> List.map capturedObservationMessage
+        let agentProjections = (AgentJournal.snapshot durable).AgentProjections
+
+        let captured =
+            observations |> List.map (capturedObservationMessage sessionId agentProjections)
 
         let observedIds =
             observations |> List.map (fun observation -> observation.HostMessageId)
@@ -1174,36 +1343,25 @@ module XTraceCapture =
                 |> List.mapi (fun index message ->
                     { Message = message
                       HostMessageId = messageIds |> Option.bind (List.tryItem index)
+                      PromptKey = None
                       Origin = None })
 
             let! captured = captureObservedMessagesWithReceipt journal sessionId observations
             return captured |> Result.map (fun result -> result.Receipt)
         }
 
-    /// Trace-owned capture decision for a complete Host snapshot. Composition
-    /// roots control ordering; this operation alone chooses stable vs positional
-    /// identity and performs the durable append.
-    let private captureIdentityForEligibility =
-        function
-        | XTraceStableCaptureEligibility.Eligible _ -> XTraceCaptureIdentity.StableHostIdentity
-        | _ -> XTraceCaptureIdentity.PositionalIdentity
-
     let private captureSessionMessagesDurable journal durable sessionId messages =
         task {
-            let before = xTraceOf durable sessionId
-
-            let eligibility =
+            let observations =
                 messages
-                |> List.map (fun message -> Some message.Id)
-                |> stableCaptureEligibility journal sessionId
+                |> List.map (fun message ->
+                    { Message = toCapturedWire message
+                      HostMessageId = Some message.Id
+                      PromptKey = message.PromptKey |> Option.map PromptKey.create
+                      Origin = message.Origin })
 
-            let identity = captureIdentityForEligibility eligibility
-            let! result = captureSessionMessages journal sessionId messages
-
-            return
-                result
-                |> Result.mapError XTraceCaptureError.Refused
-                |> Result.map (fun () -> captureReceipt identity before (xTraceOf durable sessionId))
+            let! result = captureObservedDurable journal durable sessionId observations
+            return result |> Result.map (fun captured -> captured.Receipt)
         }
 
     let captureSessionMessagesWithReceipt

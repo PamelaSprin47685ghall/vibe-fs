@@ -742,7 +742,7 @@ module EnforcerContinuation =
                   RawMessages = rawMessages
                   Project = project
                   Stop = stop
-                  RefreshMainContext = BloggerMainContext.fromJournal scope durable
+                  RefreshMainContext = BloggerMainContext.fromJournal durable
                   IsEmptyTextCycleFailure = isEmptyTextCycleFailure }
 
             let ownership durable live physical =

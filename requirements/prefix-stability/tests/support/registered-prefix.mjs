@@ -6,6 +6,8 @@ import * as Journal from '../../../../dist/Persistence/Journal/Surface.js'
 import * as Enforcer from '../../../../dist/Enforcer/Surface.js'
 import * as Dispatch from '../../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import * as Recovery from '../../../../dist/OpenCode/Host/SessionRecoveryHostSurface.js'
+import * as Trace from '../../../../dist/Context/Trace/SemanticTraceSurface.js'
+import * as WorkRecord from '../../../../dist/Mission/WorkRecord/Surface.js'
 import { acceptAuthorityRoot, awaitPrompted } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 
 const payload = (value, name) => {
@@ -32,6 +34,33 @@ export const prefixHistory = directory => ({
   reanchors: facts(directory, 'ContextReanchored'),
   observations: facts(directory, 'BlogObservationCommitted'),
 })
+
+export const checkpointEvidence = (runtime, sessionID, callId) =>
+  WorkRecord.journalCheckpointEvidence(runtime.journal, sessionID, callId)
+
+export const candidateEvidence = (runtime, sessionID, phaseCutoff = null) =>
+  WorkRecord.journalCandidateEvidence(runtime.journal, sessionID, phaseCutoff)
+
+export const commitOfferedFrame = async (runtime, sessionID, label) => {
+  const request = await WorkRecord.nextBloggerRequest(runtime.journal, sessionID)
+  assert.ok(request)
+  const payload = await Journal.JournalSurface_writePayload(runtime.journal, 'Recorded the material offered in ' + label)
+  assert.equal(payload.ok, true)
+  const proof = {
+    bloggerSessionId: request.bloggerSessionId, requestId: request.requestId,
+    frameEpoch: request.frameEpoch,
+    previousIngestedThroughSequence: request.previousSequence,
+    nextIngestedThroughSequence: request.nextSequence,
+    previousCoverableTurnCutoffExclusive: request.previousCutoff,
+    nextCoverableTurnCutoffExclusive: request.nextCutoff,
+    nextCoveredPrefixDigest: request.nextCoveredPrefixDigest,
+    textRef: payload.blobRef, textDigest: payload.blobDigest, toolCallIds: [], tipRuleId: label,
+    fieldNameAtCommit: label, observedPrefixEpoch: request.observedPrefixEpoch,
+  }
+  const committed = await WorkRecord.appendBlogObservation(runtime.journal, sessionID, `run-${label}`, proof)
+  assert.equal(committed.ok, true, JSON.stringify(committed.error))
+  return proof
+}
 
 export const observeFact = async (directory, name, action) => {
   const observed = Promise.withResolvers()
@@ -136,14 +165,20 @@ export const coveredSession = async (hooks, runtime, directory, sessionID, testC
     await hooks['tool.execute.after']({ ...input, args: output.args }, { title: 'todowrite', output: 'Todos updated', metadata: {} })
     await hooks.event({ event: { type: 'message.part.updated', properties: { sessionID, part: { type: 'tool', tool: 'todowrite', callID: input.callID, state: { status: 'completed' } } } } })
     assert.equal(Journal.JournalSurface_snapshot(runtime.journal).todoCheckpoints[0].checkpoints[0].callId, input.callID)
+    assert.deepEqual(checkpointEvidence(runtime, sessionID, input.callID), { checkpointTurn: 4, desiredCutoff: 4 })
+    assert.equal(facts(directory, 'BlogObservationCommitted')[0].NextCoverableTurnCutoffExclusive, 4)
+    assert.deepEqual(await candidateEvidence(runtime, sessionID, 2), { ok: false, reason: 'NoCoverage' }, 'CTX-029: a frame crossing the desired boundary must not advance')
+    assert.deepEqual(await candidateEvidence(runtime, sessionID, 4), { ok: true, cutoff: 4 })
   })
   return { sessionID, profile, messages, transform, push, clock: 10, blogger, bloggerPhysical, bloggerMessages, bloggerNext }
 }
 
 export const commitPendingBlogger = async (hooks, runtime, directory, session) => {
   const request = facts(directory, 'BloggerRequestMaterialized').at(-1)
-  assert.equal(request.PreviousIngestedThroughSequence, '4')
+  const previous = facts(directory, 'BlogObservationCommitted').at(-1)
+  assert.equal(request.PreviousIngestedThroughSequence, previous.NextIngestedThroughSequence)
   assert.equal(request.NextIngestedThroughSequence, '6')
+  assert.deepEqual(Trace.semanticCursorAfter(Trace.cursor(6), Trace.snapshot(runtime.journal, session.sessionID)), { turn: 6, partIndex: 0 })
   const entry = { charge: 'Record the completed checkpoint.', occurrence: 'The checkpoint completed.', settlement: 'The checkpoint is durable.', consequence: 'Later work retains the checkpoint.', tip: Enforcer.fieldNames()[0] }
   const recorded = await hooks.tool.chronicle.execute(entry, { sessionID: session.blogger, agent: 'blogger', messageID: session.bloggerNext.info.id, callID: 'call-blog-second' })
   session.bloggerNext.info.finish = 'tool-calls'
@@ -156,15 +191,9 @@ export const commitPendingBlogger = async (hooks, runtime, directory, session) =
   assert.equal(committed.length, 2)
   assert.deepEqual(committed.at(-1).RequestId, request.RequestId)
   assert.deepEqual(committed.at(-1).ProviderRun, ['ProviderRunIdentity', session.bloggerNext.info.id])
-  assert.equal(committed.at(-1).PreviousIngestedThroughSequence, '4')
-  assert.equal(committed.at(-1).NextIngestedThroughSequence, '6')
-  // The second chunk covers sequence 4..6 but stops before the next complete
-  // host turn boundary, so BlogProjection_applyEntry keeps the coverable cutoff
-  // at 4 (CTX-016: CoverableTurnCutoffExclusive advances only on complete host
-  // turns; CTX-028: a checkpoint's turn is never cut mid call/result). The
-  // first frame already ends at cutoff 4 and DevOps generation 11 measured
-  // that this second observation does not move it past 4.
-  assert.equal(committed.at(-1).NextCoverableTurnCutoffExclusive, 4)
+  assert.equal(committed.at(-1).PreviousIngestedThroughSequence, request.PreviousIngestedThroughSequence)
+  assert.equal(committed.at(-1).NextIngestedThroughSequence, request.NextIngestedThroughSequence)
+  assert.equal(committed.at(-1).NextCoverableTurnCutoffExclusive, 6)
   const cycles = state(runtime, session.sessionID).bloggerCycles
   assert.equal(cycles.receiptCount, 2)
   assert.ok(cycles.receiptRuns.includes(session.bloggerNext.info.id), 'the second producer must have its durable cycle receipt')

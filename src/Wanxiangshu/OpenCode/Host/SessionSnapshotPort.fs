@@ -8,6 +8,7 @@ open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Dispatch.OpenCode
+open Wanxiangshu.Interaction.Authority
 
 module SessionSnapshotPort =
 
@@ -91,13 +92,19 @@ module SessionSnapshotPort =
         | "error" -> SnapshotToolPartState.Failed(canonicalValue (failedErrorOf state))
         | _ -> SnapshotToolPartState.Pending
 
-    let private sessionToolPartOf (partId: string) (call: string) (name: string) (part: obj) (state: obj) =
+    let private sessionToolPartOf
+        (partId: HostToolPartId option)
+        (call: string)
+        (name: string)
+        (part: obj)
+        (state: obj)
+        =
         let stateValue =
             readString (if isNull state then null else state?status)
             |> Option.map (fun value -> value.ToLowerInvariant())
             |> Option.defaultValue "pending"
 
-        { HostToolPartId = HostToolPartId.create partId
+        { HostToolPartId = partId
           ToolCallId = ToolCallId.create call
           ToolName = name
           InputCanonical = canonicalValue (toolInputOf part state)
@@ -113,10 +120,10 @@ module SessionSnapshotPort =
             |> Option.orElse (readString part?callId)
 
         let toolName = readString part?tool |> Option.orElse (readString part?name)
-        let hostToolPartId = readString part?id |> Option.orElse callId
+        let hostToolPartId = readString part?id |> Option.map HostToolPartId.create
 
-        match hostToolPartId, callId, toolName with
-        | Some partId, Some call, Some name -> Some(sessionToolPartOf partId call name part state)
+        match callId, toolName with
+        | Some call, Some name -> Some(sessionToolPartOf hostToolPartId call name part state)
         | _ -> None
 
     /// Evidence → Decision: part kind is a tool wire form.
@@ -217,36 +224,28 @@ module SessionSnapshotPort =
         || isTrue (if isNull info then null else info?summary)
         || isTrue (if isNull raw then null else raw?summary)
 
-    /// PROMPT-011 anchor, wherever the Host kept it.
-    ///
-    /// `OpenCodePort` writes it onto the text part because that survives the Host
-    /// round-trip more reliably than `body.metadata`; both spellings are read here so
-    /// the recovery does not depend on which one a given Host version preserved.
-    let private promptKeyFromMetadata (source: obj) =
+    let private textFromMetadata (field: string) (source: obj) =
         if isNull source || isNull source?metadata then
             None
         else
-            readString source?metadata?(PromptMetadataCodec.PromptKeyField)
+            readString source?metadata?(field)
 
-    let private promptKeyFromPart (part: obj) =
-        if isNull part then None else promptKeyFromMetadata part
-
-    let private tryPickPromptKeyFromParts (parts: obj array) =
+    let private textFromMetadataParts (field: string) (parts: obj array) =
         try
-            parts |> Array.tryPick promptKeyFromPart
+            parts |> Array.tryPick (textFromMetadata field)
         with _ ->
             None
 
-    let private promptKeyFromParts (raw: obj) =
+    let private metadataTextFromParts (field: string) (raw: obj) =
         if isNull raw || isNull raw?parts then
             None
         else
-            tryPickPromptKeyFromParts (unbox<obj array> raw?parts)
+            textFromMetadataParts field (unbox<obj array> raw?parts)
 
-    let private promptKeyOf (info: obj) (raw: obj) =
-        promptKeyFromMetadata info
-        |> Option.orElseWith (fun () -> promptKeyFromMetadata raw)
-        |> Option.orElseWith (fun () -> promptKeyFromParts raw)
+    let private metadataTextOf (field: string) (info: obj) (raw: obj) =
+        textFromMetadata field info
+        |> Option.orElseWith (fun () -> textFromMetadata field raw)
+        |> Option.orElseWith (fun () -> metadataTextFromParts field raw)
 
     let projectMessage (raw: obj) : SessionMessage option =
         if isNull raw then
@@ -290,7 +289,10 @@ module SessionSnapshotPort =
                       CreatedAt = createdAtOf info raw
                       Completed = completedOf info raw
                       IsCompaction = isCompactionOf info raw
-                      PromptKey = promptKeyOf info raw
+                      PromptKey = metadataTextOf PromptMetadataCodec.PromptKeyField info raw
+                      Origin =
+                        metadataTextOf PromptMetadataCodec.OriginField info raw
+                        |> Option.map PromptAuthority.originFromLabel
                       Parts = parts
                       PartIds = partIds
                       ToolParts = toolPartsOf raw }

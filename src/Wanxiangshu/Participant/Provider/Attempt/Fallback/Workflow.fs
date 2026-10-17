@@ -416,7 +416,7 @@ module ProviderRecoveryWorkflow =
         (failed: BloggerRequestContext)
         : Task<RetryVerdict> =
         task {
-            match! BloggerMainContext.fromJournal scope durable mainSessionId turn.SessionId with
+            match! BloggerMainContext.fromJournal durable mainSessionId turn.SessionId with
             | None -> return RetryVerdict.Terminal "Blogger squash failed and no main material can be rebuilt"
             | Some main ->
                 return!

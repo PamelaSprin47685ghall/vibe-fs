@@ -206,19 +206,6 @@ module PluginTransforms =
         |> Option.map restore
         |> Option.defaultWith (fun () -> Task.FromResult(Ok rawMessages))
 
-    let private decodePromptOrigin (label: string) : PromptAuthority.PromptOrigin =
-        match label with
-        | "HumanRoot" -> PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot
-        | "AgentOwnerRoot" ->
-            PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.AgentOwnerRoot
-        | "HostInternal" -> PromptAuthority.PromptOrigin.HostInternal
-        | "UnknownOrigin" -> PromptAuthority.PromptOrigin.UnknownOrigin
-        | continuation ->
-            continuation
-            |> PromptAuthority.tryParseContinuationKind
-            |> Option.map PromptAuthority.PromptOrigin.Continuation
-            |> Option.defaultValue PromptAuthority.PromptOrigin.UnknownOrigin
-
     let private determineTransformMode
         (branches: TransformBranchCapabilities)
         (projectionSessionIdOpt: string option)
@@ -636,9 +623,10 @@ module PluginTransforms =
                             |> Option.map (fun message ->
                                 { Message = message
                                   HostMessageId = ProviderWireDecode.hostMessageId rawMessage
+                                  PromptKey = ProviderWireDecode.promptKeyOfMessage rawMessage
                                   Origin =
                                     ProviderWireDecode.promptOriginOfMessage rawMessage
-                                    |> Option.map decodePromptOrigin }))
+                                    |> Option.map PromptAuthority.originFromLabel }))
 
                     match!
                         XTraceCapture.captureObservedMessagesWithReceipt

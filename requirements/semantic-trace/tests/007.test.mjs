@@ -1,6 +1,60 @@
 import test from 'node:test'
 import { withReopenableJournal } from './support/journal.mjs'
 
+test('WHAT[semantic-trace-007] opaque Host identities survive durable capture and cold replay', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { spawnSync } = await import('node:child_process')
+  const { fileURLToPath } = await import('node:url')
+  const { NODE_TEST_CONTEXT, WANXIANGSHU_NO_FATAL_EXIT, ...env } = process.env
+  const child = spawnSync(process.execPath, [fileURLToPath(new URL('./support/opaque-identities-child.mjs', import.meta.url))], {
+    encoding: 'utf8', env, timeout: 15000,
+  })
+  assert.ifError(child.error)
+  assert.equal(child.status, 0, child.stderr)
+  assert.deepEqual(JSON.parse(child.stdout), { captured: 2, terminals: 1, cold: true })
+})
+
+test('WHAT[semantic-trace-007] old opaque provenance is replayed without narrowing its accepted domain', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { readdirSync, readFileSync, writeFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  const { encode } = await import('../../../dist/Persistence/EventStore/CodecSurface.js')
+  await withReopenableJournal(async (handle, reopen, directory) => {
+    const session = 'old-opaque-provenance'
+    const captured = await trace.captureObservedMessages(handle, session, [{ hostMessageId: 'message', message: {
+      info: { role: 'user' }, parts: [{ id: 'part', type: 'text', text: 'complete historical original' }],
+    } }])
+    assert.equal(captured.ok, true, captured.error)
+    journal.JournalSurface_dispose(handle)
+    const events = join(directory, 'wanxiangshu', 'events')
+    const provenance = `g:0/msg:${'m'.repeat(1000)}/host-part:p`
+    let rewritten = 0
+    const replaceProvenance = value => {
+      if (!value || typeof value !== 'object') return
+      if (typeof value.Provenance === 'string') {
+        value.Provenance = provenance
+        rewritten += 1
+      }
+      Object.values(value).forEach(replaceProvenance)
+    }
+    for (const name of readdirSync(events).filter(name => name.endsWith('.ndjson'))) {
+      const path = join(events, name)
+      const rows = readFileSync(path, 'utf8').trim().split('\n').map(JSON.parse)
+      rows.forEach(row => replaceProvenance(row.payload))
+      writeFileSync(path, rows.map(row => encode({ id: row.event_id, stream: row.stream_id, type: row.event_type,
+        parents: row.parents, payload: row.payload, payloadRefs: row.payload_refs, payloads: row.payloads })).join(''))
+    }
+    assert.equal(rewritten, 1)
+    const cold = await reopen()
+    const parts = trace.orderedSemanticParts(trace.snapshot(cold, session))
+    assert.equal(parts.length, 1)
+    assert.equal(parts[0].provenance, provenance)
+    assert.equal((await trace.currentProjection(cold, session)).messages[0].parts[0].text, 'complete historical original')
+  })
+})
+
 test('WHAT[semantic-trace-007] a payload cannot manufacture terminal evidence without an actual ProviderRun', async () => {
   const assert = (await import('node:assert/strict')).default
   const journal = await import('../../../dist/Persistence/Journal/Surface.js')

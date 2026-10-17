@@ -1,5 +1,36 @@
 import test from 'node:test'
 
+test('WHAT[semantic-trace-003] only canonical structured tuples provide Host identity evidence', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  const message = 'real/msg:literal/host-part:message\0\ud800'
+  const tuple = ['physical', message, 'actual/part\0\ud801', 'content']
+  const canonical = JSON.stringify(tuple)
+  const invalid = [
+    `g:0/material: ${canonical}`,
+    `g:0/material:${canonical.slice(0, 1)} ${canonical.slice(1)}`,
+    `g:0/material:${canonical.replace('real/', 'real\\/')}`,
+    `g:00/material:${canonical}`,
+    `g:-1/material:${canonical}`,
+    `g:0/material:${JSON.stringify(['other', message, 'actual/part', 'content'])}`,
+    `g:0/material:${JSON.stringify(['physical', message, 42, 'content'])}`,
+    `g:0/material:${JSON.stringify(['physical', message, 'actual/part', 'tool-call'])}`,
+    `g:0/material:${JSON.stringify([...tuple, 'extra'])}`,
+    `g:0/material:${JSON.stringify({ tag: 'physical', message })}`,
+    `g:0/material:["physical","${message}","part","content"]`,
+  ]
+  for (const [index, provenance] of [`g:0/material:${canonical}`, ...invalid].entries()) {
+    const appended = trace.appendPart(trace.emptyProjection(), {
+      sequence: 1, role: 'user', provenance, turn: 0, partIndex: 0, kind: 'text',
+      textRef: `blob-${index}`, textDigest: `digest-${index}`, body: 'actual text',
+    })
+    assert.equal(appended.ok, true, JSON.stringify(appended.error))
+    const part = trace.orderedSemanticParts(appended.projection)[0]
+    assert.equal(trace.tryHostMessageIdAt(part.cursor, appended.projection), index === 0 ? message : undefined, provenance)
+    assert.deepEqual(trace.partsForHostMessageIds([message, 'literal', 'message'], appended.projection).map(part => part.cursor.sequence), index === 0 ? [1] : [])
+  }
+})
+
 test('WHAT[semantic-trace-003] old physical tool provenance replays without adding a cursor or backfilling missing evidence', async () => {
   const assert = (await import('node:assert/strict')).default
   const { withReopenableJournal } = await import('./support/journal.mjs')
@@ -66,7 +97,111 @@ test('WHAT[semantic-trace-003] duplicate Host parts in one batch consume one sem
   })
 })
 
-for (const change of ['bytes', 'role']) {
+for (const [beforeKind, afterKind] of [['text', 'tool-call'], ['reasoning', 'tool-result'], ['tool-call', 'text'], ['tool-result', 'reasoning']]) {
+  test(`WHAT[semantic-trace-003] one physical material cannot change from ${beforeKind} to ${afterKind}`, async () => {
+    const assert = (await import('node:assert/strict')).default
+    const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+    const { withReopenableJournal } = await import('./support/journal.mjs')
+    await withReopenableJournal(async (handle, reopen) => {
+      const session = `physical-kind-${beforeKind}-${afterKind}`
+      const part = kind => kind === 'text' || kind === 'reasoning'
+        ? { id: 'actual-part', type: kind, text: 'same bytes' }
+        : { id: 'actual-part', type: 'tool', tool: 'read', callID: 'actual-call', state: kind === 'tool-call' ? { status: 'running', input: 'same bytes' } : { status: 'completed', output: 'same bytes' } }
+      const observed = kind => [{ hostMessageId: 'actual-message', message: { info: { id: 'actual-message', role: 'assistant' }, parts: [part(kind)] } }]
+      assert.equal((await trace.captureObservedMessages(handle, session, observed(beforeKind))).ok, true)
+      const before = trace.traceRecords(trace.snapshot(handle, session))
+      const refused = await trace.captureObservedMessages(handle, session, observed(afterKind))
+      assert.equal(refused.ok, false)
+      assert.match(JSON.stringify(refused.error), /conflict/i)
+      assert.deepEqual(trace.traceRecords(trace.snapshot(handle, session)), before)
+      assert.deepEqual(trace.traceRecords(trace.snapshot(await reopen(), session)), before)
+    })
+  })
+}
+
+test('WHAT[semantic-trace-003] a legacy physical content identity cannot evade kind checks through the new namespace', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+  const { withReopenableJournal } = await import('./support/journal.mjs')
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'legacy-physical-kind'
+    const payload = await journal.JournalSurface_writePayload(handle, 'same bytes')
+    assert.equal(payload.ok, true)
+    const appended = await journal.JournalSurface_appendAgent(handle, { kind: 'Session', session }, 'actual-message', {
+      family: 'Companion', case: 'XTracePartAppended', payload: {
+        SessionId: session, CursorSequence: 1n, Role: 'assistant', Turn: 0, PartIndex: 0, Kind: 'text', ToolName: null,
+        TextRef: payload.blobRef, TextDigest: payload.blobDigest, Provenance: 'g:0/msg:actual-message/host-part:actual-part',
+        ProviderRun: 'actual-message', ToolCallId: null, HostToolPartId: null,
+      },
+    })
+    assert.equal(appended.ok, true, JSON.stringify(appended.error))
+    const before = trace.traceRecords(trace.snapshot(handle, session))
+    const refused = await trace.captureObservedMessages(handle, session, [{ hostMessageId: 'actual-message', message: { info: { id: 'actual-message', role: 'assistant' }, parts: [{ id: 'actual-part', type: 'reasoning', text: 'same bytes' }] } }])
+    assert.equal(refused.ok, false)
+    assert.deepEqual(trace.traceRecords(trace.snapshot(handle, session)), before)
+    assert.deepEqual(trace.traceRecords(trace.snapshot(await reopen(), session)), before)
+  })
+})
+
+for (const shape of ['current', 'physical', 'suffix']) {
+  for (const changedField of ['call', 'run', 'role']) {
+    test(`WHAT[semantic-trace-003] tool facets retain their shared ownership (${shape}, ${changedField})`, async () => {
+      const assert = (await import('node:assert/strict')).default
+      const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+      const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+      const { withReopenableJournal } = await import('./support/journal.mjs')
+      await withReopenableJournal(async (handle, reopen) => {
+        const session = `facet-ownership-${shape}-${changedField}`
+        if (shape === 'current') {
+          assert.equal((await trace.captureObservedMessages(handle, session, [{ hostMessageId: 'actual-message', message: { info: { id: 'actual-message', role: 'assistant' }, parts: [{ id: 'actual-part', type: 'tool', tool: 'read', callID: 'actual-call', state: { status: 'running', input: { path: 'a' } } }] } }])).ok, true)
+        } else {
+          const payload = await journal.JournalSurface_writePayload(handle, '{"path":"a"}')
+          assert.equal(payload.ok, true)
+          const appended = await journal.JournalSurface_appendAgent(handle, { kind: 'Session', session }, 'actual-message', {
+            family: 'Companion', case: 'XTracePartAppended', payload: {
+              SessionId: session, CursorSequence: 1n, Role: 'assistant', Turn: 0, PartIndex: 0, Kind: 'tool_call', ToolName: 'read',
+              TextRef: payload.blobRef, TextDigest: payload.blobDigest, ProviderRun: 'actual-message', ToolCallId: 'actual-call', HostToolPartId: 'actual-part',
+              Provenance: `g:0/msg:actual-message/host-part:actual-part${shape === 'suffix' ? '/tool-call' : ''}`,
+            },
+          })
+          assert.equal(appended.ok, true, JSON.stringify(appended.error))
+        }
+        const before = trace.traceRecords(trace.snapshot(handle, session))
+        const message = { info: { id: 'actual-message', role: 'assistant' }, parts: [{ id: 'actual-part', type: 'tool', tool: 'read', callID: 'actual-call', state: { status: 'completed', output: 'actual result' } }] }
+        if (changedField === 'call') message.parts[0].callID = 'another-call'
+        else if (changedField === 'run') message.info.id = 'another-run'
+        else message.info.role = 'user'
+        const refused = await trace.captureObservedMessages(handle, session, [{ hostMessageId: 'actual-message', message }])
+        assert.equal(refused.ok, false)
+        assert.match(JSON.stringify(refused.error), /conflict/i)
+        assert.deepEqual(trace.traceRecords(trace.snapshot(handle, session)), before)
+        assert.deepEqual(trace.traceRecords(trace.snapshot(await reopen(), session)), before)
+      })
+    })
+  }
+}
+
+for (const conflict of ['kind', 'call']) {
+  test(`WHAT[semantic-trace-003] physical facet conflicts in one batch are refused before the first append (${conflict})`, async () => {
+    const assert = (await import('node:assert/strict')).default
+    const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+    const { withReopenableJournal } = await import('./support/journal.mjs')
+    await withReopenableJournal(async (handle, reopen) => {
+      const session = `physical-batch-conflict-${conflict}`
+      const call = { id: 'actual-part', type: 'tool', tool: 'read', callID: 'actual-call', state: { status: 'running', input: { path: 'a' } } }
+      const other = conflict === 'kind'
+        ? { id: 'actual-part', type: 'text', text: 'separate content is not a facet' }
+        : { id: 'actual-part', type: 'tool', tool: 'read', callID: 'another-call', state: { status: 'completed', output: 'actual result' } }
+      const refused = await trace.captureObservedMessages(handle, session, [{ hostMessageId: 'actual-message', message: { info: { id: 'actual-message', role: 'assistant' }, parts: [call, other] } }])
+      assert.equal(refused.ok, false)
+      assert.deepEqual(trace.traceRecords(trace.snapshot(handle, session)), [])
+      assert.deepEqual(trace.traceRecords(trace.snapshot(await reopen(), session)), [])
+    })
+  })
+}
+
+for (const change of ['bytes', 'role', 'kind']) {
   test(`WHAT[semantic-trace-003] conflicting confirmed Host material is refused without advancing its prefix (${change})`, async () => {
     const assert = (await import('node:assert/strict')).default
     const { withReopenableJournal } = await import('./support/journal.mjs')
@@ -77,7 +212,8 @@ for (const change of ['bytes', 'role']) {
       const before = trace.traceRecords(trace.snapshot(handle, 'conflict-material'))
       const changed = structuredClone(original)
       if (change === 'bytes') changed.message.parts[0].text = 'changed'
-      else changed.message.info.role = 'user'
+      else if (change === 'role') changed.message.info.role = 'user'
+      else changed.message.parts[0].type = 'reasoning'
       const refused = await trace.captureObservedMessages(handle, 'conflict-material', [changed])
       assert.equal(refused.ok, false)
       assert.match(JSON.stringify(refused.error), /conflict/i)
@@ -131,10 +267,8 @@ test('WHAT[semantic-trace-003] concurrent same-session captures serialize before
     const parts = trace.orderedSemanticParts(trace.snapshot(handle, SESSION))
     assert.equal(parts.length, 2)
     assert.deepEqual(parts.map((part) => part.cursor.sequence), [1, 2])
-    assert.deepEqual(parts.map((part) => part.provenance).sort(), [
-      'g:0/msg:concurrent-a/host-part:concurrent-a-part',
-      'g:0/msg:concurrent-b/host-part:concurrent-b-part',
-    ])
+    const captured = trace.snapshot(handle, SESSION)
+    assert.deepEqual(parts.map((part) => trace.tryHostMessageIdAt(part.cursor, captured)).sort(), ['concurrent-a', 'concurrent-b'])
   })
 })
 }

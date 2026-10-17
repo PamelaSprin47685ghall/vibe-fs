@@ -73,15 +73,13 @@ module XTraceMaterialization =
         (_turn, parts: XTracePartRef list)
         : Task<Result<ProviderProjection.SemanticMessage, string>> =
         taskResult {
-            let ordered = parts |> List.sortBy (fun part -> part.PartIndex)
-
             let role =
-                ordered
+                parts
                 |> List.tryHead
                 |> Option.map (fun part -> part.Role)
                 |> Option.defaultValue "user"
 
-            let! semanticParts = ordered |> TaskResultList.traverseM (readSemanticPart xTrace)
+            let! semanticParts = parts |> TaskResultList.traverseM (readSemanticPart xTrace)
 
             return
                 { ProviderProjection.SemanticMessage.Role = role
@@ -93,7 +91,8 @@ module XTraceMaterialization =
         (parts: XTracePartRef list)
         : Task<Result<ProviderProjection.ProviderSemanticProjection, string>> =
         taskResult {
-            let turns = parts |> List.groupBy (fun part -> part.Turn) |> List.sortBy fst
+            let turns =
+                parts |> XTraceProjection.canonicalParts |> List.groupBy (fun part -> part.Turn)
 
             let! messages = turns |> TaskResultList.traverseM (readTurn xTrace)
             return { empty with Messages = messages }

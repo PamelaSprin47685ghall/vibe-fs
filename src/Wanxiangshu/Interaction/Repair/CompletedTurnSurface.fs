@@ -180,6 +180,7 @@ module CompletedTurnSurface =
                 unbox<bool> value?completed
           IsCompaction = false
           PromptKey = None
+          Origin = None
           Parts = partsOf value?parts
           PartIds = [||]
           ToolParts = [||] }

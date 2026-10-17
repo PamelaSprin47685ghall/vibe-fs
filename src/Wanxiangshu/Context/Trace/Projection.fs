@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Context.Trace
 
+open Fable.Core
 open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
@@ -112,10 +113,10 @@ module XTraceProjection =
           Terminals = []
           Bridge = WanxiangliTrace.emptyBridge traceId }
 
-    let empty = emptyWithIdentity "xtrace-material-v2/projection"
+    let empty = emptyWithIdentity (WanxiangliTrace.traceIdentity "projection")
 
     let emptyForSession sessionId =
-        emptyWithIdentity ("xtrace-material-v2/" + SessionId.value sessionId)
+        emptyWithIdentity (WanxiangliTrace.traceIdentity (SessionId.value sessionId))
 
     /// Oldest-first cursor order. The stored field is newest-first.
     let internal parts (state: XTraceProjectionState) : XTracePartRef list = List.rev state.Parts
@@ -307,6 +308,42 @@ module XTraceProjection =
         else
             0
 
+    [<Emit("JSON.stringify($0)")>]
+    let private encodeMaterialTuple (_values: string array) : string = jsNative
+
+    [<Emit("""(() => {
+        try {
+            const tuple = JSON.parse($0);
+            return Array.isArray(tuple) && tuple.length === 4
+                && tuple.every(value => typeof value === "string")
+                && ["physical", "call", "position"].includes(tuple[0])
+                && ["content", "tool_call", "tool_result"].includes(tuple[3])
+                && JSON.stringify(tuple) === $0 ? tuple : null;
+        } catch {
+            return null;
+        }
+    })()""")>]
+    let private parseMaterialTuple (_text: string) : string array = jsNative
+
+    let internal materialProvenance generation addressTag messageId address facet =
+        let encoded = encodeMaterialTuple [| addressTag; messageId; address; facet |]
+
+        if generation < 0 || (parseMaterialTuple encoded |> Option.ofObj).IsNone then
+            invalidArg "provenance" "Material provenance requires a generation and a canonical identity tuple"
+
+        sprintf "g:%d/material:%s" generation encoded
+
+    let internal tryMaterialProvenance (provenance: string) =
+        let prefix = sprintf "g:%d/material:" (provenanceGeneration provenance)
+
+        if not (provenance.StartsWith(prefix, System.StringComparison.Ordinal)) then
+            None
+        else
+            provenance.Substring(prefix.Length)
+            |> parseMaterialTuple
+            |> Option.ofObj
+            |> Option.map (fun tuple -> tuple[0], tuple[1], tuple[2], tuple[3])
+
     let private appendMaterial append =
         try
             Ok(append ())
@@ -419,10 +456,6 @@ module XTraceProjection =
         | [] -> []
         | first :: rest -> collectCurrentGeneration first.Generation [ first ] rest
 
-    /// Oldest-first copied views from the latest reanchor generation only.
-    let currentGenerationSemanticParts (state: XTraceProjectionState) : XTraceSemanticPartView list =
-        state |> parts |> currentGenerationParts |> List.map semanticPartView
-
     let providerRunParts
         (providerRun: ProviderRunIdentity)
         (state: XTraceProjectionState)
@@ -476,14 +509,67 @@ module XTraceProjection =
         else
             part.Provenance.Substring(idStart, length) |> nonBlankHostMessageId
 
-    let internal tryHostMessageId (part: XTracePartRef) : string option =
+    let private legacyHostMessageId (part: XTracePartRef) : string option =
         let marker = "/msg:"
         let start = part.Provenance.IndexOf(marker, System.StringComparison.Ordinal)
 
-        if start < 0 then
+        let generation = sprintf "g:%d" part.Generation
+
+        let legacyPrefix =
+            part.Provenance.StartsWith(generation + marker, System.StringComparison.Ordinal)
+
+        if start < 0 || not legacyPrefix then
             None
         else
             hostMessageIdFrom part (start + marker.Length)
+
+    let internal tryHostMessageId (part: XTracePartRef) : string option =
+        match tryMaterialProvenance part.Provenance with
+        | Some(_, messageId, _, _) -> nonBlankHostMessageId messageId
+        | None -> legacyHostMessageId part
+
+    let internal tryPhysicalHostIdentity (part: XTracePartRef) : (string * string) option =
+        match tryMaterialProvenance part.Provenance with
+        | Some("physical", messageId, partId, _) -> Some(messageId, partId)
+        | _ -> None
+
+    let internal canonicalParts (ordered: XTracePartRef list) : XTracePartRef list =
+        let sameMessage (left: XTracePartRef) (right: XTracePartRef) =
+            left.Role = right.Role
+            && left.Turn = right.Turn
+            && match tryHostMessageId left, tryHostMessageId right with
+               | Some leftId, Some rightId -> leftId = rightId
+               | None, None -> true
+               | _ -> false
+
+        ordered
+        |> List.mapFold
+            (fun (previous, turn, index) part ->
+                let same = previous |> Option.exists (fun prior -> sameMessage prior part)
+                let nextTurn = if same then turn else turn + 1
+                let nextIndex = if same then index + 1 else 0
+
+                { part with
+                    Turn = nextTurn
+                    PartIndex = nextIndex },
+                (Some part, nextTurn, nextIndex))
+            (None, -1, -1)
+        |> fst
+
+    /// Semantic coordinates follow the durable prefix, including late facets.
+    let currentGenerationSemanticParts (state: XTraceProjectionState) : XTraceSemanticPartView list =
+        state
+        |> parts
+        |> currentGenerationParts
+        |> canonicalParts
+        |> List.map semanticPartView
+
+    let lastCursorBeforeSemantic (nextCursor: SemanticCursor) (state: XTraceProjectionState) : XTraceCursor option =
+        currentGenerationSemanticParts state
+        |> List.tryFindBack (fun part ->
+            part.Turn < nextCursor.TurnIndex
+            || (part.Turn = nextCursor.TurnIndex && part.PartIndex < nextCursor.PartIndex))
+        |> Option.map (fun part -> part.Cursor)
 
     let tryHostMessageIdAt (cursor: XTraceCursor) (state: XTraceProjectionState) : string option =
         parts state
@@ -532,6 +618,7 @@ module XTraceProjection =
         state
         |> parts
         |> currentGenerationParts
+        |> canonicalParts
         |> List.tryPick (fun part ->
             match tryHostMessageId part with
             | Some stable when stable = messageId -> Some part.Turn
@@ -547,6 +634,7 @@ module XTraceProjection =
         state
         |> parts
         |> currentGenerationParts
+        |> canonicalParts
         |> List.tryPick (fun part ->
             match part.ToolCallId with
             | Some owned when owned = callId -> Some part.Turn
@@ -564,6 +652,7 @@ module XTraceProjection =
         state
         |> parts
         |> currentGenerationParts
+        |> canonicalParts
         |> List.tryLast
         |> Option.map (fun part -> part.Turn)
 
@@ -585,12 +674,26 @@ module XTraceProjection =
     /// delete exactly the historical rows proved by XTrace without moving an
     /// unrelated request-local presentation row across the boundary.
     let hostMessageIdsBeforeTurn (cutoffExclusive: int) (state: XTraceProjectionState) : string list =
-        state
-        |> parts
-        |> currentGenerationParts
-        |> List.filter (fun part -> part.Turn < cutoffExclusive)
-        |> List.choose tryHostMessageId
-        |> List.distinct
+        let messages =
+            state
+            |> parts
+            |> currentGenerationParts
+            |> canonicalParts
+            |> List.choose (fun part -> tryHostMessageId part |> Option.map (fun id -> id, part.Turn))
+            |> List.groupBy fst
+
+        let crossesBoundary (_, occurrences) =
+            let before = occurrences |> List.exists (fun (_, turn) -> turn < cutoffExclusive)
+            let after = occurrences |> List.exists (fun (_, turn) -> turn >= cutoffExclusive)
+            before && after
+
+        if messages |> List.exists crossesBoundary then
+            []
+        else
+            messages
+            |> List.filter (fun (_, occurrences) ->
+                occurrences |> List.forall (fun (_, turn) -> turn < cutoffExclusive))
+            |> List.map fst
 
     /// Map an ingest cursor (sequence of the last COVERED part) to the semantic
     /// cursor of the first UNCOVERED part. `>` not `>=`: the coverage sequence
@@ -606,7 +709,7 @@ module XTraceProjection =
             let ordered = parts state
             let current = currentGenerationParts ordered
 
-            if List.isEmpty current then ordered else current
+            (if List.isEmpty current then ordered else current) |> canonicalParts
 
         match
             searchable

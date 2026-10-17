@@ -28,6 +28,13 @@ module PromptAuthorityProjectionQueries =
         agentProjections: AgentProjectionSet ->
             PromptAuthority.PromptClaim option
 
+    val recordedOrigin:
+        sessionId: SessionId ->
+        physicalUserMessageId: PhysicalUserMessageId option ->
+        promptKey: PromptKey option ->
+        agentProjections: AgentProjectionSet ->
+            PromptAuthority.PromptOrigin option
+
     [<RequireQualifiedAccess>]
     type DispatchStatus =
         | Accepted of evidence: PromptAuthority.AcceptedDispatch

@@ -289,6 +289,17 @@ module PromptAuthority =
         | "DeferredWorkPresentation" -> Some DeferredWorkPresentation
         | _ -> None
 
+    let originFromLabel (label: string) =
+        match label with
+        | "HumanRoot" -> AuthorityRoot HumanRoot
+        | "AgentOwnerRoot" -> AuthorityRoot AgentOwnerRoot
+        | "HostInternal" -> HostInternal
+        | "UnknownOrigin" -> UnknownOrigin
+        | continuation ->
+            tryParseContinuationKind continuation
+            |> Option.map Continuation
+            |> Option.defaultValue UnknownOrigin
+
     /// Why a managed agent name was refused.
     ///
     /// Typed rather than a message, because the three cases mean different things to

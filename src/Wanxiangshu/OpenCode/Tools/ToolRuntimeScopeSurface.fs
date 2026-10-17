@@ -69,13 +69,16 @@ type private DummyObserver() =
 
 type private ControlledPtyPorts() =
     let sessions = Dictionary<string, PtyPort * PtyId>()
+    // DSL-MUTABLE: resource — count controlled backend termination receipts
     let mutable terminations = 0
+    // DSL-MUTABLE: resource — count controlled backend spawn receipts
     let mutable spawns = 0
 
     member _.Terminations = terminations
     member _.Spawns = spawns
 
     member _.Create() =
+        // DSL-MUTABLE: resource — controlled backend completion port
         let mutable portRef: PtyPort option = None
 
         let handler id command =
@@ -806,6 +809,7 @@ type ToolRuntimeScopeSurface =
 
             let childId = SessionId.create "devops-session-1"
             let run = manager.InstallRun("devops", childId, Role.DevOps, root)
+            // DSL-MUTABLE: subscription — observe the controlled terminal callback
             let mutable delivered = false
 
             task {

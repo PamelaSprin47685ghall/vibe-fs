@@ -43,6 +43,7 @@ type XTraceStableCaptureEligibility =
 type XTraceMessageObservation =
     { Message: ProviderWireCapture.CapturedWireMessage
       HostMessageId: string option
+      PromptKey: PromptKey option
       Origin: PromptAuthority.PromptOrigin option }
 
 type XTraceMessageCapture =

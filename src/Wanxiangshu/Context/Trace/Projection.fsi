@@ -97,6 +97,11 @@ module XTraceProjection =
 
     val provenanceGeneration: provenance: string -> int
 
+    val internal materialProvenance:
+        generation: int -> addressTag: string -> messageId: string -> address: string -> facet: string -> string
+
+    val internal tryMaterialProvenance: provenance: string -> (string * string * string * string) option
+
     val applyPart:
         cursorSequence: int64 ->
         role: string ->
@@ -131,7 +136,9 @@ module XTraceProjection =
     val terminalText: providerRun: ProviderRunIdentity -> state: XTraceProjectionState -> Result<string, string>
 
     val internal currentGenerationParts: parts: XTracePartRef list -> XTracePartRef list
+    val internal canonicalParts: ordered: XTracePartRef list -> XTracePartRef list
     val currentGenerationSemanticParts: state: XTraceProjectionState -> XTraceSemanticPartView list
+    val lastCursorBeforeSemantic: nextCursor: SemanticCursor -> state: XTraceProjectionState -> XTraceCursor option
 
     val providerRunParts:
         providerRun: ProviderRunIdentity -> state: XTraceProjectionState -> XTraceSemanticPartView list
@@ -150,6 +157,7 @@ module XTraceProjection =
             XTraceSemanticPartView list
 
     val internal tryHostMessageId: part: XTracePartRef -> string option
+    val internal tryPhysicalHostIdentity: part: XTracePartRef -> (string * string) option
     val tryHostMessageIdAt: cursor: XTraceCursor -> state: XTraceProjectionState -> string option
     val hostMessageFirstCursors: state: XTraceProjectionState -> Map<string, int64>
     val partsForHostMessageIds: messageIds: Set<string> -> state: XTraceProjectionState -> XTraceSemanticPartView list

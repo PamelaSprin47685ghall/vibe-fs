@@ -64,6 +64,7 @@ module PluginHooksSurface =
                       Completed = completed
                       IsCompaction = false
                       PromptKey = None
+                      Origin = None
                       Parts = [| MessagePart.Text "completed provider output" |]
                       PartIds = [| None |]
                       ToolParts = [||] }

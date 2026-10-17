@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Context.Companion.Blogger
 
 open System.Threading.Tasks
-open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Projection
@@ -44,9 +43,8 @@ module BloggerMainContext =
         projection: ProviderProjection.ProviderSemanticProjection ->
             BloggerRequestContext option
 
-    /// Async derivation from the live journal, honoring runtime Host flight/drain gates.
+    /// Async derivation from the live journal, honoring durable Blogger admission gates.
     val fromJournal:
-        scope: IBloggerRuntimeHost ->
         journal: AgentJournal ->
         mainSessionId: SessionId ->
         bloggerSessionId: SessionId ->

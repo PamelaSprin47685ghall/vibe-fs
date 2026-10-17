@@ -29,6 +29,22 @@ module PromptAuthorityProjectionQueries =
         projectionFor sessionId agentProjections
         |> Option.bind (fun authority -> Map.tryFind promptKey authority.PendingClaims)
 
+    let recordedOrigin
+        (sessionId: SessionId)
+        (physicalUserMessageId: PhysicalUserMessageId option)
+        (promptKey: PromptKey option)
+        (agentProjections: AgentProjectionSet)
+        =
+        projectionFor sessionId agentProjections
+        |> Option.bind (fun authority ->
+            physicalUserMessageId
+            |> Option.bind (fun physical -> Map.tryFind physical authority.PhysicalLandings)
+            |> Option.map (fun landing -> landing.Origin)
+            |> Option.orElseWith (fun () ->
+                promptKey
+                |> Option.bind (fun key -> Map.tryFind key authority.PendingClaims)
+                |> Option.map (fun claim -> claim.Origin)))
+
     /// The durable outcome of one logical dispatch, for resend admission.
     ///
     /// REVIEW-013/018 (process-review assignment reentry): `Accepted` means the

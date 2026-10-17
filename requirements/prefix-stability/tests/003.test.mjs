@@ -36,7 +36,7 @@ test('WHAT[prefix-stability-003] the registered failure proof rejects production
     'actual Chronicle execution and Host transcript commit the covered frame',
     'native checkpoint tool completion opens the real phase window',
     'exact first provider failure establishes the retry budget without promotion',
-    'the admitted retry keeps the unprovable boundary uncommitted',
+    'the admitted retry carries the proven candidate without committing it',
   ].map(name => ({ name, receipt: Promise.withResolvers() }))
   const child = spawn(process.execPath, [
     join(import.meta.dirname, 'support/promotion-proof-runner.mjs'),
@@ -149,7 +149,7 @@ test('WHAT[prefix-stability-003] CTX_010_the_required_blob_follows_the_choice_no
 })
 }
 
-test('WHAT[prefix-stability-003] the actual admitted retry candidate is refused at an unprovable boundary and no prefix survives the failure', async t => {
+test('WHAT[prefix-stability-003] the actual admitted retry candidate stays uncommitted after exact failures and cold replay', async t => {
   const assert = (await import('node:assert/strict')).default
   const { configureManagedPlugin, withRestartablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
   const { checkedTest, coveredSession, continuation, completeToolAttempt, failAttempt, facts, observeFact, prefixHistory, prefixState, state } = await import('./support/registered-prefix.mjs')
@@ -172,35 +172,29 @@ test('WHAT[prefix-stability-003] the actual admitted retry candidate is refused 
       })
       await check('exact first provider failure establishes the retry budget without promotion', async () => {
         const initial = await continuation(hooks, runtime, session, 'msg-first-candidate')
-        // CTX-029 (requirements/context-compression/WHAT.md): the single Blogger
-        // frame covers turns through 4 while the phase window still keeps turns from
-        // 2 raw. No verifiable complete-material subset ends at the desired boundary,
-        // so this ordinary request must not advance: no synthetic companion memory,
-        // no prefix fact, and the raw Opening is projected verbatim.
-        assert.ok(!initial.projected.messages.some(message => message.info?.source === 'companion-memory'), 'CTX-029: a frame crossing the desired boundary must not advance')
+        assert.ok(initial.projected.messages.some(message => message.info?.source === 'companion-memory'), 'the proven candidate must actually be presented before its failure is tested')
+        const started = facts(directory, 'ProviderStarted').find(fact => fact.Key.PhysicalUserMessageId[1] === initial.physical)
+        assert.equal(started.Evidence.ProjectionChoice[0], 'UsePrefixProbe')
+        assert.equal(started.Evidence.ProjectionChoice[1].Candidate.CutoffExclusive, 4)
         assert.ok(initial.projected.messages.some(message => message.parts?.some(part => part?.text === 'opening assignment')), 'the raw Opening stays verbatim')
-        assert.deepEqual(prefixHistory(directory), history, 'a non-advancing request must not write a prefix fact')
+        assert.deepEqual(prefixHistory(directory), history, 'presenting a candidate must not write a prefix fact')
         await observeFact(directory, 'FailureRecorded', () => failAttempt(hooks, runtime, session, initial, 'Failed'))
         assert.deepEqual(prefixHistory(directory), history, 'failed candidate must not be promoted')
         assert.equal(state(runtime, sessionID).providerFailures.consecutiveFailureCount, 1)
         baseline = prefixState(runtime, sessionID)
       })
-      await check('the admitted retry keeps the unprovable boundary uncommitted', async () => {
+      await check('the admitted retry carries the proven candidate without committing it', async () => {
         retry = await continuation(hooks, runtime, session, 'msg-failed-retry', 'ProviderRetryAttempt')
         assert.equal(retry.message.metadata.wanxiangshu_origin, 'ProviderRetryAttempt')
-        // CTX-029 (requirements/context-compression/WHAT.md): the single Blogger
-        // frame crosses the desired boundary, so no verifiable complete-material
-        // subset ends at the retry's request bound. The failure-recovery exception
-        // lifts only the K-window desire — the request-turn bound and the cutoff
-        // proof still hold, so the retry must not advance. DevOps generation 11
-        // measured that this retry renders no companion-memory candidate.
-        assert.ok(!retry.projected.messages.some(message => message.info?.source === 'companion-memory'), 'CTX-029: an unprovable boundary must not advance on retry')
+        assert.ok(retry.projected.messages.some(message => message.info?.source === 'companion-memory'), 'the exact retry must carry a promotable probe for the failed-promotion negative control')
         assert.ok(retry.projected.messages.some(message => message.parts?.some(part => part?.text === 'opening assignment')), 'the raw Opening stays verbatim')
         const started = facts(directory, 'ProviderStarted').find(fact => fact.Key.PhysicalUserMessageId[1] === retry.physical)
         assert.deepEqual(started.Evidence.ProviderRun, ['ProviderRunIdentity', retry.run.info.id])
         assert.deepEqual(started.Evidence.Accepted.Origin, ['Continuation', 'ProviderRetryAttempt'])
-        assert.deepEqual(prefixHistory(directory), history, 'a non-advancing retry must not write a prefix fact')
-        assert.deepEqual(prefixState(runtime, sessionID), baseline, 'a non-advancing retry cannot commit an epoch')
+        assert.equal(started.Evidence.ProjectionChoice[0], 'UsePrefixProbe')
+        assert.equal(started.Evidence.ProjectionChoice[1].Candidate.CutoffExclusive, 4)
+        assert.deepEqual(prefixHistory(directory), history, 'an uncompleted retry must not write a prefix fact')
+        assert.deepEqual(prefixState(runtime, sessionID), baseline, 'presenting the retry cannot commit an epoch')
       })
       await check('the exact retry failure appends no prefix fact', async () => {
         if (process.env.WANXIANGSHU_FAILED_PREFIX_PROMOTION_MUTATION === 'enabled') {
@@ -238,20 +232,18 @@ test('WHAT[prefix-stability-003] the actual admitted retry candidate is refused 
         const started = facts(directory, 'ProviderStarted').find(fact => fact.Key.PhysicalUserMessageId[1] === next.physical)
         assert.deepEqual(started.Evidence.Accepted.Origin, ['Continuation', 'ManagedDelegationAssignment'])
         assert.deepEqual(started.Evidence.ProviderRun, ['ProviderRunIdentity', next.run.info.id])
-        // CTX-029 (requirements/context-compression/WHAT.md): the reopened ordinary
-        // request still has no verifiable complete-material subset ending at the
-        // desired boundary, so it must not advance. The plan's projection choice is
-        // deliberately not asserted: a non-advancing attempt freezes no probe plan,
-        // and no observed run establishes which value the ProviderStarted evidence
-        // carries. The observable guarantees are the raw Opening, no synthetic
-        // memory, no prefix fact, and an unchanged epoch.
         assert.ok(next.projected.messages.some(message => message.parts?.some(part => part?.text === 'opening assignment')), 'the raw Opening stays verbatim')
-        assert.ok(!next.projected.messages.some(message => message.info?.source === 'companion-memory'))
+        assert.ok(next.projected.messages.some(message => message.info?.source === 'companion-memory'))
+        assert.equal(started.Evidence.ProjectionChoice[0], 'UsePrefixProbe')
+        assert.equal(started.Evidence.ProjectionChoice[1].Candidate.CutoffExclusive, 4)
       })
-      await check('the new successful provider run still commits no boundary-crossing prefix', async () => {
+      await check('only the new successful provider run commits its exact candidate', async () => {
         await completeToolAttempt(session, next, reopened)
-        assert.deepEqual(prefixHistory(directory).rebases, [], 'CTX-029: a successful attempt can only commit a prefix its plan actually carried')
-        assert.deepEqual(prefixState(runtime, sessionID), baseline)
+        const rebases = prefixHistory(directory).rebases
+        assert.equal(rebases.length, 1)
+        assert.equal(rebases[0].CutoffExclusive, 4)
+        assert.deepEqual(rebases[0].SolvingProviderRun, ['ProviderRunIdentity', next.run.info.id])
+        assert.deepEqual(prefixState(runtime, sessionID).prefixEpoch, { epochId: 1n, snapshotPresent: true })
       })
     })
   })

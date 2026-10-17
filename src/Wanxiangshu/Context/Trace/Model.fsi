@@ -21,6 +21,7 @@ module internal WanxiangliTrace =
           RecordCount: int }
 
     val emptyBridge: traceId: string -> ProjectionBridge
+    val traceIdentity: session: string -> string
 
     val appendOpeningToBridge:
         assignment: string -> requirements: string list -> bridge: ProjectionBridge -> ProjectionBridge

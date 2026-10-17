@@ -8,6 +8,13 @@ open Wanxiangshu.Persistence.Journal
 /// parts, journal facts, identities, and F# collections remain internal.
 [<RequireQualifiedAccess>]
 module WorkRecordSurface =
+    /// Derive actual Blogger coverage from the durable trace without exposing owner state.
+    val nextBloggerRequest: handle: JournalHandle -> sessionId: string -> Task<obj option>
+
+    val journalCheckpointEvidence: handle: JournalHandle -> sessionId: string -> callId: string -> obj
+
+    val journalCandidateEvidence: handle: JournalHandle -> sessionId: string -> phaseCutoff: obj -> Task<obj>
+
     /// COMPANION-003: capture an OpeningPrompt through the canonical XTrace owner.
     val captureOpening:
         handle: JournalHandle -> sessionId: string -> assignment: string -> requirements: obj -> Task<unit>

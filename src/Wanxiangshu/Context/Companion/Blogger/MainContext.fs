@@ -36,18 +36,6 @@ module BloggerMainContext =
             blog.Coverage.CoverableTurnCutoffExclusive
             projection.Messages
 
-    /// Map chunk NextCursor (first unconsumed semantic position) to the XTrace
-    /// cursor of the last covered part. None means the mapping failed (empty
-    /// trace or Host cursor not present on XTrace). Never default to zero:
-    /// a silent zero with previous greater than zero would stage a
-    /// non-advancing window that dies at commit.
-    let private lastCoveredCursor (xTrace: XTraceProjectionState) (nextCursor: SemanticCursor) : XTraceCursor option =
-        XTraceProjection.currentGenerationSemanticParts xTrace
-        |> List.tryFindBack (fun part ->
-            part.Turn < nextCursor.TurnIndex
-            || (part.Turn = nextCursor.TurnIndex && part.PartIndex < nextCursor.PartIndex))
-        |> Option.map (fun part -> part.Cursor)
-
     /// Digest of the provider-visible prefix at the coverable cutoff. When the
     /// cutoff does not move the previous digest is kept so a mid-turn chunk
     /// cannot rewrite a proof that still describes the same turns.
@@ -96,7 +84,7 @@ module BloggerMainContext =
             |> XTraceCursor.create
             |> RecordCoverage.create
 
-        match lastCoveredCursor xTrace chunk.NextCursor with
+        match XTraceProjection.lastCursorBeforeSemantic chunk.NextCursor xTrace with
         | None -> None
         | Some nextCursor when not (XTraceCursor.isAfter nextCursor (RecordCoverage.ingestedThrough previousCoverage)) ->
             None
@@ -157,7 +145,6 @@ module BloggerMainContext =
         |> Option.bind (mainContextFromChunk mainSessionId bloggerSessionId observedEpoch blog xTrace projection)
 
     let fromJournal
-        (scope: IBloggerRuntimeHost)
         (journal: AgentJournal)
         (mainSessionId: SessionId)
         (bloggerSessionId: SessionId)

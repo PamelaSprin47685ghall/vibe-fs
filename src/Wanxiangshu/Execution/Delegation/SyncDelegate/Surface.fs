@@ -1641,6 +1641,7 @@ module SyncDelegateSurface =
               Completed = finish = "length"
               IsCompaction = false
               PromptKey = None
+              Origin = None
               Parts = [||]
               PartIds = [||]
               ToolParts = [||] }

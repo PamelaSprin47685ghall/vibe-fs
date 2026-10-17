@@ -194,6 +194,7 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
         | Some(_handle, closed) -> publishFirstClose id closed item
 
     member _.AddExitListener(listener: PtyExitEvent -> unit) =
+        // DSL-MUTABLE: subscription — detach this listener once under the port gate
         let mutable subscribed = true
         lock gate (fun () -> exitListeners.Add listener)
 
@@ -414,6 +415,7 @@ type PtyPort(?exitListener: PtyExitEvent -> unit, ?handler: PtyBackendHandler) a
             }
 
         task {
+            // DSL-MUTABLE: algorithm-scratch — retain the first cleanup failure
             let mutable failure = None
 
             for id in ids do

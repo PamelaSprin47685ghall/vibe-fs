@@ -1,5 +1,103 @@
 import test from 'node:test'
 
+for (const layout of ['single tool', 'late result after text', 'late result after another message']) {
+  test(`WHAT[semantic-trace-006] Blogger coverage consumes only the durable prefix it received (${layout})`, async () => {
+    const assert = (await import('node:assert/strict')).default
+    const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+    const { withReopenableJournal, commitFrame, record } = await import('../../work-record/tests/support/record.mjs')
+    await withReopenableJournal(async (handle, reopen) => {
+      const session = `facet-prefix-${layout}`
+      const withText = layout === 'late result after text'
+      const withOther = layout === 'late result after another message'
+      const call = 'CALL-' + 'C'.repeat(220000)
+      const result = 'RESULT-MUST-STILL-BE-OFFERED'
+      const observations = state => [
+        { hostMessageId: 'tool-message', message: { info: { id: 'tool-message', role: 'assistant' }, parts: [
+          { id: 'tool-part', type: 'tool', tool: 'read', callID: 'call', state },
+          ...(withText ? [{ id: 'text-part', type: 'text', text: 'TEXT-BEFORE-LATE-RESULT' }] : []),
+        ] } },
+        ...(withOther ? [{ hostMessageId: 'later-message', message: { info: { role: 'user' }, parts: [{ id: 'later-part', type: 'text', text: 'OTHER-MESSAGE' }] } }] : []),
+      ]
+      assert.equal((await trace.captureObservedMessages(handle, session, observations({ status: 'running', input: call }))).ok, true)
+      assert.equal((await trace.captureObservedMessages(handle, session, observations({ status: 'completed', output: result }))).ok, true)
+      const canonical = await trace.currentProjection(handle, session)
+      const kinds = canonical.messages.flatMap(message => message.parts.map(part => part.kind))
+      assert.deepEqual(kinds, ['tool-call', ...(withText || withOther ? ['text'] : []), 'tool-result'])
+      const first = await record.nextBloggerRequest(handle, session)
+      assert.equal(first.nextSequence, 1n)
+      assert.equal(first.toml.includes(result), false)
+      assert.equal(first.toml.includes('TEXT-BEFORE-LATE-RESULT'), false)
+      assert.equal(first.toml.includes('OTHER-MESSAGE'), false)
+      await commitFrame(handle, session, { from: 0, through: first.nextSequence, body: 'Only the offered tool call', id: layout })
+      const expectedCursor = withOther ? { turn: 1, partIndex: 0 } : { turn: 0, partIndex: 1 }
+      assert.deepEqual(trace.semanticCursorAfter(trace.cursor(1), trace.snapshot(handle, session)), expectedCursor)
+      const next = await record.nextBloggerRequest(handle, session)
+      assert.equal(next.previousSequence, 1n)
+      assert.equal(next.nextSequence, withText || withOther ? 3n : 2n)
+      assert.equal(next.toml.includes(result), true)
+      assert.equal(next.toml.includes('CALL-'), false)
+      if (withText) assert.equal(next.toml.includes('TEXT-BEFORE-LATE-RESULT'), true)
+      if (withOther) assert.equal(next.toml.includes('OTHER-MESSAGE'), true)
+      const cold = await reopen()
+      assert.deepEqual(await record.nextBloggerRequest(cold, session), next)
+      assert.deepEqual(await trace.currentProjection(cold, session), canonical)
+    })
+  })
+}
+
+test('WHAT[semantic-trace-006] actual Blogger request evidence preserves a durable cursor beyond Int32', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+  const record = await import('../../../dist/Mission/WorkRecord/Surface.js')
+  const { withReopenableJournal } = await import('./support/journal.mjs')
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'large-cursor-proof'
+    const sequence = 2147483653n
+    const body = await journal.JournalSurface_writePayload(handle, 'actual confirmed material')
+    assert.equal(body.ok, true)
+    const appended = await journal.JournalSurface_appendAgent(handle, { kind: 'Session', session }, 'actual-run', {
+      family: 'Companion', case: 'XTracePartAppended', payload: {
+        SessionId: session, CursorSequence: sequence, Role: 'assistant', Turn: 0, PartIndex: 0, Kind: 'text',
+        ToolName: null, ProviderRun: 'actual-run', ToolCallId: null, HostToolPartId: null,
+        TextRef: body.blobRef, TextDigest: body.blobDigest, Provenance: 'g:0/msg:actual-message/part:0',
+      },
+    })
+    assert.equal(appended.ok, true, JSON.stringify(appended.error))
+    const offered = await record.nextBloggerRequest(handle, session)
+    assert.ok(offered)
+    assert.equal(offered.nextSequence, sequence)
+    assert.equal(offered.previousSequence, 0n)
+    assert.equal(offered.frameEpoch, 0n)
+    assert.equal(offered.observedPrefixEpoch, 0n)
+    assert.deepEqual(await record.nextBloggerRequest(await reopen(), session), offered)
+  })
+})
+
+test('WHAT[semantic-trace-006] a physical prefix cannot cut across repeated canonical segments of one Host message', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  const { withReopenableJournal } = await import('./support/journal.mjs')
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'late-facet-prefix-boundary'
+    const observed = state => [
+      { hostMessageId: 'opening', message: { info: { role: 'user' }, parts: [{ id: 'u', type: 'text', text: 'task' }] } },
+      { hostMessageId: 'a', message: { info: { id: 'a', role: 'assistant' }, parts: [{ id: 'tool', type: 'tool', tool: 'read', callID: 'call', state }] } },
+      { hostMessageId: 'b', message: { info: { role: 'user' }, parts: [{ id: 'b-part', type: 'text', text: 'later' }] } },
+    ]
+    assert.equal((await trace.captureObservedMessages(handle, session, observed({ status: 'running', input: 'old call' }))).ok, true)
+    const first = trace.snapshot(handle, session)
+    assert.deepEqual(trace.hostMessageIdsBeforeTurn(2, first), ['opening', 'a'])
+    assert.equal((await trace.captureObservedMessages(handle, session, observed({ status: 'completed', output: 'late result' }))).ok, true)
+    const current = trace.snapshot(handle, session)
+    assert.deepEqual(trace.hostMessageIdsBeforeTurn(2, current), [])
+    assert.deepEqual(trace.hostMessageIdsBeforeTurn(3, current), [])
+    assert.deepEqual(trace.hostMessageIdsBeforeTurn(4, current), ['opening', 'a', 'b'])
+    const cold = trace.snapshot(await reopen(), session)
+    assert.deepEqual(trace.hostMessageIdsBeforeTurn(2, cold), [])
+    assert.deepEqual(trace.hostMessageIdsBeforeTurn(4, cold), ['opening', 'a', 'b'])
+  })
+})
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");

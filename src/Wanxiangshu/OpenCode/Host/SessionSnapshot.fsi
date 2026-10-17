@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Interaction.Authority
 
 [<RequireQualifiedAccess>]
 type SnapshotToolPartState =
@@ -11,7 +12,7 @@ type SnapshotToolPartState =
     | Failed of errorCanonical: string
 
 type SessionToolPart =
-    { HostToolPartId: HostToolPartId
+    { HostToolPartId: HostToolPartId option
       ToolCallId: ToolCallId
       ToolName: string
       InputCanonical: string
@@ -29,6 +30,7 @@ type SessionMessage =
       Completed: bool
       IsCompaction: bool
       PromptKey: string option
+      Origin: PromptOrigin option
       Parts: MessagePart array
       PartIds: HostMessagePartId option array
       ToolParts: SessionToolPart array }

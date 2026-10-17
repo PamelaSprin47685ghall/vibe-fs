@@ -632,22 +632,19 @@ module SemanticTraceSurface =
                 arrayOf observations
                 |> Array.toList
                 |> List.map (fun observation ->
+                    let rawMessage = field observation "message"
+
                     let decoded =
-                        Wanxiangshu.OpenCode.ProviderWireCapture.decodeCapturedMessageView
-                            [ field observation "message" ]
+                        Wanxiangshu.OpenCode.ProviderWireCapture.decodeCapturedMessageView [ rawMessage ]
                         |> List.head
 
                     let origin =
-                        match optionalText (field observation "origin") with
-                        | Some "ProviderRetryAttempt" ->
-                            Some(
-                                PromptAuthority.PromptOrigin.Continuation
-                                    PromptAuthority.ContinuationKind.ProviderRetryAttempt
-                            )
-                        | _ -> None
+                        optionalText (field observation "origin")
+                        |> Option.map PromptAuthority.originFromLabel
 
                     { Message = decoded
                       HostMessageId = optionalText (field observation "hostMessageId")
+                      PromptKey = Wanxiangshu.OpenCode.ProviderWireDecode.promptKeyOfMessage rawMessage
                       Origin = origin })
 
             let! result =
@@ -667,6 +664,17 @@ module SemanticTraceSurface =
                         {| ok = true
                            receipt = receiptView (Ok captured.Receipt)
                            projection = captured.Current |> Option.map SemanticTraceProjection.Create |> Option.toObj |}
+        }
+
+    let captureSessionSnapshot (handle: JournalHandle) (sessionId: string) (messages: obj) : Task<obj> =
+        task {
+            let! result =
+                XTraceCapture.captureSessionMessagesWithReceipt
+                    (Some handle.Journal)
+                    (SessionId.create sessionId)
+                    (Wanxiangshu.OpenCode.SessionSnapshotPort.projectMessages (arrayOf messages))
+
+            return receiptView result
         }
 
     let currentProjection (handle: JournalHandle) (sessionId: string) : Task<obj> =

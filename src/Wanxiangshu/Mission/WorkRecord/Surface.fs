@@ -5,6 +5,8 @@ open System
 open System.Threading.Tasks
 open Fable.Core.JsInterop
 open Wanxiangshu.Context.Companion
+open Wanxiangshu.Context.Companion.Blogger
+open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
@@ -17,6 +19,93 @@ open Wanxiangshu.Foundation.Identity
 /// parts, journal facts, identities, and F# collections remain internal.
 [<RequireQualifiedAccess>]
 module WorkRecordSurface =
+
+    let nextBloggerRequest (handle: JournalHandle) (sessionId: string) : Task<obj option> =
+        task {
+            let! request =
+                BloggerMainContext.fromJournal
+                    handle.Journal
+                    (SessionId.create sessionId)
+                    (SessionId.create ("blog-" + sessionId))
+
+            return
+                request
+                |> Option.map (function
+                    | BloggerRequestContext.Main main ->
+                        box
+                            {| toml = main.Toml
+                               requestId = BloggerRequestId.value main.RequestId
+                               bloggerSessionId = SessionId.value main.BloggerSessionId
+                               frameEpoch = FrameEpochId.value main.FrameEpochId
+                               previousSequence = main.PreviousIngestedThroughSequence
+                               nextSequence = main.NextIngestedThroughSequence
+                               previousCutoff = main.PreviousCoverableTurnCutoffExclusive
+                               nextCutoff = main.NextCoverableTurnCutoffExclusive
+                               nextCoveredPrefixDigest = main.NextCoveredPrefixDigest
+                               observedPrefixEpoch = PrefixEpochId.value main.ObservedPrefixEpochId |}
+                    | BloggerRequestContext.Squash _ -> invalidOp "Expected a Blogger main request")
+        }
+
+    let private journalPrefixState (handle: JournalHandle) (sessionId: string) =
+        let port = AgentJournalPortAdapter.forWire handle.Journal
+        let session = SessionId.create sessionId
+
+        let state =
+            (port.ReadView session).State
+            |> Option.defaultWith (fun () -> invalidOp "Prefix evidence requires a durable session")
+
+        port, session, state
+
+    let journalCheckpointEvidence (handle: JournalHandle) (sessionId: string) (callId: string) : obj =
+        let _, _, state = journalPrefixState handle sessionId
+        let trace = state.XTrace |> Option.defaultValue XTraceProjection.empty
+
+        let turnOf call =
+            XTraceProjection.tryTurnOfToolCallId call trace
+
+        let desired =
+            match PhaseWindow.desiredCutoffOf turnOf state.TodoCheckpoints with
+            | PhaseWindowDecision.NoPhases -> null
+            | PhaseWindowDecision.KeepFrom cutoff -> box cutoff
+
+        box
+            {| checkpointTurn = turnOf (ToolCallId.create callId) |> Option.map box |> Option.defaultValue null
+               desiredCutoff = desired |}
+
+    let journalCandidateEvidence (handle: JournalHandle) (sessionId: string) (phaseCutoff: obj) : Task<obj> =
+        task {
+            let port, session, state = journalPrefixState handle sessionId
+            let trace = state.XTrace |> Option.defaultValue XTraceProjection.empty
+            let! projected = port.CurrentProjection trace
+            let projection = projected |> Result.defaultWith invalidOp
+
+            let window =
+                if isNull phaseCutoff then
+                    ProbeBound.CoverageOnly
+                else
+                    ProbeBound.PhaseBoundary(unbox<int> phaseCutoff)
+
+            let! selected =
+                XWire.candidate
+                    port
+                    window
+                    session
+                    { CurrentProjection = projection }
+                    (state.PrefixEpoch |> Option.bind (fun prefix -> prefix.Snapshot))
+                    state
+                    (XTraceProjection.frontierTurn trace |> Option.defaultValue 0)
+
+            return
+                match selected with
+                | Ok probe ->
+                    box
+                        {| ok = true
+                           cutoff = probe.Candidate.CutoffExclusive |}
+                | Error reason ->
+                    box
+                        {| ok = false
+                           reason = sprintf "%A" reason |}
+        }
 
     let private text (value: obj) : string =
         if isNull value then "" else string value

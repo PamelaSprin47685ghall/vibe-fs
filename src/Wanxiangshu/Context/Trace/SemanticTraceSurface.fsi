@@ -105,6 +105,7 @@ module SemanticTraceSurface =
 
     val captureMessageView: handle: JournalHandle -> sessionId: string -> messages: obj -> Task<obj>
     val captureObservedMessages: handle: JournalHandle -> sessionId: string -> observations: obj -> Task<obj>
+    val captureSessionSnapshot: handle: JournalHandle -> sessionId: string -> messages: obj -> Task<obj>
     val currentProjection: handle: JournalHandle -> sessionId: string -> Task<obj>
     val currentProjectionBetween: handle: JournalHandle -> sessionId: string -> range: obj -> Task<obj>
     val renderRange: handle: JournalHandle -> sessionId: string -> range: obj -> Task<string>

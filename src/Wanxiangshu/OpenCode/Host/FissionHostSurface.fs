@@ -109,6 +109,7 @@ module FissionHostSurface =
           Completed = completed
           IsCompaction = false
           PromptKey = None
+          Origin = None
           Parts = parts
           PartIds = Array.create parts.Length None
           ToolParts = [||] }

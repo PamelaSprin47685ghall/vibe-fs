@@ -10,6 +10,12 @@ XTrace 是工作会话唯一的原始语义事实源，只能追加。Opening �
 
 `ProviderRetryAttempt` 必须按 Host 的 typed origin 识别，不按正文猜测。其物理身份可保留坐标，正文不得进入 XTrace、Y、WorkRecord 或 prefix digest。
 
+transform 与完整 snapshot 使用同一 typed origin 裁决；缺少物理 part ID 仍是缺失，不能用 callID 冒充。真实 callID 可以在独立字段内参与材料去重。材料种类与 raw 身份分开编码，不能因 raw ID 含 facet 标签而碰撞。
+
+user 来源遵守 interaction-authority-008：同 Session 的确切已确认物理消息优先，其次确切未决 PromptKey，最后才用 Host 诊断来源标签。不能凭正文、其他 Session、已被接受的旧 key 或当前运行猜来源；Host 标签也不得覆盖持久证据。新捕获的 message、地址类型、地址与 facet 采用无歧义的结构化编码，完整保留 opaque 身份；旧未转义且有歧义的历史不补造缺失身份。
+
+同一确切物理 part 只接受同材料重放，或共享角色、ProviderRun 与 ToolCallId 的 tool-call/tool-result 两个 facet；不允许其他 kind 改写。同批冲突须在首条写入前拒绝。旧历史缺失物理字段且旧路径有歧义时保留未知，不补造物理身份。
+
 Stable historical insertion 须有 durable journal、非 legacy positional trace，且普通 Host 消息身份全部存在、非空、互异。资格查询与捕获复用 trace 所有者的同一纯裁决，消费者不得重写判断。
 
 ## [003] cursor 严格单调、独立于 Host 坐标
@@ -35,6 +41,8 @@ Stable historical insertion 须有 durable journal、非 legacy positional trace
 按 stable Host identity 定位时，请求集合须全部且恰好出现，按历史顺序构成单一连续区间；缺失、夹入额外身份或游标缺口均返回无证据。
 
 游标创建、序列化、比较、覆盖与区间包含关系由 trace 所有者计算，消费者不得重写公式。
+
+canonical 消费坐标由 Trace 按 durable 游标顺序生成。一个 Host 工具的 call/result、晚到结果与其他已捕获部件都占独立语义位置；不得按旧 Host 下标把晚到材料插入绝对前缀。Blogger 的 NextCursor 只能覆盖本次已提供的连续前缀，换算与物化共用同一坐标规则。边界若截断单个 Host 消息的多个 canonical 段，整条物理前缀替换无证据；不能只过滤该消息后继续替换。
 
 ## [007] XTrace 是 Y delta / prefix proof / LWR gap / terminal / 案例来源的单一 source
 

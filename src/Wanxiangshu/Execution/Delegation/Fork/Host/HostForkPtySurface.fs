@@ -193,6 +193,7 @@ module HostForkPtySurface =
             portRef <- Some port
 
             let completingPort () =
+                // DSL-MUTABLE: resource — controlled backend termination-completion port
                 let mutable localPort: PtyPort option = None
 
                 let completeOnTerminate id command =

@@ -331,8 +331,21 @@ module JoinSurface =
 
         let sessions = JoinProbeSessions() :> ISessionHostPort
 
+        // DSL-MUTABLE: resource — controlled backend termination-completion port
+        let mutable portRef: PtyPort option = None
+
         let port =
-            PtyPort(handler = (fun _ _ -> Task.FromResult(Ok(): Result<unit, string>)))
+            PtyPort(
+                handler =
+                    (fun id command ->
+                        match command, portRef with
+                        | PtyCommand.Signal PtySignal.Terminate, Some ownedPort -> ownedPort.Complete id
+                        | _ -> ()
+
+                        Task.FromResult(Ok(): Result<unit, string>))
+            )
+
+        portRef <- Some port
 
         let runtime =
             HostForkRuntime(
