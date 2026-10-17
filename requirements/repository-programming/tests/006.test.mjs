@@ -31,9 +31,9 @@ test('WHAT[repository-programming-006] JS011_sandbox_program_uses_bindings_end_t
     const result = await run(surface.baseClassSource, program, apiOf(binding), 2000, Date.now() + 60_000, 1 << 20)
     assert.equal(result.ok, true)
     assert.deepEqual(JSON.parse(result.value), { before: 'hello world' })
-    assert.equal(stagedCount(binding), 1, 'rewrite staged through the binding')
+    assert.equal(stagedCount(binding), 1, 'rewrite recorded in the as-is ledger')
     const disk = apiOf(binding).js.read('a.txt')
-    assert.equal(disk.text, 'hello world')
+    assert.equal(disk.text, 'goodbye world')
   } finally {
     cleanup()
   }

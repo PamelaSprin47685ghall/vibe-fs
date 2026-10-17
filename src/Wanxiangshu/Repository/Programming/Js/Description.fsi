@@ -178,6 +178,12 @@ module JsCanonicalDescription =
         [<Literal>]
         val HookNotVisible: string = "tool/js-program/hook-not-visible"
 
+        [<Literal>]
+        val Park: string = "tool/js-program/park"
+
+        [<Literal>]
+        val ParkedPayload: string = "tool/js-program/parked-payload"
+
     type Prose =
         { Header: string
           EditPrelude: string
@@ -232,7 +238,9 @@ module JsCanonicalDescription =
           ReasonEditUnknownFields: string
           ReasonEditCandidate: string
           ReasonEditLine: string
-          ReasonEditOverlaps: string }
+          ReasonEditOverlaps: string
+          Park: string
+          ParkedPayload: string }
 
     val fileAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
     val planFileAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string

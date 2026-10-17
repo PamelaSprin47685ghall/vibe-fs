@@ -20,13 +20,15 @@ const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, 
 const ToolPermission = toolPermissionByName
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 const fsPermissionsOf = (role) =>
-  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))
+  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove'].includes(n))
 const MEMBERS_BY_PERMISSION = {
   Read: ['file'],
   Glob: ['glob'],
   Grep: ['grep'],
   Edit: ['edit', 'rewrite'],
   Write: ['write'],
+  Move: ['mv'],
+  Remove: ['rm'],
 }
 const BINDING_BY_MEMBER = {
   file: 'js.read',
@@ -35,8 +37,10 @@ const BINDING_BY_MEMBER = {
   edit: 'js.edit',
   rewrite: 'js.edit',
   write: 'js.write',
+  rm: 'js.rm',
+  mv: 'js.mv',
 }
-const MEMBER_ORDER = ['file', 'glob', 'grep', 'edit', 'rewrite', 'write']
+const MEMBER_ORDER = ['file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv']
 const layersOf = (s) =>
   Object.fromEntries(
     s.members.map((fragment) => [

@@ -1,0 +1,1 @@
+mv(from, to) — move or rename a file or directory (POSIX mv); overwrite is allowed and a missing source is an error. Inherits the programming-surface protections: resolveInside path boundary, FILE_CHANGED before the write, single-entry durable accounting. Cross-device (EXDEV) moves must error and roll back, never leaving both sides present.

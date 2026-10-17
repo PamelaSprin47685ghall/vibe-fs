@@ -87,7 +87,9 @@ test('WHAT[repository-programming-011] JS010_array_null_is_invalid_return_value'
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
     assert.equal(parseToml(render(outcome)).code, 'INVALID_RETURN_VALUE')
-    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old')
+    // Under as-is semantics the rewrite already landed before the return-value
+    // validation failed; the write is a fact that stays on disk.
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'new')
   } finally {
     cleanup()
   }

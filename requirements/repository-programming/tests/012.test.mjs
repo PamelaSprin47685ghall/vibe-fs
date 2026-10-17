@@ -15,7 +15,7 @@ const sandbox = () => {
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
 
-test('WHAT[repository-programming-012] JS008_012_bindings_rewrite_stages_without_touching_disk', () => {
+test('WHAT[repository-programming-012] JS008_012_bindings_rewrite_persists_immediately', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
@@ -24,19 +24,20 @@ test('WHAT[repository-programming-012] JS008_012_bindings_rewrite_stages_without
     assert.equal(result.ok, true)
     assert.equal(stagedCount(binding), 1)
     const disk = apiOf(binding).js.read('a.txt')
-    assert.equal(disk.text, 'old text')
+    assert.equal(disk.text, 'new text')
   } finally {
     cleanup()
   }
 })
-test('WHAT[repository-programming-012] JS009_012_bindings_write_leaves_disk_untouched', () => {
+test('WHAT[repository-programming-012] JS009_012_bindings_write_persists_immediately', () => {
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
     const result = apiOf(binding).js.write('new.txt', 'fresh')
     assert.equal(result.ok, true)
     const disk = apiOf(binding).js.read('new.txt')
-    assert.equal(disk.ok, false)
+    assert.equal(disk.ok, true)
+    assert.equal(disk.text, 'fresh')
   } finally {
     cleanup()
   }
@@ -59,9 +60,7 @@ const sandbox = () => {
 }
 const localStore = (commonDir) => {
   const owned = commonDir ?? mkdtempSync(join(tmpdir(), 'wxs-txstore-events-'))
-  const gitCommonDir = join(owned, '.git')
-  mkdirSync(gitCommonDir, { recursive: true })
-  const handle = createEventStore(gitCommonDir, randomUUID().replaceAll('-', ''))
+  const handle = createEventStore(owned, randomUUID().replaceAll('-', ''))
   return { handle, owned, close: () => { disposeEventStore(handle); if (!commonDir) rmSync(owned, { recursive: true, force: true }) } }
 }
 const unwrap = (result) => {
@@ -73,16 +72,16 @@ const mutation = (path, originalText, newText) => ({
   originalText,
   newText,
 })
-const prepared = (id, root, mutations) => ({
+const prepared = (id, root, mutation) => ({
   transactionId: id,
   workspaceRoot: root,
-  mutations,
+  mutation,
 })
 
 test('WHAT[repository-programming-012] JS012_prepare_then_commit_updates_only_integrator_Current', async () => {
   const local = localStore()
   try {
-    const p = prepared('tx-1', '/ws', [mutation('a.txt', 'old', 'new')])
+    const p = prepared('tx-1', '/ws', mutation('a.txt', 'old', 'new'))
     unwrap(await appendPrepared(local.handle, p))
     assert.equal(pending(local.handle).length, 1)
 
@@ -113,9 +112,7 @@ const sandbox = () => {
 }
 const localStore = () => {
   const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
-  mkdirSync(commonDir, { recursive: true })
-  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
+  const handle = createEventStore(owned, randomUUID().replaceAll('-', ''))
   return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')

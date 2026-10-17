@@ -183,6 +183,12 @@ module JsCanonicalDescription =
         [<Literal>]
         let HookNotVisible = "tool/js-program/hook-not-visible"
 
+        [<Literal>]
+        let Park = "tool/js-program/park"
+
+        [<Literal>]
+        let ParkedPayload = "tool/js-program/parked-payload"
+
     type Prose =
         { Header: string
           EditPrelude: string
@@ -237,7 +243,9 @@ module JsCanonicalDescription =
           ReasonEditUnknownFields: string
           ReasonEditCandidate: string
           ReasonEditLine: string
-          ReasonEditOverlaps: string }
+          ReasonEditOverlaps: string
+          Park: string
+          ParkedPayload: string }
 
     let private fill (template: string) (pairs: (string * string) list) =
         let replaced =
@@ -505,6 +513,27 @@ module JsCanonicalDescription =
   }"""
             [ "comment_host_capability", prose.CommentHostCapability ]
 
+    let private rmStub (prose: Prose) =
+        fill
+            """  rm(path) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private mvStub (prose: Prose) =
+        fill
+            """  mv(from, to) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private parkStub (prose: Prose) =
+        fill
+            """  async park(payload) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
     let private runStub (prose: Prose) =
         fill
             """  async run() {
@@ -543,6 +572,14 @@ class JsProgram {"""
                   rewriteStub prose
               if has capabilities JsCapability.Write then
                   writeStub prose
+              if has capabilities JsCapability.Remove then
+                  rmStub prose
+              if has capabilities JsCapability.Move then
+                  mvStub prose
+              // park is a lifecycle capability every js-* surface carries; it
+              // is not a filesystem permission projection, so it is always
+              // present in the base class (PLAN S1 B.17).
+              parkStub prose
               runStub prose ]
 
         String.concat "\n\n" (classOpen :: methods @ [ "}" ])
@@ -1139,6 +1176,30 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     {{rethrow_host}}
   }"""
                       [ "rethrow_host", rethrowHost ]
+              if has capabilities JsCapability.Remove then
+                  fill
+                      """  rm(path) {
+    const result = this._api.js.rm(path);
+    {{rethrow_host}}
+    return { removed: result.removed };
+  }"""
+                      [ "rethrow_host", rethrowHost ]
+              if has capabilities JsCapability.Move then
+                  fill
+                      """  mv(from, to) {
+    const result = this._api.js.mv(from, to);
+    {{rethrow_host}}
+    return { moved: result.moved, destination: result.destination };
+  }"""
+                      [ "rethrow_host", rethrowHost ]
+              // park is a lifecycle capability every js-* surface carries; it
+              // is not a filesystem permission projection, so it is always
+              // present in the runtime base class.
+              fill
+                  """  async park(payload) {
+    return await this._api.js.park(payload);
+  }"""
+                  []
               runStub prose ]
 
         String.concat "\n\n" (classOpen :: methods @ [ "}" ])

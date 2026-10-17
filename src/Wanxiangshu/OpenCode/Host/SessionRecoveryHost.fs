@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Wanxiangshu.OpenCode
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
@@ -21,7 +22,8 @@ type SessionRecoveryHost
         journal: AgentJournal,
         snapshot: ISessionSnapshotPort,
         scope: PluginRecoveryScope,
-        acceptedMessageRecovery: ExactAcceptedMessageRecoveryPort option
+        acceptedMessageRecovery: ExactAcceptedMessageRecoveryPort option,
+        notifyTerminal: (SessionId -> TerminalOutcome -> unit) option
     ) =
 
     let drainGate = obj ()
@@ -30,6 +32,21 @@ type SessionRecoveryHost
     let keyOfStarted (started: ProviderStartedEvidence) : ChatExecutionKey =
         { SessionId = started.Accepted.SessionId
           PhysicalUserMessageId = started.Accepted.PhysicalUserMessageId }
+
+    /// provider-attempt-recovery-023 / managed-chat-execution-015: a pre-provider
+    /// settlement writes a durable Terminal but the parent Fork / SyncDelegate
+    /// completion subscription is fed only by NotifyTerminal on the shared event
+    /// port. Without this publish the parent join would wait forever on a fact
+    /// that already happened. The terminal is published only after a fresh
+    /// Failed / Rejected commit (the caller has already verified the exact key
+    /// was Accepted before settling); a missing event port is a test surface and
+    /// stays a no-op.
+    let publishPreProviderTerminal (key: ChatExecutionKey) (authorityRoot: AuthorityRootUserMessageId) =
+        notifyTerminal
+        |> Option.iter (fun publish ->
+            publish
+                key.SessionId
+                (TerminalOutcome.Failed(TerminalStop.forAuthority authorityRoot "provider never started")))
 
     let eventKey (event: ChatExecutionRecoveryLifecycleEvent) =
         match event with
@@ -275,6 +292,7 @@ type SessionRecoveryHost
                 (completedLifecycleSettlement (ChatExecutionState.Accepted accepted) settled)
                 |> ignore
 
+                publishPreProviderTerminal request.ExecutionKey accepted.AuthorityRootUserMessageId
                 publishNoAuthorizedDisposition request
             | Some _
             | None -> ()
@@ -375,6 +393,7 @@ type SessionRecoveryHost
 
             match settled with
             | Ok _ ->
+                publishPreProviderTerminal key accepted.AuthorityRootUserMessageId
                 do! release key
                 scope.RevokeManualIntervention key
                 return "terminalized"

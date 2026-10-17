@@ -23,7 +23,7 @@ ${body}
 const execute = (dir, body, language = 'en') =>
   run(dir, 'Coder', language, program(body), 2000, Date.now() + 60_000, 1 << 20, null)
 
-test('WHAT[repository-programming-014] JS_EDIT_target_read_is_observed_and_external_change_wins', async () => {
+test('WHAT[repository-programming-014] JS_EDIT_target_read_is_observed_and_external_change_after_edit_is_a_separate_fact', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
@@ -39,12 +39,13 @@ test('WHAT[repository-programming-014] JS_EDIT_target_read_is_observed_and_exter
       async (readPaths, effectPaths) => {
         assert.deepEqual(readPaths, [{ path: realpathSync(join(dir, 'a.txt')), resultBytes: 'alpha\n' }])
         assert.deepEqual(effectPaths, ['a.txt'])
+        // The edit landed as-is at call time; an external write after it is a
+        // later, separate fact and does not fail the already-succeeded edit.
         writeFileSync(join(dir, 'a.txt'), 'external\n', 'utf8')
       },
     )
 
-    assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'FILE_CHANGED')
+    assert.equal(caseName(outcome), 'Succeeded')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'external\n')
   } finally {
     cleanup()
@@ -149,9 +150,7 @@ const sandbox = () => {
 }
 const localStore = () => {
   const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
-  mkdirSync(commonDir, { recursive: true })
-  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
+  const handle = createEventStore(owned, randomUUID().replaceAll('-', ''))
   return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
@@ -160,7 +159,7 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {
   surface: coderSurface(),
 })
 
-test('WHAT[repository-programming-014] JS014_workflow_rejects_a_changed_read_only_dependency', async () => {
+test('WHAT[repository-programming-014] JS014_as_is_external_change_after_write_does_not_undo_the_write', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'dependency.txt'), 'snapshot', 'utf8')
@@ -185,20 +184,21 @@ test('WHAT[repository-programming-014] JS014_workflow_rejects_a_changed_read_onl
         observations += 1
         assert.deepEqual(readPaths, [{ path: realpathSync(join(dir, 'dependency.txt')), resultBytes: 'snapshot' }])
         assert.deepEqual(effectPaths, ['output.txt'])
+        // The write already landed as-is; an external change after it is a
+        // later fact and does not roll the write back.
         writeFileSync(join(dir, 'dependency.txt'), 'external', 'utf8')
       },
     )
 
-    assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'FILE_CHANGED')
+    assert.equal(caseName(outcome), 'Succeeded')
+    assert.equal(readFileSync(join(dir, 'output.txt'), 'utf8'), 'snapshot')
     assert.equal(readFileSync(join(dir, 'dependency.txt'), 'utf8'), 'external')
-    assert.equal(existsSync(join(dir, 'output.txt')), false)
     assert.equal(observations, 1)
   } finally {
     cleanup()
   }
 })
-test('WHAT[repository-programming-014] JS014_workflow_rejects_a_create_target_added_after_staging', async () => {
+test('WHAT[repository-programming-014] JS014_as_is_create_lands_immediately_and_later_external_write_wins', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const program = `class Js extends JsProgram {
@@ -219,22 +219,23 @@ test('WHAT[repository-programming-014] JS014_workflow_rejects_a_create_target_ad
       async () => writeFileSync(join(dir, 'new.txt'), 'external', 'utf8'),
     )
 
-    assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'FILE_CHANGED')
+    // The create landed at call time; the observation callback's external
+    // write is a later, separate fact and does not fail the program.
+    assert.equal(caseName(outcome), 'Succeeded')
     assert.equal(readFileSync(join(dir, 'new.txt'), 'utf8'), 'external')
   } finally {
     cleanup()
   }
 })
-test('WHAT[repository-programming-014] JS014_workflow_tracks_every_file_scanned_by_grep', async () => {
+test('WHAT[repository-programming-014] JS014_as_is_grep_snapshot_does_not_block_a_later_write_to_another_path', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'source.txt'), 'needle', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const matches = await this.grep('needle', '*.txt');
-    this.write('output.txt', String(matches.length));
-    return { count: matches.length };
+    const listing = await this.grep('needle', '*.txt');
+    this.write('output.txt', String(listing.matches.length));
+    return { count: listing.matches.length };
   }
 }`
     const outcome = await runObserved(
@@ -252,9 +253,12 @@ test('WHAT[repository-programming-014] JS014_workflow_tracks_every_file_scanned_
       },
     )
 
-    assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'FILE_CHANGED')
-    assert.equal(existsSync(join(dir, 'output.txt')), false)
+    // As-is writes check the target's own freshness at call time; the write
+    // target (output.txt) is absent and created successfully. The grep
+    // snapshot of source.txt does not participate in another path's write.
+    assert.equal(caseName(outcome), 'Succeeded')
+    assert.equal(readFileSync(join(dir, 'output.txt'), 'utf8'), '1')
+    assert.equal(readFileSync(join(dir, 'source.txt'), 'utf8'), 'external')
   } finally {
     cleanup()
   }

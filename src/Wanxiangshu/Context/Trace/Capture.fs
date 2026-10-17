@@ -526,27 +526,53 @@ module XTraceCapture =
         && part.HostToolPartId = work.Source.HostToolPartId
         && BlobDigest.value part.TextDigest = HostDigest.sha256Hex body
 
-    let private stablePartAlreadyCaptured (existing: XTracePartRef list) (work: PartCaptureWork) =
+    /// 每批只建一次索引。可选身份也参与匹配，不能丢掉缺少 run 或 call 的旧记录。
+    type private StableCaptureIndex =
+        { ByProvenance: HashSet<string>
+          ByHostToolPart: HashSet<HostToolPartId * ToolCallId option * ProviderRunIdentity option>
+          ByLegacyProvenance: Dictionary<string, XTracePartRef list> }
+
+    let private buildStableCaptureIndex (existing: XTracePartRef list) : StableCaptureIndex =
+        let byProvenance = HashSet<string>()
+        let byHostToolPart = HashSet<HostToolPartId * ToolCallId option * ProviderRunIdentity option>()
+        let byLegacyProvenance = Dictionary<string, XTracePartRef list>()
+
+        for part in existing do
+            byProvenance.Add part.Provenance |> ignore
+
+            part.HostToolPartId
+            |> Option.iter (fun hostTool ->
+                byHostToolPart.Add((hostTool, part.ToolCallId, part.ProviderRun)) |> ignore)
+
+            let previous =
+                match byLegacyProvenance.TryGetValue part.Provenance with
+                | true, parts -> parts
+                | false, _ -> []
+
+            byLegacyProvenance.[part.Provenance] <- part :: previous
+
+        { ByProvenance = byProvenance
+          ByHostToolPart = byHostToolPart
+          ByLegacyProvenance = byLegacyProvenance }
+
+    let private stablePartAlreadyCaptured (index: StableCaptureIndex) (work: PartCaptureWork) =
         let exactPhysicalProvenance =
             match work.Source.HostPartId with
-            | Some _ -> existing |> List.exists (fun part -> part.Provenance = work.Provenance)
+            | Some _ -> index.ByProvenance.Contains work.Provenance
             | None -> false
 
         let exactPhysicalToolPart =
             match work.Source.HostToolPartId with
             | Some hostToolPartId ->
-                existing
-                |> List.exists (fun part ->
-                    part.ProviderRun = work.Message.ProviderRun
-                    && part.HostToolPartId = Some hostToolPartId
-                    && part.ToolCallId = work.Source.ToolCallId)
+                index.ByHostToolPart.Contains((hostToolPartId, work.Source.ToolCallId, work.Message.ProviderRun))
             | None -> false
 
         let compatibleLegacyPosition =
             work.LegacyStableProvenance
             |> Option.exists (fun provenance ->
-                existing
-                |> List.exists (fun part -> part.Provenance = provenance && legacySemanticMatch work part))
+                match index.ByLegacyProvenance.TryGetValue provenance with
+                | true, parts -> List.exists (legacySemanticMatch work) parts
+                | false, _ -> false)
 
         exactPhysicalProvenance || exactPhysicalToolPart || compatibleLegacyPosition
 
@@ -556,12 +582,12 @@ module XTraceCapture =
     let private appendStablePartIfAbsent
         (durable: AgentJournal)
         (sessionId: SessionId)
-        (existing: XTracePartRef list)
+        (index: StableCaptureIndex)
         (nextCursor: unit -> int64)
         (work: PartCaptureWork)
         : Task<Result<unit, string>> =
         taskResult {
-            if stablePartAlreadyCaptured existing work then
+            if stablePartAlreadyCaptured index work then
                 return ()
             else
                 let cursor = nextCursor ()
@@ -599,6 +625,7 @@ module XTraceCapture =
             let generation = captureGeneration durable sessionId
 
             let recorded = XTraceProjection.parts existing
+            let index = buildStableCaptureIndex recorded
             // DSL-MUTABLE: algorithm-scratch — next durable cursor while appending one stable capture batch
             let mutable cursor = XTraceProjection.headSequence existing
 
@@ -609,7 +636,7 @@ module XTraceCapture =
             let works = enumerateStableCaptureWork generation messageIds messages
 
             for work in works do
-                do! appendStablePartIfAbsent durable sessionId recorded nextCursor work
+                do! appendStablePartIfAbsent durable sessionId index nextCursor work
 
             return Some(xTraceOf durable sessionId)
         }

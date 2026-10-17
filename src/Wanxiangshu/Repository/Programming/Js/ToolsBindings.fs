@@ -7,7 +7,9 @@ open FsToolkit.ErrorHandling
 /// JS-010/JS-016: the api object injected into the sandbox — the only
 /// authority a model program sees. Every member returns a JSON-compatible
 /// object; failures carry `{ ok: false, code, reason }` with stable codes
-/// (JS-019). Mutations only stage (JS-012); the transaction engine commits.
+/// (JS-019). Mutations write as-is: each edit/write is atomically persisted
+/// through MutationFs at call time; the staging buffer records what was
+/// actually written, so a later failure keeps earlier writes on disk (JS-012).
 module JsToolsBindings =
 
     [<Import("resolve", "node:path")>]
@@ -24,6 +26,24 @@ module JsToolsBindings =
 
     [<Import("realpathSync", "node:fs")>]
     let private realpathSync (path: string) : string = jsNative
+
+    [<Import("unlinkSync", "node:fs")>]
+    let private unlinkSync (path: string) : unit = jsNative
+
+    [<Import("readdirSync", "node:fs")>]
+    let private readdirSync (path: string) : string array = jsNative
+
+    [<Import("lstatSync", "node:fs")>]
+    let private lstatSync (path: string) : obj = jsNative
+
+    [<Import("renameSync", "node:fs")>]
+    let private renameSync (fromPath: string) (toPath: string) : unit = jsNative
+
+    [<Import("rmdirSync", "node:fs")>]
+    let private rmdirSync (path: string) : unit = jsNative
+
+    [<Emit("$0.isDirectory()")>]
+    let private statIsDirectory (stat: obj) : bool = jsNative
 
     [<Emit("$0 === undefined || $0 === null")>]
     let private isUndefined (value: obj) : bool = jsNative
@@ -187,7 +207,13 @@ module JsToolsBindings =
             result {
                 let! full = resolveInside root path
                 let! current = JsUtf8Fs.readUtf8Classified full
-                staging.Add(JsStagedMutation.Rewrite(path, current, replacement))
+                let mutation = JsStagedMutation.Rewrite(path, current, replacement)
+
+                // As-is write: the single-mutation commit plan validates the
+                // target is still fresh (FILE_CHANGED otherwise) and atomically
+                // persists this one write; it never rolls back earlier writes.
+                do! JsMutationFs.commitPlan root (JsTransaction.commitPlan [ mutation ])
+                staging.Add mutation
                 return createObj [ "ok" ==> true ]
             }
             |> renderOutcome
@@ -204,19 +230,176 @@ module JsToolsBindings =
                     else
                         Ok()
 
-                staging.Add(JsStagedMutation.Create(path, text))
+                let mutation = JsStagedMutation.Create(path, text)
+
+                // As-is write: the single-mutation commit plan creates the
+                // file with a no-clobber flag (FILE_CHANGED if a third party
+                // created it meanwhile) and persists immediately.
+                do! JsMutationFs.commitPlan root (JsTransaction.commitPlan [ mutation ])
+                staging.Add mutation
                 return createObj [ "ok" ==> true ]
             }
             |> renderOutcome
 
-    /// Build the api object for one sandbox run. `staging` collects every
-    /// mutation the program makes; the caller commits or discards it.
+    /// JS-020/JS-030 write-before check: a mutation target that was read
+    /// through file() must still match its snapshot, exactly like edit. A
+    /// third-party change is FILE_CHANGED with no implicit retry.
+    let private checkSnapshotFreshness
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (path: string)
+        (full: string)
+        : Result<unit, JsFailure> =
+        readSnapshots
+        |> Seq.tryFind (fun snapshot -> snapshot.Path = path)
+        |> function
+            | None -> Ok()
+            | Some snapshot ->
+                match JsUtf8Fs.readUtf8Classified full with
+                | Ok current when current = snapshot.Text -> Ok()
+                | _ -> Error(JsFailure.FileChanged path)
+
+    /// JS-020/JS-030 rm: delete a file or an empty directory; refuse a
+    /// non-empty directory (DIRECTORY_NOT_EMPTY). Missing target is
+    /// FILE_NOT_FOUND. Takes effect immediately (as-is) and records one
+    /// durable Remove entry.
+    let private makeRmMember
+        (root: string)
+        (staging: ResizeArray<JsStagedMutation>)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        =
+        "rm"
+        ==> fun (path: string) ->
+            result {
+                let! full = resolveInside root path
+
+                if not (JsMutationFs.existsPath full) then
+                    return! Error(JsFailure.FileNotFound path)
+
+                do! checkSnapshotFreshness readSnapshots path full
+
+                try
+                    let stat = lstatSync full
+
+                    if statIsDirectory stat then
+                        let entries = readdirSync full
+
+                        if entries.Length > 0 then
+                            return! Error(JsFailure.DirectoryNotEmpty path)
+
+                        rmdirSync full
+                    else
+                        unlinkSync full
+                with error ->
+                    if string error?code = "ENOTEMPTY" then
+                        return! Error(JsFailure.DirectoryNotEmpty path)
+                    elif string error?code = "ENOENT" then
+                        return! Error(JsFailure.FileNotFound path)
+                    else
+                        return! Error(JsFailure.FileReadFailed path)
+
+                staging.Add(JsStagedMutation.Remove path)
+                return createObj [ "ok" ==> true; "removed" ==> path ]
+            }
+            |> renderOutcome
+
+    /// JS-020/JS-030 mv: move or rename a file or directory (POSIX mv).
+    /// Overwrite is allowed; a missing source is FILE_NOT_FOUND. Both sides
+    /// resolve inside the capability boundary. A cross-device move (EXDEV) is
+    /// refused and rolled back: renameSync is atomic, so on EXDEV neither side
+    /// changed and no two-sided intermediate state is ever left behind.
+    let private makeMvMember
+        (root: string)
+        (staging: ResizeArray<JsStagedMutation>)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        =
+        "mv"
+        ==> fun (fromPath: string) (toPath: string) ->
+            result {
+                let! fromFull = resolveInside root fromPath
+                let! toFull = resolveInside root toPath
+
+                if not (JsMutationFs.existsPath fromFull) then
+                    return! Error(JsFailure.FileNotFound fromPath)
+
+                do! checkSnapshotFreshness readSnapshots fromPath fromFull
+
+                if JsMutationFs.existsPath toFull then
+                    do! checkSnapshotFreshness readSnapshots toPath toFull
+
+                try
+                    renameSync fromFull toFull
+                with error ->
+                    if string error?code = "EXDEV" then
+                        return! Error(JsFailure.CrossDeviceMove fromPath)
+                    else
+                        return! Error(JsFailure.FileReadFailed fromPath)
+
+                staging.Add(JsStagedMutation.Move(fromPath, toPath))
+                return createObj [ "ok" ==> true; "moved" ==> fromPath; "destination" ==> toPath ]
+            }
+            |> renderOutcome
+
+    /// PLAN S2 step 4: the park member. `await js.park(payload)` suspends the
+    /// program at this await point: it fires the park signal (which the
+    /// workflow races against the program promise) with the payload, then
+    /// returns a deferred promise the host keeps the resolve/reject right to.
+    /// `unpark` resolves the deferred with the injected value, letting the
+    /// program continue as if the await returned that value. `abandon` rejects
+    /// it with the `__jsAbandoned` marker so native try/finally runs. During
+    /// an abandon cleanup window park is refused with
+    /// CANNOT_PARK_WHILE_ABANDONING.
+    let private makeParkMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
+        "park"
+        ==> fun (payload: obj) ->
+            if parkState.AbandonRequested then
+                failureObj JsFailure.CannotParkWhileAbandoning
+            else
+                parkState.ParkRequested <- true
+                parkState.ParkPayload <- payload
+
+                if not (isNull parkState.ParkSignalResolve) then
+                    emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
+
+                // The deferred promise: the host keeps the resolve/reject
+                // closures in ParkState. The program awaits this promise, so it
+                // suspends here until resumed (unpark) or abandoned.
+                emitJsExpr
+                    (parkState)
+                    "(() => { const state = $0; return new Promise((resolve, reject) => { state.ParkDeferredResolve = resolve; state.ParkDeferredReject = reject; }); })()"
+                    : obj
+
+    /// Build the api object for one sandbox run. `staging` records every
+    /// mutation that was actually persisted as-is; the caller reports it. The
+    /// park member is absent here (no park state); use `createApiWithPark`.
     let createApi
         (capabilities: Set<JsCapability>)
         (root: string)
         (staging: ResizeArray<JsStagedMutation>)
         (readSnapshots: ResizeArray<JsReadSnapshot>)
         (explicitReads: ResizeArray<JsExplicitFileRead>)
+        : obj =
+        createApiCore capabilities root staging readSnapshots explicitReads None
+
+    /// Build the api object for one sandbox run that carries a park lifecycle
+    /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
+    /// the sandbox wrapper; the generated `js.park` member suspends through it.
+    let createApiWithPark
+        (capabilities: Set<JsCapability>)
+        (root: string)
+        (staging: ResizeArray<JsStagedMutation>)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (explicitReads: ResizeArray<JsExplicitFileRead>)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
+        : obj =
+        createApiCore capabilities root staging readSnapshots explicitReads (Some parkState)
+
+    let private createApiCore
+        (capabilities: Set<JsCapability>)
+        (root: string)
+        (staging: ResizeArray<JsStagedMutation>)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (explicitReads: ResizeArray<JsExplicitFileRead>)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         : obj =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
@@ -232,6 +415,16 @@ module JsToolsBindings =
                   makeEditMember root staging
 
               if Set.contains JsCapability.Write capabilities then
-                  makeWriteMember root staging ]
+                  makeWriteMember root staging
+
+              if Set.contains JsCapability.Remove capabilities then
+                  makeRmMember root staging readSnapshots
+
+              if Set.contains JsCapability.Move capabilities then
+                  makeMvMember root staging readSnapshots
+
+              match parkState with
+              | Some state -> makeParkMember state
+              | None -> () ]
 
         createObj [ "js" ==> createObj members ]

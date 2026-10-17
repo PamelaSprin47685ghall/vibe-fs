@@ -11,6 +11,44 @@ open Wanxiangshu.Repository.Programming.Js
 /// invocation mechanism; the vm context is the authority boundary.
 module JsSandbox =
 
+    /// Handle to a started sandbox program: the async IIFE promise is exposed
+    /// (not awaited to completion) so a caller may hold it across calls, and
+    /// the deadline reference is mutable so a caller may reset the async
+    /// deadline without re-wrapping the program.
+    type JsRunHandle =
+        { ProgramPromise: Task<string>
+          DeadlineRef: obj
+          Api: obj
+          ParkState: ParkState }
+
+    /// Park lifecycle state carried by the api closure. The park member reads
+    /// and writes these fields through the same mutable object the workflow
+    /// holds, so a parked program and the orchestrator observe one state.
+    ///
+    /// `ParkSignalResolve` is the park-signal resolver the workflow installs
+    /// before each race: the park member calls it with the payload when the
+    /// program suspends, completing the signal the workflow races against the
+    /// program promise. `ParkDeferredResolve` / `ParkDeferredReject` are the
+    /// deferred-promise resolvers the park member creates: `unpark` calls
+    /// resolve with the injected value (the program continues as if the await
+    /// returned it); `abandon` calls reject with the `__jsAbandoned` marker so
+    /// native try/finally runs. `AbandonRequested` marks the cleanup window
+    /// during which park is refused.
+    type ParkState =
+        { mutable ParkRequested: bool
+          mutable ParkPayload: obj
+          /// The park-signal resolver (a JS function) installed before each
+          /// race; the park member calls it with the payload to complete the
+          /// signal the workflow races against. `null` before install.
+          mutable ParkSignalResolve: obj
+          /// The deferred-promise resolver the park member creates; `unpark`
+          /// calls it with the injected value. `null` while not parked.
+          mutable ParkDeferredResolve: obj
+          /// The deferred-promise rejecter the park member creates; `abandon`
+          /// calls it with the `__jsAbandoned` marker. `null` while not parked.
+          mutable ParkDeferredReject: obj
+          mutable AbandonRequested: bool }
+
     [<Import("Buffer", "node:buffer")>]
     let private nodeBuffer: obj = jsNative
 
@@ -23,17 +61,42 @@ module JsSandbox =
     [<Emit("JSON.parse($0)")>]
     let private parseJson (text: string) : obj = jsNative
 
+    [<Emit("$0.current = $1")>]
+    let private setDeadline (deadlineRef: obj) (epochMs: int64) : unit = jsNative
+
     /// Sentinel payloads the wrapper returns instead of the program result;
     /// recognized by prefix, never by exception-message sniffing (JS-019).
     let private failedPrefix = "{\"__jsProgramFailed\":"
     let private hostFailedPrefix = "{\"__jsHostFailed\":"
     let private invalidReturnPrefix = "{\"__jsInvalidReturn\":"
+    let private parkedPrefix = "{\"__jsParked\":"
+
+    /// The ABANDONED protocol sentinel. Rejecting the program promise with an
+    /// error carrying this marker unwinds the program stack from its await
+    /// point so native try/finally blocks run as a finalizer (PLAN S2 step 6 /
+    /// algorithm F; Python GeneratorExit precedent). The marker is a stable
+    /// prefix, not a message-text sniff.
+    let abandonedSentinel = "__jsAbandoned"
 
     /// Wrap base class + model source into an async IIFE that evaluates to a
     /// JSON string. The api is proxied so every member call re-checks the
-    /// injected absolute deadline: synchronous segments are bounded by the vm
-    /// timeout, async segments by the proxy (JS-054.1).
-    let wrapProgram (baseClassSource: string) (modelSource: string) (deadlineEpochMs: int64) : string =
+    /// mutable injected deadline reference: synchronous segments are bounded by
+    /// the vm timeout, async segments by the proxy (JS-054.1). The deadline is
+    /// read from the vm-global `__deadlineRef.current` at each call, so a
+    /// caller may reset it between calls without re-wrapping the program.
+    ///
+    /// Park lifecycle: the api's `js.park(payload)` member (built by
+    /// ToolsBindings) sets `__parkState.ParkRequested`, fires the park signal
+    /// the workflow races against, and returns a deferred Promise the program
+    /// awaits. The wrapper itself is a plain async IIFE: it stays pending while
+    /// the program is suspended at `await js.park`, and resolves with the final
+    /// result when the program finishes (or with a failure/timeout sentinel).
+    /// `unpark` resolves the deferred with the injected value, letting the
+    /// program continue as if the await returned that value.
+    ///
+    /// The abandon path rejects the program promise with an `__jsAbandoned`
+    /// marker so native try/finally blocks run as a finalizer (PLAN S2 step 6).
+    let wrapProgram (baseClassSource: string) (modelSource: string) : string =
         "(async () => {\n"
         + baseClassSource
         + "\n"
@@ -44,9 +107,7 @@ module JsSandbox =
         + "    const value = target[prop];\n"
         + "    if (typeof value === 'function') {\n"
         + "      return (...args) => {\n"
-        + "        if (Date.now() > "
-        + string deadlineEpochMs
-        + ") {\n"
+        + "        if (Date.now() > __deadlineRef.current) {\n"
         + "          const err = new Error('program exceeded its deadline');\n"
         + "          err.__jsFailure = { code: 'PROGRAM_TIMEOUT', reason: 'program exceeded its deadline' };\n"
         + "          throw err;\n"
@@ -68,6 +129,9 @@ module JsSandbox =
         + "      code: __e.__jsFailure.code,\n"
         + "      reason: String(__e.__jsFailure.reason || __e.__jsFailure.code)\n"
         + "    });\n"
+        + "  }\n"
+        + "  if (__e && __e.__jsAbandoned) {\n"
+        + "    return JSON.stringify({ __jsAbandoned: true });\n"
         + "  }\n"
         + "  return JSON.stringify({ __jsProgramFailed: true, message: String((__e && __e.message) || __e) });\n"
         + "}\n"
@@ -105,11 +169,12 @@ module JsSandbox =
         with _ ->
             JsFailure.ProgramFailed "program threw"
 
-    /// Execute the wrapped program in a fresh vm context.
-    ///
-    /// `deadlineMs` bounds the synchronous segment via the vm timeout; the
-    /// injected proxy bounds async segments. `outputBoundBytes` bounds the
-    /// serialized result (JS-054.2).
+    /// Decode the wrapper's JSON string into a typed result. `outputBoundBytes`
+    /// bounds the serialized result (JS-054.2). Sentinel prefixes are matched
+    /// before the byte bound so failures are never misreported as oversized.
+    /// A parked sentinel is a normal outcome (the program suspended at
+    /// `await js.park`), not a failure; it decodes to `Ok` with the sentinel
+    /// JSON so the workflow can register the site.
     let private decodeRunResult (json: string) (outputBoundBytes: int) : Result<string, JsFailure> =
         if json.StartsWith hostFailedPrefix then
             Error(decodeHostFailed json)
@@ -117,39 +182,132 @@ module JsSandbox =
             Error(decodeProgramFailed json)
         elif json.StartsWith invalidReturnPrefix then
             Error JsFailure.InvalidReturnValue
+        elif json.StartsWith parkedPrefix then
+            Ok json
         elif (nodeBuffer?byteLength (json, "utf8") |> unbox<int>) > outputBoundBytes then
             Error(JsFailure.ResultTooLarge None)
         else
             Ok json
 
-    let run
-        (wrappedSource: string)
-        (api: obj)
-        (deadlineMs: int)
-        (outputBoundBytes: int)
-        : Task<Result<string, JsFailure>> =
-        task {
-            try
-                let context = createContext (createObj [ "api" ==> api ])
-
-                let promise =
-                    runInContext wrappedSource context (createObj [ "timeout" ==> deadlineMs ])
-
-                let! json = promise :?> Task<string>
-                return decodeRunResult json outputBoundBytes
-            with ex ->
-                return Error(classifySyncError ex)
-        }
-
-    /// Run a program with the surface the generator produced: base class
-    /// source, model source, and a binding object. Convenience entry that
-    /// keeps call sites free of wrapper details (JS-002/011).
+    /// Start a wrapped program in a fresh vm context without awaiting it to
+    /// completion. The async IIFE's promise is exposed as `ProgramPromise` so a
+    /// caller may hold it across calls; the deadline is injected as a mutable
+    /// reference (`DeadlineRef`) so a caller may reset the async deadline
+    /// without re-wrapping. The vm context is held by the promise's closure
+    /// chain while it remains unsettled — it is not explicitly lifted.
+    ///
+    /// `deadlineMs` bounds the synchronous segment via the vm timeout; the
+    /// injected proxy bounds async segments (JS-054.1). Synchronous errors
+    /// (SyntaxError, vm timeout) surface as a rejected `ProgramPromise` and are
+    /// classified by `awaitResult`.
     let runSurface
         (baseClassSource: string)
         (modelSource: string)
         (api: obj)
         (deadlineMs: int)
         (deadlineEpochMs: int64)
-        (outputBoundBytes: int)
-        : Task<Result<string, JsFailure>> =
-        run (wrapProgram baseClassSource modelSource deadlineEpochMs) api deadlineMs outputBoundBytes
+        : Task<JsRunHandle> =
+        runSurfaceWithPark baseClassSource modelSource api deadlineMs deadlineEpochMs None
+
+    /// Start a wrapped program with an explicit park lifecycle state. The
+    /// caller owns the ParkState and builds the api with park support
+    /// (JsToolsBindings.createApiWithPark); this function injects both the api
+    /// and the park state into the vm context.
+    let runSurfaceWithPark
+        (baseClassSource: string)
+        (modelSource: string)
+        (api: obj)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (parkState: ParkState option)
+        : Task<JsRunHandle> =
+        task {
+            let deadlineRef = createObj [ "current" ==> deadlineEpochMs ]
+
+            let state =
+                match parkState with
+                | Some state -> state
+                | None ->
+                    { ParkRequested = false
+                      ParkPayload = null
+                      ParkSignalResolve = null
+                      ParkDeferredResolve = null
+                      ParkDeferredReject = null
+                      AbandonRequested = false }
+
+            try
+                let context =
+                    createContext (
+                        createObj
+                            [ "api" ==> api
+                              "__deadlineRef" ==> deadlineRef
+                              "__parkState" ==> state ]
+                    )
+
+                let promise =
+                    runInContext (wrapProgram baseClassSource modelSource) context (createObj [ "timeout" ==> deadlineMs ])
+
+                return
+                    { ProgramPromise = promise :?> Task<string>
+                      DeadlineRef = deadlineRef
+                      Api = api
+                      ParkState = state }
+            with ex ->
+                return
+                    { ProgramPromise = task { return raise ex }
+                      DeadlineRef = deadlineRef
+                      Api = api
+                      ParkState = state }
+        }
+
+    /// Await a started sandbox program and classify its outcome. Synchronous
+    /// errors (SyntaxError → INVALID_PROGRAM, vm timeout → PROGRAM_TIMEOUT) are
+    /// classified here; async failures arrive as sentinel JSON and are decoded
+    /// by `decodeRunResult`.
+    let awaitResult (handle: JsRunHandle) (outputBoundBytes: int) : Task<Result<string, JsFailure>> =
+        task {
+            try
+                let! json = handle.ProgramPromise
+                return decodeRunResult json outputBoundBytes
+            with ex ->
+                return Error(classifySyncError ex)
+        }
+
+    /// Reset the async deadline of an in-flight sandbox program. Subsequent api
+    /// member calls re-check `deadlineRef.current`, so the new epoch takes
+    /// effect without re-wrapping or re-running the program.
+    let resetDeadline (handle: JsRunHandle) (deadlineEpochMs: int64) : unit =
+        setDeadline handle.DeadlineRef deadlineEpochMs
+
+    /// Install the park signal the workflow races against the program promise.
+    /// The returned Task completes with the parked payload when the program's
+    /// `js.park(payload)` member fires; the resolver is stored in
+    /// `parkState.ParkSignalResolve` so the park member can call it.
+    let installParkSignal (parkState: ParkState) : Task<obj> =
+        parkState.ParkRequested <- false
+        parkState.ParkPayload <- null
+        parkState.ParkSignalResolve <- null
+
+        emitJsExpr
+            (parkState)
+            "(() => { const state = $0; return new Promise((resolve) => { state.ParkSignalResolve = resolve; }); })()"
+            :?> Task<obj>
+
+    /// Resolve the deferred promise the program is awaiting at `await js.park`.
+    /// Called by `unpark` with the injected value; the program continues as if
+    /// the await returned that value.
+    let unpark (parkState: ParkState) (value: obj) : unit =
+        if not (isNull parkState.ParkDeferredResolve) then
+            emitJsExpr (parkState.ParkDeferredResolve, value) "$0($1)" |> ignore
+
+    /// Reject the deferred promise with the `__jsAbandoned` marker. Called by
+    /// `abandon`/`reap`; the rejection unwinds the program stack from the await
+    /// point so native try/finally blocks run as a finalizer.
+    let abandon (parkState: ParkState) : unit =
+        parkState.AbandonRequested <- true
+
+        if not (isNull parkState.ParkDeferredReject) then
+            emitJsExpr
+                (parkState.ParkDeferredReject, abandonedSentinel)
+                "$0(Object.assign(new Error($1), { __jsAbandoned: true, message: $1 }))"
+            |> ignore

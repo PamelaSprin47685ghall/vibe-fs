@@ -25,6 +25,7 @@ module JsToolGenerator =
         capabilities
         |> Set.toList
         |> List.sortBy JsCapability.order
+        |> List.filter (fun capability -> capability <> JsCapability.Park)
         |> List.collect (fun capability ->
             Map.tryFind capability JsFragmentRegistry.byCapability |> Option.defaultValue [])
 

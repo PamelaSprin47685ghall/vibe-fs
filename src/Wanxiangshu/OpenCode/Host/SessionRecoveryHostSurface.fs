@@ -165,7 +165,14 @@ module SessionRecoveryHostSurface =
                     { new ISessionSnapshotPort with
                         member _.GetMessages _ = Task.FromResult(Ok []) }
 
-                let host = SessionRecoveryHost(journalHandle.Journal, snapshot, scope, port)
+                let host =
+                    SessionRecoveryHost(
+                        journalHandle.Journal,
+                        snapshot,
+                        scope,
+                        port,
+                        None
+                    )
 
                 let plainGate =
                     TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -486,7 +493,14 @@ module SessionRecoveryHostSurface =
                         { new ISessionSnapshotPort with
                             member _.GetMessages _ = Task.FromResult(Ok []) }
 
-                    let host = SessionRecoveryHost(journal, snapshot, scope, port)
+                    let host =
+                        SessionRecoveryHost(
+                            journal,
+                            snapshot,
+                            scope,
+                            port,
+                            None
+                        )
 
                     return
                         { Journal = JournalHandle.Create(journal, None)

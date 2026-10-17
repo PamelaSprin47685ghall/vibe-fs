@@ -32,7 +32,7 @@ module ProviderLifecycle =
         journal: AgentJournal option ->
         freezeAttemptPlan: (SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> Result<unit, 'bindingError>) ->
         projectionSessionIdOpt: string option ->
-        outObj: obj ->
+        physicalUserMessageId: PhysicalUserMessageId option ->
             Task<Result<unit, ProviderStartObservationError<'bindingError>>>
 
     val persistProviderStartedFromObservation:

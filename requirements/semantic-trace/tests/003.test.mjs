@@ -51,6 +51,31 @@ test('WHAT[semantic-trace-003] concurrent same-session captures serialize before
     ])
   })
 })
+
+test('WHAT[semantic-trace-003] stable tool-part identity remains idempotent without a provider-run identity', async () => {
+  await withJournal(async (handle) => {
+    const observation = (hostMessageId) => ({
+      hostMessageId,
+      message: {
+        info: { id: hostMessageId, role: 'tool' },
+        parts: [{
+          id: 'same-host-tool-part', type: 'tool', tool: 'read', callID: 'same-tool-call',
+          state: { status: 'completed', input: { path: 'sample' }, output: 'stable tool output' },
+        }],
+      },
+    })
+    const first = await trace.captureObservedMessages(handle, SESSION, [observation('first-host-message')])
+    assert.equal(first.ok, true, first.ok ? '' : first.error)
+    assert.equal(first.receipt.capturedPartCount, 1)
+    const before = trace.orderedSemanticParts(trace.snapshot(handle, SESSION))
+    assert.equal(before[0].providerRun, null)
+
+    const replay = await trace.captureObservedMessages(handle, SESSION, [observation('reanchored-host-message')])
+    assert.equal(replay.ok, true, replay.ok ? '' : replay.error)
+    assert.equal(replay.receipt.capturedPartCount, 0)
+    assert.deepEqual(trace.orderedSemanticParts(trace.snapshot(handle, SESSION)), before)
+  })
+})
 }
 
 {

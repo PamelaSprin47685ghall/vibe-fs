@@ -80,7 +80,7 @@ test('WHAT[repository-programming-023] JS_EDIT_only_surface_has_private_snapshot
     assert.equal(stagedCount(handle), 1)
     assert.deepEqual(stagedKinds(handle), ['Rewrite'])
     assert.deepEqual(runtimeReadPaths(handle), ['a.txt'])
-    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'alpha\n', 'runtime surface only stages')
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'beta\n', 'runtime surface persists as-is')
   } finally {
     cleanup()
   }
@@ -189,7 +189,7 @@ test('WHAT[repository-programming-023] JS_EDIT_noop_succeeds_without_a_rewrite_i
   }
 })
 
-test('WHAT[repository-programming-023] JS_EDIT_later_file_failure_discards_earlier_file_staging', async () => {
+test('WHAT[repository-programming-023] JS_EDIT_later_file_failure_keeps_earlier_file_writes', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
@@ -199,7 +199,7 @@ test('WHAT[repository-programming-023] JS_EDIT_later_file_failure_discards_earli
 
     assert.equal(caseName(outcome), 'Failed')
     assert.equal(failureCode(outcome), 'EDIT_NOT_FOUND')
-    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'alpha\n')
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'changed\n', 'earlier write stays on disk')
     assert.equal(readFileSync(join(dir, 'b.txt'), 'utf8'), 'bravo\n')
   } finally {
     cleanup()

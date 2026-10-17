@@ -14,7 +14,7 @@ for (const phase of ['Prepared', 'Committed']) {
   for (const scenario of ['valid', 'malformed', 'malformed-release']) {
     test(`WHAT[repository-programming-013] JS ${phase} actual EventStore port ${scenario} bad-input defense settles bytes before semantic-cut fatal`, async t => {
       const root = mkdtempSync(join(tmpdir(), 'js-cut-boundary-'))
-      const commonDir = join(root, '.git')
+      const commonDir = root
       const writer = randomUUID()
       const env = { ...process.env }
       delete env.NODE_TEST_CONTEXT
@@ -187,9 +187,7 @@ const sandbox = () => {
 }
 const localStore = () => {
   const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
-  mkdirSync(commonDir, { recursive: true })
-  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
+  const handle = createEventStore(owned, randomUUID().replaceAll('-', ''))
   return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
@@ -226,8 +224,10 @@ for (const fate of [
         assert.equal(caseName(outcome), 'Failed')
         const expectedCode = `TRANSACTION_${phase === 'Prepared' ? 'PREPARE' : 'COMMIT'}_${fate.suffix}`
         assert.equal(failureCode(outcome), expectedCode)
-        assert.deepEqual(rewritten(outcome), [])
-        assert.deepEqual(created(outcome), [])
+        // Under as-is semantics the filesystem effects already landed at each
+        // edit/write call; a durable-accounting failure reports them as-is.
+        assert.deepEqual(rewritten(outcome), ['a.txt'])
+        assert.deepEqual(created(outcome), ['created.txt'])
         assert.equal(observed.length, phase === 'Prepared' ? 1 : 2, 'no append retry or new transaction identity')
         const failedAppend = observed.at(-1)
         const failure = persistenceFailure(outcome)
@@ -243,8 +243,11 @@ for (const fate of [
           assert.strictEqual(failure.cleanupFailures[0].cause, cleanupCause)
         }
         if (phase === 'Prepared') {
-          assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old', 'Prepared failure precedes all file effects')
-          assert.equal(existsSync(join(dir, 'created.txt')), false)
+          // Under as-is semantics the filesystem effects already landed at each
+          // edit/write call before the durable accounting runs; a Prepared
+          // append failure therefore does not roll them back.
+          assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'new', 'as-is write stays despite Prepared failure')
+          assert.equal(readFileSync(join(dir, 'created.txt'), 'utf8'), 'created')
           assert.deepEqual(pending(local.handle), [])
         } else {
           assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'new', 'Committed failure does not claim rollback of real effects')
@@ -259,7 +262,8 @@ for (const fate of [
         const doc = parseToml(rendered)
         assert.equal(doc.code, expectedCode)
         assert.equal(doc.data, undefined)
-        assert.equal(doc.fs, undefined)
+        assert.deepEqual(doc.fs.rewritten, ['a.txt'], 'failure reports the already-applied writes')
+        assert.deepEqual(doc.fs.created, ['created.txt'])
       } finally { local.close(); cleanup() }
     })
   }

@@ -72,6 +72,9 @@ module DurableWorkHost =
 
     val inspected: gitCommonDir: string -> workId: string -> InspectedWork option
 
+    val inspectedMany:
+        gitCommonDir: string -> workIds: string array -> (string * Result<InspectedWork option, string>) array
+
     val ensureOpened:
         gitCommonDir: string ->
         workId: string ->

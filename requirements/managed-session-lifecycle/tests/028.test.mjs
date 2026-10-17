@@ -91,3 +91,47 @@ test('WHAT[managed-session-lifecycle-028] a proven terminal that faults during s
     rmSync(directory, { recursive: true, force: true })
   }
 })
+
+test('WHAT[managed-session-lifecycle-028] a PERSIST-settled Source with durable work still Active wakes the join instead of hanging on the journal revision', async () => {
+  const owner = 'manager-settlement-persist-source'
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-settle-persist-'))
+
+  const runtime = await forkTool.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
+
+  try {
+    const placed = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'PERSIST-SOURCE-CHARGE')
+    await forkTool.awaitPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+    assert.match(await placed, /Ada/)
+
+    // The pending run exists and its durable work is still Active.
+    assert.equal(forkTool.workSnapshot(runtime, owner)[0].lifecycle, 'Active')
+
+    // Settlement faulted: the Source is settled to a PERSIST failure while the
+    // durable work stays Active and the run stays pending (unknown durable
+    // commit). The journal revision never advances, so a join waiting only on
+    // journal change would hang forever — it must instead surface the
+    // settlement failure through the pending Source.
+    const injected = await forkTool.injectPendingPersistFailure(runtime, owner)
+    assert.equal(injected.ok, true)
+
+    const joined = await Promise.race([
+      forkTool.executeJoin(runtime, owner),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('join hung on PERSIST-settled Source with durable work Active')), 5000),
+      ),
+    ])
+    assert.match(
+      joined,
+      /could not be gathered|未能被收集|materializ/i,
+      `join surfaced the settlement failure instead of hanging: ${joined}`,
+    )
+
+    // The durable work is NOT released: it stays Active. An unknown durable
+    // commit must not permit new work or masquerade as a success.
+    assert.equal(forkTool.workSnapshot(runtime, owner)[0].lifecycle, 'Active')
+  } finally {
+    forkTool.disposeRuntime(runtime)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})

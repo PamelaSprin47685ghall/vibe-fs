@@ -171,9 +171,8 @@ module DurableWorkHost =
         | Some opened -> opened?close ()
         | None -> closeConnection connection
 
-    /// One open, one close. SqliteJournal.close closes the connection it was given.
-    /// If the journal is never constructed, this function closes the connection itself.
-    let useWork (gitCommonDir: string) (workId: string) (body: obj -> 'a) : 'a =
+    /// 一个操作持有一个连接，构造失败时也关闭连接。
+    let private useJournal (gitCommonDir: string) (body: obj -> 'a) : 'a =
         let path = journalPath gitCommonDir
         ensureDir (parentOf path)
         let connection = openDatabase path
@@ -183,10 +182,12 @@ module DurableWorkHost =
         try
             let opened: obj = createNew SqliteJournal connection
             journal <- Some opened
-            let work: obj = createNew DurableWork (workId, opened)
-            body work
+            body opened
         finally
             closeJournal journal connection
+
+    let useWork (gitCommonDir: string) (workId: string) (body: obj -> 'a) : 'a =
+        useJournal gitCommonDir (fun journal -> body (createNew DurableWork (workId, journal)))
 
     let private appendSeed (journal: obj) (workId: string) (revision: float) (record: string) : float =
         let frame: obj = emitJsExpr record "JSON.parse($0)"
@@ -451,24 +452,42 @@ module DurableWorkHost =
             |> Array.map hostAdvanceOf
             |> Array.toList }
 
-    let private inspectedJournal (gitCommonDir: string) (workId: string) : InspectedWork option =
-        // Read once. Snapshot and history must describe the same revision.
-        useWork gitCommonDir workId (fun durable ->
-            let records: string array = durable?records ()
-            let work: obj = createNew Work (workId, records)
-            let snapshot: obj = work?inspect ()
+    let private inspectedFromJournal (journal: obj) (workId: string) : InspectedWork option =
+        // 同一份已校验记录只折叠一次，快照与历史属于同一修订。
+        let records: string array = journal?read (workId)
+        let work: obj = createNew Work (workId, records)
+        let snapshot: obj = work?inspect ()
 
-            if unbox<bool> snapshot?opened then
-                Some(projectedWork snapshot work)
-            else
-                None)
+        if unbox<bool> snapshot?opened then
+            Some(projectedWork snapshot work)
+        else
+            None
 
     let inspected (gitCommonDir: string) (workId: string) : InspectedWork option =
         // An empty id names no work; it never reaches the journal as a query.
         if String.IsNullOrEmpty workId then
             None
         else
-            inspectedJournal gitCommonDir workId
+            useJournal gitCommonDir (fun journal -> inspectedFromJournal journal workId)
+
+    /// 启动枚举共用一次连接和全库完整性检查，各工作流仍分别校验并报告错误。
+    let inspectedMany (gitCommonDir: string) (workIds: string array) =
+        if Array.isEmpty workIds then
+            [||]
+        else
+            useJournal gitCommonDir (fun journal ->
+                workIds
+                |> Array.map (fun workId ->
+                    let result =
+                        try
+                            if String.IsNullOrEmpty workId then
+                                Ok None
+                            else
+                                Ok(inspectedFromJournal journal workId)
+                        with error ->
+                            Error error.Message
+
+                    workId, result))
 
     let private openingFailure (receipt: HostReceipt) =
         if receipt.Reason = "" then

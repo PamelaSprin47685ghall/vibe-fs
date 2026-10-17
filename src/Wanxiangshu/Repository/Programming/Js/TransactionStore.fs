@@ -12,10 +12,21 @@ type IJsTransactionPersistence =
     abstract AppendPrepared: prepared: JsTransactionPrepared -> Task<Result<EventId, JsTransactionAppendFailure>>
     abstract AppendCommitted: transactionId: JsTransactionId -> Task<Result<EventId, JsTransactionAppendFailure>>
 
+/// Narrow durable audit capability for parked-site lifecycle transitions
+/// (PLAN S2 step 8 / algorithm H3). The audit stream is separate from the
+/// mutation-ledger stream: it records that a lifecycle transition happened and
+/// never participates in write replay. Callers (park/unpark/abandon/reap in
+/// ToolWorkflow) receive this interface; the append implementation is here.
+type IJsLifecyclePersistence =
+    abstract AppendLifecycleEvent:
+        event: JsLifecycleEvent -> Task<Result<EventId, JsLifecycleAppendFailure>>
+
 /// JS-012/JS-015: durable transaction facts through the unified EventStore —
 /// the only persistence a js-* transaction may use (forbid js-transaction.db
 /// / feature store). A transaction is Prepared before any filesystem effect
 /// and Committed after; an uncommitted Prepared remains interrupted-tool evidence.
+/// PLAN S2 step 8: the Prepared payload is single-mutation — each write has
+/// its own Prepared/Committed pair, no multi-mutation aggregation.
 module JsToolsTransactionStore =
 
     /// Single linear stream for transaction facts.
@@ -32,25 +43,40 @@ module JsToolsTransactionStore =
               match mutation.OriginalText with
               | Some text -> Encode.string text
               | None -> Encode.nil
-              "newText", Encode.string mutation.NewText ]
+              "newText", Encode.string mutation.NewText
+              "kind",
+              match mutation.Kind with
+              | JsDurableMutationKind.Rewrite -> Encode.string "rewrite"
+              | JsDurableMutationKind.Create -> Encode.string "create"
+              | JsDurableMutationKind.Remove -> Encode.string "remove"
+              | JsDurableMutationKind.Move -> Encode.string "move" ]
 
     let private decodeDurableMutation: Decoder<JsDurableMutation> =
         Decode.object (fun get ->
             { Path = get.Required.Field "path" Decode.string
               OriginalText = get.Optional.Field "originalText" Decode.string
-              NewText = get.Required.Field "newText" Decode.string })
+              NewText = get.Required.Field "newText" Decode.string
+              Kind =
+                match get.Optional.Field "kind" Decode.string with
+                | None -> JsDurableMutationKind.Rewrite
+                | Some "create" -> JsDurableMutationKind.Create
+                | Some "remove" -> JsDurableMutationKind.Remove
+                | Some "move" -> JsDurableMutationKind.Move
+                | Some _ -> JsDurableMutationKind.Rewrite })
 
+    /// PLAN S2 step 8 / algorithm H1: the Prepared payload is a single
+    /// mutation, not an array.
     let private encodePrepared (prepared: JsTransactionPrepared) : JsonValue =
         Encode.object
             [ "transactionId", Encode.string (JsTransactionId.value prepared.TransactionId)
               "workspaceRoot", Encode.string prepared.WorkspaceRoot
-              "mutations", Encode.list (List.map encodeDurableMutation prepared.Mutations) ]
+              "mutation", encodeDurableMutation prepared.Mutation ]
 
     let private decodePrepared: Decoder<JsTransactionPrepared> =
         Decode.object (fun get ->
             { TransactionId = JsTransactionId.create (get.Required.Field "transactionId" Decode.string)
               WorkspaceRoot = get.Required.Field "workspaceRoot" Decode.string
-              Mutations = get.Required.Field "mutations" (Decode.list decodeDurableMutation) })
+              Mutation = get.Required.Field "mutation" decodeDurableMutation })
 
     let private encodeCommitted (committed: JsTransactionCommitted) : JsonValue =
         Encode.object [ "transactionId", Encode.string (JsTransactionId.value committed.TransactionId) ]
@@ -183,3 +209,128 @@ module JsToolsTransactionStore =
         { new IJsTransactionPersistence with
             member _.AppendPrepared(prepared) = appendPrepared store prepared
             member _.AppendCommitted(transactionId) = appendCommitted store transactionId }
+
+    // ---- lifecycle audit stream (PLAN S2 step 8 / algorithm H3) ------------
+
+    /// Independent linear audit stream, deliberately separate from
+    /// `js-tools/transactions`: mutation-ledger facts participate in interrupt
+    /// audit and write replay; lifecycle audit facts only record "happened".
+    let LifecycleAuditStream = "js-tools/lifecycle-audit"
+    let ParkedEventType = JsLifecycleAuditEventTypes.Parked
+    let UnparkedEventType = JsLifecycleAuditEventTypes.Unparked
+    let AbandonedEventType = JsLifecycleAuditEventTypes.Abandoned
+    let ReapedEventType = JsLifecycleAuditEventTypes.Reaped
+
+    let lifecycleEventTypeOf (eventType: JsLifecycleEventType) : string =
+        match eventType with
+        | JsLifecycleEventType.Parked -> ParkedEventType
+        | JsLifecycleEventType.Unparked -> UnparkedEventType
+        | JsLifecycleEventType.Abandoned -> AbandonedEventType
+        | JsLifecycleEventType.Reaped -> ReapedEventType
+
+    let lifecycleEventTypeOfName (eventType: string) : JsLifecycleEventType option =
+        match eventType with
+        | value when value = ParkedEventType -> Some JsLifecycleEventType.Parked
+        | value when value = UnparkedEventType -> Some JsLifecycleEventType.Unparked
+        | value when value = AbandonedEventType -> Some JsLifecycleEventType.Abandoned
+        | value when value = ReapedEventType -> Some JsLifecycleEventType.Reaped
+        | _ -> None
+
+    let isLifecycleEventType eventType =
+        JsLifecycleAuditEventTypes.isLifecycleAuditEvent eventType
+
+    /// PLAN H3 field shape: { eventType, handle, sessionId, at } — no site
+    /// serialization, no payload/value.
+    let private encodeLifecycleEvent (event: JsLifecycleEvent) : JsonValue =
+        Encode.object
+            [ "eventType", Encode.string (lifecycleEventTypeOf event.EventType)
+              "handle", Encode.string event.Handle
+              "sessionId", Encode.string event.SessionId
+              "at", Encode.string event.At ]
+
+    let private decodeLifecycleEvent: Decoder<JsLifecycleEvent> =
+        Decode.object (fun get ->
+            let eventType =
+                get.Required.Field "eventType" Decode.string
+                |> lifecycleEventTypeOfName
+
+            match eventType with
+            | None -> failwith "JsLifecycle eventType is not part of the audit vocabulary"
+            | Some kind ->
+                { EventType = kind
+                  Handle = get.Required.Field "handle" Decode.string
+                  SessionId = get.Required.Field "sessionId" Decode.string
+                  At = get.Required.Field "at" Decode.string })
+
+    type DecodedLifecycleEvent = Lifecycle of JsLifecycleEvent
+
+    let tryDecodeLifecycleEnvelope (envelope: EventEnvelope) : Result<DecodedLifecycleEvent, string> =
+        if isLifecycleEventType envelope.EventType then
+            Decode.fromValue "$" decodeLifecycleEvent envelope.Payload |> Result.map Lifecycle
+        else
+            Error(sprintf "not a JsLifecycle audit event: %s" envelope.EventType)
+
+    let private tripSettledLifecycleCut eventType eventId error =
+        if
+            AppendError.semanticCuts error
+            |> List.exists (fun cut -> cut.FailedEventId = eventId)
+        then
+            FatalProcess.trip
+                "js-lifecycle-audit-semantic-cut"
+                (sprintf
+                    "%s semantic cut after append %s: %s"
+                    eventType
+                    (EventId.value eventId)
+                    (AppendError.describe error))
+
+    /// Append one lifecycle audit trace. Callers are the park/unpark/abandon/
+    /// reap transition points in ToolWorkflow (lane-a-core owns those call
+    /// sites); this function is the append interface.
+    let appendLifecycleEvent
+        (store: IEventStore)
+        (event: JsLifecycleEvent)
+        : Task<Result<EventId, JsLifecycleAppendFailure>> =
+        task {
+            let eventId = EventId.create (System.Guid.NewGuid().ToString("N"))
+            let streamId = EventStreamId.create LifecycleAuditStream
+            let eventType = lifecycleEventTypeOf event.EventType
+
+            let envelope =
+                EventEnvelope.normalize
+                    { EventId = eventId
+                      StreamId = streamId
+                      EventType = eventType
+                      Parents = store.TryHead streamId |> Option.toList
+                      Payload = payload (encodeLifecycleEvent event)
+                      PayloadRefs = []
+                      Payloads = Map.empty }
+
+            match! store.Append [ envelope ] with
+            | Ok receipt when AppendReceipt.cutFor eventId receipt |> Option.isSome ->
+                let cut = AppendReceipt.cutFor eventId receipt |> Option.get
+                let reason = "JsLifecycle audit semantic cut: " + cut.Reason
+                FatalProcess.trip "js-lifecycle-audit-semantic-cut" reason
+
+                return
+                    Error
+                        { EventType = event.EventType
+                          Handle = event.Handle
+                          SessionId = event.SessionId
+                          EventId = eventId
+                          Error = AppendError.SemanticCut cut }
+            | Ok _ -> return Ok eventId
+            | Error err ->
+                tripSettledLifecycleCut eventType eventId err
+
+                return
+                    Error
+                        { EventType = event.EventType
+                          Handle = event.Handle
+                          SessionId = event.SessionId
+                          EventId = eventId
+                          Error = err }
+        }
+
+    let createLifecyclePersistence (store: IEventStore) : IJsLifecyclePersistence =
+        { new IJsLifecyclePersistence with
+            member _.AppendLifecycleEvent(event) = appendLifecycleEvent store event }

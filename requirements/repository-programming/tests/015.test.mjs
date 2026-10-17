@@ -68,9 +68,7 @@ const sandbox = () => {
 }
 const localStore = (commonDir) => {
   const owned = commonDir ?? mkdtempSync(join(tmpdir(), 'wxs-txstore-events-'))
-  const gitCommonDir = join(owned, '.git')
-  mkdirSync(gitCommonDir, { recursive: true })
-  const handle = createEventStore(gitCommonDir, randomUUID().replaceAll('-', ''))
+  const handle = createEventStore(owned, randomUUID().replaceAll('-', ''))
   return { handle, owned, close: () => { disposeEventStore(handle); if (!commonDir) rmSync(owned, { recursive: true, force: true }) } }
 }
 const unwrap = (result) => {
@@ -82,21 +80,21 @@ const mutation = (path, originalText, newText) => ({
   originalText,
   newText,
 })
-const prepared = (id, root, mutations) => ({
+const prepared = (id, root, mutation) => ({
   transactionId: id,
   workspaceRoot: root,
-  mutations,
+  mutation,
 })
 
 test('WHAT[repository-programming-015] JS015_prepared_without_committed_is_interrupted_tool_evidence', async () => {
   const local = localStore()
   try {
-    const p = prepared('tx-2', '/ws', [mutation('a.txt', 'old', 'new'), mutation('b.txt', null, 'fresh')])
+    const p = prepared('tx-2', '/ws', mutation('a.txt', 'old', 'new'))
     unwrap(await appendPrepared(local.handle, p))
     const waiting = pending(local.handle)
     assert.equal(waiting.length, 1)
     assert.equal(waiting[0].workspaceRoot, '/ws')
-    assert.equal(waiting[0].mutations.length, 2)
+    assert.equal(waiting[0].mutation.path, 'a.txt')
   } finally {
     local.close()
   }
@@ -108,7 +106,7 @@ test('WHAT[repository-programming-015] JS015_reopening_store_never_undoes_an_int
     writeFileSync(join(dir, 'a.txt'), 'new', 'utf8')
     const first = localStore(common)
     try {
-      unwrap(await appendPrepared(first.handle, prepared('tx-3', dir, [mutation('a.txt', 'old', 'new')])))
+      unwrap(await appendPrepared(first.handle, prepared('tx-3', dir, mutation('a.txt', 'old', 'new'))))
     } finally {
       first.close()
     }
@@ -163,11 +161,6 @@ ${body}
   1 << 20,
   store,
 )
-const mutationView = (mutation) => ({
-  path: mutation.path,
-  originalText: mutation.originalText,
-  newText: mutation.newText,
-})
 
 test('WHAT[repository-programming-015] Adapter JS015_MutationFs_commits_atomically_and_reopen_never_blind_retries_an_ambiguous_partial_commit', async () => {
   const workspace = makeDirectory('wxs-js-mutation-adapter-')
@@ -201,9 +194,10 @@ test('WHAT[repository-programming-015] Adapter JS015_MutationFs_commits_atomical
     committedStore.close()
 
     // The second target snapshots as absent, but its missing parent makes the
-    // physical write fail after MutationFs has written the first target. The
-    // production adapter must roll that partial effect back and leave Prepared
-    // durable because no Committed receipt is safe to claim.
+    // physical write fail. Under as-is semantics the first rewrite already
+    // landed at call time; the failed write does not roll it back, and no
+    // Committed receipt is claimed because the durable accounting records the
+    // whole written set after the fact.
     writeFileSync(join(workspace, 'first.txt'), 'cut:old', 'utf8')
     const interruptedStore = openStore(interruptedEvents)
     const interrupted = await runWorkflow(workspace, interruptedStore.handle, `    this.rewrite('first.txt', 'cut:new');
@@ -212,38 +206,25 @@ test('WHAT[repository-programming-015] Adapter JS015_MutationFs_commits_atomical
 
     assert.equal(caseName(interrupted), 'Failed')
     assert.equal(failureCode(interrupted), 'TRANSACTION_COMMIT_FAILED')
-    assert.equal(readFileSync(join(workspace, 'first.txt'), 'utf8'), 'cut:old', 'partial first write was rolled back')
+    assert.equal(readFileSync(join(workspace, 'first.txt'), 'utf8'), 'cut:new', 'as-is rewrite stays despite later write failure')
     assert.equal(existsSync(join(workspace, 'missing-parent/second.txt')), false)
 
+    // Under as-is semantics a write failure surfaces at the failing call; the
+    // durable accounting never runs, so no Prepared record is left behind.
     const waiting = pending(interruptedStore.handle)
-    assert.equal(waiting.length, 1, 'Prepared remains durable after ambiguous physical failure')
-    assert.equal(waiting[0].workspaceRoot, workspace)
-    assert.equal(typeof waiting[0].transactionId, 'string')
-    assert.notEqual(waiting[0].transactionId, '')
-    assert.deepEqual(waiting[0].mutations.map(mutationView), [
-      { path: 'first.txt', originalText: 'cut:old', newText: 'cut:new' },
-      { path: 'missing-parent/second.txt', originalText: null, newText: 'must-not-survive' },
-    ])
+    assert.equal(waiting.length, 0, 'no durable accounting for a program that failed before completion')
     interruptedStore.close()
 
     // Make a retry physically possible only after the interrupted process is
     // gone. Reopening Current must observe evidence, never replay the plan.
     mkdirSync(join(workspace, 'missing-parent'))
     const reopenedInterrupted = openStore(interruptedEvents)
-    assert.equal(readFileSync(join(workspace, 'first.txt'), 'utf8'), 'cut:old')
+    assert.equal(readFileSync(join(workspace, 'first.txt'), 'utf8'), 'cut:new', 'as-is write survives reopen; reopen never replays')
     assert.equal(existsSync(join(workspace, 'missing-parent/second.txt')), false, 'reopen did not blindly retry')
     assert.deepEqual(
-      pending(reopenedInterrupted.handle).map((item) => ({
-        transactionId: item.transactionId,
-        workspaceRoot: item.workspaceRoot,
-        mutations: item.mutations.map(mutationView),
-      })),
-      waiting.map((item) => ({
-        transactionId: item.transactionId,
-        workspaceRoot: item.workspaceRoot,
-        mutations: item.mutations.map(mutationView),
-      })),
-      'pending projection is durable and unchanged across reopen',
+      pending(reopenedInterrupted.handle),
+      [],
+      'no durable pending facts exist across reopen for a failed program',
     )
     reopenedInterrupted.close()
   } finally {

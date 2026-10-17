@@ -159,6 +159,7 @@ type HostForkRuntime =
     member OwnsPty: id: PtyId -> bool
     member AwaitObservedWork: unit -> Task<unit>
     member DrainOwnedWork: unit -> Task<unit>
+    member internal InjectPendingPersistFailure: unit -> unit
     member CloseOwnedPtys: ?graceMs: int -> Task<unit>
     member IsPtyCompletion: runId: string -> bool
     member TryBindTerminalName: name: string * id: PtyId -> Result<unit, string>

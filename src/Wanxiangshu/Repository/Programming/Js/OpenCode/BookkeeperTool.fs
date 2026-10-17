@@ -298,13 +298,17 @@ module JsBookkeeperTool =
                     let api = createApi language question answer staged
 
                     let! json =
-                        JsSandbox.runSurface
-                            runtimeBaseClass
-                            program
-                            api
-                            10000
-                            (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L)
-                            (1 <<< 20)
+                        task {
+                            let! handle =
+                                JsSandbox.runSurface
+                                    runtimeBaseClass
+                                    program
+                                    api
+                                    10000
+                                    (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L)
+
+                            return! JsSandbox.awaitResult handle (1 <<< 20)
+                        }
                         |> TaskResult.mapError JsFailure.reason
 
                     let! value = JsToolsData.parse json |> Result.mapError JsFailure.reason

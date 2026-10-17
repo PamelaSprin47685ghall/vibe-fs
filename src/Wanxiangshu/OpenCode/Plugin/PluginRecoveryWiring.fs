@@ -22,6 +22,30 @@ module PluginRecoveryWiring =
             Diagnostic.emit "lifecycle-work-recovery-refused" [ "work_id", workId; "reason", error.Message ]
             None
 
+    let private inspectRecoveryWorks (journal: AgentJournal) (workspace: string option) =
+        let stateRoot = workspace |> Option.map RuntimePath.stateRoot |> Option.defaultValue ""
+
+        if String.IsNullOrWhiteSpace stateRoot then
+            [||]
+        else
+            let workIds =
+                (AgentJournal.snapshot journal).AgentProjections.Sessions
+                |> Seq.map (fun (KeyValue(sessionId, _)) -> SessionId.value sessionId)
+                |> Seq.toArray
+
+            try
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspectedMany stateRoot workIds
+                |> Array.choose (fun (workId, result) ->
+                    match result with
+                    | Ok(Some work) -> Some(SessionId.create workId, work)
+                    | Ok None -> None
+                    | Error reason ->
+                        Diagnostic.emit "lifecycle-work-recovery-refused" [ "work_id", workId; "reason", reason ]
+                        None)
+            with error ->
+                Diagnostic.emit "lifecycle-work-recovery-refused" [ "workspace", stateRoot; "reason", error.Message ]
+                [||]
+
     let private isFlightActive
         (bloggerHost: IBloggerRuntimeHost)
         (bloggerSessionId: SessionId)
@@ -52,24 +76,21 @@ module PluginRecoveryWiring =
     /// child session, and ModelRouting owns the binding. A road without a bound
     /// target is skipped; a malformed one is refused by the parser rather than
     /// replaced by the current scheduler preference.
-    let private seedBoundDevOpsModelTargets (journal: AgentJournal) (workspace: string option) =
+    let private seedBoundDevOpsModelTargets
+        (journal: AgentJournal)
+        (works: (SessionId * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) array)
+        =
         let snapshot = AgentJournal.snapshot journal
 
-        let gitCommonDir =
-            workspace
-            |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
-            |> Option.defaultValue ""
-
-        for KeyValue(sessionId, projection) in snapshot.AgentProjections.Sessions do
-            let workId = SessionId.value sessionId
-
+        for sessionId, work in works do
             let target =
-                inspectRecoveryWork gitCommonDir workId
-                |> Option.bind (fun work -> work.DevOpsTarget)
+                work.DevOpsTarget
                 |> Option.filter (fun text -> not (String.IsNullOrWhiteSpace text))
 
             let child =
-                projection.Handles
+                snapshot.AgentProjections.Sessions
+                |> Map.tryFind sessionId
+                |> Option.bind (fun projection -> projection.Handles)
                 |> Option.bind (HandleProjection.tryFindByByname "devops")
                 |> Option.map (fun handle -> handle.ChildSessionId)
 
@@ -224,7 +245,7 @@ module PluginRecoveryWiring =
     /// we read the exact bound session and settle only when the real first user
     /// message proves the reserved plan bytes reached that container.
     let private reconcilePendingDeliveries
-        (journal: AgentJournal)
+        (works: (SessionId * Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) array)
         (workspace: string option)
         (snapshotPort: ISessionSnapshotPort option)
         (discoveryPort: ISessionDiscoveryPort option)
@@ -237,13 +258,9 @@ module PluginRecoveryWiring =
                 |> Option.defaultValue ""
 
             let sessions =
-                if String.IsNullOrWhiteSpace gitCommonDir then
-                    [||]
-                else
-                    (AgentJournal.snapshot journal).AgentProjections.Sessions
-                    |> Seq.map (fun (KeyValue(sessionId, _)) -> SessionId.value sessionId)
-                    |> Seq.distinct
-                    |> Seq.toArray
+                works
+                |> Array.choose (fun (sessionId, work) ->
+                    if work.PendingDelivery then Some(SessionId.value sessionId) else None)
 
             for workId in sessions do
                 do! recoverDeliveryWork gitCommonDir workId snapshotPort discoveryPort retirementBlockers
@@ -319,6 +336,11 @@ module PluginRecoveryWiring =
                                 do! settleStaleBloggerSession bloggerSessionId
                         }
 
+                    let recoveryWorks =
+                        boot.Journal
+                        |> Option.map (fun journal -> inspectRecoveryWorks journal boot.WorkspaceDirectory)
+                        |> Option.defaultValue [||]
+
                     match boot.Journal with
                     | Some journal ->
                         do! ChildWorkRecovery.settleOrphanedChildRuns journal
@@ -326,7 +348,7 @@ module PluginRecoveryWiring =
 
                         do!
                             reconcilePendingDeliveries
-                                journal
+                                recoveryWorks
                                 boot.WorkspaceDirectory
                                 snapshotPort
                                 discoveryPort
@@ -343,7 +365,7 @@ module PluginRecoveryWiring =
                     // admission would take the target from the current scheduler
                     // preference and silently overwrite the road's fixed one.
                     match boot.Journal with
-                    | Some journal -> seedBoundDevOpsModelTargets journal boot.WorkspaceDirectory
+                    | Some journal -> seedBoundDevOpsModelTargets journal recoveryWorks
                     | None -> ()
 
                     // crash-reconciliation-018: the load-phase normalization above owes

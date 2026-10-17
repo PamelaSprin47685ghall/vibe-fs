@@ -46,9 +46,11 @@
 
 返回值限于 JSON 兼容子集：null、布尔值、有限数字、字符串、普通数组与对象；数组不得含 null 或异构类型。undefined、BigInt、NaN、Infinity、函数、Symbol、循环引用及其他非法值均在提交前以 `INVALID_RETURN_VALUE` 拒绝，终止事务。
 
-## [012] 事务 Staging 与单一 EventStore 提交
+## [012] 事务 As-Is 逐笔落盘与单一 EventStore 记账
 
-一次调用只有一个事务。全部修改先暂存于内存，`run()` 成功结束前不改变磁盘；持久化 Prepare 与 Commit 只进入统一 EventStore，不另建专有文件或存储。
+一次调用只有一个事务。每笔 `edit`/`write` 在调用发生时立即经 MutationFs 原子写盘（单笔文件层原子，跨笔不回滚）；`run()` 成功结束前磁盘已经反映已发生的每笔写入。程序以任何方式终止或挂起（throw、超时、输出超限）时，那一刻之前已落盘的改动保持为事实分界线，之后的未发生。
+
+持久化 Prepare 与 Commit 只进入统一 EventStore，不另建专有文件或存储。
 
 ## [013] 多文件 All-or-Nothing 提交
 
@@ -56,7 +58,7 @@
 
 ## [014] 冲突检测与无隐式重试
 
-预检比较读取时的快照指纹。读取过的文件或写入目标被外部改变时，以 `FILE_CHANGED` 失败，不自动重读、重定位锚点或重跑程序。
+每次写前各自做冲突校验（校验点从统一 preflight 移到每次写前）：若目标路径在 readSnapshots 中，读取当前盘字节与快照比对，不一致时以 `FILE_CHANGED` 失败并停止；已发生的改动保留在盘上。不自动重读、不重定位锚点、不重跑程序。
 
 ## [015] 正常回滚与崩溃后不自动补提交
 
@@ -64,7 +66,7 @@
 
 ## [016] Synthetic TOML 结果面
 
-成功以 `# ok` 开头，返回值放在 `[data]`、`data = ...` 或 `[[data]]`；有实际写盘时，文末 `[fs]` 声明 rewritten/created 路径。失败以 `# failed` 开头，根级给稳定 code 与可读 reason，不含 data/fs 结果节。
+成功以 `# ok` 开头，返回值放在 `[data]`、`data = ...` 或 `[[data]]`；有实际写盘时，文末 `[fs]` 声明 rewritten/created 路径。失败以 `# failed` 开头，根级给稳定 code 与可读 reason，并附本次调用已真实落盘的改动清单（`[fs]` 的 rewritten/created）；无已落盘改动时失败不附 fs 节。
 
 成败由顶级结构区分，不另用 `status = "ok"` 等歧义字段；编码与组合遵守 provider-projection。
 
@@ -128,6 +130,33 @@ ReadSnapshots 只用于事务隔离与冲突检测，不直接作为案例关联
 
 ## [027] Engineer 与 DevOps 的统一文件面
 
-两者按已授予能力获得直接 Read/Write/Edit/Glob/Grep/Move/Remove 工具及生成的 js-engineer/js-devops。直接与可编程文件操作共享路径边界、UTF-8 校验、符号链接防护和 All-or-Nothing 事务语义。
+两者按已授予能力获得直接 Read/Write/Edit/Glob/Grep/Move/Remove 工具及生成的 js-engineer/js-devops。直接与可编程文件操作共享路径边界、UTF-8 校验、符号链接防护和 As-Is 逐笔落盘写语义（每笔写即原子落盘、跨笔不回滚、失败保留已落盘改动）。
 
 Manager 的 `js-manager` 仅提供 Read/Glob/Grep，能力过滤同样到达真实 API；评审及当前事实准入遵循 capability-enforcement-025，不因生成工具而取得修改或执行权。
+
+## [028] programPromise 暴露与 deadline 可重置
+
+沙箱启动与结果等待解耦：`runSurface` 返回一个持有 `ProgramPromise`（async IIFE 的未 settle promise）与可变 `DeadlineRef` 的句柄，调用方可跨调用持有该 promise 而不在启动处 await 到底；vm context 由 promise 未 settle 时的闭包链自然持有，不显式提升。异步 deadline 从生成代码内联常量改为 api 闭包捕获的可变引用，`resetDeadline` 可在不重包、不重跑程序的前提下改变后续 api 调用的超时窗口。哨兵识别、错误分类与结果反序列化保持不变。
+
+
+## [029] As-Is 逐笔落盘的失败与成功形态
+
+每次 `edit`/`write` 调用即原子落盘，跨笔不回滚。程序后续失败、终止或挂起（throw、超时、输出超限、返回值非法）时，已落盘的改动保持为事实分界线并如实上报：
+
+- 成功返回 `# ok`，`[fs]` 声明 rewritten/created。
+- 失败返回 `# failed`，根级给 code/reason，并附本次调用已真实落盘的改动清单（`[fs]` 的 rewritten/created）；无已落盘改动时失败不附 fs 节。
+- 写前冲突校验（目标当前内容与写者所见不一致）以 `FILE_CHANGED` 失败，该笔不落盘，此前已落盘的改动保留。
+
+## [030] Remove 与 Move 编程面成员
+
+`rm(path)` 与 `mv(from, to)` 由 Remove/Move capability 投影，与 edit/write 同属 as-is 逐笔落盘路径：
+
+- `rm` 删除文件或空目录，拒绝非空目录（`DIRECTORY_NOT_EMPTY`）；缺失目标报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, removed: path }`，durable 记一笔 Remove。
+- `mv` 移动或重命名文件及目录（POSIX mv），支持覆盖，源缺失报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, moved: from, destination: to }`，durable 记一笔 Move。
+- 两者都继承 resolveInside 路径边界（越界 `PATH_DENIED`）与写前 `FILE_CHANGED` 校验：目标若在 readSnapshots 中且当前内容与快照不一致则拒绝，不隐式重试。
+- 跨设备移动（EXDEV）以稳定码 `CROSS_DEVICE_MOVE` 报错并回滚；renameSync 原子语义保证源与目标都不残留中间态，绝不保留两侧并存。
+- `[fs]` 结果面新增 removed 与 moved（`from -> to`）字段；失败时同样如实上报已真实落盘的删除/移动。
+
+## [031] Remove/Move 的权限投影与四层同构
+
+Move/Remove 权限在 Engineer 与 DevOps 上放行投影（对齐宿主工具权限），`JsCapability.ofToolPermission` 是唯一映射。四层同构扩展为：公开基类含 `rm(path)`/`mv(from, to)` 方法、工具描述与 canonical example 含对应成员、运行时门禁按 capability 挂载 rm/mv 执行器。Manager 的 `js-manager` 仍只读，不含 Move/Remove。

@@ -12,6 +12,8 @@ type JsCapability =
     | Edit
     | Glob
     | Grep
+    | Move
+    | Remove
 
 module JsCapability =
 
@@ -24,13 +26,17 @@ module JsCapability =
         | ToolPermission.Edit -> Some JsCapability.Edit
         | ToolPermission.Glob -> Some JsCapability.Glob
         | ToolPermission.Grep -> Some JsCapability.Grep
+        | ToolPermission.Move -> Some JsCapability.Move
+        | ToolPermission.Remove -> Some JsCapability.Remove
         | _ -> None
 
     let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
         capabilities |> Set.toList |> List.choose ofToolPermission |> Set.ofList
 
     /// Fixed canonical capability-family order (JS-002). A capability may
-    /// project more than one ordered member (Edit → edit, rewrite).
+    /// project more than one ordered member (Edit → edit, rewrite). Park is a
+    /// lifecycle capability every js-* surface carries; it sorts after the
+    /// filesystem families so existing member lists keep their byte identity.
     let order (capability: JsCapability) : int =
         match capability with
         | JsCapability.Read -> 0
@@ -38,6 +44,9 @@ module JsCapability =
         | JsCapability.Grep -> 2
         | JsCapability.Edit -> 3
         | JsCapability.Write -> 4
+        | JsCapability.Move -> 5
+        | JsCapability.Remove -> 6
+        | JsCapability.Park -> 7
 
 /// One capability's complete SDK projection: the single source for member
 /// name, description, canonical example, and runtime binding key. The four
@@ -159,9 +168,69 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.write" }
 
+    let rm: JsCapabilityFragment =
+        { Capability = JsCapability.Remove
+          MemberName = "rm"
+          Signature = "rm(path)"
+          Description =
+            "rm(path) — delete a file or an empty directory; refuse a non-empty "
+            + "directory. Takes effect immediately on success (as-is); FILE_CHANGED "
+            + "is checked before the write like edit. The first irreversible "
+            + "programming-surface operation; durable accounting is a single entry."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    this.rm(\"generated/scratch.tmp\");\n"
+            + "    return { removed: \"generated/scratch.tmp\" };\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.rm" }
+
+    let mv: JsCapabilityFragment =
+        { Capability = JsCapability.Move
+          MemberName = "mv"
+          Signature = "mv(from, to)"
+          Description =
+            "mv(from, to) — move or rename a file or directory (POSIX mv); "
+            + "overwrite is allowed and a missing source is an error. Inherits the "
+            + "programming-surface protections: resolveInside path boundary, "
+            + "FILE_CHANGED before the write, single-entry durable accounting. "
+            + "Cross-device (EXDEV) moves must error and roll back, never leaving "
+            + "both sides present."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    this.mv(\"src/old.js\", \"src/new.js\");\n"
+            + "    return { moved: \"src/old.js -> src/new.js\" };\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.mv" }
+
+    /// park fragment — the pause/resume mechanism (PLAN S1 B.7/B.17). Unlike
+    /// the filesystem members this is not a ToolPermission projection: it is a
+    /// lifecycle capability every js-* surface carries. The runtime binding is
+    /// the deferred-Promise park member injected by ToolsBindings.
+    let park: JsCapabilityFragment =
+        { Capability = JsCapability.Park
+          MemberName = "park"
+          Signature = "async park(payload)"
+          Description =
+            "park(payload) — suspend this program at this await point and hand "
+            + "control back to the orchestrator. The tool call returns a top-level "
+            + "parked payload { handle, payload }; the caller resumes with "
+            + "{ unpark: { handle, value } } or gives up with { abandon: { handle } }."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const decision = await this.park({ stage: \"review\" });\n"
+            + "    return { decided: decision.value };\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.park" }
+
     /// Canonical member order inside capability families. Filtering this list
     /// is the deterministic projection; never rebuild member order elsewhere.
-    let all: JsCapabilityFragment list = [ read; glob; grep; edit; rewrite; write ]
+    let all: JsCapabilityFragment list = [ read; glob; grep; edit; rewrite; write; rm; mv; park ]
 
     let byCapability: Map<JsCapability, JsCapabilityFragment list> =
         all |> List.groupBy _.Capability |> Map.ofList

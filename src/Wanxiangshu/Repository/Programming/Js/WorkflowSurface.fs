@@ -97,6 +97,48 @@ module JsWorkflowSurface =
         : Task<obj> =
         runWithObservation workspaceRoot role language program deadlineMs deadlineEpochMs outputBoundBytes store None
 
+    /// Execute under the three-state input protocol (PLAN S2 step 5).
+    /// `input` is one of `{ program } | { unpark: { handle, value } } |
+    /// { abandon: { handle } }`. The program state is passed as the input
+    /// object; `sessionId` tags newly created parked sites.
+    let execute
+        (workspaceRoot: string)
+        (role: string)
+        (language: string)
+        (sessionId: string)
+        (input: obj)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        (store: obj)
+        : Task<obj> =
+        task {
+            match JsGeneratorSurface.typedRole role language with
+            | None -> return null
+            | Some surface ->
+                let persistence =
+                    if isNull store then
+                        None
+                    else
+                        Some(JsTransactionSurface.persistenceOf store)
+
+                let! outcome =
+                    JsToolWorkflow.execute
+                        sessionId
+                        surface.Capabilities
+                        workspaceRoot
+                        surface.BaseClassSource
+                        input
+                        deadlineMs
+                        deadlineEpochMs
+                        outputBoundBytes
+                        persistence
+                        None
+                        None
+
+                return box (JsWorkflowOutcomeHandle outcome)
+        }
+
     let runObserved
         (workspaceRoot: string)
         (role: string)
@@ -123,31 +165,65 @@ module JsWorkflowSurface =
         match outcomeOf value with
         | JsToolWorkflow.JsToolOutcome.Succeeded _ -> "Succeeded"
         | JsToolWorkflow.JsToolOutcome.Failed _ -> "Failed"
+        | JsToolWorkflow.JsToolOutcome.Parked _ -> "Parked"
+
+    let parkedHandle (value: obj) : obj =
+        match outcomeOf value with
+        | JsToolWorkflow.JsToolOutcome.Parked(handle, _) -> box handle
+        | _ -> null
+
+    let parkedPayload (value: obj) : obj =
+        match outcomeOf value with
+        | JsToolWorkflow.JsToolOutcome.Parked(_, payload) -> payload
+        | _ -> null
 
     let rewritten (value: obj) : string array =
         match outcomeOf value with
-        | JsToolWorkflow.JsToolOutcome.Succeeded(_, paths, _) -> paths |> List.toArray
-        | JsToolWorkflow.JsToolOutcome.Failed _ -> [||]
+        | JsToolWorkflow.JsToolOutcome.Succeeded(_, paths, _, _, _) -> paths |> List.toArray
+        | JsToolWorkflow.JsToolOutcome.Failed(_, paths, _, _, _) -> paths |> List.toArray
+        | JsToolWorkflow.JsToolOutcome.Parked _ -> [||]
 
     let created (value: obj) : string array =
         match outcomeOf value with
-        | JsToolWorkflow.JsToolOutcome.Succeeded(_, _, paths) -> paths |> List.toArray
-        | JsToolWorkflow.JsToolOutcome.Failed _ -> [||]
+        | JsToolWorkflow.JsToolOutcome.Succeeded(_, _, paths, _, _) -> paths |> List.toArray
+        | JsToolWorkflow.JsToolOutcome.Failed(_, _, paths, _, _) -> paths |> List.toArray
+        | JsToolWorkflow.JsToolOutcome.Parked _ -> [||]
+
+    let removed (value: obj) : string array =
+        match outcomeOf value with
+        | JsToolWorkflow.JsToolOutcome.Succeeded(_, _, _, paths, _) -> paths |> List.toArray
+        | JsToolWorkflow.JsToolOutcome.Failed(_, _, _, paths, _) -> paths |> List.toArray
+        | JsToolWorkflow.JsToolOutcome.Parked _ -> [||]
+
+    let moved (value: obj) : string array =
+        match outcomeOf value with
+        | JsToolWorkflow.JsToolOutcome.Succeeded(_, _, _, _, paths) ->
+            paths |> List.map (fun (fromPath, toPath) -> fromPath + " -> " + toPath) |> List.toArray
+        | JsToolWorkflow.JsToolOutcome.Failed(_, _, _, _, paths) ->
+            paths |> List.map (fun (fromPath, toPath) -> fromPath + " -> " + toPath) |> List.toArray
+        | JsToolWorkflow.JsToolOutcome.Parked _ -> [||]
 
     let failureCode (value: obj) : obj =
         match outcomeOf value with
         | JsToolWorkflow.JsToolOutcome.Succeeded _ -> null
-        | JsToolWorkflow.JsToolOutcome.Failed failure -> box (JsFailure.code failure)
+        | JsToolWorkflow.JsToolOutcome.Failed(failure, _, _, _, _) -> box (JsFailure.code failure)
+        | JsToolWorkflow.JsToolOutcome.Parked _ -> null
 
     let failureReason (value: obj) : obj =
         match outcomeOf value with
         | JsToolWorkflow.JsToolOutcome.Succeeded _ -> null
-        | JsToolWorkflow.JsToolOutcome.Failed failure -> box (JsFailure.reason failure)
+        | JsToolWorkflow.JsToolOutcome.Failed(failure, _, _, _, _) -> box (JsFailure.reason failure)
+        | JsToolWorkflow.JsToolOutcome.Parked _ -> null
 
     let persistenceFailure (value: obj) : obj =
         match outcomeOf value with
-        | JsToolWorkflow.JsToolOutcome.Failed(JsFailure.TransactionPersistenceFailed failure) ->
+        | JsToolWorkflow.JsToolOutcome.Failed(JsFailure.TransactionPersistenceFailed failure, _, _, _, _) ->
             JsTransactionSurface.persistenceFailureToJs failure
         | _ -> null
+
+    /// Test hook: clear the process-live parked-site table so tests do not
+    /// leak sites across cases (the table is module-level and process-live).
+    let clearParkedSites () : unit =
+        JsParkedSites.clearAll ()
 
     let render (value: obj) : string = JsToolsResult.render (outcomeOf value)

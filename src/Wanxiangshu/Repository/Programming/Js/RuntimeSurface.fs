@@ -1,10 +1,12 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open Fable.Core
+open Fable.Core.JsInterop
 open System.Threading.Tasks
 
 /// JS runtime owner boundary for bindings and sandbox execution. The mutable
-/// staging buffer and sandbox failure union remain opaque; observations cross
-/// as plain result objects.
+/// as-is write ledger (persisted at each edit/write call) and sandbox failure
+/// union remain opaque; observations cross as plain result objects.
 [<RequireQualifiedAccess>]
 module JsRuntimeSurface =
 
@@ -26,7 +28,10 @@ module JsRuntimeSurface =
                   JsCapability.Write
                   JsCapability.Edit
                   JsCapability.Glob
-                  JsCapability.Grep ]
+                  JsCapability.Grep
+                  JsCapability.Move
+                  JsCapability.Remove
+                  JsCapability.Park ]
 
         let api =
             JsToolsBindings.createApi allCapabilities root staging readSnapshots (ResizeArray<JsExplicitFileRead>())
@@ -40,6 +45,9 @@ module JsRuntimeSurface =
         | "Edit" -> Some JsCapability.Edit
         | "Glob" -> Some JsCapability.Glob
         | "Grep" -> Some JsCapability.Grep
+        | "Move" -> Some JsCapability.Move
+        | "Remove" -> Some JsCapability.Remove
+        | "Park" -> Some JsCapability.Park
         | _ -> None
 
     let createApiFor (root: string) (permissionLabels: string array) : obj =
@@ -62,7 +70,9 @@ module JsRuntimeSurface =
         (unbox<JsBindingsHandle> handle).Staging
         |> Seq.map (function
             | JsStagedMutation.Rewrite _ -> "Rewrite"
-            | JsStagedMutation.Create _ -> "Create")
+            | JsStagedMutation.Create _ -> "Create"
+            | JsStagedMutation.Remove _ -> "Remove"
+            | JsStagedMutation.Move _ -> "Move")
         |> Seq.toArray
 
     let readPaths (handle: obj) : string array =
@@ -87,17 +97,51 @@ module JsRuntimeSurface =
         (outputBoundBytes: int)
         : Task<obj> =
         task {
-            let! result =
+            let! handle =
                 Wanxiangshu.Process.JsSandbox.runSurface
                     baseClassSource
                     modelSource
                     apiValue
                     deadlineMs
                     deadlineEpochMs
-                    outputBoundBytes
+
+            let! result = Wanxiangshu.Process.JsSandbox.awaitResult handle outputBoundBytes
 
             return
                 match result with
                 | Ok value -> box {| ok = true; value = value |}
                 | Error failure -> failureResult failure
+        }
+
+    /// Start a sandbox program without awaiting it to completion, exposing the
+    /// in-flight result promise and a mutable deadline reset (JS-054.1). The
+    /// promise resolves to the same `{ ok, value | code, reason }` shape as
+    /// `run`; `resetDeadline(epochMs)` re-arms the async deadline so a caller
+    /// may keep an in-flight program alive across calls.
+    let start
+        (baseClassSource: string)
+        (modelSource: string)
+        (apiValue: obj)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        : Task<obj> =
+        task {
+            let! handle =
+                Wanxiangshu.Process.JsSandbox.runSurface baseClassSource modelSource apiValue deadlineMs deadlineEpochMs
+
+            let resultTask =
+                task {
+                    let! result = Wanxiangshu.Process.JsSandbox.awaitResult handle outputBoundBytes
+
+                    return
+                        match result with
+                        | Ok value -> box {| ok = true; value = value |}
+                        | Error failure -> failureResult failure
+                }
+
+            return
+                createObj
+                    [ "promise" ==> resultTask
+                      "resetDeadline" ==> fun (epochMs: int64) -> Wanxiangshu.Process.JsSandbox.resetDeadline handle epochMs ]
         }

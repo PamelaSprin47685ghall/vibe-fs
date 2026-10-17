@@ -1147,6 +1147,30 @@ type HostForkRuntime
             | _, (true, childId) -> Some(childId, true)
             | _ -> None)
 
+    /// managed-session-lifecycle settlement-failure seam: settle the pending
+    /// run's Source to a PERSIST failure exactly as the settlement-fault path
+    /// does, while leaving the durable work Active and the run in pendingRuns.
+    /// This is the state a join must wake on and surface as a materialization
+    /// failure instead of waiting forever on a journal revision that never
+    /// advances. Test-only; production settlement uses HostForkRunLifecycle.
+    member _.InjectPendingPersistFailure() : unit =
+        lock gate (fun () ->
+            match pendingRuns.Values |> Seq.tryHead with
+            | None -> ()
+            | Some run ->
+                AsyncSupport.trySetResult
+                    run.Source
+                    (AgentCompletion.failed
+                        run.AgentId
+                        ("run-" + run.AgentId)
+                        (Some run.Role)
+                        (Some run.ChildId)
+                        "PERSIST"
+                        "completion settlement faulted: injected")
+                |> ignore)
+
+        runtime.PulseWake()
+
     member internal _.ActivateDormantChild(agentId: string, childId: SessionId, role: Role) : unit =
         lock gate (fun () ->
             dormantChildren.Remove agentId |> ignore

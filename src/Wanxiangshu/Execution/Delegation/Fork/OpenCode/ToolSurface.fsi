@@ -81,6 +81,7 @@ module ForkToolSurface =
 
     val injectAcceptedAssessment: value: obj -> owner: string -> Task
     val injectAuditPendingIncumbency: value: obj -> owner: string -> Task
+    val injectPendingPersistFailure: value: obj -> owner: string -> Task<obj>
     val startUnprepared: obj -> string -> string -> Task<obj>
     val emitStopForRoot: obj -> string -> string -> string -> Task
 

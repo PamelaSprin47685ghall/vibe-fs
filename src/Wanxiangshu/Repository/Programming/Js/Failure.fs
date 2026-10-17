@@ -37,6 +37,9 @@ type JsFailure =
     | FileNotFound of string
     | FileAlreadyExists of string
     | FileReadFailed of string
+    | DirectoryNotEmpty of string
+    | CrossDeviceMove of string
+    | InvalidArgument of string
     | InvalidUtf8 of string
     | AnchorEmptyContent
     | AnchorInvalidPattern
@@ -59,6 +62,9 @@ type JsFailure =
     | TransactionPersistenceFailed of JsTransactionAppendFailure
     | UnknownMember
     | PlanReviewRequired
+    | ConcurrencyLimit
+    | HandleUnknown of string
+    | CannotParkWhileAbandoning
 
 module JsFailure =
 
@@ -88,6 +94,9 @@ module JsFailure =
         | JsFailure.FileNotFound _ -> "FILE_NOT_FOUND"
         | JsFailure.FileAlreadyExists _ -> "FILE_ALREADY_EXISTS"
         | JsFailure.FileReadFailed _ -> "FILE_READ_FAILED"
+        | JsFailure.DirectoryNotEmpty _ -> "DIRECTORY_NOT_EMPTY"
+        | JsFailure.CrossDeviceMove _ -> "CROSS_DEVICE_MOVE"
+        | JsFailure.InvalidArgument _ -> "INVALID_ARGUMENT"
         | JsFailure.InvalidUtf8 _ -> "INVALID_UTF8"
         | JsFailure.AnchorEmptyContent -> "EMPTY_ANCHOR_CONTENT"
         | JsFailure.AnchorInvalidPattern -> "INVALID_ANCHOR_PATTERN"
@@ -111,6 +120,9 @@ module JsFailure =
             transactionPhaseCode failure.Phase + appendFailureCode failure.Error
         | JsFailure.UnknownMember -> "UNKNOWN_MEMBER"
         | JsFailure.PlanReviewRequired -> "PLAN_REVIEW_REQUIRED"
+        | JsFailure.ConcurrencyLimit -> "CONCURRENCY_LIMIT"
+        | JsFailure.HandleUnknown _ -> "HANDLE_UNKNOWN"
+        | JsFailure.CannotParkWhileAbandoning -> "CANNOT_PARK_WHILE_ABANDONING"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
     let private reasonWithMessage fallback prefix message =
@@ -130,6 +142,9 @@ module JsFailure =
         | JsFailure.FileNotFound path -> "target file does not exist: " + path
         | JsFailure.FileAlreadyExists path -> "target file already exists: " + path
         | JsFailure.FileReadFailed path -> "file read failed: " + path
+        | JsFailure.DirectoryNotEmpty path -> "directory is not empty: " + path
+        | JsFailure.CrossDeviceMove path -> "cross-device move is refused and rolled back: " + path
+        | JsFailure.InvalidArgument detail -> reasonWithMessage "invalid argument" "invalid argument: " detail
         | JsFailure.InvalidUtf8 path -> "file is not strict UTF-8: " + path
         | JsFailure.AnchorEmptyContent -> "anchor content is empty"
         | JsFailure.AnchorInvalidPattern -> "anchor RegExp is invalid"
@@ -158,6 +173,10 @@ module JsFailure =
         | JsFailure.UnknownMember -> "member is not part of this generated surface"
         | JsFailure.PlanReviewRequired ->
             "Review is required before modifying the plan artifact. You must call review first."
+        | JsFailure.ConcurrencyLimit -> "parked-site concurrency limit reached; no queue is formed"
+        | JsFailure.HandleUnknown handle -> "no parked site with this handle: " + handle
+        | JsFailure.CannotParkWhileAbandoning ->
+            "park is refused while the site is in its abandon cleanup window"
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
     let render (failure: JsFailure) : string =
@@ -188,6 +207,9 @@ module JsFailure =
         | "FILE_NOT_FOUND" -> JsFailure.FileNotFound(after "target file does not exist: ")
         | "FILE_ALREADY_EXISTS" -> JsFailure.FileAlreadyExists(after "target file already exists: ")
         | "FILE_READ_FAILED" -> JsFailure.FileReadFailed(after "file read failed: ")
+        | "DIRECTORY_NOT_EMPTY" -> JsFailure.DirectoryNotEmpty(after "directory is not empty: ")
+        | "CROSS_DEVICE_MOVE" -> JsFailure.CrossDeviceMove(after "cross-device move is refused and rolled back: ")
+        | "INVALID_ARGUMENT" -> JsFailure.InvalidArgument(after "invalid argument: ")
         | "INVALID_UTF8" -> JsFailure.InvalidUtf8(after "file is not strict UTF-8: ")
         | "EMPTY_ANCHOR_CONTENT" -> JsFailure.AnchorEmptyContent
         | "INVALID_ANCHOR_PATTERN" -> JsFailure.AnchorInvalidPattern
@@ -210,4 +232,7 @@ module JsFailure =
         | "TRANSACTION_RECOVERY_REQUIRED" -> JsFailure.TransactionRecoveryRequired
         | "UNKNOWN_MEMBER" -> JsFailure.UnknownMember
         | "PLAN_REVIEW_REQUIRED" -> JsFailure.PlanReviewRequired
+        | "CONCURRENCY_LIMIT" -> JsFailure.ConcurrencyLimit
+        | "HANDLE_UNKNOWN" -> JsFailure.HandleUnknown(after "no parked site with this handle: ")
+        | "CANNOT_PARK_WHILE_ABANDONING" -> JsFailure.CannotParkWhileAbandoning
         | _ -> JsFailure.ProgramFailed text

@@ -21,6 +21,7 @@ open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Requirement.Grounding
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
@@ -41,6 +42,10 @@ module PairProgrammingThoughtTransform =
 
     [<Literal>]
     let private PairProgrammingGuidelinePath = "host/pair-programming-guideline"
+
+    /// Algorithm G2: the parked-site reminder rides the same PairHint channel.
+    [<Literal>]
+    let private ParkedHintPath = "tool/js-program/parked-hint"
 
     /// HOST-013 English canonical used by tests; production loads via session language.
     let text =
@@ -1330,20 +1335,40 @@ module PairProgrammingThoughtTransform =
         (guideline: string)
         (restartGuidance: string option)
         : Task<LlmFacing.Document> =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId ->
-            task {
-                let! guidance = EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
+        task {
+            let! guidance =
+                match journal, projectionSessionIdOpt with
+                | Some durable, Some sessionId ->
+                    EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
+                | _ -> Task.FromResult None
 
-                return
-                    PairProgrammingCalibration.documentWithElapsed guidance elapsed toolEstimate guideline
-                    |> withRestartGuidance restartGuidance
-            }
-        | _ ->
-            Task.FromResult(
-                PairProgrammingCalibration.documentWithElapsed None elapsed toolEstimate guideline
+            // Algorithm G2: every round that carries a PairHint also lists the
+            // unresolved parked handles, so the AI is pressed to take a
+            // position (unpark/abandon) without being forced to resume. The
+            // parked site table and its read-only query are owned by
+            // lane-a-core (JsParkedSites.parkedHandles). A carrier-less round
+            // never reaches this point (decideCurrentPlacement).
+            let parkedHandles = JsParkedSites.parkedHandles ()
+
+            let parkedHint =
+                if List.isEmpty parkedHandles then
+                    []
+                else
+                    let language =
+                        match journal, projectionSessionIdOpt with
+                        | Some _, Some sessionId ->
+                            Wanxiangshu.OpenCode.Host.ProviderLanguageBinding.forSessionText sessionId
+                        | _ -> ProviderLanguage.SimplifiedChinese
+
+                    [ ProviderProse.render language ParkedHintPath (Map [ "handles", String.Join(", ", parkedHandles) ]) ]
+
+            let document =
+                PairProgrammingCalibration.documentWithElapsed guidance elapsed toolEstimate guideline
+                |> LlmFacing.withInstructions parkedHint
                 |> withRestartGuidance restartGuidance
-            )
+
+            return document
+        }
 
     let private concernInstructions language (prepared: ConcernPreparedFragments) =
         let announcements =

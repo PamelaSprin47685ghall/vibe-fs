@@ -22,6 +22,11 @@ module internal WanxiangliTrace =
 
     val emptyBridge: traceId: string -> ProjectionBridge
 
+    /// Oldest-first record lines. `ProjectionBridge.Records` is stored
+    /// newest-first (O(1) prepend on append); this restores chronological order
+    /// for the trace constructor and the `traceRecords` surface.
+    val recordsOldestFirst: bridge: ProjectionBridge -> string list
+
     val appendOpeningToBridge:
         assignment: string ->
         requirements: string list ->

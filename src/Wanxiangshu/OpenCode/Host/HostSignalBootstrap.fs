@@ -119,7 +119,14 @@ module HostSignalBootstrap =
 
             journal
             |> Option.iter (fun durable ->
-                let recovery = SessionRecoveryHost(durable, snapshot, scope.Recovery, None)
+                let recovery =
+                    SessionRecoveryHost(
+                        durable,
+                        snapshot,
+                        scope.Recovery,
+                        None,
+                        Some(fun sessionId outcome -> eventPort.NotifyTerminal sessionId outcome |> ignore)
+                    )
                 scope.AttachChatRecoveryRuntime recovery
 
                 scope.AttachDurabilityActivation(fun () ->
@@ -542,8 +549,61 @@ module HostSignalBootstrap =
                 |> Option.map (fun durable ->
                     let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
-                    ChatAdmissionTransaction.production durable (fun managed ->
-                        runtime.AcceptManagedChatIntent(ChatAdmissionIntent.ofManaged managed)))
+                    let accept managed =
+                        runtime.AcceptManagedChatIntent(ChatAdmissionIntent.ofManaged managed)
+
+                    // provider-attempt-recovery-023 / managed-chat-execution-015: a
+                    // pre-provider admission settlement writes a durable Terminal but
+                    // the parent Fork / SyncDelegate completion subscription is fed
+                    // only by NotifyTerminal on the shared event port. Without a
+                    // publish the parent join waits forever on a fact that already
+                    // happened.
+                    //
+                    // The publish is deliberately narrow: only a freshly terminalized
+                    // Failed / Rejected disposition is a confirmed-uncontinuable end
+                    // of THIS physical attempt, and only when the exact key was
+                    // Accepted (not yet terminal) immediately before settlement.
+                    // Cancelled / Superseded are physical-attempt observations — a
+                    // newer physical attempt may share the same authority root and
+                    // still be alive, so publishing Failed for them would let
+                    // RunLifecycle.stopBelongsToRun (which matches by authority root)
+                    // prematurely settle live work. An AlreadyTerminal replay is a
+                    // no-op and never republishes.
+                    fun projectHostModel ->
+                        let productionPorts =
+                            ChatAdmissionTransaction.production durable accept projectHostModel
+
+                        { productionPorts with
+                            SettlePreProvider =
+                                fun key evidence disposition ->
+                                    task {
+                                        let wasAccepted =
+                                            match productionPorts.ReadExact key with
+                                            | Some(ChatExecutionState.Accepted _) -> true
+                                            | _ -> false
+
+                                        let! settled = productionPorts.SettlePreProvider key evidence disposition
+
+                                        match settled with
+                                        | Ok _ when
+                                            wasAccepted
+                                            && (disposition = ChatExecutionTerminalDisposition.Failed
+                                                || disposition = ChatExecutionTerminalDisposition.Rejected)
+                                            ->
+                                            eventPort.NotifyTerminal
+                                                key.SessionId
+                                                (TerminalOutcome.Failed(
+                                                    TerminalStop.forAuthority
+                                                        evidence.AuthorityRootUserMessageId
+                                                        "provider never started"
+                                                ))
+                                            |> ignore
+                                        | Ok _
+                                        | Error _ -> ()
+
+                                        return settled
+                                    } }
+                )
 
             // 本机持久化不安装 Git hooks，不改 SSH 配置，不发布运行状态 refs。
             let requireDurabilityActivation () = scope.ActivateDurability()

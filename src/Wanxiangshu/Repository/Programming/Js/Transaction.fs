@@ -3,15 +3,20 @@ namespace Wanxiangshu.Repository.Programming.Js
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.EventStore
 
-/// DSL-class: DurableFact — JS-012/JS-013/JS-015: one staged mutation in a
+/// DSL-class: DurableFact — JS-012/JS-013/JS-015: one as-is mutation in a
 /// js-* program. `Rewrite` edits an existing file; `Create` writes a missing
-/// one (JS-008/009). The set of all mutations is the WriteSet; it commits
-/// all-or-nothing or not at all.
+/// one (JS-008/009). `Remove` deletes a file or an empty directory; `Move`
+/// renames a file or directory (JS-020/030). Each mutation is atomically
+/// persisted at call time; the staging buffer records what was actually
+/// written, so a later failure keeps earlier writes on disk.
 [<RequireQualifiedAccess>]
 type JsStagedMutation =
     | Rewrite of path: string * originalText: string * newText: string
     | Create of path: string * text: string
+    | Remove of path: string
+    | Move of fromPath: string * toPath: string
 
 type JsReadSnapshot = { Path: string; Text: string }
 
@@ -33,6 +38,8 @@ module JsStagedMutation =
         match mutation with
         | JsStagedMutation.Rewrite(path, _, _) -> path
         | JsStagedMutation.Create(path, _) -> path
+        | JsStagedMutation.Remove(path) -> path
+        | JsStagedMutation.Move(fromPath, _) -> fromPath
 
 /// DSL-class: Decision — JS-012/013/014: the pure transaction rules,
 /// bridged to `wanxiangli/fs` (CUT-24). The decision algorithm lives in the
@@ -173,19 +180,59 @@ type JsDurableMutation =
         /// Some = rewrite (rollback restores this text); None = create.
         OriginalText: string option
         NewText: string
+        /// Durable mutation kind. Rewrite/Create keep the legacy shape; Remove
+        /// records the deleted path (rollback recreates an empty file or empty
+        /// directory); Move records from → to (rollback renames back).
+        Kind: JsDurableMutationKind
     }
+
+[<RequireQualifiedAccess>]
+type JsDurableMutationKind =
+    | Rewrite
+    | Create
+    | Remove
+    | Move
 
 /// DSL-class: DurableFact — JS-012: the durable prepare fact. Written to the
 /// unified EventStore BEFORE any filesystem effect; a committed transaction
-/// is a pair (Prepared, Committed) on the same stream.
+/// is a pair (Prepared, Committed) on the same stream. Each Prepared records
+/// exactly one mutation (PLAN S2 step 8 / algorithm H1): the durable ledger
+/// tracks per-mutation granularity, so the multi-mutation array form is gone.
 type JsTransactionPrepared =
     { TransactionId: JsTransactionId
       WorkspaceRoot: string
-      Mutations: JsDurableMutation list }
+      Mutation: JsDurableMutation }
 
 /// DSL-class: DurableFact — JS-012: the durable commit fact. Its presence
 /// after a Prepared fact is what makes the transaction committed.
 type JsTransactionCommitted = { TransactionId: JsTransactionId }
+
+/// DSL-class: DurableFact — PLAN S2 step 8 / algorithm H3: one lifecycle
+/// audit trace for a js-* parked site. Only the audit trace is durable; the
+/// parked site itself is a process-live object and is never serialized. The
+/// event carries no payload or value beyond the four audit fields.
+type JsLifecycleEvent =
+    { EventType: JsLifecycleEventType
+      Handle: string
+      SessionId: string
+      At: string }
+
+[<RequireQualifiedAccess>]
+type JsLifecycleEventType =
+    | Parked
+    | Unparked
+    | Abandoned
+    | Reaped
+
+/// DSL-class: Vocabulary — PLAN S2 step 8 / algorithm H4: the lifecycle audit
+/// append failure, kept deliberately separate from the mutation-ledger append
+/// failure because the audit stream never participates in write replay.
+type JsLifecycleAppendFailure =
+    { EventType: JsLifecycleEventType
+      Handle: string
+      SessionId: string
+      EventId: EventId
+      Error: AppendError }
 
 /// Incremental recovery Current owned by the canonical Integrator. Pending holds
 /// exactly Prepared facts not yet followed by their matching Committed fact;
@@ -210,16 +257,26 @@ module JsTransactionProjection =
 
 module JsTransactionFacts =
 
-    /// Durable mutations from a staged set (JS-012).
-    let ofStaged (mutations: JsStagedMutation list) : JsDurableMutation list =
-        mutations
-        |> List.map (fun mutation ->
-            match mutation with
-            | JsStagedMutation.Rewrite(path, originalText, newText) ->
-                { Path = path
-                  OriginalText = Some originalText
-                  NewText = newText }
-            | JsStagedMutation.Create(path, text) ->
-                { Path = path
-                  OriginalText = None
-                  NewText = text })
+    /// Durable mutation from a single staged mutation (JS-012 / PLAN H1).
+    let ofMutation (mutation: JsStagedMutation) : JsDurableMutation =
+        match mutation with
+        | JsStagedMutation.Rewrite(path, originalText, newText) ->
+            { Path = path
+              OriginalText = Some originalText
+              NewText = newText
+              Kind = JsDurableMutationKind.Rewrite }
+        | JsStagedMutation.Create(path, text) ->
+            { Path = path
+              OriginalText = None
+              NewText = text
+              Kind = JsDurableMutationKind.Create }
+        | JsStagedMutation.Remove(path) ->
+            { Path = path
+              OriginalText = None
+              NewText = ""
+              Kind = JsDurableMutationKind.Remove }
+        | JsStagedMutation.Move(fromPath, toPath) ->
+            { Path = fromPath
+              OriginalText = Some toPath
+              NewText = ""
+              Kind = JsDurableMutationKind.Move })

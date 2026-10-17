@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { realpathSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { DatabaseSync } from 'node:sqlite'
@@ -8,6 +9,7 @@ import { SqliteJournal } from 'wanxiangli/eventstore'
 import { observeDeliveryDiscovery } from '../../../dist/OpenCode/Host/SessionsSurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import * as workHost from '../../../dist/Mission/Lifecycle/DurableWorkHost.js'
 import { acceptAuthorityRoot, withRestartablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
@@ -111,6 +113,45 @@ const activateDurability = async (hooks, suffix) => {
   const parts = [{ id: `part-${sessionID}`, type: 'text', text: 'activate durable recovery' }]
   await hooks['chat.message']({ sessionID, agent: 'manager' }, { message, parts })
 }
+
+test('WHAT[work-048] startup batch inspection preserves corrupt-work isolation and observes later committed revisions', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-recovery-batch-'))
+  const stateRoot = join(directory, '.Herdchestra')
+  try {
+    for (const workId of ['bad', 'good']) {
+      accepted(life.execute(stateRoot, workId, 'open', {
+        type: 'Open', root: directory, sequence: ['S4'], ownerId: workId, openingCursor: 0,
+      }))
+    }
+    const database = new DatabaseSync(life.journalPath(stateRoot))
+    try {
+      database.exec('DROP TRIGGER journal_no_update')
+      database.prepare('UPDATE journal_entries SET checksum=? WHERE stream=?').run('0'.repeat(64), 'bad')
+    } finally {
+      database.close()
+    }
+
+    const before = life.inspected(stateRoot, 'good')
+    const observations = new Map(workHost.inspectedMany(stateRoot, ['bad', 'missing', 'good']))
+    assert.equal(observations.get('bad').tag, 1, 'a corrupt work must retain its explicit read failure')
+    assert.match(observations.get('bad').fields[0], /checksum mismatch/i)
+    assert.equal(observations.get('missing').tag, 0)
+    assert.equal(observations.get('missing').fields[0], undefined)
+    assert.equal(observations.get('good').tag, 0)
+    assert.deepEqual(observations.get('good').fields[0], before)
+    assert.throws(() => life.inspected(stateRoot, 'bad'), /checksum mismatch/i)
+
+    accepted(life.execute(stateRoot, 'good', 'review', {
+      type: 'Review', incumbencyId: before.ActiveId, reviewerId: 'reviewer', findings: [],
+    }))
+    const later = new Map(workHost.inspectedMany(stateRoot, ['good'])).get('good')
+    assert.equal(later.tag, 0)
+    assert.equal(later.fields[0].Reviewed, true, 'a later batch reads the journal, not an old process-local cache')
+    assert.equal(before.Reviewed, false)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 test('WHAT[work-048] corrupt work cannot prevent an independent bound delivery from recovering', async () => {
   await withRestartablePlugin(async (start, directory, control) => {

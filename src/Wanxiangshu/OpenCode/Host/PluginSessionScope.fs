@@ -40,6 +40,7 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// Per-instance session registry state for one plugin instance (HOST-012):
 /// owned sessions, companions, verdicts, nudges,
@@ -241,6 +242,14 @@ type PluginSessionScope
                     remember failure
 
             do! attempt (fun () -> this.SettleSessionExecutions sessionId)
+
+            // Algorithm G3: closing a session reaps every parked site owned by
+            // that session (Algorithm F, ABANDONED protocol) so no parked
+            // program survives its owner silently. The reap action is owned by
+            // lane-a-core (JsParkedSites.reapSession) and records a Reaped
+            // durable audit event. Failures are remembered like every other
+            // close obligation; the close never error-silently drops them.
+            do! attempt (fun () -> JsParkedSites.reapSession sessionId)
 
             // managed-session-lifecycle-027: scope close cancels the retained
             // continuation inputs this session owns; the last cancellation

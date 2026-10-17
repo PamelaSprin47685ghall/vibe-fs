@@ -38,4 +38,14 @@ module JsTransactionSurface =
     val internal persistenceOf: store: obj -> IJsTransactionPersistence
 
     val createPersistence: store: obj -> obj
+
+    /// Append one lifecycle audit trace (PLAN S2 step 8 / algorithm H3).
+    /// Callers are park/unpark/abandon/reap transition points.
+    val appendLifecycleEvent: store: obj -> value: obj -> Task<obj>
+
+    /// Opaque lifecycle audit capability consumed by park/unpark/abandon/reap.
+    val internal lifecyclePersistenceOf: store: obj -> IJsLifecyclePersistence
+
+    val createLifecyclePersistence: store: obj -> obj
+
     val createTransactionContext: unit -> obj

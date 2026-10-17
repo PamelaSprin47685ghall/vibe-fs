@@ -71,6 +71,46 @@ module HostForkJoin =
             let agentId = AgentHandleId.value handleId
             runtime.OwnsAgent agentId || runtime.EstablishedByProcess agentId
 
+    let private neverCompleting<'T> () : Task<'T> =
+        (TaskCompletionSource<'T>(TaskCreationOptions.RunContinuationsAsynchronously)).Task
+
+    /// P0-RECOVERY-JOIN-001 / PERSIST-002: a pending run whose durable completion
+    /// commit is unknown (Source settled to a PERSIST failure) leaves the durable
+    /// work Active and the run Finished in pendingRuns — the journal revision
+    /// never advances, so a join waiting only on journal change would wait
+    /// forever. Race the pending runs' Source cells so an already-settled
+    /// settlement failure wakes the join. `accept` filters to the runs this
+    /// join may observe (all for the owner join, lane affinity for fission).
+    /// The Source is the process-local settlement failure signal; it never
+    /// consumes durable work and never removes the pending run (unknown durable
+    /// state must not release the road for new work).
+    let private pendingSourceSettled
+        (runtime: HostForkRuntime)
+        (accept: PendingHostRun -> bool)
+        : Task<AgentCompletionOutcome> =
+        task {
+            let sources =
+                lock runtime.Gate (fun () ->
+                    runtime.PendingRuns.Values
+                    |> Seq.filter accept
+                    |> Seq.map (fun run -> run.Source.Task)
+                    |> Seq.toArray)
+
+            match sources with
+            | [||] -> return! neverCompleting ()
+            | _ -> return! emitJsExpr sources "Promise.race($0)"
+        }
+
+    /// A settled Source is a PERSIST settlement failure exactly when its outcome
+    /// is an AgentFailed with Code "PERSIST" (the only path that settles the
+    /// Source while leaving the durable work Active). Any other settled Source
+    /// means the durable completion committed and the normal drain path owns it.
+    let private persistSettlementError (outcome: AgentCompletionOutcome) : ForkError option =
+        match outcome with
+        | AgentFailed { Code = "PERSIST" } ->
+            Some(ForkError.TerminalMaterializationFailed "completion settlement failed to persist")
+        | _ -> None
+
     let private tryResultsAvailable (items: JoinItem list) =
         NonEmptyBatch.tryOfList items
         |> Option.map (fun batch -> Ok(ResultsAvailable batch))
@@ -225,16 +265,30 @@ module HostForkJoin =
         | LocalInterrupt reason -> Done(Ok(Interrupted reason))
         | CompletionMayBeAvailable -> Retry
 
-    let private decideJournalRaceWinner (winner: Choice<MailboxWakeReason, unit, JoinInterruptReason>) =
+    let private decideJournalRaceWinner
+        (winner: Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome>)
+        =
         match winner with
-        | Choice1Of3 reason -> decideWakeReason reason
-        | Choice3Of3 interruptReason -> Done(Ok(Interrupted interruptReason))
-        | Choice2Of3() -> Retry
+        | Choice1Of4 reason -> decideWakeReason reason
+        | Choice3Of4 interruptReason -> Done(Ok(Interrupted interruptReason))
+        | Choice4Of4 outcome ->
+            // A settled Source is a PERSIST settlement failure (durable work
+            // still Active, run still pending) exactly when it is an AgentFailed
+            // with Code PERSIST. Any other settled Source means the durable
+            // completion committed and the normal drain path owns it.
+            match persistSettlementError outcome with
+            | Some error -> Done(Error error)
+            | None -> Retry
+        | Choice2Of4() -> Retry
 
-    let private decideFissionRaceWinner (winner: Choice<unit, JoinInterruptReason>) =
+    let private decideFissionRaceWinner (winner: Choice<unit, JoinInterruptReason, AgentCompletionOutcome>) =
         match winner with
-        | Choice2Of2 reason -> Done(Ok(Interrupted reason))
-        | Choice1Of2() -> Retry
+        | Choice2Of3 reason -> Done(Ok(Interrupted reason))
+        | Choice3Of3 outcome ->
+            match persistSettlementError outcome with
+            | Some error -> Done(Error error)
+            | None -> Retry
+        | Choice1Of3() -> Retry
 
     let private applyJoinPoll (poll: JoinPoll) (retry: unit -> Task<Result<JoinWaitOutcome<JoinItem>, ForkError>>) =
         match poll with
@@ -277,31 +331,39 @@ module HostForkJoin =
         (durable: AgentJournal)
         (interrupt: Task<JoinInterruptReason>)
         (runtime: HostForkRuntime)
-        : Task<Choice<MailboxWakeReason, unit, JoinInterruptReason>> =
+        : Task<Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome>> =
         task {
             let _, fromRev = durable.SnapshotWithRevision
             let wakeSource = runtime.Runtime.WaitForWake()
             let changeSource = durable.AwaitChangeFrom fromRev
+            let sourceSettled = pendingSourceSettled runtime (fun _ -> true)
 
-            let tagWake (reason: MailboxWakeReason) : Choice<MailboxWakeReason, unit, JoinInterruptReason> =
-                Choice1Of3 reason
+            let tagWake (reason: MailboxWakeReason) : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
+                Choice1Of4 reason
 
-            let tagChange (_: JournalChange) : Choice<MailboxWakeReason, unit, JoinInterruptReason> = Choice2Of3()
+            let tagChange (_: JournalChange) : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
+                Choice2Of4()
 
-            let tagInterrupt (reason: JoinInterruptReason) : Choice<MailboxWakeReason, unit, JoinInterruptReason> =
-                Choice3Of3 reason
+            let tagInterrupt (reason: JoinInterruptReason) : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
+                Choice3Of4 reason
 
-            let wakeChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason>> =
+            let tagSource (outcome: AgentCompletionOutcome) : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
+                Choice4Of4 outcome
+
+            let wakeChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome>> =
                 emitJsExpr (wakeSource, tagWake) "$0.then($1)"
 
-            let changeChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason>> =
+            let changeChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome>> =
                 emitJsExpr (changeSource, tagChange) "$0.then($1)"
 
-            let interruptChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason>> =
+            let interruptChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome>> =
                 emitJsExpr (interrupt, tagInterrupt) "$0.then($1)"
 
-            let! (winner: Choice<MailboxWakeReason, unit, JoinInterruptReason>) =
-                emitJsExpr (wakeChoice, changeChoice, interruptChoice) "Promise.race([$0, $1, $2])"
+            let sourceChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome>> =
+                emitJsExpr (sourceSettled, tagSource) "$0.then($1)"
+
+            let! (winner: Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome>) =
+                emitJsExpr (wakeChoice, changeChoice, interruptChoice, sourceChoice) "Promise.race([$0, $1, $2, $3])"
 
             runtime.Runtime.PulseWake()
             return winner
@@ -461,23 +523,47 @@ module HostForkJoin =
         }
 
     let private raceFissionArms
+        (runtime: HostForkRuntime)
         (durable: AgentJournal)
+        (groupId: string)
+        (laneIndex: int)
         (interrupt: Task<JoinInterruptReason>)
-        : Task<Choice<unit, JoinInterruptReason>> =
+        : Task<Choice<unit, JoinInterruptReason, AgentCompletionOutcome>> =
         task {
             let _, fromRevision = durable.SnapshotWithRevision
             let changeSource = durable.AwaitChangeFrom fromRevision
-            let tagChange (_: JournalChange) : Choice<unit, JoinInterruptReason> = Choice1Of2()
-            let tagInterrupt (reason: JoinInterruptReason) : Choice<unit, JoinInterruptReason> = Choice2Of2 reason
 
-            let changeChoice: Task<Choice<unit, JoinInterruptReason>> =
+            // A fission lane may only observe the Source of pending runs whose
+            // handle affinity belongs to this lane; a sibling lane's PERSIST
+            // failure must not surface here as this lane's error.
+            let sourceSettled =
+                pendingSourceSettled
+                    runtime
+                    (fun run ->
+                        match HandleId.tryAgent (HandleController.agentHandle run.AgentId) with
+                        | Some handleId -> agentAffinityMatchesLane durable groupId laneIndex handleId
+                        | None -> false)
+
+            let tagChange (_: JournalChange) : Choice<unit, JoinInterruptReason, AgentCompletionOutcome> =
+                Choice1Of3()
+
+            let tagInterrupt (reason: JoinInterruptReason) : Choice<unit, JoinInterruptReason, AgentCompletionOutcome> =
+                Choice2Of3 reason
+
+            let tagSource (outcome: AgentCompletionOutcome) : Choice<unit, JoinInterruptReason, AgentCompletionOutcome> =
+                Choice3Of3 outcome
+
+            let changeChoice: Task<Choice<unit, JoinInterruptReason, AgentCompletionOutcome>> =
                 emitJsExpr (changeSource, tagChange) "$0.then($1)"
 
-            let interruptChoice: Task<Choice<unit, JoinInterruptReason>> =
+            let interruptChoice: Task<Choice<unit, JoinInterruptReason, AgentCompletionOutcome>> =
                 emitJsExpr (interrupt, tagInterrupt) "$0.then($1)"
 
-            let! (winner: Choice<unit, JoinInterruptReason>) =
-                emitJsExpr (changeChoice, interruptChoice) "Promise.race([$0, $1])"
+            let sourceChoice: Task<Choice<unit, JoinInterruptReason, AgentCompletionOutcome>> =
+                emitJsExpr (sourceSettled, tagSource) "$0.then($1)"
+
+            let! (winner: Choice<unit, JoinInterruptReason, AgentCompletionOutcome>) =
+                emitJsExpr (changeChoice, interruptChoice, sourceChoice) "Promise.race([$0, $1, $2])"
 
             return winner
         }
@@ -517,7 +603,7 @@ module HostForkJoin =
 
         and raceThenDrain () =
             task {
-                let! winner = raceFissionArms durable interrupt
+                let! winner = raceFissionArms runtime durable groupId laneIndex interrupt
                 let! drained = tryDrain ()
                 return! afterOptionalDrain drained (fun () -> continueFromFissionRace winner)
             }

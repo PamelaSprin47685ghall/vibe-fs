@@ -1461,5 +1461,20 @@ module ForkToolSurface =
         }
         :> Task
 
+    let injectPendingPersistFailure (value: obj) (owner: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           error = sprintf "%A" error |}
+            | Ok runtime ->
+                runtime.InjectPendingPersistFailure()
+                return box {| ok = true |}
+        }
+
     let disposeRuntime (value: obj) =
         unbox<ForkHarness> value |> fun harness -> harness.Dispose()

@@ -141,7 +141,7 @@ module PluginTransforms =
           RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
           ApplyCompanion: string option -> obj -> obj -> Task<unit>
           ApplyXWire: obj -> Task<PrefixPresentationHorizon>
-          FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
+          FreezeProviderAttemptPlan: string option -> PhysicalUserMessageId option -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
           ApplyReadonlyDelegation: string option -> obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
@@ -248,16 +248,13 @@ module PluginTransforms =
         /// the refusal carries no exact key and is never guessed.
         let exactProviderStartBoundaryKey
             (projectionSessionIdOpt: string option)
-            (outObj: obj)
+            (physicalUserMessageId: PhysicalUserMessageId option)
             : ChatExecutionKey option =
-            match projectionSessionIdOpt with
-            | Some sessionText when not (String.IsNullOrWhiteSpace sessionText) ->
-                outObj
-                |> ProviderWireDecode.messagesFromTransformOutput
-                |> ProviderWireCapture.lastUserMessageId
-                |> Option.map (fun physical ->
+            match projectionSessionIdOpt, physicalUserMessageId with
+            | Some sessionText, Some physical when not (String.IsNullOrWhiteSpace sessionText) ->
+                Some
                     { SessionId = SessionId.create sessionText
-                      PhysicalUserMessageId = physical })
+                      PhysicalUserMessageId = physical }
             | _ -> None
 
         let signalProviderStartBoundaryRejection (key: ChatExecutionKey) (reason: string) () : Task =
@@ -269,12 +266,12 @@ module PluginTransforms =
         /// diagnostic and the caller still raises the hook failure below.
         let reportProviderStartBoundaryRejected
             (projectionSessionIdOpt: string option)
-            (outObj: obj)
+            (physicalUserMessageId: PhysicalUserMessageId option)
             (reason: string)
             : Task =
             task {
                 let report () =
-                    match exactProviderStartBoundaryKey projectionSessionIdOpt outObj with
+                    match exactProviderStartBoundaryKey projectionSessionIdOpt physicalUserMessageId with
                     | Some key -> signalProviderStartBoundaryRejection key reason ()
                     | None -> Task.FromResult(()) :> Task
 
@@ -328,14 +325,9 @@ module PluginTransforms =
                     requireProviderAdmission key
             }
 
-        let confirmProviderStarted projectionSessionIdOpt outObj =
+        let confirmProviderStarted projectionSessionIdOpt physicalUserMessageId =
             task {
-                let physical =
-                    outObj
-                    |> ProviderWireDecode.messagesFromTransformOutput
-                    |> ProviderWireCapture.lastUserMessageId
-
-                match projectionSessionIdOpt, physical with
+                match projectionSessionIdOpt, physicalUserMessageId with
                 | Some sessionText, Some physical ->
                     let key =
                         { SessionId = SessionId.create sessionText
@@ -381,7 +373,7 @@ module PluginTransforms =
                 |> Option.defaultWith (fun () ->
                     Task.FromResult(Error "MANAGED-SESSION-017: current authority root unavailable"))
 
-        let freezeProviderAttemptPlan projectionSessionIdOpt outObj =
+        let freezeProviderAttemptPlan projectionSessionIdOpt physicalUserMessageId =
             task {
                 let conflictingPlan existing attempted =
                     invalidOp (
@@ -426,9 +418,9 @@ module PluginTransforms =
                         journal
                         adaptedFreezeAttemptPlan
                         projectionSessionIdOpt
-                        outObj
+                        physicalUserMessageId
                 with
-                | Ok _ -> do! confirmProviderStarted projectionSessionIdOpt outObj
+                | Ok _ -> do! confirmProviderStarted projectionSessionIdOpt physicalUserMessageId
                 | Error error ->
                     let reason = ProviderLifecycle.providerStartObservationErrorCode error
 
@@ -436,7 +428,7 @@ module PluginTransforms =
                     // reported to the settlement owner for the exact execution. The
                     // report never replaces the original refusal: a failed report is
                     // emitted as a diagnostic and the hook failure is raised below.
-                    do! reportProviderStartBoundaryRejected projectionSessionIdOpt outObj reason
+                    do! reportProviderStartBoundaryRejected projectionSessionIdOpt physicalUserMessageId reason
 
                     return
                         invalidOp (
@@ -1330,7 +1322,7 @@ module PluginTransforms =
                     Run =
                       fun frame ->
                           task {
-                              do! caps.FreezeProviderAttemptPlan frame.SessionId frame.OutObj
+                              do! caps.FreezeProviderAttemptPlan frame.SessionId frame.PhysicalUserMessageId
                               return Some frame
                           } }
                   // 12. EnforcerContinuation.applyContinuation
@@ -1411,11 +1403,16 @@ module PluginTransforms =
                 match determineTransformMode branches projectionSessionIdOpt outObj with
                 | StrengthReplica runtime ->
                     projectionSessionIdOpt |> Option.iter branches.RegisterOwned
+                    let physicalUserMessageId =
+                        outObj
+                        |> ProviderWireDecode.messagesFromTransformOutput
+                        |> ProviderWireCapture.lastUserMessageId
+
                     // STRENGTH-004/009: Replica uses exactly one request-plan
                     // writer plus its mirror/K gate. XTrace, Manager narrative,
                     // Companion, Enforcer, Pair and Review are owner-only.
                     do! branches.ReplicaXWire outObj
-                    do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt outObj
+                    do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt physicalUserMessageId
                     // host-boundary-032 / same restore on the
                     // Replica branch, before the runtime reads this request.
                     do! caps.RestoreProtocolArguments outObj

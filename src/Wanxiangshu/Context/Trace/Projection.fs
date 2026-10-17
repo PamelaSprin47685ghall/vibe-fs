@@ -398,7 +398,7 @@ module XTraceProjection =
     let traceIntervalAfterCoverage (coverage: RecordCoverage) (state: XTraceProjectionState) : XTraceCut * XTraceCut =
         WanxiangliTrace.intervalAfterCoverageOnBridge coverage state.Bridge
 
-    let traceRecords (state: XTraceProjectionState) : string list = state.Bridge.Records
+    let traceRecords (state: XTraceProjectionState) : string list = WanxiangliTrace.recordsOldestFirst state.Bridge
 
     /// Host turn indices restart per reanchor generation; XTrace Sequence does not.
     /// Turn/Part labels are only comparable within one generation.

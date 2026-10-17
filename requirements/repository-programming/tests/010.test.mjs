@@ -102,7 +102,7 @@ test('WHAT[repository-programming-010] JS009_012_bindings_write_stages_create', 
     cleanup()
   }
 })
-test('WHAT[repository-programming-010] JS009_bindings_write_rejects_an_existing_target_before_staging', () => {
+test('WHAT[repository-programming-010] JS009_bindings_write_rejects_an_existing_target_before_writing', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'existing.txt'), 'external', 'utf8')

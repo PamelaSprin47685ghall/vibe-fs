@@ -472,10 +472,20 @@ module HostForkRunLifecycle =
         let claimed, subscriptionToDispose = claimPendingRun gate pendingRuns run
 
         if claimed then
-            subscriptionToDispose
-            |> Option.iter (fun subscription -> subscription.Dispose())
+            task {
+                // The claim consumed this run's only completion promise. A faulting
+                // subscription Dispose must not strand the Source: the delivery (and
+                // its PERSIST failure settlement) always runs, even when cleanup
+                // itself faults. The `do!` stays after the fault boundary, not in
+                // a `finally` (a `finally` in `task { }` cannot await).
+                try
+                    subscriptionToDispose
+                    |> Option.iter (fun subscription -> subscription.Dispose())
+                with _ -> ()
 
-            startClaimDelivery gate pendingRuns journal parentId run proof agentOutcome
+                do! startClaimDelivery gate pendingRuns journal parentId run proof agentOutcome
+            }
+            :> Task
         else
             Task.FromResult(())
 

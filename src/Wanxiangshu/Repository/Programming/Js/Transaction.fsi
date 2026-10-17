@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Persistence.EventStore
 
 [<RequireQualifiedAccess>]
 type JsStagedMutation =
@@ -44,14 +45,42 @@ module JsTransaction =
 type JsDurableMutation =
     { Path: string
       OriginalText: string option
-      NewText: string }
+      NewText: string
+      Kind: JsDurableMutationKind }
+
+[<RequireQualifiedAccess>]
+type JsDurableMutationKind =
+    | Rewrite
+    | Create
+    | Remove
+    | Move
 
 type JsTransactionPrepared =
     { TransactionId: JsTransactionId
       WorkspaceRoot: string
-      Mutations: JsDurableMutation list }
+      Mutation: JsDurableMutation }
 
 type JsTransactionCommitted = { TransactionId: JsTransactionId }
+
+type JsLifecycleEvent =
+    { EventType: JsLifecycleEventType
+      Handle: string
+      SessionId: string
+      At: string }
+
+[<RequireQualifiedAccess>]
+type JsLifecycleEventType =
+    | Parked
+    | Unparked
+    | Abandoned
+    | Reaped
+
+type JsLifecycleAppendFailure =
+    { EventType: JsLifecycleEventType
+      Handle: string
+      SessionId: string
+      EventId: EventId
+      Error: AppendError }
 
 type JsTransactionProjection =
     { Head: EventId option
@@ -75,4 +104,4 @@ module JsTransactionProjection =
     val pending: projection: JsTransactionProjection -> JsTransactionPrepared list
 
 module JsTransactionFacts =
-    val ofStaged: mutations: JsStagedMutation list -> JsDurableMutation list
+    val ofMutation: mutation: JsStagedMutation -> JsDurableMutation

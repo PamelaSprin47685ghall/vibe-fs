@@ -54,6 +54,9 @@ type JsFailure =
     | TransactionPersistenceFailed of JsTransactionAppendFailure
     | UnknownMember
     | PlanReviewRequired
+    | ConcurrencyLimit
+    | HandleUnknown of string
+    | CannotParkWhileAbandoning
 
 module JsFailure =
     val code: failure: JsFailure -> string

@@ -105,7 +105,9 @@ module JsDescriptionAssets =
           ReasonEditUnknownFields = text lang JsCanonicalDescription.Path.ReasonEditUnknownFields
           ReasonEditCandidate = text lang JsCanonicalDescription.Path.ReasonEditCandidate
           ReasonEditLine = text lang JsCanonicalDescription.Path.ReasonEditLine
-          ReasonEditOverlaps = text lang JsCanonicalDescription.Path.ReasonEditOverlaps }
+          ReasonEditOverlaps = text lang JsCanonicalDescription.Path.ReasonEditOverlaps
+          Park = template lang JsCanonicalDescription.Path.Park
+          ParkedPayload = template lang JsCanonicalDescription.Path.ParkedPayload }
 
     let argProgram (lang: ProviderLanguage) =
         text lang JsCanonicalDescription.Path.ArgProgram
@@ -126,7 +128,9 @@ module JsToolSpec =
                   ToolPermission.Write
                   ToolPermission.Edit
                   ToolPermission.Glob
-                  ToolPermission.Grep ]
+                  ToolPermission.Grep
+                  ToolPermission.Move
+                  ToolPermission.Remove ]
 
         ToolAdmission.OfficeRole(fun _ r ->
             (string r).ToLowerInvariant() = roleName.ToLowerInvariant()
@@ -150,31 +154,48 @@ module JsToolSpec =
         : ToolSpec =
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
 
-        let runProgram ctx programSource =
-            let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
+        /// Build the three-state input object from the Host arguments:
+        /// `{ program } | { unpark: { handle, value } } | { abandon: { handle } }`.
+        let inputOf (args: HostToolArguments) : obj =
+            let program = readProgram args
 
-            match fileAccessObservation with
-            | None ->
-                JsToolWorkflow.run
-                    surface.Capabilities
-                    workspaceRoot
-                    surface.BaseClassSource
-                    programSource
-                    10000
-                    deadlineEpochMs
-                    (1 <<< 20)
-                    persistence
-            | Some observe ->
-                JsToolWorkflow.runWithFileAccessObservation
-                    surface.Capabilities
-                    workspaceRoot
-                    surface.BaseClassSource
-                    programSource
-                    10000
-                    deadlineEpochMs
-                    (1 <<< 20)
-                    persistence
-                    (observe ctx)
+            let unpark =
+                if isNull (args.Raw?unpark) then
+                    null
+                else
+                    args.Raw?unpark
+
+            let abandon =
+                if isNull (args.Raw?abandon) then
+                    null
+                else
+                    args.Raw?abandon
+
+            match program, unpark, abandon with
+            | Some source, _, _ -> createObj [ "program" ==> source ]
+            | None, unparkValue, _ when not (isNull unparkValue) ->
+                createObj
+                    [ "unpark"
+                      ==> createObj
+                              [ "handle" ==> string (unparkValue?handle)
+                                "value" ==> unparkValue?value ] ]
+            | None, _, abandonValue when not (isNull abandonValue) ->
+                createObj
+                    [ "abandon"
+                      ==> createObj [ "handle" ==> string (abandonValue?handle) ] ]
+            | _ -> createObj []
+
+        // The unpark/abandon arguments are nested objects; the Host schema
+        // describes them as plain objects with string handle fields. The value
+        // field of unpark is free-form (the injected resume value).
+        let unparkSchema =
+            ToolHostCodec.objectSchemaOf
+                [ "handle", ToolHostCodec.stringSchema factory
+                  "value", ToolHostCodec.stringSchema factory ]
+                factory
+
+        let abandonSchema =
+            ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
         { Name = surface.ToolName
           Description = surface.Description
@@ -182,13 +203,20 @@ module JsToolSpec =
             [ "program",
               ToolHostCodec.stringSchemaDescribed
                   (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
-                  factory ]
+                  factory
+              "unpark",
+              unparkSchema
+              "abandon",
+              abandonSchema ]
           Admission = admissionFor surface.RoleName
           Execute =
             fun args ctx ->
                 task {
-                    match readProgram args with
-                    | None ->
+                    let input = inputOf args
+
+                    let hasProgram = not (isNull (input?program))
+
+                    if not hasProgram && isNull (input?unpark) && isNull (input?abandon) then
                         return
                             ToolHostCodec.tomlObject
                                 [ "error",
@@ -197,12 +225,25 @@ module JsToolSpec =
                                           ProviderLanguageBinding.readGlobalPreference ()
                                       )
                                   ) ]
-                    | Some programSource ->
+                    else
                         // 10 s sandbox deadline; 1 MiB output bound (JS-054).
-                        let! outcome = runProgram ctx programSource
+                        let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
+
+                        let! outcome =
+                            JsToolWorkflow.execute
+                                ctx.SessionId
+                                surface.Capabilities
+                                workspaceRoot
+                                surface.BaseClassSource
+                                input
+                                10000
+                                deadlineEpochMs
+                                (1 <<< 20)
+                                persistence
+                                None
+                                (fileAccessObservation |> Option.map (fun observe -> observe ctx))
 
                         return JsToolsResult.render outcome
-                } }
 
     /// Build a ToolSpec for the dedicated js-predictor surface with PrivateAttachment admission.
     let createWithAdmission

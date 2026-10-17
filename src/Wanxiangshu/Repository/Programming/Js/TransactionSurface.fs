@@ -86,6 +86,9 @@ module JsTransactionSurface =
            JsFailure.ResultTooLarge None, "ResultTooLarge"
            JsFailure.InvalidReturnValue, "InvalidReturnValue"
            JsFailure.FileChanged "a", "FileChanged"
+           JsFailure.DirectoryNotEmpty "a", "DirectoryNotEmpty"
+           JsFailure.CrossDeviceMove "a", "CrossDeviceMove"
+           JsFailure.InvalidArgument "a", "InvalidArgument"
            JsFailure.TransactionPrepareFailed, "TransactionPrepareFailed"
            JsFailure.TransactionCommitFailed, "TransactionCommitFailed"
            JsFailure.TransactionRecoveryRequired, "TransactionRecoveryRequired"
@@ -163,36 +166,51 @@ module JsTransactionSurface =
     let private eventStoreOf (handle: obj) : IEventStore = (unbox<EventStoreHandle> handle).Store
 
     let private durableMutationToJs (mutation: JsDurableMutation) =
+        let kind =
+            match mutation.Kind with
+            | JsDurableMutationKind.Rewrite -> "rewrite"
+            | JsDurableMutationKind.Create -> "create"
+            | JsDurableMutationKind.Remove -> "remove"
+            | JsDurableMutationKind.Move -> "move"
+
         box
             {| path = mutation.Path
                originalText = mutation.OriginalText |> Option.toObj
-               newText = mutation.NewText |}
+               newText = mutation.NewText
+               kind = kind |}
 
     let private preparedToJs (prepared: JsTransactionPrepared) =
         box
             {| transactionId = JsTransactionId.value prepared.TransactionId
                workspaceRoot = prepared.WorkspaceRoot
-               mutations = prepared.Mutations |> List.map durableMutationToJs |> List.toArray |}
+               mutation = durableMutationToJs prepared.Mutation |}
 
     let private preparedOf (value: obj) : JsTransactionPrepared =
-        let mutations =
-            if isNull value?mutations then
-                []
-            else
-                unbox<obj array> value?mutations
-                |> Array.toList
-                |> List.map (fun item ->
-                    { Path = text (item?path)
-                      OriginalText =
-                        if isNull (item?originalText) then
-                            None
-                        else
-                            Some(text (item?originalText))
-                      NewText = text (item?newText) })
+        if isNull value || isNull (value?mutation) then
+            invalidArg "mutation" "Prepared payload requires a single mutation object"
+
+        let item = value?mutation
+
+        let kind =
+            match text (item?kind) with
+            | "create" -> JsDurableMutationKind.Create
+            | "remove" -> JsDurableMutationKind.Remove
+            | "move" -> JsDurableMutationKind.Move
+            | _ -> JsDurableMutationKind.Rewrite
+
+        let mutation =
+            { Path = text (item?path)
+              OriginalText =
+                if isNull (item?originalText) then
+                    None
+                else
+                    Some(text (item?originalText))
+              NewText = text (item?newText)
+              Kind = kind }
 
         { TransactionId = JsTransactionId.create (text (value?transactionId))
           WorkspaceRoot = text (value?workspaceRoot)
-          Mutations = mutations }
+          Mutation = mutation }
 
     let persistenceFailureToJs (failure: JsTransactionAppendFailure) : obj =
         let eventIds events =
@@ -286,6 +304,53 @@ module JsTransactionSurface =
         JsToolsTransactionStore.createPersistence (eventStoreOf store)
 
     let createPersistence (store: obj) : obj = persistenceOf store |> box
+
+    // ---- lifecycle audit surface (PLAN S2 step 8 / algorithm H3) -----------
+
+    let private lifecycleAppendResult (result: Result<EventId, JsLifecycleAppendFailure>) : obj =
+        match result with
+        | Ok _ -> box {| ok = true |}
+        | Error failure ->
+            box
+                {| ok = false
+                   code = "LIFECYCLE_AUDIT_APPEND_FAILED"
+                   error = AppendError.describe failure.Error
+                   eventType = JsToolsTransactionStore.lifecycleEventTypeOf failure.EventType
+                   handle = failure.Handle
+                   sessionId = failure.SessionId |}
+
+    /// Append one lifecycle audit trace. Callers are park/unpark/abandon/reap
+    /// transition points (lane-a-core owns those call sites). Unknown event
+    /// types fail closed with a typed rejection instead of throwing.
+    let appendLifecycleEvent (store: obj) (value: obj) : Task<obj> =
+        task {
+            match JsToolsTransactionStore.lifecycleEventTypeOfName (text (value?eventType)) with
+            | None ->
+                return
+                    box
+                        {| ok = false
+                           code = "LIFECYCLE_AUDIT_APPEND_FAILED"
+                           error = sprintf "unknown lifecycle audit event type: %s" (text (value?eventType))
+                           eventType = text (value?eventType)
+                           handle = text (value?handle)
+                           sessionId = text (value?sessionId) |}
+            | Some kind ->
+                let event =
+                    { EventType = kind
+                      Handle = text (value?handle)
+                      SessionId = text (value?sessionId)
+                      At = text (value?at) }
+
+                let! result = JsToolsTransactionStore.appendLifecycleEvent (eventStoreOf store) event
+                return lifecycleAppendResult result
+        }
+
+    /// Opaque lifecycle audit capability consumed by the park/unpark/abandon/
+    /// reap transition points.
+    let internal lifecyclePersistenceOf (store: obj) : IJsLifecyclePersistence =
+        JsToolsTransactionStore.createLifecyclePersistence (eventStoreOf store)
+
+    let createLifecyclePersistence (store: obj) : obj = lifecyclePersistenceOf store |> box
 
     let createTransactionContext () : obj =
         let readSnapshots = System.Collections.Generic.HashSet<string>()

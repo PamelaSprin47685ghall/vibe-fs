@@ -92,6 +92,8 @@ capacity fence 至少因果绑定 exact session、physical message、fixed Role 
 
 `null` 或暂不可 acquire 的已接受 demand 只能进入有明确上限的 typed queue；entry 必须携带 exact `(SessionId, PhysicalUserMessageId)`、resolved target、role/participant/lender 输入与 supersession identity。队列满返回 typed `CapacityQueueFull` 并交给 failure policy，绝不得丢弃、无限扩容、解析错误文本后重试，或借 wall-clock timeout 清退。capacity release、exact supersede、session deletion 与 shutdown 是队列重算/移除事件；队列 correctness 不依赖 polling、sleep 或 elapsed time。
 
+已确认的 provider 驱逐同样触发队列重算。每个既有 demand 按自己的 role 与 purpose 查询理论容量：仍有候选时继续正常调度或排队；已无候选时以与新 admission 相同的 typed `CapacityQueueFull` 结算，不能等待已不存在的容量生产者。其它池的 demand 与已提交 exact lease 不因此被取消或释放。普通 route 返回 `null` 不等于理论容量为 false。
+
 ## [014] Capacity snapshot 与 reconciliation 只观察、绝不修复
 
 Capacity owner 必须发布不可变 snapshot：ledger entry、token state、exact execution owner、pending waiter、role/participant 身份与单调 duplicate/stale/conflict transition counter。始终满足 `0 <= active <= ledger entries`，且每个 token、waiter 与 map owner 均可追溯到 snapshot 内同一 exact identity。纯 `Evidence -> Decision` reconciliation 对合法 evidence 返回 `NoOp`；任何 map/ledger divergence、无 owner token/waiter 或不可能计数返回 typed `FailClosed`，不得自动补删 ledger/map、清零 counter/config 或借时间推断。release、commit、cancel 仅返回封闭 outcome `Applied | AlreadyApplied | StaleFence | Conflict`；duplicate 不得二次递减，旧 fence 不得触碰新 execution。
@@ -112,6 +114,8 @@ provider 恢复的一次已确认失败由 `ModelRouting` 结算失败 attempt �
 - 驱逐目标：其 provider 在进程生命周期内被 poison，后续 fresh admission 回到普通调度。
 
 两种结局都只属于该 exact witness：witness 单次消费，重复或过期证据不产生第二结局；无 witness（例如进程重启后）不产生任何结局。recovery retry 绑定不是 session 级 previous 缓存：它只由失败结算从 exact witness 显式写入、只服务该 session 的下一次 fresh admission，并在 force cleanup（`ReleaseExecution`）时清除。
+
+provider 健康变化只参与 fresh demand 的准入与既有队列的重算。同一 exact physical execution 重放时，先核对既有 role、participant、purpose 并复用原 fence；不得把后来的理论容量不足误作该已提交准入的拒绝，也不得为此替换或释放旧 lease。
 
 ## [018] 新角色集合模型路由与旧角色槽位解耦
 

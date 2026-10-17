@@ -9,6 +9,9 @@ type JsCapability =
     | Edit
     | Glob
     | Grep
+    | Move
+    | Remove
+    | Park
 
 module JsCapability =
     val ofToolPermission: permission: ToolPermission -> JsCapability option
@@ -30,5 +33,8 @@ module JsFragmentRegistry =
     val edit: JsCapabilityFragment
     val rewrite: JsCapabilityFragment
     val write: JsCapabilityFragment
+    val rm: JsCapabilityFragment
+    val mv: JsCapabilityFragment
+    val park: JsCapabilityFragment
     val all: JsCapabilityFragment list
     val byCapability: Map<JsCapability, JsCapabilityFragment list>

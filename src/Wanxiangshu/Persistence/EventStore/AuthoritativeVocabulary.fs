@@ -20,6 +20,7 @@ module AuthoritativeEventTypes =
               "JobConflictResolved"
               // Domain-owned names, joined from the owning vocabulary contracts.
               yield! JsTransactionEventTypes.all
+              yield! JsLifecycleAuditEventTypes.all
               yield! CasebookEventTypes.all
               yield! StrengthEventTypes.all
               // Version 1 remains readable for the domain's explicit semantic cut.

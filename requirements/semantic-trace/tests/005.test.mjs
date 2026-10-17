@@ -176,6 +176,65 @@ test('WHAT[semantic-trace-005] opaque projection and wanxiangli/trace reject sta
   )
 })
 
+test('WHAT[semantic-trace-005] long append sequences preserve authenticated chronological records and range boundaries', () => {
+  let projection = unwrap(trace.appendOpening(trace.emptyProjection(), 'bulk append', []))
+  const N = 300
+  for (let i = 1; i <= N; i++) {
+    projection = unwrap(trace.appendPart(projection, partDescriptor(i)))
+  }
+
+  const records = trace.traceRecords(projection)
+  // Opening + one RunStarted/MessageObserved/PartConfirmed/MessageFinished/RunFinished
+  // run per part (assistant role carries a run). Assert records are non-empty and
+  // the trace reconstructs to the same head — the exact ordering guarantee.
+  assert.equal(records.length > N, true)
+
+  const headCut = trace.traceHeadCut(projection)
+  const restored = new Trace(headCut.traceId, records)
+  assert.deepEqual(restored.head(), headCut)
+
+  // Chronological part cursors must be exactly 1..N in order.
+  const parts = trace.orderedSemanticParts(projection)
+  assert.deepEqual(
+    parts.map((p) => p.cursor.sequence),
+    Array.from({ length: N }, (_, i) => i + 1),
+  )
+
+  // A later slice must resolve against the same chronological cuts.
+  const midRange = trace.createRange(trace.cursor(100), trace.cursor(200))
+  const sliced = trace.slice(midRange, projection)
+  assert.deepEqual(
+    sliced.map((p) => p.cursor.sequence),
+    Array.from({ length: 100 }, (_, i) => i + 100),
+  )
+})
+
+test('WHAT[semantic-trace-005] appending two branches preserves the old projection and both authenticated histories', () => {
+  const base = unwrap(trace.appendPart(
+    unwrap(trace.appendOpening(trace.emptyProjection(), 'branch proof', [])),
+    partDescriptor(1),
+  ))
+  const baseRecords = trace.traceRecords(base)
+  const baseCut = trace.traceHeadCut(base)
+  const left = unwrap(trace.appendPart(base, partDescriptor(2, { textRef: 'left-ref', textDigest: 'left-digest' })))
+  const leftRecords = trace.traceRecords(left)
+  const leftCut = trace.traceHeadCut(left)
+  const right = unwrap(trace.appendPart(base, partDescriptor(2, { textRef: 'right-ref', textDigest: 'right-digest' })))
+  const rightRecords = trace.traceRecords(right)
+  const rightCut = trace.traceHeadCut(right)
+  unwrap(trace.appendPart(left, partDescriptor(3)))
+
+  assert.deepEqual(trace.traceRecords(base), baseRecords)
+  assert.deepEqual(trace.traceHeadCut(base), baseCut)
+  assert.deepEqual(trace.traceRecords(left), leftRecords)
+  assert.deepEqual(trace.traceHeadCut(left), leftCut)
+  assert.deepEqual(trace.traceRecords(right), rightRecords)
+  assert.deepEqual(trace.traceHeadCut(right), rightCut)
+  assert.notDeepEqual(leftCut, rightCut)
+  assert.deepEqual(new Trace(leftCut.traceId, leftRecords).head(), leftCut)
+  assert.deepEqual(new Trace(rightCut.traceId, rightRecords).head(), rightCut)
+})
+
 integrationTest('WHAT[semantic-trace-005] independently compile a consumer and reject access to opaque trace state, cursor and append refs', async () => {
   const { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } = await import('node:fs')
   const { createHash } = await import('node:crypto')

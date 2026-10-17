@@ -56,6 +56,10 @@ module ToolRegistry =
         [<Literal>]
         let DeniedTaskState = "tool/registry/denied-task-state"
 
+        /// Algorithm G1: deliver is blocked while any parked site is unresolved.
+        [<Literal>]
+        let DeliverBlockedByParked = "tool/js-program/parked-deliver-blocked"
+
     let private lang (ctx: HostToolContext) =
         let sessionText = ctx.SessionId
 
@@ -409,29 +413,33 @@ module ToolRegistry =
 
     let private writePlanFile root sessionId newText value =
         match PlanPath.rewritePlanAtomic root sessionId newText with
-        | Ok(_path, _digest) -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [ "plan.md" ], []))
+        | Ok(_path, _digest) -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [ "plan.md" ], [], [], []))
         | Error err ->
             JsToolsResult.render (
                 JsToolWorkflow.JsToolOutcome.Failed(
-                    JsFailure.ProgramFailed(sprintf "Failed to write plan artifact: %s" err)
+                    JsFailure.ProgramFailed(sprintf "Failed to write plan artifact: %s" err),
+                    [],
+                    [],
+                    [],
+                    []
                 )
             )
 
     let private commitPlanMutation root sessionId hasReviewed newTextOpt value =
         match newTextOpt with
-        | None -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [], []))
+        | None -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [], [], [], []))
         | Some _ when not hasReviewed ->
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed JsFailure.PlanReviewRequired)
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.PlanReviewRequired, [], [], [], []))
         | Some newText -> writePlanFile root sessionId newText value
 
     let private renderPlanParseOutcome root sessionId hasReviewed stagedMutation json =
         match JsToolsData.parse json with
-        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed failure)
+        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
         | Ok value -> commitPlanMutation root sessionId hasReviewed stagedMutation value
 
     let private renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation runOutcome =
         match runOutcome with
-        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed failure)
+        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
         | Ok json -> renderPlanParseOutcome root sessionId hasReviewed stagedMutation json
 
     let private executePlanSandbox prose root sessionId hasReviewed programSource =
@@ -449,8 +457,10 @@ module ToolRegistry =
             let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
             let outputBoundBytes = 1 <<< 20
 
-            let! runOutcome =
-                JsSandbox.runSurface baseClassSource programSource api deadlineMs deadlineEpochMs outputBoundBytes
+            let! handle =
+                JsSandbox.runSurface baseClassSource programSource api deadlineMs deadlineEpochMs
+
+            let! runOutcome = JsSandbox.awaitResult handle outputBoundBytes
 
             return renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation.Value runOutcome
         }
@@ -468,7 +478,7 @@ module ToolRegistry =
     let private executeTenureSandbox prose root gitCommonDir sessionId programSource =
         match resolveActiveTenure gitCommonDir sessionId with
         | Error reason ->
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason))
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason, [], [], [], []))
             |> Task.FromResult
         | Ok hasReviewed -> executePlanSandbox prose root sessionId hasReviewed programSource
 
@@ -480,11 +490,17 @@ module ToolRegistry =
         (programSourceOpt: string option)
         : Task<string> =
         if Option.isNone programSourceOpt then
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed JsFailure.InvalidProgram)
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.InvalidProgram, [], [], [], []))
             |> Task.FromResult
         elif Option.isNone rootOpt || Option.isNone gitCommonDirOpt then
             JsToolsResult.render (
-                JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed "The plan workspace is unavailable")
+                JsToolWorkflow.JsToolOutcome.Failed(
+                    JsFailure.ProgramFailed "The plan workspace is unavailable",
+                    [],
+                    [],
+                    [],
+                    []
+                )
             )
             |> Task.FromResult
         else
@@ -1015,9 +1031,28 @@ module ToolRegistry =
                         || OfficeCapability.isAllowed role ToolPermission.Deliver)
                 Execute =
                     fun args ctx ->
-                        match sequenceOf ctx with
-                        | Some [ "S1"; "S2"; "S3" ] -> planSpec.Execute args ctx
-                        | _ -> managerSpec.Execute args ctx }
+                        task {
+                            // Algorithm G1: the deliver hard gate. While any
+                            // parked site is unresolved (state=Parked and no
+                            // unpark/abandon has been taken), delivery is
+                            // refused and every handle is listed. The parked
+                            // site table and its read-only query are owned by
+                            // lane-a-core (JsParkedSites.parkedHandles).
+                            let parkedHandles = JsParkedSites.parkedHandles ()
+
+                            if not (List.isEmpty parkedHandles) then
+                                let handles = String.Join(", ", parkedHandles)
+
+                                return
+                                    ToolHostCodec.tomlObjectWithInstructions
+                                        [ ProviderProse.render (lang ctx) Path.DeliverBlockedByParked (Map [ "handles", handles ]) ]
+                                        [ "code", ToolHostCodec.TString Path.DeliverBlockedByParked
+                                          "parked_handles", ToolHostCodec.TString handles ]
+                            else
+                                match sequenceOf ctx with
+                                | Some [ "S1"; "S2"; "S3" ] -> return! planSpec.Execute args ctx
+                                | _ -> return! managerSpec.Execute args ctx
+                        } }
 
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime

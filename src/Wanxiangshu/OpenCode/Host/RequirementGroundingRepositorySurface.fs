@@ -57,8 +57,9 @@ module RequirementGroundingRepositorySurface =
 
         let caseName, failureCode, created =
             match outcome with
-            | JsToolWorkflow.JsToolOutcome.Succeeded(_, _, created) -> "Succeeded", null, List.toArray created
-            | JsToolWorkflow.JsToolOutcome.Failed failure -> "Failed", box (failureCodeText failure), [||]
+            | JsToolWorkflow.JsToolOutcome.Succeeded(_, _, created, _, _) -> "Succeeded", null, List.toArray created
+            | JsToolWorkflow.JsToolOutcome.Failed(failure, _, _, _, _) -> "Failed", box (failureCodeText failure), [||]
+            | JsToolWorkflow.JsToolOutcome.Parked _ -> "Parked", null, [||]
 
         box
             {| runtime = (runtime :> obj)

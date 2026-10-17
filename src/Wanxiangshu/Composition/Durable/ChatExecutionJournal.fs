@@ -56,9 +56,8 @@ module private ManagedChatExecutionFlight' =
         let started =
             Defer.defer (fun () ->
                 task {
-                    do! precedingFlight
-
                     try
+                        do! precedingFlight
                         return! operation ()
                     finally
                         removeIfCurrent flightKey marker

@@ -3,11 +3,16 @@ import test from 'node:test'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
+import { execFile } from 'node:child_process'
+import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 import * as recoveryHost from '../../../dist/OpenCode/Host/SessionRecoveryHostSurface.js'
 import * as routing from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import * as ownership from '../../verification-system/tests/support/blogger-ownership.mjs'
 import {
   acceptAuthorityRoot,
+  claimBloggerRequest,
   startPluginIncarnation,
   withExecutablePlugin,
 } from '../../verification-system/tests/support/plugin-fixture.mjs'
@@ -213,5 +218,69 @@ test('WHAT[managed-chat-execution-015] the real transform refusal settles the ex
       'WHAT[managed-chat-execution-015]: the real refusal must settle the exact execution as a pre-provider Failed terminal',
     )
     assert.equal(leaseCount(), 0, 'WHAT[managed-chat-execution-015]: the exact capacity must return after the durable terminal')
+  })
+})
+
+
+test('WHAT[managed-chat-execution-015] Blogger wire replacement preserves the original accepted physical execution', async () => {
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    const main = 'ses-chat015-original-main'
+    const blogger = 'ses-chat015-original-blogger'
+    const physical = 'msg-chat015-original-physical'
+    // Real admission: chat.message establishes the durable Accepted execution and
+    // the exact capacity lease for `physical` (same setup the refusal case uses).
+    await acceptAuthorityRoot(runtime, blogger, 'blogger', physical)
+    const profile = await ownership.rootBlogger(runtime.journal, blogger, physical)
+    await ownership.linkBlogger(runtime.journal, main, blogger)
+    const claim = await claimBloggerRequest({
+      runtime, mainSession: main, bloggerSession: blogger, profile,
+      dispatchPhysical: 'msg-chat015-landed', requestId: 'chat015-replaced-wire',
+      toml: 'charge = "Preserve the original physical execution."',
+    })
+    try {
+      const user = {
+        info: { id: physical, sessionID: blogger, role: 'user', agent: 'blogger', time: { created: 3 } },
+        parts: [{ type: 'text', text: ownership.BLOGGER_INSTRUCTION }],
+      }
+      await hooks['chat.message'](
+        { sessionID: blogger, messageID: physical, agent: 'blogger' },
+        { message: user.info, parts: user.parts },
+      )
+      const assistant = {
+        info: {
+          id: 'msg-chat015-original-run', sessionID: blogger, parentID: physical,
+          role: 'assistant', agent: 'blogger', providerID: 'provider',
+          modelID: 'blogger-model', time: { created: 4 },
+        },
+        parts: [],
+      }
+      runtime.pushHostMessage(blogger, user)
+      runtime.pushHostMessage(blogger, assistant)
+      const output = { messages: structuredClone([user, assistant]) }
+      await hooks['experimental.chat.messages.transform']({ sessionID: blogger }, output)
+
+      // managed-chat-execution-015: the start boundary binds the durable
+      // Accepted/ProviderStarted facts and the exact capacity fence to the real
+      // pre-transform physical user message (captured before Blogger/Relay
+      // rewrites the wire), never to a message id re-derived from the projected
+      // tail. The transform returning without `accepted-execution-missing` while
+      // ProviderStarted + the fence stay bound to `physical` is that proof: under
+      // the pre-fix code the freeze looked up a synthetic trailing id and refused.
+      assert.equal(
+        recoveryHost.journalExecutionStatus(runtime.journal, blogger, physical).phase,
+        'ProviderStarted',
+        'the start boundary binds ProviderStarted to the original physical message',
+      )
+      assert.equal(executionCount(blogger, physical), 1, 'the original execution keeps its exact capacity fence')
+    } finally {
+      claim.dispose()
+    }
+  })
+})
+
+integrationTest('WHAT[managed-chat-execution-015] a real Host admission failure reaches and settles the real parent join', { timeout: 120000 }, async () => {
+  const script = fileURLToPath(new URL('./support/run-pre-provider-join-smoke.mjs', import.meta.url))
+  await promisify(execFile)(process.execPath, [script], {
+    timeout: 110000, maxBuffer: 4 * 1024 * 1024,
   })
 })
