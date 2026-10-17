@@ -7,6 +7,8 @@ open Wanxiangshu.Repository.Programming.Js
 /// Parse the sandbox JSON string into LlmFacing reference data and enforce JS-010.
 module JsToolsData =
     val parse: json: string -> Result<LlmFacing.Data.Value, JsFailure>
+    val isDelivered: json: string -> bool
+    val parseOutcome: json: string -> Result<LlmFacing.Data.Value, JsFailure>
     val parseParkedPayload: json: string -> obj
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of

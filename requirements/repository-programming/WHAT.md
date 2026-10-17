@@ -279,3 +279,7 @@ ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, 
 ## [053] view 视图声明捕获
 
 每个生成的编程工具接受可选 `view` 参数 `{ prefixUntil, extra }`：捕获发生在工具调用时、进入下一次请求前，写入进程内 ANCHOR 现场表（context-compression [031]），被下一请求消费一次。缺失该参数时行为不变；`extra` 每项是锚点编号或散文值。参数描述由双语资源 `tool/js-program/view-declaration-extra` 提供。
+
+## [054] deliver 显式终值
+
+`deliver(value)` 是生命周期成员，任何生成面无条件携带（与 park 同级）。调用即用该值结束程序：栈展开、不再执行后续语句，终值成为本次调用结果，与 `return` 等价；值必须是 JSON 兼容数据，缺失或非法时以 `INVALID_RETURN_VALUE` 失败。程序捕获内部交付哨兵后可以继续存活，此后的 return 值才是结果——捕获即知情取消。subagent 必须以 deliver 显式结束的强制判定属于会话层级（后续阶段），本期只交付程序级语义。描述与双语资源 `tool/js-program/deliver` 陈述同一契约。

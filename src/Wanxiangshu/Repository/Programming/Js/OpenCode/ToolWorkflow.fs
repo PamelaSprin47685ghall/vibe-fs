@@ -126,6 +126,22 @@ module JsToolsData =
         with _ ->
             Error JsFailure.InvalidReturnValue
 
+    /// `js.deliver(value)` ends the program with an explicit terminal value;
+    /// the sandbox reports it as this sentinel instead of a return value.
+    let private deliveredPrefix = "{\"__jsDelivered\":"
+
+    let isDelivered (json: string) = json.StartsWith deliveredPrefix
+
+    let private parseDelivered (json: string) : Result<LlmFacing.Data.Value, JsFailure> =
+        try
+            ofJsValue ((JS.JSON.parse json)?value)
+        with _ ->
+            Error JsFailure.InvalidReturnValue
+
+    /// One decode for both endings: a delivered value is the program's result.
+    let parseOutcome (json: string) : Result<LlmFacing.Data.Value, JsFailure> =
+        if isDelivered json then parseDelivered json else parse json
+
     /// Extract the payload from a parked sentinel JSON string. The sentinel is
     /// produced by the park signal path; its payload is the value the program
     /// passed to `await js.park(payload)`.
@@ -306,7 +322,7 @@ module JsToolWorkflow =
                             return! JsSandbox.awaitResult handle outputBoundBytes
                         }
 
-                    let! value = JsToolsData.parse resultJson
+                    let! value = JsToolsData.parseOutcome resultJson
                     return value
                 }
 
@@ -495,7 +511,8 @@ module JsToolWorkflow =
                 | Choice1Of2 json ->
                     // The program finished first (Done, or a failure/timeout
                     // sentinel). Decode it like the plain path.
-                    JsSandbox.classifyResult json outputBoundBytes |> Result.bind JsToolsData.parse
+                    JsSandbox.classifyResult json outputBoundBytes
+                    |> Result.bind JsToolsData.parseOutcome
                 | Choice2Of2 _ ->
                     // Park won: the program suspended at `await js.park`.
                     Ok(LlmFacing.Data.Value.String "{\"__jsParked\":true}")
@@ -610,7 +627,7 @@ module JsToolWorkflow =
                         return
                             match decoded with
                             | Error failure -> Error failure
-                            | Ok json -> JsToolsData.parse json
+                            | Ok json -> JsToolsData.parseOutcome json
                     }
                 | Choice2Of2 _ -> task { return Ok(LlmFacing.Data.Value.String "{\"__jsParked\":true}") }
 

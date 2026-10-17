@@ -74,6 +74,7 @@ module JsDescriptionAssets =
           Rm = text lang JsCanonicalDescription.Path.Rm
           Mv = text lang JsCanonicalDescription.Path.Mv
           RunRules = text lang JsCanonicalDescription.Path.RunRules
+          Deliver = text lang JsCanonicalDescription.Path.Deliver
           UltraFraming = text lang JsCanonicalDescription.Path.UltraFraming
           UltraUnavailable = text lang JsCanonicalDescription.Path.UltraUnavailable
           UltraEngineering = text lang JsCanonicalDescription.Path.UltraEngineering

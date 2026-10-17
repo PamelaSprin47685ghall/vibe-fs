@@ -77,6 +77,9 @@ module JsCanonicalDescription =
         val ViewDeclarationExtra: string = "tool/js-program/view-declaration-extra"
 
         [<Literal>]
+        val Deliver: string = "tool/js-program/deliver"
+
+        [<Literal>]
         val UltraFraming: string = "tool/js-program/ultra-framing"
 
         [<Literal>]
@@ -219,6 +222,7 @@ module JsCanonicalDescription =
           Rm: string
           Mv: string
           RunRules: string
+          Deliver: string
           UltraFraming: string
           UltraUnavailable: string
           UltraEngineering: string

@@ -82,6 +82,9 @@ module JsCanonicalDescription =
         let ViewDeclarationExtra = "tool/js-program/view-declaration-extra"
 
         [<Literal>]
+        let Deliver = "tool/js-program/deliver"
+
+        [<Literal>]
         let UltraFraming = "tool/js-program/ultra-framing"
 
         [<Literal>]
@@ -224,6 +227,7 @@ module JsCanonicalDescription =
           Rm: string
           Mv: string
           RunRules: string
+          Deliver: string
           UltraFraming: string
           UltraUnavailable: string
           UltraEngineering: string
@@ -591,6 +595,13 @@ module JsCanonicalDescription =
   }"""
             [ "comment_host_capability", prose.CommentHostCapability ]
 
+    let private deliverStub (prose: Prose) =
+        fill
+            """  async deliver(value) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
     let private runStub (prose: Prose) =
         fill
             """  async run() {
@@ -658,6 +669,7 @@ class JsProgram {"""
               // is not a filesystem permission projection, so it is always
               // present in the base class (PLAN S1 B.17).
               parkStub prose
+              deliverStub prose
               runStub prose ]
 
         String.concat "\n\n" ((runnableOpen capabilities + classOpen) :: methods @ [ "}" ])
@@ -1327,6 +1339,13 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     return await this._api.js.park(payload);
   }"""
                   []
+              fill
+                  """  async deliver(value) {
+    const err = new Error("delivered");
+    err.__jsDelivered = { value: value };
+    throw err;
+  }"""
+                  []
               runStub prose ]
 
         String.concat "\n\n" ((runnableOpen capabilities + classOpen) :: methods @ [ "}" ])
@@ -1453,6 +1472,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
               "```js\n" + baseClass + "\n```"
               rulesFor prose tutorial capabilities
               prose.Park
+              prose.Deliver
               prose.MechanicalSemantic
               ultraBlock
               prose.Footer ]
