@@ -46,7 +46,7 @@ test('WHAT[managed-session-lifecycle-022] CASE_SETTLE_uncommitted_finalize_does_
     assert.equal(settled.ok, false)
     assert.match(String(settled.error), /bookkeeper runtime unavailable/)
 
-    const handle = eventStore.create(dir, 'insp-settle-uncommitted-read')
+    const handle = eventStore.create(join(dir, '.Herdchestra'),'insp-settle-uncommitted-read')
     try {
       const fetched = await casebook.fetchCase(handle, 10, key)
       assert.equal(fetched.ok, true)
@@ -74,7 +74,7 @@ test('WHAT[managed-session-lifecycle-022] archive commits once and duplicate fin
     assert.equal(first.ok, true)
     assert.equal(createCalls.length, 1)
 
-    const handle = eventStore.create(dir, 'insp-settle-read')
+    const handle = eventStore.create(join(dir, '.Herdchestra'),'insp-settle-read')
     try {
       const fetched = await casebook.fetchCase(handle, 10, key)
       assert.equal(fetched.ok, true)
@@ -90,7 +90,7 @@ test('WHAT[managed-session-lifecycle-022] archive commits once and duplicate fin
     assert.match(String(second.error), /already finalized/)
     assert.equal(createCalls.length, 1)
 
-    const reread = eventStore.create(dir, 'insp-settle-reread')
+    const reread = eventStore.create(join(dir, '.Herdchestra'),'insp-settle-reread')
     try {
       const still = await casebook.fetchCase(reread, 10, key)
       assert.equal(still.ok, true)
@@ -274,7 +274,7 @@ const d0Deferred = () => {
   return { promise, resolve }
 }
 const d0EventFiles = directory => {
-  const events = join(directory, '.git', 'wanxiangshu', 'events')
+  const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
   return Object.fromEntries(readdirSync(events).filter(name => name.endsWith('.ndjson'))
     .sort().map(name => [name, readFileSync(join(events, name), 'base64')]))
 }
@@ -366,7 +366,7 @@ test('WHAT[managed-session-lifecycle-022] original child and owner deletion arch
     }
     let completedBookkeeper = false
     try {
-      const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
+      const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
       const resolveDecoyFile = () => {
         const legacy = join(eventsDir, 'd0g-decoy.ndjson')
         if (existsSync(legacy)) return legacy
@@ -469,7 +469,7 @@ test('WHAT[managed-session-lifecycle-022] original child and owner deletion arch
       delete coldEnv.NODE_TEST_CONTEXT
       delete coldEnv.WANXIANGSHU_NO_FATAL_EXIT
       const cold = spawnSync(process.execPath, [fileURLToPath(new URL('./support/deletion-cold-child.mjs', import.meta.url)),
-        join(directory, '.git'), JSON.stringify(request)], { encoding: 'utf8', env: coldEnv })
+        join(directory, '.Herdchestra'), JSON.stringify(request)], { encoding: 'utf8', env: coldEnv })
       assert.equal(cold.signal, null, cold.stderr)
       assert.equal(cold.status, 0, cold.stderr)
       const observation = JSON.parse(cold.stdout.trim())
@@ -492,12 +492,12 @@ test('WHAT[managed-session-lifecycle-022] original child and owner deletion arch
     }
   }, { beforeCreate: async directory => {
     writeFileSync(join(directory, 'd0g-decoy.txt'), decoyText)
-    const handle = eventStore.create(join(directory, '.git'), 'd0g-decoy')
+    const handle = eventStore.create(join(directory, '.Herdchestra'), 'd0g-decoy')
     try {
       const baseline = await casebook.freezeCompletionState(handle, directory, ['d0g-decoy.txt'])
       assert.equal((await casebook.finalizeEngineerCase(handle, decoyIdentity, 'd0g-decoy-trace',
         'D0-G prior decoy question', 'D0-G prior decoy answer', ['d0g-decoy.txt'], baseline)).kind, 'finalized')
-      const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
+      const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
       const decoyFile = existsSync(join(eventsDir, 'd0g-decoy.ndjson'))
         ? join(eventsDir, 'd0g-decoy.ndjson')
         : join(eventsDir, 'd0g-decoy-0000.ndjson')

@@ -138,3 +138,12 @@ Session 收束（`PluginSessionScope.ClearSession`，覆盖宿主 `SessionDelete
 - 禁止后果：不得使用 `ReleaseExecution`/`ReleaseSession` 等 force 路径；不得 session-wide blind release、计数减一或以时间猜测释放；保留未取消时不得宣称归还完成；取消操作不得取消无关的 pending demand 或触碰其他 session 的保留。
 - 失败后果：取消回放对 `AlreadyApplied` 与 `StaleFence` 按幂等结果接受，视同归还完成并清除挂起记录；对 `Conflict` 不得吞没——以带 exact key 信息文本的 `InvalidOperationException` 显式暴露（风格对齐 [026] 的 `SessionRecoveryHost.release`），且暴露时保留挂起记录，使「取消已完成、归还未完成」的状态不被静默吞掉。重复收束幂等：保留已取消时不产生第二次释放副作用；除真实所有权冲突外不抛错。
 - 失败隔离：收束链的任一步失败只隔离该步自身，不得跳过其余独立义务。`ClearSession` 内，Main 自身的结算、保留取消或释放失败不得跳过 linked Attached InternalLeaf 的结算、保留取消与 exact 释放；任一作用域的失败也不得跳过本次收束的无条件 per-session 清理组（registry 条目、quiescence、join-interrupt、companion 等）。`PluginRuntimeScope.DisposeSession` 承接 `ClearSession` 失败后仍必须执行其后续清理组（recovery scope、attempt plan、Blogger parked/episodes、LoopSensor 等）。失败在完成其余义务后仍显式暴露：首个真实失败被保留并在其余义务完成后重新抛出；上一段的真冲突例外语义不因隔离被吞掉或降级。重复收束继续幂等，已消费的失败源不得在第二次收束中再次产生副作用或吞掉新的失败。
+
+## [028] Child 终态结算必须可观察
+
+child run 已在 journal 中证实的 Terminal 事实必须总能转化为一次可观察的 settlement。结算路径的任何故障都不得让父 join 陷入无界等待，也不得只靠 shutdown 取消收场。
+
+- 允许后果：work-record 读取故障时降级为空记录继续结算，已完成的 child 仍写入可 join 的 `CompletedAwaitingJoin`，owner 的 work record 不因读取失败丢失。结算本身故障时，该 run 的唯一 completion promise 以显式 joinable 失败解决，join 消费到明确 outcome（完成、失败或取消），不静默，不搁浅 Source。
+- PERSIST 形态：Source 结算为 PERSIST 失败而 durable work 仍 Active 时，join 经 pending Source 浮现该失败，不挂等 journal revision 前进；未知 durable commit 不放行新工作，durable work 保持 Active，不得伪装成成功或按完成释放。
+- 禁止后果：不得以 work-record 读取失败为由跳过结算或吞掉完成事实；不得让 join 无界等待；不得把未知 durable commit 当作已交付完成。
+- 失败后果：结算故障必须落为显式可 join 的失败事实并保留原始证据，供恢复与取证；不得用空记录、静默或成功文字代替停止保证。

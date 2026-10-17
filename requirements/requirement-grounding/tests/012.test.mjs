@@ -191,7 +191,7 @@ test('WHAT[requirement-grounding-012] separate registered producer and restarted
       assert.deepEqual(replay.projected, receipts.append.projected)
       assert.deepEqual(replay.raw, receipts.append.raw)
     })
-    const eventsDirectory = join(dir, '.git', 'wanxiangshu', 'events')
+    const eventsDirectory = join(dir, '.Herdchestra', 'wanxiangshu', 'events')
     const writer = readdirSync(eventsDirectory).map(name => join(eventsDirectory, name)).find(file => readFileSync(file, 'utf8').split('\n').some(line => line.includes('RequirementGroundingAnchored') && line.includes('what-v1')))
     assert.ok(writer, 'the actual producer wrote a typed grounding occurrence to its durable writer')
     const lines = readFileSync(writer, 'utf8').split('\n')

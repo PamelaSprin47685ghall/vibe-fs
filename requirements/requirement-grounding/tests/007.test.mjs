@@ -115,7 +115,7 @@ const originalMaterials = [
 const originalMaterialCarrier = body => `${body}\n\nrequirement_source_path = "requirements/alpha/WHAT.md"\n`
 
 const sessionHostFacts = (directory, sessionID) => {
-  const events = join(directory, '.git', 'wanxiangshu', 'events')
+  const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
   return readdirSync(events).flatMap(name => readFileSync(join(events, name), 'utf8').split('\n').filter(Boolean).map(JSON.parse))
     .flatMap(event => {
       const fact = event.payload?.Fact
@@ -125,9 +125,9 @@ const sessionHostFacts = (directory, sessionID) => {
 }
 
 const withPresentationJournals = async (directory, body) => {
-  const pairJournal = await pair.createJournal(join(directory, '.git'))
+  const pairJournal = await pair.createJournal(join(directory, '.Herdchestra'))
   assert.equal(pairJournal.ok, true)
-  const groundingJournal = await grounding.createJournal(join(directory, '.git'))
+  const groundingJournal = await grounding.createJournal(join(directory, '.Herdchestra'))
   assert.equal(groundingJournal.ok, true)
   try { return await body(pairJournal.journal, groundingJournal.journal) }
   finally {
@@ -412,7 +412,7 @@ for (const damage of ['missing', 'changed']) {
       assert.equal(captured.hostToolPartId, `part-${damage}`)
       // durable-events-012: the ndjson line is the only payload carrier. Damage
       // means: the content address no longer matches the bytes it names.
-      const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
+      const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
       const writerFile = readdirSync(eventsDir).find((name) => name.endsWith('.ndjson'))
       const writerPath = join(eventsDir, writerFile)
       const lines = readFileSync(writerPath, 'utf8').trimEnd().split('\n')
@@ -439,10 +439,10 @@ for (const damage of ['missing', 'changed']) {
       // history. Neither presentation owner can therefore be handed the evidence,
       // and no boot can smuggle the damaged line into a fold.
       const expected =
-        damage === 'missing' ? /missing durable inline payload/ : /durable inline payload digest mismatch/
+        damage === 'missing' ? /MissingPayload/ : /payload digest mismatch/
       for (const [owner, open] of [
-        ['pair', () => pair.createJournal(join(directory, '.git'))],
-        ['grounding', () => grounding.createJournal(join(directory, '.git'))],
+        ['pair', () => pair.createJournal(join(directory, '.Herdchestra'))],
+        ['grounding', () => grounding.createJournal(join(directory, '.Herdchestra'))],
       ]) {
         await assert.rejects(
           open,
