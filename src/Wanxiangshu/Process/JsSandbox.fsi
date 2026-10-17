@@ -55,6 +55,10 @@ module JsSandbox =
 
     val awaitResult: handle: JsRunHandle -> outputBoundBytes: int -> Task<Result<string, JsFailure>>
 
+    /// Classify an already-awaited wrapper JSON string (sentinel prefixes and
+    /// output bound) without awaiting the program promise again.
+    val classifyResult: json: string -> outputBoundBytes: int -> Result<string, JsFailure>
+
     val resetDeadline: handle: JsRunHandle -> deadlineEpochMs: int64 -> unit
 
     /// Mark the suspended model-source line with `>| ` (others ` | `).

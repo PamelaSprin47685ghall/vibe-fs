@@ -63,6 +63,12 @@ type JsFailure =
     | HandleUnknown of string
     | CannotParkWhileAbandoning
     | Abandoned
+    | RunnableSpecIncomplete of string
+    | RunCommandUnsupported of string
+    | RunWaitTimeout
+    | RunChildUnknown of string
+    | RunParkUnsupported
+    | RunHostUnavailable
 
 module JsFailure =
     val code: failure: JsFailure -> string

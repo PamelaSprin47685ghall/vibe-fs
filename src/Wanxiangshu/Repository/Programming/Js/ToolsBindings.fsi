@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open System.Threading.Tasks
+
 /// JS-010/JS-016: the api object injected into the sandbox — the only
 /// authority a model program sees. Every member returns a JSON-compatible
 /// object; failures carry `{ ok: false, code, reason }` with stable codes
@@ -7,6 +9,10 @@ namespace Wanxiangshu.Repository.Programming.Js
 /// through MutationFs at call time; the staging buffer records what was
 /// actually written (JS-012).
 module JsToolsBindings =
+    /// The host loop behind `js.run`, injected by the workflow.
+    type JsRunHost =
+        { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }
+
     val createLedger: persistence: IJsTransactionPersistence option -> JsAsIsLedger
 
     val createApi:
@@ -16,6 +22,7 @@ module JsToolsBindings =
         readSnapshots: ResizeArray<JsReadSnapshot> ->
         explicitReads: ResizeArray<JsExplicitFileRead> ->
         ledger: JsAsIsLedger ->
+        runHost: JsRunHost option ->
             obj
 
     /// Build the api object for one sandbox run that carries a park lifecycle
@@ -29,4 +36,5 @@ module JsToolsBindings =
         explicitReads: ResizeArray<JsExplicitFileRead> ->
         ledger: JsAsIsLedger ->
         parkState: Wanxiangshu.Process.JsSandbox.ParkState ->
+        runHost: JsRunHost option ->
             obj

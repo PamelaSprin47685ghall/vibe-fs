@@ -95,7 +95,13 @@ module JsTransactionSurface =
            JsFailure.TransactionPrepareFailed, "TransactionPrepareFailed"
            JsFailure.TransactionCommitFailed, "TransactionCommitFailed"
            JsFailure.TransactionRecoveryRequired, "TransactionRecoveryRequired"
-           JsFailure.UnknownMember, "UnknownMember" |]
+           JsFailure.UnknownMember, "UnknownMember"
+           JsFailure.RunnableSpecIncomplete "missing check", "RunnableSpecIncomplete"
+           JsFailure.RunCommandUnsupported "next() returned an object", "RunCommandUnsupported"
+           JsFailure.RunWaitTimeout, "RunWaitTimeout"
+           JsFailure.RunChildUnknown "srv", "RunChildUnknown"
+           JsFailure.RunParkUnsupported, "RunParkUnsupported"
+           JsFailure.RunHostUnavailable, "RunHostUnavailable" |]
         |> Array.map (fun (failure, name) ->
             box
                 {| name = name

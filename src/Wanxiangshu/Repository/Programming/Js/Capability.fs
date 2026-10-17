@@ -14,6 +14,8 @@ type JsCapability =
     | Grep
     | Move
     | Remove
+    /// Host-owned long-running command engineering (`js.run`).
+    | Exec
     | Park
 
 module JsCapability =
@@ -29,6 +31,7 @@ module JsCapability =
         | ToolPermission.Grep -> Some JsCapability.Grep
         | ToolPermission.Move -> Some JsCapability.Move
         | ToolPermission.Remove -> Some JsCapability.Remove
+        | ToolPermission.Exec -> Some JsCapability.Exec
         | _ -> None
 
     let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
@@ -296,6 +299,32 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.where" }
 
+    let run: JsCapabilityFragment =
+        { Capability = JsCapability.Exec
+          MemberName = "run"
+          Signature = "async run(RunnableClass)"
+          Description =
+            "run(class extends js.Runnable { ... }) — the host-owned engineering loop. "
+            + "The class must declare a positive maxDuration, next(ctx) and check(ctx); "
+            + "the host runs each command, calls check once per interval slice, dispatches "
+            + "onExit and enforces maxDuration. Returns "
+            + "{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    return await js.run(class extends js.Runnable {\n"
+            + "      maxDuration = 60000;\n"
+            + "      async next(ctx) {\n"
+            + "        return ctx.step === 0 ? \"echo hello\" : null;\n"
+            + "      }\n"
+            + "      check(ctx) {\n"
+            + "        return ctx.exited && ctx.exitCode !== 0 ? { abort: \"command failed\" } : true;\n"
+            + "      }\n"
+            + "    });\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.run" }
+
     /// park fragment — the pause/resume mechanism (PLAN S1 B.7/B.17). Unlike
     /// the filesystem members this is not a ToolPermission projection: it is a
     /// lifecycle capability every js-* surface carries. The runtime binding is
@@ -335,6 +364,7 @@ module JsFragmentRegistry =
           mkdir
           whereAll
           where
+          run
           park ]
 
     let byCapability: Map<JsCapability, JsCapabilityFragment list> =

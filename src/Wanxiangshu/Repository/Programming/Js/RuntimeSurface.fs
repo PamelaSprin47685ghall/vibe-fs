@@ -31,6 +31,7 @@ module JsRuntimeSurface =
                   JsCapability.Grep
                   JsCapability.Move
                   JsCapability.Remove
+                  JsCapability.Exec
                   JsCapability.Park ]
 
         let api =
@@ -41,6 +42,7 @@ module JsRuntimeSurface =
                 readSnapshots
                 (ResizeArray<JsExplicitFileRead>())
                 (JsToolsBindings.createLedger None)
+                None
 
         box (JsBindingsHandle(api, staging, readSnapshots))
 
@@ -53,6 +55,7 @@ module JsRuntimeSurface =
         | "Grep" -> Some JsCapability.Grep
         | "Move" -> Some JsCapability.Move
         | "Remove" -> Some JsCapability.Remove
+        | "Exec" -> Some JsCapability.Exec
         | "Park" -> Some JsCapability.Park
         | _ -> None
 
@@ -70,6 +73,7 @@ module JsRuntimeSurface =
                 readSnapshots
                 (ResizeArray<JsExplicitFileRead>())
                 (JsToolsBindings.createLedger None)
+                None
 
         box (JsBindingsHandle(api, staging, readSnapshots))
 

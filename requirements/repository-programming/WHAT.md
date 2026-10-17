@@ -253,3 +253,25 @@ rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INV
 parked 载荷的 `source` 字段携带完整程序与执行点标记（[037]）。直接 `park` 与 `where` 歧义都经同一挂起路径产生 source；恢复后再次 park 产生新的 handle 与新的 source。source 行标记按 vm 栈换算，解析失败时降级而不是失败。
 
 `unpark.value` 的 host schema 是任意 JSON 值（可选），执行端零校验；注入值的语义由 park 点定义，错误注入由下游自然失败。工具描述与 `tool/js-program/park` 资源明确这一责任边界。
+
+## [050] js.run：宿主拥有的工程执行循环
+
+Exec capability 投影出 `run` 成员与全局 `js.Runnable`。模型写成 `await js.run(class extends js.Runnable { ... })`；控制流归宿主：宿主实例化类、校验规格、执行命令、按时间片调用 `check`、派发 `onExit`、执行 `maxDuration` 上界，模型只写语义回调。
+
+必选 `maxDuration`（正数毫秒）、`next(ctx)`、`check(ctx)`；缺任一以 `RUNNABLE_SPEC_INCOMPLETE` 失败。可选 `interval`（默认 10000ms，下限钳制）、`onExit(result)`、`onTimeout`。`check` 是规格的一部分，因此 watchdog 不可能被绕过。
+
+`next(ctx)` 返回代数：命令字符串（前台跑到退出）| `null`（完工）| `{ spawn, name }`（后台进程，立即继续）| `{ signal, name }`（向该后台发送 `signal`，默认 SIGTERM；2 秒后仍存活则 SIGKILL）| `{ waitFor: { port, timeoutMs } }`（等到 TCP 端口可连接）。其他形态以 `RUN_COMMAND_UNSUPPORTED` 失败；`waitFor` 超时以 `RUN_WAIT_TIMEOUT` 失败；`signal` 指向未知后台以 `RUN_CHILD_UNKNOWN` 失败。
+
+`check(ctx)` 每片返回 continue（无返回/true）、`{ abort: reason }` 或 `{ park: payload }`。park 走与 `js.park` 相同的挂起通道（载荷与 source 执行点同样登记）；恢复值 `'abort'` 中止，其余继续。合法的 abort/timeout SIGKILL 前台命令；运行结束时全部后台进程被杀死。park 裁决需要编排执行路径，缺 park 通道时以 `RUN_PARK_UNSUPPORTED` 失败，不静默降级。
+
+ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, stderr, exited, exitCode, backgrounds, elapsedMs, remainingMs }`，`stdout`/`stderr` 是本片增量，`backgrounds` 是 `{ name, exited, exitCode }` 数组。成功结局是结构化对象 `{ ok, status: completed|aborted|timeout, exitCode, stdout, stderr, truncated, bytes, durationMs }`；host 失败经 `__jsFailure` 哨兵成为程序的稳定失败码，而不是数据。
+
+每路输出保留至多 256 KiB（前 128 KiB 加后 128 KiB），`truncated` 为真并如实报告总字节数；磁盘不回滚，剧本（如 `wget -c`）自行幂等。
+
+## [051] js.run 的多进程形态
+
+`spawn` 起的后台进程进入本次 run 的进程表，`check` 的 `backgrounds` 观察面报告其 exited/exitCode；`signal` 收割命名后台；run 结束时兜底 SIGKILL 全部后台。`waitFor` 期间宿主仍按片调用 `check`，后台崩溃可被观察并触发 abort。
+
+## [052] js.run 教学与验证形态
+
+双语资源 `tool/js-program/run-rules` 与 `tool/js-program/ultra-devops`（wget 批量下载 Ultra Example）成对；示例覆盖断点续传、停滞/过慢检测、退出码分派与逐文件 park 汇报。测试以本地限速 Range 服务器真实驱动 `wget -c`：中断后恢复、部分文件保留、逐文件 park/unpark、404 退出码 8 分派给 `onExit`。

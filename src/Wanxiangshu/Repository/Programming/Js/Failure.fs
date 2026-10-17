@@ -68,6 +68,12 @@ type JsFailure =
     | HandleUnknown of string
     | CannotParkWhileAbandoning
     | Abandoned
+    | RunnableSpecIncomplete of string
+    | RunCommandUnsupported of string
+    | RunWaitTimeout
+    | RunChildUnknown of string
+    | RunParkUnsupported
+    | RunHostUnavailable
 
 module JsFailure =
 
@@ -129,6 +135,12 @@ module JsFailure =
         | JsFailure.HandleUnknown _ -> "HANDLE_UNKNOWN"
         | JsFailure.CannotParkWhileAbandoning -> "CANNOT_PARK_WHILE_ABANDONING"
         | JsFailure.Abandoned -> "ABANDONED"
+        | JsFailure.RunnableSpecIncomplete _ -> "RUNNABLE_SPEC_INCOMPLETE"
+        | JsFailure.RunCommandUnsupported _ -> "RUN_COMMAND_UNSUPPORTED"
+        | JsFailure.RunWaitTimeout -> "RUN_WAIT_TIMEOUT"
+        | JsFailure.RunChildUnknown _ -> "RUN_CHILD_UNKNOWN"
+        | JsFailure.RunParkUnsupported -> "RUN_PARK_UNSUPPORTED"
+        | JsFailure.RunHostUnavailable -> "RUN_HOST_UNAVAILABLE"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
     let private reasonWithMessage fallback prefix message =
@@ -185,6 +197,12 @@ module JsFailure =
         | JsFailure.HandleUnknown handle -> "no parked site with this handle: " + handle
         | JsFailure.CannotParkWhileAbandoning -> "park is refused while the site is in its abandon cleanup window"
         | JsFailure.Abandoned -> "the parked program was abandoned; its finalizer has run"
+        | JsFailure.RunnableSpecIncomplete detail -> reasonWithMessage "Runnable spec is incomplete" "" detail
+        | JsFailure.RunCommandUnsupported detail -> reasonWithMessage "next() returned an unsupported command" "" detail
+        | JsFailure.RunWaitTimeout -> "waitFor condition was not met before its timeout"
+        | JsFailure.RunChildUnknown name -> "no background process with this name: " + name
+        | JsFailure.RunParkUnsupported -> "park verdict requires the orchestrated execution path"
+        | JsFailure.RunHostUnavailable -> "js.run has no host loop in this execution path"
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
     let render (failure: JsFailure) : string =
@@ -246,4 +264,10 @@ module JsFailure =
         | "HANDLE_UNKNOWN" -> JsFailure.HandleUnknown(after "no parked site with this handle: ")
         | "CANNOT_PARK_WHILE_ABANDONING" -> JsFailure.CannotParkWhileAbandoning
         | "ABANDONED" -> JsFailure.Abandoned
+        | "RUNNABLE_SPEC_INCOMPLETE" -> JsFailure.RunnableSpecIncomplete text
+        | "RUN_COMMAND_UNSUPPORTED" -> JsFailure.RunCommandUnsupported text
+        | "RUN_WAIT_TIMEOUT" -> JsFailure.RunWaitTimeout
+        | "RUN_CHILD_UNKNOWN" -> JsFailure.RunChildUnknown(after "no background process with this name: ")
+        | "RUN_PARK_UNSUPPORTED" -> JsFailure.RunParkUnsupported
+        | "RUN_HOST_UNAVAILABLE" -> JsFailure.RunHostUnavailable
         | _ -> JsFailure.ProgramFailed text

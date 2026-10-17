@@ -24,6 +24,10 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 `rm`/`mv` 由 Remove/Move capability 投影，与 edit/write 同属 as-is 逐笔落盘路径：rm 删文件或空目录，mv 按 POSIX 语义移动或重命名并支持覆盖。越界报 `PATH_DENIED` 且源存活；成功渲染报 `removed = [...]` 与 `moved = ["from -> to"]`。每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影。
 
+## js.run 工程执行循环（WHAT[repository-programming-050]、[051]、[052]）
+
+Exec capability 投影出 `run` 成员与全局 `js.Runnable`。模型写 `await js.run(class extends js.Runnable { ... })`；宿主拥有循环：校验规格（`maxDuration`/`next`/`check` 缺一即 `RUNNABLE_SPEC_INCOMPLETE`）、执行命令、按 `interval` 时间片调用 `check`、派发 `onExit`、执行 `maxDuration` 上界。`check` 可 `{ abort }` 或 `{ park }`；park 走与 `js.park` 相同的挂起通道与 source 标记，恢复值 `'abort'` 中止。`next` 支持命令字符串/`null`/`{ spawn, name }`/`{ signal, name }`/`{ waitFor: { port, timeoutMs } }`；后台进程在 `check` 的 `backgrounds` 观察面可见，run 结束时全部 SIGKILL。成功结局是 `{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }`；每路输出保留头尾各 128 KiB 并如实报总字节。host 失败经 `__jsFailure` 哨兵成为稳定失败码。双语教学在 `tool/js-program/run-rules`，wget Ultra Example 在 `tool/js-program/ultra-devops`。
+
 ## 持久化机制（WHAT[repository-programming-012]、[013]、[015]、[019]、[029]）
 
 as-is 逐笔落盘：每笔 `edit`/`write` 调用即经 MutationFs 单笔原子落盘，跨笔不回滚；程序以任何方式终止时，已落盘改动保持为事实分界线，失败结果如实附已落盘清单（`# failed` 加 `[fs]`），无落盘改动时不附 fs 节。

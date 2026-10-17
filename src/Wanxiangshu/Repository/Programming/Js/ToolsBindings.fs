@@ -45,6 +45,12 @@ module JsToolsBindings =
     [<Emit("new Error().stack")>]
     let private currentStack () : string = jsNative
 
+    /// `js.run` returns a structured outcome; a host failure must surface as a
+    /// decoded js failure, so reject the promise with the `__jsFailure`
+    /// sentinel the wrapper classifies instead of returning ok:false as data.
+    [<Emit("Promise.resolve($0).then(function(value) { if (value && value.ok === false) { const err = new Error(value.reason || value.code); err.__jsFailure = { code: value.code, reason: value.reason || value.code }; throw err; } return value; })")>]
+    let private rejectRunFailure (promise: obj) : obj = jsNative
+
     /// A span must cross the vm boundary as a plain JS array, not a typed
     /// array: the parked payload is JSON round-tripped, and a typed array
     /// serializes to an object with numeric keys.
@@ -710,6 +716,23 @@ module JsToolsBindings =
     let private makeParkMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
         "park" ==> fun (payload: obj) -> suspend parkState payload
 
+    /// The host loop behind `js.run`. The closure is injected by the workflow
+    /// (Process.JsRunLoop) so this module stays free of process interop.
+    type JsRunHost =
+        { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }
+
+    /// `js.run(class extends js.Runnable { ... })`: hand the class to the host
+    /// loop and await its structured outcome. Without an injected host loop
+    /// the member refuses with RUN_HOST_UNAVAILABLE instead of pretending.
+    let private makeRunMember (host: JsRunHost option) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
+        let settled =
+            fun (runnableClass: obj) ->
+                match host with
+                | Some injected -> box (injected.Loop parkState runnableClass (currentStack ()))
+                | None -> box (task { return failureObj JsFailure.RunHostUnavailable })
+
+        "run" ==> fun (runnableClass: obj) -> rejectRunFailure (settled runnableClass)
+
     let private createApiCore
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -718,6 +741,7 @@ module JsToolsBindings =
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        (runHost: JsRunHost option)
         : obj =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
@@ -747,6 +771,9 @@ module JsToolsBindings =
               if Set.contains JsCapability.Move capabilities then
                   makeMvMember root staging readSnapshots ledger
 
+              if Set.contains JsCapability.Exec capabilities then
+                  makeRunMember runHost parkState
+
               match parkState with
               | Some state -> makeParkMember state
               | None -> () ]
@@ -765,8 +792,9 @@ module JsToolsBindings =
         (readSnapshots: ResizeArray<JsReadSnapshot>)
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
+        (runHost: JsRunHost option)
         : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads ledger None
+        createApiCore capabilities root staging readSnapshots explicitReads ledger None runHost
 
     /// Build the api object for one sandbox run that carries a park lifecycle
     /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
@@ -779,5 +807,6 @@ module JsToolsBindings =
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
+        (runHost: JsRunHost option)
         : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads ledger (Some parkState)
+        createApiCore capabilities root staging readSnapshots explicitReads ledger (Some parkState) runHost

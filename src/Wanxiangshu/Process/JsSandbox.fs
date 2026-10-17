@@ -106,6 +106,8 @@ module JsSandbox =
         "(async () => {\n"
         + baseClassSource
         + "\n"
+        + "const js = api.js;\n"
+        + "if (typeof JsRunnable === 'function') { js.Runnable = JsRunnable; }\n"
         + modelSource
         + "\n"
         + "const __wrap = (target) => new Proxy(target, {\n"
@@ -280,6 +282,13 @@ module JsSandbox =
                 return Error(classifySyncError ex)
         }
 
+    /// Classify one already-awaited wrapper JSON string (sentinel prefixes and
+    /// output bound) without re-awaiting the program promise. The park race
+    /// uses this so a program failure on the raced path decodes exactly like
+    /// the plain path.
+    let classifyResult (json: string) (outputBoundBytes: int) : Result<string, JsFailure> =
+        decodeRunResult json outputBoundBytes
+
     /// Reset the async deadline of an in-flight sandbox program. Subsequent api
     /// member calls re-check `deadlineRef.current`, so the new epoch takes
     /// effect without re-wrapping or re-running the program.
@@ -295,7 +304,9 @@ module JsSandbox =
     /// stack degrades to ` | ` on every line, never to a failed park.
     let sourceWithExecutionMarker (baseClassSource: string) (modelSource: string) (stack: string) : string =
         let lines = modelSource.Split('\n')
-        let modelStartLine = baseClassSource.Split('\n').Length + 2
+        // Wrapper lines: 1 = "(async () => {", then the base class, then the
+        // `const js = api.js;` prelude and the optional JsRunnable bind.
+        let modelStartLine = baseClassSource.Split('\n').Length + 4
         let modelEndLine = modelStartLine + lines.Length - 1
         let mutable currentLine = -1
 

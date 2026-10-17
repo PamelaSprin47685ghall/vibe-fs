@@ -100,7 +100,7 @@ test('WHAT[repository-programming-043] JsFragmentRegistry carries the rm/mv frag
   assert.ok(allBlock, 'the fragment registry must declare the canonical member list')
   assert.deepEqual(
     allBlock[1].split(/\s+/).filter(Boolean),
-    ['read', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where', 'park'],
+    ['read', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where', 'run', 'park'],
   )
 })
 

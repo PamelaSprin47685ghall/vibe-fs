@@ -71,6 +71,9 @@ module JsCanonicalDescription =
         val Mv: string = "tool/js-program/mv"
 
         [<Literal>]
+        val RunRules: string = "tool/js-program/run-rules"
+
+        [<Literal>]
         val UltraFraming: string = "tool/js-program/ultra-framing"
 
         [<Literal>]
@@ -212,6 +215,7 @@ module JsCanonicalDescription =
           MutationRules: string
           Rm: string
           Mv: string
+          RunRules: string
           UltraFraming: string
           UltraUnavailable: string
           UltraEngineering: string

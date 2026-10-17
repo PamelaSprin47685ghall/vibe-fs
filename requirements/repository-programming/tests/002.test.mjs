@@ -61,6 +61,7 @@ const MEMBERS_BY_PERMISSION = {
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
+  Exec: ['run'],
 }
 
 const BINDING_BY_MEMBER = {
@@ -78,11 +79,13 @@ const BINDING_BY_MEMBER = {
   mkdir: 'js.mkdir',
   whereAll: 'js.whereAll',
   where: 'js.where',
+  run: 'js.run',
 }
 
 const MEMBER_ORDER = [
   'file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv',
   'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
+  'run',
 ]
 
 const layersOf = (s) =>

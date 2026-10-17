@@ -76,6 +76,9 @@ module JsCanonicalDescription =
         let Mv = "tool/js-program/mv"
 
         [<Literal>]
+        let RunRules = "tool/js-program/run-rules"
+
+        [<Literal>]
         let UltraFraming = "tool/js-program/ultra-framing"
 
         [<Literal>]
@@ -217,6 +220,7 @@ module JsCanonicalDescription =
           MutationRules: string
           Rm: string
           Mv: string
+          RunRules: string
           UltraFraming: string
           UltraUnavailable: string
           UltraEngineering: string
@@ -598,6 +602,15 @@ module JsCanonicalDescription =
 class JsProgram {"""
             .TrimStart()
 
+    /// `js.Runnable` exists exactly when the Exec capability is projected; the
+    /// wrapper binds the class onto the global `js` namespace before the model
+    /// source runs.
+    let private runnableOpen (capabilities: Set<JsCapability>) =
+        if has capabilities JsCapability.Exec then
+            "class JsRunnable {}\n\n"
+        else
+            ""
+
     let private publicReadSource =
         """
     const source = await HOST_READ_IMMUTABLE_UTF8_SNAPSHOT(path);"""
@@ -632,13 +645,19 @@ class JsProgram {"""
                   rmStub prose
               if has capabilities JsCapability.Move then
                   mvStub prose
+              if has capabilities JsCapability.Exec then
+                  fill
+                      """  async run(RunnableClass) {
+    // {{comment_host_capability}}
+  }"""
+                      [ "comment_host_capability", prose.CommentHostCapability ]
               // park is a lifecycle capability every js-* surface carries; it
               // is not a filesystem permission projection, so it is always
               // present in the base class (PLAN S1 B.17).
               parkStub prose
               runStub prose ]
 
-        String.concat "\n\n" (classOpen :: methods @ [ "}" ])
+        String.concat "\n\n" ((runnableOpen capabilities + classOpen) :: methods @ [ "}" ])
 
     let private rethrowHost =
         """if (result && result.ok === false) {
@@ -1307,7 +1326,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                   []
               runStub prose ]
 
-        String.concat "\n\n" (classOpen :: methods @ [ "}" ])
+        String.concat "\n\n" ((runnableOpen capabilities + classOpen) :: methods @ [ "}" ])
 
     let private contractFor
         (prose: Prose)
@@ -1335,7 +1354,8 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                   if has capabilities JsCapability.Write then
                       [ prose.VerbCreate; "mkdir" ]
                   else
-                      [] ]
+                      []
+                  if has capabilities JsCapability.Exec then [ "run" ] else [] ]
             |> String.concat ", "
 
         let parallelTemplate =
@@ -1374,6 +1394,8 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                   prose.Rm
               if has capabilities JsCapability.Move then
                   prose.Mv
+              if has capabilities JsCapability.Exec then
+                  prose.RunRules
               if has capabilities JsCapability.Edit || has capabilities JsCapability.Write then
                   prose.MutationRules ]
 

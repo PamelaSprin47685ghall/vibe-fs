@@ -39,6 +39,12 @@ test('WHAT[repository-programming-018] JS019_failure_codes_are_stable_and_unique
     'TRANSACTION_COMMIT_FAILED',
     'TRANSACTION_RECOVERY_REQUIRED',
     'UNKNOWN_MEMBER',
+    'RUNNABLE_SPEC_INCOMPLETE',
+    'RUN_COMMAND_UNSUPPORTED',
+    'RUN_WAIT_TIMEOUT',
+    'RUN_CHILD_UNKNOWN',
+    'RUN_PARK_UNSUPPORTED',
+    'RUN_HOST_UNAVAILABLE',
   ]
   const cases = failureCatalog()
   assert.equal(cases.length, expectedCodes.length)

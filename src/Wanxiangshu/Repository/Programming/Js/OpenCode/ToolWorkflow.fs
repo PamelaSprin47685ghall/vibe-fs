@@ -284,8 +284,19 @@ module JsToolWorkflow =
 
             let! outcome =
                 taskResult {
+                    let runHost: JsToolsBindings.JsRunHost =
+                        { Loop =
+                            fun parkState runnableClass stack -> JsRunLoop.execute parkState root runnableClass stack }
+
                     let api =
-                        JsToolsBindings.createApi capabilities root staging readSnapshots explicitReads ledger
+                        JsToolsBindings.createApi
+                            capabilities
+                            root
+                            staging
+                            readSnapshots
+                            explicitReads
+                            ledger
+                            (Some runHost)
 
                     let! resultJson =
                         task {
@@ -441,7 +452,18 @@ module JsToolWorkflow =
                   AbandonRequested = false }
 
             let api =
-                JsToolsBindings.createApiWithPark capabilities root staging readSnapshots explicitReads ledger parkState
+                let runHost: JsToolsBindings.JsRunHost =
+                    { Loop = fun parkState runnableClass stack -> JsRunLoop.execute parkState root runnableClass stack }
+
+                JsToolsBindings.createApiWithPark
+                    capabilities
+                    root
+                    staging
+                    readSnapshots
+                    explicitReads
+                    ledger
+                    parkState
+                    (Some runHost)
 
             // Install the park signal the workflow races against the program
             // promise before the program starts: the async IIFE body runs
@@ -473,7 +495,7 @@ module JsToolWorkflow =
                 | Choice1Of2 json ->
                     // The program finished first (Done, or a failure/timeout
                     // sentinel). Decode it like the plain path.
-                    JsToolsData.parse json
+                    JsSandbox.classifyResult json outputBoundBytes |> Result.bind JsToolsData.parse
                 | Choice2Of2 _ ->
                     // Park won: the program suspended at `await js.park`.
                     Ok(LlmFacing.Data.Value.String "{\"__jsParked\":true}")
