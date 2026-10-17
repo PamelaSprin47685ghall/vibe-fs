@@ -143,77 +143,6 @@ module JsToolsData =
 /// Prepared BEFORE any filesystem effect and Committed AFTER, so crash
 /// recovery can undo only what was provably written.
 
-/// Module-level parked-site table (PLAN S2 step 3, algorithms C/D/E/F/G).
-/// The table is a process-live object: it resets on restart, never touches
-/// durable storage, and consumes each handle exactly once with no tombstone.
-module JsParkedSites =
-
-    /// A parked site: the in-flight sandbox run handle (whose closure chain
-    /// holds the vm context and whose DeadlineRef is resettable), the read
-    /// snapshots for write-before checks, the session owner, and the Parked
-    /// state.
-    type JsParkedSite =
-        { Handle: string
-          RunHandle: Wanxiangshu.Process.JsSandbox.JsRunHandle
-          ReadSnapshots: ResizeArray<JsReadSnapshot>
-          SessionId: string }
-
-    /// Concurrency ceiling for parked sites (PLAN S2 step 3: default 8).
-    let concurrencyLimit = 8
-
-    // DSL-MUTABLE: resource — process-live parked-site table. Reset on
-    // restart by construction (module state); handles are consumed once.
-    let private table = System.Collections.Generic.Dictionary<string, JsParkedSite>()
-    let private mutable nextHandle = 0
-
-    /// Allocate a monotonically increasing process-unique handle (algorithm C2).
-    let allocateHandle () : string =
-        nextHandle <- nextHandle + 1
-        sprintf "park-%d" nextHandle
-
-    /// Register a parked site under its handle. Refuses with CONCURRENCY_LIMIT
-    /// when the table already holds `concurrencyLimit` sites (no queue).
-    let register (site: JsParkedSite) : Result<string, JsFailure> =
-        if table.Count >= concurrencyLimit then
-            Error JsFailure.ConcurrencyLimit
-        else
-            table.[site.Handle] <- site
-            Ok site.Handle
-
-    /// Look up a parked site by handle.
-    let tryFind (handle: string) : JsParkedSite option =
-        match table.TryGetValue handle with
-        | true, site -> Some site
-        | false, _ -> None
-
-    /// Remove a parked site (one-shot consumption; no tombstone).
-    let remove (handle: string) : unit =
-        table.Remove handle |> ignore
-
-    /// Algorithm G1/G2: all unresolved parked handles (deliver gate + PairHint).
-    let parkedHandles () : string list =
-        table.Keys |> Seq.toList |> List.sort
-
-    /// Algorithm F/G3: abandon every parked site owned by the session. The
-    /// ABANDONED rejection unwinds each program's stack so native try/finally
-    /// runs; the site is then removed. Durable Reaped audit is the caller's
-    /// responsibility (PluginSessionScope records it).
-    let reapSession (sessionId: string) : Task =
-        task {
-            let owned =
-                table.Values
-                |> Seq.filter (fun site -> site.SessionId = sessionId)
-                |> Seq.toList
-
-            for site in owned do
-                Wanxiangshu.Process.JsSandbox.abandon site.RunHandle.ParkState
-                remove site.Handle
-        }
-
-    /// Test hook: clear the whole table.
-    let clearAll () : unit =
-        table.Clear()
-
 module JsToolWorkflow =
 
     type FileAccessObservation = JsExplicitFileRead list -> string list -> Task<unit>
@@ -226,6 +155,13 @@ module JsToolWorkflow =
         | Succeeded of value: LlmFacing.Data.Value * rewritten: string list * created: string list * removed: string list * moved: (string * string) list
         | Failed of failure: JsFailure * rewritten: string list * created: string list * removed: string list * moved: (string * string) list
         | Parked of handle: string * payload: obj
+
+    /// The park payload is created inside the sandbox realm; the host reads it
+    /// from ParkState across the vm boundary. A JSON round-trip detaches the
+    /// value from the vm prototypes so host-side consumers and semantic tests
+    /// compare it structurally as a plain host-realm object.
+    [<Emit("JSON.parse(JSON.stringify($0))")>]
+    let private hostRealmPayload (payload: obj) : obj = jsNative
 
     let private rewrittenPaths (mutations: JsStagedMutation list) =
         mutations
@@ -432,6 +368,29 @@ module JsToolWorkflow =
             persistence
             (Some fileAccessObservation)
 
+    /// Best-effort lifecycle audit trace. A failed audit never fails the tool
+    /// call: the parked site is process-live and the audit is only a trace.
+    let private recordLifecycle
+        (lifecyclePersistence: IJsLifecyclePersistence option)
+        (eventType: JsLifecycleEventType)
+        (handle: string)
+        (sessionId: string)
+        : unit =
+        match lifecyclePersistence with
+        | None -> ()
+        | Some durable ->
+            let event: JsLifecycleEvent =
+                { EventType = eventType
+                  Handle = handle
+                  SessionId = sessionId
+                  At = System.DateTimeOffset.UtcNow.ToString("o") }
+
+            task {
+                let! _ = durable.AppendLifecycleEvent event
+                return ()
+            }
+            |> ignore
+
     /// Run a new program with park support. `sessionId` tags the site so
     /// session close can reap it. The park signal is installed before the
     /// program starts; if the program suspends at `await js.park(payload)` the
@@ -473,6 +432,14 @@ module JsToolWorkflow =
             let api =
                 JsToolsBindings.createApiWithPark capabilities root staging readSnapshots explicitReads parkState
 
+            // Install the park signal the workflow races against the program
+            // promise before the program starts: the async IIFE body runs
+            // synchronously to its first await, so an immediate
+            // `await js.park(payload)` must already see ParkSignalResolve.
+            // Fable has no Task.WhenAny; Promise.race is the established
+            // pattern (Await.fs / FinalityController).
+            let parkSignal = JsSandbox.installParkSignal parkState
+
             let! runHandle =
                 JsSandbox.runSurfaceWithPark
                     baseClassSource
@@ -481,11 +448,6 @@ module JsToolWorkflow =
                     deadlineMs
                     deadlineEpochMs
                     (Some parkState)
-
-            // Install the park signal the workflow races against the program
-            // promise. Fable has no Task.WhenAny; Promise.race is the
-            // established pattern (Await.fs / FinalityController).
-            let parkSignal = JsSandbox.installParkSignal parkState
 
             let taggedProgram: Task<obj> =
                 task {
@@ -551,7 +513,7 @@ module JsToolWorkflow =
                 | Ok _ ->
                     // Record the Parked audit trace (best-effort; algorithm H3).
                     recordLifecycle lifecyclePersistence JsLifecycleEventType.Parked handle sessionId
-                    return Parked(handle, parkState.ParkPayload)
+                    return Parked(handle, hostRealmPayload parkState.ParkPayload)
             | Ok value ->
                 if not hasMutationCapability && not (List.isEmpty mutations) then
                     return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
@@ -567,29 +529,6 @@ module JsToolWorkflow =
                         | Error failure -> return Failed(failure, rewritten, created, removed, moved)
                         | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
         }
-
-    /// Best-effort lifecycle audit trace. A failed audit never fails the tool
-    /// call: the parked site is process-live and the audit is only a trace.
-    let private recordLifecycle
-        (lifecyclePersistence: IJsLifecyclePersistence option)
-        (eventType: JsLifecycleEventType)
-        (handle: string)
-        (sessionId: string)
-        : unit =
-        match lifecyclePersistence with
-        | None -> ()
-        | Some durable ->
-            let event: JsLifecycleEvent =
-                { EventType = eventType
-                  Handle = handle
-                  SessionId = sessionId
-                  At = System.DateTimeOffset.UtcNow.ToString("o") }
-
-            task {
-                let! _ = durable.AppendLifecycleEvent event
-                return ()
-            }
-            |> ignore
 
     /// Resume a parked site (algorithm E). `handle` must exist; the deferred
     /// promise is resolved with `value`, the handle is removed (one-shot), and
@@ -642,7 +581,7 @@ module JsToolWorkflow =
                 | _ -> false
 
             match outcome with
-            | Error failure -> return JsToolWorkflow.Failed(failure, [], [], [], [])
+            | Error failure -> return Failed(failure, [], [], [], [])
             | Ok parkedValue when isParkedSentinel parkedValue ->
                 // The resumed program parked again: a new handle and a new
                 // parked payload (algorithm E5).
@@ -655,9 +594,9 @@ module JsToolWorkflow =
                       SessionId = site.SessionId }
 
                 match JsParkedSites.register newSite with
-                | Error failure -> return JsToolWorkflow.Failed(failure, [], [], [], [])
-                | Ok _ -> return JsToolWorkflow.Parked(newHandle, site.RunHandle.ParkState.ParkPayload)
-            | Ok value -> return JsToolWorkflow.Succeeded(value, [], [], [], [])
+                | Error failure -> return Failed(failure, [], [], [], [])
+                | Ok _ -> return Parked(newHandle, hostRealmPayload site.RunHandle.ParkState.ParkPayload)
+            | Ok value -> return Succeeded(value, [], [], [], [])
         }
 
     /// Abandon a parked site (algorithm F): reject the deferred promise with
@@ -683,7 +622,7 @@ module JsToolWorkflow =
             JsParkedSites.remove site.Handle
 
             match result with
-            | _ -> return JsToolWorkflow.Failed(JsFailure.ProgramFailed "abandoned", [], [], [], [])
+            | _ -> return Failed(JsFailure.ProgramFailed "abandoned", [], [], [], [])
         }
 
     /// Execute one js-* tool invocation under the three-state input protocol
@@ -692,8 +631,9 @@ module JsToolWorkflow =
     ///   { unpark: { handle: string, value: obj } }
     ///   { abandon: { handle: string } }
     /// `sessionId` tags newly created parked sites so session close can reap
-    /// them. `lifecyclePersistence` records Parked/Unparked/Abandoned/Reaped
-    /// audit traces (best-effort; a failed audit never fails the tool call).
+    /// them. `lifecyclePersistence` records Parked/Unparked/Abandoned audit
+    /// traces (best-effort; a failed audit never fails the tool call); Reaped
+    /// is recorded by the session-close path (PluginSessionScope).
     let execute
         (sessionId: string)
         (capabilities: Set<JsCapability>)
@@ -807,6 +747,6 @@ module JsToolsResult =
             LlmFacing.instruction "parked"
             |> LlmFacing.withData (
                 [ LlmFacing.Data.stringField "handle" handle ]
-                @ LlmFacing.Data.structuredValue (LlmFacing.Data.ofJs payload)
+                @ LlmFacing.Data.rootStructuredValue (LlmFacing.Data.ofJs payload)
             )
             |> LlmFacing.render

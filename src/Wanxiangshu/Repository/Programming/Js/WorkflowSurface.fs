@@ -122,6 +122,12 @@ module JsWorkflowSurface =
                     else
                         Some(JsTransactionSurface.persistenceOf store)
 
+                let lifecyclePersistence =
+                    if isNull store then
+                        None
+                    else
+                        Some(JsTransactionSurface.lifecyclePersistenceOf store)
+
                 let! outcome =
                     JsToolWorkflow.execute
                         sessionId
@@ -133,7 +139,7 @@ module JsWorkflowSurface =
                         deadlineEpochMs
                         outputBoundBytes
                         persistence
-                        None
+                        lifecyclePersistence
                         None
 
                 return box (JsWorkflowOutcomeHandle outcome)

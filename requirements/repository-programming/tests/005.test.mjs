@@ -114,6 +114,7 @@ const toolModule = () => {
       type: 'string',
       describe: (description) => ({ type: 'string', description }),
     }),
+    object: (shape) => ({ type: 'object', shape }),
   }
   return { tool }
 }

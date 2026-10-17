@@ -35,6 +35,7 @@ module JsToolSpec =
         surface: JsSurface ->
         workspaceRoot: string ->
         persistence: IJsTransactionPersistence option ->
+        lifecyclePersistence: IJsLifecyclePersistence option ->
         fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
             ToolSpec
 
@@ -44,5 +45,6 @@ module JsToolSpec =
         admission: ToolAdmission ->
         workspaceRoot: string ->
         persistence: IJsTransactionPersistence option ->
+        lifecyclePersistence: IJsLifecyclePersistence option ->
         fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
             ToolSpec

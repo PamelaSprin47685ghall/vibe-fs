@@ -11,16 +11,6 @@ open Wanxiangshu.Repository.Programming.Js
 /// invocation mechanism; the vm context is the authority boundary.
 module JsSandbox =
 
-    /// Handle to a started sandbox program: the async IIFE promise is exposed
-    /// (not awaited to completion) so a caller may hold it across calls, and
-    /// the deadline reference is mutable so a caller may reset the async
-    /// deadline without re-wrapping the program.
-    type JsRunHandle =
-        { ProgramPromise: Task<string>
-          DeadlineRef: obj
-          Api: obj
-          ParkState: ParkState }
-
     /// Park lifecycle state carried by the api closure. The park member reads
     /// and writes these fields through the same mutable object the workflow
     /// holds, so a parked program and the orchestrator observe one state.
@@ -48,6 +38,16 @@ module JsSandbox =
           /// calls it with the `__jsAbandoned` marker. `null` while not parked.
           mutable ParkDeferredReject: obj
           mutable AbandonRequested: bool }
+
+    /// Handle to a started sandbox program: the async IIFE promise is exposed
+    /// (not awaited to completion) so a caller may hold it across calls, and
+    /// the deadline reference is mutable so a caller may reset the async
+    /// deadline without re-wrapping the program.
+    type JsRunHandle =
+        { ProgramPromise: Task<string>
+          DeadlineRef: obj
+          Api: obj
+          ParkState: ParkState }
 
     [<Import("Buffer", "node:buffer")>]
     let private nodeBuffer: obj = jsNative
@@ -189,26 +189,6 @@ module JsSandbox =
         else
             Ok json
 
-    /// Start a wrapped program in a fresh vm context without awaiting it to
-    /// completion. The async IIFE's promise is exposed as `ProgramPromise` so a
-    /// caller may hold it across calls; the deadline is injected as a mutable
-    /// reference (`DeadlineRef`) so a caller may reset the async deadline
-    /// without re-wrapping. The vm context is held by the promise's closure
-    /// chain while it remains unsettled — it is not explicitly lifted.
-    ///
-    /// `deadlineMs` bounds the synchronous segment via the vm timeout; the
-    /// injected proxy bounds async segments (JS-054.1). Synchronous errors
-    /// (SyntaxError, vm timeout) surface as a rejected `ProgramPromise` and are
-    /// classified by `awaitResult`.
-    let runSurface
-        (baseClassSource: string)
-        (modelSource: string)
-        (api: obj)
-        (deadlineMs: int)
-        (deadlineEpochMs: int64)
-        : Task<JsRunHandle> =
-        runSurfaceWithPark baseClassSource modelSource api deadlineMs deadlineEpochMs None
-
     /// Start a wrapped program with an explicit park lifecycle state. The
     /// caller owns the ParkState and builds the api with park support
     /// (JsToolsBindings.createApiWithPark); this function injects both the api
@@ -260,6 +240,26 @@ module JsSandbox =
                       ParkState = state }
         }
 
+    /// Start a wrapped program in a fresh vm context without awaiting it to
+    /// completion. The async IIFE's promise is exposed as `ProgramPromise` so a
+    /// caller may hold it across calls; the deadline is injected as a mutable
+    /// reference (`DeadlineRef`) so a caller may reset the async deadline
+    /// without re-wrapping. The vm context is held by the promise's closure
+    /// chain while it remains unsettled — it is not explicitly lifted.
+    ///
+    /// `deadlineMs` bounds the synchronous segment via the vm timeout; the
+    /// injected proxy bounds async segments (JS-054.1). Synchronous errors
+    /// (SyntaxError, vm timeout) surface as a rejected `ProgramPromise` and are
+    /// classified by `awaitResult`.
+    let runSurface
+        (baseClassSource: string)
+        (modelSource: string)
+        (api: obj)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        : Task<JsRunHandle> =
+        runSurfaceWithPark baseClassSource modelSource api deadlineMs deadlineEpochMs None
+
     /// Await a started sandbox program and classify its outcome. Synchronous
     /// errors (SyntaxError → INVALID_PROGRAM, vm timeout → PROGRAM_TIMEOUT) are
     /// classified here; async failures arrive as sentinel JSON and are decoded
@@ -288,10 +288,12 @@ module JsSandbox =
         parkState.ParkPayload <- null
         parkState.ParkSignalResolve <- null
 
-        emitJsExpr
-            (parkState)
-            "(() => { const state = $0; return new Promise((resolve) => { state.ParkSignalResolve = resolve; }); })()"
-            :?> Task<obj>
+        let signal: obj =
+            emitJsExpr
+                (parkState)
+                "(() => { const state = $0; return new Promise((resolve) => { state.ParkSignalResolve = resolve; }); })()"
+
+        signal :?> Task<obj>
 
     /// Resolve the deferred promise the program is awaiting at `await js.park`.
     /// Called by `unpark` with the injected value; the program continues as if

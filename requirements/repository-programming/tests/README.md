@@ -10,5 +10,9 @@
 - 025 的真实 EventStore 追加、fold 和同进程日志重开继续保留，名称改为实际场景；没有注入不确定追加或杀进程。删去辅助模型构造 incident 自证和源码词形代替 mandatory 注入的断言，真实结算先于唯一熔断留 TODO。
 - 026 改为实际 CasebookCapture 对显式读取、发现和提交结果的分类，涵盖移动两端；原 TransactionSurface 自建状态机不再充当产品链证据。程序执行如何向案例收集器传递结果仍未证明。
 - 027 只证明两个角色相同能力生成相同成员；当前注册的直接工具与程序工具是否共用全部保护仍为 TODO。
+- 028—029 以 dist 产物真实运行：programPromise 句柄与 deadline 的过期、重置与催断，逐笔落盘的成功、失败与 FILE_CHANGED 预检结果面。异步等待与内存隔离的受控证据仍沿 006 的 TODO。
+- 030—037、039 真实运行 park/unpark/abandon 全周期：parked 载荷与渲染、handle 恰好消费一次、abandon 的 finalizer 与清理窗口、并发上限与释放、进程内存活；031 与 039 另含源码静态断言，核对三件套接线与现场表归属。会话 close 的 reap 仍是接线证据，未以真实会话关闭运行。
+- 040 真实运行 rm/mv 的 POSIX 语义、越界拒绝、durable 单笔记账与稳定失败码目录；EXDEV 只查目录登记，不造真实跨设备场景。
+- 041 是生产接线的源码静态断言：lifecycle persistence 沿 PluginHostInterop → ToolRegistry.create → JsToolSpec/execute 与 PluginBoot → PluginRuntimeScope → ClearSession 贯通，执行链不留硬编码 None，四类事件同住单一审计流，ParkedSites 表不触碰 durable。它证明接线存在，不证明运行期审计真实落盘。
 
 未闭合范围见 GAP-088/089，旧发布清单的 DONE 不作本次验收证据。先完成正式构建，再运行本包、requirement-system 和相邻接地/能力测试；不以原 154 项通过代表每条规范已经落实。

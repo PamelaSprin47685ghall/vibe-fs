@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.journal-outcome-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-catalog.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.behavior-diagnosis.enforcer-projection.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-facts.fsproj"/>

@@ -532,6 +532,7 @@ module ToolRegistry =
         (isReplicaSession: (SessionId -> bool) option)
         (casebookToolSpecs: ToolSpec list)
         (jsTransactionPersistence: IJsTransactionPersistence option)
+        (jsLifecyclePersistence: IJsLifecyclePersistence option)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
         (childWorkRecordForRun:
             (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) option)
@@ -587,6 +588,7 @@ module ToolRegistry =
                     surface
                     (defaultArg workspaceDirectory "")
                     jsTransactionPersistence
+                    jsLifecyclePersistence
                     (Some groundingObservation))
 
         let generatedJsSpecs () =
@@ -607,6 +609,7 @@ module ToolRegistry =
                 admission
                 (defaultArg workspaceDirectory "")
                 jsTransactionPersistence
+                jsLifecyclePersistence
                 (Some groundingObservation)
 
         // Lifecycle uses its own wanxiangli journal. The common directory is

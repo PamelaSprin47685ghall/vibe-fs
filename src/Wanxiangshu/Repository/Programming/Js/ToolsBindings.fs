@@ -368,31 +368,6 @@ module JsToolsBindings =
                     "(() => { const state = $0; return new Promise((resolve, reject) => { state.ParkDeferredResolve = resolve; state.ParkDeferredReject = reject; }); })()"
                     : obj
 
-    /// Build the api object for one sandbox run. `staging` records every
-    /// mutation that was actually persisted as-is; the caller reports it. The
-    /// park member is absent here (no park state); use `createApiWithPark`.
-    let createApi
-        (capabilities: Set<JsCapability>)
-        (root: string)
-        (staging: ResizeArray<JsStagedMutation>)
-        (readSnapshots: ResizeArray<JsReadSnapshot>)
-        (explicitReads: ResizeArray<JsExplicitFileRead>)
-        : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads None
-
-    /// Build the api object for one sandbox run that carries a park lifecycle
-    /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
-    /// the sandbox wrapper; the generated `js.park` member suspends through it.
-    let createApiWithPark
-        (capabilities: Set<JsCapability>)
-        (root: string)
-        (staging: ResizeArray<JsStagedMutation>)
-        (readSnapshots: ResizeArray<JsReadSnapshot>)
-        (explicitReads: ResizeArray<JsExplicitFileRead>)
-        (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
-        : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads (Some parkState)
-
     let private createApiCore
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -428,3 +403,29 @@ module JsToolsBindings =
               | None -> () ]
 
         createObj [ "js" ==> createObj members ]
+
+    /// Build the api object for one sandbox run. `staging` records every
+    /// mutation that was actually persisted as-is; the caller reports it. The
+    /// park member is absent here (no park state); use `createApiWithPark`.
+    let createApi
+        (capabilities: Set<JsCapability>)
+        (root: string)
+        (staging: ResizeArray<JsStagedMutation>)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (explicitReads: ResizeArray<JsExplicitFileRead>)
+        : obj =
+        createApiCore capabilities root staging readSnapshots explicitReads None
+
+    /// Build the api object for one sandbox run that carries a park lifecycle
+    /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
+    /// the sandbox wrapper; the generated `js.park` member suspends through it.
+    let createApiWithPark
+        (capabilities: Set<JsCapability>)
+        (root: string)
+        (staging: ResizeArray<JsStagedMutation>)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (explicitReads: ResizeArray<JsExplicitFileRead>)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
+        : obj =
+        createApiCore capabilities root staging readSnapshots explicitReads (Some parkState)
+

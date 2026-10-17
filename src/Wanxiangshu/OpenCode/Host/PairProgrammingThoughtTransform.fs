@@ -1357,7 +1357,7 @@ module PairProgrammingThoughtTransform =
                     let language =
                         match journal, projectionSessionIdOpt with
                         | Some _, Some sessionId ->
-                            Wanxiangshu.OpenCode.Host.ProviderLanguageBinding.forSessionText sessionId
+                            Wanxiangshu.OpenCode.ProviderLanguageBinding.forSessionText sessionId
                         | _ -> ProviderLanguage.SimplifiedChinese
 
                     [ ProviderProse.render language ParkedHintPath (Map [ "handles", String.Join(", ", parkedHandles) ]) ]

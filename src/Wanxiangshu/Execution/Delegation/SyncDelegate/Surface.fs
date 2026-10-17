@@ -789,7 +789,7 @@ module SyncDelegateSurface =
             let plugin =
                 match retryMode with
                 | RetryHarnessMode.Scripted -> None
-                | RetryHarnessMode.ProviderRecovery -> Some(new PluginRuntimeScope(Some journal, (fun _ -> false)))
+                | RetryHarnessMode.ProviderRecovery -> Some(new PluginRuntimeScope(Some journal, (fun _ -> false), None))
 
             let gate =
                 match plugin with

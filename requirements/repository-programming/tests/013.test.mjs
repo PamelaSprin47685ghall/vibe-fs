@@ -87,7 +87,7 @@ const unwrap = (result) => {
   return result.value
 }
 
-test('WHAT[repository-programming-013] JS013_commitPlan_all_or_nothing', () => {
+test('WHAT[repository-programming-013] JS013_commitPlan_writes_every_planned_file', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
@@ -119,18 +119,19 @@ test('WHAT[repository-programming-013] JS013_commitPlan_aborts_before_write_when
     cleanup()
   }
 })
-test('WHAT[repository-programming-013] JS013_commitPlan_rolls_back_written_files_on_write_failure', () => {
+test('WHAT[repository-programming-013] JS013_commitPlan_restores_earlier_writes_on_write_failure', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
     // second target's parent directory does not exist → write fails → the
-    // already-written first file must be rolled back (all-or-nothing)
+    // already-written first file is restored by the commit plan (its own
+    // restore semantics, not the workflow's as-is path)
     const plan = [
       { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'oldA', newText: 'newA' },
       { kind: 'create', path: 'x/y.txt', newText: 'nope' },
     ]
     assert.equal(codeOf(commitPlan(dir, plan)), 'TRANSACTION_COMMIT_FAILED')
-    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'oldA', 'first write rolled back')
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'oldA', 'first write restored by the commit plan')
   } finally {
     cleanup()
   }

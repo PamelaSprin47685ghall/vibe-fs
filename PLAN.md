@@ -175,7 +175,7 @@ C. 非目标：
 
 1. as-is 写语义翻转（Transaction.fs + ToolWorkflow.fs）：去统一 staging 结算，每笔 mutation 写前 FILE_CHANGED 校验（读当前盘比对 readSnapshots.Text），失败返回附「本次调用已发生的改动」清单；同步修订 WHAT [012]/[014]/[016]/[027] 条款。
 2. JsSandbox 现场可持有化（JsSandbox.fs）：runSurface 签名改造，把 programPromise 暴露给 runCore；deadline 从内联常量（47-48）改为 api 闭包捕获的可重置引用（Proxy 检查时读引用当前值）；vm context 不显式提升——由 programPromise 闭包自然持有（反事实检验见下）。
-3. 模块级现场表（ToolWorkflow.fs）：JsParkedSite { handle, programPromise, api, readSnapshots, deadlineRef }，handle 生成与登记、会话归属标记、并发现场上限（S2 裁决：默认 8）。
+3. 模块级现场表（ParkedSites.fs，独立进程级静态表模块 JsParkedSites，由 ToolWorkflow 与 PluginSessionScope 共享引用）：JsParkedSite { handle, programPromise, api, readSnapshots, deadlineRef }，handle 生成与登记、会话归属标记、并发现场上限（S2 裁决：默认 8）。
 4. 竞速挂起（ToolWorkflow.fs）：runCore 同时 await programPromise 与暂停信号；park 绑定触发暂停信号；挂起时登记现场表，该次工具调用返回顶级 parked 载荷（handle + payload）。
 5. 编排层三态入参：{ program } | { unpark: { handle, value } } | { abandon: { handle } }；unpark 查表 → resolve deferred 注入 value → 继续竞速，deadline 重置 now+10 秒；一次性恢复，重复报 HANDLE_UNKNOWN。恢复后程序若再次 park，该次恢复调用返回顶级 parked 载荷（新 handle），语义与首次 park 一致——恢复调用的返回形态是「恢复后程序继续执行的结果」，若再次挂起则该结果即新 parked 载荷（裁决 S1 事实 15「定稿未锁死」的设计点）。
 6. ABANDONED 协议：abandon/reap 时 reject __jsAbandoned 哨兵 → 栈从 await 处展开 → 程序 try/finally 收拾资源；清理期 api as-is 生效、再 park 报 CANNOT_PARK_WHILE_ABANDONING；展开窗口 = 重置后 10 秒；catch ABANDONED 后继续跑返回值丢弃，结局仍记 Abandoned。
@@ -188,7 +188,7 @@ C. 非目标：
 **边界**：
 - 步骤 1 只动 Transaction.fs/ToolWorkflow.fs 事务链与 WHAT 条款文字，不碰 JsSandbox 内部、不碰 Description 资源。
 - 步骤 2 只动 JsSandbox.fs 的 runSurface 签名与 wrapProgram 生成代码、deadline 注入方式，不碰 ToolWorkflow 编排、不碰渲染协议。
-- 步骤 3/4/5/6 只动 ToolWorkflow 编排层与 JsToolOutcome 渲染分支，不碰 JsSandbox 内部、不碰 Description 资源。
+- 步骤 3/4/5/6 只动 ParkedSites 现场表、ToolWorkflow 编排层与 JsToolOutcome 渲染分支，不碰 JsSandbox 内部、不碰 Description 资源。
 - 步骤 7 只动交付门禁（Manager 侧）与 PairHint 通道（PairProgrammingThoughtTransform.fs），不碰程序语义。
 - 步骤 8 只动 durable 事件形态（EventStore 流），不碰现场表内存形态。
 - 步骤 9 只动四层注册与 Description 资源，不碰既有六成员语义。
@@ -251,7 +251,7 @@ B4. [返回] 返回 { programPromise, api }；算法终止。
 
 ### 算法 C · 模块级现场表
 
-Algorithm C：在 ToolWorkflow 建立模块级现场表，登记挂起现场并施加并发上限。
+Algorithm C：在 ParkedSites.fs 建立模块级现场表（独立进程级静态表模块，ToolWorkflow 与 PluginSessionScope 共享引用），登记挂起现场并施加并发上限。
 输入：park 触发时由 runCore 提供的现场对象 { programPromise, api, readSnapshots, deadlineRef }。
 输出：登记后的现场条目 { handle, site }；或并发已满的拒绝。
 

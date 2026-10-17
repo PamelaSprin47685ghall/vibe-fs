@@ -52,17 +52,25 @@
 
 持久化 Prepare 与 Commit 只进入统一 EventStore，不另建专有文件或存储。
 
-## [013] 多文件 All-or-Nothing 提交
+## [013] 写前校验、提交计划与 durable 记账失败映射
 
-全部文件修改作为一个事务提交，顺序为：全部预检 → 持久化 Prepare → 按规范路径顺序写入 → 持久化 Commit → 返回成功。任一写入失败时全量回滚，第三方已改内容按 [015] 保留。
+写前校验作为实现单元保持精确形状并短路：重复的修改意图最先报 `DUPLICATE_MUTATION_TARGET`，缺失目标按快照校验报 `FILE_CHANGED`，全部通过才继续。提交计划（commitPlan）输出精确的执行序列（rewrite 携带 expectedCurrent，create 携带文本），成功时把计划内全部目标写入；计划内某笔写失败时以 `TRANSACTION_COMMIT_FAILED` 失败，并按计划内还原序把已写目标还原——该还原是实现单元自身的语义，工作流主路径仍按 [012] 的 as-is 逐笔落盘。
+
+durable 记账追加失败时（Prepare 或 Commit 阶段的各失败形态），程序结果为 Failed，给稳定码 `TRANSACTION_PREPARE_*`/`TRANSACTION_COMMIT_*`，不报告成功；按 [012]/[029] 的 as-is 语义，已落盘的文件效果如实上报且不回滚。失败不重试追加、不换新事务身份，并携带原事件 id、事务 id 与原始 cause；Prepared 失败后 pending 投影为空（记账未完成），Committed 失败后原 Prepared 仍留在 pending。
+
+EventStore 端口的坏输入防御先结算物理事实（append、fsync、close、release 的确切计数与落盘字节），再经唯一的语义熔断（`js-transaction-semantic-cut`）以 SIGKILL 终止；对 Release 阶段的坏输入，最终报告保留原请求事件身份。
 
 ## [014] 冲突检测与无隐式重试
 
 每次写前各自做冲突校验（校验点从统一 preflight 移到每次写前）：若目标路径在 readSnapshots 中，读取当前盘字节与快照比对，不一致时以 `FILE_CHANGED` 失败并停止；已发生的改动保留在盘上。不自动重读、不重定位锚点、不重跑程序。
 
-## [015] 正常回滚与崩溃后不自动补提交
+## [015] 中断证据与重开不重放
 
-进程内正常失败按 CAS 还原已写入的临时修改，不覆盖第三方变化。Prepare 后、Commit 前崩溃，重启不得自动重放、回滚或补交事务；未完成 Prepare 只作为中断审计证据，保持失败。
+Prepare 已入账而无 Committed 是中断审计证据：pending 投影保留该记录，跨 EventStore 重开仍可见。重开只观察证据，不自动重放、回滚或补交事务，磁盘保持中断时已落盘的状态。
+
+物理写失败以 `TRANSACTION_COMMIT_FAILED` 失败，失败笔之前的 as-is 已落盘改动保留；程序失败先于 durable 记账完成时（写失败、返回值非法），记账不发生，不留 durable pending。每笔写入经 MutationFs 单笔原子落盘，重开不盲目重试模糊的半完成提交。
+
+CAS 还原（rollbackPlan：restore 与 removeCreated，逆序）保留为实现单元，还原时按 expectedCurrent 比对、不覆盖第三方已改内容；TransactionStore 不提供手动历史读取接口。
 
 ## [016] Synthetic TOML 结果面
 
@@ -78,9 +86,9 @@
 
 预期失败使用稳定具名错误码，不笼统压成 `PROGRAM_FAILED`。原因只给受控摘要，不泄露沙箱内部代码、宿主路径或敏感环境；具体原语的错误码按对应条款。
 
-## [019] 返回值与 Commit 耦合
+## [019] 失败不产生 durable Commit，已落盘改动保留
 
-有修改时，返回值校验与 Commit 均成功后才暴露业务结果；提交失败不返回该结果。纯查询校验后直接返回，无须提交；新旧内容完全相同时成功且不做无意义写盘。
+程序以任何方式失败（throw、返回值非法、目标缺失）时结果为 Failed，不产生 durable Commit；失败前已按 as-is 落盘的改动保留在盘上——非法返回值不撤销已应用的重写。新旧内容完全相同时成功且不做无意义写盘。
 
 ## [020] 文件变换的 POSIX 语义
 
@@ -120,7 +128,7 @@ edit 的预期失败至少区分 `INVALID_EDIT`、`EDIT_NOT_FOUND`、`EDIT_AMBIG
 
 ## [025] 事务致命失败先结算再熔断
 
-事务不变量失败先完成保留第三方变化的 CAS 回滚或 durable semantic cut-tail，取得 committed/unknown 结算证据后才构造 typed incident，并调用由 composition 注入的 mandatory fatal capability。不得直接取得物理适配器或用 optional/default/global 兜底。
+事务不变量失败先完成 durable semantic cut-tail 结算（保留已落盘的 as-is 文件效果与第三方变化），取得 committed/unknown 结算证据后才构造 typed incident，并调用由 composition 注入的 mandatory fatal capability。不得直接取得物理适配器或用 optional/default/global 兜底。
 
 同一 incident 只报告、终止一次；旧快照、第三方变化及普通编辑拒绝仍为 typed nonfatal，致命处理不得覆盖工作树。
 
@@ -138,7 +146,6 @@ Manager 的 `js-manager` 仅提供 Read/Glob/Grep，能力过滤同样到达真�
 
 沙箱启动与结果等待解耦：`runSurface` 返回一个持有 `ProgramPromise`（async IIFE 的未 settle promise）与可变 `DeadlineRef` 的句柄，调用方可跨调用持有该 promise 而不在启动处 await 到底；vm context 由 promise 未 settle 时的闭包链自然持有，不显式提升。异步 deadline 从生成代码内联常量改为 api 闭包捕获的可变引用，`resetDeadline` 可在不重包、不重跑程序的前提下改变后续 api 调用的超时窗口。哨兵识别、错误分类与结果反序列化保持不变。
 
-
 ## [029] As-Is 逐笔落盘的失败与成功形态
 
 每次 `edit`/`write` 调用即原子落盘，跨笔不回滚。程序后续失败、终止或挂起（throw、超时、输出超限、返回值非法）时，已落盘的改动保持为事实分界线并如实上报：
@@ -147,16 +154,58 @@ Manager 的 `js-manager` 仅提供 Read/Glob/Grep，能力过滤同样到达真�
 - 失败返回 `# failed`，根级给 code/reason，并附本次调用已真实落盘的改动清单（`[fs]` 的 rewritten/created）；无已落盘改动时失败不附 fs 节。
 - 写前冲突校验（目标当前内容与写者所见不一致）以 `FILE_CHANGED` 失败，该笔不落盘，此前已落盘的改动保留。
 
-## [030] Remove 与 Move 编程面成员
+## [030] park 与 Parked 结果
 
-`rm(path)` 与 `mv(from, to)` 由 Remove/Move capability 投影，与 edit/write 同属 as-is 逐笔落盘路径：
+程序调用 `await this.park(payload)` 后执行结果变为 Parked：顶级 parked 载荷携带非空 handle 与程序传入的 payload；渲染文档以 `# parked` 开头并包含 handle。未调用 park 的程序正常完成（Succeeded，无 handle）。park 是 async 成员，在 await 点挂起程序并让本次调用返回该 parked 载荷；首个 park 赢得竞争，第二次 park 要等第一次恢复后才到达。
 
-- `rm` 删除文件或空目录，拒绝非空目录（`DIRECTORY_NOT_EMPTY`）；缺失目标报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, removed: path }`，durable 记一笔 Remove。
-- `mv` 移动或重命名文件及目录（POSIX mv），支持覆盖，源缺失报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, moved: from, destination: to }`，durable 记一笔 Move。
-- 两者都继承 resolveInside 路径边界（越界 `PATH_DENIED`）与写前 `FILE_CHANGED` 校验：目标若在 readSnapshots 中且当前内容与快照不一致则拒绝，不隐式重试。
-- 跨设备移动（EXDEV）以稳定码 `CROSS_DEVICE_MOVE` 报错并回滚；renameSync 原子语义保证源与目标都不残留中间态，绝不保留两侧并存。
-- `[fs]` 结果面新增 removed 与 moved（`from -> to`）字段；失败时同样如实上报已真实落盘的删除/移动。
+## [031] 泄漏兜底三件套的调用接线
 
-## [031] Remove/Move 的权限投影与四层同构
+交付硬门禁接在 deliverSpec 执行链（plan/manager 分派之前）：存在未处理 parked handle 时拒绝交付，拒绝内容列出全部 handle，资源路径 `tool/js-program/parked-deliver-blocked`。每回合提醒经由 PairHint 的 composeMarkerDocument 并入：查询全部未表态 handle，非空时渲染 `tool/js-program/parked-hint` 提醒并追加为 marker 文档指令；无载体回合不走到 composeMarkerDocument，不凭空注入。会话终结在 ClearSession 清理链中强制 reap 该 session 名下全部 parked 现场，durable 记 Reaped。两个资源均为 zh-CN.md/en.md 成对双语文件、占位符集合一致且含 `{{handles}}`。三个调用点只调用 JsParkedSites，不定义现场表类型或 reap 接口本身。
 
-Move/Remove 权限在 Engineer 与 DevOps 上放行投影（对齐宿主工具权限），`JsCapability.ofToolPermission` 是唯一映射。四层同构扩展为：公开基类含 `rm(path)`/`mv(from, to)` 方法、工具描述与 canonical example 含对应成员、运行时门禁按 capability 挂载 rm/mv 执行器。Manager 的 `js-manager` 仍只读，不含 Move/Remove。
+## [032] unpark 恢复
+
+以 `{ unpark: { handle, value } }` 调用恢复挂起程序：恢复后的程序继续运行到完成，返回继续结果（Succeeded，无 handle）；挂起点的 await 表达式求值为注入值。未知 handle 报 `HANDLE_UNKNOWN`。恢复后的程序再次 park 时返回新的 parked 载荷与新 handle。
+
+## [033] handle 恰好消费一次
+
+一个 handle 只被消费一次：第一次 unpark 恢复程序，第二次对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。abandon 同样消费 handle：abandon 之后对同一 handle 的 unpark 报 `HANDLE_UNKNOWN`。对未知 handle 的 abandon 也报 `HANDLE_UNKNOWN`。
+
+## [034] abandon 与程序侧 finalizer
+
+abandon 以拒绝 parked await 的方式终结程序：原生 try/finally 作为 finalizer 照常运行，finalizer 内的 rm/write 按 as-is 落盘。abandon 清理窗口内 api 仍可照常使用。程序捕获放弃并继续执行时，其返回值被丢弃，结果仍为 Abandoned（Failed，无值）。
+
+## [035] abandon 清理窗口内禁止再 park
+
+清理窗口内的 park 被拒绝，程序侧得到 `{ ok: false, code: 'CANNOT_PARK_WHILE_ABANDONING' }` 结果；程序可通过 as-is 写盘记录该拒绝。
+
+## [036] parked-site 表并发上限
+
+parked-site 表有进程级并发上限（默认 8）：上限内 park 成功；超出后下一个 park 以 Failed 与 `CONCURRENCY_LIMIT` 拒绝，无排队。一个现场被 abandon 释放后，新 park 可入。
+
+## [037] Parked 载荷渲染
+
+parked 结果渲染为顶级 parked 载荷文档：handle 字段与程序 payload 的字段平铺进文档顶层，可按 Synthetic TOML 解析。载荷就是程序传入的数据，原样呈现，不是宿主裁决。
+
+## [038] park 的编程面投影
+
+park 是生命周期能力：任何 js-* 生成面无条件携带。生成基类含 `async park(payload)`；只读面（如 Manager）同样携带。描述与示例教授 park/unpark/abandon 三态契约。park 不是文件系统权限投影，不进入 members 列表，保持既有角色的成员序列字节同一（file、glob、grep、edit、rewrite、write、rm、mv）。
+
+## [039] 现场表归属与进程内存活
+
+park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.fs，并发上限 8），唯一归属、不散落：工具编排层 ToolWorkflow 与 session 回收层 PluginSessionScope 共享引用；调用方（ToolRegistry、PairProgrammingThoughtTransform、PluginSessionScope）不重定义表模块。parked 现场携带 session owner，会话终结可据此 reap。parked 程序进程内存活：同进程内后续调用仍见其挂起，handle 可解析；每次 park 得到不同 handle。
+
+## [040] rm/mv：Move/Remove 编程面与 as-is 落盘
+
+`rm(path)` 与 `mv(from, to)` 由 Remove/Move capability 投影（`JsCapability.ofToolPermission` 是唯一映射），与 edit/write 同属 as-is 逐笔落盘路径。四层同构：生成基类含 `rm`/`mv` 方法、工具描述与 canonical example 含对应成员、运行时门禁按 capability 挂载 rm/mv 执行器。Manager 的 `js-manager` 仍只读，不含 Move/Remove。
+
+- `rm` 删除文件或空目录；非空目录报 `DIRECTORY_NOT_EMPTY`，缺失目标报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, removed: path }`。
+- `mv` 按 POSIX 语义移动或重命名文件及目录，支持覆盖；源缺失报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, moved: from, destination: to }`。
+- 越界拒绝：rm 的目标、mv 的源与目标都在能力边界内校验，越界报 `PATH_DENIED` 且源存活。继承 [014] 的写前冲突校验：file() 取得的快照仍新鲜时，目标可照常被 rm 删除落盘。
+- 每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影；渲染结果报 `removed = [...]` 与 `moved = ["from -> to"]`。
+- 稳定失败码 `DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INVALID_ARGUMENT` 登记在冻结失败目录；EXDEV 依靠 renameSync 原子语义保证源与目标都不残留中间态。
+
+## [041] Lifecycle 审计的生产接线与会话收束
+
+Parked/Unparked/Abandoned 的 lifecycle 审计沿生产组装路径接线：PluginHostInterop 从 workspace 的统一 WorkspaceEventStore 同源构造 `IJsLifecyclePersistence`（与 jsTransactionPersistence 共用同一 store），经 ToolRegistry.create 贯通到每个生成的 JsToolSpec；JsToolSpec.execute 调用点传入该 persistence，不留硬编码 None。JsToolWorkflow 在执行链上记录 Parked、Unparked、Abandoned 三类事件。宿主侧 ToolHostSurface 与 WorkflowSurface 同样从各自的 store 构造 lifecycle persistence 并传入调用。
+
+四种 lifecycle 事件类型（Parked、Unparked、Abandoned、Reaped）同住 TransactionStore 的单一审计流（createLifecyclePersistence 与 appendLifecycleEvent）。会话关闭链沿 PluginBoot → PluginRuntimeScope → PluginSessionScope 贯通 jsLifecyclePersistence；ClearSession 先以 JsParkedSites.handlesForSession 枚举现场，reapSession 之后逐 handle 记录 Reaped 审计事件（durable.AppendLifecycleEvent）。ParkedSites 现场表保持进程内存活、不触碰 durable：Reaped 审计归调用方，现场表自身不含 appendLifecycleEvent。

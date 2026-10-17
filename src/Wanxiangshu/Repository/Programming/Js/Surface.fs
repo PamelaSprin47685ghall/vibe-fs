@@ -22,12 +22,10 @@ type JsSurface =
 module JsToolGenerator =
 
     let membersFor (capabilities: Set<JsCapability>) : JsCapabilityFragment list =
-        capabilities
-        |> Set.toList
-        |> List.sortBy JsCapability.order
-        |> List.filter (fun capability -> capability <> JsCapability.Park)
-        |> List.collect (fun capability ->
-            Map.tryFind capability JsFragmentRegistry.byCapability |> Option.defaultValue [])
+        JsFragmentRegistry.all
+        |> List.filter (fun fragment ->
+            fragment.Capability <> JsCapability.Park
+            && Set.contains fragment.Capability capabilities)
 
     let toolNameFor (roleName: string) : string = "js-" + roleName.ToLowerInvariant()
 

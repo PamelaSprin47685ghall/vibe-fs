@@ -466,6 +466,11 @@ module PluginHostInterop =
             |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.stateRoot workspace))
             |> Option.map JsToolsTransactionStore.createPersistence
 
+        let jsLifecyclePersistence =
+            workspaceDirectory
+            |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.stateRoot workspace))
+            |> Option.map JsToolsTransactionStore.createLifecyclePersistence
+
         let quiescence = scope.Sessions.Quiescence :> ISessionQuiescenceGate
 
         let registration =
@@ -493,6 +498,7 @@ module PluginHostInterop =
                  |> Option.map (fun s -> fun sid -> s.StrengthRuntime.TryFindByReplica sid |> Option.isSome))
                 casebookToolSpecs
                 jsTransactionPersistence
+                jsLifecyclePersistence
                 continueManagerLoop
                 (Some childWorkRecordForRun)
                 (Some workRecordCapability)

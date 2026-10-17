@@ -728,6 +728,8 @@ Process/LargeGateSurface.fsi
 Process/LargeGateSurface.fs
 Process/JsSandbox.fsi
 Process/JsSandbox.fs
+Repository/Programming/Js/OpenCode/ParkedSites.fsi
+Repository/Programming/Js/OpenCode/ParkedSites.fs
 Process/PtyTypes.fsi
 Process/PtyTypes.fs
 Process/PtySession.fsi
@@ -1086,6 +1088,8 @@ Context/Companion/Blogger/OpenCode/PluginScope.fsi
 Context/Companion/Blogger/OpenCode/PluginScope.fs
 Strength/OpenCode/PluginScope.fsi
 Strength/OpenCode/PluginScope.fs
+Repository/Programming/Js/TransactionStore.fsi
+Repository/Programming/Js/TransactionStore.fs
 OpenCode/Host/PluginSessionScope.fsi
 OpenCode/Host/PluginSessionScope.fs
 OpenCode/Host/PluginRecoveryScope.fsi
@@ -1252,8 +1256,6 @@ Repository/Knowledge/Casebook/Index.fsi
 Repository/Knowledge/Casebook/Index.fs
 Repository/Programming/Js/ToolsBindings.fsi
 Repository/Programming/Js/ToolsBindings.fs
-Repository/Programming/Js/TransactionStore.fsi
-Repository/Programming/Js/TransactionStore.fs
 Persistence/EventStore/IntegratorEngine.fsi
 Persistence/EventStore/IntegratorEngine.fs
 Composition/Durable/JournalIntegration.fsi

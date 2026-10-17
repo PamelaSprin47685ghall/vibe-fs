@@ -1317,6 +1317,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
               contractFor prose tutorial toolName capabilities
               "```js\n" + baseClass + "\n```"
               rulesFor prose tutorial capabilities
+              prose.Park
               prose.MechanicalSemantic
               ultraBlock
               prose.Footer ]

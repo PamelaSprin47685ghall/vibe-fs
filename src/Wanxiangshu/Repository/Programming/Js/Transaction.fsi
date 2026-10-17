@@ -7,6 +7,8 @@ open Wanxiangshu.Persistence.EventStore
 type JsStagedMutation =
     | Rewrite of path: string * originalText: string * newText: string
     | Create of path: string * text: string
+    | Remove of path: string
+    | Move of fromPath: string * toPath: string
 
 type JsReadSnapshot = { Path: string; Text: string }
 
@@ -42,18 +44,18 @@ module JsTransaction =
     val commitPlan: mutations: JsStagedMutation list -> JsCommitMutation list
     val rollbackPlan: mutations: JsStagedMutation list -> JsRollbackMutation list
 
-type JsDurableMutation =
-    { Path: string
-      OriginalText: string option
-      NewText: string
-      Kind: JsDurableMutationKind }
-
 [<RequireQualifiedAccess>]
 type JsDurableMutationKind =
     | Rewrite
     | Create
     | Remove
     | Move
+
+type JsDurableMutation =
+    { Path: string
+      OriginalText: string option
+      NewText: string
+      Kind: JsDurableMutationKind }
 
 type JsTransactionPrepared =
     { TransactionId: JsTransactionId
@@ -62,18 +64,18 @@ type JsTransactionPrepared =
 
 type JsTransactionCommitted = { TransactionId: JsTransactionId }
 
-type JsLifecycleEvent =
-    { EventType: JsLifecycleEventType
-      Handle: string
-      SessionId: string
-      At: string }
-
 [<RequireQualifiedAccess>]
 type JsLifecycleEventType =
     | Parked
     | Unparked
     | Abandoned
     | Reaped
+
+type JsLifecycleEvent =
+    { EventType: JsLifecycleEventType
+      Handle: string
+      SessionId: string
+      At: string }
 
 type JsLifecycleAppendFailure =
     { EventType: JsLifecycleEventType

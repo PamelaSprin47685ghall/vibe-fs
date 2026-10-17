@@ -32,6 +32,9 @@ type JsFailure =
     | FileNotFound of string
     | FileAlreadyExists of string
     | FileReadFailed of string
+    | DirectoryNotEmpty of string
+    | CrossDeviceMove of string
+    | InvalidArgument of string
     | InvalidUtf8 of string
     | AnchorEmptyContent
     | AnchorInvalidPattern

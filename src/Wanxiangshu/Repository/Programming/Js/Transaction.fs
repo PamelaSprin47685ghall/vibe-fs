@@ -76,6 +76,9 @@ module JsTransaction =
                   "originalText" ==> originalText
                   "newText" ==> newText ]
         | JsStagedMutation.Create(path, text) -> createObj [ "kind" ==> "create"; "path" ==> path; "text" ==> text ]
+        | JsStagedMutation.Remove _
+        | JsStagedMutation.Move _ ->
+            invalidArg "mutation" "remove/move are committed as-is and never enter the batched fs decision"
 
     let private mutationsToJs (mutations: JsStagedMutation list) : obj array =
         mutations |> List.map mutationToJs |> Array.ofList
@@ -171,6 +174,17 @@ module JsTransaction =
         let result = api?rollbackPlan (mutationsToJs mutations)
         unbox<obj array> (result?value) |> Array.toList |> List.map rollbackOf
 
+/// DSL-class: DurableFact — JS-015: the durable mutation kind. Rewrite/Create
+/// keep the legacy shape; Remove records the deleted path (rollback recreates
+/// an empty file or empty directory); Move records from → to (rollback
+/// renames back).
+[<RequireQualifiedAccess>]
+type JsDurableMutationKind =
+    | Rewrite
+    | Create
+    | Remove
+    | Move
+
 /// DSL-class: DurableFact — JS-015: one mutation as persisted in a prepared
 /// transaction, sufficient to undo it after a crash (original text for
 /// rewrites, absence for creates).
@@ -180,18 +194,8 @@ type JsDurableMutation =
         /// Some = rewrite (rollback restores this text); None = create.
         OriginalText: string option
         NewText: string
-        /// Durable mutation kind. Rewrite/Create keep the legacy shape; Remove
-        /// records the deleted path (rollback recreates an empty file or empty
-        /// directory); Move records from → to (rollback renames back).
         Kind: JsDurableMutationKind
     }
-
-[<RequireQualifiedAccess>]
-type JsDurableMutationKind =
-    | Rewrite
-    | Create
-    | Remove
-    | Move
 
 /// DSL-class: DurableFact — JS-012: the durable prepare fact. Written to the
 /// unified EventStore BEFORE any filesystem effect; a committed transaction
@@ -207,6 +211,13 @@ type JsTransactionPrepared =
 /// after a Prepared fact is what makes the transaction committed.
 type JsTransactionCommitted = { TransactionId: JsTransactionId }
 
+[<RequireQualifiedAccess>]
+type JsLifecycleEventType =
+    | Parked
+    | Unparked
+    | Abandoned
+    | Reaped
+
 /// DSL-class: DurableFact — PLAN S2 step 8 / algorithm H3: one lifecycle
 /// audit trace for a js-* parked site. Only the audit trace is durable; the
 /// parked site itself is a process-live object and is never serialized. The
@@ -216,13 +227,6 @@ type JsLifecycleEvent =
       Handle: string
       SessionId: string
       At: string }
-
-[<RequireQualifiedAccess>]
-type JsLifecycleEventType =
-    | Parked
-    | Unparked
-    | Abandoned
-    | Reaped
 
 /// DSL-class: Vocabulary — PLAN S2 step 8 / algorithm H4: the lifecycle audit
 /// append failure, kept deliberately separate from the mutation-ledger append
@@ -279,4 +283,4 @@ module JsTransactionFacts =
             { Path = fromPath
               OriginalText = Some toPath
               NewText = ""
-              Kind = JsDurableMutationKind.Move })
+              Kind = JsDurableMutationKind.Move }

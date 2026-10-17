@@ -150,6 +150,7 @@ module JsToolSpec =
         (surface: JsSurface)
         (workspaceRoot: string)
         (persistence: IJsTransactionPersistence option)
+        (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
         : ToolSpec =
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
@@ -240,10 +241,11 @@ module JsToolSpec =
                                 deadlineEpochMs
                                 (1 <<< 20)
                                 persistence
-                                None
+                                lifecyclePersistence
                                 (fileAccessObservation |> Option.map (fun observe -> observe ctx))
 
                         return JsToolsResult.render outcome
+                } }
 
     /// Build a ToolSpec for the dedicated js-predictor surface with PrivateAttachment admission.
     let createWithAdmission
@@ -252,7 +254,8 @@ module JsToolSpec =
         (admission: ToolAdmission)
         (workspaceRoot: string)
         (persistence: IJsTransactionPersistence option)
+        (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
         : ToolSpec =
-        let spec = create factory surface workspaceRoot persistence fileAccessObservation
+        let spec = create factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation
         { spec with Admission = admission }

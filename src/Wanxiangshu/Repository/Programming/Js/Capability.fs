@@ -14,6 +14,7 @@ type JsCapability =
     | Grep
     | Move
     | Remove
+    | Park
 
 module JsCapability =
 
@@ -32,21 +33,6 @@ module JsCapability =
 
     let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
         capabilities |> Set.toList |> List.choose ofToolPermission |> Set.ofList
-
-    /// Fixed canonical capability-family order (JS-002). A capability may
-    /// project more than one ordered member (Edit → edit, rewrite). Park is a
-    /// lifecycle capability every js-* surface carries; it sorts after the
-    /// filesystem families so existing member lists keep their byte identity.
-    let order (capability: JsCapability) : int =
-        match capability with
-        | JsCapability.Read -> 0
-        | JsCapability.Glob -> 1
-        | JsCapability.Grep -> 2
-        | JsCapability.Edit -> 3
-        | JsCapability.Write -> 4
-        | JsCapability.Move -> 5
-        | JsCapability.Remove -> 6
-        | JsCapability.Park -> 7
 
 /// One capability's complete SDK projection: the single source for member
 /// name, description, canonical example, and runtime binding key. The four

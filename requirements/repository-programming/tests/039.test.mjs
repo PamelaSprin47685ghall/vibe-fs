@@ -36,15 +36,21 @@ test('WHAT[repository-programming-039] parked sites carry a session owner so ses
   assert.match(scope, /JsParkedSites\.reapSession sessionId/, 'session close must force-reap the session-owned sites')
 })
 
-test('WHAT[repository-programming-039] the parked-site table lives in ToolWorkflow.fs and is not redefined by callers', () => {
+test('WHAT[repository-programming-039] the parked-site table is one process-level static module shared by its consumers, not redefined by them', () => {
+  const sites = read(join(SOURCE_ROOT, 'Repository/Programming/Js/OpenCode/ParkedSites.fs'))
+  assert.match(sites, /module JsParkedSites\b/, 'the table is defined once in ParkedSites.fs')
+  assert.match(sites, /let concurrencyLimit = 8/, 'the default ceiling is 8')
+
   const workflow = read(join(SOURCE_ROOT, 'Repository/Programming/Js/OpenCode/ToolWorkflow.fs'))
-  assert.match(workflow, /module JsParkedSites\b/, 'the table module is owned by ToolWorkflow.fs')
-  assert.match(workflow, /let concurrencyLimit = 8/, 'the default ceiling is 8')
+  assert.match(workflow, /JsParkedSites\.register/, 'the orchestration layer references the shared table')
+
+  const scope = read(join(SOURCE_ROOT, 'OpenCode/Host/PluginSessionScope.fs'))
+  assert.match(scope, /JsParkedSites\.reapSession/, 'the session-close layer references the shared table')
 
   const registry = read(join(SOURCE_ROOT, 'OpenCode/Tools/ToolRegistry.fs'))
   const transform = read(join(SOURCE_ROOT, 'OpenCode/Host/PairProgrammingThoughtTransform.fs'))
-  for (const source of [ registry, transform, scope ]) {
-    assert.doesNotMatch(source, /module JsParkedSites\b/, 'callers must not redefine the table module')
+  for (const source of [ workflow, registry, transform, scope ]) {
+    assert.doesNotMatch(source, /module JsParkedSites\b/, 'consumers must not redefine the table module')
   }
 })
 

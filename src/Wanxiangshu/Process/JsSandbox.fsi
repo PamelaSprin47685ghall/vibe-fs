@@ -5,15 +5,6 @@ open Wanxiangshu.Repository.Programming.Js
 
 module JsSandbox =
 
-    /// Handle to a started sandbox program: the async IIFE promise is exposed
-    /// (not awaited to completion) so a caller may hold it across calls, and the
-    /// deadline reference is mutable so a caller may reset the async deadline.
-    type JsRunHandle =
-        { ProgramPromise: Task<string>
-          DeadlineRef: obj
-          Api: obj
-          ParkState: ParkState }
-
     /// Park lifecycle state carried by the api closure. The park member reads
     /// and writes these fields through the same mutable object the workflow
     /// holds, so a parked program and the orchestrator observe one state.
@@ -24,6 +15,15 @@ module JsSandbox =
           mutable ParkDeferredResolve: obj
           mutable ParkDeferredReject: obj
           mutable AbandonRequested: bool }
+
+    /// Handle to a started sandbox program: the async IIFE promise is exposed
+    /// (not awaited to completion) so a caller may hold it across calls, and the
+    /// deadline reference is mutable so a caller may reset the async deadline.
+    type JsRunHandle =
+        { ProgramPromise: Task<string>
+          DeadlineRef: obj
+          Api: obj
+          ParkState: ParkState }
 
     /// Sentinel family recognized by the wrapper (JS-019: prefix, never
     /// exception-message sniffing). `__jsAbandoned` is the ABANDONED protocol

@@ -69,39 +69,6 @@ module JsToolWorkflow =
         fileAccessObservation: FileAccessObservation option ->
             Task<JsToolOutcome>
 
-/// Module-level parked-site table (PLAN S2 step 3, algorithms C/D/E/F/G).
-/// The table is a process-live object: it resets on restart, never touches
-/// durable storage, and consumes each handle exactly once with no tombstone.
-/// The module is owned here (ToolWorkflow.fs) so ToolRegistry, PairHint and
-/// PluginSessionScope can call `parkedHandles` / `reapSession` through the
-/// OpenCode namespace without defining the table themselves (repository-
-/// programming-031).
-module JsParkedSites =
-    /// A parked site: the in-flight sandbox run handle (whose closure chain
-    /// holds the vm context and whose DeadlineRef is resettable), the read
-    /// snapshots for write-before checks, the session owner, and the Parked
-    /// state.
-    type JsParkedSite =
-        { Handle: string
-          RunHandle: Wanxiangshu.Process.JsSandbox.JsRunHandle
-          ReadSnapshots: ResizeArray<JsReadSnapshot>
-          SessionId: string }
-
-    /// Concurrency ceiling for parked sites (PLAN S2 step 3: default 8).
-    val concurrencyLimit: int
-
-    /// Allocate a monotonically increasing process-unique handle (algorithm C2).
-    val allocateHandle: unit -> string
-
-    val register:
-        site: JsParkedSite -> Result<string, JsFailure>
-
-    val tryFind: handle: string -> JsParkedSite option
-    val remove: handle: string -> unit
-    val parkedHandles: unit -> string list
-    val reapSession: sessionId: string -> Task
-    val clearAll: unit -> unit
-
 /// JS-016: stable LLM-visible result shapes, rendered as Synthetic TOML
 /// (the only rendering owner; ARCH-010). Success is `# ok` plus data/fs;
 /// failure is `# failed` plus code/reason; a parked payload renders as a

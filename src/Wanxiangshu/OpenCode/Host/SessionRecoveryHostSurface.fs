@@ -186,7 +186,7 @@ module SessionRecoveryHostSurface =
                 return
                     { Journal = journalHandle
                       Scope = scope
-                      Sessions = PluginSessionScope(Some journalHandle.Journal, (fun _ -> false))
+                      Sessions = PluginSessionScope(Some journalHandle.Journal, (fun _ -> false), None)
                       Host = host
                       PortOutcome = portOutcome
                       TerminalGate = plainGate
@@ -505,7 +505,7 @@ module SessionRecoveryHostSurface =
                     return
                         { Journal = JournalHandle.Create(journal, None)
                           Scope = scope
-                          Sessions = PluginSessionScope(Some journal, (fun _ -> false))
+                          Sessions = PluginSessionScope(Some journal, (fun _ -> false), None)
                           Host = host
                           PortOutcome = portOutcome
                           TerminalGate = gate

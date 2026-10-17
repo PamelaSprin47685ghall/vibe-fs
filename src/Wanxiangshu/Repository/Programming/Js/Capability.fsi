@@ -16,7 +16,6 @@ type JsCapability =
 module JsCapability =
     val ofToolPermission: permission: ToolPermission -> JsCapability option
     val ofToolCapabilities: capabilities: Set<ToolPermission> -> Set<JsCapability>
-    val order: capability: JsCapability -> int
 
 type JsCapabilityFragment =
     { Capability: JsCapability
