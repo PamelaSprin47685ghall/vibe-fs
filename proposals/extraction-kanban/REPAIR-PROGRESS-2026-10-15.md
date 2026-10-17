@@ -2,6 +2,16 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第十三批：发布失败证据与本轮验收（2026-10-17）
+
+从干净 `266f0c8eb` 继续 R12-U1 分层调查，确认 **R13-01/P1，R6-C 原实现缺陷**：真实内层 onExit 后，外层 terminal 发布异常会被 listener 隔离吞掉，内层目录随后正常清理，custodian 仍活却没有 terminal/fault。正式 Node/Bun 八个原反例全部失败。现先复制本次原生 code/signal/stopped，显式报告发布失败（包括 fault 文件也失败），只允许通过原实例认证且独占的 recover 重发布同一事实。待发布期间禁止控制，不重发命令；owner 丢失且仅有 signed pending 仍留账。
+
+独立复查另指出本轮未交付候选的退休遗漏：目录 fsync 与首次正式回执读取先后失败，冷恢复成功后 owner 仍常驻；首候选十二项 **10 pass / 2 fail**。现 100ms 仅观察正式回执，验签并匹配原生事实后退休，不自动重发布。最终十二项物理反例和六项真实 Host/SQLite 用例 **18/18**，保留原 creator 的失败、退出码和停止标记。非作者另做六项实际 COMMIT 前/后 Unknown 及 ownerlost+pending 组合，全部通过。
+
+Fable **generation 540**、174 surfaces / 838 modules；三个不重叠套件 **1232 / 1169 pass / 0 普通 fail / 16 skip / 47 TODO**。format、实际 check 和 diff whitespace 通过。精确包 **2075 members / 13,275,545 bytes**，摘要 `3241a9414740371febe870a6f36bd521d3122dd99ef4c96b313408df9be60d07`；隔离 npm ci、默认入口、Node/Bun/OpenCode 实际 PTY 消费全部通过。首次包验证的旧后代断言失败来自临时夹具跨运行共用 PID marker，已隔离文件名重验；PtyScope.js 与旧精确包 SHA-256 完全相同，未据此改产品。
+
+**用户决定本轮验收通过，原 R12-U1 暂存待后续处理。** 40 次内层保全复验与固定并发 2 的六例分层对照均未自然复现；SIGSTOP 彩排实际执行 Unknown 捕获、sample 和延后 10s 观察，证明取证路径可用，不能唯一解释原 441 行。看板 R6-C 已验收，R12-U1 另列 BACKLOG；O-01/GAP-133 整体、Trace 及既有其余边界继续开放。独立库/vendor 未改，未部署用户运行中的 Host。详细归因、失败日志和验收证据见 [本轮报告](PTY-RESTART-RECOVERY-2026-10-16.md#r12-u1-分层取证与本轮验收2026-10-17)。
+
 ## 第十二批：R6-C 复审与修正（2026-10-16）
 
 从干净 `9a89db96a` 对照 `81cb278a5` 复审，确认并修正五项：**R12-01/P1**（creator 越过未读输出完成）、**R12-02/P2**（恢复途中有效 NotStarted 误报 Unknown）、**R12-03/P2**（原 Host 无法收束即时或迟到的确切未启动）、**R12-04/P2**（一个本地失败阻断其他旧实例恢复）、**R12-05/P2**（真实 spawn 失败留下空端点）。均为 R6-C 新增问题，不归给原拆分。正常完成沿有序流交付输出；NotStarted 保留独立类型和原因；只有确认 Drain 才恢复无本地绑定的旧实例，本地输出故障和 Unknown 不被物理回执掩盖。命令不重发。

@@ -166,3 +166,49 @@ format/check 已通过：`r6c-review-format-final.log`、`r6c-review-check-final
 本次五项已确认缺陷已闭环；因 R12-U1 证据不足，CUT-04-R6-C 仍为 REVIEW，不能给出无条件“未引入任何回退”的结论。不以盲目补丁或扩大所有超时替代定因。
 
 下次定向捕获必须在删除工作区前保存脱敏的外层帧、request 身份摘要、内层 started/target-exit/scope-ended/fault 和确切进程关系，并延后观察一次有界窗口。内层已结束但外层缺 terminal 时定位 Recovery 交付边界；内层缺结束时对比直接 PtyScope 控制，区分原监管 Unknown 与新层交互。只有取得稳定反例才调整实现，随后加入正式 003/025、跑对应回归并由非作者复验；无论哪条路径，缺失退出证据继续留 blocker，不用 PID 或计数推断结束。禁止把“40 次未复现”写成该现象已修复。
+
+## R12-U1 分层取证与本轮验收（2026-10-17）
+
+本轮起点为干净 `266f0c8eb`。用户在本轮末决定：先验收已确认的修复，原自然 Unknown 记录待以后处理。以下结论只覆盖所列实现和验证；R12-U1 未定因，不以这次修复替原 441 行补写原因。
+
+### 问题与归因
+
+| 项目 | 证据、修正及边界 |
+|---|---|
+| R13-01 / P1，R6-C 原实现缺陷 | `PtyScope` 已取得真实 scope-ended(code23)，Recovery 的 onExit listener 调用 terminal 发布；rename/fsync 异常被内层通用 listener 隔离捕获，内层随后正常删除证据。旧外层既没有 terminal，也没有 fault，custodian 保持存活。受控 rename EIO 的原型保留内层三份记录、pending、心跳及一次命令计数；原八项正式反例全部失败，`r12-u1-publication-requirement-red.log`。这证实一个实现机制，但反例一般已有 started，与原 441 行不能画等号。 |
+| 修正契约 | 只在真实 onExit 首次复制本次 code/signal/stopped；发布失败显式发送 fault，fault 持久化也失败时仍报告两项原因。只允许原 key/incarnation/secret 校验通过且取得独占连接的 recover 重发布该事实，成功后直接 terminal，不再 attached 或排队 TERM。待发布状态禁止 write/resize/signal；不读 pending 清账，不根据 PID 或 Closed 推断完成，不重发命令。原 creator 的失败不被后来冷恢复改写。 |
+| R13-C1 / P2，本轮未交付候选遗漏 | 首候选在目录 fsync 与第一次正式 terminal 回读均 EIO 时，冷 drain 已能读到真实回执，owner 却不退休。Node/Bun 均失败：十二项 **10 pass / 2 fail**，`r12-u1-publication-first.log`。现保留 100ms 只读观察，正式回执验签且匹配所缓存的退出事实后才退休；没有回执时继续 Unknown，不自动重发布。候选遗漏在交付前修正，不归原拆分。 |
+| R13-F1，临时包验收夹具 | 首次精确包验证中，普通 Bun 完成后留下固定 `pty-descendant` PID 文件，下一次 OpenCode 可提前读到旧死 PID，后代 alive 断言失败，`r12-u1-package-540.log`。改为每次进程独立 marker 后，同一包完整消费通过，`r12-u1-package-540-green.log`。非作者的真实 OpenCode 两例对照确定重现该污染路径：旧等待条件成立时读到旧死 PID，真实新后代仍活着；独立 marker 则读到确切新 PID，二者随后均确切回收，`r12u1-marker-contrast.log`、`r12u1-marker-contrast-aCri7J/{stale,unique}/evidence.json`。负控人为延后新 marker，原失败目录已被旧 finally 删除，不声称复原原次 PID 号。PtyScope.js 与旧 538 包均为 `760d6722307fdc7e42d278fd1537dfc3e0932613e3daa12c7d788231c11e1ca3`，未修改生产监管算法。此项不算新产品回退。 |
+
+本轮只改 `Process/PtyRecovery.fs` 的物理事实交付与 custodian 寿命；Host/Ownership 权责、独立库及 vendor 保持不变。通用 PtyScope listener 隔离仍保留，不能让一个消费者抛错阻止其他消费者或内层清理。未确认新的 review 误判；失败的候选、夹具和原未定因观察分别保留。
+
+### 已执行的分层对照
+
+1. 稳定旧 538 的真实 Host 复验：Node/Bun 各 20 次全部 Ended(code23)，最长 538ms，40 套内层记录与 120 条外层帧即时保全，无 SQL Busy 或 close 失败。证据 `r12u1-host-recovery-observation-538.log`、`r12u1-host-recovery-paIbuh/{events.jsonl,verification.json}`。这不是原异常的定因。
+2. 直接 Scope 对照：同命令正常 216ms 完成；受控丢弃一次真实 bun-pty onExit 后，5.5s 时内层三项结束记录完整、inspect 为 Draining，已知目标退出码 23。因此，单独丢 native onExit 不足以解释原“只有 attached”。证据 `r6c-native-exit-{baseline,dropped}.log`，不据此盲改依赖或原生监管。
+3. 稳定 540 固定并发 2 的三对直接 Scope/Node Recovery/Bun Recovery：六例均确切 Ended(code23)，241～380ms，命令各一次。另一个 SIGSTOP 彩排在 5.275s 触发 Unknown，保全内层、外层、目录、心跳、完整本例进程关系，sample 实际成功；再观察 10.124s 才恢复。冻结 15.106s 期间无心跳，恢复后同一实例结束且计数仍一。七例清理记录及残留扫描均为空。证据 `r12u1-layer-observation-540.log`、`r12u1-layer-zvPCYw/{summary.json,verification.json,residual-verification.json}`。这是取证分支实演，不能冒充自然复现。
+
+上述日志与目录均位于 `/private/tmp/`。原 441 行缺少内层和延后现场，其唯一原因无法追溯确认；受控发布错误与冻结事件循环已能被分开观察。按用户决定停止扩大自然 Unknown 调查，保留现有证据及后续计划。
+
+### 验收与非作者复查
+
+`process-execution/003` 新增十二项：Node/Bun 各覆盖连续 rename EIO、terminal/fault 双发布失败、目录 fsync EIO、fsync 加首次回读 EIO、真实 TERM 的 stopped=true 保留、ownerlost+pending。检查实际 native code23、命令一次、错误凭据不触发重发布、连续恢复失败后再成功、原 creator 不收到假 Ended。`managed-session-lifecycle/025` 新增六项：Node/Bun 各验证发布重试、已存在正式回执的冷清账，以及仅有真签名 pending 的两次 fresh Host 拒绝。最终聚焦 **18/18**，`r12-u1-focused-540.log`。
+
+非作者 `r6c_protocol_review` 复核认证、独占、缓存事实、pending 禁止控制和 100ms 回读退休，未发现新的实证问题；`r6c_ownership_review` 另以实际 SQLite 在第三次物理发布成功后的 Ended COMMIT 前/后丢回执：该次仍失败，before 留 blocker、after 虽已提交也不报成功，下一 fresh Host 才完成。Node/Bun 四例通过；另两例 ownerlost+真签名 pending 反复恢复仍留账。原 creator 始终保留原 EIO，命令一次，自有 custodian 均退出。证据 `r12u1-independent-host-{node,bun}-{rename-before,rename-after,owner-lost}-540.log`。`r6c_observation_review` 完成上面的真实分层对照与捕获演练。没有把六项独立补证加进正式套件总数。
+
+Fable **generation 540，174 surfaces / 838 modules**，`r12-u1-build-second.log`，exit 0；未使用 dotnet build。首轮三个控制嵌套门禁失败保留于 `r12-u1-check-first.log`，手工平整后实际 check 通过 `r12-u1-check-second.log`，未放宽规则。`r12-u1-format-final.log` 与 diff whitespace 检查通过。仓库输入在构建、回归及精确包验证期间冻结。
+
+| 相关套件 | total / pass / 普通 fail / skip / TODO | `/private/tmp/` 日志 |
+|---|---|---|
+| Work、managed-session、session-ontology、crash 018/020、相关 delegation/horizon | **564 / 535 / 0 / 5 / 24** | `r12-u1-ownership-540.log` |
+| managed-chat、execution-model-routing、capability-enforcement | **430 / 401 / 0 / 11 / 18** | `r12-u1-provider-540.log` |
+| Process | **238 / 233 / 0 / 0 / 5** | `r12-u1-process-540.log` |
+| 合计，不重叠文件 | **1232 / 1169 / 0 / 16 / 47** | skip/TODO 不计通过 |
+
+精确包 `.fable-build/verify-logs/r12-u1-package/wanxiangshu-0.9.0.tgz`：**2075 members / 13,275,545 bytes**，内容 SHA-256 **`3241a9414740371febe870a6f36bd521d3122dd99ef4c96b313408df9be60d07`**。真正 pack/解包、隔离 npm ci、默认入口消费通过；同一 tarball 的旧监管用例在 Bun/OpenCode 下通过，新接管 7+3 场景、有序观察 8+3 场景、发布故障 Node/Bun/OpenCode 共 18 场景均通过，`r12-u1-package-540-green.log`，exit 0。只验收本机 macOS arm64；本轮 Linux 胶囊传输中断且核对未落文件，不记通过，不更改上一批已记录的平台边界。
+
+### 验收决定与剩余待办
+
+本轮所列修复及独立复审验收通过，CUT-04-R6-C 转 DONE；**R12-U1 转单独 BACKLOG，仍未定因、未修复**。以后取得新现场或用户重新认领时，沿已实演的保全路径分层定位，再补正式反例。缺少确切物理证据时继续留 blocker；不加大所有超时或降低 Unknown 标准。
+
+该决定不等于 O-01/GAP-133 整体、Trace、主动脱离控制终端、Windows/musl、断电或完整 Bootstrap 矩阵已闭合。按 AGENTS.md 正常提交并推送 master，禁止 force push；构建验证、Git 交付及实际部署分别记账。本轮未部署用户运行中的 Host。文档收尾后仅刷新构建元数据；generation 542 精确包内容相同，`r12-u1-package-final-identity.log`。新测试只整理多语句同行后，十八项另复验全绿，`r12-u1-focused-final.log`，不冒称又一轮全套行为回归。

@@ -262,6 +262,7 @@ module private PtyRecoveryWorker =
             let mutable attachedMode = ""
             let mutable stateTimer: obj = null
             let mutable readySent = false
+            let mutable ended: obj = null
             let server: obj = N.sockets?createServer ()
 
             let send socket frame =
@@ -279,11 +280,9 @@ module private PtyRecoveryWorker =
                     0
                 |> ignore
 
-            let endOwner result =
-                N.receipt directory request result
+            let closeOwner () =
                 settled <- true
                 N.clearTimer stateTimer
-                notify (N.objectOf [ "kind", box "terminal"; "result", result ])
                 server?close () |> ignore
                 N.timer exitOwnerSoon 5000 |> ignore
 
@@ -293,9 +292,54 @@ module private PtyRecoveryWorker =
                     N.on controller "close" (fun _ -> exitOwnerSoon ())
                     N.finishSocket controller exitOwnerSoon
 
+            let completeOwner result =
+                notify (N.objectOf [ "kind", box "terminal"; "result", result ])
+                closeOwner ()
+
+            let endOwner result =
+                N.receipt directory request result
+                completeOwner result
+
             let fail reason =
-                N.publish directory "fault" (N.objectOf [ "incarnation", request?incarnation; "reason", box reason ])
-                notify (N.objectOf [ "kind", box "fault"; "reason", box reason ])
+                let reported =
+                    try
+                        N.publish
+                            directory
+                            "fault"
+                            (N.objectOf [ "incarnation", request?incarnation; "reason", box reason ])
+
+                        reason
+                    with error ->
+                        reason + "; PTY fault publication failed: " + error.Message
+
+                notify (N.objectOf [ "kind", box "fault"; "reason", box reported ])
+
+            let hasEndedReceipt () =
+                try
+                    N.terminal directory request
+                    |> Option.exists (fun result ->
+                        result?kind = "Ended"
+                        && result?exit?code = ended?exit?code
+                        && result?exit?signal = ended?exit?signal
+                        && result?stopped = ended?stopped)
+                with _ ->
+                    false
+
+            let publishEnded () =
+                let published =
+                    try
+                        N.receipt directory request ended
+                        true
+                    with error ->
+                        fail error.Message
+                        false
+
+                if published then
+                    completeOwner ended
+                elif hasEndedReceipt () then
+                    closeOwner ()
+                elif not (N.absent controller) then
+                    N.endSocket controller
 
             let! loaded =
                 task {
@@ -312,10 +356,27 @@ module private PtyRecoveryWorker =
                     readySent <- true
                     notify (N.objectOf [ "kind", box "started"; "state", state ])
 
-            let rec observe () =
-                if not settled && not (N.absent terminal) then
+            let observeState () =
+                if not (N.absent ended) && hasEndedReceipt () then
+                    closeOwner ()
+
+                if N.absent ended && not (N.absent terminal) then
                     notifyStarted (terminal?inspect ())
-                    stateTimer <- N.timer observe 10
+
+            let rec observe () =
+                let interval = if N.absent ended then 10 else 100
+
+                if not settled then
+                    observeState ()
+                    stateTimer <- N.timer observe interval
+
+            let rememberExit (exit: obj) =
+                if N.absent ended then
+                    ended <-
+                        N.objectOf
+                            [ "kind", box "Ended"
+                              "exit", N.objectOf [ "code", exit?code; "signal", exit?signal ]
+                              "stopped", box stopped ]
 
             let start spawn =
                 let options =
@@ -334,8 +395,11 @@ module private PtyRecoveryWorker =
                 terminal?onFault fail |> ignore
 
                 terminal?onExit (fun exit ->
-                    N.require (N.validExit exit) "PTY owner has no native exit status"
-                    endOwner (N.objectOf [ "kind", box "Ended"; "exit", exit; "stopped", box stopped ]))
+                    if N.validExit exit then
+                        rememberExit exit
+                        publishEnded ()
+                    else
+                        fail "PTY owner has no native exit status")
                 |> ignore
 
                 observe ()
@@ -374,8 +438,11 @@ module private PtyRecoveryWorker =
                     creatorSeen <- true
                     loaded |> Option.iter start
 
-                send socket (N.objectOf [ "kind", box "attached" ])
-                sendState socket
+                if mode = "recover" && not (N.absent ended) then
+                    publishEnded ()
+                else
+                    send socket (N.objectOf [ "kind", box "attached" ])
+                    sendState socket
 
             let applyControl (frame: obj) =
                 match unbox<string> frame?kind with
@@ -405,6 +472,7 @@ module private PtyRecoveryWorker =
                 else
                     N.require (obj.ReferenceEquals(controller, socket)) "PTY control connection is not admitted"
                     N.require (not settled && not (N.absent terminal)) "PTY physical owner is unavailable"
+                    N.require (N.absent ended) "PTY physical scope has ended and awaits terminal publication"
                     applyControl frame
                     send socket (N.objectOf [ "kind", box "ack"; "sequence", frame?sequence ])
 

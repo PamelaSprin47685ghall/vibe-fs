@@ -21,6 +21,16 @@ import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js
 import { hostPort } from '../../interaction-authority/tests/support/authority.mjs'
 import { createHmac } from 'node:crypto'
 
+for (const runtime of ['node', 'bun']) {
+  for (const mode of ['rename', 'directory-sync', 'owner-lost']) {
+    test(`WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (${runtime}, ${mode})`, { timeout: 25000 }, async t => {
+      if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
+      const helper = fileURLToPath(new URL('./support/pty-publication-evidence.mjs', import.meta.url))
+      await promisify(execFile)(runtime, [helper, mode], { timeout: 20000 })
+    })
+  }
+}
+
 test('WHAT[managed-session-lifecycle-025] another process cannot reserve a PTY after the work round stops admission', { timeout: 20000 }, async () => {
   await withAdmissionWorkers('stop-first', async (producer, stopper) => {
     const stopped = await stopper.call('stop')

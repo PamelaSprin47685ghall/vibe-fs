@@ -7,6 +7,16 @@ import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 
 for (const runtime of ['node', 'bun']) {
+  for (const mode of ['rename', 'double-failure', 'directory-sync', 'directory-sync-read', 'stopped', 'owner-lost']) {
+    test(`WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (${runtime}, ${mode})`, { timeout: 20000 }, async t => {
+      if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the PTY owner')
+      const helper = fileURLToPath(new URL('./support/pty-recovery-publication.mjs', import.meta.url))
+      await promisify(execFile)(runtime, [helper, mode], { timeout: 15000 })
+    })
+  }
+}
+
+for (const runtime of ['node', 'bun']) {
   for (const scenario of ['paused-small', 'paused-large', 'truncated', ...(runtime === 'node' ? ['not-started-race', 'ended-race'] : [])]) {
     test(`WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (${runtime}, ${scenario})`, { timeout: 15000 }, async t => {
       if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the PTY owner')
