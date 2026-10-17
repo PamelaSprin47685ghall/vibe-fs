@@ -892,6 +892,14 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Repository/Programming/Js/Anchor/AnchorSurface.js',
+    owner: 'context-compression',
+    laws: ['CONTEXT-COMPRESSION-031'],
+    source: 'src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fs',
+    representation: 'json',
+    kind: 'pure',
+  },
+  {
     module: 'Persistence/Journal/ObligationJournalSurface.js',
     owner: 'obligation-ledger',
     laws: ['OBLIGATION-LEDGER-007'],

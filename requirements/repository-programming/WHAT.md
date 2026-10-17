@@ -275,3 +275,7 @@ ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, 
 ## [052] js.run 教学与验证形态
 
 双语资源 `tool/js-program/run-rules` 与 `tool/js-program/ultra-devops`（wget 批量下载 Ultra Example）成对；示例覆盖断点续传、停滞/过慢检测、退出码分派与逐文件 park 汇报。测试以本地限速 Range 服务器真实驱动 `wget -c`：中断后恢复、部分文件保留、逐文件 park/unpark、404 退出码 8 分派给 `onExit`。
+
+## [053] view 视图声明捕获
+
+每个生成的编程工具接受可选 `view` 参数 `{ prefixUntil, extra }`：捕获发生在工具调用时、进入下一次请求前，写入进程内 ANCHOR 现场表（context-compression [031]），被下一请求消费一次。缺失该参数时行为不变；`extra` 每项是锚点编号或散文值。参数描述由双语资源 `tool/js-program/view-declaration-extra` 提供。

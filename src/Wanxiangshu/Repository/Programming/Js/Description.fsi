@@ -74,6 +74,9 @@ module JsCanonicalDescription =
         val RunRules: string = "tool/js-program/run-rules"
 
         [<Literal>]
+        val ViewDeclarationExtra: string = "tool/js-program/view-declaration-extra"
+
+        [<Literal>]
         val UltraFraming: string = "tool/js-program/ultra-framing"
 
         [<Literal>]

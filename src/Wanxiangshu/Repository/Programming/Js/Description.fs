@@ -79,6 +79,9 @@ module JsCanonicalDescription =
         let RunRules = "tool/js-program/run-rules"
 
         [<Literal>]
+        let ViewDeclarationExtra = "tool/js-program/view-declaration-extra"
+
+        [<Literal>]
         let UltraFraming = "tool/js-program/ultra-framing"
 
         [<Literal>]

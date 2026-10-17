@@ -22,6 +22,8 @@ open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Repository.Programming.Js.OpenCode
+open Wanxiangshu.Repository.Programming.Js.Anchor
+open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Requirement.Grounding
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
@@ -1413,6 +1415,88 @@ module PairProgrammingThoughtTransform =
             }
         | None -> Task.FromResult()
 
+    /// ANCHOR stage (PLAN phase 3): number every identified outgoing message,
+    /// consume one pending view declaration, apply its selection, and build the
+    /// instruction block that carries the anchor map, the declaration echo and
+    /// the token economy. Without a declaration the messages pass through
+    /// untouched and only the bounded anchor map is reported.
+    let private wireTextOf (raw: obj) : string =
+        ProviderWireDecode.rawPartsOf raw
+        |> List.choose ProviderWireDecode.decodePart
+        |> List.map (function
+            | ProviderProjection.WireText text
+            | ProviderProjection.WireReasoning text -> text
+            | ProviderProjection.WireToolCall(_, name, args) -> name + " " + args
+            | ProviderProjection.WireToolResult(_, result) -> result
+            | ProviderProjection.WireMedia _ -> "")
+        |> String.concat "\n"
+
+    let private applyAnchorView
+        (projectionSessionIdOpt: string option)
+        (messages: obj list)
+        : obj list * string option =
+        match projectionSessionIdOpt with
+        | None -> messages, None
+        | Some sessionId ->
+            for raw in messages do
+                ProviderWireDecode.hostMessageId raw
+                |> Option.iter (fun messageId -> AnchorLedger.numberMessage sessionId messageId |> ignore)
+
+            let mapLines =
+                AnchorLedger.anchors sessionId
+                |> List.rev
+                |> List.truncate 20
+                |> List.rev
+                |> List.map (fun (anchor, messageId) -> sprintf "[ANCHOR: %d] %s" anchor messageId)
+
+            match AnchorLedger.takeView sessionId with
+            | None ->
+                if List.isEmpty mapLines then
+                    messages, None
+                else
+                    messages,
+                    Some(
+                        "ANCHOR map (reference these numbers in a js- tool's view declaration):\n"
+                        + String.concat "\n" mapLines
+                    )
+            | Some declaration ->
+                let inputs =
+                    messages
+                    |> List.map (fun raw ->
+                        { AnchorView.AnchorMessage.Id = ProviderWireDecode.hostMessageId raw
+                          AnchorView.AnchorMessage.Text = wireTextOf raw
+                          AnchorView.AnchorMessage.Raw = raw })
+
+                let survivors, report =
+                    AnchorView.apply (AnchorLedger.numberMessage sessionId) AnchorSurface.countTokens declaration inputs
+
+                let prefixText =
+                    match declaration.PrefixUntil with
+                    | Some value -> string value
+                    | None -> "all"
+
+                let extraText =
+                    declaration.Extra
+                    |> List.map (function
+                        | AnchorExtra.Anchor anchor -> sprintf "#%d" anchor
+                        | AnchorExtra.Prose text -> text)
+                    |> String.concat ", "
+
+                let block =
+                    [ "ANCHOR view applied: prefixUntil=" + prefixText + "; extra=[" + extraText + "]"
+                      sprintf
+                          "token economy: total=%d used=%d cached=%d (prefix survives in the cache prefix; extras are recomputed)"
+                          report.Total
+                          report.Used
+                          report.Cached ]
+                    @ report.ExtraProse
+                    @ (if List.isEmpty mapLines then
+                           []
+                       else
+                           "ANCHOR map:" :: mapLines)
+
+                survivors |> List.map (fun message -> message.Raw), Some(String.concat "\n" block)
+
     let private markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored =
         // crash-reconciliation-018: the restart guidance is delivered
         // exactly once; a replayed placement never consumes it.
@@ -1458,6 +1542,8 @@ module PairProgrammingThoughtTransform =
         task {
             let messages = unbox<obj array> outObj?messages |> Array.toList
 
+            let messages, anchorBlock = applyAnchorView projectionSessionIdOpt messages
+
             let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
 
             let elapsed =
@@ -1470,6 +1556,11 @@ module PairProgrammingThoughtTransform =
 
             let! markerDocument =
                 composeMarkerDocument journal projectionSessionIdOpt elapsed toolEstimate guideline restartGuidance
+
+            let markerDocument =
+                match anchorBlock with
+                | Some text -> LlmFacing.withInstruction text markerDocument
+                | None -> markerDocument
 
             let concernInstructions, concernPlacement =
                 prepareConcernFragments journal projectionSessionIdOpt language

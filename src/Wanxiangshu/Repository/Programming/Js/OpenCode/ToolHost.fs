@@ -118,6 +118,9 @@ module JsDescriptionAssets =
     let missingProgram (lang: ProviderLanguage) =
         text lang JsCanonicalDescription.Path.MissingProgram
 
+    let viewDeclarationExtra (lang: ProviderLanguage) =
+        text lang JsCanonicalDescription.Path.ViewDeclarationExtra
+
 /// JS-073/JS-074: a generated js-* tool spec — the dynamic counterpart of the
 /// static baseSpecs. Built from a generated surface (JS-002); execution goes
 /// through JsToolWorkflow (sandbox → staging → preflight → durable facts →
@@ -189,6 +192,19 @@ module JsToolSpec =
         let abandonSchema =
             ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
+        // ANCHOR next-turn view declaration (PLAN phase 3): prefixUntil keeps
+        // the context up to one anchor, extra re-adds referenced segments and
+        // prose values. Optional; consumed once by the next transform.
+        let viewSchema =
+            ToolHostCodec.objectSchemaOf
+                [ "prefixUntil", ToolHostCodec.optionalNumberSchema factory
+                  "extra",
+                  ToolHostCodec.arraySchemaOf
+                      (ToolHostCodec.anySchema factory)
+                      (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
+                      factory ]
+                factory
+
         { Name = surface.ToolName
           Description = surface.Description
           Arguments =
@@ -197,11 +213,15 @@ module JsToolSpec =
                   (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
                   factory
               "unpark", unparkSchema
-              "abandon", abandonSchema ]
+              "abandon", abandonSchema
+              "view", viewSchema ]
           Admission = admissionFor surface.RoleName
           Execute =
             fun args ctx ->
                 task {
+                    if not (isUndefined (args.Raw?view)) then
+                        Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId (args.Raw?view)
+
                     let input = inputOf args
 
                     let hasProgram = not (isNull (input?program))

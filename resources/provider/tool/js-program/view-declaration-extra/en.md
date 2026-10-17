@@ -1,0 +1,1 @@
+Anchors re-added by this view declaration: each entry is an anchor number (re-injects that message) or a prose value (carried verbatim into the next request). The declaration is consumed by the next request and does not persist.

@@ -118,6 +118,12 @@ const toolModule = () => {
       type: 'any',
       optional: () => ({ type: 'any', optional: true }),
     }),
+    number: () => ({ type: 'number', optional: () => ({ type: 'number', optional: true }) }),
+    array: (item) => ({
+      type: 'array',
+      item,
+      describe: (description) => ({ type: 'array', item, description }),
+    }),
     object: (shape) => ({ type: 'object', shape }),
   }
   return { tool }

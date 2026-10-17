@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import {
   createRegistered,
   description,
+  argumentNames,
   argumentSchema,
 } from '../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js'
 
@@ -25,6 +26,12 @@ const toolModule = () => {
       type: 'any',
       optional: () => ({ type: 'any', optional: true }),
     }),
+    number: () => ({ type: 'number', optional: () => ({ type: 'number', optional: true }) }),
+    array: (item) => ({
+      type: 'array',
+      item,
+      describe: (description) => ({ type: 'array', item, description }),
+    }),
     object: (shape) => ({ type: 'object', shape }),
   }
   return { tool }
@@ -34,6 +41,7 @@ test('WHAT[repository-programming-049] unpark.value is declared as an optional f
   const { dir, cleanup } = sandbox()
   try {
     const registered = createRegistered(toolModule(), 'Coder', 'en', dir, null)
+    assert.deepEqual(argumentNames(registered), ['program', 'unpark', 'abandon', 'view'])
     const unpark = argumentSchema(registered, 'unpark')
     assert.equal(unpark.type, 'object')
     assert.equal(unpark.shape.handle.type, 'string')

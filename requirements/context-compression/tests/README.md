@@ -22,6 +22,7 @@ WHAT 拥有输入、提交与生命周期边界；本文只说明现有测试如
 | 027 | owner 构造性质及真实磁盘 blob 解码验证；冻结身份和 epoch 保留，损坏输入分类。真实 integration Fable consumer 已验证：同一真实声明闭包内，工厂调用、公开成员读取及请求种类匹配编译成功；外部直接构造 Main/Squash 分别在对应 consumer 位置报具体类型的访问拒绝。三项编译用例全部通过，源码与产物均隔离在临时目录；这些证据不替代旧 epoch 实际提交拒绝及全链保留 typed rejection 的缺证。 |
 | 028 | 生产 K 窗口公式、同回合多提交及有地址边界；真实 XWire 在只有一条用户消息的工作循环中折叠已覆盖前导历史，同时保留 Opening 与窗口回合。注入材料端口不等于真实磁盘提交。 |
 | 029 | 生产 selector 的窗口、coverage、请求边界、不可回退和 digest 证明；传入无窗口不证明上层只会在真实失败后选择紧急 Probe，仍需调用链证据。 |
+| 031 | ANCHOR 编号稳定、视图声明一次性消费、前缀保留/尾部丢弃/引用重加、无标识消息保守保留、token 经济计数与生成工具的 view 参数捕获。真实 transform 管线内的注入块端到端断言仍待补（当前由 400 例既有 transform 用例证明无回归）。 |
 
 018 原有纯 frame 覆盖集中在 010/011/015/016，flight 竞争在 024，handle 生命周期在 delegation 013/023。删除的源码名字检查、测试自建 Set 去重、空 frame fatal、claim/release 冒充 commit，并不算覆盖迁移；对应缺证留在 GAP-104 与 TODO。effect-accounting 004 的低层重复 receipt 也不能代替完整提交入口，见 GAP-105。
 

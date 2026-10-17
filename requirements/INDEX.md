@@ -161,7 +161,7 @@
 | 31 | `change-integration` | 14 | change-integration-001 ~ 009、011、013 ~ 015、017 |
 | 32 | `semantic-trace` | 12 | semantic-trace-001 ~ 010、semantic-trace-011（Fission keyed convergence 与多 Present 轨迹归并）、semantic-trace-012（独立 Invocation 范围与 Resume 边界） |
 | 33 | `work-record` | 17 | work-record-001 ~ 016、work-record-017（Fission 汇聚生成单次 Invocation Canonical Record） |
-| 34 | `context-compression` | 30 | context-compression-001 ~ 027、context-compression-028（逐次 todowrite K 窗口）、context-compression-029（coverage 落后不丢 raw 与紧急 Probe 例外）、context-compression-030（assume call/result 永久原文穿透 LWR） |
+| 34 | `context-compression` | 31 | context-compression-001 ~ 027、context-compression-028（逐次 todowrite K 窗口）、context-compression-029（coverage 落后不丢 raw 与紧急 Probe 例外）、context-compression-030（assume call/result 永久原文穿透 LWR）、context-compression-031（ANCHOR 编址、视图声明与 token 经济） |
 | 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015；todowrite checkpoint 窗口见 context-compression-028 |
 | 36 | `execution-failure-policy` | 14 | execution-failure-policy-001 ~ 014 |
 | 37 | `provider-attempt-recovery` | 24 | provider-attempt-recovery-001 ~ 023、provider-attempt-recovery-024（加载期 Blogger stale 请求的同源未启动执行定夺） |
