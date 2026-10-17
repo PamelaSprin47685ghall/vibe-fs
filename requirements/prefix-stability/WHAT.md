@@ -63,6 +63,8 @@ ProviderRetryAttempt 不进入 X/Y/digest；定位当前 retry 的 request-start
 
 guidance 后缀正文只参与 provider 呈现，不进入 XTrace、Companion decode、Blogger delta、WorkRecord 或 compaction 输入。仅其 durable occurrence 投影参与 guidance 恢复。
 
+Host 捕获读取原始物理消息，呈现使用副本。剥离已经附加的呈现时，须按同一 Host message/part 的原文和该位置的 durable occurrence 精确核对完整字节；普通用户或工具正文引用相同文本、分隔符或完整包装时仍是业务原文，不能按文本替换删除。底层 Trace 入口不猜测调用者提供的正文是否来自呈现层。
+
 ## [015] synthetic identity 确定性
 
 Synthetic ID 由 SealRoot、frameEpoch、ordinal 等持久化身份材料确定性派生，不用 GUID、随机数、时间戳或临时运行时 ID。

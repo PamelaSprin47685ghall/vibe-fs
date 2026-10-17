@@ -188,7 +188,7 @@ const pair = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtSur
 const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
 const { withReopenableJournal } = await import('../../semantic-trace/tests/support/journal.mjs')
 
-test('WHAT[prefix-stability-014] injected wire fed directly to durable capture excludes guidance and preserves ordinary quotation', { todo: 'GAP-108: direct capture retains suffix bytes; verify and close the actual Host admission path without teaching semantic capture to guess prose' }, async () => {
+test('WHAT[prefix-stability-014] bare semantic capture preserves supplied bytes rather than guessing guidance from prose', async () => {
   const guidance = 'a unique guidance sentence'
   const raw = [{
     info: { id: 'tool-message', role: 'assistant' },
@@ -209,8 +209,91 @@ test('WHAT[prefix-stability-014] injected wire fed directly to durable capture e
     assert.equal(captured.ok, true)
     const recovered = await trace.currentProjection(await reopen(), 'ses-trace-guidance')
     const parts = recovered.messages.flatMap(message => message.parts)
-    assert.deepEqual(parts.filter(part => part.kind === 'tool-result'), [{ kind: 'tool-result', result: 'file content\r\n' }])
+    assert.deepEqual(parts.filter(part => part.kind === 'tool-result'), [{ kind: 'tool-result', result: `file content\r\n\0\uFEFF${guidance}` }])
     assert.deepEqual(parts.filter(part => part.kind === 'text'), [{ kind: 'text', text: guidance }])
   })
+})
+}
+
+{
+const assert = (await import('node:assert/strict')).default
+const pair = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js')
+const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+const { join } = await import('node:path')
+const { withGuidanceHost, toolBody, separator } = await import('./support/guidance-host.mjs')
+
+for (const status of ['completed', 'error']) {
+  test(`WHAT[prefix-stability-014] registered Host ${status} tool presentation leaves physical snapshot and durable originals unchanged`, async () => {
+    await withGuidanceHost(status, async host => {
+      const before = await host.current()
+      const frontier = host.head()
+      assert.equal(host.textOf(host.result), toolBody)
+      assert.deepEqual(before.messages.flatMap(message => message.parts).filter(part => part.kind === 'tool-result'), [{ kind: 'tool-result', result: toolBody }])
+      const completed = { tool: 'read', sessionID: host.sessionID, callID: 'call-read', args: { filePath: 'x' } }
+      await host.hooks['tool.execute.after'](completed, { title: 'read', output: toolBody, metadata: {} })
+      await host.hooks.event({ event: { type: 'message.part.updated', properties: { sessionID: host.sessionID, part: host.result.parts[0] } } })
+      const snapshot = await trace.captureSessionSnapshot(host.runtime.journal, host.sessionID, host.raw)
+      assert.equal(snapshot.ok, true, JSON.stringify(snapshot))
+      await host.transform(host.raw)
+      await host.transform(host.first)
+      assert.deepEqual(host.head(), frontier)
+      assert.deepEqual(await host.current(), before)
+      const cold = host.cold()
+      assert.notEqual(cold.pid, process.pid)
+      assert.deepEqual(cold.projection, before)
+    })
+  })
+}
+
+for (const form of ['plain', 'enclosed', 'embedded', 'position', 'multiple']) {
+  test(`WHAT[prefix-stability-014] a real user ${form} quotation of previous guidance is preserved in the request and cold trace`, async () => {
+    await withGuidanceHost('completed', async host => {
+      const block = `${separator}<system>\n${host.guidance.trim()}\n</system>`
+      const text = form === 'plain' ? host.guidance : form === 'enclosed' ? block : `literal${block}\nend`
+      const quoted = await host.quote(text, { physicalPart: form !== 'position', multiple: form === 'multiple' })
+      assert.ok(quoted.presented.startsWith(text), 'guidance rendering must retain the complete original user body')
+      assert.equal(quoted.message.parts.at(-1).text, text)
+      const projection = await host.current()
+      assert.equal(projection.messages.at(-1).parts.at(-1).text, text)
+      assert.deepEqual(host.cold().projection, projection)
+    }, form)
+  })
+}
+
+test('WHAT[prefix-stability-014] a captured user carrier presentation replays from its proven original without adding trace material', async () => {
+  await withGuidanceHost('completed', async host => {
+    const quoted = await host.quote('continue the work')
+    const before = await host.current()
+    const frontier = host.head()
+    const reopened = await pair.createJournal(join(host.runtime.directory, '.git'))
+    assert.equal(reopened.ok, true, JSON.stringify(reopened))
+    try {
+      const carrier = { ...quoted.message, parts: [{ ...quoted.message.parts[0], text: quoted.presented }] }
+      const replayed = await pair.tryInjectWithJournal(reopened.journal, host.sessionID, 'unused marker at the same placement', [...host.raw, carrier])
+      assert.equal(replayed.ok, true, replayed.error)
+      assert.equal(replayed.value.find(message => message.info.id === quoted.message.info.id).parts.at(-1).text, quoted.presented)
+    } finally {
+      pair.disposeJournal(reopened.journal)
+    }
+    assert.deepEqual(host.head(), frontier)
+    assert.deepEqual(await host.current(), before)
+    assert.deepEqual(host.cold().projection, before)
+  }, 'user-reentry')
+})
+}
+
+{
+const assert = (await import('node:assert/strict')).default
+const { execFileSync } = await import('node:child_process')
+const { fileURLToPath } = await import('node:url')
+const { integrationTest } = await import('../../verification-system/tests/support/tier-gate.mjs')
+
+integrationTest('WHAT[prefix-stability-014] actual OpenCode Host provider requests preserve user quotations and keep guidance out of physical tool originals through cold recovery', () => {
+  const output = execFileSync(process.execPath, [fileURLToPath(new URL('./support/real-guidance-host.mjs', import.meta.url))], { encoding: 'utf8' })
+  const evidence = JSON.parse(output.trim().split('\n').at(-1))
+  assert.equal(evidence.quotePreserved, true)
+  assert.equal(evidence.persistedUnchanged, true)
+  assert.equal(evidence.coldVerified, true)
+  assert.ok(evidence.providerRequests >= 4)
 })
 }

@@ -1817,7 +1817,11 @@ test('WHAT[host-boundary-032] C35_unknown_tool_call_leaves_persisted_history_unt
   })
 })
 
-test('WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stable', async () => {
+test('WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stable', async t => {
+  const previousState = globalThis.__wanxiangshu_test_predictor_state
+  const previousReason = globalThis.__wanxiangshu_test_predictor_reason
+  setPredictorState('configured')
+  t.after(() => previousState === undefined ? clearPredictorState() : setPredictorState(previousState, previousReason))
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const tool = 'js-manager'
     const sessionID = 'ses-c36'

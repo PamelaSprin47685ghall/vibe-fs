@@ -15,6 +15,13 @@ module XTraceMaterialization =
         xTrace: XTraceProjectionState ->
             Task<Result<string option, string>>
 
+    val tryHostUserText:
+        messageId: TranscriptMessageAddress ->
+        partId: HostMessagePartId option ->
+        partIndex: int ->
+        xTrace: XTraceProjectionState ->
+            Task<Result<string option, string>>
+
     val currentProjection:
         xTrace: XTraceProjectionState -> Task<Result<ProviderProjection.ProviderSemanticProjection, string>>
 

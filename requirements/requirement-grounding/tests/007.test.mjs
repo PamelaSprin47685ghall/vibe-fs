@@ -7,6 +7,7 @@ import test from 'node:test'
 import * as grounding from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
 import * as pair from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
 import * as trace from '../../../dist/Context/Trace/SemanticTraceSurface.js'
+import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import { acceptAuthorityRoot, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import './support/007-provider-serialization.integration.mjs'
 
@@ -278,7 +279,7 @@ test('WHAT[requirement-grounding-007] missing physical part IDs bind only to exa
   })
 })
 
-test('WHAT[requirement-grounding-007] ambiguous captured missing-part call identity is rejected by both presentation owners', async () => {
+test('WHAT[requirement-grounding-007] new ambiguous missing-part material is refused and legacy ambiguity is rejected by both presentation owners', async () => {
   await withExecutablePlugin(async (_hooks, directory, _createdIds, runtime) => {
     const sessionID = 'ambiguous-missing-part'
     const raw = [{ info: { id: 'ambiguous-missing-part-result', role: 'assistant', sessionID, providerID: 'anthropic' },
@@ -286,8 +287,23 @@ test('WHAT[requirement-grounding-007] ambiguous captured missing-part call ident
         state: { status: 'completed', input: { filePath: 'README.md' }, output, time: { start: 0, end: 1 } } })) }]
     const captured = await trace.captureObservedMessages(runtime.journal, sessionID,
       raw.map(message => ({ hostMessageId: message.info.id, message })))
-    assert.equal(captured.ok, true)
-    const evidence = trace.orderedSemanticParts(captured.projection).filter(part => part.kind === 'tool_result')
+    assert.equal(captured.ok, false)
+    assert.match(JSON.stringify(captured.error), /conflict|ambiguous/i)
+    assert.deepEqual(trace.orderedSemanticParts(trace.snapshot(runtime.journal, sessionID)), [])
+    for (const [index, part] of raw[0].parts.entries()) {
+      const body = await journal.JournalSurface_writePayload(runtime.journal, part.state.output)
+      assert.equal(body.ok, true)
+      const appended = await journal.JournalSurface_appendAgent(runtime.journal, { kind: 'Session', session: sessionID }, raw[0].info.id, {
+        family: 'Companion', case: 'XTracePartAppended', payload: {
+          SessionId: sessionID, CursorSequence: BigInt(index + 1), Role: 'assistant', Turn: 0, PartIndex: index,
+          Kind: 'tool_result', ToolName: null, ProviderRun: raw[0].info.id, ToolCallId: 'ambiguous-call', HostToolPartId: null,
+          TextRef: body.blobRef, TextDigest: body.blobDigest,
+          Provenance: `g:0/msg:${raw[0].info.id}/part:${index}`,
+        },
+      })
+      assert.equal(appended.ok, true, JSON.stringify(appended.error))
+    }
+    const evidence = trace.orderedSemanticParts(trace.snapshot(runtime.journal, sessionID)).filter(part => part.kind === 'tool_result')
     assert.equal(evidence.length, 2)
     assert.deepEqual(evidence.map(part => [part.hostToolPartId, part.toolCallId]), [[null, 'ambiguous-call'], [null, 'ambiguous-call']])
     await withPresentationJournals(directory, async (pairJournal, groundingJournal) => {

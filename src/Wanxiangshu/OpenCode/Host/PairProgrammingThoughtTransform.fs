@@ -499,28 +499,31 @@ module PairProgrammingThoughtTransform =
         else
             rawMsg
 
-    let private stripUserMessageCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj =
+    let private mapUserMessageText (mapText: string -> string) (rawMsg: obj) : obj =
         let parts = rawParts rawMsg
-
-        let stripKnown (value: string) =
-            (value, suffixTexts)
-            ||> List.fold (fun current text ->
-                current
-                    .Replace(cursorGuidanceSeparator + systemBlock text, "", StringComparison.Ordinal)
-                    .Replace(cursorGuidanceSeparator + text, "", StringComparison.Ordinal))
 
         match terminalTextPartIndex parts with
         | Some index ->
             let originalPart = parts.[index]
             let originalText = partText originalPart
             let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
-            clonedPart?text <- box (stripKnown originalText)
+            clonedPart?text <- box (mapText originalText)
             let clonedParts = Array.copy parts
             clonedParts.[index] <- clonedPart
             let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
             clonedMessage?parts <- box clonedParts
             clonedMessage
-        | None -> stripFallbackUserText stripKnown rawMsg
+        | None -> stripFallbackUserText mapText rawMsg
+
+    let private stripUserMessageCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj =
+        mapUserMessageText
+            (fun value ->
+                (value, suffixTexts)
+                ||> List.fold (fun current text ->
+                    current
+                        .Replace(cursorGuidanceSeparator + systemBlock text, "", StringComparison.Ordinal)
+                        .Replace(cursorGuidanceSeparator + text, "", StringComparison.Ordinal)))
+            rawMsg
 
     let stripCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj =
         let parts = rawParts rawMsg
@@ -550,7 +553,8 @@ module PairProgrammingThoughtTransform =
 
     type private CapturedCursorResults =
         { HasTrace: bool
-          Results: Map<CursorResultIdentity, CapturedCursorResult> }
+          Results: Map<CursorResultIdentity, CapturedCursorResult>
+          UserTexts: Map<TranscriptMessageAddress, CapturedCursorResult> }
 
     let private cursorPartId (part: obj) =
         if isNull part?id then
@@ -577,12 +581,18 @@ module PairProgrammingThoughtTransform =
                   CallId = ToolCallId.create (unbox<string> parts.[index]?callID) }))
 
     let private cursorPresentationPrefixes
+        userMessage
         (guidance: PairProgrammingGuideline list)
         (occurrences: RequirementGroundingOccurrence list)
         =
         let guidanceBytes =
             guidance
-            |> List.map (fun pair -> cursorGuidanceSeparator + pair.MarkerText)
+            |> List.map (fun pair ->
+                cursorGuidanceSeparator
+                + (if userMessage then
+                       systemBlock pair.MarkerText
+                   else
+                       pair.MarkerText))
             |> String.concat ""
 
         occurrences
@@ -620,6 +630,7 @@ module PairProgrammingThoughtTransform =
 
             let atAnchor (pairs: PairProgrammingGuideline list) (occurrences: RequirementGroundingOccurrence list) =
                 cursorPresentationPrefixes
+                    (messageRole rawMsg = "user")
                     (pairs |> List.filter (fun pair -> atMessage pair.ResultGap))
                     (occurrences |> List.filter (fun occurrence -> atMessage occurrence.ResultGap))
 
@@ -647,6 +658,46 @@ module PairProgrammingThoughtTransform =
         |> Option.map (snd >> capture)
         |> Option.defaultWith (fun () -> Task.FromResult(Ok None))
 
+    let private captureUserText trace session (rawMsg: obj) =
+        let needsProof =
+            messageRole rawMsg = "user"
+            && (rawParts rawMsg
+                |> terminalTextPartIndex
+                |> Option.exists (fun index -> (partText (rawParts rawMsg).[index]).Contains cursorGuidanceSeparator))
+
+        let source =
+            (if needsProof then
+                 ProviderWireCapture.decodeCapturedMessage rawMsg
+             else
+                 None)
+            |> Option.filter (fun message -> message.Role = "user" && isString rawMsg?info?id)
+            |> Option.bind (fun message ->
+                message.Parts
+                |> List.mapi (fun index part ->
+                    match part.WirePart with
+                    | Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WireText _ ->
+                        Some(index, part.HostPartId)
+                    | _ -> None)
+                |> List.choose id
+                |> List.tryLast)
+
+        let capture (index, partId) =
+            taskResult {
+                let messageId = TranscriptMessageAddress.create (unbox<string> rawMsg?info?id)
+                let! body = XTraceMaterialization.tryHostUserText messageId partId index trace
+
+                return
+                    body
+                    |> Option.map (fun original ->
+                        messageId,
+                        { Body = original
+                          Presentations = presentationsAtMessage session rawMsg })
+            }
+
+        source
+        |> Option.map capture
+        |> Option.defaultWith (fun () -> Task.FromResult(Ok None))
+
     let private captureCursorResults journal sessionId rawMessages =
         let session =
             AgentJournal.snapshot journal
@@ -655,10 +706,12 @@ module PairProgrammingThoughtTransform =
         let capture trace =
             taskResult {
                 let! captured = rawMessages |> TaskResultList.traverseM (captureCursorResult trace session)
+                let! users = rawMessages |> TaskResultList.traverseM (captureUserText trace session)
 
                 return
                     { HasTrace = true
-                      Results = captured |> List.choose id |> Map.ofList }
+                      Results = captured |> List.choose id |> Map.ofList
+                      UserTexts = users |> List.choose id |> Map.ofList }
             }
 
         session
@@ -668,7 +721,8 @@ module PairProgrammingThoughtTransform =
             Task.FromResult(
                 Ok
                     { HasTrace = false
-                      Results = Map.empty }
+                      Results = Map.empty
+                      UserTexts = Map.empty }
             ))
 
     let private findCapturedCursorResult captures rawMsg =
@@ -715,8 +769,25 @@ module PairProgrammingThoughtTransform =
             stripCapturedPresentation owner captured value
             |> Result.map (fun retained -> mapCapturedResult index (fun _ -> retained) rawMsg)
 
-        if not captures.HasTrace || messageRole rawMsg = "user" then
+        let stripUser captured =
+            let value =
+                rawParts rawMsg
+                |> terminalTextPartIndex
+                |> Option.map (fun index -> partText (rawParts rawMsg).[index])
+
+            match value with
+            | None -> Ok rawMsg
+            | Some text ->
+                stripCapturedPresentation owner captured text
+                |> Result.map (fun retained -> mapUserMessageText (fun _ -> retained) rawMsg)
+
+        if not captures.HasTrace then
             Ok(stripCursorSuffixes suffixTexts rawMsg)
+        elif messageRole rawMsg = "user" && isString rawMsg?info?id then
+            captures.UserTexts
+            |> Map.tryFind (TranscriptMessageAddress.create (unbox<string> rawMsg?info?id))
+            |> Option.map stripUser
+            |> Option.defaultValue (Ok rawMsg)
         else
             findCapturedCursorResult captures rawMsg
             |> Option.map strip
@@ -1222,7 +1293,8 @@ module PairProgrammingThoughtTransform =
                     Task.FromResult(
                         Ok
                             { HasTrace = false
-                              Results = Map.empty }
+                              Results = Map.empty
+                              UserTexts = Map.empty }
                     )
 
             let! rawMessages =

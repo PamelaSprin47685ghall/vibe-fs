@@ -46,6 +46,31 @@ module XTraceMaterialization =
             | _ -> return! Error "XTrace original Host tool result identity is ambiguous"
         }
 
+    let tryHostUserText
+        (messageId: TranscriptMessageAddress)
+        (partId: HostMessagePartId option)
+        (partIndex: int)
+        (xTrace: XTraceProjectionState)
+        : Task<Result<string option, string>> =
+        let matchesPart (part: XTraceSemanticPartView) =
+            match partId, XTraceProjection.tryMaterialProvenance part.Provenance with
+            | Some physical, Some("physical", _, address, "content") -> address = HostMessagePartId.value physical
+            | None, Some("position", _, address, "content") -> address = string partIndex
+            | _ -> false
+
+        let candidates =
+            XTraceProjection.partsForHostMessageIds (Set.singleton (TranscriptMessageAddress.value messageId)) xTrace
+            |> List.filter (fun part -> part.Role = "user" && part.Kind = "text" && matchesPart part)
+
+        taskResult {
+            match candidates with
+            | [] -> return None
+            | [ part ] ->
+                let! body = XTraceProjection.partText part.Provenance xTrace
+                return Some body
+            | _ -> return! Error "XTrace original Host user text identity is ambiguous"
+        }
+
     let private semanticPart (part: XTracePartRef) (body: string) =
         match part.Kind with
         | "text" -> Ok(ProviderProjection.SemanticText body)
