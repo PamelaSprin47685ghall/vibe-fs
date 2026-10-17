@@ -47,8 +47,8 @@ const openingFact = () =>
     'msg_opening',
   )
 
-const partFact = () =>
-  companionFact(
+const partFact = () => ({
+  ...companionFact(
     'XTracePartAppended',
     {
       SessionId: SESSION,
@@ -66,10 +66,12 @@ const partFact = () =>
       TextDigest: 'sha-part',
     },
     'msg_part',
-  )
+  ),
+  material: 'actual assistant material',
+})
 
-const terminalFact = () =>
-  companionFact(
+const terminalFact = () => ({
+  ...companionFact(
     'TerminalOutputCaptured',
     {
       SessionId: SESSION,
@@ -78,7 +80,9 @@ const terminalFact = () =>
       ProviderRun: 'msg_terminal',
     },
     'msg_terminal',
-  )
+  ),
+  material: 'actual formal terminal',
+})
 
 const closedFact = () => companionFact('CompanionBloggerClosed', { SessionId: SESSION })
 
@@ -183,6 +187,16 @@ test('WHAT[durable-events-015] PERSIST_010_companion_online_and_codec_replay_are
   const envelopes = [linkedFact(), openingFact(), partFact(), terminalFact(), closedFact()]
 
   assert.deepEqual(contextFold.replay(envelopes), contextFold.fold(envelopes))
+})
+
+test('WHAT[durable-events-015] trace facts require material at the fold boundary', () => {
+  for (const fact of [partFact(), terminalFact()]) {
+    const { material, ...withoutMaterial } = fact
+    const refused = contextFold.fold([withoutMaterial])
+    assert.equal(refused.ok, false)
+    assert.match(refused.error.Reason, /payload was not provided/)
+    assert.deepEqual(contextFold.replay([withoutMaterial]), refused)
+  }
 })
 
 test('WHAT[durable-events-015] PERSIST_010_companion_facts_fold_into_the_owned_projection', () => {

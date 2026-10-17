@@ -58,9 +58,11 @@ type XTraceFoldRejection =
     | OpeningAlreadyCaptured
     | CursorNotAfterHead of expected: int64 * actual: int64
     | TerminalAlreadyCaptured
+    | MaterialRejected of reason: string
 
 module XTraceProjection =
     val empty: XTraceProjectionState
+    val emptyForSession: sessionId: SessionId -> XTraceProjectionState
     val internal parts: state: XTraceProjectionState -> XTracePartRef list
     val internal partCount: state: XTraceProjectionState -> int
     val internal terminalCount: state: XTraceProjectionState -> int
@@ -108,6 +110,7 @@ module XTraceProjection =
         hostToolPartId: HostToolPartId option ->
         textRef: BlobRef ->
         textDigest: BlobDigest ->
+        body: string ->
         state: XTraceProjectionState ->
             Result<XTraceProjectionState, XTraceFoldRejection>
 
@@ -115,6 +118,7 @@ module XTraceProjection =
         textRef: BlobRef ->
         textDigest: BlobDigest ->
         providerRun: ProviderRunIdentity ->
+        body: string ->
         state: XTraceProjectionState ->
             Result<XTraceProjectionState, XTraceFoldRejection>
 
@@ -123,6 +127,8 @@ module XTraceProjection =
     val traceIntervalOfRange: range: XTraceRange -> state: XTraceProjectionState -> XTraceCut * XTraceCut
     val traceIntervalAfterCoverage: coverage: RecordCoverage -> state: XTraceProjectionState -> XTraceCut * XTraceCut
     val traceRecords: state: XTraceProjectionState -> string list
+    val partText: provenance: string -> state: XTraceProjectionState -> Result<string, string>
+    val terminalText: providerRun: ProviderRunIdentity -> state: XTraceProjectionState -> Result<string, string>
 
     val internal currentGenerationParts: parts: XTracePartRef list -> XTracePartRef list
     val currentGenerationSemanticParts: state: XTraceProjectionState -> XTraceSemanticPartView list

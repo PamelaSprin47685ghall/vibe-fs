@@ -14,6 +14,12 @@ module Fold =
 
     val foldEnvelope: projection: ProjectionSet -> envelope: Envelope -> Result<ProjectionSet, FoldRejection>
 
+    val foldEnvelopeWithMaterial:
+        material: string option ->
+        projection: ProjectionSet ->
+        envelope: Envelope ->
+            Result<ProjectionSet, FoldRejection>
+
     val isOk: result: Result<'T, 'E> -> bool
 
     val unwrap: result: Result<'T, 'E> -> 'T

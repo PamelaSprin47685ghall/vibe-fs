@@ -18,6 +18,7 @@ const partDescriptor = (sequence, overrides = {}) => ({
   kind: 'text',
   textRef: `blob-${sequence}`,
   textDigest: `digest-${sequence}`,
+  body: `raw-${sequence}`,
   providerRun: `run-${sequence}`,
   ...overrides,
 })
@@ -47,6 +48,7 @@ test('WHAT[semantic-trace-005] composition bridge maps XTraceRange [start, end) 
   projection = unwrap(trace.appendTerminal(projection, {
     textRef: 'blob-term',
     textDigest: 'digest-term',
+    body: 'formal terminal',
     providerRun: 'run-3',
   }))
 
@@ -88,7 +90,7 @@ test('WHAT[semantic-trace-005] composition bridge maps XTraceRange [start, end) 
   assert.throws(() => new Trace(headCut.traceId, [tamperedRecord, ...records.slice(1)]), /Trace/)
 })
 
-test('WHAT[semantic-trace-005] lossless envelope and >512 KiB chunking preserve reasoning, tool_result, media and raw bytes across wanxiangli/trace', () => {
+test('WHAT[semantic-trace-005] durable originals preserve reasoning, tool results and raw bytes without temporary recapture', async () => {
   const userRaw = '用户原话\r\n\uFEFF\u0000keep-exact-bytes'
   const largeToolResult = 'L'.repeat(600 * 1024) + '\r\n\u0000tail'
   const items = [
@@ -100,16 +102,32 @@ test('WHAT[semantic-trace-005] lossless envelope and >512 KiB chunking preserve 
     { cursor: trace.cursor(6), role: 'assistant', provenance: 'g:0/msg:a2/part:0', part: trace.semanticText('Final prose statement.') },
   ]
 
-  const fullRange = trace.createRange(trace.cursor(1), trace.cursor(7))
-  const inspected = trace.inspectBridge('bridge-512k', 'Opening task\r\n\u0000', fullRange, items)
-  assert.equal(inspected.materializedCount, 6)
-
-  const restored = new Trace('bridge-512k', inspected.records)
-  const window = restored.materialize(inspected.after, inspected.through)
-  assert.equal(window.originals.length, 1)
-  assert.equal(window.originals[0].parts[0].content.text, userRaw)
-  assert.notEqual(window.statement, null)
-  assert.equal(window.statement.content.text, 'Final prose statement.')
+  const { withReopenableJournal } = await import('./support/journal.mjs')
+  await withReopenableJournal(async (handle, reopen) => {
+    const messages = [
+      { role: 'user', parts: [trace.semanticText(userRaw)] },
+      { role: 'assistant', parts: items.slice(1, 5).map(item => item.part) },
+      { role: 'assistant', parts: [trace.semanticText('Final prose statement.')] },
+    ]
+    const captured = await trace.captureProjection(handle, 'originals-512k', { messages })
+    assert.equal(captured.ok, true, JSON.stringify(captured.error))
+    const projection = trace.snapshot(handle, 'originals-512k')
+    const cut = trace.traceHeadCut(projection)
+    const restored = new Trace(cut.traceId, trace.traceRecords(projection))
+    const window = restored.materialize(restored.cut(0), cut)
+    assert.equal(window.materials.length, 6)
+    assert.equal(window.materials[0].content.text, userRaw)
+    assert.equal(window.materials[1].kind, 'reasoning')
+    assert.equal(window.materials[2].toolName, 'read')
+    assert.equal(window.materials[3].content.text, largeToolResult)
+    assert.equal(window.materials[4].kind, 'media-omitted')
+    assert.equal(window.statement, null, 'confirmed material must not invent message completion')
+    assert.equal(restored.inspect().runs, 0)
+    const before = await trace.currentProjection(handle, 'originals-512k')
+    const cold = await reopen()
+    assert.deepEqual(await trace.currentProjection(cold, 'originals-512k'), before)
+    assert.deepEqual(trace.traceRecords(trace.snapshot(cold, 'originals-512k')), restored.records())
+  })
 
   const roundTripped = trace.sliceBetween(trace.cursor(1), trace.cursor(7), items)
   assert.equal(roundTripped.length, 6)

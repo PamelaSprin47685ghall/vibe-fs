@@ -2,6 +2,18 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第十四批：T-01 原件接管与消费者切换（2026-10-17）
+
+按剩余计划处理下一个 P1，输入干净主仓 `84ba23b2d`、库 `b6984d9 / 0.6.2`，R12-U1 保持 BACKLOG。库 `a636cbc / 0.6.3` 新增已确认材料和明确 Terminal 绑定；主仓由当前 envelope 的已验证 payload 接回同步 fold，不补缺失 run/message/Completed。Materialization、WorkRecord、Y/prefix、Strength 及经 WorkRecord 的后续消费者共用实际原件，删除描述符追加与临时重捕获。EventStore 仍是唯一持久载体，既有语义游标与范围保留，新 raw identity 明确隔离旧描述符。
+
+修正既有 Host 去重遗漏：同身份改写明确拒绝、批内重复只分配一个游标、同工具部件的调用与结果分别保留，并按精确旧物理路径兼容旧缺失字段。另修旧 Emit 缓存反复实例化及假的 lifecycle→Terminal 测试便利入口。**本轮候选引入的 Replayed record 重复追加、工具 facet 历史兼容遗漏分别记 T01-N1/N2**；null/undefined、SIGKILL/exitCode、证据视图 body 等 oracle 误判另记，不归给原拆分。非作者先证明重复前缀损坏，再验证拒绝、独立分支、缓存、旧字段保留和冷恢复。
+
+生产 Fable **547**，文档/夹具元数据 **548**，收尾 **549** 同包摘要再核对通过，174 surfaces / 838 modules；格式、静态门禁和 diff 通过。两个不重叠相关组 **1290 / 1207 pass / 0 普通 fail / 34 skip / 49 TODO**。另启用 integration tier，独立 F# 消费者正反编译、真实非空 Trace/Terminal 的 checkpoint 保留均通过。库 Node/Bun 各 **67/67**，拆除构建 **2/2**，实际安装包 SQLite 强杀恢复、类型正反及拆除消费 **5/5**。
+
+精确库包 SHA-256 `42eb5ca5aeb9b613ea5400ab43b4de835605e7b74d232f31db4f8e21b04e6162`；主包 **2075 members / 13,291,249 bytes**，SHA-256 `918cf931babe942b2d9f1306d1e1cbc99c5ee98c6add32d8cc0ae1dcb19e0c7b`。隔离 npm ci、默认入口、Node/Bun 包外实际捕获→SIGKILL→新进程 cold replay 的完整 11 条 records/head/正文/范围/Terminal 前沿一致，未借兄弟源码或主仓 node_modules。只有坏 durable fact 的已接受 Trace 前缀保持不动，不声称原物理日志零追加：坏 fact 和 cut-tail 仍按原 Journal 契约保存并强杀进程。
+
+T-01 范围进入 DONE；完整产品链的 GAP-101/108/109/111、Process P2、O-01 脱组边界和 R12-U1 不销项。库正常推送既有修复分支；主仓正常交付 master，无强推，未部署运行中的 Host。[本包问题归因、逐项进度、完整命令及验收证据](TRACE-ORIGINALS-2026-10-17.md)。
+
 ## 第十三批：发布失败证据与本轮验收（2026-10-17）
 
 从干净 `266f0c8eb` 继续 R12-U1 分层调查，确认 **R13-01/P1，R6-C 原实现缺陷**：真实内层 onExit 后，外层 terminal 发布异常会被 listener 隔离吞掉，内层目录随后正常清理，custodian 仍活却没有 terminal/fault。正式 Node/Bun 八个原反例全部失败。现先复制本次原生 code/signal/stopped，显式报告发布失败（包括 fault 文件也失败），只允许通过原实例认证且独占的 recover 重发布同一事实。待发布期间禁止控制，不重发命令；owner 丢失且仅有 signed pending 仍留账。
@@ -366,4 +378,4 @@ T-01 / O-01 仍 DOING，GAP-133 仍 PARTIAL。本次独立真实反例确认：P
 
 下一包 **T01：原件接管及消费者切换**：先冻结库侧“已确认材料＋明确终结绑定”协议；在 JournalIntegration 的 envelope 接口保留 payload 上下文，由同步 fold 把已校验字节交给库。统一 EventStore 继续作为唯一持久载体，不新建旁挂数据库。然后保持已发布语义游标，切换 Materialization、WorkRecord 等实际消费者，删除 Model 中描述符桥及临时原文重捕获，最后用真实 journal 验收大正文、推理、工具、Terminal、并发、retry、重锚与旧保存范围。缺 payload、摘要失配、冲突必须拒绝且不推进 head。
 
-旧生产 journal 未发现持久保存桥的 raw cut；外部另存的旧 raw cut 不保证在更换内部协议后继续使用同 ID/游标。这一边界须在协议中显式写明。此包尚未实现，T-01 保持未关闭。
+旧生产 journal 未发现持久保存桥的 raw cut；外部另存的旧 raw cut 不保证在更换内部协议后继续使用同 ID/游标。以上是当时的 T-01 计划快照，现已按第十四批完成所列原件接管范围，历史边界与未闭合的产品证明见本包报告，不将旧计划状态当作当前状态。

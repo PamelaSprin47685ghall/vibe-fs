@@ -30,8 +30,8 @@ module CompanionTransform =
         : Task<ProviderProjection.ProviderSemanticProjection> =
         match journal with
         | None -> Task.FromResult XTraceMaterialization.empty
-        | Some durable ->
-            XTraceMaterialization.currentProjection durable xTrace
+        | Some _ ->
+            XTraceMaterialization.currentProjection xTrace
             |> TaskValue.map requireCanonicalProjection
 
     let private restoredBloggerId (journal: AgentJournal option) (sessionId: string) =

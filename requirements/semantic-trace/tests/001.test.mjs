@@ -52,6 +52,7 @@ const part = (sequence, overrides = {}) => ({
   kind: 'text',
   textRef: `blob-${sequence}`,
   textDigest: `digest-${sequence}`,
+  body: `raw-${sequence}`,
   providerRun: `run-${sequence}`,
   ...overrides,
 })
@@ -76,31 +77,32 @@ test('WHAT[semantic-trace-001] semantic parts append in strict cursor order', ()
   assert.equal(trace.headCursor(projection).sequence, 4)
 })
 test('WHAT[semantic-trace-001] terminal evidence is idempotent per provider run', () => {
-  const terminal = { textRef: 'blob-terminal', textDigest: 'digest-terminal', providerRun: 'run-terminal' }
+  const terminal = { textRef: 'blob-terminal', textDigest: 'digest-terminal', providerRun: 'run-terminal', body: 'terminal' }
   const first = unwrap(trace.appendTerminal(trace.emptyProjection(), terminal))
   const second = unwrap(trace.appendTerminal(first, terminal))
+  const { body, ...evidence } = terminal
   assert.deepEqual(trace.latestTerminalEvidence(second), {
-    ...terminal,
+    ...evidence,
     frontier: { sequence: 0 },
   })
   assert.deepEqual(trace.terminalEvidenceForProviderRun('run-terminal', second), trace.latestTerminalEvidence(second))
 })
 test('WHAT[semantic-trace-001] distinct provider runs retain distinct terminal evidence', () => {
   let projection = unwrap(trace.appendTerminal(trace.emptyProjection(), {
-    textRef: 'blob-one', textDigest: 'digest-one', providerRun: 'run-one',
+    textRef: 'blob-one', textDigest: 'digest-one', providerRun: 'run-one', body: 'one',
   }))
   projection = unwrap(trace.appendTerminal(projection, {
-    textRef: 'blob-two', textDigest: 'digest-two', providerRun: 'run-two',
+    textRef: 'blob-two', textDigest: 'digest-two', providerRun: 'run-two', body: 'two',
   }))
   assert.equal(trace.terminalEvidenceForProviderRun('run-one', projection).textRef, 'blob-one')
   assert.equal(trace.latestTerminalEvidence(projection).providerRun, 'run-two')
 })
 test('WHAT[semantic-trace-001] one provider run cannot publish conflicting terminal evidence', () => {
   const projection = unwrap(trace.appendTerminal(trace.emptyProjection(), {
-    textRef: 'blob-one', textDigest: 'digest-one', providerRun: 'same-run',
+    textRef: 'blob-one', textDigest: 'digest-one', providerRun: 'same-run', body: 'one',
   }))
   const rejected = trace.appendTerminal(projection, {
-    textRef: 'blob-two', textDigest: 'digest-two', providerRun: 'same-run',
+    textRef: 'blob-two', textDigest: 'digest-two', providerRun: 'same-run', body: 'two',
   })
   assert.equal(rejected.ok, false)
   assert.equal(rejected.error, 'terminal-already-captured')

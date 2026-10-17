@@ -26,6 +26,8 @@ Stable historical insertion 须有 durable journal、非 legacy positional trace
 
 投影状态、游标与区间由 trace 所有者封装。跨所有者只提供复制的语义部件、Opening/Terminal 证据及精确查询，不公开内部状态、追加引用或游标字段。
 
+独立原件 owner 保存已确认材料的真实字节与语义种类。合法缺失的 ProviderRun 或 Host 消息完成状态须保留缺失，不得按 part 游标合成 run/message 并补写 Completed。Terminal 用明确的 ProviderRun 与固定前沿绑定；它不是库的最后助手散文视图。冷 replay 必须校验同一 durable envelope 的 payload 与摘要，缺失或冲突不推进原件前缀。消费者从该 owner 取材，不重新读正文后另建临时 Trace。
+
 ## [006] 稳定 frontier / range / cutoff
 
 历史按半开区间精确切片；工作记录的持久覆盖游标可落在半轮。审查前沿须由完整 Host 快照与 durable XTrace 收敛确定，不能使用未完成传输切片。

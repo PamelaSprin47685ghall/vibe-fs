@@ -152,6 +152,7 @@ const withRepo = (writerId, fn) => {
 
 test('WHAT[durable-events-013] journal_surface_does_not_mint_terminal_proof_from_forged_strings', () => {
   assert.equal(Object.hasOwn(journal, 'JournalSurface_recordTerminalCompletion'), false)
+  assert.equal(Object.hasOwn(journal, 'JournalSurface_appendManagerLifecycle'), false)
 })
 }
 
@@ -165,17 +166,6 @@ const { default: test } = await import("node:test");
 const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 const revisions = await import("../../../dist/Persistence/Journal/RevisionSurface.js");
 
-const lifeOpened = (session) => ({
-  case: 'LifeOpened',
-  payload: {
-    SessionId: session,
-    LifeId: `life-${session}`,
-    OpeningUserMessageId: `msg-${session}`,
-    OpeningTextRef: 'blobs/placeholder',
-    OpeningTextDigest: 'sha-placeholder',
-    OpeningCursorSequence: 1,
-  },
-})
 const openJournal = async (writerId) => {
   const repo = mkdtempSync(join(tmpdir(), `wxs-jrev-${writerId}-`))
   execFileSync('git', ['init', '--quiet', repo])
@@ -198,8 +188,10 @@ const withJournal = async (writerId, fn) => {
     opened.close()
   }
 }
-const appendLife = (handle, session) =>
-  journal.JournalSurface_appendManagerLifecycle(handle, { kind: 'Session', session }, lifeOpened(session))
+const appendFact = (handle, session) =>
+  journal.JournalSurface_appendAgent(handle, { kind: 'Session', session }, null, {
+    family: 'Companion', case: 'CompanionBloggerClosed', payload: { SessionId: session },
+  })
 const revisionOf = (handle) => Number(revisions.revision(handle))
 
 test('WHAT[durable-events-013] EXEC_journal_revision_advances_only_on_successful_fold', async (context) => {
@@ -208,7 +200,7 @@ test('WHAT[durable-events-013] EXEC_journal_revision_advances_only_on_successful
   const before = Number(revisions.revision(opened.handle))
   assert.equal(before, 0, 'pure load writes no RuntimeStarted and starts at revision 0')
 
-  const linked = await appendLife(opened.handle, 'ses_p')
+  const linked = await appendFact(opened.handle, 'ses_p')
   assert.equal(linked.ok, true, JSON.stringify(linked.error))
 
   const after = Number(revisions.revision(opened.handle))
@@ -217,7 +209,7 @@ test('WHAT[durable-events-013] EXEC_journal_revision_advances_only_on_successful
 test('WHAT[durable-events-013] EXEC_AwaitChangeFrom_after_append_returns_promptly', async () => {
   await withJournal('revision-prompt', async (handle) => {
     const from = revisionOf(handle)
-    const linked = await appendLife(handle, 'ses_prompt')
+    const linked = await appendFact(handle, 'ses_prompt')
     assert.equal(linked.ok, true, JSON.stringify(linked.error))
 
     const started = Date.now()
@@ -235,7 +227,7 @@ test('WHAT[durable-events-013] EXEC_AwaitChangeFrom_before_append_waits_then_com
     const pending = revisions.awaitChangeFrom(from, handle)
 
     setTimeout(() => {
-      void appendLife(handle, 'ses_wait').then((linked) => {
+      void appendFact(handle, 'ses_wait').then((linked) => {
         assert.equal(linked.ok, true, JSON.stringify(linked.error))
       })
     }, 30)

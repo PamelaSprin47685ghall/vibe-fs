@@ -96,8 +96,14 @@ module CompanionProjectionBridge =
         | CompanionProjectionChange.XTraceSet(sessionId, xTrace) ->
             ProjectionUpdate.updateSession sessionId (fun session -> { session with XTrace = Some xTrace }) projection
 
-    let fold (projection: AgentProjectionSet) (fact: CompanionFactCases) : Result<AgentProjectionSet, FoldRejection> =
-        match CompanionFactFold.fold projection.Associations (companionOf projection) (xTraceOf projection) fact with
+    let fold
+        body
+        (projection: AgentProjectionSet)
+        (fact: CompanionFactCases)
+        : Result<AgentProjectionSet, FoldRejection> =
+        match
+            CompanionFactFold.fold body projection.Associations (companionOf projection) (xTraceOf projection) fact
+        with
         | Ok changes -> Ok(List.fold applyChange projection changes)
         | Error rejection ->
             FoldRejection.reject (CompanionFoldRejection.fact rejection) (CompanionFoldRejection.message rejection)

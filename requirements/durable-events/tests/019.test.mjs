@@ -138,18 +138,18 @@ test('WHAT[durable-events-019] every registered business oracle changes its prod
         'write Journal payload',
       )
       mustOk(
-        await journal.JournalSurface_appendManagerLifecycle(
+        await journal.JournalSurface_appendAgent(
           booted.journal,
           { kind: 'Session', session: 'canonical-session' },
+          'canonical-run',
           {
-            case: 'LifeOpened',
+            family: 'Companion',
+            case: 'TerminalOutputCaptured',
             payload: {
               SessionId: 'canonical-session',
-              LifeId: 'canonical-life',
-              OpeningUserMessageId: 'canonical-message',
-              OpeningTextRef: payload.blobRef,
-              OpeningTextDigest: payload.blobDigest,
-              OpeningCursorSequence: 1,
+              TextRef: payload.blobRef,
+              TextDigest: payload.blobDigest,
+              ProviderRun: 'canonical-run',
             },
           },
         ),

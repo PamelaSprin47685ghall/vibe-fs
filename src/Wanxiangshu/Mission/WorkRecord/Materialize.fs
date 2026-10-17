@@ -37,47 +37,40 @@ module LifecycleWorkRecordProjection =
                     |> Result.requireSome ("WorkRecord frame unavailable or corrupt: " + BlobDigest.value frame.Digest)
             })
 
-    let private tryReadPartBody (durable: AgentJournal) (part: XTraceSemanticPartView) : Task<string option> =
-        task {
-            match! durable.Writer.BlobWriter.Read part.TextRef with
-            | Ok body when HostDigest.sha256Hex body = BlobDigest.value part.TextDigest -> return Some body
-            | _ -> return None
-        }
+    let private tryReadPartBody xTrace (part: XTraceSemanticPartView) : Task<string option> =
+        XTraceProjection.partText part.Provenance xTrace
+        |> Result.toOption
+        |> Task.FromResult
 
     let private readVerifiedTerminalText
-        (durable: AgentJournal)
+        (xTrace: XTraceProjectionState)
         (terminal: XTraceTerminalEvidence)
         : Task<string option> =
-        task {
-            match! durable.Writer.BlobWriter.Read terminal.TextRef with
-            | Ok text when
-                HostDigest.sha256Hex text = BlobDigest.value terminal.TextDigest
-                && not (String.IsNullOrWhiteSpace text)
-                ->
-                return Some text
-            | _ -> return None
-        }
+        XTraceProjection.terminalText terminal.ProviderRun xTrace
+        |> Result.toOption
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        |> Task.FromResult
 
     let private isNaturalAssistant (part: XTraceSemanticPartView) =
         part.Role = "assistant" && (part.Kind = "text" || part.Kind = "reasoning")
 
     let private readOptionalPartBody
-        (durable: AgentJournal)
+        (xTrace: XTraceProjectionState)
         (part: XTraceSemanticPartView)
         : Task<Result<string option, string>> =
         task {
-            let! body = tryReadPartBody durable part
+            let! body = tryReadPartBody xTrace part
             return Ok body
         }
 
-    let private readPartBodies durable parts =
+    let private readPartBodies xTrace parts =
         task {
-            let! bodies = parts |> TaskResultList.traverseM (readOptionalPartBody durable)
+            let! bodies = parts |> TaskResultList.traverseM (readOptionalPartBody xTrace)
             return bodies |> Result.defaultValue [] |> List.choose id
         }
 
     let private terminalAlreadyCaptured
-        (durable: AgentJournal)
+        (xTrace: XTraceProjectionState)
         (ordered: XTraceSemanticPartView list)
         (terminalText: string)
         : Task<bool> =
@@ -93,7 +86,7 @@ module LifecycleWorkRecordProjection =
                         && part.Generation = latest.Generation
                         && (part.Kind = "text" || part.Kind = "reasoning"))
 
-                let! bodies = readPartBodies durable relevant
+                let! bodies = readPartBodies xTrace relevant
                 return String.concat "\n\n" bodies = terminalText
         }
 
@@ -106,24 +99,24 @@ module LifecycleWorkRecordProjection =
         | false, true -> fallback
         | false, false -> rendered + "\n" + fallback
 
-    let private appendTerminalText durable ordered rendered terminalText =
+    let private appendTerminalText xTrace ordered rendered terminalText =
         task {
-            let! alreadyCaptured = terminalAlreadyCaptured durable ordered terminalText
+            let! alreadyCaptured = terminalAlreadyCaptured xTrace ordered terminalText
             return appendTerminalWhenMissing rendered terminalText alreadyCaptured
         }
 
     let private appendTerminalFallback
-        (durable: AgentJournal)
+        (xTrace: XTraceProjectionState)
         (ordered: XTraceSemanticPartView list)
         (rendered: string)
         (terminal: XTraceTerminalEvidence)
         : Task<string> =
         task {
-            let! terminalText = readVerifiedTerminalText durable terminal
+            let! terminalText = readVerifiedTerminalText xTrace terminal
 
             match terminalText with
             | None -> return rendered
-            | Some text -> return! appendTerminalText durable ordered rendered text
+            | Some text -> return! appendTerminalText xTrace ordered rendered text
         }
 
     let private laterCursor left right =
@@ -143,12 +136,6 @@ module LifecycleWorkRecordProjection =
         |> Option.map XTraceProjection.frontierAfter
         |> Option.defaultValue XTraceCursor.originCursor
 
-    let private renderRange (durable: AgentJournal) (range: XTraceRange) (xTrace: XTraceProjectionState) =
-        XTraceMaterialization.renderRange durable range xTrace
-
-    let private renderWorkRecordRange (durable: AgentJournal) (range: XTraceRange) (xTrace: XTraceProjectionState) =
-        XTraceMaterialization.renderWorkRecordRange durable range xTrace
-
     type private RenderedRecordEvidence =
         { ConstitutiveBody: string
           Gap: string }
@@ -162,12 +149,12 @@ module LifecycleWorkRecordProjection =
                   Gap = renderedGap }
         | _ -> None
 
-    let private completeFullGap durable xTrace gapStart renderedGap =
+    let private completeFullGap xTrace gapStart renderedGap =
         task {
             match XTraceProjection.latestTerminalEvidence xTrace with
             | Some terminal when XTraceCursor.isAtOrAfter terminal.Frontier gapStart ->
                 return!
-                    appendTerminalFallback durable (XTraceProjection.orderedSemanticParts xTrace) renderedGap terminal
+                    appendTerminalFallback xTrace (XTraceProjection.orderedSemanticParts xTrace) renderedGap terminal
             | _ -> return renderedGap
         }
 
@@ -189,8 +176,8 @@ module LifecycleWorkRecordProjection =
             let gapStart = laterCursor (RecordCoverage.ingestedThrough coverage) openingEnd
             let gapRange = XTraceProjection.rangeFrom gapStart xTrace
 
-            let! constitutive = renderRange durable constitutiveRange xTrace
-            let! gap = renderWorkRecordRange durable gapRange xTrace
+            let! constitutive = XTraceMaterialization.renderRange constitutiveRange xTrace
+            let! gap = XTraceMaterialization.renderWorkRecordRange gapRange xTrace
 
             match frames, renderedRecordEvidence constitutive gap with
             | Error _, _
@@ -199,7 +186,7 @@ module LifecycleWorkRecordProjection =
                 let openingMaterial =
                     LifecycleWorkRecord.withConstitutive opening evidence.ConstitutiveBody
 
-                let! finalGap = completeFullGap durable xTrace gapStart evidence.Gap
+                let! finalGap = completeFullGap xTrace gapStart evidence.Gap
                 return Some(LifecycleWorkRecord.materialize openingMaterial verifiedFrames finalGap includeOpening)
         }
 
@@ -292,12 +279,12 @@ module LifecycleWorkRecordProjection =
         else
             coverage
 
-    let private completeBoundedGap durable xTrace workRange range terminalProviderRun renderedGap =
+    let private completeBoundedGap xTrace workRange range terminalProviderRun renderedGap =
         task {
             match terminalForBoundedRange terminalProviderRun range xTrace with
             | None -> return renderedGap
             | Some terminal ->
-                return! appendTerminalFallback durable (XTraceProjection.slice workRange xTrace) renderedGap terminal
+                return! appendTerminalFallback xTrace (XTraceProjection.slice workRange xTrace) renderedGap terminal
         }
 
     let private materializeBoundedOpeningEvidence durable session range terminalProviderRun xTrace opening =
@@ -320,13 +307,13 @@ module LifecycleWorkRecordProjection =
                 laterCursor (RecordCoverage.ingestedThrough coverage) (XTraceRange.startInclusive workRange)
 
             let gapRange = XTraceRange.create gapStart (XTraceRange.endExclusive workRange)
-            let! gap = renderWorkRecordRange durable gapRange xTrace
+            let! gap = XTraceMaterialization.renderWorkRecordRange gapRange xTrace
 
             match frames, gap with
             | Error _, _
             | _, Error _ -> return None
             | Ok verifiedFrames, Ok renderedGap ->
-                let! finalGap = completeBoundedGap durable xTrace workRange range terminalProviderRun renderedGap
+                let! finalGap = completeBoundedGap xTrace workRange range terminalProviderRun renderedGap
 
                 return Some(LifecycleWorkRecord.materialize opening verifiedFrames finalGap false)
         }

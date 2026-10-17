@@ -629,16 +629,11 @@ module PairProgrammingThoughtTransform =
                 (RequirementGroundingProjection.visibleOccurrences grounding)
             |> List.distinct
 
-    let private captureCursorResult journal trace session (rawMsg: obj) =
+    let private captureCursorResult trace session (rawMsg: obj) =
         let capture identity =
             taskResult {
                 let! body =
-                    XTraceMaterialization.tryHostToolResult
-                        journal
-                        identity.MessageId
-                        identity.PartId
-                        identity.CallId
-                        trace
+                    XTraceMaterialization.tryHostToolResult identity.MessageId identity.PartId identity.CallId trace
 
                 return
                     body
@@ -659,9 +654,7 @@ module PairProgrammingThoughtTransform =
 
         let capture trace =
             taskResult {
-                let! captured =
-                    rawMessages
-                    |> TaskResultList.traverseM (captureCursorResult journal trace session)
+                let! captured = rawMessages |> TaskResultList.traverseM (captureCursorResult trace session)
 
                 return
                     { HasTrace = true

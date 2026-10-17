@@ -1,6 +1,105 @@
 import test from 'node:test'
 import { withReopenableJournal } from './support/journal.mjs'
 
+test('WHAT[semantic-trace-007] a payload cannot manufacture terminal evidence without an actual ProviderRun', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  await withReopenableJournal(async handle => {
+    const payload = await journal.JournalSurface_writePayload(handle, 'formal material without execution evidence')
+    assert.equal(payload.ok, true)
+    await assert.rejects(journal.JournalSurface_appendAgent(handle, { kind: 'Session', session: 'missing-run' }, null, {
+      family: 'Companion', case: 'TerminalOutputCaptured',
+      payload: { SessionId: 'missing-run', TextRef: payload.blobRef, TextDigest: payload.blobDigest },
+    }), /Terminal evidence requires an explicit ProviderRun/)
+    assert.deepEqual(trace.traceRecords(trace.snapshot(handle, 'missing-run')), [])
+    assert.equal(journal.JournalSurface_hasSession(handle, 'missing-run'), false)
+  })
+})
+
+for (const error of ['digest mismatch', 'missing payload']) {
+  test(`WHAT[semantic-trace-007] an invalid durable terminal cannot advance the original owner (${error})`, async () => {
+    const assert = (await import('node:assert/strict')).default
+    const journal = await import('../../../dist/Persistence/Journal/Surface.js')
+    const { spawnSync } = await import('node:child_process')
+    const { fileURLToPath } = await import('node:url')
+    const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+    await withReopenableJournal(async (handle, reopen, directory) => {
+      const session = 'refused-material'
+      assert.equal((await trace.captureProjection(handle, session, { messages: [{ role: 'user', parts: [trace.semanticText('accepted original')] }] })).ok, true)
+      const before = trace.traceRecords(trace.snapshot(handle, session))
+      journal.JournalSurface_dispose(handle)
+      const { NODE_TEST_CONTEXT, WANXIANGSHU_NO_FATAL_EXIT, ...env } = process.env
+      const refused = spawnSync(process.execPath, [fileURLToPath(new URL('./support/invalid-material-child.mjs', import.meta.url)), directory, error], {
+        encoding: 'utf8', env, timeout: 10000,
+      })
+      assert.ifError(refused.error)
+      if (error === 'digest mismatch') {
+        assert.equal(refused.signal, 'SIGKILL', refused.stderr)
+        assert.match(refused.stderr, /XTrace material digest mismatch/)
+        assert.match(refused.stderr, /journal-semantic-cut/)
+      } else {
+        assert.equal(refused.status, 0, refused.stderr)
+        assert.equal(JSON.parse(refused.stdout).ok, false)
+      }
+      assert.deepEqual(trace.traceRecords(trace.snapshot(await reopen(), session)), before)
+    })
+  })
+}
+
+test('WHAT[semantic-trace-007] real terminal evidence keeps its exact run and frozen original frontier after later capture', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { Trace } = await import('wanxiangli/trace')
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'terminal-original-owner'
+    const observation = (id, value) => [{ hostMessageId: id, message: { info: { id, role: 'assistant' }, parts: [{ id: `${id}-part`, type: 'reasoning', text: value }] } }]
+    assert.equal((await trace.captureObservedMessages(handle, session, observation('real-run', 'reasoning'))).ok, true)
+    const frontier = trace.traceHeadCut(trace.snapshot(handle, session))
+    await trace.captureTerminalText(handle, session, 'formal\r\n\0statement', 'real-run')
+    assert.equal((await trace.captureObservedMessages(handle, session, observation('later-run', 'later'))).ok, true)
+    const current = trace.snapshot(handle, session)
+    const head = trace.traceHeadCut(current)
+    const owner = new Trace(head.traceId, trace.traceRecords(current))
+    const terminal = owner.materialize(owner.cut(0), owner.head()).terminals[0]
+    assert.deepEqual(terminal.frontier, frontier)
+    assert.equal(terminal.providerRun, 'real-run')
+    assert.equal(terminal.content.text, 'formal\r\n\0statement')
+    assert.equal(owner.inspect().runs, 0)
+    assert.deepEqual(trace.traceRecords(trace.snapshot(await reopen(), session)), trace.traceRecords(current))
+  })
+})
+
+test('WHAT[semantic-trace-007] real Host bytes and missing run evidence survive in the single original owner', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { Trace } = await import('wanxiangli/trace')
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'actual-original-owner'
+    const raw = '\uFEFF原话\r\n\0' + '🧭'.repeat(160000)
+    const observations = [
+      { hostMessageId: 'actual-user', message: { info: { role: 'user' }, parts: [{ id: 'actual-text', type: 'text', text: raw }] } },
+      { hostMessageId: 'actual-assistant', message: { info: { role: 'assistant' }, parts: [{ id: 'actual-thought', type: 'reasoning', text: '确切推理' }] } },
+    ]
+    const receipt = await trace.captureObservedMessages(handle, session, observations)
+    assert.equal(receipt.ok, true, JSON.stringify(receipt.error))
+    const projection = trace.snapshot(handle, session)
+    const records = trace.traceRecords(projection)
+    const head = trace.traceHeadCut(projection)
+    const owner = new Trace(head.traceId, records)
+    const materials = owner.materialize(owner.cut(0), owner.head()).materials
+    assert.equal(materials[0].content.text, raw)
+    assert.equal(materials[1].content.text, '确切推理')
+    assert.equal(materials[1].providerRun, null)
+    assert.equal(owner.inspect().runs, 0)
+    assert.equal(records.some(row => JSON.parse(row).observation.type === 'RunFinished'), false)
+    const semantic = await trace.currentProjection(handle, session)
+    const cold = await reopen()
+    assert.deepEqual(trace.traceRecords(trace.snapshot(cold, session)), records)
+    assert.deepEqual(await trace.currentProjection(cold, session), semantic)
+  })
+})
+
 test('WHAT[semantic-trace-007] durable materialization survives reopening with exact user and tool text', async () => {
   const assert = (await import('node:assert/strict')).default
   const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')

@@ -38,6 +38,14 @@ module SemanticTraceSurface =
     let private optionalText value =
         if isNullish value then None else Some(text value)
 
+    let private materialBody value =
+        let body = field value "body"
+
+        if not (emitJsExpr body "typeof $0 === 'string'") then
+            invalidOp "Confirmed material body is required"
+
+        unbox<string> body
+
     let private arrayOf value =
         if isNullish value then [||] else unbox<obj array> value
 
@@ -177,6 +185,7 @@ module SemanticTraceSurface =
         | XTraceFoldRejection.OpeningAlreadyCaptured -> "opening-already-captured"
         | XTraceFoldRejection.CursorNotAfterHead(expected, actual) -> $"cursor-{actual}-not-after-{expected}"
         | XTraceFoldRejection.TerminalAlreadyCaptured -> "terminal-already-captured"
+        | XTraceFoldRejection.MaterialRejected reason -> reason
 
     let private updateResult result : obj =
         match result with
@@ -282,6 +291,7 @@ module SemanticTraceSurface =
             (optionalText (field value "hostToolPartId") |> Option.map HostToolPartId.create)
             (BlobRef.create (text (field value "textRef")))
             (BlobDigest.create (text (field value "textDigest")))
+            (materialBody value)
             (stateOf projection)
         |> updateResult
 
@@ -290,6 +300,7 @@ module SemanticTraceSurface =
             (BlobRef.create (text (field value "textRef")))
             (BlobDigest.create (text (field value "textDigest")))
             (ProviderRunIdentity.create (text (field value "providerRun")))
+            (materialBody value)
             (stateOf projection)
         |> updateResult
 
@@ -493,10 +504,6 @@ module SemanticTraceSurface =
         |> List.map itemView
         |> List.toArray
 
-    let inspectBridge (traceId: string) openingText range values : obj =
-        let items = arrayOf values |> Array.toList |> List.map itemOf
-        WanxiangliTrace.inspectItemsBridge traceId (optionalText openingText) (rangeOf range) items
-
     let forOpening values =
         arrayOf values
         |> Array.toList
@@ -666,7 +673,7 @@ module SemanticTraceSurface =
         task {
             let trace = traceOf handle sessionId
 
-            match! XTraceMaterialization.currentProjection handle.Journal (stateOf trace) with
+            match! XTraceMaterialization.currentProjection (stateOf trace) with
             | Ok projection -> return projectionView projection
             | Error error -> return raise (InvalidOperationException error)
         }
@@ -675,7 +682,7 @@ module SemanticTraceSurface =
         task {
             let trace = traceOf handle sessionId
 
-            match! XTraceMaterialization.currentProjectionBetween handle.Journal (rangeOf range) (stateOf trace) with
+            match! XTraceMaterialization.currentProjectionBetween (rangeOf range) (stateOf trace) with
             | Ok projection -> return projectionView projection
             | Error error -> return raise (InvalidOperationException error)
         }
@@ -684,7 +691,7 @@ module SemanticTraceSurface =
         task {
             let trace = traceOf handle sessionId
 
-            match! XTraceMaterialization.renderRange handle.Journal (rangeOf range) (stateOf trace) with
+            match! XTraceMaterialization.renderRange (rangeOf range) (stateOf trace) with
             | Ok rendered -> return rendered
             | Error error -> return raise (InvalidOperationException error)
         }

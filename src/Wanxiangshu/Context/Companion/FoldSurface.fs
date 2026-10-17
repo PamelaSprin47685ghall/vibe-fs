@@ -509,12 +509,13 @@ module ContextFoldSurface =
             {| Fact = rejection.Fact
                Reason = rejection.Reason |}
 
-    let private foldEnvelopes (envelopes: Envelope array) : obj =
+    let private foldEnvelopes (envelopes: (Envelope * string option) array) : obj =
         envelopes
         |> Array.fold
-            (fun result envelope ->
+            (fun result (envelope, material) ->
                 result
-                |> Result.bind (fun current -> Wanxiangshu.Composition.Durable.Fold.foldEnvelope current envelope))
+                |> Result.bind (fun current ->
+                    Wanxiangshu.Composition.Durable.Fold.foldEnvelopeWithMaterial material current envelope))
             (Ok Wanxiangshu.Composition.Durable.Fold.empty)
         |> function
             | Ok projection ->
@@ -526,8 +527,20 @@ module ContextFoldSurface =
                     {| ok = false
                        error = rejectionToJs rejection |}
 
+    let private materialOfJs (value: obj) =
+        let material: obj = value?material
+
+        if isNull material then
+            None
+        elif emitJsExpr material "typeof $0 === 'string'" then
+            Some(unbox<string> material)
+        else
+            invalidArg "material" "Confirmed material must be a string"
+
     let fold (envelopes: obj array) : obj =
-        envelopes |> Array.map envelopeOfJs |> foldEnvelopes
+        envelopes
+        |> Array.map (fun value -> envelopeOfJs value, materialOfJs value)
+        |> foldEnvelopes
 
     /// Same fold, but each envelope crosses the canonical line codec first.
     let replay (envelopes: obj array) : obj =
@@ -537,7 +550,7 @@ module ContextFoldSurface =
                 let envelope = envelopeOfJs value
 
                 match Envelope.deserialize (Envelope.serialize envelope) with
-                | Ok roundTripped -> roundTripped
+                | Ok roundTripped -> roundTripped, materialOfJs value
                 | Error error -> failwith $"ContextFoldSurface: envelope round trip failed: {error}")
 
         foldEnvelopes decoded

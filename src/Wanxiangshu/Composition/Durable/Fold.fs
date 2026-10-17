@@ -23,7 +23,18 @@ module Fold =
 
     let private reject = FoldRejection.reject
 
-    let foldAgentFact (projection: AgentProjectionSet) (fact: AgentFact) : Result<AgentProjectionSet, FoldRejection> =
+    let private foldCompanion material projection fact =
+        match fact, material with
+        | CompanionFactCases.XTracePartAppended _, None
+        | CompanionFactCases.TerminalOutputCaptured _, None ->
+            reject "XTraceMaterial" "confirmed trace material payload was not provided"
+        | _ -> CompanionProjectionBridge.fold (Option.defaultValue "" material) projection fact
+
+    let private foldAgentFactWithMaterial
+        material
+        (projection: AgentProjectionSet)
+        (fact: AgentFact)
+        : Result<AgentProjectionSet, FoldRejection> =
         // DSL-003: one dispatch per bounded-context family; each family folds
         // through its own branch so no fold depends on the whole catalogue.
         match fact with
@@ -46,13 +57,16 @@ module Fold =
             |> Result.mapError (fun rejection ->
                 { Fact = OrchestratorFoldRejection.fact rejection
                   Reason = OrchestratorFoldRejection.message rejection })
-        | AgentFact.Companion companion -> CompanionProjectionBridge.fold projection companion
+        | AgentFact.Companion companion -> foldCompanion material projection companion
         | AgentFact.Context context -> ContextProjectionBridge.fold projection context
         | AgentFact.Host host -> HostFactFold.fold projection host
         | AgentFact.Fission fission -> ProjectionUpdate.applyFission projection fission
         | AgentFact.Delegation delegation -> DelegationProjectionBridge.foldDelegation projection delegation
         | AgentFact.Attention attention -> ProjectionUpdate.applyAttention projection attention
         | AgentFact.Concern concern -> ProjectionUpdate.applyConcern projection concern
+
+    let foldAgentFact projection fact =
+        foldAgentFactWithMaterial None projection fact
 
     /// Fact-only fold for callers that do not need envelope metadata.
     /// RuntimeStarted needs no envelope field (RuntimeId is in the payload).
@@ -71,7 +85,11 @@ module Fold =
                 { projection with
                     AgentProjections = agents })
 
-    let foldEnvelope (projection: ProjectionSet) (envelope: Envelope) : Result<ProjectionSet, FoldRejection> =
+    let foldEnvelopeWithMaterial
+        material
+        (projection: ProjectionSet)
+        (envelope: Envelope)
+        : Result<ProjectionSet, FoldRejection> =
         match envelope.Fact with
         | Runtime(RuntimeStarted runtime) ->
             // Historical workspace runtime watermark. Prompt claims retain the
@@ -85,10 +103,13 @@ module Fold =
                             RuntimeStartCount = projection.AgentProjections.RuntimeStartCount + 1 } }
 
         | Agent fact ->
-            foldAgentFact projection.AgentProjections fact
+            foldAgentFactWithMaterial material projection.AgentProjections fact
             |> Result.map (fun agents ->
                 { projection with
                     AgentProjections = agents })
+
+    let foldEnvelope projection envelope =
+        foldEnvelopeWithMaterial None projection envelope
 
     let isOk (result: Result<'T, 'E>) : bool =
         match result with

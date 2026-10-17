@@ -178,7 +178,7 @@ module BloggerMainContext =
                     |> Option.map (fun prefix -> prefix.EpochId)
                     |> Option.defaultValue PrefixEpochId.initial
 
-                let! projectionResult = XTraceMaterialization.currentProjection journal xTrace
+                let! projectionResult = XTraceMaterialization.currentProjection xTrace
                 let projection = requireCanonicalProjection projectionResult
                 return fromProjection (Some journal) mainSessionId bloggerSessionId epoch blog xTrace projection
         }

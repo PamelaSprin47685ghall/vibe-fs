@@ -37,18 +37,18 @@ if (mode === 'persist') {
   if (!written.ok) throw new Error(written.error)
   // durable-events-012: the ndjson event line is the only payload carrier, so a
   // payload survives exactly when a committed fact embeds it. Commit that fact.
-  const appended = await journal.JournalSurface_appendManagerLifecycle(
+  const appended = await journal.JournalSurface_appendAgent(
     boot.journal,
     { kind: 'Session', session: 'ses-fatal-exit' },
+    'run-fatal-exit',
     {
-      case: 'LifeOpened',
+      family: 'Companion',
+      case: 'TerminalOutputCaptured',
       payload: {
         SessionId: 'ses-fatal-exit',
-        LifeId: 'life-fatal-exit',
-        OpeningUserMessageId: 'msg-fatal-exit',
-        OpeningTextRef: written.blobRef,
-        OpeningTextDigest: written.blobDigest,
-        OpeningCursorSequence: 1,
+        TextRef: written.blobRef,
+        TextDigest: written.blobDigest,
+        ProviderRun: 'run-fatal-exit',
       },
     },
   )

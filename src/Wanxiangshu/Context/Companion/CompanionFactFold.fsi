@@ -25,6 +25,7 @@ module CompanionFoldRejection =
 
 module CompanionFactFold =
     val fold:
+        body: string ->
         associations: Map<SessionId, SessionAssociation> ->
         companionOf: (SessionId -> CompanionProjection option) ->
         xTraceOf: (SessionId -> XTraceProjectionState option) ->

@@ -82,7 +82,6 @@ module SemanticTraceSurface =
     val item: value: 'a -> obj
     val sliceBetween: start: 'a -> endExclusive: 'b -> values: 'c -> obj array
     val sliceFrom: start: 'a -> values: 'b -> obj array
-    val inspectBridge: traceId: string -> openingText: 'a -> range: 'b -> values: 'c -> obj
     val forOpening: values: 'a -> obj array
     val forWorkRecord: values: 'a -> obj array
     val render: values: 'a -> string

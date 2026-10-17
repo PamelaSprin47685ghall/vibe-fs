@@ -16,6 +16,7 @@ const append = (projection, sequence, generation, turn) => unwrap(trace.appendPa
   kind: 'text',
   textRef: `blob-${sequence}`,
   textDigest: `digest-${sequence}`,
+  body: `raw-${sequence}`,
   providerRun: `run-${sequence}`,
 }))
 

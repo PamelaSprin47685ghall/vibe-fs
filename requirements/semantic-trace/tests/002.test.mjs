@@ -1,5 +1,24 @@
 import test from 'node:test'
 
+test('WHAT[semantic-trace-002] a real Host tool part keeps its confirmed call and completed result as distinct material', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { withReopenableJournal } = await import('./support/journal.mjs')
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  await withReopenableJournal(async (handle, reopen) => {
+    const observation = state => [{ hostMessageId: 'tool-message', message: { info: { id: 'actual-run', role: 'assistant' }, parts: [{ id: 'actual-tool-part', type: 'tool', tool: 'read', callID: 'actual-call', state }] } }]
+    const running = observation({ status: 'running', input: { path: 'a' } })
+    const completed = observation({ status: 'completed', output: 'actual-result' })
+    assert.equal((await trace.captureObservedMessages(handle, 'tool-facets', running)).ok, true)
+    const result = await trace.captureObservedMessages(handle, 'tool-facets', completed)
+    assert.equal(result.ok, true, JSON.stringify(result.error))
+    assert.equal(result.receipt.capturedPartCount, 1)
+    const original = await trace.currentProjection(handle, 'tool-facets')
+    assert.deepEqual(original.messages[0].parts, [trace.semanticToolCall('read', '{"path":"a"}'), trace.semanticToolResult('actual-result')])
+    assert.equal((await trace.captureObservedMessages(handle, 'tool-facets', completed)).receipt.capturedPartCount, 0)
+    assert.deepEqual(await trace.currentProjection(await reopen(), 'tool-facets'), original)
+  })
+})
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { readFileSync } = await import("node:fs");
@@ -20,6 +39,7 @@ const partDescriptor = {
   toolName: 'read',
   textRef: 'blob-1',
   textDigest: 'digest-1',
+  body: '{}',
   providerRun: 'provider-run-1',
   toolCallId: 'call-1',
   hostToolPartId: 'part-1',
@@ -172,6 +192,7 @@ const append = (projection, sequence, options = {}) => unwrap(trace.appendPart(p
   toolName: options.toolName ?? 'todowrite',
   textRef: `blob-${sequence}`,
   textDigest: `digest-${sequence}`,
+  body: `raw-${sequence}`,
   providerRun: options.providerRun ?? 'provider-run-a',
   toolCallId: options.toolCallId ?? 'call-a',
   hostToolPartId: options.hostToolPartId ?? `part-${sequence}`,
@@ -225,6 +246,7 @@ test('WHAT[semantic-trace-002] later parts and reanchor copies cannot move a ret
       toolName: kind.startsWith('tool_') ? 'js-plan' : undefined,
       textRef: `blob-${sequence}`,
       textDigest: `digest-${sequence}`,
+      body: `raw-${sequence}`,
       providerRun: messageId.startsWith('user-') ? undefined : messageId,
       toolCallId: kind.startsWith('tool_') ? 'retired-call' : undefined,
       hostToolPartId: kind.startsWith('tool_') ? 'retired-tool-part' : undefined,

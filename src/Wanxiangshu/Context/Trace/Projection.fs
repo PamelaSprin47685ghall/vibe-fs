@@ -14,9 +14,8 @@ open Wanxiangshu.Foundation
 /// the ingest position, so the two can be validated against each other in the
 /// fold without a second copy.
 ///
-/// Bodies live in blobs (PERSIST-007): the journal line carries cursor, kind,
-/// role, digest and reference; the text is resolved at the read boundary, the
-/// same way `XWire.readFrames` resolves `BlogFrame.TextRef`.
+/// The journal supplies verified payload bytes at fold. Trace owns the material;
+/// this projection retains semantic coordinates and durable references.
 type XTraceProjectionState =
     private
         {
@@ -103,14 +102,20 @@ type XTraceFoldRejection =
     /// This ProviderRun already captured a different terminal. Idempotent replay
     /// carries the same digest; another ProviderRun owns another occurrence.
     | TerminalAlreadyCaptured
+    | MaterialRejected of reason: string
 
 module XTraceProjection =
 
-    let empty =
+    let private emptyWithIdentity traceId =
         { Opening = None
           Parts = []
           Terminals = []
-          Bridge = WanxiangliTrace.emptyBridge "xtrace-projection" }
+          Bridge = WanxiangliTrace.emptyBridge traceId }
+
+    let empty = emptyWithIdentity "xtrace-material-v2/projection"
+
+    let emptyForSession sessionId =
+        emptyWithIdentity ("xtrace-material-v2/" + SessionId.value sessionId)
 
     /// Oldest-first cursor order. The stored field is newest-first.
     let internal parts (state: XTraceProjectionState) : XTracePartRef list = List.rev state.Parts
@@ -243,22 +248,25 @@ module XTraceProjection =
               PartIndex = 0 }
         | None -> { TurnIndex = 0; PartIndex = 0 }
 
-    let private appendPartRefToBridge (part: XTracePartRef) (bridge: WanxiangliTrace.ProjectionBridge) =
-        WanxiangliTrace.appendPartDescriptorToBridge
+    let private appendPartRefToBridge body (part: XTracePartRef) (bridge: WanxiangliTrace.ProjectionBridge) =
+        WanxiangliTrace.appendPartToBridge
             (XTraceCursor.sequence part.Cursor)
             part.Role
             part.Provenance
             part.Kind
             part.ToolName
-            (BlobRef.value part.TextRef)
-            (BlobDigest.value part.TextDigest)
+            (part.ProviderRun |> Option.map ProviderRunIdentity.value)
+            body
             bridge
 
-    let private appendTerminalRefToBridge (terminal: XTraceTerminalRef) (bridge: WanxiangliTrace.ProjectionBridge) =
-        WanxiangliTrace.appendTerminalDescriptorToBridge
+    let private appendTerminalRefToBridge
+        body
+        (terminal: XTraceTerminalRef)
+        (bridge: WanxiangliTrace.ProjectionBridge)
+        =
+        WanxiangliTrace.appendTerminalToBridge
             (ProviderRunIdentity.value terminal.ProviderRun)
-            (BlobRef.value terminal.TextRef)
-            (BlobDigest.value terminal.TextDigest)
+            body
             (XTraceCursor.sequence terminal.Frontier)
             bridge
 
@@ -299,6 +307,12 @@ module XTraceProjection =
         else
             0
 
+    let private appendMaterial append =
+        try
+            Ok(append ())
+        with error ->
+            Error(XTraceFoldRejection.MaterialRejected error.Message)
+
     /// COMPANION-003 / HOST-005: append one semantic part reference. Strictly
     /// monotonic; a duplicate cursor or a retreat is refused (PERSIST-010).
     let applyPart
@@ -314,12 +328,15 @@ module XTraceProjection =
         (hostToolPartId: HostToolPartId option)
         (textRef: BlobRef)
         (textDigest: BlobDigest)
+        (body: string)
         (state: XTraceProjectionState)
         : Result<XTraceProjectionState, XTraceFoldRejection> =
         let head = headSequence state
 
         if cursorSequence <= head then
             Error(XTraceFoldRejection.CursorNotAfterHead(head, cursorSequence))
+        elif state.Parts |> List.exists (fun part -> part.Provenance = provenance) then
+            Error(XTraceFoldRejection.MaterialRejected("Material identity already captured: " + provenance))
         else
             let partRef: XTracePartRef =
                 { Cursor = XTraceCursor.create cursorSequence
@@ -336,12 +353,11 @@ module XTraceProjection =
                   TextRef = textRef
                   TextDigest = textDigest }
 
-            let nextBridge = appendPartRefToBridge partRef state.Bridge
-
-            Ok
+            appendMaterial (fun () -> appendPartRefToBridge body partRef state.Bridge)
+            |> Result.map (fun nextBridge ->
                 { state with
                     Parts = partRef :: state.Parts
-                    Bridge = nextBridge }
+                    Bridge = nextBridge })
 
     /// COMPANION-003 / EXEC-009: capture one terminal occurrence. Idempotency is
     /// scoped to ProviderRun, not terminal bytes: two reused work units may
@@ -351,6 +367,7 @@ module XTraceProjection =
         (textRef: BlobRef)
         (textDigest: BlobDigest)
         (providerRun: ProviderRunIdentity)
+        (body: string)
         (state: XTraceProjectionState)
         : Result<XTraceProjectionState, XTraceFoldRejection> =
         match terminalForProviderRun providerRun state with
@@ -363,12 +380,11 @@ module XTraceProjection =
                   ProviderRun = providerRun
                   Frontier = XTraceCursor.create (head state) }
 
-            let nextBridge = appendTerminalRefToBridge terminalRef state.Bridge
-
-            Ok
+            appendMaterial (fun () -> appendTerminalRefToBridge body terminalRef state.Bridge)
+            |> Result.map (fun nextBridge ->
                 { state with
                     Terminals = terminalRef :: state.Terminals
-                    Bridge = nextBridge }
+                    Bridge = nextBridge })
 
     let traceHeadCut (state: XTraceProjectionState) : XTraceCut =
         WanxiangliTrace.headCutOfBridge state.Bridge
@@ -383,6 +399,18 @@ module XTraceProjection =
         WanxiangliTrace.intervalAfterCoverageOnBridge coverage state.Bridge
 
     let traceRecords (state: XTraceProjectionState) : string list = state.Bridge.Records
+
+    let partText provenance (state: XTraceProjectionState) =
+        try
+            Ok(WanxiangliTrace.partText provenance state.Bridge)
+        with error ->
+            Error error.Message
+
+    let terminalText providerRun (state: XTraceProjectionState) =
+        try
+            Ok(WanxiangliTrace.terminalText (ProviderRunIdentity.value providerRun) state.Bridge)
+        with error ->
+            Error error.Message
 
     /// Host turn indices restart per reanchor generation; XTrace Sequence does not.
     /// Turn/Part labels are only comparable within one generation.

@@ -191,7 +191,7 @@ module AgentJournalPortAdapter =
                             { BlobRef = r.BlobRef
                               BlobDigest = r.BlobDigest })
                 }
-          CurrentProjection = fun xTrace -> XTraceMaterialization.currentProjection journal xTrace
+          CurrentProjection = XTraceMaterialization.currentProjection
           RecordConfirmedSuccess = ProviderFailureLedger.recordConfirmedSuccess failurePort
           CommitPrefixRebase =
             fun sessionId providerRun rebase ->

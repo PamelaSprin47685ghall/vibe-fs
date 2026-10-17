@@ -19,6 +19,7 @@ const append = (projection, sequence, options = {}) => unwrap(trace.appendPart(p
   toolName: options.toolName ?? 'todowrite',
   textRef: `blob-${sequence}`,
   textDigest: `digest-${sequence}`,
+  body: `raw-${sequence}`,
   providerRun: options.providerRun ?? 'provider-run-a',
   toolCallId: options.toolCallId ?? 'call-a',
   hostToolPartId: options.hostToolPartId ?? `part-${sequence}`,
@@ -57,6 +58,7 @@ const append = (projection, sequence, generation, run, turn = 0) => unwrap(trace
   kind: 'text',
   textRef: `blob-${sequence}`,
   textDigest: `digest-${sequence}`,
+  body: `raw-${sequence}`,
   providerRun: run,
 }))
 

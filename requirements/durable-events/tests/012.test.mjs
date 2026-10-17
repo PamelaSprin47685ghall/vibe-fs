@@ -51,19 +51,18 @@ test('WHAT[durable-events-012] appended_fact_lifts_real_blob_digest_into_persist
     const handle = receipt.blobRef.slice('blobs/'.length)
 
     const fact = {
-      case: 'LifeOpened',
+      family: 'Companion',
+      case: 'TerminalOutputCaptured',
       payload: {
         SessionId: 'ses_closure',
-        LifeId: 'life_closure',
-        OpeningUserMessageId: 'msg_1',
-        OpeningTextRef: receipt.blobRef,
-        OpeningTextDigest: receipt.blobDigest,
-        OpeningCursorSequence: 1,
+        TextRef: receipt.blobRef,
+        TextDigest: receipt.blobDigest,
+        ProviderRun: 'real-closure-run',
       },
     }
 
     const appended = mustOk(
-      await journal.JournalSurface_appendManagerLifecycle(booted.journal, { kind: 'Session', session: 'ses_closure' }, fact),
+      await journal.JournalSurface_appendAgent(booted.journal, { kind: 'Session', session: 'ses_closure' }, 'real-closure-run', fact),
       'append',
     )
     assert.ok(appended.projection)
@@ -81,20 +80,20 @@ test('WHAT[durable-events-012] closure_fails_closed_when_a_real_content_address_
     const missingDigest = 'f'.repeat(64)
 
     const fact = {
-      case: 'LifeOpened',
+      family: 'Companion',
+      case: 'TerminalOutputCaptured',
       payload: {
         SessionId: 'ses_missing',
-        LifeId: 'life_missing',
-        OpeningUserMessageId: 'msg_missing',
-        OpeningTextRef: `blobs/${missingDigest}`,
-        OpeningTextDigest: missingDigest,
-        OpeningCursorSequence: 1,
+        TextRef: `blobs/${missingDigest}`,
+        TextDigest: missingDigest,
+        ProviderRun: 'real-missing-run',
       },
     }
 
-    const result = await journal.JournalSurface_appendManagerLifecycle(
+    const result = await journal.JournalSurface_appendAgent(
       booted.journal,
       { kind: 'Session', session: 'ses_missing' },
+      'real-missing-run',
       fact,
     )
     assert.equal(result.ok, false)
@@ -126,15 +125,14 @@ const withJournal = async (writerId, fn) => {
     rmSync(repo, { recursive: true, force: true })
   }
 }
-const lifeOpened = (session, ref, digest) => ({
-  case: 'LifeOpened',
+const terminalCaptured = (session, ref, digest) => ({
+  family: 'Companion',
+  case: 'TerminalOutputCaptured',
   payload: {
     SessionId: session,
-    LifeId: `life-${session}`,
-    OpeningUserMessageId: `msg-${session}`,
-    OpeningTextRef: ref,
-    OpeningTextDigest: digest,
-    OpeningCursorSequence: 1,
+    TextRef: ref,
+    TextDigest: digest,
+    ProviderRun: `run-${session}`,
   },
 })
 const payloadRefsFromFile = (commonDir, writerId) => {
@@ -161,10 +159,11 @@ test('WHAT[durable-events-012] closure_lifts_a_content_addressed_digest_into_pay
     const receipt = await journal.JournalSurface_writePayload(handle, 'durable body\n')
     assert.equal(receipt.ok, true, JSON.stringify(receipt.error))
 
-    const appended = await journal.JournalSurface_appendManagerLifecycle(
+    const appended = await journal.JournalSurface_appendAgent(
       handle,
       { kind: 'Session', session: 'ses_real' },
-      lifeOpened('ses_real', receipt.blobRef, receipt.blobDigest),
+      'run-ses_real',
+      terminalCaptured('ses_real', receipt.blobRef, receipt.blobDigest),
     )
     assert.equal(appended.ok, true, JSON.stringify(appended.error))
 
@@ -183,10 +182,11 @@ test('WHAT[durable-events-012] closure_dedupes_a_matching_blob_ref_and_digest_pa
     assert.equal(receipt.ok, true, JSON.stringify(receipt.error))
     // The writer derives the digest from bytes; use a real content address and
     // assert the closure contains one ref even though ref + digest are both present.
-    const appended = await journal.JournalSurface_appendManagerLifecycle(
+    const appended = await journal.JournalSurface_appendAgent(
       handle,
       { kind: 'Session', session: 'ses_dedupe' },
-      lifeOpened('ses_dedupe', receipt.blobRef, receipt.blobDigest),
+      'run-ses_dedupe',
+      terminalCaptured('ses_dedupe', receipt.blobRef, receipt.blobDigest),
     )
     assert.equal(appended.ok, true, JSON.stringify(appended.error))
 
@@ -195,15 +195,23 @@ test('WHAT[durable-events-012] closure_dedupes_a_matching_blob_ref_and_digest_pa
     assert.equal(refs.at(-1)[0], receipt.blobRef.slice('blobs/'.length))
   })
 })
-test('WHAT[durable-events-012] closure_ignores_non_content_addressed_placeholder_handles', async () => {
+test('WHAT[durable-events-012] closure ignores placeholder handles while Trace refuses to treat them as original material', async () => {
   await withJournal('closure-placeholder', async (commonDir, handle) => {
-    const appended = await journal.JournalSurface_appendManagerLifecycle(
-      handle,
-      { kind: 'Session', session: 'ses_placeholder' },
-      lifeOpened('ses_placeholder', 'blobs/placeholder', 'sha-placeholder'),
-    )
-    assert.equal(appended.ok, true, JSON.stringify(appended.error))
-    assert.deepEqual(payloadRefsFromFile(commonDir, 'closure-placeholder').at(-1), [])
+    const { spawnSync } = await import('node:child_process')
+    const { fileURLToPath } = await import('node:url')
+    const { readdirSync } = await import('node:fs')
+    journal.JournalSurface_dispose(handle)
+    const { NODE_TEST_CONTEXT, WANXIANGSHU_NO_FATAL_EXIT, ...env } = process.env
+    const probe = spawnSync(process.execPath, [fileURLToPath(new URL('../../semantic-trace/tests/support/invalid-material-child.mjs', import.meta.url)), commonDir, 'placeholder'], { env, encoding: 'utf8', timeout: 10000 })
+    assert.ifError(probe.error)
+    assert.equal(probe.signal, 'SIGKILL', probe.stderr)
+    assert.match(probe.stderr, /XTrace material is outside the declared payload closure/)
+    const directory = join(commonDir, 'wanxiangshu', 'events')
+    const facts = readdirSync(directory).filter(file => file.endsWith('.ndjson'))
+      .flatMap(file => readFileSync(join(directory, file), 'utf8').trim().split('\n').map(JSON.parse))
+    const placeholder = facts.filter(event => JSON.stringify(event.payload).includes('blobs/placeholder'))
+    assert.equal(placeholder.length, 1)
+    assert.deepEqual(placeholder[0].payload_refs, [])
   })
 })
 test('WHAT[durable-events-012] closure_is_empty_for_a_fact_without_blob_fields', async () => {

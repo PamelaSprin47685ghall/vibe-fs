@@ -85,7 +85,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 |---|---|---|---|---|---|
 | [CUT-01-R1](SOURCE-AUDIT-2026-10-15.md#repair-lifecycle) | Journal 测试关闭同步、构造锁竞争和 Process 平台证明 | DONE | 库完整候选与精确包 Node/Bun 验证通过；未测平台不扩张 | root；audit_process（复审） | 交叉复审 |
 | [CUT-02-R1](SOURCE-AUDIT-2026-10-15.md#repair-process) | 无损输出、Draining 物理监管、相对 PATH；补 D-03 | DONE | 所选非 PTY 生产接线、192 项需求及实际安装包验收；原有 5 TODO 保留 | audit_process；audit_trace（监管）；root（集成） | 交叉复审 |
-| [CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) | 原件权威、完整 Opening、稳定 cut、Proxy 重入证明；补 D-02 | DOING | T-02/T-03/E-01 已修；D-02 对账落盘，T-01 原件接管仍待下一包 | root（下一包）；audit_trace（已交接） | 交叉复审 |
+| [CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) | 原件权威、完整 Opening、稳定 cut、Proxy 重入证明；补 D-02 | DOING | T-02/T-03/E-01 已修；D-02 对账及 T-01 原件接管已按 CUT-03-R6 验收。完整产品链的 GAP-101/108/109/111 等独立证明仍保留，不借存储迁移关闭整张卡 | root；audit_trace（已交接） | 交叉复审 |
 | [CUT-04-R1](SOURCE-AUDIT-2026-10-15.md#repair-ownership) | PTY 真实终结、早到回执、持久预留/恢复、统一 blocker | DOING | O-02/O-03/O-04 已修；R6-A/B/C 已完成所列实现及独立复审；原自然 Unknown 按用户决定单列待办，脱离控制终端及整体闭合未完 | root（剩余监管/恢复）；audit_ownership（已交接） | 交叉复审 |
 | [CUT-01-R2](SOURCE-AUDIT-2026-10-15.md#second-review-fixes) | J-01：原生 statement 释放及 Unknown 后即时恢复写入 | DONE | 0.6.2 源码及精确包的非作者复验、真实 get 释放 oracle 和去 finalize 突变通过；新发现另记 R3，不覆盖 0.6.1 历史 | root | independent_journal_r2、independent_boundaries_r2 |
 | [CUT-04-R2](SOURCE-AUDIT-2026-10-15.md#second-review-fixes) | O-05/06/07、B-01：收尾确认、共享端口隔离、永久准入关闭及依赖声明 | DONE | 非作者确认原限定范围成立；真实 focused 778 与 0.6.2 主仓包消费通过；收尾新反例记 R3，O-01/T-01 不销项 | root | independent_pty_r2、independent_boundaries_r2 |
@@ -99,7 +99,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-04-R6-B](PTY-RUN-ADMISSION-2026-10-16.md) | O-01 跨进程每轮 PTY 准入 | DONE | 本提交修正两项新增回退和既有 Load void 遗漏；clean 523，1175 项相关测试 1112 pass / 0 fail / 16 skip / 47 TODO；非作者反例、真实双进程 CAS/Bun PTY、精确包隔离消费通过；R6-C/O-01 整体未闭合 | root | r6b_admission_review、r6b_unknown_review、r6b_requirements_review |
 | [CUT-04-R6-C](PTY-RESTART-RECOVERY-2026-10-16.md#r12-u1-分层取证与本轮验收2026-10-17) | O-01 跨重启物理接管 | DONE | 已确认的发布缺陷已修；1232 项相关回归 0 普通失败，精确包 Node/Bun/OpenCode 消费通过，三名非作者复查完成。按用户决定验收本轮范围；R12-U1 单列待办，O-01/GAP-133 整体不销项 | root | r6c_protocol_review、r6c_ownership_review、r6c_observation_review |
 | [CUT-04-R12-U1](PTY-RESTART-RECOVERY-2026-10-16.md#r12-u1-分层取证与本轮验收2026-10-17) | 原自然 Unknown 追踪 | BACKLOG | 用户决定暂存；原 441 行没有内层现场，仍未唯一归因。已保全分层证据并实演 Unknown 捕获；有新现场或用户重启此包时再处理，不把未复现写成已修复 | root（后续） | 待重新认领 |
-| [CUT-03-R6](REMAINING-REPAIRS-2026-10-16.md) | T-01 原件捕获、冷恢复、消费者切换和旧路径退出 | READY | 先冻结 D-02 与旧数据/cut 处置，再完成一条真实单 owner 捕获链；不把描述符或双写算完成 | root（计划） | 待非作者复审 |
+| [CUT-03-R6](TRACE-ORIGINALS-2026-10-17.md) | T-01 原件捕获、冷恢复、消费者切换和旧路径退出 | DONE | 库 a636cbc/0.6.3；1290 项相关回归 0 普通失败、固定包 Node/Bun 实际 SIGKILL/冷恢复、独立编译及非作者复验通过。原拆分缺口、本轮候选回退和 oracle 误判分别留证；R12-U1、GAP-101 等独立边界不销项 | root | r6c_protocol_review、r6c_observation_review |
 | [CUT-02-R6-A](REMAINING-REPAIRS-2026-10-16.md) | GAP-091 纯契约及编译/消费者边界 | READY | 真实正反编译与注入能力证明，不能只改目录或外观入口 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-B](REMAINING-REPAIRS-2026-10-16.md) | GAP-092 完整 wire 总预算 | READY | 先明确最小可接纳预算和预执行拒绝通道，再以实际编码限制完整结果 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-C](REMAINING-REPAIRS-2026-10-16.md) | Bun 特殊 env、参数证明及 stdin 四项失败 | READY | 原生对照已完成；分别处理能力与测试假设，不放宽断言，不标全套通过 | root（计划） | 待非作者复审 |

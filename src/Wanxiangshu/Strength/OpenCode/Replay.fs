@@ -224,7 +224,7 @@ module StrengthReplay =
         }
 
     let private resolveObservedParts
-        (durable: AgentJournal)
+        (traceState: XTraceProjectionState)
         (parts: XTraceSemanticPartView list)
         : Task<Result<StrengthTraceObservedPart list, string>> =
         let rec loop (remaining: XTraceSemanticPartView list) (acc: StrengthTraceObservedPart list) =
@@ -232,7 +232,7 @@ module StrengthReplay =
                 match remaining with
                 | [] -> return List.rev acc
                 | part :: tail ->
-                    let! body = durable.Writer.BlobWriter.Read part.TextRef
+                    let! body = XTraceProjection.partText part.Provenance traceState
 
                     return!
                         loop
@@ -276,7 +276,6 @@ module StrengthReplay =
             : StrengthTraceRange))
 
     let private recoverPlanTraceRange
-        (durable: AgentJournal)
         (plan: StrengthReplayPlan)
         (traceState: XTraceProjectionState)
         : Task<Result<StrengthTraceRange option, string>> =
@@ -284,7 +283,7 @@ module StrengthReplay =
             match tryStableTraceRange plan traceState with
             | Some value -> return Some value
             | None ->
-                let! observed = resolveObservedParts durable (XTraceProjection.orderedSemanticParts traceState)
+                let! observed = resolveObservedParts traceState (XTraceProjection.orderedSemanticParts traceState)
                 return! StrengthTraceRecovery.recoverRange plan.Bundle observed
         }
 
@@ -311,21 +310,19 @@ module StrengthReplay =
         }
 
     let private commitPlanTrace
-        (durable: AgentJournal)
         (durability: StrengthDurabilityPort)
         (failClosed: string -> unit)
         (traceState: XTraceProjectionState)
         (plan: StrengthReplayPlan)
         : Task =
         task {
-            match! recoverPlanTraceRange durable plan traceState with
+            match! recoverPlanTraceRange plan traceState with
             | Error error -> failClosed ("Strength Traced recovery failed: " + error)
             | Ok None -> failClosed "Strength Promoted frame is absent from XTrace after replay capture"
             | Ok(Some traced) -> do! appendTracedOrFailClosed durability failClosed plan traced
         }
 
     let private commitCapturedPlans
-        (durable: AgentJournal)
         (durability: StrengthDurabilityPort)
         (failClosed: string -> unit)
         (updated: XTraceProjectionState)
@@ -335,14 +332,13 @@ module StrengthReplay =
             let pending = plans |> List.filter (fun plan -> plan.ExistingTraceRange.IsNone)
 
             for plan in pending do
-                do! commitPlanTrace durable durability failClosed updated plan
+                do! commitPlanTrace durability failClosed updated plan
         }
 
     let private commitAvailableTrace journal strengthDurability traceState failClosed plans : Task =
         task {
             match journal, strengthDurability, traceState with
-            | Some durable, Some durability, Some updated ->
-                do! commitCapturedPlans durable durability failClosed updated plans
+            | Some _, Some durability, Some updated -> do! commitCapturedPlans durability failClosed updated plans
             | _ -> ()
         }
 

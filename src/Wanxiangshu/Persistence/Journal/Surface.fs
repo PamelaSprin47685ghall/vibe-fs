@@ -115,6 +115,14 @@ module JournalSurface =
         else
             Some(ProviderRunIdentity.create (str value))
 
+    let private terminalProviderRun (value: obj) =
+        let run = str value
+
+        if String.IsNullOrWhiteSpace run then
+            invalidArg "ProviderRun" "Terminal evidence requires an explicit ProviderRun"
+
+        ProviderRunIdentity.create run
+
     let private agentFactOfJs (value: obj) : AgentFact =
         let family = str (value?family)
         let case = str (value?case)
@@ -128,16 +136,27 @@ module JournalSurface =
                    BloggerAgent = str payload?BloggerAgent |}
         | "Companion", "CompanionBloggerClosed" ->
             CompanionFact.CompanionBloggerClosed {| SessionId = sessionIdOf (payload?SessionId) |}
+        | "Companion", "XTracePartAppended" ->
+            CompanionFact.XTracePartAppended
+                {| SessionId = sessionIdOf (payload?SessionId)
+                   CursorSequence = Int64.Parse(str payload?CursorSequence)
+                   Role = str payload?Role
+                   Turn = unbox<int> payload?Turn
+                   PartIndex = unbox<int> payload?PartIndex
+                   Kind = str payload?Kind
+                   ToolName = Option.ofObj payload?ToolName |> Option.map str
+                   TextRef = BlobRef.create (str payload?TextRef)
+                   TextDigest = BlobDigest.create (str payload?TextDigest)
+                   Provenance = str payload?Provenance
+                   ProviderRun = providerRunOf payload?ProviderRun
+                   ToolCallId = Option.ofObj payload?ToolCallId |> Option.map (str >> ToolCallId.create)
+                   HostToolPartId = Option.ofObj payload?HostToolPartId |> Option.map (str >> HostToolPartId.create) |}
         | "Companion", "TerminalOutputCaptured" ->
-            let runId =
-                let r = str payload?ProviderRun
-                if String.IsNullOrEmpty r then "run-terminal" else r
-
             CompanionFact.TerminalOutputCaptured
                 {| SessionId = sessionIdOf (payload?SessionId)
                    TextRef = BlobRef.create (str payload?TextRef)
                    TextDigest = BlobDigest.create (str payload?TextDigest)
-                   ProviderRun = ProviderRunIdentity.create runId |}
+                   ProviderRun = terminalProviderRun payload?ProviderRun |}
         | "Execution", "HandleLinked" ->
             let handleId = str payload?Handle
 
@@ -582,28 +601,6 @@ module JournalSurface =
                         {| ok = false
                            error = error.ToString() |}
         }
-
-    let appendManagerLifecycle (handle: JournalHandle) (stream: obj) (factObj: obj) : Task<obj> =
-        let sessionId =
-            match str (stream?kind) with
-            | "Session" -> sessionIdOf (stream?session)
-            | _ -> SessionId.create (str stream)
-
-        let payload = unbox<obj> factObj?payload
-        let textRef = str payload?OpeningTextRef
-        let textDigest = str payload?OpeningTextDigest
-
-        appendAgent
-            handle
-            stream
-            (box null)
-            (box
-                {| family = "Companion"
-                   case = "TerminalOutputCaptured"
-                   payload =
-                    {| SessionId = box (SessionId.value sessionId)
-                       TextRef = textRef
-                       TextDigest = textDigest |} |})
 
     /// Write a UTF-8 payload through the journal's local payload owner.
     let writePayload (handle: JournalHandle) (content: string) : Task<obj> =

@@ -330,6 +330,7 @@ module XTraceCapture =
           PartIndex: int
           Source: TraceSourcePart
           Provenance: string
+          LegacyPhysicalProvenance: string option
           LegacyStableProvenance: string option }
 
     let private enumeratePositionalCaptureWork
@@ -345,8 +346,15 @@ module XTraceCapture =
                   PartIndex = partIndex
                   Source = source
                   Provenance = sprintf "g:%d/turn:%d/part:%d" generation turnIndex partIndex
+                  LegacyPhysicalProvenance = None
                   LegacyStableProvenance = None }))
         |> List.concat
+
+    let private toolFacet (part: SemanticPart) =
+        match part with
+        | SemanticToolCall _ -> "/tool-call"
+        | SemanticToolResult _ -> "/tool-result"
+        | _ -> ""
 
     let private enumerateStableCaptureWork
         (generation: int)
@@ -357,17 +365,23 @@ module XTraceCapture =
         |> List.mapi (fun turnIndex (messageId, message) ->
             message.Parts
             |> List.mapi (fun partIndex source ->
-                let provenance =
+                let physicalProvenance =
                     match source.HostPartId with
                     | Some partId ->
-                        sprintf "g:%d/msg:%s/host-part:%s" generation messageId (HostMessagePartId.value partId)
-                    | None -> sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex
+                        Some(sprintf "g:%d/msg:%s/host-part:%s" generation messageId (HostMessagePartId.value partId))
+                    | None -> None
+
+                let provenance =
+                    physicalProvenance
+                    |> Option.map (fun identity -> identity + toolFacet source.Part)
+                    |> Option.defaultWith (fun () -> sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex)
 
                 { Message = message
                   TurnIndex = turnIndex
                   PartIndex = partIndex
                   Source = source
                   Provenance = provenance
+                  LegacyPhysicalProvenance = physicalProvenance
                   LegacyStableProvenance = Some(sprintf "g:%d/msg:%s/part:%d" generation messageId partIndex) }))
         |> List.concat
 
@@ -516,39 +530,83 @@ module XTraceCapture =
             stableCaptureEligibility journal sessionId (messageIds |> List.map Some)
             |> requireStableEligibility
 
-    let private legacySemanticMatch (work: PartCaptureWork) (part: XTracePartRef) =
+    let private sameMaterial (work: PartCaptureWork) (part: XTracePartRef) =
         let kind, toolName, body = partShape work.Source.Part
 
-        part.ProviderRun = work.Message.ProviderRun
+        part.Role = work.Message.Role
+        && part.ProviderRun = work.Message.ProviderRun
         && part.Kind = kind
         && part.ToolName = toolName
         && part.ToolCallId = work.Source.ToolCallId
-        && part.HostToolPartId = work.Source.HostToolPartId
         && BlobDigest.value part.TextDigest = HostDigest.sha256Hex body
 
+    let private legacySemanticMatch (work: PartCaptureWork) (part: XTracePartRef) =
+        sameMaterial work part && part.HostToolPartId = work.Source.HostToolPartId
+
+    let private legacyPhysicalReplay (work: PartCaptureWork) (part: XTracePartRef) =
+        work.LegacyPhysicalProvenance = Some part.Provenance
+        && part.HostToolPartId.IsNone
+        && sameMaterial work part
+
     let private stablePartAlreadyCaptured (existing: XTracePartRef list) (work: PartCaptureWork) =
-        let exactPhysicalProvenance =
-            match work.Source.HostPartId with
-            | Some _ -> existing |> List.exists (fun part -> part.Provenance = work.Provenance)
-            | None -> false
+        let kind, _, _ = partShape work.Source.Part
 
-        let exactPhysicalToolPart =
-            match work.Source.HostToolPartId with
-            | Some hostToolPartId ->
-                existing
-                |> List.exists (fun part ->
-                    part.ProviderRun = work.Message.ProviderRun
-                    && part.HostToolPartId = Some hostToolPartId
+        let matching =
+            existing
+            |> List.tryFind (fun part ->
+                part.Provenance = work.Provenance
+                || (work.LegacyPhysicalProvenance = Some part.Provenance && part.Kind = kind)
+                || (work.Source.HostToolPartId.IsSome
+                    && part.Kind = kind
+                    && part.ProviderRun = work.Message.ProviderRun
+                    && part.HostToolPartId = work.Source.HostToolPartId
                     && part.ToolCallId = work.Source.ToolCallId)
-            | None -> false
+                || (work.LegacyStableProvenance = Some part.Provenance
+                    && legacySemanticMatch work part))
 
-        let compatibleLegacyPosition =
-            work.LegacyStableProvenance
-            |> Option.exists (fun provenance ->
-                existing
-                |> List.exists (fun part -> part.Provenance = provenance && legacySemanticMatch work part))
+        match matching with
+        | None -> Ok false
+        | Some part when legacySemanticMatch work part || legacyPhysicalReplay work part -> Ok true
+        | Some _ -> Error "Confirmed Host material identity conflict"
 
-        exactPhysicalProvenance || exactPhysicalToolPart || compatibleLegacyPosition
+    let private workSignature (work: PartCaptureWork) =
+        let kind, toolName, body = partShape work.Source.Part
+
+        work.Message.Role,
+        work.Message.ProviderRun,
+        kind,
+        toolName,
+        body,
+        work.Source.ToolCallId,
+        work.Source.HostToolPartId
+
+    let private conflictingMaterialGroups groups =
+        groups
+        |> List.exists (fun (_, group) -> group |> List.map workSignature |> List.distinct |> List.length > 1)
+
+    let private validateStableBatch existing works =
+        let conflict =
+            works
+            |> List.tryPick (fun work ->
+                match stablePartAlreadyCaptured existing work with
+                | Error error -> Some error
+                | Ok _ -> None)
+
+        let conflictingCopies =
+            works |> List.groupBy (fun work -> work.Provenance) |> conflictingMaterialGroups
+
+        let conflictingToolAliases =
+            works
+            |> List.filter (fun work -> work.Source.HostToolPartId.IsSome)
+            |> List.groupBy (fun work ->
+                let kind, _, _ = partShape work.Source.Part
+                kind, work.Message.ProviderRun, work.Source.HostToolPartId, work.Source.ToolCallId)
+            |> conflictingMaterialGroups
+
+        match conflict, conflictingCopies || conflictingToolAliases with
+        | Some error, _ -> Error error
+        | None, true -> Error "Confirmed Host material identity conflict within capture batch"
+        | None, false -> Ok()
 
     /// One stable Host part: physical part identity wins. Legacy positional
     /// provenance is accepted only while the semantic payload at that slot is
@@ -556,12 +614,14 @@ module XTraceCapture =
     let private appendStablePartIfAbsent
         (durable: AgentJournal)
         (sessionId: SessionId)
-        (existing: XTracePartRef list)
         (nextCursor: unit -> int64)
         (work: PartCaptureWork)
         : Task<Result<unit, string>> =
         taskResult {
-            if stablePartAlreadyCaptured existing work then
+            let existing = xTraceOf durable sessionId |> XTraceProjection.parts
+            let! alreadyCaptured = stablePartAlreadyCaptured existing work
+
+            if alreadyCaptured then
                 return ()
             else
                 let cursor = nextCursor ()
@@ -607,9 +667,10 @@ module XTraceCapture =
                 cursor
 
             let works = enumerateStableCaptureWork generation messageIds messages
+            do! validateStableBatch recorded works
 
             for work in works do
-                do! appendStablePartIfAbsent durable sessionId recorded nextCursor work
+                do! appendStablePartIfAbsent durable sessionId nextCursor work
 
             return Some(xTraceOf durable sessionId)
         }

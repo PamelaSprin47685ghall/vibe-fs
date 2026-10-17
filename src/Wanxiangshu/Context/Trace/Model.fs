@@ -30,7 +30,9 @@ module internal WanxiangliTrace =
     let private createEmptyTrace (_ctor: obj) (_traceId: string) : obj = jsNative
 
     [<Emit("(() => { const wm = new WeakMap(); return { attach: (b, t) => { wm.set(b, t); return b; }, take: (b, c) => { const t = wm.get(b); if (t && t.inspect().cursor === c) { wm.delete(b); return t; } return null; }, peek: (b, c) => { const t = wm.get(b); return (t && t.inspect().cursor === c) ? t : null; } }; })()")>]
-    let private traceCache: obj = jsNative
+    let private createTraceCache () : obj = jsNative
+
+    let private traceCache = createTraceCache ()
 
     [<Emit("$0.attach($1, $2)")>]
     let private attachCachedTrace (_cache: obj) (_bridge: 'a) (_trace: obj) : 'a = jsNative
@@ -53,9 +55,6 @@ module internal WanxiangliTrace =
     [<Emit("$0.slice($1, $2)")>]
     let private sliceBytes (_bytes: obj) (_startIdx: int) (_endIdx: int) : obj = jsNative
 
-    [<Emit("Buffer.concat($0.map(c => Buffer.from(c))).toString('utf8')")>]
-    let private concatBytesToUtf8 (_chunks: obj array) : string = jsNative
-
     [<Emit("$0.capture($1)")>]
     let private captureObs (_trace: obj) (_observation: obj) : obj = jsNative
 
@@ -65,17 +64,11 @@ module internal WanxiangliTrace =
     [<Emit("$0.cut($1)")>]
     let private rawCut (_trace: obj) (_cursor: int) : obj = jsNative
 
-    [<Emit("$0.records()")>]
-    let private rawRecords (_trace: obj) : string array = jsNative
-
     [<Emit("$0.inspect().cursor")>]
     let private rawInspectCursor (_trace: obj) : int = jsNative
 
     [<Emit("$0.read($1, $2)")>]
     let private rawRead (_trace: obj) (_afterCut: obj) (_throughCut: obj) : obj array = jsNative
-
-    [<Emit("$0.materialize($1, $2)")>]
-    let private rawMaterialize (_trace: obj) (_afterCut: obj) (_throughCut: obj) : obj = jsNative
 
     [<Emit("$0[$1]")>]
     let private getField (_target: obj) (_name: string) : obj = jsNative
@@ -142,9 +135,6 @@ module internal WanxiangliTrace =
     let private obsOpeningBound (messageId: string) : obj =
         createObj [ "type", box "OpeningBound"; "messageId", box messageId ]
 
-    let private obsRunStarted (runId: string) : obj =
-        createObj [ "type", box "RunStarted"; "runId", box runId ]
-
     let private obsMessageObserved (messageId: string) (role: string) (origin: string) (runIdOpt: string option) : obj =
         let runField =
             match runIdOpt with
@@ -173,11 +163,12 @@ module internal WanxiangliTrace =
               "messageId", box messageId
               "partCount", box partCount ]
 
-    let private obsRunFinished (runId: string) (outcome: string) : obj =
-        createObj [ "type", box "RunFinished"; "runId", box runId; "outcome", box outcome ]
-
     let private captureObsRecord (trace: obj) (obs: obj) : string =
         let result = captureObs trace obs
+
+        if string (getField result "status") <> "Appended" then
+            invalidOp "A new semantic observation must append a new Trace record"
+
         string (getField result "record")
 
     let private captureOpeningRecords (trace: obj) (payload: string) : string list =
@@ -240,85 +231,47 @@ module internal WanxiangliTrace =
 
         attachCachedTrace traceCache updated trace
 
-    let private wireRoleAndOrigin (role: string) (kind: string) (runId: string) : string * string * string option =
-        match kind, role with
-        | "tool_call", _ -> "assistant", "provider", Some runId
-        | "tool-call", _ -> "assistant", "provider", Some runId
-        | "tool_result", _ -> "tool", "provider", Some runId
-        | "tool-result", _ -> "tool", "provider", Some runId
-        | _, "user" -> "user", "human", None
-        | _, "system" -> "system", "host-internal", None
-        | _ -> "assistant", "provider", Some runId
-
-    let private wirePartKind (kind: string) : string =
-        match kind with
+    let private materialKind =
+        function
+        | "tool_call" -> "tool-call"
+        | "tool_result" -> "tool-result"
+        | "media_omitted" -> "media-omitted"
         | "text" -> "text"
-        | "tool_call"
-        | "tool-call" -> "tool-call"
-        | "tool_result"
-        | "tool-result" -> "tool-result"
-        | _ -> "binary"
+        | "reasoning" -> "reasoning"
+        | kind -> invalidOp ("Unknown confirmed material kind: " + kind)
 
-    let private captureChunkedMessage
-        (trace: obj)
-        (messageId: string)
-        (role: string)
-        (origin: string)
-        (runIdOpt: string option)
-        (partIdPrefix: string)
-        (wireKind: string)
-        (payload: string)
-        : string list =
-        let started =
-            match runIdOpt with
-            | Some runId -> [ captureObsRecord trace (obsRunStarted runId) ]
-            | None -> []
+    let private captureMaterialRecords trace identity role kind toolName providerRun body =
+        let chunks = chunkBytes body
 
-        let observed =
-            captureObsRecord trace (obsMessageObserved messageId role origin runIdOpt)
+        chunks
+        |> Array.mapi (fun index bytes ->
+            createObj
+                [ "type", box "MaterialConfirmed"
+                  "identity", box identity
+                  "role", box role
+                  "kind", box kind
+                  "toolName", toolName |> Option.map box |> Option.toObj
+                  "providerRun", providerRun |> Option.map box |> Option.toObj
+                  "chunk", box index
+                  "chunks", box chunks.Length
+                  "bytes", bytes ]
+            |> captureObsRecord trace)
+        |> Array.toList
 
-        let chunks = chunkBytes payload
-
-        let partRecords =
-            chunks
-            |> Array.mapi (fun index chunk ->
-                let partId = sprintf "%s/c:%d" partIdPrefix index
-                captureObsRecord trace (obsPartConfirmed messageId partId index wireKind chunk))
-            |> Array.toList
-
-        let finished = captureObsRecord trace (obsMessageFinished messageId chunks.Length)
-
-        let runEnded =
-            match runIdOpt with
-            | Some runId -> [ captureObsRecord trace (obsRunFinished runId "Completed") ]
-            | None -> []
-
-        started @ (observed :: partRecords) @ (finished :: runEnded)
-
-    let appendPartDescriptorToBridge
+    let appendPartToBridge
         (cursorSequence: int64)
         (role: string)
         (provenance: string)
         (kind: string)
         (toolName: string option)
-        (textRef: string)
-        (textDigest: string)
+        (providerRun: string option)
+        (body: string)
         (bridge: ProjectionBridge)
         : ProjectionBridge =
         let trace = acquireWritableTrace bridge
-        let runId = sprintf "xrun-%d" cursorSequence
-        let messageId = sprintf "xmsg-%d" cursorSequence
-        let wireRole, wireOrigin, wireRunOpt = wireRoleAndOrigin role kind runId
-        let mappedKind = wirePartKind kind
-        let toolLabel = Option.defaultValue "" toolName
-
-        let payload =
-            sprintf "%s|%s|%s|%s|%s|%s" role provenance kind toolLabel textRef textDigest
-
-        let partPrefix = sprintf "p:%d" cursorSequence
 
         let addedRecords =
-            captureChunkedMessage trace messageId wireRole wireOrigin wireRunOpt partPrefix mappedKind payload
+            captureMaterialRecords trace ("part:" + provenance) role (materialKind kind) toolName providerRun body
 
         let afterCursor = rawInspectCursor trace
 
@@ -330,23 +283,36 @@ module internal WanxiangliTrace =
 
         attachCachedTrace traceCache updated trace
 
-    let appendTerminalDescriptorToBridge
+    let appendTerminalToBridge
         (providerRun: string)
-        (textRef: string)
-        (textDigest: string)
+        (body: string)
         (frontierSequence: int64)
         (bridge: ProjectionBridge)
         : ProjectionBridge =
         let trace = acquireWritableTrace bridge
-        let termOrd = bridge.RecordCount + 1
-        let runId = sprintf "xterm-run-%d" termOrd
-        let messageId = sprintf "xterm-msg-%d" termOrd
+        let identity = "terminal:" + providerRun
 
-        let payload =
-            sprintf "terminal|%s|%s|%s|%d" providerRun textRef textDigest frontierSequence
+        let frontierCursor =
+            bridge.PartCuts
+            |> List.filter (fun (sequence, _) -> sequence < frontierSequence)
+            |> List.tryLast
+            |> Option.map snd
+            |> Option.defaultValue bridge.OpeningCutCursor
 
-        let addedRecords =
-            captureChunkedMessage trace messageId "assistant" "provider" (Some runId) "term" "binary" payload
+        let frontier = rawCut trace frontierCursor
+
+        let material =
+            captureMaterialRecords trace identity "assistant" "text" None (Some providerRun) body
+
+        let bound =
+            createObj
+                [ "type", box "TerminalBound"
+                  "identity", box identity
+                  "providerRun", box providerRun
+                  "frontier", frontier ]
+            |> captureObsRecord trace
+
+        let addedRecords = material @ [ bound ]
 
         let afterCursor = rawInspectCursor trace
 
@@ -356,6 +322,26 @@ module internal WanxiangliTrace =
                 RecordCount = afterCursor }
 
         attachCachedTrace traceCache updated trace
+
+    let private readMaterialText identity (bridge: ProjectionBridge) =
+        let trace = acquireReadableTrace bridge
+        let material: obj = trace?material (identity, rawHead trace)
+
+        if isNullOrUndefined material || not (unbox<bool> material?complete) then
+            invalidOp ("Confirmed trace material is unavailable: " + identity)
+
+        let text: obj = material?content?text
+
+        if isNullOrUndefined text then
+            invalidOp ("Confirmed trace material is not valid UTF-8: " + identity)
+
+        unbox<string> text
+
+    let partText provenance bridge =
+        readMaterialText ("part:" + provenance) bridge
+
+    let terminalText providerRun bridge =
+        readMaterialText ("terminal:" + providerRun) bridge
 
     let headCutOfBridge (bridge: ProjectionBridge) : XTraceCut =
         let trace = acquireReadableTrace bridge
@@ -441,181 +427,13 @@ module internal WanxiangliTrace =
         let afterCut, throughCut = intervalOfRangeOnBridge range bridge
         rawRead trace (cutToJs afterCut) (cutToJs throughCut)
 
-    let private encodeItemPayload (part: SemanticPart) : string * string * string =
-        match part with
-        | SemanticText text -> "text", "text", text
-        | SemanticReasoning text -> "binary", "reasoning", text
-        | SemanticToolCall(name, args) -> "tool-call", "tool_call", sprintf "%d:%s\n%s" name.Length name args
-        | SemanticToolResult result -> "tool-result", "tool_result", result
-        | SemanticMedia(Some mediaType, digest) ->
-            "binary", "media", sprintf "1:%d:%s\n%s" mediaType.Length mediaType digest
-        | SemanticMedia(None, digest) -> "binary", "media", sprintf "0:0:\n%s" digest
-
-    let private decodeToolCallPayload (raw: string) : SemanticPart =
-        let colon = raw.IndexOf(':')
-        let len = Int32.Parse(raw.Substring(0, colon))
-        let name = raw.Substring(colon + 1, len)
-        let args = raw.Substring(colon + 1 + len + 1)
-        SemanticToolCall(name, args)
-
-    let private decodeMediaPayload (raw: string) : SemanticPart =
-        let firstColon = raw.IndexOf(':')
-        let hasMedia = raw.Substring(0, firstColon) = "1"
-        let rest = raw.Substring(firstColon + 1)
-        let secondColon = rest.IndexOf(':')
-        let len = Int32.Parse(rest.Substring(0, secondColon))
-        let mediaType = rest.Substring(secondColon + 1, len)
-        let digest = rest.Substring(secondColon + 1 + len + 1)
-        SemanticMedia((if hasMedia then Some mediaType else None), digest)
-
-    let private decodeItemPart (tag: string) (raw: string) : SemanticPart =
-        match tag with
-        | "text" -> SemanticText raw
-        | "reasoning" -> SemanticReasoning raw
-        | "tool_call" -> decodeToolCallPayload raw
-        | "tool_result" -> SemanticToolResult raw
-        | "media" -> decodeMediaPayload raw
-        | _ -> SemanticText raw
-
-    let private parsePartTag (partId: string) : string =
-        if partId.StartsWith("k:", StringComparison.Ordinal) then
-            let slash = partId.IndexOf('/')
-            if slash > 2 then partId.Substring(2, slash - 2) else "text"
-        else
-            "text"
-
-    let private parseMessageOrdinal (messageId: string) : int option =
-        let parsed, value =
-            if messageId.StartsWith("xmsg-", StringComparison.Ordinal) then
-                Int32.TryParse(messageId.Substring(5))
-            else
-                false, 0
-
-        if parsed then Some value else None
-
-    let private firstPartTag (sortedParts: obj array) : string =
-        if sortedParts.Length = 0 then
-            "text"
-        else
-            parsePartTag (string (getField sortedParts.[0] "partId"))
-
-    let private reconstructOrdinalItem (original: XTraceItem) (messageView: obj) : XTraceItem =
-        let rawParts = unbox<obj array> (getField messageView "parts")
-
-        let sortedParts =
-            rawParts |> Array.sortBy (fun part -> unbox<int> (getField part "index"))
-
-        let chunks =
-            sortedParts
-            |> Array.map (fun part -> getField (getField part "content") "bytes")
-
-        let fullText = concatBytesToUtf8 chunks
-        let tag = firstPartTag sortedParts
-
-        { Cursor = original.Cursor
-          Provenance = original.Provenance
-          Role = original.Role
-          Part = decodeItemPart tag fullText }
-
-    let private reconstructMessageItem (itemsByOrdinal: XTraceItem array) (messageView: obj) : XTraceItem option =
-        let messageId = string (getField messageView "messageId")
-
-        parseMessageOrdinal messageId
-        |> Option.bind (fun ordinal ->
-            if ordinal < 0 || ordinal >= itemsByOrdinal.Length then
-                None
-            else
-                Some(reconstructOrdinalItem itemsByOrdinal.[ordinal] messageView))
-
-    let private populateTraceFromItems (traceId: string) (openingText: string option) (items: XTraceItem list) =
-        let trace = createEmptyTrace traceCtor traceId
-
-        let openingRecords, openingCutCursor =
-            match openingText with
-            | Some text ->
-                let records = captureOpeningRecords trace text
-                records, rawInspectCursor trace
-            | None -> [], 0
-
-        let itemsArray = List.toArray items
-
-        let partPairs =
-            itemsArray
-            |> Array.mapi (fun ordinal item ->
-                let seq = XTraceCursor.sequence item.Cursor
-                let wireKind, tag, payload = encodeItemPayload item.Part
-                let runId = sprintf "xrun-%d" ordinal
-                let messageId = sprintf "xmsg-%d" ordinal
-                let wireRole, wireOrigin, wireRunOpt = wireRoleAndOrigin item.Role tag runId
-                let prefix = sprintf "k:%s" tag
-
-                let added =
-                    captureChunkedMessage trace messageId wireRole wireOrigin wireRunOpt prefix wireKind payload
-
-                added, (seq, rawInspectCursor trace))
-
-        let allRecords = openingRecords @ (partPairs |> Array.toList |> List.collect fst)
-
-        let partCuts = partPairs |> Array.map snd |> Array.toList
-        let finalCursor = rawInspectCursor trace
-
-        let bridge =
-            { TraceId = traceId
-              Records = allRecords
-              OpeningCutCursor = openingCutCursor
-              PartCuts = partCuts
-              RecordCount = finalCursor }
-
-        let attached = attachCachedTrace traceCache bridge trace
-        attached, trace, itemsArray
-
-    let materializeItemsInRange (range: XTraceRange) (items: XTraceItem list) : XTraceItem list =
-        if List.isEmpty items || XTraceRange.isEmpty range then
-            []
-        else
-            let bridge, trace, itemsArray = populateTraceFromItems "xtrace-items" None items
-            let afterCut, throughCut = intervalOfRangeOnBridge range bridge
-            let window = rawMaterialize trace (cutToJs afterCut) (cutToJs throughCut)
-            let messageViews = unbox<obj array> (getField window "messages")
-
-            messageViews
-            |> Array.choose (reconstructMessageItem itemsArray)
-            |> Array.filter (fun item -> XTraceRange.contains item.Cursor range)
-            |> Array.toList
-
-    let inspectItemsBridge
-        (traceId: string)
-        (openingText: string option)
-        (range: XTraceRange)
-        (items: XTraceItem list)
-        : obj =
-        let bridge, trace, itemsArray = populateTraceFromItems traceId openingText items
-        let afterCut, throughCut = intervalOfRangeOnBridge range bridge
-        let window = rawMaterialize trace (cutToJs afterCut) (cutToJs throughCut)
-        let messageViews = unbox<obj array> (getField window "messages")
-
-        let materialized =
-            messageViews
-            |> Array.choose (reconstructMessageItem itemsArray)
-            |> Array.filter (fun item -> XTraceRange.contains item.Cursor range)
-
-        createObj
-            [ "traceId", box bridge.TraceId
-              "head", cutToJs (headCutOfBridge bridge)
-              "after", cutToJs afterCut
-              "through", cutToJs throughCut
-              "records", box (List.toArray bridge.Records)
-              "window", window
-              "materializedCount", box materialized.Length ]
-
 [<RequireQualifiedAccess>]
 module XTrace =
 
     /// `cursor >= start` 且 `cursor < endExclusive` 的 items。
-    /// 经由组合层 C 的 WanxiangliTrace 执行 (after, through] 固定区间切片与字节无损还原。
     let sliceBetween (start: XTraceCursor) (endExclusive: XTraceCursor) (items: XTraceItem list) =
         let range = XTraceRange.create start endExclusive
-        WanxiangliTrace.materializeItemsInRange range items
+        items |> List.filter (fun item -> XTraceRange.contains item.Cursor range)
 
     /// 当前 head：最后一条 item 之后的位置。空轨迹为 origin。
     let head (items: XTraceItem list) : XTraceCursor =

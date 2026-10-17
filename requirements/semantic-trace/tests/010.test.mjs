@@ -103,6 +103,7 @@ const part = (sequence, overrides = {}) => ({
   kind: 'text',
   textRef: `blob-${sequence}`,
   textDigest: `digest-${sequence}`,
+  body: `raw-${sequence}`,
   providerRun: `run-${sequence}`,
   ...overrides,
 })
@@ -133,7 +134,7 @@ test('WHAT[semantic-trace-010] large Opening preserves the complete bytes and di
 test('WHAT[semantic-trace-010] late Opening appends without changing old cuts or old semantic ranges', async () => {
   const { Trace } = await import('wanxiangli/trace')
   let before = unwrap(trace.appendPart(trace.emptyProjection(), part(1)))
-  before = unwrap(trace.appendTerminal(before, { textRef: 'terminal', textDigest: 'terminal-digest', providerRun: 'run-1' }))
+  before = unwrap(trace.appendTerminal(before, { textRef: 'terminal', textDigest: 'terminal-digest', providerRun: 'run-1', body: 'terminal' }))
   const oldHead = trace.traceHeadCut(before)
   const oldRecords = trace.traceRecords(before)
   const original = new Trace(oldHead.traceId, oldRecords)
@@ -154,7 +155,7 @@ test('WHAT[semantic-trace-010] small first Opening retains the original record p
   const records = trace.traceRecords(projection)
   assert.equal(records.length, 1)
   assert.equal(JSON.parse(records[0]).observation.type, 'Opening')
-  const legacy = new Trace('xtrace-projection')
+  const legacy = new Trace('xtrace-material-v2/projection')
   legacy.capture({ type: 'Opening', bytes: new TextEncoder().encode('assignment:4:task\nrequirement') })
   assert.deepEqual(records, legacy.records())
 })

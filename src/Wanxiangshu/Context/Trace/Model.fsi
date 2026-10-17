@@ -25,34 +25,28 @@ module internal WanxiangliTrace =
     val appendOpeningToBridge:
         assignment: string -> requirements: string list -> bridge: ProjectionBridge -> ProjectionBridge
 
-    val appendPartDescriptorToBridge:
+    val appendPartToBridge:
         cursorSequence: int64 ->
         role: string ->
         provenance: string ->
         kind: string ->
         toolName: string option ->
-        textRef: string ->
-        textDigest: string ->
+        providerRun: string option ->
+        body: string ->
         bridge: ProjectionBridge ->
             ProjectionBridge
 
-    val appendTerminalDescriptorToBridge:
-        providerRun: string ->
-        textRef: string ->
-        textDigest: string ->
-        frontierSequence: int64 ->
-        bridge: ProjectionBridge ->
-            ProjectionBridge
+    val appendTerminalToBridge:
+        providerRun: string -> body: string -> frontierSequence: int64 -> bridge: ProjectionBridge -> ProjectionBridge
+
+    val partText: provenance: string -> bridge: ProjectionBridge -> string
+    val terminalText: providerRun: string -> bridge: ProjectionBridge -> string
 
     val headCutOfBridge: bridge: ProjectionBridge -> XTraceCut
     val cutAtSequenceOfBridge: sequence: int64 -> bridge: ProjectionBridge -> XTraceCut
     val intervalOfRangeOnBridge: range: XTraceRange -> bridge: ProjectionBridge -> XTraceCut * XTraceCut
     val intervalAfterCoverageOnBridge: coverage: RecordCoverage -> bridge: ProjectionBridge -> XTraceCut * XTraceCut
     val verifyAndReadIntervalOnBridge: range: XTraceRange -> bridge: ProjectionBridge -> obj array
-    val materializeItemsInRange: range: XTraceRange -> items: XTraceItem list -> XTraceItem list
-
-    val inspectItemsBridge:
-        traceId: string -> openingText: string option -> range: XTraceRange -> items: XTraceItem list -> obj
 
 [<RequireQualifiedAccess>]
 module XTrace =

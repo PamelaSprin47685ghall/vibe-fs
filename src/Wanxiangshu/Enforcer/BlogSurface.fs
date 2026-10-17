@@ -784,7 +784,7 @@ module BlogSurface =
                     XTraceProjection.applyPart
                         sequence
                         "user"
-                        "g:0/coverage-birth"
+                        (sprintf "g:0/coverage-birth/%d" sequence)
                         (int sequence)
                         0
                         "text"
@@ -794,6 +794,7 @@ module BlogSurface =
                         None
                         (BlobRef.create "coverage-birth")
                         (BlobDigest.create "coverage-birth")
+                        ""
                         state
                     |> Result.defaultWith (string >> invalidOp))
                 XTraceProjection.empty

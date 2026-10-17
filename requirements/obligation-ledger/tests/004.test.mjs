@@ -13,7 +13,7 @@ const { integrationTest } = await import("../../verification-system/tests/suppor
 // only the call identity (context-compression-028: K is the fixed module
 // constant, not per-fact data). Sequence fields use BigInt like the
 // durable-events/015 fixtures they are modelled on.
-const envelope = (seq, session, fact, run = null) => ({
+const envelope = (seq, session, fact, run = null, material = null) => ({
   runtime: 'rt-004',
   seq,
   observedAt: '2026-01-01T00:00:00Z',
@@ -21,6 +21,7 @@ const envelope = (seq, session, fact, run = null) => ({
   session,
   run,
   fact,
+  material,
 })
 
 const bloggerLinked = (session, bloggerSession) => ({
@@ -118,8 +119,8 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable c
   const prefix = [
     envelope(1, 'ses-a', bloggerLinked('ses-a', 'ses-blog')),
     envelope(2, 'ses-a', openingCaptured('ses-a', 'do the entrusted work')),
-    envelope(3, 'ses-a', tracePartAppended('ses-a')),
-    envelope(4, 'ses-a', terminalCaptured('ses-a'), 'msg-terminal-004'),
+    envelope(3, 'ses-a', tracePartAppended('ses-a'), 'msg-004', 'actual assistant material'),
+    envelope(4, 'ses-a', terminalCaptured('ses-a'), 'msg-terminal-004', 'actual formal terminal'),
     envelope(5, 'ses-a', blogEntry('ses-a', 'ses-blog'), 'msg-entry-004'),
     envelope(6, 'ses-a', prefixRebase('ses-a'), 'msg-rebase-004'),
   ]
@@ -250,7 +251,9 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
     await bindManagedChild(runtime, sessionID, childID, 'engineer')
     await openIncumbency(runtime, sessionID)
-    await journalSurface.JournalSurface_appendAgent(
+    const terminal = await journalSurface.JournalSurface_writePayload(runtime.journal, 'actual formal terminal')
+    assert.equal(terminal.ok, true)
+    const linked = await journalSurface.JournalSurface_appendAgent(
       runtime.journal,
       { kind: 'Session', session: sessionID },
       null,
@@ -260,16 +263,19 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
         payload: { SessionId: sessionID, BloggerSessionId: bloggerSession, BloggerAgent: 'blogger' },
       },
     )
-    await journalSurface.JournalSurface_appendAgent(
+    assert.equal(linked.ok, true, JSON.stringify(linked.error))
+    const captured = await journalSurface.JournalSurface_appendAgent(
       runtime.journal,
       { kind: 'Session', session: sessionID },
       null,
       {
         family: 'Companion',
         case: 'TerminalOutputCaptured',
-        payload: { SessionId: sessionID, TextRef: 'blob-ol-004-terminal', TextDigest: 'digest-ol-004-terminal', ProviderRun: 'run-ol-004' },
+        payload: { SessionId: sessionID, TextRef: terminal.blobRef, TextDigest: terminal.blobDigest, ProviderRun: 'run-ol-004' },
       },
     )
+
+    assert.equal(captured.ok, true, JSON.stringify(captured.error))
 
     const before = journalSurface.JournalSurface_snapshot(runtime.journal)
     const beforeSlices = before.sessionProjections[sessionID]

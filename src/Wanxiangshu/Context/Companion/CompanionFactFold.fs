@@ -35,6 +35,8 @@ module CompanionFoldRejection =
         | CompanionFoldRejection.XTraceOpeningRejected r -> sprintf "unexpected XTrace rejection: %A" r
         | CompanionFoldRejection.XTracePartRejected(XTraceFoldRejection.CursorNotAfterHead(expected, actual)) ->
             sprintf "cursor %d is not after the head %d (PERSIST-010)" actual expected
+        | CompanionFoldRejection.XTracePartRejected(XTraceFoldRejection.MaterialRejected reason)
+        | CompanionFoldRejection.XTraceTerminalRejected(XTraceFoldRejection.MaterialRejected reason) -> reason
         | CompanionFoldRejection.XTracePartRejected r -> sprintf "unexpected XTrace rejection: %A" r
         | CompanionFoldRejection.XTraceTerminalRejected XTraceFoldRejection.TerminalAlreadyCaptured ->
             "terminal was already captured with a different blob for this ProviderRun (PERSIST-010)"
@@ -103,13 +105,16 @@ module CompanionFactFold =
         // text is the crash-recovery path; a DIFFERENT text is a line no
         // correct writer produces, so it fails the fold closed.
         let current =
-            Option.defaultValue XTraceProjection.empty (xTraceOf payload.SessionId)
+            Option.defaultWith
+                (fun () -> XTraceProjection.emptyForSession payload.SessionId)
+                (xTraceOf payload.SessionId)
 
         match XTraceProjection.applyOpening payload.AssignmentText payload.AuthoritativeRequirements current with
         | Ok updated -> Ok [ CompanionProjectionChange.XTraceSet(payload.SessionId, updated) ]
         | Error rejection -> Error(CompanionFoldRejection.XTraceOpeningRejected rejection)
 
     let private foldXTracePartAppended
+        (body: string)
         (xTraceOf: SessionId -> XTraceProjectionState option)
         (payload:
             {| SessionId: SessionId
@@ -130,7 +135,9 @@ module CompanionFactFold =
         // The provenance is stored VERBATIM from the writer, so the recorded
         // set and the writer's dedupe check share one namespace.
         let current =
-            Option.defaultValue XTraceProjection.empty (xTraceOf payload.SessionId)
+            Option.defaultWith
+                (fun () -> XTraceProjection.emptyForSession payload.SessionId)
+                (xTraceOf payload.SessionId)
 
         match
             XTraceProjection.applyPart
@@ -146,12 +153,14 @@ module CompanionFactFold =
                 payload.HostToolPartId
                 payload.TextRef
                 payload.TextDigest
+                body
                 current
         with
         | Ok updated -> Ok [ CompanionProjectionChange.XTraceSet(payload.SessionId, updated) ]
         | Error rejection -> Error(CompanionFoldRejection.XTracePartRejected rejection)
 
     let private foldTerminalOutputCaptured
+        (body: string)
         (xTraceOf: SessionId -> XTraceProjectionState option)
         (payload:
             {| SessionId: SessionId
@@ -160,13 +169,16 @@ module CompanionFactFold =
                ProviderRun: ProviderRunIdentity |})
         : Result<CompanionProjectionChange list, CompanionFoldRejection> =
         let current =
-            Option.defaultValue XTraceProjection.empty (xTraceOf payload.SessionId)
+            Option.defaultWith
+                (fun () -> XTraceProjection.emptyForSession payload.SessionId)
+                (xTraceOf payload.SessionId)
 
-        match XTraceProjection.applyTerminal payload.TextRef payload.TextDigest payload.ProviderRun current with
+        match XTraceProjection.applyTerminal payload.TextRef payload.TextDigest payload.ProviderRun body current with
         | Ok updated -> Ok [ CompanionProjectionChange.XTraceSet(payload.SessionId, updated) ]
         | Error rejection -> Error(CompanionFoldRejection.XTraceTerminalRejected rejection)
 
     let fold
+        (body: string)
         (associations: Map<SessionId, SessionAssociation>)
         (companionOf: SessionId -> CompanionProjection option)
         (xTraceOf: SessionId -> XTraceProjectionState option)
@@ -178,5 +190,5 @@ module CompanionFactFold =
         | CompanionFactCases.CompanionBloggerClosed payload ->
             foldCompanionBloggerClosed associations companionOf payload
         | CompanionFactCases.OpeningPromptCaptured payload -> foldOpeningPromptCaptured xTraceOf payload
-        | CompanionFactCases.XTracePartAppended payload -> foldXTracePartAppended xTraceOf payload
-        | CompanionFactCases.TerminalOutputCaptured payload -> foldTerminalOutputCaptured xTraceOf payload
+        | CompanionFactCases.XTracePartAppended payload -> foldXTracePartAppended body xTraceOf payload
+        | CompanionFactCases.TerminalOutputCaptured payload -> foldTerminalOutputCaptured body xTraceOf payload
