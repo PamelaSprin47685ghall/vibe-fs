@@ -103,8 +103,10 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-02-R6-A](REMAINING-REPAIRS-2026-10-16.md) | GAP-091 纯契约及编译/消费者边界 | READY | 真实正反编译与注入能力证明，不能只改目录或外观入口 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-B](REMAINING-REPAIRS-2026-10-16.md) | GAP-092 完整 wire 总预算 | READY | 先明确最小可接纳预算和预执行拒绝通道，再以实际编码限制完整结果 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-C](REMAINING-REPAIRS-2026-10-16.md) | Bun 特殊 env、参数证明及 stdin 四项失败 | READY | 原生对照已完成；分别处理能力与测试假设，不放宽断言，不标全套通过 | root（计划） | 待非作者复审 |
+| [CUT-06-R1](REMAINING-REPAIRS-2026-10-16.md#gap111-next) | GAP-111 跨 invocation frame 的 bounded 取材与 coverage | BACKLOG | 下一个 P1；c3689035c 定向复测仍混入 EARLIER_WORK。先定跨界材料与 coverage 共同契约、核对真实消费者并预约写集合，再进入 READY；不是整张 CUT-06 抽取 | — | 待非作者复审 |
+| [CUT-17-R1](REMAINING-REPAIRS-2026-10-16.md#guidance-followup) | GAP-108 指导呈现回流的真实 Host 路径核查 | BACKLOG | 优先按 P1 风险核查；直接捕获反例仍红，正常 Host 可达性未证。先驱动真实请求/捕获链，不教原件层按正文删后缀；不是整张 CUT-17 抽取 | — | 待非作者复审 |
 
-P1 行为缺陷优先；PATH、PTY 提前清账/同步完成和 Proxy 测试可先形成独立小闭环。公共文件、两仓发布及主仓集成仍串行，不能用这些局部修复关闭整张关联卡。
+2026-10-17 当前顺序：先 CUT-06-R1，再 CUT-17-R1 核查，随后三个 Process P2 按 R6-B → R6-C → R6-A 各自闭环；完整 Trace/Ownership 产品链和主动脱组另分场景证明，R12-U1 暂缓。[当前排期与验收范围](REMAINING-REPAIRS-2026-10-16.md#post-t01-plan)。公共文件、两仓发布及主仓集成仍串行，不能用局部修复关闭整张关联卡。
 
 ## 波次：什么时候拉哪张卡
 

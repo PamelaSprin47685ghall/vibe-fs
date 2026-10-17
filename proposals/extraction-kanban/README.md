@@ -6,7 +6,7 @@
 
 这是后续抽吸工作的共同蓝图，不是全系统已经审计完毕的声明。目录与需求包已经纳入分工；每卡开工仍需追踪实际调用者、在途状态和持久数据。包名、接口与删除清单中的待定项必须在该卡准备阶段落实，不用想象填空。
 
-**最新复核：** [四模块源码复核、问题报告与修复计划（2026-10-15）](SOURCE-AUDIT-2026-10-15.md)。主仓 `7d8feff03` 的 CUT-02/03/04 有已确认的接线缺陷；历史合入记录保留，未闭合范围见 [关联修复卡](BOARD.md#source-audit-repairs)。
+**当前入口：** [T-01 独立复审与修正](TRACE-ORIGINALS-2026-10-17.md)已在主仓 `c3689035c` 交付；[剩余问题与下一轮排期](REMAINING-REPAIRS-2026-10-16.md#post-t01-plan)从该版本盘点，下一包是跨 invocation 的 WorkRecord 取材。最初的[四模块源码问题报告](SOURCE-AUDIT-2026-10-15.md)保留为历史依据，实际状态只在[关联修复卡](BOARD.md#source-audit-repairs)维护。
 
 ## 入口：五份文件，各管一件事
 
@@ -28,7 +28,7 @@ Lifecycle 已通过 `wanxiangli/work`、`eventstore`、`durable-work` 接回主�
 
 建板基线中，`wanxiangli/process`、`trace`、`ownership` 已有独立实现与测试，主仓尚只接入前三个生命周期入口。随后 CUT-02/03/04 已合入接线；本次完整源码复核发现部分产品义务尚未承接，状态与反例以最新看板和上述报告为准。导入包、基础测试通过或历史 DONE 均不能单独证明职责已迁完。
 
-主仓当前锁定并跟踪 `vendor/wanxiangli-0.6.2.tgz`，0.5.2 是建板历史基线。旁边的 `wanxiangli/` 是另一 Git 仓，不是主仓源码依赖；新成员只克隆主仓也必须能构建。位置变化不应影响 npm 消费。[分发要求](../../requirements/distribution/WHAT.md)。全部修复的双版比较、归因及剩余边界见[2026-10-16 独立复审](REGRESSION-REVIEW-2026-10-16.md)。
+主仓当前锁定并跟踪 `vendor/wanxiangli-0.6.4.tgz`，0.5.2 是建板历史基线。旁边的 `wanxiangli/` 是另一 Git 仓，不是主仓源码依赖；新成员只克隆主仓也必须能构建。位置变化不应影响 npm 消费。[分发要求](../../requirements/distribution/WHAT.md)。全部修复的双版比较见[2026-10-16 独立复审](REGRESSION-REVIEW-2026-10-16.md)，后续归因和证据见[修复记录](REPAIR-PROGRESS-2026-10-15.md)。
 
 ### 第一批怎么分人
 

@@ -2,6 +2,14 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第十六批：T-01 后剩余项盘点与排期（2026-10-17，仅规划）
+
+输入干净主仓 `c3689035c`、库 `10bbb32 / 0.6.4`。四个原 P1 子包的已验收结论保留；本次未改生产实现、测试、依赖或库包。重跑现有 work-record-004、prefix-stability-014、process-execution-012/015，得到 **17 / 12 pass / 0 普通 fail / 0 skip / 5 TODO**，日志 `/private/tmp/post-t01-plan-baseline-20261017.log`。四个 TODO 仍执行失败：跨 invocation 摘要混入旧工作、直接捕获加工后指导、纯契约混编、256 字节预算返回 549 字节；另一个仅声明待补消费者能力。直接指导捕获反例不能单独证明正常 Host 请求会污染历史，未把 TODO 数量当作产品错误数量。
+
+已更新[剩余计划](REMAINING-REPAIRS-2026-10-16.md#post-t01-plan)与看板：下一包为 CUT-06-R1/GAP-111 的 bounded 取材及 coverage，随后 CUT-17-R1/GAP-108 核查真实回流，再按 B/C/A 完成三个 Process P2。新卡仍 BACKLOG，尚未认领生产写集合；完整 Trace/Opening/Resume/Fission、Bootstrap/主动脱组及平台/容量证明各自保留，R12-U1 继续暂缓。修正施工指南的旧 vendor 版本与旧“下一步”入口，历史失败及验收记录原样保留。
+
+文档候选 `node scripts/build.mjs` 通过，generation 559，174 surfaces / 838 modules；日志 `/private/tmp/post-t01-plan-build-20261017.log`。`git diff --check` 通过；不把文档构建算作新一轮行为修复验收。本批只提交上述计划、看板、进度和指南，按 AGENTS.md 正常推送 master，不强推，未部署 Host。
+
 ## 第十五批：T-01 独立复审（2026-10-17，已修正并验收）
 
 以主仓 `97abafc4a`、库 `a636cbc / 0.6.3` 为基线，先由三位非作者分别复审，再由 root 与 capture/recovery 修正，最终由未编辑源码的 originals 独立复验。原 T-01 的 N3 身份限制、N4 双 facet 消费覆盖、N5 facet 碰撞及 N6 物理种类/归属护栏遗漏均已修正。本轮未交付候选的 N7 旧 kind 绕过、N8 wrapper 误计冲突及 N9 证据 DTO int64 缩窄分别记录并修正。既有 snapshot 来源/缺 ID 和分隔符编码问题分别记 T01-04/05/06；环境、旧夹具坐标误判与门禁漂移另记，不混同归因。
