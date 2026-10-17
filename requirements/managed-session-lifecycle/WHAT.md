@@ -64,6 +64,8 @@ Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle �
 
 内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。自动化机制不得任意中断用户根会话；deliver 可凭已落地的退休事实终止残余尝试。work-049 的已登记用户询问是另一项窄例外：同一 ask 的工具结果确认后，只暂停提问者的当前 attempt，不取消已入队的真实用户输入，也不影响子资源或逻辑运行。
 
+work-011 的 S4 Delivered 是完成停止，不是任意取消：无继任者时，在退休与对应 logical run 关闭落盘后、deliver 返回前等待当前 attempt 的中断回执。有继任者的 Relayed 不发此中断；第一次确认也不中断。失败必须如实呈现，不能用成功文字代替停止保证。
+
 真实外部物理用户输入只允许打断 `join` 等待，不得中断当前 LLM 输出或其他工具，也不得调用 Host `AbortSession` / `InterruptAttempt` 排空当前 attempt。新输入作为下一次 LLM 请求的材料，由 Host 在当前输出或工具自然结束后纳入；当前物理 assistant 与工具结果仍须正常保存。
 
 work-049 的 `ask` 是模型主动请求的人类等待，不是“新用户输入到来即中断”。它在自身工具结果得到 Host 确认后中断当前 attempt，保留 logical run 与工作资源。用户随后回复仍走本条的普通人类输入准入，不再发一次 interrupt，也不因此注销任期。

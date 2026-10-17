@@ -4,7 +4,7 @@ import {withReview, scores} from './support/plugin.mjs'
 import {withSuccessor, messageId} from './support/cut.mjs'
 import { withExecutablePlugin, acceptAuthorityRoot, injectAcceptedAssessment, lifecycleWorkView } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
-test('WHAT[work-011] actual Promoted deliver confirms then retires without abort and dispatches no successor', async () => {
+test('WHAT[work-011] Promoted deliver waits for its terminal attempt interrupt before returning and dispatches no successor', async () => {
   await withReview(async ({execute, hooks, runtime, session}) => {
     assert.match(await execute(scores('PERFECT')), /recorded = true/)
     const retirement = {
@@ -19,10 +19,36 @@ test('WHAT[work-011] actual Promoted deliver confirms then retires without abort
     assert.match(confirmation, /confirmation_required = true/)
     assert.match(confirmation, /finished = false/)
     assert.deepEqual(runtime.abortedIds, [])
-    // A different callID retires. Promoted writes Delivered and starts no successor.
-    const result = await hooks.tool.deliver.execute({}, retire)
-    assert.match(result, /Finished\. Do not continue work\./)
-    assert.deepEqual(runtime.abortedIds, [])
+    // 无继任者的终态必须先等 Host 中断回执，不能把成功文字当作停止保证。
+    const interruptStarted = Promise.withResolvers()
+    const interruptAck = Promise.withResolvers()
+    const abort = runtime.client.session.abort
+    runtime.client.session.abort = async args => {
+      await abort(args)
+      interruptStarted.resolve()
+      await interruptAck.promise
+      return {}
+    }
+    let returned = false
+    const delivery = hooks.tool.deliver.execute({}, retire).then(result => {
+      returned = true
+      return result
+    })
+    try {
+      const first = await Promise.race([
+        interruptStarted.promise.then(() => 'interrupt'),
+        delivery.then(() => 'returned'),
+      ])
+      assert.equal(first, 'interrupt', 'deliver must interrupt before returning')
+      assert.equal(returned, false, 'deliver must wait for the Host interrupt acknowledgement')
+      const work = lifecycleWorkView(runtime, session)
+      assert.equal(work.delivered, true, 'interrupt follows durable delivery')
+      assert.equal(work.active, false, 'a final delivery has no successor tenure')
+      assert.deepEqual(runtime.abortedIds, [session])
+    } finally {
+      interruptAck.resolve()
+    }
+    await delivery
     assert.equal(runtime.prompts.length, 0)
     const output = {messages: [
       {info: {id: 'user-root', role: 'user', sessionID: session, model: {providerID: 'provider', modelID: 'manager-model'}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]},
@@ -30,12 +56,40 @@ test('WHAT[work-011] actual Promoted deliver confirms then retires without abort
       {info: {id: 'retirement-run', role: 'assistant', parentID: 'user-root', time: {created: 3}}, parts: [{type: 'text', text: 'Old closing tail'}]},
     ]}
     await hooks['experimental.chat.messages.transform']({sessionID: session}, output)
-    // Delivered has no successor. The transform must not stop this attempt
-    // and must not abort the session.
-    assert.notEqual(output.messages.length, 0)
-    assert.deepEqual(runtime.abortedIds.filter(id => id === session), [])
+    // 后续 transform 不能再对同一终态发第二次会话中断。
+    assert.deepEqual(runtime.abortedIds.filter(id => id === session), [session])
   })
 })
+
+for (const failure of ['rejected', 'thrown']) {
+  test(`WHAT[work-011] a ${failure} Host interrupt cannot be reported as successful final delivery`, async () => {
+    await withReview(async ({execute, hooks, runtime, session}) => {
+      await execute(scores('PERFECT'))
+      runtime.pushHostMessage(session, {
+        info: {id: 'final-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 3}},
+        parts: [{type: 'tool', tool: 'deliver', callID: 'final-call', state: {status: 'pending', input: {}}}],
+      })
+      await hooks.tool.deliver.execute({}, {
+        sessionID: session, agent: 'manager', messageID: 'confirmation-run', callID: 'confirmation-call',
+      })
+      const reason = `terminal-interrupt-${failure}`
+      runtime.client.session.abort = async () => {
+        if (failure === 'thrown') throw new Error(reason)
+        return {error: reason}
+      }
+      await assert.rejects(
+        hooks.tool.deliver.execute({}, {
+          sessionID: session, agent: 'manager', messageID: 'final-run', callID: 'final-call',
+        }),
+        new RegExp(reason),
+      )
+      const work = lifecycleWorkView(runtime, session)
+      assert.equal(work.delivered, true, 'a failed physical interrupt must not undo committed delivery')
+      assert.equal(work.active, false, 'interrupt failure must not create a successor')
+      assert.equal(runtime.prompts.length, 0)
+    }, {session: `final-interrupt-${failure}`})
+  })
+}
 
 test('WHAT[work-011] actual Stayed deliver starts one same-session successor, the next transform stops the retired attempt, and the successor transform retains the old physical history without another abort', async () => {
   await withSuccessor(async ({hooks, runtime, session, history, gate}) => {

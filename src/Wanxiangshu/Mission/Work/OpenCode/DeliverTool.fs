@@ -285,6 +285,18 @@ module DeliverTool =
                 do! enqueueRelayedSuccessor scope prepared receipt.Kind
                 scope.UnfreezeRetirement context.SessionId
 
+                if receipt.Kind = "Delivered" then
+                    let retirementId =
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "retirementId"
+
+                    do! JournalSurface.appendAuthorityLogicalRunClosed journalDir context.SessionId retirementId
+
+                    let! interrupted = scope.Sessions.InterruptAttempt prepared.SessionId
+
+                    interrupted
+                    |> Result.defaultWith (fun reason ->
+                        invalidOp ("Manager delivery was recorded, but its attempt interrupt failed: " + reason))
+
                 return
                     Ok(
                         if receipt.Kind = "Confirmed" then
@@ -375,12 +387,6 @@ module DeliverTool =
             scope.UnfreezeRetirement context.SessionId
             raise (InvalidOperationException error)
 
-    // No session-scoped physical cut here. AbortSession names a session, not the
-    // retired run; the Host applies it after an unobservable delay, so on a reused
-    // session it lands inside the next loop iteration and kills it mid-tool. Retired
-    // output is contained by the durable cut (ProjectionCut.ProviderRunId) plus Retired
-    // tool denial; the retired run's further provider requests are refused in
-    // the transform hook by exact manager-loop gate identity, so the run ends there.
     let private refreshedTarget
         (target: PreparedRetirement)
         (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)

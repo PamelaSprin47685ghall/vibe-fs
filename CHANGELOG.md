@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — Manager 终态交付保证停止
+
+- `DeliverTool` 在 S4 `Delivered`（无继任者）落盘后，使用既有 `JournalSurface.appendAuthorityLogicalRunClosed` 关闭对应 Manager/HumanRoot logical run，随后等待 `Sessions.InterruptAttempt`，最后才返回“已结束”。原生产路径既漏了 logical run 关闭，也漏了 interrupt，导致模型在已退休且无权限的任期内继续调用工具。
+- `Confirmed` 与有继任者的 `Relayed` 不发终态中断；不放宽 `MANAGED-SESSION-016` 的根会话保护，不删除会话、不级联取消子资源。Host 中断拒绝或抛错时，工具保留真实 Delivered 事实并报错，不伪装停止成功。
+- 验证：`work/011` 的等待中断回执、SDK 拒绝与异常回归通过；work 全套 174 通过、1 项既有 TODO，managed-session-lifecycle/016 的 3 项通过。隔离 `opencode serve` 与本地脚本化 provider 实跑：Delivered 的 interrupt 请求及确认均早于终态工具返回，Host 最终 idle，Manager 只请求 3 次模型；Relayed 无 interrupt，继任者发出第 4 次模型请求并保持 busy。额外运行的 interaction-authority/018 有 1 项因测试仍读取旧 `.git/wanxiangshu/events` 路径而失败，另有 2 项既有 TODO；不宣称该套件全绿。
+
 ## Unreleased — 终态投递必达：子完成不再被静默吞掉
 
 - 事故（2026-10-16，KTraderNew 会话 `ses_ebcc542feffeWWeVr6kxBLsBWW`）：DevOps 子会话 run 于 07:21:13 到达 `Terminal(Completed)`（journal 有事实），父侧却无任何 `HandleWorkCompleted` 落账；manager 的 join 永久等待，直到 07:35:28 关停才以 `Cancelled` 收场。前 5 次同类完成都在 0.2 秒内落账并唤醒父侧——第 6 次事件发生了，却没有触发正确的结果。
