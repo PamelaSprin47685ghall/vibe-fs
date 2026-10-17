@@ -19,7 +19,7 @@ test('WHAT[repository-programming-003] JS002_generation_is_deterministic_and_nam
   const a = generate('Engineer', perms, 'en')
   const b = generate('Engineer', perms, 'en')
   assert.equal(isSome(a) && isSome(b), true)
-  assert.equal(a.toolName, 'js-engineer')
+  assert.equal(a.toolName, 'todowrite-for-engineer')
   assert.equal(a.description, b.description)
   assert.equal(a.baseClassSource, b.baseClassSource)
   assert.deepEqual(a.examples, b.examples)

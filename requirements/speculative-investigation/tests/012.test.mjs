@@ -318,7 +318,7 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_fa
 
   // 12 participating tools get decorated
   const participating = [
-    'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
+    'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
     'edit', 'write', 'mv', 'rm', 'fetch', 'run',
   ]
   for (const tool of participating) {
@@ -333,8 +333,8 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_fa
     'fork', 'resume', 'commission', 'join', 'horizon', 'review', 'deliver',
     'fission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
     'skill', 'assume', 'defer', 
-    'publish', 'chronicle', 'js-bookkeeper',
-    'bash-honeypot', 'invalid', 'js-orchestrator', 'js-blogger',
+    'publish', 'chronicle', 'todowrite-for-bookkeeper',
+    'bash-honeypot', 'invalid', 'todowrite-for-orchestrator', 'todowrite-for-blogger',
   ]
   for (const tool of nonParticipating) {
     const def = decorateUnder('en', tool)

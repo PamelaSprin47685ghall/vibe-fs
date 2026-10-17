@@ -293,7 +293,7 @@ type HostSchema = private HostSchema of obj
 
 /// The authority a tool call is admitted under. capability-enforcement-006 keeps the two sources
 /// apart in the type: an office tool is decided by the public Role the Authority
-/// Root established, while an internal leaf tool (Bookkeeper's `js-bookkeeper`)
+/// Root established, while an internal leaf tool (Bookkeeper's `todowrite-for-bookkeeper`)
 /// is decided by owner-held attachment evidence because its session is
 /// HostInternal and holds no public authority profile at all.
 [<RequireQualifiedAccess>]
@@ -313,6 +313,9 @@ module ToolHostCodec =
 
     [<Emit("$0.schema.string()")>]
     let private rawStringSchema (tool: obj) : obj = jsNative
+
+    [<Emit("$0.schema.any().optional()")>]
+    let private rawAnySchema (tool: obj) : obj = jsNative
 
     [<Emit("$0.schema.string().describe($1)")>]
     let private rawStringSchemaDescribed (tool: obj) (description: string) : obj = jsNative
@@ -472,6 +475,9 @@ module ToolHostCodec =
     let internal schemaValue (HostSchema schema) = schema
 
     let stringSchema (HostToolFactory factory) = HostSchema(rawStringSchema factory)
+
+    /// Free-form JSON value: the caller owns the injected value's shape.
+    let anySchema (HostToolFactory factory) = HostSchema(rawAnySchema factory)
 
     let stringSchemaDescribed description (HostToolFactory factory) =
         HostSchema(rawStringSchemaDescribed factory description)

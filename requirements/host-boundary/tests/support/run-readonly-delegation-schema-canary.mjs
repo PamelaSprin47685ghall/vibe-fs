@@ -54,7 +54,7 @@ const BUDGET = 2
 const SELF_NOTE = 'checking the canary fixture'
 
 const EXPECTED_PARTICIPATING_NAMES = [
-  'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
+  'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
   'edit', 'write', 'mv', 'rm', 'fetch', 'run',
 ]
 

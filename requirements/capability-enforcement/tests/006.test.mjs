@@ -345,7 +345,7 @@ const { allRoleLabels } = await import("../../../dist/Foundation/RolesSurface.js
 const OFFICE_TOOLS = ['fetch', 'review', 'join', 'chronicle', 'run', 'fork', 'resume']
 
 test('WHAT[capability-enforcement-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office', () => {
-  assert.equal(admissionAuthority('js-bookkeeper'), 'private-attachment')
+  assert.equal(admissionAuthority('todowrite-for-bookkeeper'), 'private-attachment')
   for (const tool of OFFICE_TOOLS) {
     assert.equal(admissionAuthority(tool), 'office', `${tool} is an office tool`)
   }
@@ -354,12 +354,12 @@ test('WHAT[capability-enforcement-006] internal_leaf_tool_declares_attachment_au
 test('WHAT[capability-enforcement-006] internal_leaf_tool_is_invisible_to_every_public_office_role', () => {
   assert.ok(allRoleLabels.length > 0)
   for (const role of allRoleLabels) {
-    assert.equal(rolePredicate('js-bookkeeper', role), false, `js-bookkeeper must stay invisible to ${role}`)
+    assert.equal(rolePredicate('todowrite-for-bookkeeper', role), false, `todowrite-for-bookkeeper must stay invisible to ${role}`)
   }
 })
 test('WHAT[capability-enforcement-006] attachment_authority_is_fail_closed_without_an_attached_transaction', () => {
-  assert.equal(privateAttachmentAdmits('js-bookkeeper', 'ses-never-attached'), false)
-  assert.equal(privateAttachmentAdmits('js-bookkeeper', ''), false)
+  assert.equal(privateAttachmentAdmits('todowrite-for-bookkeeper', 'ses-never-attached'), false)
+  assert.equal(privateAttachmentAdmits('todowrite-for-bookkeeper', ''), false)
 })
 test('WHAT[capability-enforcement-006] an_office_tool_can_never_be_admitted_through_the_attachment_path', () => {
   for (const tool of OFFICE_TOOLS) {

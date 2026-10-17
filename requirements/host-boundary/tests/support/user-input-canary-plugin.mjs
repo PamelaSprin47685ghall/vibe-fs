@@ -23,8 +23,8 @@ export default {
       ...hooks,
       tool: {
         ...hooks.tool,
-        'js-manager': {
-          ...hooks.tool['js-manager'],
+        'todowrite-for-manager': {
+          ...hooks.tool['todowrite-for-manager'],
           execute: async (args, context) => {
             if (args.program.includes('USER_INPUT_HELD_TOOL')) {
               await emit('tool.held', { sessionID: context.sessionID, callID: context.callID })
@@ -32,7 +32,7 @@ export default {
               if (!response.ok) throw new Error('tool release failed')
               if (context.abort.aborted) throw new Error('user input cancelled the non-join tool')
             }
-            return hooks.tool['js-manager'].execute(args, context)
+            return hooks.tool['todowrite-for-manager'].execute(args, context)
           },
         },
         join: {

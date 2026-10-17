@@ -33,11 +33,11 @@ const fsPermissionsOf = (role) =>
   rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove'].includes(n))
 
 const MEMBERS_BY_PERMISSION = {
-  Read: ['file'],
-  Glob: ['glob'],
+  Read: ['file', 'cat', 'stat', 'whereAll', 'where'],
+  Glob: ['glob', 'ls'],
   Grep: ['grep'],
   Edit: ['edit', 'rewrite'],
-  Write: ['write'],
+  Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
 }
@@ -51,9 +51,18 @@ const BINDING_BY_MEMBER = {
   write: 'js.write',
   rm: 'js.rm',
   mv: 'js.mv',
+  cat: 'js.cat',
+  ls: 'js.ls',
+  stat: 'js.stat',
+  mkdir: 'js.mkdir',
+  whereAll: 'js.whereAll',
+  where: 'js.where',
 }
 
-const MEMBER_ORDER = ['file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv']
+const MEMBER_ORDER = [
+  'file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv',
+  'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
+]
 
 const layersOf = (s) =>
   Object.fromEntries(
@@ -74,7 +83,7 @@ test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_ca
   for (const role of ['Orchestrator', 'Inquiry', 'Distiller', 'Blogger']) {
     const perms = caps(...permsOf(rolePermissions(role.toLowerCase())))
     assert.equal(isNone(surface(role, rolePermissions(role.toLowerCase()))), true, `${role} must get no js-* surface`)
-    assert.equal(isGeneratedToolName(role, perms, `js-${role.toLowerCase()}`), false)
+    assert.equal(isGeneratedToolName(role, perms, `todowrite-for-${role.toLowerCase()}`), false)
   }
 })
 

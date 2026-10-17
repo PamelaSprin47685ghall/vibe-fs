@@ -4,7 +4,7 @@
 
 未配置 Predictor 模型时，系统对本机制保持无功能基线：不装饰任何工具 schema、不追加说明、不产生委托授权、不创建 Replica，全部会话的 provider 可见字节、工具权限、retry 流程、评审终结逻辑与控制流与不存在本机制时完全一致。
 
-已配置 Predictor 模型时，仅对第 5.2 节参与工具（read/glob/grep/js-manager/js-engineer/js-devops/edit/write/mv/rm/fetch/run 共 12 个）装饰参数：必选原生整数 `estimated_readonly_rounds` 与可选参数 `self_note`，并在原工具描述之后幂等追加事实性估计说明；原有的必选项、功能说明与安全约束保持原样。
+已配置 Predictor 模型时，仅对第 5.2 节参与工具（read/glob/grep/todowrite-for-manager/todowrite-for-engineer/todowrite-for-devops/edit/write/mv/rm/fetch/run 共 12 个）装饰参数：必选原生整数 `estimated_readonly_rounds` 与可选参数 `self_note`，并在原工具描述之后幂等追加事实性估计说明；原有的必选项、功能说明与安全约束保持原样。
 
 所有未参与工具（如 fork/join/chronicle/horizon/review/fission/terminal 类工具/assume 等）及未判定动态工具均保持原有定义，无任何本协议增量，也不截取其同名业务字段。
 
@@ -54,7 +54,7 @@
 
 进程表只是常驻身份的缓存。重启恢复仅认 durable DelegationBound 记录的 ReplicaSessionId，并核对 Host 中的 agent、title 与物理 family children；无关联不收养其他会话，多个候选、属性冲突或查询失败明确拒绝，不以查询失败为丢失证据再建一个。仅确认原 child 永久丢失时才替换，并释放原登记的容量。物理 parent 一律压平到 Host 证明的 family root；逻辑 owner、身份继承与语言仍属于实际工作的 owner，两者不可混用。
 
-同伴只能调用唯一专用的只读 JS 编程面 `js-predictor`（能力严格限定为 {Read, Glob, Grep}）；`read`/`glob`/`grep` 原生工具不在同伴的可调用集合内，全部只读查证经该 JS 面完成。其模型可见工具 schema 与底层执行门禁同源：会话级权限规则在 deny 全部工具后精准放行此项。尝试写入、调用其他工具、借 fork/MCP/通用 JS 工具（如 `js-engineer`、`js-devops` 等）绕过只读能力，均 fail closed 且不产生任何实际效果；shell 命令不因"看起来只读"而入列。
+同伴只能调用唯一专用的只读 JS 编程面 `todowrite-for-predictor`（能力严格限定为 {Read, Glob, Grep}）；`read`/`glob`/`grep` 原生工具不在同伴的可调用集合内，全部只读查证经该 JS 面完成。其模型可见工具 schema 与底层执行门禁同源：会话级权限规则在 deny 全部工具后精准放行此项。尝试写入、调用其他工具、借 fork/MCP/通用 JS 工具（如 `todowrite-for-engineer`、`todowrite-for-devops` 等）绕过只读能力，均 fail closed 且不产生任何实际效果；shell 命令不因"看起来只读"而入列。
 
 准入与副本能力均采用现行角色集合 `Roles.all`，不得各自维护角色白名单。现行角色的副本能力一律为上述只读集合；普通请求的角色权限不变。Blogger 等内部会话仍由 root-work、request-kind 与防递归门禁限制，不能靠角色名称发起嵌套委托。
 
@@ -65,10 +65,10 @@
 ## [005] 真实完整交换与 digest：无专属字节上限
 
 回传给主模型的材料包含同伴真实的只读工具交换与实际输出的 assistant text：每个候选帧保留 request batch 边界、原始调用顺序、原始 arguments、真实执行结果与内容 digest，call/result 严格一对一配对。assistant text 在主模型上下文中降为 reasoning，同伴原生 reasoning 不回传；正文不是工具证据，不是待主模型采信的研究报告。纯文本输出仍是提前结束信号；即使之后没有新的 provider 请求，其终止正文也必须被收集。混合工具消息中的正文按原文和部件顺序保留，未完成工具批次的正文不提前发布。
-来源整批可能包含非只读调用；Frame 构造必须过滤保留其中的只读交换（read/glob/grep/js-predictor），而不是直接因整批混入非只读工具而拒绝整个帧（UnsupportedTool）。只有过滤后既无合法只读交换也无实际正文时，才按无材料（NoMaterial）正常处理。
+来源整批可能包含非只读调用；Frame 构造必须过滤保留其中的只读交换（read/glob/grep/todowrite-for-predictor），而不是直接因整批混入非只读工具而拒绝整个帧（UnsupportedTool）。只有过滤后既无合法只读交换也无实际正文时，才按无材料（NoMaterial）正常处理。
 过滤后仍有材料的批次按原顺序连续编号为 1..N；被筛空的首批或中间批次不留下编号空隙。材料编号不承担 provider 请求预算记账，失败请求与真实外发轮数仍由准入账本记录。
 
-同伴自己看到的交换保留其真实调用名 `js-predictor`；回传注入主人会话时，该交换按主人的角色投影为其自己的 `js-<role>` 工具名（如 devops 主人即 `js-devops`），使主人看到的是它本可自行调用、结果形态一致的证据，而非一个它无权调用的工具。该重命名只发生在面向主人的投影渲染处，Frame 的材料 digest、持久化 payload 与同伴自身的 transcript 均保持原名不变。
+同伴自己看到的交换保留其真实调用名 `todowrite-for-predictor`；回传注入主人会话时，该交换按主人的角色投影为其自己的 `js-<role>` 工具名（如 devops 主人即 `todowrite-for-devops`），使主人看到的是它本可自行调用、结果形态一致的证据，而非一个它无权调用的工具。该重命名只发生在面向主人的投影渲染处，Frame 的材料 digest、持久化 payload 与同伴自身的 transcript 均保持原名不变。
 候选首次投递与后续 replay 使用同一工具命名规则。逻辑 call/result 行在追踪与上下文投影阶段保持完整，最终 Host 外发边界才合并为原生 assistant completed `tool` parts；不能把 Host 不消费的通用 `tool-call/tool-result` 行当作已经交付。真实工具输出始终保留原始文本字节，内容看似 JSON 也不得解析成对象、数字或 null。
 
 新字段随真实 arguments 保存。不存在 Delegate 专属的字节、token、短记长度或批次大小上限，不存在按长度丢弃、保留小前缀、"过大退回零步"或等价替身规则；超过任何历史大小的完整交换仍可构建、持久化、映射与恢复。
@@ -223,8 +223,8 @@ CLI 先校验参数、登记版本、备份路径和活库禁令，再加载迁�
 
 2. **逐工具判定（classifyTool）**：
    工具策略采用严格的三态联合类型，禁止任何形式的前缀匹配（如 `js-` 前缀）或名称模糊匹配（如包含 read/search）：
-   - `EstimateAfterCall`（参与工具，共 12 个）：`read`、`glob`、`grep`、`js-manager`、`js-engineer`、`js-devops`、`edit`、`write`、`mv`、`rm`、`fetch`、`run`。调用完成后允许主模型提供后续只读查证估计；
-   - `NoEstimate`（不参与工具，显式白名单共 24 个）：`fork`、`resume`、`commission`、`join`、`horizon`、`review`、`deliver`、`fission`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`skill`、`todowrite`、`assume`、`defer`、`publish`、`chronicle`、`js-bookkeeper`、`js-predictor`、`bash-honeypot`、`invalid`、`js-orchestrator`、`js-blogger`。本协议不向其装饰任何字段与说明；
+   - `EstimateAfterCall`（参与工具，共 12 个）：`read`、`glob`、`grep`、`todowrite-for-manager`、`todowrite-for-engineer`、`todowrite-for-devops`、`edit`、`write`、`mv`、`rm`、`fetch`、`run`。调用完成后允许主模型提供后续只读查证估计；
+   - `NoEstimate`（不参与工具，显式白名单共 24 个）：`fork`、`resume`、`commission`、`join`、`horizon`、`review`、`deliver`、`fission`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`skill`、`todowrite`、`assume`、`defer`、`publish`、`chronicle`、`todowrite-for-bookkeeper`、`todowrite-for-predictor`、`bash-honeypot`、`invalid`、`todowrite-for-orchestrator`、`todowrite-for-blogger`。本协议不向其装饰任何字段与说明；
    - `Unreviewed`（未判定工具）：所有不在上述 36 个固定名称表内的工具（包括带有已知前缀的衍生工具名如 `read-extra`、`globbing`、`grepper`、`edit_file`、`writer`、`run_command`、`fetch_data`、`js-devops-v2`、`fork_child`、`resume_parent`、`custom_tool` 等）一律判定为未判定，保持原有业务行为，不增加协议字段。
 
 3. **入参容器与协议混合排斥**：

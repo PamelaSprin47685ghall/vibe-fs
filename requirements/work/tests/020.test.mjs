@@ -15,7 +15,7 @@ import {
 
 // WHAT[work-020] fixes the closed input set a Plan runner receives:
 // U (verbatim, original order), LWR_prev (materialized, empty on the first
-// tenure) and P (the only writable surface, reached through js-plan only).
+// tenure) and P (the only writable surface, reached through todowrite-for-plan only).
 // The assembly entry below is the same PlanningSurface.assembleTenureMessages
 // the transform pipeline calls. It now takes the canonical 4th argument
 // messageCursors (plain id -> bigint first-observation evidence); the
@@ -104,7 +104,7 @@ test('WHAT[work-020] assembled messages come only from U, LWR_prev and current-t
       `assembled message id ${msgId(m)} must originate from the input messages or the LWR_prev record`,
     )
   }
-  // The draft P is reachable only through the js-plan tool surface; the
+  // The draft P is reachable only through the todowrite-for-plan tool surface; the
   // assembled request never carries its content as an injected message.
   assert.equal(result.messages.length, rawMessages.length + 1)
 })
@@ -113,7 +113,7 @@ test('WHAT[work-020] the plan runner holds no write capability beyond P', () => 
   for (const perm of ['Write', 'Edit', 'Move', 'Remove', 'Exec', 'Pty']) {
     assert.equal(isAllowed('plan', perm), false, `plan must be denied ${perm}`)
   }
-  // P itself is reached through the js-plan programming surface.
+  // P itself is reached through the todowrite-for-plan programming surface.
   assert.equal(isAllowed('plan', 'JsPlan'), true)
 })
 

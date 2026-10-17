@@ -14,6 +14,7 @@ module JsSandbox =
           mutable ParkSignalResolve: obj
           mutable ParkDeferredResolve: obj
           mutable ParkDeferredReject: obj
+          mutable ParkStack: string
           mutable AbandonRequested: bool }
 
     /// Handle to a started sandbox program: the async IIFE promise is exposed
@@ -55,6 +56,9 @@ module JsSandbox =
     val awaitResult: handle: JsRunHandle -> outputBoundBytes: int -> Task<Result<string, JsFailure>>
 
     val resetDeadline: handle: JsRunHandle -> deadlineEpochMs: int64 -> unit
+
+    /// Mark the suspended model-source line with `>| ` (others ` | `).
+    val sourceWithExecutionMarker: baseClassSource: string -> modelSource: string -> stack: string -> string
 
     /// Install the park signal the workflow races against the program promise.
     val installParkSignal: parkState: ParkState -> Task<obj>

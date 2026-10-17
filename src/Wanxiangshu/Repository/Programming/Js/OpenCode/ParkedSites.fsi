@@ -21,7 +21,8 @@ module JsParkedSites =
           RunHandle: Wanxiangshu.Process.JsSandbox.JsRunHandle
           ReadSnapshots: ResizeArray<JsReadSnapshot>
           Ledger: JsAsIsLedger
-          SessionId: string }
+          SessionId: string
+          ModelSource: string }
 
     /// Concurrency ceiling for parked sites (PLAN S2 step 3: default 8).
     val concurrencyLimit: int

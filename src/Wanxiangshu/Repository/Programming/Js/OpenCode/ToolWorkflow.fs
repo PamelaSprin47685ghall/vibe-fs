@@ -164,7 +164,7 @@ module JsToolWorkflow =
             created: string list *
             removed: string list *
             moved: (string * string) list
-        | Parked of handle: string * payload: obj
+        | Parked of handle: string * payload: obj * source: string
 
     /// The park payload is created inside the sandbox realm; the host reads it
     /// from ParkState across the vm boundary. A JSON round-trip detaches the
@@ -437,6 +437,7 @@ module JsToolWorkflow =
                   ParkSignalResolve = null
                   ParkDeferredResolve = null
                   ParkDeferredReject = null
+                  ParkStack = null
                   AbandonRequested = false }
 
             let api =
@@ -512,14 +513,19 @@ module JsToolWorkflow =
                       RunHandle = runHandle
                       ReadSnapshots = readSnapshots
                       Ledger = ledger
-                      SessionId = sessionId }
+                      SessionId = sessionId
+                      ModelSource = modelSource }
 
                 match JsParkedSites.register site with
                 | Error failure -> return Failed(failure, rewritten, created, removed, moved)
                 | Ok _ ->
                     // Record the Parked audit trace (best-effort; algorithm H3).
                     recordLifecycle lifecyclePersistence JsLifecycleEventType.Parked handle sessionId
-                    return Parked(handle, hostRealmPayload parkState.ParkPayload)
+
+                    let source =
+                        JsSandbox.sourceWithExecutionMarker baseClassSource modelSource parkState.ParkStack
+
+                    return Parked(handle, hostRealmPayload parkState.ParkPayload, source)
             | Ok value ->
                 if not hasMutationCapability && not (List.isEmpty mutations) then
                     return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
@@ -543,6 +549,7 @@ module JsToolWorkflow =
     let private unparkSite
         (site: JsParkedSites.JsParkedSite)
         (value: obj)
+        (baseClassSource: string)
         (deadlineMs: int)
         (outputBoundBytes: int)
         : Task<JsToolOutcome> =
@@ -574,8 +581,18 @@ module JsToolWorkflow =
 
             let outcome =
                 match unbox<Choice<string, obj>> winnerObj with
-                | Choice1Of2 json -> JsToolsData.parse json
-                | Choice2Of2 _ -> Ok(LlmFacing.Data.Value.String "{\"__jsParked\":true}")
+                | Choice1Of2 _ ->
+                    task {
+                        let! decoded = JsSandbox.awaitResult site.RunHandle outputBoundBytes
+
+                        return
+                            match decoded with
+                            | Error failure -> Error failure
+                            | Ok json -> JsToolsData.parse json
+                    }
+                | Choice2Of2 _ -> task { return Ok(LlmFacing.Data.Value.String "{\"__jsParked\":true}") }
+
+            let! outcome = outcome
 
             let isParkedSentinel (value: LlmFacing.Data.Value) =
                 match value with
@@ -597,11 +614,19 @@ module JsToolWorkflow =
                       RunHandle = site.RunHandle
                       ReadSnapshots = site.ReadSnapshots
                       Ledger = site.Ledger
-                      SessionId = site.SessionId }
+                      SessionId = site.SessionId
+                      ModelSource = site.ModelSource }
 
                 match JsParkedSites.register newSite with
                 | Error failure -> return Failed(failure, [], [], [], [])
-                | Ok _ -> return Parked(newHandle, hostRealmPayload site.RunHandle.ParkState.ParkPayload)
+                | Ok _ ->
+                    let source =
+                        JsSandbox.sourceWithExecutionMarker
+                            baseClassSource
+                            site.ModelSource
+                            site.RunHandle.ParkState.ParkStack
+
+                    return Parked(newHandle, hostRealmPayload site.RunHandle.ParkState.ParkPayload, source)
             | Ok value ->
                 let! ledgerOutcome = settleLedger site.Ledger
 
@@ -707,7 +732,7 @@ module JsToolWorkflow =
                     | Some site ->
                         // Record the Unparked audit trace (best-effort).
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Unparked handle sessionId
-                        return! unparkSite site value deadlineMs outputBoundBytes
+                        return! unparkSite site value baseClassSource deadlineMs outputBoundBytes
                 | None ->
                     match abandonHandle with
                     | Some handle ->
@@ -754,14 +779,15 @@ module JsToolsResult =
                 @ effects
             )
             |> LlmFacing.render
-        | JsToolWorkflow.JsToolOutcome.Parked(handle, payload) ->
+        | JsToolWorkflow.JsToolOutcome.Parked(handle, payload, source) ->
             // Top-level parked payload (PLAN S2 step 4): the program suspended
             // at `await js.park(payload)` and the site is registered under
             // handle. The caller resumes with `{ unpark: { handle, value } }`
             // or gives up with `{ abandon: { handle } }`.
             LlmFacing.instruction "parked"
             |> LlmFacing.withData (
-                [ LlmFacing.Data.stringField "handle" handle ]
+                [ LlmFacing.Data.stringField "handle" handle
+                  LlmFacing.Data.stringField "source" source ]
                 @ LlmFacing.Data.rootStructuredValue (LlmFacing.Data.ofJs payload)
             )
             |> LlmFacing.render

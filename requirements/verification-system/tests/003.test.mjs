@@ -107,7 +107,7 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
   // The Manager provider surface carries independent assume + native todowrite.
   const managerTools = [
     'assume', 'defer',
-    'fork', 'horizon', 'join', 'js-manager', 'publish', 'resume',
+    'fork', 'horizon', 'join', 'todowrite-for-manager', 'publish', 'resume',
     'review', 'skill',  'deliver', 'todowrite',
   ];
   const request = (turn, step) => ({
@@ -136,7 +136,7 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
     "# act on either assumption. The predecessor's work is the object you must assess; the shared workspace is the actual state it left behind: check it directly\n" +
     '# rather than trusting any inherited claim.\n' +
     '#\n' +
-    "# During assessment, you may directly use the review-only read tool js-manager, or entrust read-only work to Engineer to establish facts about the predecessor's work";
+    "# During assessment, you may directly use the review-only read tool todowrite-for-manager, or entrust read-only work to Engineer to establish facts about the predecessor's work";
   const loopRequest = (turn, step) => ({
     messages: [
       { role: 'user', content: turn },

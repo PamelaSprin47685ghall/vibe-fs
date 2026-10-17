@@ -175,12 +175,17 @@ module JsWorkflowSurface =
 
     let parkedHandle (value: obj) : obj =
         match outcomeOf value with
-        | JsToolWorkflow.JsToolOutcome.Parked(handle, _) -> box handle
+        | JsToolWorkflow.JsToolOutcome.Parked(handle, _, _) -> box handle
         | _ -> null
 
     let parkedPayload (value: obj) : obj =
         match outcomeOf value with
-        | JsToolWorkflow.JsToolOutcome.Parked(_, payload) -> payload
+        | JsToolWorkflow.JsToolOutcome.Parked(_, payload, _) -> payload
+        | _ -> null
+
+    let parkedSource (value: obj) : obj =
+        match outcomeOf value with
+        | JsToolWorkflow.JsToolOutcome.Parked(_, _, source) -> box source
         | _ -> null
 
     let rewritten (value: obj) : string array =

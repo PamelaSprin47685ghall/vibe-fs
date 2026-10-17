@@ -16,7 +16,7 @@ const roleApi = (role, dir) => runtime.api(runtime.createApiFor(dir, permissionL
 test('WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generator_output', () => {
   for (const role of allRoleLabels) {
     const generated = generateRole(role, 'en')
-    const toolName = `js-${role}`
+    const toolName = `todowrite-for-${role}`
     const admitted = rolePredicate(toolName, role)
     if (generated) {
       assert.equal(admitted, true, `Role ${role} has generated surface ${generated.toolName} but ToolRegistry denied it`)
@@ -32,7 +32,7 @@ test('WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generat
 test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only', () => {
   const surface = generateRole('manager', 'en')
   assert.ok(surface, 'Manager must generate JS surface')
-  assert.equal(surface.toolName, 'js-manager')
+  assert.equal(surface.toolName, 'todowrite-for-manager')
   assert.deepEqual(surface.capabilities.sort(), ['Glob', 'Grep', 'Read'], 'Manager capabilities must be strictly {Read, Glob, Grep}')
 
   // 四层同构第 1 层：生成的 JsProgram 基类中不声明任何写方法
@@ -59,13 +59,21 @@ test('WHAT[capability-enforcement-025] J02_manager_create_api_omits_mutation_met
     assert.equal(typeof binding.js.read, 'function', 'read must be constructed')
     assert.equal(typeof binding.js.glob, 'function', 'glob must be constructed')
     assert.equal(typeof binding.js.grep, 'function', 'grep must be constructed')
+    assert.equal(typeof binding.js.cat, 'function', 'cat must be constructed')
+    assert.equal(typeof binding.js.ls, 'function', 'ls must be constructed')
+    assert.equal(typeof binding.js.stat, 'function', 'stat must be constructed')
+    assert.equal(typeof binding.js.whereAll, 'function', 'whereAll must be constructed')
+    assert.equal(typeof binding.js.where, 'function', 'where must be constructed')
 
     // 未授予的写 API 在 api.js 中直接不存在（undefined），绝非存在而抛错
     assert.equal('edit' in binding.js, false, 'edit property must not exist')
     assert.equal('write' in binding.js, false, 'write property must not exist')
     assert.equal(binding.js.edit, undefined)
     assert.equal(binding.js.write, undefined)
-    assert.deepEqual(Object.keys(binding.js).sort(), ['glob', 'grep', 'read'])
+    assert.deepEqual(
+      Object.keys(binding.js).sort(),
+      ['cat', 'glob', 'grep', 'ls', 'read', 'stat', 'where', 'whereAll'],
+    )
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -143,16 +151,20 @@ test('WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_
 })
 
 test('WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_not_broadened', () => {
-  // Bookkeeper / internal leaf 不因 js-manager 出现而放宽
-  assert.equal(rolePredicate('js-bookkeeper', 'manager'), false, 'Manager must deny js-bookkeeper')
-  assert.equal(rolePredicate('js-manager', 'bookkeeper'), false, 'Bookkeeper must deny js-manager')
-  assert.equal(rolePredicate('js-engineer', 'manager'), false, 'Manager must deny js-engineer')
-  assert.equal(rolePredicate('js-devops', 'manager'), false, 'Manager must deny js-devops')
+  // Bookkeeper / internal leaf 不因 todowrite-for-manager 出现而放宽
+  assert.equal(rolePredicate('todowrite-for-bookkeeper', 'manager'), false, 'Manager must deny todowrite-for-bookkeeper')
+  assert.equal(rolePredicate('todowrite-for-manager', 'bookkeeper'), false, 'Bookkeeper must deny todowrite-for-manager')
+  assert.equal(rolePredicate('todowrite-for-engineer', 'manager'), false, 'Manager must deny todowrite-for-engineer')
+  assert.equal(rolePredicate('todowrite-for-devops', 'manager'), false, 'Manager must deny todowrite-for-devops')
   assert.equal(generateRole('bookkeeper', 'en'), null, 'Bookkeeper generates no public surface')
 
-  // StrengthReplica 投机只读通道不包含 js-manager
+  // StrengthReplica 投机只读通道不包含 todowrite-for-manager
   const replicaTools = capabilityToolNames('manager', 'strength-replica')
-  assert.equal(replicaTools.includes('js-manager'), false, 'StrengthReplica must not include js-manager')
+  assert.equal(
+    replicaTools.includes('todowrite-for-manager'),
+    false,
+    'StrengthReplica must not include todowrite-for-manager',
+  )
 })
 
 test('WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data', async () => {

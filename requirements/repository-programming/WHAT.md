@@ -2,11 +2,13 @@
 
 ## [001] Capability 投影面与单一权限源
 
-每次请求的 `js-ROLE` 工具只从该 Attempt 的唯一权威能力集生成，不另算 role→JS 权限。没有文件系统 primitive capability 时不生成 `js-*` 工具。
+每次请求的 `todowrite-for-ROLE` 工具只从该 Attempt 的唯一权威能力集生成，不另算 role→JS 权限。没有文件系统 primitive capability 时不生成 `todowrite-for-*` 工具。
 
 ## [002] 四层同构应用
 
 每项文件系统 capability 在公开基类、工具描述、canonical examples 与运行时门禁中一致投影；缺失能力在四层均不可用，伪造调用也须拒绝。一项能力可生成固定顺序的同权成员族，不产生第二份授权。
+
+主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`。旧成员 `file`/`glob`/`grep`/`edit`/`rewrite` 在本期保留，退役由后续阶段统一执行。
 
 ## [003] 确定性生成
 
@@ -38,9 +40,9 @@
 
 `grep(needle, pattern)` 只由 Grep capability 授权；Read+Glob 不代替它。needle 接受字符串或正则，必填 pattern 按 glob 规则选文件；返回行列位置与匹配文本，不可读或非 UTF-8 文件跳过。
 
-## [010] Rewrite 与 Write 分离
+## [010] Rewrite、Write 与 Mkdir 的落盘语义
 
-`rewrite` 只替换已有文件，缺失时报 `FILE_NOT_FOUND`；`write` 只创建新文件，已存在时报 `FILE_ALREADY_EXISTS`。同一程序对同一路径只能声明一次修改意图，重复时报 `DUPLICATE_MUTATION_TARGET`。
+`rewrite` 只替换已有文件，缺失时报 `FILE_NOT_FOUND`；`write` 覆盖已有文件或创建缺失文件，等价于 POSIX 重定向：一次原子写、即写即生效。写入前若目标已通过 `cat` 或 `file` 读取且盘上内容已变，报 `FILE_CHANGED`。`mkdir` 只建一个目录，非递归；已存在报 `DIRECTORY_EXISTS`，父目录缺失报 `PARENT_DIRECTORY_MISSING`。同一程序对同一路径只能声明一次文件修改意图，重复时报 `DUPLICATE_MUTATION_TARGET`。
 
 ## [011] 可表示的返回值与提交前校验
 
@@ -138,9 +140,9 @@ ReadSnapshots 只用于事务隔离与冲突检测，不直接作为案例关联
 
 ## [027] Engineer 与 DevOps 的统一文件面
 
-两者按已授予能力获得直接 Read/Write/Edit/Glob/Grep/Move/Remove 工具及生成的 js-engineer/js-devops。直接与可编程文件操作共享路径边界、UTF-8 校验、符号链接防护和 As-Is 逐笔落盘写语义（每笔写即原子落盘、跨笔不回滚、失败保留已落盘改动）。
+两者按已授予能力获得直接 Read/Write/Edit/Glob/Grep/Move/Remove 工具及生成的 todowrite-for-engineer/todowrite-for-devops。直接与可编程文件操作共享路径边界、UTF-8 校验、符号链接防护和 As-Is 逐笔落盘写语义（每笔写即原子落盘、跨笔不回滚、失败保留已落盘改动）。
 
-Manager 的 `js-manager` 仅提供 Read/Glob/Grep，能力过滤同样到达真实 API；评审及当前事实准入遵循 capability-enforcement-025，不因生成工具而取得修改或执行权。
+Manager 的 `todowrite-for-manager` 仅提供 Read/Glob/Grep，能力过滤同样到达真实 API；评审及当前事实准入遵循 capability-enforcement-025，不因生成工具而取得修改或执行权。
 
 ## [028] programPromise 暴露与 deadline 可重置
 
@@ -186,7 +188,9 @@ parked-site 表有进程级并发上限（默认 8）：上限内 park 成功；
 
 ## [037] Parked 载荷渲染
 
-parked 结果渲染为顶级 parked 载荷文档：handle 字段与程序 payload 的字段平铺进文档顶层，可按 Synthetic TOML 解析。载荷就是程序传入的数据，原样呈现，不是宿主裁决。
+parked 结果渲染为顶级 parked 载荷文档：handle 字段、source 字段与程序 payload 的字段平铺进文档顶层，可按 Synthetic TOML 解析。载荷就是程序传入的数据，原样呈现，不是宿主裁决。
+
+`source` 是完整程序源码：挂起行以 `>| ` 前缀标记，其余行以 ` | ` 前缀标记，行号由 vm 栈换算到模型源码坐标。栈无法解析时降级为全部 ` | `，仍携带完整源码，不使 park 失败。source 只进入 parked 载荷，不进入每回合提醒。
 
 ## [038] park 的编程面投影
 
@@ -200,7 +204,7 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 ## [040] rm/mv：Move/Remove 编程面与 as-is 落盘
 
-`rm(path)` 与 `mv(from, to)` 由 Remove/Move capability 投影（`JsCapability.ofToolPermission` 是唯一映射），与 edit/write 同属 as-is 逐笔落盘路径。四层同构：生成基类含 `rm`/`mv` 方法、工具描述与 canonical example 含对应成员、运行时门禁按 capability 挂载 rm/mv 执行器。Manager 的 `js-manager` 仍只读，不含 Move/Remove。
+`rm(path)` 与 `mv(from, to)` 由 Remove/Move capability 投影（`JsCapability.ofToolPermission` 是唯一映射），与 edit/write 同属 as-is 逐笔落盘路径。四层同构：生成基类含 `rm`/`mv` 方法、工具描述与 canonical example 含对应成员、运行时门禁按 capability 挂载 rm/mv 执行器。Manager 的 `todowrite-for-manager` 仍只读，不含 Move/Remove。
 
 - `rm` 删除文件或空目录；非空目录报 `DIRECTORY_NOT_EMPTY`，缺失目标报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, removed: path }`。
 - `mv` 按 POSIX 语义移动或重命名文件及目录，支持覆盖；源缺失报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, moved: from, destination: to }`。
@@ -225,3 +229,27 @@ rm/mv 的成员文案是 zh-CN.md/en.md 成对双语资源（`tool/js-program/rm
 ## [044] rm/mv 失败码的 reason 稳定与成对上报
 
 rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INVALID_ARGUMENT`、`FILE_NOT_FOUND`、`FILE_CHANGED`、`FILE_READ_FAILED`）在冻结失败目录中携带可读且稳定的 reason 文案。运行期失败结果的 code 与 reason 成对出现，reason 携带涉事路径（如 `directory is not empty: <path>`、`path outside capability boundary: <path>`、`target file does not exist: <path>`）；PATH_DENIED 时源存活（[040]）。
+
+## [045] 文件原语：cat/ls/stat/write/mkdir
+
+`cat(path)` 读严格 UTF-8 文件并登记读快照；缺失报 `FILE_NOT_FOUND`，非法编码报 `INVALID_UTF8`。`ls(path)` 只列一层，排序返回，目录条目以 `/` 结尾；非递归需求用 `glob` 组合。`stat(path)` 返回 `{ exists, size, mtime, isDir }`，缺失是正常观察而非失败。`mkdir(path)` 非递归，已存在报 `DIRECTORY_EXISTS`，父目录缺失报 `PARENT_DIRECTORY_MISSING`；它不产生 durable mutation 条目。
+
+`write(path, content)` 覆盖或创建，一次原子写、即写即生效（[010]）。五个原语都继承路径边界、符号链接防护、写前 `FILE_CHANGED` 与 as-is 逐笔落盘；底层文件系统效果与稳定失败映射归 MutationFs 原语。
+
+## [046] where/whereAll：规范化匹配与歧义即 park
+
+`whereAll(content, needle, from = 0)` 在内容上做规范化精确匹配：每段空白折叠为一个空格，needle 首尾空白裁掉；返回全部非重叠匹配的原文 UTF-16 下标 `[[begin, end], ...]`，零个返回 `[]`，`from` 是原文起始下标。
+
+`where(content, needle, from = 0)` 的唯一匹配直接返回 `[begin, end]`。零个或多个匹配时，程序经与 `js.park` 相同的信号通道挂起，载荷为 `{ needle, candidates, nearest }`：`candidates` 至多 8 项，每项 `{ span, context }`；零匹配时 `nearest` 为最接近的一行 `{ span, text, distance }` 或 null。unpark 注入的值原样成为 `where` 的返回值；注入非 span 时由后续程序自然失败，宿主不预校验。`where` 永不抛定位错误，也永不静默选择匹配。
+
+## [047] 原语组合与教学资源
+
+原语只提供动词，不提供编辑 DSL：find/replace = `cat → where → 拼接 → write`；批量替换 = 一次 `whereAll` 加反向拼接；append = `cat + write`；锚点切片 = 两次 `where`（第二次带 `from`）；递归枚举 = `glob`；grep 找候选。`cat`/`ls`/`stat`/`write`/`mkdir`/`where`/`whereAll` 与既有 rm/mv 共享同一路径边界与 as-is 纪律。
+
+教学资源 `tool/js-program/header` 与 `tool/js-program/park` 双语成对，声明主原语、组合模式、where 歧义契约与 unpark 自由值契约；`tool/js-program/contract` 不再声称 all-or-nothing 提交，失败经验与 as-is 语义一致。
+
+## [048] parked source 与 unpark 自由值
+
+parked 载荷的 `source` 字段携带完整程序与执行点标记（[037]）。直接 `park` 与 `where` 歧义都经同一挂起路径产生 source；恢复后再次 park 产生新的 handle 与新的 source。source 行标记按 vm 栈换算，解析失败时降级而不是失败。
+
+`unpark.value` 的 host schema 是任意 JSON 值（可选），执行端零校验；注入值的语义由 park 点定义，错误注入由下游自然失败。工具描述与 `tool/js-program/park` 资源明确这一责任边界。

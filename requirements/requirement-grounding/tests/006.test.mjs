@@ -327,9 +327,9 @@ test('WHAT[requirement-grounding-006] registered program grep keeps scan freshne
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
     const args = { program: "class Js extends JsProgram { async run() { return await this.grep('GREPPED', 'requirements/alpha/WHAT.md'); } }" }
-    const input = { tool: 'js-manager', sessionID, callID: 'grep-only' }
+    const input = { tool: 'todowrite-for-manager', sessionID, callID: 'grep-only' }
     await hooks['tool.execute.before'](input, { args })
-    const output = await hooks.tool['js-manager'].execute(args, { sessionID, agent: 'manager' })
+    const output = await hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
     assert.match(output, /text = "GREPPED"/)
     const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
     const persisted = readdirSync(events).map(name => readFileSync(join(events, name), 'utf8')).join('\n')
@@ -356,9 +356,9 @@ test('WHAT[requirement-grounding-006] registered complete file reads preserve ex
       await openIncumbency(runtime, sessionID)
       const args = { program: "class Js extends JsProgram { async run() { const file = await this.file('requirements/alpha/WHAT.md'); return file.text(); } }" }
       const execute = async callID => {
-        const input = { tool: 'js-manager', sessionID, callID }
+        const input = { tool: 'todowrite-for-manager', sessionID, callID }
         await incarnation.hooks['tool.execute.before'](input, { args })
-        const output = await incarnation.hooks.tool['js-manager'].execute(args, { sessionID, agent: 'manager' })
+        const output = await incarnation.hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
         await incarnation.hooks['tool.execute.after']({ ...input, args }, { title: 'read', output, metadata: {} })
         return output
       }
@@ -371,7 +371,7 @@ test('WHAT[requirement-grounding-006] registered complete file reads preserve ex
       assert.equal(observed[0].Observation.Digest, digest('requirements/alpha/WHAT.md', 'what-v1\n'))
       await execute('complete-repeated')
       assert.equal(readFacts(join(dir, '.Herdchestra')).length, 1, 'the same actual returned version is not recorded twice')
-      const projected = { messages: [{ info: { id: 'complete-result', sessionID, role: 'assistant' }, parts: [{ type: 'tool', tool: 'js-manager', callID: 'complete-first', state: { status: 'completed', input: args, output } }] }] }
+      const projected = { messages: [{ info: { id: 'complete-result', sessionID, role: 'assistant' }, parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'complete-first', state: { status: 'completed', input: args, output } }] }] }
       await incarnation.hooks['experimental.chat.messages.transform']({ sessionID }, projected)
       const enriched = projected.messages[0].parts[0].state.output
       assert.ok(enriched.includes('requirement_source_path = "requirements/alpha/HOW.md"'))

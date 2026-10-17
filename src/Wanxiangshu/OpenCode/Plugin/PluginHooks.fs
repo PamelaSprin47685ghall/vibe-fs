@@ -362,7 +362,7 @@ module PluginHooks =
                 | None -> false
 
             let isReviewPermitted toolName (facts: ManagerCapabilityFacts) =
-                if toolName = "js-manager" && facts.HasActiveIncumbency then
+                if toolName = "todowrite-for-manager" && facts.HasActiveIncumbency then
                     OfficeCapability.isAllowedForManagerFacts facts ToolPermission.Read
                 else
                     reviewToolPermitted toolName facts
@@ -570,7 +570,9 @@ module PluginHooks =
 
             let checkManagerReviewPermissions toolName toolInput =
                 let sessionId = toolField toolInput "sessionID"
-                let blockedNative = toolName = "js-engineer" || toolName = "js-devops"
+
+                let blockedNative =
+                    toolName = "todowrite-for-engineer" || toolName = "todowrite-for-devops"
 
                 if roleFor (SessionId.create sessionId) = Some Role.Manager && blockedNative then
                     invalidOp (sprintf "Manager tool '%s' is refused on the review gate" toolName)

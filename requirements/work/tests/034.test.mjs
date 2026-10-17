@@ -53,7 +53,7 @@ test('WHAT[work-034] initial tenure (S1) assembles U + current messages with no 
   const subsequentMessages = [
     ...rawMessages,
     assistantText('a1', 'working on S1', 'u2'),
-    toolResult('t1', 'js-plan', 'draft'),
+    toolResult('t1', 'todowrite-for-plan', 'draft'),
   ]
   const tenureContinuing = { ...tenure, isFreshHandover: false }
   const secondTurn = assemble(
@@ -79,10 +79,10 @@ test('WHAT[work-034] non-initial tenure strips prior assistant/tool messages, in
   const rawMessages = [
     userText('u1', 'Initial user prompt'),
     assistantText('a-old', 'S1 assistant work', 'u1'),
-    toolResult('t-old', 'js-plan', 'S1 tool work'),
+    toolResult('t-old', 'todowrite-for-plan', 'S1 tool work'),
     userText('u2', 'Feedback from user'),
     assistantText('a-current', 'S2 assistant fresh', 'u2'),
-    toolResult('t-current', 'js-plan', 'S2 tool result'),
+    toolResult('t-current', 'todowrite-for-plan', 'S2 tool result'),
   ]
 
   const tenureS2 = {
@@ -409,7 +409,7 @@ test('WHAT[work-034] successor projection strips earlier assistant and tool mess
   const rawMessages = [
     userText('u-history', 'Original user request'),
     assistantText('a-old', 'previous tenure answer'),
-    toolResult('t-old', 'js-plan', 'old draft'),
+    toolResult('t-old', 'todowrite-for-plan', 'old draft'),
     assistantText('a-current', 'this tenure answer'),
     assistantText('a-uncaptured', 'this request, not captured yet'),
   ]
@@ -449,7 +449,7 @@ test('WHAT[work-034] post-S3 projection strips all S3-and-earlier context and in
   const rawMessages = [
     userText('u-history', 'Original user request'),
     assistantText('a-s1', 'S1 tenure assistant'),
-    toolResult('t-s1', 'js-plan', 'S1 tool'),
+    toolResult('t-s1', 'todowrite-for-plan', 'S1 tool'),
     assistantText('a-s2', 'S2 tenure assistant'),
     assistantText('a-s3', 'S3 tenure assistant'),
     userText('u-command', 'Please execute deliver now.'),

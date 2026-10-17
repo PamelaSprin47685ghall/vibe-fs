@@ -172,13 +172,13 @@ module ToolRegistry =
         )
 
     /// capability-enforcement-005 / STRENGTH-004: Host-native read/glob/grep are
-    /// the entire replica surface. js-predictor is the single plugin tool a live
+    /// the entire replica surface. todowrite-for-predictor is the single plugin tool a live
     /// replica may execute; every other plugin tool stays denied.
     let private replicaStage (gate: ToolGateFacts) (spec: ToolSpec) (ctx: HostToolContext) : Task<string option> =
         Task.FromResult(
             if not (gate.IsStrengthReplica ctx) then
                 None
-            elif spec.Name = "js-predictor" then
+            elif spec.Name = "todowrite-for-predictor" then
                 None
             else
                 Some(denied ctx spec.Name Path.DeniedStrength Map.empty None)
@@ -355,14 +355,14 @@ module ToolRegistry =
           "publish", ConcernTools.admission
           "chronicle", ChronicleTool.admission bloggerHost
           "fetch", ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
-          "js-bookkeeper", JsBookkeeperTool.admission ]
+          "todowrite-for-bookkeeper", JsBookkeeperTool.admission ]
 
     let private tryAdmissionFor (specName: string) (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission option =
         match staticAdmissions bloggerHost |> List.tryFind (fun (name, _) -> name = specName) with
         | Some(_, admission) -> Some admission
-        | None when specName = "js-predictor" -> Some(ToolAdmission.PrivateAttachment(fun _ -> false))
-        | None when specName.StartsWith "js-" && specName <> "js-bookkeeper" ->
-            Some(JsToolSpec.admissionFor (specName.Substring 3))
+        | None when specName = "todowrite-for-predictor" -> Some(ToolAdmission.PrivateAttachment(fun _ -> false))
+        | None when specName.StartsWith "todowrite-for-" && specName <> "todowrite-for-bookkeeper" ->
+            Some(JsToolSpec.admissionFor (specName.Substring 14))
         | None -> None
 
     let private probeContext (sessionId: string) : HostToolContext =
@@ -413,7 +413,8 @@ module ToolRegistry =
 
     let private writePlanFile root sessionId newText value =
         match PlanPath.rewritePlanAtomic root sessionId newText with
-        | Ok(_path, _digest) -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [ "plan.md" ], [], [], []))
+        | Ok(_path, _digest) ->
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [ "plan.md" ], [], [], []))
         | Error err ->
             JsToolsResult.render (
                 JsToolWorkflow.JsToolOutcome.Failed(
@@ -457,8 +458,7 @@ module ToolRegistry =
             let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
             let outputBoundBytes = 1 <<< 20
 
-            let! handle =
-                JsSandbox.runSurface baseClassSource programSource api deadlineMs deadlineEpochMs
+            let! handle = JsSandbox.runSurface baseClassSource programSource api deadlineMs deadlineEpochMs
 
             let! runOutcome = JsSandbox.awaitResult handle outputBoundBytes
 
@@ -970,7 +970,7 @@ module ToolRegistry =
             }
 
         let planningSpecs () =
-            [ { Name = "js-plan"
+            [ { Name = "todowrite-for-plan"
                 Description =
                   JsCanonicalDescription.renderPlan
                       jsProse
@@ -1048,7 +1048,10 @@ module ToolRegistry =
 
                                 return
                                     ToolHostCodec.tomlObjectWithInstructions
-                                        [ ProviderProse.render (lang ctx) Path.DeliverBlockedByParked (Map [ "handles", handles ]) ]
+                                        [ ProviderProse.render
+                                              (lang ctx)
+                                              Path.DeliverBlockedByParked
+                                              (Map [ "handles", handles ]) ]
                                         [ "code", ToolHostCodec.TString Path.DeliverBlockedByParked
                                           "parked_handles", ToolHostCodec.TString handles ]
                             else

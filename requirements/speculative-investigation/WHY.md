@@ -25,7 +25,7 @@
 - 在 `chronicle`（Blogger 日志工具）等具有单一专职用途的工具上，注入调查参数完全违反了其生命周期契约；
 - 在终端类工具（`open-terminal` / `read-terminal` / `send-terminal`）上，由于其操作对象是活跃进程而非稳定静态文件，强加只读文件查证估计破坏了终端交互边界。
 
-新合同改为严格的**逐工具判定表（第 5.2 节参与工具，共 12 个）**：只有在调用后确实合理存在连续文件系统查证展望的工具（如 read/glob/grep、文件编辑修改 edit/write/mv/rm、综合操作 js-manager/js-engineer/js-devops、案例检索 fetch 与 DevOps 命令 run），才装饰估计协议。其余所有未参与工具保持原定义完全无增量，也不截取其同名业务字段。这大幅降低了模型的输入负担与注意力分散。
+新合同改为严格的**逐工具判定表（第 5.2 节参与工具，共 12 个）**：只有在调用后确实合理存在连续文件系统查证展望的工具（如 read/glob/grep、文件编辑修改 edit/write/mv/rm、综合操作 todowrite-for-manager/todowrite-for-engineer/todowrite-for-devops、案例检索 fetch 与 DevOps 命令 run），才装饰估计协议。其余所有未参与工具保持原定义完全无增量，也不截取其同名业务字段。这大幅降低了模型的输入负担与注意力分散。
 
 ## 为什么短记改为建议性未来调查展望
 

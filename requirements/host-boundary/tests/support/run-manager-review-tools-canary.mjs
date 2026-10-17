@@ -37,8 +37,8 @@ assert.equal(pluginVersion, fixture.targetVersion);
 assert.equal(opencodeVersion, fixture.targetVersion);
 assert.ok(productionPluginPath, 'production plugin must be available');
 
-const REVIEW_TOOLS = ['js-manager'];
-const CONTROL_TOOLS = ['read', 'grep', 'glob', 'js-engineer', 'js-devops'];
+const REVIEW_TOOLS = ['todowrite-for-manager'];
+const CONTROL_TOOLS = ['read', 'grep', 'glob', 'todowrite-for-engineer', 'todowrite-for-devops'];
 const CONTRACT_TOKEN = 'do-not-use-except-for-review';
 const CANCEL_ARGUMENTS = {
   program: 'class Js extends JsProgram { async run() { await new Promise(() => {}); return null; } }',
@@ -144,7 +144,7 @@ const isManagerRequest = (request, body) => {
     .filter((n) => typeof n === 'string');
 
   // Review tools are strictly exclusive to Role.Manager
-  const hasManagerReviewTools = toolNames.includes('js-manager');
+  const hasManagerReviewTools = toolNames.includes('todowrite-for-manager');
 
   if (!hasManagerReviewTools || managerReviewStage(body) === null) {
     return false;
@@ -219,7 +219,7 @@ const provider = await startHttpServer(async (request, response) => {
           return !Object.hasOwn(properties, 'estimated_readonly_rounds') && !Object.hasOwn(properties, 'self_note');
         });
         const readManagerTool = body.tools.find(
-          (t) => (t?.function?.name ?? t?.name) === 'js-manager',
+          (t) => (t?.function?.name ?? t?.name) === 'todowrite-for-manager',
         );
         const contractProp = readManagerTool?.function?.parameters?.properties?.contract;
         const required = readManagerTool?.function?.parameters?.required ?? [];
@@ -229,7 +229,7 @@ const provider = await startHttpServer(async (request, response) => {
       }
 
       const call = {
-        name: 'js-manager',
+        name: 'todowrite-for-manager',
         argsStr: JSON.stringify({
           program: "class Js extends JsProgram { async run() { const f = await this.file('fixture-sample.txt'); return f.text('^', '$'); } }",
           contract: CONTRACT_TOKEN,
@@ -257,7 +257,7 @@ const provider = await startHttpServer(async (request, response) => {
     // Business error call.
     if (stage === 4) {
       const call = {
-        name: 'js-manager',
+        name: 'todowrite-for-manager',
         argsStr: JSON.stringify({
           program: "class Js extends JsProgram { async run() { const f = await this.file('nonexistent-missing-file.txt'); return f.text('^', '$'); } }",
           contract: CONTRACT_TOKEN,
@@ -275,7 +275,7 @@ const provider = await startHttpServer(async (request, response) => {
     // Cancellation call.
     if (stage === 6) {
       const call = {
-        name: 'js-manager',
+        name: 'todowrite-for-manager',
         argsStr: JSON.stringify(CANCEL_ARGUMENTS),
       };
       sendSSE(response, buildToolCallChunks('call_js_cancel_1', call.name, call.argsStr, 35));
@@ -288,14 +288,14 @@ const provider = await startHttpServer(async (request, response) => {
       publish({ kind: 'manager.cancellation.history', value: cancelled?.function?.arguments ?? null });
     }
 
-    // Executor rejection call (T180): the canary plugin wraps the js-manager
+    // Executor rejection call (T180): the canary plugin wraps the todowrite-for-manager
     // executor to reject this specific program before it runs. The Host must
     // materialize the rejection as a durable error tool part without invoking
     // tool.execute.after, and the follow-up request must still carry the
     // original wire arguments.
     if (stage === 8) {
       const call = {
-        name: 'js-manager',
+        name: 'todowrite-for-manager',
         argsStr: JSON.stringify({
           program: `class Js extends JsProgram { async run() { return '${EXECUTOR_THROW_SENTINEL}'; } }`,
           contract: CONTRACT_TOKEN,
@@ -372,7 +372,7 @@ const scenarioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiangshu-manager-r
 const workspace = path.join(scenarioDir, 'workspace');
 fs.mkdirSync(workspace, { recursive: true });
 
-// Create test fixture file for js-manager
+// Create test fixture file for todowrite-for-manager
 fs.writeFileSync(
   path.join(workspace, 'fixture-sample.txt'),
   'Hello Wanxiangshu Manager Review Tools Canary\nLine 2: sample text\n',
@@ -404,7 +404,7 @@ try {
 
   await createManagerSession();
 
-  // 1. Normal js-manager prompt
+  // 1. Normal todowrite-for-manager prompt
   const msg1 = 'msg_canary_prompt_1';
   await request(host.baseUrl, 'POST', `/session/${sessionID}/message`, prompt(msg1, 'READ_SAMPLE'), 200);
 

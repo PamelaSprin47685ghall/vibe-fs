@@ -2,4 +2,4 @@
 
 本编程面没有 glob、grep，也不访问仓库文件。需要仓库事实时用 `devops`。
 
-每一任期在本任调用 `review` 之前，`js-plan` 对底稿严格只读。此前调用 `edit` 或 `rewrite` 会被拒绝，并要求先调用 `review`。评审之后写权限解锁。接力开启的下一任期，在它自己的 `review` 之前重新锁定为只读。
+每一任期在本任调用 `review` 之前，`todowrite-for-plan` 对底稿严格只读。此前调用 `edit` 或 `rewrite` 会被拒绝，并要求先调用 `review`。评审之后写权限解锁。接力开启的下一任期，在它自己的 `review` 之前重新锁定为只读。

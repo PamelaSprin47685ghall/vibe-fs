@@ -192,6 +192,110 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.mv" }
 
+    let cat: JsCapabilityFragment =
+        { Capability = JsCapability.Read
+          MemberName = "cat"
+          Signature = "async cat(path)"
+          Description =
+            "cat(path) — read a strict-UTF-8 file as a string and register it as the "
+            + "current read snapshot for the write-before FILE_CHANGED check. A missing "
+            + "path is FILE_NOT_FOUND; non-UTF-8 content is INVALID_UTF8."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const text = await this.cat(\"README.md\");\n"
+            + "    return { bytes: text.length };\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.cat" }
+
+    let ls: JsCapabilityFragment =
+        { Capability = JsCapability.Glob
+          MemberName = "ls"
+          Signature = "async ls(path)"
+          Description =
+            "ls(path) — list one directory in sorted order. Directory entries end "
+            + "with \"/\". Non-recursive: recursion is the glob composition. A missing "
+            + "path is FILE_NOT_FOUND."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    return await this.ls(\"src\");\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.ls" }
+
+    let stat: JsCapabilityFragment =
+        { Capability = JsCapability.Read
+          MemberName = "stat"
+          Signature = "async stat(path)"
+          Description =
+            "stat(path) — return { exists, size, mtime, isDir }. A missing path is "
+            + "a normal observation with exists = false, not a failure."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const info = await this.stat(\"package.json\");\n"
+            + "    return info;\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.stat" }
+
+    let mkdir: JsCapabilityFragment =
+        { Capability = JsCapability.Write
+          MemberName = "mkdir"
+          Signature = "mkdir(path)"
+          Description =
+            "mkdir(path) — create one directory (POSIX, non-recursive). Existing "
+            + "target is DIRECTORY_EXISTS; a missing parent is PARENT_DIRECTORY_MISSING. "
+            + "Structural operation with no durable mutation entry."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    this.mkdir(\"generated\");\n"
+            + "    this.write(\"generated/version.txt\", \"1.2.3\\n\");\n"
+            + "    return { ok: true };\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.mkdir" }
+
+    let whereAll: JsCapabilityFragment =
+        { Capability = JsCapability.Read
+          MemberName = "whereAll"
+          Signature = "whereAll(content, needle, from = 0)"
+          Description =
+            "whereAll(content, needle, from = 0) — normalized exact search: whitespace "
+            + "runs collapse to one space. Returns every match as [[begin, end], ...] in "
+            + "original UTF-16 offsets; no match returns []."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const text = await this.cat(\"src/foo.js\");\n"
+            + "    return this.whereAll(text, \"const value\");\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.whereAll" }
+
+    let where: JsCapabilityFragment =
+        { Capability = JsCapability.Read
+          MemberName = "where"
+          Signature = "async where(content, needle, from = 0)"
+          Description =
+            "where(content, needle, from = 0) — exactly one normalized match returns "
+            + "[begin, end]. Zero or many matches suspend the program through the park "
+            + "channel with { needle, candidates, nearest }; unpark injects the chosen "
+            + "span. The program always receives one span."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const text = await this.cat(\"src/foo.js\");\n"
+            + "    const [begin, end] = await this.where(text, \"const value\");\n"
+            + "    this.write(\"src/foo.js\", text.slice(0, begin) + \"const next\" + text.slice(end));\n"
+            + "    return { edited: true };\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.where" }
+
     /// park fragment — the pause/resume mechanism (PLAN S1 B.7/B.17). Unlike
     /// the filesystem members this is not a ToolPermission projection: it is a
     /// lifecycle capability every js-* surface carries. The runtime binding is
@@ -217,7 +321,21 @@ module JsFragmentRegistry =
     /// Canonical member order inside capability families. Filtering this list
     /// is the deterministic projection; never rebuild member order elsewhere.
     let all: JsCapabilityFragment list =
-        [ read; glob; grep; edit; rewrite; write; rm; mv; park ]
+        [ read
+          glob
+          grep
+          edit
+          rewrite
+          write
+          rm
+          mv
+          cat
+          ls
+          stat
+          mkdir
+          whereAll
+          where
+          park ]
 
     let byCapability: Map<JsCapability, JsCapabilityFragment list> =
         all |> List.groupBy _.Capability |> Map.ofList

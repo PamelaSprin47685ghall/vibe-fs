@@ -28,7 +28,7 @@ const ownerExchange = (ordinal) => [
 
 // A child tool exchange: the same shape, as the replica itself produced it.
 const childExchange = (ordinal) => [
-  { role: 'assistant', parts: [{ kind: 'tool-call', callId: `p${ordinal}`, name: 'js-predictor', args: '{}' }] },
+  { role: 'assistant', parts: [{ kind: 'tool-call', callId: `p${ordinal}`, name: 'todowrite-for-predictor', args: '{}' }] },
   { role: 'tool', parts: [{ kind: 'tool-result', callId: `p${ordinal}`, result: `q${ordinal}` }] },
 ]
 

@@ -82,8 +82,8 @@ module StrengthDelegate =
             let wire = ProviderWireCapture.decodeMessageView rawMessages
 
             let displayName tool =
-                if tool = "js-predictor" then
-                    "js-" + Roles.roleLabel ownerRole
+                if tool = "todowrite-for-predictor" then
+                    "todowrite-for-" + Roles.roleLabel ownerRole
                 else
                     tool
 

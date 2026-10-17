@@ -19,6 +19,10 @@ const toolModule = () => {
       type: 'string',
       describe: (description) => ({ type: 'string', description }),
     }),
+    any: () => ({
+      type: 'any',
+      optional: () => ({ type: 'any', optional: true }),
+    }),
     object: (shape) => ({ type: 'object', shape }),
   }
   return { tool }

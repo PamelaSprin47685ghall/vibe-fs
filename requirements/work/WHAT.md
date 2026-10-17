@@ -167,7 +167,7 @@ S4 第一次调用只确认。第二次调用依持久退休结果分流：Relay
 
 当调度器识别到 CanonicalRole 为 `Plan`（Wire 标识为 `plan`）时，系统投影其专属权限与工具集。
 
-- 允许后果：Plan 的工作工具为 `js-plan`、`devops`、`ask`、`review`、`deliver`。`js-plan`、`devops` 与 `ask` 只向 Plan 开放；`ask` 供 Plan 明确询问用户（[049]），Manager 禁用 `ask`，且 `ask` 不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
+- 允许后果：Plan 的工作工具为 `todowrite-for-plan`、`devops`、`ask`、`review`、`deliver`。`todowrite-for-plan`、`devops` 与 `ask` 只向 Plan 开放；`ask` 供 Plan 明确询问用户（[049]），Manager 禁用 `ask`，且 `ask` 不再表示 DevOps 调查。`review` 与 Manager 共用同一工具名与同一语义（见 [038] 与 [003]）。
 - 禁止后果：Plan 角色禁止获得代码仓库与执行工具的权限，包括但不限于 `read`、`glob`、`grep`、`edit`、`write`、`mv`、`rm`、`run`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`fork`、`fission`、`commission`。严禁向 Plan 开放任何真实 shell 或命令执行通道。`resume` 与 `handoff` 不再属于 Plan 的工具面。
 - 失败后果：任何越权工具调用必须在 `ToolRegistry` 执行门禁被直接拦截（fail-closed），返回强类型拒绝错误，零副作用。
 
@@ -205,9 +205,9 @@ Plan 的轮换生命周期由不可变 wanxiangli 事实驱动并投影状态。
 工具调用进入执行前，动作门必须基于当前任期、授权与工作状态进行单一判定。
 
 - 允许后果：
-  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `js-plan`、`devops`、`ask`、`review`、`deliver`；`ask` 另需当前 Plan 权威与精确调用身份（[049]），Manager 禁用 `ask`；
-  2. 每一任期在调用 `review` 工具之前，`js-plan` 工具是严格只读的（仅允许读操作 `read`）；若在此之前尝试写入（`edit`、`rewrite` 等修改操作），动作门与执行层均强制拦截拒绝，并向模型报错说明必须先完成 `review`。当前任期成功调用 `review` 工具之后方解锁写权限；接力（无权 deliver）开启的新任期在其成功调用 `review` 之前重新锁定为只读；
-  3. 工作处于 `delivered`（`post-S3` 态）时，`js-plan` 仅允许 `read`，`devops` 与 `review` 拒绝；当用户在 `post-S3` 态下输入命令要求执行交付时，允许调用 `deliver` 启动 `S4` 执行会话（且用户可反复要求启动 `S4`）；
+  1. 仅当调用者为 `Plan` 且工作处于 `active`（有活跃任期）时放行 `todowrite-for-plan`、`devops`、`ask`、`review`、`deliver`；`ask` 另需当前 Plan 权威与精确调用身份（[049]），Manager 禁用 `ask`；
+  2. 每一任期在调用 `review` 工具之前，`todowrite-for-plan` 工具是严格只读的（仅允许读操作 `read`）；若在此之前尝试写入（`edit`、`rewrite` 等修改操作），动作门与执行层均强制拦截拒绝，并向模型报错说明必须先完成 `review`。当前任期成功调用 `review` 工具之后方解锁写权限；接力（无权 deliver）开启的新任期在其成功调用 `review` 之前重新锁定为只读；
+  3. 工作处于 `delivered`（`post-S3` 态）时，`todowrite-for-plan` 仅允许 `read`，`devops` 与 `review` 拒绝；当用户在 `post-S3` 态下输入命令要求执行交付时，允许调用 `deliver` 启动 `S4` 执行会话（且用户可反复要求启动 `S4`）；
   4. `review` 为硬门：本任已有 `Reviewed` 事实时拒绝再次调用（每任恰好一次，见 [038]）；
   5. `devops` 在同一 work 已有一个未决委派时拒绝新委派（见 [028]）；`ask` 正在等待用户时，不准再启动其他工作工具；
   6. `deliver` 要求无活跃 blocker（递归 live 资源）；行为按授权分支：持权走交付（[026]），无权走接力（[025]）。
@@ -257,9 +257,9 @@ Manager 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾�
 
 底稿 `P` 是模型唯一可读写的持久化文件产物，其路径由系统确定性派生。
 
-- 允许后果：系统以 `workId` 派生安全编码的 `canonical-work-key`，路径固定为 `<git-common-dir>/wanxiangshu/plan/<canonical-work-key>/plan.md`。`js-plan` 是标准的 JS 编程面工具（接受单一参数 `program: string`，在沙箱中执行继承自 `JsProgram` 的类并实现 `async run()`），仅作用于该单一底稿 `P`。它直接模仿其它 `js-*` 工具的锚点编辑法，但因为作用域严格限定于单一底稿 `P`，严禁且无需传入任何路径参数：提供 `file(matches)` 读快照与锚点切片、`edit(changes)` 局部修改与 `rewrite(newText)` 全量覆盖能力；无 `glob`/`grep` 仓库检索能力。写入采用排他临时文件写入、flush 后原子替换的方式发布。
-- 允许后果：交给模型的 `js-plan` 工具描述复用其它 `js-*` 的同一套教程面：有序锚点、`text(from, to)`、精确 `edit`、结构重组，以及一份按底稿职责成形的样例。教程按本工具的无路径签名填写：`file(matches = [])`、`edit(changes)`、`rewrite(newText)`。`P` 的单一作用域、禁路径和写前评审只作为作用域约束放在教程前面，不另写一套锚点用法。
-- 禁止后果：模型不得在工具参数中使用多余字段，只传递 `program`。在 `JsProgram` 的 `file`、`edit`、`rewrite` 方法中严禁传入任何路径参数，若调用时尝试传入路径参数，沙箱必须直接报错拒绝。严禁路径穿越（path traversal）、符号链接逃逸、不安全 ID 注入或根目录漂移。`js-plan` 严禁提供任何超出 `P` 之外的文件系统能力，严禁暴露目录列表或仓库文件读写。写盘完成后取消读回校验。
+- 允许后果：系统以 `workId` 派生安全编码的 `canonical-work-key`，路径固定为 `<git-common-dir>/wanxiangshu/plan/<canonical-work-key>/plan.md`。`todowrite-for-plan` 是标准的 JS 编程面工具（接受单一参数 `program: string`，在沙箱中执行继承自 `JsProgram` 的类并实现 `async run()`），仅作用于该单一底稿 `P`。它直接模仿其它 `js-*` 工具的锚点编辑法，但因为作用域严格限定于单一底稿 `P`，严禁且无需传入任何路径参数：提供 `file(matches)` 读快照与锚点切片、`edit(changes)` 局部修改与 `rewrite(newText)` 全量覆盖能力；无 `glob`/`grep` 仓库检索能力。写入采用排他临时文件写入、flush 后原子替换的方式发布。
+- 允许后果：交给模型的 `todowrite-for-plan` 工具描述复用其它 `js-*` 的同一套教程面：有序锚点、`text(from, to)`、精确 `edit`、结构重组，以及一份按底稿职责成形的样例。教程按本工具的无路径签名填写：`file(matches = [])`、`edit(changes)`、`rewrite(newText)`。`P` 的单一作用域、禁路径和写前评审只作为作用域约束放在教程前面，不另写一套锚点用法。
+- 禁止后果：模型不得在工具参数中使用多余字段，只传递 `program`。在 `JsProgram` 的 `file`、`edit`、`rewrite` 方法中严禁传入任何路径参数，若调用时尝试传入路径参数，沙箱必须直接报错拒绝。严禁路径穿越（path traversal）、符号链接逃逸、不安全 ID 注入或根目录漂移。`todowrite-for-plan` 严禁提供任何超出 `P` 之外的文件系统能力，严禁暴露目录列表或仓库文件读写。写盘完成后取消读回校验。
 - 禁止后果：工具描述不得另写精简教程替代共享教程，不得在教程或样例中教模型传入路径参数，不得把运行时内部对象暴露给模型。
 - 失败后果：检测到路径异常、传入路径参数、尝试访问 `P` 之外的文件或目标文件被外部非法篡改时，操作必须立即拒绝。
 
@@ -267,7 +267,7 @@ Manager 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾�
 
 系统启动时，必须显式注册 Plan 相关的工具与参数规范。
 
-- 允许后果：在 `ToolRegistry` 中登记 `js-plan`（JS 编程面）、`devops`、`ask`、`review`、`deliver`（编排面）。静态工具名单与投机调查分类显式登记五个名称；`ask` 参数为 `question`，`devops` 参数为 `intent`，能力映射不得混用。`review` 与 Manager 共用同一 ToolSpec（见 [038]）。
+- 允许后果：在 `ToolRegistry` 中登记 `todowrite-for-plan`（JS 编程面）、`devops`、`ask`、`review`、`deliver`（编排面）。静态工具名单与投机调查分类显式登记五个名称；`ask` 参数为 `question`，`devops` 参数为 `intent`，能力映射不得混用。`review` 与 Manager 共用同一 ToolSpec（见 [038]）。
 - 禁止后果：严禁使用前缀匹配、通配符或模糊规则对工具进行分类或准入。未显式登记的工具不得进入 Plan 的工具列表。`handoff` 与 `resume` 不得作为 Plan 工具登记或注册。
 - 失败后果：若工具名称或分类缺失，系统在启动静态校验或工具构建期必须报错阻断。
 
@@ -294,7 +294,7 @@ Plan 角色与各阶段使用的指导文档必须在资源目录中中英双语
 Plan 的阶段与任期机制不得污染其他角色；[027] 明确规定的 Manager 长程连续性除外。
 
 - 允许后果：Orchestrator、Engineer、DevOps、Blogger 的既有角色合同不变。Manager 禁止静默停止且禁用 `ask`，`review` 的业务判断不变。
-- 禁止后果：非 Plan 角色严禁获取 `js-plan`、`devops` 或 `ask`。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
+- 禁止后果：非 Plan 角色严禁获取 `todowrite-for-plan`、`devops` 或 `ask`。Plan 的 Baton 隔离逻辑严禁污染非 Plan 会话。任何角色都不得再使用已经撤销的 Plan 空停豁免。
 - 失败后果：任何非 Plan 回归测试失败均表明破坏了全局不变量，改动必须判定为不合格。
 
 ## [033] wanxiangli record、SQLite 持久化与投影

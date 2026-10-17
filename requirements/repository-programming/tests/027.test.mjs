@@ -6,10 +6,13 @@ test('WHAT[repository-programming-027] both working roles receive the same gener
   const capabilities = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove']
   const engineer = generateSurfaceForRole('Engineer', capabilities)
   const devops = generateSurfaceForRole('DevOps', capabilities)
-  assert.equal(engineer.toolName, 'js-engineer')
-  assert.equal(devops.toolName, 'js-devops')
+  assert.equal(engineer.toolName, 'todowrite-for-engineer')
+  assert.equal(devops.toolName, 'todowrite-for-devops')
   assert.equal(engineer.baseClassSource, devops.baseClassSource)
-  assert.deepEqual(engineer.members.map(m => m.memberName), ['file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv'])
+  assert.deepEqual(
+    engineer.members.map(m => m.memberName),
+    ['file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where'],
+  )
   assert.deepEqual(devops.members, engineer.members)
 })
 

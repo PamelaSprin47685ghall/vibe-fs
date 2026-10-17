@@ -42,4 +42,4 @@ verify:release 覆盖构建、真实 npm pack、解包和消费者验证。校�
 
 ## [010] 活跃注册一致
 
-产物的代码和资源须与现行活跃角色一致，不含废止角色的注册代码、死资源或旧工具映射。js-engineer、js-devops、js-bookkeeper 等现行工具在编译代码、surface manifest 和资源清单中保持完整一致，无孤立注册。
+产物的代码和资源须与现行活跃角色一致，不含废止角色的注册代码、死资源或旧工具映射。todowrite-for-engineer、todowrite-for-devops、todowrite-for-bookkeeper 等现行工具在编译代码、surface manifest 和资源清单中保持完整一致，无孤立注册。

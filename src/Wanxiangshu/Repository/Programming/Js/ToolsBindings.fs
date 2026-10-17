@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
 open System.Threading.Tasks
+open System.Text
 open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
@@ -41,6 +42,15 @@ module JsToolsBindings =
               "code" ==> JsFailure.code failure
               "reason" ==> JsFailure.reason failure ]
 
+    [<Emit("new Error().stack")>]
+    let private currentStack () : string = jsNative
+
+    /// A span must cross the vm boundary as a plain JS array, not a typed
+    /// array: the parked payload is JSON round-tripped, and a typed array
+    /// serializes to an object with numeric keys.
+    [<Emit("[$0, $1]")>]
+    let private jsSpan (beginIndex: int) (endIndex: int) : obj = jsNative
+
     let private renderOutcome (outcome: Result<obj, JsFailure>) : obj =
         match outcome with
         | Error failure -> failureObj failure
@@ -74,6 +84,21 @@ module JsToolsBindings =
             Ok(realpathSync path)
         with error ->
             Error(readPathResolutionFailure path error)
+
+    /// Symlink-escape check for an existing path: resolve both ends and
+    /// require the target to stay inside the capability boundary.
+    let private ensureRealPathInside (root: string) (callerPath: string) (full: string) =
+        result {
+            let! readPath = resolveReadPath full
+            let! readRoot = resolveReadPath root
+            let relative = (pathRelative readRoot readPath).Replace("\\", "/")
+
+            do!
+                if relative = ".." || relative.StartsWith("../") || pathIsAbsolute relative then
+                    Error(JsFailure.PathDenied callerPath)
+                else
+                    Ok()
+        }
 
     /// Interpret a JS find value: string → Exact anchor, RegExp → Regex anchor.
     let private anchorOf (find: obj) : Result<AnchorSpec, JsFailure> =
@@ -245,35 +270,9 @@ module JsToolsBindings =
             }
             |> renderOutcome
 
-    let private makeWriteMember (root: string) (staging: ResizeArray<JsStagedMutation>) (ledger: JsAsIsLedger) =
-        "write"
-        ==> fun (path: string) (text: string) ->
-            result {
-                let! full = resolveInside root path
-
-                do!
-                    if JsMutationFs.existsPath full then
-                        Error(JsFailure.FileAlreadyExists path)
-                    else
-                        Ok()
-
-                let mutation = JsStagedMutation.Create(path, text)
-
-                // As-is write: the single-mutation commit plan creates the
-                // file with a no-clobber flag (FILE_CHANGED if a third party
-                // created it meanwhile) and persists immediately.
-                // H1: Prepared fires before the write, Committed right after.
-                let transactionId = firePrepared ledger root mutation
-                do! JsMutationFs.commitPlan root (JsTransaction.commitPlan [ mutation ])
-                fireCommitted ledger transactionId
-                staging.Add mutation
-                return createObj [ "ok" ==> true ]
-            }
-            |> renderOutcome
-
     /// JS-020/JS-030 write-before check: a mutation target that was read
-    /// through file() must still match its snapshot, exactly like edit. A
-    /// third-party change is FILE_CHANGED with no implicit retry.
+    /// through file() or cat() must still match its snapshot. A third-party
+    /// change is FILE_CHANGED with no implicit retry.
     let private checkSnapshotFreshness
         (readSnapshots: ResizeArray<JsReadSnapshot>)
         (path: string)
@@ -287,6 +286,38 @@ module JsToolsBindings =
                 match JsUtf8Fs.readUtf8Classified full with
                 | Ok current when current = snapshot.Text -> Ok()
                 | _ -> Error(JsFailure.FileChanged path)
+
+    let private makeWriteMember
+        (root: string)
+        (staging: ResizeArray<JsStagedMutation>)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (ledger: JsAsIsLedger)
+        =
+        "write"
+        ==> fun (path: string) (text: string) ->
+            result {
+                let! full = resolveInside root path
+                do! checkSnapshotFreshness readSnapshots path full
+
+                let! mutation =
+                    if JsMutationFs.existsPath full then
+                        JsUtf8Fs.readUtf8Classified full
+                        |> Result.map (fun current -> JsStagedMutation.Rewrite(path, current, text))
+                    else
+                        Ok(JsStagedMutation.Create(path, text))
+
+                // As-is write: overwrite an existing file or create a missing
+                // one in one atomic mutation. A rewrite carries expectedCurrent
+                // so a third-party change since the read is FILE_CHANGED; a
+                // create is no-clobber.
+                // H1: Prepared fires before the write, Committed right after.
+                let transactionId = firePrepared ledger root mutation
+                do! JsMutationFs.commitPlan root (JsTransaction.commitPlan [ mutation ])
+                fireCommitted ledger transactionId
+                staging.Add mutation
+                return createObj [ "ok" ==> true ]
+            }
+            |> renderOutcome
 
     /// The rm/mv primitives carry the resolved absolute path in their
     /// failures; the member contract reports the caller-visible path (WHAT
@@ -372,34 +403,312 @@ module JsToolsBindings =
             }
             |> renderOutcome
 
-    /// PLAN S2 step 4: the park member. `await js.park(payload)` suspends the
-    /// program at this await point: it fires the park signal (which the
-    /// workflow races against the program promise) with the payload, then
-    /// returns a deferred promise the host keeps the resolve/reject right to.
-    /// `unpark` resolves the deferred with the injected value, letting the
-    /// program continue as if the await returned that value. `abandon` rejects
-    /// it with the `__jsAbandoned` marker so native try/finally runs. During
-    /// an abandon cleanup window park is refused with
-    /// CANNOT_PARK_WHILE_ABANDONING.
-    let private makeParkMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
-        "park"
-        ==> fun (payload: obj) ->
-            if parkState.AbandonRequested then
-                failureObj JsFailure.CannotParkWhileAbandoning
+    /// cat(path): strict-UTF-8 snapshot read. Registers the snapshot for the
+    /// write-before FILE_CHANGED check and the explicit-read case record.
+    let private makeCatMember
+        (root: string)
+        (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (explicitReads: ResizeArray<JsExplicitFileRead>)
+        =
+        "cat"
+        ==> fun (path: string) ->
+            result {
+                let! full = resolveInside root path
+                let! readPath = resolveReadPath full
+                let! readRoot = resolveReadPath root
+                let relative = (pathRelative readRoot readPath).Replace("\\", "/")
+
+                do!
+                    if relative = ".." || relative.StartsWith("../") || pathIsAbsolute relative then
+                        Error(JsFailure.PathDenied path)
+                    else
+                        Ok()
+
+                let! text = JsUtf8Fs.readUtf8Classified readPath
+                readSnapshots.Add { Path = path; Text = text }
+                explicitReads.Add { Path = readPath; ResultBytes = text }
+
+                return createObj [ "ok" ==> true; "text" ==> text ]
+            }
+            |> renderOutcome
+
+    /// ls(path): one directory, sorted, directory entries end with "/".
+    let private makeLsMember (root: string) =
+        "ls"
+        ==> fun (path: string) ->
+            result {
+                let! full = resolveInside root path
+                do! ensureRealPathInside root path full
+                let! entries = JsMutationFs.listDirectory full
+                return createObj [ "ok" ==> true; "entries" ==> (List.toArray entries) ]
+            }
+            |> renderOutcome
+
+    /// stat(path): metadata; a missing path is a normal `exists = false`.
+    let private makeStatMember (root: string) =
+        "stat"
+        ==> fun (path: string) ->
+            result {
+                let! full = resolveInside root path
+                let! stat = JsMutationFs.statPath full
+
+                do!
+                    if unbox<bool> (stat?exists) then
+                        ensureRealPathInside root path full
+                    else
+                        Ok()
+
+                return createObj [ "ok" ==> true; "stat" ==> stat ]
+            }
+            |> renderOutcome
+
+    /// mkdir(path): POSIX non-recursive directory creation. Structural, so it
+    /// carries no durable mutation entry (the as-is ledger owns file writes,
+    /// removals and moves).
+    let private makeMkdirMember (root: string) =
+        "mkdir"
+        ==> fun (path: string) ->
+            result {
+                let! full = resolveInside root path
+                do! JsMutationFs.makeDirectory full
+                return createObj [ "ok" ==> true; "path" ==> path ]
+            }
+            |> renderOutcome
+
+    let private isWhitespaceChar (ch: char) =
+        ch = ' ' || ch = '\t' || ch = '\n' || ch = '\r' || ch = '\012' || ch = '\011'
+
+    /// Collapse a whitespace run to one space and drop leading/trailing
+    /// whitespace. This is the canonical `where` needle normalization.
+    let private collapseWhitespace (text: string) =
+        let sb = StringBuilder()
+        let mutable pendingSpace = false
+
+        for ch in text do
+            if isWhitespaceChar ch then
+                pendingSpace <- true
             else
-                parkState.ParkRequested <- true
-                parkState.ParkPayload <- payload
+                if pendingSpace && sb.Length > 0 then
+                    sb.Append(' ') |> ignore
 
-                if not (isNull parkState.ParkSignalResolve) then
-                    emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
+                pendingSpace <- false
+                sb.Append(ch) |> ignore
 
-                // The deferred promise: the host keeps the resolve/reject
-                // closures in ParkState. The program awaits this promise, so it
-                // suspends here until resumed (unpark) or abandoned.
-                emitJsExpr
-                    (parkState)
-                    "(() => { const state = $0; return new Promise((resolve, reject) => { state.ParkDeferredResolve = resolve; state.ParkDeferredReject = reject; }); })()"
-                : obj
+        sb.ToString()
+
+    /// Normalize content and keep the original offset of every normalized
+    /// character. A whitespace run maps to its first original character.
+    let private normalizeWithMap (text: string) =
+        let sb = StringBuilder()
+        let offsets = ResizeArray<int>()
+        let mutable previousWasSpace = false
+
+        for index in 0 .. text.Length - 1 do
+            let ch = text.[index]
+
+            if isWhitespaceChar ch then
+                if not previousWasSpace && sb.Length > 0 then
+                    sb.Append(' ') |> ignore
+                    offsets.Add index
+                    previousWasSpace <- true
+            else
+                sb.Append ch |> ignore
+                offsets.Add index
+                previousWasSpace <- false
+
+        sb.ToString(), offsets
+
+    /// All non-overlapping normalized matches, mapped back to original
+    /// UTF-16 offsets. `fromIndex` is an original content offset.
+    let private whereSpans (content: string) (needle: string) (fromIndex: int) =
+        let target = collapseWhitespace needle
+
+        if target.Length = 0 then
+            []
+        else
+            let normalized, offsets = normalizeWithMap content
+            let mutable cursor = 0
+            let spans = ResizeArray<int * int>()
+
+            while cursor <= normalized.Length - target.Length do
+                let found = normalized.IndexOf(target, cursor)
+
+                if found < 0 then
+                    cursor <- normalized.Length
+                else
+                    let beginIndex = offsets.[found]
+                    let endIndex = offsets.[found + target.Length - 1] + 1
+
+                    if beginIndex >= fromIndex then
+                        spans.Add(beginIndex, endIndex)
+
+                    cursor <- found + max 1 target.Length
+
+            List.ofSeq spans
+
+    let private editDistance (left: string) (right: string) =
+        let a = if left.Length > 200 then left.Substring(0, 200) else left
+
+        let b =
+            if right.Length > 200 then
+                right.Substring(0, 200)
+            else
+                right
+
+        let previous = Array.init (b.Length + 1) id
+        let current = Array.zeroCreate<int> (b.Length + 1)
+
+        for i in 1 .. a.Length do
+            current.[0] <- i
+
+            for j in 1 .. b.Length do
+                let substitution = if a.[i - 1] = b.[j - 1] then 0 else 1
+
+                current.[j] <- min (min (current.[j - 1] + 1) (previous.[j] + 1)) (previous.[j - 1] + substitution)
+
+            Array.blit current 0 previous 0 current.Length
+
+        previous.[b.Length]
+
+    /// Diagnostic for a zero-match where: the closest single line, bounded to
+    /// the first 2000 non-empty lines so a huge file cannot dominate cost.
+    let private nearestLine (content: string) (needle: string) =
+        let target = collapseWhitespace needle
+
+        if target.Length = 0 then
+            null
+        else
+            let lines = content.Split('\n')
+            let mutable offset = 0
+            let mutable bestDistance = System.Int32.MaxValue
+            let mutable bestStart = 0
+            let mutable bestEnd = 0
+            let mutable bestText = ""
+            let mutable scanned = 0
+
+            for line in lines do
+                if scanned < 2000 then
+                    let trimmed = line.Trim()
+
+                    if trimmed.Length > 0 then
+                        let distance = editDistance trimmed target
+
+                        if distance < bestDistance then
+                            bestDistance <- distance
+                            bestStart <- offset
+                            bestEnd <- offset + line.Length
+                            bestText <- trimmed
+
+                        scanned <- scanned + 1
+
+                offset <- offset + line.Length + 1
+
+            if bestDistance = System.Int32.MaxValue then
+                null
+            else
+                createObj
+                    [ "span" ==> jsSpan bestStart bestEnd
+                      "text" ==> bestText
+                      "distance" ==> bestDistance ]
+
+    /// Shared suspension path: park(payload) and where ambiguity both fire
+    /// the same signal and await the same deferred promise.
+    let private suspend (parkState: Wanxiangshu.Process.JsSandbox.ParkState) (payload: obj) : obj =
+        if parkState.AbandonRequested then
+            failureObj JsFailure.CannotParkWhileAbandoning
+        else
+            parkState.ParkRequested <- true
+            parkState.ParkPayload <- payload
+            parkState.ParkStack <- currentStack ()
+
+            if not (isNull parkState.ParkSignalResolve) then
+                emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
+
+            // The deferred promise: the host keeps the resolve/reject
+            // closures in ParkState. The program awaits this promise, so it
+            // suspends here until resumed (unpark) or abandoned.
+            emitJsExpr
+                (parkState)
+                "(() => { const state = $0; return new Promise((resolve, reject) => { state.ParkDeferredResolve = resolve; state.ParkDeferredReject = reject; }); })()"
+            : obj
+
+    let private candidateObjects (content: string) (spans: (int * int) list) =
+        spans
+        |> List.truncate 8
+        |> List.map (fun (beginIndex, endIndex) ->
+            let contextStart = max 0 (beginIndex - 80)
+            let contextEnd = min content.Length (endIndex + 80)
+
+            createObj
+                [ "span" ==> jsSpan beginIndex endIndex
+                  "context" ==> content.Substring(contextStart, contextEnd - contextStart) ])
+        |> Array.ofList
+
+    /// whereAll(content, needle, from?): every normalized match as [start, end].
+    let private makeWhereAllMember () =
+        "whereAll"
+        ==> fun (content: string) (needle: string) (fromIndex: obj) ->
+            if isNull content || isNull needle then
+                failureObj (JsFailure.InvalidArgument "whereAll requires string content and needle")
+            else
+                let start =
+                    if isUndefined fromIndex then
+                        0
+                    else
+                        max 0 (int (unbox<float> fromIndex))
+
+                let spans = whereSpans content needle start
+
+                createObj
+                    [ "ok" ==> true
+                      "spans"
+                      ==> (spans
+                           |> List.map (fun (beginIndex, endIndex) -> jsSpan beginIndex endIndex)
+                           |> Array.ofList) ]
+
+    /// where(content, needle, from?): exactly one match returns its span;
+    /// zero or many suspend the program through the same park channel as
+    /// js.park, with a diagnostic payload. The injected value is returned
+    /// verbatim (Unix responsibility: a wrong injection fails downstream).
+    let private makeWhereMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
+        "where"
+        ==> fun (content: string) (needle: string) (fromIndex: obj) (stack: obj) ->
+            if isNull content || isNull needle then
+                failureObj (JsFailure.InvalidArgument "where requires string content and needle")
+            else
+                let start =
+                    if isUndefined fromIndex then
+                        0
+                    else
+                        max 0 (int (unbox<float> fromIndex))
+
+                let spans = whereSpans content needle start
+
+                match spans with
+                | [ beginIndex, endIndex ] -> createObj [ "ok" ==> true; "span" ==> jsSpan beginIndex endIndex ]
+                | _ ->
+                    match parkState with
+                    | None -> failureObj (JsFailure.InvalidArgument "where requires a park-capable surface")
+                    | Some state ->
+                        if not (isNull stack) then
+                            state.ParkStack <- string stack
+
+                        let payload =
+                            createObj
+                                [ "needle" ==> needle
+                                  "candidates" ==> candidateObjects content spans
+                                  "nearest"
+                                  ==> (if List.isEmpty spans then
+                                           nearestLine content needle
+                                       else
+                                           null) ]
+
+                        suspend state payload
+
+    /// PLAN S2 step 4: the park member. `await js.park(payload)` suspends the
+    /// program at this await point through the shared suspension path.
+    let private makeParkMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
+        "park" ==> fun (payload: obj) -> suspend parkState payload
 
     let private createApiCore
         (capabilities: Set<JsCapability>)
@@ -413,9 +722,14 @@ module JsToolsBindings =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
                   makeReadMember root readSnapshots explicitReads
+                  makeCatMember root readSnapshots explicitReads
+                  makeStatMember root
+                  makeWhereAllMember ()
+                  makeWhereMember parkState
 
               if Set.contains JsCapability.Glob capabilities then
                   makeGlobMember root
+                  makeLsMember root
 
               if Set.contains JsCapability.Grep capabilities then
                   makeGrepMember root readSnapshots
@@ -424,7 +738,8 @@ module JsToolsBindings =
                   makeEditMember root staging ledger
 
               if Set.contains JsCapability.Write capabilities then
-                  makeWriteMember root staging ledger
+                  makeWriteMember root staging readSnapshots ledger
+                  makeMkdirMember root
 
               if Set.contains JsCapability.Remove capabilities then
                   makeRmMember root staging readSnapshots ledger

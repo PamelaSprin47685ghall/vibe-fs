@@ -1,1 +1,1 @@
-重塑暂存 Case 时，只有 js-bookkeeper 可用。
+重塑暂存 Case 时，只有 todowrite-for-bookkeeper 可用。

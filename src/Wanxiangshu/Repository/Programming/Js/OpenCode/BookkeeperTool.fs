@@ -332,7 +332,7 @@ module JsBookkeeperTool =
     let spec (factory: HostToolFactory) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
-        { Name = "js-bookkeeper"
+        { Name = "todowrite-for-bookkeeper"
           Description = assembleDescription language
           Arguments = [ "program", ToolHostCodec.stringSchemaDescribed (prose language Path.ArgProgram) factory ]
           Admission = admission

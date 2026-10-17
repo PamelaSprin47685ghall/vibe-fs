@@ -96,7 +96,12 @@ test('WHAT[repository-programming-043] JsFragmentRegistry carries the rm/mv frag
   assert.match(capability, /RuntimeBindingKey = "js\.mv" }/, 'the mv fragment must bind js.mv')
 
   // 两个 fragment 进入确定性投影的 canonical 成员序。
-  assert.match(capability, /\[ read; glob; grep; edit; rewrite; write; rm; mv; park \]/)
+  const allBlock = capability.match(/let all: JsCapabilityFragment list =\s*\[([\s\S]*?)\]/)
+  assert.ok(allBlock, 'the fragment registry must declare the canonical member list')
+  assert.deepEqual(
+    allBlock[1].split(/\s+/).filter(Boolean),
+    ['read', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where', 'park'],
+  )
 })
 
 test('WHAT[repository-programming-043] ToolsBindings binds the rm/mv members behind Remove/Move capabilities and delegates the effects to MutationFs primitives', () => {

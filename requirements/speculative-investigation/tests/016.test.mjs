@@ -21,7 +21,7 @@ const pluginHooksSourcePath = path.join(repoRoot, 'src/Wanxiangshu/OpenCode/Plug
 const delegateSourcePath = path.join(repoRoot, 'src/Wanxiangshu/Strength/OpenCode/Delegate.fs');
 
 const PARTICIPATING_TOOLS = [
-  'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
+  'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
   'edit', 'write', 'mv', 'rm', 'fetch', 'run'
 ];
 const PARTICIPATING_SET = new Set(PARTICIPATING_TOOLS);
@@ -148,8 +148,8 @@ test('WHAT[speculative-investigation-016] the production classifier admits exact
     'fork', 'resume', 'commission', 'join', 'horizon', 'review', 'deliver',
     'fission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
     'skill', 'todowrite', 'assume', 'defer', 
-    'publish', 'chronicle', 'js-bookkeeper', 'js-predictor',
-    'bash-honeypot', 'invalid', 'js-orchestrator', 'js-blogger'
+    'publish', 'chronicle', 'todowrite-for-bookkeeper', 'todowrite-for-predictor',
+    'bash-honeypot', 'invalid', 'todowrite-for-orchestrator', 'todowrite-for-blogger'
   ];
   for (const name of noEstimate) {
     assert.equal(

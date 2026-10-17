@@ -31,9 +31,9 @@ module InvestigationEstimateContract =
         | "read"
         | "glob"
         | "grep"
-        | "js-manager"
-        | "js-engineer"
-        | "js-devops"
+        | "todowrite-for-manager"
+        | "todowrite-for-engineer"
+        | "todowrite-for-devops"
         | "edit"
         | "write"
         | "mv"
@@ -47,7 +47,7 @@ module InvestigationEstimateContract =
         | "horizon"
         | "review"
         | "fission"
-        | "js-plan"
+        | "todowrite-for-plan"
         | "ask"
         | "devops"
         | "handoff"
@@ -62,12 +62,12 @@ module InvestigationEstimateContract =
         | "defer"
         | "publish"
         | "chronicle"
-        | "js-bookkeeper"
-        | "js-predictor"
+        | "todowrite-for-bookkeeper"
+        | "todowrite-for-predictor"
         | "bash-honeypot"
         | "invalid"
-        | "js-orchestrator"
-        | "js-blogger" -> InvestigationToolPolicy.NoEstimate
+        | "todowrite-for-orchestrator"
+        | "todowrite-for-blogger" -> InvestigationToolPolicy.NoEstimate
         | _ -> InvestigationToolPolicy.Unreviewed
 
     [<Struct>]

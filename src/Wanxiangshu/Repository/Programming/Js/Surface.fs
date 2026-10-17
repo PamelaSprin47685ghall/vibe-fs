@@ -27,7 +27,8 @@ module JsToolGenerator =
             fragment.Capability <> JsCapability.Park
             && Set.contains fragment.Capability capabilities)
 
-    let toolNameFor (roleName: string) : string = "js-" + roleName.ToLowerInvariant()
+    let toolNameFor (roleName: string) : string =
+        "todowrite-for-" + roleName.ToLowerInvariant()
 
     let private tryProject (roleName: string) (capabilities: Set<ToolPermission>) =
         let jsCapabilities = JsCapability.ofToolCapabilities capabilities

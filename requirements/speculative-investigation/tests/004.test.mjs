@@ -212,7 +212,7 @@ const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 
 const exactReadonly = ['Glob', 'Grep', 'Read']
-const allowedTools = ['read', 'glob', 'grep', 'js-predictor']
+const allowedTools = ['read', 'glob', 'grep', 'todowrite-for-predictor']
 
 // WHAT[004]: delegation changes the execution purpose, model target, visible
 // tools and short-term control. It never creates a second persona.
@@ -231,7 +231,7 @@ test('WHAT[speculative-investigation-004] STRENGTH_004_unknown_role_fails_closed
   assert.deepEqual(Strength.capabilities('Unknown'), [])
   assert.deepEqual(
     Strength.exactReadonlyHostToolMap.map((entry) => `${entry.tool}:${entry.allowed}`).sort(),
-    ['*:false', 'js-predictor:true'],
+    ['*:false', 'todowrite-for-predictor:true'],
     'the host gate denies everything by wildcard and allows exactly the single readonly JS surface',
   )
 })

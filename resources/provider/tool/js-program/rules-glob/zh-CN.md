@@ -3,3 +3,6 @@ glob(pattern) 以 gitignore/wildmatch 语义在当前路径边界下枚举文件
 .md 文件）。{a,b} 展开为交替。结果省略 .git、省略 gitignored 路径、不
 跟随符号链接，并已排序。返回值是 { paths }。glob
 不授予 Read。
+
+`ls(path)` 只列一层目录：条目排序，目录以 "/" 结尾。递归是 glob 的组合，
+不是 ls 的参数。

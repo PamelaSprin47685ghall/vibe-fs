@@ -99,7 +99,7 @@ export const extractRolePredicateArms = (text) => {
   if (!match) return arms
   for (const hit of match[0].matchAll(ROLE_PREDICATE_ARM_RE)) {
     const name = hit[1]
-    if (!name.startsWith('js-')) arms.push(name)
+    if (!name.startsWith('todowrite-for-')) arms.push(name)
   }
   return arms
 }

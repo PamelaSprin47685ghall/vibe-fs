@@ -114,6 +114,10 @@ const toolModule = () => {
       type: 'string',
       describe: (description) => ({ type: 'string', description }),
     }),
+    any: () => ({
+      type: 'any',
+      optional: () => ({ type: 'any', optional: true }),
+    }),
     object: (shape) => ({ type: 'object', shape }),
   }
   return { tool }
@@ -123,15 +127,15 @@ test('WHAT[repository-programming-005] JS003_builtin_fallback_descriptions_are_l
   assert.deepEqual([...builtinTools()].sort(), ['edit', 'glob', 'grep', 'patch', 'read', 'write'])
   for (const builtinName of builtinTools()) {
     const original = `${builtinName} primitive fallback`
-    const visible = annotate(builtinName, original, 'js-coder')
+    const visible = annotate(builtinName, original, 'todowrite-for-coder')
     assert.equal(visible, original)
     assert.doesNotMatch(visible, /DEPRECATED|js-coder/i)
   }
-  assert.equal(annotate('join', 'Join a session', 'js-coder'), 'Join a session')
+  assert.equal(annotate('join', 'Join a session', 'todowrite-for-coder'), 'Join a session')
 })
 test('WHAT[repository-programming-005] JS003_hook_must_not_recommend_invisible_tools', () => {
-  assert.equal(validateRecommendation('js-coder', ['js-coder', 'read']).ok, true)
-  const denied = validateRecommendation('js-coder', ['read'])
+  assert.equal(validateRecommendation('todowrite-for-coder', ['todowrite-for-coder', 'read']).ok, true)
+  const denied = validateRecommendation('todowrite-for-coder', ['read'])
   assert.equal(denied.ok, false)
   assert.equal(denied.error.includes('not provider-visible') || denied.error.includes('不可见'), true)
 })
@@ -139,7 +143,7 @@ test('WHAT[repository-programming-005] JS073_spec_carries_generated_name_and_hon
   const { dir, cleanup } = sandbox()
   try {
     const registered = createRegistered(toolModule(), 'Coder', 'en', dir, null)
-    assert.equal(name(registered), 'js-coder')
+    assert.equal(name(registered), 'todowrite-for-coder')
     assert.equal(description(registered).includes('class JsProgram'), true)
     assert.equal(description(registered).includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
     assert.equal(description(registered).includes('_api'), false)

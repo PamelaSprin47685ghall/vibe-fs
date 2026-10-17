@@ -23,8 +23,8 @@ const storeOf = (directory) => workspaceEvents.acquire(journalSurface.JournalSur
 
 
 
-// 执行入口门禁：tool.execute.before 只对评审专用工具（js-manager）与跨角色
-// 绕路工具（js-engineer/js-devops）生效；Host 原生工具（read）与 office 工具
+// 执行入口门禁：tool.execute.before 只对评审专用工具（todowrite-for-manager）与跨角色
+// 绕路工具（todowrite-for-engineer/todowrite-for-devops）生效；Host 原生工具（read）与 office 工具
 // （fork/resume/review/deliver）的准入/拒绝由 ToolRegistry 执行入口决定。
 const assertBeforeDenied = async (hooks, sessionID, tool, callID) => {
   await assert.rejects(
@@ -47,8 +47,8 @@ test('WHAT[work-019] 没有任期时 read、review、fork、resume 在工具执�
     const deliverResult = await hooks.tool.deliver.execute({}, { sessionID, agent: 'manager' })
     assert.match(String(deliverResult), denied)
     assert.equal(createdIds.length, 0)
-    // js-manager 评审专用只读工具在 before 门禁即被拒绝（无任期）。
-    await assertBeforeDenied(hooks, sessionID, 'js-manager', 'call-js')
+    // todowrite-for-manager 评审专用只读工具在 before 门禁即被拒绝（无任期）。
+    await assertBeforeDenied(hooks, sessionID, 'todowrite-for-manager', 'call-js')
   })
 })
 
@@ -63,8 +63,8 @@ test('WHAT[work-019] 有任期且评审尚未接纳时只读与观察放行，�
       message: { id: 'user-root', role: 'user', agent: 'manager' },
       parts: [{ type: 'text', text: 'Deliver the requested behavior and verification.' }],
     })
-    // 评审未接纳：js-manager 评审专用只读工具放行（before 门禁通过）。
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-js' }, { args: { path: 'x' } })
+    // 评审未接纳：todowrite-for-manager 评审专用只读工具放行（before 门禁通过）。
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID: 'call-js' }, { args: { path: 'x' } })
     // 派工（fork/resume devops）与 deliver 在执行入口拒绝。
     const forkDevops = await hooks.tool.fork.execute({ name: 'devops', charge: 'look' }, { sessionID, agent: 'manager' })
     assert.match(String(forkDevops), devopsDispatchDenied)
@@ -91,8 +91,8 @@ test('WHAT[work-019] 评审已接纳且尚未确认时 read 与固定 DevOps 派
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
     await injectAcceptedAssessment(runtime, sessionID)
-    // 评审接纳后：js-manager 只读工具被收口拒绝（Read 从 Manager 权限中移除）。
-    await assertBeforeDenied(hooks, sessionID, 'js-manager', 'call-js')
+    // 评审接纳后：todowrite-for-manager 只读工具被收口拒绝（Read 从 Manager 权限中移除）。
+    await assertBeforeDenied(hooks, sessionID, 'todowrite-for-manager', 'call-js')
     // 固定 DevOps 派工恢复（resume devops 放行）。
     const resumeResult = await hooks.tool.resume.execute({ name: 'devops', charge: 'look' }, { sessionID, agent: 'manager' })
     assert.match(String(resumeResult), /现已接下这项托付|carries this charge now/i)
@@ -151,9 +151,9 @@ test('WHAT[work-019] 工具名→权限映射维护在唯一目录，禁止按�
   assert.equal(permissionName(permissionOfToolName(manager, 'review')), 'ReviewAssessment')
   assert.equal(permissionName(permissionOfToolName(plan, 'review')), 'Review')
   // 未知名字不得按后缀（js-）或启发式规则放行。
-  assert.equal(permissionName(permissionOfToolName(manager, 'js-manager')), null)
+  assert.equal(permissionName(permissionOfToolName(manager, 'todowrite-for-manager')), null)
   assert.equal(permissionName(permissionOfToolName(manager, 'js-unknown')), null)
-  // 角色层投影：Manager 的 read 固定 deny（评审只读由 js-manager 承载）。
+  // 角色层投影：Manager 的 read 固定 deny（评审只读由 todowrite-for-manager 承载）。
   assert.equal(rolePermissionRules('manager').read, 'deny')
 })
 

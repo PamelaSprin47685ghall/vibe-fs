@@ -335,12 +335,12 @@ const TOOL_NAMES = [
   'review', 'chronicle', 'fetch', 'deliver',
 ]
 const PLUGIN_TOOL_NAMES = [
-  'ask', 'js-plan',
+  'ask', 'todowrite-for-plan',
   'fork', 'resume', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
   'join', 'horizon', 'fission', 'review', 'deliver', 'run',
   'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
   'defer',  'publish',
-  'js-engineer', 'js-devops', 'js-manager', 'js-predictor',
+  'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-predictor',
 ]
 const HOST_OWNED_TOOL_NAMES = [ 'read', 'write', 'edit', 'glob', 'grep', 'skill', 'todowrite',
 ]
@@ -375,7 +375,7 @@ const fullConfig = () => ({
 
 integrationTest('WHAT[capability-enforcement-010] MANAGER_plugin_registers_only_plugin_owned_capability_tools', async () => {
   await withPlugin(async (hooks) => {
-    // js-predictor 属于插件注册面：WHAT[005] 要求副本面在 deny 全部工具后精准放行它。
+    // todowrite-for-predictor 属于插件注册面：WHAT[005] 要求副本面在 deny 全部工具后精准放行它。
     // 它经 ToolRegistry.fs:267 的 predictorJsSpec () 与其它 js-* 同源注册；注册存在
     // 只是导出面，其准入为 PrivateAttachment 且仅副本会话放行，不等于能力扩大。
     assert.equal(new Set(PLUGIN_TOOL_NAMES).size, PLUGIN_TOOL_NAMES.length, 'shared tools have one registration')

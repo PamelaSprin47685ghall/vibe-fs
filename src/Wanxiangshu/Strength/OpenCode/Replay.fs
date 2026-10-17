@@ -45,11 +45,11 @@ module StrengthReplay =
                 |> XTraceCursor.sequence))
 
     /// The owner-facing name for one projected exchange. The replica calls the
-    /// readonly `js-predictor` surface; the owner must instead see the `js-<role>`
+    /// readonly `todowrite-for-predictor` surface; the owner must instead see the `todowrite-for-<role>`
     /// tool it could have called itself. Every other name passes through unchanged.
     let private ownerDisplayName (ownerRole: Role option) (toolName: string) =
         match ownerRole with
-        | Some role when toolName = "js-predictor" -> "js-" + Roles.roleLabel role
+        | Some role when toolName = "todowrite-for-predictor" -> "todowrite-for-" + Roles.roleLabel role
         | _ -> toolName
 
     let private applyRenderedPlans

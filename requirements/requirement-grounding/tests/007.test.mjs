@@ -464,10 +464,10 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
       for (const [name, body] of originalMaterials) {
         writeFileSync(join(directory, 'requirements', 'alpha', 'WHAT.md'), body)
-        for (const tool of ['read', 'js-manager']) {
+        for (const tool of ['read', 'todowrite-for-manager']) {
           await t.test(`WHAT[requirement-grounding-007] ${providerID} ${tool} ${name} exact content carrier and canonical history`, async () => {
             const sessionID = `original-${providerID}-${tool}-${name}`
-            if (tool === 'js-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')
+            if (tool === 'todowrite-for-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')
             await openIncumbency(runtime, sessionID)
             const args = tool === 'read' ? { filePath: sourcePath }
               : { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
@@ -530,27 +530,27 @@ const exerciseRegisteredComposition = async (providerID) => {
     writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
     const sourcePath = join(directory, 'src', 'main.fs')
     writeFileSync(sourcePath, 'before\n')
-    for (const tool of ['read', 'write', 'edit', 'patch', 'apply_patch', 'mv', 'rm', 'js-manager', 'js-engineer']) {
+    for (const tool of ['read', 'write', 'edit', 'patch', 'apply_patch', 'mv', 'rm', 'todowrite-for-manager', 'todowrite-for-engineer']) {
       const sessionID = `composition-${providerID}-${tool}`
-      if (tool === 'js-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')
-      if (tool === 'js-engineer') await acceptAuthorityRoot(runtime, sessionID, 'engineer')
+      if (tool === 'todowrite-for-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')
+      if (tool === 'todowrite-for-engineer') await acceptAuthorityRoot(runtime, sessionID, 'engineer')
       await openIncumbency(runtime, sessionID)
       const callID = `call-${sessionID}`
-      const args = tool === 'js-manager'
+      const args = tool === 'todowrite-for-manager'
         ? { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
-        : tool === 'js-engineer'
+        : tool === 'todowrite-for-engineer'
           ? { program: "class Js extends JsProgram { async run() { await this.write('src/generated.fs', 'PROGRAM-MUTATION'); return 'PROGRAM-WRITTEN'; } }" }
           : tool === 'mv'
             ? { source: sourcePath, destination: join(directory, 'src', 'next.fs') }
             : { filePath: sourcePath, content: 'changed\n' }
       const input = { tool, sessionID, callID }
       await hooks['tool.execute.before'](input, { args })
-      const actualOutput = tool.startsWith('js-')
-        ? await hooks.tool[tool].execute(args, { sessionID, agent: tool.slice(3) })
+      const actualOutput = tool.startsWith('todowrite-for-')
+        ? await hooks.tool[tool].execute(args, { sessionID, agent: tool.slice('todowrite-for-'.length) })
         : 'NATIVE-RESULT\r\n'
-      if (tool === 'js-manager') assert.match(actualOutput, /before/, 'registered program actually reads covered source')
-      if (tool === 'js-engineer') assert.match(actualOutput, /PROGRAM-WRITTEN/, 'registered program actually mutates covered source')
-      if (tool === 'js-engineer') assert.equal(readFileSync(join(directory, 'src', 'generated.fs'), 'utf8'), 'PROGRAM-MUTATION')
+      if (tool === 'todowrite-for-manager') assert.match(actualOutput, /before/, 'registered program actually reads covered source')
+      if (tool === 'todowrite-for-engineer') assert.match(actualOutput, /PROGRAM-WRITTEN/, 'registered program actually mutates covered source')
+      if (tool === 'todowrite-for-engineer') assert.equal(readFileSync(join(directory, 'src', 'generated.fs'), 'utf8'), 'PROGRAM-MUTATION')
       const rawOutput = `${actualOutput}\0\uFEFFEXISTING-SUFFIX\n`
       await hooks['tool.execute.after']({ ...input, args }, { title: tool, output: rawOutput, metadata: {} })
       const original = [{

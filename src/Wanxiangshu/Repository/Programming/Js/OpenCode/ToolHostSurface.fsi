@@ -17,4 +17,5 @@ module JsToolHostSurface =
     val name: handle: obj -> string
     val description: handle: obj -> string
     val argumentNames: handle: obj -> string array
+    val argumentSchema: handle: obj -> name: string -> obj
     val execute: handle: obj -> args: obj -> context: obj -> Task<obj>

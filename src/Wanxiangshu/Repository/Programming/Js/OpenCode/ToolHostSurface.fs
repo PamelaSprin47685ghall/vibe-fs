@@ -70,5 +70,11 @@ module JsToolHostSurface =
         |> List.map fst
         |> List.toArray
 
+    let argumentSchema (handle: obj) (name: string) : obj =
+        (unbox<JsRegisteredToolHandle> handle).Spec.Arguments
+        |> List.tryFind (fun (argumentName, _) -> argumentName = name)
+        |> Option.map (fun (_, schema) -> ToolHostCodec.schemaValue schema)
+        |> Option.defaultValue null
+
     let execute (handle: obj) (args: obj) (context: obj) : Task<obj> =
         invokeRegistered (unbox<JsRegisteredToolHandle> handle).Registered args context

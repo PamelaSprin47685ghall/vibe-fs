@@ -4,3 +4,6 @@ A pattern without a slash matches at any depth (*.md matches every .md file).
 {a,b} expands to alternatives. Results omit .git, omit gitignored paths, do
 not follow symlinks, and are sorted. The return value is { paths }. glob
 does not grant Read.
+
+`ls(path)` lists exactly one directory: sorted entries, directories suffixed
+with "/". Recursion is the glob composition, not an ls option.

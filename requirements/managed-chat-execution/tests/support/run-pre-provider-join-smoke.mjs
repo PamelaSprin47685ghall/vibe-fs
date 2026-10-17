@@ -30,7 +30,7 @@ const provider = await startHttpServer(async (request, response) => {
   const body = await readRequestBody(request)
   const requestNumber = ++providerRequests
   const names = (body.tools ?? []).map(tool => tool.function?.name ?? tool.name)
-  if (names.includes('js-engineer')) childRequests++
+  if (names.includes('todowrite-for-engineer')) childRequests++
   const call = (name, args) => sendSSE(response, buildToolCallsChunks(`join-smoke-${requestNumber}`, [{ name, argsStr: JSON.stringify(args) }], 10))
   if (names.includes('chronicle')) {
     return call('chronicle', {

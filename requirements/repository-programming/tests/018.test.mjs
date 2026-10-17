@@ -31,6 +31,8 @@ test('WHAT[repository-programming-018] JS019_failure_codes_are_stable_and_unique
     'FILE_CHANGED',
     'FILE_READ_FAILED',
     'DIRECTORY_NOT_EMPTY',
+    'DIRECTORY_EXISTS',
+    'PARENT_DIRECTORY_MISSING',
     'CROSS_DEVICE_MOVE',
     'INVALID_ARGUMENT',
     'TRANSACTION_PREPARE_FAILED',

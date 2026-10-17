@@ -137,7 +137,7 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_host_adapter_encodes_dele
 test('WHAT[speculative-investigation-009] native completed tool output preserves JSON-looking result bytes as text', () => {
   for (const output of ['[]', '{"value": 1}', '"quoted"', 'null', '42']) {
     const applied = Strength.tryApplyRenderedMessages('owner', H, {
-      messages: [msg('assistant', [call('c1', 'js-manager', '{"program":"inspect"}')]),
+      messages: [msg('assistant', [call('c1', 'todowrite-for-manager', '{"program":"inspect"}')]),
         msg('tool', [result('c1', output)])],
       hostMessageIds: ['call', 'result'], hostIsPhysical: [false, false],
     })
@@ -151,14 +151,14 @@ test('WHAT[speculative-investigation-009] final owner encoding preserves physica
     { type: 'file', url: 'file:///fixture.png', mime: 'image/png' },
   ] }
   const native = { info: { id: 'native', sessionID: 'owner', role: 'assistant' }, parts: [
-    { type: 'tool', callID: 'native-call', tool: 'js-manager', state: {
+    { type: 'tool', callID: 'native-call', tool: 'todowrite-for-manager', state: {
       status: 'completed', input: { program: 'original' }, output: 'original result',
     } },
   ] }
   const logical = Wire.tryApplyRenderedMessages('owner', H, {
     messages: [msg('assistant', [
-      call('first', 'js-manager', '{"program":"read first"}'),
-      call('second', 'js-manager', '{"program":"read second"}'),
+      call('first', 'todowrite-for-manager', '{"program":"read first"}'),
+      call('second', 'todowrite-for-manager', '{"program":"read second"}'),
     ]), msg('tool', [result('first', 'first evidence'), result('second', 'second evidence')])],
     hostMessageIds: ['batch-call', 'batch-result'], hostIsPhysical: [false, false],
   })
@@ -171,8 +171,8 @@ test('WHAT[speculative-investigation-009] final owner encoding preserves physica
   assert.deepEqual(encoded.value[1].parts.map(part => [
     part.type, part.callID, part.tool, part.state.status, part.state.input.program, part.state.output,
   ]), [
-    ['tool', 'first', 'js-manager', 'completed', 'read first', 'first evidence'],
-    ['tool', 'second', 'js-manager', 'completed', 'read second', 'second evidence'],
+    ['tool', 'first', 'todowrite-for-manager', 'completed', 'read first', 'first evidence'],
+    ['tool', 'second', 'todowrite-for-manager', 'completed', 'read second', 'second evidence'],
   ])
   const incomplete = Strength.tryEncodeOwnerMessages(H, [physical, logical.value[0]])
   assert.equal(incomplete.ok, false)
@@ -394,7 +394,7 @@ test('WHAT[speculative-investigation-009] registered Replica hook closes the pro
             'the provider-only user row is not durable acceptance or dispatch evidence')
 
           response.parts.push({
-            type: 'tool', tool: 'js-predictor', callID: 'replica-call',
+            type: 'tool', tool: 'todowrite-for-predictor', callID: 'replica-call',
             state: { status: 'completed', input: { code: 'read("a")', estimated_readonly_rounds: 0 }, output: 'alpha' },
           })
           response.info.time.completed = 5

@@ -124,10 +124,10 @@ const ROLE_ALLOW = {
     'horizon',
     'deliver',
     'review',
-    'js-manager',
+    'todowrite-for-manager',
   ],
   Orchestrator: ['commission', 'join', 'horizon'],
-  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission', 'js-engineer'],
+  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
     'read',
     'write',
@@ -143,7 +143,7 @@ const ROLE_ALLOW = {
     'send-terminal',
     'read-terminal',
     'signal-terminal',
-    'js-devops',
+    'todowrite-for-devops',
   ],
   Blogger: ['chronicle'],
 }

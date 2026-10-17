@@ -222,7 +222,7 @@ test('WHAT[semantic-trace-002] later parts and reanchor copies cannot move a ret
       turn: sequence,
       partIndex: 0,
       kind,
-      toolName: kind.startsWith('tool_') ? 'js-plan' : undefined,
+      toolName: kind.startsWith('tool_') ? 'todowrite-for-plan' : undefined,
       textRef: `blob-${sequence}`,
       textDigest: `digest-${sequence}`,
       providerRun: messageId.startsWith('user-') ? undefined : messageId,
@@ -240,7 +240,7 @@ test('WHAT[semantic-trace-002] later parts and reanchor copies cannot move a ret
   const retired = {
     info: { id: 'retired-exchange', role: 'assistant' },
     parts: [{
-      id: 'retired-tool-part', type: 'tool', callID: 'retired-call', tool: 'js-plan',
+      id: 'retired-tool-part', type: 'tool', callID: 'retired-call', tool: 'todowrite-for-plan',
       state: { status: 'completed', input: { program: 'previous work' }, output: 'retired output' },
     }],
   }

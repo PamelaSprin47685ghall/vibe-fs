@@ -3,7 +3,7 @@ namespace Wanxiangshu.Repository.Knowledge.Casebook
 open System.Collections.Generic
 
 /// Process-local staged Case for one Bookkeeper transaction.
-/// The provider sees one atomic question/answer object through js-bookkeeper;
+/// The provider sees one atomic question/answer object through todowrite-for-bookkeeper;
 /// no filesystem-shaped Q.md/A.md surface exists here.
 module BookkeeperStaging =
 
@@ -12,7 +12,7 @@ module BookkeeperStaging =
     let private gate = obj ()
     // DSL-MUTABLE: resource — staged transaction slot registry
     let private slots = Dictionary<string, Slot>()
-    let private missingTransaction = "js-bookkeeper: no staged transaction"
+    let private missingTransaction = "todowrite-for-bookkeeper: no staged transaction"
 
     let beginTransaction (txId: string) (question: string) (answer: string) : unit =
         lock gate (fun () -> slots.[txId] <- { Question = question; Answer = answer })

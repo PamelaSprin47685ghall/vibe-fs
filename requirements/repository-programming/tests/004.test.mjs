@@ -72,9 +72,9 @@ const layersOf = (s) =>
 
 test('WHAT[repository-programming-004] JS001_generated_name_gate_rejects_forged_names', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
-  assert.equal(isGeneratedToolName('Engineer', perms, 'js-engineer'), true)
-  assert.equal(isGeneratedToolName('Engineer', perms, 'js-devops'), false)
+  assert.equal(isGeneratedToolName('Engineer', perms, 'todowrite-for-engineer'), true)
+  assert.equal(isGeneratedToolName('Engineer', perms, 'todowrite-for-devops'), false)
   assert.equal(isGeneratedToolName('Engineer', perms, 'read'), false)
   // a role without the capability set never admits its own name
-  assert.equal(isGeneratedToolName('Engineer', caps(ToolPermission.Fork), 'js-engineer'), false)
+  assert.equal(isGeneratedToolName('Engineer', caps(ToolPermission.Fork), 'todowrite-for-engineer'), false)
 })

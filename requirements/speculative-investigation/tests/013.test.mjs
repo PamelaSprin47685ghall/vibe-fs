@@ -435,12 +435,12 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_tool_definition_decorates
         assert.equal(unreviewedOutput.parameters.required.includes('estimated_readonly_rounds'), false)
         assert.equal(unreviewedOutput.description, 'custom unreviewed tool')
 
-        // js-manager participating tool: review contract and delegation protocol coexist without mutual interference
+        // todowrite-for-manager participating tool: review contract and delegation protocol coexist without mutual interference
         const managerOutput = {
           description: 'Review workspace changes as manager',
           parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
         }
-        await hooks['tool.definition']({ toolID: 'js-manager' }, managerOutput)
+        await hooks['tool.definition']({ toolID: 'todowrite-for-manager' }, managerOutput)
         const mgrProps = managerOutput.parameters.properties
         assert.equal(mgrProps.estimated_readonly_rounds?.type, 'integer')
         assert.equal(mgrProps.estimated_readonly_rounds?.minimum, 0)
@@ -454,11 +454,11 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_tool_definition_decorates
         assert.equal(mgrProps.self_note?.type, 'string')
         assert.equal(managerOutput.parameters.required.includes('self_note'), false)
         assert.equal(mgrProps.contract?.type, 'string', 'review contract property must coexist with delegation protocol')
-        assert.ok(managerOutput.parameters.required.includes('contract'), 'js-manager must require review contract beside delegation protocol')
+        assert.ok(managerOutput.parameters.required.includes('contract'), 'todowrite-for-manager must require review contract beside delegation protocol')
         assert.equal(
           managerOutput.parameters.required.filter((x) => x === 'contract').length,
           1,
-          'js-manager must require contract exactly once',
+          'todowrite-for-manager must require contract exactly once',
         )
       } finally {
         if (previousLanguage === undefined) {
@@ -882,7 +882,7 @@ const runnerPath = path.join(here, '../../host-boundary/tests/support/run-readon
 const builtins = ['read', 'glob', 'grep', 'edit', 'write']
 
 const PARTICIPATING_TOOLS = new Set([
-  'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
+  'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
   'edit', 'write', 'mv', 'rm', 'fetch', 'run',
 ])
 
@@ -984,7 +984,7 @@ integrationTest(
         assert.equal(view.budget?.maximum, 2147483647, `${name} estimated_readonly_rounds maximum must be 2147483647`)
         assert.equal(view.note?.type, 'string', `${name} self_note must be a string`)
 
-        // Note: js-manager is a manager review tool not issued on the engineer provider wire,
+        // Note: todowrite-for-manager is a manager review tool not issued on the engineer provider wire,
         // so summary.tools contains the engineer session tools. Its review contract and delegation
         // coexistence invariant is verified via direct decoration below.
       } else {
@@ -1015,9 +1015,9 @@ integrationTest(
       }
     }
 
-    // For js-manager: review contract and delegation protocol coexist without mutual interference.
-    // Because the canary runner session runs as engineer, js-manager (a manager review tool) is not present
-    // on the engineer wire tools. We directly execute the real tool definition decoration path for js-manager.
+    // For todowrite-for-manager: review contract and delegation protocol coexist without mutual interference.
+    // Because the canary runner session runs as engineer, todowrite-for-manager (a manager review tool) is not present
+    // on the engineer wire tools. We directly execute the real tool definition decoration path for todowrite-for-manager.
     const managerDef = {
       description: 'Review workspace changes as manager',
       parameters: {
@@ -1026,45 +1026,45 @@ integrationTest(
         required: ['path'],
       },
     }
-    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('js-manager', managerDef)
-    PluginHooksSurface.decorateReviewToolDefinition('js-manager', managerDef)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('todowrite-for-manager', managerDef)
+    PluginHooksSurface.decorateReviewToolDefinition('todowrite-for-manager', managerDef)
 
     assert.ok(
       managerDef.parameters.properties.contract,
-      'js-manager must expose review contract property beside delegation protocol',
+      'todowrite-for-manager must expose review contract property beside delegation protocol',
     )
     assert.equal(managerDef.parameters.properties.contract.type, 'string')
     assert.ok(
       managerDef.parameters.required.includes('contract'),
-      'js-manager must require review contract beside delegation protocol',
+      'todowrite-for-manager must require review contract beside delegation protocol',
     )
     assert.equal(
       managerDef.parameters.required.filter((entry) => entry === 'contract').length,
       1,
-      'js-manager must require contract exactly once',
+      'todowrite-for-manager must require contract exactly once',
     )
     assert.ok(
       managerDef.parameters.properties.estimated_readonly_rounds,
-      'js-manager must expose estimated_readonly_rounds beside review contract',
+      'todowrite-for-manager must expose estimated_readonly_rounds beside review contract',
     )
     assert.equal(managerDef.parameters.properties.estimated_readonly_rounds.type, 'integer')
     assert.ok(
       managerDef.parameters.required.includes('estimated_readonly_rounds'),
-      'js-manager must require estimated_readonly_rounds',
+      'todowrite-for-manager must require estimated_readonly_rounds',
     )
     assert.equal(
       managerDef.parameters.required.filter((entry) => entry === 'estimated_readonly_rounds').length,
       1,
-      'js-manager must require estimated_readonly_rounds exactly once',
+      'todowrite-for-manager must require estimated_readonly_rounds exactly once',
     )
     assert.ok(
       managerDef.parameters.properties.self_note,
-      'js-manager must expose self_note',
+      'todowrite-for-manager must expose self_note',
     )
     assert.equal(
       managerDef.parameters.required.includes('self_note'),
       false,
-      'js-manager must not require self_note',
+      'todowrite-for-manager must not require self_note',
     )
     // Decoration extends the schema; it never replaces the tool's own contract.
     assert.ok(summary.tools.read.required.includes('filePath'), 'read must still require filePath')

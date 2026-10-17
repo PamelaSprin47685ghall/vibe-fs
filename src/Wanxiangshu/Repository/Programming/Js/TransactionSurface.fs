@@ -88,6 +88,8 @@ module JsTransactionSurface =
            JsFailure.FileChanged "a", "FileChanged"
            JsFailure.FileReadFailed "a", "FileReadFailed"
            JsFailure.DirectoryNotEmpty "a", "DirectoryNotEmpty"
+           JsFailure.DirectoryExists "a", "DirectoryExists"
+           JsFailure.ParentDirectoryMissing "a", "ParentDirectoryMissing"
            JsFailure.CrossDeviceMove "a", "CrossDeviceMove"
            JsFailure.InvalidArgument "a", "InvalidArgument"
            JsFailure.TransactionPrepareFailed, "TransactionPrepareFailed"

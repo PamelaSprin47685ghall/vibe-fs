@@ -38,6 +38,8 @@ type JsFailure =
     | FileAlreadyExists of string
     | FileReadFailed of string
     | DirectoryNotEmpty of string
+    | DirectoryExists of string
+    | ParentDirectoryMissing of string
     | CrossDeviceMove of string
     | InvalidArgument of string
     | InvalidUtf8 of string
@@ -96,6 +98,8 @@ module JsFailure =
         | JsFailure.FileAlreadyExists _ -> "FILE_ALREADY_EXISTS"
         | JsFailure.FileReadFailed _ -> "FILE_READ_FAILED"
         | JsFailure.DirectoryNotEmpty _ -> "DIRECTORY_NOT_EMPTY"
+        | JsFailure.DirectoryExists _ -> "DIRECTORY_EXISTS"
+        | JsFailure.ParentDirectoryMissing _ -> "PARENT_DIRECTORY_MISSING"
         | JsFailure.CrossDeviceMove _ -> "CROSS_DEVICE_MOVE"
         | JsFailure.InvalidArgument _ -> "INVALID_ARGUMENT"
         | JsFailure.InvalidUtf8 _ -> "INVALID_UTF8"
@@ -145,6 +149,8 @@ module JsFailure =
         | JsFailure.FileAlreadyExists path -> "target file already exists: " + path
         | JsFailure.FileReadFailed path -> "file read failed: " + path
         | JsFailure.DirectoryNotEmpty path -> "directory is not empty: " + path
+        | JsFailure.DirectoryExists path -> "directory already exists: " + path
+        | JsFailure.ParentDirectoryMissing path -> "parent directory does not exist: " + path
         | JsFailure.CrossDeviceMove path -> "cross-device move is refused and rolled back: " + path
         | JsFailure.InvalidArgument detail -> reasonWithMessage "invalid argument" "invalid argument: " detail
         | JsFailure.InvalidUtf8 path -> "file is not strict UTF-8: " + path
@@ -210,6 +216,8 @@ module JsFailure =
         | "FILE_ALREADY_EXISTS" -> JsFailure.FileAlreadyExists(after "target file already exists: ")
         | "FILE_READ_FAILED" -> JsFailure.FileReadFailed(after "file read failed: ")
         | "DIRECTORY_NOT_EMPTY" -> JsFailure.DirectoryNotEmpty(after "directory is not empty: ")
+        | "DIRECTORY_EXISTS" -> JsFailure.DirectoryExists(after "directory already exists: ")
+        | "PARENT_DIRECTORY_MISSING" -> JsFailure.ParentDirectoryMissing(after "parent directory does not exist: ")
         | "CROSS_DEVICE_MOVE" -> JsFailure.CrossDeviceMove(after "cross-device move is refused and rolled back: ")
         | "INVALID_ARGUMENT" -> JsFailure.InvalidArgument(after "invalid argument: ")
         | "INVALID_UTF8" -> JsFailure.InvalidUtf8(after "file is not strict UTF-8: ")

@@ -110,7 +110,7 @@ test('WHAT[feature-ablation-002] ABL_002_station_14_keeps_engineer_surface_and_a
     assert.equal(Ablation.allowsTool('glob'), true)
     assert.equal(Ablation.allowsTool('grep'), true)
     assert.equal(Ablation.allowsTool('fork'), false)
-    assert.equal(Ablation.allowsTool('js-manager'), false)
+    assert.equal(Ablation.allowsTool('todowrite-for-manager'), false)
     assert.equal(Ablation.allowsPrimaryAgent('manager'), false)
     assert.equal(Ablation.fissionVisible(), false)
   })

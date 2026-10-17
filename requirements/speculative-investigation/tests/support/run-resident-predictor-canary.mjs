@@ -31,13 +31,13 @@ const provider = http.createServer(async (req, res) => {
   const body = JSON.parse(Buffer.concat(chunks).toString())
   allProviderRequests.push(body)
   const names = (body.tools ?? []).map(tool => tool.function?.name ?? tool.name)
-  if (names.includes('js-predictor')) {
+  if (names.includes('todowrite-for-predictor')) {
     replicaRequests.push(body)
     replicaStep += 1
-    // Decision 1 (replicaStep 1..3): 2 rounds of js-predictor tool calls, then completed on round 3
+    // Decision 1 (replicaStep 1..3): 2 rounds of todowrite-for-predictor tool calls, then completed on round 3
     if (replicaStep === 1 || replicaStep === 2) {
       fs.writeFileSync(path.join(workspace, 'fixture.txt'), `readonly-evidence-${replicaStep}`)
-      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'js-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
+      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
       return
     }
     if (replicaStep === 3) {
@@ -45,22 +45,22 @@ const provider = http.createServer(async (req, res) => {
       return
     }
     // Decision 2 (replicaStep 4..5, budget 2):
-    // Round 1 (replicaStep 4): model calls malformed / unknown tool (e.g. "<tool_call>js-predictor")
+    // Round 1 (replicaStep 4): model calls malformed / unknown tool (e.g. "<tool_call>todowrite-for-predictor")
     // causing Host to record status=error (no readonly exchange collected for request ordinal 1)
     if (replicaStep === 4) {
-      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, '<tool_call>js-predictor', JSON.stringify({ program: "malformed" }), 10))
+      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, '<tool_call>todowrite-for-predictor', JSON.stringify({ program: "malformed" }), 10))
       return
     }
-    // Round 2 (replicaStep 5): model recovers and calls valid js-predictor tool (request ordinal 2 from host perspective)
+    // Round 2 (replicaStep 5): model recovers and calls valid todowrite-for-predictor tool (request ordinal 2 from host perspective)
     if (replicaStep === 5) {
       fs.writeFileSync(path.join(workspace, 'fixture.txt'), `readonly-evidence-${replicaStep}`)
-      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'js-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
+      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
       return
     }
     // Decision 3 (post restart, replicaStep 6..7):
     if (replicaStep === 6) {
       fs.writeFileSync(path.join(workspace, 'fixture.txt'), `readonly-evidence-${replicaStep}`)
-      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'js-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
+      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
       return
     }
     if (replicaStep === 7) {
@@ -70,7 +70,7 @@ const provider = http.createServer(async (req, res) => {
     // Decision 4 (sub-owner, replicaStep 8..9):
     if (replicaStep === 8) {
       fs.writeFileSync(path.join(workspace, 'fixture.txt'), `readonly-evidence-${replicaStep}`)
-      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'js-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
+      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
       return
     }
     if (replicaStep === 9) {
@@ -79,10 +79,10 @@ const provider = http.createServer(async (req, res) => {
     }
     return
   }
-  if (names.includes('js-engineer')) {
+  if (names.includes('todowrite-for-engineer')) {
     subOwnerStep += 1
     if (subOwnerStep === 1) {
-      sendSSE(res, buildToolCallChunks('owner-sub', 'js-engineer', JSON.stringify({
+      sendSSE(res, buildToolCallChunks('owner-sub', 'todowrite-for-engineer', JSON.stringify({
         program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }",
         estimated_readonly_rounds: 2,
         self_note: 'Inspect the fixture and stop once its contents are verified.',
@@ -92,16 +92,16 @@ const provider = http.createServer(async (req, res) => {
     }
     return
   }
-  if (names.includes('js-manager')) {
+  if (names.includes('todowrite-for-manager')) {
     ownerStep += 1
     if (ownerStep === 1) {
-      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'js-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 3, self_note: 'Inspect the fixture in two tool rounds plus terminal.' }), 10))
+      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'todowrite-for-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 3, self_note: 'Inspect the fixture in two tool rounds plus terminal.' }), 10))
     } else if (ownerStep === 2) {
-      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'js-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 2, self_note: 'Inspect the fixture with one malformed and one valid tool.' }), 10))
+      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'todowrite-for-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 2, self_note: 'Inspect the fixture with one malformed and one valid tool.' }), 10))
     } else if (ownerStep === 3) {
       sendSSE(res, buildTextChunks('owner-done', 'Smoke complete.', 20))
     } else if (ownerStep === 4) {
-      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'js-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 2, self_note: 'Inspect the fixture third time post restart.' }), 10))
+      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'todowrite-for-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 2, self_note: 'Inspect the fixture third time post restart.' }), 10))
     } else {
       sendSSE(res, buildTextChunks('owner-done-post-restart', 'Restart smoke complete.', 20))
     }
@@ -155,7 +155,7 @@ try {
   assert.ok(first.parts.some(part => part.text === 'Smoke complete.'))
   assert.equal(replicaRequests.length, 5, 'decision 1 has 3 requests (2 tool rounds + 1 completion), decision 2 has 2 requests')
   const childrenPayload1 = await request(currentHost, 'GET', `/session/${session}/children`)
-  const residents = childrenPayload1.filter(child => child.permission?.some(rule => rule.permission === 'js-predictor' && rule.action === 'allow'))
+  const residents = childrenPayload1.filter(child => child.permission?.some(rule => rule.permission === 'todowrite-for-predictor' && rule.action === 'allow'))
   assert.equal(residents.length, 1, 'one readonly resident before restart')
   const residentChildId = residents[0].id
   assert.equal(residents[0].parentID, session, 'predictor physical parent is the main session')
@@ -170,9 +170,9 @@ try {
   assert.ok(restarted.info.time.completed)
   assert.ok(restarted.parts.some(part => part.text === 'Restart smoke complete.'))
 
-  assert.equal(replicaRequests.length, 7, 'decision 1 has 3 requests, decision 2 has 2 (1 malformed tool + 1 js-predictor, budget reached), decision 3 has 2 (total 7 across 3 decisions)')
+  assert.equal(replicaRequests.length, 7, 'decision 1 has 3 requests, decision 2 has 2 (1 malformed tool + 1 todowrite-for-predictor, budget reached), decision 3 has 2 (total 7 across 3 decisions)')
   for (const body of replicaRequests) {
-    assert.deepEqual(body.tools.map(tool => tool.function?.name ?? tool.name), ['js-predictor'])
+    assert.deepEqual(body.tools.map(tool => tool.function?.name ?? tool.name), ['todowrite-for-predictor'])
     assert.ok(body.messages.some(message => message.role === 'system' && JSON.stringify(message.content).includes(instruction)), JSON.stringify(body.messages.filter(message => message.role === 'system' || message.role === 'developer')))
   }
   const childrenPayload = await request(currentHost, 'GET', `/session/${session}/children`)
@@ -248,7 +248,7 @@ try {
       assert.equal(toolBatches.length, 2, 'decision 1 carries two rounds of tool batches')
       assert.deepEqual(toolBatches.map(b => b.request_ordinal), [1, 2], 'sequential request ordinals 1 and 2')
     } else if (sourceCallId === 'owner-2') {
-      // Decision 2: round 1 was unknown tool (filtered out, not a readonly exchange), round 2 was js-predictor
+      // Decision 2: round 1 was unknown tool (filtered out, not a readonly exchange), round 2 was todowrite-for-predictor
       // Its single completed exchange came from host round 2.
       const exchange = exchangeParts.find(part => part.callID === 'replica-5')
       assert.equal(exchange.state.status, 'completed')
@@ -317,7 +317,7 @@ try {
   assert.deepEqual(subBundle.batches.flatMap(batch => batch.exchanges.map(exchange => exchange.result)), [subExchange.state.output])
   assert.deepEqual(subBundle.batches.flatMap(batch => batch.assistant_text ?? []), [predictorConclusion(9)])
   for (const body of replicaRequests.slice(7)) {
-    assert.deepEqual(body.tools.map(tool => tool.function?.name ?? tool.name), ['js-predictor'])
+    assert.deepEqual(body.tools.map(tool => tool.function?.name ?? tool.name), ['todowrite-for-predictor'])
   }
   const physicalFamily = await request(currentHost, 'GET', `/session/${session}/children`)
   assert.ok(physicalFamily.some(child => child.id === subReplica && child.parentID === session))
@@ -330,12 +330,12 @@ try {
 
   // Assertions on main model provider requests (provider wire):
   // Main model requests must observe the injected candidate/replay tool exchanges
-  // under the owner's own js-<role> name (js-manager or js-engineer), not js-predictor,
+  // under the owner's own js-<role> name (todowrite-for-manager or todowrite-for-engineer), not todowrite-for-predictor,
   // paired as tool_calls with corresponding tool results, preserving original program args,
   // Text crosses as reasoning; the predictor's original reasoning stays private.
   const mainRequests = allProviderRequests.filter(req => {
     const names = (req.tools ?? []).map(t => t.function?.name ?? t.name)
-    return !names.includes('js-predictor')
+    return !names.includes('todowrite-for-predictor')
   })
   assert.ok(mainRequests.length > 0, 'must have observed main model provider requests')
 
@@ -345,20 +345,20 @@ try {
         assert.doesNotMatch(msg.content, /Predictor conclusion/, 'predictor text is not main assistant speech')
       }
       assert.doesNotMatch(JSON.stringify(msg), /Predictor private/, 'native predictor reasoning does not cross')
-      // Tool calls on main wire must only use owner-visible tool names, NEVER js-predictor
+      // Tool calls on main wire must only use owner-visible tool names, NEVER todowrite-for-predictor
       if (Array.isArray(msg.tool_calls)) {
         for (const call of msg.tool_calls) {
           const name = call.function?.name ?? call.name
-          assert.notEqual(name, 'js-predictor', 'main model must never receive tool call named js-predictor')
+          assert.notEqual(name, 'todowrite-for-predictor', 'main model must never receive tool call named todowrite-for-predictor')
         }
       }
     }
   }
 
   const managerRequests = mainRequests.filter(req =>
-    req.tools?.some(tool => tool.function?.name === 'js-manager'))
+    req.tools?.some(tool => tool.function?.name === 'todowrite-for-manager'))
   const engineerRequests = mainRequests.filter(req =>
-    req.tools?.some(tool => tool.function?.name === 'js-engineer'))
+    req.tools?.some(tool => tool.function?.name === 'todowrite-for-engineer'))
   for (const [body, step] of [[managerRequests[1], 3], [managerRequests[4], 7], [engineerRequests[1], 9]]) {
     const demoted = body.messages.filter(message => message.reasoning_content?.includes(predictorConclusion(step)))
     assert.equal(demoted.length, 1, `main receives predictor conclusion ${step} exactly once as reasoning`)
@@ -377,7 +377,7 @@ try {
     const matching = results.flatMap(result => messages.flatMap(message => message.tool_calls ?? [])
       .filter(call => call.id === result.tool_call_id
         && !originalCallIds.has(call.id)
-        && call.function?.name === `js-${role}`
+        && call.function?.name === `todowrite-for-${role}`
         && JSON.stringify(JSON.parse(call.function.arguments)) === JSON.stringify(exchange.state.input)))
     assert.equal(matching.length, 1, `${role} target receives exactly one relocated call/result pair: ${exchange.callID}`)
   }
@@ -399,7 +399,7 @@ try {
   // Stderr must be clean of errors, fuses, or invalid bundles
   assert.doesNotMatch(currentHost.stderrLog, /failed ref=|fuse|bundle invalid|InvalidRequestOrdinal/i, 'stderr must contain no failed ref, fuse, or bundle invalid')
 
-  console.log(`RESIDENT_PREDICTOR_CANARY ${JSON.stringify({ managerAssignments: 3, subOwnerAssignments: 1, predictorRequests: replicaRequests.length, residentChild: transcripts[0].child, readableBootstrapMessages: transcripts[0].prompts.length, boundDecisions: 4, preparedDecisions: 4, bareContinueMessages: 0, predictorTools: ['js-predictor'], restarted: true, sourceIdentityVerified: true, decisionMaterialIsolated: true, subOwnerFlattened: true, mainReceivedExchanges: 5, promotedReplayTraced: true, textDemotedToReasoning: true, nativeReasoningExcluded: true, textRoundtripExact: true })}`)
+  console.log(`RESIDENT_PREDICTOR_CANARY ${JSON.stringify({ managerAssignments: 3, subOwnerAssignments: 1, predictorRequests: replicaRequests.length, residentChild: transcripts[0].child, readableBootstrapMessages: transcripts[0].prompts.length, boundDecisions: 4, preparedDecisions: 4, bareContinueMessages: 0, predictorTools: ['todowrite-for-predictor'], restarted: true, sourceIdentityVerified: true, decisionMaterialIsolated: true, subOwnerFlattened: true, mainReceivedExchanges: 5, promotedReplayTraced: true, textDemotedToReasoning: true, nativeReasoningExcluded: true, textRoundtripExact: true })}`)
 } catch (error) {
   console.error(currentHost.stdoutLog.slice(-5000))
   console.error(currentHost.stderrLog.slice(-5000))

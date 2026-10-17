@@ -16,13 +16,13 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 读同一 
 
 同一 Office 的工具权限集完全由 `CanonicalRole` 决定，与执行档位无关。执行档位仅代表底层机器与推理深度，不影响权限矩阵。托管 agent 使用 canonical bare 名称 (`manager`/`orchestrator`/`engineer`/`devops`/`blogger`/`bookkeeper`/`predictor`)，不再有 `fast-`/`deep-` 前缀。
 
-## [005] request-specific replica/leaf 可进一步收窄：StrengthReplica 只 {Read; Glob; Grep} 与只读 js-predictor
+## [005] request-specific replica/leaf 可进一步收窄：StrengthReplica 只 {Read; Glob; Grep} 与只读 todowrite-for-predictor
 
-用于投机调查的 `StrengthReplica` 仅保留唯一专用的只读 JS 编程面 `js-predictor`（能力面 {Read; Glob; Grep}）。其运行时工具映射在 deny 全部工具后精准放行这一项；原生 `read`/`glob`/`grep` 与其余修改、执行工具（包括 write, edit, run, fork, join 以及角色特权 js-* 面）在副本内全部 fail-closed。
+用于投机调查的 `StrengthReplica` 仅保留唯一专用的只读 JS 编程面 `todowrite-for-predictor`（能力面 {Read; Glob; Grep}）。其运行时工具映射在 deny 全部工具后精准放行这一项；原生 `read`/`glob`/`grep` 与其余修改、执行工具（包括 write, edit, run, fork, join 以及角色特权 js-* 面）在副本内全部 fail-closed。
 
 ## [006] internal-only participants/actions 不进无资格 participant 的工具面
 
-内部专用工具（如 Blogger 的 `chronicle`、Bookkeeper 的 `js-bookkeeper`）仅向对应内部角色开放，普通角色不可见亦不可执行。认知与交互效用工具（如 `assume` 等）及 Host 工具（如 `skill`）不属于领域业务权限，不进入 `Roles.permissions`，亦不得借此扩大角色的领域权能；内部伴随角色（Blogger）禁止获得 `skill` 与 `assume` 等效用工具。
+内部专用工具（如 Blogger 的 `chronicle`、Bookkeeper 的 `todowrite-for-bookkeeper`）仅向对应内部角色开放，普通角色不可见亦不可执行。认知与交互效用工具（如 `assume` 等）及 Host 工具（如 `skill`）不属于领域业务权限，不进入 `Roles.permissions`，亦不得借此扩大角色的领域权能；内部伴随角色（Blogger）禁止获得 `skill` 与 `assume` 等效用工具。
 
 ## [007] Host-native/MCP/plugin 等不同技术来源的 actions 服从同一 semantic capability policy
 
@@ -30,7 +30,7 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 读同一 
 
 ## [008] js-* 编程面四层同构：capability → base-class member → description → example → runtime gate
 
-针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。编程面四层同构原则不变；`js-manager` 面向 Manager 且仅限当前未接纳评审的只读能力（Read/Glob/Grep），其能力过滤必须到达真实执行 API 层。
+针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。编程面四层同构原则不变；`todowrite-for-manager` 面向 Manager 且仅限当前未接纳评审的只读能力（Read/Glob/Grep），其能力过滤必须到达真实执行 API 层。
 
 ## [009] 工具名引用完整性：same tool name → 唯一 schema owner + 唯一 semantic contract
 
@@ -110,7 +110,7 @@ DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, 
 
 ## [025] Manager 评审专用只读工具固定可见与当前事实收口
 
-Manager 评审专用只读工具（`js-manager`）在模型 Schema 中固定可见；运行时由当前事实收口准入门禁：已接纳评审且仍有 findings、退任冻结或存在清理阻塞时拒绝执行。已接纳空集 findings 的末任 Manager 保留只读收尾能力，可读、清理并收口，但不得开新工作。原生 `read`/`grep`/`glob` 与 `js-engineer`/`js-devops` 对 Manager 的跨角色绕路调用始终拒绝。工具名到既有语义权限的映射必须维护在唯一目录中，禁止按后缀或启发式规则推测授权。
+Manager 评审专用只读工具（`todowrite-for-manager`）在模型 Schema 中固定可见；运行时由当前事实收口准入门禁：已接纳评审且仍有 findings、退任冻结或存在清理阻塞时拒绝执行。已接纳空集 findings 的末任 Manager 保留只读收尾能力，可读、清理并收口，但不得开新工作。原生 `read`/`grep`/`glob` 与 `todowrite-for-engineer`/`todowrite-for-devops` 对 Manager 的跨角色绕路调用始终拒绝。工具名到既有语义权限的映射必须维护在唯一目录中，禁止按后缀或启发式规则推测授权。
 
 ## [026] Review 接纳前禁止向固定 DevOps 派工
 

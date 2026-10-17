@@ -25,19 +25,25 @@ module JsSandbox =
     /// native try/finally runs. `AbandonRequested` marks the cleanup window
     /// during which park is refused.
     type ParkState =
-        { mutable ParkRequested: bool
-          mutable ParkPayload: obj
-          /// The park-signal resolver (a JS function) installed before each
-          /// race; the park member calls it with the payload to complete the
-          /// signal the workflow races against. `null` before install.
-          mutable ParkSignalResolve: obj
-          /// The deferred-promise resolver the park member creates; `unpark`
-          /// calls it with the injected value. `null` while not parked.
-          mutable ParkDeferredResolve: obj
-          /// The deferred-promise rejecter the park member creates; `abandon`
-          /// calls it with the `__jsAbandoned` marker. `null` while not parked.
-          mutable ParkDeferredReject: obj
-          mutable AbandonRequested: bool }
+        {
+            mutable ParkRequested: bool
+            mutable ParkPayload: obj
+            /// The park-signal resolver (a JS function) installed before each
+            /// race; the park member calls it with the payload to complete the
+            /// signal the workflow races against. `null` before install.
+            mutable ParkSignalResolve: obj
+            /// The deferred-promise resolver the park member creates; `unpark`
+            /// calls it with the injected value. `null` while not parked.
+            mutable ParkDeferredResolve: obj
+            /// The deferred-promise rejecter the park member creates; `abandon`
+            /// calls it with the `__jsAbandoned` marker. `null` while not parked.
+            mutable ParkDeferredReject: obj
+            /// The JS stack captured when the park member fired. The workflow
+            /// uses it to mark the model-source line that is currently
+            /// suspended; null when no stack was captured.
+            mutable ParkStack: string
+            mutable AbandonRequested: bool
+        }
 
     /// Handle to a started sandbox program: the async IIFE promise is exposed
     /// (not awaited to completion) so a caller may hold it across calls, and
@@ -213,19 +219,20 @@ module JsSandbox =
                       ParkSignalResolve = null
                       ParkDeferredResolve = null
                       ParkDeferredReject = null
+                      ParkStack = null
                       AbandonRequested = false }
 
             try
                 let context =
                     createContext (
-                        createObj
-                            [ "api" ==> api
-                              "__deadlineRef" ==> deadlineRef
-                              "__parkState" ==> state ]
+                        createObj [ "api" ==> api; "__deadlineRef" ==> deadlineRef; "__parkState" ==> state ]
                     )
 
                 let promise =
-                    runInContext (wrapProgram baseClassSource modelSource) context (createObj [ "timeout" ==> deadlineMs ])
+                    runInContext
+                        (wrapProgram baseClassSource modelSource)
+                        context
+                        (createObj [ "timeout" ==> deadlineMs ])
 
                 return
                     { ProgramPromise = promise :?> Task<string>
@@ -278,6 +285,40 @@ module JsSandbox =
     /// effect without re-wrapping or re-running the program.
     let resetDeadline (handle: JsRunHandle) (deadlineEpochMs: int64) : unit =
         setDeadline handle.DeadlineRef deadlineEpochMs
+
+    /// Render the full model program with the suspended line marked. The
+    /// wrapper places line 1 at `(async () => {`, the generated base class
+    /// next, then the model source; `modelStartLine` is the base class line
+    /// count plus two. The closest vm frame at or after that line is the
+    /// model frame that called park (directly or through where). The marker
+    /// is `>| ` on the suspended line and ` | ` everywhere else; a missing
+    /// stack degrades to ` | ` on every line, never to a failed park.
+    let sourceWithExecutionMarker (baseClassSource: string) (modelSource: string) (stack: string) : string =
+        let lines = modelSource.Split('\n')
+        let modelStartLine = baseClassSource.Split('\n').Length + 2
+        let modelEndLine = modelStartLine + lines.Length - 1
+        let mutable currentLine = -1
+
+        if not (isNull stack) then
+            for frame in stack.Split('\n') do
+                if currentLine < 0 then
+                    let marker = "evalmachine.<anonymous>:"
+                    let at = frame.IndexOf marker
+
+                    if at >= 0 then
+                        let rest = frame.Substring(at + marker.Length)
+                        let colon = rest.IndexOf ':'
+                        let digits = if colon >= 0 then rest.Substring(0, colon) else rest
+
+                        match System.Int32.TryParse digits with
+                        | true, line when line >= modelStartLine && line <= modelEndLine ->
+                            currentLine <- line - modelStartLine
+                        | _ -> ()
+
+        lines
+        |> Array.mapi (fun index line -> (if index = currentLine then ">| " else " | ") + line)
+        |> String.concat "\n"
+        |> fun marked -> marked + "\n"
 
     /// Install the park signal the workflow races against the program promise.
     /// The returned Task completes with the parked payload when the program's

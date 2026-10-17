@@ -118,7 +118,7 @@ const handleProvider = async (request, response) => {
   const body = await bodyOf(request)
   const names = (body.tools ?? []).map(tool => tool.function?.name ?? tool.name)
   const messageID = request.headers['x-wxs-canary-message']
-  if (guidanceMode && names.includes('js-engineer')) {
+  if (guidanceMode && names.includes('todowrite-for-engineer')) {
     const text = JSON.stringify(body.messages)
     if (!text.includes('USER_INPUT_GUIDANCE_ONLY')) {
       const firstRequest = childRequestsBeforeGuidance++ === 0
@@ -138,7 +138,7 @@ const handleProvider = async (request, response) => {
         if (childStops) {
           response.write(`data: ${JSON.stringify({ ...prefix, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`)
         } else {
-          for (const chunk of buildToolCallChunks('child-tool', 'js-engineer', JSON.stringify({
+          for (const chunk of buildToolCallChunks('child-tool', 'todowrite-for-engineer', JSON.stringify({
             program: 'class Js extends JsProgram { async run() { return "CHILD_TOOL_RESULT"; } }',
           }), 1)) response.write(`data: ${JSON.stringify(chunk)}\n\n`)
         }
@@ -166,7 +166,7 @@ const handleProvider = async (request, response) => {
     }
     return
   }
-  if (!names.includes('js-manager')) {
+  if (!names.includes('todowrite-for-manager')) {
     const chronicle = body.tools?.find(tool => tool.function?.name === 'chronicle')
     if (chronicle) {
       sendSSE(response, buildToolCallChunks('chronicle', 'chronicle', JSON.stringify({
@@ -206,7 +206,7 @@ const handleProvider = async (request, response) => {
     sendSSE(response, buildTextChunks('human', 'HUMAN_ANSWER', 1))
   } else if (messageID === rootID) {
     if (phase === 'TOOL') {
-      sendSSE(response, buildToolCallChunks('held-tool', 'js-manager', JSON.stringify({
+      sendSSE(response, buildToolCallChunks('held-tool', 'todowrite-for-manager', JSON.stringify({
         program: 'class Js extends JsProgram { async run() { return "USER_INPUT_HELD_TOOL"; } }',
       }), 1))
     } else {
@@ -357,7 +357,7 @@ export default function route(role, running) {
     if (phase === 'STREAMING') {
       assert.ok(previous.parts.some(part => part.type === 'text' && part.text === 'OLD_PREFIX_OLD_SUFFIX'))
     } else {
-      const tool = previous.parts.find(part => part.type === 'tool' && part.tool === 'js-manager')
+      const tool = previous.parts.find(part => part.type === 'tool' && part.tool === 'todowrite-for-manager')
       assert.equal(tool.state.status, 'completed', JSON.stringify(tool))
       assert.ok(tool.state.output.includes('USER_INPUT_HELD_TOOL'))
     }

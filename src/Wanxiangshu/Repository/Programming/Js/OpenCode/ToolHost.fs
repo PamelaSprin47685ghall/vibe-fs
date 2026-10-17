@@ -182,7 +182,7 @@ module JsToolSpec =
         let unparkSchema =
             ToolHostCodec.objectSchemaOf
                 [ "handle", ToolHostCodec.stringSchema factory
-                  "value", ToolHostCodec.stringSchema factory ]
+                  "value", ToolHostCodec.anySchema factory ]
                 factory
 
         let abandonSchema =
@@ -235,7 +235,7 @@ module JsToolSpec =
                         return JsToolsResult.render outcome
                 } }
 
-    /// Build a ToolSpec for the dedicated js-predictor surface with PrivateAttachment admission.
+    /// Build a ToolSpec for the dedicated todowrite-for-predictor surface with PrivateAttachment admission.
     let createWithAdmission
         (factory: HostToolFactory)
         (surface: JsSurface)

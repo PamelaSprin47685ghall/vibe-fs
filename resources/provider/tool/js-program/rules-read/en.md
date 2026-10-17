@@ -59,3 +59,24 @@ presumption. The lower-level technique carries the burden of proof.
 
 Prefer:
   f.text("^", "begin") + "newString" + f.text("end", "$")
+
+Primary read primitives:
+
+- `cat(path)` returns the file as a string and registers the read snapshot used
+  by the write-before FILE_CHANGED check. A missing path is FILE_NOT_FOUND.
+- `stat(path)` returns `{ exists, size, mtime, isDir }`; a missing path is
+  `exists: false`, not an error.
+- `whereAll(content, needle, from = 0)` returns every normalized match as
+  `[[begin, end], ...]`; `where(content, needle, from = 0)` returns the single
+  span. Normalization collapses whitespace runs to one space and trims the
+  needle; offsets always address the original string.
+
+`where` never throws a locating error and never silently picks a match. Zero or
+many matches suspend the program through the same channel as `park`, with
+`{ needle, candidates, nearest }`; resume by injecting the chosen span. A wrong
+injection fails naturally in the next statement — the host does not pre-validate it.
+
+Recompose text with slices instead of re-searching it:
+  const text = await this.cat(path);
+  const [begin, end] = await this.where(text, "old");
+  return text.slice(0, begin) + "new" + text.slice(end);

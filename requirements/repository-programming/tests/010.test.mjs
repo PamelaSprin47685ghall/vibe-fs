@@ -64,7 +64,7 @@ test('WHAT[repository-programming-010] FILETOOLS_edit_refuses_unparseable_payloa
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { mkdtempSync, writeFileSync, rmSync, mkdirSync } = await import("node:fs");
+const { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const { createApi, api: apiOf, stagedCount, stagedKinds, run } = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
@@ -102,15 +102,16 @@ test('WHAT[repository-programming-010] JS009_012_bindings_write_stages_create', 
     cleanup()
   }
 })
-test('WHAT[repository-programming-010] JS009_bindings_write_rejects_an_existing_target_before_writing', () => {
+test('WHAT[repository-programming-010] JS009_bindings_write_overwrites_an_existing_target_as_is', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'existing.txt'), 'external', 'utf8')
     const binding = createApi(dir)
     const result = apiOf(binding).js.write('existing.txt', 'tool')
-    assert.equal(result.ok, false)
-    assert.equal(result.code, 'FILE_ALREADY_EXISTS')
-    assert.equal(stagedCount(binding), 0)
+    assert.equal(result.ok, true)
+    assert.equal(readFileSync(join(dir, 'existing.txt'), 'utf8'), 'tool')
+    assert.equal(stagedCount(binding), 1)
+    assert.deepEqual(stagedKinds(binding), ['Rewrite'])
   } finally {
     cleanup()
   }

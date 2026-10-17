@@ -96,7 +96,7 @@ test('WHAT[work-029] P is read, rewritten atomically with exclusive temp file, a
   }
 })
 
-test('WHAT[work-029] js-plan programming surface runs via class Js extends JsProgram and strictly forbids path arguments', async () => {
+test('WHAT[work-029] todowrite-for-plan programming surface runs via class Js extends JsProgram and strictly forbids path arguments', async () => {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-prog-test-'))
   const workId = 'work-jsplan-paths'
 
@@ -142,7 +142,7 @@ test('WHAT[work-029] js-plan programming surface runs via class Js extends JsPro
   }
 })
 
-test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks edits and rewrites until review; review unlocks writes and relay re-locks', async () => {
+test('WHAT[work-029] unreviewed tenure permits todowrite-for-plan file reading but blocks edits and rewrites until review; review unlocks writes and relay re-locks', async () => {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-review-gate-test-'))
   const workId = 'work-jsplan-review-gate'
 
@@ -246,7 +246,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
   }
 })
 
-test('WHAT[work-029] js-plan tool description reuses the shared anchor tutorial with pathless signatures', () => {
+test('WHAT[work-029] todowrite-for-plan tool description reuses the shared anchor tutorial with pathless signatures', () => {
   for (const language of ['en', 'zh-CN']) {
     const description = registry.jsPlanDescription(language)
     const text = description.replace(/\s+/g, ' ')

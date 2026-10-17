@@ -56,3 +56,22 @@ file_len 即 source.length。位移不入库。若整串已是
 
 优先：
   f.text("^", "begin") + "newString" + f.text("end", "$")
+
+主读取原语：
+
+- `cat(path)` 返回文件字符串，并登记写前 FILE_CHANGED 校验使用的读快照。
+  路径缺失报 FILE_NOT_FOUND。
+- `stat(path)` 返回 `{ exists, size, mtime, isDir }`；路径缺失是
+  `exists: false`，不是错误。
+- `whereAll(content, needle, from = 0)` 返回全部规范化匹配
+  `[[begin, end], ...]`；`where(content, needle, from = 0)` 返回单个 span。
+  规范化把每一段空白折叠成一个空格并裁掉 needle 首尾空白；下标始终指向原字符串。
+
+`where` 永不抛定位错误，也永不静默挑一个匹配。零个或多个匹配会经与 `park`
+相同的通道挂起，载荷为 `{ needle, candidates, nearest }`；恢复时注入选中的
+span。注入错了，就让下一句自然失败——宿主不做预校验。
+
+用切片重组文本，而不是重新搜索：
+  const text = await this.cat(path);
+  const [begin, end] = await this.where(text, "old");
+  return text.slice(0, begin) + "new" + text.slice(end);

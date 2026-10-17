@@ -14,5 +14,8 @@
 - 030—037、039 真实运行 park/unpark/abandon 全周期：parked 载荷与渲染、handle 恰好消费一次、abandon 的 finalizer 与清理窗口、并发上限与释放、进程内存活；031 与 039 另含源码静态断言，核对三件套接线与现场表归属。会话 close 的 reap 仍是接线证据，未以真实会话关闭运行。
 - 040 真实运行 rm/mv 的 POSIX 语义、越界拒绝、durable 单笔记账与稳定失败码目录；EXDEV 只查目录登记，不造真实跨设备场景。
 - 041 是生产接线的源码静态断言：lifecycle persistence 沿 PluginHostInterop → ToolRegistry.create → JsToolSpec/execute 与 PluginBoot → PluginRuntimeScope → ClearSession 贯通，执行链不留硬编码 None，四类事件同住单一审计流，ParkedSites 表不触碰 durable。它证明接线存在，不证明运行期审计真实落盘。
+- 045—047 真实运行主原语面：cat/ls/stat/mkdir 的成功与稳定失败形态、write 覆盖与读快照冲突、whereAll 规范化匹配与 from、where 唯一/零/多三态与 park 注入、组合模式（find/replace、批量替换、append、锚点切片、grep/glob 组合）。长程异步与内存隔离仍沿 006 的 TODO，不在本批外推。
+- 048 真实运行 parked source：完整程序回传、挂起行 `>| ` 标记、where 调用点标记与渲染字面块；栈解析失败的降级路径未单独造桩。
+- 049 以真实 ToolSpec 装配检查 unpark.value 的 host schema 为可选任意值，并核对描述中的自由注入责任文案。
 
-2026-10-17 交付验证：`node scripts/build.mjs` 构建成功（generation 31，172 surfaces、829 模块链接闭合），本包 001-044 全套 248 例 231 过 0 败 9 跳 8 todo（028-044 以本次 dist 产物真实运行）；requirement-system 16/16、requirement-grounding 102 例 0 败、capability-enforcement 215 例 0 败。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护保持 TODO 诚实标注；未闭合范围见 GAP-088。
+2026-10-17 一期交付验证：`node scripts/build.mjs` 构建成功（generation 8，172 surfaces、829 模块链接闭合），本包 001-049 全套 254 例 0 败 9 跳 8 todo（045-049 以本次 dist 产物真实运行：九原语、where 三态与组合模式、parked source、unpark 自由值 schema）。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护保持 TODO 诚实标注；未闭合范围见 GAP-088。

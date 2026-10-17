@@ -50,7 +50,7 @@ const writeProgram = "class Js extends JsProgram { async run() { await this.writ
 
 async function deliverKnowledge(hooks, directory, runtime, sessionID, providerID, established) {
   const path = join(directory, 'src', 'main.fs')
-  const tool = established ? 'js-manager' : 'read'
+  const tool = established ? 'todowrite-for-manager' : 'read'
   const args = established
     ? { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
     : { filePath: path }
@@ -94,13 +94,13 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       const writes = join(directory, 'src', 'unauthorized.fs')
       const promptsBefore = runtime.prompts.length
       const childrenBefore = createdIds.length
-      const denied = await hooks.tool['js-engineer'].execute({ program: writeProgram }, { sessionID, agent: 'engineer' })
+      const denied = await hooks.tool['todowrite-for-engineer'].execute({ program: writeProgram }, { sessionID, agent: 'engineer' })
       assert.equal(existsSync(writes), false, 'cross-role program cannot create the unauthorized write effect after knowledge delivery')
       assert.equal(String(denied).includes('UNAUTHORIZED-COMPLETED'), false)
-      const memberDenied = await hooks.tool['js-manager'].execute({ program: writeProgram }, { sessionID, agent: 'manager' })
+      const memberDenied = await hooks.tool['todowrite-for-manager'].execute({ program: writeProgram }, { sessionID, agent: 'manager' })
       assert.equal(existsSync(writes), false, 'the actual Manager programming API remains read-only')
       assert.equal(String(memberDenied).includes('UNAUTHORIZED-COMPLETED'), false)
-      const permitted = await hooks.tool['js-manager'].execute({ program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }, { sessionID, agent: 'manager' })
+      const permitted = await hooks.tool['todowrite-for-manager'].execute({ program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }, { sessionID, agent: 'manager' })
       assert.ok(String(permitted).includes('SOURCE-CONTROL'), 'the same current authority still executes its legitimate read')
       assert.equal(readFileSync(join(directory, 'src', 'main.fs'), 'utf8'), 'SOURCE-CONTROL\n')
       assert.equal(runtime.prompts.length, promptsBefore)
@@ -111,7 +111,7 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       await deliverKnowledge(hooks, directory, runtime, unbound, providerID, false)
       const unboundPromptsBefore = runtime.prompts.length
       const unboundChildrenBefore = createdIds.length
-      const unboundDenied = await hooks.tool['js-engineer'].execute({ program: writeProgram }, { sessionID: unbound, agent: 'engineer' })
+      const unboundDenied = await hooks.tool['todowrite-for-engineer'].execute({ program: writeProgram }, { sessionID: unbound, agent: 'engineer' })
       assert.equal(existsSync(writes), false, 'a knowledge-only session cannot mint execution authority')
       assert.equal(String(unboundDenied).includes('UNAUTHORIZED-COMPLETED'), false)
       assert.equal(observeAuthority(runtime, unbound).activeLogicalRun, null)

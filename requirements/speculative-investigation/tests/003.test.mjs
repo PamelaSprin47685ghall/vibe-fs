@@ -194,10 +194,10 @@ test('WHAT[speculative-investigation-003] resident history cannot be republished
   const runtime = registered(replica, 2)
   const transformed = await Strength.transformApply(H, runtime, { messages: [
     user('old-assignment', replica, [hostText('previous readonly assignment')]),
-    assistant('old-read', replica, [hostResult('old-call', 'js-predictor', { code: 'old' }, 'stale-evidence')]),
+    assistant('old-read', replica, [hostResult('old-call', 'todowrite-for-predictor', { code: 'old' }, 'stale-evidence')]),
     assistant('old-final', replica, [hostText('previous decision completed')]),
     user('new-assignment', replica, [hostText('current readonly assignment')]),
-    assistant('new-read', replica, [hostResult('new-call', 'js-predictor', { code: 'new' }, 'current-evidence')]),
+    assistant('new-read', replica, [hostResult('new-call', 'todowrite-for-predictor', { code: 'new' }, 'current-evidence')]),
   ] }, true)
   assert.equal(transformed.kind, 'Ready')
   assert.deepEqual(transformed.batches.map(batch => batch.exchanges.map(exchange => exchange.canonicalResult)), [['current-evidence']])

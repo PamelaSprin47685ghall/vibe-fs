@@ -10,7 +10,7 @@ const { default: assert } = await import('node:assert/strict')
 test('WHAT[repository-programming-002] registered_js_tools_match_js_tool_generator_output', () => {
   for (const role of allRoleLabels) {
     const generated = generateRole(role, 'en')
-    const toolName = `js-${role}`
+    const toolName = `todowrite-for-${role}`
     const admitted = rolePredicate(toolName, role)
     if (generated) {
       assert.equal(admitted, true, `Role ${role} has generated surface ${generated.toolName} but ToolRegistry denied it`)
@@ -54,11 +54,11 @@ const fsPermissionsOf = (role) =>
   rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove'].includes(n))
 
 const MEMBERS_BY_PERMISSION = {
-  Read: ['file'],
-  Glob: ['glob'],
+  Read: ['file', 'cat', 'stat', 'whereAll', 'where'],
+  Glob: ['glob', 'ls'],
   Grep: ['grep'],
   Edit: ['edit', 'rewrite'],
-  Write: ['write'],
+  Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
 }
@@ -72,9 +72,18 @@ const BINDING_BY_MEMBER = {
   write: 'js.write',
   rm: 'js.rm',
   mv: 'js.mv',
+  cat: 'js.cat',
+  ls: 'js.ls',
+  stat: 'js.stat',
+  mkdir: 'js.mkdir',
+  whereAll: 'js.whereAll',
+  where: 'js.where',
 }
 
-const MEMBER_ORDER = ['file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv']
+const MEMBER_ORDER = [
+  'file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv',
+  'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
+]
 
 const layersOf = (s) =>
   Object.fromEntries(
@@ -95,7 +104,10 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
   const result = surface('Engineer', ['Read', 'Write', 'Edit', 'Glob', 'Grep'])
   assert.equal(isSome(result), true)
   const layers = layersOf(result)
-  assert.deepEqual(Object.keys(layers).sort(), ['edit', 'file', 'glob', 'grep', 'rewrite', 'write'])
+  assert.deepEqual(
+    Object.keys(layers).sort(),
+    ['cat', 'edit', 'file', 'glob', 'grep', 'ls', 'mkdir', 'rewrite', 'stat', 'where', 'whereAll', 'write'],
+  )
   for (const [member, layer] of Object.entries(layers)) {
     assert.equal(layer.inBaseClass, true, `${member} in base class`)
     assert.equal(layer.inDescription, true, `${member} in description`)
@@ -115,7 +127,7 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
 test('WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers', () => {
   const result = surface('Engineer', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
-  assert.deepEqual(memberNames(result), ['file', 'glob', 'grep'])
+  assert.deepEqual(memberNames(result), ['file', 'glob', 'grep', 'cat', 'ls', 'stat', 'whereAll', 'where'])
   assert.equal(result.description.includes('edit(path'), false)
   assert.equal(result.description.includes('rewrite(path'), false)
   assert.equal(result.description.includes('write(path'), false)
@@ -138,12 +150,12 @@ test('WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_r
   assert.doesNotMatch(editOnly.description, /(^|[^A-Za-z0-9_])write\(path/m)
 
   const readEdit = surface('Engineer', ['Read', 'Edit'])
-  assert.deepEqual(memberNames(readEdit), ['file', 'edit', 'rewrite'])
+  assert.deepEqual(memberNames(readEdit), ['file', 'edit', 'rewrite', 'cat', 'stat', 'whereAll', 'where'])
   assert.equal(readEdit.description.includes('file(matches) + text() + rewrite()'), true)
   assert.doesNotMatch(readEdit.description, /(^|[^A-Za-z0-9_])write\(path/m)
 
   const editWrite = surface('Engineer', ['Edit', 'Write'])
-  assert.deepEqual(memberNames(editWrite), ['edit', 'rewrite', 'write'])
+  assert.deepEqual(memberNames(editWrite), ['edit', 'rewrite', 'write', 'mkdir'])
   assert.equal(editWrite.description.includes('file(matches)'), false)
   assert.equal(editWrite.description.includes('file(path'), false)
   assert.equal(editWrite.description.includes('FileView.text'), false)
@@ -155,6 +167,11 @@ test('WHAT[repository-programming-002] JS004_member_gate_binds_present_members_o
   assert.equal(memberBinding('Engineer', perms, 'file'), 'js.read')
   assert.equal(memberBinding('Engineer', perms, 'glob'), 'js.glob')
   assert.equal(memberBinding('Engineer', perms, 'grep'), 'js.grep')
+  assert.equal(memberBinding('Engineer', perms, 'cat'), 'js.cat')
+  assert.equal(memberBinding('Engineer', perms, 'ls'), 'js.ls')
+  assert.equal(memberBinding('Engineer', perms, 'stat'), 'js.stat')
+  assert.equal(memberBinding('Engineer', perms, 'whereAll'), 'js.whereAll')
+  assert.equal(memberBinding('Engineer', perms, 'where'), 'js.where')
   assert.equal(memberBinding('Engineer', perms, 'edit'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'rewrite'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'write'), undefined)

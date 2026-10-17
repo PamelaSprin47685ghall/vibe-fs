@@ -11,7 +11,7 @@ open Wanxiangshu.Repository.Programming.Js.OpenCode
 /// token pair (AgentJournal + IEventStore in one file is forbidden).
 module CasebookTools =
 
-    /// Marker + EventStore availability → fetch + js-bookkeeper, or none.
+    /// Marker + EventStore availability → fetch + todowrite-for-bookkeeper, or none.
     /// Acquire failure degrades the surface instead of failing the plugin —
     /// the schema gate and the execution gate stay in agreement.
     let private tryBuildSpecs

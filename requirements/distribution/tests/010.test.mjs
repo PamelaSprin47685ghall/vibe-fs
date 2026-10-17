@@ -55,12 +55,12 @@ test('WHAT[distribution-010] repository resources and emitted role/tool declarat
   const knownTools = toolSurface.toolSpecNames() || []
 
   const requiredTools = [
-    'js-engineer',
-    'js-devops',
-    'js-bookkeeper',
-    'js-manager',
-    'js-orchestrator',
-    'js-blogger',
+    'todowrite-for-engineer',
+    'todowrite-for-devops',
+    'todowrite-for-bookkeeper',
+    'todowrite-for-manager',
+    'todowrite-for-orchestrator',
+    'todowrite-for-blogger',
   ]
   const forbiddenTools = ['js-coder', 'js-inspector', 'js-browser']
 

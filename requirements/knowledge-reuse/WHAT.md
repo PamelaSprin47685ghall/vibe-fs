@@ -29,7 +29,7 @@ grep、glob、目录列表、仅展示符号位置的导航及文本中提及的
 
 ## [006] Bookkeeper
 
-私有 Bookkeeper 只提供 CaseFinalize（按轨迹整理）和 CaseRefresh（按旧案与 diff 维护），通过 `js-bookkeeper` 访问当前案例；无仓库调查或读写权，不接收完整新旧文件。
+私有 Bookkeeper 只提供 CaseFinalize（按轨迹整理）和 CaseRefresh（按旧案与 diff 维护），通过 `todowrite-for-bookkeeper` 访问当前案例；无仓库调查或读写权，不接收完整新旧文件。
 
 一次 JavaScript 程序是一笔原子 staged 变换，setQuestion、setAnswer 各至多调用一次，零修改合法。成功即推进维护基线，包括判断 diff 无关而保持正文的情况；失败则正文与基线均不推进。
 

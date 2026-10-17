@@ -29,7 +29,7 @@ const withStore = async (body) => {
 
 test('WHAT[work-024] Plan admits its five role tools on every stage; handoff and resume stay denied', () => {
   const rules = rolePermissionRules('plan')
-  for (const tool of ['js-plan', 'devops', 'ask', 'review', 'deliver']) {
+  for (const tool of ['todowrite-for-plan', 'devops', 'ask', 'review', 'deliver']) {
     assert.equal(rules[tool], 'allow', `plan must admit ${tool}`)
     assert.notEqual(rolePermissionRules('engineer')[tool], 'allow', `engineer must not admit ${tool}`)
   }

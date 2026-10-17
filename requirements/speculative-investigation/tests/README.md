@@ -7,7 +7,7 @@
 | [001] | 不健康前提、Shadow、嵌套请求的 K0 裁决和默认设置 | 同一次真实 Work 在 Off/K0/熔断与无优化时的行为等价 |
 | [002] | 每个机会前提单独翻转的策略矩阵；未知标签拒绝 | 真正 Work 入口从冻结身份与 target 取得证据；角色白名单有合同冲突 |
 | [003] | Collector 的并发配对、跨 request 边界；真实 transform/coordinator 的预算关闭；筛空首批和中间批次后的材料连续编号；真实 Host 中两轮只读工具及错误工具后恢复的预算隔离 | 更多预算与故障截断组合的真实网络证明 |
-| [004] | 现行角色的精确 readonly capability、退役角色拒绝、owner attachment、single-flight；Host 原始 system 数组中的双语约束；真实 provider 仅收到 js-predictor | 所有角色、语言及拒绝效果的真实 Host 矩阵 |
+| [004] | 现行角色的精确 readonly capability、退役角色拒绝、owner attachment、single-flight；Host 原始 system 数组中的双语约束；真实 provider 仅收到 todowrite-for-predictor | 所有角色、语言及拒绝效果的真实 Host 矩阵 |
 | [005] | Frame 规范化、序号、digest/调用标识；完整 canonical 文本的独立 UTF-8 字节边界；正文降为 reasoning，排除原生 reasoning；混合工具消息正文保真；真实 Host provider wire 收到五条重定位后的完整交换，参数与结果同源、使用 owner 工具名 | 所有工具结果形态与普通压缩组合 |
 | [006] | 真 EventStore/payload closure、冲突拒绝、关闭重开读取；Prepared 不 replay | 模糊写入时实际 Owner 外发被阻止 |
 | [007] | 消费证据分类、exact target 裁决、失败轮次 Abandoned、Promoted 持久化 | 模糊 Promotion 时实际 continuation 被阻止 |

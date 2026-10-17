@@ -47,6 +47,7 @@ module JsWorkflowSurface =
     val caseName: value: obj -> string
     val parkedHandle: value: obj -> obj
     val parkedPayload: value: obj -> obj
+    val parkedSource: value: obj -> obj
     val rewritten: value: obj -> string array
     val created: value: obj -> string array
     val removed: value: obj -> string array

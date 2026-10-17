@@ -347,12 +347,12 @@ test('WHAT[managed-session-lifecycle-022] original child and owner deletion arch
       try {
         if (!programAttempted) {
           programAttempted = true
-          const output = await hooks.tool['js-bookkeeper'].execute({ program }, {
+          const output = await hooks.tool['todowrite-for-bookkeeper'].execute({ program }, {
             sessionID: child, agent: 'bookkeeper', messageID: bookkeeperAssistant.info.id,
             callID: 'd0g-bookkeeper-program',
           })
           assert.equal(typeof output, 'string')
-          bookkeeperAssistant.parts.push({ type: 'tool', tool: 'js-bookkeeper', callID: 'd0g-bookkeeper-program',
+          bookkeeperAssistant.parts.push({ type: 'tool', tool: 'todowrite-for-bookkeeper', callID: 'd0g-bookkeeper-program',
             state: { status: 'completed', input: { program }, output } })
         }
       } finally {
@@ -391,7 +391,7 @@ test('WHAT[managed-session-lifecycle-022] original child and owner deletion arch
       ])
       assert.equal(bookkeeperEntered, 1)
       assert.equal(prepared.args.body.agent, 'bookkeeper')
-      assert.deepEqual(prepared.args.body.tools, { '*': false, 'js-bookkeeper': true })
+      assert.deepEqual(prepared.args.body.tools, { '*': false, 'todowrite-for-bookkeeper': true })
       const promptText = prepared.args.body.parts.filter(part => part.type === 'text').map(part => part.text).join('\n')
       assert.ok(promptText.includes(sent.child))
       assert.ok(promptText.includes(charge))

@@ -193,7 +193,7 @@ for (const completed of [false, true]) {
       const local = createLocalEventStore()
       try {
         const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-          { toolName: 'js-predictor', canonicalArguments: '{}', canonicalResult: 'actual readonly material' },
+          { toolName: 'todowrite-for-predictor', canonicalArguments: '{}', canonicalResult: 'actual readonly material' },
         ] }]).value
         assert.equal((await append(local.store, Strength.eventRequested({
           decisionId: 'd1', ownerSessionId: 'owner',
@@ -281,7 +281,7 @@ test('WHAT[speculative-investigation-008] demoted predictor text survives durabl
   let local = createLocalEventStore({ commonDir: join(directory, '.git'), writerId: 'before' })
   const value = Strength.frameTryBuild(H, [
     { requestOrdinal: 1, assistantText: ['核对结果𠀀'], exchanges: [
-      { toolName: 'js-predictor', canonicalArguments: '{}', canonicalResult: 'actual result' },
+      { toolName: 'todowrite-for-predictor', canonicalArguments: '{}', canonicalResult: 'actual result' },
     ] },
     { requestOrdinal: 2, assistantText: ['conclusion'], exchanges: [] },
   ]).value

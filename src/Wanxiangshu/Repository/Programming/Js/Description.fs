@@ -468,8 +468,8 @@ module JsCanonicalDescription =
             prose
             """  async file(matches = []) {
     if (typeof matches === "string" || arguments.length > 1) {
-      const err = new Error("PATH_FORBIDDEN: js-plan operates strictly on the plan artifact; passing a path is forbidden. Call file(matches) without a path.");
-      err.__jsFailure = { code: "PATH_DENIED", reason: "js-plan operates strictly on the plan artifact; passing a path is forbidden." };
+      const err = new Error("PATH_FORBIDDEN: todowrite-for-plan operates strictly on the plan artifact; passing a path is forbidden. Call file(matches) without a path.");
+      err.__jsFailure = { code: "PATH_DENIED", reason: "todowrite-for-plan operates strictly on the plan artifact; passing a path is forbidden." };
       throw err;
     }
     const path = "plan.md";"""
@@ -516,7 +516,49 @@ module JsCanonicalDescription =
 
     let private writeStub (prose: Prose) =
         fill
-            """  write(path, newText) {
+            """  write(path, content) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private catStub (prose: Prose) =
+        fill
+            """  async cat(path) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private lsStub (prose: Prose) =
+        fill
+            """  async ls(path) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private statStub (prose: Prose) =
+        fill
+            """  async stat(path) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private mkdirStub (prose: Prose) =
+        fill
+            """  mkdir(path) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private whereAllStub (prose: Prose) =
+        fill
+            """  whereAll(content, needle, from = 0) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private whereStub (prose: Prose) =
+        fill
+            """  async where(content, needle, from = 0) {
     // {{comment_host_capability}}
   }"""
             [ "comment_host_capability", prose.CommentHostCapability ]
@@ -570,8 +612,13 @@ class JsProgram {"""
         let methods =
             [ if has capabilities JsCapability.Read then
                   fileAlgorithm prose publicReadSource publicRaiseFailure
+                  catStub prose
+                  statStub prose
+                  whereAllStub prose
+                  whereStub prose
               if has capabilities JsCapability.Glob then
                   globStub prose
+                  lsStub prose
               if has capabilities JsCapability.Grep then
                   grepStub prose
               if has capabilities JsCapability.Edit then
@@ -580,6 +627,7 @@ class JsProgram {"""
                   rewriteStub prose
               if has capabilities JsCapability.Write then
                   writeStub prose
+                  mkdirStub prose
               if has capabilities JsCapability.Remove then
                   rmStub prose
               if has capabilities JsCapability.Move then
@@ -612,8 +660,8 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             .Trim()
 
     let private runtimePathRefusal =
-        """const err = new Error("PATH_FORBIDDEN: js-plan operates strictly on the plan artifact; passing a path is forbidden. Call edit(changes) without a path.");
-      err.__jsFailure = { code: "PATH_DENIED", reason: "js-plan operates strictly on the plan artifact; passing a path is forbidden." };
+        """const err = new Error("PATH_FORBIDDEN: todowrite-for-plan operates strictly on the plan artifact; passing a path is forbidden. Call edit(changes) without a path.");
+      err.__jsFailure = { code: "PATH_DENIED", reason: "todowrite-for-plan operates strictly on the plan artifact; passing a path is forbidden." };
       throw err;"""
 
     let private editPrologue =
@@ -1097,7 +1145,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
       {{raise_failure}}
     };
     if (typeof newText !== "string" || arguments.length > 1) {
-      fail("PATH_DENIED", "js-plan operates strictly on the plan artifact; passing a path is forbidden. Call rewrite(newText) without a path.");
+      fail("PATH_DENIED", "todowrite-for-plan operates strictly on the plan artifact; passing a path is forbidden. Call rewrite(newText) without a path.");
     }
     const result = this._api.js.edit("plan.md", newText);
     {{rethrow_host}}
@@ -1150,12 +1198,53 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                   .TrimStart()
               if has capabilities JsCapability.Read then
                   fileAlgorithm prose (runtimeReadSource prose) runtimeRaiseFailure
+
+                  fill
+                      """  async cat(path) {
+    const result = await this._api.js.cat(path);
+    {{rethrow_host}}
+    return result.text;
+  }"""
+                      [ "rethrow_host", rethrowHost ]
+
+                  fill
+                      """  async stat(path) {
+    const result = await this._api.js.stat(path);
+    {{rethrow_host}}
+    return result.stat;
+  }"""
+                      [ "rethrow_host", rethrowHost ]
+
+                  fill
+                      """  whereAll(content, needle, from = 0) {
+    const result = this._api.js.whereAll(content, needle, from);
+    {{rethrow_host}}
+    return result.spans;
+  }"""
+                      [ "rethrow_host", rethrowHost ]
+
+                  fill
+                      """  async where(content, needle, from = 0) {
+    const stack = new Error().stack;
+    const result = await this._api.js.where(content, needle, from, stack);
+    {{rethrow_host}}
+    return result && result.span !== undefined ? result.span : result;
+  }"""
+                      [ "rethrow_host", rethrowHost ]
               if has capabilities JsCapability.Glob then
                   fill
                       """  async glob(pattern) {
     const result = await this._api.js.glob(pattern);
     {{rethrow_host}}
     return { paths: result.paths };
+  }"""
+                      [ "rethrow_host", rethrowHost ]
+
+                  fill
+                      """  async ls(path) {
+    const result = await this._api.js.ls(path);
+    {{rethrow_host}}
+    return result.entries;
   }"""
                       [ "rethrow_host", rethrowHost ]
               if has capabilities JsCapability.Grep then
@@ -1179,9 +1268,17 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                       [ "rethrow_host", rethrowHost ]
               if has capabilities JsCapability.Write then
                   fill
-                      """  write(path, newText) {
-    const result = this._api.js.write(path, newText);
+                      """  write(path, content) {
+    const result = this._api.js.write(path, content);
     {{rethrow_host}}
+  }"""
+                      [ "rethrow_host", rethrowHost ]
+
+                  fill
+                      """  mkdir(path) {
+    const result = this._api.js.mkdir(path);
+    {{rethrow_host}}
+    return { ok: true, path };
   }"""
                       [ "rethrow_host", rethrowHost ]
               if has capabilities JsCapability.Remove then
@@ -1221,9 +1318,10 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
         let verbs =
             List.concat
                 [ if has capabilities JsCapability.Read then
-                      [ prose.VerbRead ]
+                      [ prose.VerbRead; "cat"; "stat"; "where"; "whereAll" ]
                   else
                       []
+                  if has capabilities JsCapability.Glob then [ "ls" ] else []
                   if has capabilities JsCapability.Grep then
                       [ prose.VerbSearch ]
                   elif has capabilities JsCapability.Read && has capabilities JsCapability.Glob then
@@ -1235,7 +1333,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                   else
                       []
                   if has capabilities JsCapability.Write then
-                      [ prose.VerbCreate ]
+                      [ prose.VerbCreate; "mkdir" ]
                   else
                       [] ]
             |> String.concat ", "
@@ -1344,6 +1442,6 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
 
         let blocks =
             [ scope
-              renderFor prose planTutorial "plan" "js-plan" planCapabilities (publicPlanBaseClass prose) ]
+              renderFor prose planTutorial "plan" "todowrite-for-plan" planCapabilities (publicPlanBaseClass prose) ]
 
         String.concat "\n\n" blocks

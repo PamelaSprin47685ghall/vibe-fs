@@ -1,1 +1,1 @@
-Only js-bookkeeper is available while reshaping a staged Case.
+Only todowrite-for-bookkeeper is available while reshaping a staged Case.

@@ -58,7 +58,7 @@ test('WHAT[host-boundary-032] canary provider routes repeated requests by physic
   assert.equal(managerReviewStage({ messages: [{ role: 'user', content: 'unrelated Manager work' }] }), null)
 })
 
-const REVIEW_TOOLS = ['js-manager']
+const REVIEW_TOOLS = ['todowrite-for-manager']
 
 test('WHAT[host-boundary-032] C01_tool_definition_decorates_the_review_tool_with_contract_enum', async () => {
   await withExecutablePlugin(async (hooks) => {
@@ -98,7 +98,7 @@ test('WHAT[host-boundary-032] C01_tool_definition_decorates_the_review_tool_with
 
 test('WHAT[host-boundary-032] C05_tool_execute_before_strips_contract_and_after_restores', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const tool = 'js-manager'
+    const tool = 'todowrite-for-manager'
     const sessionID = 'ses-c05'
     await openIncumbency(runtime, sessionID)
     const callID = 'call-c05-1'
@@ -119,7 +119,7 @@ test('WHAT[host-boundary-032] C05_tool_execute_before_strips_contract_and_after_
     )
 
     const afterOutput = {
-      title: 'js-manager',
+      title: 'todowrite-for-manager',
       output: 'file contents',
       metadata: {},
     }
@@ -138,7 +138,7 @@ test('WHAT[host-boundary-032] C05_tool_execute_before_strips_contract_and_after_
 
 test('WHAT[host-boundary-032] C09_concurrent_tool_invocations_do_not_mix_contract_parameters', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const tool = 'js-manager'
+    const tool = 'todowrite-for-manager'
     const call1 = {
       sessionID: 'ses-c09-1',
       callID: 'call-c09-1',
@@ -188,8 +188,8 @@ test('WHAT[host-boundary-032] C02_definition_decoration_leaves_native_and_non_re
       'edit',
       'glob',
       'grep',
-      'js-engineer',
-      'js-devops',
+      'todowrite-for-engineer',
+      'todowrite-for-devops',
       'bash-honeypot',
       'assume',
     ]
@@ -282,11 +282,11 @@ test('WHAT[host-boundary-032] C06_missing_wrong_string_null_or_wrong_json_type_c
       }
 
       // 插件本地对缺失或错误的 contract 采取乐观处理，不进行二次强校验拒绝
-      await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID }, beforeOutput)
+      await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID }, beforeOutput)
       assert.equal('contract' in beforeOutput.args, false, `contract must be stripped during execution for test case ${i}`)
 
-      const afterOutput = { title: 'js-manager', output: 'ok', metadata: {} }
-      await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID, args: beforeOutput.args }, afterOutput)
+      const afterOutput = { title: 'todowrite-for-manager', output: 'ok', metadata: {} }
+      await hooks['tool.execute.after']({ tool: 'todowrite-for-manager', sessionID, callID, args: beforeOutput.args }, afterOutput)
 
       if (contractVal === undefined) {
         assert.equal('contract' in beforeOutput.args, false, 'missing contract must remain missing after restore')
@@ -305,18 +305,18 @@ test('WHAT[host-boundary-032] C07_contract_undefined_versus_completely_missing_p
     // 情况 1: 显式赋值 contract: undefined
     const argsExplicitUndefined = { path: 'file.txt', contract: undefined }
     const call1ID = 'call-c07-undef'
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: call1ID }, { args: argsExplicitUndefined })
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID: call1ID }, { args: argsExplicitUndefined })
     assert.equal('contract' in argsExplicitUndefined, false)
-    await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID: call1ID, args: argsExplicitUndefined }, { title: 'js-manager', output: '', metadata: {} })
+    await hooks['tool.execute.after']({ tool: 'todowrite-for-manager', sessionID, callID: call1ID, args: argsExplicitUndefined }, { title: 'todowrite-for-manager', output: '', metadata: {} })
     assert.equal(Object.prototype.hasOwnProperty.call(argsExplicitUndefined, 'contract'), true, 'contract: undefined must be restored as own property')
     assert.equal(argsExplicitUndefined.contract, undefined)
 
     // 情况 2: 完全未提供 contract 字段
     const argsCompletelyMissing = { path: 'file.txt' }
     const call2ID = 'call-c07-missing'
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: call2ID }, { args: argsCompletelyMissing })
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID: call2ID }, { args: argsCompletelyMissing })
     assert.equal('contract' in argsCompletelyMissing, false)
-    await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID: call2ID, args: argsCompletelyMissing }, { title: 'js-manager', output: '', metadata: {} })
+    await hooks['tool.execute.after']({ tool: 'todowrite-for-manager', sessionID, callID: call2ID, args: argsCompletelyMissing }, { title: 'todowrite-for-manager', output: '', metadata: {} })
     assert.equal(Object.prototype.hasOwnProperty.call(argsCompletelyMissing, 'contract'), false, 'completely missing contract must remain absent as own property')
   })
 })
@@ -330,16 +330,16 @@ test('WHAT[host-boundary-032] C08_repeated_before_and_repeated_after_preserves_o
     const beforeOutput = { args: { path: 'file.txt', contract: originalContract } }
 
     // 重复执行 before hook
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID }, beforeOutput)
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID }, beforeOutput)
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID }, beforeOutput)
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID }, beforeOutput)
     assert.equal('contract' in beforeOutput.args, false, 'contract stripped')
 
     // 重复执行 after hook
-    const afterOutput = { title: 'js-manager', output: '', metadata: {} }
-    await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID, args: beforeOutput.args }, afterOutput)
+    const afterOutput = { title: 'todowrite-for-manager', output: '', metadata: {} }
+    await hooks['tool.execute.after']({ tool: 'todowrite-for-manager', sessionID, callID, args: beforeOutput.args }, afterOutput)
     assert.equal(beforeOutput.args.contract, originalContract, 'first restore recovers original contract')
 
-    await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID, args: beforeOutput.args }, afterOutput)
+    await hooks['tool.execute.after']({ tool: 'todowrite-for-manager', sessionID, callID, args: beforeOutput.args }, afterOutput)
     assert.equal(beforeOutput.args.contract, originalContract, 'second restore is idempotent and preserves contract')
   })
 })
@@ -358,14 +358,14 @@ test('WHAT[host-boundary-032] C10_model_submitted_pseudo_contract_fields_not_tre
       },
     }
 
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID }, beforeOutput)
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID }, beforeOutput)
     // 仅真实的 contract 字段被暂存并隐藏，伪造字段不作为私有记录、原样保留
     assert.equal('contract' in beforeOutput.args, false)
     assert.equal(beforeOutput.args._contract, 'malicious-injected-pseudo-contract')
     assert.equal(beforeOutput.args.__contract, 'another-pseudo-field')
 
-    const afterOutput = { title: 'js-manager', output: '', metadata: {} }
-    await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID, args: beforeOutput.args }, afterOutput)
+    const afterOutput = { title: 'todowrite-for-manager', output: '', metadata: {} }
+    await hooks['tool.execute.after']({ tool: 'todowrite-for-manager', sessionID, callID, args: beforeOutput.args }, afterOutput)
     assert.equal(beforeOutput.args.contract, 'valid-review-contract')
     assert.equal(beforeOutput.args._contract, 'malicious-injected-pseudo-contract')
     assert.equal(beforeOutput.args.__contract, 'another-pseudo-field')
@@ -380,13 +380,13 @@ test('WHAT[host-boundary-032] C11_reported_failure_after_callback_restores_contr
     const originalContract = 'contract-c11'
     const beforeOutput = { args: { path: 'nonexistent-throw.txt', contract: originalContract } }
 
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID }, beforeOutput)
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID }, beforeOutput)
     assert.equal('contract' in beforeOutput.args, false)
 
     const executionError = new Error('Reported file system IO failure')
-    const afterOutput = { title: 'js-manager', output: 'error', metadata: { error: executionError } }
+    const afterOutput = { title: 'todowrite-for-manager', output: 'error', metadata: { error: executionError } }
     await hooks['tool.execute.after'](
-      { tool: 'js-manager', sessionID, callID, args: beforeOutput.args },
+      { tool: 'todowrite-for-manager', sessionID, callID, args: beforeOutput.args },
       afterOutput,
     )
 
@@ -403,12 +403,12 @@ test('WHAT[host-boundary-032] C12_after_hook_returns_with_original_contract_rest
     const originalContract = 'contract-c12'
     const beforeOutput = { args: { path: 'file.txt', contract: originalContract } }
 
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID }, beforeOutput)
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID }, beforeOutput)
     assert.equal('contract' in beforeOutput.args, false)
 
     await hooks['tool.execute.after'](
-      { tool: 'js-manager', sessionID, callID, args: beforeOutput.args },
-      { title: 'js-manager', output: 'content', metadata: {} },
+      { tool: 'todowrite-for-manager', sessionID, callID, args: beforeOutput.args },
+      { title: 'todowrite-for-manager', output: 'content', metadata: {} },
     )
     assert.equal(beforeOutput.args.contract, originalContract)
   })
@@ -426,7 +426,7 @@ test('WHAT[host-boundary-032] C13_frozen_or_non_extensible_args_fails_atomically
     // 对不可扩展或冻结的 args，hide 应当抛出 TypeError，保持原子失败且绝不发生文件访问
     await assert.rejects(
       async () => {
-        await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID }, beforeOutput)
+        await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID }, beforeOutput)
       },
       TypeError,
       'frozen args must fail atomically with TypeError',
@@ -443,7 +443,7 @@ test('WHAT[host-boundary-032] C14_direct_tool_execution_without_before_hook_perf
     // 直接调用 tool.execute（绕过 tool.execute.before）
     // 缺少私有暂存 key 时，after/restore 是 no-op，且 tool.execute 执行完整权限核验
     const directArgs = { path: 'src/App.fs' }
-    const execResult = await hooks.tool['js-manager'].execute(
+    const execResult = await hooks.tool['todowrite-for-manager'].execute(
       directArgs,
       { sessionID, agent: 'manager' },
     )
@@ -451,8 +451,8 @@ test('WHAT[host-boundary-032] C14_direct_tool_execution_without_before_hook_perf
 
     // 缺少私有暂存 key 时执行 after hook 亦幂等安全退出
     await hooks['tool.execute.after'](
-      { tool: 'js-manager', sessionID, callID: 'call-c14', args: directArgs },
-      { title: 'js-manager', output: execResult, metadata: {} },
+      { tool: 'todowrite-for-manager', sessionID, callID: 'call-c14', args: directArgs },
+      { title: 'todowrite-for-manager', output: execResult, metadata: {} },
     )
     assert.equal('contract' in directArgs, false, 'unprovided contract remains absent')
   })
@@ -466,24 +466,24 @@ test('WHAT[host-boundary-032] C15_contract_position_first_middle_or_last_restore
     // 1. contract 在第一个位置
     const objFirst = { contract: 'first-token', a: 1, b: 2 }
     const firstKeys = Object.keys(objFirst)
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-c15-1' }, { args: objFirst })
-    await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID: 'call-c15-1', args: objFirst }, { title: 'js-manager', output: '', metadata: {} })
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID: 'call-c15-1' }, { args: objFirst })
+    await hooks['tool.execute.after']({ tool: 'todowrite-for-manager', sessionID, callID: 'call-c15-1', args: objFirst }, { title: 'todowrite-for-manager', output: '', metadata: {} })
     assert.equal(objFirst.contract, 'first-token')
     assert.deepEqual(Object.keys(objFirst), firstKeys)
 
     // 2. contract 在中间位置
     const objMid = { a: 1, contract: 'mid-token', b: 2 }
     const middleKeys = Object.keys(objMid)
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-c15-2' }, { args: objMid })
-    await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID: 'call-c15-2', args: objMid }, { title: 'js-manager', output: '', metadata: {} })
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID: 'call-c15-2' }, { args: objMid })
+    await hooks['tool.execute.after']({ tool: 'todowrite-for-manager', sessionID, callID: 'call-c15-2', args: objMid }, { title: 'todowrite-for-manager', output: '', metadata: {} })
     assert.equal(objMid.contract, 'mid-token')
     assert.deepEqual(Object.keys(objMid), middleKeys)
 
     // 3. contract 在最后位置
     const objLast = { a: 1, b: 2, contract: 'last-token' }
     const lastKeys = Object.keys(objLast)
-    await hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-c15-3' }, { args: objLast })
-    await hooks['tool.execute.after']({ tool: 'js-manager', sessionID, callID: 'call-c15-3', args: objLast }, { title: 'js-manager', output: '', metadata: {} })
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID: 'call-c15-3' }, { args: objLast })
+    await hooks['tool.execute.after']({ tool: 'todowrite-for-manager', sessionID, callID: 'call-c15-3', args: objLast }, { title: 'todowrite-for-manager', output: '', metadata: {} })
     assert.equal(objLast.contract, 'last-token')
     assert.deepEqual(Object.keys(objLast), lastKeys)
   })
@@ -497,7 +497,7 @@ test('WHAT[host-boundary-032] C16_upstream_validation_rejection_not_swallowed_an
     // 1. 本地插件路径：对 missing/malformed contract 乐观处理，不进行二次强校验，不主动拒绝
     const relaxedArgs = { path: 'file.txt', contract: 'not-in-enum-value' }
     await hooks['tool.execute.before'](
-      { tool: 'js-manager', sessionID, callID: 'call-c16-local' },
+      { tool: 'todowrite-for-manager', sessionID, callID: 'call-c16-local' },
       { args: relaxedArgs },
     )
     assert.equal('contract' in relaxedArgs, false, 'local plugin must strip contract without strong revalidation rejection')
@@ -693,23 +693,23 @@ test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexis
   try {
     language.refreshGlobalLanguage()
     const definition = {
-      description: 'Description for js-manager',
+      description: 'Description for todowrite-for-manager',
       parameters: {
         type: 'object',
         properties: { path: { type: 'string' } },
         required: ['path'],
       },
     }
-    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('js-manager', definition)
-    PluginHooksSurface.decorateReviewToolDefinition('js-manager', definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('todowrite-for-manager', definition)
+    PluginHooksSurface.decorateReviewToolDefinition('todowrite-for-manager', definition)
     const firstSnapshot = structuredClone(definition)
 
     // 重复装饰、两类装饰交替都不产生重复项
-    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('js-manager', definition)
-    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('js-manager', definition)
-    PluginHooksSurface.decorateReviewToolDefinition('js-manager', definition)
-    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('js-manager', definition)
-    PluginHooksSurface.decorateReviewToolDefinition('js-manager', definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('todowrite-for-manager', definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('todowrite-for-manager', definition)
+    PluginHooksSurface.decorateReviewToolDefinition('todowrite-for-manager', definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('todowrite-for-manager', definition)
+    PluginHooksSurface.decorateReviewToolDefinition('todowrite-for-manager', definition)
 
     assert.deepEqual(definition, firstSnapshot, 'coexisting decorations must be idempotent across repeats')
     assert.equal(
@@ -928,7 +928,7 @@ test('WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_
 
 test('WHAT[host-boundary-032] C24_review_contract_and_delegation_fields_coexist_without_crosstalk', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const tool = 'js-manager'
+    const tool = 'todowrite-for-manager'
     const sessionID = 'ses-c24'
     await openIncumbency(runtime, sessionID)
     const callID = 'call-c24-1'
@@ -1043,11 +1043,11 @@ test('WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protoco
     const directArgs = { path: 'src/App.fs', estimated_readonly_rounds: 0 }
 
     await hooks['tool.execute.before'](
-      { tool: 'js-manager', sessionID, callID: 'call-c27' },
+      { tool: 'todowrite-for-manager', sessionID, callID: 'call-c27' },
       { args: directArgs },
     )
 
-    const execResult = await hooks.tool['js-manager'].execute(directArgs, { sessionID, agent: 'manager' })
+    const execResult = await hooks.tool['todowrite-for-manager'].execute(directArgs, { sessionID, agent: 'manager' })
     assert.ok(typeof execResult === 'string', 'tool execution must succeed on the cleaned business view')
 
     // 业务执行视图在 before 暂存之后不再持有协议字段；在 after 恢复之前断言，
@@ -1064,8 +1064,8 @@ test('WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protoco
     )
 
     await hooks['tool.execute.after'](
-      { tool: 'js-manager', sessionID, callID: 'call-c27', args: directArgs },
-      { title: 'js-manager', output: execResult, metadata: {} },
+      { tool: 'todowrite-for-manager', sessionID, callID: 'call-c27', args: directArgs },
+      { title: 'todowrite-for-manager', output: execResult, metadata: {} },
     )
 
     // after 的同源恢复之后，provider 原始 arguments 证据重新出现；这与
@@ -1086,7 +1086,7 @@ test('WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protoco
 test('WHAT[host-boundary-032] C28_unconfigured_predictor_leaves_tool_definitions_undecorated', async () => {
   clearPredictorState()
   await withExecutablePlugin(async (hooks) => {
-    for (const toolID of ['js-manager', 'read', 'write']) {
+    for (const toolID of ['todowrite-for-manager', 'read', 'write']) {
       const originalDescription = `Description for ${toolID}`
       const output = {
         description: originalDescription,
@@ -1127,7 +1127,7 @@ test('WHAT[host-boundary-032] C29_configured_predictor_decorates_every_tool_thro
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   try {
     await withExecutablePlugin(async (hooks) => {
-      for (const toolID of ['js-manager', 'read', 'write']) {
+      for (const toolID of ['todowrite-for-manager', 'read', 'write']) {
         const originalDescription = `Description for ${toolID}`
         const output = {
           description: originalDescription,
@@ -1171,12 +1171,12 @@ test('WHAT[host-boundary-032] C29_configured_predictor_decorates_every_tool_thro
           output.description.length > originalDescription.length,
           `${toolID} description must gain the collaboration prose`,
         )
-        if (toolID === 'js-manager') {
+        if (toolID === 'todowrite-for-manager') {
           // 与评审 contract 在同一 hook 路径并存，互不排斥
           assert.equal(
             output.parameters.required.includes('contract'),
             true,
-            'review contract must coexist with the delegation budget on js-manager',
+            'review contract must coexist with the delegation budget on todowrite-for-manager',
           )
           assert.equal(
             output.parameters.properties.contract.type,
@@ -1398,7 +1398,7 @@ test('WHAT[host-boundary-032] C44_registered_hooks_restore_exact_argument_identi
       const calls = [
         { tool: 'read', args: { estimated_readonly_rounds: 2, path: 'first.txt', self_note: 'first', limit: 10 } },
         { tool: 'read', args: { path: 'middle.txt', self_note: 'middle', limit: 20, estimated_readonly_rounds: 3 } },
-        { tool: 'js-manager', args: { self_note: 'review', path: 'review.txt', contract: { original: true }, estimated_readonly_rounds: 4, limit: 30 } },
+        { tool: 'todowrite-for-manager', args: { self_note: 'review', path: 'review.txt', contract: { original: true }, estimated_readonly_rounds: 4, limit: 30 } },
       ].map((call, index) => ({
         ...call,
         sessionID: `ses-c44-${index}`,
@@ -1464,7 +1464,7 @@ test('WHAT[host-boundary-032] C46_before_hide_failure_restores_the_already_hidde
       const keys = Reflect.ownKeys(args)
       const output = { args }
       await assert.rejects(
-        hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-c46' }, output),
+        hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID: 'call-c46' }, output),
         TypeError,
       )
       assert.equal(output.args, args)
@@ -1477,7 +1477,7 @@ test('WHAT[host-boundary-032] C46_before_hide_failure_restores_the_already_hidde
 })
 
 // T180 probe conclusion (installed OpenCode 1.18.29, real three-round
-// observation): when a tool executor rejects (js-manager execute wrapped to
+// observation): when a tool executor rejects (todowrite-for-manager execute wrapped to
 // reject), the Host never invokes tool.execute.after (observed sequence:
 // before.observed → executor.throwing → sessionIdle, after absent for the
 // whole 25s window). The Host materializes the exception as a durable tool
@@ -1523,7 +1523,7 @@ test('WHAT[host-boundary-032] C47_interrupted_field_deletion_restores_arguments_
       const keys = Reflect.ownKeys(args)
       const output = { args }
       await assert.rejects(
-        hooks['tool.execute.before']({ tool: 'js-manager', sessionID, callID: 'call-c47' }, output),
+        hooks['tool.execute.before']({ tool: 'todowrite-for-manager', sessionID, callID: 'call-c47' }, output),
         (error) => error === sentinel,
       )
       assert.equal(failNoteDeletion, false, 'the failure occurred after the earlier field deletion')
@@ -1588,7 +1588,7 @@ integrationTest(
     assert.equal(stdoutSummary.versions?.plugin, '1.18.29', 'plugin version must match fixture')
     assert.deepEqual(
       stdoutSummary.reviewTools,
-      ['js-manager'],
+      ['todowrite-for-manager'],
       'reviewTools must contain exactly the single review tool',
     )
     for (const tool of stdoutSummary.reviewTools) {
@@ -1625,8 +1625,8 @@ integrationTest(
     )
     const visibleToolNames = stdoutSummary.wireInspection.providerVisibleToolNames
     assert.ok(
-      visibleToolNames.includes('js-manager'),
-      `provider-visible set must include the plugin tool js-manager; observed: ${visibleToolNames.join(',')}`,
+      visibleToolNames.includes('todowrite-for-manager'),
+      `provider-visible set must include the plugin tool todowrite-for-manager; observed: ${visibleToolNames.join(',')}`,
     )
     assert.ok(
       ['skill', 'read', 'glob', 'grep'].some((name) => visibleToolNames.includes(name)),
@@ -1695,7 +1695,7 @@ integrationTest(
 test('WHAT[host-boundary-032] C34_transform_restores_hidden_protocol_fields_into_persisted_history', async () => {
   setPredictorState('configured')
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const tool = 'js-manager'
+    const tool = 'todowrite-for-manager'
     const sessionID = 'ses-c34'
     await openIncumbency(runtime, sessionID)
     const callID = 'call-c34-1'
@@ -1819,7 +1819,7 @@ test('WHAT[host-boundary-032] C35_unknown_tool_call_leaves_persisted_history_unt
 
 test('WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stable', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const tool = 'js-manager'
+    const tool = 'todowrite-for-manager'
     const sessionID = 'ses-c36'
     await openIncumbency(runtime, sessionID)
     const callID = 'call-c36-1'
@@ -1867,7 +1867,7 @@ test('WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stab
 
 test('WHAT[host-boundary-032] C37_tool_results_are_never_rewritten_by_the_restore', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const tool = 'js-manager'
+    const tool = 'todowrite-for-manager'
     const sessionID = 'ses-c37'
     await openIncumbency(runtime, sessionID)
     const callID = 'call-c37-1'
@@ -2081,7 +2081,7 @@ test('WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_a
 
     // 负向 2：非参与工具（如 review / join）若携带 estimated_readonly_rounds / self_note
     // sanitizeSnapshot 根据 classifyTool = NoEstimate，将其 ReadonlyRounds 与 SelfNote 均清洗为 None。
-    // 注：在当前实现中，ManagerReviewTools.isReviewTool 仅硬编码为 js-manager（而 js-manager 在 classifyTool 中恰好亦属于参与工具）。
+    // 注：在当前实现中，ManagerReviewTools.isReviewTool 仅硬编码为 todowrite-for-manager（而 todowrite-for-manager 在 classifyTool 中恰好亦属于参与工具）。
     // 工具 'review' 在 classifyTool 中虽名为 review 但属于 NoEstimate，且在 ManagerReviewTools 中不属于 review 工具。
     // 当非参与工具被调用并携带协议字段时，sanitizeSnapshot 将其过滤，三项均为 None，不进 vault，后续 transform 亦绝不写入/改写历史。
     const nonParticipatingCallID = 'call-c40-non-participating'
@@ -2577,10 +2577,10 @@ test('WHAT[host-boundary-032] C48_configured_before_repeats_only_for_the_same_hi
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
       const sessionID = 'ses-c48'
       await openIncumbency(runtime, sessionID)
-      for (const tool of ['read', 'js-manager']) {
+      for (const tool of ['read', 'todowrite-for-manager']) {
         const args = { self_note: 'original note', path: 'file.txt', estimated_readonly_rounds: 2 }
         const businessContract = { native: true }
-        args.contract = tool === 'js-manager' ? 'original review' : businessContract
+        args.contract = tool === 'todowrite-for-manager' ? 'original review' : businessContract
         const original = structuredClone(args)
         const keys = Reflect.ownKeys(args)
         const input = { tool, sessionID, callID: `call-c48-${tool}` }
@@ -2588,7 +2588,7 @@ test('WHAT[host-boundary-032] C48_configured_before_repeats_only_for_the_same_hi
         await hooks['tool.execute.before'](input, output)
         await hooks['tool.execute.before']({ ...input }, output)
         assert.equal(output.args, args)
-        const businessView = tool === 'js-manager' ? { path: 'file.txt' } : { path: 'file.txt', contract: businessContract }
+        const businessView = tool === 'todowrite-for-manager' ? { path: 'file.txt' } : { path: 'file.txt', contract: businessContract }
         assert.deepEqual(args, businessView, 'the repeated callback keeps only the business view')
         if (tool === 'read') assert.equal(args.contract, businessContract, 'a non-review contract belongs to the business tool')
         await hooks['tool.execute.after']({ ...input, args }, { title: tool, output: 'result', metadata: {} })
@@ -2682,7 +2682,7 @@ test('WHAT[host-boundary-032] C52_review_contract_reintroduced_on_the_same_call_
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
       const sessionID = 'ses-c52'
       await openIncumbency(runtime, sessionID)
-      const input = { tool: 'js-manager', sessionID, callID: 'call-c52' }
+      const input = { tool: 'todowrite-for-manager', sessionID, callID: 'call-c52' }
       const args = { estimated_readonly_rounds: 2, contract: 'original review', self_note: 'original note', path: 'file.txt' }
       const original = structuredClone(args)
       const keys = Reflect.ownKeys(args)
@@ -2691,7 +2691,7 @@ test('WHAT[host-boundary-032] C52_review_contract_reintroduced_on_the_same_call_
       args.contract = 'reintroduced review'
       await assert.rejects(hooks['tool.execute.before'](input, output), /Invalid investigation estimate arguments:/)
       assert.equal(output.args, args)
-      await hooks['tool.execute.after']({ ...input, args }, { title: 'js-manager', output: 'result', metadata: {} })
+      await hooks['tool.execute.after']({ ...input, args }, { title: 'todowrite-for-manager', output: 'result', metadata: {} })
       assert.deepEqual(args, original)
       assert.deepEqual(Reflect.ownKeys(args), keys)
     })
@@ -2710,7 +2710,7 @@ test('WHAT[host-boundary-032] C53_concurrent_calls_sharing_arguments_have_only_o
       const descriptors = Object.getOwnPropertyDescriptors(args)
       const keys = Reflect.ownKeys(args)
       const calls = ['first', 'second'].map((suffix) => ({
-        input: { tool: 'js-manager', sessionID, callID: `call-c53-${suffix}` },
+        input: { tool: 'todowrite-for-manager', sessionID, callID: `call-c53-${suffix}` },
         output: { args },
       }))
       const results = await Promise.allSettled(calls.map(({ input, output }) => hooks['tool.execute.before'](input, output)))
@@ -2722,7 +2722,7 @@ test('WHAT[host-boundary-032] C53_concurrent_calls_sharing_arguments_have_only_o
       await hooks['tool.execute.before']({ ...winner.input }, winner.output)
       await assert.rejects(hooks['tool.execute.before']({ ...loser.input }, loser.output), /Invalid investigation estimate arguments:/)
       assert.deepEqual(args, { path: 'file.txt' })
-      await hooks['tool.execute.after']({ ...winner.input, args }, { title: 'js-manager', output: 'result', metadata: {} })
+      await hooks['tool.execute.after']({ ...winner.input, args }, { title: 'todowrite-for-manager', output: 'result', metadata: {} })
       for (const call of calls) assert.equal(call.output.args, args)
       assert.deepEqual(Object.getOwnPropertyDescriptors(args), descriptors)
       assert.deepEqual(Reflect.ownKeys(args), keys)
@@ -2732,7 +2732,7 @@ test('WHAT[host-boundary-032] C53_concurrent_calls_sharing_arguments_have_only_o
   }
 })
 
-for (const [predictor, tool] of [['unconfigured', 'js-manager'], ['configured', 'js-manager'], ['configured', 'read']]) {
+for (const [predictor, tool] of [['unconfigured', 'todowrite-for-manager'], ['configured', 'todowrite-for-manager'], ['configured', 'read']]) {
   test(`WHAT[host-boundary-032] C54_late_after_does_not_restore_new_owner_${predictor}_${tool}`, async () => {
     setPredictorState(predictor)
     try {

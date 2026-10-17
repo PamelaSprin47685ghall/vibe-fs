@@ -176,7 +176,7 @@ must = [
   "orch.2",
   # DELEGATE 14.5: the three uniquely-declared delegation turns must be physically
   # reached. Both companions' bootstrap requests share ONE wire shape (manager
-  # agent alias, only the js-predictor face, the readonly-investigation prose as
+  # agent alias, only the todowrite-for-predictor face, the readonly-investigation prose as
   # last user), so a second bootstrap declaration with an equal-length prefix
   # would be ambiguous and fail closed. The recovery companion's physical
   # arrival is proven session-scoped by bindDelegationReplicas (chat counts
@@ -657,10 +657,10 @@ tools = ["join", "assume", "deliver"]
 id = "engineer"
 lane = "engineer"
 user = "# Write publish_proof.txt."
-tools = ["js-engineer", "read"]
+tools = ["todowrite-for-engineer", "read"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "js-engineer", args = { program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = { program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
 
   # Native-read failure probe: ordinary Engineer mainline, not Strength Replica.
   # Unique path makes message.part.updated correlation unambiguous in the real Host SSE stream.
@@ -1197,7 +1197,7 @@ optional = true
 # waitForExpectationAttempt 等待并以 >= 1 钉住；完整两轮交付与恰一次口径由主流程
 # 覆盖（replica chats [1, 2]、owner chats [4, 5]、Requested/Bound == 2）。
 # budget=2：同伴第 1 轮经
-# 唯一只读面 js-predictor 读 large_probe.txt（工具既有截断由宿主掌握；帧只保存
+# 唯一只读面 todowrite-for-predictor 读 large_probe.txt（工具既有截断由宿主掌握；帧只保存
 # 实际返回字节，marker 在头部，截断也存活），第 2 轮以纯文本提前结束；材料经
 # Prepared → Promoted 回传 owner 的后续请求。两个 companion 的每次请求 wire
 # 同形（启动 prose 永远渲染在末尾，replica 自己的交换在它之前），bootstrap 与
@@ -1213,8 +1213,8 @@ optional = true
 # 事实屏障、preflow matchCount 与自定义 oracle 从持久事实与公开 wire 证明。
 # owner 与同伴条目的 last user 不同：owner 是测试声明的提示词，同伴是生产的
 # delegation/readonly-investigation prose（两个 companion 完全相同，故只有一条
-# bootstrap 声明入口），另以 tools 门禁区分：owner 要求 js-manager，同伴只放
-# js-predictor 且禁止 js-manager。
+# bootstrap 声明入口），另以 tools 门禁区分：owner 要求 todowrite-for-manager，同伴只放
+# todowrite-for-predictor 且禁止 todowrite-for-manager。
 #
 # owner 角色是 manager（014 preFlow 与 flow 的 createSession 均以 manager 建会话）：
 # 委托 capture 要求 root owner work，而顶层 manager API 会话是本世界唯一的
@@ -1252,18 +1252,18 @@ optional = true
 id = "strength-canary-owner"
 internal = true
 user = "STRENGTH_HOST_CANARY: inspect README.md through the real nested Replica path."
-tools = ["js-manager"]
+tools = ["todowrite-for-manager"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "js-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }", estimated_readonly_rounds = 2, self_note = "read-only survey before publishing" } }
+  respond = { type = "tool-call", tool = "todowrite-for-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }", estimated_readonly_rounds = 2, self_note = "read-only survey before publishing" } }
 
   # The continuation whose transform starts the decision (Bound → companion
   # rounds → Prepared) and renders the candidate before the target assistant
   # output — the mid-insertion the prefix-probe epoch below admits. Its explicit
   # zero estimate keeps the legal "estimate 0 without self_note" pairing on the
-  # wire after both companions moved to the non-participating js-predictor face.
+  # wire after both companions moved to the non-participating todowrite-for-predictor face.
   [[turn.step]]
-  respond = { type = "tool-call", tool = "js-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }", estimated_readonly_rounds = 0 } }
+  respond = { type = "tool-call", tool = "todowrite-for-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }", estimated_readonly_rounds = 0 } }
 
   # Successor transform replays the Promoted frames into XTrace before capture
   # (WHAT[speculative-investigation-008]) → StrengthFramesTraced.
@@ -1278,7 +1278,7 @@ tools = ["js-manager"]
 
 # Every companion request shares ONE wire shape: the replica inherits the
 # owner's agent (manager), so its session auto-binds the `manager` alias, and
-# the request carries only the permitted `js-predictor` face with the
+# the request carries only the permitted `todowrite-for-predictor` face with the
 # delegation/readonly-investigation prose as its LAST user message. The
 # companion's own completed exchanges render BEFORE that trailing prose, so the
 # continuation round lands on the same step-0 key as the bootstrap and no
@@ -1299,11 +1299,11 @@ tools = ["js-manager"]
 id = "strength-canary-replica"
 internal = true
 user = "Continue the current task's read-only investigation"
-tools = ["js-predictor"]
-forbiddenTools = ["js-manager"]
+tools = ["todowrite-for-predictor"]
+forbiddenTools = ["todowrite-for-manager"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "js-predictor", args = { program = "class Js extends JsProgram { async run() { const f = await this.file('large_probe.txt'); return f.text('^', '$'); } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-predictor", args = { program = "class Js extends JsProgram { async run() { const f = await this.file('large_probe.txt'); return f.text('^', '$'); } }" } }
 
 [[turn]]
 id = "strength-recovery-owner-title"
@@ -1321,17 +1321,17 @@ optional = true
 id = "strength-recovery-owner"
 lane = "strength-recovery-owner"
 user = "STRENGTH_RECOVERY: resume the readonly delegation after a provider failure."
-tools = ["js-manager"]
+tools = ["todowrite-for-manager"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "js-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }", estimated_readonly_rounds = 1, self_note = "verify probe content after provider fault recovery" } }
+  respond = { type = "tool-call", tool = "todowrite-for-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }", estimated_readonly_rounds = 1, self_note = "verify probe content after provider fault recovery" } }
 
   # First delivery of this step is refused by the declared fault; the Host
   # retry serves this same response. DelegationRequested was persisted by the
   # capture phase before the fault; the Prepared candidate re-renders
   # identically on the retry (DELEGATE-10).
   [[turn.step]]
-  respond = { type = "tool-call", tool = "js-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Recovered delegation consumed; continuing the road." }
@@ -1345,7 +1345,7 @@ tools = ["js-manager"]
 # The recovery decision's companion: estimated_readonly_rounds 1, so its bootstrap
 # is the only admitted round and the N+1 outbound request is refused at the
 # transform gate before any physical send. Its bootstrap request is wire-identical
-# to the canary companion's (manager agent, js-predictor, same prose) and is
+# to the canary companion's (manager agent, todowrite-for-predictor, same prose) and is
 # answered by the shared strength-canary-replica step 0 above; a second
 # declaration would be an equal-length ambiguous duplicate. Physical arrival is
 # proven by bindDelegationReplicas' session-scoped chat counts [1, 2].
@@ -1371,7 +1371,7 @@ optional = true
 # readonly-investigation prose relocated to the end. That per-round rebuild is
 # a deliberate relocation (not an append), and it lands on the same step-0
 # entry as the bootstrap — declared here. The prefix-probe admission keeps the
-# provider plan (js-predictor) fixed while the message prefix is rebuilt.
+# provider plan (todowrite-for-predictor) fixed while the message prefix is rebuilt.
 # Optional: a future projection that appends in place is admitted rather than
 # fatal.
 [[epoch]]

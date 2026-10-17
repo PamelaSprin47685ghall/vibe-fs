@@ -305,13 +305,13 @@ module StrengthSurface =
         |> projectionIntentResultToJs
 
     /// Owner-facing display name for one projected exchange: the replica calls
-    /// `js-predictor`, but the owner must see its own `js-<role>` surface.
+    /// `todowrite-for-predictor`, but the owner must see its own `todowrite-for-<role>` surface.
     let private ownerDisplayNameOf (value: obj) (toolName: string) : string =
         if isNull value || isNull value?ownerRole then
             toolName
         else
             match Roles.tryParseRole (textOf value?ownerRole) with
-            | Some role when toolName = "js-predictor" -> "js-" + Roles.roleLabel role
+            | Some role when toolName = "todowrite-for-predictor" -> "todowrite-for-" + Roles.roleLabel role
             | _ -> toolName
 
     let candidate (sha256: string -> string) (value: obj) : obj =
@@ -1760,8 +1760,8 @@ module StrengthSurface =
             match Roles.tryParseRole ownerRole with
             | Some role ->
                 fun toolName ->
-                    if toolName = "js-predictor" then
-                        "js-" + Roles.roleLabel role
+                    if toolName = "todowrite-for-predictor" then
+                        "todowrite-for-" + Roles.roleLabel role
                     else
                         toolName
             | None -> id

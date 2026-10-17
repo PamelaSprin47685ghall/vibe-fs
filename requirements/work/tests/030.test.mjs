@@ -4,7 +4,7 @@ import * as ToolSurface from '../../../dist/OpenCode/Tools/ToolSurface.js'
 import * as Strength from '../../../dist/Strength/Surface.js'
 
 test('WHAT[work-030] StaticTools and estimate contract explicitly distinguish all five plan tools', () => {
-  const planTools = ['js-plan', 'devops', 'ask', 'review', 'deliver']
+  const planTools = ['todowrite-for-plan', 'devops', 'ask', 'review', 'deliver']
 
   // ToolSurface exports toolSpecNames as an array of all recognized tool names
   const names = ToolSurface.toolSpecNames()

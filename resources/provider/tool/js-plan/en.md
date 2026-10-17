@@ -2,4 +2,4 @@ The programming surface for the planning draft `P`. `P` is the only file this to
 
 This surface has no glob, no grep, and no access to repository files. For repository facts, use `devops`.
 
-In each incumbency, `js-plan` is strictly read-only until this incumbency calls `review`. An `edit` or `rewrite` before that call is refused and tells you to call `review` first. After `review`, writing is unlocked. A relayed successor incumbency is read-only again until its own `review`.
+In each incumbency, `todowrite-for-plan` is strictly read-only until this incumbency calls `review`. An `edit` or `rewrite` before that call is refused and tells you to call `review` first. After `review`, writing is unlocked. A relayed successor incumbency is read-only again until its own `review`.

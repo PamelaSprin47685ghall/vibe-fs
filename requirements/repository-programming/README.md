@@ -8,7 +8,7 @@
 
 ## park/unpark/abandon 生命周期（WHAT[repository-programming-030]、[032]-[036]、[038]、[039]）
 
-程序内 `await this.park(payload)` 让执行结果变为 Parked：顶级 parked 载荷带非空 handle 与程序传入的 payload，渲染以 `# parked` 开头。park 是 async 生命周期成员，任何 js-* 生成面无条件携带（含只读的 Manager），但不进 filesystem members 列表，既有角色的成员序列保持字节同一；描述与示例教授 park/unpark/abandon 三态契约。
+程序内 `await this.park(payload)` 让执行结果变为 Parked：顶级 parked 载荷带非空 handle、程序传入的 payload 与完整程序源码（挂起行以 `>| ` 标记），渲染以 `# parked` 开头。park 是 async 生命周期成员，任何 js-* 生成面无条件携带（含只读的 Manager），但不进 filesystem members 列表；`where` 的零/多匹配歧义也经同一挂起通道。一期在旧成员之后追加九个主原语（cat/ls/stat/write/mkdir/where/whereAll 新增，rm/mv 语义保留），member 序列为 `file, glob, grep, edit, rewrite, write, rm, mv, cat, ls, stat, mkdir, whereAll, where`。描述与示例教授 park/unpark/abandon 三态契约与 unpark 自由值责任。
 
 `unpark` 以 `{ handle, value }` 恢复挂起程序，挂起点的 await 求值为注入值；恢复后的程序可再次 park 并得到新 handle。handle 恰好消费一次：第二次 unpark、abandon 之后的 unpark、对未知 handle 的 unpark 或 abandon 都报 `HANDLE_UNKNOWN`。
 

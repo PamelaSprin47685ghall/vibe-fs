@@ -6,8 +6,8 @@
  *   - tool.execute.before
  *   - tool.execute.after
  *
- * Observes the sole manager review tool (js-manager)
- * and control tools (read, grep, glob, js-engineer, js-devops), recording:
+ * Observes the sole manager review tool (todowrite-for-manager)
+ * and control tools (read, grep, glob, todowrite-for-engineer, todowrite-for-devops), recording:
  *   - schema decoration with contract (type, enum, required)
  *   - before: args reference identity and unchanged business arguments
  *   - after: original argument values, object identity and key order
@@ -40,8 +40,8 @@ const productionPluginPath =
 
 const EXECUTOR_THROW_SENTINEL = 'T180-EXECUTOR-THROW-SENTINEL';
 const EXECUTOR_THROW_MESSAGE = 'T180-EXECUTOR-THROW: intentional executor rejection';
-const REVIEW_TOOLS = Object.freeze(['js-manager']);
-const CONTROL_TOOLS = Object.freeze(['read', 'grep', 'glob', 'js-engineer', 'js-devops']);
+const REVIEW_TOOLS = Object.freeze(['todowrite-for-manager']);
+const CONTROL_TOOLS = Object.freeze(['read', 'grep', 'glob', 'todowrite-for-engineer', 'todowrite-for-devops']);
 
 const emit = async (kind, value) => {
   if (!collectorUrl) return;
@@ -134,8 +134,8 @@ export default {
 
       tool: {
         ...(hooks.tool ?? {}),
-        'js-manager': {
-          ...(hooks.tool?.['js-manager'] ?? {}),
+        'todowrite-for-manager': {
+          ...(hooks.tool?.['todowrite-for-manager'] ?? {}),
           // T180 executorThrow canary: when the provider-authored program
           // carries the throw sentinel, this wrapper rejects before the real
           // executor runs. before/after stay production-owned so the canary
@@ -150,8 +150,8 @@ export default {
               });
               throw new Error(EXECUTOR_THROW_MESSAGE);
             }
-            const originalExecutor = hooks.tool?.['js-manager']?.execute;
-            return await originalExecutor.call(hooks.tool?.['js-manager'], args, context);
+            const originalExecutor = hooks.tool?.['todowrite-for-manager']?.execute;
+            return await originalExecutor.call(hooks.tool?.['todowrite-for-manager'], args, context);
           },
         },
       },

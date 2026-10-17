@@ -14,3 +14,10 @@ module JsMutationFs =
     /// EXDEV is CROSS_DEVICE_MOVE with neither side changed. As-is: same
     /// ownership boundary as removePath.
     val movePath: fromPath: string -> toPath: string -> Result<unit, JsFailure>
+    /// Enumerate one directory in sorted order; directory entries end with "/".
+    val listDirectory: path: string -> Result<string list, JsFailure>
+    /// Metadata for one path; a missing path is `exists = false`, not an error.
+    val statPath: path: string -> Result<obj, JsFailure>
+    /// Create one directory (non-recursive). Existing is DIRECTORY_EXISTS;
+    /// a missing parent is PARENT_DIRECTORY_MISSING.
+    val makeDirectory: path: string -> Result<unit, JsFailure>

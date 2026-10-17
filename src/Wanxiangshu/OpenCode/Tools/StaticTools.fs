@@ -30,7 +30,7 @@ module StaticTools =
         | ToolPermission.Chronicle -> [ "chronicle" ]
         | ToolPermission.Fetch -> [ "fetch" ]
         | ToolPermission.Finality -> [ "deliver" ]
-        | ToolPermission.JsPlan -> [ "js-plan" ]
+        | ToolPermission.JsPlan -> [ "todowrite-for-plan" ]
         | ToolPermission.Ask -> [ "ask" ]
         | ToolPermission.DevOpsConsultation -> [ "devops" ]
         | ToolPermission.Deliver -> [ "deliver" ]
@@ -100,9 +100,9 @@ module StaticTools =
         |> Option.exists (fun permission -> OfficeCapability.permissions role |> Set.contains permission)
 
 
-    /// JS-001: the generated js-ROLE tool name for a role.
+    /// JS-001: the generated todowrite-for-ROLE tool name for a role.
     let jsToolName (role: Role) : string =
-        "js-" + (string role).ToLowerInvariant()
+        "todowrite-for-" + (string role).ToLowerInvariant()
 
     /// Shared office boundary for lightweight cognitive utilities. Both the
     /// custom assume tool and the Host-native todowrite surface consume this
@@ -160,13 +160,13 @@ module StaticTools =
           "chronicle"
           "fetch"
           "deliver"
-          "js-engineer"
-          "js-manager"
-          "js-orchestrator"
-          "js-devops"
-          "js-blogger"
-          "js-bookkeeper"
-          "js-plan"
+          "todowrite-for-engineer"
+          "todowrite-for-manager"
+          "todowrite-for-orchestrator"
+          "todowrite-for-devops"
+          "todowrite-for-blogger"
+          "todowrite-for-bookkeeper"
+          "todowrite-for-plan"
           "ask"
           "devops"
           "deliver" ]
@@ -198,9 +198,9 @@ module StaticTools =
         if admitted then "allow" else "deny"
 
     let private jsPermission role name =
-        if name = "js-manager" && role = Role.Manager then
+        if name = "todowrite-for-manager" && role = Role.Manager then
             "allow"
-        elif name = "js-plan" && role = Role.Plan then
+        elif name = "todowrite-for-plan" && role = Role.Plan then
             "allow"
         elif name = jsToolName role && hasFsCapability role then
             "allow"
@@ -211,7 +211,7 @@ module StaticTools =
         match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
         // 普通工具准入与可见性使用同一份能力映射。
-        | true, ("ask" | "devops" | "review" | "deliver" | "js-plan"), Role.Plan -> "allow"
+        | true, ("ask" | "devops" | "review" | "deliver" | "todowrite-for-plan"), Role.Plan -> "allow"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
         | true, ("read" | "grep" | "glob"), Role.Manager -> "deny"
@@ -228,8 +228,8 @@ module StaticTools =
         | true, ("assume" | "todowrite"), _ -> "allow"
         | true, ("defer" | "publish"), Role.Blogger -> "deny"
         | true, ("defer" | "publish"), _ -> "allow"
-        | true, "js-bookkeeper", _ -> "deny"
-        | true, name, _ when name.StartsWith "js-" -> jsPermission role name
+        | true, "todowrite-for-bookkeeper", _ -> "deny"
+        | true, name, _ when name.StartsWith "todowrite-for-" -> jsPermission role name
         | true, _, _ -> defaultPermission allowed role name
 
     let permissionObj (role: Role) : obj =
@@ -284,7 +284,7 @@ module StaticTools =
     /// System prompt for B-record distillation with chronicle tool protocol.
     let bloggerAgentConfig (prompt: string) : obj = hiddenAgent Role.Blogger prompt
 
-    /// InternalLeaf Bookkeeper Host stub (AGENT-002): hidden; ToolRegistry gates js-bookkeeper by attachment.
+    /// InternalLeaf Bookkeeper Host stub (AGENT-002): hidden; ToolRegistry gates todowrite-for-bookkeeper by attachment.
     let bookkeeperAgentConfig (prompt: string) : obj =
         let pairs =
             [ yield "*", box "deny"

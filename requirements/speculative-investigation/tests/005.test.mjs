@@ -31,7 +31,7 @@ test('WHAT[speculative-investigation-005] predictor text crosses as reasoning wi
       { kind: 'reasoning', text: 'private thinking' },
       { kind: 'text', text: texts[0] },
       { kind: 'text', text: texts[1] },
-      call('p1', 'js-predictor', '{"program":"read"}'),
+      call('p1', 'todowrite-for-predictor', '{"program":"read"}'),
     ] },
     { role: 'tool', parts: [result('p1', 'actual evidence')] },
     { role: 'assistant', parts: [
@@ -42,7 +42,7 @@ test('WHAT[speculative-investigation-005] predictor text crosses as reasoning wi
   const batches = Strength.collectCompleteBatches(messages)
   assert.deepEqual(batches, [
     { requestOrdinal: 1, assistantText: texts.slice(0, 2), exchanges: [
-      exchange('js-predictor', '{"program":"read"}', 'actual evidence'),
+      exchange('todowrite-for-predictor', '{"program":"read"}', 'actual evidence'),
     ] },
     { requestOrdinal: 2, assistantText: texts.slice(2), exchanges: [] },
   ])
@@ -88,7 +88,7 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_frame_bundle_accepts_only
   assert.match(good.value.digest, /^H\(/)
   assert.ok(good.value.byteLength > 0)
   const withJsPredictor = Strength.frameTryBuild(H, [
-    batch(1, [exchange('js-predictor', '{"program":"..."}', 'readonly result')]),
+    batch(1, [exchange('todowrite-for-predictor', '{"program":"..."}', 'readonly result')]),
   ])
   assert.equal(withJsPredictor.ok, true)
   const writeOnly = Strength.frameTryBuild(H, [batch(1, [exchange('write', '{}', 'ok')])])

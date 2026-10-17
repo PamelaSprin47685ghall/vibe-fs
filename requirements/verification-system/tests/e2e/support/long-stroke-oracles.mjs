@@ -1105,7 +1105,7 @@ const requestModel = (request) => {
 };
 
 const PARTICIPATING_TOOLS = new Set([
-  'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
+  'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
   'edit', 'write', 'mv', 'rm', 'fetch', 'run',
 ]);
 
@@ -1218,12 +1218,12 @@ export async function bindDelegationReplicas(scenario, ctx) {
  // Assert replica provider request carries only allowed readonly tools
       if (Array.isArray(request?.tools) && request.tools.length > 0) {
         const toolNames = request.tools.map((t) => t?.function?.name ?? t?.name).filter(Boolean);
-        const disallowed = ['write', 'edit', 'run', 'fork', 'join', 'mv', 'rm', 'bash', 'js-engineer', 'js-devops', 'js-manager'];
+        const disallowed = ['write', 'edit', 'run', 'fork', 'join', 'mv', 'rm', 'bash', 'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager'];
         for (const disallowedTool of disallowed) {
           assert.ok(!toolNames.includes(disallowedTool), `replica ${id} must never carry ${disallowedTool}`);
         }
-        const allowedSet = new Set(['read', 'glob', 'grep', 'js-predictor']);
-        assert.ok(toolNames.every((t) => allowedSet.has(t)), `replica ${id} tools must be subset of {read, glob, grep, js-predictor}, got: ${toolNames.join(', ')}`);
+        const allowedSet = new Set(['read', 'glob', 'grep', 'todowrite-for-predictor']);
+        assert.ok(toolNames.every((t) => allowedSet.has(t)), `replica ${id} tools must be subset of {read, glob, grep, todowrite-for-predictor}, got: ${toolNames.join(', ')}`);
       }
     }
   }

@@ -378,7 +378,7 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
     const first = await lifecycle.tryFinalize(dir, delegateId)
     assert.equal(first.ok, true, `tryFinalize ok: ${JSON.stringify(first.error)}`)
     assert.equal(bookkeeperPort.createCalls.length, 1, 'detached Bookkeeper sibling lane once')
-    assert.equal(bookkeeperPort.programCalls.length >= 1, true, 'js-bookkeeper must reshape Q and A in one program')
+    assert.equal(bookkeeperPort.programCalls.length >= 1, true, 'todowrite-for-bookkeeper must reshape Q and A in one program')
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('CaseFinalize')), true)
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q1')), true)
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q3')), true)
@@ -464,7 +464,7 @@ test('WHAT[knowledge-reuse-010] actual reusable Engineer results can be manually
     const first = await lifecycle.tryFinalize(dir, delegateId)
     assert.equal(first.ok, true, `exactly one finalize ok: ${JSON.stringify(first.error)}`)
     assert.equal(bookkeeperPort.createCalls.length, 1, 'exactly one detached Bookkeeper sibling lane')
-    assert.equal(bookkeeperPort.programCalls.length >= 1, true, 'js-bookkeeper invoked')
+    assert.equal(bookkeeperPort.programCalls.length >= 1, true, 'todowrite-for-bookkeeper invoked')
 
     const store = eventStore.create(join(dir, '.git'), 'g6-host-fetch')
     const published = await casebook.fetchCase(store, 10, delegateId)

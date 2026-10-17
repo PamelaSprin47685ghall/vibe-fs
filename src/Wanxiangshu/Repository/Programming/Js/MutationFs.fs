@@ -96,8 +96,23 @@ module JsMutationFs =
     [<Import("renameSync", "node:fs")>]
     let private renameSync (fromPath: string) (toPath: string) : unit = jsNative
 
+    [<Import("statSync", "node:fs")>]
+    let private statSync (path: string) : obj = jsNative
+
+    [<Import("mkdirSync", "node:fs")>]
+    let private mkdirSync (path: string) : unit = jsNative
+
+    [<Import("join", "node:path")>]
+    let private pathJoin (a: string) (b: string) : string = jsNative
+
     [<Emit("$0.isDirectory()")>]
     let private statIsDirectory (stat: obj) : bool = jsNative
+
+    [<Emit("$0.size")>]
+    let private statSize (stat: obj) : float = jsNative
+
+    [<Emit("$0.mtime.toISOString()")>]
+    let private statMtime (stat: obj) : string = jsNative
 
     /// Delete a file or an empty directory; a non-empty directory is
     /// DIRECTORY_NOT_EMPTY, a missing target is FILE_NOT_FOUND. The caller
@@ -144,3 +159,56 @@ module JsMutationFs =
                 Error(JsFailure.CrossDeviceMove fromPath)
             else
                 Error(JsFailure.FileReadFailed fromPath)
+
+    /// Enumerate one directory, POSIX `ls` order. Directory entries carry a
+    /// trailing slash so the caller can tell them apart without another
+    /// stat. A missing path is FILE_NOT_FOUND; a file path is not a listing.
+    let listDirectory (path: string) : Result<string list, JsFailure> =
+        try
+            let names = readdirSync path |> Array.sort
+
+            names
+            |> Array.map (fun name ->
+                let entry = pathJoin path name
+                let stat = lstatSync entry
+                if statIsDirectory stat then name + "/" else name)
+            |> Array.toList
+            |> Ok
+        with error ->
+            if string error?code = "ENOENT" then
+                Error(JsFailure.FileNotFound path)
+            else
+                Error(JsFailure.FileReadFailed path)
+
+    /// One path's metadata. A missing path is a normal observation
+    /// (`exists = false`), not a failure; the caller decides what absence
+    /// means. Any other filesystem error is FILE_READ_FAILED.
+    let statPath (path: string) : Result<obj, JsFailure> =
+        try
+            let stat = statSync path
+
+            Ok(
+                createObj
+                    [ "exists" ==> true
+                      "size" ==> statSize stat
+                      "mtime" ==> statMtime stat
+                      "isDir" ==> statIsDirectory stat ]
+            )
+        with error ->
+            if string error?code = "ENOENT" then
+                Ok(createObj [ "exists" ==> false; "size" ==> 0; "mtime" ==> null; "isDir" ==> false ])
+            else
+                Error(JsFailure.FileReadFailed path)
+
+    /// Create exactly one directory (POSIX mkdir, non-recursive). An existing
+    /// target is DIRECTORY_EXISTS; a missing parent is
+    /// PARENT_DIRECTORY_MISSING so the caller can tell the two apart.
+    let makeDirectory (path: string) : Result<unit, JsFailure> =
+        try
+            mkdirSync path
+            Ok()
+        with error ->
+            match string error?code with
+            | "EEXIST" -> Error(JsFailure.DirectoryExists path)
+            | "ENOENT" -> Error(JsFailure.ParentDirectoryMissing path)
+            | _ -> Error(JsFailure.FileReadFailed path)
