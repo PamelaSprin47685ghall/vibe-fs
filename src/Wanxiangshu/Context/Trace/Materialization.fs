@@ -50,6 +50,7 @@ module XTraceMaterialization =
         (messageId: TranscriptMessageAddress)
         (partId: HostMessagePartId option)
         (partIndex: int)
+        (generation: int)
         (xTrace: XTraceProjectionState)
         : Task<Result<string option, string>> =
         let matchesPart (part: XTraceSemanticPartView) =
@@ -60,7 +61,11 @@ module XTraceMaterialization =
 
         let candidates =
             XTraceProjection.partsForHostMessageIds (Set.singleton (TranscriptMessageAddress.value messageId)) xTrace
-            |> List.filter (fun part -> part.Role = "user" && part.Kind = "text" && matchesPart part)
+            |> List.filter (fun part ->
+                part.Generation = generation
+                && part.Role = "user"
+                && part.Kind = "text"
+                && matchesPart part)
 
         taskResult {
             match candidates with

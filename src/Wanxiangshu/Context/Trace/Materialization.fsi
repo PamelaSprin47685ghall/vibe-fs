@@ -19,6 +19,7 @@ module XTraceMaterialization =
         messageId: TranscriptMessageAddress ->
         partId: HostMessagePartId option ->
         partIndex: int ->
+        generation: int ->
         xTrace: XTraceProjectionState ->
             Task<Result<string option, string>>
 

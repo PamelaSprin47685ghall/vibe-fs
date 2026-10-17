@@ -42,6 +42,8 @@ ProviderRetryAttempt 不进入 X/Y/digest；定位当前 retry 的 request-start
 
 所有 provider 共用 cursor 呈现，不生成 synthetic skill 消息。guidance 只能附在**本次请求最新一条真实消息**上，且只有该消息本身承载呈现时才有载体：用户消息附于其末尾并使用无 name 属性的 `<system>` 包装；其余角色附于其 terminal 工具结果（completed/error）的 NUL+BOM 后缀。最新消息不承载载体时，本轮不生成新 occurrence，也不留下任何无法呈现的 durable 事实；不得把 occurrence 记在渲染器改不动的位置（`Before(user)`、`After(assistant 文本)` 等）上。
 
+用户消息的末尾文本 part 须能由同一 Host capture codec 解码为文本。被该 codec 省略的空字符串、纯空白或未识别 part 不承载新 occurrence；保留原始 Host part 的字节，也不把指导移到前面的文本 part。完全无内容的 provider 消息仍遵守 host-boundary-011 的无语义占位规则。
+
 同一未重锚 horizon 按 durable occurrence 原位、原字节回放，不删除、过滤、去重、搬移或叠加第二后缀；placement 判定先剥离后缀，再精确重附。ContextReanchored 退休旧 occurrence 的可见性：旧 occurrence 不再呈现，新 occurrence 以新序号追加到新的载体；新 horizon 下同一位置承载新字节属于退休而非改写，不构成对未重锚回放律的违反。
 
 
@@ -63,7 +65,11 @@ ProviderRetryAttempt 不进入 X/Y/digest；定位当前 retry 的 request-start
 
 guidance 后缀正文只参与 provider 呈现，不进入 XTrace、Companion decode、Blogger delta、WorkRecord 或 compaction 输入。仅其 durable occurrence 投影参与 guidance 恢复。
 
-Host 捕获读取原始物理消息，呈现使用副本。剥离已经附加的呈现时，须按同一 Host message/part 的原文和该位置的 durable occurrence 精确核对完整字节；普通用户或工具正文引用相同文本、分隔符或完整包装时仍是业务原文，不能按文本替换删除。底层 Trace 入口不猜测调用者提供的正文是否来自呈现层。
+Host 捕获读取原始物理消息，呈现使用副本。捕获前不得按旧原文、后缀或 occurrence 改写物理输入：同代原件变化由 semantic-trace-002 拒绝，新代原文完整捕获。已呈现 wire 不能冒充物理原件重入捕获入口。
+
+Pair/Grounding 呈现所有者在已确认原件上剥离或重放已附加的呈现时，须按同一 Host message/part 的原文和该位置的 durable occurrence 精确核对完整字节；普通用户或工具正文引用相同文本、分隔符或完整包装时仍是业务原文，不能按文本替换删除。底层 Trace 入口不猜测调用者提供的正文是否来自呈现层。
+
+用户原文查询只在本次捕获所属的 generation 内判定唯一性。新代尚未捕获时不回退旧代证明，也不从旧呈现推断新正文。同代歧义拒绝；当前可见 occurrence 的呈现缺少对应原文时也须拒绝，退休 occurrence 不得删字或阻断新原文。不从后缀反推空白原文或继续将呈现捕获为业务正文。
 
 ## [015] synthetic identity 确定性
 

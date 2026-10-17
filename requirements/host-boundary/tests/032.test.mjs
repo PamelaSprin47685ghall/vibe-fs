@@ -1850,10 +1850,13 @@ test('WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stab
       ],
     }
 
+    const physicalOutput = transformed.messages[0].parts[0].state.output
     await hooks['experimental.chat.messages.transform']({}, transformed)
     const afterFirst = structuredClone(transformed)
 
+    transformed.messages[0].parts[0].state.output = physicalOutput
     await hooks['experimental.chat.messages.transform']({}, transformed)
+    transformed.messages[0].parts[0].state.output = physicalOutput
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
     assert.deepEqual(

@@ -289,16 +289,16 @@ module XTraceCapture =
         let text = CompletedTurnClassifier.partsSessionText turn.Parts
         captureTerminalText journal turn.SessionId text turn.ProviderRun
 
-    /// HOST-006: Host turn indices restart after reanchor; XTrace does not.
-    /// Provenance must carry the reanchor generation or post-compaction turns
-    /// collide with pre-compaction `turn:0/part:0` and never append — RecordCoverage
-    /// then maps a Host cursor onto a dead numbering and stages Next≤Prev.
+    let generationForEpoch (epoch: ActivePrefixEpoch option) : int =
+        epoch
+        |> Option.map (fun state -> Set.count state.ReanchoredRuns)
+        |> Option.defaultValue 0
+
     let private captureGeneration (journal: AgentJournal) (sessionId: SessionId) : int =
         AgentJournal.snapshot journal
         |> fun projection -> AgentProjection.tryFind sessionId projection.AgentProjections
         |> Option.bind (fun session -> session.PrefixEpoch)
-        |> Option.map (fun epoch -> Set.count epoch.ReanchoredRuns)
-        |> Option.defaultValue 0
+        |> generationForEpoch
 
     /// COMPANION-003 / COMPANION-007: synchronise the XTrace with the provider's
     /// semantic projection at the transform boundary.

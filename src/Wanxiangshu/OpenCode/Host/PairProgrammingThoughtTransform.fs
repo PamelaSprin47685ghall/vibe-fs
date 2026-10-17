@@ -611,7 +611,7 @@ module PairProgrammingThoughtTransform =
               { GuidanceBytes = ""
                 RequirementBytes = reads } ])
 
-    let private presentationsAtMessage (session: SessionAgentProjection option) (rawMsg: obj) =
+    let private presentationsAtMessage includeRetired (session: SessionAgentProjection option) (rawMsg: obj) =
         let atMessage gap =
             match gap with
             | TranscriptGap.After address ->
@@ -634,7 +634,10 @@ module PairProgrammingThoughtTransform =
                     (pairs |> List.filter (fun pair -> atMessage pair.ResultGap))
                     (occurrences |> List.filter (fun occurrence -> atMessage occurrence.ResultGap))
 
-            atAnchor (GuidelineProjection.pairs guidance) (RequirementGroundingProjection.occurrences grounding)
+            (if includeRetired then
+                 atAnchor (GuidelineProjection.pairs guidance) (RequirementGroundingProjection.occurrences grounding)
+             else
+                 [])
             @ atAnchor
                 (GuidelineProjection.visiblePairs guidance)
                 (RequirementGroundingProjection.visibleOccurrences grounding)
@@ -651,14 +654,14 @@ module PairProgrammingThoughtTransform =
                     |> Option.map (fun original ->
                         identity,
                         { Body = original
-                          Presentations = presentationsAtMessage session rawMsg })
+                          Presentations = presentationsAtMessage true session rawMsg })
             }
 
         cursorResultIdentity rawMsg
         |> Option.map (snd >> capture)
         |> Option.defaultWith (fun () -> Task.FromResult(Ok None))
 
-    let private captureUserText trace session (rawMsg: obj) =
+    let private captureUserText trace generation session (rawMsg: obj) =
         let needsProof =
             messageRole rawMsg = "user"
             && (rawParts rawMsg
@@ -684,14 +687,23 @@ module PairProgrammingThoughtTransform =
         let capture (index, partId) =
             taskResult {
                 let messageId = TranscriptMessageAddress.create (unbox<string> rawMsg?info?id)
-                let! body = XTraceMaterialization.tryHostUserText messageId partId index trace
+                let! body = XTraceMaterialization.tryHostUserText messageId partId index generation trace
 
-                return
-                    body
-                    |> Option.map (fun original ->
-                        messageId,
-                        { Body = original
-                          Presentations = presentationsAtMessage session rawMsg })
+                match body with
+                | None when
+                    presentationsAtMessage false session rawMsg
+                    |> List.exists (fun presentation ->
+                        presentation.GuidanceBytes <> "" || presentation.RequirementBytes <> "")
+                    ->
+                    return! Error "XTrace original Host user text is missing for its cursor presentation"
+                | None -> return None
+                | Some original ->
+                    return
+                        Some(
+                            messageId,
+                            { Body = original
+                              Presentations = presentationsAtMessage true session rawMsg }
+                        )
             }
 
         source
@@ -703,10 +715,16 @@ module PairProgrammingThoughtTransform =
             AgentJournal.snapshot journal
             |> fun projection -> AgentProjection.tryFind sessionId projection.AgentProjections
 
+        let generation =
+            session |> Option.bind _.PrefixEpoch |> XTraceCapture.generationForEpoch
+
         let capture trace =
             taskResult {
                 let! captured = rawMessages |> TaskResultList.traverseM (captureCursorResult trace session)
-                let! users = rawMessages |> TaskResultList.traverseM (captureUserText trace session)
+
+                let! users =
+                    rawMessages
+                    |> TaskResultList.traverseM (captureUserText trace generation session)
 
                 return
                     { HasTrace = true
@@ -1012,7 +1030,11 @@ module PairProgrammingThoughtTransform =
     /// occurrence is committed but never rendered.
     let private messageCarriesGuidance (rawMsg: obj) : bool =
         if messageRole rawMsg = "user" then
-            terminalTextPartIndex (rawParts rawMsg) |> Option.isSome
+            terminalTextPartIndex (rawParts rawMsg)
+            |> Option.bind (fun index -> ProviderWireDecode.decodePart (rawParts rawMsg).[index])
+            |> Option.exists (function
+                | Wanxiangshu.Participant.Provider.Projection.ProviderProjection.WireText _ -> true
+                | _ -> false)
         else
             rawParts rawMsg
             |> Array.mapi terminalGuidanceIndex

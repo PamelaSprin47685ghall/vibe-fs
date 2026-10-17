@@ -72,7 +72,7 @@ try {
   const rendered = toolPart(observed.after.find(message => message.info.id === originalMessage.info.id)).state.output
   assert.ok(rendered.startsWith(original + '\0\uFEFF'))
   assert.deepEqual(observed.projection.messages.flatMap(message => message.parts).filter(part => part.kind === 'tool-result'), [{ kind: 'tool-result', result: original }])
-  assert.ok(requests.some(value => value.session === sessionID && value.body.messages?.some(message => typeof message.content === 'string' && message.content === rendered)), 'the actual provider request must carry the presented tool result')
+  await waitFor(() => requests.some(value => value.session === sessionID && value.body.messages?.some(message => typeof message.content === 'string' && message.content === rendered)))
   await waitCompleted(originalMessage.info.parentID)
 
   const guidance = rendered.slice(original.length + 2)

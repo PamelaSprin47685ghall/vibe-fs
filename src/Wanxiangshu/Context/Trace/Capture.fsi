@@ -3,6 +3,7 @@ namespace Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal.JournalOutcome
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Turn
+open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -52,6 +53,8 @@ type XTraceMessageCapture =
 
 module XTraceCapture =
     val semanticPart: part: MessagePart -> SemanticPart option
+
+    val generationForEpoch: epoch: ActivePrefixEpoch option -> int
 
     val stableCaptureEligibility:
         journal: AgentJournal option ->

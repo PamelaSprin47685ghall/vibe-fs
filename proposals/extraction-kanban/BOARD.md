@@ -108,8 +108,9 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-06-R2](WORK-RECORD-HISTORY-2026-10-17.md) | GAP-111 已完成范围的历史表示稳定性 | DONE | Terminal时原子固定WorkRecord摘要引用，真实Sync/Fork使用确切完成终点；Node/Bun核心69pass/1TODO、相关1239项0普通失败，非作者源/暖冷行为及旧精确包blob升级消费通过。575精确包df0ccd隔离默认入口和同包非作者Node/Bun实际消费者均通过，随本原子提交交付；历史关联缺失不自动迁移，R12-U1暂缓 | root | g111r_contracts |
 | [CUT-06-R4](WORK-RECORD-HISTORY-2026-10-17.md#r4-review) | R2 独立复审：并发事实下的完成因果边界 | DONE | 并发晚摘要/原件、多head父边及完成歧义已修；1311项0普通失败、Bun核心91pass/1TODO、真实checkpoint/消费者/冷恢复、旧R2包升级及229980精确包独立Node/Bun消费通过。三名非作者复验完成，撤回的五个越界白盒用例不计正式验收；GAP-111/109、旧缺边历史与R12-U1边界保留，随本原子提交交付 | root | r2_freeze_review、r2_replay_review、r2_consumer_review |
 | [CUT-17-R1](GUIDANCE-INGRESS-2026-10-17.md) | GAP-108 指导呈现回流的真实 Host 路径核查 | DONE | 正常Host原件隔离成立，原直接capture TODO改为保真负控和实际Host证明；引用误删P1已修。1350项相关回归0普通失败、实际Host网络/持久/冷读、Trace正反编译及f047精确包隔离Node/Bun消费通过；旧错历史及完整CUT-17不销项，R12-U1暂缓，随本原子提交交付 | root | root自审；未做非作者复审 |
+| [CUT-17-R2](GUIDANCE-INGRESS-2026-10-17.md#r2-review) | R1 独立复审：来源身份、Host 链路与验收归因 | DONE | 四项R1回退已修，捕获前还原删除，原件/呈现职责分开；O1撤为review误判。600核心Node/Bun25pass/1skip、真实Host1/1、1363项0普通失败及2e0f精确包非作者Node/Bun各12组暖/新OS冷读通过；三名非作者复验完成，旧错历史/完整CUT-17不销项，R12-U1暂缓，随本原子提交交付 | root | g108r_provenance、g108r_host、g108r_evidence |
 
-2026-10-17 当前顺序：CUT-06-R1/R3/R2/R4及CUT-17-R1所列范围已验收；接着三个Process P2按R6-B → R6-C → R6-A各自闭环。旧历史关联及完整Trace/Ownership产品链分别施工，主动脱组另做原型，R12-U1暂缓。[当前排期与验收范围](REMAINING-REPAIRS-2026-10-16.md#post-t01-plan)。公共文件、两仓发布及主仓集成仍串行，不能用局部修复关闭整张关联卡。
+2026-10-17 当前顺序：CUT-06-R1/R3/R2/R4及CUT-17-R1/R2所列范围已验收；接着三个Process P2按R6-B → R6-C → R6-A各自闭环。旧历史关联及完整Trace/Ownership产品链分别施工，主动脱组另做原型，R12-U1暂缓。[当前排期与验收范围](REMAINING-REPAIRS-2026-10-16.md#post-t01-plan)。公共文件、两仓发布及主仓集成仍串行，不能用局部修复关闭整张关联卡。
 
 ## 波次：什么时候拉哪张卡
 

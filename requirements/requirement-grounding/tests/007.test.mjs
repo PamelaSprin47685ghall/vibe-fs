@@ -137,6 +137,15 @@ const withPresentationJournals = async (directory, body) => {
   }
 }
 
+const replayPresentation = (directory, sessionID, messages) =>
+  withPresentationJournals(directory, async (pairJournal, groundingJournal) => {
+    const paired = await pair.tryInjectWithJournal(pairJournal, sessionID, pair.text, structuredClone(messages))
+    assert.equal(paired.ok, true, paired.error)
+    const grounded = await grounding.projectWithJournal(groundingJournal, sessionID, paired.value)
+    assert.equal(grounded.ok, true, grounded.error)
+    return grounded.value
+  })
+
 for (const providerID of ['anthropic', 'cursor', 'openai']) {
   test(`WHAT[requirement-grounding-007] registered original results retain complete saved presentation text (${providerID})`, async () => {
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -178,10 +187,17 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       const canonical = await trace.currentProjection(runtime.journal, sessionID)
       assert.deepEqual(canonical.messages.flatMap(message => message.parts).filter(part => part.kind === 'tool-result'),
         [{ kind: 'tool-result', result: seed.parts[0].state.output }, { kind: 'tool-result', result: output }])
-      const repeated = { messages: structuredClone(projected.messages) }
-      await hooks['experimental.chat.messages.transform']({}, repeated)
+      const repeated = { messages: await replayPresentation(directory, sessionID, projected.messages) }
       assert.deepEqual(repeated.messages, projected.messages, 'known payloads are data in original results and material bodies during projected replay')
       assert.deepEqual(await trace.currentProjection(runtime.journal, sessionID), canonical)
+      const prefixBody = `${oldCarrier}new body\r\n\0\uFEFFtail  `
+      writeFileSync(materialPath, prefixBody)
+      const third = await produce('carrier-prefix', 'third actual source\r\n')
+      const extended = { messages: structuredClone([...raw, third]) }
+      await hooks['experimental.chat.messages.transform']({}, extended)
+      assert.ok(extended.messages.at(-1).parts[0].state.output.endsWith(grounding.cursorSeparator + originalMaterialCarrier(prefixBody)))
+      const extendedReplay = { messages: await replayPresentation(directory, sessionID, extended.messages) }
+      assert.deepEqual(extendedReplay.messages, extended.messages, 'an older complete token that prefixes a new material carrier cannot split the new carrier')
       for (const identity of ['missing-part', 'wrong-part', 'wrong-message', 'wrong-call']) {
         const unbound = structuredClone(next)
         if (identity === 'missing-part') delete unbound.parts[0].id
@@ -198,15 +214,6 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
           assert.ok(grounded.value.at(-1).parts[0].state.output.startsWith(output), `${identity}: grounding never guesses where original bytes end`)
         })
       }
-      const prefixBody = `${oldCarrier}new body\r\n\0\uFEFFtail  `
-      writeFileSync(materialPath, prefixBody)
-      const third = await produce('carrier-prefix', 'third actual source\r\n')
-      const extended = { messages: structuredClone([...raw, third]) }
-      await hooks['experimental.chat.messages.transform']({}, extended)
-      assert.ok(extended.messages.at(-1).parts[0].state.output.endsWith(grounding.cursorSeparator + originalMaterialCarrier(prefixBody)))
-      const extendedReplay = { messages: structuredClone(extended.messages) }
-      await hooks['experimental.chat.messages.transform']({}, extendedReplay)
-      assert.deepEqual(extendedReplay.messages, extended.messages, 'an older complete token that prefixes a new material carrier cannot split the new carrier')
     })
   })
 }
@@ -249,16 +256,14 @@ test('WHAT[requirement-grounding-007] missing physical part IDs bind only to exa
     const nextGuidance = sessionHostFacts(directory, sessionID).filter(fact => fact[0] === 'PairProgrammingGuidelineAnchored').at(-1)[1].MarkerText
     assert.equal(projected.messages.at(-1).parts[0].state.output,
       body + grounding.cursorSeparator + nextGuidance + grounding.cursorSeparator + originalMaterialCarrier(materialBody))
-    const replay = { messages: structuredClone(projected.messages) }
-    await hooks['experimental.chat.messages.transform']({}, replay)
+    const replay = { messages: await replayPresentation(directory, sessionID, projected.messages) }
     assert.deepEqual(replay.messages, projected.messages, 'captured missing-part identity replays both owners once without stripping literal material')
-    const thirdReplay = { messages: structuredClone(replay.messages) }
-    await hooks['experimental.chat.messages.transform']({}, thirdReplay)
+    const thirdReplay = { messages: await replayPresentation(directory, sessionID, replay.messages) }
     assert.deepEqual(thirdReplay.messages, projected.messages, 'three projection passes retain the same whole presentation')
     const canonicalResults = (await trace.currentProjection(runtime.journal, sessionID)).messages.flatMap(message => message.parts).filter(part => part.kind === 'tool-result')
     assert.deepEqual(canonicalResults,
       [{ kind: 'tool-result', result: first.parts[0].state.output }, { kind: 'tool-result', result: body }],
-      'three passes capture each actual result once and do not append request-local presentation')
+      'registered capture stores each actual result once; presentation replay adds no Trace material')
     assert.equal(trace.orderedSemanticParts(trace.snapshot(runtime.journal, sessionID)).filter(part => part.kind === 'tool_result').length, 2)
     for (const identity of ['present-part', 'wrong-call', 'wrong-message']) {
       const unbound = structuredClone(next)
@@ -510,8 +515,7 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
             assert.deepEqual(projected.messages.map(message => message.info), raw.map(message => message.info))
             const canonical = await trace.currentProjection(runtime.journal, sessionID)
             assert.deepEqual(canonical.messages.flatMap(message => message.parts).filter(part => part.kind === 'tool-result'), [{ kind: 'tool-result', result: output }])
-            const repeated = { messages: structuredClone(projected.messages) }
-            await hooks['experimental.chat.messages.transform']({}, repeated)
+            const repeated = { messages: await replayPresentation(directory, sessionID, projected.messages) }
             assert.deepEqual(repeated.messages, projected.messages, 'projected wire replay preserves the complete carrier once')
             assert.deepEqual(await trace.currentProjection(runtime.journal, sessionID), canonical)
           })

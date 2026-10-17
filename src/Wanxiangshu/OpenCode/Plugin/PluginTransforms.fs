@@ -180,32 +180,6 @@ module PluginTransforms =
         fuse reason
         raise (InvalidOperationException reason)
 
-    let private canonicalCaptureMessages (journal: AgentJournal option) session rawMessages =
-        let restore durable =
-            task {
-                match!
-                    PairProgrammingThoughtTransform.stripCursorSuffixesWithJournal
-                        durable
-                        session
-                        PairProgrammingThoughtTransform.CursorPresentationOwner.PairGuidance
-                        []
-                        rawMessages
-                with
-                | Error error -> return Error error
-                | Ok paired ->
-                    return!
-                        PairProgrammingThoughtTransform.stripCursorSuffixesWithJournal
-                            durable
-                            session
-                            PairProgrammingThoughtTransform.CursorPresentationOwner.RequirementGrounding
-                            []
-                            paired
-            }
-
-        journal
-        |> Option.map restore
-        |> Option.defaultWith (fun () -> Task.FromResult(Ok rawMessages))
-
     let private determineTransformMode
         (branches: TransformBranchCapabilities)
         (projectionSessionIdOpt: string option)
@@ -613,11 +587,8 @@ module PluginTransforms =
                           Current = None
                           Receipt = None }
                 | Some sessionId ->
-                    let! canonical = canonicalCaptureMessages journal (SessionId.create sessionId) rawMessages
-
                     let observations =
-                        canonical
-                        |> Result.defaultWith (raiseFailClosed strengthFailFuse)
+                        rawMessages
                         |> List.choose (fun rawMessage ->
                             ProviderWireCapture.decodeCapturedMessage rawMessage
                             |> Option.map (fun message ->
