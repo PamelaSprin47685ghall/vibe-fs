@@ -728,6 +728,8 @@ Process/LargeGateSurface.fsi
 Process/LargeGateSurface.fs
 Process/JsSandbox.fsi
 Process/JsSandbox.fs
+Repository/Programming/Js/TransactionStore.fsi
+Repository/Programming/Js/TransactionStore.fs
 Repository/Programming/Js/OpenCode/ParkedSites.fsi
 Repository/Programming/Js/OpenCode/ParkedSites.fs
 Process/PtyTypes.fsi
@@ -1088,8 +1090,6 @@ Context/Companion/Blogger/OpenCode/PluginScope.fsi
 Context/Companion/Blogger/OpenCode/PluginScope.fs
 Strength/OpenCode/PluginScope.fsi
 Strength/OpenCode/PluginScope.fs
-Repository/Programming/Js/TransactionStore.fsi
-Repository/Programming/Js/TransactionStore.fs
 OpenCode/Host/PluginSessionScope.fsi
 OpenCode/Host/PluginSessionScope.fs
 OpenCode/Host/PluginRecoveryScope.fsi

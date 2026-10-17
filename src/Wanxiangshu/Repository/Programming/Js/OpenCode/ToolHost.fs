@@ -71,6 +71,8 @@ module JsDescriptionAssets =
           EditRules = template lang JsCanonicalDescription.Path.EditRules
           WriteRules = text lang JsCanonicalDescription.Path.WriteRules
           MutationRules = text lang JsCanonicalDescription.Path.MutationRules
+          Rm = text lang JsCanonicalDescription.Path.Rm
+          Mv = text lang JsCanonicalDescription.Path.Mv
           UltraFraming = text lang JsCanonicalDescription.Path.UltraFraming
           UltraUnavailable = text lang JsCanonicalDescription.Path.UltraUnavailable
           UltraEngineering = text lang JsCanonicalDescription.Path.UltraEngineering
@@ -160,30 +162,18 @@ module JsToolSpec =
         let inputOf (args: HostToolArguments) : obj =
             let program = readProgram args
 
-            let unpark =
-                if isNull (args.Raw?unpark) then
-                    null
-                else
-                    args.Raw?unpark
+            let unpark = if isNull (args.Raw?unpark) then null else args.Raw?unpark
 
-            let abandon =
-                if isNull (args.Raw?abandon) then
-                    null
-                else
-                    args.Raw?abandon
+            let abandon = if isNull (args.Raw?abandon) then null else args.Raw?abandon
 
             match program, unpark, abandon with
             | Some source, _, _ -> createObj [ "program" ==> source ]
             | None, unparkValue, _ when not (isNull unparkValue) ->
                 createObj
                     [ "unpark"
-                      ==> createObj
-                              [ "handle" ==> string (unparkValue?handle)
-                                "value" ==> unparkValue?value ] ]
+                      ==> createObj [ "handle" ==> string (unparkValue?handle); "value" ==> unparkValue?value ] ]
             | None, _, abandonValue when not (isNull abandonValue) ->
-                createObj
-                    [ "abandon"
-                      ==> createObj [ "handle" ==> string (abandonValue?handle) ] ]
+                createObj [ "abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ] ]
             | _ -> createObj []
 
         // The unpark/abandon arguments are nested objects; the Host schema
@@ -205,10 +195,8 @@ module JsToolSpec =
               ToolHostCodec.stringSchemaDescribed
                   (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
                   factory
-              "unpark",
-              unparkSchema
-              "abandon",
-              abandonSchema ]
+              "unpark", unparkSchema
+              "abandon", abandonSchema ]
           Admission = admissionFor surface.RoleName
           Execute =
             fun args ctx ->
@@ -257,5 +245,7 @@ module JsToolSpec =
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
         : ToolSpec =
-        let spec = create factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation
+        let spec =
+            create factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation
+
         { spec with Admission = admission }

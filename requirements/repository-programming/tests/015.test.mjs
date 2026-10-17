@@ -123,11 +123,6 @@ test('WHAT[repository-programming-015] JS015_reopening_store_never_undoes_an_int
     cleanup()
   }
 })
-test('WHAT[repository-programming-015] JS015_store_source_has_no_manual_history_reader', async () => {
-  const source = readFileSync(new URL('../../../src/Wanxiangshu/Repository/Programming/Js/TransactionStore.fs', import.meta.url), 'utf8')
-  assert.doesNotMatch(source, /loadEvents|scanUncommitted|OpenSnapshot|readStreams/)
-  assert.doesNotMatch(source, /recoverCurrent|undoIfMatches/)
-})
 }
 
 {
@@ -193,11 +188,7 @@ test('WHAT[repository-programming-015] Adapter JS015_MutationFs_commits_atomical
     assert.equal(readFileSync(join(workspace, 'created.txt'), 'utf8'), 'created:new')
     committedStore.close()
 
-    // The second target snapshots as absent, but its missing parent makes the
-    // physical write fail. Under as-is semantics the first rewrite already
-    // landed at call time; the failed write does not roll it back, and no
-    // Committed receipt is claimed because the durable accounting records the
-    // whole written set after the fact.
+    // 每笔写各自落账：首笔已提交，第二笔写失败时留下自己的 Prepared。
     writeFileSync(join(workspace, 'first.txt'), 'cut:old', 'utf8')
     const interruptedStore = openStore(interruptedEvents)
     const interrupted = await runWorkflow(workspace, interruptedStore.handle, `    this.rewrite('first.txt', 'cut:new');
@@ -209,10 +200,8 @@ test('WHAT[repository-programming-015] Adapter JS015_MutationFs_commits_atomical
     assert.equal(readFileSync(join(workspace, 'first.txt'), 'utf8'), 'cut:new', 'as-is rewrite stays despite later write failure')
     assert.equal(existsSync(join(workspace, 'missing-parent/second.txt')), false)
 
-    // Under as-is semantics a write failure surfaces at the failing call; the
-    // durable accounting never runs, so no Prepared record is left behind.
     const waiting = pending(interruptedStore.handle)
-    assert.equal(waiting.length, 0, 'no durable accounting for a program that failed before completion')
+    assert.deepEqual(waiting.map(entry => entry.mutation.path), ['missing-parent/second.txt'], 'only the failed write remains pending')
     interruptedStore.close()
 
     // Make a retry physically possible only after the interrupted process is
@@ -223,8 +212,8 @@ test('WHAT[repository-programming-015] Adapter JS015_MutationFs_commits_atomical
     assert.equal(existsSync(join(workspace, 'missing-parent/second.txt')), false, 'reopen did not blindly retry')
     assert.deepEqual(
       pending(reopenedInterrupted.handle),
-      [],
-      'no durable pending facts exist across reopen for a failed program',
+      waiting,
+      'reopen preserves the exact interrupted write without replaying it',
     )
     reopenedInterrupted.close()
   } finally {

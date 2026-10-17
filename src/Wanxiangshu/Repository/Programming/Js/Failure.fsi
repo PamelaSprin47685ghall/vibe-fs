@@ -60,6 +60,7 @@ type JsFailure =
     | ConcurrencyLimit
     | HandleUnknown of string
     | CannotParkWhileAbandoning
+    | Abandoned
 
 module JsFailure =
     val code: failure: JsFailure -> string

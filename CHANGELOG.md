@@ -1,5 +1,13 @@
 # Changelog — 版本历史
 
+## Unreleased — JS 工具当前工作区构建恢复
+
+- 补齐实现已有但签名遗漏的 `Prose.Rm/Mv`、对应资源路径与 `JsFailure.Abandoned`，不回退 rm/mv 或 abandon 功能。
+- 将跨 park/unpark 保存的 `JsAsIsLedger` 从后编译的 `ToolsBindings` 模块移到现有 `TransactionStore` 协议；同步所有类型引用，并让事务协议先于 `ParkedSites` 编译。无新包装层、兼容别名或 `obj` 强转。
+- 保留既有逐笔 As-Is 写语义。回归不再用整批追加次数判断重试，改验每笔写的唯一身份与具体失败；失败写的 Prepared 事实须跨重启保留、不得自动重放。移除源码拷贝和固定文案断言，保留实际文件效果、失败码及涉事路径验证。
+- 当前工作区构建成功（generation 24），172 个公开 surface 与 829 个产物模块链接加载通过。实际启动 `opencode serve` 加载当前 `dist`，`js-manager` 完成 glob、park/unpark、review 与两段 deliver，终态中断早于工具返回，Host 最终 idle；未终止已有用户会话。
+- 定向回归：repository-programming 全套、work/011、managed-session-lifecycle/016 合计 235 通过、0 失败、9 跳过、9 TODO；跳过与 TODO 不计入通过。
+
 ## Unreleased — Manager 终态交付保证停止
 
 - `DeliverTool` 在 S4 `Delivered`（无继任者）落盘后，使用既有 `JournalSurface.appendAuthorityLogicalRunClosed` 关闭对应 Manager/HumanRoot logical run，随后等待 `Sessions.InterruptAttempt`，最后才返回“已结束”。原生产路径既漏了 logical run 关闭，也漏了 interrupt，导致模型在已退休且无权限的任期内继续调用工具。

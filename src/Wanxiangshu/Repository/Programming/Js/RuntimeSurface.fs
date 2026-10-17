@@ -34,7 +34,13 @@ module JsRuntimeSurface =
                   JsCapability.Park ]
 
         let api =
-            JsToolsBindings.createApi allCapabilities root staging readSnapshots (ResizeArray<JsExplicitFileRead>())
+            JsToolsBindings.createApi
+                allCapabilities
+                root
+                staging
+                readSnapshots
+                (ResizeArray<JsExplicitFileRead>())
+                (JsToolsBindings.createLedger None)
 
         box (JsBindingsHandle(api, staging, readSnapshots))
 
@@ -57,7 +63,13 @@ module JsRuntimeSurface =
         let capabilities = permissionLabels |> Array.choose capabilityOfLabel |> Set.ofArray
 
         let api =
-            JsToolsBindings.createApi capabilities root staging readSnapshots (ResizeArray<JsExplicitFileRead>())
+            JsToolsBindings.createApi
+                capabilities
+                root
+                staging
+                readSnapshots
+                (ResizeArray<JsExplicitFileRead>())
+                (JsToolsBindings.createLedger None)
 
         box (JsBindingsHandle(api, staging, readSnapshots))
 

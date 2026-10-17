@@ -152,8 +152,18 @@ module JsToolWorkflow =
     /// payload: the program suspended at `await js.park(payload)` and the site
     /// is registered under `handle` (PLAN S2 step 4).
     type JsToolOutcome =
-        | Succeeded of value: LlmFacing.Data.Value * rewritten: string list * created: string list * removed: string list * moved: (string * string) list
-        | Failed of failure: JsFailure * rewritten: string list * created: string list * removed: string list * moved: (string * string) list
+        | Succeeded of
+            value: LlmFacing.Data.Value *
+            rewritten: string list *
+            created: string list *
+            removed: string list *
+            moved: (string * string) list
+        | Failed of
+            failure: JsFailure *
+            rewritten: string list *
+            created: string list *
+            removed: string list *
+            moved: (string * string) list
         | Parked of handle: string * payload: obj
 
     /// The park payload is created inside the sandbox realm; the host reads it
@@ -201,31 +211,29 @@ module JsToolWorkflow =
         operation
         |> TaskValue.map (Result.mapError JsFailure.TransactionPersistenceFailed)
 
-    /// As-is durable accounting. The filesystem effects already happened at
-    /// each edit/write call (JS-012); this records the Prepared/Committed pair
-    /// for the mutations that were actually written. PLAN S2 step 8 (algorithm
-    /// H1/H2) is per-mutation granularity: each mutation gets its own
-    /// Prepared/Committed pair, no multi-mutation aggregation. Prepared is
-    /// recorded after the as-is write landed (as-is semantics), so the durable
-    /// ledger tracks exactly what the disk reflects at this point.
-    let private accountDurable
-        (persistence: IJsTransactionPersistence option)
-        (root: string)
-        (mutations: JsStagedMutation list)
-        : Task<Result<unit, JsFailure>> =
-        taskResult {
-            match persistence with
-            | None -> return ()
-            | Some durable ->
-                for mutation in mutations do
-                    let prepared =
-                        { TransactionId = JsTransactionId.generate ()
-                          WorkspaceRoot = root
-                          Mutation = JsTransactionFacts.ofMutation mutation }
+    /// Settle the H1 ledger the mutation members fired (PLAN algorithm H1):
+    /// await every Prepared/Committed append. The members fire Prepared at
+    /// call time (before the write lands) and Committed right after, at
+    /// per-mutation granularity with no aggregation; the physical EventStore
+    /// append chain settles within the same event-loop turn as the write. A
+    /// failed append fails the tool result with the stable
+    /// TRANSACTION_PREPARE_*/COMMIT_* codes while the landed as-is writes
+    /// stay reported, never rolled back ([013]).
+    let private settleLedger (ledger: JsAsIsLedger) : Task<Result<unit, JsFailure>> =
+        task {
+            let mutable appendFailure = None
 
-                    let! _ = durable.AppendPrepared prepared |> mapPersistenceFailure
-                    let! _ = durable.AppendCommitted prepared.TransactionId |> mapPersistenceFailure
-                    return ()
+            for pending in ledger.Appends do
+                let! appended = pending
+
+                if appendFailure.IsNone then
+                    match appended with
+                    | Error failure -> appendFailure <- Some(JsFailure.TransactionPersistenceFailed failure)
+                    | Ok _ -> ()
+
+            match appendFailure with
+            | Some failure -> return Error failure
+            | None -> return Ok()
         }
 
     let private invokeObservation observe readPaths effectPaths : Task<Result<unit, JsFailure>> =
@@ -272,11 +280,12 @@ module JsToolWorkflow =
             let staging = ResizeArray<JsStagedMutation>()
             let readSnapshots = ResizeArray<JsReadSnapshot>()
             let explicitReads = ResizeArray<JsExplicitFileRead>()
+            let ledger = JsToolsBindings.createLedger persistence
 
             let! outcome =
                 taskResult {
                     let api =
-                        JsToolsBindings.createApi capabilities root staging readSnapshots explicitReads
+                        JsToolsBindings.createApi capabilities root staging readSnapshots explicitReads ledger
 
                     let! resultJson =
                         task {
@@ -304,6 +313,8 @@ module JsToolWorkflow =
                 || Set.contains JsCapability.Remove capabilities
                 || Set.contains JsCapability.Move capabilities
 
+            let! ledgerOutcome = settleLedger ledger
+
             match outcome with
             | Error failure ->
                 // Program execution or return-value parsing failed; the writes
@@ -318,9 +329,7 @@ module JsToolWorkflow =
                     match observation with
                     | Error failure -> return Failed(failure, rewritten, created, removed, moved)
                     | Ok() ->
-                        let! account = accountDurable persistence root mutations
-
-                        match account with
+                        match ledgerOutcome with
                         | Error failure -> return Failed(failure, rewritten, created, removed, moved)
                         | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
         }
@@ -418,6 +427,7 @@ module JsToolWorkflow =
             let staging = ResizeArray<JsStagedMutation>()
             let readSnapshots = ResizeArray<JsReadSnapshot>()
             let explicitReads = ResizeArray<JsExplicitFileRead>()
+            let ledger = JsToolsBindings.createLedger persistence
 
             // DSL-MUTABLE: resource — park lifecycle state shared by the api
             // member and the workflow. Process-live, never durable.
@@ -430,7 +440,7 @@ module JsToolWorkflow =
                   AbandonRequested = false }
 
             let api =
-                JsToolsBindings.createApiWithPark capabilities root staging readSnapshots explicitReads parkState
+                JsToolsBindings.createApiWithPark capabilities root staging readSnapshots explicitReads ledger parkState
 
             // Install the park signal the workflow races against the program
             // promise before the program starts: the async IIFE body runs
@@ -441,13 +451,7 @@ module JsToolWorkflow =
             let parkSignal = JsSandbox.installParkSignal parkState
 
             let! runHandle =
-                JsSandbox.runSurfaceWithPark
-                    baseClassSource
-                    modelSource
-                    api
-                    deadlineMs
-                    deadlineEpochMs
-                    (Some parkState)
+                JsSandbox.runSurfaceWithPark baseClassSource modelSource api deadlineMs deadlineEpochMs (Some parkState)
 
             let taggedProgram: Task<obj> =
                 task {
@@ -461,11 +465,7 @@ module JsToolWorkflow =
                     return box (Choice2Of2 payload)
                 }
 
-            let! winnerObj =
-                emitJsExpr
-                    (taggedProgram, taggedPark)
-                    "Promise.race([$0, $1])"
-                    : Task<obj>
+            let! winnerObj = emitJsExpr (taggedProgram, taggedPark) "Promise.race([$0, $1])": Task<obj>
 
             let outcome =
                 match unbox<Choice<string, obj>> winnerObj with
@@ -497,7 +497,12 @@ module JsToolWorkflow =
                 | _ -> false
 
             match outcome with
-            | Error failure -> return Failed(failure, rewritten, created, removed, moved)
+            | Error failure ->
+                // The program failed after the race; drain the fired ledger
+                // (H1) so no append task is left unsettled. The program
+                // failure keeps the reported code; landed writes stay as-is.
+                let! _ = settleLedger ledger
+                return Failed(failure, rewritten, created, removed, moved)
             | Ok parkedValue when isParkedSentinel parkedValue ->
                 // The program parked. Register the site under a fresh handle.
                 let handle = JsParkedSites.allocateHandle ()
@@ -506,6 +511,7 @@ module JsToolWorkflow =
                     { Handle = handle
                       RunHandle = runHandle
                       ReadSnapshots = readSnapshots
+                      Ledger = ledger
                       SessionId = sessionId }
 
                 match JsParkedSites.register site with
@@ -523,9 +529,9 @@ module JsToolWorkflow =
                     match observation with
                     | Error failure -> return Failed(failure, rewritten, created, removed, moved)
                     | Ok() ->
-                        let! account = accountDurable persistence root mutations
+                        let! ledgerOutcome = settleLedger ledger
 
-                        match account with
+                        match ledgerOutcome with
                         | Error failure -> return Failed(failure, rewritten, created, removed, moved)
                         | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
         }
@@ -564,11 +570,7 @@ module JsToolWorkflow =
                     return box (Choice2Of2 payload)
                 }
 
-            let! winnerObj =
-                emitJsExpr
-                    (taggedProgram, taggedPark)
-                    "Promise.race([$0, $1])"
-                    : Task<obj>
+            let! winnerObj = emitJsExpr (taggedProgram, taggedPark) "Promise.race([$0, $1])": Task<obj>
 
             let outcome =
                 match unbox<Choice<string, obj>> winnerObj with
@@ -581,22 +583,31 @@ module JsToolWorkflow =
                 | _ -> false
 
             match outcome with
-            | Error failure -> return Failed(failure, [], [], [], [])
+            | Error failure ->
+                let! _ = settleLedger site.Ledger
+                return Failed(failure, [], [], [], [])
             | Ok parkedValue when isParkedSentinel parkedValue ->
                 // The resumed program parked again: a new handle and a new
-                // parked payload (algorithm E5).
+                // parked payload (algorithm E5). The ledger stays with the
+                // site: it is settled when the resumed run finishes.
                 let newHandle = JsParkedSites.allocateHandle ()
 
                 let newSite: JsParkedSites.JsParkedSite =
                     { Handle = newHandle
                       RunHandle = site.RunHandle
                       ReadSnapshots = site.ReadSnapshots
+                      Ledger = site.Ledger
                       SessionId = site.SessionId }
 
                 match JsParkedSites.register newSite with
                 | Error failure -> return Failed(failure, [], [], [], [])
                 | Ok _ -> return Parked(newHandle, hostRealmPayload site.RunHandle.ParkState.ParkPayload)
-            | Ok value -> return Succeeded(value, [], [], [], [])
+            | Ok value ->
+                let! ledgerOutcome = settleLedger site.Ledger
+
+                match ledgerOutcome with
+                | Error failure -> return Failed(failure, [], [], [], [])
+                | Ok() -> return Succeeded(value, [], [], [], [])
         }
 
     /// Abandon a parked site (algorithm F): reject the deferred promise with
@@ -617,12 +628,16 @@ module JsToolWorkflow =
 
             // Await the program's settle; the ABANDONED rejection unwinds the
             // stack so finally blocks run. A timeout force-truncates (F5).
-            let! result = JsSandbox.awaitResult site.RunHandle outputBoundBytes
+            let! _ = JsSandbox.awaitResult site.RunHandle outputBoundBytes
+
+            // Drain the ledger the finalizer fired (H1): the Abandoned
+            // outcome is final regardless, so a failed append is only
+            // observed here, never escalated into a different code.
+            let! _ = settleLedger site.Ledger
 
             JsParkedSites.remove site.Handle
 
-            match result with
-            | _ -> return Failed(JsFailure.ProgramFailed "abandoned", [], [], [], [])
+            return Failed(JsFailure.Abandoned, [], [], [], [])
         }
 
     /// Execute one js-* tool invocation under the three-state input protocol

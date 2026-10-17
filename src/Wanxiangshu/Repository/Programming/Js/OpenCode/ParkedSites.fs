@@ -10,12 +10,14 @@ module JsParkedSites =
 
     /// A parked site: the in-flight sandbox run handle (whose closure chain
     /// holds the vm context and whose DeadlineRef is resettable), the read
-    /// snapshots for write-before checks, the session owner, and the Parked
-    /// state.
+    /// snapshots for write-before checks, the as-is ledger the resumed
+    /// program keeps firing into (settled when the resumed run finishes),
+    /// the session owner, and the Parked state.
     type JsParkedSite =
         { Handle: string
           RunHandle: Wanxiangshu.Process.JsSandbox.JsRunHandle
           ReadSnapshots: ResizeArray<JsReadSnapshot>
+          Ledger: JsAsIsLedger
           SessionId: string }
 
     /// Concurrency ceiling for parked sites (PLAN S2 step 3: default 8).
@@ -47,12 +49,10 @@ module JsParkedSites =
         | false, _ -> None
 
     /// Remove a parked site (one-shot consumption; no tombstone).
-    let remove (handle: string) : unit =
-        table.Remove handle |> ignore
+    let remove (handle: string) : unit = table.Remove handle |> ignore
 
     /// Algorithm G1/G2: all unresolved parked handles (deliver gate + PairHint).
-    let parkedHandles () : string list =
-        table.Keys |> Seq.toList |> List.sort
+    let parkedHandles () : string list = table.Keys |> Seq.toList |> List.sort
 
     /// Algorithm G3: handles currently parked by the given session. The
     /// session-close caller enumerates them before reapSession consumes the
@@ -81,5 +81,4 @@ module JsParkedSites =
         }
 
     /// Test hook: clear the whole table.
-    let clearAll () : unit =
-        table.Clear()
+    let clearAll () : unit = table.Clear()

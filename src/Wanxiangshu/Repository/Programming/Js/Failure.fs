@@ -65,6 +65,7 @@ type JsFailure =
     | ConcurrencyLimit
     | HandleUnknown of string
     | CannotParkWhileAbandoning
+    | Abandoned
 
 module JsFailure =
 
@@ -123,6 +124,7 @@ module JsFailure =
         | JsFailure.ConcurrencyLimit -> "CONCURRENCY_LIMIT"
         | JsFailure.HandleUnknown _ -> "HANDLE_UNKNOWN"
         | JsFailure.CannotParkWhileAbandoning -> "CANNOT_PARK_WHILE_ABANDONING"
+        | JsFailure.Abandoned -> "ABANDONED"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
     let private reasonWithMessage fallback prefix message =
@@ -177,6 +179,8 @@ module JsFailure =
         | JsFailure.HandleUnknown handle -> "no parked site with this handle: " + handle
         | JsFailure.CannotParkWhileAbandoning ->
             "park is refused while the site is in its abandon cleanup window"
+        | JsFailure.Abandoned ->
+            "the parked program was abandoned; its finalizer has run"
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
     let render (failure: JsFailure) : string =
@@ -235,4 +239,5 @@ module JsFailure =
         | "CONCURRENCY_LIMIT" -> JsFailure.ConcurrencyLimit
         | "HANDLE_UNKNOWN" -> JsFailure.HandleUnknown(after "no parked site with this handle: ")
         | "CANNOT_PARK_WHILE_ABANDONING" -> JsFailure.CannotParkWhileAbandoning
+        | "ABANDONED" -> JsFailure.Abandoned
         | _ -> JsFailure.ProgramFailed text

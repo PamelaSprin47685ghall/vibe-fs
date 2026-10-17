@@ -1,8 +1,10 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
+open Wanxiangshu.Foundation.Identity
 
 /// JS-010/JS-016: the api object injected into the sandbox — the only
 /// authority a model program sees. Every member returns a JSON-compatible
@@ -26,24 +28,6 @@ module JsToolsBindings =
 
     [<Import("realpathSync", "node:fs")>]
     let private realpathSync (path: string) : string = jsNative
-
-    [<Import("unlinkSync", "node:fs")>]
-    let private unlinkSync (path: string) : unit = jsNative
-
-    [<Import("readdirSync", "node:fs")>]
-    let private readdirSync (path: string) : string array = jsNative
-
-    [<Import("lstatSync", "node:fs")>]
-    let private lstatSync (path: string) : obj = jsNative
-
-    [<Import("renameSync", "node:fs")>]
-    let private renameSync (fromPath: string) (toPath: string) : unit = jsNative
-
-    [<Import("rmdirSync", "node:fs")>]
-    let private rmdirSync (path: string) : unit = jsNative
-
-    [<Emit("$0.isDirectory()")>]
-    let private statIsDirectory (stat: obj) : bool = jsNative
 
     [<Emit("$0 === undefined || $0 === null")>]
     let private isUndefined (value: obj) : bool = jsNative
@@ -199,7 +183,51 @@ module JsToolsBindings =
         "grep"
         ==> fun (needle: obj) (pattern: string) -> runGrep root readSnapshots needle pattern
 
-    let private makeEditMember (root: string) (staging: ResizeArray<JsStagedMutation>) =
+    let createLedger (persistence: IJsTransactionPersistence option) : JsAsIsLedger =
+        { Persistence = persistence
+          Appends = ResizeArray() }
+
+    /// Observe a fired append so a rejected task never becomes an unhandled
+    /// rejection on a path that does not settle the ledger (a parked site
+    /// suspends before settlement).
+    [<Emit("$0.catch(() => undefined)")>]
+    let private observeRejection (append: obj) : obj = jsNative
+
+    /// H1: fire the Prepared append before the write lands. Returns the
+    /// transaction id so the matching Committed can be fired after the write;
+    /// a failed write leaves that Prepared as interrupt evidence ([015]).
+    let private firePrepared
+        (ledger: JsAsIsLedger)
+        (root: string)
+        (mutation: JsStagedMutation)
+        : JsTransactionId option =
+        match ledger.Persistence with
+        | None -> None
+        | Some durable ->
+            let prepared =
+                { TransactionId = JsTransactionId.generate ()
+                  WorkspaceRoot = root
+                  Mutation = JsTransactionFacts.ofMutation mutation }
+
+            let pending = durable.AppendPrepared prepared
+            observeRejection (box pending) |> ignore
+            ledger.Appends.Add pending
+            Some prepared.TransactionId
+
+    /// H1: fire the Committed append after the write landed.
+    let private fireCommitted (ledger: JsAsIsLedger) (transactionId: JsTransactionId option) : unit =
+        match ledger.Persistence, transactionId with
+        | Some durable, Some transactionId ->
+            let pending = durable.AppendCommitted transactionId
+            observeRejection (box pending) |> ignore
+            ledger.Appends.Add pending
+        | _ -> ()
+
+    let private makeEditMember
+        (root: string)
+        (staging: ResizeArray<JsStagedMutation>)
+        (ledger: JsAsIsLedger)
+        =
         "edit"
         ==> fun (path: string) (newText: obj) ->
             let replacement = string newText
@@ -212,13 +240,20 @@ module JsToolsBindings =
                 // As-is write: the single-mutation commit plan validates the
                 // target is still fresh (FILE_CHANGED otherwise) and atomically
                 // persists this one write; it never rolls back earlier writes.
+                // H1: Prepared fires before the write, Committed right after.
+                let transactionId = firePrepared ledger root mutation
                 do! JsMutationFs.commitPlan root (JsTransaction.commitPlan [ mutation ])
+                fireCommitted ledger transactionId
                 staging.Add mutation
                 return createObj [ "ok" ==> true ]
             }
             |> renderOutcome
 
-    let private makeWriteMember (root: string) (staging: ResizeArray<JsStagedMutation>) =
+    let private makeWriteMember
+        (root: string)
+        (staging: ResizeArray<JsStagedMutation>)
+        (ledger: JsAsIsLedger)
+        =
         "write"
         ==> fun (path: string) (text: string) ->
             result {
@@ -235,7 +270,10 @@ module JsToolsBindings =
                 // As-is write: the single-mutation commit plan creates the
                 // file with a no-clobber flag (FILE_CHANGED if a third party
                 // created it meanwhile) and persists immediately.
+                // H1: Prepared fires before the write, Committed right after.
+                let transactionId = firePrepared ledger root mutation
                 do! JsMutationFs.commitPlan root (JsTransaction.commitPlan [ mutation ])
+                fireCommitted ledger transactionId
                 staging.Add mutation
                 return createObj [ "ok" ==> true ]
             }
@@ -261,11 +299,14 @@ module JsToolsBindings =
     /// JS-020/JS-030 rm: delete a file or an empty directory; refuse a
     /// non-empty directory (DIRECTORY_NOT_EMPTY). Missing target is
     /// FILE_NOT_FOUND. Takes effect immediately (as-is) and records one
-    /// durable Remove entry.
+    /// durable Remove entry: H1 fires Prepared before the deletion and
+    /// Committed right after it landed (per-mutation granularity, no
+    /// multi-mutation aggregation).
     let private makeRmMember
         (root: string)
         (staging: ResizeArray<JsStagedMutation>)
         (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (ledger: JsAsIsLedger)
         =
         "rm"
         ==> fun (path: string) ->
@@ -277,25 +318,9 @@ module JsToolsBindings =
 
                 do! checkSnapshotFreshness readSnapshots path full
 
-                try
-                    let stat = lstatSync full
-
-                    if statIsDirectory stat then
-                        let entries = readdirSync full
-
-                        if entries.Length > 0 then
-                            return! Error(JsFailure.DirectoryNotEmpty path)
-
-                        rmdirSync full
-                    else
-                        unlinkSync full
-                with error ->
-                    if string error?code = "ENOTEMPTY" then
-                        return! Error(JsFailure.DirectoryNotEmpty path)
-                    elif string error?code = "ENOENT" then
-                        return! Error(JsFailure.FileNotFound path)
-                    else
-                        return! Error(JsFailure.FileReadFailed path)
+                let transactionId = firePrepared ledger root (JsStagedMutation.Remove path)
+                do! JsMutationFs.removePath full
+                fireCommitted ledger transactionId
 
                 staging.Add(JsStagedMutation.Remove path)
                 return createObj [ "ok" ==> true; "removed" ==> path ]
@@ -305,12 +330,16 @@ module JsToolsBindings =
     /// JS-020/JS-030 mv: move or rename a file or directory (POSIX mv).
     /// Overwrite is allowed; a missing source is FILE_NOT_FOUND. Both sides
     /// resolve inside the capability boundary. A cross-device move (EXDEV) is
-    /// refused and rolled back: renameSync is atomic, so on EXDEV neither side
-    /// changed and no two-sided intermediate state is ever left behind.
+    /// refused: renameSync is atomic, so on EXDEV neither side changed and
+    /// no two-sided intermediate state is ever left behind. H1 fires Prepared
+    /// before the move and Committed right after it landed (same ledger seam
+    /// as makeRmMember — the members land the as-is effect and fire the
+    /// per-mutation accounting themselves).
     let private makeMvMember
         (root: string)
         (staging: ResizeArray<JsStagedMutation>)
         (readSnapshots: ResizeArray<JsReadSnapshot>)
+        (ledger: JsAsIsLedger)
         =
         "mv"
         ==> fun (fromPath: string) (toPath: string) ->
@@ -326,13 +355,11 @@ module JsToolsBindings =
                 if JsMutationFs.existsPath toFull then
                     do! checkSnapshotFreshness readSnapshots toPath toFull
 
-                try
-                    renameSync fromFull toFull
-                with error ->
-                    if string error?code = "EXDEV" then
-                        return! Error(JsFailure.CrossDeviceMove fromPath)
-                    else
-                        return! Error(JsFailure.FileReadFailed fromPath)
+                let transactionId =
+                    firePrepared ledger root (JsStagedMutation.Move(fromPath, toPath))
+
+                do! JsMutationFs.movePath fromFull toFull
+                fireCommitted ledger transactionId
 
                 staging.Add(JsStagedMutation.Move(fromPath, toPath))
                 return createObj [ "ok" ==> true; "moved" ==> fromPath; "destination" ==> toPath ]
@@ -374,11 +401,12 @@ module JsToolsBindings =
         (staging: ResizeArray<JsStagedMutation>)
         (readSnapshots: ResizeArray<JsReadSnapshot>)
         (explicitReads: ResizeArray<JsExplicitFileRead>)
+        (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         : obj =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
-                  makeReadMember root readSnapshots explicitReads
+                   makeReadMember root readSnapshots explicitReads
 
               if Set.contains JsCapability.Glob capabilities then
                   makeGlobMember root
@@ -387,16 +415,16 @@ module JsToolsBindings =
                   makeGrepMember root readSnapshots
 
               if Set.contains JsCapability.Edit capabilities then
-                  makeEditMember root staging
+                  makeEditMember root staging ledger
 
               if Set.contains JsCapability.Write capabilities then
-                  makeWriteMember root staging
+                  makeWriteMember root staging ledger
 
               if Set.contains JsCapability.Remove capabilities then
-                  makeRmMember root staging readSnapshots
+                  makeRmMember root staging readSnapshots ledger
 
               if Set.contains JsCapability.Move capabilities then
-                  makeMvMember root staging readSnapshots
+                  makeMvMember root staging readSnapshots ledger
 
               match parkState with
               | Some state -> makeParkMember state
@@ -405,16 +433,19 @@ module JsToolsBindings =
         createObj [ "js" ==> createObj members ]
 
     /// Build the api object for one sandbox run. `staging` records every
-    /// mutation that was actually persisted as-is; the caller reports it. The
-    /// park member is absent here (no park state); use `createApiWithPark`.
+    /// mutation that was actually persisted as-is; `ledger` is the H1
+    /// per-mutation durable channel the mutation members fire into; the
+    /// caller reports and settles both. The park member is absent here (no
+    /// park state); use `createApiWithPark`.
     let createApi
         (capabilities: Set<JsCapability>)
         (root: string)
         (staging: ResizeArray<JsStagedMutation>)
         (readSnapshots: ResizeArray<JsReadSnapshot>)
         (explicitReads: ResizeArray<JsExplicitFileRead>)
+        (ledger: JsAsIsLedger)
         : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads None
+        createApiCore capabilities root staging readSnapshots explicitReads ledger None
 
     /// Build the api object for one sandbox run that carries a park lifecycle
     /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
@@ -425,7 +456,8 @@ module JsToolsBindings =
         (staging: ResizeArray<JsStagedMutation>)
         (readSnapshots: ResizeArray<JsReadSnapshot>)
         (explicitReads: ResizeArray<JsExplicitFileRead>)
+        (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
         : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads (Some parkState)
+        createApiCore capabilities root staging readSnapshots explicitReads ledger (Some parkState)
 

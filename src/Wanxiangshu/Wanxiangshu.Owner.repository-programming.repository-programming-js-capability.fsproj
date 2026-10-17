@@ -21,9 +21,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-fatal-effect.fsproj"/>
     <Compile Include="Process/JsSandbox.fsi"/>
     <Compile Include="Process/JsSandbox.fs"/>
+    <Compile Include="Repository/Programming/Js/TransactionStore.fsi"/>
+    <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fs"/>
-      <Compile Include="Repository/Programming/Js/TransactionStore.fsi"/>
-    <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
   </ItemGroup>
 </Project>

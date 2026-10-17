@@ -70,6 +70,12 @@ module JsCanonicalDescription =
         let MutationRules = "tool/js-program/rules-mutation"
 
         [<Literal>]
+        let Rm = "tool/js-program/rm"
+
+        [<Literal>]
+        let Mv = "tool/js-program/mv"
+
+        [<Literal>]
         let UltraFraming = "tool/js-program/ultra-framing"
 
         [<Literal>]
@@ -209,6 +215,8 @@ module JsCanonicalDescription =
           EditRules: string
           WriteRules: string
           MutationRules: string
+          Rm: string
+          Mv: string
           UltraFraming: string
           UltraUnavailable: string
           UltraEngineering: string
@@ -1264,6 +1272,10 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                   fillTutorial tutorial prose.EditRules
               if has capabilities JsCapability.Write then
                   prose.WriteRules
+              if has capabilities JsCapability.Remove then
+                  prose.Rm
+              if has capabilities JsCapability.Move then
+                  prose.Mv
               if has capabilities JsCapability.Edit || has capabilities JsCapability.Write then
                   prose.MutationRules ]
 

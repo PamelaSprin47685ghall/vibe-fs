@@ -7,12 +7,15 @@ namespace Wanxiangshu.Repository.Programming.Js
 /// through MutationFs at call time; the staging buffer records what was
 /// actually written (JS-012).
 module JsToolsBindings =
+    val createLedger: persistence: IJsTransactionPersistence option -> JsAsIsLedger
+
     val createApi:
         capabilities: Set<JsCapability> ->
         root: string ->
         staging: ResizeArray<JsStagedMutation> ->
         readSnapshots: ResizeArray<JsReadSnapshot> ->
         explicitReads: ResizeArray<JsExplicitFileRead> ->
+        ledger: JsAsIsLedger ->
             obj
 
     /// Build the api object for one sandbox run that carries a park lifecycle
@@ -24,5 +27,6 @@ module JsToolsBindings =
         staging: ResizeArray<JsStagedMutation> ->
         readSnapshots: ResizeArray<JsReadSnapshot> ->
         explicitReads: ResizeArray<JsExplicitFileRead> ->
+        ledger: JsAsIsLedger ->
         parkState: Wanxiangshu.Process.JsSandbox.ParkState ->
             obj

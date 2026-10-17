@@ -78,3 +78,69 @@ module JsMutationFs =
         let api = createFilesystem Filesystem root
         let mutations = plan |> List.map rollbackToJs |> Array.ofList
         api?applyRollback (mutations)
+
+    // ---- rm/mv primitives (JS-020/JS-030, PLAN S2 step 9) -------------------
+
+    [<Import("lstatSync", "node:fs")>]
+    let private lstatSync (path: string) : obj = jsNative
+
+    [<Import("readdirSync", "node:fs")>]
+    let private readdirSync (path: string) : string array = jsNative
+
+    [<Import("unlinkSync", "node:fs")>]
+    let private unlinkSync (path: string) : unit = jsNative
+
+    [<Import("rmdirSync", "node:fs")>]
+    let private rmdirSync (path: string) : unit = jsNative
+
+    [<Import("renameSync", "node:fs")>]
+    let private renameSync (fromPath: string) (toPath: string) : unit = jsNative
+
+    [<Emit("$0.isDirectory()")>]
+    let private statIsDirectory (stat: obj) : bool = jsNative
+
+    /// Delete a file or an empty directory; a non-empty directory is
+    /// DIRECTORY_NOT_EMPTY, a missing target is FILE_NOT_FOUND. The caller
+    /// (ToolsBindings) owns the path boundary (resolveInside) and the
+    /// write-before FILE_CHANGED check; this primitive only maps the
+    /// filesystem effect to the stable failure algebra. It takes effect
+    /// immediately (as-is) and touches no durable fact — the per-mutation
+    /// ledger belongs to the workflow's accounting channel.
+    let removePath (path: string) : Result<unit, JsFailure> =
+        try
+            let stat = lstatSync path
+
+            if statIsDirectory stat then
+                let entries = readdirSync path
+
+                if entries.Length > 0 then
+                    Error(JsFailure.DirectoryNotEmpty path)
+                else
+                    rmdirSync path
+                    Ok()
+            else
+                unlinkSync path
+                Ok()
+        with error ->
+            if string error?code = "ENOTEMPTY" then
+                Error(JsFailure.DirectoryNotEmpty path)
+            elif string error?code = "ENOENT" then
+                Error(JsFailure.FileNotFound path)
+            else
+                Error(JsFailure.FileReadFailed path)
+
+    /// Move or rename a file or directory (POSIX mv) over renameSync
+    /// (same-device atomic; overwrite allowed). A cross-device move (EXDEV)
+    /// is refused: renameSync is atomic, so neither side changed and no
+    /// two-sided intermediate state is ever left behind. Same ownership
+    /// boundary as removePath — path checks live in the caller, durable
+    /// accounting lives in the workflow.
+    let movePath (fromPath: string) (toPath: string) : Result<unit, JsFailure> =
+        try
+            renameSync fromPath toPath
+            Ok()
+        with error ->
+            if string error?code = "EXDEV" then
+                Error(JsFailure.CrossDeviceMove fromPath)
+            else
+                Error(JsFailure.FileReadFailed fromPath)

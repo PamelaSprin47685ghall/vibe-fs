@@ -12,6 +12,11 @@ type IJsTransactionPersistence =
     abstract AppendPrepared: prepared: JsTransactionPrepared -> Task<Result<EventId, JsTransactionAppendFailure>>
     abstract AppendCommitted: transactionId: JsTransactionId -> Task<Result<EventId, JsTransactionAppendFailure>>
 
+/// 同一程序跨 park/unpark 持有的逐笔追加账本，由 workflow 在程序终局排空。
+type JsAsIsLedger =
+    { Persistence: IJsTransactionPersistence option
+      Appends: ResizeArray<Task<Result<EventId, JsTransactionAppendFailure>>> }
+
 /// Narrow durable audit capability for parked-site lifecycle transitions
 /// (PLAN S2 step 8 / algorithm H3). The audit stream is separate from the
 /// mutation-ledger stream: it records that a lifecycle transition happened and
