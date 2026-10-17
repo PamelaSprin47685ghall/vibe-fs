@@ -76,6 +76,11 @@ many matches suspend the program through the same channel as `park`, with
 `{ needle, candidates, nearest }`; resume by injecting the chosen span. A wrong
 injection fails naturally in the next statement — the host does not pre-validate it.
 
+Independent file IO runs in parallel inside one program: `Promise.all` and
+`Promise.allSettled` need no host primitive. The host adds no lock or queue, and
+a failed sibling never undoes a write that already landed; same-file races are
+the program author's responsibility.
+
 Recompose text with slices instead of re-searching it:
   const text = await this.cat(path);
   const [begin, end] = await this.where(text, "old");

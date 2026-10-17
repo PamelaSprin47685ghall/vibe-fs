@@ -283,3 +283,7 @@ ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, 
 ## [054] deliver 显式终值
 
 `deliver(value)` 是生命周期成员，任何生成面无条件携带（与 park 同级）。调用即用该值结束程序：栈展开、不再执行后续语句，终值成为本次调用结果，与 `return` 等价；值必须是 JSON 兼容数据，缺失或非法时以 `INVALID_RETURN_VALUE` 失败。程序捕获内部交付哨兵后可以继续存活，此后的 return 值才是结果——捕获即知情取消。subagent 必须以 deliver 显式结束的强制判定属于会话层级（后续阶段），本期只交付程序级语义。描述与双语资源 `tool/js-program/deliver` 陈述同一契约。
+
+## [055] vm 并行边界
+
+同一程序内 `Promise.all` / `Promise.allSettled` 直接表达 IO 并行，不需要新原语：vm 单线程事件循环天然把每次 api 调用串行化，宿主不加锁、不排队、不互斥。独立分支的效果各自 as-is 落盘；一个分支失败不清除兄弟分支已落地的改动。同一文件的写竞态由程序作者自负（Unix 哲学），宿主只保单笔写原子与写前校验。

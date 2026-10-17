@@ -71,6 +71,10 @@ file_len 即 source.length。位移不入库。若整串已是
 相同的通道挂起，载荷为 `{ needle, candidates, nearest }`；恢复时注入选中的
 span。注入错了，就让下一句自然失败——宿主不做预校验。
 
+独立文件 IO 在一个程序内并行：`Promise.all` / `Promise.allSettled` 不需要宿主
+原语。宿主不加锁、不排队；兄弟分支失败不会撤销已经落盘的写；同文件竞态由
+程序作者自负。
+
 用切片重组文本，而不是重新搜索：
   const text = await this.cat(path);
   const [begin, end] = await this.where(text, "old");
