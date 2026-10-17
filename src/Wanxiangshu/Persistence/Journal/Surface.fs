@@ -54,6 +54,8 @@ type JournalHandle private (journal: AgentJournal, release: unit -> unit, store:
     static member internal CreateShared(journal: AgentJournal, store: IEventStore option) =
         JournalHandle(journal, (fun () -> SharedAgentJournal.release (Some journal)), store)
 
+    static member internal CreateBorrowed(journal: AgentJournal) = JournalHandle(journal, ignore, None)
+
 [<RequireQualifiedAccess>]
 module JournalSurface =
 

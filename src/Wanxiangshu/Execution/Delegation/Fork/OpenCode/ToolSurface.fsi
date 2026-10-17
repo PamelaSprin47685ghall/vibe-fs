@@ -99,3 +99,7 @@ module ForkToolSurface =
     val coldConsumeWorkWithOutcome: string -> string -> string -> string -> Task<obj>
 
     val disposeRuntime: value: obj -> Task
+
+    /// Use the actual writer through a scoped opaque handle; it expires after this callback.
+    val withJournal:
+        value: obj -> observe: (Wanxiangshu.Persistence.Journal.JournalHandle -> Task<'result>) -> Task<'result>

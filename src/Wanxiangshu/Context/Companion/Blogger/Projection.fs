@@ -255,8 +255,8 @@ module BlogProjection =
             let replaced = List.truncate count oldestFirst
 
             // Squash unions replaced frames' coverage (min from, max through).
-            // A merged interval can span two invocations; overlap decides
-            // Chronicle membership — do not invent a splitter.
+            // A merged interval can span invocations. Bounded readers require
+            // complete containment or use the original interval.
             let storedFrame =
                 { frame with
                     CoveredFromSequence = replaced |> List.map (fun item -> item.CoveredFromSequence) |> List.min

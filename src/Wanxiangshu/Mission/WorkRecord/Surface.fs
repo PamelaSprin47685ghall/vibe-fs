@@ -262,6 +262,26 @@ module WorkRecordSurface =
             return appendResult result
         }
 
+    let appendBlogSquash (handle: JournalHandle) (sessionId: string) (providerRun: string) (payload: obj) : Task<obj> =
+        let fact =
+            ContextFact.BlogObservationsSquashed
+                {| SessionId = SessionId.create sessionId
+                   BloggerSessionId = SessionId.create (text (payload?bloggerSessionId))
+                   RequestId = BloggerRequestId.create (text (payload?requestId))
+                   PreviousFrameEpochId = FrameEpochId.create (int64 (text (payload?previousFrameEpoch)))
+                   NextFrameEpochId = FrameEpochId.create (int64 (text (payload?nextFrameEpoch)))
+                   CoveredFrameCount = int (text (payload?coveredFrameCount))
+                   TextRef = BlobRef.create (text (payload?textRef))
+                   TextDigest = BlobDigest.create (text (payload?textDigest))
+                   ProviderRun = ProviderRunIdentity.create providerRun |}
+
+        task {
+            let! result =
+                AgentJournal.appendAgent (streamOfSession sessionId) (runOf (box providerRun)) fact handle.Journal
+
+            return appendResult result
+        }
+
     /// EXEC-006 / EXEC-008: render one session's canonical full lifecycle WorkRecord.
     let lifecycleWorkRecord (handle: JournalHandle) (sessionId: string) (includeOpening: bool) : Task<obj> =
         task {

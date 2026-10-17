@@ -32,6 +32,8 @@ module WorkRecordSurface =
     val appendBlogObservation:
         handle: JournalHandle -> sessionId: string -> providerRun: obj -> payload: obj -> Task<obj>
 
+    val appendBlogSquash: handle: JournalHandle -> sessionId: string -> providerRun: string -> payload: obj -> Task<obj>
+
     /// EXEC-006 / EXEC-008: render one session's canonical full lifecycle WorkRecord.
     val lifecycleWorkRecord: handle: JournalHandle -> sessionId: string -> includeOpening: bool -> Task<obj>
 

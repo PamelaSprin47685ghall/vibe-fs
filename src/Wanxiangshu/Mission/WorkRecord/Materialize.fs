@@ -229,15 +229,15 @@ module LifecycleWorkRecordProjection =
         | Some durable ->
             lifecycleWorkRecordFromSnapshot durable (AgentJournal.snapshot durable) sessionId includeOpening None
 
-    /// COMPANION-015: (Previous, Next] overlaps [Start, End); Next is inclusive-through.
-    let private framesOverlappingRange (range: XTraceRange) (frames: BlogFrame list) =
+    let private framePrefixInRange (range: XTraceRange) (frames: BlogFrame list) =
         let startSequence = range |> XTraceRange.startInclusive |> XTraceCursor.sequence
         let endSequence = range |> XTraceRange.endExclusive |> XTraceCursor.sequence
 
         frames
-        |> List.filter (fun frame ->
-            frame.CoveredFromSequence + 1L < endSequence
-            && frame.CoveredThroughSequence >= startSequence)
+        |> List.skipWhile (fun frame -> frame.CoveredThroughSequence < startSequence)
+        |> List.takeWhile (fun frame ->
+            frame.CoveredFromSequence >= startSequence - 1L
+            && frame.CoveredThroughSequence < endSequence)
 
     let private boundedWorkRange
         (providerRun: ProviderRunIdentity option)
@@ -267,24 +267,26 @@ module LifecycleWorkRecordProjection =
         |> Option.bind (fun run -> XTraceProjection.terminalEvidenceForProviderRun run xTrace)
         |> Option.filter (fun terminal -> sameCursor terminal.Frontier (XTraceRange.endExclusive range))
 
-    let private clampCoverageToRange (coverage: RecordCoverage) (range: XTraceRange) =
-        let cursor = RecordCoverage.ingestedThrough coverage
-        let start = XTraceRange.startInclusive range
-        let finish = XTraceRange.endExclusive range
+    let private boundedGapStart frames workRange xTrace =
+        let covered =
+            frames
+            |> List.tryLast
+            |> Option.map (fun frame -> XTraceCursor.create frame.CoveredThroughSequence)
+            |> Option.defaultValue (XTraceRange.startInclusive workRange)
 
-        if XTraceCursor.isBefore cursor start then
-            RecordCoverage.create start
-        elif XTraceCursor.isAfter cursor finish then
-            RecordCoverage.create finish
-        else
-            coverage
+        XTraceProjection.slice workRange xTrace
+        |> List.filter (fun part -> part.Role = "assistant" && part.Kind = "text")
+        |> List.tryLast
+        |> Option.filter (fun part -> XTraceCursor.isBefore part.Cursor covered)
+        |> Option.map (fun part -> part.Cursor)
+        |> Option.defaultValue covered
 
-    let private completeBoundedGap xTrace workRange range terminalProviderRun renderedGap =
+    let private completeBoundedGap xTrace gapRange range terminalProviderRun renderedGap =
         task {
             match terminalForBoundedRange terminalProviderRun range xTrace with
             | None -> return renderedGap
             | Some terminal ->
-                return! appendTerminalFallback xTrace (XTraceProjection.slice workRange xTrace) renderedGap terminal
+                return! appendTerminalFallback xTrace (XTraceProjection.slice gapRange xTrace) renderedGap terminal
         }
 
     let private materializeBoundedOpeningEvidence durable session range terminalProviderRun xTrace opening =
@@ -292,28 +294,22 @@ module LifecycleWorkRecordProjection =
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
             let workRange = boundedWorkRange terminalProviderRun range xTrace
 
-            let! frames =
-                BlogProjection.frames blog
-                |> framesOverlappingRange workRange
-                |> resolveFrames durable
+            let selectedFrames = BlogProjection.frames blog |> framePrefixInRange workRange
 
-            let coverage =
-                blog.Coverage.IngestedThroughSequence
-                |> XTraceCursor.create
-                |> RecordCoverage.create
-                |> fun value -> clampCoverageToRange value workRange
+            let! frames = resolveFrames durable selectedFrames
 
-            let gapStart =
-                laterCursor (RecordCoverage.ingestedThrough coverage) (XTraceRange.startInclusive workRange)
+            let gapRange =
+                XTraceRange.create
+                    (boundedGapStart selectedFrames workRange xTrace)
+                    (XTraceRange.endExclusive workRange)
 
-            let gapRange = XTraceRange.create gapStart (XTraceRange.endExclusive workRange)
             let! gap = XTraceMaterialization.renderWorkRecordRange gapRange xTrace
 
             match frames, gap with
             | Error _, _
             | _, Error _ -> return None
             | Ok verifiedFrames, Ok renderedGap ->
-                let! finalGap = completeBoundedGap xTrace workRange range terminalProviderRun renderedGap
+                let! finalGap = completeBoundedGap xTrace gapRange range terminalProviderRun renderedGap
 
                 return Some(LifecycleWorkRecord.materialize opening verifiedFrames finalGap false)
         }

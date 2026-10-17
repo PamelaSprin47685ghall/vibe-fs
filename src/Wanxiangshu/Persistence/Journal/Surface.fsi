@@ -10,6 +10,7 @@ type JournalHandle =
     member internal Dispose: unit -> unit
     static member internal Create: journal: AgentJournal * store: IEventStore option -> JournalHandle
     static member internal CreateShared: journal: AgentJournal * store: IEventStore option -> JournalHandle
+    static member internal CreateBorrowed: journal: AgentJournal -> JournalHandle
 
 [<RequireQualifiedAccess>]
 module JournalSurface =

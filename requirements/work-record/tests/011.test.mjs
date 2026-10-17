@@ -95,7 +95,8 @@ test('WHAT[work-record-011] bounded terminal-only completion still yields Recent
       ],
     })
     assert.equal(captured.currentHeadSequence, 3)
-    await commitY(handle, { from: 0, to: 2, body: 'CURRENT_CHRONICLE', n: 10 })
+    await commitY(handle, { from: 0, to: 1, body: 'CALLER_CHARGE', n: 9 })
+    await commitY(handle, { from: 1, to: 2, body: 'CURRENT_CHRONICLE', n: 10 })
     await workRecord.captureTerminalText(handle, SEM, 'FINAL_STATEMENT_FROM_TERMINAL', 'run-terminal-race')
 
     const bounded = await workRecord.lifecycleWorkRecordBounded(handle, SEM, {

@@ -16,6 +16,8 @@ Chronicle 是 Y 已沉淀的 frame，Recent work 是 Y 未覆盖的 X-derived su
 
 复用 session 可保留跨调用记忆，但每个 batch/resume 只物化本次 invocation 范围。早先 frame/trace 不混入，后续 Chronicle/terminal 不改变已完成范围的重物化。
 
+bounded 视图只采用完整落在本次工作范围内、且不跳过尚未表示原件的连续 Chronicle 前缀。跨界 frame 不能整段借用，也不能按摘要文字裁切；从已采用前缀的末端读取本范围的 canonical 原件，保留本轮全部剩余材料。视图的取材起点由实际采用的材料证明，不沿用已排除 frame 的 coverage，不改写 durable RecordCoverage 或 PrefixCoverage。
+
 ## [005] Recent work 是 bounded safe suffix
 
 Recent work 从 RecordCoverage.IngestedThrough 与 Opening 终点的较大者起算，限于本次 record frontier，并保留最后一条助手文本作为正式陈述。

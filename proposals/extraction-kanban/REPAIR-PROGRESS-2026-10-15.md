@@ -2,6 +2,16 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第十七批：GAP-111 bounded 取材修复（2026-10-17）
+
+从干净主仓 `53cba28de`、库 `10bbb32 / 0.6.4` 继续 CUT-06-R1。生产 bounded 路径只采用完整落在本次工作范围内的连续 frame 前缀，以实际采用材料决定 raw 起点，不再借全会话 coverage 跳过原件。保留最后助手正文；Terminal 仅对实际展示的 raw 去重。原跨界反例和无/有 Terminal 的尾部工具吞正式陈述反例均在原实现失败，现已修正。
+
+真实 SyncDelegate、Fork resume/Join 通过 scoped JournalHandle 在实际 writer 提交观察；回调成功或抛错均撤销借用，原 owner 继续可用。未参与修改的 `gap111_review` 在固定563产物独立 Node/Bun 验证源边界、真实消费者、借用寿命、正式陈述和独立新进程冷恢复，未发现本包新的阻断问题。两处旧正控曾把 caller+assistant 聚合摘要用于 assistant-only 范围，现拆成两个真实 frame，保留 Chronicle/Terminal 正控及跨界负控；非作者确认这是夹具前提修正。
+
+三个不重叠相关组 **1199 / 1096 pass / 0 普通 fail / 34 skip / 69 TODO**；最终核心004/010/011在Node/Bun各 **30 / 28 pass / 0 fail / 2 TODO**，不与大组重复相加。生产构建563，元数据564；format/check通过，独立编译与非空Trace checkpoint两项integration各1/1。精确主包 **2075 members / 13,323,845 bytes**，SHA-256 `ce6e084c2f0f6038edd5ad483bdbc62cd86e8ae0f5dd552caa3676335a495be1`，真实pack、隔离安装与默认入口通过；包外复核及交付结果见[完整报告](WORK-RECORD-RANGES-2026-10-17.md)。原始失败、工具/夹具误判和新证据均保留。
+
+同一确切主包的非作者隔离离线安装、逐字节核对及Node/Bun包外探针均通过，未借主仓runtime，临时安装已清理。本包进入DONE并随本提交正常推送master；GAP-111仍PARTIAL：固定range的当前派生表示可随squash由摘要变原文，这不证明已发布完成记录被改写，后续CUT-06-R2补实际冻结与消费证据，顶层TODO保留。GAP-101/108/109、CUT-06整卡及R12-U1的边界不变；库包未改，未部署用户Host。
+
 ## 第十六批：T-01 后剩余项盘点与排期（2026-10-17，仅规划）
 
 输入干净主仓 `c3689035c`、库 `10bbb32 / 0.6.4`。四个原 P1 子包的已验收结论保留；本次未改生产实现、测试、依赖或库包。重跑现有 work-record-004、prefix-stability-014、process-execution-012/015，得到 **17 / 12 pass / 0 普通 fail / 0 skip / 5 TODO**，日志 `/private/tmp/post-t01-plan-baseline-20261017.log`。四个 TODO 仍执行失败：跨 invocation 摘要混入旧工作、直接捕获加工后指导、纯契约混编、256 字节预算返回 549 字节；另一个仅声明待补消费者能力。直接指导捕获反例不能单独证明正常 Host 请求会污染历史，未把 TODO 数量当作产品错误数量。

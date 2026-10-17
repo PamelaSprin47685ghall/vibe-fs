@@ -1462,3 +1462,13 @@ module ForkToolSurface =
 
     let disposeRuntime (value: obj) : Task =
         unbox<ForkHarness> value |> fun harness -> harness.DisposeAsync()
+
+    let withJournal (value: obj) (observe: JournalHandle -> Task<'result>) : Task<'result> =
+        task {
+            let handle = JournalHandle.CreateBorrowed((unbox<ForkHarness> value).Journal)
+
+            try
+                return! observe handle
+            finally
+                handle.Dispose()
+        }

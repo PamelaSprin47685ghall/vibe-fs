@@ -184,6 +184,10 @@ module SyncDelegateSurface =
     val dispatchRetryAttempt: value: obj -> owner: string -> role: string -> bool
     val dispose: value: obj -> unit
 
+    /// Use the actual writer through a scoped opaque handle; it expires after this callback.
+    val withJournal:
+        value: obj -> observe: (Wanxiangshu.Persistence.Journal.JournalHandle -> Task<'result>) -> Task<'result>
+
     /// delegation-031 probe: close the journal writer so later appends are known
     /// NotAttempted; the next invocation must still deliver its WorkRecord.
     val closeJournalWriter: value: obj -> unit

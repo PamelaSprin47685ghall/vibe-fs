@@ -2123,6 +2123,16 @@ module SyncDelegateSurface =
     let dispose (value: obj) : unit =
         unbox<Harness> value |> fun harness -> harness.Dispose()
 
+    let withJournal (value: obj) (observe: JournalHandle -> Task<'result>) : Task<'result> =
+        task {
+            let handle = JournalHandle.CreateBorrowed((unbox<Harness> value).Journal)
+
+            try
+                return! observe handle
+            finally
+                handle.Dispose()
+        }
+
     /// delegation-031 probe: close the journal writer exactly once, so every later
     /// append is a known NotAttempted (WriterClosing/WriterDisposed). The next
     /// invocation must still deliver its earned WorkRecord — the uncommitted

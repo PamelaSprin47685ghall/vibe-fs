@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as workRecord from '../../../dist/Mission/WorkRecord/Surface.js'
+import { commitFrame, withReopenableJournal } from './support/record.mjs'
 
 const SEM = 'ses_bounded_lwr'
 
@@ -125,7 +126,8 @@ test('WHAT[work-record-004] same terminal text in a reused child is a fresh occu
       ],
     })
     assert.equal(second.currentHeadSequence, 5)
-    await commitY(handle, { from: 2, to: 4, body: 'SECOND_CHRONICLE', n: 12 })
+    await commitY(handle, { from: 2, to: 3, body: 'SECOND_CALLER_CHARGE', n: 12 })
+    await commitY(handle, { from: 3, to: 4, body: 'SECOND_CHRONICLE', n: 15 })
     await workRecord.captureTerminalText(handle, SEM, 'SAME_FINAL_TEXT', 'run-reuse-2')
 
     const bounded = await workRecord.lifecycleWorkRecordBounded(handle, SEM, {
@@ -176,25 +178,189 @@ test('WHAT[work-record-004] rematerializing an older bounded range never substit
   })
 })
 
-{
-const { record, commitFrame, withReopenableJournal } = await import('./support/record.mjs')
-test('WHAT[work-record-004] a frame spanning two invocations cannot leak the earlier work into the later bounded record', { todo: 'GAP-111: straddling Y frame leaks earlier work; decide exact bounded representation without contradicting coverage semantics' }, async () => {
-  await withReopenableJournal(async handle => {
+test('WHAT[work-record-004] a frame spanning two invocations cannot leak the earlier work into the later bounded record', async () => {
+  await withReopenableJournal(async (handle, reopen) => {
     const session = 'record-crossing-frame'
-    await record.captureOpening(handle, session, 'charge', [])
-    await record.captureProjection(handle, session, { messages: [
+    await workRecord.captureOpening(handle, session, 'charge', [])
+    await workRecord.captureProjection(handle, session, { messages: [
       { role: 'user', parts: [{ kind: 'text', text: 'charge' }] },
       { role: 'assistant', parts: [{ kind: 'text', text: 'EARLIER_WORK' }] },
       { role: 'user', parts: [{ kind: 'text', text: 'later charge' }] },
       { role: 'assistant', parts: [{ kind: 'text', text: 'LATER_WORK' }] },
     ] })
     await commitFrame(handle, session, { from: 0, through: 4, body: 'EARLIER_WORK and LATER_WORK', id: 'crossing' })
-    const bounded = await record.lifecycleWorkRecordBounded(handle, session, {
+    const range = {
       StartInclusive: { Sequence: 3 }, EndExclusive: { Sequence: 5 },
-    })
+    }
+    const bounded = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
     assert.equal(typeof bounded, 'string')
     assert.ok(bounded.includes('LATER_WORK'))
     assert.equal(bounded.includes('EARLIER_WORK'), false)
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), bounded)
   })
 })
+
+const rangeMessages = [
+  { role: 'user', parts: [{ kind: 'text', text: 'ROOT_CHARGE' }] },
+  { role: 'assistant', parts: [{ kind: 'text', text: 'PRIOR_WORK' }] },
+  { role: 'user', parts: [{ kind: 'text', text: 'CURRENT_CHARGE' }] },
+  { role: 'assistant', parts: [
+    { kind: 'reasoning', text: 'CURRENT_REASONING' },
+    { kind: 'tool-call', name: 'read', args: 'CURRENT_TOOL_CALL' },
+    { kind: 'tool-result', result: 'CURRENT_TOOL_RESULT' },
+    { kind: 'text', text: 'CURRENT_BODY' },
+  ] },
+  { role: 'user', parts: [{ kind: 'text', text: 'NEXT_CHARGE' }] },
+  { role: 'assistant', parts: [{ kind: 'text', text: 'NEXT_WORK' }] },
+]
+
+for (const scenario of [
+  { name: 'no frames', frames: [], summary: false },
+  { name: 'contained prefix', frames: [[3, 'PRIOR_SUMMARY'], [5, 'CURRENT_REASONING_SUMMARY']], summary: true },
+  { name: 'contained through final text', frames: [[3, 'PRIOR_SUMMARY'], [7, 'CURRENT_REASONING_SUMMARY']], summary: true },
+  { name: 'crosses start', frames: [[6, 'PRIOR_WORK CURRENT_BODY CROSSING_SUMMARY']], summary: false },
+  { name: 'crosses end', frames: [[3, 'PRIOR_SUMMARY'], [9, 'CURRENT_BODY NEXT_WORK CROSSING_SUMMARY']], summary: false },
+  { name: 'crosses both', frames: [[9, 'PRIOR_WORK CURRENT_BODY NEXT_WORK CROSSING_SUMMARY']], summary: false },
+  { name: 'contained then crossing', frames: [[3, 'PRIOR_SUMMARY'], [5, 'CURRENT_REASONING_SUMMARY'], [9, 'CURRENT_BODY NEXT_WORK CROSSING_SUMMARY']], summary: true },
+  { name: 'crossing then contained', frames: [[4, 'PRIOR_WORK CROSSING_SUMMARY'], [6, 'UNUSABLE_LATER_SUMMARY']], summary: false },
+  { name: 'inclusive end at range start', frames: [[4, 'PRIOR_WORK CROSSING_SUMMARY']], summary: false },
+]) {
+  test(`WHAT[work-record-004] bounded originals and coverage stay complete when a frame ${scenario.name}`, async () => {
+    await withReopenableJournal(async (handle, reopen) => {
+      const session = `record-range-${scenario.name}`
+      await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
+      const captured = await workRecord.captureProjection(handle, session, { messages: rangeMessages })
+      assert.equal(captured.currentHeadSequence, 10)
+      let previous = 0
+      for (const [index, [through, body]] of scenario.frames.entries()) {
+        await commitFrame(handle, session, { from: previous, through, body, id: `frame-${index}` })
+        previous = through
+      }
+      const full = await workRecord.lifecycleWorkRecord(handle, session, false)
+      const range = { StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 8 } }
+      const bounded = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+      assert.equal(typeof bounded, 'string')
+      assert.match(bounded, /CURRENT_BODY/)
+      assert.doesNotMatch(bounded, /ROOT_CHARGE|PRIOR_|CURRENT_CHARGE|NEXT_|CROSSING_SUMMARY|UNUSABLE_LATER_SUMMARY|CURRENT_TOOL_/)
+      if (scenario.summary) {
+        assert.match(bounded, /^Chronicle\nCURRENT_REASONING_SUMMARY\n\nRecent work\nassistant: CURRENT_BODY$/)
+      } else {
+        assert.equal(bounded, 'Recent work\nCURRENT_REASONING\nassistant: CURRENT_BODY')
+      }
+      assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, range), bounded)
+      assert.equal(await workRecord.lifecycleWorkRecord(handle, session, false), full)
+      const recovered = await reopen()
+      assert.equal(await workRecord.lifecycleWorkRecordBounded(recovered, session, range), bounded)
+      assert.equal(await workRecord.lifecycleWorkRecord(recovered, session, false), full)
+    })
+  })
+}
+
+test('WHAT[work-record-004] a later crossing frame cannot expand a completed range or hide its original suffix', async () => {
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'record-range-later-frame'
+    await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
+    await workRecord.captureProjection(handle, session, { messages: rangeMessages.slice(0, 4) })
+    await commitFrame(handle, session, { from: 0, through: 3, body: 'PRIOR_SUMMARY', id: 'prior' })
+    await commitFrame(handle, session, { from: 3, through: 5, body: 'CURRENT_REASONING_SUMMARY', id: 'current' })
+    const range = { StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 8 } }
+    const before = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+    await workRecord.captureProjection(handle, session, { messages: rangeMessages })
+    await commitFrame(handle, session, { from: 5, through: 9, body: 'NEXT_WORK CROSSING_SUMMARY', id: 'later' })
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, range), before)
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), before)
+  })
+})
+
+test('WHAT[work-record-004] empty and terminal-only bounded records do not borrow a crossing summary', async () => {
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'record-range-terminal'
+    await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
+    await workRecord.captureProjection(handle, session, { messages: rangeMessages.slice(0, 4) })
+    await workRecord.captureTerminalText(handle, session, 'CURRENT_FINAL', 'current-run')
+    await commitFrame(handle, session, { from: 0, through: 7, body: 'PRIOR_WORK CURRENT_BODY', id: 'all' })
+    const empty = { StartInclusive: { Sequence: 8 }, EndExclusive: { Sequence: 8 } }
+    const terminal = { ...empty, ProviderRun: 'current-run' }
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, empty), '')
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, terminal), 'Recent work\nassistant: CURRENT_FINAL')
+    const recovered = await reopen()
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(recovered, session, empty), '')
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(recovered, session, terminal), 'Recent work\nassistant: CURRENT_FINAL')
+  })
+})
+
+for (const terminal of [false, true]) {
+  test(`WHAT[work-record-004] bounded formal statement survives a fully covered trailing tool with terminal=${terminal}`, async () => {
+    await withReopenableJournal(async (handle, reopen) => {
+      const session = `bounded-final-before-tool-${terminal}`
+      await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
+      await workRecord.captureProjection(handle, session, { messages: [
+        ...rangeMessages.slice(0, 3),
+        { role: 'assistant', parts: [
+          { kind: 'text', text: 'CURRENT_STATEMENT' },
+          { kind: 'tool-call', name: 'read', args: 'CURRENT_TOOL_CALL' },
+          { kind: 'tool-result', result: 'CURRENT_TOOL_RESULT' },
+        ] },
+      ] })
+      await commitFrame(handle, session, { from: 0, through: 3, body: 'PRIOR_SUMMARY', id: 'prior' })
+      await commitFrame(handle, session, { from: 3, through: 6, body: 'current summary', id: 'current' })
+      if (terminal) await workRecord.captureTerminalText(handle, session, 'CURRENT_STATEMENT', 'current-run')
+      const range = {
+        StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 7 },
+        ...(terminal ? { ProviderRun: 'current-run' } : {}),
+      }
+      const bounded = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+      assert.equal(bounded, 'Chronicle\ncurrent summary\n\nRecent work\nassistant: CURRENT_STATEMENT')
+      assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), bounded)
+    })
+  })
+}
+
+test('WHAT[work-record-004] an actual durable squash spanning invocations restores only bounded originals after cold replay', async () => {
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'record-range-squashed'
+    await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
+    await workRecord.captureProjection(handle, session, { messages: rangeMessages })
+    await commitFrame(handle, session, { from: 0, through: 3, body: 'PRIOR_SUMMARY', id: 'prior' })
+    await commitFrame(handle, session, { from: 3, through: 5, body: 'CURRENT_REASONING_SUMMARY', id: 'current' })
+    await commitFrame(handle, session, { from: 5, through: 9, body: 'CURRENT_BODY NEXT_WORK', id: 'later' })
+    const range = { StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 8 } }
+    const written = await journal.JournalSurface_writePayload(handle, 'PRIOR_WORK CURRENT_BODY NEXT_WORK SQUASHED_SUMMARY')
+    assert.equal(written.ok, true)
+    const committed = await workRecord.appendBlogSquash(handle, session, 'squash-run', {
+      bloggerSessionId: `blog-${session}`, requestId: 'squash-request',
+      previousFrameEpoch: 0, nextFrameEpoch: 1, coveredFrameCount: 3,
+      textRef: written.blobRef, textDigest: written.blobDigest,
+    })
+    assert.equal(committed.ok, true, committed.error)
+    const bounded = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+    assert.equal(bounded, 'Recent work\nCURRENT_REASONING\nassistant: CURRENT_BODY')
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), bounded)
+  })
+})
+
+test.todo('WHAT[work-record-004] later squash preserves frozen historical representation bytes; GAP-111: bounded originals are complete, but current frames alone do not freeze the earlier rendered summary')
+
+for (const corrupt of ['selected', 'crossing']) {
+  test(`WHAT[work-record-004] ${corrupt} frame corruption obeys the bounded evidence boundary`, async () => {
+    await withReopenableJournal(async (handle, reopen) => {
+      const session = `record-range-corrupt-${corrupt}`
+      await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
+      await workRecord.captureProjection(handle, session, { messages: rangeMessages })
+      if (corrupt === 'selected') {
+        await commitFrame(handle, session, { from: 0, through: 3, body: 'PRIOR_SUMMARY', id: 'prior' })
+      }
+      const other = await journal.JournalSurface_writePayload(handle, 'a different verified payload')
+      assert.equal(other.ok, true)
+      await commitFrame(handle, session, {
+        from: corrupt === 'selected' ? 3 : 0, through: 5,
+        body: 'untrusted frame', id: 'corrupt', textDigest: other.blobDigest,
+      })
+      const range = { StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 8 } }
+      const bounded = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+      if (corrupt === 'selected') assert.equal(bounded, null)
+      else assert.equal(bounded, 'Recent work\nCURRENT_REASONING\nassistant: CURRENT_BODY')
+      assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), bounded)
+    })
+  })
 }
