@@ -69,23 +69,21 @@ module LifecycleWorkRecordProjection =
             return bodies |> Result.defaultValue [] |> List.choose id
         }
 
-    let private terminalAlreadyCaptured
-        (xTrace: XTraceProjectionState)
-        (ordered: XTraceSemanticPartView list)
-        (terminalText: string)
-        : Task<bool> =
-        task {
-            match ordered |> List.filter isNaturalAssistant |> List.tryLast with
-            | None -> return false
-            | Some latest ->
-                let relevant =
-                    ordered
-                    |> List.filter (fun part ->
-                        part.Role = "assistant"
-                        && part.Turn = latest.Turn
-                        && part.Generation = latest.Generation
-                        && (part.Kind = "text" || part.Kind = "reasoning"))
+    let private latestNaturalTurn (ordered: XTraceSemanticPartView list) =
+        match ordered |> List.filter isNaturalAssistant |> List.tryLast with
+        | None -> []
+        | Some latest ->
+            ordered
+            |> List.filter (fun part ->
+                isNaturalAssistant part
+                && part.Turn = latest.Turn
+                && part.Generation = latest.Generation)
 
+    let private terminalAlreadyCaptured xTrace ordered terminalText : Task<bool> =
+        task {
+            match latestNaturalTurn ordered with
+            | [] -> return false
+            | relevant ->
                 let! bodies = readPartBodies xTrace relevant
                 return String.concat "\n\n" bodies = terminalText
         }
@@ -281,12 +279,58 @@ module LifecycleWorkRecordProjection =
         |> Option.map (fun part -> part.Cursor)
         |> Option.defaultValue covered
 
-    let private completeBoundedGap xTrace gapRange range terminalProviderRun renderedGap =
+    let private terminalCapturedWithVisibleSuffix xTrace workRange gapRange terminalText =
         task {
-            match terminalForBoundedRange terminalProviderRun range xTrace with
+            let terminalParts = XTraceProjection.slice workRange xTrace |> latestNaturalTurn
+
+            let! renderedBodies =
+                terminalParts
+                |> List.filter (fun part -> XTraceRange.contains part.Cursor gapRange)
+                |> readPartBodies xTrace
+
+            if renderedBodies |> List.exists (String.IsNullOrWhiteSpace >> not) then
+                return! terminalAlreadyCaptured xTrace terminalParts terminalText
+            else
+                return false
+        }
+
+    let private terminalFormalAlreadyCaptured xTrace ordered terminalText =
+        task {
+            match
+                latestNaturalTurn ordered
+                |> List.filter (fun part -> part.Kind = "text")
+                |> List.tryLast
+            with
+            | None -> return false
+            | Some formal ->
+                let! body = tryReadPartBody xTrace formal
+                return body = Some terminalText
+        }
+
+    let private boundedTerminalAlreadyCaptured xTrace workRange gapRange terminalText =
+        task {
+            let gapParts = XTraceProjection.slice gapRange xTrace
+            let! capturedInGap = terminalAlreadyCaptured xTrace gapParts terminalText
+            let! capturedFormal = terminalFormalAlreadyCaptured xTrace gapParts terminalText
+
+            if capturedInGap || capturedFormal then
+                return true
+            else
+                return! terminalCapturedWithVisibleSuffix xTrace workRange gapRange terminalText
+        }
+
+    let private completeBoundedGap xTrace workRange gapRange range terminalProviderRun renderedGap =
+        task {
+            let! terminalText =
+                terminalForBoundedRange terminalProviderRun range xTrace
+                |> Option.map (readVerifiedTerminalText xTrace)
+                |> Option.defaultValue (Task.FromResult None)
+
+            match terminalText with
             | None -> return renderedGap
-            | Some terminal ->
-                return! appendTerminalFallback xTrace (XTraceProjection.slice gapRange xTrace) renderedGap terminal
+            | Some text ->
+                let! alreadyCaptured = boundedTerminalAlreadyCaptured xTrace workRange gapRange text
+                return appendTerminalWhenMissing renderedGap text alreadyCaptured
         }
 
     let private materializeBoundedOpeningEvidence durable session range terminalProviderRun xTrace opening =
@@ -309,7 +353,7 @@ module LifecycleWorkRecordProjection =
             | Error _, _
             | _, Error _ -> return None
             | Ok verifiedFrames, Ok renderedGap ->
-                let! finalGap = completeBoundedGap xTrace gapRange range terminalProviderRun renderedGap
+                let! finalGap = completeBoundedGap xTrace workRange gapRange range terminalProviderRun renderedGap
 
                 return Some(LifecycleWorkRecord.materialize opening verifiedFrames finalGap false)
         }

@@ -2,6 +2,8 @@
 
 输入：主仓 `53cba28de`，库 `10bbb32 / 0.6.4`；工作区干净。按[当前计划](REMAINING-REPAIRS-2026-10-16.md#gap111-next)认领 CUT-06-R1，状态只在[看板](BOARD.md#source-audit-repairs)维护。R12-U1 按用户要求继续暂缓。
 
+首次交付为 `e7a150937`。下方施工记录保留当时结论；当前结果以[独立复审与修正](#independent-review)为准。本轮修正两个bounded Terminal去重问题：一项为e7新引入的回退，另一项在修复前已有。不能把两者统称原拆分问题。
+
 ## 原因与契约
 
 `Materialize.fs` 的 bounded 路径采用所有相交 frame，再用全会话 RecordCoverage 决定 raw 起点。跨起点 frame 会带入旧工作；只过滤摘要仍沿用其 coverage，又会遗漏本轮原文。既有 work-record-004 TODO 已在 `c3689035c` 的真实 journal 反例中失败，本包不是 T-01 新引入的问题。
@@ -60,12 +62,60 @@
 
 同一确切tarball由非作者另在隔离目录按精确lock离线 `npm ci` 安装117依赖；删除顶层wanxiangli，实际使用包内bundled0.6.4。安装文件与tarball逐字节一致，依赖及链接均在隔离目录，没有借主仓/兄弟仓runtime。Node/Bun包外探针均exit0，覆盖borrowed-owner、跨界范围、正式陈述和独立新进程冷恢复。`gap111-package-review-{ci,integrity,isolation,node,bun,cleanup}.log`；首次直接离线install缺packument的 `gap111-package-review-install.log` 保留，不记产品失败。安装及临时Git目录已清理。
 
-CUT-06-R1按上述限定范围完成，随本原子提交正常推送master；不强推，不部署用户Host。`gap111-check-delivery.log`、`gap111-format-delivery.log`与diff检查通过。最后仅刷新文档/测试元数据并核对同一包身份，不冒称又一轮全套行为验收。
+CUT-06-R1按上述限定范围完成，随 e7 原子提交正常推送master；不强推，不部署用户Host。`gap111-check-delivery.log`、`gap111-format-delivery.log`与diff检查通过。最后仅刷新文档/测试元数据并核对同一包身份，不冒称又一轮全套行为验收。
+
+<a id="independent-review"></a>
+## 独立复审与修正（CUT-06-R3）
+
+复审输入为干净主仓 `e7a150937`、未改动的库 `10bbb32 / 0.6.4`。`g111r_ranges`、`g111r_consumers`、`g111r_contracts` 均未参与 e7 实现；三者分别检查范围与 coverage、真实消费者与借用寿命、契约与完成记录持久化。它们未编辑共享仓或重建共享产物；root 串行修正、构建和发布。R12-U1 未重新调查。
+
+### 问题与归因
+
+| 项目 | 结论与处置 |
+|---|---|
+| G111-01/02，原有范围越界、漏原文和尾部工具遮蔽正式陈述 | 原修正继续成立；frame 连续性由 Blogger 的前游标相等、严格前进和 squash 只替换最旧前缀保证。既有负控与独立分区、冷恢复、消费者对照继续通过 |
+| G111-R3-01，P2：同源 Terminal 重新插入已摘要正文 | **e7 新引入，前轮 review 漏检，本轮已修复。** 同一助手 turn 的 reasoning/text 前半已进入 Chronicle，而正式 text 仍在 raw gap 时，gap-only 比对误将完整 Terminal 判为未捕获；结果正文重复、已摘要前半重新进入 Recent。原独立 Node/Bun 反例均失败，新增18条正式矩阵在566为11pass/7fail。不能只回退到完整 workRange 判重，否则会重开“工具后只剩空白却不补 Terminal”的缺口 |
+| G111-R3-02，P2：完整raw配仅formal Terminal仍重复正文 | **输入已有，本轮包外复审发现并修正。** 同一自然turn的reasoning和text都在raw，Terminal仅为末条text，旧整turn聚合不相等而重复追加。至少53c源码已有该公式，无frame也可触发，不能归为e7或本轮修正新引入；未独立重建53实跑。170b中间包Node/Bun均红，另8条正式矩阵在568为4pass/4fail |
+| 当前修正 | 保留既有 boundedGapStart 的最后助手正文。先以实际gap的完整自然turn或该turn最后text的整body精确判重；不能以任意较早text代替末条正式正文。若仍不等，只有最新自然turn确有已验证、非空白原件进入gap，才以本范围完整turn精确比对Terminal。gap是连续suffix，因此此证据也包含后续自然材料；空白、user或media不能冒充该证据。不同Terminal仍完整补出，不裁切/包含匹配Terminal，不回写coverage；全会话去重仅提取原有选择helper，语义不变，本包不扩称全会话取材已整体闭合 |
+| G111-R2，已完成范围的历史重物化 | **已确认的既有 WHAT-004 缺口，继续由 CUT-06-R2 处理。** 本轮真实 Fork 已写 Terminal/HandleCompleted 后，后续 squash 仍能改变当前投影重物化的字符串。这比上一轮未完成事实的探针更强，不能再仅称“冻结待补证”。同时，已保存完成 blob、实际同进程 Join 及冷恢复消费保持原表示，不能称已发布完成记录被改写 |
+| 旧 Host 消息新增部件的观察 | 同物理 part 修订被拒绝且 Trace 不变；已终结旧消息在新 invocation 内首次出现全新 part，则按首次确认 cursor 进入新范围。先前暂称“旧内容混入”过强：它不是此前已确认原件，WHAT-002 也不以 transcript 下标定义范围。正常 Host 是否会在终结后这样增长尚无证据；捕获/起点路径在53→e7未变，无frame时原算法读取同一range，静态归因不支持 e7 新回退。保留观察，不为此修改 Trace 保真或添加正文过滤 |
+
+### AGENTS.md 与验收边界
+
+- 只手工修改私有物化逻辑、004/010编号测试及本包文档；无接口、fsproj、版本、lock 或 vendor 变更。Trace 仍保管原件，Blogger 仍保管 frame/coverage，WorkRecord 只组合已验证材料，没有第二份持久 owner。
+- 使用 `node scripts/build.mjs`，未使用 `dotnet build`。567 候选行为虽绿，静态门禁仍拒绝两处嵌套控制分支；root 将可见 suffix 证明独立成一步、用 Option 读取终态后，568构建及静态门禁通过。未增加门禁例外。
+- 首轮受限沙箱中的 Git 工具身份探测失败，trace组则因未启用 TODO override 返回非零；原日志 `gap111r-*-baseline.log` 保留。相同源在授权工具环境及 `WXS_ACCEPT_TODO=1` 下重跑，三个基线组1199项0普通失败。override只允许带未完成证据结束，不把TODO/skip记为通过。
+- 新010夹具最初给 `withJournal` 的 Task 回调返回了同步对象，两项失败。按既有契约补 `async` 后转绿，未让产品API兼容错误夹具。`gap111r-core-{node,bun}-568.log`及非作者首次日志保留；004一处未写完成事实的旧标题改为 earlier bounded，避免夸大证明。
+
+### 最终候选与证据
+
+生产源固定于 **generation570**：174 surfaces / 838 modules，`gap111r-build-formal.log`；测试元数据571，`gap111r-build-package-ready.log`。568/569及170b包为第一个修正候选，其通过不能代替包外新反例的修正。以下日志均在 `/private/tmp/`。
+
+| 不重叠默认组 | total / pass / 普通fail / skip / TODO | 日志 |
+|---|---|---|
+| WorkRecord、semantic-trace、prefix-stability | 346 / 328 / 0 / 1 / 17 | `gap111r-trace-record-prefix-final-571.log` |
+| context-compression、delegation、participant-horizon | 598 / 549 / 0 / 6 / 43 | `gap111r-consumer-compression-final-571.log` |
+| durable-events、obligation-ledger | 283 / 247 / 0 / 27 / 9 | `gap111r-durable-coverage-final-571.log` |
+| 合计 | **1227 / 1124 / 0 / 34 / 69** | TODO/skip不计通过 |
+
+核心004/010/011在Node/Bun各 **58 / 56 pass / 0 fail / 2 TODO**，root日志 `gap111r-core-{node,bun}-570.log`，非作者日志 `gap111r-core-independent-{node,bun}-final-570.log`。新增26条Terminal矩阵：18条覆盖部分reasoning/text、完整同源/仅suffix/不同Terminal、尾工具、空白suffix及正式陈述；另8条覆盖完整raw有/无跨界frame、末条formal去重及较早正文同字不得误吞的新终态。两个红矩阵日志为 `gap111r-terminal-red-566.log`、`gap111r-formal-only-red-568.log`。两条010走真实Fork完成→后续squash→同进程Join或冷journal消费；当前派生表示确已变化只是实验前提，不算WHAT-004已满足。
+
+额外 host-boundary-021 **20/20**，`gap111r-host-boundary-021-final-570.log`。独立Fable消费者正反编译、非空Trace/Terminal checkpoint两个integration各 **1/1**，`gap111r-independent-compile-final-570.log`、`gap111r-checkpoint-integration-final-570.log`；后两项不与默认组重复相加。格式与静态门禁日志为 `gap111r-format-check-formal.log`、`gap111r-check-formal.log`。
+
+非作者在570再次用自有探针验证每runtime **32种frame分区、224个暖视图、224个独立新进程冷视图**，逐项检查范围内自然材料完整、范围外及工具协议不存在、暖冷字节相同；原Terminal重复和空白fallback探针均转绿。日志 `gap111r-ranges-independent-{node,bun}-final-570.log`、`gap111r-terminal-{suffix,empty}-independent-{node,bun}-final-570.log`。借用寿命、真实双轮Sync/Fork及caller charge/后续澄清边界曾在567的Node/Bun复验通过，`g111r-borrow-{node,bun}-567.log`、`g111r-consumers-{node,bun}-user-boundary-567.log`；570最终核心真实消费者也已复验，包外另用最终确切包重测。
+
+完成记录的独立探针 `gap111r-contracts-freeze-final-{node,bun}.log` 通过：Fork将确切WorkRecord存入v2完成blob，Join经digest校验后解码并CAS消费，后续squash不改blob。新进程读取同一ref/digest/字节；真实Join按本进程归属契约排除旧handle且不消费，随后另开journal的持久consume返回原表示。**冷consume不等于真实Join验收。** 对应源码为 `Fork/Host/RunLifecycle.fs`、`Handle/CompletionCodec.fs`、`Handle/JoinDrain.fs` 与 `Fork/Host/Join.fs`。
+
+精确主包验证571通过，`gap111r-package-final-571.log`：**2075 members / 13,326,481 bytes**，SHA-256 **`eeaa8b243ed2da6e292bd87d549ed5a810d3e75820c39310dc108df4e7f4d92f`**。真实pack、闭包校验、隔离安装与默认入口通过；库仍为原0.6.4。170b中间包的合法formal-only反例保留为 `g111r-package-review-{node,bun}-suffix-terminal-failure.log`，不以改成whole-turn输入替代它。
+
+同一eeaa包的非作者隔离精确离线安装117依赖、前后逐字核对全部2075成员及7条目录内symlink通过，删除顶层wanxiangli后以ESM实际解析包内0.6.4。没有主仓runtime/support引入，工具schema为手工plain输入数据。Node/Bun各14材料组、真实SyncDelegate/Fork双轮均通过，每runtime另启3个子进程，分别对照14组材料、Sync及Fork冷读，全部逐字相等；formal-only原反例在同输入下转绿。日志 `g111r-package-review-final-{node,bun,ci,integrity-before,integrity-after,cleanup}.log`。最初用CJS解析import-only子路径失败属于复审方法误判，按真实ESM边界校正，未改包来迁就探针。临时安装及Git/journal目录均清理。
+
+CUT-06-R3限定范围完成，两个问题的归因分别保留，随本原子提交正常推送master。最终只刷新文档元数据并核对同一包身份；不将其冒称又一轮行为测试。库未改，未部署用户Host，GAP-111与R2的剩余义务不关闭。
 
 <a id="remaining-boundaries"></a>
 ## 剩余边界
 
 - 本包只关闭跨界摘要越界、排除后漏原文、正式陈述被尾部工具遮蔽的已确认反例。完整且连续的摘要仍可复用；跨界后原件来自同一Trace，EventStore继续是唯一持久载体，durable RecordCoverage/PrefixCoverage不回写。
-- GAP-111保持PARTIAL。后轮squash使固定range的当前派生表示从摘要变为原文，内容范围正确；这尚不能证明已发布的完成记录被改写。CUT-06-R2先核对已有完成WorkRecord的持久表示及实际下游读取，再补冻结证据。不为此向Trace添加Blogger状态，不创建任意range的第二份写入权威。
+- GAP-111保持PARTIAL。本轮真实完成后squash已确认：同一完成range按当前投影重物化的表示仍可改变，WHAT-004这一项尚未满足，属于既有缺口；完成blob、实际Join和已验证冷消费保持冻结。CUT-06-R2按[后续计划](REMAINING-REPAIRS-2026-10-16.md#gap111-history)盘点其他消费者的完成表示与读取，再修历史查询的冻结义务，不为此向Trace添加Blogger状态或创建任意range的第二份写入权威。
 - 实际同步Engineer和Fork resume/Join已验证；退役Inspector不开放，真实provider、完整Opening/Fission及所有消费者的生命周期证明仍归GAP-101/109。scope借用是已登记验收边界，不是新的产品业务入口或持久owner。
 - 独立writer未建立因果顺序的捕获/终结实验保留原日志，不据此宣称跨writer排序已验收。旧坏历史也不自动改写。R12-U1继续按用户要求暂缓，本包未调查物理Unknown、未部署用户Host。

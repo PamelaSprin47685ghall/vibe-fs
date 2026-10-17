@@ -256,7 +256,7 @@ for (const scenario of [
   })
 }
 
-test('WHAT[work-record-004] a later crossing frame cannot expand a completed range or hide its original suffix', async () => {
+test('WHAT[work-record-004] a later crossing frame cannot expand an earlier bounded range or hide its original suffix', async () => {
   await withReopenableJournal(async (handle, reopen) => {
     const session = 'record-range-later-frame'
     await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
@@ -314,6 +314,124 @@ for (const terminal of [false, true]) {
       assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), bounded)
     })
   })
+}
+
+for (const prefixKind of ['reasoning', 'text']) {
+  for (const trailingTool of [false, true]) {
+    for (const terminalKind of ['turn', 'suffix', 'distinct']) {
+      test(`WHAT[work-record-004] partial ${prefixKind} coverage keeps one formal statement with ${terminalKind} terminal and trailingTool=${trailingTool}`, async () => {
+        await withReopenableJournal(async (handle, reopen) => {
+          const session = `record-terminal-${prefixKind}-${terminalKind}-${trailingTool}`
+          await workRecord.captureOpening(handle, session, 'PRIOR_CHARGE', [])
+          const captured = await workRecord.captureProjection(handle, session, { messages: [
+            { role: 'user', parts: [{ kind: 'text', text: 'PRIOR_CHARGE' }] },
+            { role: 'assistant', parts: [{ kind: 'text', text: 'PRIOR_WORK' }] },
+            { role: 'user', parts: [{ kind: 'text', text: 'CURRENT_CHARGE' }] },
+            { role: 'assistant', parts: [
+              { kind: prefixKind, text: 'CURRENT_COVERED_PREFIX' },
+              { kind: 'tool-call', name: 'read', args: 'PRIVATE_TOOL' },
+              { kind: 'text', text: 'CURRENT_FORMAL_STATEMENT' },
+              ...(trailingTool ? [{ kind: 'tool-result', result: 'PRIVATE_RESULT' }] : []),
+            ] },
+          ] })
+          await commitFrame(handle, session, { from: 0, through: 3, body: 'PRIOR_SUMMARY', id: 'prior' })
+          await commitFrame(handle, session, {
+            from: 3, through: trailingTool ? 7 : 5, body: 'CURRENT_SUMMARY', id: 'current',
+          })
+          const range = {
+            StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: captured.currentHeadSequence },
+            ProviderRun: 'current-run',
+          }
+          const before = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+          assert.equal(before, 'Chronicle\nCURRENT_SUMMARY\n\nRecent work\nassistant: CURRENT_FORMAL_STATEMENT')
+          const terminal = terminalKind === 'turn'
+            ? 'CURRENT_COVERED_PREFIX\n\nCURRENT_FORMAL_STATEMENT'
+            : terminalKind === 'suffix' ? 'CURRENT_FORMAL_STATEMENT' : 'DISTINCT_FORMAL_STATEMENT'
+          await workRecord.captureTerminalText(handle, session, terminal, 'current-run')
+          const expected = terminalKind === 'distinct' ? `${before}\nassistant: ${terminal}` : before
+          const completed = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+          assert.equal(completed, expected)
+          assert.doesNotMatch(completed, /PRIOR_|CURRENT_CHARGE|CURRENT_COVERED_PREFIX|PRIVATE_/)
+          assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), expected)
+        })
+      })
+    }
+  }
+}
+
+for (const emptySuffix of ['', ' ', '\n']) {
+  for (const formalVisible of [false, true]) {
+    test(`WHAT[work-record-004] empty reasoning suffix ${JSON.stringify(emptySuffix)} preserves terminal evidence with formalVisible=${formalVisible}`, async () => {
+      await withReopenableJournal(async (handle, reopen) => {
+        const session = `record-empty-suffix-${emptySuffix.length}-${formalVisible}`
+        await workRecord.captureOpening(handle, session, 'CHARGE', [])
+        const captured = await workRecord.captureProjection(handle, session, { messages: [
+          { role: 'user', parts: [{ kind: 'text', text: 'CHARGE' }] },
+          { role: 'assistant', parts: [
+            { kind: 'reasoning', text: 'COVERED_REASONING' },
+            ...(formalVisible ? [{ kind: 'text', text: 'VISIBLE_FORMAL' }] : []),
+            { kind: 'reasoning', text: emptySuffix },
+            { kind: 'tool-result', result: 'PRIVATE_RESULT' },
+          ] },
+        ] })
+        await commitFrame(handle, session, { from: 0, through: 1, body: 'CALLER_SUMMARY', id: 'caller' })
+        await commitFrame(handle, session, {
+          from: 1, through: 3, body: 'CURRENT_SUMMARY', id: 'current',
+        })
+        const range = {
+          StartInclusive: { Sequence: 2 }, EndExclusive: { Sequence: captured.currentHeadSequence },
+          ProviderRun: 'current-run',
+        }
+        const before = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+        const terminal = ['COVERED_REASONING', ...(formalVisible ? ['VISIBLE_FORMAL'] : []), emptySuffix].join('\n\n')
+        await workRecord.captureTerminalText(handle, session, terminal, 'current-run')
+        const completed = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+        if (formalVisible) assert.equal(completed, before)
+        else assert.equal(completed, `Chronicle\nCURRENT_SUMMARY\n\nRecent work\n${emptySuffix ? `${emptySuffix}\n` : ''}assistant: ${terminal}`)
+        assert.doesNotMatch(completed, /CALLER_SUMMARY|CHARGE|PRIVATE_RESULT/)
+        assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), completed)
+      })
+    })
+  }
+}
+
+for (const prefixKind of ['reasoning', 'text']) {
+  for (const crossingFrame of [false, true]) {
+    for (const terminalKind of ['formal', 'earlier']) {
+      test(`WHAT[work-record-004] complete raw ${prefixKind} work with crossingFrame=${crossingFrame} uses latest formal evidence for ${terminalKind} terminal`, async () => {
+        await withReopenableJournal(async (handle, reopen) => {
+          const session = `record-raw-${prefixKind}-${crossingFrame}-${terminalKind}`
+          await workRecord.captureOpening(handle, session, 'PRIOR_CHARGE', [])
+          const captured = await workRecord.captureProjection(handle, session, { messages: [
+            { role: 'user', parts: [{ kind: 'text', text: 'PRIOR_CHARGE' }] },
+            { role: 'assistant', parts: [{ kind: 'text', text: 'PRIOR_WORK' }] },
+            { role: 'user', parts: [{ kind: 'text', text: 'CURRENT_CHARGE' }] },
+            { role: 'assistant', parts: [
+              { kind: prefixKind, text: 'CURRENT_PREFIX' },
+              { kind: 'text', text: 'CURRENT_FORMAL' },
+            ] },
+          ] })
+          if (crossingFrame) await commitFrame(handle, session, {
+            from: 0, through: 5, body: 'PRIOR_WORK CURRENT_FORMAL CROSSING_SUMMARY', id: 'crossing',
+          })
+          const range = {
+            StartInclusive: { Sequence: 3 }, EndExclusive: { Sequence: captured.currentHeadSequence },
+            ProviderRun: 'current-run',
+          }
+          const before = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+          const prefix = prefixKind === 'text' ? 'assistant: CURRENT_PREFIX' : 'CURRENT_PREFIX'
+          assert.equal(before, `Recent work\n${prefix}\nassistant: CURRENT_FORMAL`)
+          const terminal = terminalKind === 'formal' ? 'CURRENT_FORMAL' : 'CURRENT_PREFIX'
+          await workRecord.captureTerminalText(handle, session, terminal, 'current-run')
+          const expected = terminalKind === 'formal' ? before : `${before}\nassistant: ${terminal}`
+          const completed = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+          assert.equal(completed, expected)
+          assert.doesNotMatch(completed, /PRIOR_|CURRENT_CHARGE|CROSSING_SUMMARY/)
+          assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), expected)
+        })
+      })
+    }
+  }
 }
 
 test('WHAT[work-record-004] an actual durable squash spanning invocations restores only bounded originals after cold replay', async () => {

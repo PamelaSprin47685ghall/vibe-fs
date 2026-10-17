@@ -2,6 +2,16 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第十八批：GAP-111 独立复审及 Terminal 去重回退修正（2026-10-17）
+
+从干净主仓 `e7a150937` 复核，库 `10bbb32 / 0.6.4` 未改。三名非作者分别检查范围/coverage、真实消费者/借用寿命、契约/完成blob。两项bounded P2已修：**e7新引入、前轮review漏检** 的部分摘要同源Terminal重复（18条在原566为11pass/7fail）；包外另发现输入已有的完整raw配仅formal Terminal重复（8条在568为4pass/4fail，至少53源码已有）。现在先比实际gap/最新turn末条formal，再以本轮已验证非空自然suffix与完整turn精确证明去重；较早正文同字、尾tools、空白suffix及不同Terminal仍保留应有正式陈述。未裁切/包含匹配Terminal、未回写coverage或新增持久owner。
+
+生产最终570、测试元数据571；核心Node/Bun及非作者各 **58 / 56pass / 0fail / 2TODO**。三个不重叠默认组 **1227 / 1124pass / 0普通fail / 34skip / 69TODO**，另host-boundary-021为20/20，独立Fable编译与非空Trace checkpoint两个integration各1/1（不与默认组重复相加）。非作者每runtime另验224暖视图和224新进程冷视图，真实Sync/Fork的caller charge、后续澄清、正文与正式陈述边界及借用寿命通过。分支嵌套门禁与新增测试Task回调夹具的初次失败均保留，未放宽产品或门禁；最终静态、格式通过。
+
+精确包2075members / 13,326,481bytes，SHA-256 `eeaa8b243ed2da6e292bd87d549ed5a810d3e75820c39310dc108df4e7f4d92f`，真实pack、隔离安装和默认入口通过。非作者同一包独立离线安装、成员字节及依赖边界核对通过；Node/Bun各14材料组、真实Sync/Fork双轮及3个子进程冷读逐字相等，formal-only原例转绿，安装及临时Git/journal已清理。170b中间包失败与CJS解析误判保留，不冒充最终证据。R3随本原子提交正常推送master。完整日志、归因和剩余边界见[复审报告](WORK-RECORD-RANGES-2026-10-17.md#independent-review)。
+
+R2不能再仅写缺证据：真实Terminal/HandleCompleted之后，后续squash使同一完成range按当前投影重物化的表示改变，WHAT-004这一项是已确认的既有缺口；完成blob、同进程真实Join、冷解码及持久consume保持冻结。新进程Join按原归属契约排除旧handle，不冒称它已消费。GAP-111仍PARTIAL，R2按消费者分包计划继续；R12-U1暂缓，未部署用户Host。
+
 ## 第十七批：GAP-111 bounded 取材修复（2026-10-17）
 
 从干净主仓 `53cba28de`、库 `10bbb32 / 0.6.4` 继续 CUT-06-R1。生产 bounded 路径只采用完整落在本次工作范围内的连续 frame 前缀，以实际采用材料决定 raw 起点，不再借全会话 coverage 跳过原件。保留最后助手正文；Terminal 仅对实际展示的 raw 去重。原跨界反例和无/有 Terminal 的尾部工具吞正式陈述反例均在原实现失败，现已修正。

@@ -104,10 +104,11 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-02-R6-B](REMAINING-REPAIRS-2026-10-16.md) | GAP-092 完整 wire 总预算 | READY | 先明确最小可接纳预算和预执行拒绝通道，再以实际编码限制完整结果 | root（计划） | 待非作者复审 |
 | [CUT-02-R6-C](REMAINING-REPAIRS-2026-10-16.md) | Bun 特殊 env、参数证明及 stdin 四项失败 | READY | 原生对照已完成；分别处理能力与测试假设，不放宽断言，不标全套通过 | root（计划） | 待非作者复审 |
 | [CUT-06-R1](WORK-RECORD-RANGES-2026-10-17.md) | GAP-111 跨 invocation frame 的 bounded 取材与 coverage | DONE | 本原子提交修正范围与正式陈述，1199项0普通失败；Node/Bun核心28pass/0fail/2TODO，非作者源/消费者/独立新进程恢复及精确包外Node/Bun均通过，库0.6.4未变。只关闭本包范围，不关闭整项GAP-111/109 | root | gap111_review |
-| [CUT-06-R2](WORK-RECORD-RANGES-2026-10-17.md#remaining-boundaries) | GAP-111 历史 bounded 表示的冻结证据 | BACKLOG | 真实后轮 squash 使固定range的当前派生表示变为原文，范围完整但字符串不同；尚未证明已发布完成记录被改写。先盘点完成WorkRecord持久表示与实际读取，再补冻结验收；不得向Trace塞Blogger状态或用任意range缓存冒充持久事实 | — | 待认领 |
+| [CUT-06-R3](WORK-RECORD-RANGES-2026-10-17.md#independent-review) | GAP-111 独立复审：部分摘要及formal-only Terminal去重 | DONE | e7新回退与输入已有的formal-only重复均已修；最终核心Node/Bun各56pass/0fail/2TODO，相关1227项0普通失败；非作者570范围/冷进程/消费者及eeaa8b精确包外14材料组、真实Sync/Fork和新进程冷读通过，随本原子提交交付；R2不销项 | root | g111r_ranges、g111r_consumers、g111r_contracts |
+| [CUT-06-R2](REMAINING-REPAIRS-2026-10-16.md#gap111-history) | GAP-111 已完成range的当前重物化表示仍可改变 | BACKLOG | 真实Terminal/HandleCompleted后squash已确认WHAT-004的既有缺口；Fork完成blob、同进程Join及冷持久消费稳定。先按消费者盘点完成表示与历史查询，区分当前视图和已发布canonical读取；不得向Trace塞Blogger状态或用任意range缓存冒充持久事实 | — | 待认领 |
 | [CUT-17-R1](REMAINING-REPAIRS-2026-10-16.md#guidance-followup) | GAP-108 指导呈现回流的真实 Host 路径核查 | BACKLOG | 优先按 P1 风险核查；直接捕获反例仍红，正常 Host 可达性未证。先驱动真实请求/捕获链，不教原件层按正文删后缀；不是整张 CUT-17 抽取 | — | 待非作者复审 |
 
-2026-10-17 当前顺序：CUT-06-R1限定范围已完成，随后 CUT-17-R1 核查与三个 Process P2 按 R6-B → R6-C → R6-A 各自闭环；CUT-06-R2及完整Trace/Ownership产品链分场景补证，主动脱组另做原型，R12-U1暂缓。[当前排期与验收范围](REMAINING-REPAIRS-2026-10-16.md#post-t01-plan)。公共文件、两仓发布及主仓集成仍串行，不能用局部修复关闭整张关联卡。
+2026-10-17 当前顺序：CUT-06-R1限定范围已交付，R3独立复审修正及最终验收完成；随后 CUT-17-R1 核查与三个 Process P2 按 R6-B → R6-C → R6-A 各自闭环；CUT-06-R2的历史重物化缺口及完整Trace/Ownership产品链分别施工，主动脱组另做原型，R12-U1暂缓。[当前排期与验收范围](REMAINING-REPAIRS-2026-10-16.md#post-t01-plan)。公共文件、两仓发布及主仓集成仍串行，不能用局部修复关闭整张关联卡。
 
 ## 波次：什么时候拉哪张卡
 
@@ -146,6 +147,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | `src/Wanxiangshu/Context/Trace/*.fs(.fsi)` | `CUT-03` | `eng-cut03` | `b322c180b` | `CUT-03 完成确认轨迹子范围接线与 semantic-trace 测试回归`（2026-10-15 全套验证全绿含裁决后 005 重入段，主线提交 62dbebc5d，证据见 cards/CUT-03.md） | `已释放` |
 | `src/Wanxiangshu/Execution/Session/Ownership.fs(.fsi), src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs(.fsi)` | `CUT-04` | `eng-cut04` | `b322c180b` | `CUT-04 完成资源归属接线与 session/work 测试回归`（2026-10-15 删除清单闭合与 work 009/044、025 全绿，主线提交 62dbebc5d，证据见 cards/CUT-04.md） | `已释放` |
 | `Mission/WorkRecord/{Materialize,Surface}.fs(.fsi)`、`Context/Companion/Blogger/Projection.fs` 的范围说明、`Persistence/Journal/Surface.fs(.fsi)` 的 scoped 借用、`Execution/Delegation/{SyncDelegate/Surface,Fork/OpenCode/ToolSurface}.fs(.fsi)` 的观察接缝、work-record WHAT/004/010/011/辅助夹具及本包文档 | `CUT-06-R1` | root | `53cba28de` | 实际跨界反例、冷恢复和同步/异步消费者验收及非作者、精确包复验均通过，随本原子提交交付；库 10bbb32 / 0.6.4 未改 | `已释放` |
+| `Mission/WorkRecord/Materialize.fs`、work-record 004/010 测试及 GAP/本包进度文档 | `CUT-06-R3` | root | `e7a150937` | 两项Terminal重复反例、1227项相关需求、非作者最终候选及eeaa精确包外复验完成，随本原子提交交付；其他代理只读 | `已释放` |
 
 ## 两仓集成队列
 

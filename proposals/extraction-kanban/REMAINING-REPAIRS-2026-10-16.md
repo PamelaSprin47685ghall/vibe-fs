@@ -9,6 +9,8 @@
 
 同日执行：已从 `53cba28de` 完成 CUT-06-R1 的范围隔离、原件补足和真实同步/异步消费者修正，见[反例、非作者复验与交付证据](WORK-RECORD-RANGES-2026-10-17.md)。GAP-111 保持 PARTIAL：后续 squash 后的历史表示字节冻结仍是独立边界；R12-U1 继续暂缓。下文保留当时盘点及计划，当前状态以看板为准。
 
+同日独立复审：CUT-06-R3修正e7新引入的Terminal重复回退，并修复前已有的formal-only重复，原跨界与正文保留继续成立。真实完成→squash的对照已将CUT-06-R2从“待补冻结证据”收窄为[已确认的历史重物化契约缺口](#gap111-history)；Fork完成blob、Join及冷持久消费稳定，不等于所有历史查询都已冻结。最新计数、归因和边界见[复审证据](WORK-RECORD-RANGES-2026-10-17.md#independent-review)，R12-U1继续暂缓。
+
 原四项 P1 工作包 R6-A/B/C 与 T-01 已在声明范围内验收；最近 T-01 复审确认的问题均已修正。父卡 CUT-03-R1、CUT-04-R1 仍有产品链和监管范围义务。上一轮 2270 项中的 100 TODO、51 skip 不是 151 个已确认错误；缺实现、缺证据、运行前提与已确认失败须分别处理。
 
 ### 当前剩余项
@@ -36,6 +38,15 @@
 5. 定向运行 work-record、semantic-trace、context-compression、prefix 及实际受影响的 delegation/horizon 用例；由非作者复审最终候选。这里只关闭 GAP-111 对应反例与已验证路径，不顺带宣布 GAP-101/109 或 CUT-06 全部完成。
 
 候选写集合从 `Mission/WorkRecord/Materialize.fs(.fsi)`、必要的 Trace/Blogger 范围查询及相应编号测试开始；先核对实际调用点再预约公共文件。当前只完成盘点，尚未认领生产编辑面。
+
+<a id="gap111-history"></a>
+### CUT-06-R2：已完成范围的历史重物化
+
+难度中高。已确认后续squash会改变已完成range经当前投影重物化的表示，WHAT-004尚未满足；不是已发布完成blob被改写，也不是本轮Terminal修正新引入。Fork的v2完成blob、同进程Join和冷持久consume已有正控，新进程Join按既有归属契约排除旧handle。不能用这一条Fork链替其他消费者关闭缺口。
+
+1. 逐一盘点SyncDelegate、process review、Finality、parent bounded record等实际调用者：谁需要当前范围视图，谁需要已经发布的canonical完成记录，已有哪一笔完成事实和blob能承接。核对完成身份、ProviderRun、range及读取时机，不先添加通用range缓存。
+2. 在现有work/完成记录owner决定冻结与读取契约，优先消费已有确切完成表示；缺少持久关联时先定完成时的原子事实，再调整真实生产调用者。Trace只保管原件，Blogger只保管摘要和coverage；不向Trace塞Blogger快照，不回写历史coverage，不通过弱化WHAT-004来迁就当前实现。
+3. 用实际完成→后续entry/squash/terminal/reanchor的正反对照验证，同一完成身份/range的canonical读取暖冷保持确切表示，新invocation不借旧记录；同时保留当前range取材完整与工具材料排除。没有独立consumer和新进程证据，不关闭整项GAP-111/109。先按消费者分包，旧错历史不自动迁移。
 
 <a id="guidance-followup"></a>
 ### 第二个工作包：CUT-17-R1，证明或修正真实指导回流
