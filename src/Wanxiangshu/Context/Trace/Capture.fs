@@ -1173,6 +1173,7 @@ module XTraceCapture =
                         task {
                             match
                                 XTraceProjection.applyOpening
+                                    None
                                     assignmentText
                                     authoritativeRequirements
                                     (xTraceOf durable sessionId)

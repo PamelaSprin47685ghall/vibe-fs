@@ -290,7 +290,7 @@ test('WHAT[durable-events-013] canonical shape requires one-envelope rule and sh
   const kernel = [
     'type IntegrationRule =',
     '    { Name: string',
-    '      Integrate: obj -> EventEnvelope -> Result<obj, string> }',
+    '      Integrate: EventCausalContext -> obj -> EventEnvelope -> Result<obj, string> }',
     'type PreparedIntegration = { Commit: unit -> unit }',
   ].join('\n')
   const goodCanonical = [
@@ -316,8 +316,8 @@ test('WHAT[durable-events-013] canonical shape requires one-envelope rule and sh
   )
 
   const collectionRule = kernel.replace(
-    'Integrate: obj -> EventEnvelope -> Result<obj, string>',
-    'Integrate: obj -> EventEnvelope list -> Result<obj, string>',
+    'Integrate: EventCausalContext -> obj -> EventEnvelope -> Result<obj, string>',
+    'Integrate: EventCausalContext -> obj -> EventEnvelope list -> Result<obj, string>',
   )
   const collectionHits = scanCanonicalSharedProgram([
     { file: kernelFile, text: collectionRule },

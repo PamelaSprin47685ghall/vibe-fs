@@ -25,7 +25,7 @@ module StrengthIntegrationRules =
           FaultScope = fun _ -> "global"
           Accepts = fun envelope -> StrengthEventTypes.isStrengthEvent envelope.EventType
           Integrate =
-            fun current envelope ->
+            fun _ current envelope ->
                 match LegacyProtocolClassifier.classifyPayload envelope.EventType envelope.Payload with
                 | LegacyProtocolVerdict.LegacyStrength reason -> Error(LegacyProtocolClassifier.refusalMessage reason)
                 | LegacyProtocolVerdict.CurrentProtocol

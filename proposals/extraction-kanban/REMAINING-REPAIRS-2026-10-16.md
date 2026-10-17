@@ -44,6 +44,8 @@
 
 2026-10-17执行：已按下列计划完成有确切Terminal事实的WorkRecord表示派生、真实Sync/Fork终点及暖冷历史查询，核心69pass/1TODO、相关1239项0普通失败；非作者源/行为复验、旧精确包升级blob消费、精确新包隔离默认入口及同包非作者Node/Bun行为复验均通过，随本原子提交交付。[实现、消费者盘点、历史边界和日志](WORK-RECORD-HISTORY-2026-10-17.md)。以下保留施工依据；GAP-111/109不整项关闭，R12-U1继续暂缓。
 
+同日R4独立复审纠正上述验收的外延：并发晚摘要/原件可在冷排序中提前，原R2未固定其因果取材。现按Terminal显式父边、Trace材料见证与WorkRecord摘要替换关系修正，多head写者保留全部父边；同身份/同终点有不同完成表示时缺证，不按回放次序猜胜者。旧丢边历史不补造关联，旧v2 blob仍保留原字节。1311个不同用例0普通失败，checkpoint/消费者/独立冷读、三名非作者及229980精确包隔离Node/Bun消费者均已通过；撤回的五个越界Kernel白盒用例不计正式验收。本包限定范围完成，完整GAP-111/109及R12-U1边界保留。[问题分类与R4证据](WORK-RECORD-HISTORY-2026-10-17.md#r4-review)。
+
 难度中高。已确认后续squash会改变已完成range经当前投影重物化的表示，WHAT-004尚未满足；不是已发布完成blob被改写，也不是本轮Terminal修正新引入。Fork的v2完成blob、同进程Join和冷持久consume已有正控，新进程Join按既有归属契约排除旧handle。不能用这一条Fork链替其他消费者关闭缺口。
 
 1. 逐一盘点SyncDelegate、process review、Finality、parent bounded record等实际调用者：谁需要当前范围视图，谁需要已经发布的canonical完成记录，已有哪一笔完成事实和blob能承接。核对完成身份、ProviderRun、range及读取时机，不先添加通用range缓存。

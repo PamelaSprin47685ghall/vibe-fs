@@ -2,6 +2,14 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第二十批：CUT-06-R4 完成表示独立复审（2026-10-17）
+
+从干净 `49b64879c` 复核，三名非作者确认并发晚摘要、晚原件、同身份/同终点并发完成的原有缺口未闭合；原 R2 的线性历史与旧 blob 消费证据保留，不能扩大成所有并发冷恢复证明。修正显式父边因果成员、Trace 终点、WorkRecord 摘要替换关系、多 head 写入及完成歧义，另修正本轮候选的 coverage 洞和未证完成阻断后续范围两项回退。原问题、候选回退和 review 误判分别记录在[报告 R4](WORK-RECORD-HISTORY-2026-10-17.md#r4-review)。
+
+新增确定性反例先红；本轮未提交候选还拦下 standalone Opening、同证据重复完成、未证重放扩界及 eager clock 成本问题，均已修正或移除，不混记成原输入缺陷。生产generation582：三组默认1311个不同用例 / 1195 pass / 0普通fail / 40 skip / 76 TODO；Bun核心92项/91 pass/0 fail/1 TODO。真实checkpoint前后物化及独立冷读、Trace opaque正反编译各1/1，Completion owner的94源独立Fable编译通过。三名非作者最终矩阵、真实Sync/Fork及新进程、旧v2格式和真正旧R2二进制发布blob的升级消费通过。五组Kernel白盒探针另列调查证据；其曾越界加入正式测试，已按JS门禁撤回，不计正式通过数，未增加豁免；最终完整check、format通过。
+
+精确新包2076文件 / 13,366,102字节，SHA-256 `22998049cad15b0b4cf580c87def35f95b0656b55835fc775d4e3607f7f4176c`，真实pack和隔离默认入口通过；非作者同包独立离线安装，Node/Bun实际Sync/Fork暖交付与新进程冷读逐字相同，安装文件和包摘要前后不变，临时目录已清理。本包限定范围进入DONE，随本原子提交正常推送master。旧缺边历史不猜来源，旧v2完成blob不迁移，GAP-111/109不整项关闭；库0.6.4未改，R12-U1暂缓，未部署用户Host。
+
 ## 第十九批：CUT-06-R2 已完成范围的历史表示（2026-10-17）
 
 从干净 `2ec1a5400` 继续，库 `10bbb32 / 0.6.4` 未改。新增纯 WorkRecord 完成表示投影：在已验证 Terminal 成功折叠的同一次 aggregate 更新中保存其 ProviderRun、确切终点和当时的不可变frame引用；不缓存任意range、复制正文或coverage、不向Trace塞Blogger状态。后续entry/squash/Terminal/reanchor与冷回放不重选表示。Sync/Fork改用该run的Terminal终点，修复完成通知/消费前head增长的既有越界；旧精确包实际Fork混入FUTURE_DETAIL的红例已保留。

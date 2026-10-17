@@ -231,11 +231,18 @@ module LifecycleWorkRecordProjection =
         let startSequence = range |> XTraceRange.startInclusive |> XTraceCursor.sequence
         let endSequence = range |> XTraceRange.endExclusive |> XTraceCursor.sequence
 
+        let rec takePrefix covered remaining selected =
+            match remaining with
+            | frame :: rest when
+                frame.CoveredFromSequence = covered
+                && frame.CoveredThroughSequence < endSequence
+                ->
+                takePrefix frame.CoveredThroughSequence rest (frame :: selected)
+            | _ -> List.rev selected
+
         frames
         |> List.skipWhile (fun frame -> frame.CoveredThroughSequence < startSequence)
-        |> List.takeWhile (fun frame ->
-            frame.CoveredFromSequence >= startSequence - 1L
-            && frame.CoveredThroughSequence < endSequence)
+        |> fun remaining -> takePrefix (max 0L (startSequence - 1L)) remaining []
 
     let private boundedWorkRange
         (providerRun: ProviderRunIdentity option)
@@ -333,19 +340,8 @@ module LifecycleWorkRecordProjection =
                 return appendTerminalWhenMissing renderedGap text alreadyCaptured
         }
 
-    let private materializeBoundedOpeningEvidence durable session range terminalProviderRun xTrace opening =
+    let private materializeBoundedFrames durable selectedFrames workRange range terminalProviderRun xTrace opening =
         task {
-            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
-            let workRange = boundedWorkRange terminalProviderRun range xTrace
-
-            let selectedFrames =
-                session.CompletedWorkRecords
-                |> Option.bind (
-                    CompletedWorkRecordProjection.framesForRange terminalProviderRun (XTraceRange.endExclusive range)
-                )
-                |> Option.defaultWith (fun () -> BlogProjection.frames blog)
-                |> framePrefixInRange workRange
-
             let! frames = resolveFrames durable selectedFrames
 
             let gapRange =
@@ -360,8 +356,30 @@ module LifecycleWorkRecordProjection =
             | _, Error _ -> return None
             | Ok verifiedFrames, Ok renderedGap ->
                 let! finalGap = completeBoundedGap xTrace workRange gapRange range terminalProviderRun renderedGap
-
                 return Some(LifecycleWorkRecord.materialize opening verifiedFrames finalGap false)
+        }
+
+    let private materializeBoundedOpeningEvidence durable session range terminalProviderRun xTrace opening =
+        task {
+            let blog = session.Blog |> Option.defaultValue BlogProjection.empty
+            let workRange = boundedWorkRange terminalProviderRun range xTrace
+
+            let selection =
+                session.CompletedWorkRecords
+                |> Option.map (
+                    CompletedWorkRecordProjection.framesForRange terminalProviderRun (XTraceRange.endExclusive range)
+                )
+                |> Option.defaultValue (Ok None)
+                |> Result.map (fun frames ->
+                    frames
+                    |> Option.defaultWith (fun () -> BlogProjection.frames blog)
+                    |> framePrefixInRange workRange)
+
+            match selection with
+            | Error _ -> return None
+            | Ok selectedFrames ->
+                return!
+                    materializeBoundedFrames durable selectedFrames workRange range terminalProviderRun xTrace opening
         }
 
     let private materializeBoundedOpenedSession

@@ -10,9 +10,23 @@ module CompletedWorkRecordProjection =
     val empty: CompletedWorkRecordProjectionState
 
     val capture:
+        causality: (EventId * (EventId -> bool)) option ->
         providerRun: ProviderRunIdentity ->
         frontier: XTraceCursor ->
-        framesNewestFirst: BlogFrame list ->
+        state: CompletedWorkRecordProjectionState ->
+            CompletedWorkRecordProjectionState
+
+    val recordFrame:
+        causality: (EventId * (EventId -> bool)) option ->
+        replacedCount: int ->
+        frame: BlogFrame ->
+        currentFramesNewestFirst: BlogFrame list ->
+        state: CompletedWorkRecordProjectionState ->
+            CompletedWorkRecordProjectionState
+
+    val markUnproven:
+        providerRun: ProviderRunIdentity ->
+        observedHead: XTraceCursor ->
         state: CompletedWorkRecordProjectionState ->
             CompletedWorkRecordProjectionState
 
@@ -20,4 +34,4 @@ module CompletedWorkRecordProjection =
         providerRun: ProviderRunIdentity option ->
         endExclusive: XTraceCursor ->
         state: CompletedWorkRecordProjectionState ->
-            BlogFrame list option
+            Result<BlogFrame list option, unit>

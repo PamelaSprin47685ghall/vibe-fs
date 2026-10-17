@@ -515,7 +515,7 @@ module ContextFoldSurface =
             (fun result (envelope, material) ->
                 result
                 |> Result.bind (fun current ->
-                    Wanxiangshu.Composition.Durable.Fold.foldEnvelopeWithMaterial material current envelope))
+                    Wanxiangshu.Composition.Durable.Fold.foldEnvelopeWithMaterial None material current envelope))
             (Ok Wanxiangshu.Composition.Durable.Fold.empty)
         |> function
             | Ok projection ->

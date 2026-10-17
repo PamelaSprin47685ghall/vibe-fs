@@ -94,6 +94,7 @@ module CompanionFactFold =
               CompanionProjectionChange.CompanionSet(payload.SessionId, closedCompanion) ]
 
     let private foldOpeningPromptCaptured
+        causality
         (xTraceOf: SessionId -> XTraceProjectionState option)
         (payload:
             {| SessionId: SessionId
@@ -109,11 +110,18 @@ module CompanionFactFold =
                 (fun () -> XTraceProjection.emptyForSession payload.SessionId)
                 (xTraceOf payload.SessionId)
 
-        match XTraceProjection.applyOpening payload.AssignmentText payload.AuthoritativeRequirements current with
+        match
+            XTraceProjection.applyOpening
+                (causality |> Option.map fst)
+                payload.AssignmentText
+                payload.AuthoritativeRequirements
+                current
+        with
         | Ok updated -> Ok [ CompanionProjectionChange.XTraceSet(payload.SessionId, updated) ]
         | Error rejection -> Error(CompanionFoldRejection.XTraceOpeningRejected rejection)
 
     let private foldXTracePartAppended
+        causality
         (body: string)
         (xTraceOf: SessionId -> XTraceProjectionState option)
         (payload:
@@ -141,6 +149,7 @@ module CompanionFactFold =
 
         match
             XTraceProjection.applyPart
+                causality
                 payload.CursorSequence
                 payload.Role
                 payload.Provenance
@@ -160,6 +169,7 @@ module CompanionFactFold =
         | Error rejection -> Error(CompanionFoldRejection.XTracePartRejected rejection)
 
     let private foldTerminalOutputCaptured
+        causality
         (body: string)
         (xTraceOf: SessionId -> XTraceProjectionState option)
         (payload:
@@ -173,11 +183,14 @@ module CompanionFactFold =
                 (fun () -> XTraceProjection.emptyForSession payload.SessionId)
                 (xTraceOf payload.SessionId)
 
-        match XTraceProjection.applyTerminal payload.TextRef payload.TextDigest payload.ProviderRun body current with
+        match
+            XTraceProjection.applyTerminal causality payload.TextRef payload.TextDigest payload.ProviderRun body current
+        with
         | Ok updated -> Ok [ CompanionProjectionChange.XTraceSet(payload.SessionId, updated) ]
         | Error rejection -> Error(CompanionFoldRejection.XTraceTerminalRejected rejection)
 
     let fold
+        causality
         (body: string)
         (associations: Map<SessionId, SessionAssociation>)
         (companionOf: SessionId -> CompanionProjection option)
@@ -189,6 +202,7 @@ module CompanionFactFold =
             foldCompanionBloggerLinked associations companionOf payload
         | CompanionFactCases.CompanionBloggerClosed payload ->
             foldCompanionBloggerClosed associations companionOf payload
-        | CompanionFactCases.OpeningPromptCaptured payload -> foldOpeningPromptCaptured xTraceOf payload
-        | CompanionFactCases.XTracePartAppended payload -> foldXTracePartAppended body xTraceOf payload
-        | CompanionFactCases.TerminalOutputCaptured payload -> foldTerminalOutputCaptured body xTraceOf payload
+        | CompanionFactCases.OpeningPromptCaptured payload -> foldOpeningPromptCaptured causality xTraceOf payload
+        | CompanionFactCases.XTracePartAppended payload -> foldXTracePartAppended causality body xTraceOf payload
+        | CompanionFactCases.TerminalOutputCaptured payload ->
+            foldTerminalOutputCaptured causality body xTraceOf payload

@@ -14,7 +14,7 @@ module JsTransactionIntegrationRules =
           FaultScope = fun _ -> "global"
           Accepts = fun envelope -> JsToolsTransactionStore.isTransactionEventType envelope.EventType
           Integrate =
-            fun current envelope ->
+            fun _ current envelope ->
                 match JsToolsTransactionStore.tryDecodeEnvelope envelope with
                 | Error error -> Error error
                 | Ok(JsToolsTransactionStore.DecodedTransactionEvent.Prepared prepared) ->

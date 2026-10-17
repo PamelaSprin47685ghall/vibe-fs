@@ -624,3 +624,283 @@ for (const corrupt of ['selected', 'crossing']) {
     })
   })
 }
+
+const { withCausalHistory, causalRange, causalSession } = await import('./support/causal-history.mjs')
+
+test('WHAT[work-record-004] a completed Chronicle excludes a later concurrent writer entry after cold replay', async () => {
+  await withCausalHistory(async history => {
+    await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    const completed = history.read()
+    assert.equal(completed.terminal.frontier.sequence, 4)
+    assert.equal(completed.record, 'Chronicle\nORIGINAL_SUMMARY\n\nRecent work\nORIGINAL_REASONING\nassistant: FORMAL_RESULT')
+    await history.append('late-entry', 'late-writer', 0x10000000, [history.base])
+    const recovered = history.read()
+    assert.match(recovered.live, /LATE_ENTRY/)
+    assert.equal(recovered.terminal.frontier.sequence, 4)
+    assert.equal(recovered.record, completed.record)
+    assert.equal(history.read().record, completed.record)
+  })
+})
+
+test('WHAT[work-record-004] a completed frontier excludes later concurrent writer originals after cold replay', async () => {
+  await withCausalHistory(async history => {
+    await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    const completed = history.read()
+    await history.append('late-original', 'late-writer', 0x10000000, [history.base])
+    const recovered = history.read()
+    assert.equal(recovered.head.sequence, 5)
+    assert.match(recovered.live, /LATE_ORIGINAL/)
+    assert.equal(recovered.terminal.frontier.sequence, completed.terminal.frontier.sequence)
+    assert.equal(recovered.record, completed.record)
+    assert.equal(history.read(causalRange).record, completed.record)
+  })
+})
+
+for (const [mutation, steps] of [
+  ['partial-squash', ['late-entry', 'partial-squash']],
+  ['full-squash', ['late-entry', 'partial-squash', 'full-squash']],
+  ['nested-squash', ['late-entry', 'partial-squash', 'full-squash', 'late-tip', 'nested-squash']],
+]) {
+  test(`WHAT[work-record-004] completed bytes exclude concurrent writer ${mutation} ancestry after cold replay`, async () => {
+    await withCausalHistory(async history => {
+      await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+      const completed = history.read()
+      const genericRange = { StartInclusive: causalRange.StartInclusive, EndExclusive: causalRange.EndExclusive }
+      const generic = history.read(genericRange).record
+      let parent = history.base
+      for (let index = 0; index < steps.length; index += 1) {
+        parent = await history.append(steps[index], 'late-writer', 0x10000000 + index, [parent])
+      }
+      const recovered = history.read()
+      assert.match(recovered.live, new RegExp(mutation.toUpperCase().replaceAll('-', '_')))
+      assert.equal(recovered.terminal.frontier.sequence, 4)
+      assert.equal(recovered.record, completed.record)
+      assert.equal(history.read(genericRange).record, generic)
+      assert.equal(history.read().record, completed.record)
+    })
+  })
+}
+
+test('WHAT[work-record-004] a new Terminal sees all merged heads and retains them across later concurrent originals', async () => {
+  await withCausalHistory(async history => {
+    const terminal = await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    const first = history.read()
+    const late = await history.append('late-entry', 'late-writer', 0x10000000, [history.base])
+    await history.append('completed-b', 'merged-writer', 0xff000000, [terminal, late])
+    const secondRange = { ...causalRange, ProviderRun: 'completed-b' }
+    const second = history.read(secondRange)
+    assert.equal(second.terminal.frontier.sequence, 4)
+    assert.match(second.record, /LATE_ENTRY/)
+    assert.match(second.record, /SECOND_FINAL/)
+    await history.append('late-original', 'original-writer', 0x11000000, [late])
+    const recovered = history.read(secondRange)
+    assert.equal(recovered.head.sequence, 5)
+    assert.equal(recovered.terminal.frontier.sequence, 4)
+    assert.equal(recovered.record, second.record)
+    assert.equal(history.read().record, first.record)
+    assert.equal(history.read(secondRange).record, second.record)
+  })
+})
+
+test('WHAT[work-record-004] an ordered duplicate terminal keeps its first representation after a later Entry', async () => {
+  await withCausalHistory(async history => {
+    const terminal = await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    const first = history.read()
+    const late = await history.append('late-entry', 'late-writer', 0x10000000, [terminal])
+    await history.append('completed-a', 'duplicate-writer', 0x11000000, [late])
+    const recovered = history.read()
+    assert.match(recovered.live, /LATE_ENTRY/)
+    assert.equal(recovered.terminal.frontier.sequence, 4)
+    assert.equal(recovered.record, first.record)
+  })
+})
+
+for (const [conflict, event] of [['frontier', 'late-original'], ['Chronicle', 'late-entry']]) {
+  test(`WHAT[work-record-004] concurrent same-run terminals fail closed when their ${conflict} evidence differs`, async () => {
+    await withCausalHistory(async history => {
+      await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+      const first = history.read()
+      assert.equal(typeof first.record, 'string')
+      const late = await history.append(event, 'late-writer', 0x10000000, [history.base])
+      await history.append('completed-a', 'duplicate-writer', 0x11000000, [late])
+      assert.equal(history.read().record, null)
+      assert.equal(history.read().record, null)
+    })
+  })
+}
+
+test('WHAT[work-record-004] concurrent same-frontier runs require a run identity when their Chronicle choices differ', async () => {
+  await withCausalHistory(async history => {
+    await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    const first = history.read()
+    const late = await history.append('late-entry', 'late-writer', 0x10000000, [history.base])
+    await history.append('completed-b', 'other-terminal-writer', 0x11000000, [late])
+    const secondRange = { ...causalRange, ProviderRun: 'completed-b' }
+    const second = history.read(secondRange)
+    assert.equal(second.terminal.frontier.sequence, 4)
+    assert.match(second.record, /LATE_ENTRY/)
+    assert.match(second.record, /SECOND_FINAL/)
+    assert.equal(history.read({ StartInclusive: causalRange.StartInclusive, EndExclusive: causalRange.EndExclusive }).record, null)
+    assert.equal(history.read().record, first.record)
+    assert.equal(history.read(secondRange).record, second.record)
+  })
+})
+
+test('WHAT[work-record-004] concurrent identical same-run terminals retain their shared completion evidence', async () => {
+  await withCausalHistory(async history => {
+    await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    const first = history.read()
+    await history.append('completed-a', 'duplicate-writer', 0x10000000, [history.base])
+    const recovered = history.read()
+    assert.equal(recovered.terminal.frontier.sequence, 4)
+    assert.equal(recovered.record, first.record)
+  })
+})
+
+test('WHAT[work-record-004] concurrent same-frontier runs share a generic view when their Chronicle evidence agrees', async () => {
+  await withCausalHistory(async history => {
+    await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    const first = history.read()
+    const genericRange = { StartInclusive: causalRange.StartInclusive, EndExclusive: causalRange.EndExclusive }
+    const generic = history.read(genericRange).record
+    await history.append('completed-b', 'other-terminal-writer', 0x10000000, [history.base])
+    assert.equal(history.read(genericRange).record, generic)
+    assert.equal(history.read().record, first.record)
+    assert.match(history.read({ ...causalRange, ProviderRun: 'completed-b' }).record, /SECOND_FINAL/)
+  })
+})
+
+test('WHAT[work-record-004] a refreshed Journal writer includes every session head in its new Terminal parents', async () => {
+  await withCausalHistory(async history => {
+    const terminal = await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    const late = await history.append('late-entry', 'late-writer', 0x10000000, [history.base])
+    assert.deepEqual(new Set(history.headState().heads), new Set([terminal, late]))
+    await history.withJournal(async handle => {
+      assert.match(await workRecord.lifecycleWorkRecord(handle, causalSession, false), /LATE_ENTRY/)
+      await workRecord.captureTerminalText(handle, causalSession, 'MERGED_FINAL', 'merged-live-run')
+      const captured = history.headState()
+      assert.equal(captured.heads.length, 1)
+      assert.deepEqual(new Set(captured.event.parents), new Set([terminal, late]))
+      const query = { ...causalRange, ProviderRun: 'merged-live-run' }
+      const warm = await workRecord.lifecycleWorkRecordBounded(handle, causalSession, query)
+      assert.match(warm, /LATE_ENTRY/)
+      assert.match(warm, /MERGED_FINAL/)
+      assert.equal(history.read(query).record, warm)
+    })
+  })
+})
+
+for (const [missing, parentCursors] of [
+  ['Opening ancestry', { 1: [] }],
+  ['an original below the frontier', { 3: [1] }],
+]) {
+  test(`WHAT[work-record-004] a Terminal with ${missing} missing fails closed without borrowing the current view`, async () => {
+    await withCausalHistory(async history => {
+      await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+      const recovered = history.read()
+      assert.match(recovered.live, /ORIGINAL_SUMMARY/)
+      assert.equal(recovered.record, null)
+      assert.equal(history.read({ StartInclusive: causalRange.StartInclusive, EndExclusive: causalRange.EndExclusive }).record, null)
+      assert.equal(history.read().record, null)
+    }, { parentCursors })
+  })
+}
+
+test('WHAT[work-record-004] a Terminal that knows only a second identical Opening has valid zero-frontier evidence', async () => {
+  await withCausalHistory(async history => {
+    const opening = await history.append('opening', 'opening-writer', 0x10000000, [])
+    await history.append('completed-a', 'terminal-writer', 0xf0000000, [opening])
+    const query = { StartInclusive: { Sequence: 0 }, EndExclusive: { Sequence: 0 }, ProviderRun: 'completed-a' }
+    const recovered = history.read(query)
+    assert.equal(recovered.head.sequence, 4)
+    assert.equal(recovered.terminal.frontier.sequence, 0)
+    assert.equal(recovered.record, 'Recent work\nassistant: FORMAL_RESULT')
+    assert.equal(history.read(query).record, recovered.record)
+  })
+})
+
+test('WHAT[work-record-004] a formal-only completion without semantic parts retains its zero frontier after cold replay', async () => {
+  await withCausalHistory(async history => {
+    await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    const query = { StartInclusive: { Sequence: 0 }, EndExclusive: { Sequence: 0 }, ProviderRun: 'completed-a' }
+    const recovered = history.read(query)
+    assert.equal(recovered.head.sequence, 0)
+    assert.equal(recovered.terminal.frontier.sequence, 0)
+    assert.equal(recovered.record, 'Recent work\nassistant: FORMAL_RESULT')
+    assert.equal(history.read(query).record, recovered.record)
+  }, { openingOnly: true })
+})
+
+test('WHAT[work-record-004] a causally selected later frame cannot skip originals represented only by an unseen frame', async () => {
+  await withCausalHistory(async history => {
+    await history.append('disconnected-first', 'first-frame-writer', 0x10000000, [history.base])
+    const second = await history.append('disconnected-second', 'second-frame-writer', 0x11000000, [history.base])
+    await history.append('completed-a', 'terminal-writer', 0xf0000000, [second])
+    const recovered = history.read()
+    assert.match(recovered.live, /DISCONNECTED_FIRST/)
+    assert.match(recovered.live, /DISCONNECTED_SECOND/)
+    assert.equal(recovered.terminal.frontier.sequence, 4)
+    assert.equal(recovered.record, 'Recent work\nORIGINAL_REASONING\nassistant: FORMAL_RESULT')
+    assert.equal(history.read().record, recovered.record)
+  }, { rawOnly: true, gapFrames: true })
+})
+
+test('WHAT[work-record-004] an old unproven Terminal does not block a later unfinished generic range', async () => {
+  await withCausalHistory(async history => {
+    const terminal = await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    assert.equal(history.read().record, null)
+    const late = await history.append('late-original', 'new-work-writer', 0xff000000, [terminal, history.opening])
+    const range = { StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 5 } }
+    const recovered = history.read(range)
+    assert.equal(recovered.head.sequence, 5)
+    assert.equal(recovered.record, 'Recent work\nassistant: LATE_ORIGINAL')
+    assert.equal(history.read(range).record, recovered.record)
+    await history.append('completed-a', 'ordered-replay-writer', 0xff100000, [late])
+    assert.equal(history.read(range).record, recovered.record)
+  }, { parentCursors: { 1: [] } })
+})
+
+test('WHAT[work-record-004] a concurrent completion can prove its material without knowing another Terminal shortcut', async () => {
+  await withCausalHistory(async history => {
+    await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    const first = history.read()
+    const part = await history.append('late-original', 'new-work-writer', 0x10000000, [history.base])
+    await history.append('completed-b', 'other-terminal-writer', 0x11000000, [part])
+    const second = history.read({ ...causalRange, EndExclusive: { Sequence: 5 }, ProviderRun: 'completed-b' })
+    assert.equal(second.terminal.frontier.sequence, 5)
+    assert.match(second.record, /LATE_ORIGINAL/)
+    assert.match(second.record, /SECOND_FINAL/)
+    assert.equal(history.read().record, first.record)
+  })
+})
+
+test('WHAT[work-record-004] a standalone Trace Terminal keeps its zero frontier when a concurrent Opening arrives later', async () => {
+  await withCausalHistory(async history => {
+    await history.append('completed-a', 'terminal-writer', 0xf0000000, [])
+    const range = { StartInclusive: { Sequence: 0 }, EndExclusive: { Sequence: 0 }, ProviderRun: 'completed-a' }
+    const before = history.read(range)
+    assert.equal(before.terminal?.frontier.sequence, 0)
+    assert.equal(before.record, null)
+    await history.append('opening', 'opening-writer', 0x10000000, [])
+    const recovered = history.read(range)
+    assert.equal(recovered.terminal?.frontier.sequence, 0)
+    assert.equal(recovered.record, null)
+    assert.equal(history.read(range).terminal?.frontier.sequence, 0)
+  }, { emptyBase: true })
+})
+
+test('WHAT[work-record-004] concurrent identical completions keep current views for a later mismatched endpoint', async () => {
+  await withCausalHistory(async history => {
+    const terminal = await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
+    await history.append('late-original', 'new-work-writer', 0xff000000, [terminal])
+    const range = { ...causalRange, EndExclusive: { Sequence: 5 } }
+    const before = history.read(range)
+    assert.equal(before.terminal.frontier.sequence, 4)
+    assert.match(before.record, /LATE_ORIGINAL/)
+    await history.append('completed-a', 'concurrent-replay-writer', 0x10000000, [history.base])
+    const recovered = history.read(range)
+    assert.equal(recovered.terminal.frontier.sequence, 4)
+    assert.equal(recovered.record, before.record)
+    assert.equal(history.read(range).record, before.record)
+  })
+})

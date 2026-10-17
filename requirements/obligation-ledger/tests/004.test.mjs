@@ -6,6 +6,9 @@ const { default: test } = await import("node:test");
 const foldSurface = await import("../../../dist/Context/Companion/FoldSurface.js");
 const obligation = await import("../../../dist/Persistence/Journal/ObligationJournalSurface.js");
 const journalSurface = await import("../../../dist/Persistence/Journal/Surface.js");
+const workRecord = await import("../../../dist/Mission/WorkRecord/Surface.js");
+const { execFileSync } = await import('node:child_process')
+const { join } = await import('node:path')
 const { acceptAuthorityRoot, bindManagedChild, lifecycleWorkView, openIncumbency, withExecutablePlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 const { integrationTest } = await import("../../verification-system/tests/support/tier-gate.mjs");
 
@@ -238,9 +241,8 @@ const todoCall = (hooks, sessionID, callID) => {
 // Handles via the production HandleLinked journal append, Relay via the real
 // RelayTransaction append, Companion and the XTrace terminal via the journal
 // surface's Companion facts. The checkpoint itself crosses the same
-// completed-terminal path 005 proved. The observation port forwards every
-// session slice, so a deep comparison over all of them turns any non-checkpoint
-// mutation — e.g. the handles being cleared — into a red.
+// completed-terminal path 005 proved. The observation port forwards fourteen
+// slices. The opaque completion projection is checked through its actual reader.
 integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint leaves every non-checkpoint projection slice untouched', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'ol-004-slices'
@@ -251,6 +253,24 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
     await bindManagedChild(runtime, sessionID, childID, 'engineer')
     await openIncumbency(runtime, sessionID)
+    await workRecord.captureOpening(runtime.journal, sessionID, 'checkpoint work', [])
+    const trace = await workRecord.captureProjection(runtime.journal, sessionID, { messages: [
+      { role: 'assistant', parts: [
+        { kind: 'reasoning', text: 'checkpoint reasoning' },
+        { kind: 'text', text: 'actual formal terminal' },
+      ] },
+    ] })
+    assert.equal(trace.currentHeadSequence, 3)
+    const summary = await journalSurface.JournalSurface_writePayload(runtime.journal, 'CHECKPOINT_CHRONICLE')
+    assert.equal(summary.ok, true)
+    const blog = await workRecord.appendBlogObservation(runtime.journal, sessionID, 'checkpoint-summary', {
+      bloggerSessionId: bloggerSession, requestId: 'checkpoint-summary', frameEpoch: 0,
+      previousIngestedThroughSequence: 0, nextIngestedThroughSequence: 2,
+      previousCoverableTurnCutoffExclusive: 0, nextCoverableTurnCutoffExclusive: 0,
+      nextCoveredPrefixDigest: '', textRef: summary.blobRef, textDigest: summary.blobDigest,
+      toolCallIds: [], tipRuleId: 'checkpoint', fieldNameAtCommit: 'checkpoint', observedPrefixEpoch: 0,
+    })
+    assert.equal(blog.ok, true, JSON.stringify(blog.error))
     const terminal = await journalSurface.JournalSurface_writePayload(runtime.journal, 'actual formal terminal')
     assert.equal(terminal.ok, true)
     const linked = await journalSurface.JournalSurface_appendAgent(
@@ -277,6 +297,11 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
 
     assert.equal(captured.ok, true, JSON.stringify(captured.error))
 
+    const completedRange = { StartInclusive: { Sequence: 0 }, EndExclusive: { Sequence: 3 }, ProviderRun: 'run-ol-004' }
+    const completedRecord = await workRecord.lifecycleWorkRecordBounded(runtime.journal, sessionID, completedRange)
+    assert.match(completedRecord, /CHECKPOINT_CHRONICLE/)
+    assert.match(completedRecord, /actual formal terminal/)
+
     const before = journalSurface.JournalSurface_snapshot(runtime.journal)
     const beforeSlices = before.sessionProjections[sessionID]
 
@@ -296,6 +321,21 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
     await hooks.event(terminalEvent(sessionID, callID, 'completed'))
 
     const after = journalSurface.JournalSurface_snapshot(runtime.journal)
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(runtime.journal, sessionID, completedRange), completedRecord)
+    const coldScript = `
+      import * as journal from ${JSON.stringify(new URL('../../../dist/Persistence/Journal/Surface.js', import.meta.url).href)};
+      import * as record from ${JSON.stringify(new URL('../../../dist/Mission/WorkRecord/Surface.js', import.meta.url).href)};
+      const opened = await journal.JournalSurface_boot(process.argv[1], 'checkpoint-cold', process.pid, new Date().toISOString());
+      if (!opened.ok) throw new Error(JSON.stringify(opened.error));
+      try {
+        const value = await record.lifecycleWorkRecordBounded(opened.journal, process.argv[2], JSON.parse(process.argv[3]));
+        process.stdout.write(JSON.stringify(value));
+      } finally { journal.JournalSurface_dispose(opened.journal); }
+    `
+    const recovered = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', coldScript,
+      join(runtime.directory, '.git'), sessionID, JSON.stringify(completedRange),
+    ], { encoding: 'utf8', env: { ...process.env, WXS_E2E_QUIET: '1' } }))
+    assert.equal(recovered, completedRecord)
 
     // Only the checkpoint window changed for the session.
     const beforeWindow = before.todoCheckpoints.find((entry) => entry.sessionId === sessionID)

@@ -782,6 +782,7 @@ module BlogSurface =
             |> List.fold
                 (fun state sequence ->
                     XTraceProjection.applyPart
+                        None
                         sequence
                         "user"
                         (sprintf "g:0/coverage-birth/%d" sequence)

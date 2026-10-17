@@ -24,15 +24,20 @@ type XTraceProjectionState =
             /// human-sized; fold materialises the LWR Opening section without a
             /// second read. BlindPlan interval end = WorkRecordStart (COMPANION-014).
             Opening: XTraceOpeningEvidence option
+            OpeningCapturedBy: EventId list
+            OpeningShortcut: EventId option
             /// Semantic parts. Stored newest-first so replay cons is O(1);
             /// `XTraceProjection.parts` restores oldest-first cursor order.
             /// `Kind` is one of text / reasoning / tool_call / tool_result / media.
             Parts: XTracePartRef list
+            PartWitnesses: EventId list
+            PrefixShortcut: EventId option
             /// Terminal occurrences, newest first. Reusable managed sessions may
             /// complete many work units; each occurrence keeps the ProviderRun and
             /// the XTrace part frontier at which that completion happened so a
             /// bounded WorkRecord can project only its own formal statement.
             Terminals: XTraceTerminalRef list
+            TerminalsByRun: Map<ProviderRunIdentity, XTraceTerminalRef list>
             /// Composition-layer bridge to the underlying wanxiangli/trace instance.
             Bridge: WanxiangliTrace.ProjectionBridge
         }
@@ -42,6 +47,8 @@ type XTraceProjectionState =
 /// stages or mutable continuation state.
 and internal XTracePartRef =
     {
+        CapturedBy: EventId option
+        PrefixWitnesses: EventId list
         Cursor: XTraceCursor
         Provenance: string
         /// Parsed once at fold from Provenance (`g:N/...`; legacy → 0).
@@ -62,7 +69,10 @@ and internal XTracePartRef =
     }
 
 and internal XTraceTerminalRef =
-    { TextRef: BlobRef
+    { CapturedBy: EventId option
+      HasCausalRange: bool
+      HasCausalOpening: bool
+      TextRef: BlobRef
       TextDigest: BlobDigest
       ProviderRun: ProviderRunIdentity
       Frontier: XTraceCursor }
@@ -109,8 +119,13 @@ module XTraceProjection =
 
     let private emptyWithIdentity traceId =
         { Opening = None
+          OpeningCapturedBy = []
+          OpeningShortcut = None
           Parts = []
+          PartWitnesses = []
+          PrefixShortcut = None
           Terminals = []
+          TerminalsByRun = Map.empty
           Bridge = WanxiangliTrace.emptyBridge traceId }
 
     let empty = emptyWithIdentity (WanxiangliTrace.traceIdentity "projection")
@@ -211,20 +226,50 @@ module XTraceProjection =
     let partKinds (state: XTraceProjectionState) : string list =
         parts state |> List.map (fun part -> part.Kind)
 
-    let internal latestTerminal (state: XTraceProjectionState) : XTraceTerminalRef option = List.tryHead state.Terminals
+    let internal terminalForProviderRun (providerRun: ProviderRunIdentity) (state: XTraceProjectionState) =
+        let candidates =
+            state.TerminalsByRun |> Map.tryFind providerRun |> Option.defaultValue []
+
+        candidates
+        |> List.tryHead
+        |> Option.filter (fun first ->
+            candidates
+            |> List.forall (fun candidate ->
+                candidate.HasCausalRange
+                && candidate.Frontier = first.Frontier
+                && candidate.TextRef = first.TextRef
+                && candidate.TextDigest = first.TextDigest))
+
+    let internal latestTerminal (state: XTraceProjectionState) : XTraceTerminalRef option =
+        state.Terminals
+        |> List.tryHead
+        |> Option.bind (fun terminal -> terminalForProviderRun terminal.ProviderRun state)
 
     let latestTerminalEvidence (state: XTraceProjectionState) : XTraceTerminalEvidence option =
         latestTerminal state |> Option.map terminalEvidence
-
-    let internal terminalForProviderRun (providerRun: ProviderRunIdentity) (state: XTraceProjectionState) =
-        state.Terminals
-        |> List.tryFind (fun terminal -> terminal.ProviderRun = providerRun)
 
     let terminalEvidenceForProviderRun
         (providerRun: ProviderRunIdentity)
         (state: XTraceProjectionState)
         : XTraceTerminalEvidence option =
         terminalForProviderRun providerRun state |> Option.map terminalEvidence
+
+    let completionRangeForProviderRun providerRun (state: XTraceProjectionState) =
+        let candidates =
+            state.TerminalsByRun |> Map.tryFind providerRun |> Option.defaultValue []
+
+        let boundary =
+            candidates
+            |> List.map (fun terminal -> terminal.Frontier)
+            |> List.sortByDescending XTraceCursor.sequence
+            |> List.tryHead
+
+        boundary
+        |> Option.map (fun through ->
+            terminalEvidenceForProviderRun providerRun state
+            |> Option.filter (fun _ -> candidates |> List.forall (fun terminal -> terminal.HasCausalOpening))
+            |> Option.map Ok
+            |> Option.defaultValue (Error through))
 
     let private parseGeneration (token: string) =
         match System.Int32.TryParse token with
@@ -274,6 +319,7 @@ module XTraceProjection =
     /// COMPANION-003: capture the opening task verbatim. Idempotent: replaying
     /// the same text changes nothing; a DIFFERENT text is refused (PERSIST-010).
     let applyOpening
+        capturedBy
         (assignment: string)
         (requirements: string list)
         (state: XTraceProjectionState)
@@ -283,7 +329,12 @@ module XTraceProjection =
             existing.AssignmentText = assignment
             && existing.AuthoritativeRequirements = requirements
             ->
-            Ok state
+            Ok
+                { state with
+                    OpeningCapturedBy =
+                        capturedBy
+                        |> Option.map (fun eventId -> eventId :: state.OpeningCapturedBy)
+                        |> Option.defaultValue state.OpeningCapturedBy }
         | Some _ -> Error XTraceFoldRejection.OpeningAlreadyCaptured
         | None ->
             let nextBridge =
@@ -291,6 +342,7 @@ module XTraceProjection =
 
             Ok
                 { state with
+                    OpeningCapturedBy = capturedBy |> Option.toList
                     Opening =
                         Some
                             { AssignmentText = assignment
@@ -350,9 +402,27 @@ module XTraceProjection =
         with error ->
             Error(XTraceFoldRejection.MaterialRejected error.Message)
 
+    let private nextShortcut proved causality previous =
+        if proved then causality |> Option.map fst else previous
+
+    let private allPartsVisible causality (state: XTraceProjectionState) =
+        match causality with
+        | None -> true
+        | Some(_, contains) ->
+            (state.PrefixShortcut |> Option.exists contains)
+            || ((List.isEmpty state.Parts || not (List.isEmpty state.PartWitnesses))
+                && (state.PartWitnesses |> List.forall contains))
+
+    let private nextPartWitnesses causality state =
+        match causality with
+        | None -> state.PartWitnesses
+        | Some(eventId, _) when allPartsVisible causality state -> [ eventId ]
+        | Some(eventId, contains) -> eventId :: (state.PartWitnesses |> List.filter (contains >> not))
+
     /// COMPANION-003 / HOST-005: append one semantic part reference. Strictly
     /// monotonic; a duplicate cursor or a retreat is refused (PERSIST-010).
     let applyPart
+        (causality: (EventId * (EventId -> bool)) option)
         (cursorSequence: int64)
         (role: string)
         (provenance: string)
@@ -375,8 +445,12 @@ module XTraceProjection =
         elif state.Parts |> List.exists (fun part -> part.Provenance = provenance) then
             Error(XTraceFoldRejection.MaterialRejected("Material identity already captured: " + provenance))
         else
+            let witnesses = nextPartWitnesses causality state
+
             let partRef: XTracePartRef =
-                { Cursor = XTraceCursor.create cursorSequence
+                { CapturedBy = causality |> Option.map fst
+                  PrefixWitnesses = witnesses
+                  Cursor = XTraceCursor.create cursorSequence
                   Provenance = provenance
                   Generation = provenanceGeneration provenance
                   Role = role
@@ -394,33 +468,93 @@ module XTraceProjection =
             |> Result.map (fun nextBridge ->
                 { state with
                     Parts = partRef :: state.Parts
+                    PartWitnesses = witnesses
+                    PrefixShortcut = None
                     Bridge = nextBridge })
 
     /// COMPANION-003 / EXEC-009: capture one terminal occurrence. Idempotency is
     /// scoped to ProviderRun, not terminal bytes: two reused work units may
     /// legitimately return identical prose and still need distinct bounded
     /// completion evidence.
+    let private isCausalPart causality (part: XTracePartRef) =
+        match causality, part.CapturedBy with
+        | Some(_, contains), Some eventId -> contains eventId
+        | None, _ -> true
+        | _ -> false
+
+    let private hasCausalOpening causality (state: XTraceProjectionState) =
+        match causality with
+        | Some(_, contains) ->
+            (state.OpeningShortcut |> Option.exists contains)
+            || (state.OpeningCapturedBy |> List.exists contains)
+        | None -> state.Opening.IsSome
+
+    let private terminalRange causality state =
+        let allVisible = allPartsVisible causality state
+
+        let part =
+            if allVisible then
+                List.tryHead state.Parts
+            else
+                state.Parts |> List.tryFind (isCausalPart causality)
+
+        let frontier =
+            part
+            |> Option.map (fun part -> XTraceCursor.nextCursor part.Cursor)
+            |> Option.defaultValue (XTraceCursor.create 0L)
+
+        let contains = causality |> Option.map snd |> Option.defaultValue (fun _ -> true)
+
+        let valid =
+            allVisible
+            || (part |> Option.forall (fun part -> part.PrefixWitnesses |> List.forall contains))
+
+        frontier, valid, allVisible
+
     let applyTerminal
+        (causality: (EventId * (EventId -> bool)) option)
         (textRef: BlobRef)
         (textDigest: BlobDigest)
         (providerRun: ProviderRunIdentity)
         (body: string)
         (state: XTraceProjectionState)
         : Result<XTraceProjectionState, XTraceFoldRejection> =
-        match terminalForProviderRun providerRun state with
+        let candidates =
+            state.TerminalsByRun |> Map.tryFind providerRun |> Option.defaultValue []
+
+        let prior =
+            candidates
+            |> List.tryFind (fun terminal ->
+                match causality, terminal.CapturedBy with
+                | Some(_, contains), Some eventId -> contains eventId
+                | None, _ -> true
+                | _ -> false)
+
+        match prior with
         | Some existing when existing.TextRef = textRef && existing.TextDigest = textDigest -> Ok state
         | Some _ -> Error XTraceFoldRejection.TerminalAlreadyCaptured
         | None ->
+            let frontier, valid, allVisible = terminalRange causality state
+
             let terminalRef: XTraceTerminalRef =
-                { TextRef = textRef
+                { CapturedBy = causality |> Option.map fst
+                  HasCausalRange = valid
+                  HasCausalOpening = hasCausalOpening causality state
+                  TextRef = textRef
                   TextDigest = textDigest
                   ProviderRun = providerRun
-                  Frontier = XTraceCursor.create (head state) }
+                  Frontier = frontier }
 
-            appendMaterial (fun () -> appendTerminalRefToBridge body terminalRef state.Bridge)
+            (if List.isEmpty candidates && terminalRef.HasCausalRange then
+                 appendMaterial (fun () -> appendTerminalRefToBridge body terminalRef state.Bridge)
+             else
+                 Ok state.Bridge)
             |> Result.map (fun nextBridge ->
                 { state with
                     Terminals = terminalRef :: state.Terminals
+                    TerminalsByRun = Map.add providerRun (terminalRef :: candidates) state.TerminalsByRun
+                    PrefixShortcut = nextShortcut allVisible causality state.PrefixShortcut
+                    OpeningShortcut = nextShortcut terminalRef.HasCausalOpening causality state.OpeningShortcut
                     Bridge = nextBridge })
 
     let traceHeadCut (state: XTraceProjectionState) : XTraceCut =
@@ -443,11 +577,16 @@ module XTraceProjection =
         with error ->
             Error error.Message
 
-    let terminalText providerRun (state: XTraceProjectionState) =
+    let private readTerminalText providerRun (state: XTraceProjectionState) =
         try
             Ok(WanxiangliTrace.terminalText (ProviderRunIdentity.value providerRun) state.Bridge)
         with error ->
             Error error.Message
+
+    let terminalText providerRun (state: XTraceProjectionState) =
+        terminalForProviderRun providerRun state
+        |> Option.map (fun _ -> readTerminalText providerRun state)
+        |> Option.defaultValue (Error "Terminal has no unique causal evidence")
 
     /// Host turn indices restart per reanchor generation; XTrace Sequence does not.
     /// Turn/Part labels are only comparable within one generation.

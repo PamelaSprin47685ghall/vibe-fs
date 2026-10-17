@@ -273,11 +273,12 @@ module SemanticTraceSurface =
     let private stateOf (projection: SemanticTraceProjection) : XTraceProjectionState = projection.State
 
     let appendOpening (projection: SemanticTraceProjection) assignmentText (requirements: string array) : obj =
-        XTraceProjection.applyOpening assignmentText (requirements |> Array.toList) (stateOf projection)
+        XTraceProjection.applyOpening None assignmentText (requirements |> Array.toList) (stateOf projection)
         |> updateResult
 
     let appendPart (projection: SemanticTraceProjection) value : obj =
         XTraceProjection.applyPart
+            None
             (int64 (text (field value "sequence")))
             (text (field value "role"))
             (text (field value "provenance"))
@@ -297,6 +298,7 @@ module SemanticTraceSurface =
 
     let appendTerminal (projection: SemanticTraceProjection) value : obj =
         XTraceProjection.applyTerminal
+            None
             (BlobRef.create (text (field value "textRef")))
             (BlobDigest.create (text (field value "textDigest")))
             (ProviderRunIdentity.create (text (field value "providerRun")))

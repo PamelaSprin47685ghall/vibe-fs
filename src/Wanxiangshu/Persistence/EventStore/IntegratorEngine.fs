@@ -15,7 +15,7 @@ module StructuralIntegration =
           Accepts = fun _ -> true
           FaultScope = fun _ -> "global"
           Integrate =
-            fun current envelope ->
+            fun _ current envelope ->
                 StructuralProjection.apply (unbox<StructuralProjection> current) envelope
                 |> box
                 |> Ok
@@ -44,6 +44,7 @@ module IntegratorEngine =
         { Currents: Map<string, obj>
           Events: Map<string, EventEnvelope>
           PayloadIndex: Map<PayloadRef, byte[]>
+          CausalParents: Map<EventId, EventId list>
           Faults: Map<RuleFaultKey, RuleFault> }
 
     type private IntegrationStep =
@@ -65,6 +66,7 @@ module IntegratorEngine =
         { Currents = program |> List.map (fun rule -> rule.Name, rule.Initial) |> Map.ofList
           Events = Map.empty
           PayloadIndex = Map.empty
+          CausalParents = Map.empty
           Faults = Map.empty }
 
     let private eventKey (eventId: EventId) = EventId.value eventId
@@ -103,13 +105,18 @@ module IntegratorEngine =
                 envelope.Payload
             |> Result.toOption
 
-    let private structuralStep (state: IntegratorState) (normalized: EventEnvelope) =
+    let private causalStep (state: IntegratorState) (envelope: EventEnvelope) =
+        EventCausalContext.create envelope.Parents state.CausalParents,
+        { state with
+            CausalParents = Map.add envelope.EventId envelope.Parents state.CausalParents }
+
+    let private structuralStep context (state: IntegratorState) (normalized: EventEnvelope) =
         let current =
             state.Currents
             |> Map.tryFind structuralRule.Name
             |> Option.defaultValue structuralRule.Initial
 
-        match structuralRule.Integrate current normalized with
+        match structuralRule.Integrate context current normalized with
         | Ok next ->
             { state with
                 Currents = Map.add structuralRule.Name next state.Currents }
@@ -136,19 +143,29 @@ module IntegratorEngine =
         | Some rule, Some failed -> applyCutForRule state payload rule (faultKey rule failed)
         | _ -> state
 
-    let private evaluateBusinessRule (state: IntegratorState) (normalized: EventEnvelope) (rule: IntegrationRule) =
+    let private evaluateBusinessRule
+        context
+        (state: IntegratorState)
+        (normalized: EventEnvelope)
+        (rule: IntegrationRule)
+        =
         let prior =
             state.Currents |> Map.tryFind rule.Name |> Option.defaultValue rule.Initial
 
-        match rule.Integrate prior normalized with
+        match rule.Integrate context prior normalized with
         | Ok next -> RuleAdvanced next
         | Error reason -> RuleFailed reason
 
-    let private decideBusinessRule (state: IntegratorState) (normalized: EventEnvelope) (rule: IntegrationRule) =
+    let private decideBusinessRule
+        context
+        (state: IntegratorState)
+        (normalized: EventEnvelope)
+        (rule: IntegrationRule)
+        =
         if Map.containsKey (faultKey rule normalized) state.Faults then
             RuleSkipped
         else
-            evaluateBusinessRule state normalized rule
+            evaluateBusinessRule context state normalized rule
 
     let private applyBusinessDecision
         (normalized: EventEnvelope)
@@ -174,27 +191,33 @@ module IntegratorEngine =
             (key, reason) :: failures
 
     let private applyBusinessRule
+        context
         (normalized: EventEnvelope)
         ((state: IntegratorState), (failures: (RuleFaultKey * string) list))
         (rule: IntegrationRule)
         =
-        decideBusinessRule state normalized rule
+        decideBusinessRule context state normalized rule
         |> applyBusinessDecision normalized rule (state, failures)
 
-    let private integrateBusiness (program: IntegrationRule list) (state: IntegratorState) (normalized: EventEnvelope) =
+    let private integrateBusiness
+        context
+        (program: IntegrationRule list)
+        (state: IntegratorState)
+        (normalized: EventEnvelope)
+        =
         let next, failures =
             matchingBusinessRules program normalized
-            |> List.fold (applyBusinessRule normalized) (state, [])
+            |> List.fold (applyBusinessRule context normalized) (state, [])
 
         { State = next
           FailedRules = List.rev failures }
 
-    let private semanticStep (program: IntegrationRule list) state normalized =
+    let private semanticStep context (program: IntegrationRule list) state normalized =
         match tryDecodeCutPayload normalized with
         | Some payload ->
             { State = applyCut program state payload
               FailedRules = [] }
-        | None -> integrateBusiness program state normalized
+        | None -> integrateBusiness context program state normalized
 
     let private addIntegratedEvent key normalized (semantic: IntegrationStep) =
         let payloadIndex =
@@ -221,16 +244,14 @@ module IntegratorEngine =
         match missingParent with
         | Some parent when not allowExternalParents ->
             Error(sprintf "missing parent during integration: %s" (EventId.value parent))
-        | None ->
-            semanticStep program (structuralStep state normalized) normalized
-            |> addIntegratedEvent key normalized
-            |> Ok
-        | Some _ ->
+        | _ ->
             // Retained replay may begin after this event's causal predecessor
             // aged out as a whole writer. EventKWayMerge.mergeRetained already
             // proved the parent is absent from the entire retained set; only
             // this boot/reload mode may treat that boundary as satisfied.
-            semanticStep program (structuralStep state normalized) normalized
+            let context, causalState = causalStep state normalized
+
+            semanticStep context program (structuralStep context causalState normalized) normalized
             |> addIntegratedEvent key normalized
             |> Ok
 

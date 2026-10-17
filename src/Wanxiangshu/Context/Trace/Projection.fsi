@@ -7,12 +7,19 @@ open Wanxiangshu.Foundation
 type XTraceProjectionState =
     private
         { Opening: XTraceOpeningEvidence option
+          OpeningCapturedBy: EventId list
+          OpeningShortcut: EventId option
           Parts: XTracePartRef list
+          PartWitnesses: EventId list
+          PrefixShortcut: EventId option
           Terminals: XTraceTerminalRef list
+          TerminalsByRun: Map<ProviderRunIdentity, XTraceTerminalRef list>
           Bridge: WanxiangliTrace.ProjectionBridge }
 
 and internal XTracePartRef =
-    { Cursor: XTraceCursor
+    { CapturedBy: EventId option
+      PrefixWitnesses: EventId list
+      Cursor: XTraceCursor
       Provenance: string
       Generation: int
       Role: string
@@ -27,7 +34,10 @@ and internal XTracePartRef =
       TextDigest: BlobDigest }
 
 and internal XTraceTerminalRef =
-    { TextRef: BlobRef
+    { CapturedBy: EventId option
+      HasCausalRange: bool
+      HasCausalOpening: bool
+      TextRef: BlobRef
       TextDigest: BlobDigest
       ProviderRun: ProviderRunIdentity
       Frontier: XTraceCursor }
@@ -89,7 +99,13 @@ module XTraceProjection =
     val terminalEvidenceForProviderRun:
         providerRun: ProviderRunIdentity -> state: XTraceProjectionState -> XTraceTerminalEvidence option
 
+    val completionRangeForProviderRun:
+        providerRun: ProviderRunIdentity ->
+        state: XTraceProjectionState ->
+            Result<XTraceTerminalEvidence, XTraceCursor> option
+
     val applyOpening:
+        capturedBy: EventId option ->
         assignment: string ->
         requirements: string list ->
         state: XTraceProjectionState ->
@@ -103,6 +119,7 @@ module XTraceProjection =
     val internal tryMaterialProvenance: provenance: string -> (string * string * string * string) option
 
     val applyPart:
+        causality: (EventId * (EventId -> bool)) option ->
         cursorSequence: int64 ->
         role: string ->
         provenance: string ->
@@ -120,6 +137,7 @@ module XTraceProjection =
             Result<XTraceProjectionState, XTraceFoldRejection>
 
     val applyTerminal:
+        causality: (EventId * (EventId -> bool)) option ->
         textRef: BlobRef ->
         textDigest: BlobDigest ->
         providerRun: ProviderRunIdentity ->

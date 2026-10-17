@@ -250,7 +250,7 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
             | Fact.Runtime(RuntimeStarted _) ->
                 let heads = store.AllHeads()
                 if List.isEmpty heads then [] else heads
-            | _ -> store.TryHead streamId |> Option.toList
+            | _ -> store.TryHeads streamId
 
         let dependencySession =
             match envelope.Fact with
@@ -267,9 +267,9 @@ type EventStoreJournalWriter private (runtimeId: RuntimeId, init: Envelope, blob
         let parents =
             parents
             @ (dependencySession
-               |> Option.bind (fun session ->
-                   store.TryHead(EventStoreJournalCodec.encodeStreamId (StreamId.Session session)))
-               |> Option.toList)
+               |> Option.map (fun session ->
+                   store.TryHeads(EventStoreJournalCodec.encodeStreamId (StreamId.Session session)))
+               |> Option.defaultValue [])
 
         let encoded =
             EventStoreJournalCodec.encode parents (JournalPayloadClosure.ofFact envelope.Fact) envelope

@@ -109,7 +109,7 @@ module Integrator =
           Initial = box empty
           FaultScope = fun envelope -> EventStreamId.value envelope.StreamId
           Accepts = fun envelope -> SphinxV2EventTypes.isKnown envelope.EventType
-          Integrate = fun current envelope -> integrateOne digest (unbox<Current> current) envelope |> Result.map box
+          Integrate = fun _ current envelope -> integrateOne digest (unbox<Current> current) envelope |> Result.map box
           PlanCut =
             fun _ envelope reason _ ->
                 Ok

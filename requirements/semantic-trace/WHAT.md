@@ -42,6 +42,8 @@ Stable historical insertion 须有 durable journal、非 legacy positional trace
 
 游标创建、序列化、比较、覆盖与区间包含关系由 trace 所有者计算，消费者不得重写公式。
 
+Terminal 的完成终点只由其因果可见的原件确定，不取规范回放当下的全 session head。须能证明终点内连续原件前缀；缺证或同 run 并发完成给出不同终点时，不发布已验证终点或向库 Trace 写入猜出的完成绑定。完整工作记录另需 Terminal 的因果 Opening 见证；相同材料的 Opening 重放保留各次成功捕获见证。独立 Trace 的无 Opening Terminal 不因后来并发出现 Opening 而改变有效性。完成终点之外的晚到材料不影响已有证据。
+
 canonical 消费坐标由 Trace 按 durable 游标顺序生成。一个 Host 工具的 call/result、晚到结果与其他已捕获部件都占独立语义位置；不得按旧 Host 下标把晚到材料插入绝对前缀。Blogger 的 NextCursor 只能覆盖本次已提供的连续前缀，换算与物化共用同一坐标规则。边界若截断单个 Host 消息的多个 canonical 段，整条物理前缀替换无证据；不能只过滤该消息后继续替换。
 
 ## [007] XTrace 是 Y delta / prefix proof / LWR gap / terminal / 案例来源的单一 source

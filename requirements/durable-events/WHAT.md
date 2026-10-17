@@ -56,6 +56,8 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 任何业务查询不得手动全量扫描、过滤或折叠事件历史，必须且只能读取唯一的规范 Integrator 维护的 `Current` 积分状态。修改状态可以先计算待提交状态，但只有本地事实完整追加成功后才能原子推进 `Current`；追加失败或提交闭包未执行时，事件、结构 head 与所有业务 Current 必须保持提交前状态。
 
+单信封 integration oracle 可接收由 Integrator 封装的不可变因果成员上下文，只能询问确切 EventId 是否属于该信封的持久父边闭包，不能枚举历史或取得历史 reader。语义失败和 cut-tail 仍传递其结构父边；同 EventId 重复不增加或改写原有因果证据。物理写者顺序、时间戳与 RuntimeId 均不能给既有事实补造父边。
+
 ## [014] k-way 输入顺序与确定性积分
 
 每个 writer 的逻辑流（同 `WriterId` 段序列按 `seq` 拼接，见 [005]）内部按自然追加顺序排列；同 `WriterId` 的段必须先聚合为单条逻辑流才可作为 k-way merge 的输入，禁止把段当作独立 writer 流参与合并。先按 durable-convergence-011 的统一截止时刻过滤整条过期 writer（段序列整体），再通过确定的 k-way merge 算法产生全局一致的规范序列。Integrator 按此顺序确定性消费事件，相同截止时刻与相同 writer 集合在任何环境中必须计算出完全一致的 `Current`。

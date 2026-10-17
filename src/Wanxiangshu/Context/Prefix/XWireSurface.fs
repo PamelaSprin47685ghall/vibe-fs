@@ -882,7 +882,9 @@ module XWireSurface =
                         { XTrace =
                             xTraceOpening
                             |> Option.bind (fun op ->
-                                match XTraceProjection.applyOpening op.AssignmentText [] XTraceProjection.empty with
+                                match
+                                    XTraceProjection.applyOpening None op.AssignmentText [] XTraceProjection.empty
+                                with
                                 | Ok st -> Some st
                                 | Error _ -> None)
                           Blog = Some blogState

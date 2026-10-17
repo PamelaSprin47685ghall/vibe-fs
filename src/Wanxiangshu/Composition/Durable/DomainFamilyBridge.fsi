@@ -4,6 +4,7 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Foundation
+open Wanxiangshu.Foundation.Identity
 
 /// Assembly for the domain-owned fact families whose fold now decides on its own
 /// slices and returns a change list: the bridge supplies the narrow reads the
@@ -18,10 +19,15 @@ module ProviderFailureProjectionBridge =
 
 module CompanionProjectionBridge =
     val fold:
+        causality: (EventId * (EventId -> bool)) option ->
         body: string ->
         projection: AgentProjectionSet ->
         fact: CompanionFactCases ->
             Result<AgentProjectionSet, FoldRejection>
 
 module ContextProjectionBridge =
-    val fold: projection: AgentProjectionSet -> fact: ContextFactCases -> Result<AgentProjectionSet, FoldRejection>
+    val fold:
+        causality: (EventId * (EventId -> bool)) option ->
+        projection: AgentProjectionSet ->
+        fact: ContextFactCases ->
+            Result<AgentProjectionSet, FoldRejection>

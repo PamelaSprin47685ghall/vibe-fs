@@ -65,14 +65,18 @@ module JournalIntegration =
           // Journal streams while waiting for that stream's cut-tail.
           FaultScope = fun envelope -> EventStreamId.value envelope.StreamId
           Integrate =
-            fun current envelope ->
+            fun context current envelope ->
                 match EventStoreJournalCodec.tryDecode envelope with
                 | Error error when FactCodec.isIgnoredLegacyDecodeError error -> Ok current
                 | Error error -> Error error
                 | Ok journalEnvelope ->
                     materialOf envelope journalEnvelope.Fact
                     |> Result.bind (fun material ->
-                        Fold.foldEnvelopeWithMaterial material (unbox<ProjectionSet> current) journalEnvelope
+                        Fold.foldEnvelopeWithMaterial
+                            (Some(envelope.EventId, (fun eventId -> EventCausalContext.contains eventId context)))
+                            material
+                            (unbox<ProjectionSet> current)
+                            journalEnvelope
                         |> Result.mapError (fun rejection ->
                             sprintf "Journal fact '%s' rejected: %s" rejection.Fact rejection.Reason))
                     |> Result.map box

@@ -16,7 +16,7 @@ module CasebookIntegrationRules =
           FaultScope = fun _ -> "global"
           Accepts = fun envelope -> CasebookStore.isCasebookEventType envelope.EventType
           Integrate =
-            fun current envelope ->
+            fun _ current envelope ->
                 match CasebookStore.tryDecodeEnvelope envelope with
                 | Error error -> Error error
                 | Ok event ->

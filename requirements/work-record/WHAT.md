@@ -18,7 +18,7 @@ Chronicle 是 Y 已沉淀的 frame，Recent work 是 Y 未覆盖的 X-derived su
 
 bounded 视图只采用完整落在本次工作范围内、且不跳过尚未表示原件的连续 Chronicle 前缀。跨界 frame 不能整段借用，也不能按摘要文字裁切；从已采用前缀的末端读取本范围的 canonical 原件，保留本轮全部剩余材料。视图的取材起点由实际采用的材料证明，不沿用已排除 frame 的 coverage，不改写 durable RecordCoverage 或 PrefixCoverage。
 
-已验证的 Terminal 完成事实固定该 ProviderRun 的终点和当时可用的 Chronicle 引用。WorkRecord 在同一次事实折叠中派生完成表示；首次读取、后续 entry/squash/Terminal/reanchor 和冷恢复均不重新选择摘要。带 ProviderRun 的历史读取须匹配其确切完成终点；不带 ProviderRun 的 bounded 读取使用该终点首个完成事实的摘要引用，但不借用 Terminal 正文。尚未完成的范围与全 session 记忆继续使用当前视图。
+已验证的 Terminal 完成事实固定该 ProviderRun 的因果终点和当时可见的 Chronicle 引用；并发事实不因冷回放排在 Terminal 前就成为其取材依据。WorkRecord 在同一次事实折叠中派生完成表示；首次读取、后续 entry/squash/Terminal/reanchor 和冷恢复均不重新选择摘要。带 ProviderRun 的历史读取须匹配其确切完成终点；不带 ProviderRun 的 bounded 读取使用该终点因果上首个完成事实的摘要引用，但不借用 Terminal 正文。无法证明唯一完成表示的并发 Terminal 返回缺证，不任意按回放次序选胜者，也不回退到当前摘要。尚未完成的范围与全 session 记忆继续使用当前视图。
 
 真实完成消费者以该 ProviderRun 的 Terminal 终点关闭 invocation，不取完成后增长的 session head。已保存的旧完成 blob 继续作为其原有消费者的完成表示，不根据缺失的 range 关联自动迁移或改写旧历史。
 

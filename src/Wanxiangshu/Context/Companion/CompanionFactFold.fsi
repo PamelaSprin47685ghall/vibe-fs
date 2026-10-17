@@ -25,6 +25,7 @@ module CompanionFoldRejection =
 
 module CompanionFactFold =
     val fold:
+        causality: (EventId * (EventId -> bool)) option ->
         body: string ->
         associations: Map<SessionId, SessionAssociation> ->
         companionOf: (SessionId -> CompanionProjection option) ->

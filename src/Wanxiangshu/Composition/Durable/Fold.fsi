@@ -15,6 +15,7 @@ module Fold =
     val foldEnvelope: projection: ProjectionSet -> envelope: Envelope -> Result<ProjectionSet, FoldRejection>
 
     val foldEnvelopeWithMaterial:
+        causality: (EventId * (EventId -> bool)) option ->
         material: string option ->
         projection: ProjectionSet ->
         envelope: Envelope ->

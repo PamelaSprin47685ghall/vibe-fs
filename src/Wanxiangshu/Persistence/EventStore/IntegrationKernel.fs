@@ -1,8 +1,48 @@
 namespace Wanxiangshu.Persistence.EventStore
 
 open Wanxiangshu.Foundation.Identity
+open System.Collections.Generic
 
 type SemanticCutPlan = { ResetJson: string }
+
+type EventCausalContext =
+    private
+        { Parents: EventId list
+          ParentIndex: Map<EventId, EventId list>
+          Membership: Dictionary<EventId, bool> }
+
+[<RequireQualifiedAccess>]
+module EventCausalContext =
+    let internal create parents parentIndex =
+        { Parents = parents
+          ParentIndex = parentIndex
+          Membership = Dictionary<EventId, bool>() }
+
+    let private find target context =
+        let rec search pending visited =
+            match pending with
+            | [] -> false
+            | eventId :: _ when eventId = target -> true
+            | eventId :: rest when Set.contains eventId visited -> search rest visited
+            | eventId :: _ when
+                context.ParentIndex
+                |> Map.tryFind eventId
+                |> Option.exists (List.contains target)
+                ->
+                true
+            | eventId :: rest ->
+                let parents = Map.tryFind eventId context.ParentIndex |> Option.defaultValue []
+                search (parents @ rest) (Set.add eventId visited)
+
+        search context.Parents Set.empty
+
+    let contains eventId context =
+        match context.Membership.TryGetValue eventId with
+        | true, known -> known
+        | false, _ ->
+            let known = find eventId context
+            context.Membership.Add(eventId, known)
+            known
 
 /// One registered business integration oracle. It receives exactly one durable
 /// EventEnvelope and its own current slot; it never receives a history reader.
@@ -16,7 +56,7 @@ type IntegrationRule =
         /// Semantic-failure quarantine domain. Rules with independent durable streams
         /// must not let one bad stream suppress unrelated streams in the same rule.
         FaultScope: EventEnvelope -> string
-        Integrate: obj -> EventEnvelope -> Result<obj, string>
+        Integrate: EventCausalContext -> obj -> EventEnvelope -> Result<obj, string>
         PlanCut: obj -> EventEnvelope -> string -> bool -> Result<SemanticCutPlan, string>
         ApplyCut: obj -> string -> Result<obj, string>
     }

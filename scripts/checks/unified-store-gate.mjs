@@ -714,7 +714,7 @@ export const scanCanonicalSharedProgram = (entries) => {
     const end = start < 0 ? -1 : lines.findIndex((line, i) => i > start && /^\s*type\s+/.test(stripLineComment(line)))
     const block = start < 0 ? '' : lines.slice(start, end < 0 ? lines.length : end).map(stripLineComment).join('\n')
     const hasOneEnvelopeOracle =
-      /\bIntegrate\s*:\s*obj\s*->\s*EventEnvelope\s*->\s*Result</.test(block) &&
+      /\bIntegrate\s*:\s*EventCausalContext\s*->\s*obj\s*->\s*EventEnvelope\s*->\s*Result</.test(block) &&
       !/\bEventEnvelope\s+(?:list|array|seq)\b|\b(?:History|Streams|Events)Reader\b/.test(block)
     if (!hasOneEnvelopeOracle) {
       missing(

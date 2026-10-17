@@ -4,12 +4,19 @@ open Wanxiangshu.Foundation.Identity
 
 type SemanticCutPlan = { ResetJson: string }
 
+type EventCausalContext
+
+[<RequireQualifiedAccess>]
+module EventCausalContext =
+    val internal create: parents: EventId list -> parentIndex: Map<EventId, EventId list> -> EventCausalContext
+    val contains: eventId: EventId -> context: EventCausalContext -> bool
+
 type IntegrationRule =
     { Name: string
       Initial: obj
       Accepts: EventEnvelope -> bool
       FaultScope: EventEnvelope -> string
-      Integrate: obj -> EventEnvelope -> Result<obj, string>
+      Integrate: EventCausalContext -> obj -> EventEnvelope -> Result<obj, string>
       PlanCut: obj -> EventEnvelope -> string -> bool -> Result<SemanticCutPlan, string>
       ApplyCut: obj -> string -> Result<obj, string> }
 
