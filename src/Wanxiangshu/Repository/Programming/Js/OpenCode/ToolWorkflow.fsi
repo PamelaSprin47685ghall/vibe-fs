@@ -23,8 +23,18 @@ module JsToolWorkflow =
     /// is registered under `handle` (PLAN S2 step 4).
     [<RequireQualifiedAccess>]
     type JsToolOutcome =
-        | Succeeded of value: LlmFacing.Data.Value * rewritten: string list * created: string list * removed: string list * moved: (string * string) list
-        | Failed of failure: JsFailure * rewritten: string list * created: string list * removed: string list * moved: (string * string) list
+        | Succeeded of
+            value: LlmFacing.Data.Value *
+            rewritten: string list *
+            created: string list *
+            removed: string list *
+            moved: (string * string) list
+        | Failed of
+            failure: JsFailure *
+            rewritten: string list *
+            created: string list *
+            removed: string list *
+            moved: (string * string) list
         | Parked of handle: string * payload: obj
 
     val run:

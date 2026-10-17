@@ -110,12 +110,7 @@ module JsRuntimeSurface =
         : Task<obj> =
         task {
             let! handle =
-                Wanxiangshu.Process.JsSandbox.runSurface
-                    baseClassSource
-                    modelSource
-                    apiValue
-                    deadlineMs
-                    deadlineEpochMs
+                Wanxiangshu.Process.JsSandbox.runSurface baseClassSource modelSource apiValue deadlineMs deadlineEpochMs
 
             let! result = Wanxiangshu.Process.JsSandbox.awaitResult handle outputBoundBytes
 
@@ -155,5 +150,6 @@ module JsRuntimeSurface =
             return
                 createObj
                     [ "promise" ==> resultTask
-                      "resetDeadline" ==> fun (epochMs: int64) -> Wanxiangshu.Process.JsSandbox.resetDeadline handle epochMs ]
+                      "resetDeadline"
+                      ==> fun (epochMs: int64) -> Wanxiangshu.Process.JsSandbox.resetDeadline handle epochMs ]
         }

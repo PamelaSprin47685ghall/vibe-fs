@@ -86,6 +86,7 @@ module JsTransactionSurface =
            JsFailure.ResultTooLarge None, "ResultTooLarge"
            JsFailure.InvalidReturnValue, "InvalidReturnValue"
            JsFailure.FileChanged "a", "FileChanged"
+           JsFailure.FileReadFailed "a", "FileReadFailed"
            JsFailure.DirectoryNotEmpty "a", "DirectoryNotEmpty"
            JsFailure.CrossDeviceMove "a", "CrossDeviceMove"
            JsFailure.InvalidArgument "a", "InvalidArgument"

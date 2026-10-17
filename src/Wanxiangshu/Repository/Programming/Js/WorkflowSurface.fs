@@ -204,9 +204,13 @@ module JsWorkflowSurface =
     let moved (value: obj) : string array =
         match outcomeOf value with
         | JsToolWorkflow.JsToolOutcome.Succeeded(_, _, _, _, paths) ->
-            paths |> List.map (fun (fromPath, toPath) -> fromPath + " -> " + toPath) |> List.toArray
+            paths
+            |> List.map (fun (fromPath, toPath) -> fromPath + " -> " + toPath)
+            |> List.toArray
         | JsToolWorkflow.JsToolOutcome.Failed(_, _, _, _, paths) ->
-            paths |> List.map (fun (fromPath, toPath) -> fromPath + " -> " + toPath) |> List.toArray
+            paths
+            |> List.map (fun (fromPath, toPath) -> fromPath + " -> " + toPath)
+            |> List.toArray
         | JsToolWorkflow.JsToolOutcome.Parked _ -> [||]
 
     let failureCode (value: obj) : obj =
@@ -229,7 +233,6 @@ module JsWorkflowSurface =
 
     /// Test hook: clear the process-live parked-site table so tests do not
     /// leak sites across cases (the table is module-level and process-live).
-    let clearParkedSites () : unit =
-        JsParkedSites.clearAll ()
+    let clearParkedSites () : unit = JsParkedSites.clearAll ()
 
     let render (value: obj) : string = JsToolsResult.render (outcomeOf value)

@@ -223,11 +223,7 @@ module JsToolsBindings =
             ledger.Appends.Add pending
         | _ -> ()
 
-    let private makeEditMember
-        (root: string)
-        (staging: ResizeArray<JsStagedMutation>)
-        (ledger: JsAsIsLedger)
-        =
+    let private makeEditMember (root: string) (staging: ResizeArray<JsStagedMutation>) (ledger: JsAsIsLedger) =
         "edit"
         ==> fun (path: string) (newText: obj) ->
             let replacement = string newText
@@ -249,11 +245,7 @@ module JsToolsBindings =
             }
             |> renderOutcome
 
-    let private makeWriteMember
-        (root: string)
-        (staging: ResizeArray<JsStagedMutation>)
-        (ledger: JsAsIsLedger)
-        =
+    let private makeWriteMember (root: string) (staging: ResizeArray<JsStagedMutation>) (ledger: JsAsIsLedger) =
         "write"
         ==> fun (path: string) (text: string) ->
             result {
@@ -296,6 +288,17 @@ module JsToolsBindings =
                 | Ok current when current = snapshot.Text -> Ok()
                 | _ -> Error(JsFailure.FileChanged path)
 
+    /// The rm/mv primitives carry the resolved absolute path in their
+    /// failures; the member contract reports the caller-visible path (WHAT
+    /// [018]: reasons never leak host paths).
+    let private withCallerPath (path: string) (failure: JsFailure) =
+        match failure with
+        | JsFailure.DirectoryNotEmpty _ -> JsFailure.DirectoryNotEmpty path
+        | JsFailure.FileNotFound _ -> JsFailure.FileNotFound path
+        | JsFailure.FileReadFailed _ -> JsFailure.FileReadFailed path
+        | JsFailure.CrossDeviceMove _ -> JsFailure.CrossDeviceMove path
+        | other -> other
+
     /// JS-020/JS-030 rm: delete a file or an empty directory; refuse a
     /// non-empty directory (DIRECTORY_NOT_EMPTY). Missing target is
     /// FILE_NOT_FOUND. Takes effect immediately (as-is) and records one
@@ -319,7 +322,7 @@ module JsToolsBindings =
                 do! checkSnapshotFreshness readSnapshots path full
 
                 let transactionId = firePrepared ledger root (JsStagedMutation.Remove path)
-                do! JsMutationFs.removePath full
+                do! (JsMutationFs.removePath full |> Result.mapError (withCallerPath path))
                 fireCommitted ledger transactionId
 
                 staging.Add(JsStagedMutation.Remove path)
@@ -358,7 +361,10 @@ module JsToolsBindings =
                 let transactionId =
                     firePrepared ledger root (JsStagedMutation.Move(fromPath, toPath))
 
-                do! JsMutationFs.movePath fromFull toFull
+                do!
+                    (JsMutationFs.movePath fromFull toFull
+                     |> Result.mapError (withCallerPath fromPath))
+
                 fireCommitted ledger transactionId
 
                 staging.Add(JsStagedMutation.Move(fromPath, toPath))
@@ -393,7 +399,7 @@ module JsToolsBindings =
                 emitJsExpr
                     (parkState)
                     "(() => { const state = $0; return new Promise((resolve, reject) => { state.ParkDeferredResolve = resolve; state.ParkDeferredReject = reject; }); })()"
-                    : obj
+                : obj
 
     let private createApiCore
         (capabilities: Set<JsCapability>)
@@ -406,7 +412,7 @@ module JsToolsBindings =
         : obj =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
-                   makeReadMember root readSnapshots explicitReads
+                  makeReadMember root readSnapshots explicitReads
 
               if Set.contains JsCapability.Glob capabilities then
                   makeGlobMember root
@@ -460,4 +466,3 @@ module JsToolsBindings =
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
         : obj =
         createApiCore capabilities root staging readSnapshots explicitReads ledger (Some parkState)
-

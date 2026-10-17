@@ -18,8 +18,7 @@ type JsAsIsLedger =
 /// Narrow durable audit capability for parked-site lifecycle transitions.
 /// The audit stream is separate from the mutation-ledger stream.
 type IJsLifecyclePersistence =
-    abstract AppendLifecycleEvent:
-        event: JsLifecycleEvent -> Task<Result<EventId, JsLifecycleAppendFailure>>
+    abstract AppendLifecycleEvent: event: JsLifecycleEvent -> Task<Result<EventId, JsLifecycleAppendFailure>>
 
 /// JS-012/JS-015: durable transaction facts through the unified EventStore —
 /// the only persistence a js-* transaction may use (forbid js-transaction.db
@@ -57,8 +56,7 @@ module JsToolsTransactionStore =
     val lifecycleEventTypeOfName: eventType: string -> JsLifecycleEventType option
     val isLifecycleEventType: eventType: string -> bool
 
-    type DecodedLifecycleEvent =
-        | Lifecycle of JsLifecycleEvent
+    type DecodedLifecycleEvent = Lifecycle of JsLifecycleEvent
 
     val tryDecodeLifecycleEnvelope: envelope: EventEnvelope -> Result<DecodedLifecycleEvent, string>
 

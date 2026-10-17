@@ -82,7 +82,7 @@ test('WHAT[durable-events-019] every registered business oracle changes its prod
         await transaction.appendPrepared(store, {
           transactionId: 'canonical-transaction',
           workspaceRoot: '/canonical-workspace',
-          mutations: [{ path: 'a.txt', originalText: 'before', newText: 'after' }],
+          mutation: { path: 'a.txt', originalText: 'before', newText: 'after' },
         }),
         'append JsTransaction fact',
       )
@@ -321,7 +321,7 @@ test('WHAT[durable-events-019] removing one real hostProgram registration blocks
           await transaction.appendPrepared(store, {
             transactionId: 'isolated-transaction',
             workspaceRoot: '/isolated-workspace',
-            mutations: [{ path: 'a.txt', originalText: 'before', newText: 'after' }],
+            mutation: { path: 'a.txt', originalText: 'before', newText: 'after' },
           }),
           'append JsTransaction fact with rule removed',
         )

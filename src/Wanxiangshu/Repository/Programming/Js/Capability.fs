@@ -216,7 +216,8 @@ module JsFragmentRegistry =
 
     /// Canonical member order inside capability families. Filtering this list
     /// is the deterministic projection; never rebuild member order elsewhere.
-    let all: JsCapabilityFragment list = [ read; glob; grep; edit; rewrite; write; rm; mv; park ]
+    let all: JsCapabilityFragment list =
+        [ read; glob; grep; edit; rewrite; write; rm; mv; park ]
 
     let byCapability: Map<JsCapability, JsCapabilityFragment list> =
         all |> List.groupBy _.Capability |> Map.ofList

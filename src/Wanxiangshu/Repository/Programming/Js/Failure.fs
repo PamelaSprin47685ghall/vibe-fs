@@ -177,10 +177,8 @@ module JsFailure =
             "Review is required before modifying the plan artifact. You must call review first."
         | JsFailure.ConcurrencyLimit -> "parked-site concurrency limit reached; no queue is formed"
         | JsFailure.HandleUnknown handle -> "no parked site with this handle: " + handle
-        | JsFailure.CannotParkWhileAbandoning ->
-            "park is refused while the site is in its abandon cleanup window"
-        | JsFailure.Abandoned ->
-            "the parked program was abandoned; its finalizer has run"
+        | JsFailure.CannotParkWhileAbandoning -> "park is refused while the site is in its abandon cleanup window"
+        | JsFailure.Abandoned -> "the parked program was abandoned; its finalizer has run"
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
     let render (failure: JsFailure) : string =

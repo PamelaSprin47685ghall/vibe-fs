@@ -23,8 +23,7 @@ type JsAsIsLedger =
 /// never participates in write replay. Callers (park/unpark/abandon/reap in
 /// ToolWorkflow) receive this interface; the append implementation is here.
 type IJsLifecyclePersistence =
-    abstract AppendLifecycleEvent:
-        event: JsLifecycleEvent -> Task<Result<EventId, JsLifecycleAppendFailure>>
+    abstract AppendLifecycleEvent: event: JsLifecycleEvent -> Task<Result<EventId, JsLifecycleAppendFailure>>
 
 /// JS-012/JS-015: durable transaction facts through the unified EventStore —
 /// the only persistence a js-* transaction may use (forbid js-transaction.db
@@ -256,8 +255,7 @@ module JsToolsTransactionStore =
     let private decodeLifecycleEvent: Decoder<JsLifecycleEvent> =
         Decode.object (fun get ->
             let eventType =
-                get.Required.Field "eventType" Decode.string
-                |> lifecycleEventTypeOfName
+                get.Required.Field "eventType" Decode.string |> lifecycleEventTypeOfName
 
             match eventType with
             | None -> failwith "JsLifecycle eventType is not part of the audit vocabulary"
@@ -271,7 +269,8 @@ module JsToolsTransactionStore =
 
     let tryDecodeLifecycleEnvelope (envelope: EventEnvelope) : Result<DecodedLifecycleEvent, string> =
         if isLifecycleEventType envelope.EventType then
-            Decode.fromValue "$" decodeLifecycleEvent envelope.Payload |> Result.map Lifecycle
+            Decode.fromValue "$" decodeLifecycleEvent envelope.Payload
+            |> Result.map Lifecycle
         else
             Error(sprintf "not a JsLifecycle audit event: %s" envelope.EventType)
 

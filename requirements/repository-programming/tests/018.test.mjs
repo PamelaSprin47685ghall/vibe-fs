@@ -29,6 +29,7 @@ test('WHAT[repository-programming-018] JS019_failure_codes_are_stable_and_unique
     'RESULT_TOO_LARGE',
     'INVALID_RETURN_VALUE',
     'FILE_CHANGED',
+    'FILE_READ_FAILED',
     'DIRECTORY_NOT_EMPTY',
     'CROSS_DEVICE_MOVE',
     'INVALID_ARGUMENT',

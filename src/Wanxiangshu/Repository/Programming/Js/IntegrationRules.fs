@@ -60,7 +60,11 @@ module JsLifecycleIntegrationRules =
                 | Error error -> Error error
                 | Ok _ ->
                     let projection = unbox<JsLifecycleAuditProjection> current
-                    box { projection with Head = Some envelope.EventId } |> Ok
+
+                    box
+                        { projection with
+                            Head = Some envelope.EventId }
+                    |> Ok
           PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
           ApplyCut = fun current _ -> Ok current }
 

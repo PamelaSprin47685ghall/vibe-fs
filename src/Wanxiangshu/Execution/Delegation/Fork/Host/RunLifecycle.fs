@@ -481,7 +481,8 @@ module HostForkRunLifecycle =
                 try
                     subscriptionToDispose
                     |> Option.iter (fun subscription -> subscription.Dispose())
-                with _ -> ()
+                with _ ->
+                    ()
 
                 do! startClaimDelivery gate pendingRuns journal parentId run proof agentOutcome
             }
@@ -663,8 +664,7 @@ module HostForkRunLifecycle =
                                 task {
                                     try
                                         return! workRecordForOutcome childWorkRecordForRun xTraceHead run outcome
-                                    with
-                                    | error ->
+                                    with error ->
                                         logError
                                             "FORK-WORKRECORD"
                                             (sprintf "run %s work-record read faulted: %s" run.AgentId error.Message)

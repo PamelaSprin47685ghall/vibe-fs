@@ -72,7 +72,8 @@ module HostForkJoin =
             runtime.OwnsAgent agentId || runtime.EstablishedByProcess agentId
 
     let private neverCompleting<'T> () : Task<'T> =
-        (TaskCompletionSource<'T>(TaskCreationOptions.RunContinuationsAsynchronously)).Task
+        (TaskCompletionSource<'T>(TaskCreationOptions.RunContinuationsAsynchronously))
+            .Task
 
     /// P0-RECOVERY-JOIN-001 / PERSIST-002: a pending run whose durable completion
     /// commit is unknown (Source settled to a PERSIST failure) leaves the durable
@@ -338,16 +339,24 @@ module HostForkJoin =
             let changeSource = durable.AwaitChangeFrom fromRev
             let sourceSettled = pendingSourceSettled runtime (fun _ -> true)
 
-            let tagWake (reason: MailboxWakeReason) : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
+            let tagWake
+                (reason: MailboxWakeReason)
+                : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
                 Choice1Of4 reason
 
-            let tagChange (_: JournalChange) : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
+            let tagChange
+                (_: JournalChange)
+                : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
                 Choice2Of4()
 
-            let tagInterrupt (reason: JoinInterruptReason) : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
+            let tagInterrupt
+                (reason: JoinInterruptReason)
+                : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
                 Choice3Of4 reason
 
-            let tagSource (outcome: AgentCompletionOutcome) : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
+            let tagSource
+                (outcome: AgentCompletionOutcome)
+                : Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome> =
                 Choice4Of4 outcome
 
             let wakeChoice: Task<Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome>> =
@@ -537,20 +546,19 @@ module HostForkJoin =
             // handle affinity belongs to this lane; a sibling lane's PERSIST
             // failure must not surface here as this lane's error.
             let sourceSettled =
-                pendingSourceSettled
-                    runtime
-                    (fun run ->
-                        match HandleId.tryAgent (HandleController.agentHandle run.AgentId) with
-                        | Some handleId -> agentAffinityMatchesLane durable groupId laneIndex handleId
-                        | None -> false)
+                pendingSourceSettled runtime (fun run ->
+                    match HandleId.tryAgent (HandleController.agentHandle run.AgentId) with
+                    | Some handleId -> agentAffinityMatchesLane durable groupId laneIndex handleId
+                    | None -> false)
 
-            let tagChange (_: JournalChange) : Choice<unit, JoinInterruptReason, AgentCompletionOutcome> =
-                Choice1Of3()
+            let tagChange (_: JournalChange) : Choice<unit, JoinInterruptReason, AgentCompletionOutcome> = Choice1Of3()
 
             let tagInterrupt (reason: JoinInterruptReason) : Choice<unit, JoinInterruptReason, AgentCompletionOutcome> =
                 Choice2Of3 reason
 
-            let tagSource (outcome: AgentCompletionOutcome) : Choice<unit, JoinInterruptReason, AgentCompletionOutcome> =
+            let tagSource
+                (outcome: AgentCompletionOutcome)
+                : Choice<unit, JoinInterruptReason, AgentCompletionOutcome> =
                 Choice3Of3 outcome
 
             let changeChoice: Task<Choice<unit, JoinInterruptReason, AgentCompletionOutcome>> =
