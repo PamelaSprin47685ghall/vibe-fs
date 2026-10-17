@@ -15,4 +15,4 @@
 - 040 真实运行 rm/mv 的 POSIX 语义、越界拒绝、durable 单笔记账与稳定失败码目录；EXDEV 只查目录登记，不造真实跨设备场景。
 - 041 是生产接线的源码静态断言：lifecycle persistence 沿 PluginHostInterop → ToolRegistry.create → JsToolSpec/execute 与 PluginBoot → PluginRuntimeScope → ClearSession 贯通，执行链不留硬编码 None，四类事件同住单一审计流，ParkedSites 表不触碰 durable。它证明接线存在，不证明运行期审计真实落盘。
 
-未闭合范围见 GAP-088/089，旧发布清单的 DONE 不作本次验收证据。先完成正式构建，再运行本包、requirement-system 和相邻接地/能力测试；不以原 154 项通过代表每条规范已经落实。
+2026-10-17 交付验证：`node scripts/build.mjs` 构建成功（generation 31，172 surfaces、829 模块链接闭合），本包 001-044 全套 248 例 231 过 0 败 9 跳 8 todo（028-044 以本次 dist 产物真实运行）；requirement-system 16/16、requirement-grounding 102 例 0 败、capability-enforcement 215 例 0 败。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护保持 TODO 诚实标注；未闭合范围见 GAP-088。
