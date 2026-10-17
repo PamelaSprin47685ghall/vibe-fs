@@ -16,6 +16,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
+open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -40,6 +41,7 @@ type SessionAgentProjection =
         /// `Companion` because that record is the runtime cache's durable mirror,
         /// while this one is the frame history CTX-011 builds probe candidates from.
         Blog: BlogProjectionState option
+        CompletedWorkRecords: CompletedWorkRecordProjectionState option
         /// COMPANION-009: which X prefix generation is in force. Not folded into
         /// `Blog`: a squash advances the frame epoch without touching the prefix, and
         /// a reanchor retires the prefix without touching frames, so one record for
@@ -111,6 +113,7 @@ module AgentProjection =
         { Companion = None
           XTrace = None
           Blog = None
+          CompletedWorkRecords = None
           PrefixEpoch = None
           Handles = None
           ProviderFailures = None

@@ -95,10 +95,9 @@ const SOURCE_BUDGETS = new Map([
 ])
 
 const ADAPTER_RATCHET = new Map([
-  // 2026-10-17: both the pre-review 97abafc4a plan and the reviewed plan contain
-  // the same 391 sources. Record the existing durable admission, supervision,
-  // and recovery closure; this review adds no source to the Host adapter.
-  ['delegation-host-adapter', 391],
+  // CUT-06-R2 adds only the pure WorkRecord completion projection to the
+  // measured 391-source closure. The 60% ceiling and vocabulary isolation stay.
+  ['delegation-host-adapter', 392],
   ['delegation-pty-adapter', 305],
   // 47 on 2026-09-14 — this batch hoisted Runtime.fs settleCompletedFromParts
   // into a module-internal SyncDelegateInternals module (namespace-scoped files

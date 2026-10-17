@@ -124,7 +124,7 @@ Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真
 
 委托合同只含 command/result、fact、typed payload、logical route、completion evidence 和 injected capability；fold 纯计算，durable composition 连接 canonical journal，各 workflow 消费合同与 fold。Host dispatch 和 PTY adapter 只由 composition root 绑定，合同的直接及传递依赖不得包含 Host、工具、PTY、process、EventStore runtime 或委托/恢复 workflow。
 
-合同传递 production `.fs` 上限100；fold/runtime/sync/fork 目标185。Host/PTY adapter 因组装共享 durable/wait/signal/identity 能力，以全仓 production `.fs` 的60%为硬上限，超过须 full fallback；实测规模作 ratchet，增长须修订本条，当前 Host adapter 为391。2026-10-17 对照本轮复审前的 `97abafc4a` 与复审工作区，两者均为391，文件集合相同；312 是未随既有依赖更新的旧记录。本次只纠正计数，不增加该 adapter 的依赖，不放宽合同、恢复消费者的实现隔离或60%硬上限。owner compile 将所选 locality 的传递 ProjectReference 展成唯一计划，单次 Compile Include 保持拓扑偏序，不得退回目录通配。
+合同传递 production `.fs` 上限100；fold/runtime/sync/fork 目标185。Host/PTY adapter 因组装共享 durable/wait/signal/identity 能力，以全仓 production `.fs` 的60%为硬上限，超过须 full fallback；实测规模作 ratchet，增长须修订本条。2026-10-17 的 `97abafc4a` 与 CUT-06-R3 均为391，312 是未随既有依赖更新的旧记录。CUT-06-R2 对照 `2ec1a5400` 后为392，新增集合只有 `Mission/WorkRecord/CompletionProjection.fs`：在完成事实折叠时派生历史摘要引用，复用已有依赖，不引入新的 Host、I/O 或恢复能力。合同、恢复消费者的实现隔离与60%硬上限保持。owner compile 将所选 locality 的传递 ProjectReference 展成唯一计划，单次 Compile Include 保持拓扑偏序，不得退回目录通配。
 
 ## [029] 领域意图与物理能力单向注入
 

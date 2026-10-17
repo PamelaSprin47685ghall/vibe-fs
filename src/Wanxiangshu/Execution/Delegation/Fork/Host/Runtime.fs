@@ -603,14 +603,22 @@ type HostForkRuntime
 
     let handoffPort = handoff
 
-    let xTraceHead (sessionId: SessionId) : XTraceCursor =
+    let xTraceOf (sessionId: SessionId) =
         journal
         |> Option.bind (fun durable ->
             AgentJournal.snapshot durable
             |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
             |> Option.bind (fun session -> session.XTrace))
+
+    let xTraceHead (sessionId: SessionId) : XTraceCursor =
+        xTraceOf sessionId
         |> Option.defaultValue XTraceProjection.empty
         |> XTraceProjection.headCursor
+
+    let completedFrontier sessionId providerRun =
+        xTraceOf sessionId
+        |> Option.bind (XTraceProjection.terminalEvidenceForProviderRun providerRun)
+        |> Option.map (fun terminal -> terminal.Frontier)
 
     let prepareCompletion (run: PendingHostRun) (outcome: TerminalOutcome) =
         task {
@@ -624,7 +632,7 @@ type HostForkRuntime
             | Role.DevOps, None -> invalidOp "DevOps PTY round drain is unavailable"
             | _ -> ()
 
-            return! HostForkRunLifecycle.workRecordForOutcome childWorkRecordOfRun xTraceHead run outcome
+            return! HostForkRunLifecycle.workRecordForOutcome childWorkRecordOfRun completedFrontier run outcome
         }
 
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())

@@ -25,7 +25,7 @@ module HostForkRunLifecycle =
 
     val workRecordForOutcome:
         childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) ->
-        xTraceHead: (SessionId -> XTraceCursor) ->
+        completedFrontier: (SessionId -> ProviderRunIdentity -> XTraceCursor option) ->
         run: PendingHostRun ->
         outcome: TerminalOutcome ->
             Task<string option>

@@ -2,6 +2,16 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第十九批：CUT-06-R2 已完成范围的历史表示（2026-10-17）
+
+从干净 `2ec1a5400` 继续，库 `10bbb32 / 0.6.4` 未改。新增纯 WorkRecord 完成表示投影：在已验证 Terminal 成功折叠的同一次 aggregate 更新中保存其 ProviderRun、确切终点和当时的不可变frame引用；不缓存任意range、复制正文或coverage、不向Trace塞Blogger状态。后续entry/squash/Terminal/reanchor与冷回放不重选表示。Sync/Fork改用该run的Terminal终点，修复完成通知/消费前head增长的既有越界；旧精确包实际Fork混入FUTURE_DETAIL的红例已保留。
+
+Fable生产574、文档/测试元数据575；核心Node/Bun各70项 / 69pass / 0fail / 1TODO。三个不重叠相关组1239项 / 1137pass / 0普通fail / 34skip / 68TODO；新增owner94源声明闭包独立Fable编译通过；原Trace正反编译、非空checkpoint各1/1，Host接线smoke20/20。非作者独立验证真实Fork完成、后续squash、Join与新进程冷恢复，并验证空frame、重复/冲突Terminal和同终点多run。首次ratchet失败经旧新闭包对照确认只增加纯CompletionProjection.fs（391→392），按WHAT-028同步记录，未放宽60%硬上限或隔离要求。
+
+修正前轮验收表述：Fork旧测试settle接缝缺生产Terminal捕获，旧完成blob/Join稳定证明成立，但不能单独证明Terminal事实已存在；本轮已补真正的捕获顺序。修复前已有问题、本轮编译/夹具失败和review表述误判分别列入[本包报告](WORK-RECORD-HISTORY-2026-10-17.md)。旧eeaa精确包经实际Fork生成的完成blob升级冷consume逐字保留；Terminal后才摘要/发布的旧blob缺range关联，与Terminal时刻派生视图不自动迁移或强行统一。精确新包df0ccd、2076members / 13,336,942bytes的真实pack与隔离默认入口通过；非作者同包独立离线安装、全文件字节及Node/Bun暖冷消费者四项probe均通过，format/check/diff通过。
+
+本包所列已验证Terminal完成表示与消费者进入DONE，随本原子提交正常推送master；GAP-111/109、Opening/Resume/Fission完整链及父卡仍保持原边界。R12-U1继续暂缓；未部署用户Host。完整交付及包外证据见本包报告。
+
 ## 第十八批：GAP-111 独立复审及 Terminal 去重回退修正（2026-10-17）
 
 从干净主仓 `e7a150937` 复核，库 `10bbb32 / 0.6.4` 未改。三名非作者分别检查范围/coverage、真实消费者/借用寿命、契约/完成blob。两项bounded P2已修：**e7新引入、前轮review漏检** 的部分摘要同源Terminal重复（18条在原566为11pass/7fail）；包外另发现输入已有的完整raw配仅formal Terminal重复（8条在568为4pass/4fail，至少53源码已有）。现在先比实际gap/最新turn末条formal，再以本轮已验证非空自然suffix与完整turn精确证明去重；较早正文同字、尾tools、空白suffix及不同Terminal仍保留应有正式陈述。未裁切/包含匹配Terminal、未回写coverage或新增持久owner。

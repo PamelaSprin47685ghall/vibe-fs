@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { record, commitFrame, withReopenableJournal } from './support/record.mjs'
+import { record, commitFrame, withReopenableJournal, readBoundedInNewProcess } from './support/record.mjs'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -203,10 +203,11 @@ for (const delivery of ['join', 'cold-consume']) {
         assert.equal(squashed.ok, true, squashed.error)
       })
       const derived = await fork.withJournal(runtime, handle => record.lifecycleWorkRecordBounded(handle, session, range))
-      assert.notEqual(derived, frozen)
+      assert.equal(derived, frozen)
       assert.match(derived, /CURRENT_DETAIL\r\n正文/)
       assert.match(derived, /CURRENT_FINAL/)
-      assert.doesNotMatch(derived, /PRIOR_|FUTURE_|SQUASHED_SUMMARY|CURRENT_SUMMARY/)
+      assert.doesNotMatch(derived, /PRIOR_|FUTURE_|SQUASHED_SUMMARY/)
+      assert.match(await fork.withJournal(runtime, handle => record.lifecycleWorkRecord(handle, session, false)), /SQUASHED_SUMMARY/)
       assert.deepEqual(await fork.withJournal(runtime, handle => journal.JournalSurface_readPayload(handle, work.completionRef)), completed)
       if (delivery === 'join') {
         const joined = await fork.executeJoin(runtime, owner)
@@ -219,12 +220,114 @@ for (const delivery of ['join', 'cold-consume']) {
         runtime = undefined
         const cold = await withWriter(directory, handle => journal.JournalSurface_readPayload(handle, work.completionRef))
         assert.deepEqual(cold, completed)
+        assert.equal(await withWriter(directory, handle => record.lifecycleWorkRecordBounded(handle, session, range)), frozen)
         const consumed = await fork.coldConsumeWorkWithOutcome(directory, owner, work.root, 'confirmed')
         assert.equal(consumed.ok, true, JSON.stringify(consumed))
         assert.equal(consumed.workRecord, frozen)
       }
     } finally {
       if (runtime) await fork.disposeRuntime(runtime)
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+for (const mode of ['sync', 'fork-join']) {
+  test(`WHAT[work-record-010] actual ${mode} pins the terminal frontier before later trace and squash`, async () => {
+    const directory = mkdtempSync(join(tmpdir(), `completed-frontier-${mode}-`))
+    execFileSync('git', ['init', '--quiet', directory])
+    const owner = `completed-frontier-${mode}-owner`
+    const runtime = mode === 'sync'
+      ? await sync.create(directory, [{ sessionId: owner, agent: 'manager' }])
+      : await fork.createRuntime(directory, [{ sessionId: owner, agent: 'manager' }])
+    const observe = run => mode === 'sync' ? sync.withJournal(runtime, run) : fork.withJournal(runtime, run)
+    const accept = async count => {
+      if (mode === 'sync') {
+        await sync.awaitPromptCount(runtime, owner, 'Engineer', count)
+        assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', count - 1), true)
+      } else {
+        await fork.awaitPromptCount(runtime, count)
+        assert.equal(fork.acceptPrompt(runtime, count - 1), true)
+      }
+    }
+    try {
+      const first = mode === 'sync'
+        ? sync.invoke(runtime, owner, 'Engineer', 'PRIOR_CHARGE')
+        : fork.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'PRIOR_CHARGE')
+      await accept(1)
+      if (mode === 'sync') {
+        assert.equal(await sync.settle(runtime, owner, 'Engineer', 'PRIOR_FINAL', 'prior-run'), true)
+        assert.match((await first).value, /PRIOR_FINAL/)
+      } else {
+        await first
+        assert.equal(await fork.settle(runtime, owner, 'PRIOR_FINAL', 'prior-run'), true)
+        assert.match(await fork.executeJoin(runtime, owner), /PRIOR_FINAL/)
+      }
+      const session = mode === 'sync' ? sync.child(runtime, owner, 'Engineer') : fork.child(runtime)
+      const start = await observe(async handle => {
+        await observeDetail(handle, session, 'prior-detail', 'PRIOR_DETAIL')
+        return trace.headCursor(trace.snapshot(handle, session)).sequence
+      })
+      const second = mode === 'sync'
+        ? sync.invoke(runtime, owner, 'Engineer', 'CURRENT_CHARGE')
+        : fork.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'CURRENT_CHARGE')
+      await accept(2)
+      if (mode === 'fork-join') await second
+      const covered = await observe(async handle => {
+        await observeDetail(handle, session, 'current-detail', 'CURRENT_DETAIL\r\n正文')
+        const through = trace.headCursor(trace.snapshot(handle, session)).sequence - 1
+        await commitFrame(handle, session, { from: 0, through: through - 1, body: 'PRIOR_SUMMARY', id: 'prior' })
+        await commitFrame(handle, session, { from: through - 1, through, body: 'CURRENT_SUMMARY', id: 'current' })
+        return through
+      })
+      let deliver
+      if (mode === 'sync') {
+        await observe(handle => record.captureTerminalText(handle, session, 'CURRENT_FINAL', 'current-run'))
+        deliver = () => sync.settle(runtime, owner, 'Engineer', 'CURRENT_FINAL', 'current-run')
+      } else {
+        deliver = await fork.prepareTerminalDelivery(runtime, owner, 'CURRENT_FINAL', 'current-run')
+      }
+      const range = await observe(async handle => ({
+        StartInclusive: { Sequence: start },
+        EndExclusive: { Sequence: trace.terminalEvidenceForProviderRun('current-run', trace.snapshot(handle, session)).frontier.sequence },
+        ProviderRun: 'current-run',
+      }))
+      const expected = await observe(handle => record.lifecycleWorkRecordBounded(handle, session, range))
+      assert.match(expected, /CURRENT_SUMMARY/)
+      assert.match(expected, /CURRENT_DETAIL\r\n正文/)
+      assert.match(expected, /CURRENT_FINAL/)
+      await observe(async handle => {
+        await observeDetail(handle, session, 'future-detail', 'FUTURE_DETAIL')
+        const through = trace.headCursor(trace.snapshot(handle, session)).sequence - 1
+        assert.ok(through >= range.EndExclusive.Sequence)
+        await commitFrame(handle, session, { from: covered, through, body: 'FUTURE_SUMMARY', id: 'future' })
+        const blob = await journal.JournalSurface_writePayload(handle, 'PRIOR_DETAIL CURRENT_DETAIL FUTURE_DETAIL SQUASHED_SUMMARY')
+        assert.equal(blob.ok, true)
+        const squashed = await record.appendBlogSquash(handle, session, 'squash-run', {
+          bloggerSessionId: `blog-${session}`, requestId: 'squash-request',
+          previousFrameEpoch: 0, nextFrameEpoch: 1, coveredFrameCount: 3,
+          textRef: blob.blobRef, textDigest: blob.blobDigest,
+        })
+        assert.equal(squashed.ok, true, squashed.error)
+        await record.captureTerminalText(handle, session, 'FUTURE_FINAL', 'future-run')
+        assert.match(await record.lifecycleWorkRecord(handle, session, false), /SQUASHED_SUMMARY/)
+      })
+      await deliver()
+      if (mode === 'sync') assert.equal((await second).value, expected)
+      else {
+        const work = fork.workSnapshot(runtime, owner).find(cell => cell.lifecycle === 'CompletedAwaitingJoin')
+        const blob = await observe(handle => journal.JournalSurface_readPayload(handle, work.completionRef))
+        assert.equal(blob.ok, true)
+        assert.equal(JSON.parse(blob.content).work_record, expected)
+        const joined = await fork.executeJoin(runtime, owner)
+        assert.ok(joined.includes(expected.replace(/\r\n/g, '\n').split('\n').map(line => line ? `# ${line}` : '#').join('\n')))
+      }
+      assert.doesNotMatch(expected, /PRIOR_|FUTURE_|CURRENT_CHARGE|SQUASHED_SUMMARY/)
+      assert.equal(await observe(handle => record.lifecycleWorkRecordBounded(handle, session, range)), expected)
+      assert.equal(readBoundedInNewProcess(directory, session, range), expected)
+    } finally {
+      if (mode === 'sync') sync.dispose(runtime)
+      else await fork.disposeRuntime(runtime)
       rmSync(directory, { recursive: true, force: true })
     }
   })

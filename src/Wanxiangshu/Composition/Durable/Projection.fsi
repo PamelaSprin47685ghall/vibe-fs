@@ -16,6 +16,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Concern
+open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -24,6 +25,7 @@ type SessionAgentProjection =
     { Companion: CompanionProjection option
       XTrace: XTraceProjectionState option
       Blog: BlogProjectionState option
+      CompletedWorkRecords: CompletedWorkRecordProjectionState option
       PrefixEpoch: ActivePrefixEpoch option
       Handles: AgentLinkageProjection option
       ProviderFailures: ProviderFailureProjection option

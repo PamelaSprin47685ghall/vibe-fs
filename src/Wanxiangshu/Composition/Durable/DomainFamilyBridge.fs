@@ -6,6 +6,7 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
+open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Foundation
 
@@ -96,6 +97,28 @@ module CompanionProjectionBridge =
         | CompanionProjectionChange.XTraceSet(sessionId, xTrace) ->
             ProjectionUpdate.updateSession sessionId (fun session -> { session with XTrace = Some xTrace }) projection
 
+    let private captureCompletedRecord providerRun (session: SessionAgentProjection) =
+        session.XTrace
+        |> Option.bind (XTraceProjection.terminalEvidenceForProviderRun providerRun)
+        |> Option.map (fun terminal ->
+            let completed =
+                session.CompletedWorkRecords
+                |> Option.defaultValue CompletedWorkRecordProjection.empty
+
+            let frames =
+                session.Blog |> Option.map (fun blog -> blog.Frames) |> Option.defaultValue []
+
+            { session with
+                CompletedWorkRecords =
+                    Some(CompletedWorkRecordProjection.capture providerRun terminal.Frontier frames completed) })
+        |> Option.defaultValue session
+
+    let private captureCompletion fact projection =
+        match fact with
+        | CompanionFactCases.TerminalOutputCaptured payload ->
+            ProjectionUpdate.updateSession payload.SessionId (captureCompletedRecord payload.ProviderRun) projection
+        | _ -> projection
+
     let fold
         body
         (projection: AgentProjectionSet)
@@ -104,7 +127,7 @@ module CompanionProjectionBridge =
         match
             CompanionFactFold.fold body projection.Associations (companionOf projection) (xTraceOf projection) fact
         with
-        | Ok changes -> Ok(List.fold applyChange projection changes)
+        | Ok changes -> Ok(captureCompletion fact (List.fold applyChange projection changes))
         | Error rejection ->
             FoldRejection.reject (CompanionFoldRejection.fact rejection) (CompanionFoldRejection.message rejection)
 

@@ -159,6 +159,12 @@ module JournalSurface =
                    TextRef = BlobRef.create (str payload?TextRef)
                    TextDigest = BlobDigest.create (str payload?TextDigest)
                    ProviderRun = terminalProviderRun payload?ProviderRun |}
+        | "Context", "ContextReanchored" ->
+            ContextFact.ContextReanchored
+                {| SessionId = sessionIdOf (payload?SessionId)
+                   PreviousEpochId = PrefixEpochId.create (Int64.Parse(str payload?PreviousEpochId))
+                   NextEpochId = PrefixEpochId.create (Int64.Parse(str payload?NextEpochId))
+                   ObservedCompactionRun = ProviderRunIdentity.create (str payload?ObservedCompactionRun) |}
         | "Execution", "HandleLinked" ->
             let handleId = str payload?Handle
 

@@ -338,7 +338,13 @@ module LifecycleWorkRecordProjection =
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
             let workRange = boundedWorkRange terminalProviderRun range xTrace
 
-            let selectedFrames = BlogProjection.frames blog |> framePrefixInRange workRange
+            let selectedFrames =
+                session.CompletedWorkRecords
+                |> Option.bind (
+                    CompletedWorkRecordProjection.framesForRange terminalProviderRun (XTraceRange.endExclusive range)
+                )
+                |> Option.defaultWith (fun () -> BlogProjection.frames blog)
+                |> framePrefixInRange workRange
 
             let! frames = resolveFrames durable selectedFrames
 

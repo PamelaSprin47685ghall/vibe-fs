@@ -829,6 +829,22 @@ module ForkToolSurface =
         }
         :> Task
 
+    let private captureCompletedTrace journal sessionId providerRun text : Task =
+        task {
+            do! captureTraceText journal sessionId providerRun text
+
+            match!
+                XTraceCapture.captureTerminalTextWithReceipt
+                    (Some journal)
+                    sessionId
+                    text
+                    (ProviderRunIdentity.create providerRun)
+            with
+            | Ok _ -> ()
+            | Error error -> return raise (InvalidOperationException(sprintf "%A" error))
+        }
+        :> Task
+
     let captureOwnerDeltaPart (value: obj) (owner: string) (text: string) (providerRun: string) : Task =
         let harness = unbox<ForkHarness> value
         captureTraceText harness.Journal (harness.OwnerSession owner) providerRun text
@@ -1036,7 +1052,7 @@ module ForkToolSurface =
                 match harness.Sessions.LatestAuthorityRoot childId with
                 | None -> return false
                 | Some root ->
-                    do! captureTraceText harness.Journal childId providerRun answer
+                    do! captureCompletedTrace harness.Journal childId providerRun answer
 
                     match harness.Scope.RuntimeFor(managerContext harness owner) with
                     | Error _ -> return false
@@ -1091,7 +1107,7 @@ module ForkToolSurface =
                     harness.Sessions.LatestAuthorityRoot childId
                 with
                 | Some binding, Some root ->
-                    do! captureTraceText harness.Journal childId providerRun answer
+                    do! captureCompletedTrace harness.Journal childId providerRun answer
 
                     return
                         fun () ->

@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
 import * as workRecord from '../../../dist/Mission/WorkRecord/Surface.js'
-import { commitFrame, withReopenableJournal } from './support/record.mjs'
+import * as trace from '../../../dist/Context/Trace/SemanticTraceSurface.js'
+import { commitFrame, withReopenableJournal, readBoundedInNewProcess } from './support/record.mjs'
 
 const SEM = 'ses_bounded_lwr'
 
@@ -457,7 +458,148 @@ test('WHAT[work-record-004] an actual durable squash spanning invocations restor
   })
 })
 
-test.todo('WHAT[work-record-004] later squash preserves frozen historical representation bytes; GAP-111: bounded originals are complete, but current frames alone do not freeze the earlier rendered summary')
+for (const providerRun of [undefined, 'current-run']) {
+  for (const readBefore of [false, true]) {
+    for (const mutation of ['entry', 'squash']) {
+      test(`WHAT[work-record-004] completed representation survives later ${mutation}, readBefore=${readBefore}, providerRun=${providerRun}`, async () => {
+        await withReopenableJournal(async (handle, reopen) => {
+          const session = `completed-record-${providerRun}-${readBefore}-${mutation}`
+          await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
+          await workRecord.captureProjection(handle, session, { messages: rangeMessages.slice(0, 4) })
+          await commitFrame(handle, session, { from: 0, through: 3, body: 'PRIOR_SUMMARY', id: 'prior' })
+          await commitFrame(handle, session, { from: 3, through: 5, body: 'CURRENT_REASONING_SUMMARY', id: 'current' })
+          await workRecord.captureTerminalText(handle, session, 'CURRENT_BODY', 'current-run')
+          const range = {
+            StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 8 },
+            ...(providerRun ? { ProviderRun: providerRun } : {}),
+          }
+          const expected = 'Chronicle\nCURRENT_REASONING_SUMMARY\n\nRecent work\nassistant: CURRENT_BODY'
+          if (readBefore) assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, range), expected)
+          if (mutation === 'entry') {
+            await commitFrame(handle, session, { from: 5, through: 7, body: 'LATE_SUMMARY', id: 'late' })
+          } else {
+            await workRecord.captureProjection(handle, session, { messages: rangeMessages })
+            await commitFrame(handle, session, { from: 5, through: 9, body: 'CURRENT_BODY NEXT_WORK', id: 'future' })
+            const blob = await journal.JournalSurface_writePayload(handle, 'PRIOR_WORK CURRENT_BODY NEXT_WORK SQUASHED_SUMMARY')
+            assert.equal(blob.ok, true)
+            const squashed = await workRecord.appendBlogSquash(handle, session, 'squash-run', {
+              bloggerSessionId: `blog-${session}`, requestId: 'squash-request',
+              previousFrameEpoch: 0, nextFrameEpoch: 1, coveredFrameCount: 3,
+              textRef: blob.blobRef, textDigest: blob.blobDigest,
+            })
+            assert.equal(squashed.ok, true, squashed.error)
+            await workRecord.captureTerminalText(handle, session, 'NEXT_FINAL', 'next-run')
+          }
+          const live = await workRecord.lifecycleWorkRecord(handle, session, false)
+          assert.match(live, mutation === 'entry' ? /LATE_SUMMARY/ : /SQUASHED_SUMMARY/)
+          assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, range), expected)
+          const recovered = await reopen()
+          assert.equal(await workRecord.lifecycleWorkRecordBounded(recovered, session, range), expected)
+          assert.equal(await workRecord.lifecycleWorkRecord(recovered, session, false), live)
+        })
+      })
+    }
+  }
+}
+
+test('WHAT[work-record-004] empty completion frames, duplicate terminals and same-frontier runs retain distinct historical choices', async () => {
+  await withReopenableJournal(async (handle, reopen, directory) => {
+    const session = 'completed-empty-frames'
+    await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
+    await workRecord.captureProjection(handle, session, { messages: rangeMessages.slice(0, 4) })
+    await workRecord.captureTerminalText(handle, session, 'CURRENT_BODY', 'first-run')
+    await commitFrame(handle, session, { from: 0, through: 3, body: 'PRIOR_SUMMARY', id: 'prior' })
+    await commitFrame(handle, session, { from: 3, through: 5, body: 'LATE_SUMMARY', id: 'late' })
+    const first = trace.terminalEvidenceForProviderRun('first-run', trace.snapshot(handle, session))
+    const duplicate = await journal.JournalSurface_appendAgent(handle, { kind: 'Session', session }, null, {
+      family: 'Companion', case: 'TerminalOutputCaptured', payload: {
+        SessionId: session, ProviderRun: 'first-run', TextRef: first.textRef, TextDigest: first.textDigest,
+      },
+    })
+    assert.equal(duplicate.ok, true, duplicate.error)
+    await workRecord.captureTerminalText(handle, session, 'SECOND_FINAL', 'second-run')
+    const range = { StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 8 } }
+    const raw = 'Recent work\nCURRENT_REASONING\nassistant: CURRENT_BODY'
+    const second = 'Chronicle\nLATE_SUMMARY\n\nRecent work\nassistant: CURRENT_BODY\nassistant: SECOND_FINAL'
+    for (const [providerRun, expected] of [[undefined, raw], ['first-run', raw], ['second-run', second]]) {
+      const query = { ...range, ...(providerRun ? { ProviderRun: providerRun } : {}) }
+      assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, query), expected)
+      assert.equal(readBoundedInNewProcess(directory, session, query), expected)
+      handle = await reopen()
+      assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, query), expected)
+    }
+    const wrongRun = await workRecord.lifecycleWorkRecordBounded(handle, session, { ...range, ProviderRun: 'missing-run' })
+    assert.match(wrongRun, /LATE_SUMMARY/)
+    assert.doesNotMatch(wrongRun, /SECOND_FINAL/)
+    assert.match(await workRecord.lifecycleWorkRecordBounded(handle, session, {
+      ...range, EndExclusive: { Sequence: 9 }, ProviderRun: 'first-run',
+    }), /LATE_SUMMARY/)
+  })
+})
+
+test('WHAT[work-record-004] a completed representation survives reanchor and a fresh invocation in another process', async () => {
+  await withReopenableJournal(async (handle, reopen, directory) => {
+    const session = 'completed-reanchor'
+    await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
+    await workRecord.captureProjection(handle, session, { messages: rangeMessages.slice(0, 4) })
+    await commitFrame(handle, session, { from: 0, through: 3, body: 'PRIOR_SUMMARY', id: 'prior' })
+    await commitFrame(handle, session, { from: 3, through: 5, body: 'CURRENT_REASONING_SUMMARY', id: 'current' })
+    await workRecord.captureTerminalText(handle, session, 'CURRENT_BODY', 'current-run')
+    const range = { StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 8 }, ProviderRun: 'current-run' }
+    const expected = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
+    assert.match(expected, /CURRENT_REASONING_SUMMARY/)
+    const reanchored = await journal.JournalSurface_appendAgent(handle, { kind: 'Session', session }, null, {
+      family: 'Context', case: 'ContextReanchored', payload: {
+        SessionId: session, PreviousEpochId: 0, NextEpochId: 1, ObservedCompactionRun: 'compaction-run',
+      },
+    })
+    assert.equal(reanchored.ok, true, JSON.stringify(reanchored.error))
+    assert.equal(Number(journal.JournalSurface_snapshot(handle).sessionProjections[session].prefixEpoch.epochId), 1)
+    const observed = await trace.captureObservedMessages(handle, session, [
+      { hostMessageId: 'next-charge', message: { info: { id: 'next-charge', role: 'user' }, parts: [{ id: 'next-charge-text', type: 'text', text: 'NEXT_CHARGE' }] } },
+      { hostMessageId: 'next-work', message: { info: { id: 'next-work', role: 'assistant' }, parts: [{ id: 'next-work-text', type: 'text', text: 'NEXT_WORK' }] } },
+    ])
+    assert.equal(observed.ok, true, JSON.stringify(observed.error))
+    await workRecord.captureTerminalText(handle, session, 'NEXT_FINAL', 'next-run')
+    const nextEnd = trace.terminalEvidenceForProviderRun('next-run', trace.snapshot(handle, session)).frontier.sequence
+    const nextRange = { StartInclusive: { Sequence: 8 }, EndExclusive: { Sequence: nextEnd }, ProviderRun: 'next-run' }
+    const next = await workRecord.lifecycleWorkRecordBounded(handle, session, nextRange)
+    assert.match(next, /NEXT_WORK/)
+    assert.match(next, /NEXT_FINAL/)
+    assert.doesNotMatch(next, /PRIOR_|CURRENT_|NEXT_CHARGE/)
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, range), expected)
+    assert.equal(readBoundedInNewProcess(directory, session, range), expected)
+    assert.equal(readBoundedInNewProcess(directory, session, nextRange), next)
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), expected)
+  })
+})
+
+test('WHAT[work-record-004] a corrupt frozen frame fails closed even after a valid squash replaces the live frames', async () => {
+  await withReopenableJournal(async (handle, reopen) => {
+    const session = 'completed-corrupt-frame'
+    await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
+    await workRecord.captureProjection(handle, session, { messages: rangeMessages.slice(0, 4) })
+    await commitFrame(handle, session, { from: 0, through: 3, body: 'PRIOR_SUMMARY', id: 'prior' })
+    const other = await journal.JournalSurface_writePayload(handle, 'different digest')
+    assert.equal(other.ok, true)
+    await commitFrame(handle, session, { from: 3, through: 5, body: 'CORRUPT_CURRENT_SUMMARY', textDigest: other.blobDigest, id: 'current' })
+    await workRecord.captureTerminalText(handle, session, 'CURRENT_BODY', 'current-run')
+    await workRecord.captureProjection(handle, session, { messages: rangeMessages })
+    await commitFrame(handle, session, { from: 5, through: 9, body: 'FUTURE_SUMMARY', id: 'future' })
+    const blob = await journal.JournalSurface_writePayload(handle, 'VALID_SQUASHED_SUMMARY')
+    assert.equal(blob.ok, true)
+    const squashed = await workRecord.appendBlogSquash(handle, session, 'squash-run', {
+      bloggerSessionId: `blog-${session}`, requestId: 'squash-request',
+      previousFrameEpoch: 0, nextFrameEpoch: 1, coveredFrameCount: 3,
+      textRef: blob.blobRef, textDigest: blob.blobDigest,
+    })
+    assert.equal(squashed.ok, true, squashed.error)
+    assert.match(await workRecord.lifecycleWorkRecord(handle, session, false), /VALID_SQUASHED_SUMMARY/)
+    const range = { StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 8 }, ProviderRun: 'current-run' }
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, range), null)
+    assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), null)
+  })
+})
 
 for (const corrupt of ['selected', 'crossing']) {
   test(`WHAT[work-record-004] ${corrupt} frame corruption obeys the bounded evidence boundary`, async () => {

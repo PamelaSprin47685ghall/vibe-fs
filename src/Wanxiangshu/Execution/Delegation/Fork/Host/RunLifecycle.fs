@@ -228,16 +228,19 @@ module HostForkRunLifecycle =
 
     let workRecordForOutcome
         (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
-        (xTraceHead: SessionId -> XTraceCursor)
+        (completedFrontier: SessionId -> ProviderRunIdentity -> XTraceCursor option)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
         =
         match outcome with
         | TerminalOutcome.Completed result ->
-            childWorkRecordForRun
-                run.ChildId
-                (DelegationHandoff.childRange run.StartCursor (xTraceHead run.ChildId))
-                result.ProviderRun
+            completedFrontier run.ChildId result.ProviderRun
+            |> Option.map (fun frontier ->
+                childWorkRecordForRun
+                    run.ChildId
+                    (DelegationHandoff.childRange run.StartCursor frontier)
+                    result.ProviderRun)
+            |> Option.defaultValue (Task.FromResult None)
         | _ -> Task.FromResult None
 
     /// Idle existing child / first prompt for an AgentOwnerRoot work unit.

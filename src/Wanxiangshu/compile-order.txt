@@ -562,6 +562,8 @@ Execution/Session/ChatExecution/RecoveryRuntimeSurface.fsi
 Execution/Session/ChatExecution/RecoveryRuntimeSurface.fs
 Execution/Session/ChatExecution/Admission.fsi
 Execution/Session/ChatExecution/Admission.fs
+Mission/WorkRecord/CompletionProjection.fsi
+Mission/WorkRecord/CompletionProjection.fs
 Composition/Durable/Projection.fsi
 Composition/Durable/Projection.fs
 Enforcer/Observation.fsi

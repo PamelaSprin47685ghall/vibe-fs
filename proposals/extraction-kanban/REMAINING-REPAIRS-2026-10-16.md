@@ -42,6 +42,8 @@
 <a id="gap111-history"></a>
 ### CUT-06-R2：已完成范围的历史重物化
 
+2026-10-17执行：已按下列计划完成有确切Terminal事实的WorkRecord表示派生、真实Sync/Fork终点及暖冷历史查询，核心69pass/1TODO、相关1239项0普通失败；非作者源/行为复验、旧精确包升级blob消费、精确新包隔离默认入口及同包非作者Node/Bun行为复验均通过，随本原子提交交付。[实现、消费者盘点、历史边界和日志](WORK-RECORD-HISTORY-2026-10-17.md)。以下保留施工依据；GAP-111/109不整项关闭，R12-U1继续暂缓。
+
 难度中高。已确认后续squash会改变已完成range经当前投影重物化的表示，WHAT-004尚未满足；不是已发布完成blob被改写，也不是本轮Terminal修正新引入。Fork的v2完成blob、同进程Join和冷持久consume已有正控，新进程Join按既有归属契约排除旧handle。不能用这一条Fork链替其他消费者关闭缺口。
 
 1. 逐一盘点SyncDelegate、process review、Finality、parent bounded record等实际调用者：谁需要当前范围视图，谁需要已经发布的canonical完成记录，已有哪一笔完成事实和blob能承接。核对完成身份、ProviderRun、range及读取时机，不先添加通用range缓存。

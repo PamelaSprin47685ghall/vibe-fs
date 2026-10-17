@@ -46,6 +46,7 @@
     <Compile Include="Context/Companion/Blogger/ContextFactFold.fsi"/>
     <Compile Include="Context/Companion/Blogger/ContextFactFold.fs"/>
     <Compile Include="Composition/Durable/DomainFamilyBridge.fsi"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-completion-projection.fsproj"/>
     <Compile Include="Composition/Durable/DomainFamilyBridge.fs"/>
     <Compile Include="Composition/Durable/Fold.fsi"/>
     <Compile Include="Composition/Durable/Fold.fs"/>

@@ -519,16 +519,21 @@ type SyncDelegateRuntime
 
         popAll ()
 
-    let resolveWorkRecord
-        (turnSessionId: SessionId)
-        (call: SyncDelegateCall)
-        (endCursor: XTraceCursor)
-        (providerRun: ProviderRunIdentity)
-        =
-        match call.Invocations |> List.tryHead |> Option.bind (fun inv -> inv.StartCursor) with
-        | None -> Task.FromResult None
-        | Some startCursor ->
+    let completedFrontier sessionId providerRun =
+        (AgentJournal.snapshot journal).AgentProjections
+        |> AgentProjection.tryFind sessionId
+        |> Option.bind (fun session -> session.XTrace)
+        |> Option.bind (XTraceProjection.terminalEvidenceForProviderRun providerRun)
+        |> Option.map (fun terminal -> terminal.Frontier)
+
+    let resolveWorkRecord (turnSessionId: SessionId) (call: SyncDelegateCall) (providerRun: ProviderRunIdentity) =
+        match
+            call.Invocations |> List.tryHead |> Option.bind (fun inv -> inv.StartCursor),
+            completedFrontier turnSessionId providerRun
+        with
+        | Some startCursor, Some endCursor ->
             projectWorkRecord turnSessionId (XTraceRange.create (XTraceCursor.create startCursor) endCursor) providerRun
+        | _ -> Task.FromResult None
 
     let noteDelegateIfRole (call: SyncDelegateCall) turnSessionId record =
         if
@@ -587,8 +592,8 @@ type SyncDelegateRuntime
             | Error error ->
                 store.FailCall(call, sprintf "sync delegate terminal trace capture failed: %A" error)
                 return true
-            | Ok receipt ->
-                let! workRecord = resolveWorkRecord turn.SessionId call receipt.CurrentHead turn.ProviderRun
+            | Ok _ ->
+                let! workRecord = resolveWorkRecord turn.SessionId call turn.ProviderRun
                 return finishCompletedCall turn call workRecord
         }
 
