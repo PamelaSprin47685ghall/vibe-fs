@@ -117,4 +117,23 @@ test('WHAT[repository-programming-008] JS007_glob_gitignore_skips_git_and_ignore
     cleanup()
   }
 })
+
+test('WHAT[repository-programming-008] leading closing brackets stay inside glob and ignore character classes', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    mkdirSync(join(dir, 'src'))
+    mkdirSync(join(dir, 'other'))
+    for (const path of ['src/]', 'src/|', 'src/a', 'other/file]']) {
+      writeFileSync(join(dir, path), 'member', 'utf8')
+    }
+    assert.deepEqual(unwrap(await glob(dir, '/src/[]a]')).paths, ['src/]', 'src/a'])
+    assert.deepEqual(unwrap(await glob(dir, '/src/[]|]')).paths, ['src/]', 'src/|'])
+    writeFileSync(join(dir, '.gitignore'), '/src/[]|]\n', 'utf8')
+    const visible = unwrap(await glob(dir, '**/*')).paths
+    assert.equal(visible.includes('src/]'), false)
+    assert.equal(visible.includes('src/|'), false)
+    assert.equal(visible.includes('src/a'), true)
+    assert.equal(visible.includes('other/file]'), true)
+  } finally { cleanup() }
+})
 }

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import * as grounding from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
 import * as catalog from '../../../dist/Requirement/Grounding/Surface.js'
-import { openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { acceptAuthorityRoot, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const prepareWorkspace = (dir) => {
   mkdirSync(join(dir, 'requirements', 'alpha'), { recursive: true })
@@ -57,18 +57,18 @@ test('WHAT[requirement-grounding-008] mutation grounding is weak observation and
   }
 })
 
-const assertRegisteredMutationContinues = async (brokenMapping) => {
+const assertRegisteredMutationContinues = async (mapping = '/src/**\n', expectedError = null) => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     prepareWorkspace(directory)
     const sourcePath = join(directory, 'src', 'main.fs')
     const mappingPath = join(directory, 'requirements', 'alpha', 'APPLIES-TO')
     assert.deepEqual(catalog.resolvePackages(directory, sourcePath), ['alpha'])
-    if (brokenMapping) {
-      writeFileSync(mappingPath, '[\n', 'utf8')
-      assert.throws(() => catalog.resolvePackages(directory, sourcePath), /invalid APPLIES-TO pattern/)
+    writeFileSync(mappingPath, mapping, 'utf8')
+    if (expectedError) {
+      assert.throws(() => catalog.resolvePackages(directory, sourcePath), expectedError)
     }
 
-    const sessionID = brokenMapping ? 'mutation-broken-mapping' : 'mutation-not-grounded'
+    const sessionID = expectedError ? 'mutation-broken-mapping' : 'mutation-not-grounded'
     await openIncumbency(runtime, sessionID)
     const input = { tool: 'write', sessionID, callID: 'write-once' }
     const args = { filePath: sourcePath, content: 'changed by controlled Host continuation\n' }
@@ -94,12 +94,40 @@ const assertRegisteredMutationContinues = async (brokenMapping) => {
     assert.equal(output.args, args)
     assert.deepEqual(args, originalArgs)
     assert.deepEqual(Reflect.ownKeys(args), keys)
-    assert.equal(readFileSync(mappingPath, 'utf8'), brokenMapping ? '[\n' : '/src/**\n')
+    assert.equal(readFileSync(mappingPath, 'utf8'), mapping)
   })
 }
 
 test('WHAT[requirement-grounding-008] registered hooks allow a controlled Host write to an ungrounded covered path', () =>
-  assertRegisteredMutationContinues(false))
+  assertRegisteredMutationContinues())
 
 test('WHAT[requirement-grounding-008] registered hooks allow a controlled Host write despite invalid APPLIES-TO metadata', () =>
-  assertRegisteredMutationContinues(true))
+  assertRegisteredMutationContinues('[\n', /invalid APPLIES-TO pattern/))
+
+for (const prefix of ['', '!']) {
+  test(`WHAT[requirement-grounding-008] registered write remains fail-open for an illegal ${prefix || 'positive'} self declaration`, () =>
+    assertRegisteredMutationContinues(`/src/**\n${prefix}/requirements/alpha/tests/**\n`, /must not declare package self coverage/))
+
+  test(`WHAT[requirement-grounding-008] actual JS mutation commits once with an illegal ${prefix || 'positive'} self declaration`, async () => {
+    await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+      prepareWorkspace(directory)
+      writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'),
+        `/src/**\n${prefix}/requirements/alpha/tests/**\n`)
+      assert.throws(() => catalog.discoverPackages(directory), /must not declare package self coverage/)
+      const sessionID = 'mutation-illegal-self-js'
+      await acceptAuthorityRoot(runtime, sessionID, 'engineer')
+      await openIncumbency(runtime, sessionID)
+      const input = { tool: 'js-engineer', sessionID, callID: 'js-write-once' }
+      const args = { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); await this.rewrite('src/main.fs', file.text() + 'ONCE\\n'); return 'PROGRAM-WRITTEN'; } }" }
+      const originalArgs = structuredClone(args)
+      const carrier = { args }
+      await hooks['tool.execute.before'](input, carrier)
+      assert.equal(carrier.args, args)
+      const output = await hooks.tool['js-engineer'].execute(args, { sessionID, agent: 'engineer' })
+      assert.match(output, /PROGRAM-WRITTEN/)
+      await hooks['tool.execute.after']({ ...input, args }, { title: 'js-engineer', output, metadata: {} })
+      assert.deepEqual(args, originalArgs)
+      assert.equal(readFileSync(join(directory, 'src', 'main.fs'), 'utf8'), 'before\nONCE\n')
+    })
+  })
+}

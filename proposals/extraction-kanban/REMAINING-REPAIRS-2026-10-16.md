@@ -33,7 +33,7 @@
 |---|---|---|
 | 已交付，退出待施工顺序 | [D1 → D2终结事实](#process-termination) | 声明范围验收；不关闭完整Process、PTY或R12。输入尾17及停止完整性已修，原红保留 |
 | 独立验证支线 | [CUT-00-R1](#finite-verification)、[R2](#bun-verification)、[R3](#isolated-pty-evidence) | 分别修正式等待、建立 Bun 监督、解释旧隔离失败；不以任一项代证另外两项 |
-| 独立行为修复 | [GAP-085、159、140](#adjacent-repairs) | 分别修规则自覆盖、显式权限、持久失败预算；不并入 Process 提交 |
+| 独立行为修复 | [GAP-159、140](#adjacent-repairs) | GAP-085列明范围已交付，退出待施工顺序；继续显式权限、持久失败预算，不并入Process提交 |
 | 按范围契约顺序 | [CUT-03-R7 → CUT-06-R5 → CUT-03-R8 → CUT-03-R9](#trace-product-chain) | Opening、真实取材消费者、压缩重锚、Fission 汇聚，各自闭环 |
 | 现有接管能力上补真实启动链 | [CUT-04-R7](#bootstrap-recovery) | 两个真实 Host 的 Bootstrap 崩溃矩阵和持久收尾 |
 | R7 之后，先原型再决定实现 | [CUT-04-R8-A → R8-B](#detached-processes) | 主动脱组可行性与生产接线分开；B 依赖 A 的肯定结论及冻结承诺 |
@@ -187,6 +187,8 @@ C/R7-A 的剩余整体验收由下列 CUT-00-R3 取得归因后再裁决；R1/R2
 
 <a id="gap085"></a>
 ### GAP-085 规则自覆盖
+
+2026-10-19交付：整目录校验和首`]`字符类纠错已接线，候选667最终14文件128/0/0TODO、owned accepted；三名非作者Node/Bun规则、共享glob/grep、真实Plugin读写和冷重放复验通过。GAP-085按本卡范围关闭，退出待施工顺序；完整WHAT002中反斜杠包名的旧天然覆盖缺陷及未约定完整glob方言不随卡关闭，后续单独确定路径合同再改，不批量迁移。见[范围、归因及验收](GROUNDING-SCOPE-GAP085-2026-10-19.md)。
 
 **范围与前置：** 以包的整个 requirements 子树为隐式覆盖；修正规则规范化、显式自包含与自排除校验及实际 discoverPackages/grounding 接线，不改其他包的覆盖规则。
 

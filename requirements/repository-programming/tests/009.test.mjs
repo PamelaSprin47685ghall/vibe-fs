@@ -73,4 +73,17 @@ test('WHAT[repository-programming-009] JS020_grep_returns_line_column_and_skips_
     cleanup()
   }
 })
+
+test('WHAT[repository-programming-009] grep character-class candidates cannot leak to another path prefix', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    mkdirSync(join(dir, 'src'))
+    mkdirSync(join(dir, 'other'))
+    for (const path of ['src/]', 'src/|', 'src/a', 'other/file]']) {
+      writeFileSync(join(dir, path), 'needle\n', 'utf8')
+    }
+    const hits = unwrap(await grep(dir, exact('needle'), '/src/[]|]')).matches
+    assert.deepEqual(hits.map(hit => hit.path), ['src/]', 'src/|'])
+  } finally { cleanup() }
+})
 }

@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import * as grounding from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
+import * as catalog from '../../../dist/Requirement/Grounding/Surface.js'
 import * as pair from '../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js'
 import * as trace from '../../../dist/Context/Trace/SemanticTraceSurface.js'
 import * as journal from '../../../dist/Persistence/Journal/Surface.js'
@@ -124,6 +125,55 @@ const sessionHostFacts = (directory, sessionID) => {
       return host?.[1]?.SessionId?.[1] === sessionID ? [host] : []
     })
 }
+
+test('WHAT[requirement-grounding-007] registered reads reject illegal self scope without consuming its materials', async t => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const packageRoot = join(directory, 'requirements', 'alpha')
+    mkdirSync(packageRoot, { recursive: true })
+    mkdirSync(join(directory, 'src'), { recursive: true })
+    const sourcePath = join(directory, 'src', 'main.fs')
+    const sentinel = 'SELF-SCOPE-MATERIAL-MUST-NOT-LEAK'
+    writeFileSync(sourcePath, 'ACTUAL-SOURCE\r\n')
+    writeFileSync(join(packageRoot, 'WHAT.md'), sentinel)
+    for (const [scope, rule] of [['legal', ''], ['positive', '/requirements/alpha/tests/**'], ['negative', '!/requirements/alpha/tests/**']]) {
+      writeFileSync(join(packageRoot, 'APPLIES-TO'), `/src/**\n${rule}\n`)
+      const legal = scope === 'legal'
+      if (legal) assert.deepEqual(catalog.discoverPackages(directory), ['alpha'])
+      else {
+        assert.throws(() => catalog.discoverPackages(directory), /must not declare package self coverage/)
+        assert.throws(() => catalog.materializePackage(directory, 'alpha'), /must not declare package self coverage/)
+      }
+      for (const tool of ['read', 'js-manager']) {
+        await t.test(`WHAT[requirement-grounding-007] ${scope} scope with registered ${tool}`, async () => {
+          const sessionID = `scope-${scope}-${tool}`
+          if (tool === 'js-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')
+          await openIncumbency(runtime, sessionID)
+          const args = tool === 'read' ? { filePath: sourcePath }
+            : { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
+          const input = { tool, sessionID, callID: `call-${sessionID}` }
+          await hooks['tool.execute.before'](input, { args })
+          const output = tool === 'read' ? readFileSync(sourcePath, 'utf8')
+            : await hooks.tool[tool].execute(args, { sessionID, agent: 'manager' })
+          assert.ok(output.includes('ACTUAL-SOURCE'), 'the actual file read succeeds despite invalid grounding')
+          await hooks['tool.execute.after']({ ...input, args }, { title: tool, output, metadata: {} })
+          const raw = [{ info: { id: `result-${sessionID}`, role: 'assistant', sessionID, providerID: 'anthropic' },
+            parts: [{ id: `part-${sessionID}`, type: 'tool', tool, callID: input.callID,
+              state: { status: 'completed', input: args, output, time: { start: 0, end: 1 } } }] }]
+          const projected = { messages: structuredClone(raw) }
+          await hooks['experimental.chat.messages.transform']({}, projected)
+          const terminal = projected.messages[0].parts[0].state.output
+          assert.ok(terminal.startsWith(output), 'the original result bytes remain intact')
+          assert.equal(terminal.includes(sentinel), legal)
+          assert.equal(terminal.includes('requirement_source_path = "requirements/alpha/WHAT.md"'), legal)
+          const facts = sessionHostFacts(directory, sessionID)
+          for (const kind of ['RequirementGroundingRequested', 'RequirementGroundingAnchored']) {
+            assert.equal(facts.filter(fact => fact[0] === kind).length, legal ? 1 : 0, `${scope}: ${kind}`)
+          }
+        })
+      }
+    }
+  })
+})
 
 const withPresentationJournals = async (directory, body) => {
   const pairJournal = await pair.createJournal(join(directory, '.git'))

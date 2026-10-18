@@ -1,0 +1,84 @@
+{
+  "card": "GAP-085",
+  "scope": "Current plan self-subtree validation and real grounding boundaries",
+  "mainBase": "5157c4915",
+  "fixedProductGeneration": 667,
+  "fixedTarballSHA256": "b0de9b9770139ae4aa977fae3d8b8d59f2d558cf4ff4a41cf4a1289419743297",
+  "productFiles": 2076,
+  "productDifferences": [],
+  "changedSinceD2": [
+    "dist/Foundation/GlobMatch.js",
+    "dist/Requirement/Grounding/Catalog.js"
+  ],
+  "libraryUnchanged": true,
+  "formal": {
+    "generation": 668,
+    "files": 14,
+    "pass": 128,
+    "fail": 0,
+    "todo": 0,
+    "skip": 0,
+    "ownedAccepted": true
+  },
+  "independent": {
+    "reviewers": [
+      "d1_review_git",
+      "d1_review_tests",
+      "d1_review_host"
+    ],
+    "hosts": [
+      "Node 26.6.0",
+      "Bun 1.3.14"
+    ],
+    "pointPairsPerHost": 234,
+    "subtreeCasesPerHost": 27,
+    "classCasesPerHost": 6,
+    "formal002PerHost": {
+      "pass": 8,
+      "fail": 0,
+      "todo": 0
+    },
+    "sameOld002PerHost": {
+      "pass": 4,
+      "fail": 4
+    },
+    "witnessAndPolicyCasesPerHost": 59,
+    "publicPluginTestsPerHost": 5,
+    "publicConsumerInstallationFiles": 11024,
+    "installationUnchanged": true,
+    "coldOccurrenceReplay": true,
+    "illegalMaterialReads": 0,
+    "materialReadCountHasPositiveControl": true
+  },
+  "static": {
+    "exit": 0,
+    "reportOnlyFindings": 526,
+    "controlPyramids": 0
+  },
+  "finalIntegration": {
+    "generation": 669,
+    "fixedProductGeneration": 667,
+    "productFiles": 2076,
+    "differences": [],
+    "logSHA256": "dd61d16db596ac77cf59ca3d06886f9e13254c598d7112647e83aeb6ec3aba32"
+  },
+  "oldBoundaries": [
+    "WHAT002 backslash package names",
+    "Existing negated-leading-bracket glob dialect limitations"
+  ],
+  "deferred": [
+    "R12-U1"
+  ],
+  "archives": {
+    "character-class-666-red.tgz": "d62101e0d5665d5706e8f106d090ac1dde7eea59e3364e354fb25cec7fca4ccf",
+    "design-domain.tgz": "c4a668b486e323209438caff79cf03cdc69da218995af4d89f980c70c3f83324",
+    "design-initial.tgz": "819f4d8d8c2bf74482f7d22f98a6390925055dc8b4ce2b5bbabfb1c5ade047cb",
+    "non-author-host.tgz": "852730e1dc13d4328d71ea605678b138b47a2d29f4775e7d9e2d37804431124c",
+    "non-author-policy.tgz": "a2394b732632fa1f92021a5281c432f83b24e0fb9100375af133f4cc20058b2f",
+    "non-author-rules.tgz": "76f37ce625ce0cd07f74be80358b62d2ec26a9e92a08dca8c9f6b3a912d4cf04",
+    "root-verification.tgz": "b67250171399c92911f6dd310185c2e6bf5958f75da87572fe66f7c7ee71ebf0",
+    "scope-addendum.tgz": "b4e4b0d4bb05a0b72de9601f7171dc98a65ba8f88c2fd19bfdd6b717d1814e3d"
+  },
+  "deployment": "not performed",
+  "registryPublication": "not performed"
+}

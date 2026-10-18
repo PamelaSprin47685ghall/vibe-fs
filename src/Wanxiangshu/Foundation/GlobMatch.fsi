@@ -7,3 +7,5 @@ module GlobMatch =
     val compilePattern: pattern: string -> Result<obj, GlobPatternError>
     val testCompiled: regex: obj -> text: string -> bool
     val matchesPathPattern: pattern: string -> path: string -> Result<bool, GlobPatternError>
+
+    val mayMatchSubtree: pattern: string -> directory: string -> Result<bool, GlobPatternError>
