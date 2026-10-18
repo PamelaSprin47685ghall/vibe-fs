@@ -51,12 +51,11 @@ const ToolPermission = toolPermissionByName
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 
 const fsPermissionsOf = (role) =>
-  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Move', 'Remove'].includes(n))
+  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Glob', 'Move', 'Remove'].includes(n))
 
 const MEMBERS_BY_PERMISSION = {
-  Read: ['file', 'cat', 'stat', 'whereAll', 'where'],
+  Read: ['cat', 'stat', 'whereAll', 'where'],
   Glob: ['ls'],
-  Edit: ['edit', 'rewrite'],
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
@@ -64,9 +63,6 @@ const MEMBERS_BY_PERMISSION = {
 }
 
 const BINDING_BY_MEMBER = {
-  file: 'js.read',
-  edit: 'js.edit',
-  rewrite: 'js.edit',
   write: 'js.write',
   rm: 'js.rm',
   mv: 'js.mv',
@@ -80,7 +76,7 @@ const BINDING_BY_MEMBER = {
 }
 
 const MEMBER_ORDER = [
-  'file', 'edit', 'rewrite', 'write', 'rm', 'mv',
+  'write', 'rm', 'mv',
   'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
   'run',
 ]
@@ -106,56 +102,70 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
   const layers = layersOf(result)
   assert.deepEqual(
     Object.keys(layers).sort(),
-    ['cat', 'edit', 'file', 'ls', 'mkdir', 'rewrite', 'stat', 'where', 'whereAll', 'write'],
+    ['cat', 'ls', 'mkdir', 'stat', 'where', 'whereAll', 'write'],
   )
   for (const [member, layer] of Object.entries(layers)) {
     assert.equal(layer.inBaseClass, true, `${member} in base class`)
     assert.equal(layer.inDescription, true, `${member} in description`)
     assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${member} binding`)
   }
-  assert.equal(result.description.includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
-  assert.match(result.description, /name\+N \/ name-N/)
-  assert.match(result.description, /not a line number/)
-  assert.match(result.description, /text\(from = "\^", to = "\$"\)/)
-  assert.match(result.description, /edit\(path, changes\)/)
+  assert.match(result.description, /cat\(path\)/)
+  assert.match(result.description, /where\(content, needle, from = 0\)/)
+  assert.match(result.description, /whereAll\(content, needle, from = 0\)/)
+  assert.match(result.description, /write\(path, content\)/)
+  assert.match(result.description, /mkdir\(path\)/)
+  assert.equal(result.description.includes('file(path'), false)
+  assert.equal(result.description.includes('edit(path'), false)
+  assert.equal(result.description.includes('rewrite(path'), false)
   assert.equal(result.description.includes('_api'), false)
   assert.equal(result.description.includes('__jsFailure'), false)
   assert.equal(result.examples.length, 1, 'one responsibility-shaped Ultra Example')
-  assert.match(result.examples[0], /oldApi -> newApi/)
+  assert.match(result.examples[0], /RetryPolicy/)
 })
 
 test('WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers', () => {
   const result = surface('Engineer', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
-  assert.deepEqual(memberNames(result), ['file', 'cat', 'ls', 'stat', 'whereAll', 'where'])
+  assert.deepEqual(memberNames(result), ['cat', 'ls', 'stat', 'whereAll', 'where'])
   assert.equal(result.description.includes('edit(path'), false)
   assert.equal(result.description.includes('rewrite(path'), false)
   assert.equal(result.description.includes('write(path, content)'), false)
   assert.equal(result.baseClassSource.includes('js.edit'), false)
   assert.equal(result.baseClassSource.includes('js.write'), false)
-  assert.equal(result.examples.some((example) => example.includes('this.rewrite')), false)
+  assert.equal(result.examples.some((example) => example.includes('this.write')), false)
 })
 
 test('WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_read_or_write_members', () => {
   const editOnly = surface('Engineer', ['Edit'])
-  assert.deepEqual(memberNames(editOnly), ['edit', 'rewrite'])
+  assert.equal(isNone(editOnly), true, 'Edit permission alone projects no JsCapability after legacy retirement')
+
+  const writeOnly = surface('Engineer', ['Write'])
+  assert.deepEqual(memberNames(writeOnly), ['write', 'mkdir'])
   for (const unavailable of [
+    'async cat(path)',
+    'async where(content',
+    'whereAll(content, needle',
     'file(matches)',
     'file() + JavaScript',
     'file(path',
     'FileView.text',
+    'edit(path',
+    'rewrite(path',
   ]) {
-    assert.equal(editOnly.description.includes(unavailable), false, `Edit-only surface leaked ${unavailable}`)
+    assert.equal(writeOnly.description.includes(unavailable), false, `Write-only surface leaked ${unavailable}`)
   }
-  assert.doesNotMatch(editOnly.description, /(^|[^A-Za-z0-9_])write\(path, content\)/m)
+  assert.match(writeOnly.description, /(^|[^A-Za-z0-9_])write\(path, content\)/m)
 
   const readEdit = surface('Engineer', ['Read', 'Edit'])
-  assert.deepEqual(memberNames(readEdit), ['file', 'edit', 'rewrite', 'cat', 'stat', 'whereAll', 'where'])
-  assert.equal(readEdit.description.includes('file(matches) + text() + rewrite()'), true)
+  assert.deepEqual(memberNames(readEdit), ['cat', 'stat', 'whereAll', 'where'])
+  assert.equal(readEdit.description.includes('cat(path)'), true)
+  assert.equal(readEdit.description.includes('file(matches)'), false)
+  assert.equal(readEdit.description.includes('edit(path'), false)
+  assert.equal(readEdit.description.includes('rewrite(path'), false)
   assert.doesNotMatch(readEdit.description, /(^|[^A-Za-z0-9_])write\(path, content\)/m)
 
   const editWrite = surface('Engineer', ['Edit', 'Write'])
-  assert.deepEqual(memberNames(editWrite), ['edit', 'rewrite', 'write', 'mkdir'])
+  assert.deepEqual(memberNames(editWrite), ['write', 'mkdir'])
   assert.equal(editWrite.description.includes('file(matches)'), false)
   assert.equal(editWrite.description.includes('file(path'), false)
   assert.equal(editWrite.description.includes('FileView.text'), false)
@@ -164,7 +174,7 @@ test('WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_r
 
 test('WHAT[repository-programming-002] JS004_member_gate_binds_present_members_only', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
-  assert.equal(memberBinding('Engineer', perms, 'file'), 'js.read')
+  assert.equal(memberBinding('Engineer', perms, 'file'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'glob'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'grep'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'cat'), 'js.cat')
@@ -175,7 +185,7 @@ test('WHAT[repository-programming-002] JS004_member_gate_binds_present_members_o
   assert.equal(memberBinding('Engineer', perms, 'edit'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'rewrite'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'write'), undefined)
-  assert.equal(memberBinding('Blogger', caps(ToolPermission.Chronicle), 'file'), undefined)
+  assert.equal(memberBinding('Blogger', caps(ToolPermission.Chronicle), 'cat'), undefined)
 })
 
 test('WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_rejected', () => {
@@ -184,11 +194,13 @@ test('WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_r
   // must refuse the member: memberBinding returns undefined for it, so a
   // forged call cannot resolve an executor (JS-004).
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
-  // lie: 'rewrite' is NOT in this surface's bindings (Inspector has no Edit)
+  // lie: retired 'file'/'edit'/'rewrite' and absent 'write' are NOT in this surface's bindings
+  assert.equal(memberBinding('Inspector', perms, 'file'), undefined)
+  assert.equal(memberBinding('Inspector', perms, 'edit'), undefined)
   assert.equal(memberBinding('Inspector', perms, 'rewrite'), undefined)
   assert.equal(memberBinding('Inspector', perms, 'write'), undefined)
   // the honest members resolve
-  assert.equal(memberBinding('Inspector', perms, 'file'), 'js.read')
+  assert.equal(memberBinding('Inspector', perms, 'cat'), 'js.cat')
   // a lying description would name methods the surface lacks; the generator
   // never does — prove the surface itself contains no unbounded members
   const result = generate('Inspector', perms, 'en')
@@ -197,4 +209,5 @@ test('WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_r
     assert.notEqual(memberBinding('Inspector', perms, name), undefined, `${name} must resolve`)
   }
   assert.equal(names.includes('rewrite'), false)
+  assert.equal(names.includes('write'), false)
 })

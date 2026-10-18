@@ -33,9 +33,9 @@ test('WHAT[requirement-grounding-010] js-* read is a real read: covered code tri
   try {
     const readProgram = `class Js extends JsProgram {
       async run() {
-        const spec = await this.file('requirements/alpha/WHAT.md');
-        const code = await this.file('src/alpha/a.txt');
-        return { spec: spec.text(), code: code.text() };
+        const spec = await this.cat('requirements/alpha/WHAT.md');
+        const code = await this.cat('src/alpha/a.txt');
+        return { spec, code };
       }
     }`
     const result = await surface.runFirstAttempt(dir, 'js-read', readProgram)

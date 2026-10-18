@@ -103,33 +103,6 @@ module JsToolsBindings =
                     Ok()
         }
 
-    let private makeReadMember
-        (root: string)
-        (readSnapshots: ResizeArray<JsReadSnapshot>)
-        (explicitReads: ResizeArray<JsExplicitFileRead>)
-        =
-        "read"
-        ==> fun (path: string) ->
-            result {
-                let! full = resolveInside root path
-                let! readPath = resolveReadPath full
-                let! readRoot = resolveReadPath root
-                let relative = (pathRelative readRoot readPath).Replace("\\", "/")
-
-                do!
-                    if relative = ".." || relative.StartsWith("../") || pathIsAbsolute relative then
-                        Error(JsFailure.PathDenied path)
-                    else
-                        Ok()
-
-                let! text = JsUtf8Fs.readUtf8Classified readPath
-                readSnapshots.Add { Path = path; Text = text }
-                explicitReads.Add { Path = readPath; ResultBytes = text }
-
-                return createObj [ "ok" ==> true; "path" ==> path; "text" ==> text; "byteCount" ==> text.Length ]
-            }
-            |> renderOutcome
-
 
     let createLedger (persistence: IJsTransactionPersistence option) : JsAsIsLedger =
         { Persistence = persistence
@@ -171,27 +144,6 @@ module JsToolsBindings =
             ledger.Appends.Add pending
         | _ -> ()
 
-    let private makeEditMember (root: string) (staging: ResizeArray<JsStagedMutation>) (ledger: JsAsIsLedger) =
-        "edit"
-        ==> fun (path: string) (newText: obj) ->
-            let replacement = string newText
-
-            result {
-                let! full = resolveInside root path
-                let! current = JsUtf8Fs.readUtf8Classified full
-                let mutation = JsStagedMutation.Rewrite(path, current, replacement)
-
-                // As-is write: the single-mutation commit plan validates the
-                // target is still fresh (FILE_CHANGED otherwise) and atomically
-                // persists this one write; it never rolls back earlier writes.
-                // H1: Prepared fires before the write, Committed right after.
-                let transactionId = firePrepared ledger root mutation
-                do! JsMutationFs.commitPlan root (JsTransaction.commitPlan [ mutation ])
-                fireCommitted ledger transactionId
-                staging.Add mutation
-                return createObj [ "ok" ==> true ]
-            }
-            |> renderOutcome
 
     /// JS-020/JS-030 write-before check: a mutation target that was read
     /// through file() or cat() must still match its snapshot. A third-party
@@ -688,7 +640,6 @@ module JsToolsBindings =
         : obj =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
-                  makeReadMember root readSnapshots explicitReads
                   makeCatMember root readSnapshots explicitReads
                   makeStatMember root
                   makeWhereAllMember ()
@@ -696,9 +647,6 @@ module JsToolsBindings =
 
               if Set.contains JsCapability.Glob capabilities then
                   makeLsMember root
-
-              if Set.contains JsCapability.Edit capabilities then
-                  makeEditMember root staging ledger
 
               if Set.contains JsCapability.Write capabilities then
                   makeWriteMember root staging readSnapshots ledger

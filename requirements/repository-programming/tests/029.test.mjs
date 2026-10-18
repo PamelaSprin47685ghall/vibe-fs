@@ -33,13 +33,15 @@ test('WHAT[repository-programming-029] JS_ASIS_each_write_lands_immediately_and_
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
     writeFileSync(join(dir, 'b.txt'), 'bravo\n', 'utf8')
-    // First edit succeeds and persists; the second edit fails to match. Under
+    // First write succeeds and persists; the second read fails on a missing path. Under
     // as-is semantics the first write stays on disk and is reported.
-    const outcome = await execute(dir, `    this.edit('a.txt', { find: 'alpha', put: 'changed' });
-    this.edit('b.txt', { find: 'missing', put: 'changed' });`)
+    const outcome = await execute(dir, `    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'alpha');
+    this.write('a.txt', text.slice(0, begin) + 'changed' + text.slice(end));
+    await this.cat('missing.txt');`)
 
     assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'EDIT_NOT_FOUND')
+    assert.equal(failureCode(outcome), 'FILE_NOT_FOUND')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'changed\n', 'earlier write persisted')
     assert.equal(readFileSync(join(dir, 'b.txt'), 'utf8'), 'bravo\n', 'failed write did not land')
     assert.deepEqual(rewritten(outcome), ['a.txt'], 'failure reports the actually-written paths')
@@ -53,7 +55,9 @@ test('WHAT[repository-programming-029] JS_ASIS_success_reports_rewritten_and_cre
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
-    const outcome = await execute(dir, `    this.edit('a.txt', { find: 'alpha', put: 'beta' });
+    const outcome = await execute(dir, `    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'alpha');
+    this.write('a.txt', text.slice(0, begin) + 'beta' + text.slice(end));
     await this.write('new.txt', 'fresh');`)
 
     assert.equal(caseName(outcome), 'Succeeded')
@@ -74,13 +78,15 @@ test('WHAT[repository-programming-029] JS_ASIS_failure_renders_code_reason_and_a
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
     writeFileSync(join(dir, 'b.txt'), 'bravo\n', 'utf8')
-    const outcome = await execute(dir, `    this.edit('a.txt', { find: 'alpha', put: 'changed' });
-    this.edit('b.txt', { find: 'missing', put: 'changed' });`)
+    const outcome = await execute(dir, `    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'alpha');
+    this.write('a.txt', text.slice(0, begin) + 'changed' + text.slice(end));
+    await this.cat('missing.txt');`)
 
     const rendered = render(outcome)
     assert.equal(rendered.startsWith('# failed\n'), true)
     const doc = parseToml(rendered)
-    assert.equal(doc.code, 'EDIT_NOT_FOUND')
+    assert.equal(doc.code, 'FILE_NOT_FOUND')
     assert.ok(doc.reason.length > 0)
     assert.deepEqual(doc.fs.rewritten, ['a.txt'], 'failure carries the already-applied fs list')
   } finally {
@@ -92,14 +98,14 @@ test('WHAT[repository-programming-029] JS_ASIS_failure_without_effects_omits_fs_
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
-    const outcome = await execute(dir, `    this.edit('a.txt', { find: 'missing', put: 'beta' });`)
+    const outcome = await execute(dir, `    await this.cat('missing.txt');`)
 
     assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'EDIT_NOT_FOUND')
+    assert.equal(failureCode(outcome), 'FILE_NOT_FOUND')
     assert.deepEqual(rewritten(outcome), [])
     const rendered = render(outcome)
     const doc = parseToml(rendered)
-    assert.equal(doc.code, 'EDIT_NOT_FOUND')
+    assert.equal(doc.code, 'FILE_NOT_FOUND')
     assert.equal(doc.fs, undefined, 'no applied effects means no fs section')
   } finally {
     cleanup()

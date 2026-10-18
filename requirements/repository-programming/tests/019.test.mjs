@@ -44,12 +44,13 @@ test('WHAT[repository-programming-019] JS085_workflow_blocks_a_rewrite_of_a_miss
     writeFileSync(join(dir, 'a.txt'), 'current text', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    this.rewrite('missing.txt', 'x');
+    this.write('missing-dir/missing.txt', 'x');
     return { ok: true };
   }
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
+    assert.equal(failureCode(outcome), 'TRANSACTION_COMMIT_FAILED')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'current text')
   } finally {
     cleanup()
@@ -78,7 +79,7 @@ test('WHAT[repository-programming-019] JS019_invalid_return_value_keeps_the_alre
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    this.rewrite('a.txt', 'new')
+    this.write('a.txt', 'new')
     return [null]
   }
 }`

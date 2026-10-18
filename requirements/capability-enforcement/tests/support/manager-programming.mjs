@@ -40,6 +40,7 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   )
 
   // 四层同构第 1 层：生成的 JsProgram 基类中不声明任何写方法
+  assert.equal(surface.baseClassSource.includes('file('), false, 'BaseClass must not declare retired file')
   assert.equal(surface.baseClassSource.includes('edit('), false, 'BaseClass must not declare edit')
   assert.equal(surface.baseClassSource.includes('write('), false, 'BaseClass must not declare write')
   assert.equal(surface.baseClassSource.includes('rewrite('), false, 'BaseClass must not declare rewrite')
@@ -50,7 +51,7 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   assert.equal(surface.baseClassSource.includes('join('), true, 'BaseClass must declare join')
 
   // 四层同构第 2 层：描述文档不包含写入/修改暗示
-  assert.doesNotMatch(surface.description, /edit\(path|rewrite\(path|write\(path/, 'Description must not advertise write methods')
+  assert.doesNotMatch(surface.description, /edit\(path|rewrite\(path|write\(path,\s*content\)/, 'Description must not advertise write methods')
 
   // 四层同构第 3 层：示例代码（ultraExample manager 分支）纯只读，无写入调用
   assert.ok(surface.examples.length > 0, 'Manager surface must include ultraExample')
@@ -65,7 +66,6 @@ test('WHAT[capability-enforcement-025] J02_manager_create_api_omits_mutation_met
     const binding = roleApi('manager', dir)
 
     // 已授予只读成员正常暴露
-    assert.equal(typeof binding.js.read, 'function', 'read must be constructed')
     assert.equal(typeof binding.js.cat, 'function', 'cat must be constructed')
     assert.equal(typeof binding.js.ls, 'function', 'ls must be constructed')
     assert.equal(typeof binding.js.stat, 'function', 'stat must be constructed')
@@ -74,9 +74,13 @@ test('WHAT[capability-enforcement-025] J02_manager_create_api_omits_mutation_met
     assert.equal(typeof binding.js.fork, 'function', 'fork must be constructed')
     assert.equal(typeof binding.js.join, 'function', 'join must be constructed')
 
-    // 已退役的 glob/grep 与未授予的写/执行 API 在 api.js 中直接不存在（undefined）
+    // 已退役的 file/read/glob/grep/edit/rewrite 与未授予的写/执行 API 在 api.js 中直接不存在（undefined）
+    assert.equal('file' in binding.js, false, 'retired file property must not exist')
+    assert.equal('read' in binding.js, false, 'retired read property must not exist')
     assert.equal('glob' in binding.js, false, 'retired glob property must not exist')
     assert.equal('grep' in binding.js, false, 'retired grep property must not exist')
+    assert.equal(binding.js.file, undefined)
+    assert.equal(binding.js.read, undefined)
     assert.equal(binding.js.glob, undefined)
     assert.equal(binding.js.grep, undefined)
     assert.equal('edit' in binding.js, false, 'edit property must not exist')
@@ -85,7 +89,7 @@ test('WHAT[capability-enforcement-025] J02_manager_create_api_omits_mutation_met
     assert.equal(binding.js.write, undefined)
     assert.deepEqual(
       Object.keys(binding.js).sort(),
-      ['cat', 'fork', 'join', 'ls', 'read', 'stat', 'where', 'whereAll'],
+      ['cat', 'fork', 'join', 'ls', 'stat', 'where', 'whereAll'],
     )
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -129,7 +133,7 @@ test('WHAT[capability-enforcement-025] J04_read_only_execution_returns_success_w
       dir,
       'manager',
       'en',
-      `class Js extends JsProgram { async run() { const file = await this.file('file.txt'); return { text: file.text('^', '$') }; } }`,
+      `class Js extends JsProgram { async run() { const text = await this.cat('file.txt'); return { text }; } }`,
       2000,
       Date.now() + 60_000,
       1 << 20,
@@ -148,10 +152,10 @@ test('WHAT[capability-enforcement-025] J04_read_only_execution_returns_success_w
 test('WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_edit_capabilities', async () => {
   const engSurface = generateRole('engineer', 'en')
   const devopsSurface = generateRole('devops', 'en')
-  assert.ok(engSurface.capabilities.includes('Edit'))
+  assert.equal(engSurface.capabilities.includes('Edit'), false, 'JsCapability.Edit is retired from generated role surfaces')
   assert.ok(engSurface.capabilities.includes('Write'))
   assert.ok(engSurface.capabilities.includes('Fission'))
-  assert.ok(devopsSurface.capabilities.includes('Edit'))
+  assert.equal(devopsSurface.capabilities.includes('Edit'), false, 'JsCapability.Edit is retired from generated role surfaces')
   assert.ok(devopsSurface.capabilities.includes('Write'))
   assert.ok(devopsSurface.capabilities.includes('Exec'))
   assert.ok(devopsSurface.capabilities.includes('Join'))
@@ -159,7 +163,8 @@ test('WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j05-'))
   try {
     const engApi = roleApi('engineer', dir)
-    assert.equal(typeof engApi.js.edit, 'function', 'Engineer must retain edit api')
+    assert.equal('edit' in engApi.js, false, 'retired edit member must not be exposed on Engineer api.js')
+    assert.equal(engApi.js.edit, undefined)
     assert.equal(typeof engApi.js.write, 'function', 'Engineer must retain write api')
     assert.equal(typeof engApi.js.fission, 'function', 'Engineer must expose fission api')
   } finally {
@@ -192,7 +197,7 @@ test('WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes
     const api = roleApi('manager', dir)
 
     // filePath 含引号不改变纯数据解析意图
-    const res = api.js.read(specialName)
+    const res = api.js.cat(specialName)
     assert.equal(res.ok, true)
     assert.equal(res.text, 'special content')
 
@@ -224,21 +229,21 @@ test('WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_ro
     const api = roleApi('manager', dir)
 
     // 1. 根目录内子路径与相对路径正常放行
-    const insideRes = api.js.read('sub/foo.txt')
+    const insideRes = api.js.cat('sub/foo.txt')
     assert.equal(insideRes.ok, true, 'sub path inside root is allowed')
     assert.equal(insideRes.text, 'sub content')
 
     // 2. 父目录相对路径越界逃逸严格返回 PATH_DENIED
-    const parentEscapeRes = api.js.read('../outside.txt')
+    const parentEscapeRes = api.js.cat('../outside.txt')
     assert.equal(parentEscapeRes.ok, false)
     assert.equal(parentEscapeRes.code, 'PATH_DENIED', 'path traversal escaping root is denied with PATH_DENIED')
 
-    const doubleDotRes = api.js.read('..')
+    const doubleDotRes = api.js.cat('..')
     assert.equal(doubleDotRes.ok, false)
     assert.equal(doubleDotRes.code, 'PATH_DENIED', 'parent directory traversal is denied with PATH_DENIED')
 
     // 3. 绝对外部路径安全判据：绝不能读取到工作树外真实内容（以 PATH_DENIED 或 FILE_NOT_FOUND 失败，内容严格不可达）
-    const absoluteRes = api.js.read(secretOutsideFile)
+    const absoluteRes = api.js.cat(secretOutsideFile)
     assert.equal(absoluteRes.ok, false, 'absolute path outside root must fail')
     assert.ok(
       absoluteRes.code === 'PATH_DENIED' || absoluteRes.code === 'FILE_NOT_FOUND',
@@ -274,17 +279,17 @@ test('WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_
     const api = roleApi('manager', dir)
 
     // 空文件
-    assert.equal(api.js.read('empty.txt').text, '')
-    assert.equal(api.js.read('empty.txt').byteCount, 0)
+    assert.equal(api.js.cat('empty.txt').text, '')
+    assert.equal(api.js.stat('empty.txt').stat.size, 0)
 
     // CRLF 换行
-    assert.equal(api.js.read('crlf.txt').text, 'line1\r\nline2\r\n')
+    assert.equal(api.js.cat('crlf.txt').text, 'line1\r\nline2\r\n')
 
     // 中文字符串 UTF-8
-    assert.equal(api.js.read('chinese.txt').text, '你好，世界！万象树架构。')
+    assert.equal(api.js.cat('chinese.txt').text, '你好，世界！万象树架构。')
 
     // 末行无换行
-    assert.equal(api.js.read('noeol.txt').text, 'first\nsecond')
+    assert.equal(api.js.cat('noeol.txt').text, 'first\nsecond')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -299,7 +304,7 @@ test('WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_se
     const api = roleApi('manager', dir)
 
     // 1. 缺失文件明确返回 FILE_NOT_FOUND
-    const miss = api.js.read('nonexistent.txt')
+    const miss = api.js.cat('nonexistent.txt')
     assert.equal(miss.ok, false)
     assert.equal(miss.code, 'FILE_NOT_FOUND')
 
@@ -330,32 +335,23 @@ test('WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_se
     assert.equal(invalidWhereAll.ok, false)
     assert.equal(invalidWhereAll.code, 'INVALID_ARGUMENT', 'null content must fail with INVALID_ARGUMENT')
 
-    // 5. JsProgram.file 锚点搜索错误边界：空字符串 pattern 明确返回 EMPTY_ANCHOR_CONTENT，非法正则返回 INVALID_ANCHOR_PATTERN
-    const emptyAnchorOutcome = await run(
-      dir,
-      'manager',
-      'en',
-      `class Js extends JsProgram { async run() { const f = await this.file('sample.txt', [['a', 'b', '']]); return f.text('^', '$'); } }`,
-      2000,
-      Date.now() + 60_000,
-      1 << 20,
-      null,
-    )
-    assert.equal(caseName(emptyAnchorOutcome), 'Failed')
-    assert.equal(failureCode(emptyAnchorOutcome), 'EMPTY_ANCHOR_CONTENT')
+    const invalidWhere = api.js.where('sample', null)
+    assert.equal(invalidWhere.ok, false)
+    assert.equal(invalidWhere.code, 'INVALID_ARGUMENT', 'null needle must fail with INVALID_ARGUMENT')
 
-    const invalidAnchorOutcome = await run(
+    // 5. 退役的 JsProgram.file 在运行期拒绝调用（不再暴露锚点搜索成员）
+    const retiredFileOutcome = await run(
       dir,
       'manager',
       'en',
-      `class Js extends JsProgram { async run() { const f = await this.file('sample.txt', [['a', 'b', 123]]); return f.text('^', '$'); } }`,
+      `class Js extends JsProgram { async run() { return await this.file('sample.txt'); } }`,
       2000,
       Date.now() + 60_000,
       1 << 20,
       null,
     )
-    assert.equal(caseName(invalidAnchorOutcome), 'Failed')
-    assert.equal(failureCode(invalidAnchorOutcome), 'INVALID_ANCHOR_PATTERN')
+    assert.equal(caseName(retiredFileOutcome), 'Failed')
+    assert.equal(failureCode(retiredFileOutcome), 'PROGRAM_FAILED')
 
     // 6. 结果超限返回 RESULT_TOO_LARGE
     const bigProgram = `class Js extends JsProgram {
@@ -383,10 +379,10 @@ test('WHAT[capability-enforcement-025] J11_observation_records_only_successful_d
     let recordedEffects = []
     const program = `class Js extends JsProgram {
       async run() {
-        const a = await this.file('read1.txt');
-        const b = await this.file('read1.txt'); // 重复读取同一文件
-        const c = await this.file('read2.txt');
-        try { await this.file('missing.txt'); } catch (e) {} // 失败读取
+        const a = await this.cat('read1.txt');
+        const b = await this.cat('read1.txt'); // 重复读取同一文件
+        const c = await this.cat('read2.txt');
+        try { await this.cat('missing.txt'); } catch (e) {} // 失败读取
         return { done: true };
       }
     }`

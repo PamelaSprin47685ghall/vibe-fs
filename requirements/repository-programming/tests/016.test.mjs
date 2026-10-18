@@ -42,9 +42,10 @@ test('WHAT[repository-programming-016] JS073_spec_executes_program_and_renders_r
 
     const program = `class Js extends JsProgram {
   async run() {
-    const view = await this.file('a.txt', [['begin', 'end', 'hello']]);
-    this.rewrite('a.txt', view.text('^', 'begin') + 'goodbye' + view.text('end', '$'));
-    return { before: view.text() };
+    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'hello');
+    this.write('a.txt', text.slice(0, begin) + 'goodbye' + text.slice(end));
+    return { before: text };
   }
 }`
     const result = await execute(registered, { program }, { sessionID: 'ses-test', agent: 'coder' })
@@ -99,8 +100,9 @@ test('WHAT[repository-programming-016] JS016_result_renders_stable_toml_shapes',
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const file = await this.file('a.txt', [['begin', 'end', 'hello']]);
-    this.rewrite('a.txt', file.text('^', 'begin') + 'goodbye' + file.text('end', '$'));
+    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'hello');
+    this.write('a.txt', text.slice(0, begin) + 'goodbye' + text.slice(end));
     return { before: 'x' };
   }
 }`

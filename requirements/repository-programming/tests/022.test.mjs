@@ -30,30 +30,29 @@ const ToolPermission = toolPermissionByName
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 
 const fsPermissionsOf = (role) =>
-  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove'].includes(n))
+  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Glob', 'Move', 'Remove'].includes(n))
 
 const MEMBERS_BY_PERMISSION = {
-  Read: ['file'],
-  Glob: ['glob'],
-  Grep: ['grep'],
-  Edit: ['edit', 'rewrite'],
-  Write: ['write'],
+  Read: ['cat', 'stat', 'whereAll', 'where'],
+  Glob: ['ls'],
+  Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
 }
 
 const BINDING_BY_MEMBER = {
-  file: 'js.read',
-  glob: 'js.glob',
-  grep: 'js.grep',
-  edit: 'js.edit',
-  rewrite: 'js.edit',
   write: 'js.write',
   rm: 'js.rm',
   mv: 'js.mv',
+  cat: 'js.cat',
+  ls: 'js.ls',
+  stat: 'js.stat',
+  mkdir: 'js.mkdir',
+  whereAll: 'js.whereAll',
+  where: 'js.where',
 }
 
-const MEMBER_ORDER = ['file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv']
+const MEMBER_ORDER = ['write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where']
 
 const layersOf = (s) =>
   Object.fromEntries(
@@ -75,18 +74,17 @@ test('WHAT[repository-programming-022] JS_description_is_action_first_then_teach
   const lessonText = coder.description.replace(/\s+/g, ' ')
 
   assert.equal(
-    lessonText.startsWith('For ordinary edits, start with edit(path, changes).'),
+    lessonText.startsWith('WARNING: You may be about to turn a bounded filesystem task into a self-inflicted repair job.'),
     true,
-    'the first screen must provide the default action before the cautionary manual',
+    'the first screen must provide the boundary warning and primitive contract',
   )
 
   for (const affordance of [
-    'Decision ladder',
-    'one exact replacement, insertion, deletion, or repeated replacement',
-    'one edit call per path',
-    '{ find, put, all? }',
-    'use file(matches) + text() + rewrite() for structural recomposition',
-    'Near matches are diagnostics, never write authority',
+    'Read with `cat(path)`',
+    'Locate with `where` / `whereAll`',
+    'Recompose with slices',
+    'Find and replace is a composition, not a primitive',
+    'Batch replacement is one whereAll plus a reverse loop. Append is cat + write.',
   ]) {
     assert.equal(lessonText.includes(affordance), true, `action-first affordance missing: ${affordance}`)
   }
@@ -102,19 +100,16 @@ test('WHAT[repository-programming-022] JS_description_is_action_first_then_teach
     'does not get to renegotiate those rules after seeing an inconvenient result',
     'Numbers, required sentinels, and section counts outrank the story',
     'Do not let familiarity impersonate facts',
-    'The lower-level technique carries the burden of proof',
     'facts beat confidence',
     'Do not invent a third category called "probably fine"',
     'I have already paid for this mistake',
     'roughly 8k lines',
     'roughly 31k lines',
-    'grep was finding candidates, not owning structure',
-    'ordered anchors',
+    'Raw search was finding candidates, not owning structure',
     'second and third cleanup programs',
     'cheap invariants',
     'throw before return',
     'zero committed mutations',
-    'If you are about to calculate structural boundaries by hand',
     'STOP SIGNAL',
     'Do not confuse "I can reimplement this" with "I should reimplement this"',
   ]) {
@@ -128,18 +123,17 @@ test('WHAT[repository-programming-022] JS_description_is_action_first_then_teach
   ).description.replace(/\s+/g, ' ')
 
   assert.equal(
-    zh.startsWith('普通编辑默认从 edit(path, changes) 开始。'),
+    zh.startsWith('警告：你正准备把一个本来有边界保护的文件任务，亲手变成一场返工事故。'),
     true,
-    '中文第一屏必须先给动作，再给风险记忆',
+    '中文第一屏必须先给边界合同与原语选择',
   )
 
   for (const affordance of [
-    '选择阶梯',
-    '一次精确替换、插入、删除或重复替换',
-    '每个路径只调用一次 edit',
-    '{ find, put, all? }',
-    '结构重组才使用 file(matches) + text() + rewrite()',
-    '近似匹配只产生诊断，绝不获得写权限',
+    '用 `cat(path)` 读取',
+    '用 `where` / `whereAll` 定位',
+    '用切片重组',
+    '查找替换是组合，不是原语',
+    '批量替换 = 一次 whereAll 加反向循环。append = cat + write。',
   ]) {
     assert.equal(zh.includes(affordance), true, `中文 action-first affordance 缺失: ${affordance}`)
   }
@@ -154,15 +148,13 @@ test('WHAT[repository-programming-022] JS_description_is_action_first_then_teach
     '先承诺，再动手',
     '就没有资格临时改口',
     '优先于你在坏结果出现后给自己编的解释',
-    '别让熟悉感冒充事实',
-    '举证责任在你',
+    '不要让熟悉冒充事实',
     '事实 > 自信',
     '不要再发明第三类叫「大概没问题」',
-    '这笔学费我已经交过一次',
+    '我为这个错误付过代价',
     '约 8k 行',
     '约 31k 行',
     '给前一个 program 擦屁股',
-    '如果你正准备手算结构边界',
     '停止信号',
     '别把「我也能自己重写一遍」误当成「我应该自己重写一遍」',
   ]) {

@@ -9,6 +9,9 @@ open Wanxiangshu.Foundation
 type JsCapability =
     | Read
     | Write
+    /// Plan-artifact write capability. No fragment projects it — the plan
+    /// tenure surface carries its own file/edit/rewrite API — but the plan
+    /// description gates its artifact-write teaching blocks on it.
     | Edit
     | Glob
     | Move
@@ -31,7 +34,6 @@ module JsCapability =
         match permission with
         | ToolPermission.Read -> Some JsCapability.Read
         | ToolPermission.Write -> Some JsCapability.Write
-        | ToolPermission.Edit -> Some JsCapability.Edit
         | ToolPermission.Glob -> Some JsCapability.Glob
         | ToolPermission.Move -> Some JsCapability.Move
         | ToolPermission.Remove -> Some JsCapability.Remove
@@ -61,67 +63,13 @@ type JsCapabilityFragment =
 /// Fixed registry of all fragments: the only place a js-* member can be born.
 module JsFragmentRegistry =
 
-    let read: JsCapabilityFragment =
-        { Capability = JsCapability.Read
-          MemberName = "file"
-          Signature = "async file(path, matches = [])"
-          Description =
-            "file(path, matches = []) — read a strict-UTF-8 immutable snapshot and "
-            + "optionally resolve ordered begin/end anchors. Returns FileView with text(from, to)."
-          CanonicalExample =
-            "class Js extends JsProgram {\n"
-            + "  async run() {\n"
-            + "    const file = await this.file(\"README.md\");\n"
-            + "    return file.text();\n"
-            + "  }\n"
-            + "}"
-          RuntimeBindingKey = "js.read" }
-
-
-    let edit: JsCapabilityFragment =
-        { Capability = JsCapability.Edit
-          MemberName = "edit"
-          Signature = "edit(path, changes)"
-          Description =
-            "edit(path, changes) — atomically apply one { find, put, all? } change or a non-empty "
-            + "array against one immutable target snapshot. Exact by default; 0, ambiguous, or "
-            + "overlapping matches fail before staging."
-          CanonicalExample =
-            "class Js extends JsProgram {\n"
-            + "  async run() {\n"
-            + "    this.edit(\"src/foo.js\", [\n"
-            + "      { find: \"const oldName = 1;\", put: \"const newName = 1;\" },\n"
-            + "    ]);\n"
-            + "    return { edited: \"src/foo.js\" };\n"
-            + "  }\n"
-            + "}"
-          // edit() is a derived SDK affordance over the same guarded staging
-          // executor as rewrite(); no second Edit permission exists.
-          RuntimeBindingKey = "js.edit" }
-
-    let rewrite: JsCapabilityFragment =
-        { Capability = JsCapability.Edit
-          MemberName = "rewrite"
-          Signature = "rewrite(path, newText)"
-          Description =
-            "rewrite(path, newText) — stage replacement of an existing UTF-8 file. "
-            + "Missing target is FILE_NOT_FOUND. Commits with the program (all-or-nothing)."
-          CanonicalExample =
-            "class Js extends JsProgram {\n"
-            + "  async run() {\n"
-            + "    this.rewrite(\"src/foo.js\", \"export const value = 2;\\n\");\n"
-            + "    return { rewritten: \"src/foo.js\" };\n"
-            + "  }\n"
-            + "}"
-          RuntimeBindingKey = "js.edit" }
-
     let write: JsCapabilityFragment =
         { Capability = JsCapability.Write
           MemberName = "write"
-          Signature = "write(path, newText)"
+          Signature = "write(path, content)"
           Description =
-            "write(path, newText) — stage creation of a missing UTF-8 file. "
-            + "Existing target is FILE_ALREADY_EXISTS. Commits with the program."
+            "write(path, content) — overwrite an existing UTF-8 file or create a missing one; "
+            + "one atomic as-is write, with the write-before FILE_CHANGED check against read snapshots."
           CanonicalExample =
             "class Js extends JsProgram {\n"
             + "  async run() {\n"
@@ -403,10 +351,7 @@ module JsFragmentRegistry =
     /// Canonical member order inside capability families. Filtering this list
     /// is the deterministic projection; never rebuild member order elsewhere.
     let all: JsCapabilityFragment list =
-        [ read
-          edit
-          rewrite
-          write
+        [ write
           rm
           mv
           cat

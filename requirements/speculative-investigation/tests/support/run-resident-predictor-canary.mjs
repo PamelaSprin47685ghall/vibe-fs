@@ -37,7 +37,7 @@ const provider = http.createServer(async (req, res) => {
     // Decision 1 (replicaStep 1..3): 2 rounds of todowrite-for-predictor tool calls, then completed on round 3
     if (replicaStep === 1 || replicaStep === 2) {
       fs.writeFileSync(path.join(workspace, 'fixture.txt'), `readonly-evidence-${replicaStep}`)
-      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
+      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { return await this.cat('fixture.txt'); } }" }), 10))
       return
     }
     if (replicaStep === 3) {
@@ -54,13 +54,13 @@ const provider = http.createServer(async (req, res) => {
     // Round 2 (replicaStep 5): model recovers and calls valid todowrite-for-predictor tool (request ordinal 2 from host perspective)
     if (replicaStep === 5) {
       fs.writeFileSync(path.join(workspace, 'fixture.txt'), `readonly-evidence-${replicaStep}`)
-      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
+      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { return await this.cat('fixture.txt'); } }" }), 10))
       return
     }
     // Decision 3 (post restart, replicaStep 6..7):
     if (replicaStep === 6) {
       fs.writeFileSync(path.join(workspace, 'fixture.txt'), `readonly-evidence-${replicaStep}`)
-      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
+      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { return await this.cat('fixture.txt'); } }" }), 10))
       return
     }
     if (replicaStep === 7) {
@@ -70,7 +70,7 @@ const provider = http.createServer(async (req, res) => {
     // Decision 4 (sub-owner, replicaStep 8..9):
     if (replicaStep === 8) {
       fs.writeFileSync(path.join(workspace, 'fixture.txt'), `readonly-evidence-${replicaStep}`)
-      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }" }), 10))
+      sendSSE(res, buildToolCallChunks(`replica-${replicaStep}`, 'todowrite-for-predictor', JSON.stringify({ program: "class Js extends JsProgram { async run() { return await this.cat('fixture.txt'); } }" }), 10))
       return
     }
     if (replicaStep === 9) {
@@ -83,7 +83,7 @@ const provider = http.createServer(async (req, res) => {
     subOwnerStep += 1
     if (subOwnerStep === 1) {
       sendSSE(res, buildToolCallChunks('owner-sub', 'todowrite-for-engineer', JSON.stringify({
-        program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }",
+        program: "class Js extends JsProgram { async run() { return await this.cat('fixture.txt'); } }",
         estimated_readonly_rounds: 2,
         self_note: 'Inspect the fixture and stop once its contents are verified.',
       }), 10))
@@ -95,13 +95,13 @@ const provider = http.createServer(async (req, res) => {
   if (names.includes('todowrite-for-manager')) {
     ownerStep += 1
     if (ownerStep === 1) {
-      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'todowrite-for-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 3, self_note: 'Inspect the fixture in two tool rounds plus terminal.' }), 10))
+      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'todowrite-for-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { return await this.cat('fixture.txt'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 3, self_note: 'Inspect the fixture in two tool rounds plus terminal.' }), 10))
     } else if (ownerStep === 2) {
-      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'todowrite-for-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 2, self_note: 'Inspect the fixture with one malformed and one valid tool.' }), 10))
+      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'todowrite-for-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { return await this.cat('fixture.txt'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 2, self_note: 'Inspect the fixture with one malformed and one valid tool.' }), 10))
     } else if (ownerStep === 3) {
       sendSSE(res, buildTextChunks('owner-done', 'Smoke complete.', 20))
     } else if (ownerStep === 4) {
-      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'todowrite-for-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { const f = await this.file('fixture.txt'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 2, self_note: 'Inspect the fixture third time post restart.' }), 10))
+      sendSSE(res, buildToolCallChunks(`owner-${ownerStep}`, 'todowrite-for-manager', JSON.stringify({ program: "class Js extends JsProgram { async run() { return await this.cat('fixture.txt'); } }", contract: 'do-not-use-except-for-review', estimated_readonly_rounds: 2, self_note: 'Inspect the fixture third time post restart.' }), 10))
     } else {
       sendSSE(res, buildTextChunks('owner-done-post-restart', 'Restart smoke complete.', 20))
     }

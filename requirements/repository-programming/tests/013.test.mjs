@@ -217,8 +217,8 @@ for (const fate of [
         }, (append) => observed.push(append))
         const { outcome } = await runWorkflow(dir, `class Js extends JsProgram {
   async run() {
-    this.rewrite('a.txt', 'new');
-    await this.write('created.txt', 'created');
+    this.write('a.txt', 'new');
+    this.write('created.txt', 'created');
     return { receipt: 'must-not-report-success' };
   }
 }`, { store })
@@ -280,9 +280,10 @@ test('WHAT[repository-programming-013] JS085_workflow_reads_and_commits_rewrite'
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const view = await this.file('a.txt', [['begin', 'end', 'hello']]);
-    this.rewrite('a.txt', view.text('^', 'begin') + 'goodbye' + view.text('end', '$'));
-    return { before: view.text() };
+    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'hello');
+    this.write('a.txt', text.slice(0, begin) + 'goodbye' + text.slice(end));
+    return { before: text };
   }
 }`
     const { outcome } = await runWorkflow(dir, program)

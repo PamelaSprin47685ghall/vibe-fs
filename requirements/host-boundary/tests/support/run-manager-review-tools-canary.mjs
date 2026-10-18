@@ -231,7 +231,7 @@ const provider = await startHttpServer(async (request, response) => {
       const call = {
         name: 'todowrite-for-manager',
         argsStr: JSON.stringify({
-          program: "class Js extends JsProgram { async run() { const f = await this.file('fixture-sample.txt'); return f.text('^', '$'); } }",
+          program: "class Js extends JsProgram { async run() { return await this.cat('fixture-sample.txt'); } }",
           contract: CONTRACT_TOKEN,
         }),
       };
@@ -259,7 +259,7 @@ const provider = await startHttpServer(async (request, response) => {
       const call = {
         name: 'todowrite-for-manager',
         argsStr: JSON.stringify({
-          program: "class Js extends JsProgram { async run() { const f = await this.file('nonexistent-missing-file.txt'); return f.text('^', '$'); } }",
+          program: "class Js extends JsProgram { async run() { return await this.cat('nonexistent-missing-file.txt'); } }",
           contract: CONTRACT_TOKEN,
         }),
       };

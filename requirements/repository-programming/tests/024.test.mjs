@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   caseName,
+  execute as executeWorkflow,
   failureCode,
   failureReason,
+  parkedPayload,
   rewritten,
   run,
   runObserved,
@@ -36,24 +38,23 @@ ${body}
 const execute = (dir, body, language = 'en') =>
   run(dir, 'Coder', language, program(body), 2000, Date.now() + 60_000, 1 << 20, null)
 
+const executeWithPark = (dir, body, sessionId = 'sess-024', language = 'en') =>
+  executeWorkflow(dir, 'Coder', language, sessionId, { program: program(body) }, 2000, Date.now() + 60_000, 1 << 20, null)
+
 test('WHAT[repository-programming-024] JS_EDIT_near_match_is_copy_ready_diagnostic_but_never_write_authority', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.js'), 'const timeout = 1000;\nstart(timeout);\n', 'utf8')
-    const outcome = await execute(dir, `    this.edit('a.js', {
-      find: 'const timout = 1000;',
-      put: 'const timeout = 5000;',
-    });`)
+    const outcome = await executeWithPark(dir, `    const text = await this.cat('a.js');
+    const [begin, end] = await this.where(text, 'const timout = 1000;');
+    this.write('a.js', text.slice(0, begin) + 'const timeout = 5000;' + text.slice(end));`, 'sess-024-near')
 
-    assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'EDIT_NOT_FOUND')
+    assert.equal(caseName(outcome), 'Parked')
     assert.equal(readFileSync(join(dir, 'a.js'), 'utf8'), 'const timeout = 1000;\nstart(timeout);\n')
-    const reason = String(failureReason(outcome))
-    assert.match(reason, /a\.js/)
-    assert.match(reason, /Current file near the closest candidate/)
-    assert.match(reason, /Copy-ready corrected change/)
-    assert.match(reason, /const timeout = 1000;/)
-    assert.match(reason, /No changes from this edit call were staged\./)
+    const payload = parkedPayload(outcome)
+    assert.equal(payload.needle, 'const timout = 1000;')
+    assert.deepEqual(payload.candidates, [])
+    assert.equal(payload.nearest.text, 'const timeout = 1000;')
   } finally {
     cleanup()
   }
@@ -63,20 +64,17 @@ test('WHAT[repository-programming-024] JS_EDIT_ambiguous_match_returns_candidate
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'section A\nvalue = 1\nsection B\nvalue = 1\n', 'utf8')
-    const outcome = await execute(dir, `    this.edit('a.txt', {
-      find: 'value = 1',
-      put: 'value = 2',
-    });`)
+    const outcome = await executeWithPark(dir, `    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'value = 1');
+    this.write('a.txt', text.slice(0, begin) + 'value = 2' + text.slice(end));`, 'sess-024-ambig')
 
-    assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'EDIT_AMBIGUOUS')
+    assert.equal(caseName(outcome), 'Parked')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'section A\nvalue = 1\nsection B\nvalue = 1\n')
-    const reason = String(failureReason(outcome))
-    assert.match(reason, /lines? 2/i)
-    assert.match(reason, /lines? 4/i)
-    assert.match(reason, /unique surrounding context/i)
-    assert.match(reason, /all: true/)
-    assert.match(reason, /No changes from this edit call were staged\./)
+    const payload = parkedPayload(outcome)
+    assert.equal(payload.needle, 'value = 1')
+    assert.equal(payload.candidates.length, 2)
+    assert.deepEqual(payload.candidates[0].span, [10, 19])
+    assert.deepEqual(payload.candidates[1].span, [30, 39])
   } finally {
     cleanup()
   }
@@ -86,20 +84,17 @@ test('WHAT[repository-programming-024] JS_EDIT_overlap_and_invalid_shape_have_st
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha beta gamma\n', 'utf8')
-    const overlap = await execute(dir, `    this.edit('a.txt', [
-      { find: 'alpha beta', put: 'first' },
-      { find: 'beta gamma', put: 'second' },
-    ]);`)
-    assert.equal(caseName(overlap), 'Failed')
-    assert.equal(failureCode(overlap), 'EDIT_OVERLAP')
+    const text = readFileSync(join(dir, 'a.txt'), 'utf8')
+    const empty = await execute(dir, `    const spans = this.whereAll(${JSON.stringify(text)}, '   ');
+    if (spans.length !== 0) throw new Error('whitespace needle must return empty spans');`)
+    assert.equal(caseName(empty), 'Succeeded')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'alpha beta gamma\n')
-    assert.match(String(failureReason(overlap)), /merge them into one/i)
 
-    const invalid = await execute(dir, `    this.edit('a.txt', { find: '', put: 'x' });`)
-    assert.equal(caseName(invalid), 'Failed')
-    assert.equal(failureCode(invalid), 'INVALID_EDIT')
+    const invalid = await executeWithPark(dir, `    const src = await this.cat('a.txt');
+    await this.where(src, '');`, 'sess-024-empty')
+    assert.equal(caseName(invalid), 'Parked')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'alpha beta gamma\n')
-    assert.match(String(failureReason(invalid)), /\{ find, put, all\? \}/)
+    assert.deepEqual(parkedPayload(invalid).candidates, [])
   } finally {
     cleanup()
   }
@@ -110,45 +105,29 @@ test('WHAT[repository-programming-024] JS_EDIT_rejects_invalid_path_unknown_fiel
   try {
     writeFileSync(join(dir, 'a.txt'), 'alpha\n', 'utf8')
 
-    const invalidPath = await execute(dir, `    this.edit('', { find: 'alpha', put: 'beta' });`)
+    const invalidPath = await execute(dir, `    await this.cat('../outside.txt');`)
     assert.equal(caseName(invalidPath), 'Failed')
-    assert.equal(failureCode(invalidPath), 'INVALID_EDIT', 'path validation precedes Host reading')
+    assert.equal(failureCode(invalidPath), 'PATH_DENIED', 'path validation precedes Host reading')
 
-    const typo = await execute(dir, `    this.edit('a.txt', {
-      find: 'alpha',
-      put: 'beta',
-      al: true,
-    });`)
-    assert.equal(caseName(typo), 'Failed')
-    assert.equal(failureCode(typo), 'INVALID_EDIT')
-    assert.match(String(failureReason(typo)), /unknown field.*al/i)
+    const retiredEdit = await execute(dir, `    if (typeof this.edit !== 'undefined' || typeof this.rewrite !== 'undefined' || typeof this.file !== 'undefined') {
+      throw new Error('legacy member still present');
+    }`)
+    assert.equal(caseName(retiredEdit), 'Succeeded')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'alpha\n')
 
-    const exotic = await execute(dir, `    const change = Object.assign(new Date(0), {
-      find: 'alpha',
-      put: 'beta',
-    });
-    this.edit('a.txt', change);`)
-    assert.equal(caseName(exotic), 'Failed')
-    assert.equal(failureCode(exotic), 'INVALID_EDIT')
-    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'alpha\n')
-
-    const editOnly = generate('Coder', ['Edit'], 'en')
+    assert.equal(generate('Coder', ['Edit'], 'en'), null)
+    const writeOnly = generate('Coder', ['Write'], 'en')
     const handle = createRuntimeApi(dir)
     const malformedMissingPath = await runRuntime(
-      editOnly.baseClassSource,
-      program(`    this.edit('missing.txt', {
-      find: 'alpha',
-      put: 'beta',
-      al: true,
-    });`),
+      writeOnly.baseClassSource,
+      program(`    this.write('../outside.txt', 'beta');`),
       runtimeApi(handle),
       2000,
       Date.now() + 60_000,
       1 << 20,
     )
     assert.equal(malformedMissingPath.ok, false)
-    assert.equal(malformedMissingPath.code, 'INVALID_EDIT')
+    assert.equal(malformedMissingPath.code, 'PATH_DENIED')
     assert.deepEqual(runtimeReadPaths(handle), [], 'pure declaration failure precedes target read')
     assert.equal(stagedCount(handle), 0)
   } finally {
@@ -160,30 +139,18 @@ test('WHAT[repository-programming-024] JS_EDIT_diagnostics_are_bounded_and_echo_
   const { dir, cleanup } = sandbox()
   try {
     const longLine = `${'x'.repeat(6000)} const timeout = 1000; ${'y'.repeat(6000)}`
-    writeFileSync(join(dir, 'a.js'), `${longLine}\n`, 'utf8')
-    const hugePut = 'z'.repeat(8000)
-    const outcome = await execute(dir, `    this.edit('a.js', {
-      find: 'const timout = 1000;',
-      put: ${JSON.stringify(hugePut)},
-    });`)
+    writeFileSync(join(dir, 'a.js'), `${longLine}\n${longLine}\n`, 'utf8')
+    const outcome = await executeWithPark(dir, `    const text = await this.cat('a.js');
+    await this.where(text, 'const timeout = 1000;');`, 'sess-024-bounded')
 
-    assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'EDIT_NOT_FOUND')
-    const reason = String(failureReason(outcome))
-    assert.match(reason, /Attempted find:/)
-    assert.match(reason, /const timout = 1000;/)
-    assert.ok(reason.length < 6000, `diagnostic must be bounded, got ${reason.length} chars`)
-    assert.equal(readFileSync(join(dir, 'a.js'), 'utf8'), `${longLine}\n`)
-
-    const unknownFields = await execute(dir, `    const change = {
-      find: 'const timeout = 1000;',
-      put: 'const timeout = 5000;',
-    };
-    for (let i = 0; i < 1000; i += 1) change['unknown_' + i + '_' + 'q'.repeat(100)] = true;
-    this.edit('a.js', change);`)
-    assert.equal(caseName(unknownFields), 'Failed')
-    assert.equal(failureCode(unknownFields), 'INVALID_EDIT')
-    assert.ok(String(failureReason(unknownFields)).length < 1500)
+    assert.equal(caseName(outcome), 'Parked')
+    const payload = parkedPayload(outcome)
+    assert.equal(payload.needle, 'const timeout = 1000;')
+    assert.equal(payload.candidates.length, 2)
+    for (const candidate of payload.candidates) {
+      assert.ok(candidate.context.length <= 200, `candidate context must be bounded, got ${candidate.context.length} chars`)
+    }
+    assert.equal(readFileSync(join(dir, 'a.js'), 'utf8'), `${longLine}\n${longLine}\n`)
   } finally {
     cleanup()
   }
@@ -193,16 +160,11 @@ test('WHAT[repository-programming-024] JS_EDIT_copy_ready_fix_uses_the_exact_can
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.js'), 'prefix const timeout = 1000; suffix\n', 'utf8')
-    const outcome = await execute(dir, `    this.edit('a.js', {
-      find: 'const timout = 1000;',
-      put: 'const timeout = 5000;',
-    });`)
+    const outcome = await execute(dir, `    const text = await this.cat('a.js');
+    const [begin, end] = await this.where(text, 'const timeout = 1000;');
+    return { subspan: text.slice(begin, end) };`)
 
-    assert.equal(caseName(outcome), 'Failed')
-    assert.equal(failureCode(outcome), 'EDIT_NOT_FOUND')
-    const reason = String(failureReason(outcome))
-    assert.match(reason, /"find": "const timeout = 1000;"/)
-    assert.doesNotMatch(reason, /"find": "prefix const timeout/)
+    assert.equal(caseName(outcome), 'Succeeded')
     assert.equal(readFileSync(join(dir, 'a.js'), 'utf8'), 'prefix const timeout = 1000; suffix\n')
   } finally {
     cleanup()
@@ -213,26 +175,13 @@ test('WHAT[repository-programming-024] JS_EDIT_failure_control_language_is_local
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'value = 1\nvalue = 1\n', 'utf8')
-    const ambiguous = await execute(dir, `    this.edit('a.txt', {
-      find: 'value = 1',
-      put: 'value = 2',
-    });`, 'zh-CN')
+    const ambiguous = await executeWithPark(dir, `    const text = await this.cat('a.txt');
+    await this.where(text, 'value = 1');`, 'sess-024-zh', 'zh-CN')
 
-    assert.equal(caseName(ambiguous), 'Failed')
-    assert.equal(failureCode(ambiguous), 'EDIT_AMBIGUOUS')
-    const ambiguousReason = String(failureReason(ambiguous))
-    assert.match(ambiguousReason, /候选 1[:：] 行 1/)
-    assert.match(ambiguousReason, /本次 edit 调用没有暂存任何修改/)
-    assert.doesNotMatch(ambiguousReason, /Candidate|No changes from/)
-
-    const invalid = await execute(dir, `    this.edit('a.txt', {
-      find: 'value = 1',
-      put: 'value = 2',
-      al: true,
-    });`, 'zh-CN')
-    assert.equal(caseName(invalid), 'Failed')
-    assert.equal(failureCode(invalid), 'INVALID_EDIT')
-    assert.match(String(failureReason(invalid)), /未知字段： al/)
+    assert.equal(caseName(ambiguous), 'Parked')
+    const payload = parkedPayload(ambiguous)
+    assert.equal(payload.needle, 'value = 1')
+    assert.equal(payload.candidates.length, 2)
   } finally {
     cleanup()
   }

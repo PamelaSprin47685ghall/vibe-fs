@@ -31,7 +31,9 @@ test('WHAT[repository-programming-014] JS_EDIT_target_read_is_observed_and_exter
       dir,
       'Coder',
       'en',
-      program(`    this.edit('a.txt', { find: 'alpha', put: 'beta' });`),
+      program(`    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'alpha');
+    this.write('a.txt', text.slice(0, begin) + 'beta' + text.slice(end));`),
       2000,
       Date.now() + 60_000,
       1 << 20,
@@ -165,8 +167,8 @@ test('WHAT[repository-programming-014] JS014_as_is_external_change_after_write_d
     writeFileSync(join(dir, 'dependency.txt'), 'snapshot', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const dependency = await this.file('dependency.txt');
-    this.write('output.txt', dependency.text());
+    const dependency = await this.cat('dependency.txt');
+    this.write('output.txt', dependency);
     return { ok: true };
   }
 }`

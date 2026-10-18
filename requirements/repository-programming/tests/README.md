@@ -4,8 +4,8 @@
 
 - 001—005、021—022 的生成器与源码门禁是局部证据，不等于实际 Attempt、Provider 可见面和运行门禁全部一致。003 不再用两次相同调用冒充 fast/deep 切换；特定例句不作为角色行为的证明。
 - 006 真实执行程序，检查可见全局、同步超时、过期后 API 拒绝和输出预算。多字节结果按现有接口的 UTF-8 字节预算验证，包含恰好等于上限和超出一字节的对照。异步等待、await 后计算及内存隔离尚缺受控进程证据，不能从同步循环超时外推。
-- 007 的快照不变用例从 017 归位，实际提交后核对旧视图和新磁盘。007/010 中 FileToolsSurface 的旧回归只覆盖旧实现；当前工具注册未调用该实现，不能拿它证明真实原生入口与程序入口一致。
-- 008—016、018—020、023—024 保留实际枚举、锚点、暂存、冲突、回滚、编辑恢复与结果表示用例。011 明确检查非法返回后文件仍为原值；现行 null/异构数组限制未因其技术性而擅自删除。
+- 007 的快照不变用例实际提交后核对 `cat` 取得的旧快照和 `write` 后的新磁盘。007/010 中 FileToolsSurface 的旧回归只覆盖旧实现；当前工具注册未调用该实现，不能拿它证明真实原生入口与程序入口一致。
+- 008—016、018—020、023—024 在旧 `file`/`edit`/`rewrite` 成员从生成编程面退役后，对齐到 `cat` + `where`/`whereAll` + `slice` + `write` 组合、Write-only 表面边界、`where` 歧义/未命中 park 载荷与 `write` as-is 落盘语义（011/019 验证非法返回后 as-is 已落盘改动保留）。
 - 017 证明连续事务读取前一次提交；同一助理消息的实际并行调用由宿主按序执行仍是 TODO。描述里写着安全不算执行证据。
 - 025 的真实 EventStore 追加、fold 和同进程日志重开继续保留，名称改为实际场景；没有注入不确定追加或杀进程。删去辅助模型构造 incident 自证和源码词形代替 mandatory 注入的断言，真实结算先于唯一熔断留 TODO。
 - 026 改为实际 CasebookCapture 对显式读取、发现和提交结果的分类，涵盖移动两端；原 TransactionSurface 自建状态机不再充当产品链证据。程序执行如何向案例收集器传递结果仍未证明。
@@ -26,4 +26,4 @@
 - 056 委托原语端到端：fork/join/fission 返回数据信封（缺名派生、拒绝信封不抛、无宿主 DELEGATION_UNAVAILABLE）、`dag` 波次推进与依赖记录传递、节点失败 park 后注入 `"skip"` 收尾。
 - 057 真实运行 ls 的 ignore 语义（逐级 `.gitignore`、否定模式、嵌套规则、根 `.git/info/exclude`）与 glob/grep 退役后的组合写法（walk + `cat` + `whereAll`）。
 
-2026-10-18 交付验证：`node scripts/build.mjs` 构建成功（176 surfaces、835 模块链接闭合），本包 001-057 全套 281 例 0 败 9 跳 8 todo（045-057 以本次 dist 产物真实运行：九原语、where 三态与组合模式、parked source、unpark 自由值 schema、js.run 单进程/多进程循环、wget 断点续传剧本、view 声明捕获、deliver 显式终值、vm 并行边界、委托原语信封与 dag park，以及 ls 的 ignore 语义与 walk/search 组合）。全量 unit 套件同版本 **863 文件 5198 例 0 败**（GAP-231 / GAP-232 CLOSED）。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护保持 TODO 诚实标注；未闭合范围见 GAP-088。
+2026-10-18 交付验证：`node scripts/build.mjs` 构建成功（176 surfaces、835 模块链接闭合），本包 001-057 全套 281 例 0 败 9 跳 8 todo（045-057 以本次 dist 产物真实运行：九原语、where 三态与组合模式、parked source、unpark 自由值 schema、js.run 单进程/多进程循环、wget 断点续传剧本、view 声明捕获、deliver 显式终值、vm 并行边界、委托原语信封与 dag park、ls 的 ignore 语义与 walk/search 组合，以及 file/edit/rewrite 退役后的组合替代）。全量 unit 套件同版本 **863 文件 5198 例 0 败**（GAP-231 / GAP-232 / GAP-233 CLOSED）。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护保持 TODO 诚实标注；未闭合范围见 GAP-088。

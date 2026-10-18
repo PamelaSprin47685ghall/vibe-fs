@@ -210,9 +210,9 @@ test('WHAT[repository-programming-040] rm accepts a target that was read via fil
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'guarded.txt'), 'snapshot', 'utf8')
-    const body = `    const view = await this.file('guarded.txt');
+    const body = `    const seen = await this.cat('guarded.txt');
     this.rm('guarded.txt');
-    return { seen: view.text() };`
+    return { seen };`
     const outcome = await execute(dir, body)
     assert.equal(caseName(outcome), 'Succeeded')
     assert.equal(existsSync(join(dir, 'guarded.txt')), false, 'rm lands as-is when the snapshot is fresh')

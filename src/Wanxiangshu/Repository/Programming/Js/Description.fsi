@@ -262,7 +262,7 @@ module JsCanonicalDescription =
           Park: string
           ParkedPayload: string }
 
-    val fileAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
+
     val planFileAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
     val planEditAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
     val planRewriteAlgorithm: prose: Prose -> raiseFailure: string -> string

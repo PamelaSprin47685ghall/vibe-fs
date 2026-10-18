@@ -120,7 +120,7 @@ test('WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retain
 
     // 评审未被接纳前，todowrite-for-manager 专用只读工具仍准入，不得误封
     const beforeOutput = {
-      args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
+      args: { program: "class Js extends JsProgram { async run() { return await this.cat('src/Model.fs'); } }", contract: 'do-not-use-except-for-review' },
     }
     const originalArgs = beforeOutput.args
     const expectedArgs = { ...originalArgs }
@@ -229,7 +229,7 @@ test('WHAT[capability-enforcement-025] P11_plugin_reopen_evaluates_durable_incum
 
     // 重启后验证已接纳评审的 session：todowrite-for-manager 专用只读工具仍严格拒绝，不重置评审
     const acceptedBeforeOutput = {
-      args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
+      args: { program: "class Js extends JsProgram { async run() { return await this.cat('src/Model.fs'); } }", contract: 'do-not-use-except-for-review' },
     }
     await assert.rejects(
       async () => {
@@ -244,7 +244,7 @@ test('WHAT[capability-enforcement-025] P11_plugin_reopen_evaluates_durable_incum
 
     // 重启后未接纳评审的 session 仍准入，after 恢复原始参数。
     const unacceptedBeforeOutput = {
-      args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
+      args: { program: "class Js extends JsProgram { async run() { return await this.cat('src/Model.fs'); } }", contract: 'do-not-use-except-for-review' },
     }
     const originalArgs = unacceptedBeforeOutput.args
     const expectedArgs = { ...originalArgs }
@@ -295,7 +295,7 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_is_
 
     const beforeOutput = {
       args: {
-        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return f.text('^', '$'); } }",
+        program: "class Js extends JsProgram { async run() { return await this.cat('src/App.fs'); } }",
         contract: 'do-not-use-except-for-review',
       },
     }
@@ -353,7 +353,7 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
     // Call 1 启动并在 Review 接纳前获得最终准入与执行
     const call1Output = {
       args: {
-        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return { text: f.text('^', '$') }; } }",
+        program: "class Js extends JsProgram { async run() { const text = await this.cat('src/App.fs'); return { text }; } }",
         contract: 'do-not-use-except-for-review',
       },
     }
@@ -394,7 +394,7 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
     // 后续新调用（Call 2）发起，在入口即被拒绝
     const call2Output = {
       args: {
-        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return f.text('^', '$'); } }",
+        program: "class Js extends JsProgram { async run() { return await this.cat('src/App.fs'); } }",
         contract: 'do-not-use-except-for-review',
       },
     }
@@ -425,7 +425,7 @@ test('WHAT[capability-enforcement-025] an admitted call reads the file and befor
     mkdirSync(join(directory, 'src'), { recursive: true })
     writeFileSync(join(directory, 'src/App.fs'), 'review evidence', 'utf8')
 
-    const program = "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return { text: f.text('^', '$') }; } }"
+    const program = "class Js extends JsProgram { async run() { const text = await this.cat('src/App.fs'); return { text }; } }"
     const tool = hooks.tool['todowrite-for-manager']
 
     // The counter observes this registered tool body. The lifecycle store

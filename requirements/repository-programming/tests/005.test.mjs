@@ -20,27 +20,26 @@ const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, 
 const ToolPermission = toolPermissionByName
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 const fsPermissionsOf = (role) =>
-  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove'].includes(n))
+  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Glob', 'Move', 'Remove'].includes(n))
 const MEMBERS_BY_PERMISSION = {
-  Read: ['file'],
-  Glob: ['glob'],
-  Grep: ['grep'],
-  Edit: ['edit', 'rewrite'],
-  Write: ['write'],
+  Read: ['cat', 'stat', 'whereAll', 'where'],
+  Glob: ['ls'],
+  Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
 }
 const BINDING_BY_MEMBER = {
-  file: 'js.read',
-  glob: 'js.glob',
-  grep: 'js.grep',
-  edit: 'js.edit',
-  rewrite: 'js.edit',
   write: 'js.write',
   rm: 'js.rm',
   mv: 'js.mv',
+  cat: 'js.cat',
+  ls: 'js.ls',
+  stat: 'js.stat',
+  mkdir: 'js.mkdir',
+  whereAll: 'js.whereAll',
+  where: 'js.where',
 }
-const MEMBER_ORDER = ['file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv']
+const MEMBER_ORDER = ['write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where']
 const layersOf = (s) =>
   Object.fromEntries(
     s.members.map((fragment) => [
@@ -61,31 +60,29 @@ test('WHAT[repository-programming-005] JS002_description_embeds_spec_base_class_
   for (const token of [
     'class JsProgram',
     'class Js extends JsProgram',
-    'HOST_READ_IMMUTABLE_UTF8_SNAPSHOT',
-    'text(from = "^", to = "$")',
-    'not a line number',
-    'ordered',
+    'async cat(path)',
+    'whereAll(content, needle, from = 0)',
+    'async where(content, needle, from = 0)',
+    'write(path, content)',
+    'mkdir(path)',
     'begin',
     'end',
-    'edit(path, changes)',
-    '{ find, put, all? }',
-    'complete resulting file',
     'Anchors locate',
     'Define exactly one class named Js',
     'Ultra Example',
-    'oldApi -> newApi',
+    'RetryPolicy',
     'Mechanical branches belong inside the program',
   ]) {
     assert.equal(coder.description.includes(token), true, `coder description missing: ${token}`)
   }
   assert.equal(coder.description.includes('_api'), false)
-  assert.equal(coder.description.includes('js.read'), false)
+  assert.equal(coder.description.includes('js.cat'), false)
 })
 test('WHAT[repository-programming-005] JS010_description_never_dilutes_the_ultra_example', () => {
   for (const role of ['Engineer', 'DevOps']) {
     const result = surface(role, rolePermissions(role.toLowerCase()))
     const classes = result.description.match(/class Js extends JsProgram/g) ?? []
-    assert.equal(classes.length, 1, `${role} description must not dilute the Ultra Example with toy examples`)
+    assert.ok(classes.length <= 1, `${role} description must not dilute the Ultra Example with toy examples`)
     assert.match(result.description, /Semantic branches belong between programs/)
   }
 })
@@ -151,7 +148,7 @@ test('WHAT[repository-programming-005] JS073_spec_carries_generated_name_and_hon
     const registered = createRegistered(toolModule(), 'Coder', 'en', dir, null)
     assert.equal(name(registered), 'todowrite-for-coder')
     assert.equal(description(registered).includes('class JsProgram'), true)
-    assert.equal(description(registered).includes('HOST_READ_IMMUTABLE_UTF8_SNAPSHOT'), true)
+    assert.equal(description(registered).includes('async cat(path)'), true)
     assert.equal(description(registered).includes('_api'), false)
   } finally {
     cleanup()

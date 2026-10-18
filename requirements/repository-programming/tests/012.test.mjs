@@ -20,10 +20,11 @@ test('WHAT[repository-programming-012] JS008_012_bindings_rewrite_persists_immed
   try {
     writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
     const binding = createApi(dir)
-    const result = apiOf(binding).js.edit('a.txt', 'new text')
+    const result = apiOf(binding).js.write('a.txt', 'new text')
     assert.equal(result.ok, true)
     assert.equal(stagedCount(binding), 1)
-    const disk = apiOf(binding).js.read('a.txt')
+    assert.deepEqual(stagedKinds(binding), ['Rewrite'])
+    const disk = apiOf(binding).js.cat('a.txt')
     assert.equal(disk.text, 'new text')
   } finally {
     cleanup()
@@ -35,7 +36,7 @@ test('WHAT[repository-programming-012] JS009_012_bindings_write_persists_immedia
     const binding = createApi(dir)
     const result = apiOf(binding).js.write('new.txt', 'fresh')
     assert.equal(result.ok, true)
-    const disk = apiOf(binding).js.read('new.txt')
+    const disk = apiOf(binding).js.cat('new.txt')
     assert.equal(disk.ok, true)
     assert.equal(disk.text, 'fresh')
   } finally {
@@ -128,8 +129,9 @@ test('WHAT[repository-programming-012] JS012_workflow_with_store_persists_prepar
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const file = await this.file('a.txt', [['begin', 'end', 'hello']]);
-    this.rewrite('a.txt', file.text('^', 'begin') + 'goodbye' + file.text('end', '$'));
+    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'hello');
+    this.write('a.txt', text.slice(0, begin) + 'goodbye' + text.slice(end));
     return { done: true };
   }
 }`

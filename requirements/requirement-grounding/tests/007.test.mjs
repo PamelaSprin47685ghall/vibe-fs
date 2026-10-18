@@ -470,7 +470,7 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
             if (tool === 'todowrite-for-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')
             await openIncumbency(runtime, sessionID)
             const args = tool === 'read' ? { filePath: sourcePath }
-              : { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
+              : { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
             const input = { tool, sessionID, callID: `call-${sessionID}` }
             await hooks['tool.execute.before'](input, { args })
             const output = tool === 'read' ? readFileSync(sourcePath, 'utf8')
@@ -537,7 +537,7 @@ const exerciseRegisteredComposition = async (providerID) => {
       await openIncumbency(runtime, sessionID)
       const callID = `call-${sessionID}`
       const args = tool === 'todowrite-for-manager'
-        ? { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
+        ? { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
         : tool === 'todowrite-for-engineer'
           ? { program: "class Js extends JsProgram { async run() { await this.write('src/generated.fs', 'PROGRAM-MUTATION'); return 'PROGRAM-WRITTEN'; } }" }
           : tool === 'mv'

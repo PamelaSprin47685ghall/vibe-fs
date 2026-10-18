@@ -8,7 +8,7 @@
 
 每项文件系统 capability 在公开基类、工具描述、canonical examples 与运行时门禁中一致投影；缺失能力在四层均不可用，伪造调用也须拒绝。一项能力可生成固定顺序的同权成员族，不产生第二份授权。
 
-主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`，Exec → `run`，Fork → `fork`/`dag`，Join → `join`，Fission → `fission`。`glob`/`grep` 成员按 [057] 彻底退役；`file`/`edit`/`rewrite` 在本期保留，退役由后续阶段执行。
+主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`，Exec → `run`，Fork → `fork`/`dag`，Join → `join`，Fission → `fission`；canonical 成员序为 `write, rm, mv, cat, ls, stat, mkdir, whereAll, where, run, fork, dag, join, fission`（生命周期成员 `park` 在基类与运行时绑定中携带，不进入 `members` 列表）。`ToolPermission.Edit` 不再投影任何 `JsCapability`；旧成员 `glob`/`grep`（[057]）与 `file`/`edit`/`rewrite` 均已从仓库生成编程面彻底退役（Plan 任期专用工具 `todowrite-for-plan` 仍独立保有其无路径 `file`/`edit`/`rewrite` 接口）。
 
 ## [003] 确定性生成
 
@@ -28,9 +28,9 @@
 
 ## [007] 不可变快照与 Anchor 代数
 
-`file(path, matches)` 返回当前事务的不可变 UTF-8 快照，锚点按声明顺序匹配，`text(from, to)` 截取原文；后续修改不改变已取得视图。非法 UTF-8 拒绝为 `INVALID_UTF8`，不猜测或修复编码。
+`cat(path)` 返回当前事务的不可变 UTF-8 字符串快照并登记写前 `FILE_CHANGED` 校验使用的读快照；后续 `write` 修改不改变已取得的快照字符串。非法 UTF-8 拒绝为 `INVALID_UTF8`，不猜测或修复编码。
 
-`name±N` 的偏移按解码后 JS 字符串的 UTF-16 代码单元计，不按行或 UTF-8 字节计。声明冲突、空模式或按序未命中返回具名 `ANCHOR_NOT_FOUND`。
+在生成编程面中，旧 `file(path, matches)` 与 `FileView.text(from, to)` 已退役，定位与截取改由 `where`/`whereAll` 返回的 UTF-16 代码单元下标 `[begin, end]` 与 `text.slice(begin, end)` 组合完成；底层 `findAnchor`/`requireUnique` 实现单元与 Plan 任期面仍保持有序锚点与 UTF-16 偏移语义。
 
 ## [008] 确定性路径枚举
 
@@ -42,7 +42,7 @@
 
 ## [010] Rewrite、Write 与 Mkdir 的落盘语义
 
-`rewrite` 只替换已有文件，缺失时报 `FILE_NOT_FOUND`；`write` 覆盖已有文件或创建缺失文件，等价于 POSIX 重定向：一次原子写、即写即生效。写入前若目标已通过 `cat` 或 `file` 读取且盘上内容已变，报 `FILE_CHANGED`。`mkdir` 只建一个目录，非递归；已存在报 `DIRECTORY_EXISTS`，父目录缺失报 `PARENT_DIRECTORY_MISSING`。同一程序对同一路径只能声明一次文件修改意图，重复时报 `DUPLICATE_MUTATION_TARGET`。
+生成编程面的 `write(path, content)` 覆盖已有文件或创建缺失文件（合并原 `edit`/`rewrite` 的覆盖职责），等价于 POSIX 重定向：一次原子写、即写即生效；目标已存在时记为 `Rewrite`，缺失时记为 `Create`。写入前若目标已通过 `cat` 读取且盘上内容已变，报 `FILE_CHANGED`。`mkdir` 只建一个目录，非递归；已存在报 `DIRECTORY_EXISTS`，父目录缺失报 `PARENT_DIRECTORY_MISSING`。底层提交计划单元中 `rewrite` 要求目标已存在（缺失报 `FILE_NOT_FOUND`），同一计划对同一路径只能声明一次文件修改意图（重复报 `DUPLICATE_MUTATION_TARGET`）。
 
 ## [011] 可表示的返回值与提交前校验
 
@@ -50,7 +50,7 @@
 
 ## [012] 事务 As-Is 逐笔落盘与单一 EventStore 记账
 
-一次调用只有一个事务。每笔 `edit`/`write` 在调用发生时立即经 MutationFs 原子写盘（单笔文件层原子，跨笔不回滚）；`run()` 成功结束前磁盘已经反映已发生的每笔写入。程序以任何方式终止或挂起（throw、超时、输出超限）时，那一刻之前已落盘的改动保持为事实分界线，之后的未发生。
+一次调用只有一个事务。每笔 `write`（以及 `rm`/`mv`）在调用发生时立即经 MutationFs 原子写盘（单笔文件层原子，跨笔不回滚）；`run()` 成功结束前磁盘已经反映已发生的每笔写入。程序以任何方式终止或挂起（throw、超时、输出超限）时，那一刻之前已落盘的改动保持为事实分界线，之后的未发生。
 
 持久化 Prepare 与 Commit 只进入统一 EventStore，不另建专有文件或存储。记账时机：每笔的 Prepared 在写盘前发起（调用时序、TransactionId 成对，写失败留下无 Committed 配对的 Prepared 作中断证据），Committed 在该笔写盘成功后发起；物理落账由程序终局的结算（settleLedger）await 全部 append 完成，成功路径保证 Prepared/Committed 成对排空。单笔的物理落账发生在该笔写盘之后的同一事件循环回合（微任务），只有进程级死亡才可能丢失末笔审计。
 
@@ -104,29 +104,23 @@ CAS 还原（rollbackPlan：restore 与 removeCreated，逆序）保留为实现
 
 描述先给可执行形态与原语选择，再给显著风险和失败经验：
 
-- 普通替换、插入、删除及全匹配修改默认用 edit，同文件局部修改合并为一个 changes 数组。
-- 有 Read 时，结构切片、重排和计算式变换可用快照、锚点、text 与 rewrite；无 Read 时只教授已有的 rewrite。具备高级原语时，不默认退回手写字符串边界或盲目大替换；grep 只找候选。
-- 示例提供 replace/insert/delete/all 的最小可复制形态，并保留一个展示角色职责与多文件事务的 Ultra Example。
-- 在同一快照上形成完整目标后单次 staging，不留错误给后续程序清理；返回前检查关键不变量与数据规模，异常时抛错取消提交。
+- 用 `cat(path)` 读取不可变快照，用 `where`/`whereAll` 定位精确 span，用 `text.slice` 重组后交由 `write(path, content)` 一次落盘；查找替换、批量替换与追加均由主原语组合表达，不手算裸字符串边界或退回盲目修补。
+- 按当前角色实际投影的 capability 教授可用原语与组合食谱（`recipes`），不教授未投影成员，并保留展示角色职责的 Ultra Example。
+- 在同一快照上从可信切片构造完整目标文本后一次写入，不留残片给后续 cleanup 程序清理；动手前先承诺规模、标题与 section 数等廉价不变量，越界时作为停止信号立即失败。
 
-## [023] Edit capability 的渐进式成员族
+## [023] 精确切片替换与 Write-only 能力边界（原 Edit 成员族退役）
 
-Edit 按固定顺序生成同权的 edit、rewrite；rewrite 保持完整文件替换能力及原事务语义，不新增尺寸限制。
+仓库生成编程面已退役 `edit` 与 `rewrite` 成员，`ToolPermission.Edit` 不再投影 `JsCapability.Edit`；局部替换、插入、删除、全匹配替换与整文件重写统一由 `cat` + `where`/`whereAll` + `slice` + `write(path, content)` 组合完成，每次 `write` 对已有文件产生一笔 `Rewrite` 落盘记录，内容未变时可由程序跳过写入。
 
-`edit(path, changes)` 接受单个 plain object 或非空数组，canonical 字段为 `{ find, put, all? }`：find 是非空字符串或非零宽正则，put 是完整目标文本，all 默认 false。允许无歧义的 oldText/newText、search/replace 别名，但文档只教授 canonical 形态；未知字段或非法参数在读文件前以 `INVALID_EDIT` 拒绝，不污染 ReadSet。
+仅授 `Write` 能力（无 `Read`）的生成面只暴露 `write`/`mkdir`，不泄露 `cat` 或旧 `file`；`write` 内部读取当前文件以构造 `Rewrite` 并参与写前 `FILE_CHANGED` 快照校验，但不产生显式读观察。（注：Plan 任期专用面 `todowrite-for-plan` 仍独立保留无路径 `file`/`edit`/`rewrite` 算法与契约。）
 
-全部 change 在同一原始快照定位：默认恰好一处，all 至少一处并替换全部非重叠命中。全部成功且相互不重叠后才暂存一个 Rewrite；任一失败零暂存。字符串匹配可将一致 CRLF 与调用方 LF 对应，结果保留原换行风格；除此之外只有精确匹配获得写权限。
+## [024] 定位歧义挂起、近邻诊断与路径边界拒绝（原 Edit 恢复协议演进）
 
-成功返回冻结的 `{ path, changed, operations, replacements }`；最终内容不变时 changed 为 false、零暂存。内部读取参与快照冲突检测，提交前外部变化仍报 `FILE_CHANGED`；它不要求公开 Read，也不使 file 出现在 Edit-only 编程面。
+生成编程面的定位未命中与多义匹配不再走 `edit` 内部抛错，而是由 `where(content, needle, from = 0)` 经统一 `park` 通道挂起（零修改落盘）：
 
-## [024] 编辑失败恢复协议与保守近似
-
-edit 的预期失败至少区分 `INVALID_EDIT`、`EDIT_NOT_FOUND`、`EDIT_AMBIGUOUS`、`EDIT_OVERLAP`，不压成 `PROGRAM_FAILED`；均在 staging 前失败。reason 给受控的路径、change 序号、尝试的 find、失败种类与本调用零修改后果。
-
-- 未命中的字符串给有限带行号近似窗口；仅当候选唯一、达到保守置信阈值且完整建议在预算内时，给只修正 find、保留 put 的可复制 change。建议 find 必须是实际精确子串，不用近似整行代替原 span。
-- 多义匹配给有限候选，说明扩充唯一上下文，或仅在全部命中都应修改时用 all。重叠要求合并为声明最终文本的一个 change，不按数组顺序猜优先级。
-- 近似只用于诊断，不自动落盘；所有窗口、字段名、候选数及建议独立于文件/put 大小有界，预算不足省略建议，不制造资源故障。
-- 控制语完整本地化；code、API 字段、路径等协议 token 可不变，其余修复说明不混入另一语言。
+- 未命中时 parked 载荷携带 `needle`、空 `candidates` 与最近邻单行诊断 `nearest: { span, text, distance }`；近似只作诊断，绝不自动获得写权限。
+- 多义匹配时 parked 载荷携带至多 8 项 `candidates: [{ span, context }]`，每项 `context` 窗口独立于文件大小有界截取。
+- 越界路径在触碰磁盘前以稳定码 `PATH_DENIED` 拒绝且零暂存、不污染显式读记录；冻结失败目录仍保留 `INVALID_EDIT`、`EDIT_NOT_FOUND`、`EDIT_AMBIGUOUS`、`EDIT_OVERLAP` 供 Plan 任期面与目录契约使用。
 
 ## [025] 事务致命失败先结算再熔断
 
@@ -136,7 +130,7 @@ edit 的预期失败至少区分 `INVALID_EDIT`、`EDIT_NOT_FOUND`、`EDIT_AMBIG
 
 ## [026] 事务快照与案例实质访问分离
 
-ReadSnapshots 只用于事务隔离与冲突检测，不直接作为案例关联文件。案例只记录显式 read/file 的规范路径及已提交的修改、创建、删除、移动路径；grep 内部扫描不算实质访问。提交前 effectPaths 是意图，未提交、校验失败或回滚均不追加修改访问。
+ReadSnapshots 只用于事务隔离与冲突检测，不直接作为案例关联文件。案例只记录显式读取（`cat`/`read`）的规范路径及已提交的修改、创建、删除、移动路径；内部扫描不算实质访问。提交前 effectPaths 是意图，未提交、校验失败或回滚均不追加修改访问。
 
 ## [027] Engineer 与 DevOps 的统一文件面
 
@@ -150,7 +144,7 @@ Manager 的 `todowrite-for-manager` 只读文件能力为 Read/Glob，并持有�
 
 ## [029] As-Is 逐笔落盘的失败与成功形态
 
-每次 `edit`/`write` 调用即原子落盘，跨笔不回滚。程序后续失败、终止或挂起（throw、超时、输出超限、返回值非法）时，已落盘的改动保持为事实分界线并如实上报：
+每次 `write`（含覆盖既有文件与创建新文件）调用即原子落盘，跨笔不回滚。程序后续失败、终止或挂起（throw、超时、输出超限、返回值非法）时，已落盘的改动保持为事实分界线并如实上报：
 
 - 成功返回 `# ok`，`[fs]` 声明 rewritten/created。
 - 失败返回 `# failed`，根级给 code/reason，并附本次调用已真实落盘的改动清单（`[fs]` 的 rewritten/created）；无已落盘改动时失败不附 fs 节。
@@ -194,7 +188,7 @@ parked 结果渲染为顶级 parked 载荷文档：handle 字段、source 字段
 
 ## [038] park 的编程面投影
 
-park 是生命周期能力：任何 js-* 生成面无条件携带。生成基类含 `async park(payload)`；只读面（如 Manager）同样携带。描述与示例教授 park/unpark/abandon 三态契约。park 不是文件系统权限投影，不进入 members 列表，保持既有角色的成员序列字节同一（file、glob、grep、edit、rewrite、write、rm、mv）。
+park 是生命周期能力：任何 js-* 生成面无条件携带。生成基类含 `async park(payload)`；只读面（如 Manager）同样携带。描述与示例教授 park/unpark/abandon 三态契约。park 不是文件系统权限投影，不进入 members 列表，保持文件系统原语成员序列为 `write, rm, mv, cat, ls, stat, mkdir, whereAll, where`。
 
 ## [039] 现场表归属与进程内存活
 
@@ -204,11 +198,11 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 ## [040] rm/mv：Move/Remove 编程面与 as-is 落盘
 
-`rm(path)` 与 `mv(from, to)` 由 Remove/Move capability 投影（`JsCapability.ofToolPermission` 是唯一映射），与 edit/write 同属 as-is 逐笔落盘路径。四层同构：生成基类含 `rm`/`mv` 方法、工具描述与 canonical example 含对应成员、运行时门禁按 capability 挂载 rm/mv 执行器。Manager 的 `todowrite-for-manager` 仍只读，不含 Move/Remove。
+`rm(path)` 与 `mv(from, to)` 由 Remove/Move capability 投影（`JsCapability.ofToolPermission` 是唯一映射），与 `write` 同属 as-is 逐笔落盘路径。四层同构：生成基类含 `rm`/`mv` 方法、工具描述与 canonical example 含对应成员、运行时门禁按 capability 挂载 rm/mv 执行器。Manager 的 `todowrite-for-manager` 仍只读，不含 Move/Remove。
 
 - `rm` 删除文件或空目录；非空目录报 `DIRECTORY_NOT_EMPTY`，缺失目标报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, removed: path }`。
 - `mv` 按 POSIX 语义移动或重命名文件及目录，支持覆盖；源缺失报 `FILE_NOT_FOUND`。成功返回 `{ ok: true, moved: from, destination: to }`。
-- 越界拒绝：rm 的目标、mv 的源与目标都在能力边界内校验，越界报 `PATH_DENIED` 且源存活。继承 [014] 的写前冲突校验：file() 取得的快照仍新鲜时，目标可照常被 rm 删除落盘。
+- 越界拒绝：rm 的目标、mv 的源与目标都在能力边界内校验，越界报 `PATH_DENIED` 且源存活。继承 [014] 的写前冲突校验：`cat()` 取得的快照仍新鲜时，目标可照常被 rm 删除落盘。
 - 每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影；渲染结果报 `removed = [...]` 与 `moved = ["from -> to"]`。
 - 稳定失败码 `DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INVALID_ARGUMENT` 登记在冻结失败目录；EXDEV 依靠 renameSync 原子语义保证源与目标都不残留中间态。
 
@@ -311,4 +305,4 @@ ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, 
 
 `ls(path)` 在列出条目时应用 gitignore 语义：逐级 `.gitignore`（含否定模式与目录剪枝）加上根 `.git/info/exclude`，与 `JsGlobFs.glob` 使用同一实现（`wanxiangli/fs` 的 ignore 引擎，经新的公开入口暴露），因此「从工作区根开始的 `ls` 递归组合」等价于旧 `glob`，而「walk + `cat` + `whereAll`」等价于旧 `grep`。组合写法见双语资源 `tool/js-program/recipes`。
 
-据此彻底退役 `glob`/`grep` 两个 js 成员：fragment、运行时绑定、四层投影、描述与规则资源一并删除；`Grep` capability 不再投影任何成员。`file`/`edit`/`rewrite` 暂留（Plan tenure 编程面仍在其上）。
+据此彻底退役 `glob`/`grep` 两个 js 成员：fragment、运行时绑定、四层投影、描述与规则资源一并删除；`Grep` capability 不再投影任何成员。旧 `file`/`edit`/`rewrite` 成员亦已从生成编程面退役（仅 Plan tenure 编程面 `todowrite-for-plan` 保留其专用无路径实现）。

@@ -4,7 +4,7 @@
 
 2026-10-05 N05-B/T388有限修复已验收：gen137正式相关223/223、1454pass/0fail、21skip、87TODO，仅pending exit1；真实Host integration1/0、无skip/TODO。OriginalMaterial保留合法UTF-8原body，来源由统一typed renderer生成；exact XTrace message/optional part/call与完整durable组合保护原工具结果。真正缺part ID仅匹配None，多个候选拒绝；capture只清理observations副本，三轮后canonical工具结果唯一。完整原始红绿见[本批记录](../../../proposals/archive/2026-10-05/原始材料载体与后缀重放-2026-10-05.md)。legacy/user、无ID user/text canonical隔离、非法UTF-8和完整插件Long Stroke不在本项证明范围，整体GAP-085/086保持PARTIAL。
 
-2026-10-05 N05-A/T386当前读取版本修复已验收：gen131正式相关212/212、1547pass/0fail/31skip/94TODO，166.97s，group回收通过；native006 integration3/0、无skip/TODO。新`RequirementGroundingReadObserved`保存实际返回版本与CompleteFile/PartialFile，旧`MaterialObserved`按原codec回放、不改写或追认历史。JS实际file/read捕获读时resolved path与返回UTF-8字符串，外root拒绝；grep保留freshness，不算完整读取。观察层不按路径重读新磁盘，partial不抑制全文，reanchor清空当前资格。见[本批记录](../../../proposals/archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。
+2026-10-05 N05-A/T386当前读取版本修复已验收：gen131正式相关212/212、1547pass/0fail/31skip/94TODO，166.97s，group回收通过；native006 integration3/0、无skip/TODO。新`RequirementGroundingReadObserved`保存实际返回版本与CompleteFile/PartialFile，旧`MaterialObserved`按原codec回放、不改写或追认历史。JS实际`cat`读取捕获读时resolved path与返回UTF-8字符串，外root拒绝；grep保留freshness，不算完整读取。观察层不按路径重读新磁盘，partial不抑制全文，reanchor清空当前资格。见[本批记录](../../../proposals/archive/2026-10-05/实际读取版本与答案来源-2026-10-05.md)。
 
 安装版Host1.18.29的七项真实read可捕获完整after output/title/metadata、SDK completed结果及下一次实际provider POST，三处保持一致；LF、CRLF、无末尾LF却在公开正文与metadata中坍缩，长行截断仍报告`truncated:false`，字节上限的totalLines也不表示完整文件。因此native返回一律PartialFile，无offset、EOF或该metadata均不授完整文件资格。正式integration入口位于006，沿原5s readiness/30s观察/45s子进程预算，并用实际晚到HTTP500验证失败不会被成功summary遮蔽。此协议观察不证明生产插件的全部Host业务接线；T388保真的是自动读取的规范材料，不复原native formatter已丢失的文件字节。
 

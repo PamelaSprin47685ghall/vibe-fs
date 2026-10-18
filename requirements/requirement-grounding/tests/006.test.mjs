@@ -204,7 +204,7 @@ test('WHAT[requirement-grounding-006] an actual program file-read failure cannot
   const { dir, cleanup } = sandbox()
   try {
     const observations = []
-    const outcome = await workflow.runObserved(dir, 'Coder', 'en', "class Js extends JsProgram { async run() { const file = await this.file('requirements/alpha/missing.md'); return file.text(); } }", 2000, Date.now() + 60000, 1 << 20, null,
+    const outcome = await workflow.runObserved(dir, 'Coder', 'en', "class Js extends JsProgram { async run() { return await this.cat('requirements/alpha/missing.md'); } }", 2000, Date.now() + 60000, 1 << 20, null,
       async (reads, effects) => observations.push({ reads, effects }))
     assert.equal(workflow.caseName(outcome), 'Failed')
     assert.equal(workflow.failureCode(outcome), 'FILE_NOT_FOUND')
@@ -240,7 +240,7 @@ test('WHAT[requirement-grounding-006] a symlink replaced after the actual read p
       return result
     }
     syncBuiltinESMExports()
-    const outcome = await workflow.runObserved(root, 'Coder', 'en', "class Js extends JsProgram { async run() { const file = await this.file('src/alias.txt'); return file.text(); } }", 2000, Date.now() + 60000, 1 << 20, null,
+    const outcome = await workflow.runObserved(root, 'Coder', 'en', "class Js extends JsProgram { async run() { return await this.cat('src/alias.txt'); } }", 2000, Date.now() + 60000, 1 << 20, null,
       async (reads, effects) => {
         assert.equal(replaced, true, 'the real disk replacement precedes callback admission')
         assert.equal(realpathSync(alias), newPath)
@@ -266,7 +266,7 @@ test('WHAT[requirement-grounding-006] an actual file read through an outside-wor
   symlinkSync(outside, join(dir, 'src', 'foreign.txt'))
   const observations = []
   try {
-    const outcome = await workflow.runObserved(dir, 'Coder', 'en', "class Js extends JsProgram { async run() { const file = await this.file('src/foreign.txt'); return file.text(); } }", 2000, Date.now() + 60000, 1 << 20, null,
+    const outcome = await workflow.runObserved(dir, 'Coder', 'en', "class Js extends JsProgram { async run() { return await this.cat('src/foreign.txt'); } }", 2000, Date.now() + 60000, 1 << 20, null,
       async (reads, effects) => observations.push({ reads, effects }))
     assert.equal(workflow.caseName(outcome), 'Failed')
     assert.equal(workflow.failureCode(outcome), 'PATH_DENIED')
@@ -407,7 +407,7 @@ test('WHAT[requirement-grounding-006] registered complete file reads preserve ex
     await incarnation.withRuntime(async runtime => {
       await acceptAuthorityRoot(runtime, sessionID, 'manager')
       await openIncumbency(runtime, sessionID)
-      const args = { program: "class Js extends JsProgram { async run() { const file = await this.file('requirements/alpha/WHAT.md'); return file.text(); } }" }
+      const args = { program: "class Js extends JsProgram { async run() { return await this.cat('requirements/alpha/WHAT.md'); } }" }
       const execute = async callID => {
         const input = { tool: 'todowrite-for-manager', sessionID, callID }
         await incarnation.hooks['tool.execute.before'](input, { args })

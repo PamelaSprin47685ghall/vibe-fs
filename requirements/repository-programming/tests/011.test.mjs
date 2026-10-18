@@ -7,7 +7,7 @@ const { run } = await import("../../../dist/Repository/Programming/Js/RuntimeSur
 
 const BASE = `class JsProgram {
   constructor(api) { this._api = api; }
-  file(path) { return this._api.js.read(path); }
+  cat(path) { return this._api.js.cat(path); }
 }`
 const runWrapped = async (
   program,
@@ -17,7 +17,7 @@ const runWrapped = async (
 const failureCode = (result) => result.code
 const PROGRAM = `class Js extends JsProgram {
   async run() {
-    return { sum: 1 + 2, text: (await this.file('a.txt')).text };
+    return { sum: 1 + 2, text: (await this.cat('a.txt')).text };
   }
 }`
 
@@ -80,7 +80,7 @@ test('WHAT[repository-programming-011] JS010_array_null_is_invalid_return_value'
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    this.rewrite('a.txt', 'new')
+    this.write('a.txt', 'new')
     return [null]
   }
 }`

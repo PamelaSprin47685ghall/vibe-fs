@@ -29,9 +29,6 @@ type JsCapabilityFragment =
       RuntimeBindingKey: string }
 
 module JsFragmentRegistry =
-    val read: JsCapabilityFragment
-    val edit: JsCapabilityFragment
-    val rewrite: JsCapabilityFragment
     val write: JsCapabilityFragment
     val rm: JsCapabilityFragment
     val mv: JsCapabilityFragment

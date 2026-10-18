@@ -470,11 +470,6 @@ module JsCanonicalDescription =
              :: ("read_source", readSourceLine)
              :: fileReasons prose)
 
-    /// Proposal §16 canonical file() body (description uses HOST_READ).
-    /// `raiseFailure` closes over `code` and `reason`.
-    let fileAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
-        fileAlgorithmCore prose "  async file(path, matches = []) {" readSourceLine raiseFailure
-
     let planFileAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
         fileAlgorithmCore
             prose
@@ -495,20 +490,6 @@ module JsCanonicalDescription =
             readSourceLine
             raiseFailure
 
-
-    let private rewriteStub (prose: Prose) =
-        fill
-            """  rewrite(path, newText) {
-    // {{comment_host_capability}}
-  }"""
-            [ "comment_host_capability", prose.CommentHostCapability ]
-
-    let private editStub (prose: Prose) =
-        fill
-            """  edit(path, changes) {
-    // {{comment_host_capability}}
-  }"""
-            [ "comment_host_capability", prose.CommentHostCapability ]
 
     let private writeStub (prose: Prose) =
         fill
@@ -651,17 +632,12 @@ class JsProgram {"""
     let publicBaseClass (prose: Prose) (capabilities: Set<JsCapability>) : string =
         let methods =
             [ if has capabilities JsCapability.Read then
-                  fileAlgorithm prose publicReadSource publicRaiseFailure
                   catStub prose
                   statStub prose
                   whereAllStub prose
                   whereStub prose
               if has capabilities JsCapability.Glob then
                   lsStub prose
-              if has capabilities JsCapability.Edit then
-                  editStub prose
-              if has capabilities JsCapability.Edit then
-                  rewriteStub prose
               if has capabilities JsCapability.Write then
                   writeStub prose
                   mkdirStub prose
@@ -1179,9 +1155,6 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
               "reason_edit_line", prose.ReasonEditLine
               "reason_edit_overlaps", prose.ReasonEditOverlaps ]
 
-    let editAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
-        editAlgorithmCore prose editPrologue readSourceLine raiseFailure
-
     let planEditAlgorithm (prose: Prose) (readSourceLine: string) (raiseFailure: string) =
         editAlgorithmCore
             prose
@@ -1261,8 +1234,6 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
   constructor(api) { this._api = api; }"""
                   .TrimStart()
               if has capabilities JsCapability.Read then
-                  fileAlgorithm prose (runtimeReadSource prose) runtimeRaiseFailure
-
                   fill
                       """  async cat(path) {
     const result = await this._api.js.cat(path);
@@ -1301,15 +1272,6 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     const result = await this._api.js.ls(path);
     {{rethrow_host}}
     return result.entries;
-  }"""
-                      [ "rethrow_host", rethrowHost ]
-              if has capabilities JsCapability.Edit then
-                  editAlgorithm prose (runtimeReadSource prose) runtimeRaiseFailure
-              if has capabilities JsCapability.Edit then
-                  fill
-                      """  rewrite(path, newText) {
-    const result = this._api.js.edit(path, newText);
-    {{rethrow_host}}
   }"""
                       [ "rethrow_host", rethrowHost ]
               if has capabilities JsCapability.Write then

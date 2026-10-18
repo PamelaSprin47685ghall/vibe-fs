@@ -69,7 +69,7 @@ const { run } = await import("../../../dist/Repository/Programming/Js/RuntimeSur
 
 const BASE = `class JsProgram {
   constructor(api) { this._api = api; }
-  file(path) { return this._api.js.read(path); }
+  cat(path) { return this._api.js.cat(path); }
 }`
 const runWrapped = async (
   program,
@@ -79,7 +79,7 @@ const runWrapped = async (
 const failureCode = (result) => result.code
 const PROGRAM = `class Js extends JsProgram {
   async run() {
-    return { sum: 1 + 2, text: (await this.file('a.txt')).text };
+    return { sum: 1 + 2, text: (await this.cat('a.txt')).text };
   }
 }`
 
@@ -108,7 +108,7 @@ const { join } = await import("node:path");
 const { randomUUID } = await import("node:crypto");
 const { parse: parseToml } = await import("smol-toml");
 const { generate } = await import("../../../dist/Repository/Programming/Js/GeneratorSurface.js");
-const { run, runObserved, caseName, rewritten, created, failureCode, render } = await import("../../../dist/Repository/Programming/Js/WorkflowSurface.js");
+const { run, execute, runObserved, caseName, rewritten, created, failureCode, parkedPayload, render } = await import("../../../dist/Repository/Programming/Js/WorkflowSurface.js");
 const { create: createEventStore, dispose: disposeEventStore } = await import("../../../dist/Persistence/EventStore/Surface.js");
 const { pending } = await import("../../../dist/Repository/Programming/Js/TransactionSurface.js");
 
@@ -134,7 +134,7 @@ test('WHAT[repository-programming-018] JS085_workflow_file_missing_fails_the_pro
   try {
     const program = `class Js extends JsProgram {
   async run() {
-    await this.file('missing.txt');
+    await this.cat('missing.txt');
     return { ok: true };
   }
 }`
@@ -153,13 +153,16 @@ test('WHAT[repository-programming-018] JS019_missing_anchor_uses_stable_code', a
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    await this.file('a.txt', [['begin', 'end', '## JS-007 FileView.text()']]);
+    const text = await this.cat('a.txt');
+    await this.where(text, '## JS-007 FileView.text()');
     return { ok: true };
   }
 }`
-    const { outcome } = await runWorkflow(dir, program)
-    const failed = parseToml(render(outcome))
-    assert.equal(failed.code, 'ANCHOR_NOT_FOUND')
+    const outcome = await execute(dir, 'Coder', 'en', 'sess-018', { program }, 2000, Date.now() + 60_000, 1 << 20, null)
+    assert.equal(caseName(outcome), 'Parked')
+    const payload = parkedPayload(outcome)
+    assert.equal(payload.needle, '## JS-007 FileView.text()')
+    assert.deepEqual(payload.candidates, [])
   } finally {
     cleanup()
   }

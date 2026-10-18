@@ -26,7 +26,6 @@ module JsRuntimeSurface =
             set
                 [ JsCapability.Read
                   JsCapability.Write
-                  JsCapability.Edit
                   JsCapability.Glob
                   JsCapability.Move
                   JsCapability.Remove

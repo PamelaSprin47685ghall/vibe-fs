@@ -8,7 +8,7 @@
 
 ## park/unpark/abandon 生命周期（WHAT[repository-programming-030]、[032]-[036]、[038]、[039]）
 
-程序内 `await this.park(payload)` 让执行结果变为 Parked：顶级 parked 载荷带非空 handle、程序传入的 payload 与完整程序源码（挂起行以 `>| ` 标记），渲染以 `# parked` 开头。park 是 async 生命周期成员，任何 js-* 生成面无条件携带（含只读的 Manager），但不进 filesystem members 列表；`where` 的零/多匹配歧义也经同一挂起通道。一期在旧成员之后追加九个主原语（cat/ls/stat/write/mkdir/where/whereAll 新增，rm/mv 语义保留），member 序列为 `file, glob, grep, edit, rewrite, write, rm, mv, cat, ls, stat, mkdir, whereAll, where`。描述与示例教授 park/unpark/abandon 三态契约与 unpark 自由值责任。
+程序内 `await this.park(payload)` 让执行结果变为 Parked：顶级 parked 载荷带非空 handle、程序传入的 payload 与完整程序源码（挂起行以 `>| ` 标记），渲染以 `# parked` 开头。park 是 async 生命周期成员，任何 js-* 生成面无条件携带（含只读的 Manager），但不进 filesystem members 列表；`where` 的零/多匹配歧义也经同一挂起通道。旧成员 `file`/`glob`/`grep`/`edit`/`rewrite` 退役后，文件系统主原语的 canonical member 序列为 `write, rm, mv, cat, ls, stat, mkdir, whereAll, where`（全量注册序后接 `run, fork, dag, join, fission, park`）。描述与示例教授 park/unpark/abandon 三态契约与 unpark 自由值责任。
 
 `unpark` 以 `{ handle, value }` 恢复挂起程序，挂起点的 await 求值为注入值；恢复后的程序可再次 park 并得到新 handle。handle 恰好消费一次：第二次 unpark、abandon 之后的 unpark、对未知 handle 的 unpark 或 abandon 都报 `HANDLE_UNKNOWN`。
 
@@ -22,7 +22,7 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 ## rm/mv 编程面（WHAT[repository-programming-040]）
 
-`rm`/`mv` 由 Remove/Move capability 投影，与 edit/write 同属 as-is 逐笔落盘路径：rm 删文件或空目录，mv 按 POSIX 语义移动或重命名并支持覆盖。越界报 `PATH_DENIED` 且源存活；成功渲染报 `removed = [...]` 与 `moved = ["from -> to"]`。每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影。
+`rm`/`mv` 由 Remove/Move capability 投影，与 `write` 同属 as-is 逐笔落盘路径：rm 删文件或空目录，mv 按 POSIX 语义移动或重命名并支持覆盖。越界报 `PATH_DENIED` 且源存活；成功渲染报 `removed = [...]` 与 `moved = ["from -> to"]`。每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影。
 
 ## js.run 工程执行循环（WHAT[repository-programming-050]、[051]、[052]）
 
@@ -45,7 +45,7 @@ Exec capability 投影出 `run` 成员与全局 `js.Runnable`。模型写 `await
 
 ## 持久化机制（WHAT[repository-programming-012]、[013]、[015]、[019]、[029]）
 
-as-is 逐笔落盘：每笔 `edit`/`write` 调用即经 MutationFs 单笔原子落盘，跨笔不回滚；程序以任何方式终止时，已落盘改动保持为事实分界线，失败结果如实附已落盘清单（`# failed` 加 `[fs]`），无落盘改动时不附 fs 节。
+as-is 逐笔落盘：每笔 `write`（及 `rm`/`mv`）调用即经 MutationFs 单笔原子落盘，跨笔不回滚；程序以任何方式终止时，已落盘改动保持为事实分界线，失败结果如实附已落盘清单（`# failed` 加 `[fs]`），无落盘改动时不附 fs 节。
 
 durable 记账只进统一 EventStore：Prepare/Committed 成对追加。记账追加失败以稳定 `TRANSACTION_PREPARE_*`/`TRANSACTION_COMMIT_*` 码拒绝成功、如实上报已落盘效果，不重试追加、不换事务身份，失败携带原事件 id、事务 id 与原始 cause。物理写失败同样以 `TRANSACTION_COMMIT_FAILED` 失败且失败笔之前的落盘改动保留；程序失败先于记账完成时不留 durable pending。Prepare 无 Committed 是中断审计证据，EventStore 重开只观察证据，不重放、不回滚、不补交。EventStore 端口的坏输入先结算字节事实，再经唯一的语义熔断终止。
 

@@ -167,8 +167,8 @@ test('WHAT[repository-programming-015] Adapter JS015_MutationFs_commits_atomical
     writeFileSync(join(workspace, 'second.txt'), 'second:old', 'utf8')
 
     let committedStore = openStore(committedEvents)
-    const committed = await runWorkflow(workspace, committedStore.handle, `    this.rewrite('first.txt', 'first:new');
-    this.rewrite('second.txt', 'second:new');
+    const committed = await runWorkflow(workspace, committedStore.handle, `    this.write('first.txt', 'first:new');
+    this.write('second.txt', 'second:new');
     await this.write('created.txt', 'created:new');
     return { receipt: 'multi-file-committed' };`)
 
@@ -191,7 +191,7 @@ test('WHAT[repository-programming-015] Adapter JS015_MutationFs_commits_atomical
     // 每笔写各自落账：首笔已提交，第二笔写失败时留下自己的 Prepared。
     writeFileSync(join(workspace, 'first.txt'), 'cut:old', 'utf8')
     const interruptedStore = openStore(interruptedEvents)
-    const interrupted = await runWorkflow(workspace, interruptedStore.handle, `    this.rewrite('first.txt', 'cut:new');
+    const interrupted = await runWorkflow(workspace, interruptedStore.handle, `    this.write('first.txt', 'cut:new');
     await this.write('missing-parent/second.txt', 'must-not-survive');
     return { receipt: 'must-not-commit' };`)
 

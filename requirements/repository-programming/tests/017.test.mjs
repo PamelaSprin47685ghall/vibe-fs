@@ -28,9 +28,9 @@ test('WHAT[repository-programming-017] JS018_consecutive_transactions_re_snapsho
       dir,
       `class Js extends JsProgram {
   async run() {
-    const view = await this.file('a.txt');
-    this.rewrite('a.txt', 'step1:' + view.text());
-    return { after: view.text() };
+    const text = await this.cat('a.txt');
+    this.write('a.txt', 'step1:' + text);
+    return { after: text };
   }
 }`,
     )
@@ -41,9 +41,9 @@ test('WHAT[repository-programming-017] JS018_consecutive_transactions_re_snapsho
       dir,
       `class Js extends JsProgram {
   async run() {
-    const view = await this.file('a.txt');
-    this.rewrite('a.txt', view.text() + ':step2');
-    return { before: view.text() };
+    const text = await this.cat('a.txt');
+    this.write('a.txt', text + ':step2');
+    return { before: text };
   }
 }`,
     )

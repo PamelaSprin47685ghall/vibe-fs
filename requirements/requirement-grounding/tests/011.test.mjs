@@ -52,7 +52,7 @@ async function deliverKnowledge(hooks, directory, runtime, sessionID, providerID
   const path = join(directory, 'src', 'main.fs')
   const tool = established ? 'todowrite-for-manager' : 'read'
   const args = established
-    ? { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
+    ? { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
     : { filePath: path }
   const callID = `read-${sessionID}`
   const input = { tool, sessionID, callID }
@@ -100,7 +100,7 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       const memberDenied = await hooks.tool['todowrite-for-manager'].execute({ program: writeProgram }, { sessionID, agent: 'manager' })
       assert.equal(existsSync(writes), false, 'the actual Manager programming API remains read-only')
       assert.equal(String(memberDenied).includes('UNAUTHORIZED-COMPLETED'), false)
-      const permitted = await hooks.tool['todowrite-for-manager'].execute({ program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }, { sessionID, agent: 'manager' })
+      const permitted = await hooks.tool['todowrite-for-manager'].execute({ program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }, { sessionID, agent: 'manager' })
       assert.ok(String(permitted).includes('SOURCE-CONTROL'), 'the same current authority still executes its legitimate read')
       assert.equal(readFileSync(join(directory, 'src', 'main.fs'), 'utf8'), 'SOURCE-CONTROL\n')
       assert.equal(runtime.prompts.length, promptsBefore)

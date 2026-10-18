@@ -12,10 +12,10 @@ test('WHAT[repository-programming-007] an acquired view remains unchanged after 
     writeFileSync(join(dir, 'a.txt'), 'original')
     const outcome = await run(dir, 'Engineer', 'en', `class Js extends JsProgram {
       async run() {
-        const view = await this.file('a.txt');
-        const before = view.text();
-        this.rewrite('a.txt', 'mutated');
-        return { before, after: view.text() };
+        const snapshot = await this.cat('a.txt');
+        const before = snapshot;
+        this.write('a.txt', 'mutated');
+        return { before, after: snapshot };
       }
     }`, 2000, Date.now() + 60_000, 1 << 20, null)
     assert.equal(caseName(outcome), 'Succeeded')
@@ -119,11 +119,10 @@ test('WHAT[repository-programming-007] JS005_bindings_file_reads_utf8', () => {
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     const binding = createApi(dir)
-    const result = apiOf(binding).js.read('a.txt')
+    const result = apiOf(binding).js.cat('a.txt')
     assert.equal(result.ok, true)
     assert.equal(result.text, 'hello')
-    assert.equal(result.byteCount, 5)
-    const missing = apiOf(binding).js.read('nope.txt')
+    const missing = apiOf(binding).js.cat('nope.txt')
     assert.equal(missing.ok, false)
     assert.equal(missing.code, 'FILE_NOT_FOUND')
   } finally {
@@ -198,7 +197,7 @@ const { join } = await import("node:path");
 const { randomUUID } = await import("node:crypto");
 const { parse: parseToml } = await import("smol-toml");
 const { generate } = await import("../../../dist/Repository/Programming/Js/GeneratorSurface.js");
-const { run, runObserved, caseName, rewritten, created, failureCode, render } = await import("../../../dist/Repository/Programming/Js/WorkflowSurface.js");
+const { run, execute, runObserved, caseName, rewritten, created, failureCode, parkedPayload, render } = await import("../../../dist/Repository/Programming/Js/WorkflowSurface.js");
 const { create: createEventStore, dispose: disposeEventStore } = await import("../../../dist/Persistence/EventStore/Surface.js");
 const { pending } = await import("../../../dist/Repository/Programming/Js/TransactionSurface.js");
 
@@ -225,15 +224,17 @@ test('WHAT[repository-programming-007] JS006_missing_anchor_reason_names_declara
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    await this.file('a.txt', [['begin', 'end', '## JS-007 FileView.text()']]);
+    const text = await this.cat('a.txt');
+    await this.where(text, '## JS-007 FileView.text()');
     return { ok: true };
   }
 }`
-    const { outcome } = await runWorkflow(dir, program)
-    const failed = parseToml(render(outcome))
-    assert.equal(failed.reason.includes('anchor 1'), true)
-    assert.equal(failed.reason.includes('a.txt'), true)
-    assert.equal(failed.reason.includes('## JS-007 FileView.text()'), true)
+    const outcome = await execute(dir, 'Coder', 'en', 'sess-007', { program }, 2000, Date.now() + 60_000, 1 << 20, null)
+    assert.equal(caseName(outcome), 'Parked')
+    const payload = parkedPayload(outcome)
+    assert.equal(payload.needle, '## JS-007 FileView.text()')
+    assert.deepEqual(payload.candidates, [])
+    assert.equal(payload.nearest.text, 'hello world')
   } finally {
     cleanup()
   }
@@ -244,13 +245,15 @@ test('WHAT[repository-programming-007] JS005_offset_anchor_clips_to_closed_file_
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const file = await this.file('a.txt', [['h', 'hend', 'hello']]);
+    const text = await this.cat('a.txt');
+    const [h, hend] = await this.where(text, 'hello');
+    const clip = (n) => Math.min(Math.max(0, n), text.length);
     return {
-      window: file.text('h', 'h+6'),
-      before: file.text('hend-5', 'hend'),
-      clippedEnd: file.text('h', 'h+1000'),
-      clippedStart: file.text('^-1000', 'h'),
-      eof: file.text('$+100', '$+200').length,
+      window: text.slice(h, clip(h + 6)),
+      before: text.slice(clip(hend - 5), hend),
+      clippedEnd: text.slice(h, clip(h + 1000)),
+      clippedStart: text.slice(clip(0 - 1000), h),
+      eof: text.slice(clip(text.length + 100), clip(text.length + 200)).length,
     };
   }
 }`
@@ -271,10 +274,12 @@ test('WHAT[repository-programming-007] JS005_offset_N_is_string_index_not_line_n
     writeFileSync(join(dir, 'a.txt'), 'ab\ncd\nef', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const file = await this.file('a.txt');
+    const text = await this.cat('a.txt');
+    const [cdBegin] = await this.where(text, 'cd');
     return {
-      twoUnits: file.text('^', '^+2'),
-      threeLen: file.text('^', '^+3').length,
+      twoUnits: text.slice(0, 2),
+      threeLen: text.slice(0, 3).length,
+      cdBegin,
     };
   }
 }`
@@ -282,6 +287,7 @@ test('WHAT[repository-programming-007] JS005_offset_N_is_string_index_not_line_n
     const doc = parseToml(render(outcome))
     assert.equal(doc.data.twoUnits, 'ab')
     assert.equal(doc.data.threeLen, 3)
+    assert.equal(doc.data.cdBegin, 3)
   } finally {
     cleanup()
   }

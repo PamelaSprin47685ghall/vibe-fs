@@ -19,7 +19,7 @@ test('WHAT[repository-programming-008] JS007_bindings_path_boundary_denies_escap
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
-    const denied = apiOf(binding).js.read('../outside.txt')
+    const denied = apiOf(binding).js.cat('../outside.txt')
     assert.equal(denied.ok, false)
     assert.equal(denied.code, 'PATH_DENIED')
     const deniedWrite = apiOf(binding).js.write('../outside.txt', 'x')
