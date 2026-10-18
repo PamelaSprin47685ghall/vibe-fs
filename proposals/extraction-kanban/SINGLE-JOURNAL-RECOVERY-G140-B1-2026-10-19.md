@@ -35,15 +35,17 @@ idle/admission 使用 `SendIdleGateNudge` 和 quiescence permit，没有因为�
 
 1. **先前R1引入的监督竞争。** 上一用例 end ACK 已返回，但 native complete 尚未交付；下一真实 TestContext 的 socket begin 先到，旧 owner 误拒为重复申请。现只允许一个新 token 等待，不授予临时额度；旧截止保留到匹配 complete，下一次真实 dequeue 才授权。两项永久确定性反例（含同名下一用例）先红转绿。非作者 Node26和实际Node22.13真实 node:test/socket 受控交付对照确认：旧版第二 action 不执行，新版两个 action 均执行；未伪造 native 事件。702完整原R1七文件323 pass / 0fail / 0skip / 0TODO。详见 R1 报告追加记录。
 2. **既有005夹具改写原件。** 697/700同输入实际都报材料身份冲突。夹具把同一物理用户消息正文从 provider request 改成 tool result，违反原件不可变；不能拿它要求 ProviderStarted 接受改写。现于首次呈现前保留原始 Host 请求副本，明确断言改写拒绝，再用原副本验证后续 assistant 复用 phase、仍只有一条 ProviderStarted 且没有替换发送。它不代证真实 tool-call/result carrier 全链。
-3. **既有GAP-124。** 021试图经新 live append 建立旧 Inspector 历史，被严格 decoder 拒绝；697/700同输入都失败。历史审计读取的 WHAT[interaction-authority-021] 义务仍未完成，不能因夹具建立历史的前提不合适而销项。本包不放宽新 ingress，不升级旧身份，不改原件，也不删除失败测试。
+3. **021夹具与先前review归因不准确。** 021试图经新 live append 建立旧 Inspector 历史，被严格 decoder 拒绝；697/700同输入都失败，仅证明不是B1新增。最终回溯发现667该输入仍通过：它写原件并自动cut；680的有意收紧改为拒绝不可解码的新Journal写入。真实667写盘原件在706新OS可完整raw审计、字节不改，所以先前“历史审计reader缺失”的归因撤回。永久用例现读真实旧物理文件，保留原cut，并新增当前live append拒绝旧身份且零写的反例。FactCodec历史类型解码TODO仍在；读取原件不等于恢复活跃权限。
 
-704同142文件最终为 **609 pass / 1普通fail / 6skip / 93TODO**，142/142完成排空，owned收尾通过；唯一普通失败仍是上述021/GAP-124，整套不是绿色。R1竞争与005夹具均转绿；005的同一修正还在固定697/700、Node/Bun四格实际通过，证明未靠产品放宽原件规则。所有skip/TODO不算通过，不能以本包范围验收抹去它们。
+704同142文件当时为 **609 pass / 1普通fail / 6skip / 93TODO**，142/142完成排空，owned收尾通过；唯一普通失败是上述021的历史构造前提，整套不是绿色。R1竞争与005夹具均转绿；005的同一修正还在固定697/700、Node/Bun四格实际通过，证明未靠产品放宽原件规则。所有skip/TODO不算通过，不能以本包范围验收抹去它们。
 
 最后静态门禁查出本代理把隔离研究夹具原样长期化时，五处读取Fable union内部形状，违反JS边界规则。未豁免或隐藏：现由既有注册的DispatchSurface调用真实HostSessionNudge，F#模式匹配后只返回 `{kind,key,error}`；typed Journal与observer均留在F#，lease也经现有Surface释放。补入008法律映射及Surface owner的直接项目依赖，没有另造发送实现。
 
-706与700的2076包文件逐一对比，仅DispatchSurface.js变化，其余2075文件字节相同。最终正式加入js-semantic-surface六文件，共 **148文件653 pass / 1旧GAP124普通fail / 6skip / 95TODO**，148/148完成排空、owned收尾通过。构建、八个改动F#文件的格式及静态门禁通过；report-only提示未当作关闭。700原型内部DU探针保留研究身份，不冒称迁移后的长期JSON合同证据。
+706与700的2076包文件逐一对比，仅DispatchSurface.js变化，其余2075文件字节相同。正式加入js-semantic-surface六文件时为 **148文件653 pass / 1个021夹具普通fail / 6skip / 95TODO**，148/148完成排空、owned收尾通过；原日志保留，不把这次红改写成通过。收尾已校正021的物理历史前提，后续结果另见[八小时收尾记录](EIGHT-HOUR-CONSTRUCTION-2026-10-19.md)。构建、八个改动F#文件的格式及静态门禁通过；report-only提示未当作关闭。700原型内部DU探针保留研究身份，不冒称迁移后的长期JSON合同证据。
 
 最终706的非作者长期夹具10项及两个Host的Surface-only范围程序通过；真实第二次干净安装与便携复跑通过。只用JournalSurface和DispatchSurface，未读取Identity/Model/Nudge、内部Journal或DU形状。另验无active root/非法kind零发送、零lease及零写，不同session/gate/terminal独立，真实接收的latest owner、完成后与重开拒重及重开新occasion正常发送。24回执和PID包含两轮同程序，不重复计语义用例。
+
+八小时收尾的710选集为 **148文件655 pass / 0普通fail / 6skip / 95TODO**，148/148完成排空、owned accepted；因既存待证项仍退出1。021新增负控先错误假定events目录存在，只有该夹具断言红，显式建立空目录后转绿；review也提前发现并修正结构化error误当字符串的测试笔误。710发行包SHA与706完全相同，2076文件零变化。raw审计已验，FactCodec历史解码TODO未移除；详见八小时收尾记录和真实旧原件档。
 
 首代原型还静默丢掉加入者的观察者登记，虽与旧版同为一个 Physical 等待者待决，却改变了接管归属；非作者发现后已在交付前修正。原型首次增第三参数漏括号的编译红、永久并发夹具未给 unresolved top-level await 保留诊断出口的首红分别归施工与夹具，不归产品缺陷。物理通知广播的额外断言在697也为红，属于过强 review 假设，不据此改通用 callback 合同。
 

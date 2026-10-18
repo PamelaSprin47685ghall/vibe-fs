@@ -1,6 +1,6 @@
 # 四模块修复计划
 
-更新：2026-10-18。本次复盘截止主仓 `da8266cb6`，独立库固定为 `df14f489d0a503ce300da6df6ef8f71910b477eb / 0.6.8`；修订开始时主仓干净。依据[修复复盘](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#repair-retrospective)、[深测](DEEP-TEST-2026-10-18.md)及各包后续交付，本版替代此前施工顺序。历史结果留在各包报告和 Git 历史；当前状态和认领只在[看板](BOARD.md#source-audit-repairs)维护。
+更新：2026-10-19。原复盘截止主仓 `da8266cb6`、库0.6.8；八小时施工已推进至主仓 `3e7d1f53a`、独立库 `8bb1021 / 0.6.12`，本页按后续交付同步。依据[修复复盘](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#repair-retrospective)、[深测](DEEP-TEST-2026-10-18.md)及各包后续交付，本版替代此前施工顺序。历史结果留在各包报告和 Git 历史；当前状态和认领只在[看板](BOARD.md#source-audit-repairs)维护。
 
 同日追加[上游接收方法与样本计划](#upstream-intake)：固定本地 `25651051f`、上游主仓 `705e1ea3b` 和库 `e4ba7ab6`，完成 resources 与 time/wait 只读评估。下列原有 16 个工作包仍是本地存量；两个上游候选单列接收条件，不自动加入已授权生产施工，也不改变原包状态。
 
@@ -11,7 +11,7 @@
 <a id="post-t01-plan"></a>
 ## 目标与本轮授权
 
-本轮完成只读接收评估并修订报告、计划与索引，不启动下列生产修改，不合并、变基或挑取 upstream，也不切换依赖、工具面和持久路径。后续本地修复保全当前必要行为；[上游差异](LOCAL-UPSTREAM-FIRST-FOUR-DIFF-2026-10-18.md)指出的旧工具、LWR_prev、child WorkRecord 和 squash 流程，若以后采用上游产品面，须先重新裁决消费者，不能机械搬回或为旧接线扩展功能。
+原只读接收评估已完成；用户后续授权按计划生产施工，本次另授权连续八小时及非作者复审。D1/D2、GAP085/159、R1与G140-A/B1已按各自范围交付；下一包是G140-B2。上游两个候选仍只读暂缓，没有合并、变基或挑取upstream。[上游差异](LOCAL-UPSTREAM-FIRST-FOUR-DIFF-2026-10-18.md)指出的旧工具、LWR_prev、child WorkRecord 和 squash 流程，若以后采用上游产品面，须先重新裁决消费者，不能机械搬回或为旧接线扩展功能。
 
 用户已明确允许大幅修改，不要求迁就前面的版本。后续可以修改公开接口、事件和存储版本、工程依赖、运行时适配及测试组织；不以保持旧 API、旧事件形状、旧输出格式或旧测试数量为目标。必要的不兼容重构不再因兼容旧版而推迟。
 
@@ -214,11 +214,13 @@ GAP-085、159的列明范围已交付。GAP-159旧实际公共入口确会安装
 
 **2026-10-19 进度：** [G140-A报告](DURABLE-FAILURE-BUDGET-GAP140-2026-10-19.md)已验持久Spec、顺序入账与完整身份保留、来源root成功边界、实际故障/12轮和冷预算。697最终相关101文件693 pass / 0普通fail / 7skip / 62TODO，固定包及非作者C/J01/T通过。整卡仍DOING：既存并发命令有facts2/send2/count1，下一步先做G140-B真实writer/dispatch owner原型；实际普通冷Workflow缺Host-stop零发送仍待验。不能把局部证据写成整卡或GAP-139完成。
 
-**B拆包追加：** [G140-B1](SINGLE-JOURNAL-RECOVERY-G140-B1-2026-10-19.md)已按同live Journal的non-idle范围验收：候选700实际send2→1、两次观察及时完成，事实仍2。独立固定包22项通过，六项永久回归已绿；R1自引入双通道竞争已补修，702原七文件323/0。704相邻142文件609pass/1普通fail/6skip/93TODO，唯一普通失败仍为旧GAP124，未写成整套通过。005夹具已保持原件并补非法改写拒绝；697/700双Host均验证。整卡仍DOING。B2跨OS已确证同身份facts2；不同身份两条count1导致冷积分拒一条，不能把cold boot成功算账正确。
+**B拆包追加：** [G140-B1](SINGLE-JOURNAL-RECOVERY-G140-B1-2026-10-19.md)已按同live Journal的non-idle范围验收：候选700实际send2→1、两次观察及时完成，事实仍2。独立固定包22项通过，六项永久回归已绿；R1自引入双通道竞争已补修，702原七文件323/0。704相邻142文件609pass/1普通fail/6skip/93TODO；021当时的历史构造红与后续物理原件验证分别保留。005夹具已保持原件并补非法改写拒绝；697/700双Host均验证。整卡仍DOING。B2跨OS已确证同身份facts2；不同身份两条count1导致冷积分拒一条，不能把cold boot成功算账正确。
 
 **B2施工次序：** 先做现有StoreLock内fresh Current/纯领域决定/fresh parents/物理提交及release的私有reference原型，再定canonical freshness/frontier合同与017成本验收，然后迁领域命令、lazy init/seq/NoWrite/poison及durable prompt claim的跨Journal/OS发送权。现ReloadLocal全重放，不能直接接生产，也不能把陌生suffix简单续到旧规范顺序末尾。预热writer原型不代证初始化；预算结果仍不产生Host-stop或发送权。真实并发、故障、普通冷Workflow和固定包非作者复核全部通过前不关整卡。
 
-706收尾：长期夹具已退出内部DU读取，改走既有DispatchSurface的真实HostSessionNudge调用与JSON输出。700→706仅此Surface一个包文件变化，其余2075字节相同；新增JS边界套件后148文件653pass/1旧GAP124fail/6skip/95TODO，完整排空及收尾通过，仍不称整个套件绿色。
+706收尾：长期夹具已退出内部DU读取，改走既有DispatchSurface的真实HostSessionNudge调用与JSON输出。700→706仅此Surface一个包文件变化，其余2075字节相同；新增JS边界套件后148文件653pass/1个021夹具fail/6skip/95TODO，完整排空及收尾通过。最终真实667写盘→706新OS读证伪了“raw reader缺失”：旧用例误用新live append构造旧历史，已改用冻结旧原件并增加新写拒绝反例，历史类型解码TODO仍在。更早红不覆盖；[八小时收尾记录](EIGHT-HOUR-CONSTRUCTION-2026-10-19.md)单列新结果及归因。
+
+710最终相关选集148文件655pass/0普通fail/6skip/95TODO，全部排空、owned accepted；整组仍因待证退出1。710包与706连tar SHA都相同，产品未改。下一包保持B2 reference原型与canonical freshness，随后领域原子命令、durable跨OS发送权和普通冷Workflow；不把B1单Journal单发冒称跨OS修复。
 
 **范围与前置：** 先定每个 LogicalRun 的预算事实、重复身份和新失败的区别；统一记录、重放和实际重试准入。可升级事件版本；无依据旧记录明确拒绝或另作有输入清单的离线迁移，不按今天默认值猜旧预算。
 

@@ -1,0 +1,36 @@
+✔ WHAT[interaction-authority-021] historical payload survives actual EventStore reopen without role rewriting (9.256292ms)
+✔ WHAT[interaction-authority-021] new append cannot manufacture legacy history or infer a cut for undecodable authority (4.77375ms)
+✔ WHAT[interaction-authority-021] legacy authority is rejected at actual new ingress and current Engineer remains admissible (36.6545ms)
+⚠ WHAT[interaction-authority-021] legacy Inspector fact remains decodable for history without becoming Engineer (0.601958ms) # GAP-124 actual historical fact decoder rejects legacy SelectedAgent
+ℹ tests 4
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 1
+ℹ duration_ms 211.142958
+
+✖ failing tests:
+
+test at requirements/interaction-authority/tests/021.test.mjs:78:1
+⚠ WHAT[interaction-authority-021] legacy Inspector fact remains decodable for history without becoming Engineer (0.601958ms) # GAP-124 actual historical fact decoder rejects legacy SelectedAgent
+  AssertionError [ERR_ASSERTION]: Error at: `$[1][1].[1]`
+  The following `failure` occurred with the decoder: participant identity SelectedAgent is legacy: inspector
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///private/tmp/final8h-clean-staged/requirements/interaction-authority/tests/021.test.mjs:80:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

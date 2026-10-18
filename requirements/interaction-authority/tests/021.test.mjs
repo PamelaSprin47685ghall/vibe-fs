@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as persona from '../../../dist/Participant/Persona/Surface.js'
@@ -14,17 +14,44 @@ const historical = readFileSync(new URL('./fixtures/authority-root-v1-inspector.
 
 test('WHAT[interaction-authority-021] historical payload survives actual EventStore reopen without role rewriting', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-historical-authority-'))
-  let handle = store.create(directory, 'history-writer')
+  const events = join(directory, 'wanxiangshu', 'events')
+  const file = join(events, 'history-writer-0000.ndjson')
+  mkdirSync(events, { recursive: true })
+  copyFileSync(new URL('./fixtures/authority-root-inspector-667.ndjson', import.meta.url), file)
+  const original = readFileSync(file)
+  let handle = store.create(directory, 'history-reader')
   const event = { id: 'historical-authority', stream: 'authority-history', type: 'JournalEnvelope', parents: [], payload: { Fact: JSON.parse(historical) }, payloadRefs: [] }
   try {
-    const appended = await store.append(handle, [event])
-    assert.equal(appended.ok, true, JSON.stringify(appended))
     const before = store.read(handle, event.id)
     assert.deepEqual(before, event)
+    assert.equal(store.read(handle, '09bfb3d939db49c8b52bdd2ab0556855').payload.failed_event_id, event.id)
     store.dispose(handle)
-    handle = store.create(directory, 'history-reader')
+    handle = store.create(directory, 'history-reader-again')
     assert.deepEqual(store.read(handle, event.id), before)
     assert.equal(JSON.stringify(store.read(handle, event.id).payload.Fact), historical)
+    store.dispose(handle)
+    assert.deepEqual(readFileSync(file), original)
+    assert.deepEqual(readdirSync(events), ['history-writer-0000.ndjson'])
+  } finally {
+    store.dispose(handle)
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[interaction-authority-021] new append cannot manufacture legacy history or infer a cut for undecodable authority', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-rejected-legacy-authority-'))
+  const events = join(directory, 'wanxiangshu', 'events')
+  mkdirSync(events, { recursive: true })
+  const handle = store.create(directory, 'new-writer')
+  const event = { id: 'new-legacy-authority', stream: 'authority-history', type: 'JournalEnvelope', parents: [], payload: { Fact: JSON.parse(historical) }, payloadRefs: [] }
+  try {
+    const appended = await store.append(handle, [event])
+    assert.equal(appended.ok, false)
+    assert.equal(appended.error.code, 'AppendFailed')
+    assert.match(appended.error.reason, /Journal cut requires a decodable failed event/)
+    assert.match(appended.error.reason, /SelectedAgent is legacy: inspector/)
+    assert.equal(store.read(handle, event.id), null)
+    assert.deepEqual(readdirSync(events), [])
   } finally {
     store.dispose(handle)
     rmSync(directory, { recursive: true, force: true })
