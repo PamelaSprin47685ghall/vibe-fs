@@ -25,7 +25,9 @@
 | 上游主仓实际固定的库 | submodule `e4ba7ab6fd7e1028a68b26dcc5fda2a6e2e51f78`，包版本 `0.8.0` |
 | 两条主仓线的共同祖先 | `7d8feff030adfdeae511bdc0d8bb77f3c00b2a1f` |
 
-另外检查并保存了分析期间暂存区的 R6-B 总预算候选及其报告，将其作为“待集成的本地工作”单列。快照 patch 的 SHA-256 为 `aa45e2ee7316d27b7c13487bf9e66663477212300d694fa93da4ecf104bed330`，不把它混入上述已提交基线。
+另外检查并保存了分析期间暂存区的 R6-B 总预算候选及其报告。快照 patch 的 SHA-256 为 `aa45e2ee7316d27b7c13487bf9e66663477212300d694fa93da4ecf104bed330`，不把它混入上述初始已提交基线。
+
+分析收尾时，另一项已有施工已将 R6-B 以 `3c8f385c7` 提交并推送，本报告初稿也随该提交入库。预算修复因此由暂存候选变为本地已交付成果；其报告记载相关组 911 pass、0 普通 fail、15 skip、29 TODO，Node/Bun 精确包四文件各 46/46。该状态变化不影响上游差异结论：上游已删除旧 ExecutorTool，尚未接入同等完整 wire 预算。本轮没有重跑该施工的验收，详情以 [总预算交付报告](PROCESS-WIRE-BUDGET-2026-10-18.md) 为准。
 
 本轮在临时目录按上游锁文件安装声明依赖，用 `node scripts/build.mjs` 编译了 eventstore、trace、process、lifecycle 四个库。针对本地精确 vendor 产物和上游固定源码的生成物，在 Node 26.6.0、Bun 1.3.14 上运行同一组公开接口探针。其余主仓判断来自固定版本源码与契约对照，没有把上游整个 Host 链或全量套件宣称为已验证。
 
@@ -57,11 +59,13 @@
 | R6-C 环境、argv、stdin | 上游库仍只走 node:child_process；主仓环境用普通对象赋值，stdin 非 Written 只退出写循环，写异常也被吞掉 | **保留必要语义并适配新入口**。本地 Bun 适配、特殊键和真实回执修正没有被较高版本自动吸收 |
 | R7-A 逐路 extent | 上游没有本地 Supervision Worker 的最终 extent 与外侧 observed 一致屏障 | **保留或重做等价屏障**。目标 exit、close 或写回调不能单独证明最终消费者收齐 |
 | R7-B Bun 实际背压 | 上游没有本地 native-process/BunProcess 的 FIFO 读写及 Worker 出口交接；新 JsRunLoop 用 data 事件接字符串 | **保留背压与字节边界要求**。公开队列大小、截断字符串和写者受到背压不是同一证明 |
-| R6-B 总 wire 预算候选 | 上游已删除 ExecutorTool；JsRunLoop 的 head/tail 按字符串长度截取，外层返回结构另行渲染 | **重新落位**。保留完整编码预算、最小预算拒绝、Host 窗口、BOM、取消事实的反例，不照搬旧 run 工具注册或资源文件 |
+| R6-B 总 wire 预算及预取消修复 | 本地于分析期间完成交付；上游已删除 ExecutorTool，JsRunLoop 的 head/tail 按字符串长度截取，外层返回结构另行渲染 | **重新落位**。保留完整编码预算、最小预算拒绝、Host 窗口、BOM、预取消事实的反例，不照搬旧 run 工具注册或资源文件 |
 
 JsRunLoop 确实有独立 maxDuration、超时竞速和子进程清理循环，不能把它说成没有执行监管。但其 onChildExit 监听 exit 而非输出 close，回调未携带 signal，killManaged 会 destroy stdout/stderr，SliceBuffer 在 check 前持续拼接字符串。这些实现没有构成本地“逐路字节交付、确切退出、背压和持久资源归属”的等价证明，需要按新执行面单独验证，不能以旧工具退役判为覆盖。
 
 R6-D 的退出码与信号区分尚不是本地已完成修复：本地桥会归一为 128+signal，上游旧桥将任意 signal 归为 137，新 JsRunLoop 的 signal-only exit 也没有独立信号字段。应继续保留该待办，不把它列成本地现成补丁。
+
+R6-B 最终交付还登记了 R6-E：旧 ExecutorTool 的取消监听在实际等待前已被 finally 移除，排队取消后仍可能启动命令。它是修前缺口，预算包只关闭预取消路径。上游已退役这个工具，不能把旧 finally 补丁原样搬到 JsRunLoop，也不能据工具删除宣称新的排队、执行中取消与收尾已经验证。
 
 源码依据：[上游旧物理桥](https://github.com/PamelaSprin47685ghall/vibe-fs/blob/705e1ea3b0946ea91edb3ce694e22f58228b5c19/src/Wanxiangshu/Process/NodeProcessHost.fs#L151)、[上游纯契约测试仍为 TODO](https://github.com/PamelaSprin47685ghall/vibe-fs/blob/705e1ea3b0946ea91edb3ce694e22f58228b5c19/requirements/process-execution/tests/012.test.mjs#L9)、[新 JsRunLoop 的启动和退出观察](https://github.com/PamelaSprin47685ghall/vibe-fs/blob/705e1ea3b0946ea91edb3ce694e22f58228b5c19/src/Wanxiangshu/Process/JsRunLoop.fs#L207)、[新执行面的实际接线](https://github.com/PamelaSprin47685ghall/vibe-fs/blob/705e1ea3b0946ea91edb3ce694e22f58228b5c19/src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs#L423)。
 
@@ -125,4 +129,4 @@ R6-D 的退出码与信号区分尚不是本地已完成修复：本地桥会归
 4. 上游持久路径改为 `.Herdchestra`，禁止读取旧 `.git/wanxiang*`，依赖改为源码 submodule。它与本地 vendor 固定包及既有恢复路径是两项独立集成决定，不顺带迁移用户历史，不遗忘活动 lease 或未知提交。
 5. R12-U1、旧精确包 PTY 首轮失败、完整 Bootstrap、脱组监管、平台容量和正式监督缺口继续按原台账保留。既未被本轮修复，也不因源码差异或后来测试通过而关闭。
 
-本轮交付仅为差异报告；没有 merge、cherry-pick、rebase、依赖升级或运行中 Host 部署。工作区原有 R6-B 暂存内容由其施工继续维护，本报告不替它提交或验收。
+本轮交付仅为差异报告；没有 merge、cherry-pick、rebase、主仓依赖升级或运行中 Host 部署。R6-B 由另一项已有施工完成提交，本报告只补记其状态与边界，不将该生产修改记为本轮分析实施。
