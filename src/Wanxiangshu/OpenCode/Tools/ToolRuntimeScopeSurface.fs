@@ -730,6 +730,8 @@ type ToolRuntimeScopeSurface =
                     CompletionMailboxRuntime.create,
                     NodeTiming.nodeClockPort (),
                     NodeTiming.raceExit,
+                    ptyPort = None,
+                    recoverPty = PtyBackend.recover,
                     journal = journal.Journal
                 )
 

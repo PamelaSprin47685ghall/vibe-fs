@@ -290,6 +290,7 @@ module ExecutorTool =
             finalizeSpooled scope language context request.OutputBudgetBytes exitCode spoolPath
 
     let private runPrepared
+        (run: RunProcess)
         (scope: ToolRuntimeScope)
         (request: Request)
         (context: HostToolContext)
@@ -308,8 +309,7 @@ module ExecutorTool =
                   Arguments = [ "-lc"; request.Command ]
                   WorkingDirectory = directory
                   Environment = None
-                  Stdin = None
-                  PtyOptions = None }
+                  Stdin = None }
 
             use cancellation = new CancellationTokenSource()
             let detachAbort = context.AttachAbort cancellation.Cancel
@@ -320,26 +320,26 @@ module ExecutorTool =
 
             let! result =
                 try
-                    ProcessRunner.run command estimate processContext cancellation.Token
+                    run command estimate processContext cancellation.Token
                 finally
                     detachAbort ()
 
             return! interpretOutcome scope request language context result
         }
 
-    let private execute (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
+    let private execute (run: RunProcess) (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
             let language = lang context
 
             match scope.RuntimeFor context with
             | Error _ -> return consequence (prose language Path.Run.CannotRunFromContext)
-            | Ok _ -> return! runPrepared scope request context language
+            | Ok _ -> return! runPrepared run scope request context language
         }
 
     let runAdmission: ToolAdmission =
         ToolAdmission.OfficeRole(fun _ r -> r = Role.DevOps)
 
-    let runSpec (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
+    let runSpec (run: RunProcess) (factory: HostToolFactory) (scope: ToolRuntimeScope) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
         { Name = "run"
@@ -355,5 +355,5 @@ module ExecutorTool =
           Execute =
             fun args context ->
                 match decodeRun (lang context) args with
-                | Ok request -> execute scope request context
+                | Ok request -> execute run scope request context
                 | Error decodeError -> task { return consequence decodeError } }

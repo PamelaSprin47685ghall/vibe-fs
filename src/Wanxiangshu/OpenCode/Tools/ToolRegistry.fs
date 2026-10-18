@@ -21,6 +21,7 @@ open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Persistence.EventStore
+open Wanxiangshu.Process
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Requirement.Grounding
@@ -951,7 +952,7 @@ module ToolRegistry =
               // Plan lifecycle reads its own durable owner directly.
               yield ReviewShell.spec factory runtime
               yield deliverSpec ()
-              yield ExecutorTool.runSpec factory runtime
+              yield ExecutorTool.runSpec ProcessRunner.run factory runtime
               yield FileMutationTools.mvSpec factory
               yield FileMutationTools.rmSpec factory
               yield BashHoneypotTool.spec

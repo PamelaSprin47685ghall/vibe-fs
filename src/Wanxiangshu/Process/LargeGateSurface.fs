@@ -48,8 +48,7 @@ module LargeGateSurface =
               Arguments = [ "-c"; "echo hi" ]
               WorkingDirectory = None
               Environment = None
-              Stdin = None
-              PtyOptions = None }
+              Stdin = None }
 
         let estimate =
             { EstimatedRuntime = RuntimeSeconds 10.0

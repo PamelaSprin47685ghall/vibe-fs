@@ -13,6 +13,7 @@ open Wanxiangshu.Mission.Planning
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Process
 
 module PluginRecoveryWiring =
 
@@ -328,7 +329,12 @@ module PluginRecoveryWiring =
                                     boot.WorkspaceDirectory
                                     |> Option.defaultWith (fun () -> invalidOp "PTY recovery requires a workspace")
 
-                                do! HostForkRuntime.CloseUnboundPtyRun(RuntimePath.gitCommonDir workspace, work)
+                                do!
+                                    HostForkRuntime.CloseUnboundPtyRun(
+                                        PtyBackend.recover,
+                                        RuntimePath.gitCommonDir workspace,
+                                        work
+                                    )
                             }
 
                         do! ChildWorkRecovery.settleOrphanedChildRuns drainPtys journal

@@ -104,8 +104,7 @@ module WorktreeCommands =
           Arguments = args
           WorkingDirectory = cwd
           Environment = None
-          Stdin = None
-          PtyOptions = None }
+          Stdin = None }
 
     let private outcome code stdout stderr =
         if code = 0 then

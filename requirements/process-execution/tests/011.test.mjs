@@ -154,7 +154,7 @@ test('WHAT[process-execution-011] RUN_spooled_output_family_blocked_surfaces_rec
       process.chdir(host)
       for (const [pathValue, expected] of [['.', 'target'], ['', 'target'], ['bin', 'target-bin'], ['missing:bin', 'target-bin'], ['bin:.', 'target-bin'], ['.:bin', 'target'], [':bin', 'target'], ['bin:', 'target-bin'], [`${absolute}:bin`, 'absolute'], [`bin:${absolute}`, 'target-bin']]) {
         process.env.PATH = pathValue
-        const native = spawnSync(executable, [], { cwd: target, env: { ...process.env }, encoding: 'utf8' })
+        const native = spawnSync('/bin/sh', ['-c', `exec ${executable}`], { cwd: target, env: { ...process.env }, encoding: 'utf8' })
         assert.equal(native.error, undefined, pathValue)
         assert.equal(native.status, 0, pathValue)
         assert.equal(native.stdout, expected, pathValue)

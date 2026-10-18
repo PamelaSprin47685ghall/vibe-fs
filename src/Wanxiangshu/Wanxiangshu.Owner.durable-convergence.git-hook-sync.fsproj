@@ -7,6 +7,7 @@
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.git-gateway.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.eventstore-process-log.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-convergence.eventstore-sync-runtime.fsproj"/>

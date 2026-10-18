@@ -16,8 +16,7 @@ module GitOperations =
           Arguments = args
           WorkingDirectory = Some repo
           Environment = None
-          Stdin = None
-          PtyOptions = None }
+          Stdin = None }
 
     let private failure stdout stderr =
         if String.IsNullOrWhiteSpace stderr then stdout else stderr

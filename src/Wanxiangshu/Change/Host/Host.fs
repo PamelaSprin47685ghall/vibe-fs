@@ -39,7 +39,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let relayPortOpt = deps.Journal |> Option.map OrchestratorJournalAdapter.forRelay
 
-    let gitPort = GitOperations.createWithRepo deps.RepoPath OrchestratorGit.run
+    let runGit = OrchestratorGit.createRunner ProcessRunner.run
+    let gitPort = GitOperations.createWithRepo deps.RepoPath runGit
 
     let onChildCreated (agentId: string) (role: Role) (childId: SessionId) =
         deps.OnChildCreated agentId role childId
@@ -52,6 +53,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             CompletionMailboxRuntime.create,
             NodeTiming.nodeClockPort (),
             NodeTiming.raceExit,
+            ptyPort = None,
+            recoverPty = PtyBackend.recover,
             ?journal = deps.Journal,
             onChildCreated = onChildCreated,
             onChildCreatedDir =
@@ -230,7 +233,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let finalizeRegisteredWorktree (agentId: string) =
         match worktrees.TryGetValue agentId with
-        | true, path -> OrchestratorGit.finalizeWorktree OrchestratorGit.run agentId path
+        | true, path -> OrchestratorGit.finalizeWorktree runGit agentId path
         | false, _ -> Task.FromResult(Error(sprintf "No worktree registered for manager job '%s'" agentId))
 
     let prepareCandidate (jobId: ManagerJobId) : Task<Result<CommitHash, string>> =

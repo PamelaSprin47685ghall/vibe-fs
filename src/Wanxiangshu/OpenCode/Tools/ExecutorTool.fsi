@@ -69,6 +69,6 @@ module ExecutorTool =
           WorldLock: bool }
 
     val runAdmission: ToolAdmission
-    val runSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
+    val runSpec: run: Wanxiangshu.Process.RunProcess -> factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
 
     val internal formatSpooledOutcome: exitCode: int -> output: string -> string

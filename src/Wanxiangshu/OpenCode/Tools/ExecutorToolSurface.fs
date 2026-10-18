@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Process
 
 /// JS-native semantic surface for bounded command execution and raw output tailing.
 /// A JS test never
@@ -60,7 +61,9 @@ module ExecutorToolSurface =
     /// Plain metadata for the provider-visible run contract.
     let describeRun (toolModule: obj) : obj =
         let factory = ToolHostCodec.factory toolModule
-        let spec = ExecutorTool.runSpec factory (createScope null None |> scopeOf)
+
+        let spec =
+            ExecutorTool.runSpec ProcessRunner.run factory (createScope null None |> scopeOf)
 
         box
             {| name = spec.Name
@@ -79,7 +82,7 @@ module ExecutorToolSurface =
         if not (String.IsNullOrWhiteSpace recovery) then
             attachRecovery scope recovery
 
-        let spec = ExecutorTool.runSpec factory scope
+        let spec = ExecutorTool.runSpec ProcessRunner.run factory scope
         let hostArgs = HostToolArguments args
         let hostContext = ToolHostCodec.decodeContext context
         spec.Execute hostArgs hostContext

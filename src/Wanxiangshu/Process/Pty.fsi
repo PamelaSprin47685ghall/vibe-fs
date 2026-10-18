@@ -3,6 +3,12 @@ namespace Wanxiangshu.Process
 open System
 open System.Threading.Tasks
 
+type ReadPlan =
+    | Unknown of string
+    | AlreadyInProgress
+    | ClosedImmediate
+    | Park of TaskCompletionSource<Result<string * bool, string>>
+
 type PtyPort =
     new: ?exitListener: (PtyExitEvent -> unit) * ?handler: PtyBackendHandler -> PtyPort
 

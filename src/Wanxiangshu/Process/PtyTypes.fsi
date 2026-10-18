@@ -47,6 +47,8 @@ type PtyRecoveryExit =
     | Ended of incarnationId: string * stopped: bool * code: int option * signal: string option
     | NotStarted of incarnationId: string * reason: string
 
+type RecoverPty = string -> string -> string option -> int -> Task<PtyRecoveryExit>
+
 [<RequireQualifiedAccess>]
 type PtyCommand =
     | Spawn of command: string * cwd: string * recovery: PtyRecoveryBinding option
@@ -91,9 +93,3 @@ module PtyOutcome =
 
     [<Literal>]
     val termToKillGraceMs: int = 5000
-
-type ReadPlan =
-    | Unknown of string
-    | AlreadyInProgress
-    | ClosedImmediate
-    | Park of TaskCompletionSource<Result<string * bool, string>>

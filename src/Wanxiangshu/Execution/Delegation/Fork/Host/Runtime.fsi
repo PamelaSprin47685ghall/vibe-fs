@@ -22,10 +22,11 @@ type HostForkRuntime =
         createMailbox: (obj -> ForkCompletionMailbox) *
         clock: IClockPort *
         raceExit: (Task -> int -> Task<bool>) *
+        ptyPort: PtyPort option *
+        recoverPty: RecoverPty *
         ?journal: AgentJournal *
         ?onChildCreated: (string -> Role -> SessionId -> unit) *
         ?onChildCreatedDir: (string -> SessionId -> string option -> unit) *
-        ?ptyPort: PtyPort *
         ?directoryFor: (string -> string option) *
         ?onRunStarted: (SessionId -> Role -> string option -> unit) *
         ?parentWorkRecordFor: (SessionId -> Task<string option>) *
@@ -160,7 +161,10 @@ type HostForkRuntime =
     member DrainOwnedWork: unit -> Task<unit>
     member CloseOwnedPtys: ?graceMs: int -> Task<unit>
     member internal ClosePtyRun: work: AdmittedWork -> Task<unit>
-    static member internal CloseUnboundPtyRun: commonDir: string * work: AdmittedWork -> Task<unit>
+
+    static member internal CloseUnboundPtyRun:
+        recoverPty: RecoverPty * commonDir: string * work: AdmittedWork -> Task<unit>
+
     member ClosePty: id: PtyId * ?graceMs: int -> Task<unit>
     member IsPtyCompletion: runId: string -> bool
     member TryBindTerminalName: name: string * id: PtyId -> Result<unit, string>

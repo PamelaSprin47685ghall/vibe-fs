@@ -267,14 +267,7 @@ module GitGateway =
           EstimatedOutput = OutputBytes 65536L
           EstimatedMemory = EstimatedMemory.Medium }
 
-    /// Production runner for the hook-process Git transport path.
-    ///
-    /// Routes through `ProcessRunner.run` (the canonical Process module entry)
-    /// instead of importing `node:child_process` directly, matching the
-    /// Orchestrator-side Git path (`OrchestratorGit.run`).  `WorkingDirectory`
-    /// replaces the previous `git -C <repoPath>` argv prefix — equivalent for
-    /// git, which resolves `.git` relative to the working directory.
-    let createDefaultRunner (repoPath: string) : GitGatewayRunner =
+    let createProcessRunner (run: RunProcess) (repoPath: string) : GitGatewayRunner =
         fun args ->
             task {
                 let cmd =
@@ -282,14 +275,13 @@ module GitGateway =
                       Arguments = args
                       WorkingDirectory = Some repoPath
                       Environment = None
-                      Stdin = None
-                      PtyOptions = None }
+                      Stdin = None }
 
                 let ctx =
                     { WorkingDirectory = Some repoPath
                       HardLimit = ProcessEstimate.DefaultHardLimit }
 
-                let! res = ProcessRunner.run cmd (estimateFor args) ctx CancellationToken.None
+                let! res = run cmd (estimateFor args) ctx CancellationToken.None
 
                 match res with
                 | Ok(ProcessOutcome.Completed(code, stdout, stderr, _)) -> return (code, stdout, stderr)

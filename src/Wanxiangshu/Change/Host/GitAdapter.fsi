@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Process
 
 module OrchestratorGit =
-    val run: cmd: Command -> Task<int * string * string>
+    val createRunner: run: RunProcess -> cmd: Command -> Task<int * string * string>
 
     val command: dir: string -> args: string list -> Command
 

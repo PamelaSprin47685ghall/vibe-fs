@@ -355,7 +355,8 @@ module JoinSurface =
                 CompletionMailboxRuntime.create,
                 NodeTiming.nodeClockPort (),
                 NodeTiming.raceExit,
-                ptyPort = port
+                ptyPort = Some port,
+                recoverPty = PtyBackend.recover
             )
 
         box (JoinProbeHandle(parentId, runtime))

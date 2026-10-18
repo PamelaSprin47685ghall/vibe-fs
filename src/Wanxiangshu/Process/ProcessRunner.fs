@@ -24,7 +24,7 @@ module ProcessRunner =
             -> CancellationToken
             -> Task<Result<ChildProcess, string>>
 
-    /// EXEC-011: the effective deadline is `min(3 × estimate, administrator ceiling)`.
+    /// EXEC-011: the effective deadline is the smaller estimate or hard limit.
     /// Read from the context so the ceiling is the one the caller configured, not a
     /// second copy of the rule here.
     let private budgetSpan (estimate: ProcessEstimate) (ctx: ProcessContext) =

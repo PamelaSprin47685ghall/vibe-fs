@@ -57,7 +57,7 @@ module HookSync =
                 let repo = repositoryRoot ()
                 let gitCommonDir = commonDir repo
                 let raw = ProcessGitRawStore.create repo
-                let run = GitGateway.createDefaultRunner repo
+                let run = GitGateway.createProcessRunner ProcessRunner.run repo
 
                 let clockPort = NodeTiming.nodeClockPort ()
                 let clock () = clockPort.UtcNow()

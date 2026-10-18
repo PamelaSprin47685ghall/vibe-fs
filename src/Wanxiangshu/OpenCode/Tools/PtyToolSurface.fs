@@ -48,7 +48,8 @@ module PtyToolSurface =
                     CompletionMailboxRuntime.create,
                     NodeTiming.nodeClockPort (),
                     NodeTiming.raceExit,
-                    ptyPort = port
+                    ptyPort = Some port,
+                    recoverPty = PtyBackend.recover
                 )
 
             let capability = runtime.PtyCapability

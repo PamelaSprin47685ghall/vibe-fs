@@ -2,6 +2,14 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第二十六批：Process A 纯契约与真实消费者（2026-10-18）
+
+输入主仓`57ba194b6`、库`10bbb32 / 0.6.4`。将ProcessRequest/PtyTypes四文件收敛为无ProjectReference的纯契约工程，物理实现移至独立runtime工程；删除无消费者的PtyOptions，将RunProcess/RecoverPty及显式PTY端口注入实际Git、工具、恢复与Fork调用者，删除隐藏默认工厂。无durable workspace的生产入口仍在Reserve/Spawn前拒绝，未放宽物理所有权。
+
+012原反例转绿，真实Fable正反编译及实际Git/DelegationPtyCapability消费者2/2。原生Node128文件994项：897pass/0普通fail/25skip/72TODO；Bun9文件72pass/0fail/1skip/2TODO，实际Host1/1。完整003为60/60、025为124/124且正常退出；精确包隔离安装的Node/Bun真实run/wire和完整PTY124/124通过，2076文件前后摘要不变。包13,375,869bytes，SHA-256 `2e500c8e27a27aeb96c75c60e1c5f07429e2c8de4f3cdae01a293b58d36278ed`。构建、format、check及diff检查通过，详见[报告](PROCESS-CONTRACT-2026-10-18.md)。
+
+原拆分缺口、本轮遗漏的Deadline工程引用、测试前提错误和撤回的句柄泄漏判断分列记录。正式监督包装器在修前包与A候选均会提前终止有界物理等待，新增CUT-00-R1；其无权威总计，不记为通过。既有GAP-092预算TODO仍失败，不因普通回归全绿而销项。A进入REVIEW，待非作者复审；正常提交推送master，未部署Host。继续C的库适配与主仓集成，R12-U1暂缓。
+
 ## 第二十五批：三小时施工，CUT-17-R3 定因与夹具修正（2026-10-18）
 
 从干净`511a86d3e`开始，库`10bbb32 / 0.6.4`未变。定位后五项卡在首次chat.message，而非Pair重放或冷读：指导夹具未报告模拟provider确切终态，dispose留下Retiring；Bun又不响应后来修改HOME，加载外层推荐路由，累计16槽后等待。现在用注册Host终态事件结束自己模拟的exact执行，并检查owner/waiter消失，失败断言也收尾；统一测试路由定义，在启动Bun前创建自有HOME。另将同前提的EMR-020改为真正新OS配置验证，原断言保留。

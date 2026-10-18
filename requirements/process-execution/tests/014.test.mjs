@@ -37,27 +37,25 @@ test('WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction'
   assert.equal(parsed.output, raw, 'hostile data survives unchanged inside the output field')
 })
 
-test('WHAT[process-execution-014] actual spooled output round-trips every raw text value', async (context) => {
-  const samples = [
-    ['empty', ''],
-    ['no trailing LF', 'first\nsecond'],
-    ['trailing LF', 'first\nsecond\n'],
-    ['multiple trailing LF', 'first\nsecond\n\n'],
-    ['CRLF', 'first\r\nsecond\r\n'],
-    ['lone CR', 'first\rsecond\r'],
-    ['quotes and backslashes', '"double" \'single\' \'\'\' C:\\repo\\file\n'],
-    ['literal quotes and Unicode', "中文 😀 '' C:\\repo\\file\n"],
-    ['control characters', 'first\n\u0000\u0007\u007f\t\n'],
-  ]
-  for (const [name, raw] of samples) {
-    await context.test(name, () => {
-      const parsed = parseDocument(formatSpooledOutcome(7, raw))
-      assert.equal(parsed.output, raw)
-      assert.equal(parsed.exit_code, 7)
-      assert.equal(parsed.policy, undefined)
-    })
-  }
-})
+const rawTextSamples = [
+  ['empty', ''],
+  ['no trailing LF', 'first\nsecond'],
+  ['trailing LF', 'first\nsecond\n'],
+  ['multiple trailing LF', 'first\nsecond\n\n'],
+  ['CRLF', 'first\r\nsecond\r\n'],
+  ['lone CR', 'first\rsecond\r'],
+  ['quotes and backslashes', '"double" \'single\' \'\'\' C:\\repo\\file\n'],
+  ['literal quotes and Unicode', "中文 😀 '' C:\\repo\\file\n"],
+  ['control characters', 'first\n\u0000\u0007\u007f\t\n'],
+]
+for (const [name, raw] of rawTextSamples) {
+  test(`WHAT[process-execution-014] actual spooled output round-trips ${name}`, () => {
+    const parsed = parseDocument(formatSpooledOutcome(7, raw))
+    assert.equal(parsed.output, raw)
+    assert.equal(parsed.exit_code, 7)
+    assert.equal(parsed.policy, undefined)
+  })
+}
 
 test('WHAT[process-execution-014] truncated_notice_uses_the_session_language_and_keeps_raw_output_as_data', async () => {
   const sessionID = 'ses-output-notice-zh'

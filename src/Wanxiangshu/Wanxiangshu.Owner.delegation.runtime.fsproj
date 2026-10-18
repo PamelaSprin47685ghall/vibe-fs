@@ -57,6 +57,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-horizon.execution-session-opencode-horizontool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-trace-capture.fsproj"/>

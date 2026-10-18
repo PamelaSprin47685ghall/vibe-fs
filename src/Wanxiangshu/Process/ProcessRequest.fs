@@ -1,10 +1,8 @@
 namespace rec Wanxiangshu.Process
 
 open System
-
-/// PTY geometry, kept on the command record for round-trip but ignored by the
-/// process runner (handled by the PTY pipeline).
-type PtyOptions = { Cols: int; Rows: int }
+open System.Threading
+open System.Threading.Tasks
 
 /// Stable public protocol for one process execution.
 type Command =
@@ -12,8 +10,7 @@ type Command =
       Arguments: string list
       WorkingDirectory: string option
       Environment: Map<string, string> option
-      Stdin: string option
-      PtyOptions: PtyOptions option }
+      Stdin: string option }
 
 type EstimatedRuntime = RuntimeSeconds of float
 type EstimatedOutput = OutputBytes of int64
@@ -51,6 +48,9 @@ type ProcessError =
     | SpawnFailed of reason: string
     | ProcessCancelled of reason: string
     | ExecutionFailed of reason: string
+
+type RunProcess =
+    Command -> ProcessEstimate -> ProcessContext -> CancellationToken -> Task<Result<ProcessOutcome, ProcessError>>
 
 module ProcessEstimate =
 

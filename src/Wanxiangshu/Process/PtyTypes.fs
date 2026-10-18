@@ -56,6 +56,8 @@ type PtyRecoveryExit =
     | Ended of incarnationId: string * stopped: bool * code: int option * signal: string option
     | NotStarted of incarnationId: string * reason: string
 
+type RecoverPty = string -> string -> string option -> int -> Task<PtyRecoveryExit>
+
 [<RequireQualifiedAccess>]
 type PtyCommand =
     | Spawn of command: string * cwd: string * recovery: PtyRecoveryBinding option
@@ -102,10 +104,6 @@ type PtyRead =
       Output: string
       Closed: bool }
 
-/// SSOT §7 cleanup policy: owner-initiated cleanup sends TERM, waits this grace
-/// window, then escalates to KILL before awaiting process exit. This is
-/// resource-cleanup policy, NOT a second business deadline — the only business
-/// deadline is the 3x watchdog in the orchestrator.
 type PtyBackendHandler = PtyId -> PtyCommand -> Task<Result<unit, string>>
 
 [<RequireQualifiedAccess>]
@@ -115,10 +113,3 @@ module PtyOutcome =
 
     [<Literal>]
     let termToKillGraceMs = 5000
-
-/// Buffered-read plan: unknown id, already in-flight, already closed, or parked.
-type ReadPlan =
-    | Unknown of string
-    | AlreadyInProgress
-    | ClosedImmediate
-    | Park of TaskCompletionSource<Result<string * bool, string>>

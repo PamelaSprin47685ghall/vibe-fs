@@ -6,6 +6,12 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 
+type ReadPlan =
+    | Unknown of string
+    | AlreadyInProgress
+    | ClosedImmediate
+    | Park of TaskCompletionSource<Result<string * bool, string>>
+
 module private PtyPortSupport =
     [<Emit("performance.now()")>]
     let nowMilliseconds () : float = jsNative

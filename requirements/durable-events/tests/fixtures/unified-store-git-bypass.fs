@@ -10,6 +10,4 @@ module FeatureGit =
           Arguments = args
           WorkingDirectory = Some dir
           Environment = None
-          Stdin = None
-          Deadline = None
-          PtyOptions = None }
+          Stdin = None }

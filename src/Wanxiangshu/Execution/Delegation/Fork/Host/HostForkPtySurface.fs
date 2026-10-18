@@ -30,7 +30,8 @@ module HostForkPtySurface =
                 CompletionMailboxRuntime.create,
                 NodeTiming.nodeClockPort (),
                 NodeTiming.raceExit,
-                ptyPort = port,
+                ptyPort = Some port,
+                recoverPty = PtyBackend.recover,
                 ?journal = journal,
                 ?ownershipCommonDir = commonDir
             )
@@ -217,7 +218,8 @@ module HostForkPtySurface =
                     CompletionMailboxRuntime.create,
                     NodeTiming.nodeClockPort (),
                     NodeTiming.raceExit,
-                    ptyPort = port
+                    ptyPort = Some port,
+                    recoverPty = PtyBackend.recover
                 )
 
             let agent = ManagedAgent.make Role.DevOps
@@ -231,7 +233,9 @@ module HostForkPtySurface =
                         (fun _ _ _ -> Task.FromResult None),
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
-                        NodeTiming.raceExit
+                        NodeTiming.raceExit,
+                        ptyPort = None,
+                        recoverPty = PtyBackend.recover
                     )
 
                 let! outcome = production.ForkPty(input, agent)
@@ -337,7 +341,8 @@ module HostForkPtySurface =
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
-                        ptyPort = devopsPort,
+                        ptyPort = Some devopsPort,
+                        recoverPty = PtyBackend.recover,
                         journal = durable
                     )
                 // DevOps opens a PTY in its own session
@@ -360,7 +365,8 @@ module HostForkPtySurface =
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
-                        ptyPort = engineerPort
+                        ptyPort = Some engineerPort,
+                        recoverPty = PtyBackend.recover
                     )
 
                 let! engineerPtyResult = engineerRuntime.ForkPty("engineer-task", ManagedAgent.make Role.Engineer)
@@ -408,6 +414,8 @@ module HostForkPtySurface =
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
+                        ptyPort = None,
+                        recoverPty = PtyBackend.recover,
                         drainChildPtys = drainChildPtys,
                         journal = durable
                     )

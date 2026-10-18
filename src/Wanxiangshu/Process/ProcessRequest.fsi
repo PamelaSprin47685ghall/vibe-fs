@@ -1,16 +1,15 @@
 namespace Wanxiangshu.Process
 
 open System
+open System.Threading
+open System.Threading.Tasks
 
-type PtyOptions = { Cols: int; Rows: int }
-
-and Command =
+type Command =
     { FileName: string
       Arguments: string list
       WorkingDirectory: string option
       Environment: Map<string, string> option
-      Stdin: string option
-      PtyOptions: PtyOptions option }
+      Stdin: string option }
 
 and EstimatedRuntime = RuntimeSeconds of float
 
@@ -38,6 +37,9 @@ and [<RequireQualifiedAccess>] ProcessError =
     | SpawnFailed of reason: string
     | ProcessCancelled of reason: string
     | ExecutionFailed of reason: string
+
+type RunProcess =
+    Command -> ProcessEstimate -> ProcessContext -> CancellationToken -> Task<Result<ProcessOutcome, ProcessError>>
 
 module ProcessEstimate =
     val DefaultHardLimit: TimeSpan

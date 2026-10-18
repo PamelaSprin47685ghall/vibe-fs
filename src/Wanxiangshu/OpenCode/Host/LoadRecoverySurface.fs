@@ -13,6 +13,7 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Process
 
 module LoadRecoverySurface =
     type private State =
@@ -47,7 +48,7 @@ module LoadRecoverySurface =
 
     let settleChildRuns (handle: JournalHandle) (commonDir: string) : Task<unit> =
         let drainPtys work =
-            HostForkRuntime.CloseUnboundPtyRun(commonDir, work)
+            HostForkRuntime.CloseUnboundPtyRun(PtyBackend.recover, commonDir, work)
 
         ChildWorkRecovery.settleOrphanedChildRuns drainPtys handle.Journal
 

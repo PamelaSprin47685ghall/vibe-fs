@@ -25,4 +25,4 @@ module GitGateway =
         clock: (unit -> DateTimeOffset) ->
             Task<Result<StoreSnapshot, ConvergeError>>
 
-    val createDefaultRunner: repoPath: string -> GitGatewayRunner
+    val createProcessRunner: run: RunProcess -> repoPath: string -> GitGatewayRunner

@@ -14,13 +14,13 @@ module OrchestratorGit =
           EstimatedOutput = OutputBytes 65536L
           EstimatedMemory = EstimatedMemory.Medium }
 
-    let run (cmd: Command) : Task<int * string * string> =
+    let createRunner (run: RunProcess) (cmd: Command) : Task<int * string * string> =
         task {
             let ctx =
                 { WorkingDirectory = cmd.WorkingDirectory
                   HardLimit = ProcessEstimate.DefaultHardLimit }
 
-            let! res = ProcessRunner.run cmd estimate ctx CancellationToken.None
+            let! res = run cmd estimate ctx CancellationToken.None
 
             match res with
             | Ok(ProcessOutcome.Completed(code, stdout, stderr, _)) -> return (code, stdout, stderr)
@@ -33,8 +33,7 @@ module OrchestratorGit =
           Arguments = args
           WorkingDirectory = Some dir
           Environment = None
-          Stdin = None
-          PtyOptions = None }
+          Stdin = None }
 
     /// True when an in-progress rebase is present. Prefer rebase-merge / rebase-apply
     /// over a bare REBASE_HEAD ref: a stale REBASE_HEAD can survive after a failed

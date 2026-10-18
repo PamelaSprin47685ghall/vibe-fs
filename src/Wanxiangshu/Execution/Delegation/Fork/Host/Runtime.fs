@@ -189,7 +189,7 @@ module private HostPtyOwnership =
             ended ownership id lease incarnation (if stopped then "Cancelled" else "Completed")
         | PtyRecoveryExit.NotStarted(incarnation, reason) -> notStarted ownership id lease incarnation reason
 
-    let private recoverBlocker ownership commonDir (blocker: DurableWorkHost.OwnershipBlocker) =
+    let private recoverBlocker (recover: RecoverPty) ownership commonDir (blocker: DurableWorkHost.OwnershipBlocker) =
         task {
             try
                 if
@@ -201,8 +201,7 @@ module private HostPtyOwnership =
                 let id = blocker.Lease.ResourceId.Substring 4
                 let binding = recoveryBinding commonDir blocker.Lease ""
 
-                let! result =
-                    PtyBackend.recover binding.Directory binding.Key blocker.IncarnationId PtyOutcome.termToKillGraceMs
+                let! result = recover binding.Directory binding.Key blocker.IncarnationId PtyOutcome.termToKillGraceMs
 
                 settleRecovered ownership id blocker.Lease result
                 return None
@@ -217,7 +216,7 @@ module private HostPtyOwnership =
                     )
         }
 
-    let recoverRun ownership commonDir root runId localIds =
+    let recoverRun (recover: RecoverPty) ownership commonDir root runId localIds =
         task {
             let failures = ResizeArray<exn>()
             let localResources = localIds |> List.map (fun id -> "pty:" + id)
@@ -227,7 +226,7 @@ module private HostPtyOwnership =
                 |> List.filter (fun blocker -> not (List.contains blocker.Lease.ResourceId localResources))
 
             for blocker in unbound do
-                let! failure = recoverBlocker ownership commonDir blocker
+                let! failure = recoverBlocker recover ownership commonDir blocker
                 failure |> Option.iter failures.Add
 
             failures |> Seq.tryHead |> Option.iter raise
@@ -349,10 +348,11 @@ type HostForkRuntime
         createMailbox: obj -> ForkCompletionMailbox,
         clock: IClockPort,
         raceExit: Task -> int -> Task<bool>,
+        ptyPort: PtyPort option,
+        recoverPty: RecoverPty,
         ?journal: AgentJournal,
         ?onChildCreated: string -> Role -> SessionId -> unit,
         ?onChildCreatedDir: string -> SessionId -> string option -> unit,
-        ?ptyPort: PtyPort,
         ?directoryFor: string -> string option,
         ?onRunStarted: SessionId -> Role -> string option -> unit,
         ?parentWorkRecordFor: SessionId -> Task<string option>,
@@ -637,7 +637,10 @@ type HostForkRuntime
 
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
-    let ptyPortInstance = defaultArg ptyPort (PtyBackend.createPort ())
+    let requirePtyPort () =
+        ptyPort
+        |> Option.defaultWith (fun () -> invalidOp "PTY physical capability is unavailable")
+
     let parentKey = SessionId.value parentId
 
     let ptyRootScopeId = parentKey
@@ -814,8 +817,9 @@ type HostForkRuntime
 
     do
         ptyExitSubscription <-
-            Some(
-                ptyPortInstance.AddExitListener(fun exitEvent ->
+            ptyPort
+            |> Option.map (fun port ->
+                port.AddExitListener(fun exitEvent ->
                     let item = mapExitEvent exitEvent
                     let id = PtyJoinItem.ptyId item
                     let owned = lock gate (fun () -> ptyLeases.ContainsKey id)
@@ -826,8 +830,7 @@ type HostForkRuntime
                         lock gate (fun () -> ptyExitObservations.[id] <- exitEvent)
                         runtime.PublishPtyCompletion item
                         settlePtyLease exitEvent
-                        notifyPtyObservers item)
-            )
+                        notifyPtyObservers item))
 
     member internal _.Runtime = runtime
     member internal _.Children = children
@@ -963,7 +966,7 @@ type HostForkRuntime
     member internal _.ReleaseJoin() =
         lock gate (fun () -> joinInFlight <- false)
 
-    member internal _.PtyPort = ptyPortInstance
+    member internal _.PtyPort = requirePtyPort ()
     member internal _.DirectoryOf = directoryOf
     member internal _.RunStarted = runStarted
     member internal _.ChildCreated = childCreated
@@ -1445,7 +1448,7 @@ type HostForkRuntime
     member this.CloseOwnedPtys(?graceMs: int) : Task<unit> =
         this.ClosePtys([ ptyRootScopeId ], graceMs)
 
-    static member internal CloseUnboundPtyRun(commonDir: string, work: AdmittedWork) =
+    static member internal CloseUnboundPtyRun(recoverPty: RecoverPty, commonDir: string, work: AdmittedWork) =
         task {
             let root = AdmittedWork.id work |> fun work -> SessionId.value work.ChildSessionId
             let runId = AdmittedWork.logicalRunId work
@@ -1454,7 +1457,7 @@ type HostForkRuntime
             HostPtyOwnership.openRun ownership root runId
             |> HostPtyOwnership.drain ownership
 
-            do! HostPtyOwnership.recoverRun ownership commonDir root runId []
+            do! HostPtyOwnership.recoverRun recoverPty ownership commonDir root runId []
             HostPtyOwnership.requireRunSettled ownership root runId
         }
 
@@ -1492,7 +1495,15 @@ type HostForkRuntime
                         match stopFailure, ownershipCommonDir with
                         | None, Some directory ->
                             let localIds = lock gate (fun () -> ptyLeases.Keys |> Seq.toList)
-                            do! HostPtyOwnership.recoverRun ptyOwnership directory ptyRootScopeId runId localIds
+
+                            do!
+                                HostPtyOwnership.recoverRun
+                                    recoverPty
+                                    ptyOwnership
+                                    directory
+                                    ptyRootScopeId
+                                    runId
+                                    localIds
                         | _ -> ()
                     }
                     :> Task)
@@ -1529,7 +1540,7 @@ type HostForkRuntime
                 captureOwnedWorkFailure (fun () ->
                     task {
                         if this.OwnsPty id then
-                            do! ptyPortInstance.ClosePty(id, ?graceMs = graceMs)
+                            do! (requirePtyPort ()).ClosePty(id, ?graceMs = graceMs)
 
                         settleObservedPty id.Value
 
@@ -1558,7 +1569,12 @@ type HostForkRuntime
         if String.IsNullOrWhiteSpace name then
             None
         else
-            PtyHostHelpers.ptyByName gate terminalByName (fun id -> ptyLeases.ContainsKey id) ptyPortInstance.Known name
+            PtyHostHelpers.ptyByName
+                gate
+                terminalByName
+                (fun id -> ptyLeases.ContainsKey id)
+                (fun id -> ptyPort |> Option.exists (fun port -> port.Known id))
+                name
 
     member private this.SpawnReservedPty
         (id: PtyId, command: string, agent: ManagedAgent, cwd: string option)
@@ -1571,7 +1587,8 @@ type HostForkRuntime
                 |> Option.map (fun directory ->
                     HostPtyOwnership.recoveryBinding directory owned.Lease owned.IncarnationId)
 
-            ptyPortInstance.Fork(command, agent.Name, ptyId = id, ?cwd = cwd, ?recovery = recovery)
+            (requirePtyPort ())
+                .Fork(command, agent.Name, ptyId = id, ?cwd = cwd, ?recovery = recovery)
             |> ignore
 
             Ok id
@@ -1610,7 +1627,7 @@ type HostForkRuntime
         let valid =
             if String.IsNullOrWhiteSpace command then
                 Error "PTY command is required"
-            elif ownershipCommonDir.IsNone && ptyPort.IsNone then
+            elif ptyPort.IsNone then
                 Error "Durable PTY ownership is unavailable"
             else
                 Ok()
@@ -1629,7 +1646,10 @@ type HostForkRuntime
     member this.TryPty(id: string) =
         if String.IsNullOrWhiteSpace id then
             None
-        elif this.OwnsPty(PtyId.Create id) && ptyPortInstance.Known(PtyId.Create id) then
+        elif
+            this.OwnsPty(PtyId.Create id)
+            && (ptyPort |> Option.exists (fun port -> port.Known(PtyId.Create id)))
+        then
             Some(PtyId.Create id)
         else
             None
@@ -1639,20 +1659,23 @@ type HostForkRuntime
             do!
                 if not (this.OwnsPty id) then
                     Error(sprintf "Unknown PTY id: %s" id.Value)
-                elif not (ptyPortInstance.Exists id) then
+                elif not (ptyPort |> Option.exists (fun port -> port.Exists id)) then
                     Error(sprintf "Unknown PTY id: %s" id.Value)
                 else
                     Ok()
 
             match signal with
             | Some value ->
-                do! ptyPortInstance.Send(id, PtyCommand.Signal value)
+                do! (requirePtyPort ()).Send(id, PtyCommand.Signal value)
                 return PtyHostHelpers.emptyRead id
             | None when String.IsNullOrEmpty prompt ->
-                let! output, closed = ptyPortInstance.Read id
+                let! output, closed = (requirePtyPort ()).Read id
                 return PtyHostHelpers.mapRead id (output, closed)
             | None ->
-                do! ptyPortInstance.Send(id, PtyCommand.Write(Pty.bytes (PtyHostHelpers.ensureLf prompt)))
+                do!
+                    (requirePtyPort ())
+                        .Send(id, PtyCommand.Write(Pty.bytes (PtyHostHelpers.ensureLf prompt)))
+
                 return PtyHostHelpers.emptyRead id
         }
 

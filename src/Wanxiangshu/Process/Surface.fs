@@ -302,8 +302,7 @@ module ProcessSurface =
               Arguments = stringArrayOf arguments |> Array.toList
               WorkingDirectory = optionString workingDirectory
               Environment = None
-              Stdin = optionString stdin
-              PtyOptions = None }
+              Stdin = optionString stdin }
         :> obj
 
     let private commandOf (value: obj) = (value :?> CommandHandle).Command

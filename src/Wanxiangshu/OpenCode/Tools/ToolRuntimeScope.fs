@@ -114,6 +114,12 @@ type ToolRuntimeScope
     let ownershipCommonDir =
         workspaceDirectory
         |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+
+    let createPtyPort () =
+        match ptyPortFactory, ownershipCommonDir with
+        | Some create, _ -> Some(create ())
+        | None, Some _ -> Some(PtyBackend.createPort ())
+        | None, None -> None
     // DSL-MUTABLE: resource — per-owner fork runtime registry
     let runtimes = Dictionary<string, HostForkRuntime>()
     // DSL-MUTABLE: resource — per-session executor runtime registry
@@ -352,7 +358,7 @@ type ToolRuntimeScope
 
     let drainUnboundChildPtys work =
         match ownershipCommonDir with
-        | Some commonDir -> HostForkRuntime.CloseUnboundPtyRun(commonDir, work)
+        | Some commonDir -> HostForkRuntime.CloseUnboundPtyRun(PtyBackend.recover, commonDir, work)
         | None -> Task.FromResult(())
 
     let drainChildPtysFor (work: AdmittedWork) : Task<unit> =
@@ -380,7 +386,8 @@ type ToolRuntimeScope
             NodeTiming.raceExit,
             ?journal = journal,
             ?ownershipCommonDir = ownershipCommonDir,
-            ?ptyPort = (ptyPortFactory |> Option.map (fun create -> create ())),
+            ptyPort = createPtyPort (),
+            recoverPty = PtyBackend.recover,
             onChildCreated = (fun _ role childId -> registerChild sid role childId),
             onChildCreatedDir =
                 (fun _ childId directory ->
@@ -1282,7 +1289,8 @@ type ToolRuntimeScope
                         NodeTiming.raceExit,
                         ?journal = journal,
                         ?ownershipCommonDir = ownershipCommonDir,
-                        ?ptyPort = (ptyPortFactory |> Option.map (fun create -> create ())),
+                        ptyPort = createPtyPort (),
+                        recoverPty = PtyBackend.recover,
                         onChildCreated = (fun _ role childId -> registerChild ctx.SessionId role childId),
                         // EXEC-014: host executor leaves are Host-owned and
                         // parent-invisible. A DurableParentHandle would leak every
