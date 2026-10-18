@@ -16,7 +16,7 @@ type DeliverResult =
       NextIncumbencyId: string
       Message: string }
 
-/// planning-010: the outcome of one synchronous ask delegation.
+/// work-028: the outcome of one synchronous ask delegation.
 type AskResult =
     { Kind: string
       WorkRecord: string
@@ -207,6 +207,12 @@ module PlanTools =
             receipt.Status
         else
             receipt.Reason
+
+    /// WHAT[work-025]: a blocked retirement must reach the model as the blocker
+    /// summary it has to clear, never as a bare result name. The durable
+    /// blockerDigest stays the one the event recorded.
+    let private blockedMessage (blockers: string array) =
+        sprintf "Blocked by %d live resource(s): %s" (Array.length blockers) (String.concat "; " blockers)
 
     let private settledDelivery
         (resolved: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostReceipt)
@@ -451,11 +457,20 @@ module PlanTools =
                         else
                             reason
                     )
-            elif
-                receipt.Kind = "Relayed"
-                || receipt.Kind = "Blocked"
-                || receipt.Kind = "Delivered"
-            then
+            elif receipt.Kind = "Blocked" then
+                return
+                    Ok
+                        { Ok = true
+                          Relayed = false
+                          Delivered = false
+                          RetiredIncumbencyId = ""
+                          RetirementOutcome = "Blocked"
+                          Digest = ""
+                          Path = ""
+                          ExecSessionId = ""
+                          NextIncumbencyId = ""
+                          Message = blockedMessage (retirementBlockers ()) }
+            elif receipt.Kind = "Relayed" || receipt.Kind = "Delivered" then
                 return
                     Ok
                         { Ok = true
@@ -565,11 +580,19 @@ module PlanTools =
                     Message = "Plan entered post-S3 state" })
         elif receipt.Kind = "ReviewRequired" then
             Error "assessment required"
-        elif
-            receipt.Kind = "Relayed"
-            || receipt.Kind = "Blocked"
-            || receipt.Kind = "Delivered"
-        then
+        elif receipt.Kind = "Blocked" then
+            Ok
+                { Ok = true
+                  Relayed = false
+                  Delivered = false
+                  RetiredIncumbencyId = ""
+                  RetirementOutcome = "Blocked"
+                  Digest = ""
+                  Path = ""
+                  ExecSessionId = ""
+                  NextIncumbencyId = ""
+                  Message = blockedMessage (retirementBlockers ()) }
+        elif receipt.Kind = "Relayed" || receipt.Kind = "Delivered" then
             Ok
                 { Ok = true
                   Relayed = receipt.Kind = "Relayed"
@@ -964,6 +987,35 @@ module PlanTools =
                 promptSession
                 discardSession
 
+    /// A tool call whose (run, call) fence already owns a recorded retirement is
+    /// the re-entry of that call, not a new launch request. The retirement fence
+    /// is looked up before any no-tenure refusal, so this re-entry appends
+    /// nothing and reports the recorded outcome ([007]: a completed delivery
+    /// operation's replay returns the original retirement result). Rebuilding a
+    /// Deliver command here would recompute its cursor and blockers from the
+    /// current work state, which no longer match the recorded receipt and would
+    /// surface as a RequestIdConflict instead of the recorded answer. The draft
+    /// path is derived from the work id; the recorded draft bytes are not read.
+    let private replayRecordedFence
+        (root: string)
+        (workId: string)
+        (retired: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement)
+        : Result<DeliverResult, string> =
+        match PlanPath.resolvePlanPath root workId with
+        | Error err -> Error(sprintf "Cannot resolve plan path: %s" err)
+        | Ok planPath ->
+            Ok
+                { Ok = true
+                  Relayed = retired.Outcome = "Relayed"
+                  Delivered = retired.Outcome = "Delivered"
+                  RetiredIncumbencyId = retired.IncumbencyId
+                  RetirementOutcome = retired.Outcome
+                  Digest = ""
+                  Path = planPath
+                  ExecSessionId = ""
+                  NextIncumbencyId = ""
+                  Message = retired.Outcome }
+
     let startPostS3Execution
         (gitCommonDir: string)
         (root: string)
@@ -977,11 +1029,22 @@ module PlanTools =
         (retirementCursor: int64)
         : Task<Result<DeliverResult, string>> =
         task {
-            match lifecycleWorkOf gitCommonDir workId with
-            | None -> return Error "lifecycle work is missing"
-            | Some work when not work.Delivered ->
+            let inspected = lifecycleWorkOf gitCommonDir workId
+
+            let recordedFence =
+                inspected
+                |> Option.bind (fun work ->
+                    work.Retirements
+                    |> List.tryFind (fun retired ->
+                        retired.Fence.ProviderRunId = providerRunId
+                        && retired.Fence.ToolCallId = toolCallId))
+
+            match inspected, recordedFence with
+            | None, _ -> return Error "lifecycle work is missing"
+            | Some _, Some retired -> return replayRecordedFence root workId retired
+            | Some work, None when not work.Delivered ->
                 return Error "Cannot start S4 execution before entering post-S3 state"
-            | Some work ->
+            | Some work, None ->
                 return!
                     dispatchPostS3Execution
                         gitCommonDir
@@ -1031,9 +1094,9 @@ module PlanTools =
             else
                 settleAcceptedDelivery gitCommonDir workId operationId execSessionId digest path blockers)
 
-    // planning-010: at most one pending ask delegation per work. The tracker
+    // work-028: at most one pending ask delegation per work. The tracker
     // is process-local memory — crash recovery has no hanging ask state
-    // (planning-012), so this never becomes a durable state machine.
+    // (work-035), so this never becomes a durable state machine.
     // DSL-MUTABLE: resource — in-flight ask delegation gate
     let private pendingAskGate = obj ()
     // DSL-MUTABLE: resource — works with one pending ask delegation
@@ -1067,7 +1130,7 @@ module PlanTools =
         }
 
     // The binding is persisted single-flight after the delegation returns.
-    // An already-bound work is Done and writes nothing (planning-010).
+    // An already-bound work is Done and writes nothing (work-028).
     let private ensureDevOpsBound
         (gitCommonDir: string)
         (workId: string)

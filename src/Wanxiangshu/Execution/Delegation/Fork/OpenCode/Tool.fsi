@@ -111,10 +111,10 @@ module ForkTool =
             val ChargeTaken: string = "tool/commission/charge-taken"
 
             [<Literal>]
-            val RoadNotOpened: string = "tool/commission/road-not-opened"
+            val WorkNotOpened: string = "tool/commission/work-not-opened"
 
             [<Literal>]
-            val RoadCannotTakeCharge: string = "tool/commission/road-cannot-take-charge"
+            val WorkCannotTakeCharge: string = "tool/commission/work-cannot-take-charge"
 
         [<RequireQualifiedAccess>]
         module Resume =
@@ -129,6 +129,9 @@ module ForkTool =
 
             [<Literal>]
             val AssessmentPendingForDevOps: string = "tool/resume/assessment-pending-for-devops"
+
+            [<Literal>]
+            val DispatchClosed: string = "tool/resume/dispatch-closed"
 
     type Request =
         { Calling: string

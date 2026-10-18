@@ -65,9 +65,31 @@ module DeliverTool =
         else
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
 
-    let private deterministicId prefix payload create =
-        HostDigest.sha256Hex (prefix + "\n" + payload)
-        |> fun digest -> create (prefix + ":" + digest)
+    /// Algorithm E1.1: the fence (ProviderRunId, ToolCallId) is looked up on the
+    /// retirements the fold already committed, before the entry reads an active
+    /// tenure or a review position. A retried call must return the state that
+    /// call recorded: a delivered work has no active tenure left, and a relayed
+    /// one leaves a successor that is not yet reviewed. The recorded outcome
+    /// name is already the closed result vocabulary, so the expected advance the
+    /// entry read is the one field left to compare; a different one is the same
+    /// refusal the second call gets. This path writes nothing.
+    let recordedFenceReplay
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        (providerRunId: string)
+        (toolCallId: string)
+        : Result<string, string> option =
+        let sameFence (retirement: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement) =
+            retirement.ProjectionCut
+            && retirement.Fence.ProviderRunId = providerRunId
+            && retirement.Fence.ToolCallId = toolCallId
+
+        let recordedState (retirement: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement) =
+            if retirement.Expected = work.Authority then
+                Ok(text Path.Retired)
+            else
+                Error "RetirementReplayConflict"
+
+        work.Retirements |> List.tryFind sameFence |> Option.map recordedState
 
     let private blockedResult blockers =
         ToolHostCodec.tomlObjectWithInstructions
@@ -85,9 +107,6 @@ module DeliverTool =
             [ text Path.AssessmentRequired ]
             [ "finished", ToolHostCodec.TBool false
               "assessment_required", ToolHostCodec.TBool true ]
-
-    let private retiredResult () =
-        ToolHostCodec.tomlObjectWithInstructions [ text Path.Retired ] [ "finished", ToolHostCodec.TBool true ]
 
     let private requireSome error =
         function
@@ -145,6 +164,13 @@ module DeliverTool =
           Incumbent: string
           Reviewed: bool }
 
+    /// Algorithm E1.1 and E2: the entry either replays a fence the fold already
+    /// settled, or binds the active tenure. The replay decision belongs to the
+    /// fold, so no earlier layer answers a retried call with a refusal for the
+    /// tenure the retirement removed.
+    type private DeliverEntry =
+        | Replayed of string
+        | Prepared of PreparedRetirement
 
     let private bindInvocation (scope: ToolRuntimeScope) (context: HostToolContext) =
         match
@@ -167,19 +193,32 @@ module DeliverTool =
         | Some _, _, _, _, _, _ -> Error(text Path.NonManagerRole)
         | None, _, _, _, _, _ -> Error(text Path.NoAuthority)
 
-    let private prepareTarget (context: HostToolContext) (bound: BoundRetirement) : Result<PreparedRetirement, string> =
-        let located =
-            lifecycleWorkOf bound.Directory context.SessionId
-            |> Option.bind (fun work -> work.ActiveId |> Option.map (fun active -> work, active))
+    /// Algorithm E1: the caller enters the two-stage sequence only for the
+    /// execution sequence. Algorithm E1.1: an already committed fence replays
+    /// its recorded state before Algorithm E2 reads an active tenure.
+    let private enterDeliver (context: HostToolContext) (bound: BoundRetirement) : Result<DeliverEntry, string> =
+        let fenceReplay (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+            recordedFenceReplay work (ProviderRunIdentity.value bound.ProviderRun) (ToolCallId.value bound.ToolCallId)
+            |> Option.map (Result.map Replayed)
 
-        match located with
-        | None -> Error(text Path.BindingUnavailable)
-        | Some(work, active) ->
-            Ok
-                { Bound = bound
-                  SessionId = SessionId.create context.SessionId
-                  Incumbent = active
-                  Reviewed = work.Reviewed }
+        let activeEntry (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+            work.ActiveId
+            |> Option.map (fun active ->
+                Ok(
+                    Prepared
+                        { Bound = bound
+                          SessionId = SessionId.create context.SessionId
+                          Incumbent = active
+                          Reviewed = work.Reviewed }
+                ))
+            |> Option.defaultValue (Error(text Path.BindingUnavailable))
+
+        let openedEntry (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+            fenceReplay work |> Option.defaultWith (fun () -> activeEntry work)
+
+        match lifecycleWorkOf bound.Directory context.SessionId with
+        | Some work when work.Sequence = [ "S4" ] -> openedEntry work
+        | _ -> Error(text Path.BindingUnavailable)
 
     let private confirmationResult (prepared: PreparedRetirement) pending =
         let deferred =
@@ -297,6 +336,11 @@ module DeliverTool =
                     Ok(
                         if receipt.Kind = "Confirmed" then
                             confirmationResult prepared pending
+                        elif receipt.Kind = "Blocked" then
+                            // Algorithm E8: a committed blocker keeps the tenure
+                            // active. The call reports what to close and may be
+                            // repeated once the resources have settled.
+                            blockedResult blockers
                         else
                             text Path.Retired
                     )
@@ -431,8 +475,13 @@ module DeliverTool =
         }
 
     let private execute (scope: ToolRuntimeScope) (_: HostToolArguments) (context: HostToolContext) =
-        match bindInvocation scope context |> Result.bind (prepareTarget context) with
-        | Ok target -> executePrepared scope context target
+        let entered =
+            bindInvocation scope context
+            |> Result.bind (fun bound -> enterDeliver context bound)
+
+        match entered with
+        | Ok(Replayed result) -> task { return result }
+        | Ok(Prepared target) -> executePrepared scope context target
         | Error error -> task { return raise (InvalidOperationException error) }
 
     let description () = text Path.Description

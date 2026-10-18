@@ -235,10 +235,12 @@ module DurableWorkHost =
 
     /// One committed IncumbencyRetired fact. ProjectionCut is true when the
     /// retirement came from the execution sequence and carries no cursor.
+    /// Expected is the authority the retiring tenure expected to advance from.
     type HostRetirement =
         { RetirementId: string
           IncumbencyId: string
           Outcome: string
+          Expected: string
           Fence: HostRunFence
           ProjectionCut: bool }
 
@@ -350,6 +352,7 @@ module DurableWorkHost =
         { RetirementId = textOf event?retirementId
           IncumbencyId = textOf event?incumbencyId
           Outcome = textOf event?outcome
+          Expected = textOf event?expectedAdvance
           Fence = hostRunFenceOf event
           ProjectionCut = isRecord cut }
 

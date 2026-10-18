@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict'
+import {mkdtempSync, rmSync} from 'node:fs'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
 import test from 'node:test'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as workspaceSurface from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as hostSurface from '../../../dist/Change/Host/Surface.js'
+import * as managerWorkflow from '../../../dist/Mission/Manager/WorkflowSurface.js'
 import {withReview, scores} from './support/plugin.mjs'
 import {withSuccessor, messageId} from './support/cut.mjs'
 import { withExecutablePlugin, acceptAuthorityRoot, injectAcceptedAssessment, lifecycleWorkView } from '../../verification-system/tests/support/plugin-fixture.mjs'
+
+const life = lifecycle.LifecycleSurface ?? lifecycle
 
 test('WHAT[work-011] Promoted deliver waits for its terminal attempt interrupt before returning and dispatches no successor', async () => {
   await withReview(async ({execute, hooks, runtime, session}) => {
@@ -360,4 +370,79 @@ test('WHAT[work-011] Stayed deliver enqueues the successor manager-assess prompt
     const promptText = runtime.prompts[0]?.body?.parts?.find(p => p?.type === 'text')?.text ?? ''
     assert.match(promptText, /(你是接手此任务的第 2 个 Manager|You are the 2 Manager taking over this mission)/)
   }, {session: 'review-manager-atomic-enqueue'})
+})
+
+// ── The successor-prompt occasion, read from the fold alone ────────────────
+// WHAT[work-011]: the occasion is derived from the durable fold — sequence S4,
+// an open tenure, and a committed retirement that the open tenure has not
+// reviewed yet. `successorPromptContextOf` is the read-only probe over the same
+// predicate the dispatch reads; it dispatches nothing.
+
+const withSeededManagerWork = async (outcome, body) => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-successor-context-'))
+  const stateRoot = journalSurface.JournalSurface_initializeStateRoot(root)
+  const store = workspaceSurface.acquire(stateRoot)
+  try {
+    const sessionId = `manager-${outcome ?? 'first'}`
+    const opened = await life.seedOpen(store, 'S4', sessionId, root, 0n)
+    assert.equal(opened.ok, true, opened.error)
+    if (outcome != null) {
+      const reviewed = await life.seedReview(store, sessionId, outcome)
+      assert.equal(reviewed.ok, true, reviewed.error)
+      const confirmed = await life.seedDeliver(store, sessionId, 'run-1', 'call-1', 1n)
+      assert.equal(confirmed.ok, true, confirmed.error)
+      await life.seedDeliver(store, sessionId, 'run-2', 'call-2', 2n)
+    }
+    await body({root, stateRoot, store, sessionId, view: life.inspected(stateRoot, sessionId)})
+  } finally {
+    workspaceSurface.release(stateRoot)
+    rmSync(root, {recursive: true, force: true})
+  }
+}
+
+const successorPromptOf = (root, sessionId) => managerWorkflow.successorPromptContextOf(root, sessionId)
+
+test('WHAT[work-011] a first tenure with no retirement owes no successor prompt', async () => {
+  await withSeededManagerWork(null, async ({root, sessionId}) => {
+    const context = successorPromptOf(root, sessionId)
+    assert.equal(context.present, false, 'the first tenure has no predecessor to hand over')
+    assert.equal(context.retirementId, '')
+    assert.equal(context.providerRunId, '')
+  })
+})
+
+test('WHAT[work-011] a Relayed retirement owes the successor prompt until that successor is reviewed', async () => {
+  await withSeededManagerWork('Stayed', async ({root, store, sessionId, view}) => {
+    const retirement = Array.from(view.Retirements ?? []).at(-1)
+    assert.equal(retirement.Outcome, 'Relayed')
+    assert.equal(view.ActiveId.length > 0, true, 'the relay opened its successor in the same record')
+    assert.equal(view.Reviewed, false, 'the successor starts unreviewed')
+
+    const context = successorPromptOf(root, sessionId)
+    assert.equal(context.present, true, 'the unreviewed successor owes the successor prompt')
+    assert.equal(context.retirementId, retirement.RetirementId, 'the occasion is named by the retirement')
+    assert.equal(context.providerRunId, 'run-2', 'the cut carries the provider run that made the retirement')
+
+    const reviewed = await life.seedReview(store, sessionId, 'Stayed')
+    assert.equal(reviewed.ok, true, reviewed.error)
+    assert.equal(successorPromptOf(root, sessionId).present, false, 'a reviewed successor owes no successor prompt')
+  })
+})
+
+test('WHAT[work-011] the delivered hand-off reopens the occasion on the unreviewed next tenure', async () => {
+  await withSeededManagerWork('Promoted', async ({root, sessionId, view}) => {
+    const delivered = Array.from(view.Retirements ?? []).at(-1)
+    assert.equal(delivered.Outcome, 'Delivered')
+    assert.equal(view.ActiveId ?? null, null, 'a delivery leaves no open tenure')
+    assert.equal(successorPromptOf(root, sessionId).present, false, 'a delivered work owes no successor prompt')
+
+    const receipt = hostSurface.handOffDeliveredTenure(root, sessionId, 'hand-off:successor-context', 3)
+    assert.equal(receipt.ok, true, receipt.error)
+    assert.equal(receipt.kind, 'HandOff')
+
+    const context = successorPromptOf(root, sessionId)
+    assert.equal(context.present, true, 'the reopened tenure owes the successor prompt')
+    assert.equal(context.retirementId, delivered.RetirementId, 'the delivered retirement is the cut')
+    assert.equal(context.providerRunId, 'run-2', 'the cut carries the delivering provider run')
+  })
 })

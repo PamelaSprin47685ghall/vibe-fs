@@ -3,8 +3,8 @@ namespace Wanxiangshu.Mission.Work.OpenCode
 open System.Threading.Tasks
 open Wanxiangshu.OpenCode
 
-/// relay-assessment-011: the Manager backend of the shared `review` shell.
-/// Owns the relay assessment binding, transaction and failure paths; the
+/// work-038: the Manager backend of the shared `review` shell.
+/// Owns the review binding, transaction and failure paths; the
 /// shell (ReviewShell) dispatches to it for every non-Plan caller.
 module ReviewBackendManager =
 

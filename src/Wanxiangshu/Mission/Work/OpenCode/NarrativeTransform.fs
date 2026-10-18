@@ -21,7 +21,7 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 type RelayProjectionDisposition =
     | Unchanged
-    | CurrentIteration
+    | CurrentTenure
     | RetiredAttemptStopped
 
 module RelayNarrativeTransform =
@@ -60,7 +60,7 @@ module RelayNarrativeTransform =
     /// a previous tenure and not permission to continue.
     let private dispositionAfterProjection (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option) =
         match work with
-        | Some current when current.ActiveId.IsSome -> RelayProjectionDisposition.CurrentIteration
+        | Some current when current.ActiveId.IsSome -> RelayProjectionDisposition.CurrentTenure
         | _ -> RelayProjectionDisposition.Unchanged
 
     let private requestBelongsToSuccessor (physical: string option) afterCut freshRoot acceptedRequest gatePhysical =
@@ -209,6 +209,19 @@ module RelayNarrativeTransform =
             true
         | _ -> false
 
+    /// Algorithm G1's identity rule, the same one the Plan tenure assembly applies:
+    /// an interaction whose Host id has not been captured yet stays (its cursor is
+    /// unknown, not absent), while a semantic interaction with no Host id at all
+    /// would have to be guessed into a predecessor's row, so the assembly refuses.
+    let private interactionHasNoStableIdentity (message: obj) =
+        messageRole message
+        |> Option.exists (fun role ->
+            let role = role.ToLowerInvariant()
+
+            (role = "assistant" || role = "tool")
+            && (messageId message).IsNone
+            && not (List.isEmpty (ProviderWireDecode.rawPartsOf message)))
+
     /// Successor visibility. Opening sequence comes from the active lifecycle
     /// tenure. The other side is the first observation of a captured Host
     /// message id. A message absent from that map has not been captured yet,
@@ -229,6 +242,9 @@ module RelayNarrativeTransform =
                 | Some current when current.ActiveId.IsSome ->
                     (firstCursors journal sessionId, current.OpeningCursor |> Option.map (fun cursor -> int64 cursor))
                 | _ -> Map.empty, None
+
+            if openingCursor.IsSome && messages |> List.exists interactionHasNoStableIdentity then
+                invalidOp "Manager interaction has no stable XTrace message identity"
 
             let kept =
                 messages

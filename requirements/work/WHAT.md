@@ -151,7 +151,7 @@ S4 第一次调用只确认。第二次调用依持久退休结果分流：Relay
 
 执行入口按 sequence 与当前事实收口。工具名到权限的映射按角色解析 deliver，不按列表顺序，也不按后缀猜测。
 
-- 允许后果：没有任期时，read、review、fork、resume、deliver 在工具执行入口被拒绝。有任期且评审尚未接纳时，只读与观察放行，派工与 deliver 被拒绝。评审已接纳且尚未确认时，read 与固定 DevOps 派工放行。按角色解析时，Manager 的 deliver 是 Finality，Plan 的 deliver 是 Deliver，两者不相同。
+- 允许后果：没有任期且本次围栏未命中已落盘退休时，read、review、fork、resume、deliver 在工具执行入口被拒绝；命中已落盘退休时按 [007] 重放，不按无任期拒绝。有任期且评审尚未接纳时，只读与观察放行，派工与 deliver 被拒绝。评审已接纳且尚未确认时，read 与固定 DevOps 派工放行。按角色解析时，Manager 的 deliver 是 Finality，Plan 的 deliver 是 Deliver，两者不相同。
 - 禁止后果：有确认且没有评审时，deliver 不得写入。未知名字不得当成 deliver 放行。工具名到权限的映射不得按列表顺序或按后缀猜测。
 - 失败后果：上述拒绝发生在工具执行入口，不创建子会话。未知名字解析为 null，既不是 Finality 也不是 Deliver。
 

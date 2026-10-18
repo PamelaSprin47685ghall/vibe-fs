@@ -55,7 +55,7 @@ module ProviderSystemTransform =
         | true -> updateMatchingConstraintLine currentSystem isConstraintLine nextConstraint
         | false -> emitJsExpr (currentSystem, nextConstraint) "$0.push($1)" |> ignore
 
-    /// planning-014: the three stage-method resources. The stage slot is one
+    /// work-031: the three stage-method resources. The stage slot is one
     /// line whose content is decided by the current incumbency's stage and the
     /// current language; recognition stays byte-only across all six candidates
     /// (3 stages × 2 languages), exactly like the replica constraint slot.

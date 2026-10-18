@@ -7,4 +7,4 @@ test('WHAT[participant-horizon-015] Manager capability projection denies Fission
   assert.equal(isAllowed('engineer', 'Fission'), true)
 })
 
-test.todo('WHAT[participant-horizon-015] actual multiple-Engineer roster preserves each byname without Manager replicas or shared-DevOps fiction; two chooseRoad objects do not prove a roster (GAP-079)')
+test.todo('WHAT[participant-horizon-015] actual multiple-Engineer roster preserves each byname without Manager replicas or shared-DevOps fiction; two chooseWork objects do not prove a roster (GAP-079)')

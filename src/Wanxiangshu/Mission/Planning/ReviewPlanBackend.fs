@@ -4,14 +4,14 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
-/// planning-022: one plan review either promotes the incumbency or keeps it
+/// work-038: one plan review either promotes the incumbency or keeps it
 /// in place.
 [<RequireQualifiedAccess>]
 type PlanReviewOutcome =
     | Promoted
     | Stayed
 
-/// planning-022: the outcome of one review gate on a plan incumbency.
+/// work-038: the outcome of one review gate on a plan incumbency.
 type PlanReviewResult =
     { Outcome: PlanReviewOutcome
       Target: string
@@ -51,7 +51,7 @@ module ReviewPlanBackend =
         else
             PlanReviewOutcome.Stayed
 
-    // planning-022: each incumbency reviews exactly once. The kernel refuses a
+    // work-038: each incumbency reviews exactly once. The kernel refuses a
     // second review for the same tenure; that refusal is the already-reviewed
     // error, not a record failure.
     /// The reviewer is never the incumbency owner. A plan work opens with the

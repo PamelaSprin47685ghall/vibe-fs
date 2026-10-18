@@ -161,6 +161,11 @@ test('WHAT[work-025] relay is blocked by live resources or a wrong incumbency id
     assert.equal(blocked.relayed, false)
     assert.equal(blocked.delivered, false)
     assert.equal(blocked.retirementOutcome, 'Blocked')
+    assert.match(blocked.message, /retirement-blocked/, 'a blocked retirement returns the live resources the runner must clear')
+    const recorded = life.inspected(commonDir, 'work-h2')
+    assert.equal(recorded.Delivered, false, 'a blocked retirement must not retire the tenure')
+    assert.ok(recorded.BlockerDigest, 'the blockage is a written RetirementBlocked fact, not only a reply string')
+    assert.equal(recorded.ActiveId, activeId, 'the blocked tenure stays active for the next attempt')
 
     const wrong = await surface.PlanningSurface.executeDeliver(
       commonDir, root, 'work-h2', 'wrong-inc', 'run-w', 'call-w', false,

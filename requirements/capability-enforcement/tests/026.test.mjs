@@ -3,6 +3,9 @@ import test from 'node:test'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { acceptAuthorityRoot, injectAcceptedAssessment, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as workspaceEvents from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 // WHAT[capability-enforcement-026]: 在当前迭代的 Review 被系统接纳前，严禁
 // Manager 向绑定的固定 DevOps 派发任何任务；已有只读 Engineer 的合法 resume
@@ -12,6 +15,12 @@ import { acceptAuthorityRoot, injectAcceptedAssessment, openIncumbency, withExec
 
 const devopsDispatchDenied = /尚未被系统接纳|不得向 DevOps 派发|assessment.*not.*accepted|not allowed until/i
 const guidanceAppended = /Guidance for \S+ has been appended to the existing work|追加指导|既有任务|没有建立新任务|no new task was created/i
+// 收口窗（已确认，或已评 Promoted）的拒绝是自己的一条文案，不是评审未接纳那一句。
+const closeoutDispatchDenied = /closing out|收口/i
+const dispatchHandedOver = /carries this charge now|现已接下这项托付/i
+
+// 派工门读插件正在读的同一份工作区事件库，与 fixture 的 lifecycleStore 同源。
+const storeOf = (directory) => workspaceEvents.acquire(journalSurface.JournalSurface_initializeStateRoot(directory))
 
 test('WHAT[capability-enforcement-026] D01_resume_fixed_devops_rejected_before_review_accepted', async () => {
   await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
@@ -169,6 +178,101 @@ test('WHAT[capability-enforcement-026] D07_pre_review_devops_refusal_preserves_d
     )
     assert.match(admitted, /carries this charge now|现已接下这项托付/i)
     assert.equal(createdIds.length, 1)
+  })
+})
+
+// 修复窗（已评 Stayed、尚无确认）是本门唯一放行的格子：修复派工与修复 fork
+// 都不得被本门末尾拒绝，因为修复义务的派工本来就落在这里。
+test('WHAT[capability-enforcement-026] D08_repair_window_admits_devops_dispatch_and_repair_fork', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    const sessionID = 'ses-d08-repair-window'
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
+    await openIncumbency(runtime, sessionID)
+    await injectAcceptedAssessment(runtime, sessionID) // Stayed，尚无确认
+
+    const dispatch = await hooks.tool.resume.execute(
+      { name: 'devops', charge: 'REPAIR-THE-FINDINGS' },
+      { sessionID, agent: 'manager' },
+    )
+    assert.match(dispatch, dispatchHandedOver, 'the repair window must still admit DevOps dispatch')
+    assert.doesNotMatch(dispatch, closeoutDispatchDenied)
+    assert.equal(createdIds.length, 1)
+
+    const repairFork = await hooks.tool.fork.execute(
+      { name: 'Carl', charge: 'repair the findings' },
+      { sessionID, agent: 'manager' },
+    )
+    assert.match(repairFork, dispatchHandedOver, 'a repair fork must not be refused for not being read-only')
+    assert.equal(createdIds.length, 2)
+  })
+})
+
+// 收口窗一：确认已经落盘（Stayed 两段式的第二笔只差收口）。此时再向绑定的固定
+// DevOps 派新任务必须拒绝，且拒绝发生在任何持久化副作用之前。
+test('WHAT[capability-enforcement-026] D09_confirmed_tenure_refuses_new_devops_dispatch_with_zero_side_effects', async () => {
+  await withExecutablePlugin(async (hooks, directory, createdIds, runtime) => {
+    const sessionID = 'ses-d09-confirmed'
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
+    await openIncumbency(runtime, sessionID)
+    await injectAcceptedAssessment(runtime, sessionID) // Stayed
+
+    const store = storeOf(directory)
+    const confirmed = await lifecycle.seedDeliver(store, sessionID, 'run-d09', 'call-d09-first', 2n)
+    assert.equal(confirmed.ok, true, confirmed.error)
+    const view = lifecycle.workView(store, sessionID)
+    assert.equal(view.confirmed, true, 'the plugin must read the same confirmation the gate reads')
+    assert.equal(view.active, true)
+
+    const createdBefore = createdIds.length
+    const promptsBefore = runtime.prompts.length
+    const durableBefore = durableSnapshot(directory)
+
+    const refused = await hooks.tool.resume.execute(
+      { name: 'devops', charge: 'NEW-TASK-AFTER-CONFIRMATION' },
+      { sessionID, agent: 'manager' },
+    )
+    assert.match(refused, closeoutDispatchDenied, 'the close-out window must refuse new DevOps dispatch')
+    assert.doesNotMatch(refused, dispatchHandedOver, 'no handover may be reported in the close-out window')
+    assert.equal(createdIds.length, createdBefore, 'the refused close-out dispatch must not place a child')
+    assert.equal(runtime.prompts.length, promptsBefore, 'the refused close-out dispatch must not emit a prompt')
+    assert.deepEqual(durableSnapshot(directory), durableBefore,
+      'the refused close-out dispatch must not append any durable bytes')
+  })
+})
+
+// 收口窗二：已评 Promoted。新派工不因为已有评审被放行；同时评审接纳前已有的
+// 只读 Engineer fork/resume 不被本门误伤。
+test('WHAT[capability-enforcement-026] D10_promoted_review_refuses_new_devops_dispatch_and_spares_readonly_engineer', async () => {
+  await withExecutablePlugin(async (hooks, _directory, createdIds, runtime) => {
+    const sessionID = 'ses-d10-promoted'
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
+    await openIncumbency(runtime, sessionID)
+
+    const forked = await hooks.tool.fork.execute(
+      { name: 'Dora', charge: 'readonly investigation' },
+      { sessionID, agent: 'manager' },
+    )
+    assert.match(forked, dispatchHandedOver)
+    assert.equal(createdIds.length, 1)
+
+    const resumed = await hooks.tool.resume.execute(
+      { name: 'Dora', charge: 'continue readonly investigation' },
+      { sessionID, agent: 'manager' },
+    )
+    assert.doesNotMatch(resumed, devopsDispatchDenied)
+    assert.doesNotMatch(resumed, closeoutDispatchDenied)
+    assert.match(resumed, guidanceAppended)
+    assert.equal(createdIds.length, 1, 'resume of an existing Engineer must not create a new child')
+
+    await injectAcceptedAssessment(runtime, sessionID, `inc-${sessionID}`, 'Promoted')
+    const promptsBefore = runtime.prompts.length
+    const refused = await hooks.tool.resume.execute(
+      { name: 'devops', charge: 'NEW-TASK-PROMOTED' },
+      { sessionID, agent: 'manager' },
+    )
+    assert.doesNotMatch(refused, dispatchHandedOver, 'a Promoted review must not admit a new DevOps task')
+    assert.equal(createdIds.length, 1)
+    assert.equal(runtime.prompts.length, promptsBefore)
   })
 })
 

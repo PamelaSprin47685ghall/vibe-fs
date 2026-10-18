@@ -4,7 +4,7 @@ open System.Threading.Tasks
 open Wanxiangshu.OpenCode.Host
 open FsToolkit.ErrorHandling
 
-// planning-020 entry wiring: lifecycle opening owns its separate wanxiangli
+// work-036 entry wiring: lifecycle opening owns its separate wanxiangli
 // journal. The legacy workspace EventStore is not an admission precondition.
 module PlanWorkOpenWiring =
 

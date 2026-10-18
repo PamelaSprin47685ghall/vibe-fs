@@ -179,6 +179,25 @@ module ManagerWorkflow =
                 Some(retirement.RetirementId, retirement.Fence.ProviderRunId)
             | _ -> None)
 
+    /// Read-only probe (the `loopSignalOf` / `publishReviewOf` pattern): the
+    /// successor-prompt occasion this Manager session's work currently owes,
+    /// read from the same fold the dispatch reads and dispatching nothing.
+    /// `present = false` is the fail-closed answer for a work that owes no
+    /// successor prompt: a first tenure with no retirement, a work whose open
+    /// tenure is already reviewed, and every non-S4 sequence.
+    let successorPromptContextOf (workspaceDirectory: string) (sessionIdText: string) : obj =
+        match successorPromptContext (Some workspaceDirectory) sessionIdText with
+        | Some(retirementId, providerRunId) ->
+            box
+                {| present = true
+                   retirementId = retirementId
+                   providerRunId = providerRunId |}
+        | None ->
+            box
+                {| present = false
+                   retirementId = ""
+                   providerRunId = "" |}
+
     /// One durable opening at an observed head. DurableWorkHost owns race
     /// reconciliation: a conflicting or unknown append is accepted only when
     /// a reread proves the same Manager work now exists.

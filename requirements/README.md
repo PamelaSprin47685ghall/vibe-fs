@@ -101,7 +101,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | [crash-reconciliation](crash-reconciliation/WHAT.md) | 中断后只从 durable facts + 可信物理观察重入普通程序。 |
 | [degeneration-guard](degeneration-guard/WHAT.md) | 未结束 attempt 病态重复时主动止损再交正常 recovery。 |
 
-### 9. Mission / relay
+### 9. Mission / work
 | Package | 一句话 WHY |
 |---|---|
 | [obligation-ledger](obligation-ledger/WHAT.md) | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的非空 `view` 声明；插件不维护第二份待办真相。 |

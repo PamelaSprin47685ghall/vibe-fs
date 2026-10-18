@@ -664,6 +664,17 @@ module PluginTransforms =
             | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Plan -> Some sid
             | _ -> None
 
+        // work-002 / work-046: opening is a closed entry set. A Plan session
+        // opens S1/S2/S3 and a Manager session opens S4 — the same entry covers
+        // the Manager's direct opening, a new commission, and the parentless
+        // Manager execution session an authorized delivery spawns. Every other
+        // role (DevOps, Engineer, Orchestrator, ...) owns no lifecycle work and
+        // must not be handed one here.
+        let managerSessionOf (sidOpt: string option) : string option =
+            match sidOpt with
+            | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Manager -> Some sid
+            | _ -> None
+
         let tryReadLifecycleWork (sid: string) =
             workspaceDirectory
             |> Option.bind (fun workspace ->
@@ -828,7 +839,7 @@ module PluginTransforms =
                 match planSessionOf sidOpt with
                 | None -> ()
                 | Some sid ->
-                    // planning-020: the entry hook runs before resolveTenure so
+                    // work-036: the entry hook runs before resolveTenure so
                     // the first tenure exists when the isolation is assembled.
                     // The opening cursor is the XTrace head observed in this
                     // transform. The EventStore write lives in
@@ -960,7 +971,7 @@ module PluginTransforms =
 
                     match captured.Receipt with
                     | None -> return captured
-                    | Some receipt when planSessionOf projectionSessionIdOpt |> Option.isNone ->
+                    | Some receipt when managerSessionOf projectionSessionIdOpt |> Option.isSome ->
                         let observedHead = XTraceCursor.sequence receipt.CurrentHead
 
                         do!

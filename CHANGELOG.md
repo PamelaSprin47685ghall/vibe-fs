@@ -1,5 +1,20 @@
 # Changelog — 版本历史
 
+## Unreleased — PLAN.md 合规审计：生命周期统一实现的决策与工程修正
+
+以 `PLAN.md`（Manager/Plan 统一重组，cutover 分支 `feat/lifecycle-cutover` 已并入）为规范，对现行实现逐算法（A–Q）逐条 35 个「能证伪」条件做合规审计，修正下列真实分歧；被后续决策取代的条目（LWR_prev 交接、Reopen 语义、back-to-back 无评审接力、工作计数→durable authority 身份输入、spawn 标记）逐条记录为 SUPERSEDED，未回退。
+
+- **Reviewed 事实三字段**：内核 encode/decode 只含 `incumbencyId/stage/outcome`（work-WHAT [003]）；自证与二次评审门移入 `Commands.decide`（抛错、零写），事件不再携带 reviewer identity（wanxiangli `State.fs`/`Work.fs` + lifecycle-002 新锚点）。
+- **fence 归属分类**：记录的工具调用围栏带 owner——Confirmation 复用报 `RetirementConfirmationReplayConflict`（E5），Retirement/Delivery 报 `RetirementReplayConflict`（D1.1/E1.1/E11）。
+- **Algorithm E1.1 重放排序**：`DeliverTool` 先按 fence 查折叠，再谈无任期/无评审；`ToolRegistry` 的 deliver 执行门对已结算 fence 放行重放（此前 Delivered 成功后重入同一围栏会得到 `no active incumbency` 类拒绝）。work-007 新锚点三例。
+- **启动 fence 重放修复**：`PlanTools.replayRecordedFence` 不再用当前状态重建 Deliver 命令（那会以 `RequestIdConflict` 冲突），直接以已落盘退休作答（[007]：重放只返回原退休结果、零写）。work-026 新锚点。
+- **工作开立闭集**：`PluginTransforms` 的 S4 开立门由「非 Plan 即开」收紧为 `managerSessionOf`——DevOps/Engineer/Orchestrator 会话不再开 S4 work（探针前后对照 + work-036 新锚点「只有 Manager 会话开执行 work」）。
+- **派工门 [026] 重写为 Algorithm I 匹配**：未评审拒绝；Promoted 或已确认走新的 `dispatch-closed` 文案；仅 reviewed-Stayed-未确认（修复窗）放行 DevOps 派工与修复 fork；新增资源 `resume/dispatch-closed/{en,zh-CN}` 与 capability-enforcement-026 的 D08/D09/D10。
+- **后继投影**：无稳定 Host 身份的后继语义行改为拒绝装配（与 Plan 的 `TenureIsolation` 同判据），work-008 新锚点。
+- **术语零残迹（G5/G8）**：8 个 owner shard 改名 `Wanxiangshu.Owner.relay-*` → `Wanxiangshu.Owner.work.*`（24 条 ProjectReference + `subsystems.json` 的 `relay` 子系统移除）；`Road`→`Work`、`iteration`→`tenure`、`assessment`→`review`（错误串与文案）、`Continue`/`Accepted` 在 e2e oracle/scenario 的遗留名；资源目录 `road-*` → `work-*`、`library/relay/quality-ledger` → `library/work/quality-ledger`；53 处源码锚点改名；work-007 的本地重实现伪锚点重写为真实字节断言。
+- **契约措辞**：work-WHAT [019] 补「无任期且围栏未命中已落盘退休时拒绝；命中按 [007] 重放」的豁免句，与 [007] 及新锚点一致。
+- **验收回执**：`WXS_ACCEPT_TODO=1 UNIT_VERDICT_SILENCE_MS=30000 npm run verify:release` → **PASS（exit 0，489.8s）**：format:check / check / build 绿；unit **5148 passed / 0 failed / 865 文件**；integration OK（suites **754/0**、harness **293/293**、package 组 OK）；e2e OK（4/4，`journal=458/699 sse=2037/3351`）；package OK（1692 members，闭包 + 隔离消费者）。内核 lifecycle+assembly **72/0**；`requirements/work` **190/0**；submodule `71c155f`（Reviewed 三字段 + fence 归属）。
+
 ## Unreleased — 集成层修复、委托绑定与 WorkRecord Opening 数据丢失修复、文档漂移与构建图补齐
 
 - **集成层（integration tier）既有红清零**：`.git` 旧根夹具（change-integration-002、crash-reconciliation-020、harness 的 event-store-gate-facts、verification-system 015、work 029、repository-programming 007/011/016/018/019、knowledge-reuse 006/support 等）统一改走 `<workspace>/.Herdchestra` 状态根；`journal-observer.js` 增加 `primaryWorktree`/`stateRoot` 并让 `eventsDir` 指向生产布局；`durable-events-009` 的 shock-cut 源码扫描改指 `ProcessEventLog.fs`；rulebook 打包夹具以 `node_modules/wanxiangli` 符号链接修复解析；`distribution-008` 的 GAP-210 安装场景 TODO 落地为真实 `npm pack` + 闭包校验（package 组 4/4 绿）。

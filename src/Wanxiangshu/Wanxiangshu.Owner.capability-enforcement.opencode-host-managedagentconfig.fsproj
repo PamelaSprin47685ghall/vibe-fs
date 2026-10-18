@@ -36,8 +36,8 @@
 
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-reviewtool.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.mission-deliver-tool.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-reviewtool.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-deliver-tool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.opencode-host-requirementgrounding-runtime.fsproj"/>
     
     

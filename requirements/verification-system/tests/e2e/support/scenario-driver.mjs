@@ -262,7 +262,7 @@ export async function awaitFactBarrier(scenario, step, ctx = null) {
     // One reader for both sources: `readJournal` merges the plugin event stream with the
     // unified work journal (`work.sqlite`), and the file-watching observer only ever sees
     // the former — a session-scoped waitFact would silently read 0 for a lifecycle fact
-    // that lives in the work journal (measured: the Manager road's `Reviewed`).
+    // that lives in the work journal (measured: the Manager work's `Reviewed`).
     const counts = readJournal(scenario.host.workDir, name, renewOn, { sessionId: targetSession });
     return { named: counts.named, total: counts.total, renew: counts.renew };
   };
@@ -515,9 +515,9 @@ async function runFlow(scenario, doc, ctx) {
       const sessions = await awaitSessionsByAgent(scenario, agent, step.timeoutMs);
       const bound = step.bindChild.bind || [agent];
       // The role's OWN session is the one no other lane already owns: a preflow canary or
-      // a HumanRoot road runs on the same agent, and picking the first snapshot entry
-      // (creation order) would attribute this lane's later waits to that other road's
-      // session — measured: the Manager road's `Reviewed`/`IncumbencyRetired` facts live on
+      // a HumanRoot work runs on the same agent, and picking the first snapshot entry
+      // (creation order) would attribute this lane's later waits to that other work's
+      // session — measured: the Manager work's `Reviewed`/`IncumbencyRetired` facts live on
       // the commissioned session, not on the canary owner's.
       const bindings = scenario.provider?._scenario?.bindings;
       const ownedByAnotherLane = (sessionId) => {

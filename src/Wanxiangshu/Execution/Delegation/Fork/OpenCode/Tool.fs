@@ -126,10 +126,10 @@ module ForkTool =
             let ChargeTaken = "tool/commission/charge-taken"
 
             [<Literal>]
-            let RoadNotOpened = "tool/commission/road-not-opened"
+            let WorkNotOpened = "tool/commission/work-not-opened"
 
             [<Literal>]
-            let RoadCannotTakeCharge = "tool/commission/road-cannot-take-charge"
+            let WorkCannotTakeCharge = "tool/commission/work-cannot-take-charge"
 
         [<RequireQualifiedAccess>]
         module Resume =
@@ -144,6 +144,9 @@ module ForkTool =
 
             [<Literal>]
             let AssessmentPendingForDevOps = "tool/resume/assessment-pending-for-devops"
+
+            [<Literal>]
+            let DispatchClosed = "tool/resume/dispatch-closed"
 
     let private lang (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
@@ -660,12 +663,25 @@ module ForkTool =
 
             executeManagerExistingPerson scope runtime context request language handles existingByname
 
-    let private boundDevOpsDispatchClosed (scope: ToolRuntimeScope) parentSessionId isDevOps =
-        if isDevOps then
-            let facts = scope.ManagerCapabilityFactsFor(SessionId.value parentSessionId)
-            not facts.HasAssessment
+    /// The one parked cell of the dispatch gate is the repair window: the review
+    /// landed Stayed with no confirmation yet. Before the review lands a new task
+    /// for the bound DevOps is closed, and it closes again once the tenure is
+    /// closing out — a Promoted review opens no new work, and a durable
+    /// confirmation means the tenure's remaining step is the close-out deliver.
+    let private devopsDispatchRefusal (facts: ManagerCapabilityFacts) : string option =
+        if not facts.HasAssessment then
+            Some Path.Resume.AssessmentPendingForDevOps
+        elif facts.IsFinalIncumbent || facts.HasConfirmation then
+            Some Path.Resume.DispatchClosed
         else
-            false
+            None
+
+    let private boundDevOpsDispatchRefusal (scope: ToolRuntimeScope) parentSessionId isDevOps =
+        if isDevOps then
+            scope.ManagerCapabilityFactsFor(SessionId.value parentSessionId)
+            |> devopsDispatchRefusal
+        else
+            None
 
     let private bindWorkDevOpsIfNeeded (scope: ToolRuntimeScope) parentSessionId isDevOps =
         task {
@@ -689,9 +705,9 @@ module ForkTool =
             let isDevOps =
                 String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
 
-            if boundDevOpsDispatchClosed scope parentSessionId isDevOps then
-                return consequence (prose language Path.Resume.AssessmentPendingForDevOps)
-            else
+            match boundDevOpsDispatchRefusal scope parentSessionId isDevOps with
+            | Some refusal -> return consequence (prose language refusal)
+            | None ->
                 do! bindWorkDevOpsIfNeeded scope parentSessionId isDevOps
                 return! resumeOnRuntime scope request context language
         }
@@ -728,10 +744,9 @@ module ForkTool =
             let isDevOps =
                 String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
 
-            if boundDevOpsDispatchClosed scope parentSessionId isDevOps then
-                return consequence (prose language Path.Resume.AssessmentPendingForDevOps)
-            else
-                return! executeManagerAfterGuards scope request context language
+            match boundDevOpsDispatchRefusal scope parentSessionId isDevOps with
+            | Some refusal -> return consequence (prose language refusal)
+            | None -> return! executeManagerAfterGuards scope request context language
         }
 
     let private executeManager (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
@@ -776,7 +791,7 @@ module ForkTool =
                 )
             with
             | Ok _ -> return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
-            | Error _ -> return consequence (prose language Path.Commission.RoadNotOpened)
+            | Error _ -> return consequence (prose language Path.Commission.WorkNotOpened)
         }
 
     /// delegation-004: Orchestrator only commissions a Manager, so a blank
@@ -811,8 +826,8 @@ module ForkTool =
                 with
                 | Ok _ ->
                     return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
-                | Error _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
-            | _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
+                | Error _ -> return consequence (prose language Path.Commission.WorkCannotTakeCharge)
+            | _ -> return consequence (prose language Path.Commission.WorkCannotTakeCharge)
         }
 
     let private executeOrchestratorAfterGuards
@@ -1078,7 +1093,7 @@ module ForkTool =
             Error "charge-required"
         elif isSelfAttachment request then
             Error "placement-failed"
-        elif boundDevOpsDispatchClosed scope parentSessionId isDevOps then
+        elif (boundDevOpsDispatchRefusal scope parentSessionId isDevOps).IsSome then
             Error "placement-failed"
         else
             Ok()

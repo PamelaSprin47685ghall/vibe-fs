@@ -108,7 +108,7 @@ test('WHAT[work-033] lifecycle payload keys are ordered by Unicode code point', 
 
   const reviewed = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Promoted')
   const review = eventsOf(reviewed.bytes)[0]
-  assert.deepEqual(Object.keys(review), ['incumbencyId', 'outcome', 'reviewerId', 'stage', 'type'])
+  assert.deepEqual(Object.keys(review), ['incumbencyId', 'outcome', 'stage', 'type'])
 
   const relayed = surface.deliverProbe(`${opened}${reviewed.bytes}`, 'run-1', 'call-1', 100n)
   const [retired, successor] = eventsOf(relayed.bytes)
@@ -234,7 +234,7 @@ test('WHAT[work-033] real bytes fold through the codec and the live store', asyn
     assert.equal(stored.active, true)
     assert.equal(stored.reviewed, 'Promoted')
     assert.equal(stored.delivered, false, 'the refused deliver writes no retirement')
-    assert.equal(surface.roadDevOps(store, 'work-demo').devopsId, 'devops-fixed')
+    assert.equal(surface.workDevOps(store, 'work-demo').devopsId, 'devops-fixed')
   })
 })
 

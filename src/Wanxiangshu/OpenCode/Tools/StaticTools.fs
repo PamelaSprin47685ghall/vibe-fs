@@ -41,7 +41,7 @@ module StaticTools =
         | ToolPermission.Ask -> [ "ask" ]
         | ToolPermission.DevOpsConsultation -> [ "devops" ]
         | ToolPermission.Deliver -> [ "deliver" ]
-        // planning-002: Plan's review shares the `review` verb with Manager's
+        // work-021: Plan's review shares the `review` verb with Manager's
         // ReviewAssessment. The reverse lookup decides by role, not by this order.
         | ToolPermission.Review -> [ "review" ]
 
@@ -149,7 +149,7 @@ module StaticTools =
     /// Single source: OfficeCapability.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
     /// filters and contract tests see concrete denies (not only "*").
-    /// planning-013: `handoff` is fully retired — no permission owns it and it
+    /// work-030: `handoff` is fully retired — no permission owns it and it
     /// left this catalog. `resume` stays: Manager's delegation surface owns the
     /// verb, so every role's permission object keeps its explicit entry.
     let knownToolNames =

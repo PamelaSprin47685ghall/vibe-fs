@@ -16,7 +16,7 @@ for (const [language, locale] of [['English', 'en'], ['SimplifiedChinese', 'zh-C
     const common = read('world/common-law', locale)
     const ingress = read('library/ingress', locale)
     const closing = read('library/closing', locale)
-    const books = ['kolmogorov', 'scarcity', 'relay/quality-ledger'].map((name) => read(`library/${name}`, locale))
+    const books = ['kolmogorov', 'scarcity', 'work/quality-ledger'].map((name) => read(`library/${name}`, locale))
     for (const role of roles) {
       const law = read(`role/${role}`, locale)
       const text = instructionText(prompts.systemForRole(language, role))

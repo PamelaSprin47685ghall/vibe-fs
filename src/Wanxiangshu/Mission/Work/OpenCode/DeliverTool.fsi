@@ -5,4 +5,13 @@ open Wanxiangshu.OpenCode
 module DeliverTool =
     val description: unit -> string
     val admission: ToolAdmission
+
+    /// Algorithm E1.1: the state one deliver fence already recorded, if the work
+    /// settled it. A `None` means this call is not a replay of a retirement.
+    val recordedFenceReplay:
+        work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork ->
+        providerRunId: string ->
+        toolCallId: string ->
+            Result<string, string> option
+
     val spec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec

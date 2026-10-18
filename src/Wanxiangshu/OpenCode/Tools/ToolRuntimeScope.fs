@@ -1127,7 +1127,7 @@ type ToolRuntimeScope
 
     member _.EnsureWorkDevOpsBound(parentSessionId: SessionId) = ensureWorkDevOpsBound parentSessionId
 
-    /// planning-023: create the parentless execution container. The returned
+    /// work-039: create the parentless execution container. The returned
     /// SessionId is not permission to send its prompt: PlanTools first commits
     /// DeliverySessionBound for the operation.
     member _.CreateExecutionSession(operationId: string, agent: string) : Task<Result<string, string>> =

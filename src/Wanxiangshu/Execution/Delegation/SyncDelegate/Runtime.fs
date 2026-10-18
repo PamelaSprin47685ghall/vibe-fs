@@ -845,7 +845,7 @@ type SyncDelegateRuntime
         (turn: ReconciledTurn, failure: ExecutionFailure option, permit: QuiescencePermit option)
         : Task<bool> =
         task {
-            // planning-010 / delegation-024: every dedicated delegate role —
+            // work-028 / delegation-024: every dedicated delegate role —
             // Inspector, Coder, Engineer and DevOps — is claimable here. A
             // missing role would leave the caller's answer pending forever.
             match turn.Role, turn.Outcome with

@@ -28,7 +28,7 @@ module PluginTransformSurface =
                   ApplyRelayProjection =
                     fun _ _ ->
                         record "relay"
-                        Task.FromResult RelayProjectionDisposition.CurrentIteration
+                        Task.FromResult RelayProjectionDisposition.CurrentTenure
                   ApplyTenureIsolation = fun _ _ -> complete "tenure-isolation"
                   CaptureXTraceMessages =
                     fun _ _ ->

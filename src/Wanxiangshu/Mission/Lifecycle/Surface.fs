@@ -1382,7 +1382,7 @@ module LifecycleSurface =
                 Some(string target))
         |> Array.tryLast
 
-    let roadDevOps (store: obj) (workId: string) =
+    let workDevOps (store: obj) (workId: string) =
         match stampedDir store with
         | None -> null
         | Some dir ->

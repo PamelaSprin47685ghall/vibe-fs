@@ -14,7 +14,7 @@ module PlanWorkOpen =
         observedHead: int64 option ->
             Task<Result<unit, string>>
 
-    /// planning-020 / planning-010: the single runtime derivation of the
+    /// work-036 / work-028: the single runtime derivation of the
     /// fixed DevOps identity for a plan work. The entry binding and the
     /// single-flight ask binding must resolve the same devopsId for the same
     /// work, so the derivation lives here once.

@@ -118,14 +118,20 @@ module ToolRegistry =
     /// gate reads. `create` fills every field from the ToolRuntimeScope or its
     /// own callbacks; a stage never receives the whole scope.
     type private ToolGateFacts =
-        { RoleFor: HostToolContext -> Role option
-          EnsureRoleFor: HostToolContext -> Task<Role option>
-          IsStrengthReplica: HostToolContext -> bool
-          ManagerFactsFor: string -> ManagerCapabilityFacts
-          IsRetirementFrozen: string -> bool
-          IsWaitingForUser: string -> bool
-          BeginToolExecution: string -> unit
-          EndToolExecution: string -> unit }
+        {
+            RoleFor: HostToolContext -> Role option
+            EnsureRoleFor: HostToolContext -> Task<Role option>
+            IsStrengthReplica: HostToolContext -> bool
+            ManagerFactsFor: string -> ManagerCapabilityFacts
+            IsRetirementFrozen: string -> bool
+            IsWaitingForUser: string -> bool
+            BeginToolExecution: string -> unit
+            EndToolExecution: string -> unit
+            /// Algorithm E1.1: the work already recorded a retirement for this
+            /// call's exact fence, so a retried deliver replays its state instead
+            /// of being refused for the tenure that retirement removed.
+            RecordedDeliverReplay: HostToolContext -> bool
+        }
 
     let private accountingStageWithSession
         (gate: ToolGateFacts)
@@ -181,6 +187,21 @@ module ToolRegistry =
     /// A frozen retirement keeps Join, Finality and the explicit human Ask; the final incumbent
     /// keeps the read/cleanup/close-out surface and loses every new-work
     /// capability.
+    /// Algorithm E1.1: a retried deliver whose fence the work already settled is
+    /// not a new capability — it replays the state that call recorded, so the
+    /// missing tenure is not a reason to refuse it. Every other denied call
+    /// keeps the action-focused refusal.
+    let private refusedOrReplayed
+        (gate: ToolGateFacts)
+        (spec: ToolSpec)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        : Task<string> =
+        if spec.Name = "deliver" && gate.RecordedDeliverReplay ctx then
+            spec.Execute args ctx
+        else
+            Task.FromResult(denyTaskState ctx spec.Name)
+
     let private managerFactsStage
         (gate: ToolGateFacts)
         (spec: ToolSpec)
@@ -200,7 +221,7 @@ module ToolRegistry =
                 ->
                 return denyTaskState ctx spec.Name
             | Some permission when not (OfficeCapability.isAllowedForManagerFacts managerFacts permission) ->
-                return denyTaskState ctx spec.Name
+                return! refusedOrReplayed gate spec args ctx
             | _ -> return! spec.Execute args ctx
         }
 
@@ -881,7 +902,7 @@ module ToolRegistry =
                         )
             }
 
-        // planning-010: the real delegation capability — the SyncDelegate
+        // work-028: the real delegation capability — the SyncDelegate
         // runtime runs the bound fixed DevOps for this work synchronously and
         // hands back its complete work record. A missing runtime fails closed.
         let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
@@ -952,7 +973,7 @@ module ToolRegistry =
         let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : string option =
             lifecycleWorkOf runtime sessionId |> Option.bind (fun work -> work.ActiveId)
 
-        // planning-008: the receipt names the artifact path and the fact that
+        // work-026: the receipt names the artifact path and the fact that
         // an execution session started; the spawned session id stays out of
         // the provider-visible text.
         let renderDeliverReceipt (res: DeliverResult) : string =
@@ -968,7 +989,7 @@ module ToolRegistry =
             else
                 res.Message
 
-        // planning-007/008: the retirement cursor is the exact consumed-through
+        // work-025/026: the retirement cursor is the exact consumed-through
         // XTrace frontier of the physical exchange that owns this deliver call.
         // The snapshot may already contain a newer user/provider message appended
         // while this deliver tool runs; retirement is fenced to the exact
@@ -1358,7 +1379,7 @@ module ToolRegistry =
 
               yield HorizonTool.spec horizonContext
               yield FissionTool.spec factory runtime
-              // relay-assessment-011 / planning-022: the shared review shell.
+              // work-038: the shared review shell.
               // Plan lifecycle reads its own durable owner directly.
               yield ReviewShell.spec factory runtime
               yield deliverSpec ()
@@ -1382,6 +1403,16 @@ module ToolRegistry =
                 replicaPred (SessionId.create ctx.SessionId)
             | _ -> false
 
+        let recordedDeliverReplay (ctx: HostToolContext) =
+            match ctx.ProviderRunId, ctx.ToolCallId with
+            | Some run, Some call ->
+                let settled work =
+                    DeliverTool.recordedFenceReplay work (ProviderRunIdentity.value run) (ToolCallId.value call)
+                    |> Option.isSome
+
+                lifecycleWorkOf runtime ctx.SessionId |> Option.exists settled
+            | _ -> false
+
         let gateFacts: ToolGateFacts =
             { RoleFor = (fun ctx -> runtime.RoleFor ctx)
               EnsureRoleFor = (fun ctx -> runtime.EnsureRoleFor ctx)
@@ -1390,7 +1421,8 @@ module ToolRegistry =
               IsRetirementFrozen = (fun sessionId -> runtime.IsRetirementFrozen sessionId)
               IsWaitingForUser = runtime.IsWaitingForUser
               BeginToolExecution = beginToolExecution
-              EndToolExecution = endToolExecution }
+              EndToolExecution = endToolExecution
+              RecordedDeliverReplay = recordedDeliverReplay }
 
         // Generic execute gate: every tool declares the authority it is admitted
         // under, and the registry never invents one the session does not hold.

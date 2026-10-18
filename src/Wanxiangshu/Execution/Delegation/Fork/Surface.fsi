@@ -24,7 +24,7 @@ module ForkChildPayloadSurface =
                Payload: string option |} ->
             string
 
-    val chooseRoad: calling: string -> byname: string -> charge: string -> obj
+    val chooseWork: calling: string -> byname: string -> charge: string -> obj
 
     val reuseBinding:
         byname: string -> boundAgent: string -> requestedAgent: string -> tier: string -> charge: string -> obj

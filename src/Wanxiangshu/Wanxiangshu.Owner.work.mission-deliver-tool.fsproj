@@ -2,7 +2,7 @@
   <PropertyGroup>
     <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
     <WanxiangshuCompileShard>mission-deliver-tool</WanxiangshuCompileShard>
-    <WanxiangshuSemanticOwner>relay-retirement</WanxiangshuSemanticOwner>
+    <WanxiangshuSemanticOwner>work</WanxiangshuSemanticOwner>
     <WanxiangshuOwnerLocality>mission-deliver-tool</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
@@ -18,8 +18,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
 
-    <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.mission-relay-retirement.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-eventstore.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>

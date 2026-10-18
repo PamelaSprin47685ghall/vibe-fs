@@ -28,8 +28,6 @@ Mission/Work/Review/Model.fsi
 Mission/Work/Review/Model.fs
 Mission/Work/Review/Surface.fsi
 Mission/Work/Review/Surface.fs
-Mission/Work/Retirement/Surface.fsi
-Mission/Work/Retirement/Surface.fs
 Host/CanonicalJson.fsi
 Host/CanonicalJson.fs
 OpenCode/Host/Message.fsi

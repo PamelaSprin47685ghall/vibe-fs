@@ -31,6 +31,7 @@ module DurableWorkHost =
         { RetirementId: string
           IncumbencyId: string
           Outcome: string
+          Expected: string
           Fence: HostRunFence
           ProjectionCut: bool }
 

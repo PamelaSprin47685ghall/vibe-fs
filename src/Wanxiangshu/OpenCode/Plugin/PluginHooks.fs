@@ -121,7 +121,7 @@ module PluginHooks =
             let isReplica (sessionId: SessionId) =
                 boot.StrengthScope.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome
 
-            // planning-014: resolve the stage-method semantic path for the
+            // work-031: resolve the stage-method semantic path for the
             // session's active plan incumbency. Non-plan sessions, missing
             // stores and delivered works resolve None and append nothing, so
             // the non-plan system prompt path stays byte-identical.

@@ -38,7 +38,7 @@ module ReviewFindings =
         then
             Ok(ReviewFindings findings)
         else
-            Error "AssessmentFinding requires non-empty acceptance criteria and work plan"
+            Error "ReviewFinding requires non-empty acceptance criteria and work plan"
 
     let values (ReviewFindings findings) = findings
 

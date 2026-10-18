@@ -11,7 +11,7 @@ import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 import { ensurePlanWorkOpenedForSession } from '../../../dist/OpenCode/Plugin/PlanWorkOpenWiring.js'
-import { withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -243,4 +243,57 @@ test('WHAT[work-036] the first plan prompt opens work at the git worktree root, 
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
+})
+
+test('WHAT[work-036] only a Manager session opens execution work; another managed role opens nothing', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const drive = async (agent) => {
+      const sessionId = `ses-entry-closed-${agent}`
+      const physical = `root-${sessionId}`
+      await acceptAuthorityRoot(runtime, sessionId, agent, physical)
+      const user = {
+        info: { id: physical, sessionID: sessionId, role: 'user', agent, time: { created: 1 } },
+        parts: [{ id: `prt-${agent}`, type: 'text', text: 'first instruction' }],
+      }
+      await hooks['chat.message']({ sessionID: sessionId, agent }, { message: user.info, parts: user.parts })
+      runtime.pushHostMessage(sessionId, user)
+      runtime.pushHostMessage(sessionId, {
+        info: {
+          id: `asst-${agent}`,
+          sessionID: sessionId,
+          parentID: physical,
+          role: 'assistant',
+          agent,
+          providerID: 'provider',
+          modelID: `${agent}-model`,
+          time: { created: 2 },
+        },
+        parts: [],
+      })
+      await hooks['experimental.chat.messages.transform']({ sessionID: sessionId }, { messages: [user] })
+      return sessionId
+    }
+
+    const store = workspace.acquire(join(directory, '.Herdchestra'))
+    const eventsOf = (sessionId) => {
+      const path = life.journalPath(store.gitCommonDir)
+      if (!existsSync(path)) return []
+      const database = new DatabaseSync(path)
+      const journal = new SqliteJournal(database)
+      try {
+        return journal.read(sessionId).flatMap((line) => JSON.parse(line).events ?? [])
+      } finally {
+        journal.close()
+      }
+    }
+
+    const engineer = await drive('engineer')
+    const devops = await drive('devops')
+    assert.deepEqual(eventsOf(engineer), [], 'an Engineer session owns no lifecycle work')
+    assert.deepEqual(eventsOf(devops), [], 'a DevOps session owns no lifecycle work')
+
+    const manager = await drive('manager')
+    assert.deepEqual(eventsOf(manager).map((event) => event.type), ['WorkOpened', 'IncumbencyOpened'])
+    assert.deepEqual(eventsOf(manager)[0].sequence, ['S4'])
+  })
 })

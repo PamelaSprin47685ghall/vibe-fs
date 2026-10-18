@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { deliverOnce } from './support/contract.mjs'
+import { withReview, scores } from './support/plugin.mjs'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as scopeMod from '../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
 const verifyOwnership =
@@ -17,6 +19,35 @@ test('WHAT[work-009] a live owned resource blocks deliver without retiring', () 
   assert.equal(blocked.written[0].type, 'RetirementBlocked')
   assert.equal(blocked.written.some((event) => event.type === 'IncumbencyRetired'), false)
   assert.equal(blocked.finished, false)
+})
+
+test('WHAT[work-009] the second deliver reports the live blocker instead of reporting an end', async () => {
+  await withReview(async ({ hooks, runtime, session, execute }) => {
+    await execute(scores('REVISE'))
+    const forked = await hooks.tool.fork.execute(
+      { calling: 'engineer', name: 'Ada', charge: 'implement' },
+      { sessionID: session, callID: 'call-fork', messageID: 'run-fork', agent: 'manager' },
+    )
+    assert.match(String(forked), /carries this charge now|现已接下这项托付/)
+    // The first call only confirms; Algorithm E4 does not read the blocker set.
+    assert.match(
+      await hooks.tool.deliver.execute({}, { sessionID: session, callID: 'deliver-confirm', messageID: 'run-confirm', agent: 'manager' }),
+      /confirmation_required = true/,
+    )
+    const blocked = await hooks.tool.deliver.execute(
+      {},
+      { sessionID: session, callID: 'deliver-call', messageID: 'run-retire', agent: 'manager' },
+    )
+    // Algorithm E8: the blocker is durable and the call reports an unfinished
+    // tenure with exactly what to close, so the runner may deliver again.
+    assert.match(blocked, /finished = false/)
+    assert.match(blocked, /Close or join exactly those resources/)
+    assert.doesNotMatch(blocked, /Finished\. Do not continue work\./)
+    const after = life.inspected(journalSurface.JournalSurface_initializeStateRoot(runtime.directory), session)
+    assert.equal(Array.from(after.Retirements ?? []).length, 0)
+    assert.equal(after.Delivered, false)
+    assert.notEqual(after.BlockerDigest ?? '', '')
+  }, { session: 'blocked-second-deliver' })
 })
 
 test('WHAT[work-009] ToolRuntimeScope ownership tracks tool-owned-work and PTY leases, keeps blockers across Cancel/Drain, and clears only on Ended', async () => {

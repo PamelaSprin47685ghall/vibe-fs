@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
-    <WanxiangshuCompileShard>mission-relay-narrative-transform</WanxiangshuCompileShard>
-    <WanxiangshuSemanticOwner>relay-context-projection</WanxiangshuSemanticOwner>
-    <WanxiangshuOwnerLocality>mission-relay-narrative-transform</WanxiangshuOwnerLocality>
+    <WanxiangshuCompileShard>mission-work-narrative-transform</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>work</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-work-narrative-transform</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
@@ -16,7 +16,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-ledger.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-eventstore.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj"/>
         <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.interaction-authority-projection-queries.fsproj"/>

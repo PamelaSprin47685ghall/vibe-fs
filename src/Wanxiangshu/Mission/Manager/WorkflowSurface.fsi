@@ -18,3 +18,7 @@ module ManagerWorkflowSurface =
         providerRun: string ->
         directory: string ->
             Task
+
+    /// Read-only probe over the successor-prompt predicate: it reads the fold the
+    /// dispatch reads and dispatches nothing.
+    val successorPromptContextOf: workspaceDirectory: string -> sessionId: string -> obj

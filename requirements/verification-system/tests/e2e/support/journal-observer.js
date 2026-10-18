@@ -84,7 +84,7 @@ export function extractFactCasesAndIdentities(envelope, event) {
     if (Array.isArray(fact)) {
       if (typeof fact[0] === 'string') {
         cases.push({ name: fact[0], payload: fact[1] });
-        if ((fact[0] === 'RoadId' || fact[0] === 'SessionId') && typeof fact[1] === 'string') {
+        if (fact[0] === 'SessionId' && typeof fact[1] === 'string') {
           sessionId = sessionId ?? fact[1];
         }
         if (fact[0] === 'LogicalRunId' && typeof fact[1] === 'string') {
@@ -93,7 +93,7 @@ export function extractFactCasesAndIdentities(envelope, event) {
       }
       for (const item of fact) walkFact(item);
     } else if (fact && typeof fact === 'object') {
-      const sid = fact.sessionId ?? fact.session_id ?? fact.SessionId ?? fact.sessionID ?? fact.RoadId ?? fact.ManagerSessionId ?? fact.ChildSessionId;
+      const sid = fact.sessionId ?? fact.session_id ?? fact.SessionId ?? fact.sessionID ?? fact.ManagerSessionId ?? fact.ChildSessionId;
       if (typeof sid === 'string') sessionId = sessionId ?? sid;
       const lrid = fact.logicalRunId ?? fact.logical_run_id ?? fact.LogicalRunId ?? fact.logicalRun;
       if (typeof lrid === 'string') logicalRun = logicalRun ?? lrid;
@@ -634,7 +634,7 @@ const readLocalSnapshot = (workDir, { sessionId = null } = {}) => {
     // The events-journal envelope shape (`Fact: [name, payload]`), so payload lookup,
     // counts and the label histograms read both sources with one rule. The stream is
     // carried as the event's session identity: the unified journal is per session, and a
-    // session-scoped read must be able to attribute a fact to the road that wrote it.
+    // session-scoped read must be able to attribute a fact to the work that wrote it.
     lines.push(JSON.stringify({ Fact: [event.type, event.payload], sessionID: event.stream }));
     factCounts.set(event.type, (factCounts.get(event.type) ?? 0) + 1);
   }

@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <WanxiangshuSubsystem>relay</WanxiangshuSubsystem>
-    <WanxiangshuCompileShard>mission-relay-assessment</WanxiangshuCompileShard>
-    <WanxiangshuSemanticOwner>relay-assessment</WanxiangshuSemanticOwner>
-    <WanxiangshuOwnerLocality>mission-relay-assessment</WanxiangshuOwnerLocality>
+    <WanxiangshuSubsystem>work</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-work-assessment</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>work</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-work-assessment</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-core.fsproj"/>
     <Compile Include="Mission/Work/Review/Model.fsi"/>
     <Compile Include="Mission/Work/Review/Model.fs"/>
     <Compile Include="Mission/Work/Review/Surface.fsi"/>

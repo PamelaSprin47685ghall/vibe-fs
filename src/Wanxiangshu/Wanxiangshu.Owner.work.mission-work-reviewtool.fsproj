@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <WanxiangshuSubsystem>application-composition</WanxiangshuSubsystem>
-    <WanxiangshuCompileShard>mission-relay-reviewtool</WanxiangshuCompileShard>
-    <WanxiangshuSemanticOwner>relay-assessment</WanxiangshuSemanticOwner>
-    <WanxiangshuOwnerLocality>mission-relay-reviewtool</WanxiangshuOwnerLocality>
+    <WanxiangshuCompileShard>mission-work-reviewtool</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>work</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-work-reviewtool</WanxiangshuOwnerLocality>
     <WanxiangshuOwnerLocalityKind>composition</WanxiangshuOwnerLocalityKind>
   </PropertyGroup>
   <ItemGroup>
@@ -17,12 +17,12 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-tools-toolruntimescope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-assessment.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-assessment.fsproj"/>
 
-    <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-eventstore.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.relay-retirement.composition-turn-workflow.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.work.composition-turn-workflow.fsproj"/>
     <Compile Include="Mission/Work/OpenCode/ReviewBackendManager.fsi"/>
     <Compile Include="Mission/Work/OpenCode/ReviewBackendManager.fs"/>
     <Compile Include="Mission/Work/OpenCode/ReviewShell.fsi"/>

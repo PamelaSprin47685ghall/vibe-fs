@@ -9,21 +9,21 @@ import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
 
-test('WHAT[interaction-authority-022] actual road decision preserves an established DevOps model on a conflicting rebind', async () => {
+test('WHAT[interaction-authority-022] actual work decision preserves an established DevOps model on a conflicting rebind', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'devops-rebind-'))
   execFileSync('git', ['init'], { cwd: directory })
   mkdirSync(join(directory, '.Herdchestra'), { recursive: true })
   const store = workspace.acquire(realpathSync(join(directory, '.Herdchestra')))
-  const opened = await lifecycle.seedOpen(store, 'plan', 'road-fixed', directory, 1n)
+  const opened = await lifecycle.seedOpen(store, 'plan', 'work-fixed', directory, 1n)
   assert.equal(opened.ok, true)
-  const bound = await lifecycle.bindDevOps(store, 'road-fixed', 'devops:road-fixed', 'provider/fixed-model:high')
+  const bound = await lifecycle.bindDevOps(store, 'work-fixed', 'devops:work-fixed', 'provider/fixed-model:high')
   assert.equal(bound.ok, true)
-  const original = lifecycle.roadDevOps(store, 'road-fixed')
-  assert.equal(original.devopsId, 'devops:road-fixed')
+  const original = lifecycle.workDevOps(store, 'work-fixed')
+  assert.equal(original.devopsId, 'devops:work-fixed')
   assert.equal(original.modelTarget, 'provider/fixed-model:high')
-  const repeated = await lifecycle.bindDevOps(store, 'road-fixed', 'devops:road-fixed', 'provider/other-model:low')
+  const repeated = await lifecycle.bindDevOps(store, 'work-fixed', 'devops:work-fixed', 'provider/other-model:low')
   assert.equal(repeated.ok, true)
-  assert.deepEqual(lifecycle.roadDevOps(store, 'road-fixed'), original)
+  assert.deepEqual(lifecycle.workDevOps(store, 'work-fixed'), original)
 })
 
 test('WHAT[interaction-authority-022] pure handle transition rejects a second child on the occupied DevOps handle', () => {

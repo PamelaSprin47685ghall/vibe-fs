@@ -55,12 +55,12 @@ module DurableLoopSignal =
 /// change-integration-005/013: the same Work's next tenure after a delivered
 /// manager life.
 ///
-/// A delivered tenure has no successor record of its own, so the road's
+/// A delivered tenure has no successor record of its own, so the work's
 /// continuation is the pair `Reopened` + `IncumbencyOpened`: the one lifecycle
 /// fact pair that leaves `Delivered` and opens a fresh, read-only, unreviewed
 /// tenure of the same Work. Change records the machine conflict (or the rebase
 /// that invalidated the old qualification) outside the gate and then hands the
-/// same Work over; the physical Manager session, the worktree and the Road stay
+/// same Work over; the physical Manager session, the worktree and the Work stay
 /// exactly as they were (change-integration-009).
 ///
 /// The hand-off is not a retirement attempt: the delivered retirement already
@@ -70,15 +70,15 @@ module DurableLoopSignal =
 /// already happened, so a repeated read never opens a second one.
 [<RequireQualifiedAccess>]
 module DeliveredTenureHandOff =
-    /// The continuation one committed retirement owes its road.
+    /// The continuation one committed retirement owes its work.
     ///
     /// A Relayed retirement already opened the successor tenure it hands to. A
-    /// Delivered retirement has no successor record of its own, so the road's
+    /// Delivered retirement has no successor record of its own, so the work's
     /// continuation is the pair `Reopened` + `IncumbencyOpened`: the one lifecycle
     /// fact pair that leaves `Delivered` and opens a fresh, read-only, unreviewed
     /// tenure of the same Work. Change records the machine conflict (or the rebase
     /// that invalidated the old qualification) outside the gate and then hands the
-    /// same Work over; the physical Manager session, the worktree and the Road stay
+    /// same Work over; the physical Manager session, the worktree and the Work stay
     /// exactly as they were (change-integration-009).
     ///
     /// The hand-off is not a retirement attempt, so its blocker set is the durable
@@ -788,7 +788,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             ?expectedToolCalls: int
         ) : Task<Result<string, string>> =
         if not (tryEnterAuthorityUpdate jobId) then
-            Task.FromResult(Error "Relay authority update is already in flight for this Road")
+            Task.FromResult(Error "Relay authority update is already in flight for this Work")
         else
             runAuthorityUpdate jobId (fun () ->
                 continueManagerJobCore jobId prompt callerProviderRun callerToolCallId expectedToolCalls)

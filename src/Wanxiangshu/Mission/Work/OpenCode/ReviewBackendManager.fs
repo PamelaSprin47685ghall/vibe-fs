@@ -16,8 +16,8 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
-/// relay-assessment-011: the Manager backend of the shared `review` shell.
-/// Owns the relay assessment binding, transaction and failure paths; the
+/// work-038: the Manager backend of the shared `review` shell.
+/// Owns the review binding, transaction and failure paths; the
 /// shell (ReviewShell) dispatches to it for every non-Plan caller. The logic
 /// below is the former ReviewTool body, moved without behavioral change.
 module ReviewBackendManager =
@@ -353,8 +353,8 @@ module ReviewBackendManager =
         }
 
     /// The one review write: send `Review` to the wanxiangli work owner. The
-    /// binding is still validated first (relay-assessment-007: a rejected
-    /// invocation writes nothing and consumes no slot), but its eight fields do
+    /// binding is still validated first (a rejected invocation writes nothing
+    /// and consumes no slot), but its eight fields do
     /// not enter the event.
     let private runPrepared
         (scope: ToolRuntimeScope)

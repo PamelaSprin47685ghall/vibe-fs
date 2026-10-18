@@ -9,7 +9,7 @@ open Wanxiangshu.Persistence.Journal
 
 /// What one ManagerJob's publication attempt resolved to.
 ///
-/// Typed ids keep the durable Road identity separate from its physical Manager
+/// Typed ids keep the durable Work identity separate from its physical Manager
 /// session and Git binding.
 type OrchestratorVerdict =
     | Published of jobId: ManagerJobId * head: CommitHash

@@ -25,7 +25,7 @@ module PromptResources =
           "library/closing"
           "library/kolmogorov"
           "library/scarcity"
-          "library/relay/quality-ledger"
+          "library/work/quality-ledger"
           "role/manager"
           "role/engineer"
           "role/devops"
@@ -42,7 +42,7 @@ module PromptResources =
 
     let private libraryPaths =
         function
-        | Role.Manager -> [ "library/kolmogorov"; "library/scarcity"; "library/relay/quality-ledger" ]
+        | Role.Manager -> [ "library/kolmogorov"; "library/scarcity"; "library/work/quality-ledger" ]
         | Role.Engineer -> [ "library/kolmogorov" ]
         | Role.DevOps -> [ "library/kolmogorov"; "library/scarcity" ]
         | _ -> []

@@ -34,7 +34,7 @@ module DeliveredTenureHandOff =
 module PublishReviewEvidence =
     val ofWork: work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork -> (string * string) option
 
-/// Host wiring for one Change Road. One physical Manager session can host many
+/// Host wiring for one Change Work. One physical Manager session can host many
 /// logical Relay incumbencies; no second audit session participates in publication.
 type OrchestratorHost =
     new: deps: OrchestratorHostDeps * orchestratorId: SessionId -> OrchestratorHost

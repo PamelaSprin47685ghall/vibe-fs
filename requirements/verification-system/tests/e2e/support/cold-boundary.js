@@ -10,8 +10,8 @@
  *   CTX-010        prefix probe — attempt-local head, fixed tool set
  *   ENFORCER-030   frame commit — Blogger frame list grows, fixed system/tools
  *   SyncDelegate   request-kind switch — per-request tool map swap, same transcript
- *   MANAGER-LOOP   manager iteration — same system/plan, root authority kept while
- *                  retired-iteration traffic and the wake are removed
+ *   MANAGER-LOOP   manager tenure — same system/plan, root authority kept while
+ *                  retired-tenure traffic and the wake are removed
  *
  * Sniffing is forbidden, and package K1 measured why. The deleted `epochCold`
  * exemption read "tools and the leading system message unchanged" and then admitted
@@ -136,8 +136,8 @@ const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previ
 
 // ── pure manager loop ───────────────────────────────────────────────────────
 //
-// Every manager iteration keeps the same workspace, tools and authority plan: a
-// Continue retirement is followed by another ordinary iteration. The successor does
+// Every manager tenure keeps the same workspace, tools and authority plan: a
+// Relayed retirement is followed by another ordinary tenure. The successor does
 // NOT keep the predecessor's physical history — work-008 makes stripping the
 // predecessor's assistant/tool traffic the obligation (`RelayNarrativeTransform.
 // projectActive` keeps only interactions whose first XTrace observation is at or after
@@ -163,7 +163,7 @@ const sameProviderPlan = (previousWire, nextWire) => isDeepStrictEqual(previousW
 // The Host appends each guidance occurrence — a `<system>` block or an
 // Enforcer tip — as a `\0\uFEFF`-separated suffix to the request's terminal part (a user
 // message or the last completed tool result; `cursorGuidanceSeparator` in
-// PairProgrammingThoughtTransform.fs). A successor iteration retires such an occurrence
+// PairProgrammingThoughtTransform.fs). A successor tenure retires such an occurrence
 // without rewriting the message it was attached to.
 const GUIDANCE_MARKER = '\0\uFEFF';
 
@@ -388,7 +388,7 @@ export function sealDecision({ previousWire, body, boundary, stripAdmitted = fal
     // `frame-commit` shares this shape: the Blogger session's first request
     // establishes the seal (nothing to break), later requests break it as frames
     // accumulate. `manager-loop` shares it too: a reusable step-0 entry may see
-    // append-only retries that stay held, with only the next iteration's restart
+    // append-only retries that stay held, with only the next tenure's restart
     // breaking the seal.
     return boundary.kind === 'prefix-probe' || boundary.kind === 'frame-commit' || boundary.kind === 'manager-loop' || boundary.kind === 'epoch-switch'
       ? { held: true }
@@ -437,9 +437,9 @@ export function sealDecision({ previousWire, body, boundary, stripAdmitted = fal
         ? { resealed: 'request-kind-switch' }
         : { broken: 'request-kind-switch-rewrote-prefix' };
 
-    // MANAGER-LOOP: a Continue retirement is followed by another ordinary
-    // iteration under the same system/provider plan. The root user is kept and
-    // every next user is a subsequence of the previous users; retired-iteration
+    // MANAGER-LOOP: a Relayed retirement is followed by another ordinary
+    // tenure under the same system/provider plan. The root user is kept and
+    // every next user is a subsequence of the previous users; retired-tenure
     // assistant/tool traffic and a novel wake are absent. Anything else is a
     // rewrite of the fixed parts.
     case 'manager-loop':

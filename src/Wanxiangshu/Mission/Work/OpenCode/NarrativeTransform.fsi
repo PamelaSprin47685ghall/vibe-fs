@@ -8,7 +8,7 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 type RelayProjectionDisposition =
     | Unchanged
-    | CurrentIteration
+    | CurrentTenure
     | RetiredAttemptStopped
 
 module RelayNarrativeTransform =

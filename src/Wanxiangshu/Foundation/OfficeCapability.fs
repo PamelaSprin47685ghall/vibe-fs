@@ -30,7 +30,7 @@ type ToolPermission =
     | JsPlan
     | Ask
     | Deliver
-    /// planning-002: Plan's review hard gate. Shares the `review` tool name
+    /// work-021: Plan's review hard gate. Shares the `review` tool name
     /// with Manager's ReviewAssessment; the label stays distinct.
     | Review
     | DevOpsConsultation
@@ -53,7 +53,7 @@ module OfficeCapability =
     let managerReviewReadOnlyPermissions: ToolPermission Set =
         set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
 
-    /// capability-enforcement-025 / relay-assessment-005: the final incumbent's
+    /// capability-enforcement-025: the final incumbent's
     /// read/cleanup/close-out surface. It keeps reading, horizon, join and the
     /// deliver finality, and drops every new-work capability (fork, resume,
     /// review).

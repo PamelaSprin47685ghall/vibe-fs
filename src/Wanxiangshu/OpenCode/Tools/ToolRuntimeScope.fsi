@@ -130,7 +130,7 @@ type ToolRuntimeScope =
 
     member EnsureWorkDevOpsBound: parentSessionId: SessionId -> Task<unit>
 
-    /// planning-023: create a parentless execution container. The caller must
+    /// work-039: create a parentless execution container. The caller must
     /// durably bind the returned SessionId before sending its first prompt.
     member CreateExecutionSession: operationId: string * agent: string -> Task<Result<string, string>>
 

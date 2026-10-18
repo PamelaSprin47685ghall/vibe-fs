@@ -73,7 +73,7 @@ test('WHAT[host-boundary-019] the ordinary transform runs the full static stage 
 })
 
 // 边界：第 3 步的 RetiredAttemptStopped 早退（relay 切分后立即结束、后续 stage 不执行）
-// 无法经 ordinaryEffects 观察，该 Surface 的 ApplyRelayProjection 固定返回 CurrentIteration。
+// 无法经 ordinaryEffects 观察，该 Surface 的 ApplyRelayProjection 固定返回 CurrentTenure。
 // 此路径需要真实 Host canary 或专门的早退注入端口，不在此硬造旁路。
 
 test('WHAT[host-boundary-019] ordinary transform runs companion and prefix compression without suppression', async () => {

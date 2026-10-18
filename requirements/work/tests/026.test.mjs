@@ -151,5 +151,30 @@ test('WHAT[work-026] S3 authorized deliver enters post-S3 state without starting
     )
     assert.match(String(start2), /an execution session has been started/i)
     assert.equal(createdIds.length, 2, 'user can repeatedly request starting S4 in post-S3 state')
+
+    // A replayed fence is answered by the fold, not by a second launch. [007]:
+    // a completed delivery operation's replay returns the original retirement
+    // result, so the launch fence reports its recorded Delivered outcome with
+    // zero appends and without starting another execution session.
+    const settled = life.inspect(commonDir, sessionID).revision
+    const replayLaunch = await hooks.tool.deliver.execute(
+      {},
+      { sessionID, agent: 'plan', callID: 'call-post-s3-1', messageID: 'run-post-s3-1', providerRunID: 'run-post-s3-1' },
+    )
+    assert.match(String(replayLaunch), /Delivered/, `a replayed launch fence must report the recorded retirement result: ${replayLaunch}`)
+    assert.equal(createdIds.length, 2, 'a replayed launch fence must not start a second execution session')
+    assert.equal(life.inspect(commonDir, sessionID).revision, settled, 'a replayed launch fence appends nothing')
+
+    // The same must hold for the delivering fence itself: it already owns a
+    // retirement, so re-entering it reports that recorded result instead of
+    // reopening the delivered work or freezing the runner with an error.
+    const replayDeliver = await hooks.tool.deliver.execute(
+      {},
+      { sessionID, agent: 'plan', callID: 'call-s3-deliver', messageID: 'run-s3-deliver', providerRunID: 'run-s3-deliver' },
+    )
+    assert.match(String(replayDeliver), /Delivered/, `replayed delivering fence must report the recorded result: ${replayDeliver}`)
+    assert.equal(createdIds.length, 2, 'a replayed delivering fence must not start an execution session')
+    assert.equal(life.inspect(commonDir, sessionID).revision, settled, 'a replayed delivering fence appends nothing')
+    assert.equal(life.inspected(commonDir, sessionID).Delivered, true, 'the work stays delivered and the tenure is not reopened')
   })
 })

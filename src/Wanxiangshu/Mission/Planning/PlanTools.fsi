@@ -14,7 +14,7 @@ type DeliverResult =
       NextIncumbencyId: string
       Message: string }
 
-/// planning-010: the outcome of one synchronous ask delegation.
+/// work-028: the outcome of one synchronous ask delegation.
 type AskResult =
     { Kind: string
       WorkRecord: string
@@ -31,7 +31,7 @@ module PlanTools =
     /// content, its digest, and the resolved path. Empty or missing is an error.
     val readAndValidatePlan: root: string -> workId: string -> Result<string * string * string, string>
 
-    /// planning-007 / planning-008: an authorized delivery first creates a
+    /// work-025 / work-026: an authorized delivery first creates a
     /// parentless execution container, durably binds its SessionId to the
     /// DeliveryRequested operation, then sends the first prompt. Prompt
     /// acceptance settles Delivered; unknown acceptance remains pending.
@@ -86,7 +86,7 @@ module PlanTools =
     val bindObservedExecutionSession:
         gitCommonDir: string -> workId: string -> operationId: string -> execSessionId: string -> Result<unit, string>
 
-    /// planning-010: delegate the intent synchronously to the bound fixed
+    /// work-028: delegate the intent synchronously to the bound fixed
     /// DevOps and return its complete work record verbatim. `delegateTo`
     /// carries the real delegation capability (injected by the tool surface);
     /// at most one pending delegation per work, tracked in process memory.
@@ -97,7 +97,7 @@ module PlanTools =
         delegateTo: (string -> Task<string>) ->
             Task<Result<AskResult, string>>
 
-    /// planning-011: js-plan operates on the single derived plan path with
+    /// work-029: js-plan operates on the single derived plan path with
     /// read / edit / rewrite.
     val executeJsPlan:
         root: string ->

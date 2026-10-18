@@ -87,16 +87,16 @@ module ForkChildPayloadSurface =
         else
             Some(value.Trim())
 
-    let chooseRoad (calling: string) (byname: string) (charge: string) : obj =
-        let road = nonEmpty calling
+    let chooseWork (calling: string) (byname: string) (charge: string) : obj =
+        let work = nonEmpty calling
         let name = nonEmpty byname
         let task = nonEmpty charge
 
-        match road, name, task with
+        match work, name, task with
         | Some callingName, Some logicalName, Some assignment ->
             box
                 {| ok = true
-                   road = "Independent"
+                   work = "Independent"
                    calling = callingName
                    byname = logicalName
                    charge = assignment
@@ -104,7 +104,7 @@ module ForkChildPayloadSurface =
         | None, Some logicalName, Some assignment ->
             box
                 {| ok = true
-                   road = "Continuation"
+                   work = "Continuation"
                    calling = null
                    byname = logicalName
                    charge = assignment
@@ -112,7 +112,7 @@ module ForkChildPayloadSurface =
         | _ ->
             box
                 {| ok = false
-                   error = "charge, byname and calling (for a new road) must be non-empty" |}
+                   error = "charge, byname and calling (for a new work) must be non-empty" |}
 
     let reuseBinding
         (byname: string)
@@ -149,7 +149,7 @@ module ForkChildPayloadSurface =
                 | Some record ->
                     box
                         {| ok = true
-                           road = "Continuation"
+                           work = "Continuation"
                            byname = logicalName
                            managedAgent = record.TargetAgent
                            requestedAgent = requestedAgent

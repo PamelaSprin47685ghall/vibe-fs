@@ -230,6 +230,35 @@ module PlanningSurface =
         else
             [||]
 
+    let private deliverReceiptOfJs (outcome: Result<DeliverResult, string>) : obj =
+        match outcome with
+        | Ok res ->
+            box
+                {| ok = true
+                   relayed = res.Relayed
+                   delivered = res.Delivered
+                   retiredIncumbencyId = res.RetiredIncumbencyId
+                   retirementOutcome = res.RetirementOutcome
+                   digest = res.Digest
+                   path = res.Path
+                   execSessionId = res.ExecSessionId
+                   nextIncumbencyId = res.NextIncumbencyId
+                   message = res.Message
+                   error = null |}
+        | Error err ->
+            box
+                {| ok = false
+                   relayed = false
+                   delivered = false
+                   retiredIncumbencyId = null
+                   retirementOutcome = null
+                   digest = null
+                   path = null
+                   execSessionId = null
+                   nextIncumbencyId = null
+                   message = null
+                   error = err |}
+
     let executeDeliver
         (gitCommonDir: string)
         (root: string)
@@ -266,35 +295,47 @@ module PlanningSurface =
                             discardSession
                             cursor
 
-            match outcome with
-            | Ok res ->
-                return
-                    box
-                        {| ok = true
-                           relayed = res.Relayed
-                           delivered = res.Delivered
-                           retiredIncumbencyId = res.RetiredIncumbencyId
-                           retirementOutcome = res.RetirementOutcome
-                           digest = res.Digest
-                           path = res.Path
-                           execSessionId = res.ExecSessionId
-                           nextIncumbencyId = res.NextIncumbencyId
-                           message = res.Message
-                           error = null |}
-            | Error err ->
-                return
-                    box
-                        {| ok = false
-                           relayed = false
-                           delivered = false
-                           retiredIncumbencyId = null
-                           retirementOutcome = null
-                           digest = null
-                           path = null
-                           execSessionId = null
-                           nextIncumbencyId = null
-                           message = null
-                           error = err |}
+            return deliverReceiptOfJs outcome
+        }
+
+    /// The post-S3 delivery entry of an S1-S3 work. A call whose fence already
+    /// owns a recorded retirement replays that recorded outcome with zero
+    /// writes instead of opening another tenure.
+    let startPostS3Execution
+        (gitCommonDir: string)
+        (root: string)
+        (workId: string)
+        (providerRunId: string)
+        (toolCallId: string)
+        (hasBlocker: obj)
+        (execution: obj)
+        (retirementCursor: obj)
+        : Task<obj> =
+        let createSession = createExecutionOfJs execution
+        let promptSession = promptExecutionOfJs execution
+        let discardSession = discardExecutionOfJs execution
+
+        task {
+            let! outcome =
+                match extractInt64Opt retirementCursor with
+                | None -> Task.FromResult(Error "Plan retirement cursor evidence is required")
+                | Some cursor ->
+                    if String.IsNullOrWhiteSpace gitCommonDir then
+                        Task.FromResult(Error "git common directory is missing")
+                    else
+                        PlanTools.startPostS3Execution
+                            gitCommonDir
+                            root
+                            workId
+                            providerRunId
+                            toolCallId
+                            (retirementBlockersOfJs hasBlocker)
+                            createSession
+                            promptSession
+                            discardSession
+                            cursor
+
+            return deliverReceiptOfJs outcome
         }
 
     let reconcileBoundExecution gitCommonDir workId execSessionId observedPrompt blockers : obj =
@@ -432,7 +473,7 @@ module PlanningSurface =
         (findings: obj)
         (note: obj)
         : Task<obj> =
-        // note is accepted for writing and never returned (relay-assessment-001).
+        // note is accepted for writing and never returned.
         task {
             match parseFindings findings with
             | Error err ->
@@ -481,6 +522,7 @@ module PlanningSurface =
                editPlanAtomic = editPlanAtomic
                ensurePlanWorkOpened = ensurePlanWorkOpened
                executeDeliver = executeDeliver
+               startPostS3Execution = startPostS3Execution
                reconcileBoundExecution = reconcileBoundExecution
                executeAsk = executeAsk
                executeJsPlan = executeJsPlan
