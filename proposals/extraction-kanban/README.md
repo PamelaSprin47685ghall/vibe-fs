@@ -6,7 +6,9 @@
 
 这是后续抽吸工作的共同蓝图，不是全系统已经审计完毕的声明。目录与需求包已经纳入分工；每卡开工仍需追踪实际调用者、在途状态和持久数据。包名、接口与删除清单中的待定项必须在该卡准备阶段落实，不用想象填空。
 
-**当前入口：** [2026-10-18深测](DEEP-TEST-2026-10-18.md)已在主仓 `70c7d52ac` 交付；用户随后明确允许不兼容的大改，[修复计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)已重新组织为Bun指导挂起→Process契约/运行时/完整预算，再逐包补齐Trace与Bootstrap。旧API、旧协议和旧输出格式不再是默认兼容约束；旧事实不能猜测修复，活动资源也不能因升级抹账。原报告保留证据，状态只在[关联修复卡](BOARD.md#source-audit-repairs)维护，R12-U1继续暂缓。
+**当前入口：** [四模块报告与修复复盘](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#repair-retrospective)区分拆分缺口、修复回退、旧欠账和验证成本；[剩余计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)已按 `da8266cb6` 更新，每包列明范围、关键反例、验收及排除项。下一 P1 为终结事实 D1→D2，验证设施和旧失败取证独立，Trace 与 Bootstrap 按依赖推进，主动脱组分原型与生产接线。已完成包退出待施工顺序，状态只在[看板](BOARD.md#source-audit-repairs)维护。
+
+用户已允许必要的不兼容重构；旧事实不能猜测修复，活动资源不能因升级抹账。当前继续不合并 upstream，[差异报告](LOCAL-UPSTREAM-FIRST-FOUR-DIFF-2026-10-18.md)用于将来的职责裁决，不在本轮替换依赖或工具面。C/R7-A 的旧隔离失败继续保留，R12-U1 暂缓。
 
 三小时施工已完成[Bun挂起定因与夹具修正](GUIDANCE-BUN-LIFETIME-2026-10-18.md)和[Process纯契约及实际消费者](PROCESS-CONTRACT-2026-10-18.md)，非作者复审已核对。新增无界Bun启动器已删除，原生物理证据不替代正式监督；正式Bun适配单列CUT-00-R2，Node验证包装器的既有有界等待问题另列CUT-00-R1，不与暂缓的R12-U1混记。
 
