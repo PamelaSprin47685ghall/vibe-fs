@@ -12,6 +12,8 @@ import { registerOwnedToolTests } from './support/owned-tool-tests.mjs'
 import { classifyVerdict } from './support/verdict-feed.mjs'
 import { createWorkerCostObserver, encodeWorkerCostRecord, MAX_WORKER_COST_BYTES, validateWorkerCostSnapshot, WORKER_COST_PREFIX } from './support/worker-cost-observation.mjs'
 import * as testSupervisor from './e2e/support/supervise-node-test.mjs'
+import { NativeTestSupervision } from './support/native-test-supervision.mjs'
+import { registerFiniteWaitTests } from './support/finite-wait-tests.mjs'
 import { observeCausalProgress } from './e2e/support/causal-observation.js'
 import { gatherDiagnostics } from './e2e/support/diagnostics-collect.js'
 import { formatDiagnostics } from './e2e/support/diagnostics-format.js'
@@ -24,6 +26,7 @@ import { attachEventCeilings, eventCeilingSetupProblems, isCountedSseEvent, norm
 registerSupervisedToolReclamationTests()
 registerNormalExitResidualTest()
 registerOwnedToolTests()
+registerFiniteWaitTests()
 
 test('WHAT[verification-system-006] event safety ceilings validate input and count actual non-heartbeat events', () => {
   assert.deepEqual(normalizeEventCeilings({}), {})
@@ -316,7 +319,8 @@ process.on('uncaughtExceptionMonitor', error => fs.writeFileSync(process.env.WOR
 test('original worker result', () => {
   fs.writeFileSync(process.env.WORKER_BODY_MARKER, JSON.stringify({ pid: process.pid, parentPid: process.ppid, home: process.env.HOME }))
   process.prependOnceListener('exit', code => {
-    if (process.env.WORKER_EXIT_SINK === 'closed') fs.closeSync(1)
+    if (process.env.WORKER_EXIT_SINK === 'closed') fs.closeSync(2)
+    if (process.env.WORKER_EXIT_SINK === 'protocol-closed') fs.closeSync(1)
     fs.writeFileSync(process.env.WORKER_EXIT_MARKER, JSON.stringify({ pid: process.pid, code, sink: process.env.WORKER_EXIT_SINK }))
   })
   if (process.env.WORKER_OUTCOME === 'fail') assert.fail('original worker assertion failure')
@@ -326,7 +330,7 @@ test('original worker result', () => {
 await superviseNodeTest({ files: [${JSON.stringify(fixture)}], label: 'worker-cost-sink', silenceMs: 5000 })
 `)
     for (const outcome of ['pass', 'fail']) {
-      for (const sink of ['open', 'closed']) {
+      for (const sink of ['open', 'closed', 'protocol-closed']) {
         for (const enabled of ['0', '1']) {
           const prefix = path.join(directory, `${outcome}-${sink}-${enabled}`)
           const env = { ...process.env, WXS_VERIFICATION_WORKER_DIAGNOSTICS: enabled,
@@ -371,6 +375,7 @@ await superviseNodeTest({ files: [${JSON.stringify(fixture)}], label: 'worker-co
             assert.equal(observed.preImport.parentPid, body.parentPid)
             assert.ok(['complete', 'missing'].includes(observed.status), output)
             if (sink === 'closed') assert.equal(observed.status, 'missing', output)
+            if (sink === 'protocol-closed') assert.equal(observed.status, 'complete', output)
             if (observed.status === 'missing') {
               assert.equal(observed.reason, 'Exit observation not received')
               assert.equal(observed.exit, null)
@@ -590,6 +595,29 @@ test('WHAT[verification-system-006] the worker cost collector preserves native c
   assert.equal(observer.snapshot().preImport.cpuUserMicros, 100)
 })
 
+test('WHAT[verification-system-006] worker body identity crosses diagnostic channels without joining their fragments', () => {
+  const entryFile = path.resolve('actual-worker.test.mjs')
+  const preImport = { version: 1, phase: 'pre-import', sequence: 0, entryFile, pid: 501, parentPid: 500, monotonicMs: 10, cpuUserMicros: 100, cpuSystemMicros: 30 }
+  const exit = { ...preImport, phase: 'exit', sequence: 1, monotonicMs: 20, exitCode: 0 }
+  const event = (type, message) => ({ type, data: { entryFile, file: entryFile, message } })
+  const body = pid => `[verification-test-start] ${JSON.stringify({ entryFile, pid, parentPid: 500 })}\n`
+  for (const costChannel of ['test:stdout', 'test:stderr']) {
+    const bodyChannel = costChannel === 'test:stdout' ? 'test:stderr' : 'test:stdout'
+    const observer = createWorkerCostObserver({ entryFile, parentPid: 500 })
+    const line = encodeWorkerCostRecord(preImport)
+    observer.observe(event(costChannel, line.slice(0, 20)))
+    observer.observe(event(bodyChannel, body(501)))
+    observer.observe(event(costChannel, line.slice(20)))
+    observer.observe(event(costChannel, encodeWorkerCostRecord(exit)))
+    assert.equal(observer.snapshot().status, 'complete')
+    observer.observe(event(bodyChannel, body(502)))
+    const observed = observer.finish()
+    assert.equal(observed.status, 'invalid')
+    assert.equal(observed.interval, null)
+    assert.match(observed.reason, /body identity/)
+  }
+})
+
 test('WHAT[verification-system-006] the worker cost collector invalidates forged, duplicate, reordered and wrongly attributed observations without a business verdict', () => {
   const entryFile = path.resolve('actual-worker.test.mjs')
   const foreign = path.resolve('foreign-worker.test.mjs')
@@ -670,18 +698,18 @@ test('WHAT[verification-system-006] the worker cost collector bounds fragmented 
 
 test('WHAT[verification-system-006] file waits distinguish queued, active and verdicts awaiting stream drain', () => {
   const files = ['drained.mjs', 'verdict.mjs', 'active.mjs', 'queued.mjs'].map((file) => path.resolve(file))
-  const waits = testSupervisor.createFileWaitTracker(files)
-  const event = (type, file, name) => ({ type, data: { entryFile: file, name } })
+  const waits = new NativeTestSupervision({ files, silenceMs: 5000 })
+  const event = (type, file, name) => ({ type, data: { entryFile: file, name, nativeSequence: 1 } })
   waits.observe(event('runner:file-start', files[0]))
-  waits.observe(event('test:pass', files[0], 'finished leaf'))
+  waits.observe(event('test:complete', files[0], 'finished leaf'))
   waits.observe(event('runner:file-drained', files[0]))
   waits.observe(event('runner:file-start', files[1]))
-  waits.observe(event('test:pass', files[1], 'passed but still alive'))
+  waits.observe(event('test:complete', files[1], 'passed but still alive'))
   waits.observe(event('runner:file-start', files[2]))
   assert.deepEqual(waits.snapshot(), {
     queued: [files[3]],
     active: [
-      { file: files[1], lastVerdict: 'test:pass:passed but still alive' },
+      { file: files[1], lastVerdict: 'test:complete:passed but still alive' },
       { file: files[2], lastVerdict: null },
     ],
     drained: [files[0]],
@@ -692,7 +720,7 @@ test('WHAT[verification-system-006] file waits distinguish queued, active and ve
 
 test('WHAT[verification-system-006] file lifecycle facts reject unknown entries and impossible transitions', () => {
   const file = path.resolve('planned.mjs')
-  const waits = testSupervisor.createFileWaitTracker([file])
+  const waits = new NativeTestSupervision({ files: [file], silenceMs: 5000 })
   const event = (type, entryFile = file) => ({ type, data: { entryFile } })
   assert.throws(() => waits.observe(event('runner:file-start', path.resolve('unknown.mjs'))), /unplanned/)
   assert.throws(() => waits.observe(event('runner:file-drained')), /queued/)
@@ -706,7 +734,7 @@ test('WHAT[verification-system-006] file lifecycle facts reject unknown entries 
 
 test('WHAT[verification-system-006] a pending runtime test start remains diagnostic evidence without becoming a verdict', () => {
   const file = path.resolve('pending-runtime.mjs')
-  const waits = testSupervisor.createFileWaitTracker([file])
+  const waits = new NativeTestSupervision({ files: [file], silenceMs: 5000 })
   waits.observe({ type: 'runner:file-start', data: { entryFile: file } })
   const event = { type: 'test:start', data: {
     entryFile: file, file: path.resolve('registration.mjs'), name: 'pending child',

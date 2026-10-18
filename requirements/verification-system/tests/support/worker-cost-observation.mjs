@@ -47,9 +47,9 @@ export function installWorkerCostObservation() {
       ...(phase === 'exit' ? { exitCode } : {}),
     }
   }
-  try { write(1, encodeWorkerCostRecord(sample('pre-import')), () => {}) } catch {}
+  try { write(2, encodeWorkerCostRecord(sample('pre-import')), () => {}) } catch {}
   process.once('exit', code => {
-    try { process.stdout.write(encodeWorkerCostRecord(sample('exit', code)), () => {}) } catch {}
+    try { process.stderr.write(encodeWorkerCostRecord(sample('exit', code)), () => {}) } catch {}
   })
 }
 
@@ -74,8 +74,7 @@ export function createWorkerCostObserver({ entryFile, sourceFile = entryFile, pa
   let exit = null
   let bodyIdentity = null
   let invalidReason = null
-  let pending = ''
-  let droppingLine = false
+  const channels = new Map(['test:stdout', 'test:stderr'].map(type => [type, { pending: '', droppingLine: false }]))
   const invalidate = reason => { invalidReason ??= reason }
   const sameIdentity = record => record.parentPid === parentPid && sources.has(resolve(record.entryFile)) &&
     (!preImport || record.pid === preImport.pid) && (!bodyIdentity || record.pid === bodyIdentity.pid)
@@ -119,36 +118,43 @@ export function createWorkerCostObserver({ entryFile, sourceFile = entryFile, pa
   })
   return {
     observe(event) {
-      if (!enabled || event?.type !== 'test:stdout' || typeof event.data?.message !== 'string') return
+      if (!enabled || !channels.has(event?.type) || typeof event.data?.message !== 'string') return
       if (event.data.entryFile !== entryFile ||
           typeof event.data.file === 'string' && !sources.has(resolve(event.data.file))) {
         invalidate('Worker diagnostic differs from its node:test source file')
         return
       }
       const message = event.data.message
+      const channel = channels.get(event.type)
       let offset = 0
       while (offset < message.length) {
         const end = message.indexOf('\n', offset)
         const stop = end === -1 ? message.length : end
-        if (!droppingLine) {
-          pending += message.slice(offset, Math.min(stop, offset + MAX_WORKER_COST_BYTES + 1))
-          if (Buffer.byteLength(pending) >= MAX_WORKER_COST_BYTES) {
-            if (pending.startsWith(WORKER_COST_PREFIX)) invalidate('Worker cost record exceeds its byte boundary')
-            pending = ''
-            droppingLine = true
+        if (!channel.droppingLine) {
+          channel.pending += message.slice(offset, Math.min(stop, offset + MAX_WORKER_COST_BYTES + 1))
+          if (Buffer.byteLength(channel.pending) >= MAX_WORKER_COST_BYTES) {
+            if (channel.pending.startsWith(WORKER_COST_PREFIX) || channel.pending.startsWith(BODY_PREFIX)) {
+              invalidate('Worker diagnostic exceeds its byte boundary')
+            }
+            channel.pending = ''
+            channel.droppingLine = true
           }
         }
         if (end === -1) break
-        if (!droppingLine) observeLine(pending, event)
-        pending = ''
-        droppingLine = false
+        if (!channel.droppingLine) observeLine(channel.pending, event)
+        channel.pending = ''
+        channel.droppingLine = false
         offset = end + 1
       }
     },
     snapshot,
     finish() {
-      if (pending.startsWith(WORKER_COST_PREFIX)) invalidate('Worker cost record ended before its newline')
-      pending = ''
+      for (const channel of channels.values()) {
+        if (channel.pending.startsWith(WORKER_COST_PREFIX) || channel.pending.startsWith(BODY_PREFIX)) {
+          invalidate('Worker diagnostic ended before its newline')
+        }
+        channel.pending = ''
+      }
       return snapshot()
     },
   }

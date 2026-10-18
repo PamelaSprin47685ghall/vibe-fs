@@ -327,18 +327,28 @@ process.send({type:'inner:drained'})
 
 test('WHAT[verification-system-021] aggregate drain cannot replace a planned file stream drain', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'missing-file-drain-'))
+  const diagnostics = []
+  const originalError = console.error
+  console.error = (...args) => {
+    diagnostics.push(args.join(' '))
+    originalError(...args)
+  }
   try {
     const inner = join(directory, 'inner.mjs')
     writeFileSync(inner, `const file = process.argv[2]
 process.send({ type: 'runner:file-start', data: { entryFile: file } })
-process.send({ type: 'test:complete', data: { name: file, file, entryFile: file } })
+process.send({ type: 'test:complete', data: { name: file, file, entryFile: file, nativeSequence: 1 } })
 process.send({ type: 'runner:summary', data: { passed: 1, failed: 0, leafDurations: [] } })
 process.send({ type: 'inner:drained' })
 `)
     await assert.rejects(superviseNodeTest({
       files: [fixture], inner, env: childEnv, label: 'missing-file-drain', silenceMs: 1000, throwOnFailure: true,
     }), /supervised suite failed/)
+    assert.match(diagnostics.join('\n'), /incomplete run; not every planned file stream drained/)
+    assert.match(diagnostics.join('\n'), /1 passed, 0 failed; 1\/1 planned file/)
+    assert.doesNotMatch(diagnostics.join('\n'), /invalid file lifecycle/)
   } finally {
+    console.error = originalError
     rmSync(directory, { recursive: true, force: true })
   }
 })
@@ -453,21 +463,30 @@ releaseTest('physical acceptance', () => { throw new Error('must remain unexecut
 
 test('WHAT[verification-system-021] a known TODO cannot authorize complete acceptance', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'pending-proof-'))
+  const diagnostics = []
+  const originalError = console.error
+  console.error = (...args) => {
+    diagnostics.push(args.join(' '))
+    originalError(...args)
+  }
   try {
     const inner = join(dir, 'inner.mjs')
-    writeFileSync(inner, `const file = process.argv[2];
-process.send({type:'runner:file-start',data:{entryFile:file}});
-process.send({type:'test:complete',data:{name:file,file}});
-process.send({type:'runner:file-drained',data:{entryFile:file}});
-process.send({type:'runner:summary',data:{passed:1,failed:0,todo:1,leafDurations:[]}});
-process.send({type:'inner:drained'});
+    writeFileSync(inner, `const file = process.argv[2]
+process.send({type:'runner:file-start',data:{entryFile:file}})
+process.send({type:'test:complete',data:{name:file,file,nativeSequence:1}})
+process.send({type:'runner:file-drained',data:{entryFile:file}})
+process.send({type:'runner:summary',data:{passed:1,failed:0,todo:1,leafDurations:[]}})
+process.send({type:'inner:drained'})
 `)
     for (const env of [childEnv, { ...childEnv, WXS_ACCEPT_TODO: '1' }]) {
       await assert.rejects(superviseNodeTest({
         files: [fixture], inner, env, label: 'pending-proof', silenceMs: 10000, throwOnFailure: true,
       }), /supervised suite failed/)
     }
+    assert.equal(diagnostics.filter(line => /pending proof prevents complete acceptance/.test(line)).length, 2)
+    assert.doesNotMatch(diagnostics.join('\n'), /invalid file lifecycle/)
   } finally {
+    console.error = originalError
     rmSync(dir, { recursive: true, force: true })
   }
 })

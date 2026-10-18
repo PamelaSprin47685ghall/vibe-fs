@@ -1,0 +1,67 @@
+[
+  {
+    "file": "CUT-00-R1-VERIFICATION-689-20261019.tgz",
+    "bytes": 226097,
+    "sha256": "fe7a83a0ff2b942412814fff94cb19ad024f6e71aec31879afa994cb5ca701d5"
+  },
+  {
+    "file": "cut-r1-node2213-evidence-20261019.tgz",
+    "bytes": 14805,
+    "sha256": "440ad94586069ebaf9d8e15a70903182763d68bdcbfe0436c80bed235d5ce5f9"
+  },
+  {
+    "file": "R1-HOST-BOUNDARY-CONSTRUCTION-20261019.tgz",
+    "bytes": 14341,
+    "sha256": "a7d5bf41bddcb4a18781cbcc5a8ed77b8950b29afce1f1cd7a7997eefeaea716"
+  },
+  {
+    "file": "CUT-00-R1-NARROW-NONAUTHOR-20261019.tgz",
+    "bytes": 22221,
+    "sha256": "36b05eb8c388d67465cf7001113ef010e6d59a7a4266148ba1527f72287732cd"
+  },
+  {
+    "file": "CUT-00-R1-ACK-FINAL-20261019.tgz",
+    "bytes": 26569,
+    "sha256": "3197a5817ec172dc7cf766886c33aa94abff1101bf4d1255c0dc630d6c11093e"
+  },
+  {
+    "file": "R1-HOST-NATIVE-PARSER-BOUNDARY-20261019.tgz",
+    "bytes": 248251,
+    "sha256": "977041268b79fc28cd8c3f10fffe7b5758b261404eee3307acea584b3eac9b81"
+  },
+  {
+    "file": "CUT-00-R1-OUTPUT-REVIEW-FIRST-20261019.tgz",
+    "bytes": 51974,
+    "sha256": "6a1a469729d74cb87af3973d2117cd7aa4518d3ac2bc11dd028c45b84c6b652d"
+  },
+  {
+    "file": "CUT-00-R1-OUTPUT-GATED-FINAL-20261019.tgz",
+    "bytes": 43438,
+    "sha256": "52f829bf852c80fb1d9c8812842b3db72d3df22bb5dfd5e3731ada41cf4f1996"
+  },
+  {
+    "file": "cut-r1-684-node2213-evidence-20261019.tgz",
+    "bytes": 84096,
+    "sha256": "f55c6ec291e87c96124ed01579704462942e8da3f0094c8737ced48a37c06b0e"
+  },
+  {
+    "file": "cut-r1-686-node2213-evidence-20261019.tgz",
+    "bytes": 119353,
+    "sha256": "adbc22bad3c8e6436e5451a353daad20b34fba27f2f137670e213521c0334f87"
+  },
+  {
+    "file": "cut-r1-687-node2213-evidence-20261019.tgz",
+    "bytes": 116984,
+    "sha256": "6c31ebb4836082562fb54feb46a0a98703f987551d4f712c2f9d9621ef8e5292"
+  },
+  {
+    "file": "cut-r1-688-node2213-evidence-20261019.tgz",
+    "bytes": 134633,
+    "sha256": "001034e0c8b6df0c9efdfbd6ceb8ea8f3402090d670faa96f2636451f648a31f"
+  },
+  {
+    "file": "cut-r1-689-node2213-evidence-20261019.tgz",
+    "bytes": 135057,
+    "sha256": "ca02c2cfe659cc84d6272afc91fcf5d3e959fd9a1a9d8575e3bfe77cf86689d7"
+  }
+]

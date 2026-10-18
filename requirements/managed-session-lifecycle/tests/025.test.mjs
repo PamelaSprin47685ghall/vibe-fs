@@ -20,13 +20,15 @@ import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.j
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import { hostPort } from '../../interaction-authority/tests/support/authority.mjs'
 import { createHmac } from 'node:crypto'
+import { withFinitePhysicalWait } from '../../verification-system/tests/support/finite-physical-wait.mjs'
 
 for (const runtime of ['node', 'bun']) {
   for (const mode of ['rename', 'directory-sync', 'owner-lost']) {
     test(`WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (${runtime}, ${mode})`, { timeout: 25000 }, async t => {
       if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
       const helper = fileURLToPath(new URL('./support/pty-publication-evidence.mjs', import.meta.url))
-      await promisify(execFile)(runtime, [helper, mode], { timeout: 20000 })
+      await withFinitePhysicalWait(t, { operation: `PTY obligation publication ${runtime} ${mode}`, limitMs: 24000 },
+        () => promisify(execFile)(runtime, [helper, mode], { timeout: 20000 }))
     })
   }
 }
@@ -496,7 +498,8 @@ for (const runtime of ['node', 'bun']) {
   for (const corruption of ['proof', 'instance']) {
     test(`WHAT[managed-session-lifecycle-025] a foreign ${corruption} receipt preserves the exact blocker while another PTY drains (${runtime})`, { timeout: 30000 }, async t => {
       if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
-      await withAdmissionWorkers(`foreign-receipt-${runtime}-${corruption}`, async (producer, other, workspace, start) => {
+      await withFinitePhysicalWait(t, { operation: `PTY foreign ${corruption} receipt and physical drain ${runtime}`, limitMs: 29000 },
+        () => withAdmissionWorkers(`foreign-receipt-${runtime}-${corruption}`, async (producer, other, workspace, start) => {
         const { readdirSync } = await import('node:fs')
         const root = join(workspace, '.git', 'wanxiangshu', 'pty')
         const locate = marker => readdirSync(root).map(key => join(root, key)).find(directory => JSON.parse(readFileSync(join(directory, 'request'), 'utf8')).command.includes(marker))
@@ -550,7 +553,7 @@ for (const runtime of ['node', 'bun']) {
           for (const marker of markers) writeFileSync(`${marker}-release`, '')
           for (const pid of pids) await requirePtyTargetReaped(pid)
         }
-      }, { realBackend: true, runtime })
+      }, { realBackend: true, runtime }))
     })
   }
 }
@@ -560,7 +563,8 @@ for (const runtime of ['node', 'bun']) {
     test(`WHAT[managed-session-lifecycle-025] local ${scenario} preserves its exact evidence kind (${runtime})`, { timeout: 20000 }, async t => {
       if (scenario !== 'missing-bun' && spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
       const helper = fileURLToPath(new URL('./support/pty-local-evidence.mjs', import.meta.url))
-      await promisify(execFile)(runtime, [helper, scenario], { timeout: 15000 })
+      await withFinitePhysicalWait(t, { operation: `PTY local evidence ${runtime} ${scenario}`, limitMs: 19000 },
+        () => promisify(execFile)(runtime, [helper, scenario], { timeout: 15000 }))
     })
   }
 

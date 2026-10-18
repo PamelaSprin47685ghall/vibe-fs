@@ -101,6 +101,7 @@ export function bindTestEntry(event, entryFile) {
 
 export async function runTestFiles({
   files, concurrency = parseConcurrency(process.env.NODE_TEST_CONCURRENCY),
+  physicalWaitControl = false,
   send = (message, callback) => {
     // 当 supervisor 已终止（watchdog 静默 / backstop）时，process.connected 会先翻为 false，
     // 而 inner runner 尚未收到 SIGKILL。此时调用 process.send 会触发 ERR_IPC_CHANNEL_CLOSED，
@@ -134,14 +135,40 @@ export async function runTestFiles({
     send: (message) => { if (message.type === 'runner:error') reportError(new Error(message.data.message)) },
   }).then((outcome) => { if (outcome.error) reportError(outcome.error) })
   const eventTypes = [
-    'test:start', 'test:pass', 'test:fail', 'test:complete',
+    'test:start', 'test:dequeue', 'test:pass', 'test:fail', 'test:complete',
     'test:diagnostic', 'test:stderr', 'test:stdout',
   ]
   const transportUrl = new URL('./verdict-transport.mjs', import.meta.url).href
-  const hasTransport = process.execArgv.some((argument, index) =>
-    argument === `--import=${transportUrl}` ||
-    (argument === '--import' && process.execArgv[index + 1] === transportUrl))
-  const execArgv = hasTransport ? process.execArgv : [...process.execArgv, `--import=${transportUrl}`]
+  const execArgv = []
+  for (let index = 0; index < process.execArgv.length; index += 1) {
+    const argument = process.execArgv[index]
+    const imported = argument === '--import' ? process.execArgv[index + 1]
+      : argument.startsWith('--import=') ? argument.slice(9) : null
+    if (imported?.split('?')[0] === transportUrl) {
+      if (argument === '--import') index += 1
+    } else execArgv.push(argument)
+  }
+  const channelRequests = new Map()
+  const receiveChannel = message => {
+    if (message?.type !== 'runner:physical-channel-ready') return
+    channelRequests.get(message.data?.entryFile)?.(message.data)
+  }
+  if (physicalWaitControl) process.on('message', receiveChannel)
+  const requestChannel = file => new Promise((accept, reject) => {
+    const timer = setTimeout(() => {
+      channelRequests.delete(file)
+      reject(new Error('Physical wait control channel was not allocated in time'))
+    }, 1000)
+    channelRequests.set(file, descriptor => {
+      clearTimeout(timer)
+      channelRequests.delete(file)
+      if (descriptor.entryFile !== file || descriptor.workerParentPid !== process.pid || !/^[a-f0-9]{32}$/.test(descriptor.runId) ||
+          !/^[a-f0-9]{64}$/.test(descriptor.capability) || typeof descriptor.path !== 'string') {
+        reject(new Error('Invalid physical wait channel descriptor'))
+      } else accept(descriptor)
+    })
+    send({ type: 'runner:physical-channel', data: { entryFile: file } })
+  })
   const runFile = async (file) => {
     const controller = new AbortController()
     active.add(controller)
@@ -157,8 +184,13 @@ export async function runTestFiles({
       try { send({ type: 'runner:worker-cost', data: snapshot }, () => {}) } catch {}
     }
     try {
-      const stream = run({ files: [resolve(file)], concurrency: 1, signal: controller.signal, execArgv })
-      send({ type: 'runner:file-start', data: { entryFile: resolve(file), pid: process.pid, parentPid: process.ppid } })
+      const descriptor = physicalWaitControl ? await requestChannel(resolve(file)) : null
+      const transport = new URL(transportUrl)
+      if (descriptor) for (const [key, value] of Object.entries(descriptor)) transport.searchParams.set(key, value)
+      send({ type: 'runner:file-start', data: { entryFile: resolve(file), runId: descriptor?.runId,
+        pid: process.pid, parentPid: process.ppid } })
+      const stream = run({ files: [resolve(file)], concurrency: 1, signal: controller.signal,
+        execArgv: [...execArgv, `--import=${transport.href}`] })
       reportCosts()
       const drained = drainTestStream({ stream, send() {} })
       const attributed = new WeakMap()
@@ -166,20 +198,23 @@ export async function runTestFiles({
         if (!attributed.has(event.data)) attributed.set(event.data, bindTestEntry(event, file).data)
         return { ...event, data: attributed.get(event.data) }
       }
+      let nativeSequence = 0
       for (const type of eventTypes) {
         stream.on(type, (data) => {
           if (errors.size > 0) return
           try {
             const event = attribute({ type, data })
-            if (type === 'test:stdout') {
+            if (type === 'test:stdout' || type === 'test:stderr') {
               costs.observe(event)
               reportCosts()
             }
             applyEvent(runState, event)
+            if (type === 'test:dequeue' || type === 'test:complete') nativeSequence += 1
             send({ type, data: {
               name: data?.name, file: data?.file, entryFile: event.data.entryFile,
               testId: data?.testId, line: data?.line, column: data?.column,
               nesting: data?.nesting, testNumber: data?.testNumber, durationMs: data?.details?.duration_ms,
+              ...(['test:dequeue', 'test:complete'].includes(type) ? { nativeSequence } : {}),
               pid: process.pid, parentPid: process.ppid,
             } })
           } catch (error) { reportError(error) }
@@ -205,6 +240,7 @@ export async function runTestFiles({
       try { await runFile(next.value) } catch (error) { reportError(error) }
     }
   }))
+  if (physicalWaitControl) process.removeListener('message', receiveChannel)
   if (errors.size === 0) {
     output.end({ type: 'test:summary', data: { duration_ms: performance.now() - startedAt } })
   }
@@ -251,7 +287,7 @@ async function main() {
       process.exitCode = 2
       return
     }
-    if (!await runTestFiles({ files })) process.exitCode = 1
+    if (!await runTestFiles({ files, physicalWaitControl: arguments_.includes('--physical-wait-control') })) process.exitCode = 1
   } finally {
     if (suppliedHome === null) rmSync(runnerTestHome, { recursive: true, force: true })
   }

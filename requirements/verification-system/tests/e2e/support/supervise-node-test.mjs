@@ -13,51 +13,12 @@ import { performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
-import { Watchdog } from './watchdog.js'
 import { PROCESS_TREE_TIMEOUT_MS, SIGKILL_GRACE_MS, SUITE_BACKSTOP_MS } from './time-budget.js'
-import { classifyVerdict } from '../../support/verdict-feed.mjs'
-import { isFileCompletionEvent, testEntryFile } from '../../support/test-run-state.mjs'
 import { validateWorkerCostSnapshot } from '../../support/worker-cost-observation.mjs'
+import { NativeTestSupervision } from '../../support/native-test-supervision.mjs'
+import { createFiniteWaitChannel } from '../../support/finite-wait-channel.mjs'
 
 export const NODE_TEST_INNER = fileURLToPath(new URL('../../support/run-inner.mjs', import.meta.url))
-
-export function createFileWaitTracker(files) {
-  const entries = new Map(files.map((file) => [resolve(file), { phase: 'queued', lastVerdict: null }]))
-  return {
-    observe(event) {
-      const starts = event?.type === 'runner:file-start'
-      const drains = event?.type === 'runner:file-drained'
-      const testStarts = event?.type === 'test:start'
-      const verdict = classifyVerdict(event)
-      if (!starts && !drains && !testStarts && !verdict?.blocking) return
-      const entryFile = starts || drains ? event?.data?.entryFile : testEntryFile(event)
-      if (typeof entryFile !== 'string' || entryFile.length === 0) {
-        throw new Error('File lifecycle event requires entryFile')
-      }
-      const file = resolve(entryFile)
-      const entry = entries.get(file)
-      if (!entry) throw new Error(`File lifecycle event names unplanned entry ${file}`)
-      const expected = starts ? 'queued' : 'active'
-      if (entry.phase !== expected) {
-        throw new Error(`File lifecycle event ${event.type} received while ${file} is ${entry.phase}`)
-      }
-      if (starts) entry.phase = 'active'
-      else if (drains) entry.phase = 'drained'
-      else if (testStarts) entry.lastStart = { ...event.data }
-      else entry.lastVerdict = verdict.reason
-    },
-    snapshot() {
-      const snapshot = { queued: [], active: [], drained: [] }
-      for (const [file, entry] of entries) {
-        if (entry.phase === 'active') snapshot.active.push({ file, lastVerdict: entry.lastVerdict,
-          ...(entry.lastStart ? { lastStart: { ...entry.lastStart } } : {}),
-        })
-        else snapshot[entry.phase].push(file)
-      }
-      return snapshot
-    },
-  }
-}
 
 function liveGroupMembers(pgid, timeout = PROCESS_TREE_TIMEOUT_MS) {
   if (process.platform !== 'linux' && process.platform !== 'darwin') {
@@ -231,17 +192,22 @@ export async function superviseNodeTest({
     : null
   let result
   let failure
+  const channels = new Map()
   try {
-    result = await superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix, inner, ownedHome, inspectProcessTree })
+    result = await superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix, inner, ownedHome, inspectProcessTree, channels })
   } catch (error) {
     failure = { error }
   } finally {
-    try {
-      if (ownedHome !== null) rmSync(ownedHome, { recursive: true, force: true })
-    } catch (error) {
-      failure = { error: failure
-        ? new AggregateError([failure.error, error], 'Supervised suite failed and its owned HOME could not be reclaimed', { cause: failure.error })
-        : error }
+    const cleanup = await Promise.allSettled([...channels.values()].map(async resource => {
+        await resource.promise
+        if (resource.channel) await resource.channel.close()
+    }))
+    try { if (ownedHome !== null) rmSync(ownedHome, { recursive: true, force: true }) }
+    catch (reason) { cleanup.push({ status: 'rejected', reason }) }
+    for (const result of cleanup) {
+      if (result.status === 'rejected') failure = { error: failure
+        ? new AggregateError([failure.error, result.reason], 'Supervised suite failed and its owned resources could not be reclaimed', { cause: failure.error })
+        : result.reason }
     }
   }
   if (failure) {
@@ -252,7 +218,7 @@ export async function superviseNodeTest({
   return result
 }
 
-async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix, inner, ownedHome, inspectProcessTree }) {
+async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix, inner, ownedHome, inspectProcessTree, channels }) {
   let terminationFailure = null
   const fail = (code = 1) => {
     throw Object.assign(new Error(`${logPrefix}: supervised suite failed (exit ${code})`, {
@@ -264,8 +230,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
 
   // Absolute paths: test:complete reports absolute `data.file`.
   const plannedFiles = new Set(files.map((file) => resolve(file)))
-  const outstanding = new Set(plannedFiles)
-  const fileWaits = createFileWaitTracker(files)
+  const fileWaits = new NativeTestSupervision({ files, silenceMs, requireAllocation: inner === NODE_TEST_INNER })
   const workerCosts = new Map()
   const workerCost = file => workerCosts.get(file) ?? {
     version: 1, entryFile: file, enabled: env.WXS_VERIFICATION_WORKER_DIAGNOSTICS !== '0',
@@ -279,6 +244,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     for (const { file, lastVerdict, lastStart } of waits.active) {
       console.error(`${logPrefix}: active file ${relative(process.cwd(), file)}; waiting for stream drain; last verdict: ${lastVerdict ?? 'none received'}`)
       console.error(`${logPrefix}: worker cost ${JSON.stringify(workerCost(file))}`)
+      console.error(`${logPrefix}: current native wait ${JSON.stringify(fileWaits.currentWait(file))}`)
       if (lastStart) console.error(`${logPrefix}: last runtime test start ${JSON.stringify(lastStart)}`)
     }
     if (waits.queued.length > 0) {
@@ -295,6 +261,8 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
   let termination = null
   const requestTermination = () => {
     if (termination !== null) return
+    fileWaits.stop()
+    clearTimeout(silenceTimer)
     const deadline = Date.now() + SIGKILL_GRACE_MS
     if (exitDeadline === null) {
       exitDeadline = setTimeout(() => {
@@ -333,24 +301,25 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     })
   }
 
-  const watchdog = new Watchdog({
-    timeoutMs: silenceMs,
-    label,
-    deps: {
-      terminate() {
-        silenceFired = true
-        requestTermination()
-      },
-    },
-    onTimeout: () => {
-      if (outstanding.size === 0) {
+  let silenceTimer = null
+  const rejectProtocol = error => {
+    if (error.code === 'verification-silence') {
+      if (silenceFired) return
+      silenceFired = true
+      const progress = fileWaits.progress()
+      console.error(`WATCHDOG: '${label}' silent for ${silenceMs}ms; ${JSON.stringify(error.deadline)}; ` +
+        `${progress.count} blocking progress update(s), last progress: ${progress.last}`)
+      if (progress.lastBackground) console.error(`WATCHDOG: background progress ${progress.lastBackground} ` +
+        `(${progress.backgroundCount} background update(s), none of them renewals)`)
+      const outstanding = fileWaits.incomplete()
+      if (outstanding.length === 0) {
         console.error(
           `${logPrefix}: all planned files completed but the child would not exit — ` +
             'the runner lifecycle is still open',
         )
       } else {
         console.error(
-          `${logPrefix}: ${outstanding.size} file(s) had not reported completion`,
+          `${logPrefix}: ${outstanding.length} file(s) had not reported completion`,
         )
       }
       reportFileWaits()
@@ -360,12 +329,32 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
       try {
         process.stderr.write('')
       } catch {}
-    },
-  })
+    } else {
+      runnerError = { message: error.message }
+      console.error(`${logPrefix}: invalid file lifecycle: ${error.message}`)
+    }
+    requestTermination()
+  }
+  const armSilence = () => {
+    clearTimeout(silenceTimer)
+    const deadline = fileWaits.nextDeadline()
+    if (!deadline || silenceFired || termination !== null) return
+    silenceTimer = setTimeout(() => {
+      try {
+        fileWaits.check()
+        armSilence()
+      } catch (error) { rejectProtocol(error) }
+    }, Math.max(1, deadline.at - performance.now()))
+  }
+  const reply = responses => {
+    for (const response of responses) channels.get(resolve(response.entryFile))?.channel?.reply(response)
+  }
+  armSilence()
 
   const homeArguments = ownedHome === null ? [] : ['--owned-test-home', ownedHome]
   try {
-    child = spawn(process.execPath, [inner, ...homeArguments, ...files], {
+    const controlArguments = inner === NODE_TEST_INNER ? ['--physical-wait-control'] : []
+    child = spawn(process.execPath, [inner, ...homeArguments, ...files, ...controlArguments], {
       stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
       detached: true,
       env,
@@ -380,13 +369,16 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     child.stdout.pipe(diagnostics, { end: false })
     child.stderr.pipe(process.stderr, { end: false })
   } catch (error) {
-    watchdog.stop()
+    clearTimeout(silenceTimer)
+    fileWaits.stop()
     throw error
   }
 
   let backstopFired = false
   const backstop = setTimeout(() => {
     backstopFired = true
+    fileWaits.stop()
+    clearTimeout(silenceTimer)
     console.error(`${logPrefix}: suite exceeded the ${SUITE_BACKSTOP_MS}ms physical backstop`)
     setImmediate(() => {
       reportFileWaits()
@@ -397,6 +389,37 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
 
   const startedAt = performance.now()
   child.on('message', (event) => {
+    try { fileWaits.check() }
+    catch (error) {
+      rejectProtocol(error)
+      return
+    }
+    if (termination !== null) return
+    if (event?.type === 'runner:physical-channel') {
+      const file = event.data?.entryFile
+      if (inner !== NODE_TEST_INNER || typeof file !== 'string' || !plannedFiles.has(file) || channels.has(file)) {
+        rejectProtocol(new Error('Invalid or duplicate physical channel request'))
+        return
+      }
+      const resource = { channel: null, promise: null }
+      channels.set(file, resource)
+      resource.promise = (async () => {
+        resource.channel = await createFiniteWaitChannel({ entryFile: file,
+          onRequest: request => {
+            if (termination !== null) return
+            try {
+              reply(fileWaits.control(request))
+              armSilence()
+            } catch (error) { rejectProtocol(error) }
+          }, onError: rejectProtocol })
+        fileWaits.allocate(file, resource.channel.runId)
+        if (child.connected && termination === null) child.send({ type: 'runner:physical-channel-ready',
+          data: { ...resource.channel.descriptor, runId: resource.channel.runId, workerParentPid: child.pid } }, error => {
+            if (error) rejectProtocol(error)
+          })
+      })().catch(rejectProtocol)
+      return
+    }
     if (event?.type === 'runner:worker-cost') {
       const file = event.data?.entryFile
       if (typeof file !== 'string' || !plannedFiles.has(resolve(file)) || file !== resolve(file)) {
@@ -434,23 +457,20 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
       return
     }
     try {
-      fileWaits.observe(event)
+      reply(fileWaits.observe(event))
+      armSilence()
     } catch (error) {
-      runnerError = { message: error.message }
-      console.error(`${logPrefix}: invalid file lifecycle: ${error.message}`)
-      requestTermination()
+      rejectProtocol(error)
       return
     }
     if (event?.type === 'runner:file-start' || event?.type === 'runner:file-drained') {
       console.error(`${logPrefix}: file lifecycle ${JSON.stringify({ ...event.data, type: event.type, elapsedMs: performance.now() - startedAt })}`)
-      if (event.type === 'runner:file-drained') console.error(`${logPrefix}: worker cost ${JSON.stringify(workerCost(resolve(event.data.entryFile)))}`)
+      if (event.type === 'runner:file-drained') {
+        const file = resolve(event.data.entryFile)
+        console.error(`${logPrefix}: worker cost ${JSON.stringify(workerCost(file))}`)
+        channels.get(file)?.channel?.close().catch(rejectProtocol)
+      }
     }
-    if (isFileCompletionEvent(event)) {
-      outstanding.delete(resolve(testEntryFile(event)))
-    }
-
-    const progress = classifyVerdict(event)
-    if (progress !== null) watchdog.advance(progress)
   })
 
   const exit = await new Promise((resolveExit) => {
@@ -458,6 +478,7 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     finishExit = (outcome) => {
       if (settled) return
       settled = true
+      try { fileWaits.check() } catch (error) { rejectProtocol(error) }
       if (exitDeadline !== null) clearTimeout(exitDeadline)
       resolveExit(outcome)
     }
@@ -468,7 +489,8 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     })
   })
 
-  watchdog.stop()
+  clearTimeout(silenceTimer)
+  fileWaits.stop()
   clearTimeout(backstop)
   if (termination !== null) await termination
   const groupVerificationStarted = performance.now()
@@ -485,13 +507,14 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
   const passed = runnerSummary?.passed ?? 0
   const failed = runnerSummary?.failed ?? 0
   const leafDurations = runnerSummary?.leafDurations ?? []
+  const outstanding = fileWaits.incomplete()
 
   reportDurationDistribution(logPrefix, leafDurations)
 
   console.error(
     `\n${logPrefix}: ` +
       (runnerSummary ? `${passed} passed, ${failed} failed` : 'verdict counts unavailable; no authoritative summary') +
-      `; ${files.length - outstanding.size}/${files.length} planned file(s) completed`,
+      `; ${files.length - outstanding.length}/${files.length} planned file(s) completed`,
   )
 
   if (failed > 0) fail(1)
@@ -533,8 +556,8 @@ async function superviseOwnedNodeTest({ files, label, silenceMs, env, logPrefix,
     fail(1)
   }
 
-  if (outstanding.size > 0) {
-    console.error(`${logPrefix}: incomplete run; no completion for ${[...outstanding].join(', ')}`)
+  if (outstanding.length > 0) {
+    console.error(`${logPrefix}: incomplete run; no completion for ${outstanding.join(', ')}`)
     fail(1)
   }
 

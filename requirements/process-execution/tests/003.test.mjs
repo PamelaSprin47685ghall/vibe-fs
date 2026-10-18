@@ -5,13 +5,15 @@ import { ptyMembershipRows } from '../../../dist/Process/Surface.js'
 import { execFile, spawnSync } from 'node:child_process'
 import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
+import { withFinitePhysicalWait } from '../../verification-system/tests/support/finite-physical-wait.mjs'
 
 for (const runtime of ['node', 'bun']) {
   for (const mode of ['rename', 'double-failure', 'directory-sync', 'directory-sync-read', 'stopped', 'owner-lost']) {
     test(`WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (${runtime}, ${mode})`, { timeout: 20000 }, async t => {
       if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the PTY owner')
       const helper = fileURLToPath(new URL('./support/pty-recovery-publication.mjs', import.meta.url))
-      await promisify(execFile)(runtime, [helper, mode], { timeout: 15000 })
+      await withFinitePhysicalWait(t, { operation: `PTY terminal publication ${runtime} ${mode}`, limitMs: 19000 },
+        () => promisify(execFile)(runtime, [helper, mode], { timeout: 15000 }))
     })
   }
 }
@@ -21,7 +23,8 @@ for (const runtime of ['node', 'bun']) {
     test(`WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (${runtime}, ${scenario})`, { timeout: 15000 }, async t => {
       if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the PTY owner')
       const helper = fileURLToPath(new URL('./support/pty-recovery-observation.mjs', import.meta.url))
-      const { stdout } = await promisify(execFile)(runtime, [helper, scenario], { timeout: 12000 })
+      const { stdout } = await withFinitePhysicalWait(t, { operation: `PTY recovery observation ${runtime} ${scenario}`, limitMs: 14000 },
+        () => promisify(execFile)(runtime, [helper, scenario], { timeout: 12000 }))
       const evidence = JSON.parse(stdout.trim())
       assert.equal(evidence.custodianExited, true)
       assert.equal(evidence.commands, scenario === 'not-started-race' ? 0 : 1)
@@ -32,7 +35,8 @@ for (const runtime of ['node', 'bun']) {
 test('WHAT[process-execution-003] a durable PTY owner survives Host SIGKILL, refuses input replay and seals only its exact native outcome', { timeout: 30000 }, async t => {
   if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the PTY owner')
   const helper = fileURLToPath(new URL('./support/pty-recovery-probe.mjs', import.meta.url))
-  const { stdout } = await promisify(execFile)(process.execPath, [helper], { timeout: 25000 })
+  const { stdout } = await withFinitePhysicalWait(t, { operation: 'PTY durable owner restart matrix', limitMs: 29000 },
+    () => promisify(execFile)(process.execPath, [helper], { timeout: 25000 }))
   const evidence = stdout.trim().split('\n').map(line => JSON.parse(line))
   assert.equal(evidence.length, 7)
   assert.ok(evidence.every(item => item.ownerExited))

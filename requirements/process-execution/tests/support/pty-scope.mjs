@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { withFinitePhysicalWait } from '../../../verification-system/tests/support/finite-physical-wait.mjs'
 
 export const verifyPtyScope = async (t, mode, verify) => {
   if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) {
@@ -11,7 +12,8 @@ export const verifyPtyScope = async (t, mode, verify) => {
     return
   }
   const helper = fileURLToPath(new URL('../../../managed-session-lifecycle/tests/support/pty-scope-probe.mjs', import.meta.url))
-  const { stdout } = await promisify(execFile)('bun', [helper, mode], { timeout: 20000 })
+  const { stdout } = await withFinitePhysicalWait(t, { operation: `PTY scope ${mode}`, limitMs: 25000 },
+    () => promisify(execFile)('bun', [helper, mode], { timeout: 20000 }))
   verify(JSON.parse(stdout.trim()))
 }
 
@@ -24,10 +26,11 @@ export const verifyCompiledPtyScope = async (t, original) => {
   const helper = fileURLToPath(new URL('../../../managed-session-lifecycle/tests/support/pty-scope-probe.mjs', import.meta.url))
   const directory = mkdtempSync(join(tmpdir(), 'wxs-compiled-pty-'))
   try {
-    await promisify(execFile)(binary, [helper, 'compiled-host', original], {
+    await withFinitePhysicalWait(t, { operation: `Compiled Host PTY scope ${original}`, limitMs: 25000 },
+      () => promisify(execFile)(binary, [helper, 'compiled-host', original], {
       env: { ...process.env, BUN_BE_BUN: '1', HOME: directory, XDG_CONFIG_HOME: join(directory, 'config'), XDG_DATA_HOME: join(directory, 'data') },
       timeout: 20000,
-    })
+    }))
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
