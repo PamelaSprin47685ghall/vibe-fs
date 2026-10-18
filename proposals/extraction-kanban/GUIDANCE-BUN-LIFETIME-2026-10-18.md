@@ -7,7 +7,7 @@
 | 记录 | 归属 | 证据及处理 |
 |---|---|---|
 | R3-01 | 前轮修复新增的测试夹具缺陷；不是原拆分的产品缺陷 | `guidance-host.mjs` 自 `7c50ed590` 创建后，模拟了正在执行的 assistant，却没有报告其确切终态。dispose 将未终结的 provider step 留在 Retiring，不能凭插件关闭当作退出。连续 16 个夹具后容量用尽，后五项等在首次 `chat.message`，尚未进入呈现或冷读。现通过同一注册 Host event 交付匹配 parent 的 completed/stop，并断言本夹具没有残留 owner 或 waiter。 |
-| R3-02 | 前轮验证环境缺口 | Bun 1.3.14 的 `os.homedir()` 保留启动时 HOME；Node 26.6.0 响应后来修改的 HOME。夹具在启动后才改 HOME，因此裸 Bun 可能加载外层配置或推荐模板。新的 Bun 定向入口先创建独立 HOME 和测试路由再启动 Bun；Node runner、插件夹具和 Bun 共用同一测试配置定义。实际模型投影也须等于夹具模型，防止用错配置仍报绿。 |
+| R3-02 | 前轮验证环境缺口 | Bun 1.3.14 的 `os.homedir()` 保留启动时 HOME；Node 26.6.0 响应后来修改的 HOME。夹具在启动后才改 HOME，因此裸 Bun 可能加载外层配置或推荐模板。Bun原生探针先创建独立HOME和测试路由再启动；Node runner、插件夹具和探针共用同一测试配置定义。实际模型投影也须等于夹具模型，防止用错配置仍报绿。 |
 | R3-03 | 不成立的产品归因，未登记为确认缺陷 | 深测时只有顺序相关超时，不能据此认定 Pair、Trace、原件 owner 或上一轮生产修改回退。本轮确切等待点、容量快照及不变生产包上的夹具对照解释了原因；没有修改这些生产 owner。 |
 | R3-04 | 已有路由测试的相同环境前提错误 | EMR-020 共享配置例在同进程修改 HOME 并假定能选择自己的 module；Bun 启动 home 和已初始化 singleton 都使此前提不成立。现在真正启动新 OS 进程，启动前指定该例的自有配置，再验证两个相反的 unrelated global 不能改变其配置事实。原断言未放宽。 |
 
@@ -17,7 +17,7 @@
 
 - `guidance-host.mjs` 以 try/finally 结束最后一个已准入的模拟 provider run，包含测试断言失败；最后一轮引用的物理 parent 与 provider run 同步跟踪。注册事件之后检查本 session 的 owner/waiter 均已消失。
 - 014 增加单槽反例：第一夹具在实际 transform 后故意抛出原错误，第二夹具须能正常准入并完成新 OS 进程冷读。修前 helper 在同一生产包上 0 pass / 1 timeout；修后必须保留原异常并完成第二次调用。
-- `routing-home.mjs` 统一此前两份测试路由。`run-bun.mjs` 先检查构建新鲜度，创建及清理自有 HOME，原样将选定完整文件交给真正 Bun。它不改生产路径解析或调度规则，也不把文件拆成隔离用例。
+- `routing-home.mjs` 统一此前两份测试路由。曾新增的`run-bun.mjs`经独立复审发现导入阶段无监督，已删除；启动HOME和完整文件的物理对照仍保留为原生探针，不再规范为正式门禁。
 
 ## 验收证据
 
@@ -44,6 +44,10 @@
 
 额外 Bun 路由组初次为 14 pass / 1 fail，正是上表 R3-04；修后同一组 15/15。最终 Node 大组在 R3-04 改为子进程之前完成，随后对最后变更的 020 单独验收 7/7；不把补验再加进 265。build/check/diff 门禁通过，所有临时阶段打印已删。
 
+## 非作者复审与新增问题
+
+`review_guidance_r3`独立核对exact session/parent/provider-run终态、HOME归属、EMR-020相反配置断言，未发现产品或fixture新增问题。另发现本轮新增P2：`run-bun.mjs`无界spawnSync不能监督模块导入挂起。真实Bun反例输出module-entered后保留interval并无限await，6505ms后仍须外部SIGTERM，日志`/private/tmp/r3-review-20261018-bun-import-hang.log`。已删除入口和WHAT中的正式入口声明，不加总时长超时、不解析pass文本或伪造verdict。正式Bun监督适配单列CUT-00-R2；Node正式监督证据与Bun原生物理证据分别保留。复审时窄测被并发施工freshness拒绝，不计通过。
+
 ## 剩余边界
 
-本包只修正指导测试夹具及测试启动配置。其他夹具的完整物理收尾、Process A/C/B、Trace 完整产品链、Bootstrap 与主动脱组均不因本包通过而关闭。R12-U1 继续暂缓。候选进入 REVIEW，非作者复审待授权与执行，不把作者自检称为独立复审；本原子提交正常推送 master，未部署用户 Host。
+本包只修正指导测试夹具及测试启动配置，非作者复审已完成且发现的新增入口已移除。Bun原生通过没有完整正式监督证明，归CUT-00-R2；其他夹具完整收尾、Process A/C/B、Trace完整产品链、Bootstrap及主动脱组均不因本包通过关闭。R12-U1继续暂缓；正常提交推送master，未部署用户Host。

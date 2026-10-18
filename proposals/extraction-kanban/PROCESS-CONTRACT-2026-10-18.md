@@ -41,4 +41,10 @@ HostForkRuntime 必须显式取得端口 option 与 RecoverPty。没有端口表
 
 默认正式包装器仍有既有缺口，单列 CUT-00-R1：`process-a-20261018-main-regression.log` 在 025 的有界等待被终止；去掉 025 的诊断组又在 003 同类等待被终止，`process-a-20261018-related-final-node.log`。它们均无权威总计，不能拿已输出的 verdict 拼成全绿。修前对照 `process-a-20261018-before-025-wrapper.log` 同样失败。完整原生文件及 128 文件组实际通过，也不能写成“默认正式包装器已通过”。
 
-未加大任何静默窗口或用例超时，未删测试、刷心跳或跳过真实等待。后续须为确切有界等待设计不可续期的监督契约，同时保留真实挂起反例；与暂缓的 R12-U1 原自然 Unknown 分开处理。本包进入 REVIEW，尚待非作者复审；不关闭整个 CUT-02、GAP-092 或 PTY 脱组/Bootstrap 缺口。正常提交推送 master，不部署用户 Host。
+未加大任何静默窗口或用例超时，未删测试、刷心跳或跳过真实等待。后续须为确切有界等待设计不可续期的监督契约，同时保留真实挂起反例；与暂缓的R12-U1分开。
+
+## 非作者复审
+
+`review_process_a`独立复审`57ba194b6 → f0bfa9bbb`，未确认新增产品问题。真Fable正反编译2/2（`/private/tmp/process-a-independent-012.log`）；实际Node/Bun冷Host接管与无owner拒绝3/3、exit0（`process-a-independent-025-physical.log`），独立无端口调用确认`calls=[] / owned=false`。首次受限沙箱诊断组58项24pass/34fail，不能计通过；同一cold-load的沙箱0/1与物理权限下3/3对照保留，证明边界不混记为产品回退。
+
+本包声明范围进入DONE；不关闭整个CUT-02、GAP-092、C的运行时问题、正式包装器或PTY脱组/Bootstrap。正常提交推送master，未部署用户Host。

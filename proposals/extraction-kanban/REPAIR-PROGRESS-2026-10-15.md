@@ -2,6 +2,12 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第二十七批：R3 / A 非作者复审（2026-10-18）
+
+用户授权后，`review_guidance_r3`、`review_process_a`独立只读审查。R3模拟终态、HOME及EMR-020边界未发现问题；新增无界Bun启动器却能在导入阶段永久挂起，确认为本轮新增P2，已删除入口和WHAT正式声明，单列CUT-00-R2。Bun原生证据保留，不改写成正式监督通过。A未确认新增产品回退，独立Fable正反编译2/2、真实Node/Bun冷接管及无owner拒绝3/3；沙箱物理诊断失败单列，不记通过。
+
+R3和A仅在声明范围标DONE，父卡、正式监督缺口及预算不随之关闭。详细证据见两包报告；本次修正未变更生产实现。继续C施工，R12-U1暂缓，未部署Host。
+
 ## 第二十六批：Process A 纯契约与真实消费者（2026-10-18）
 
 输入主仓`57ba194b6`、库`10bbb32 / 0.6.4`。将ProcessRequest/PtyTypes四文件收敛为无ProjectReference的纯契约工程，物理实现移至独立runtime工程；删除无消费者的PtyOptions，将RunProcess/RecoverPty及显式PTY端口注入实际Git、工具、恢复与Fork调用者，删除隐藏默认工厂。无durable workspace的生产入口仍在Reserve/Spawn前拒绝，未放宽物理所有权。

@@ -8,7 +8,7 @@
 
 **当前入口：** [2026-10-18深测](DEEP-TEST-2026-10-18.md)已在主仓 `70c7d52ac` 交付；用户随后明确允许不兼容的大改，[修复计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)已重新组织为Bun指导挂起→Process契约/运行时/完整预算，再逐包补齐Trace与Bootstrap。旧API、旧协议和旧输出格式不再是默认兼容约束；旧事实不能猜测修复，活动资源也不能因升级抹账。原报告保留证据，状态只在[关联修复卡](BOARD.md#source-audit-repairs)维护，R12-U1继续暂缓。
 
-三小时施工已完成[Bun挂起定因与夹具修正](GUIDANCE-BUN-LIFETIME-2026-10-18.md)和[Process纯契约及实际消费者](PROCESS-CONTRACT-2026-10-18.md)，两包进入REVIEW。Bun定向测试请用 `node requirements/verification-system/tests/run-bun.mjs <选定完整测试文件>`，由入口拥有启动配置。Process C正在做原生适配与精确库包接入；验证包装器的既有有界等待问题另列CUT-00-R1，不与暂缓的R12-U1混记。
+三小时施工已完成[Bun挂起定因与夹具修正](GUIDANCE-BUN-LIFETIME-2026-10-18.md)和[Process纯契约及实际消费者](PROCESS-CONTRACT-2026-10-18.md)，非作者复审已核对。新增无界Bun启动器已删除，原生物理证据不替代正式监督；正式Bun适配单列CUT-00-R2。Process C正在做原生适配与精确库包接入；验证包装器的既有有界等待问题另列CUT-00-R1，不与暂缓的R12-U1混记。
 
 ## 入口：五份文件，各管一件事
 
