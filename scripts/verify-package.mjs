@@ -188,31 +188,75 @@ export function deriveExpectedClosure({ root = REPO_ROOT } = {}) {
       )
     }
 
-    const pending = [dependencyRoot]
-    while (pending.length > 0) {
-      const current = pending.pop()
-      for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
-        const full = path.join(current, entry.name)
-        if (entry.isDirectory()) {
-          pending.push(full)
-          continue
+    const dependencyRealRoot = fs.realpathSync(dependencyRoot)
+    const dependencyPkgPath = path.join(dependencyRealRoot, 'package.json')
+    if (!fs.existsSync(dependencyPkgPath)) {
+      throw createVerificationError(
+        'bundled-dependency-missing',
+        dependency,
+        `Bundled dependency package.json is missing: ${dependency}`,
+      )
+    }
+
+    const dependencyPkg = JSON.parse(fs.readFileSync(dependencyPkgPath, 'utf8'))
+    const addBundledFile = (full) => {
+      const stat = fs.lstatSync(full)
+      if (!stat.isFile()) {
+        throw createVerificationError(
+          'bundled-dependency-non-regular',
+          path.relative(resolvedRoot, full),
+          `Bundled dependency contains a non-regular entry: ${dependency}`,
+        )
+      }
+      const relative = path.relative(dependencyRealRoot, full).replace(/\\/g, '/')
+      const member = path.posix.join('node_modules', dependency, relative)
+      const bytes = fs.readFileSync(full)
+      expected.set(member, {
+        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+        size: bytes.length,
+        fullSourcePath: full,
+      })
+    }
+
+    const walkBundledDir = (dir) => {
+      const pending = [dir]
+      while (pending.length > 0) {
+        const current = pending.pop()
+        for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+          const full = path.join(current, entry.name)
+          if (entry.isDirectory()) {
+            pending.push(full)
+          } else {
+            addBundledFile(full)
+          }
         }
-        if (!entry.isFile()) {
+      }
+    }
+
+    if (Array.isArray(dependencyPkg.files)) {
+      addBundledFile(dependencyPkgPath)
+      const licensePath = path.join(dependencyRealRoot, 'LICENSE')
+      if (fs.existsSync(licensePath)) addBundledFile(licensePath)
+      for (const item of dependencyPkg.files) {
+        const cleanRel = String(item).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
+        if (!cleanRel) continue
+        const full = path.join(dependencyRealRoot, cleanRel)
+        if (!fs.existsSync(full)) {
           throw createVerificationError(
-            'bundled-dependency-non-regular',
+            'bundled-dependency-file-missing',
             path.relative(resolvedRoot, full),
-            `Bundled dependency contains a non-regular entry: ${dependency}`,
+            `Declared file in bundled dependency ${dependency} does not exist: ${item}`,
           )
         }
-        const relative = path.relative(dependencyRoot, full).replace(/\\/g, '/')
-        const member = path.posix.join('node_modules', dependency, relative)
-        const bytes = fs.readFileSync(full)
-        expected.set(member, {
-          sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
-          size: bytes.length,
-          fullSourcePath: full,
-        })
+        const stat = fs.lstatSync(full)
+        if (stat.isDirectory()) {
+          walkBundledDir(full)
+        } else {
+          addBundledFile(full)
+        }
       }
+    } else {
+      walkBundledDir(dependencyRealRoot)
     }
   }
 
@@ -490,7 +534,9 @@ export async function runExternalConsumer({
   // source repository.
   const rootPackage = JSON.parse(fs.readFileSync(path.join(resolvedRoot, 'package.json'), 'utf8'))
   const rootLock = JSON.parse(fs.readFileSync(path.join(resolvedRoot, 'package-lock.json'), 'utf8'))
-  const lifecycleVersion = rootLock.packages?.['node_modules/wanxiangli']?.version
+  const lockedLink = rootLock.packages?.['node_modules/wanxiangli']
+  const lifecycleVersion =
+    lockedLink?.version ?? (lockedLink?.resolved ? rootLock.packages?.[lockedLink.resolved]?.version : undefined)
   if (typeof lifecycleVersion !== 'string' || lifecycleVersion.length === 0) {
     throw createVerificationError(
       'consumer-lifecycle-version-missing',
@@ -511,7 +557,11 @@ export async function runExternalConsumer({
       )
     }
     fs.mkdirSync(path.dirname(destination), { recursive: true })
-    fs.copyFileSync(source, destination)
+    if (fs.statSync(source).isDirectory()) {
+      fs.cpSync(source, destination, { recursive: true })
+    } else {
+      fs.copyFileSync(source, destination)
+    }
   }
 
 

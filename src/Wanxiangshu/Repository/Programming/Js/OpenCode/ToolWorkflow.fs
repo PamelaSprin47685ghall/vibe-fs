@@ -237,6 +237,7 @@ module JsToolWorkflow =
     /// stay reported, never rolled back ([013]).
     let private settleLedger (ledger: JsAsIsLedger) : Task<Result<unit, JsFailure>> =
         task {
+            // DSL-MUTABLE: algorithm-scratch — first append failure for the outcome
             let mutable appendFailure = None
 
             for pending in ledger.Appends do
@@ -313,6 +314,7 @@ module JsToolWorkflow =
                             explicitReads
                             ledger
                             (Some runHost)
+                            None
 
                     let! resultJson =
                         task {
@@ -586,6 +588,7 @@ module JsToolWorkflow =
     /// The generated-surface api factory: bindings own the file members and
     /// the host loop.
     let private bindingsApiFactory
+        (sessionId: string)
         (capabilities: Set<JsCapability>)
         (root: string)
         (buffers: RunBuffers)
@@ -603,6 +606,7 @@ module JsToolWorkflow =
             buffers.Ledger
             parkState
             (Some runHost)
+            (JsDelegationBridge.hostFor sessionId)
 
     let private runProgramWithPark
         (sessionId: string)
@@ -629,7 +633,7 @@ module JsToolWorkflow =
             persistence
             lifecyclePersistence
             fileAccessObservation
-            (fun buffers parkState -> bindingsApiFactory capabilities root buffers parkState)
+            (fun buffers parkState -> bindingsApiFactory sessionId capabilities root buffers parkState)
 
 
     /// Resume a parked site (algorithm E). `handle` must exist; the deferred

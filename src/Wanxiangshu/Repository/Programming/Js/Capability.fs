@@ -16,6 +16,10 @@ type JsCapability =
     | Remove
     /// Host-owned long-running command engineering (`js.run`).
     | Exec
+    /// Delegation primitives: create a child work (`fork`) and wait for the
+    /// caller's children (`join`).
+    | Fork
+    | Join
     | Park
 
 module JsCapability =
@@ -32,6 +36,8 @@ module JsCapability =
         | ToolPermission.Move -> Some JsCapability.Move
         | ToolPermission.Remove -> Some JsCapability.Remove
         | ToolPermission.Exec -> Some JsCapability.Exec
+        | ToolPermission.Fork -> Some JsCapability.Fork
+        | ToolPermission.Join -> Some JsCapability.Join
         | _ -> None
 
     let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
@@ -325,6 +331,38 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.run" }
 
+    let fork: JsCapabilityFragment =
+        { Capability = JsCapability.Fork
+          MemberName = "fork"
+          Signature = "async fork(payload)"
+          Description =
+            "fork(payload) — delegate one charge to a child work. `payload` carries the same "
+            + "fields as the host fork tool: charge (required), name, calling, keywords. "
+            + "Returns the fork receipt text; the child runs in its own session."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    return await this.fork({ charge: \"index the parser module\", name: \"parser-index\" });\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.fork" }
+
+    let join: JsCapabilityFragment =
+        { Capability = JsCapability.Join
+          MemberName = "join"
+          Signature = "async join()"
+          Description =
+            "join() — wait for this session's children and return the join receipt batch. "
+            + "Membership-scoped: it joins the children this caller created, not an explicit handle list."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    await this.fork({ charge: \"index the parser module\" });\n"
+            + "    return await this.join();\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.join" }
+
     /// park fragment — the pause/resume mechanism (PLAN S1 B.7/B.17). Unlike
     /// the filesystem members this is not a ToolPermission projection: it is a
     /// lifecycle capability every js-* surface carries. The runtime binding is
@@ -365,6 +403,8 @@ module JsFragmentRegistry =
           whereAll
           where
           run
+          fork
+          join
           park ]
 
     let byCapability: Map<JsCapability, JsCapabilityFragment list> =

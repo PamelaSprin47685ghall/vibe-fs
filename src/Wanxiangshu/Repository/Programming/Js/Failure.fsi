@@ -70,6 +70,7 @@ type JsFailure =
     | RunParkUnsupported
     | RunHostUnavailable
     | AskRefused of string
+    | DelegationUnavailable
 
 module JsFailure =
     val code: failure: JsFailure -> string

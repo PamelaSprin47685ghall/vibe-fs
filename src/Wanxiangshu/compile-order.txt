@@ -742,6 +742,8 @@ Repository/Programming/Js/Anchor/AnchorView.fsi
 Repository/Programming/Js/Anchor/AnchorView.fs
 Repository/Programming/Js/Anchor/AnchorSurface.fsi
 Repository/Programming/Js/Anchor/AnchorSurface.fs
+Repository/Programming/Js/DelegationBridge.fsi
+Repository/Programming/Js/DelegationBridge.fs
 Process/PtyTypes.fsi
 Process/PtyTypes.fs
 Process/PtySession.fsi

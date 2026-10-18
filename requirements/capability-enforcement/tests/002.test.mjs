@@ -126,7 +126,7 @@ const ROLE_ALLOW = {
     'review',
     'todowrite-for-manager',
   ],
-  Orchestrator: ['commission', 'join', 'horizon'],
+  Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
   Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
     'read',

@@ -827,6 +827,14 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Repository/Programming/Js/OpenCode/ParkedSites.js',
+    owner: 'repository-programming',
+    laws: ['REPOSITORY-PROGRAMMING-031'],
+    source: 'src/Wanxiangshu/Repository/Programming/Js/OpenCode/ParkedSites.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'OpenCode/Tools/FileToolsSurface.js',
     owner: 'repository-programming',
     laws: ['REPOSITORY-PROGRAMMING-007', 'REPOSITORY-PROGRAMMING-010'],
@@ -1463,6 +1471,14 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'OpenCode/Plugin/PlanWorkOpenWiring.js',
+    owner: 'work',
+    laws: ['WORK-036'],
+    source: 'src/Wanxiangshu/OpenCode/Plugin/PlanWorkOpenWiring.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'OpenCode/Host/PluginHooksSurface.js',
     owner: 'host-boundary',
     laws: ['HOST-BOUNDARY-014', 'EFFECT-ACCOUNTING-008'],
@@ -1804,6 +1820,14 @@ export const SURFACE_MANIFEST = [
     ],
     source: 'src/Wanxiangshu/Mission/Lifecycle/Surface.fs',
     representation: 'json',
+    kind: 'resource',
+  },
+  {
+    module: 'Mission/Lifecycle/DurableWorkHost.js',
+    owner: 'work',
+    laws: ['WORK-048'],
+    source: 'src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs',
+    representation: 'opaque-capability',
     kind: 'resource',
   },
 

@@ -102,7 +102,8 @@ module JsTransactionSurface =
            JsFailure.RunChildUnknown "srv", "RunChildUnknown"
            JsFailure.RunParkUnsupported, "RunParkUnsupported"
            JsFailure.RunHostUnavailable, "RunHostUnavailable"
-           JsFailure.AskRefused "S2 stage", "AskRefused" |]
+           JsFailure.AskRefused "S2 stage", "AskRefused"
+           JsFailure.DelegationUnavailable, "DelegationUnavailable" |]
         |> Array.map (fun (failure, name) ->
             box
                 {| name = name

@@ -629,13 +629,49 @@ module ToolRegistry =
         let generatedJsSpecFor (role: Role) =
             JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse
             |> Option.map (fun surface ->
-                JsToolSpec.create
-                    factory
-                    surface
-                    (defaultArg workspaceDirectory "")
-                    jsTransactionPersistence
-                    jsLifecyclePersistence
-                    (Some groundingObservation))
+                let spec =
+                    JsToolSpec.create
+                        factory
+                        surface
+                        (defaultArg workspaceDirectory "")
+                        jsTransactionPersistence
+                        jsLifecyclePersistence
+                        (Some groundingObservation)
+
+                // Delegation seam: the programming surface's fork/join members
+                // drive the exact production fork/join specs registered for
+                // this role. The host is process-live for the duration of one
+                // programming call; capability gating stays on the surface.
+                let delegationSpecs =
+                    match role with
+                    | Role.Manager -> Some(Some(ForkTool.managerSpec factory runtime), JoinTool.spec runtime)
+                    | Role.Orchestrator -> Some(Some(ForkTool.orchestratorSpec factory runtime), JoinTool.spec runtime)
+                    | Role.DevOps -> Some(None, JoinTool.spec runtime)
+                    | _ -> None
+
+                match delegationSpecs with
+                | None -> spec
+                | Some(forkSpec, joinSpec) ->
+                    { spec with
+                        Execute =
+                            fun args ctx ->
+                                let host: JsDelegationHost =
+                                    { Fork =
+                                        fun payload ->
+                                            match forkSpec with
+                                            | None -> Task.FromResult "fork is not permitted for this role"
+                                            | Some fork -> fork.Execute (ToolHostCodec.argumentsOfRaw payload) ctx
+                                      Join =
+                                        fun () -> joinSpec.Execute (ToolHostCodec.argumentsOfRaw (createObj [])) ctx }
+
+                                JsDelegationBridge.install ctx.SessionId host
+
+                                task {
+                                    try
+                                        return! spec.Execute args ctx
+                                    finally
+                                        JsDelegationBridge.clear ctx.SessionId
+                                } })
 
         let generatedJsSpecs () =
             [ for role in Roles.all do

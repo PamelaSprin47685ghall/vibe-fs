@@ -19,6 +19,7 @@ module private ProviderLanguageLibrary =
     let private resourcesClass: obj = jsNative
 
     // 0.7.0 起语言原语是 Resources 实例成员；惰性构造一次，共享包内资源根。
+    // DSL-MUTABLE: resource — lazily created library binding to this package root
     let mutable private instance: obj = null
 
     let library () : obj =

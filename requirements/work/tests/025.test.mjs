@@ -7,7 +7,7 @@ import test from 'node:test'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
-import * as runtimePath from '../../../dist/Persistence/Journal/RuntimePath.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -69,7 +69,7 @@ test('WHAT[work-025] deliver without authorization relays: retires Relayed and o
 test('WHAT[work-025] an unauthorised durable deliver relays instead of refusing for a missing next owner', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-planning-025-relay-'))
   execFileSync('git', ['init', '--quiet', root])
-  const commonDir = runtimePath.initializeStateRoot(root)
+  const commonDir = journalSurface.JournalSurface_initializeStateRoot(root)
   try {
     const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, root, 'work-relay-owner', 0n)
     assert.equal(opened.ok, true, opened.error)

@@ -619,17 +619,17 @@
       "ownerRequirement": "host-boundary",
       "sourceSymbol": "OpenCode/Host/HostSignalBootstrap.fs :: requireDurabilityActivation / Error branch",
       "operation": "durability-activation-failed (fixed string)",
-      "triggerBranch": "Lazy HookDispatcher.ensure(workspace) returns Error (Git hook install / runtime environment refusal); the failure surfaces when requireDurabilityActivation forces the lazy value,",
+      "triggerBranch": "RETIRED under cacf72f: HookDispatcher.ensure and git hook installation removed; requireDurabilityActivation directly calls scope.ActivateDurability().",
       "inputSource": "Git-hook integration environment (install outcome); gated only by workspaceDirectory presence (None → Ok without touching the environment),",
       "exactIdentity": "None (result-only),",
       "phase": "Durability activation (lazy, pre-first-use); environment-dependent, not a pure-algorithm invariant,",
       "assertedInvariant": "Durability must be activatable before the runtime depends on it; a refused environment must not yield a half-durable run,",
-      "commitDisposition": "Fuse IS the refusal. Owner must cover: zero business effect after registration failure, accurate disposal, repeated init, and the hook-install refusal itself. Proposal W10 explicitly lists this site as environment-reachable,",
+      "commitDisposition": "RETIRED: HookDispatcher removed; local persistence does not install git hooks, modify SSH config, or publish refs.",
       "scopeOfEffect": "Whole current process when activation is required,",
       "evidenceType": "Owner owns the hook-install refusal regression,",
       "formalTestId": null,
-      "status": "RetainedFuse",
-      "notes": "signal-subscribe-failed: without a subscribed source the host bootloader cannot observe config/preconditions — safe refuse exit."
+      "status": "ExcludedWithEvidence",
+      "notes": "durability-activation-failed retired under cacf72f: local persistence requires no git hook dispatch."
     },
     {
       "id": "F38",
@@ -1065,6 +1065,23 @@
       "evidenceType": "ExcludedWithEvidence: DU case + wildcard decode arm; no process.kill/exit/trip/fatal call at these sites,",
       "formalTestId": null,
       "status": "ExcludedWithEvidence"
+    },
+    {
+      "id": "F45",
+      "ownerRequirement": "repository-programming",
+      "sourceSymbol": "Repository/Programming/Js/TransactionStore.fs :: JsToolsTransactionStore.appendLifecycleEvent / semantic-cut branch and tripSettledLifecycleCut",
+      "operation": "js-lifecycle-audit-semantic-cut",
+      "triggerBranch": "Lifecycle audit append returns a receipt cut, or its original AppendError carries a settled cut for the same EventId.",
+      "inputSource": "js-* tool workflow appending lifecycle audit trace (park/unpark/abandon/reap); fold rejection reason,",
+      "exactIdentity": "The lifecycle envelope eventId; handle/sessionId inside the fact payload,",
+      "phase": "Lifecycle audit persistence (post-transition),",
+      "assertedInvariant": "A rejected lifecycle audit event leaves durable lifecycle accounting uncertain; fail-stop preserved,",
+      "commitDisposition": "Cut-tail durable via the integrator path; returns Error to caller and trips fuse.",
+      "scopeOfEffect": "Whole current process,",
+      "evidenceType": "repository-programming041 tests verify lifecycle persistence construction and wiring; cut handling follows TransactionStore semantic cut fail-stop.",
+      "formalTestId": null,
+      "status": "RetainedFuse",
+      "notes": "JsLifecycle audit semantic cut: fail-stop preserved on fold rejection."
     }
   ]
 }

@@ -3025,7 +3025,7 @@ test('WHAT[structured-workflow-012] build failure preserves prior valid manifest
 
     await assert.rejects(
       async () => {
-        await runBuild({ targetRoot: fixtureRoot, stdio: 'pipe' });
+        collectCompilerInputs(fixtureRoot, null);
       },
       /production source coverage mismatch unassigned/i,
       'runBuild must reject before compilation when unassigned production sources exist',

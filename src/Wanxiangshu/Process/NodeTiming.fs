@@ -20,7 +20,9 @@ module NodeTiming =
         unbox<Task<unit>> (call "timerTask" (box [| box milliseconds |]))
 
     let raceExit (exitTask: Task) (milliseconds: int) : Task<bool> =
-        unbox<Task<bool>> (call "raceExit" (box [| exitTask, box milliseconds |]))
+        // Semicolons: a comma here builds a one-element tuple array, which
+        // reaches Time.raceExit as a single array argument.
+        unbox<Task<bool>> (call "raceExit" (box [| box exitTask; box milliseconds |]))
 
     let nodeTimerPort () : ITimerPort =
         let port = call "nodeTimerPort" (box [||])

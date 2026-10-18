@@ -28,6 +28,10 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 Exec capability 投影出 `run` 成员与全局 `js.Runnable`。模型写 `await js.run(class extends js.Runnable { ... })`；宿主拥有循环：校验规格（`maxDuration`/`next`/`check` 缺一即 `RUNNABLE_SPEC_INCOMPLETE`）、执行命令、按 `interval` 时间片调用 `check`、派发 `onExit`、执行 `maxDuration` 上界。`check` 可 `{ abort }` 或 `{ park }`；park 走与 `js.park` 相同的挂起通道与 source 标记，恢复值 `'abort'` 中止。`next` 支持命令字符串/`null`/`{ spawn, name }`/`{ signal, name }`/`{ waitFor: { port, timeoutMs } }`；后台进程在 `check` 的 `backgrounds` 观察面可见，run 结束时全部 SIGKILL。成功结局是 `{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }`；每路输出保留头尾各 128 KiB 并如实报总字节。host 失败经 `__jsFailure` 哨兵成为稳定失败码。双语教学在 `tool/js-program/run-rules`，wget Ultra Example 在 `tool/js-program/ultra-devops`。
 
+## fork/join 委托原语（WHAT[repository-programming-056]）
+
+Fork/Join capability 投影出 `fork(payload)` 与 `join()`：`payload` 与宿主 fork 工具同字段（`charge`/`name`/`calling`/`keywords`），返回 fork 回执文本；`join()` 按本会话成员收拢子工作并返回 join 收执批次。接线层（ToolRegistry）在每次编程调用期间安装进程内委托宿主，fork/join 分别驱动该角色已注册的生产 fork/join spec，调用结束即清除；没有宿主时成员以 `DELEGATION_UNAVAILABLE` 拒绝。Orchestrator 无文件权限但持有 Fork/Join，因此获得仅委托的编程面；`hasFsCapability` 与 `admissionFor` 同步把 Fork/Join 计入授权。DAG 声明糖未交付：需要一个结构化 join 聚合层（per-child 结果映射），本轮不以空实现占位。双语教学在 `tool/js-program/delegation-rules`。
+
 ## 持久化机制（WHAT[repository-programming-012]、[013]、[015]、[019]、[029]）
 
 as-is 逐笔落盘：每笔 `edit`/`write` 调用即经 MutationFs 单笔原子落盘，跨笔不回滚；程序以任何方式终止时，已落盘改动保持为事实分界线，失败结果如实附已落盘清单（`# failed` 加 `[fs]`），无落盘改动时不附 fs 节。

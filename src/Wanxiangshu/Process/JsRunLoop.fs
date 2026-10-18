@@ -105,6 +105,7 @@ module JsRunLoop =
     let private probeIntervalMs = 100
 
     type private OutputBuffer() =
+        // DSL-MUTABLE: algorithm-scratch — bounded head/tail capture for one stream
         let mutable head = ""
         let mutable tail = ""
         let mutable totalBytes = 0
@@ -133,6 +134,7 @@ module JsRunLoop =
                 tail <- tail.Substring(tail.Length - outputTailLimit)
 
     type private SliceBuffer() =
+        // DSL-MUTABLE: algorithm-scratch — slice delta buffer drained by check
         let mutable text = ""
 
         member _.Append(chunk: string) = text <- text + chunk
@@ -261,6 +263,7 @@ module JsRunLoop =
     /// Await exit after a kill, up to the grace window.
     let private awaitExit (managed: ManagedChild) (graceMs: int) : Task<unit> =
         task {
+            // DSL-MUTABLE: algorithm-scratch — grace-window wait cursor
             let mutable waited = 0
 
             while not managed.Exited && waited < graceMs do
@@ -385,6 +388,7 @@ module JsRunLoop =
                     let mutable running = true
                     let mutable status = "completed"
                     let mutable lastExitCode: int option = None
+                    // DSL-MUTABLE: algorithm-scratch — failure/outcome slot for this run
                     let mutable result: obj = null
                     let scratch = ManagedChild("wait", null)
 
@@ -428,6 +432,7 @@ module JsRunLoop =
                     let rec runForeground (command: string) : Task<unit> =
                         task {
                             let managed = startChild root "foreground" command
+                            // DSL-MUTABLE: algorithm-scratch — per-command loop state
                             let mutable finished = false
                             let mutable aborted = false
 
@@ -556,6 +561,7 @@ module JsRunLoop =
                                     int (unbox<float> value)
 
                             let waitStarted = nowMs ()
+                            // DSL-MUTABLE: algorithm-scratch — waitFor poll state
                             let mutable ready = false
                             let mutable failureReason: string option = None
 

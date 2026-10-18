@@ -33,7 +33,11 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   const surface = generateRole('manager', 'en')
   assert.ok(surface, 'Manager must generate JS surface')
   assert.equal(surface.toolName, 'todowrite-for-manager')
-  assert.deepEqual(surface.capabilities.sort(), ['Glob', 'Grep', 'Read'], 'Manager capabilities must be strictly {Read, Glob, Grep}')
+  assert.deepEqual(
+    surface.capabilities.sort(),
+    ['Fork', 'Glob', 'Grep', 'Join', 'Read'],
+    'Manager capabilities must be {Read, Glob, Grep} plus the delegation primitives',
+  )
 
   // 四层同构第 1 层：生成的 JsProgram 基类中不声明任何写方法
   assert.equal(surface.baseClassSource.includes('edit('), false, 'BaseClass must not declare edit')
@@ -64,6 +68,8 @@ test('WHAT[capability-enforcement-025] J02_manager_create_api_omits_mutation_met
     assert.equal(typeof binding.js.stat, 'function', 'stat must be constructed')
     assert.equal(typeof binding.js.whereAll, 'function', 'whereAll must be constructed')
     assert.equal(typeof binding.js.where, 'function', 'where must be constructed')
+    assert.equal(typeof binding.js.fork, 'function', 'fork must be constructed')
+    assert.equal(typeof binding.js.join, 'function', 'join must be constructed')
 
     // 未授予的写 API 在 api.js 中直接不存在（undefined），绝非存在而抛错
     assert.equal('edit' in binding.js, false, 'edit property must not exist')
@@ -72,7 +78,7 @@ test('WHAT[capability-enforcement-025] J02_manager_create_api_omits_mutation_met
     assert.equal(binding.js.write, undefined)
     assert.deepEqual(
       Object.keys(binding.js).sort(),
-      ['cat', 'glob', 'grep', 'ls', 'read', 'stat', 'where', 'whereAll'],
+      ['cat', 'fork', 'glob', 'grep', 'join', 'ls', 'read', 'stat', 'where', 'whereAll'],
     )
   } finally {
     rmSync(dir, { recursive: true, force: true })

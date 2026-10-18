@@ -76,5 +76,5 @@ test('WHAT[repository-programming-004] JS001_generated_name_gate_rejects_forged_
   assert.equal(isGeneratedToolName('Engineer', perms, 'todowrite-for-devops'), false)
   assert.equal(isGeneratedToolName('Engineer', perms, 'read'), false)
   // a role without the capability set never admits its own name
-  assert.equal(isGeneratedToolName('Engineer', caps(ToolPermission.Fork), 'todowrite-for-engineer'), false)
+  assert.equal(isGeneratedToolName('Engineer', caps(ToolPermission.Ask), 'todowrite-for-engineer'), false)
 })

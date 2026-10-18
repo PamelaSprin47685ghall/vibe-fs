@@ -2,7 +2,7 @@ import test from 'node:test'
 
 {
 const { default: assert } = await import("node:assert/strict");
-const { readFileSync } = await import("node:fs");
+const { existsSync, readFileSync } = await import("node:fs");
 const { default: test } = await import("node:test");
 const { buildSubsystemInventory } = await import("../../../scripts/checks/subsystems.mjs");
 
@@ -77,19 +77,13 @@ function references(projectName) {
   return productionProject(projectName).references.map((path) => relative(SRC, path))
 }
 
-test('WHAT[structured-workflow-013] GitGateway exposes a narrow dependency-inverted compiler boundary', () => {
+test('WHAT[structured-workflow-013] RETIRED-GATE: GitGateway and git-hook-sync shards remain deleted under durable-events [009]/[011]', () => {
   const providerName = 'Wanxiangshu.Owner.change-integration.git-gateway.fsproj'
-  const provider = productionProject(providerName)
-  assert.equal(provider.shard, 'git-gateway')
-  assert.equal(provider.subsystem, 'change')
-  assert.deepEqual(compileItems(providerName), ['Git/Gateway.fsi', 'Git/Gateway.fs'])
-
-  const consumer = references('Wanxiangshu.Owner.durable-convergence.git-hook-sync.fsproj')
-  assert.ok(consumer.includes(providerName))
-  assert.ok(!consumer.includes('Wanxiangshu.Owner.change-integration.git-integrationgate.fsproj'))
-
-  const signature = readFileSync(join(SRC, 'Git/Gateway.fsi'), 'utf8')
-  assert.doesNotMatch(signature, /SyncActiveEnv|discoverRemote/)
+  const consumerName = 'Wanxiangshu.Owner.durable-convergence.git-hook-sync.fsproj'
+  assert.equal(inventory.projects.has(join(SRC, providerName)), false, `${providerName} must remain retired`)
+  assert.equal(inventory.projects.has(join(SRC, consumerName)), false, `${consumerName} must remain retired`)
+  assert.equal(existsSync(join(SRC, 'Git/Gateway.fsi')), false, 'Git/Gateway.fsi must remain deleted')
+  assert.equal(existsSync(join(SRC, 'Git/Gateway.fs')), false, 'Git/Gateway.fs must remain deleted')
 })
 test('WHAT[structured-workflow-013] request kind and fallback facts remain disjoint compile shards', () => {
   const requestProject = 'Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj'

@@ -35,5 +35,7 @@
     <Compile Include="Repository/Programming/Js/Anchor/AnchorView.fs"/>
     <Compile Include="Repository/Programming/Js/Anchor/AnchorSurface.fsi"/>
     <Compile Include="Repository/Programming/Js/Anchor/AnchorSurface.fs"/>
+    <Compile Include="Repository/Programming/Js/DelegationBridge.fsi"/>
+    <Compile Include="Repository/Programming/Js/DelegationBridge.fs"/>
   </ItemGroup>
 </Project>

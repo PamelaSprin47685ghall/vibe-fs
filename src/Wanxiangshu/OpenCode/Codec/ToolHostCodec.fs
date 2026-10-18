@@ -472,6 +472,11 @@ module ToolHostCodec =
 
     let factory (toolModule: obj) = HostToolFactory(toolModule?tool)
 
+    /// Construct host tool arguments from an in-process raw object. The wiring
+    /// layer uses this to drive a registered tool spec directly (for example
+    /// the programming surface's fork/join members feeding the fork tool).
+    let argumentsOfRaw (raw: obj) : HostToolArguments = HostToolArguments raw
+
     let internal schemaValue (HostSchema schema) = schema
 
     let stringSchema (HostToolFactory factory) = HostSchema(rawStringSchema factory)

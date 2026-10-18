@@ -53,6 +53,8 @@ module ToolHostCodec =
     val decodeContext: raw: obj -> HostToolContext
     val hookCallId: raw: obj -> ToolCallId option
     val factory: toolModule: obj -> HostToolFactory
+    /// Construct host tool arguments from an in-process raw object.
+    val argumentsOfRaw: raw: obj -> HostToolArguments
     val internal schemaValue: schema: HostSchema -> obj
     val stringSchema: factory: HostToolFactory -> HostSchema
     val anySchema: factory: HostToolFactory -> HostSchema

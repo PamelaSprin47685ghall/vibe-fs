@@ -23,5 +23,6 @@
 - 049 同时核对生成工具声明 `program/unpark/abandon/view` 四个参数与 view 自由值描述。
 - 054 真实运行 deliver：显式终值结束程序、哨兵被捕获后程序存活、非 JSON 值以 INVALID_RETURN_VALUE 失败、每个生成面携带 deliver 成员。
 - 055 真实运行 vm 并行边界：Promise.all 并行读写、allSettled 兄弟失败不撤销已落盘写、十六路 cat 批处理。
+- 056 fork/join 按能力投影（Engineer 无、Manager 有）、安装宿主后 fork 回执与 join 收执端到端、无宿主时 DELEGATION_UNAVAILABLE 拒绝。DAG 糖未交付（需结构化 join 聚合层）。
 
-2026-10-18 交付验证：`node scripts/build.mjs` 构建成功（173 surfaces、834 模块链接闭合），本包 001-055 全套 273 例 0 败 9 跳 8 todo（045-055 以本次 dist 产物真实运行：九原语、where 三态与组合模式、parked source、unpark 自由值 schema、js.run 单进程/多进程循环、wget 断点续传剧本、view 声明捕获、deliver 显式终值与 vm 并行边界）。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护保持 TODO 诚实标注；未闭合范围见 GAP-088。
+2026-10-18 交付验证：`node scripts/build.mjs` 构建成功（176 surfaces、835 模块链接闭合），本包 001-056 全套 276 例 0 败 9 跳 8 todo（045-056 以本次 dist 产物真实运行：九原语、where 三态与组合模式、parked source、unpark 自由值 schema、js.run 单进程/多进程循环、wget 断点续传剧本、view 声明捕获、deliver 显式终值、vm 并行边界与 fork/join 委托原语）。全量 unit 套件同版本 862 文件 5193 例 0 败（GAP-231 CLOSED）。006 异步/内存隔离、017 同消息并行调用、027 直接与程序工具共享保护保持 TODO 诚实标注；未闭合范围见 GAP-088。

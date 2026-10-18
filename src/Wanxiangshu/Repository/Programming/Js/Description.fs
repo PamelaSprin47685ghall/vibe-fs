@@ -85,6 +85,9 @@ module JsCanonicalDescription =
         let Deliver = "tool/js-program/deliver"
 
         [<Literal>]
+        let DelegationRules = "tool/js-program/delegation-rules"
+
+        [<Literal>]
         let UltraFraming = "tool/js-program/ultra-framing"
 
         [<Literal>]
@@ -228,6 +231,7 @@ module JsCanonicalDescription =
           Mv: string
           RunRules: string
           Deliver: string
+          DelegationRules: string
           UltraFraming: string
           UltraUnavailable: string
           UltraEngineering: string
@@ -602,6 +606,20 @@ module JsCanonicalDescription =
   }"""
             [ "comment_host_capability", prose.CommentHostCapability ]
 
+    let private forkStub (prose: Prose) =
+        fill
+            """  async fork(payload) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private joinStub (prose: Prose) =
+        fill
+            """  async join() {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
     let private runStub (prose: Prose) =
         fill
             """  async run() {
@@ -665,6 +683,10 @@ class JsProgram {"""
     // {{comment_host_capability}}
   }"""
                       [ "comment_host_capability", prose.CommentHostCapability ]
+              if has capabilities JsCapability.Fork then
+                  forkStub prose
+              if has capabilities JsCapability.Join then
+                  joinStub prose
               // park is a lifecycle capability every js-* surface carries; it
               // is not a filesystem permission projection, so it is always
               // present in the base class (PLAN S1 B.17).
@@ -1344,6 +1366,22 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     return { moved: result.moved, destination: result.destination };
   }"""
                       [ "rethrow_host", rethrowHost ]
+              if has capabilities JsCapability.Fork then
+                  fill
+                      """  async fork(payload) {
+    const result = await this._api.js.fork(payload);
+    {{rethrow_host}}
+    return result;
+  }"""
+                      [ "rethrow_host", rethrowHost ]
+              if has capabilities JsCapability.Join then
+                  fill
+                      """  async join() {
+    const result = await this._api.js.join();
+    {{rethrow_host}}
+    return result;
+  }"""
+                      [ "rethrow_host", rethrowHost ]
               // park is a lifecycle capability every js-* surface carries; it
               // is not a filesystem permission projection, so it is always
               // present in the runtime base class.
@@ -1431,6 +1469,8 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                   prose.Mv
               if has capabilities JsCapability.Exec then
                   prose.RunRules
+              if has capabilities JsCapability.Fork || has capabilities JsCapability.Join then
+                  prose.DelegationRules
               if has capabilities JsCapability.Edit || has capabilities JsCapability.Write then
                   prose.MutationRules ]
 
@@ -1449,7 +1489,14 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             | "plan" when has capabilities JsCapability.Read && has capabilities JsCapability.Edit ->
                 Some(set [ JsCapability.Read; JsCapability.Edit ], prose.UltraPlan)
             | "manager" when
-                Set.isSubset capabilities (set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ])
+                Set.isSubset
+                    capabilities
+                    (set
+                        [ JsCapability.Read
+                          JsCapability.Glob
+                          JsCapability.Grep
+                          JsCapability.Fork
+                          JsCapability.Join ])
                 && not (Set.isEmpty capabilities)
                 ->
                 Some(set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ], prose.UltraManagerInvestigation)

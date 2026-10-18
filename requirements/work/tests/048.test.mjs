@@ -133,20 +133,20 @@ test('WHAT[work-048] startup batch inspection preserves corrupt-work isolation a
 
     const before = life.inspected(stateRoot, 'good')
     const observations = new Map(workHost.inspectedMany(stateRoot, ['bad', 'missing', 'good']))
-    assert.equal(observations.get('bad').tag, 1, 'a corrupt work must retain its explicit read failure')
-    assert.match(observations.get('bad').fields[0], /checksum mismatch/i)
-    assert.equal(observations.get('missing').tag, 0)
-    assert.equal(observations.get('missing').fields[0], undefined)
-    assert.equal(observations.get('good').tag, 0)
-    assert.deepEqual(observations.get('good').fields[0], before)
+    assert.equal(observations.get('bad').toJSON()[0], 'Error', 'a corrupt work must retain its explicit read failure')
+    assert.match(observations.get('bad').toJSON()[1], /checksum mismatch/i)
+    assert.equal(observations.get('missing').toJSON()[0], 'Ok')
+    assert.equal(observations.get('missing').toJSON()[1], undefined)
+    assert.equal(observations.get('good').toJSON()[0], 'Ok')
+    assert.deepEqual(observations.get('good').toJSON()[1], before)
     assert.throws(() => life.inspected(stateRoot, 'bad'), /checksum mismatch/i)
 
     accepted(life.execute(stateRoot, 'good', 'review', {
       type: 'Review', incumbencyId: before.ActiveId, reviewerId: 'reviewer', findings: [],
     }))
     const later = new Map(workHost.inspectedMany(stateRoot, ['good'])).get('good')
-    assert.equal(later.tag, 0)
-    assert.equal(later.fields[0].Reviewed, true, 'a later batch reads the journal, not an old process-local cache')
+    assert.equal(later.toJSON()[0], 'Ok')
+    assert.equal(later.toJSON()[1].Reviewed, true, 'a later batch reads the journal, not an old process-local cache')
     assert.equal(before.Reviewed, false)
   } finally {
     rmSync(directory, { recursive: true, force: true })

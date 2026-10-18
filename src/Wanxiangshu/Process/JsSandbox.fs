@@ -314,6 +314,7 @@ module JsSandbox =
         // `const js = api.js;` prelude and the optional JsRunnable bind.
         let modelStartLine = baseClassSource.Split('\n').Length + 4
         let modelEndLine = modelStartLine + lines.Length - 1
+        // DSL-MUTABLE: algorithm-scratch — innermost model stack frame
         let mutable currentLine = -1
 
         if not (isNull stack) then

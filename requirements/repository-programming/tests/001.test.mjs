@@ -31,7 +31,7 @@ const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 
 const fsPermissionsOf = (role) =>
   rolePermissions(role.toLowerCase()).filter((n) =>
-    ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec'].includes(n),
+    ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec', 'Fork', 'Join'].includes(n),
   )
 
 const MEMBERS_BY_PERMISSION = {
@@ -43,6 +43,8 @@ const MEMBERS_BY_PERMISSION = {
   Move: ['mv'],
   Remove: ['rm'],
   Exec: ['run'],
+  Fork: ['fork'],
+  Join: ['join'],
 }
 
 const BINDING_BY_MEMBER = {
@@ -61,12 +63,16 @@ const BINDING_BY_MEMBER = {
   whereAll: 'js.whereAll',
   where: 'js.where',
   run: 'js.run',
+  fork: 'js.fork',
+  join: 'js.join',
 }
 
 const MEMBER_ORDER = [
   'file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv',
   'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
   'run',
+  'fork',
+  'join',
 ]
 
 const layersOf = (s) =>
@@ -85,11 +91,20 @@ const layersOf = (s) =>
   )
 
 test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_capability', () => {
-  for (const role of ['Orchestrator', 'Inquiry', 'Distiller', 'Blogger']) {
+  for (const role of ['Inquiry', 'Distiller', 'Blogger']) {
     const perms = caps(...permsOf(rolePermissions(role.toLowerCase())))
     assert.equal(isNone(surface(role, rolePermissions(role.toLowerCase()))), true, `${role} must get no js-* surface`)
     assert.equal(isGeneratedToolName(role, perms, `todowrite-for-${role.toLowerCase()}`), false)
   }
+
+  // Orchestrator has no file permission but holds Fork/Join, so it gets a
+  // delegation-only programming surface (WHAT[repository-programming-056]).
+  const orchestrator = surface('Orchestrator', rolePermissions('orchestrator'))
+  assert.equal(isNone(orchestrator), false, 'Orchestrator gets the delegation-only surface')
+  assert.deepEqual(
+    orchestrator.members.map((fragment) => fragment.memberName),
+    ['fork', 'join'],
+  )
 })
 
 test('WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
@@ -110,7 +125,7 @@ test('WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_pe
 
 test('WHAT[repository-programming-001] JS001_non_fs_permissions_never_produce_members', () => {
   for (const name of PERMISSION_NAMES.filter(
-    (n) => !['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec'].includes(n),
+    (n) => !['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec', 'Fork', 'Join'].includes(n),
   )) {
     const result = generate('Engineer', caps(toolPermissionByName[name]), 'en')
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)

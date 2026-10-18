@@ -289,3 +289,11 @@ ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, 
 ## [055] vm 并行边界
 
 同一程序内 `Promise.all` / `Promise.allSettled` 直接表达 IO 并行，不需要新原语：vm 单线程事件循环天然把每次 api 调用串行化，宿主不加锁、不排队、不互斥。独立分支的效果各自 as-is 落盘；一个分支失败不清除兄弟分支已落地的改动。同一文件的写竞态由程序作者自负（Unix 哲学），宿主只保单笔写原子与写前校验。
+
+## [056] fork/join 委托原语
+
+Fork/Join capability 投影出 `fork(payload)` 与 `join()`：`payload` 与宿主 fork 工具同字段（`charge` 必填、`name`、`calling`、`keywords`），返回 fork 回执文本；`join()` 按本会话成员收拢子工作，返回 join 收执批次。接线层在每次编程调用期间安装进程内委托宿主——fork 驱动该角色已注册的生产 fork spec、join 驱动 join spec——调用结束后清除；未安装宿主时两成员以 `DELEGATION_UNAVAILABLE` 拒绝，不静默降级。
+
+委托面按能力投影：Orchestrator 没有文件权限，但持有 Fork/Join，因此获得仅含委托（fork/join/park）的编程面；`hasFsCapability`/`jsToolSpec.admissionFor` 同步把 Fork/Join 计入编程面授权，四层保持一致。失败的 fork 以回执文本返回（与宿主工具同语义），不抛出。
+
+DAG 声明式糖本轮不交付：现有 `join()` 是成员归属收拢而非显式 handle 列表，且 join 收执是渲染文本而非结构化 per-child 结果；DAG 需要结构化聚合层，属于后续设计项，不用空实现占位。

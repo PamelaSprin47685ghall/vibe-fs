@@ -14,6 +14,10 @@ module JsRuntimeSurface =
     val createApiFor: root: string -> permissionLabels: string array -> obj
 
     val api: handle: obj -> obj
+    /// Test hook: install a process-live delegation host for one session.
+    val installDelegationHost: sessionId: string -> fork: obj -> join: obj -> unit
+    val clearDelegationHost: sessionId: string -> unit
+    val clearDelegationHosts: unit -> unit
     val stagedCount: handle: obj -> int
     val stagedKinds: handle: obj -> string array
     val readPaths: handle: obj -> string array

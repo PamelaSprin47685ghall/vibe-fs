@@ -75,6 +75,7 @@ type JsFailure =
     | RunParkUnsupported
     | RunHostUnavailable
     | AskRefused of string
+    | DelegationUnavailable
 
 module JsFailure =
 
@@ -143,6 +144,7 @@ module JsFailure =
         | JsFailure.RunParkUnsupported -> "RUN_PARK_UNSUPPORTED"
         | JsFailure.RunHostUnavailable -> "RUN_HOST_UNAVAILABLE"
         | JsFailure.AskRefused _ -> "ASK_REFUSED"
+        | JsFailure.DelegationUnavailable -> "DELEGATION_UNAVAILABLE"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
     let private reasonWithMessage fallback prefix message =
@@ -206,6 +208,7 @@ module JsFailure =
         | JsFailure.RunParkUnsupported -> "park verdict requires the orchestrated execution path"
         | JsFailure.RunHostUnavailable -> "js.run has no host loop in this execution path"
         | JsFailure.AskRefused detail -> reasonWithMessage "ask was refused" "" detail
+        | JsFailure.DelegationUnavailable -> "fork/join is not wired in this execution path"
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
     let render (failure: JsFailure) : string =
@@ -274,4 +277,5 @@ module JsFailure =
         | "RUN_PARK_UNSUPPORTED" -> JsFailure.RunParkUnsupported
         | "RUN_HOST_UNAVAILABLE" -> JsFailure.RunHostUnavailable
         | "ASK_REFUSED" -> JsFailure.AskRefused text
+        | "DELEGATION_UNAVAILABLE" -> JsFailure.DelegationUnavailable
         | _ -> JsFailure.ProgramFailed text

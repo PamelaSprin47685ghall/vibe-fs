@@ -136,7 +136,7 @@ const productionDigest = async (callId, path) => {
     const entry = {
       charge: 'Record the completed read.', occurrence: 'The source was read.',
       settlement: 'The read is complete.', consequence: 'Later work retains the result.',
-      tip: Enforcer.fieldNames()[0],
+      tipName: Enforcer.fieldNames()[0], opinion: 'The durable frame preserves the outcome for later context.', advice: 'Carry the recorded material into the next step.',
     }
     const recorded = await hooks.tool.chronicle.execute(entry, { sessionID: blogger, agent: 'blogger', messageID: 'msg-blog-prefix-run', callID: 'call-blog-prefix' })
     const bloggerMessages = [

@@ -80,6 +80,9 @@ module JsCanonicalDescription =
         val Deliver: string = "tool/js-program/deliver"
 
         [<Literal>]
+        val DelegationRules: string = "tool/js-program/delegation-rules"
+
+        [<Literal>]
         val UltraFraming: string = "tool/js-program/ultra-framing"
 
         [<Literal>]
@@ -223,6 +226,7 @@ module JsCanonicalDescription =
           Mv: string
           RunRules: string
           Deliver: string
+          DelegationRules: string
           UltraFraming: string
           UltraUnavailable: string
           UltraEngineering: string

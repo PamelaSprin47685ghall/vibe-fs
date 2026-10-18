@@ -457,6 +457,7 @@ export async function runBuild({
   targetRoot = root,
   clean = false,
   stdio = 'inherit',
+  skipSourceDependency = path.resolve(targetRoot) !== root,
 } = {}) {
   const resolvedRoot = path.resolve(targetRoot)
   const targetDist = path.join(resolvedRoot, 'dist')
@@ -469,7 +470,9 @@ export async function runBuild({
 
   try {
     // 使用源码依赖的当前产物；不能让旧 node_modules tarball 替新 submodule 报绿。
-    buildSourceDependency(resolvedRoot)
+    if (!skipSourceDependency) {
+      buildSourceDependency(resolvedRoot)
+    }
     // A previously interrupted full rebuild may have left a staged backup
     // behind; settle it before reading any build state.
     recoverStaleStagedDist(targetDist)

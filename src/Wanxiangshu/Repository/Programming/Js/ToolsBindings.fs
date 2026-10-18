@@ -488,6 +488,7 @@ module JsToolsBindings =
     /// whitespace. This is the canonical `where` needle normalization.
     let private collapseWhitespace (text: string) =
         let sb = StringBuilder()
+        // DSL-MUTABLE: algorithm-scratch — whitespace run cursor
         let mutable pendingSpace = false
 
         for ch in text do
@@ -507,6 +508,7 @@ module JsToolsBindings =
     let private normalizeWithMap (text: string) =
         let sb = StringBuilder()
         let offsets = ResizeArray<int>()
+        // DSL-MUTABLE: algorithm-scratch — whitespace run cursor
         let mutable previousWasSpace = false
 
         for index in 0 .. text.Length - 1 do
@@ -533,6 +535,7 @@ module JsToolsBindings =
             []
         else
             let normalized, offsets = normalizeWithMap content
+            // DSL-MUTABLE: algorithm-scratch — match scan cursor
             let mutable cursor = 0
             let spans = ResizeArray<int * int>()
 
@@ -585,9 +588,12 @@ module JsToolsBindings =
             null
         else
             let lines = content.Split('\n')
+            // DSL-MUTABLE: algorithm-scratch — nearest-line scan state
             let mutable offset = 0
             let mutable bestDistance = System.Int32.MaxValue
+            // DSL-MUTABLE: algorithm-scratch — nearest match span state
             let mutable bestStart = 0
+            // DSL-MUTABLE: algorithm-scratch — nearest match span/scan state
             let mutable bestEnd = 0
             let mutable bestText = ""
             let mutable scanned = 0
@@ -721,6 +727,24 @@ module JsToolsBindings =
 
         "run" ==> fun (runnableClass: obj) -> rejectRunFailure (settled runnableClass)
 
+    /// `js.fork(payload)` hands the payload to the wiring-owned fork spec and
+    /// returns its receipt text; `js.join()` waits for this session's children.
+    /// Without an installed delegation host the members refuse with
+    /// DELEGATION_UNAVAILABLE instead of pretending.
+    let private makeForkMember (host: JsDelegationHost option) =
+        "fork"
+        ==> fun (payload: obj) ->
+            match host with
+            | Some delegation -> box (delegation.Fork payload)
+            | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+
+    let private makeJoinMember (host: JsDelegationHost option) =
+        "join"
+        ==> fun () ->
+            match host with
+            | Some delegation -> box (delegation.Join())
+            | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+
     let private createApiCore
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -730,6 +754,7 @@ module JsToolsBindings =
         (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         (runHost: JsRunHost option)
+        (delegationHost: JsDelegationHost option)
         : obj =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
@@ -762,6 +787,12 @@ module JsToolsBindings =
               if Set.contains JsCapability.Exec capabilities then
                   makeRunMember runHost parkState
 
+              if Set.contains JsCapability.Fork capabilities then
+                  makeForkMember delegationHost
+
+              if Set.contains JsCapability.Join capabilities then
+                  makeJoinMember delegationHost
+
               match parkState with
               | Some state -> makeParkMember state
               | None -> () ]
@@ -781,8 +812,9 @@ module JsToolsBindings =
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
         (runHost: JsRunHost option)
+        (delegationHost: JsDelegationHost option)
         : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads ledger None runHost
+        createApiCore capabilities root staging readSnapshots explicitReads ledger None runHost delegationHost
 
     /// Build the api object for one sandbox run that carries a park lifecycle
     /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
@@ -796,5 +828,15 @@ module JsToolsBindings =
         (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
         (runHost: JsRunHost option)
+        (delegationHost: JsDelegationHost option)
         : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads ledger (Some parkState) runHost
+        createApiCore
+            capabilities
+            root
+            staging
+            readSnapshots
+            explicitReads
+            ledger
+            (Some parkState)
+            runHost
+            delegationHost

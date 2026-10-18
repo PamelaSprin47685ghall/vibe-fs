@@ -46,6 +46,7 @@ test('WHAT[repository-programming-018] JS019_failure_codes_are_stable_and_unique
     'RUN_PARK_UNSUPPORTED',
     'RUN_HOST_UNAVAILABLE',
     'ASK_REFUSED',
+    'DELEGATION_UNAVAILABLE',
   ]
   const cases = failureCatalog()
   assert.equal(cases.length, expectedCodes.length)

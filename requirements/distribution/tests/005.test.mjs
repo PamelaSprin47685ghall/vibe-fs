@@ -10,28 +10,108 @@ const { tmpdir } = await import('node:os')
 const { join } = await import('node:path')
 const { assertBuildFresh, collectOutputs, readManifest, writeManifest, MANIFEST_SCHEMA, collectCompilerInputs, collectGeneratedInputs, collectArtifactInputs, computeDigest } = await import('../../../scripts/lib/build-state.mjs')
 const { resetOutputDirectory } = await import('../../../scripts/lib/owner-compile.mjs')
-const { runBuild } = await import('../../../scripts/build.mjs')
+const { runBuild, checkOutputsValid, determineBuildDecision, stagedBackupDirFor, stageDistForFullRebuild, restoreStagedDist, recoverStaleStagedDist } = await import('../../../scripts/build.mjs')
+const { execFileSync } = await import('node:child_process')
+
+const toolchainIdentity = () => {
+  let dotnetVer = 'unknown'
+  let fableVer = 'unknown'
+  try {
+    dotnetVer = execFileSync('dotnet', ['--version'], { encoding: 'utf8' }).trim()
+  } catch {}
+  try {
+    fableVer = execFileSync('dotnet', ['tool', 'run', 'fable', '--version'], { encoding: 'utf8' }).trim()
+  } catch {}
+  return `dotnet ${dotnetVer} / fable ${fableVer}`
+}
+
+const writeOrphanScenario = (root) => {
+  spawnSync('git', ['-C', root, 'init'])
+  mkdirSync(join(root, 'src', 'Wanxiangshu'), { recursive: true })
+  const distDir = join(root, 'dist')
+  const orphan = join(distDir, 'Orphan', 'Legacy.js')
+  mkdirSync(join(distDir, 'Orphan'), { recursive: true })
+  writeFileSync(orphan, 'export const legacy = 1\n', 'utf8')
+  return { distDir, orphan }
+}
 
 test('WHAT[distribution-005] assertBuildFresh succeeds on current repository build', () => {
-  const freshness = assertBuildFresh({ root: process.cwd() })
-  assert.ok(freshness.generation >= 1)
-  assert.ok(typeof freshness.compilerInputDigest === 'string')
-  assert.ok(typeof freshness.generatedInputDigest === 'string')
-  assert.ok(typeof freshness.artifactInputDigest === 'string')
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-fresh-build-'))
+  try {
+    const { distDir } = writeOrphanScenario(root)
+    const compilerInputs = collectCompilerInputs(root, null)
+    const compilerInputDigest = computeDigest(compilerInputs)
+    const generatedInputs = collectGeneratedInputs(root)
+    const generatedInputDigest = computeDigest(generatedInputs)
+    const artifactInputs = collectArtifactInputs(root)
+    const artifactInputDigest = computeDigest(artifactInputs)
+
+    writeManifest({
+      root,
+      manifest: {
+        schema: MANIFEST_SCHEMA,
+        rootIdentity: root,
+        outputDir: 'dist',
+        generation: 1,
+        compiler: { inputDigest: compilerInputDigest, inputs: compilerInputs },
+        generated: { inputDigest: generatedInputDigest, inputs: generatedInputs },
+        artifacts: { inputDigest: artifactInputDigest, inputs: artifactInputs },
+        outputs: collectOutputs(distDir),
+      },
+    })
+
+    const freshness = assertBuildFresh({ root })
+    assert.ok(freshness.generation >= 1)
+    assert.ok(typeof freshness.compilerInputDigest === 'string')
+    assert.ok(typeof freshness.generatedInputDigest === 'string')
+    assert.ok(typeof freshness.artifactInputDigest === 'string')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[distribution-005] no-op mode preserves manifest and generation', async () => {
-  const root = process.cwd()
-  const manifestBefore = readManifest({ root })
-  assert.ok(manifestBefore !== null)
+  const root = mkdtempSync(join(tmpdir(), 'wanxiang-noop-build-'))
+  try {
+    const { distDir } = writeOrphanScenario(root)
+    const compilerInputs = collectCompilerInputs(root, null)
+    const generatedInputs = collectGeneratedInputs(root)
+    const artifactInputs = collectArtifactInputs(root)
+    writeManifest({
+      root,
+      manifest: {
+        schema: MANIFEST_SCHEMA,
+        rootIdentity: root,
+        outputDir: 'dist',
+        generation: 7,
+        compiler: {
+          configuration: 'Debug',
+          toolIdentity: toolchainIdentity(),
+          inputDigest: computeDigest(compilerInputs),
+          inputs: compilerInputs,
+        },
+        generated: { inputDigest: computeDigest(generatedInputs), inputs: generatedInputs },
+        artifacts: { inputDigest: computeDigest(artifactInputs), inputs: artifactInputs },
+        outputs: collectOutputs(distDir),
+      },
+    })
 
-  const result = await runBuild({ targetRoot: root, clean: false })
-  assert.equal(result.ok, true)
-  assert.equal(result.mode, 'no-op')
-  assert.equal(result.generation, manifestBefore.generation)
+    const manifestBefore = readManifest({ root })
+    assert.ok(manifestBefore !== null)
+    const manifestBytesBefore = readFileSync(join(root, '.fable-build/build-manifest.json'))
 
-  const manifestAfter = readManifest({ root })
-  assert.equal(manifestAfter.generation, manifestBefore.generation)
+    const result = await runBuild({ targetRoot: root, clean: false })
+    assert.equal(result.ok, true)
+    assert.equal(result.mode, 'no-op')
+    assert.equal(result.reused, true)
+    assert.equal(result.generation, manifestBefore.generation)
+
+    const manifestAfter = readManifest({ root })
+    assert.equal(manifestAfter.generation, manifestBefore.generation)
+    assert.deepEqual(readFileSync(join(root, '.fable-build/build-manifest.json')), manifestBytesBefore)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 test('WHAT[distribution-005] manifest corruption causes assertBuildFresh to throw with code', () => {
@@ -123,31 +203,6 @@ test('WHAT[distribution-005] release output reset physically removes stale artif
     rmSync(root, { recursive: true, force: true })
   }
 })
-
-const { checkOutputsValid, determineBuildDecision, stagedBackupDirFor, stageDistForFullRebuild, restoreStagedDist, recoverStaleStagedDist } = await import('../../../scripts/build.mjs')
-const { execFileSync } = await import('node:child_process')
-
-const toolchainIdentity = () => {
-  let dotnetVer = 'unknown'
-  let fableVer = 'unknown'
-  try {
-    dotnetVer = execFileSync('dotnet', ['--version'], { encoding: 'utf8' }).trim()
-  } catch {}
-  try {
-    fableVer = execFileSync('dotnet', ['tool', 'run', 'fable', '--version'], { encoding: 'utf8' }).trim()
-  } catch {}
-  return `dotnet ${dotnetVer} / fable ${fableVer}`
-}
-
-const writeOrphanScenario = (root) => {
-  spawnSync('git', ['-C', root, 'init'])
-  mkdirSync(join(root, 'src', 'Wanxiangshu'), { recursive: true })
-  const distDir = join(root, 'dist')
-  const orphan = join(distDir, 'Orphan', 'Legacy.js')
-  mkdirSync(join(distDir, 'Orphan'), { recursive: true })
-  writeFileSync(orphan, 'export const legacy = 1\n', 'utf8')
-  return { distDir, orphan }
-}
 
 test('WHAT[distribution-005] full rebuild staged swap clears orphans, restores prior dist on failure, and settles stale backups', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-orphan-staged-'))

@@ -12,6 +12,8 @@ type JsCapability =
     | Move
     | Remove
     | Exec
+    | Fork
+    | Join
     | Park
 
 module JsCapability =
@@ -42,6 +44,8 @@ module JsFragmentRegistry =
     val whereAll: JsCapabilityFragment
     val where: JsCapabilityFragment
     val run: JsCapabilityFragment
+    val fork: JsCapabilityFragment
+    val join: JsCapabilityFragment
     val park: JsCapabilityFragment
     val all: JsCapabilityFragment list
     val byCapability: Map<JsCapability, JsCapabilityFragment list>

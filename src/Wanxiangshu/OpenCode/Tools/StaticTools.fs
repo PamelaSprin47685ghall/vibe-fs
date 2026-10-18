@@ -110,8 +110,10 @@ module StaticTools =
     let cognitiveUtilityRoleAllowed (role: Role) : bool =
         role <> Role.Blogger && role <> Role.Distiller
 
-    /// JS-001: a role whose capability set includes any filesystem permission
-    /// gets its js-* tool allowed in the permission matrix.
+    /// JS-001: a role whose capability set includes any programming-surface
+    /// permission gets its todowrite-for-* tool allowed in the permission
+    /// matrix. Fork/Join count: the Orchestrator's only programming surface is
+    /// delegation (js.fork/js.join).
     let private hasFsCapability (role: Role) : bool =
         let fsPermissions =
             set
@@ -119,7 +121,11 @@ module StaticTools =
                   ToolPermission.Write
                   ToolPermission.Edit
                   ToolPermission.Glob
-                  ToolPermission.Grep ]
+                  ToolPermission.Grep
+                  ToolPermission.Move
+                  ToolPermission.Remove
+                  ToolPermission.Fork
+                  ToolPermission.Join ]
 
         Set.intersect (OfficeCapability.permissions role) fsPermissions
         |> Set.isEmpty

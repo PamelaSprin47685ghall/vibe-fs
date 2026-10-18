@@ -32,6 +32,8 @@ module JsRuntimeSurface =
                   JsCapability.Move
                   JsCapability.Remove
                   JsCapability.Exec
+                  JsCapability.Fork
+                  JsCapability.Join
                   JsCapability.Park ]
 
         let api =
@@ -42,6 +44,7 @@ module JsRuntimeSurface =
                 readSnapshots
                 (ResizeArray<JsExplicitFileRead>())
                 (JsToolsBindings.createLedger None)
+                None
                 None
 
         box (JsBindingsHandle(api, staging, readSnapshots))
@@ -56,6 +59,8 @@ module JsRuntimeSurface =
         | "Move" -> Some JsCapability.Move
         | "Remove" -> Some JsCapability.Remove
         | "Exec" -> Some JsCapability.Exec
+        | "Fork" -> Some JsCapability.Fork
+        | "Join" -> Some JsCapability.Join
         | "Park" -> Some JsCapability.Park
         | _ -> None
 
@@ -74,10 +79,22 @@ module JsRuntimeSurface =
                 (ResizeArray<JsExplicitFileRead>())
                 (JsToolsBindings.createLedger None)
                 None
+                None
 
         box (JsBindingsHandle(api, staging, readSnapshots))
 
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api
+
+    /// Test hook: install a process-live delegation host for one session.
+    let installDelegationHost (sessionId: string) (fork: obj) (join: obj) : unit =
+        JsDelegationBridge.install
+            sessionId
+            { Fork = fun payload -> unbox<Task<string>> (emitJsExpr (fork, payload) "$0($1)")
+              Join = fun () -> unbox<Task<string>> (emitJsExpr join "$0()") }
+
+    let clearDelegationHost (sessionId: string) : unit = JsDelegationBridge.clear sessionId
+
+    let clearDelegationHosts () : unit = JsDelegationBridge.clearAll ()
 
     let stagedCount (handle: obj) : int =
         (unbox<JsBindingsHandle> handle).Staging.Count

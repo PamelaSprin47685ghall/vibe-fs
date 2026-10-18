@@ -23,6 +23,7 @@ module JsToolsBindings =
         explicitReads: ResizeArray<JsExplicitFileRead> ->
         ledger: JsAsIsLedger ->
         runHost: JsRunHost option ->
+        delegationHost: JsDelegationHost option ->
             obj
 
     /// Build the api object for one sandbox run that carries a park lifecycle
@@ -37,4 +38,5 @@ module JsToolsBindings =
         ledger: JsAsIsLedger ->
         parkState: Wanxiangshu.Process.JsSandbox.ParkState ->
         runHost: JsRunHost option ->
+        delegationHost: JsDelegationHost option ->
             obj

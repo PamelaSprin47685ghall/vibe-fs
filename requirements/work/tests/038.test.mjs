@@ -8,7 +8,7 @@ import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
-import * as runtimePath from '../../../dist/Persistence/Journal/RuntimePath.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -117,7 +117,7 @@ test('WHAT[work-038] a fresh tenure with empty findings is promoted', async () =
 
 test('WHAT[work-038] promoting a plan tenure via review tool immediately returns the next stage method in the tool result', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    const commonDir = runtimePath.initializeStateRoot(directory)
+    const commonDir = journalSurface.JournalSurface_initializeStateRoot(directory)
     const sessionID = 'ses-plan-review-promotion'
     await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
     const opened = await surface.PlanningSurface.ensurePlanWorkOpened(commonDir, directory, sessionID, 0n)

@@ -75,6 +75,7 @@ module JsDescriptionAssets =
           Mv = text lang JsCanonicalDescription.Path.Mv
           RunRules = text lang JsCanonicalDescription.Path.RunRules
           Deliver = text lang JsCanonicalDescription.Path.Deliver
+          DelegationRules = text lang JsCanonicalDescription.Path.DelegationRules
           UltraFraming = text lang JsCanonicalDescription.Path.UltraFraming
           UltraUnavailable = text lang JsCanonicalDescription.Path.UltraUnavailable
           UltraEngineering = text lang JsCanonicalDescription.Path.UltraEngineering
@@ -137,7 +138,9 @@ module JsToolSpec =
                   ToolPermission.Glob
                   ToolPermission.Grep
                   ToolPermission.Move
-                  ToolPermission.Remove ]
+                  ToolPermission.Remove
+                  ToolPermission.Fork
+                  ToolPermission.Join ]
 
         ToolAdmission.OfficeRole(fun _ r ->
             (string r).ToLowerInvariant() = roleName.ToLowerInvariant()
