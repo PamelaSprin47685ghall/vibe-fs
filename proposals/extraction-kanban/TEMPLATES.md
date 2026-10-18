@@ -10,7 +10,7 @@
 ```text
 卡号：CUT-NN（或已登记的子卡）
 这一棒只完成：
-交付检查清单的可访问位置 / 固定版本 / 本卡验收责任：
+适用规则 / 交付清单的可访问位置与固定版本 / 本卡验收责任：
 Owner：
 Reviewer（非作者）：
 主仓 base SHA / branch / worktree：
@@ -119,7 +119,7 @@ C：单次运行组合，校验期限/预算，启动、持续排空、申请取
 库仓：commit SHA / package version / dirty 状态
 时间与环境：OS / Node / npm / Bun / Fable / 实际 Host 版本
 输入标识：源码、工具、锁、资源、生成语料、manifest generation
-tarball：实际文件名 / SHA-256 / 包内容清单
+实际消费方式：源码接线的 gitlink/构建输入，或发行包的文件名/SHA-256/内容清单
 
 命令（原样）：
 退出码：
@@ -127,7 +127,7 @@ tarball：实际文件名 / SHA-256 / 包内容清单
 pass / fail / skip / TODO / cancelled / failed containers：
 哪些 skip 是层级未启用，哪些是平台或缺环境：
 原始日志位置/可复取 artifact：
-四类证据索引：真实消费者 / 公开产物 / 关键反例 / 旧职责退出
+已有 SPEC/单卡证据链接（完整迁移须覆盖四类，勿重复抄录）：
 用例证明的是：
 用例不证明的是：
 
@@ -157,8 +157,8 @@ pass / fail / skip / TODO / cancelled / failed containers：
 - 在途状态、历史格式、读写 owner、回退边界：
 
 ## 两仓关联
-- Library commit / version / tarball SHA-256：
-- Host base / candidate / lock integrity：
+- Library commit / version / 实际消费方式（发行验收附 tarball SHA-256）：
+- Host base / candidate / gitlink 或对应锁记录：
 - 公共文件预约及相邻卡的确认：
 
 ## 证据
@@ -179,7 +179,7 @@ pass / fail / skip / TODO / cancelled / failed containers：
 
 ## 6. 卡完成检查
 
-拆分/接收卡须先填写[交付清单的四类证据收据](UPSTREAM-DELIVERY-CHECKLIST.md#delivery-receipt)，每项指向具体候选、命令和观察结果；仅勾选以下方框不能代替证据。四类证据、适用风险门禁、非作者复核及最终集成核验全部通过，才能标 DONE。
+主仓迁移卡按[交付清单](UPSTREAM-DELIVERY-CHECKLIST.md#delivery-receipt)核对原 SPEC、测试及单卡证据；已有记录直接链接，不另填一套收据。四类证据、适用风险门禁、非作者复核及最终集成核验全部通过，才能标完整迁移 DONE。独立库先按其契约验收，主仓卡可记 LIB_READY；以下完整迁移检查不倒作库独立完成的前提。
 
 - [ ] 这项职责的库能独立理解、构建、运行、验证；没有反向依赖或模拟兄弟调用脚本。
 - [ ] 真实打包安装使用同一份被验证字节，类型与公开 JS 入口一致。
@@ -197,12 +197,11 @@ pass / fail / skip / TODO / cancelled / failed containers：
 <a id="handoff"></a>
 ## 7. 交接单
 
-拆分任务使用[专项交接入口](README.md#delivery-handoff)。将清单的位置、固定版本和本卡责任写入实际派发或接续任务的说明，尤其是仅在独立库施工的 agent；模板留在仓库里不等于已交接。
+拆分任务使用[专项交接入口](README.md#delivery-handoff)。将适用规则、清单固定版本和本卡责任写入现有派发或接续说明，库独立验收与主仓迁移责任分别写明；模板留在仓库里不等于已交接，不另要求阅读回执。
 
 ```text
 CUT-NN 当前列 / 阻塞标记：
-交付检查清单的可访问位置 / 固定版本 / 本卡验收责任：
-接手 agent 是否已读取适用清单：已读取 / 尚未确认
+适用规则 / 交付清单的可访问位置与固定版本 / 本卡验收责任：
 主仓与库仓位置 / 分支 / HEAD / 已推送到哪里：
 未提交内容以及哪些不是我写的：
 本轮已闭合的精确行为：

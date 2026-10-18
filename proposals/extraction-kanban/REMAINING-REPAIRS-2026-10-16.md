@@ -4,7 +4,7 @@
 
 同日追加[上游接收方法与样本计划](#upstream-intake)：固定本地 `25651051f`、上游主仓 `705e1ea3b` 和库 `e4ba7ab6`，完成 resources 与 time/wait 只读评估。下列原有 16 个工作包仍是本地存量；两个上游候选单列接收条件，不自动加入已授权生产施工，也不改变原包状态。
 
-同日收紧交付判定：[复盘结论](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#delivery-quality-judgment)指出已检查拆分的部分成本被推迟到接收阶段；新增[上游拆分交付清单](UPSTREAM-DELIVERY-CHECKLIST.md)，将四类证据落实到接收、复核与 DONE。此次只补文档规则，不变更依赖或宣称新的生产验收。
+同日补充交付判定：[复盘结论](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#delivery-quality-judgment)指出部分迁移成本被推迟到接收阶段。[原要求对照](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#original-requirements-alignment)确认主要是既有要求未落实；[交付清单](UPSTREAM-DELIVERY-CHECKLIST.md)据此改为证据补充提案，区分库独立验收与主仓完整迁移，复用原证明位置。此次不变更依赖或宣称新的生产验收。
 
 <a id="current-plan"></a>
 <a id="deep-test-current"></a>
@@ -53,7 +53,7 @@
 
 1. **完整职责与实际链。** 明确输入、事实 owner、外部效果、完成与收尾；列真实入口、全部受影响消费者和旧实现去向。以一条可运行闭环作为第一步，不以搬完文件作为完成。
 2. **语义差异。** 区分等价迁移、有意产品变化、旧缺陷、拆分回退和证据不足。等价部分做新旧对照，同时用现行需求独立判断；不以两边同错作为正确证明。
-3. **最小公共合同。** 先确定接口、字段、失败和能力边界，再改调用者，最后退出旧 owner。不得为逐文件交付留下永久转发层、双账本或宽泛 registry 来代替窄能力。
+3. **最小公共合同。** 沿用原自治与组合规则，先确定接口、字段、失败、状态归属和必要协作，再改调用者、退出旧 owner。按原 SPEC 验证兄弟缺席时的独立性、真实 C 的合作变化及适用的增强拆除；纯函数不强造 C，没有增强不造包装层。不得留下永久转发层、双账本或宽泛 registry 来代替窄能力。
 4. **关键反例与预算。** 开工前验证反例确实到达目标边界，列正控、接受条件和再评估点。未知原型先作有限可行性调查，不能把探索算成普通修复的确定工期。
 
 库的独立验证通过可以进入 LIB_READY；完整迁移须按下列证据门槛判定。已有看板列不再扩充。跨包契约先复核，实际完成后复核同一候选；小型纯函数不增加无关的多轮全套审查。
@@ -61,16 +61,18 @@
 <a id="delivery-evidence-gate"></a>
 ### 交付检查与 DONE 门槛
 
-每个拆分接收包按[交付清单](UPSTREAM-DELIVERY-CHECKLIST.md)留下四类证据，使用同一固定候选，不接受四类中的任何一类空缺：
+主仓职责迁移的完整接收按[交付清单](UPSTREAM-DELIVERY-CHECKLIST.md)核对四类证据，明确对应候选，不接受整类空缺；证明沿用原 SPEC、测试和单卡记录，已有记录只链接，不重复填表。独立库或增强先按其完整契约验收，不以主仓全部接完为前提：
 
 | 必需证据 | 工作包中须交付的结果 | 不足时的处理 |
 |---|---|---|
-| [真实消费者](UPSTREAM-DELIVERY-CHECKLIST.md#real-consumers) | 全部受影响链的清单、实际入口运行、新路径与结果/效果证明 | 库内成功不足以接收；补消费者证据 |
-| [公开产物](UPSTREAM-DELIVERY-CHECKLIST.md#public-artifact) | 精确包与锁、干净安装、同一程序的类型和运行时消费、实际依赖闭包 | 修产物或合同；不能用源码测试代替 |
-| [关键反例](UPSTREAM-DELIVERY-CHECKLIST.md#counterexamples) | WHAT 映射、有效负控与正常正控、相关套件和风险验证收据 | 相关失败、TODO、skip 或未运行保留为未通过 |
+| [真实消费者](UPSTREAM-DELIVERY-CHECKLIST.md#real-consumers) | 全部受影响链、实际入口、新路径与效果；涉及组合时证明 C 可改变实际合作而不改参与者内部 | 库内成功不足以证明主仓迁移；补消费者证据 |
+| [公开产物](UPSTREAM-DELIVERY-CHECKLIST.md#public-artifact) | 独立构建、实际接线输入与消费方式、临时发行包干净消费、类型与运行一致及依赖闭包 | 分清源码接线与发行验收；一方不代证另一方 |
+| [关键反例](UPSTREAM-DELIVERY-CHECKLIST.md#counterexamples) | 库 SPEC/主仓 WHAT 映射、有效正反控、适用增强拆除、相关套件和风险证据 | 相关失败、TODO、skip 或未运行保留为未通过 |
 | [旧职责退出](UPSTREAM-DELIVERY-CHECKLIST.md#old-responsibility) | 旧新 owner 对照、删除与保留依据、退出后的实际消费、必要数据和在途义务处置 | 本卡承诺仍留在旧侧时不得 DONE |
 
 四类证据与适用风险门禁通过后才进入最终复核；非作者复核及最终主仓集成候选核验通过，才可改 DONE。缺证时保留对应施工列，不把发布、净改进合入或完整子卡交付写成父卡完成；禁止在反例失败后自行缩小范围来销项。事先独立定义的原型与取证包仍按各自研究结果验收，不代替生产父项。
+
+未来上游源码接入按其批准的 submodule/gitlink 规则记录；独立发行仍验证临时 pack，不要求 tgz 入 Git。本地现有 vendor/锁流程本轮不变。上游项目规则与旧 distribution WHAT [011]、施工 §8 的矛盾见[对照记录](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#original-requirements-alignment)，采纳前由维护者统一，不以旧条款自动否决源码接入，也不静默删掉发行验收。
 
 resources 当前先补参数保真反例和真实资源消费者，再补同包公开消费及旧资源桥退出证据；time/wait 先修声明/运行时和能力边界，再证明 Host/Join 实际链及旧等待职责去向。两者均未完成接收，本轮不改变卡片状态或开启修复。细项“不适用”须有契约理由及复核，不能免除本卡已有保证。
 
@@ -302,7 +304,7 @@ R8 保留为父项，本次将原型和生产接线拆成 A/B，分别验收。A
 4. **按证据逐步扩大。** 先关键反例与相邻正控，再相关编号 requirement，最后按[风险](#acceptance-levels)和本包明确承诺运行实际 Host、冷恢复或物理验证，并消费精确包。失败先归因，只有新修改、新失败或未解风险才重复、扩大测试。受正式监督缺口影响的结果单列，不能用原生通过代替包装器通过；TODO/skip 不计完成。
 5. **固定唯一候选。** 源码、构建输入和验证产物在验收期间保持不变；共享目录内其他工作继续变动时，另用隔离候选。独立读取和无干扰验证可以并行，公共类型、writer、共享接线和发布串行。生产构建只用 `node scripts/build.mjs` 或规定入口，不运行 `dotnet build`，不批量改写程序源码。
 6. **完成实际交付。** 库 API/行为或协议变化按不兼容程度升版，验证实际 pack 的 ESM/.d.ts、摘要和隔离 Node/Bun 消费；主仓 vendor、锁和调用者在同一集成候选切换，不覆盖同版本 tarball。持久格式明确版本、归档/拒绝/必要单向迁移及在途资源处置，不从缺证补造事实。
-7. **按包收尾。** 更新看板、报告、确切产物、pass/fail/skip/TODO、旧职责退出及剩余条款。拆分/接收包逐项提交[四类证据收据](UPSTREAM-DELIVERY-CHECKLIST.md#delivery-receipt)，未通过不得 DONE。本包相关缺陷阻塞本包，独立发现另立范围；子包完成不销父项义务。原型结论、生产修复、验证通过、提交推送和部署分别记录。按现有授权正常 commit/push master，禁止 force push；本轮文档修订不部署 Host、不合并 upstream。
+7. **按包收尾。** 更新看板、报告、确切产物、pass/fail/skip/TODO、旧职责退出及剩余条款。主仓完整迁移核对[四类证据](UPSTREAM-DELIVERY-CHECKLIST.md#delivery-receipt)，引用原记录即可，未通过不得 DONE；库独立验收另记范围。本包相关缺陷阻塞本包，独立发现另立范围；子包完成不销父项义务。原型结论、生产修复、验证通过、提交推送和部署分别记录。按现有授权正常 commit/push master，禁止 force push；本轮文档修订不部署 Host、不合并 upstream。
 
 ## 已完成包与历史依据
 

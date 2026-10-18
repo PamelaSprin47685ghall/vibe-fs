@@ -7,7 +7,7 @@
 这是后续抽吸工作的共同蓝图，不是全系统已经审计完毕的声明。目录与需求包已经纳入分工；每卡开工仍需追踪实际调用者、在途状态和持久数据。包名、接口与删除清单中的待定项必须在该卡准备阶段落实，不用想象填空。
 
 <a id="delivery-handoff"></a>
-**拆分任务的交付依据与交接：** [交付检查清单](UPSTREAM-DELIVERY-CHECKLIST.md)作为本拆分计划的专项要求，供上游维护者通过 PR 审查采纳，本地据此接收。派发、接续或跨仓交接拆分任务时，在任务说明中附上清单的可访问位置、固定版本、[本卡范围](CARDS.md)与验收责任，按[交接单](TEMPLATES.md#handoff)记录接手者是否已读取。施工与复核从这些任务入口使用清单；文档合并本身不代表现有 agent 已收到或执行。
+**拆分任务的交付依据与交接：** [交付检查清单](UPSTREAM-DELIVERY-CHECKLIST.md)补充原独立库 SPEC 与本指南 A—H 的证据检查，供上游维护者通过 PR 审查采纳，本地据此接收；[原要求对照](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#original-requirements-alignment)记录依据、修正和未决冲突。派发、接续或跨仓交接时，在现有任务说明或[交接单](TEMPLATES.md#handoff)附上适用规则、清单固定版本、[本卡范围](CARDS.md)与验收责任，不另设阅读回执。文档合并本身不代表现有 agent 已收到或执行。
 
 **当前入口：** [四模块报告与修复复盘](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#repair-retrospective)区分拆分缺口、修复回退、旧欠账和验证成本；[剩余计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)已按 `da8266cb6` 更新，每包列明范围、关键反例、验收及排除项。下一 P1 为终结事实 D1→D2，验证设施和旧失败取证独立，Trace 与 Bootstrap 按依赖推进，主动脱组分原型与生产接线。已完成包退出待施工顺序，状态只在[看板](BOARD.md#source-audit-repairs)维护。
 
@@ -15,7 +15,7 @@
 
 [resources 与 time/wait 接收评估](UPSTREAM-INTAKE-ASSESSMENT-2026-10-18.md)已完成只读调查：库原有 Node/Bun 测试各 75/75，但安装包反例发现参数裁剪、声明不符和输入能力被改写，另有等待职责残留与依赖闭包缺口。两项均暂缓直接接收；按已见范围分别预算 4–8、12–24 有效工程小时，尚未施工。[新的接收计划](REMAINING-REPAIRS-2026-10-16.md#upstream-intake)按完整职责拆分、风险选择证据、固定上游批次，不将未来模块持续加入当前 16 包。
 
-[拆分质量复盘](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#delivery-quality-judgment)已记录交付偏粗、DONE 过早及成本后移的判断与证据边界。[上游拆分交付检查清单](UPSTREAM-DELIVERY-CHECKLIST.md)为拆分与接收卡规定四类必要证据：真实消费者、公开产物、关键反例、旧职责退出。缺项、相关失败或未证承诺均不得标 DONE；净改进可以按现有规则交付，完成判定仍须逐项成立。
+[拆分质量复盘](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#delivery-quality-judgment)记录的是迁移落实不足、DONE 过早及成本后移，不能推成原要求粗糙。[交付清单](UPSTREAM-DELIVERY-CHECKLIST.md)为主仓完整迁移核对真实消费者、公开产物、关键反例、旧职责退出四类证据，缺项不得标 DONE；库仍按原契约独立验收，净改进与完整子范围可以按现有规则交付。
 
 三小时施工已完成[Bun挂起定因与夹具修正](GUIDANCE-BUN-LIFETIME-2026-10-18.md)和[Process纯契约及实际消费者](PROCESS-CONTRACT-2026-10-18.md)，非作者复审已核对。新增无界Bun启动器已删除，原生物理证据不替代正式监督；正式Bun适配单列CUT-00-R2，Node验证包装器的既有有界等待问题另列CUT-00-R1，不与暂缓的R12-U1混记。
 
@@ -157,6 +157,8 @@ git -C "$WXL_WT" rev-parse HEAD
 
 ## 8. 两仓发布与主仓集成，统一串行
 
+本节保留本地当前 vendor 交付流程，不作为上游源码接入的要求。上游已改用 submodule/`file:wanxiangli`，临时发行包不得入 Git；其旧施工说明与 distribution 条款仍待维护者统一，见[原要求对照](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#original-requirements-alignment)。
+
 库发布负责人从已审的精确提交建立干净发布工作树，集中处理 package version、exports、files、锁与产物。以下流程没有 `npm publish`；公共 registry 发布不是本计划的默认动作。
 
 ```sh
@@ -204,7 +206,7 @@ git push -u origin HEAD
 
 必须阻止合入：本卡引入的未解释回归；真实效果可能重复；用户原文丢失；权限扩大；历史被错误读取/覆盖；资源提前释放；新库反向依赖；依赖无法干净安装；相关失败或取消被藏成 TODO/skip。涉及已知范围缩减，须先得到明确产品裁决，不能由卡 owner 自批。
 
-历史无关 TODO/skip 可以保留，但列出原条款和未完成范围。拆分/接收卡的四类证据及相关风险门禁只要缺一项，就不能标 DONE；已完成子范围单列，父卡承诺继续保留。获准合入的净改进不等于完整迁移已验收，不能在失败后自行缩小范围换取 DONE。既有失败未完成运行不能伪造通过数；当前 verify 返回 FAIL 就如实记录 FAIL。
+历史无关 TODO/skip 可以保留，但列出原条款和未完成范围。主仓迁移卡的四类证据及相关风险门禁只要缺一项，就不能标完整迁移 DONE；独立库按原契约验收，已完成子范围单列，父卡承诺继续保留。获准合入的净改进不等于完整迁移已验收，不能在失败后自行缩小范围换取 DONE。既有失败未完成运行不能伪造通过数；当前 verify 返回 FAIL 就如实记录 FAIL。
 
 通常执行顺序：
 
