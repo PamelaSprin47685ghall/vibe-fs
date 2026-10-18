@@ -2,6 +2,8 @@
 
 制定：2026-10-18。依据[四模块复盘](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#delivery-quality-judgment)及 [resources、time/wait 接收评估](UPSTREAM-INTAKE-ASSESSMENT-2026-10-18.md)。本清单作为本仓提出的上游交付要求和本地接收依据；本轮只更新文档，未修改或合并上游。
 
+**执行入口：** [根 AGENTS.md](../../AGENTS.md#模块拆分与接线交付)已将本清单列为拆分、接线和相关评审 agent 的开工必读要求，[职责卡首页](CARDS.md)也提供入口。包含这些文件的 PR 合并到拆分方仓库后，后续任务应从该仓库规则读取本清单；跨仓交接须明确传递位置、固定版本与验收责任，不能依赖聊天历史或假定另一个仓库自动继承规则。
+
 <a id="done-gate"></a>
 ## DONE 的必要条件
 
