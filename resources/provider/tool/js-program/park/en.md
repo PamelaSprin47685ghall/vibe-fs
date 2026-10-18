@@ -3,3 +3,5 @@ park(payload) — suspend this program at this await point and hand control back
 The program sees park as an ordinary await of an external input: the resumed value is whatever the caller injects through unpark. The site stays alive in the host until it is resumed or abandoned; a parked program is not finished and its already-applied writes remain on disk (as-is).
 
 `unpark.value` is arbitrary JSON: the park point defines what it means and how it is consumed. A wrong injection fails naturally downstream; the host does not pre-validate it. The ambiguity branch of `where` uses this same channel (its payload is `{ needle, candidates, nearest }`).
+
+Decide cheap-to-expensive when a parked payload arrives: read the payload first. A `where` ambiguity carries `candidates`/`nearest` — if the diagnosis points at the right position, unpark with that span and the program continues from the exact await; that is the everyday outcome and costs one call. Abandon is the heavy weapon: it tears down the live site and the whole program has to be reissued, so use it only when the program logic itself must be rewritten — its own invariants would reject the resume anyway.

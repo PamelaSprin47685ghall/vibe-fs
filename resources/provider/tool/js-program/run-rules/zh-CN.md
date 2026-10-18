@@ -3,25 +3,55 @@ await js.run(class extends js.Runnable { ... }) —— 工程成员。
 在全局 `js` 对象上调用它：`this.run` 是你的程序入口，绝不是这个成员——两者同名是
 有意为之的碰撞，所以工程 run 从不落在基类上。
 
-控制流归 Host，你只写语义回调。每一步 Host 调用 `next(ctx)`，执行你返回的东西，
-每个 interval 时间片用 `check(ctx)` 监督一次，进程退出交给 `onExit(result)` 处置，
+控制流归 Host，你只写语义回调。每轮 Host 调用 `next(ctx)`，执行你返回的东西，
+每个 interval 时间片用 `watch(ctx)` 守望一次，进程退出交给 `onExit(result)` 处置，
 然后再次调用 `next(ctx)`——直到它返回 `null` 或 `maxDuration` 到期。你的代码不会在
 时间片之间运行，切片时钟、子进程收割与结局都归 Host 所有：Runnable 无法跳过、
 拉长或重排一个时间片。
 
 `next` 是循环回调，不是一次性声明。每轮命令退出后 Host 都会再次调用它；工作做完时
-必须返回 `null`，典型写法 `ctx.step === 0 ? "command" : null`。
+必须返回 `null`——固定剧本写 `ctx.step === 0 ? "command" : null`，随机应变的场景
+则读状态决定。
 
 必选成员；缺失或形态不合法即 `RUNNABLE_SPEC_INCOMPLETE`：
 - `maxDuration` —— 毫秒，正数。整个工程的执行上界。
 - `next(ctx)` —— 下一步，每轮循环调用一次。
-- `check(ctx)` —— watchdog。必选，每个时间片运行一次。
+- `watch(ctx)` —— watchdog。必选，每个时间片运行一次。
+- `sanity()` —— 控制流自证（见下）。
 可选：
 - `interval` —— 每个时间片的毫秒数，默认 10000，下限钳制为 10。
 - `onExit(result)` —— 刚退出进程的处置。`result` 是
   `{ root, exitCode, stdout, stderr, elapsedMs }`，其中 `stdout`/`stderr` 携带该子进程的
   完整输出（有界头尾），不是时间片增量。
 - `onTimeout` —— `maxDuration` 到期时的处理；默认即 abort。
+
+`sanity()`：证明你没有糊弄。Host 在一切开始之前先跑它一次。它返回两个 thunk——
+宿主驱动它们并机械地检查结果，断言代码不用你写：
+```
+sanity() {
+  return {
+    nextDone: () => { this.index = this.files.length; return this.next({ root: "/", step: 99 }); },
+    watchVeto: () => { this.stalled = 6; this.current = this.files[0]; return this.watch({ ...ctx }); },
+  };
+}
+```
+`nextDone` 把实例拨到「全部完成」状态并驱动 `next`——宿主要求返回 `null`。
+`watchVeto` 把实例拨到「出了问题」状态并驱动 `watch`——宿主要求一次否决
+（`false` 或 `{ abort }`）。thunk 没展示出出口，整个 `js.run` 就在调用点 park，携带
+诊断载荷——在新调用里修好类，或 unpark 注入一个由你的程序当作 js.run 结局消费的值。
+写 thunk 就是在设计终止条件：如果你 mock 不出一个 next 返回 null 的状态，出口还不存在。
+
+驱动 `next` 的两种形态：轮次驱动（`ctx.step === 0 ? cmd : null`）适合固定剧本——
+spawn、waitFor、测试、收割；事件驱动适合一切需要随机应变的场景——`onExit` 把退出码
+记进实例字段、`watch` 把观察记进实例字段，`next` 读这些字段再决定：重试、跳过、
+hold 一片、推进，或 `null`。完整示例两种都有：`run-recipes` 是固定剧本，`ultra-devops`
+是纯事件驱动。
+
+输出在 JS 里处理，不要用 shell 管道。outcome 携带命令的完整 stdout（有界头尾，
+`truncated` 如实相告）；接 `| head`、`| tail` 或 `grep` 扔掉的恰恰是你可能需要的
+字节——关键错误常在前头，尾部不保证有任何东西。返回裸命令，在 JS 里切原文：
+`outcome.stdout.split("\n").filter((l) => l.includes("error"))`——逻辑随 JS 一样丰富，
+原文留在手上，第一次切漏了还能 fallback。
 
 `next(ctx)` 只返回以下之一：
 - `"command"` —— shell 命令，前台跑到退出。
@@ -31,26 +61,27 @@ await js.run(class extends js.Runnable { ... }) —— 工程成员。
 - `{ signal, name }` —— 向该具名后台进程发送指定信号（默认 `SIGTERM`）；2 秒后仍存活
   则 SIGKILL。
 - `{ send: { name, input } }` —— 把 `input` 写进该后台进程的 stdin（缺行尾换行时补
-  一个）；它的增量输出在下一个 `check` 片到达。嵌套是 canonical 形态；平铺
+  一个）；它的增量输出在下一个 `watch` 片到达。嵌套是 canonical 形态；平铺
   `{ send: input, name }` 拼写被接受为同一件事。这就是交互形态：起一个 REPL/server，
   发一行、读增量、再发下一行。
-- `{ waitFor: { port, timeoutMs } }` —— 等该 TCP 端口可接受连接；等待期间 `check` 以
+- `{ waitFor: { port, timeoutMs } }` —— 等该 TCP 端口可接受连接；等待期间 `watch` 以
   探测节奏（约 100ms）继续被调，崩溃仍可被观察并 abort。
 
-`check(ctx)` 返回：
+`watch(ctx)` 返回：
 - 什么都不返回，或 `true` —— 继续。
-- `{ abort: reason }` —— 立即中止。
+- `false`，或 `{ abort: reason }` —— 立即否决。`false` 是真实的否决，不是「继续」
+  的同义词。
 - `{ park: payload }` —— 通过与 `js.park` 相同的通道挂起。恢复时注入字符串 'abort'
   即中止；注入其他任何值都继续。
 
-先观察，再裁决。`check` 应当读 ctx 增量、把要紧的状态记在实例字段
+先观察，再裁决。`watch` 应当读 ctx 增量、把要紧的状态记在实例字段
 （`this.lastSize`、`this.stalled`）上，然后再决定。一个什么都不看就 `return true` 的
-check 是没有在监督的 watchdog——Host 不会拦你，但也没有任何东西在被监督。
-`next` 或 `check` 抛异常会让整个程序失败。
+watch 是没有在监督的 watchdog——Host 不会拦你，但也没有任何东西在被监督。
+`next` 或 `watch` 抛异常会让整个程序失败。
 
 `next(ctx)` 的 `ctx` 是 `{ root, step }`（`step` 从 0 起，计循环轮数）。
-`check(ctx)` 的 `ctx` 是
-`{ root, stdout, stderr, exited, exitCode, backgrounds, elapsedMs, remainingMs }`，
+`watch(ctx)` 的 `ctx` 是
+`{ root, step, stdout, stderr, exited, exitCode, backgrounds, elapsedMs, remainingMs }`，
 其中 `backgrounds` 是 `{ name, exited, exitCode }` 数组；`stdout` 与 `stderr`
 是本片增量——前台命令与全部后台子进程合并进同一个观察窗——不是全程记录。
 
@@ -60,6 +91,9 @@ await 交回的结局是
 循环轮数。
 
 失败模式，一次说清：
+- `sanity()` 携带 `sanity.failure` 载荷 park：某个 thunk 没展示出自己的出口——
+  `next` 没返回过 `null`，或 `watch` 没否决过。载荷携带失败原因与 thunk 的返回值；
+  在新调用里修好类。
 - `status: 'timeout'` 且命令输出每轮重复一份，意味着 `next` 从未返回 `null`——Host
   每轮忠实重跑它返回的东西直到 `maxDuration`。看 `steps`：轮数很多而命令很短，
   就是这个病的签名。
@@ -79,6 +113,6 @@ await 交回的结局是
 稳定失败码：`RUNNABLE_SPEC_INCOMPLETE`、`RUN_COMMAND_UNSUPPORTED`、
 `RUN_WAIT_TIMEOUT`、`RUN_CHILD_UNKNOWN`、`RUN_PARK_UNSUPPORTED`。
 
-机械规则写进回调；语义分叉交给 parked 载荷。
+机械规则写进回调；语义分叉——包括被否决的 sanity thunk——交给 parked 载荷。
 
 更多完整示例：`run-recipes`（分钟级长编译；npm 服务 + 前端测试）。

@@ -91,11 +91,19 @@ module JsRunLoop =
     [<Emit("$0.next($1)")>]
     let private callNext (instance: obj) (ctx: obj) : obj = jsNative
 
-    [<Emit("$0.check($1)")>]
-    let private callCheck (instance: obj) (ctx: obj) : obj = jsNative
+    [<Emit("$0.watch($1)")>]
+    let private callWatch (instance: obj) (ctx: obj) : obj = jsNative
 
     [<Emit("$0.onExit($1)")>]
     let private callOnExit (instance: obj) (result: obj) : obj = jsNative
+
+    [<Emit("$0.sanity()")>]
+    let private callSanity (instance: obj) : obj = jsNative
+
+    /// Invoke a sanity thunk: the host drives it and mechanically checks
+    /// the result.
+    [<Emit("$0()")>]
+    let private invokeThunk (fn: obj) : obj = jsNative
 
     [<Emit("Buffer.byteLength($0, 'utf8')")>]
     let private utf8Bytes (text: string) : int = jsNative
@@ -311,7 +319,10 @@ module JsRunLoop =
         if isNullish raw then
             Continue
         elif typeOf raw = "boolean" then
-            Continue
+            if unbox<bool> raw then
+                Continue
+            else
+                Abort "watch returned false"
         elif hasProperty raw "abort" && not (isNullish (getProperty raw "abort")) then
             Abort(string (getProperty raw "abort"))
         elif hasProperty raw "park" then
@@ -449,7 +460,8 @@ module JsRunLoop =
         | _ -> PortPending
 
     type private RunnableValidated =
-        { Instance: obj
+        { Class: obj
+          Instance: obj
           MaxDurationMs: int64
           IntervalMs: int
           HasOnExit: bool }
@@ -467,7 +479,7 @@ module JsRunLoop =
             let instance = construct runnableClass
             let maxDurationValue = getProperty instance "maxDuration"
             let hasNext = isFunction (getProperty instance "next")
-            let hasCheck = isFunction (getProperty instance "check")
+            let hasCheck = isFunction (getProperty instance "watch")
             let intervalValue = getProperty instance "interval"
             let intervalMs = parseIntervalMs intervalValue
 
@@ -480,13 +492,20 @@ module JsRunLoop =
             elif not hasNext then
                 Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement next(ctx)")
             elif not hasCheck then
-                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement check(ctx)")
+                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement watch(ctx)")
+            elif not (isFunction (getProperty instance "sanity")) then
+                Error(
+                    failure
+                        "RUNNABLE_SPEC_INCOMPLETE"
+                        "Runnable must implement sanity() — a control-flow self-test returning { nextDone, watchVeto } thunks"
+                )
             else
                 let maxDurationMs = int64 (unbox<float> maxDurationValue)
                 let hasOnExit = isFunction (getProperty instance "onExit")
 
                 Ok
-                    { Instance = instance
+                    { Class = runnableClass
+                      Instance = instance
                       MaxDurationMs = maxDurationMs
                       IntervalMs = intervalMs
                       HasOnExit = hasOnExit }
@@ -515,6 +534,33 @@ module JsRunLoop =
                 return interpretInjectedResume injected
         }
 
+    /// A failed prove() is a semantic fork, not a terminal failure: suspend
+    /// through the shared park channel with the diagnosis payload, and let the
+    /// injected unpark value become the js.run outcome by this park point's
+    /// contract. Without a park channel the diagnosis cannot be presented, so
+    /// the run refuses instead of silently degrading.
+    let private parkOrFailProof
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        (stack: string)
+        (payload: obj)
+        : Task<obj> =
+        match parkState with
+        | None ->
+            Task.FromResult(
+                failure "RUN_PARK_UNSUPPORTED" "prove failure requires the park channel to present its diagnosis"
+            )
+        | Some state ->
+            task {
+                dispatchParkSignal state stack payload
+
+                let deferred: obj =
+                    emitJsExpr
+                        state
+                        "(function(state) { return new Promise(function(resolve, reject) { state.ParkDeferredResolve = resolve; state.ParkDeferredReject = reject; }); })($0)"
+
+                return! awaitJs deferred
+            }
+
     let private executeValidated
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         (root: string)
@@ -530,8 +576,9 @@ module JsRunLoop =
             let deadlineMs = startedMs + maxDurationMs
             let children = Dictionary<string, ManagedChild>()
             let output = OutputBuffer()
-            // DSL-MUTABLE: algorithm-scratch — loop step cursor
-            let mutable step = 0
+            // // DSL-MUTABLE: algorithm-scratch — loop step counter shared with
+            // checkContext (a ref cell: a closure cannot capture a mutable let)
+            let stepCell = ref 0
             // DSL-MUTABLE: algorithm-scratch — overall loop state
             let mutable running = true
             let mutable status = "completed"
@@ -557,6 +604,7 @@ module JsRunLoop =
 
                 createObj
                     [ "root" ==> root
+                      "step" ==> stepCell.Value
                       "stdout" ==> String.concat "" stdoutParts
                       "stderr" ==> String.concat "" stderrParts
                       "exited" ==> managed.Exited
@@ -599,7 +647,7 @@ module JsRunLoop =
 
             let checkForegroundSlice (managed: ManagedChild) : Task<ForegroundSliceTransition> =
                 task {
-                    let! verdictRaw = awaitJs (callCheck instance (checkContext managed))
+                    let! verdictRaw = awaitJs (callWatch instance (checkContext managed))
 
                     match checkVerdictOf verdictRaw with
                     | SliceContinue -> return KeepWaiting
@@ -729,7 +777,7 @@ module JsRunLoop =
                 task {
                     let slice = int (min (int64 intervalMs) (max 1L (deadlineMs - nowMs ())))
                     let! _ = unbox<Task<unit>> (delay (min slice probeIntervalMs))
-                    let! verdictRaw = awaitJs (callCheck instance (checkContext scratch))
+                    let! verdictRaw = awaitJs (callWatch instance (checkContext scratch))
                     let verdict = checkVerdictOf verdictRaw
 
                     let! decision =
@@ -813,10 +861,10 @@ module JsRunLoop =
                 }
 
             while running && isNull result do
-                let ctx = createObj [ "root" ==> root; "step" ==> step ]
+                let ctx = createObj [ "root" ==> root; "step" ==> stepCell.Value ]
                 let remaining = deadlineMs - nowMs ()
                 let! stepOutcome = raceDeadline (awaitJs (callNext instance ctx)) (int remaining)
-                step <- step + 1
+                stepCell.Value <- stepCell.Value + 1
                 do! applyStepOutcome stepOutcome
 
             for entry in children.Values |> Seq.toArray do
@@ -836,7 +884,7 @@ module JsRunLoop =
                         output.Truncated
                         output.TotalBytes
                         (nowMs () - startedMs)
-                        step
+                        stepCell.Value
                         outcomeReason
         }
 
@@ -851,4 +899,59 @@ module JsRunLoop =
         : Task<obj> =
         match validateRunnableSpec runnableClass with
         | Error fail -> Task.FromResult fail
-        | Ok spec -> executeValidated parkState root stack spec
+        | Ok spec ->
+            task {
+                // The proof runs on its own construction so its mocked state
+                // never leaks into the real run; Runnable constructors must
+                // stay pure. A failed proof parks with its diagnosis; the
+                // injected unpark value becomes the js.run outcome.
+                // Sanity runs before anything else, on its own instance; the real
+                // run uses a fresh construction, so the thunks' mocked state never
+                // leaks. The host drives the two thunks and mechanically checks
+                // the results — a thunk that fails to show the exit parks with
+                // its diagnosis.
+                let sanityPayload (message: string) (returned: obj) =
+                    createObj [ "sanity" ==> createObj [ "failure" ==> message; "returned" ==> returned ] ]
+
+                let isVeto (verdict: obj) =
+                    (typeOf verdict = "boolean" && not (unbox<bool> verdict))
+                    || (hasProperty verdict "abort" && not (isNullish (getProperty verdict "abort")))
+
+                try
+                    let! sanity = awaitJs (callSanity spec.Instance)
+                    let nextDone = getProperty sanity "nextDone"
+                    let watchVeto = getProperty sanity "watchVeto"
+
+                    if not (isFunction nextDone) || not (isFunction watchVeto) then
+                        return
+                            failure
+                                "RUNNABLE_SPEC_INCOMPLETE"
+                                "sanity() must return { nextDone, watchVeto } — two thunks: one drives next to null, one drives watch to a veto"
+                    else
+                        let! nextResult = awaitJs (invokeThunk nextDone)
+
+                        if not (isNullish nextResult) then
+                            return!
+                                parkOrFailProof
+                                    parkState
+                                    stack
+                                    (sanityPayload
+                                        "next has no null path — the termination condition does not exist yet"
+                                        nextResult)
+                        else
+                            let! watchVerdict = awaitJs (invokeThunk watchVeto)
+
+                            if not (isVeto watchVerdict) then
+                                return!
+                                    parkOrFailProof
+                                        parkState
+                                        stack
+                                        (sanityPayload
+                                            "watch has no veto path — the watchdog cannot say no"
+                                            watchVerdict)
+                            else
+                                let fresh = construct spec.Class
+                                return! executeValidated parkState root stack { spec with Instance = fresh }
+                with ex ->
+                    return! parkOrFailProof parkState stack (sanityPayload (string ex.Message) null)
+            }

@@ -1,31 +1,59 @@
 class Js extends JsProgram {
   async run() {
-    const host = this;
-    return await js.run(class extends js.Runnable {
-      maxDuration = 3600000; // the whole run: 60 min
-      interval = 10000;      // check() runs once per 10 s slice
+    // 清单以不可变快照读入，再用 where 定位。这里故意留了一个歧义：
+    // "dataset-3" 在清单里出现两次——索引里一次、正文小节标题一次。下面这行
+    // where 会把程序就地 park，载荷是 { needle, candidates, nearest }。
+    // 读 parked 载荷，选中正文标题那个 span，用
+    // { unpark: { handle, value: [begin, end] } } 恢复：await 求值为注入的
+    // span，程序从原行继续。这就是日常的 park——诊断直接指出修复位置，
+    // 一次 unpark 就是全部修理；不用重写、不用 abandon。
+    const manifest = await this.cat("downloads/manifest.md");
+    const [heading] = await this.where(manifest, "dataset-3");
+    const section = manifest.slice(heading);
+    const url = section.slice(section.indexOf("https://")).split(/\s/)[0];
 
-      // Three large files, strictly serial. -c is what makes a step idempotent:
-      // running it again continues the file on disk instead of overwriting it.
+    return await js.run(class extends js.Runnable {
+      maxDuration = 3600000; // 整个工程：60 分钟
+      interval = 10000;      // watch() 每 10 秒时间片跑一次
+
+      // 三个大文件，严格串行。-c 让每一步幂等：再跑一次会接着盘上的
+      // 文件继续，而不是覆盖它。
       files = [
         { name: "dataset-1", url: "https://cdn.example.org/data/dataset-1.img", path: "downloads/dataset-1.img" },
         { name: "dataset-2", url: "https://cdn.example.org/data/dataset-2.img", path: "downloads/dataset-2.img" },
-        { name: "dataset-3", url: "https://cdn.example.org/data/dataset-3.img", path: "downloads/dataset-3.img" },
+        { name: "dataset-3", url, path: "downloads/dataset-3.img" },
       ];
-      minBytesPerSlice = 524288; // under half a MiB per 10 s slice = too slow
+      minBytesPerSlice = 524288; // 每 10 秒片不足半 MiB = 太慢
 
       index = 0;
-      current = null;   // the file whose wget is running; null on a hold slice
-      report = null;    // a finished file waiting for check() to park it
+      current = null;   // 正在跑 wget 的文件；hold 片上为 null
+      report = null;    // 已完成的文件，等 watch() 去 park 它
       attempts = 0;
       seenBytes = -1;
       stalled = 0;
       slow = 0;
 
-      // The Host owns the loop: it calls next(), runs what is returned, and
-      // comes back only when that step is over. A pending report must outlive
-      // one slice boundary, because check() is the only place a park can be
-      // raised; the hold command keeps the loop alive for exactly that slice.
+      // 控制流自证：两个 thunk，宿主驱动并机械检查。跑在独立实例上
+      // （真实运行用全新构造）——写 thunk 就是在设计出口。
+      sanity() {
+        return {
+          nextDone: () => {
+            this.index = this.files.length;
+            return this.next({ root: "/", step: 99 });
+          },
+          watchVeto: async () => {
+            this.index = 0;
+            this.current = this.files[0];
+            this.seenBytes = 0;
+            this.stalled = 6;
+            return await this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [], elapsedMs: 0, remainingMs: 60000 });
+          },
+        };
+      }
+
+      // Host 拥有循环：它调 next()、执行返回物、等这一步结束才回来。待交付的
+      // report 必须活过一个时间片边界，因为只有 watch() 能提出 park；hold
+      // 命令让循环恰好多活那一片。
       next(ctx) {
         if (this.report) return `sleep ${this.interval / 1000 + 2}`;
         if (this.index >= this.files.length) return null;
@@ -37,38 +65,36 @@ class Js extends JsProgram {
         return `mkdir -p downloads && wget -c -q -O ${file.path} ${file.url}`;
       }
 
-      // Progress is read from stat growth, not from the log: 6 slices with no
-      // new byte, or 12 slices under minBytesPerSlice, aborts the run. Abort
-      // SIGKILLs the foreground wget; the partial file stays for wget -c.
-      async check(ctx) {
+      // 进度从 stat 增量读，不从日志读：连续 6 片无新字节、或连续 12 片低于
+      // minBytesPerSlice，就 abort。abort 会 SIGKILL 前台 wget；半截文件留给
+      // wget -c。
+      async watch(ctx) {
         if (this.report) {
           const report = this.report;
           this.report = null;
-          const s = await host.stat(report.path);
-          // One durable record per finished file: a restart then repeats at
-          // most the file that was in flight.
+          const s = await this.stat(report.path);
+          // 每个完成的文件一条持久记录：重启后至多重跑当时在途的那个文件。
           return { park: { ...report, bytes: s.exists ? s.size : 0, elapsedMs: ctx.elapsedMs } };
         }
         if (!this.current) return true;
 
-        const s = await host.stat(this.current.path);
+        const s = await this.stat(this.current.path);
         const size = s.exists ? s.size : 0;
         const grew = this.seenBytes < 0 ? size : size - this.seenBytes;
         this.seenBytes = size;
         this.stalled = grew <= 0 ? this.stalled + 1 : 0;
         this.slow = grew > 0 && grew < this.minBytesPerSlice ? this.slow + 1 : 0;
 
-        if (this.stalled >= 6) return { abort: `${this.current.name}: no new bytes for 6 slices` };
-        if (this.slow >= 12) return { abort: `${this.current.name}: under ${this.minBytesPerSlice} bytes per slice for 12 slices` };
-        return true;
+        if (this.stalled >= 6) return { abort: `${this.current.name}: 连续 6 片无新字节` };
+        if (this.slow >= 12) return { abort: `${this.current.name}: 连续 12 片低于 ${this.minBytesPerSlice} 字节/片` };
+        return null; // 观察过了，没有异常——继续
       }
 
-      // Exit codes are mechanical: 0 advances, 4 and 8 retry (-c resumes from
-      // the byte offset), 3 skips the file. Anything else is reported instead
-      // of guessed at, and the run keeps its remaining files.
+      // 退出码是机械规则：0 推进、4 和 8 重试（-c 从字节偏移续传）、3 跳过该
+      // 文件。其余如实上报而不是瞎猜，run 保留剩余文件。
       onExit(result) {
         const file = this.current;
-        if (!file) return; // a hold slice carries no work
+        if (!file) return; // hold 片没有工作
         this.current = null;
 
         if (result.exitCode === 0) {
@@ -80,7 +106,7 @@ class Js extends JsProgram {
         if (result.exitCode === 4 || result.exitCode === 8) {
           if (this.attempts < 3) {
             this.attempts += 1;
-            return; // same index: next() re-issues the same wget
+            return; // index 不动：next() 重发同一个 wget
           }
           this.attempts = 0;
           this.report = {
@@ -101,8 +127,8 @@ class Js extends JsProgram {
         this.index += 1;
       }
 
-      // onTimeout keeps its default: maxDuration expiry kills the foreground
-      // and returns status "timeout", with the partial file kept on disk.
+      // onTimeout 保持默认：maxDuration 到期杀掉前台并回报 status "timeout"，
+      // 半截文件留在盘上。
     });
   }
 }

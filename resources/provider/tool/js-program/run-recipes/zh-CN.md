@@ -13,19 +13,36 @@ class Js extends JsProgram {
         return ctx.step === 0 ? "cmake --build build --parallel" : null;
       }
 
-      // 只有 check() 能返回 { abort }；非零退出后借一个保持时间片让 check() 报出稳定
-      // 中止原因。
-      check(ctx) {
+      // 只有 watch() 能返回 { abort }；非零退出后借一个保持时间片让 watch() 报出
+      // 稳定中止原因。
+      watch(ctx) {
         if (this.failureReason) return { abort: this.failureReason };
         if (ctx.elapsedMs > 600000 && ctx.remainingMs < 30000) {
           return { abort: "build_time_loss: under 30s left after 10m elapsed" };
         }
-        return true;
+        return null; // 观察过了，没有异常——继续
       }
 
       onExit(result) {
         if (result.exitCode === 0) return;
-        this.failureReason = `build_failed:exit_${result.exitCode}`;
+        // 完整输出在手：在 JS 里找第一个 error 行——不用 `| grep`（它会扔掉
+        // 日志前头的字节），原文也留在手上备查。
+        const firstError = result.stdout.split("\n").find((l) => /error:/i.test(l));
+        this.failureReason = `build_failed:exit_${result.exitCode}${firstError ? ": " + firstError.trim() : ""}`;
+      }
+
+      // 自证 thunk，先跑在独立实例上：「全部完成」（越过构建步）→ next 返回
+      // null；「出了问题」（有失败记录）→ watch 否决。写它们就是在设计出口。
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 1 }),
+          watchVeto: async () => {
+            this.failureReason = "prove: 模拟构建失败";
+            const veto = await this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [], elapsedMs: 0, remainingMs: 60000 });
+            this.failureReason = null;
+            return veto;
+          },
+        };
       }
     });
   }
@@ -50,16 +67,24 @@ class Js extends JsProgram {
         return null;
       }
 
-      check(ctx) {
+      watch(ctx) {
         const srv = ctx.backgrounds.find((b) => b.name === "srv");
         if (srv && srv.exited && srv.exitCode !== 0) {
           return { abort: `server_crashed:exit_${srv.exitCode}` };
         }
-        return true;
+        return null; // 观察过了，没有异常——继续
       }
 
       onExit(result) {
         testExitCode = result.exitCode;
+      }
+
+      // 自证：越过最后一步 next 返回 null；观察窗里 srv 崩溃让 watch 否决。
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 4 }),
+          watchVeto: () => this.watch({ root: "/", step: 2, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }),
+        };
       }
     });
     return { ...outcome, testExitCode };
@@ -67,4 +92,58 @@ class Js extends JsProgram {
 }
 ```
 
-交互形态（`{ send: { name, input } }`）同样可用于 REPL / 类终端子进程：先用 `{ spawn, name }` 启动子进程，再用 `{ send: { name, input } }` 向其 stdin 写入行，并在 `check(ctx)` 中读取本时间片的 `ctx.stdout` / `ctx.stderr` 增量——系统中已不再有 `pty` 工具。
+## 交互式驱动 REPL 子进程
+
+```js
+class Js extends JsProgram {
+  async run() {
+    const answers = [];
+    const outcome = await js.run(class extends js.Runnable {
+      maxDuration = 60000;
+      interval = 200;
+      lines = ["1 + 1", "2 * 21", "exit"];
+      sent = 0;
+      reaped = false;
+
+      // 事件驱动：读实例状态再决定。发下一行；全部行发完就收割子进程；
+      // 收割之后返回 null——出口存在，sanity() 会展示它。
+      next(ctx) {
+        if (this.reaped) return null;
+        if (this.sent >= this.lines.length) {
+          this.reaped = true;
+          return { signal: "SIGTERM", name: "py" };
+        }
+        return { send: { name: "py", input: this.lines[this.sent++] } };
+      }
+
+      // 前台命令与全部后台子进程的片增量合并进同一个观察窗；收集 REPL 打出的
+      // 内容。
+      watch(ctx) {
+        const py = ctx.backgrounds.find((b) => b.name === "py");
+        if (py && py.exited && this.sent < this.lines.length) {
+          return { abort: "repl died mid-session" };
+        }
+        if (ctx.stdout.trim()) answers.push(ctx.stdout.trim());
+        return null; // 观察过了，没有异常——继续
+      }
+
+      sanity() {
+        return {
+          nextDone: () => {
+            this.reaped = true;
+            const result = this.next({ root: "/", step: 9 });
+            this.reaped = false;
+            return result;
+          },
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "py", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 30000 }),
+        };
+      }
+    });
+    return { ...outcome, answers };
+  }
+}
+```
+
+交互形态就是同一个循环，没有独立的 pty 工具：用 `{ spawn, name }` 起进程、
+`{ send: { name, input } }` 注入行、在 `watch(ctx)` 里读本片 `ctx.stdout` /
+`ctx.stderr` 增量。

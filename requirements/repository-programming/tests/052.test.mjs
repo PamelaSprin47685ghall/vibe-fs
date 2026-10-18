@@ -35,7 +35,7 @@ ${body}
 const runProgram = (dir, body, sessionId) =>
   execute(dir, 'DevOps', 'en', sessionId, { program: program(body) }, 30_000, Date.now() + 180_000, 1 << 20, null)
 
-// A throttled range-capable server so wget -c can really resume and check can
+// A throttled range-capable server so wget -c can really resume and watch can
 // observe mid-download growth. The payload is deterministic and self-checking.
 const serveScript = () => `const http = require('node:http')
 const fs = require('node:fs')
@@ -88,9 +88,16 @@ test('WHAT[repository-programming-052] wget -c resumes a partial download after 
         if (ctx.step === 2) return "wget -c -q -O out1.bin http://127.0.0.1:${port}/big1.bin";
         return null;
       }
-      async check() {
+      async watch(ctx) {
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "wget failed" };
         const s = await host.stat("out1.bin");
         return s.exists && s.size > 100000 ? { abort: "halfway" } : true;
+      }
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 3 }),
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+        };
       }
     });`,
       'sess-052a',
@@ -114,7 +121,8 @@ test('WHAT[repository-programming-052] wget -c resumes a partial download after 
         if (ctx.step === 4) return "sleep 0.4";
         return null;
       }
-      async check() {
+      async watch(ctx) {
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "wget failed" };
         const one = await host.stat("out1.bin");
         const two = await host.stat("out2.bin");
         if (one.exists && one.size === ${first.length} && !this.sawOne) {
@@ -126,6 +134,12 @@ test('WHAT[repository-programming-052] wget -c resumes a partial download after 
           return { park: { file: "out2.bin", size: two.size } };
         }
         return true;
+      }
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 5 }),
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+        };
       }
     });`,
       'sess-052b',
@@ -186,8 +200,18 @@ test('WHAT[repository-programming-052] wget exit 8 is dispatched to onExit inste
         if (ctx.step === 2) return "wget -q -O out3.bin http://127.0.0.1:${port}/missing.bin";
         return null;
       }
-      check() { return true; }
+      watch(ctx) {
+        const srv = ctx.backgrounds.find((b) => b.name === "srv");
+        if (srv && srv.exited) return { abort: "server died" };
+        return true;
+      }
       onExit(r) { dispatched.push(r.exitCode); }
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 3 }),
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }),
+        };
+      }
     });
     return { result, dispatched };`,
       'sess-052c',

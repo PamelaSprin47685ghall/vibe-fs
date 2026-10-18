@@ -19,6 +19,13 @@ ${body}
 const runProgram = (dir, body, sessionId = 'sess-058') =>
   execute(dir, 'DevOps', 'en', sessionId, { program: program(body) }, 20_000, Date.now() + 120_000, 1 << 20, null)
 
+const sanity = (nextStep) => `sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: ${nextStep} }),
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [{ name: "echoer", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }),
+        };
+      }`
+
 test('WHAT[repository-programming-058] js.run drives an interactive child through send and observes the deltas', async () => {
   const { dir, cleanup } = sandbox()
   try {
@@ -37,10 +44,13 @@ test('WHAT[repository-programming-058] js.run drives an interactive child throug
         if (ctx.step === 3) return { signal: "SIGKILL", name: "echoer" };
         return null;
       }
-      check(ctx) {
+      watch(ctx) {
+        const echoer = ctx.backgrounds.find((b) => b.name === "echoer");
+        if (echoer && echoer.exited && ctx.step < 3) return { abort: "child died mid-session" };
         if (ctx.stdout && ctx.stdout.length > 0) seen.push(ctx.stdout);
         return true;
       }
+      ${sanity(4)}
     });
     return { out, seen };`,
     )
@@ -62,7 +72,11 @@ test('WHAT[repository-programming-058] send to an unknown child fails with RUN_C
       maxDuration = 3000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? { send: { name: "nobody", input: "hi" } } : null; }
-      check() { return true; }
+      watch(ctx) {
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
+        return true;
+      }
+      ${sanity(1)}
     });`,
     )
     assert.equal(caseName(outcome), 'Failed')

@@ -29,6 +29,13 @@ ${body}
 const runProgram = (dir, body, sessionId = 'sess-051') =>
   execute(dir, 'DevOps', 'en', sessionId, { program: program(body) }, 20_000, Date.now() + 120_000, 1 << 20, null)
 
+const sanity = (nextStep) => `sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: ${nextStep} }),
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+        };
+      }`
+
 test('WHAT[repository-programming-051] spawn, waitFor and signal drive one background server', async () => {
   const { dir, cleanup } = sandbox()
   try {
@@ -50,7 +57,11 @@ test('WHAT[repository-programming-051] spawn, waitFor and signal drive one backg
         if (ctx.step === 3) return { signal: "SIGTERM", name: "srv" };
         return null;
       }
-      check() { return true; }
+      watch(ctx) {
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
+        return true;
+      }
+      ${sanity(4)}
     });`,
     )
     assert.equal(caseName(outcome), 'Succeeded')
@@ -72,7 +83,11 @@ test('WHAT[repository-programming-051] waitFor on a closed port fails with RUN_W
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? { waitFor: { port: ${port}, timeoutMs: 300 } } : null; }
-      check() { return true; }
+      watch(ctx) {
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
+        return true;
+      }
+      ${sanity(1)}
     });`,
     )
     assert.equal(caseName(outcome), 'Failed')
@@ -91,7 +106,11 @@ test('WHAT[repository-programming-051] signal on an unknown name fails with RUN_
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? { signal: "SIGTERM", name: "nope" } : null; }
-      check() { return true; }
+      watch(ctx) {
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
+        return true;
+      }
+      ${sanity(1)}
     });`,
     )
     assert.equal(caseName(outcome), 'Failed')
@@ -101,7 +120,7 @@ test('WHAT[repository-programming-051] signal on an unknown name fails with RUN_
   }
 })
 
-test('WHAT[repository-programming-051] a crashed background is visible to check and can abort the run', async () => {
+test('WHAT[repository-programming-051] a crashed background is visible to watch and can abort the run', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const port = await freePort()
@@ -115,9 +134,15 @@ test('WHAT[repository-programming-051] a crashed background is visible to check 
         if (ctx.step === 1) return { waitFor: { port: ${port}, timeoutMs: 5000 } };
         return null;
       }
-      check(ctx) {
+      watch(ctx) {
         const dead = ctx.backgrounds.find((entry) => entry.name === "die");
         return dead && dead.exited && dead.exitCode === 3 ? { abort: "background died" } : true;
+      }
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 2 }),
+          watchVeto: () => this.watch({ root: "/", step: 1, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "die", exited: true, exitCode: 3 }], elapsedMs: 0, remainingMs: 60000 }),
+        };
       }
     });`,
     )

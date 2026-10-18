@@ -27,7 +27,7 @@ const runProgram = (dir, body, sessionId = 'sess-050') =>
 
 const runText = async (dir, body) => render(await runProgram(dir, body))
 
-test('WHAT[repository-programming-050] a Runnable missing check is refused with RUNNABLE_SPEC_INCOMPLETE', async () => {
+test('WHAT[repository-programming-050] a Runnable missing watch is refused with RUNNABLE_SPEC_INCOMPLETE', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const doc = await runText(
@@ -36,6 +36,25 @@ test('WHAT[repository-programming-050] a Runnable missing check is refused with 
     )
     assert.match(doc, /# failed/)
     assert.match(doc, /RUNNABLE_SPEC_INCOMPLETE/)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-050] a Runnable missing sanity is refused with RUNNABLE_SPEC_INCOMPLETE', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const doc = await runText(
+      dir,
+      `    return await js.run(class extends js.Runnable {
+      maxDuration = 1000;
+      next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
+      watch() { return true; }
+    });`,
+    )
+    assert.match(doc, /# failed/)
+    assert.match(doc, /RUNNABLE_SPEC_INCOMPLETE/)
+    assert.match(doc, /sanity/)
   } finally {
     cleanup()
   }
@@ -50,12 +69,23 @@ test('WHAT[repository-programming-050] the host loop runs one foreground command
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
-      check() { return true; }
+      watch(ctx) {
+        this.lastExit = ctx.exitCode;
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
+        return true;
+      }
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 1 }),
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+        };
+      }
     });`,
     )
     assert.match(doc, /# ok/)
     assert.match(doc, /status = "completed"/)
     assert.match(doc, /hello/)
+    assert.match(doc, /steps = 2/)
   } finally {
     cleanup()
   }
@@ -71,8 +101,17 @@ test('WHAT[repository-programming-050] onExit dispatches every exited command wi
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "exit 4" : null; }
-      check() { return true; }
+      watch(ctx) {
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
+        return true;
+      }
       onExit(result) { dispatched.push(result.exitCode); }
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 1 }),
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+        };
+      }
     });
     return { outcome, dispatched };`,
     )
@@ -83,7 +122,7 @@ test('WHAT[repository-programming-050] onExit dispatches every exited command wi
   }
 })
 
-test('WHAT[repository-programming-050] a check abort kills the foreground command and reports aborted', async () => {
+test('WHAT[repository-programming-050] a watch abort kills the foreground command and reports aborted', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const doc = await runText(
@@ -92,7 +131,13 @@ test('WHAT[repository-programming-050] a check abort kills the foreground comman
       maxDuration = 8000;
       interval = 200;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late.marker" : null; }
-      check() { return { abort: "stalled" }; }
+      watch() { return { abort: "stalled" }; }
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 1 }),
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+        };
+      }
     });
     return outcome;`,
     )
@@ -103,7 +148,30 @@ test('WHAT[repository-programming-050] a check abort kills the foreground comman
   }
 })
 
-test('WHAT[repository-programming-050] a check park suspends the run and resumes after unpark', async () => {
+test('WHAT[repository-programming-050] watch returning false is a real veto, not a synonym for continue', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const doc = await runText(
+      dir,
+      `    const outcome = await js.run(class extends js.Runnable {
+      maxDuration = 8000;
+      interval = 100;
+      next(ctx) { return ctx.step === 0 ? "sleep 5 && touch veto.marker" : null; }
+      watch() { return false; }
+      sanity() {
+        return { nextDone: () => this.next({ root: "/", step: 1 }), watchVeto: () => this.watch({}) };
+      }
+    });
+    return outcome;`,
+    )
+    assert.match(doc, /status = "aborted"/)
+    assert.equal(existsSync(join(dir, 'veto.marker')), false)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-050] a watch park suspends the run and resumes after unpark', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const parked = await runProgram(
@@ -112,7 +180,20 @@ test('WHAT[repository-programming-050] a check park suspends the run and resumes
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? "sleep 0.3" : null; }
-      check() { if (!this.parked) { this.parked = true; return { park: { reason: "review" } }; } return true; }
+      watch(ctx) {
+        if (!this.parked) { this.parked = true; return { park: { reason: "review" } }; }
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "failed" };
+        return true;
+      }
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 1 }),
+          watchVeto: () => {
+            this.parked = true;
+            return this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 });
+          },
+        };
+      }
     });
     return outcome;`,
     )
@@ -137,6 +218,70 @@ test('WHAT[repository-programming-050] a check park suspends the run and resumes
   }
 })
 
+test('WHAT[repository-programming-050] a sanity thunk that fails to show its exit parks with the diagnosis', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const parked = await runProgram(
+      dir,
+      `    const outcome = await js.run(class extends js.Runnable {
+      maxDuration = 3000;
+      next(ctx) { return "echo never-terminates"; }
+      watch() { return true; }
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 1 }),
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+        };
+      }
+    });
+    return outcome;`,
+    )
+    assert.equal(caseName(parked), 'Parked')
+    const payload = parkedPayload(parked)
+    assert.ok(payload.sanity)
+    assert.match(payload.sanity.failure, /next has no null path/)
+    // Nothing ran: the proof gates the whole run.
+    assert.equal(existsSync(join(dir, 'never-terminates')), false)
+
+    const resumed = await execute(
+      dir,
+      'DevOps',
+      'en',
+      'sess-050',
+      { unpark: { handle: parkedHandle(parked), value: 'sanity failed: next has no null path' } },
+      5000,
+      Date.now() + 60_000,
+      1 << 20,
+      null,
+    )
+    assert.equal(caseName(resumed), 'Succeeded')
+    const doc = render(resumed)
+    assert.match(doc, /sanity failed: next has no null path/)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-050] a sanity that returns non-thunks is refused with RUNNABLE_SPEC_INCOMPLETE', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const doc = await runText(
+      dir,
+      `    return await js.run(class extends js.Runnable {
+      maxDuration = 1000;
+      next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
+      watch() { return true; }
+      sanity() { return { nope: true }; }
+    });`,
+    )
+    assert.match(doc, /# failed/)
+    assert.match(doc, /RUNNABLE_SPEC_INCOMPLETE/)
+    assert.match(doc, /nextDone/)
+  } finally {
+    cleanup()
+  }
+})
+
 test('WHAT[repository-programming-050] maxDuration expiry kills the command and reports timeout', async () => {
   const { dir, cleanup } = sandbox()
   try {
@@ -147,7 +292,16 @@ test('WHAT[repository-programming-050] maxDuration expiry kills the command and 
       maxDuration = 400;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch too-late.marker" : null; }
-      check() { return true; }
+      watch(ctx) {
+        if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };
+        return true;
+      }
+      sanity() {
+        return {
+          nextDone: () => this.next({ root: "/", step: 1 }),
+          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+        };
+      }
     });`,
     )
     assert.match(doc, /status = "timeout"/)

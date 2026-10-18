@@ -645,7 +645,7 @@ class JsProgram {"""
                   rmStub prose
               if has capabilities JsCapability.Move then
                   mvStub prose
-              
+
               if has capabilities JsCapability.Fork then
                   forkStub prose
                   dagStub prose
@@ -1523,12 +1523,11 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     let ultraExample (prose: Prose) (roleName: string) (capabilities: Set<JsCapability>) : JsExample option =
         let candidate =
             match roleName.Trim().ToLowerInvariant() with
-            | "engineer" when has capabilities JsCapability.Edit ->
-                Some(set [ JsCapability.Read; JsCapability.Edit ], prose.UltraEngineering)
+            | "engineer" when has capabilities JsCapability.Write ->
+                Some(set [ JsCapability.Read; JsCapability.Write ], prose.UltraEngineering)
             | "engineer" -> Some(set [ JsCapability.Read ], prose.UltraInvestigation)
-            | "devops" -> Some(set [ JsCapability.Read; JsCapability.Edit ], prose.UltraDevOps)
-            | "plan" when has capabilities JsCapability.Read && has capabilities JsCapability.Edit ->
-                Some(set [ JsCapability.Read; JsCapability.Edit ], prose.UltraPlan)
+            | "devops" -> Some(set [ JsCapability.Read; JsCapability.Exec ], prose.UltraDevOps)
+            | "plan" -> Some(set [ JsCapability.Read ], prose.UltraPlan)
             | "manager" when
                 Set.isSubset
                     capabilities
