@@ -208,7 +208,7 @@ test('WHAT[work-020] a relaying tenure declaring view: { extra } commits ViewChe
             status: 'completed',
             input: {
               program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-              view: { extra: [handoverProse] },
+              view: { prefixUntil: 1, thenRemove: { 1: handoverProse } },
             },
             output: 'ok',
           },
@@ -219,7 +219,7 @@ test('WHAT[work-020] a relaying tenure declaring view: { extra } commits ViewChe
     await hooks.tool['todowrite-for-plan'].execute(
       {
         program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        view: { extra: [handoverProse] },
+        view: { prefixUntil: 1, thenRemove: { 1: handoverProse } },
       },
       { sessionID, agent: 'plan', callID: 'call-plan-view-1', messageID: 'run-plan-view-1', providerRunID: 'run-plan-view-1' },
     )

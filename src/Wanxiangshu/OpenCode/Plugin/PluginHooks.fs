@@ -965,8 +965,44 @@ module PluginHooks =
             let toolAfterRegistration =
                 registeredHook HookKey.ToolAfter (pairedHook (box toolAfter))
 
+            /// context-compression [001]: the provider's own billing for the
+            /// session's latest assistant turn, read off the host's message
+            /// events. It is a datum about the model's own state, never a
+            /// capacity derivation on our side.
+            let tokenUse (raw: obj) : (int * int) option =
+                let info = if isNull raw?properties then null else raw?properties?info
+                let tokens = if isNull info then null else info?tokens
+                let cached = if isNull tokens then null else tokens?cache?read
+                let uncached = if isNull tokens then null else tokens?input
+
+                if
+                    emitJsExpr
+                        (cached, uncached)
+                        "typeof $0 === 'number' && typeof $1 === 'number' && $0 >= 0 && $1 >= 0"
+                then
+                    Some(int (unbox<float> cached), int (unbox<float> uncached))
+                else
+                    None
+
+            let recordProviderTokenUse (rawInput: obj) =
+                let raw = HostEventEnvelope.unwrap rawInput
+
+                let observation =
+                    if HostEventEnvelope.eventTypeOf raw = "message.updated" then
+                        tokenUse raw
+                        |> Option.bind (fun usage ->
+                            HostEventEnvelope.tryMessageSessionId rawInput
+                            |> Option.map (fun sessionId -> sessionId, usage))
+                    else
+                        None
+
+                observation
+                |> Option.iter (fun (sessionId, (cached, uncached)) ->
+                    ProviderTokenUse.record (SessionId.value sessionId) cached uncached)
+
             let observeEvent raw =
                 task {
+                    recordProviderTokenUse raw
                     do! settleViewCheckpointEvent raw
                     do! settleUserQuestion raw
                     do! settlePostS3Deliver raw

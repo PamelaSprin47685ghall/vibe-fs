@@ -92,7 +92,7 @@ const provider = await startHttpServer(async (request, response) => {
       return
     }
     if (text.includes('OL002_A_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 100, extra: ['keep anchor 1'] }))
+      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 100, thenRemove: {} }))
       return
     }
     if (text.includes('OL002_B_VIEW')) {

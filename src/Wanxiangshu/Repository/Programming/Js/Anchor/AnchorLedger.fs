@@ -3,8 +3,8 @@ namespace Wanxiangshu.Repository.Programming.Js.Anchor
 open System.Collections.Generic
 
 /// Process-live ANCHOR ledger. Module state by construction: restart resets
-/// numbers and drops pending declarations, matching the process-live parked
-/// sites.
+/// numbers, drops pending declarations and forgets which anchors were
+/// summarized, matching the process-live parked sites.
 module AnchorLedger =
 
     // DSL-MUTABLE: resource — process-live anchor stream
@@ -15,6 +15,17 @@ module AnchorLedger =
 
     // DSL-MUTABLE: resource — sessionId → pending one-turn declaration
     let private views = Dictionary<string, AnchorViewDeclaration>()
+
+    // DSL-MUTABLE: resource — sessionId → (anchor → summary standing in for it)
+    let private summaries = Dictionary<string, Dictionary<int, string>>()
+
+    let private sessionTable (store: Dictionary<string, Dictionary<int, string>>) (sessionId: string) =
+        match store.TryGetValue sessionId with
+        | true, existing -> existing
+        | false, _ ->
+            let fresh = Dictionary<int, string>()
+            store.[sessionId] <- fresh
+            fresh
 
     let numberMessage (sessionId: string) (messageId: string) : int =
         let session =
@@ -50,11 +61,26 @@ module AnchorLedger =
             Some declaration
         | false, _ -> None
 
+    /// A summary is permanent: from here on the anchor's segments are replaced
+    /// by it, whether or not a later declaration names that anchor again.
+    let replaceAnchors (sessionId: string) (pairs: (int * string) list) : unit =
+        if not (List.isEmpty pairs) then
+            let session = sessionTable summaries sessionId
+
+            pairs |> List.iter (fun (anchor, summary) -> session.[anchor] <- summary)
+
+    let replacements (sessionId: string) : Map<int, string> =
+        match summaries.TryGetValue sessionId with
+        | true, existing -> existing |> Seq.map (fun pair -> pair.Key, pair.Value) |> Map.ofSeq
+        | false, _ -> Map.empty
+
     let clearSession (sessionId: string) : unit =
         numbers.Remove sessionId |> ignore
         views.Remove sessionId |> ignore
+        summaries.Remove sessionId |> ignore
 
     let clearAll () : unit =
         numbers.Clear()
         views.Clear()
+        summaries.Clear()
         nextNumber.Value <- 0

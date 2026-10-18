@@ -374,6 +374,9 @@ module ToolHostCodec =
     [<Emit("$0.schema.array($1).describe($2)")>]
     let private rawArraySchemaOf (tool: obj) (item: obj) (description: string) : obj = jsNative
 
+    [<Emit("$0.schema.record($1, $2).describe($3)")>]
+    let private rawRecordSchemaOf (tool: obj) (key: obj) (value: obj) (description: string) : obj = jsNative
+
     [<Emit("$0($1)")>]
     let private applyTool (factory: obj) (definition: obj) : obj = jsNative
 
@@ -536,6 +539,10 @@ module ToolHostCodec =
 
     let arraySchemaOf (HostSchema item) description (HostToolFactory factory) =
         HostSchema(rawArraySchemaOf factory item description)
+
+    /// Open key→value map (zod `record`); the description carries the key shape.
+    let recordSchemaOf (HostSchema key) (HostSchema value) description (HostToolFactory factory) =
+        HostSchema(rawRecordSchemaOf factory key value description)
 
     let register (HostToolFactory factory) (spec: ToolSpec) =
         let args =

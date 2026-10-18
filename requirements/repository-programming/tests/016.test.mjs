@@ -32,6 +32,12 @@ const toolModule = () => {
       item,
       describe: (description) => ({ type: 'array', item, description }),
     }),
+    record: (key, value) => ({
+      type: 'record',
+      key,
+      value,
+      describe: (description) => ({ type: 'record', key, value, description }),
+    }),
     object: (shape) => ({ type: 'object', shape }),
   }
   return { tool }
@@ -188,6 +194,12 @@ const toolModule = () => {
     any: () => ({ type: 'any', optional: () => ({ type: 'any', optional: true }) }),
     number: () => ({ type: 'number', optional: () => ({ type: 'number', optional: true }) }),
     array: (item) => ({ type: 'array', item, describe: (description) => ({ type: 'array', item, description }) }),
+    record: (key, value) => ({
+      type: 'record',
+      key,
+      value,
+      describe: (description) => ({ type: 'record', key, value, description }),
+    }),
     object: (shape) => ({ type: 'object', shape }),
   }
   return { tool }

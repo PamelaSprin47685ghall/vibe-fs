@@ -29,100 +29,81 @@ module JsToolsData =
     [<Emit("$0.length")>]
     let private jsLength (value: obj) : int = jsNative
 
-    [<Emit("Number.isInteger($0)")>]
-    let private jsIsInteger (value: obj) : bool = jsNative
-
     [<Emit("Number.isFinite($0)")>]
     let private jsIsFinite (value: obj) : bool = jsNative
 
-    let private maxSafeInteger = 9007199254740991.0
-
-    let rec private isPrimitiveTree (value: LlmFacing.Data.Value) =
-        match value with
-        | LlmFacing.Data.Value.Bool _
-        | LlmFacing.Data.Value.Integer _
-        | LlmFacing.Data.Value.Float _
-        | LlmFacing.Data.Value.String _ -> true
-        | LlmFacing.Data.Value.Array items -> List.forall isPrimitiveTree items
-        | LlmFacing.Data.Value.Null
-        | LlmFacing.Data.Value.Object _ -> false
-
-    let private validateArray (items: LlmFacing.Data.Value list) : Result<unit, JsFailure> =
-        if
-            items
-            |> List.exists (function
-                | LlmFacing.Data.Value.Null -> true
-                | _ -> false)
-        then
-            Error JsFailure.InvalidReturnValue
-        elif List.isEmpty items then
-            Ok()
-        elif
-            items
-            |> List.forall (function
-                | LlmFacing.Data.Value.Object _ -> true
-                | _ -> false)
-        then
-            Ok()
-        elif List.forall isPrimitiveTree items then
-            Ok()
-        else
-            Error JsFailure.InvalidReturnValue
-
-    let private ofJsNumber (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
-        if not (jsIsFinite value) then
-            Error JsFailure.InvalidReturnValue
-        elif not (jsIsInteger value) then
-            Ok(LlmFacing.Data.Value.Float(unbox value))
-        elif abs (unbox<float> value) <= maxSafeInteger then
-            Ok(LlmFacing.Data.Value.Integer(int64 (unbox<float> value)))
-        else
-            Ok(LlmFacing.Data.Value.Float(unbox<float> value))
-
-    let rec private ofJsValue (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
+    /// JS-010: a returned or delivered value is JSON-compatible — null, boolean,
+    /// finite number, string, or an array/object of such values. An array holds
+    /// no null element and is either all objects or one primitive tree.
+    /// Validation stays on the native value; only the rendering boundary
+    /// converts it into `LlmFacing.Data.Value` (that conversion cannot fail,
+    /// so it must not run before the value is accepted).
+    let rec private validateJsValue (value: obj) : Result<unit, JsFailure> =
         let ty = jsType value
 
-        if jsNull value then
-            Ok LlmFacing.Data.Value.Null
-        elif ty = "boolean" then
-            Ok(LlmFacing.Data.Value.Bool(unbox value))
-        elif ty = "string" then
-            Ok(LlmFacing.Data.Value.String(unbox value))
-        elif ty = "number" then
-            ofJsNumber value
-        elif jsIsArray value then
-            ofJsArray value
-        elif ty = "object" then
-            ofJsObject value
+        if jsNull value then Ok()
+        elif ty = "boolean" || ty = "string" then Ok()
+        elif ty = "number" then validateJsNumber value
+        elif jsIsArray value then validateJsArray value
+        elif ty = "object" then validateJsObject value
+        else Error JsFailure.InvalidReturnValue
+
+    and isPlainObject (value: obj) : bool =
+        not (jsNull value) && jsType value = "object" && not (jsIsArray value)
+
+    and validateJsNumber (value: obj) : Result<unit, JsFailure> =
+        if jsIsFinite value then
+            Ok()
         else
             Error JsFailure.InvalidReturnValue
 
-    and ofJsArray (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
-        result {
-            let! items =
-                [ 0 .. jsLength value - 1 ]
-                |> List.traverseResultM (fun index -> ofJsValue (jsGet value index))
+    and isPrimitiveTreeValue (value: obj) : bool =
+        let ty = jsType value
 
-            do! validateArray items
-            return LlmFacing.Data.Value.Array items
-        }
+        if ty = "boolean" || ty = "string" then
+            true
+        elif ty = "number" then
+            jsIsFinite value
+        elif jsIsArray value then
+            [ 0 .. jsLength value - 1 ]
+            |> List.forall (fun index -> isPrimitiveTreeValue (jsGet value index))
+        else
+            false
 
-    and ofJsObject (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
-        result {
-            let keys = jsKeys value
+    and validateAll (values: obj list) : Result<unit, JsFailure> =
+        match values with
+        | [] -> Ok()
+        | value :: rest -> validateJsValue value |> Result.bind (fun () -> validateAll rest)
 
-            let! fields =
-                [ 0 .. keys.Length - 1 ]
-                |> List.traverseResultM (fun index ->
-                    ofJsValue (jsGet value keys.[index])
-                    |> Result.map (fun item -> keys.[index], item))
+    and validateJsArray (value: obj) : Result<unit, JsFailure> =
+        let items = [ 0 .. jsLength value - 1 ] |> List.map (fun index -> jsGet value index)
 
-            return LlmFacing.Data.Value.Object fields
-        }
+        validateAll items
+        |> Result.bind (fun () ->
+            if List.isEmpty items then
+                Ok()
+            elif List.exists jsNull items then
+                Error JsFailure.InvalidReturnValue
+            elif List.forall isPlainObject items then
+                Ok()
+            elif List.forall isPrimitiveTreeValue items then
+                Ok()
+            else
+                Error JsFailure.InvalidReturnValue)
 
-    let parse (json: string) : Result<LlmFacing.Data.Value, JsFailure> =
+    and validateJsObject (value: obj) : Result<unit, JsFailure> =
+        let keys = jsKeys value
+
+        [ 0 .. keys.Length - 1 ]
+        |> List.map (fun index -> jsGet value keys.[index])
+        |> validateAll
+
+    let private validateParsed (value: obj) : Result<obj, JsFailure> =
+        validateJsValue value |> Result.map (fun () -> value)
+
+    let parse (json: string) : Result<obj, JsFailure> =
         try
-            ofJsValue (JS.JSON.parse json)
+            validateParsed (JS.JSON.parse json)
         with _ ->
             Error JsFailure.InvalidReturnValue
 
@@ -132,9 +113,9 @@ module JsToolsData =
 
     let isDelivered (json: string) = json.StartsWith deliveredPrefix
 
-    let private parseDelivered (json: string) : Result<LlmFacing.Data.Value, JsFailure> =
+    let private parseDelivered (json: string) : Result<obj, JsFailure> =
         try
-            ofJsValue ((JS.JSON.parse json)?value)
+            validateParsed ((JS.JSON.parse json)?value)
         with _ ->
             Error JsFailure.InvalidReturnValue
 
@@ -146,7 +127,7 @@ module JsToolsData =
             null
 
     /// One decode for both endings: a delivered value is the program's result.
-    let parseOutcome (json: string) : Result<LlmFacing.Data.Value, JsFailure> =
+    let parseOutcome (json: string) : Result<obj, JsFailure> =
         if isDelivered json then parseDelivered json else parse json
 
     /// Extract the payload from a parked sentinel JSON string. The sentinel is
@@ -176,7 +157,7 @@ module JsToolWorkflow =
     /// is registered under `handle` (PLAN S2 step 4).
     type JsToolOutcome =
         | Succeeded of
-            value: LlmFacing.Data.Value *
+            value: obj *
             rewritten: string list *
             created: string list *
             removed: string list *
@@ -195,6 +176,15 @@ module JsToolWorkflow =
     /// compare it structurally as a plain host-realm object.
     [<Emit("JSON.parse(JSON.stringify($0))")>]
     let private hostRealmPayload (payload: obj) : obj = jsNative
+
+    [<Emit("typeof $0 === 'string'")>]
+    let private isStringValue (value: obj) : bool = jsNative
+
+    /// The park signal wins the race by settling the host-synthesized marker
+    /// string; the workflow reads it back as the parked marker rather than a
+    /// program result.
+    let private isParkedSentinel (value: obj) : bool =
+        isStringValue value && (unbox<string> value).StartsWith "{\"__jsParked\":"
 
     let private rewrittenPaths (mutations: JsStagedMutation list) =
         mutations
@@ -293,11 +283,7 @@ module JsToolWorkflow =
         else
             None
 
-    let private recordDeliveredValueIfNeeded
-        sessionId
-        (json: string)
-        (parsed: Result<LlmFacing.Data.Value, JsFailure>)
-        =
+    let private recordDeliveredValueIfNeeded sessionId (json: string) (parsed: Result<obj, JsFailure>) =
         if JsToolsData.isDelivered json && Result.isOk parsed then
             JsDeliveredValues.record sessionId (JsToolsData.parseDeliveredValue json)
 
@@ -312,7 +298,7 @@ module JsToolWorkflow =
     let private settleExecutionOutcome
         (observation: Result<unit, JsFailure>)
         (ledgerOutcome: Result<unit, JsFailure>)
-        (value: LlmFacing.Data.Value)
+        (value: obj)
         (rewritten: string list)
         (created: string list)
         (removed: string list)
@@ -381,10 +367,7 @@ module JsToolWorkflow =
 
             Parked(newSite.Handle, hostRealmPayload newSite.RunHandle.ParkState.ParkPayload, source)
 
-    let private settleResumedExecutionOutcome
-        (ledgerOutcome: Result<unit, JsFailure>)
-        (value: LlmFacing.Data.Value)
-        : JsToolOutcome =
+    let private settleResumedExecutionOutcome (ledgerOutcome: Result<unit, JsFailure>) (value: obj) : JsToolOutcome =
         match ledgerOutcome with
         | Error failure -> Failed(failure, [], [], [], [])
         | Ok() -> Succeeded(value, [], [], [], [])
@@ -610,7 +593,7 @@ module JsToolWorkflow =
                     parsed
                 | Choice2Of2 _ ->
                     // Park won: the program suspended at `await js.park`.
-                    Ok(LlmFacing.Data.Value.String "{\"__jsParked\":true}")
+                    Ok(box "{\"__jsParked\":true}")
 
             let mutations = staging |> Seq.toList
             let rewritten = rewrittenPaths mutations
@@ -625,11 +608,6 @@ module JsToolWorkflow =
                 || Set.contains JsCapability.Write capabilities
                 || Set.contains JsCapability.Remove capabilities
                 || Set.contains JsCapability.Move capabilities
-
-            let isParkedSentinel (value: LlmFacing.Data.Value) =
-                match value with
-                | LlmFacing.Data.Value.String text -> text.StartsWith "{\"__jsParked\":"
-                | _ -> false
 
             match outcome with
             | Error failure ->
@@ -763,14 +741,9 @@ module JsToolWorkflow =
                         let! decoded = JsSandbox.awaitResult site.RunHandle outputBoundBytes
                         return decodeRunResult site.SessionId decoded
                     }
-                | Choice2Of2 _ -> task { return Ok(LlmFacing.Data.Value.String "{\"__jsParked\":true}") }
+                | Choice2Of2 _ -> task { return Ok(box "{\"__jsParked\":true}") }
 
             let! outcome = outcome
-
-            let isParkedSentinel (value: LlmFacing.Data.Value) =
-                match value with
-                | LlmFacing.Data.Value.String text -> text.StartsWith "{\"__jsParked\":"
-                | _ -> false
 
             match outcome with
             | Error failure ->
@@ -966,7 +939,7 @@ module JsToolsResult =
         | JsToolWorkflow.JsToolOutcome.Succeeded(value, rewritten, created, removed, moved) ->
             LlmFacing.instruction "ok"
             |> LlmFacing.withData (
-                LlmFacing.Data.structuredValue value
+                LlmFacing.Data.structuredValue (LlmFacing.Data.ofJs value)
                 @ LlmFacing.Data.fileEffects rewritten created removed moved
             )
             |> LlmFacing.render

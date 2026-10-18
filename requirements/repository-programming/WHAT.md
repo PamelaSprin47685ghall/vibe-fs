@@ -276,7 +276,7 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 
 ## [053] view 视图声明捕获
 
-每个生成的编程工具接受可选 `view` 参数 `{ prefixUntil, extra }`：捕获发生在工具调用时、进入下一次请求前，写入进程内 ANCHOR 现场表（context-compression [031]），被下一请求消费一次。缺失该参数时行为不变；`extra` 每项是锚点编号或散文值。参数描述由双语资源 `tool/js-program/view-declaration-extra` 提供。
+每个生成的编程工具接受可选 `view` 参数 `{ prefixUntil, thenRemove? }`：捕获发生在工具调用时、进入下一次请求前，写入进程内 ANCHOR 现场表（context-compression [031]），被下一请求消费一次。`prefixUntil` 必填且必须是锚点编号；`thenRemove` 是 `{ 锚点编号: 摘要 }` 映射，取代累计生效且不可撤销。声明形状非法（缺 `prefixUntil`、`prefixUntil` 不是编号、`thenRemove` 不是映射、键不是锚点编号、摘要为空或非字符串）时整次调用以 `VIEW_DECLARATION_INVALID` 失败：不执行程序，也不改动任何现场。缺失该参数时行为不变。参数描述由双语资源 `tool/js-program/view-declaration-extra` 提供。
 
 ## [054] deliver 显式终值
 

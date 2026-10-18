@@ -187,15 +187,17 @@ module JsToolSpec =
         let abandonSchema =
             ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
-        // ANCHOR next-turn view declaration (PLAN phase 3): prefixUntil keeps
-        // the context up to one anchor, extra re-adds referenced segments and
-        // prose values. Optional; consumed once by the next transform.
+        // ANCHOR view declaration (PLAN phase 3): prefixUntil protects the
+        // cache prefix and thenRemove replaces anchors with the model's own
+        // summaries for good. Optional; consumed once by the next transform.
+        // The bilingual resource states the whole contract.
         let viewSchema =
             ToolHostCodec.objectSchemaOf
-                [ "prefixUntil", ToolHostCodec.optionalNumberSchema factory
-                  "extra",
-                  ToolHostCodec.arraySchemaOf
-                      (ToolHostCodec.anySchema factory)
+                [ "prefixUntil", ToolHostCodec.numberSchema factory
+                  "thenRemove",
+                  ToolHostCodec.recordSchemaOf
+                      (ToolHostCodec.stringSchema factory)
+                      (ToolHostCodec.stringSchema factory)
                       (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
                       factory ]
                 factory
@@ -214,14 +216,23 @@ module JsToolSpec =
           Execute =
             fun args ctx ->
                 task {
-                    if not (isUndefined (args.Raw?view)) then
-                        Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId (args.Raw?view)
-
                     let input = inputOf args
 
                     let hasProgram = not (isNull (input?program))
 
-                    if not hasProgram && isNull (input?unpark) && isNull (input?abandon) then
+                    let viewFailure =
+                        match
+                            Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView
+                                ctx.SessionId
+                                (args.Raw?view)
+                        with
+                        | Ok() -> None
+                        | Error failure -> Some failure
+
+                    match viewFailure with
+                    | Some failure ->
+                        return JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
+                    | None when not hasProgram && isNull (input?unpark) && isNull (input?abandon) ->
                         return
                             ToolHostCodec.tomlObject
                                 [ "error",
@@ -230,7 +241,7 @@ module JsToolSpec =
                                           ProviderLanguageBinding.readGlobalPreference ()
                                       )
                                   ) ]
-                    else
+                    | None ->
                         // 10 s sandbox deadline; 1 MiB output bound (JS-054).
                         let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
 

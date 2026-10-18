@@ -6,9 +6,9 @@ open Wanxiangshu.Repository.Programming.Js
 
 /// Parse the sandbox JSON string into LlmFacing reference data and enforce JS-010.
 module JsToolsData =
-    val parse: json: string -> Result<LlmFacing.Data.Value, JsFailure>
+    val parse: json: string -> Result<obj, JsFailure>
     val isDelivered: json: string -> bool
-    val parseOutcome: json: string -> Result<LlmFacing.Data.Value, JsFailure>
+    val parseOutcome: json: string -> Result<obj, JsFailure>
     val parseDeliveredValue: json: string -> obj
     val parseParkedPayload: json: string -> obj
 
@@ -27,7 +27,7 @@ module JsToolWorkflow =
     [<RequireQualifiedAccess>]
     type JsToolOutcome =
         | Succeeded of
-            value: LlmFacing.Data.Value *
+            value: obj *
             rewritten: string list *
             created: string list *
             removed: string list *

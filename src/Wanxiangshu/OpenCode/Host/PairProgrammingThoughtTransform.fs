@@ -1317,6 +1317,7 @@ module PairProgrammingThoughtTransform =
         (journal: AgentJournal option)
         (projectionSessionIdOpt: string option)
         (elapsed: string option)
+        (state: string option list)
         (toolEstimate: string option)
         (guideline: string)
         (restartGuidance: string option)
@@ -1350,7 +1351,7 @@ module PairProgrammingThoughtTransform =
                     [ ProviderProse.render language ParkedHintPath (Map [ "handles", String.Join(", ", parkedHandles) ]) ]
 
             let document =
-                PairProgrammingCalibration.documentWithElapsed guidance elapsed toolEstimate guideline
+                PairProgrammingCalibration.documentWithState guidance elapsed state toolEstimate guideline
                 |> LlmFacing.withInstructions parkedHint
                 |> withRestartGuidance restartGuidance
 
@@ -1391,17 +1392,29 @@ module PairProgrammingThoughtTransform =
             ProviderWireDecode.hostMessageId raw
             |> Option.iter (fun messageId -> AnchorLedger.numberMessage sessionId messageId |> ignore)
 
-    let private formatPrefixUntil (prefixUntil: int option) : string =
-        match prefixUntil with
-        | Some value -> string value
-        | None -> "all"
+    let private hashText (anchors: int list) : string =
+        anchors |> List.map (sprintf "#%d") |> String.concat ", "
 
+    /// A replaced anchor's row stands in the request as the model's summary.
+    /// The replacement is not an anchor: it carries a derived id and is marked
+    /// synthetic, so it can never be addressed by a later declaration — which
+    /// is exactly why a later replacement swallows it.
+    [<Emit("({ info: { ...$0.info, id: (($0.info && $0.info.id) ? $0.info.id : ($0.id || 'anchor')) + '#summary', synthetic: true, source: 'anchor-summary' }, parts: [{ type: 'text', text: $1 }] })")>]
+    let private summarizedMessage (raw: obj) (summary: string) : obj = jsNative
+
+    /// Selection applies on every request: a consumed declaration states this
+    /// turn's statement (protected prefix, new summaries), while the summaries
+    /// already recorded are permanent and outlive the declaration that made them.
     let private applyDeclaredAnchorView
         (sessionId: string)
         (messages: obj list)
         (mapLines: string list)
-        (declaration: AnchorViewDeclaration)
+        (declaration: AnchorViewDeclaration option)
+        (replaced: Map<int, string>)
         : obj list * string option =
+        let effective =
+            declaration |> Option.defaultValue { PrefixUntil = 0; ThenRemove = [] }
+
         let inputs =
             messages
             |> List.map (fun raw ->
@@ -1409,47 +1422,63 @@ module PairProgrammingThoughtTransform =
                   AnchorView.AnchorMessage.Text = wireTextOf raw
                   AnchorView.AnchorMessage.Raw = raw })
 
-        let survivors, report =
-            AnchorView.apply (AnchorLedger.numberMessage sessionId) AnchorSurface.countTokens declaration inputs
+        let entries, report =
+            AnchorView.apply (AnchorLedger.numberMessage sessionId) AnchorSurface.countTokens replaced effective inputs
 
-        let prefixText = formatPrefixUntil declaration.PrefixUntil
-
-        let extraText =
-            declaration.Extra
+        let projected =
+            entries
             |> List.map (function
-                | AnchorExtra.Anchor anchor -> sprintf "#%d" anchor
-                | AnchorExtra.Prose text -> text)
-            |> String.concat ", "
+                | AnchorView.Kept message -> message.Raw
+                | AnchorView.Summarized(message, summary) -> summarizedMessage message.Raw summary)
+
+        let declaredLines =
+            declaration
+            |> Option.map (fun view ->
+                [ sprintf
+                      "ANCHOR view applied: prefixUntil=%d; thenRemove=[%s]"
+                      view.PrefixUntil
+                      (view.ThenRemove |> List.map fst |> hashText)
+                  sprintf
+                      "this request: kept=%d summarized=%d folded=%d tokens total=%d used=%d cached=%d (anchors below prefixUntil survive in the cache prefix at a fraction of the price; everything else is recomputed every turn)"
+                      report.Kept
+                      report.Summarized
+                      report.Folded
+                      report.Total
+                      report.Used
+                      report.Cached ])
+            |> Option.defaultValue []
+
+        let replacedLines =
+            if Map.isEmpty replaced then
+                []
+            else
+                [ sprintf
+                      "summaries stand in for anchors [%s] for the rest of this session and are no longer anchors; replacing an earlier anchor folds them in"
+                      (hashText report.Replaced) ]
 
         let block =
-            [ "ANCHOR view applied: prefixUntil=" + prefixText + "; extra=[" + extraText + "]"
-              sprintf
-                  "token economy: total=%d used=%d cached=%d (prefix survives in the cache prefix; extras are recomputed)"
-                  report.Total
-                  report.Used
-                  report.Cached ]
-            @ report.ExtraProse
+            declaredLines
+            @ replacedLines
             @ (if List.isEmpty mapLines then
                    []
                else
-                   "ANCHOR map:" :: mapLines)
+                   "ANCHOR map (reference these numbers in a js- tool's view declaration):"
+                   :: mapLines)
 
-        survivors |> List.map (fun message -> message.Raw), Some(String.concat "\n" block)
+        projected, Some(String.concat "\n" block)
 
     let private resolveAnchorView
         (sessionId: string)
         (messages: obj list)
         (mapLines: string list)
         : obj list * string option =
-        match AnchorLedger.takeView sessionId, List.isEmpty mapLines with
-        | None, true -> messages, None
-        | None, false ->
-            messages,
-            Some(
-                "ANCHOR map (reference these numbers in a js- tool's view declaration):\n"
-                + String.concat "\n" mapLines
-            )
-        | Some declaration, _ -> applyDeclaredAnchorView sessionId messages mapLines declaration
+        let declaration = AnchorLedger.takeView sessionId
+        let replaced = AnchorLedger.replacements sessionId
+
+        if declaration.IsNone && Map.isEmpty replaced && List.isEmpty mapLines then
+            messages, None
+        else
+            applyDeclaredAnchorView sessionId messages mapLines declaration replaced
 
     let private applyAnchorView
         (projectionSessionIdOpt: string option)
@@ -1461,7 +1490,10 @@ module PairProgrammingThoughtTransform =
             numberHostMessages sessionId messages
 
             let mapLines =
+                let replaced = AnchorLedger.replacements sessionId
+
                 AnchorLedger.anchors sessionId
+                |> List.filter (fun (anchor, _) -> not (Map.containsKey anchor replaced))
                 |> List.rev
                 |> List.truncate 20
                 |> List.rev
@@ -1514,6 +1546,17 @@ module PairProgrammingThoughtTransform =
         task {
             let messages = unbox<obj array> outObj?messages |> Array.toList
 
+            let tokenEconomy =
+                projectionSessionIdOpt
+                |> Option.bind ProviderTokenUse.tryFind
+                |> Option.map (fun usage ->
+                    PairProgrammingCalibration.renderTokenEconomy language usage.Cached usage.Uncached)
+
+            let contextLimit =
+                projectionSessionIdOpt
+                |> Option.bind DeclaredContextLimit.tryFind
+                |> Option.map (PairProgrammingCalibration.renderContextLimit language)
+
             let messages, anchorBlock = applyAnchorView projectionSessionIdOpt messages
 
             let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
@@ -1527,7 +1570,14 @@ module PairProgrammingThoughtTransform =
             let toolEstimate = toolEstimateText journal projectionSessionIdOpt language
 
             let! markerDocument =
-                composeMarkerDocument journal projectionSessionIdOpt elapsed toolEstimate guideline restartGuidance
+                composeMarkerDocument
+                    journal
+                    projectionSessionIdOpt
+                    elapsed
+                    [ tokenEconomy; contextLimit ]
+                    toolEstimate
+                    guideline
+                    restartGuidance
 
             let markerDocument =
                 match anchorBlock with

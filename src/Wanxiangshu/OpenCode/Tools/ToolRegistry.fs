@@ -863,8 +863,12 @@ module ToolRegistry =
 
         let executeJsPlanTool (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
             task {
-                if not (isNull (args.Raw?view)) then
-                    Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId (args.Raw?view)
+                let viewFailure =
+                    match
+                        Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId (args.Raw?view)
+                    with
+                    | Ok() -> None
+                    | Error failure -> Some failure
 
                 let program = args.OptionalText "program"
 
@@ -872,9 +876,11 @@ module ToolRegistry =
 
                 let abandon = if isNull (args.Raw?abandon) then null else args.Raw?abandon
 
-                match program, unpark, abandon with
-                | Some source, _, _ -> return! executePlanProgramRoute planRoot ctx source
-                | None, unparkValue, _ when not (isNull unparkValue) ->
+                match viewFailure, program, unpark, abandon with
+                | Some failure, _, _, _ ->
+                    return JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
+                | None, Some source, _, _ -> return! executePlanProgramRoute planRoot ctx source
+                | None, None, unparkValue, _ when not (isNull unparkValue) ->
                     let! outcome =
                         JsToolWorkflow.resumeParked
                             (string (unparkValue?handle))
@@ -884,7 +890,7 @@ module ToolRegistry =
                             planOutputBoundBytes
 
                     return JsToolsResult.render outcome
-                | None, _, abandonValue when not (isNull abandonValue) ->
+                | None, None, _, abandonValue when not (isNull abandonValue) ->
                     let! outcome =
                         JsToolWorkflow.abandonParked (string (abandonValue?handle)) planDeadlineMs planOutputBoundBytes
 
@@ -1256,13 +1262,17 @@ module ToolRegistry =
                 ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
             // ANCHOR handover view (context-compression [031]): a retiring
-            // tenure declares what the successor request must keep.
+            // tenure declares what the successor request must keep. Same
+            // contract as the generated surfaces: prefixUntil protects the
+            // cache prefix, thenRemove replaces anchors with the tenure's own
+            // summaries for good.
             let planViewSchema =
                 ToolHostCodec.objectSchemaOf
-                    [ "prefixUntil", ToolHostCodec.optionalNumberSchema factory
-                      "extra",
-                      ToolHostCodec.arraySchemaOf
-                          (ToolHostCodec.anySchema factory)
+                    [ "prefixUntil", ToolHostCodec.numberSchema factory
+                      "thenRemove",
+                      ToolHostCodec.recordSchemaOf
+                          (ToolHostCodec.stringSchema factory)
+                          (ToolHostCodec.stringSchema factory)
                           (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
                           factory ]
                     factory

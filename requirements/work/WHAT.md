@@ -62,7 +62,7 @@ sequence 为 S4 时，deliver 是两次调用。第一次只落确认。另一�
 
 后继不保留完整物理历史。义务是剥除前任 assistant 与 tool。后继通过用户原文 `U`、本任交互、持久化账本与前任声明的 ANCHOR 视图（durable checkpoint + `extra`）承接交棒，不注入机器物化的 `LWR_prev`。
 
-- 允许后果：稳定消息身份的首次观察序晚于本任 OpeningCursor 才留。比较单位是 XTrace 观察序。后继接收用户原文 `U`、本任物理交互、持久化账本与前任声明的视图（`ViewCheckpointCommitted` + `view.extra`）；首任与非首任一律不生成合成记录、不物化 `LWR_prev`。ProjectionCut 只判定退休尝试的请求身份，不当成新任的活跃请求，也不拿来过滤历史。不生成合成消息，不概括前任。
+- 允许后果：稳定消息身份的首次观察序晚于本任 OpeningCursor 才留。比较单位是 XTrace 观察序。后继接收用户原文 `U`、本任物理交互、持久化账本与前任声明的视图（`ViewCheckpointCommitted` 与前任在 `view` 里声明的 `thenRemove` 摘要）；首任与非首任一律不生成合成记录、不物化 `LWR_prev`。ProjectionCut 只判定退休尝试的请求身份，不当成新任的活跃请求，也不拿来过滤历史。不生成合成消息，不概括前任。
 - 禁止后果：不得把完整物理历史写成现行义务。不得把前任 assistant 与 tool 留在后继消息集里。不得注入机器物化的 `LWR_prev` 合成消息。不得把旧日志字节翻译成新事件再注入。
 - 失败后果：无稳定身份时拒绝装配，不猜测。
 
@@ -159,7 +159,7 @@ S4 第一次调用只确认。第二次调用依持久退休结果分流：Relay
 
 当 Plan 模式会话被初始化或任期推进时，系统为该任期装配输入。
 
-- 允许后果：跑者接收本规划任务范围内的全部真实用户输入原文（`U`）、本任期的交互、持久化账本与前任在编程面声明的 ANCHOR 视图（durable `ViewCheckpointCommitted` 与 `view.extra`），以及通过编程面读写的 Markdown 伪文件（`P`）；系统不生成合成工作记录，不做机器物化的 `LWR_prev` 注入。
+- 允许后果：跑者接收本规划任务范围内的全部真实用户输入原文（`U`）、本任期的交互、持久化账本与前任在编程面声明的 ANCHOR 视图（durable `ViewCheckpointCommitted` 与 `view.thenRemove` 摘要），以及通过编程面读写的 Markdown 伪文件（`P`）；系统不生成合成工作记录，不做机器物化的 `LWR_prev` 注入。
 - 禁止后果：模型不得直接读写或篡改 `U`。系统不得向消息集注入合成 `LWR_prev` 记录。`P` 不得作为文本直接注入模型输入消息集。模型不得取得任何超出 `P` 之外的仓库或工作区写权限。
 - 失败后果：若输入集合包含未经任期剥除的上下文或遗漏必需事实，系统必须在消息投影阶段拒绝生成请求并终止本次调用。
 
@@ -314,7 +314,7 @@ work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规�
 - 允许后果：先以稳定 Host 消息及 part 身份捕获本次请求中新观察到的真实交互，再按原消息顺序执行任期过滤：
   1. 当前规划任务因果范围内的全部真实用户输入原文（U）完整保留；
   2. 保留本任期真实 assistant 与 tool 交互，不把用户回答移动到它所回答的 assistant 或工具交互之前；
-  3. 交棒由前任在 `todowrite-for-plan` 声明的 ANCHOR `view`（durable `ViewCheckpointCommitted` + `view.extra`）承担，装配阶段不生成合成记录、不注入机器物化的 `LWR_prev`。
+  3. 交棒由前任在 `todowrite-for-plan` 声明的 ANCHOR `view`（durable `ViewCheckpointCommitted` + `view.thenRemove` 摘要）承担，装配阶段不生成合成记录、不注入机器物化的 `LWR_prev`。
   `openingCursor` 表示已消费到的边界。物理消息的任期归属取其稳定身份在 XTrace 中的首次观察游标，跨前缀 epoch 不变；后续追加的 part 或重锚后的重复捕获不得把旧消息变成新任消息。工具调用及结果按完整物理交互保留或剥除，不切半。
   每个任期的首条请求按持久化的 `TenureReanchored` 事实触发一次前缀重锚（reanchorRequested = true）；必须等待该事实提交后才继续请求组装。重复请求、空停后的追问和进程重启不得为同一任期重复重锚。
 - 禁止后果：上一任期及更早任期的全部 assistant 消息与 tool 消息以及任何合成记录行必须全部剥除，不得进入消息集；严禁注入机器物化的 `LWR_prev`。规划底稿 P 的正文严禁直接拼装入消息集。用户消息 U 严禁压缩、重排、重编码或篡改。禁止依赖 Host 消息上并不存在的 `cursor` 字段；缺少稳定归属证据时，禁止静默删除交互或放行旧交互。对于非 Plan 角色或无活跃任期的普通会话，严禁触发隔离与剥除。

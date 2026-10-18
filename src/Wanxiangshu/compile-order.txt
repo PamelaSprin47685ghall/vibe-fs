@@ -1034,6 +1034,10 @@ OpenCode/Host/MessageVisibility.fsi
 OpenCode/Host/MessageVisibility.fs
 OpenCode/Host/MessageVisibilitySurface.fsi
 OpenCode/Host/MessageVisibilitySurface.fs
+OpenCode/Host/ProviderTokenUse.fsi
+OpenCode/Host/ProviderTokenUse.fs
+OpenCode/Host/DeclaredContextLimit.fsi
+OpenCode/Host/DeclaredContextLimit.fs
 Enforcer/Guidance/Tip.fsi
 Enforcer/Guidance/Tip.fs
 OpenCode/Host/PairProgrammingThoughtTransform.fsi

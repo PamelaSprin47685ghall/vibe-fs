@@ -37,6 +37,6 @@ test('WHAT[attention-regulation-003] defer is retired from tool registration, Pa
 
   const viewExtraEn = read('resources/provider/tool/js-program/view-declaration-extra/en.md')
   const viewExtraZh = read('resources/provider/tool/js-program/view-declaration-extra/zh-CN.md')
-  assert.match(viewExtraEn, /prose value/)
-  assert.match(viewExtraZh, /散文值/)
+  assert.match(viewExtraEn, /summary/)
+  assert.match(viewExtraZh, /摘要/)
 })

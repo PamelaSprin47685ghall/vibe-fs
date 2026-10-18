@@ -42,4 +42,4 @@ guidance 随结对指引，以 NUL+BOM 分隔后附在真实终端工具结果�
 
 ## [012] 新 occurrence 的动态材料
 
-新 occurrence 合成 latest tip guidance、session elapsed、remaining expected tool calls，以及待交付的 concern 订阅公告或邮箱消息。各动态材料只从所属 O(1) 投影读取一次；最终 MarkerText 原子持久化后冻结，重放不重新渲染或消费动态材料。
+新 occurrence 合成 latest tip guidance、session elapsed、remaining expected tool calls、模型自身状态的两个 datum——上一轮请求的 token 经济（provider 实际计费的缓存命中 token 数与重新计算 token 数，取自宿主 `message.updated` 事件里 assistant 的 `tokens`）与 provider 声明的 context limit（取自 chat.params 处解析出的模型 `limit.context`，见 context-compression [001]）——以及待交付的 concern 订阅公告或邮箱消息。各动态材料只从所属 O(1) 投影读取一次；最终 MarkerText 原子持久化后冻结，重放不重新渲染或消费动态材料。

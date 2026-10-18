@@ -14,6 +14,12 @@ module PairProgrammingCalibration =
     [<Literal>]
     let ElapsedPath = "host/pair-programming-elapsed"
 
+    [<Literal>]
+    let TokenEconomyPath = "host/pair-programming-token-economy"
+
+    [<Literal>]
+    let ContextLimitPath = "host/pair-programming-context-limit"
+
     let private nonBlank (value: string option) =
         value
         |> Option.map (fun text -> text.Trim())
@@ -27,6 +33,12 @@ module PairProgrammingCalibration =
 
     let documentWithElapsed tip elapsed toolEstimate guideline =
         LlmFacing.instructions (instructionTexts [ tip; elapsed; toolEstimate; Some guideline ])
+
+    /// The per-round Pair Hint, including the state fragments the model needs
+    /// to price its own view declarations: last round's token economy as the
+    /// provider billed it, and the declared context limit.
+    let documentWithState tip elapsed state toolEstimate guideline =
+        LlmFacing.instructions (instructionTexts (tip :: elapsed :: (state @ [ toolEstimate; Some guideline ])))
 
     let compose tip toolEstimate guideline =
         document tip toolEstimate guideline |> LlmFacing.render
@@ -56,3 +68,11 @@ module PairProgrammingCalibration =
 
     let renderElapsed language elapsedMilliseconds =
         ProviderProse.render language ElapsedPath (Map [ "elapsed", elapsedLabel language elapsedMilliseconds ])
+
+    /// Last request's own accounting, as the provider reported it: the tokens
+    /// it served from the cache prefix, and the tokens it recomputed.
+    let renderTokenEconomy language (cached: int) (uncached: int) =
+        ProviderProse.render language TokenEconomyPath (Map [ "cached", string cached; "uncached", string uncached ])
+
+    let renderContextLimit language (limit: int) =
+        ProviderProse.render language ContextLimitPath (Map [ "limit", string limit ])

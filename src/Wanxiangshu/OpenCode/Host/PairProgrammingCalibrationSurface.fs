@@ -33,3 +33,12 @@ module PairProgrammingCalibrationSurface =
 
     let renderElapsed (language: string) (elapsedMilliseconds: obj) : string =
         PairProgrammingCalibration.renderElapsed (languageOf language) (float (string elapsedMilliseconds))
+
+    let renderTokenEconomy (language: string) (cached: obj) (uncached: obj) : string =
+        PairProgrammingCalibration.renderTokenEconomy
+            (languageOf language)
+            (int (string cached))
+            (int (string uncached))
+
+    let renderContextLimit (language: string) (limit: obj) : string =
+        PairProgrammingCalibration.renderContextLimit (languageOf language) (int (string limit))

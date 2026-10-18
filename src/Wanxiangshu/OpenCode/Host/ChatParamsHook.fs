@@ -131,6 +131,26 @@ module ChatParamsHook =
                   PhysicalUserMessageId = physical }
         | _ -> None
 
+    /// context-compression [001]: the context limit is the provider's own
+    /// declaration for this model, read off the resolved model opencode hands
+    /// over here — not a size derived from our own measurements. It is
+    /// disclosed to the model as one datum about its state; nothing predicts
+    /// overflow from it.
+    let private declaredContextLimit (input: obj) : int option =
+        let model = if isNull input then null else input?model
+        let limit = if isNull model then null else model?limit
+        let context = if isNull limit then null else limit?context
+
+        if emitJsExpr context "typeof $0 === 'number' && Number.isFinite($0) && $0 > 0" then
+            Some(int (unbox<float> context))
+        else
+            None
+
+    let private recordDeclaredLimit (input: obj) =
+        match trySessionId input, declaredContextLimit input with
+        | Some sessionId, Some limit -> DeclaredContextLimit.record (SessionId.value sessionId) limit
+        | _ -> ()
+
     /// Managed-ness is durable evidence: only a message this plugin durably
     /// accepted is a managed provider run. Such a run must hold the exact
     /// committed lease for its own physical message, or the observation fails
@@ -170,6 +190,7 @@ module ChatParamsHook =
         | _ -> ()
 
     let private handleInput (journal: AgentJournal option) (input: obj) (output: obj) =
+        recordDeclaredLimit input
         applyManagedPolicy journal input output
 
     let createWith (journal: AgentJournal option) : obj =

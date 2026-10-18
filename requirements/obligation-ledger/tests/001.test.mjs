@@ -93,7 +93,7 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a n
               status: 'completed',
               input: {
                 program: 'class Js extends JsProgram { async run() { return 1; } }',
-                view: { prefixUntil: 2, extra: ['keep anchor 2'] },
+                view: { prefixUntil: 2, thenRemove: { 4: 'keep anchor 2' } },
               },
             },
           },

@@ -76,6 +76,7 @@ type JsFailure =
     | RunHostUnavailable
     | AskRefused of string
     | DelegationUnavailable
+    | ViewDeclarationInvalid of string
 
 module JsFailure =
 
@@ -145,6 +146,7 @@ module JsFailure =
         | JsFailure.RunHostUnavailable -> "RUN_HOST_UNAVAILABLE"
         | JsFailure.AskRefused _ -> "ASK_REFUSED"
         | JsFailure.DelegationUnavailable -> "DELEGATION_UNAVAILABLE"
+        | JsFailure.ViewDeclarationInvalid _ -> "VIEW_DECLARATION_INVALID"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
     let private reasonWithMessage fallback prefix message =
@@ -209,6 +211,8 @@ module JsFailure =
         | JsFailure.RunHostUnavailable -> "js.run has no host loop in this execution path"
         | JsFailure.AskRefused detail -> reasonWithMessage "ask was refused" "" detail
         | JsFailure.DelegationUnavailable -> "fork/join is not wired in this execution path"
+        | JsFailure.ViewDeclarationInvalid detail ->
+            reasonWithMessage "view declaration is invalid" "view declaration is invalid: " detail
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
     let render (failure: JsFailure) : string =
@@ -278,4 +282,5 @@ module JsFailure =
         | "RUN_HOST_UNAVAILABLE" -> JsFailure.RunHostUnavailable
         | "ASK_REFUSED" -> JsFailure.AskRefused text
         | "DELEGATION_UNAVAILABLE" -> JsFailure.DelegationUnavailable
+        | "VIEW_DECLARATION_INVALID" -> JsFailure.ViewDeclarationInvalid text
         | _ -> JsFailure.ProgramFailed text
