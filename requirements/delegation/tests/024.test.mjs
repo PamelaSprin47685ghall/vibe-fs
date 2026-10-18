@@ -62,8 +62,6 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
-    await forkTool.captureOwnerOpening(runtime, owner, 'ROOT-OPENING-MARKER')
-
     const first = forkTool.executeManagerFork(
       runtime,
       toolModule,
@@ -78,12 +76,9 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
     const child = forkTool.child(runtime)
     assert.notEqual(child, null)
     assert.match(forkTool.prompt(runtime, 0), /FIRST-FORK-CHARGE/)
-    assert.match(forkTool.prompt(runtime, 0), /ROOT-OPENING-MARKER/)
     assert.match(await first, /Ada/)
 
     assert.equal(await forkTool.settle(runtime, owner, 'FIRST-FORK-ANSWER', 'fork-run-1'), true)
-
-    await forkTool.captureOwnerDeltaPart(runtime, owner, 'PARENT-FRESH-DELTA-MARKER', 'parent-run-2')
 
     const second = forkTool.executeManagerResume(
       runtime,
@@ -101,9 +96,6 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
 
     const secondPrompt = forkTool.prompt(runtime, 1)
     assert.match(secondPrompt, /SECOND-FORK-CHARGE/)
-    assert.match(secondPrompt, /commissioner_record\s*=/)
-    assert.match(secondPrompt, /PARENT-FRESH-DELTA-MARKER/)
-    assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
 
     const secondResult = await second
     assert.match(secondResult, /Ada/)
@@ -133,16 +125,6 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const handoff = await import("../../../dist/Execution/Delegation/HandoffSurface.js");
 
-
-test('WHAT[delegation-024] reusable handoff advances one durable parent delta window at a time', () => {
-  const first = handoff.handoffWindow(null, 10)
-  assert.deepEqual(first, { start: 0, end: 10, isInitial: true })
-
-  const second = handoff.handoffWindow(10, 17)
-  assert.deepEqual(second, { start: 10, end: 17, isInitial: false })
-
-  assert.deepEqual(handoff.handoffWindow(17, 17), { start: 17, end: 17, isInitial: false })
-})
 test('WHAT[delegation-024] bounded child result never widens to an earlier invocation', () => {
   assert.deepEqual(handoff.childRange(31, 44), { start: 31, end: 44 })
 })
@@ -178,12 +160,9 @@ const verifyReusableHandoff = async (role) => {
   const owner = `owner-handoff-${role.toLowerCase()}`
   const h = await live(owner)
   try {
-    await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
-
     const first = sync.invoke(h, owner, role, 'FIRST-CHARGE')
     await waitForPromptCount(h, owner, role, 1)
-    assert.equal(sync.handoffFrontier(h, owner, role), null)
-    assert.match(sync.prompt(h, owner, role, 0), /ROOT-OPENING-MARKER/)
+    assert.match(sync.prompt(h, owner, role, 0), /FIRST-CHARGE/)
     assert.match(
       sync.prompt(h, owner, role, 0),
       /closing report/,
@@ -194,19 +173,11 @@ const verifyReusableHandoff = async (role) => {
     const firstResult = await first
     assert.equal(firstResult.ok, true)
     assert.match(firstResult.value, /FIRST-ANSWER/)
-    const firstFrontier = sync.handoffFrontier(h, owner, role)
-    assert.notEqual(firstFrontier, null)
-
-    await sync.captureOwnerDeltaPart(h, owner, 'PARENT-DELTA-ONLY-MARKER', 'parent-run-2')
 
     const second = sync.invoke(h, owner, role, 'SECOND-CHARGE')
     await waitForPromptCount(h, owner, role, 2)
     const secondPrompt = sync.prompt(h, owner, role, 1)
     assert.match(secondPrompt, /SECOND-CHARGE/)
-    assert.match(secondPrompt, /commissioner_record\s*=/)
-    assert.match(secondPrompt, /PARENT-DELTA-ONLY-MARKER/)
-    assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
-    assert.equal(sync.handoffFrontier(h, owner, role), firstFrontier)
 
     assert.equal(
       await sync.settleWithAuthorityRoot(h, owner, role, 'STALE-ANSWER', 'run-stale', 'old-authority-root'),
@@ -219,7 +190,6 @@ const verifyReusableHandoff = async (role) => {
     assert.equal(secondResult.ok, true)
     assert.match(secondResult.value, /SECOND-ANSWER/)
     assert.doesNotMatch(secondResult.value, /FIRST-ANSWER/)
-    assert.notEqual(sync.handoffFrontier(h, owner, role), firstFrontier)
     assert.equal(sync.childCount(h), 1)
   } finally { sync.dispose(h) }
 }

@@ -149,15 +149,15 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       await acceptAuthorityRoot(runtime, sessionID, 'manager')
       await openIncumbency(runtime, sessionID)
       const produce = async (ordinal, output) => {
-        writeFileSync(sourcePath, output)
-        const args = { filePath: sourcePath }
-        const input = { tool: 'read', sessionID, callID: `call-${ordinal}` }
+        writeFileSync(sourcePath, `covered-${ordinal}\n`)
+        const args = { program: "class Js extends JsProgram { async run() { await this.cat('src/main.fs'); return { ok: true }; } }" }
+        const input = { tool: 'todowrite-for-manager', sessionID, callID: `call-${ordinal}` }
         await hooks['tool.execute.before'](input, { args })
-        const actual = readFileSync(sourcePath, 'utf8')
-        await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output: actual, metadata: {} })
+        await hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
+        await hooks['tool.execute.after']({ ...input, args }, { title: 'todowrite-for-manager', output, metadata: {} })
         return { info: { id: `result-${ordinal}`, role: 'assistant', sessionID, providerID },
-          parts: [{ id: `part-${ordinal}`, type: 'tool', tool: 'read', callID: input.callID,
-            state: { status: 'completed', input: args, output: actual, time: { start: 0, end: 1 } } }] }
+          parts: [{ id: `part-${ordinal}`, type: 'tool', tool: 'todowrite-for-manager', callID: input.callID,
+            state: { status: 'completed', input: args, output, time: { start: 0, end: 1 } } }] }
       }
       const seed = await produce('seed', 'seed source\n')
       await hooks['experimental.chat.messages.transform']({}, { messages: [structuredClone(seed)] })
@@ -223,13 +223,14 @@ test('WHAT[requirement-grounding-007] missing physical part IDs bind only to exa
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
     const produce = async (ordinal, body) => {
-      writeFileSync(sourcePath, body)
-      const args = { filePath: sourcePath }
-      const input = { tool: 'read', sessionID, callID: `missing-part-call-${ordinal}` }
+      writeFileSync(sourcePath, `covered-${ordinal}\n`)
+      const args = { program: "class Js extends JsProgram { async run() { await this.cat('src/main.fs'); return { ok: true }; } }" }
+      const input = { tool: 'todowrite-for-manager', sessionID, callID: `missing-part-call-${ordinal}` }
       await hooks['tool.execute.before'](input, { args })
-      await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output: body, metadata: {} })
+      await hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
+      await hooks['tool.execute.after']({ ...input, args }, { title: 'todowrite-for-manager', output: body, metadata: {} })
       return { info: { id: `missing-part-result-${ordinal}`, role: 'assistant', sessionID, providerID: 'anthropic' },
-        parts: [{ type: 'tool', tool: 'read', callID: input.callID,
+        parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: input.callID,
           state: { status: 'completed', input: args, output: body, time: { start: 0, end: 1 } } }] }
     }
     const first = await produce('first', 'first physical result\r\n')
@@ -461,7 +462,7 @@ for (const damage of ['missing', 'changed']) {
 }
 
 for (const providerID of ['anthropic', 'cursor', 'openai']) {
-  test(`WHAT[requirement-grounding-007] registered native hook and actual JS read preserve original material bytes for ${providerID}`, async t => {
+  test(`WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for ${providerID}`, async t => {
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
       mkdirSync(join(directory, 'requirements', 'alpha'), { recursive: true })
       mkdirSync(join(directory, 'src'), { recursive: true })
@@ -470,7 +471,7 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
       for (const [name, body] of originalMaterials) {
         writeFileSync(join(directory, 'requirements', 'alpha', 'WHAT.md'), body)
-        for (const tool of ['read', 'todowrite-for-manager']) {
+        for (const tool of ['todowrite-for-manager']) {
           await t.test(`WHAT[requirement-grounding-007] ${providerID} ${tool} ${name} exact content carrier and canonical history`, async () => {
             const sessionID = `original-${providerID}-${tool}-${name}`
             if (tool === 'todowrite-for-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')

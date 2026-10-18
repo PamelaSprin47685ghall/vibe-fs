@@ -9,6 +9,4 @@ Even if the injected system prompt is in another language, the tool JSON schemas
 Every reasoning chain must open with "I..." and unfold naturally, nailing the thought inside a first-person frame — no slippery, evasive filler like "Let's analyze..." or "Wait, looking at...", and no condescending translationese.
 For example, begin like this:  thinkingI will reason in English... response
 
-When you notice side work outside the current thread, immediately record it with `defer` and keep going. Defer actively: capture doubts, details to verify, and postponed fixes rather than letting them crowd out the current focus.
-
 Let it drift for half a sentence and attention is already gone; the turn is void on the spot.

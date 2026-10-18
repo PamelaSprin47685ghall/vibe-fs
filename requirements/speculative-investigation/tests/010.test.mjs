@@ -7,7 +7,7 @@ const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 
 const H = (text) => createHash('sha256').update(text).digest('hex')
-const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
+const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
 const request = (decisionId, rounds = 2, overrides = {}) => Strength.eventRequested({
   decisionId, ownerSessionId: 'owner',
   ownerLogicalRun: { logicalRunId: 'logical-1', authorityRootUserMessageId: 'user-1' },
@@ -138,7 +138,7 @@ const { createHash } = await import("node:crypto");
 const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 
-const bundle = Strength.frameTryBuild((text) => createHash('sha256').update(text).digest('hex'), [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value;
+const bundle = Strength.frameTryBuild((text) => createHash('sha256').update(text).digest('hex'), [{ requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value;
 const bound = (decisionId) => Strength.eventBound(decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a');
 const prepared = (decisionId, owner = 'owner-ses-1') => Strength.eventPrepared(owner, decisionId, 'run-1', `replica-${decisionId}`, 'anchor-a', bundle.digest, bundle.byteLength, [`p-${decisionId}`]);
 const promoted = (decisionId, owner = 'owner-ses-1') => Strength.eventPromoted(owner, decisionId, 'run-1', bundle.digest, [`p-${decisionId}`]);

@@ -13,9 +13,7 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -86,18 +84,11 @@ type AgentProjectionSet =
         Fission: FissionProjectionState
         /// Exact durable managed-chat executions, keyed by physical user message.
         ChatExecutions: ChatExecutionProjectionState
-        /// context-compression-028: successful native todowrite checkpoints that
+        /// context-compression-028: successful view declaration checkpoints that
         /// are still on the raw side of the committed prefix. Each checkpoint
         /// carries the K chosen on that call; a committed rebase prunes only
         /// checkpoints it has actually crossed.
-        TodoCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
-        /// Canonical per-Life Magic Todo checkpoint projection.
-        /// delegation-024: last parent XTrace cursor physically handed to each reusable
-        /// delegate session. Keyed pair lookup; never inferred from prompt text.
-        DelegationCompletedHandoffs: Map<string, int64>
-
-        Attention: AttentionProjectionState
-        Concern: ConcernProjectionState
+        ViewCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
 
         /// Historical count of folded `RuntimeStarted` envelopes. Retained for
         /// audit/backward-compatible projections; it no longer drives recovery.
@@ -130,10 +121,7 @@ module AgentProjection =
           HandleByChildSession = Map.empty
           Fission = FissionProjection.empty
           ChatExecutions = ChatExecutionProjection.empty
-          DelegationCompletedHandoffs = Map.empty
-          Attention = AttentionProjection.empty
-          TodoCheckpoints = Map.empty
-          Concern = ConcernProjection.empty
+          ViewCheckpoints = Map.empty
           RuntimeStartCount = 0 }
 
     let tryFind (sessionId: SessionId) (projection: AgentProjectionSet) =
@@ -152,10 +140,6 @@ module AgentProjection =
     let activeOrchestratorJobPairs (projection: AgentProjectionSet) : (ManagerJobId * SessionId) list =
         OrchestratorProjection.activeJobs projection.Orchestrator
         |> List.map (fun job -> job.ManagerJobId, job.ManagerSessionId)
-
-    let pendingAttentionWorkPairs (sessionId: SessionId) (projection: AgentProjectionSet) : (string * string) list =
-        AttentionProjection.pending sessionId projection.Attention
-        |> List.map (fun item -> item.OccurrenceId, item.Text)
 
     let private sessionOrEmpty sessionId projection =
         Map.tryFind sessionId projection.Sessions |> Option.defaultValue emptySession

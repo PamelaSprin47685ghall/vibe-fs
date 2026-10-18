@@ -536,13 +536,6 @@ module ForkToolSurface =
                             providerRun
                 }
 
-            let workRecordCapability: DelegationWorkRecordCapability =
-                { ParentWorkRecord =
-                    fun sessionId -> LifecycleWorkRecordProjection.lifecycleWorkRecord (Some journal) sessionId true
-                  ParentWorkRecordBounded =
-                    fun sessionId range ->
-                        LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) sessionId range }
-
             let parentWorkRecord sessionId =
                 task {
                     match beforeWorkRecord with
@@ -572,8 +565,7 @@ module ForkToolSurface =
                     None,
                     None,
                     cancelSignals,
-                    childWorkRecordForRun = childWorkRecordForRun,
-                    workRecordCapability = workRecordCapability
+                    childWorkRecordForRun = childWorkRecordForRun
                 )
 
             scope.AttachCurrentProcessJoinMode "ready"
@@ -1149,15 +1141,6 @@ module ForkToolSurface =
         |> HandleProjection.workRecords
         |> List.map workView
         |> List.toArray
-
-    let handoffSnapshot (value: obj) : obj array =
-        (AgentJournal.snapshot (unbox<ForkHarness> value).Journal)
-            .AgentProjections.DelegationCompletedHandoffs
-        |> Map.toArray
-        |> Array.map (fun (key, sequence) ->
-            box
-                {| key = key
-                   sequence = string sequence |})
 
     let coldWorkSnapshot (directory: string) (owner: string) : Task<obj array> =
         task {

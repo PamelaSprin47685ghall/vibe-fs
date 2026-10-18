@@ -41,7 +41,6 @@ type ToolRuntimeScope =
         snapshot: ISessionSnapshotPort option *
         cancelSignals: (SessionId seq -> unit) option *
         ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
-        ?workRecordCapability: DelegationWorkRecordCapability *
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) *
         ?eventPort: IEventObservationPort ->
             ToolRuntimeScope

@@ -31,7 +31,6 @@ type HostForkRunLifecycleHandle
               ChildId = SessionId.create childId
               Role = Role.Coder
               StartCursor = XTraceCursor.create 0L
-              Handoff = None
               AuthorityRoot = AuthorityRootUserMessageId.create "surface-authority-root"
               Work = None
               Source = HostPendingRun.completionSource ()
@@ -117,7 +116,6 @@ module HostForkRunLifecycleSurface =
             None
             typed.ParentId
             Unchecked.defaultof<ISessionHostPort>
-            None
             typed.Run
             (terminal typed outcome)
             None

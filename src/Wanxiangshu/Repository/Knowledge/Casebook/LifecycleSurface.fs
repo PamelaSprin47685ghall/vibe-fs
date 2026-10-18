@@ -43,7 +43,16 @@ module CasebookLifecycleSurface =
         CasebookLifecycle.noteAnswer sessionId answer
 
     let collect (sessionId: string) (toolName: string) (args: obj) (output: string) : unit =
-        CasebookLifecycle.collector.Collect(sessionId, toolName, args, output)
+        let pathOpt =
+            if isNull args then
+                None
+            else
+                [ "path"; "filePath"; "file" ]
+                |> List.tryPick (fun key -> if isNull args?(key) then None else Some(string args?(key)))
+
+        match pathOpt with
+        | Some path -> CasebookLifecycle.collector.RecordFileRead(sessionId, path, output)
+        | None -> CasebookLifecycle.collector.Collect(sessionId, toolName, args, output)
 
     let observationCount (sessionId: string) : int =
         CasebookLifecycle.collector.Count sessionId

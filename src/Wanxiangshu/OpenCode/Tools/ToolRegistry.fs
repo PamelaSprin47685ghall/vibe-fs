@@ -335,8 +335,6 @@ module ToolRegistry =
               || OfficeCapability.isAllowed role ToolPermission.Deliver)
           "bash-honeypot", BashHoneypotTool.admission
           "assume", AssumeTool.admission
-          "defer", AttentionTools.admission
-          "publish", ConcernTools.admission
           "chronicle", ChronicleTool.admission bloggerHost
           "fetch", ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
           "todowrite-for-bookkeeper", JsBookkeeperTool.admission ]
@@ -568,7 +566,6 @@ module ToolRegistry =
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
         (childWorkRecordForRun:
             (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) option)
-        (workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability option)
         (userNotify: (string -> string -> unit) option)
         =
         let factory = ToolHostCodec.factory toolModule
@@ -607,7 +604,6 @@ module ToolRegistry =
                 snapshot,
                 cancelSignals,
                 ?childWorkRecordForRun = childWorkRecordForRun,
-                ?workRecordCapability = workRecordCapability,
                 continueManagerLoop = continueManagerLoop,
                 ?eventPort = eventPort
             )
@@ -1319,8 +1315,6 @@ module ToolRegistry =
               yield deliverSpec ()
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
-              yield! AttentionTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forAttention)
-              yield! ConcernTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forConcern) userNotify
 
               yield
                   ChronicleTool.spec

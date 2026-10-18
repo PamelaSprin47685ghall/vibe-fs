@@ -183,10 +183,12 @@ module JsRunLoop =
         (truncated: bool)
         (bytes: int)
         (durationMs: int64)
+        (reason: string)
         : obj =
         createObj
             [ "ok" ==> true
               "status" ==> status
+              "reason" ==> (if isNull reason then null else box reason)
               "exitCode"
               ==> (match exitCode with
                    | Some code -> box code
@@ -391,6 +393,8 @@ module JsRunLoop =
                     // DSL-MUTABLE: algorithm-scratch — overall loop state
                     let mutable running = true
                     let mutable status = "completed"
+                    // DSL-MUTABLE: algorithm-scratch — abort/timeout explanation
+                    let mutable outcomeReason: string = null
                     let mutable lastExitCode: int option = None
                     // DSL-MUTABLE: algorithm-scratch — failure/outcome slot for this run
                     let mutable result: obj = null
@@ -457,6 +461,7 @@ module JsRunLoop =
 
                                 if remaining <= 0L then
                                     status <- "timeout"
+                                    outcomeReason <- "maxDuration exceeded"
                                     killManaged managed "SIGKILL"
                                     do! finishManaged managed
                                     finished <- true
@@ -471,8 +476,9 @@ module JsRunLoop =
 
                                         match verdictOf verdictRaw with
                                         | Continue -> ()
-                                        | Abort _ ->
+                                        | Abort reason ->
                                             status <- "aborted"
+                                            outcomeReason <- reason
                                             aborted <- true
                                             killManaged managed "SIGKILL"
                                             do! finishManaged managed
@@ -483,6 +489,7 @@ module JsRunLoop =
                                             match decision with
                                             | "abort" ->
                                                 status <- "aborted"
+                                                outcomeReason <- "check park resumed with 'abort'"
                                                 aborted <- true
                                                 killManaged managed "SIGKILL"
                                                 do! finishManaged managed
@@ -526,6 +533,7 @@ module JsRunLoop =
 
                         if stepOutcome.IsNone then
                             status <- "timeout"
+                            outcomeReason <- "maxDuration exceeded inside next(ctx)"
                             running <- false
 
                         step <- step + 1
@@ -613,6 +621,7 @@ module JsRunLoop =
                                     failureReason <- Some "timeout"
                                 elif nowMs () >= deadlineMs then
                                     status <- "timeout"
+                                    outcomeReason <- "maxDuration exceeded"
                                     failureReason <- Some "deadline"
                                 else
                                     let slice = int (min (int64 intervalMs) (max 1L (deadlineMs - nowMs ())))
@@ -636,6 +645,7 @@ module JsRunLoop =
                             | Some "deadline" -> running <- false
                             | Some "abort" ->
                                 status <- "aborted"
+                                outcomeReason <- "check aborted while waiting for the port"
                                 running <- false
                             | Some "unsupported" -> running <- false
                             | _ -> ()
@@ -662,4 +672,5 @@ module JsRunLoop =
                                 output.Truncated
                                 output.TotalBytes
                                 (nowMs () - startedMs)
+                                outcomeReason
         }

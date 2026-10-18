@@ -132,7 +132,6 @@ test('WHAT[delegation-025] observed Engineer execution publishes the exact admit
         formalText: 'FORMAL-ONLY',
       },
     })
-    assert.notEqual(sync.handoffFrontier(runtime, owner, 'Engineer'), null, 'existing completed handoff checkpoint precedes success delivery')
     assert.equal(sync.terminalListenerCount(runtime), 0)
   })
 })

@@ -9,8 +9,6 @@
     "AgentFact.Host": "requirement-grounding",
     "AgentFact.Fission": "intra-participant-parallelism",
     "AgentFact.Delegation": "delegation",
-    "AgentFact.Attention": "attention-regulation",
-    "AgentFact.Concern": "concern-routing",
     "AgentFact.ChatExecution": "managed-chat-execution",
     "AgentFact.Cognition": "cognitive-workspace"
   }

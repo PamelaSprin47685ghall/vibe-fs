@@ -54,7 +54,6 @@ module InvestigationEstimateContract =
         | "deliver"
 
         | "skill"
-        | "todowrite"
         | "assume"
         | "defer"
         | "publish"

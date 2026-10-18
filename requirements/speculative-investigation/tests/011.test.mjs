@@ -126,7 +126,7 @@ const attach = (replica, rounds, owner = 'owner') => {
   return { handle, completion: result.value.completion }
 }
 const turn = (sessionId, outcome, providerRun = 'run-t') => ({ sessionId, physicalUserMessageId: 'u1', providerRun, outcome, parts: [] })
-const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
+const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')])] })
 
 test('WHAT[speculative-investigation-011] exact terminal collects text even without a subsequent predictor request', async () => {
   const { handle, completion } = attach('replica-text-stop', 2)
@@ -167,8 +167,8 @@ test('WHAT[speculative-investigation-011] STRENGTH_011_semantic_terminal_is_firs
   assert.equal(admitted.requestsAdmitted, 1)
   assert.equal(await Strength.replicaHandleTransform(handle, { messages: [
     user('u1', 'replica-sem', [hostText('Continue.')]),
-    assistant('a1', 'replica-sem', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
-    assistant('a2', 'replica-sem', [hostResult('c2', 'grep', { pattern: 'x' }, 'hit')]),
+    assistant('a1', 'replica-sem', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
+    assistant('a2', 'replica-sem', [hostResult('c2', 'todowrite-for-predictor', { pattern: 'x' }, 'hit')]),
   ] }), true)
   const closed = Strength.replicaPeek(handle, 'replica-sem')
   assert.equal(closed.requestsAdmitted, 1, 'the refused outbound request never enters the count')
@@ -233,7 +233,7 @@ test('WHAT[speculative-investigation-011] empty stop preserves complete readonly
     assert.equal(result.requestsAdmitted, 1)
     assert.deepEqual(result.batches, [{
       requestOrdinal: 1,
-      exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }],
+      exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }],
     }])
     const next = Strength.replicaAttach(handle, binding('owner', 'replica-prefix-stop', 'next-decision', 2))
     assert.equal(next.ok, true, next.error)

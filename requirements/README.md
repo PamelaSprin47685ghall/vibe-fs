@@ -60,7 +60,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | [participant-horizon](participant-horizon/WHAT.md) | 只有会改变合法行动的最小事实应穿过 horizon。 |
 | [cognitive-environment](cognitive-environment/WHAT.md) | 长期认知层与瞬时 runtime/mission 分开；knowledge 不创造 authority。 |
 | [cognitive-workspace](cognitive-workspace/WHAT.md) | 持久认知画板已经退休；本包只保留负向合同，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
-| [attention-regulation](attention-regulation/WHAT.md) | 显式结束 evidence churn、解除自创心理债、延后非阻塞旁支；defer 不冒充 obligation。 |
+| [attention-regulation](attention-regulation/WHAT.md) | `enough`、`abandon` 与 `defer` 已经退休；注意力动作并入 `assume` 与编程面 ANCHOR `view.extra`，本包只保留负向边界。 |
 | [action-affordance](action-affordance/WHAT.md) | 决策点必须知道 act 的正负边界、成功后果与参数意义。 |
 | [provider-language](provider-language/WHAT.md) | 一个 life 一个稳定 natural-language world；protocol identifiers 不翻译。 |
 | [provider-projection](provider-projection/WHAT.md) | typed semantic intent 经唯一确定性投影成为 provider representation，表示不反向创造 authority。 |
@@ -68,7 +68,7 @@ grounding 由 `requirement-grounding` package 拥有。
 ### 5. Interaction / effect / durability
 | Package | 一句话 WHY |
 |---|---|
-| [concern-routing](concern-routing/WHAT.md) | concern-addressed mailbox 让发送者不依赖身份拓扑，消息只在下一次 Pair Hint 自然边界交付。 |
+| [concern-routing](concern-routing/WHAT.md) | concern-addressed 邮箱（`subscribe`/`publish`）已经退休；跨参与者与用户交互并入编程面 `js.fork`/`js.join`/`js.deliver`/`js.ask`，本包只保留负向边界。 |
 | [interaction-authority](interaction-authority/WHAT.md) | PhysicalUserMessage ≠ AuthorityTurn；typed provenance 才能创建/继续 logical interaction。 |
 | [managed-chat-execution](managed-chat-execution/WHAT.md) | 物理消息的 durable acceptance、provider start、唯一终态与 exact settlement 由消息级执行 owner 统一管理。 |
 | [dispatch-protocol](dispatch-protocol/WHAT.md) | 已获授权 interaction 穿过 unreliable Host 时避免 unknown outcome 复制逻辑效果。 |

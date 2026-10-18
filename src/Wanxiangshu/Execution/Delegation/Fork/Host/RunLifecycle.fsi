@@ -70,7 +70,6 @@ module HostForkRunLifecycle =
         journal: AgentJournal option ->
         parentId: SessionId ->
         sessions: ISessionHostPort ->
-        handoffPort: ReusableHandoffPort option ->
         run: PendingHostRun ->
         outcome: TerminalOutcome ->
         workRecord: string option ->
@@ -85,8 +84,6 @@ module HostForkRunLifecycle =
         childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) ->
         xTraceHead: (SessionId -> XTraceCursor) ->
         trackOwnedWork: ((unit -> Task) -> unit) ->
-        handoffPort: ReusableHandoffPort option ->
-        handoff: PreparedDelegationHandoff option ->
         agentId: string ->
         childId: SessionId ->
         role: Role ->
@@ -102,7 +99,6 @@ module HostForkRunLifecycle =
         journal: AgentJournal option ->
         parentId: SessionId ->
         sessions: ISessionHostPort ->
-        handoffPort: ReusableHandoffPort option ->
         run: PendingHostRun ->
         error: string ->
             Task

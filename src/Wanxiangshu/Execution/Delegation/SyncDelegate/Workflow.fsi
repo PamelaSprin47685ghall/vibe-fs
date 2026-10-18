@@ -33,9 +33,7 @@ module internal SyncDelegateWorkflow =
           CleanupDelegateDraft: string -> unit
           Directory: string option
           ReplaceToolEstimate: SessionId -> int option -> Task<unit>
-          SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<PreparedDelegationHandoff, string>>
-          CheckpointCompletedHandoff: SessionId -> PreparedDelegationHandoff -> Task<HandoffCheckpointSettlement>
-          TripFatal: string -> string -> unit
+          SendPrompt: SyncDelegateCall -> SyncDelegatePromptRequest -> Task<Result<unit, string>>
           ResolveBoundAgent: SessionId -> string option
           DescribeWait: SyncDelegateWait -> DiagnosticWait
           SubscribeFutureTerminal: SessionId -> TerminalCompletionListener -> IDisposable }

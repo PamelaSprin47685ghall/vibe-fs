@@ -70,7 +70,6 @@ try {
   assert.equal(firstResult.ok, true)
 
   if (scenario !== 'own-guard') {
-    const frontier = sync.handoffFrontier(runtime, owner, 'Engineer')
     const second = sync.startObserved(runtime, owner, 'SECOND-GUARD-CHARGE')
     const secondCompletion = sync.observedCompletion(second)
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 3)
@@ -97,7 +96,6 @@ try {
         successor.authorityRootUserMessageId, 'guard-successor-provider-run', staleText, '')
     assert.equal(staleAccepted, false, 'an old actual guard acceptance cannot settle the new same-root invocation')
     assert.equal(await pendingAfterTurn(secondCompletion), 'pending')
-    assert.deepEqual(sync.handoffFrontier(runtime, owner, 'Engineer'), frontier)
 
     const secondSourceRun = 'guard-second-source-provider-run'
     await sync.observeGuardDelta(runtime, {

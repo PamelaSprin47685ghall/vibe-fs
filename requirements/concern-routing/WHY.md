@@ -1,13 +1,15 @@
 # concern-routing — WHY
 
-协作者需要知道哪些信息值得告诉别人，不应先了解对方的机器身份和组织关系。稳定的语义地址让工作者更换后，关注点仍能被理解；精确代次则防止旧消息误投给接任者。
+这里记录的是 concern 邮箱机制的退役决定：按关注点寻址的异步邮筒（`subscribe`/`publish`、自动订阅与 Pair Hint 捎带投递）在结构化委派之外维护了第二套通信与代次状态机，既增加了认知负担，也模糊了责任边界。
 
-消息到达不等于值得打断当前工作。在自然认知边界集中呈现，并冻结同一次交付，既保护注意力，也避免重放时凭空增加或丢失信息。
+现在所有跨参与者通信与用户沟通均通过编程面与显式生命周期工具完成：
 
-通信提供线索，不建立命令关系。让每条消息自动产生权限或义务，会把轻量信息交换变成另一套任务系统，也会把未经验证的说法误当事实。
+- 上下级委派与结果汇合由 `js.fork` / `js.join` 与 `js.deliver` 承载；
+- 向人类用户提问与澄清由 `js.ask` / `ask` 承载；
+- 系统不再维护 `Interaction/Concern` 邮箱投影、自动订阅或 Pair Hint 消息捎带。
 
 ## DEPENDS ON
 
 - `participant-identity`
-- `participant-horizon`
-- `durable-events`
+- `delegation`
+- `repository-programming`

@@ -91,6 +91,9 @@ module PluginHooks =
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
 
+    [<Emit("$0 !== null && $0 !== undefined && typeof $0 === 'object' && !Array.isArray($0) && Object.keys($0).length > 0")>]
+    let private isNonEmptyObject (value: obj) : bool = jsNative
+
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (transform: obj -> obj -> Task<unit>) : Task<obj> =
@@ -151,14 +154,14 @@ module PluginHooks =
                 | Some ws -> CasebookFeature.isEnabled ws
                 | None -> false
 
-            // The Host-native todowrite remains the physical executor, schema and
-            // description included. The plugin records one durable compression
+            // Programming-surface calls carrying a non-empty `view` argument establish
+            // the compression checkpoint. The plugin records one durable compression
             // checkpoint per successfully completed call, keyed by exact call id.
-            let settledTodoCheckpointCalls = HashSet<SessionId * ToolCallId>()
+            let settledViewCheckpoints = HashSet<SessionId * ToolCallId>()
             // obligation-ledger-005: the in-flight append for each identity, so a
             // concurrent duplicate terminal waits for the same append's final
             // outcome instead of reporting an early success.
-            let pendingTodoCheckpointAppends = Dictionary<SessionId * ToolCallId, Task<unit>>()
+            let pendingViewCheckpointAppends = Dictionary<SessionId * ToolCallId, Task<unit>>()
 
             let collectCasebookObservation (toolInput: obj) (toolOutput: obj) =
                 let toolName = if isNull toolInput then "" else string (toolInput?tool)
@@ -214,12 +217,6 @@ module PluginHooks =
                         fun sid range run ->
                             LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sid range run
 
-                    let workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability =
-                        { ParentWorkRecord =
-                            fun sid -> LifecycleWorkRecordProjection.lifecycleWorkRecord journal sid true
-                          ParentWorkRecordBounded =
-                            fun sid range -> LifecycleWorkRecordProjection.lifecycleWorkRecordBounded journal sid range }
-
                     let casebookToolSpecs: ToolSpec list =
                         match workspaceDirectory with
                         | Some ws ->
@@ -241,7 +238,6 @@ module PluginHooks =
                             parentWorkRecordFor
                             childWorkRecordFor
                             childRecordForRun
-                            workRecordCapability
                             snapshotOpt
                             (Some wired.CancelSignals)
                             (Some eventPort)
@@ -383,10 +379,10 @@ module PluginHooks =
                 else
                     string toolInput?(name)
 
-            let appendTodoCheckpoint durable sessionText callId =
+            let appendViewCheckpoint durable sessionText callId =
                 task {
                     let fact =
-                        ContextFact.TodoCheckpointCommitted
+                        ContextFact.ViewCheckpointCommitted
                             {| SessionId = SessionId.create sessionText
                                ToolCallId = callId |}
 
@@ -440,9 +436,34 @@ module PluginHooks =
                     Some(SessionId.value sessionId, ToolCallId.create callId, status, providerRun)
                 | _ -> None
 
-            let todoTerminalObservation rawInput =
-                toolTerminalObservation "todowrite" rawInput
-                |> Option.map (fun (session, call, status, _) -> session, call, status)
+            let viewTerminalObservation rawInput =
+                let raw = HostEventEnvelope.unwrap rawInput
+                let properties = if isNull raw then null else raw?properties
+                let part = if isNull properties then null else properties?part
+                let state = if isNull part then null else part?state
+                let input = if isNull state then null else state?input
+                let view = if isNull input then null else input?view
+
+                let sessionId =
+                    HostEventEnvelope.trySessionId raw
+                    |> Option.orElseWith (fun () ->
+                        firstFieldText part [ "sessionID"; "sessionId" ] |> Option.map SessionId.create)
+
+                let tool = firstFieldText part [ "tool"; "name" ]
+                let callId = firstFieldText part [ "callID"; "callId"; "toolCallId" ]
+
+                let status =
+                    firstFieldText state [ "status" ]
+                    |> Option.map (fun value -> value.ToLowerInvariant())
+
+                match HostEventEnvelope.eventTypeOf raw, sessionId, tool, callId, status with
+                | "message.part.updated", Some sessionId, Some tool, Some callId, Some status when
+                    tool.StartsWith("todowrite-for-", StringComparison.OrdinalIgnoreCase)
+                    && (status = "completed" || status = "error")
+                    && isNonEmptyObject view
+                    ->
+                    Some(SessionId.value sessionId, ToolCallId.create callId, status)
+                | _ -> None
 
             let settleUserQuestion rawInput =
                 task {
@@ -504,47 +525,47 @@ module PluginHooks =
                     | _ -> ()
                 }
 
-            let requiredTodoJournal () =
+            let requiredViewJournal () =
                 journal
                 |> Option.defaultWith (fun () ->
-                    invalidOp "todowrite compression checkpoint requires a durable journal")
+                    invalidOp "view compression checkpoint requires a durable journal")
 
-            let removePendingCheckpoint key =
-                lock pendingTodoCheckpointAppends (fun () -> pendingTodoCheckpointAppends.Remove(key) |> ignore)
+            let removePendingViewCheckpoint key =
+                lock pendingViewCheckpointAppends (fun () -> pendingViewCheckpointAppends.Remove(key) |> ignore)
 
-            let releaseUnattemptedCheckpoint key failure =
+            let releaseUnattemptedViewCheckpoint key failure =
                 match failure with
                 | JournalAppendFailure.WriterUnavailable _ ->
-                    removePendingCheckpoint key
-                    settledTodoCheckpointCalls.Remove(key) |> ignore
+                    removePendingViewCheckpoint key
+                    settledViewCheckpoints.Remove(key) |> ignore
                 | JournalAppendFailure.WriteUnknown _
                 | JournalAppendFailure.NoNewWriteReleaseFailed _
                 | JournalAppendFailure.FactRejected _ -> ()
 
-            let appendTerminalCheckpoint key sessionText callId =
+            let appendTerminalViewCheckpoint key sessionText callId =
                 task {
                     try
-                        do! appendTodoCheckpoint (requiredTodoJournal ()) sessionText callId
-                        removePendingCheckpoint key
+                        do! appendViewCheckpoint (requiredViewJournal ()) sessionText callId
+                        removePendingViewCheckpoint key
                     with :? JournalAppendException as appendFailure ->
-                        releaseUnattemptedCheckpoint key appendFailure.Failure
+                        releaseUnattemptedViewCheckpoint key appendFailure.Failure
                         return raise appendFailure
                 }
 
-            let startTerminalCheckpoint key sessionText callId =
-                lock pendingTodoCheckpointAppends (fun () ->
-                    match pendingTodoCheckpointAppends.TryGetValue(key) with
+            let startTerminalViewCheckpoint key sessionText callId =
+                lock pendingViewCheckpointAppends (fun () ->
+                    match pendingViewCheckpointAppends.TryGetValue(key) with
                     | true, pending -> pending
                     | false, _ ->
-                        let append = appendTerminalCheckpoint key sessionText callId
-                        pendingTodoCheckpointAppends[key] <- append
+                        let append = appendTerminalViewCheckpoint key sessionText callId
+                        pendingViewCheckpointAppends[key] <- append
                         append)
 
-            let settleNewTodoTerminal key sessionText callId status =
-                if not (settledTodoCheckpointCalls.Add(key)) then
+            let settleNewViewCheckpointTerminal key sessionText callId status =
+                if not (settledViewCheckpoints.Add(key)) then
                     Task.FromResult(())
                 elif status = "completed" then
-                    startTerminalCheckpoint key sessionText callId
+                    startTerminalViewCheckpoint key sessionText callId
                 else
                     Task.FromResult(())
 
@@ -558,25 +579,25 @@ module PluginHooks =
             /// semantically refused — repeating it is unsafe), while
             /// WriterUnavailable (NotAttempted) releases the mark so the Host's
             /// retry gets a real second attempt.
-            let settleTodoTerminal (sessionText, callId, status) =
+            let settleViewCheckpointTerminal (sessionText, callId, status) =
                 let key = SessionId.create sessionText, callId
 
                 // A concurrent duplicate first joins the in-flight append (it
                 // must observe the same final outcome); only a terminal with no
                 // pending append consults the settled mark.
                 let joinPending () =
-                    lock pendingTodoCheckpointAppends (fun () ->
-                        match pendingTodoCheckpointAppends.TryGetValue(key) with
+                    lock pendingViewCheckpointAppends (fun () ->
+                        match pendingViewCheckpointAppends.TryGetValue(key) with
                         | true, pending -> Some(pending)
                         | false, _ -> None)
 
                 match joinPending () with
                 | Some pending -> pending
-                | None -> settleNewTodoTerminal key sessionText callId status
+                | None -> settleNewViewCheckpointTerminal key sessionText callId status
 
-            let settleTodoEvent rawInput =
-                todoTerminalObservation rawInput
-                |> Option.map settleTodoTerminal
+            let settleViewCheckpointEvent rawInput =
+                viewTerminalObservation rawInput
+                |> Option.map settleViewCheckpointTerminal
                 |> Option.defaultValue (Task.FromResult(()))
 
             let checkManagerReviewPermissions toolName toolInput =
@@ -925,7 +946,7 @@ module PluginHooks =
 
             let observeEvent raw =
                 task {
-                    do! settleTodoEvent raw
+                    do! settleViewCheckpointEvent raw
                     do! settleUserQuestion raw
                     do! settlePostS3Deliver raw
                     do! wired.ObserveEvent raw

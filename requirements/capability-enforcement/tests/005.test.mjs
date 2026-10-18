@@ -10,9 +10,13 @@ test('WHAT[capability-enforcement-005] replica projections and tool policy allow
   for (const role of ['engineer', 'devops', 'manager', 'orchestrator']) {
     assert.deepEqual(capabilities(role), ['Glob', 'Grep', 'Read'])
   }
-  for (const tool of ['read', 'glob', 'grep', 'todowrite-for-predictor']) assert.equal(isAllowedTool(tool), true, tool)
-  for (const tool of ['write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon', 'fission', 'unknown']) {
+  assert.equal(isProjectionTool('todowrite-for-predictor'), true)
+  for (const tool of ['todowrite-for-predictor', 'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager']) {
+    assert.equal(isAllowedTool(tool), true, tool)
+  }
+  for (const tool of ['read', 'glob', 'grep', 'write', 'edit', 'run', 'fork', 'resume', 'join', 'network', 'bash', 'horizon', 'fission', 'unknown']) {
     assert.equal(isAllowedTool(tool), false, tool)
+    assert.equal(isProjectionTool(tool), false, tool)
   }
   // A non-replica js-<role> surface is never PROJECTED into the replica, even
   // though its projected name is a legal frame name.
@@ -52,13 +56,14 @@ test('WHAT[capability-enforcement-005] H12_replica_context_with_positive_estimat
     assert.equal(isPermittedByHostGate(call.tool), false, `tool ${call.tool} must be denied by exactReadonlyHostToolMap`)
   }
 
-  // The projection whitelist stays read/glob/grep/todowrite-for-predictor, but the replica's own
-  // session gate admits exactly one callable tool: todowrite-for-predictor.
-  for (const tool of ['read', 'glob', 'grep', 'todowrite-for-predictor']) {
-    assert.equal(isAllowedTool(tool), true)
-  }
+  // Both the projection whitelist and the replica's own session gate admit
+  // exactly one callable tool: todowrite-for-predictor.
+  assert.equal(isAllowedTool('todowrite-for-predictor'), true)
+  assert.equal(isProjectionTool('todowrite-for-predictor'), true)
   assert.equal(isPermittedByHostGate('todowrite-for-predictor'), true)
   for (const tool of ['read', 'glob', 'grep']) {
+    assert.equal(isAllowedTool(tool), false, `${tool} is retired and not allowed in replica frames`)
+    assert.equal(isProjectionTool(tool), false, `${tool} is retired and not projected into the replica`)
     assert.equal(isPermittedByHostGate(tool), false, `${tool} is not callable by the replica`)
   }
 })

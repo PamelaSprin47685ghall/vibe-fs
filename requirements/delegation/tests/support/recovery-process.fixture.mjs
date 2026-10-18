@@ -89,9 +89,7 @@ try {
   assert.equal(sync.childCount(runtime), 1)
   assert.equal(sync.terminalListenerCount(runtime), 0)
   assert.equal(sync.recoveryStopSnapshot(runtime).waiting, 0)
-  assert.notEqual(sync.handoffFrontier(runtime, owner, 'Engineer'), null)
   if (scenario !== 'own-retry') {
-    const frontier = sync.handoffFrontier(runtime, owner, 'Engineer')
     const second = sync.startObserved(runtime, owner, 'SECOND-RECOVERY-CHARGE')
     const secondCompletion = sync.observedCompletion(second)
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 3)
@@ -118,7 +116,6 @@ try {
         successor.authorityRootUserMessageId, 'actual-retry-provider-run', staleText, '')
     assert.equal(staleAccepted, false, 'an actually accepted old retry cannot settle the new same-root call')
     assert.equal(await pendingAfterTurn(secondCompletion), 'pending')
-    assert.deepEqual(sync.handoffFrontier(runtime, owner, 'Engineer'), frontier)
     const secondFailedRun = 'second-failed-provider-run'
     assert.equal(sync.observeProviderFailureStop(runtime, secondAccepted.sessionId, secondFailedRun), true)
     const secondFailed = sync.observeExactProviderFailure(runtime, secondAccepted.sessionId,

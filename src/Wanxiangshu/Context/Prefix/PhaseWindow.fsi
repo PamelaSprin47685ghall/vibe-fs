@@ -9,7 +9,7 @@ type PhaseWindowDecision =
 
 [<RequireQualifiedAccess>]
 module PhaseWindow =
-    /// context-compression-028: fixed number of recent todowrite checkpoints kept raw.
+    /// context-compression-028: fixed number of recent view declaration checkpoints kept raw.
     val retainCheckpoints: int
 
     type PhaseCheckpoint = { ToolCallId: ToolCallId }

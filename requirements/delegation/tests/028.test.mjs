@@ -185,8 +185,8 @@ test('WHAT[delegation-028] current compile plans meet declared budgets and sourc
 
   const foldSources = inspectShard('delegation-fold').sources
   assert.ok(foldSources.includes('Execution/Delegation/DelegationFactFold.fs'))
-  assert.ok(!foldSources.includes('Execution/Delegation/HandoffLedger.fs'))
-  assert.ok(inspectShard('delegation-ledger').sources.includes('Execution/Delegation/HandoffLedger.fs'))
+  assert.ok(!foldSources.includes('Execution/Delegation/DelegatedToolEstimateLedger.fs'))
+  assert.ok(inspectShard('delegation-ledger').sources.includes('Execution/Delegation/DelegatedToolEstimateLedger.fs'))
   const linkageOwner = projects.find(
     (project) => project.implementationFiles.includes(join(SOURCE_ROOT, 'Execution/Delegation/LinkageProjection.fs')),
   )

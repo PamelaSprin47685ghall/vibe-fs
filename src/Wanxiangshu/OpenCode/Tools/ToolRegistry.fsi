@@ -85,6 +85,5 @@ module ToolRegistry =
         continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) ->
         childWorkRecordForRun:
             (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) option ->
-        workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability option ->
         userNotify: (string -> string -> unit) option ->
             ToolRegistration

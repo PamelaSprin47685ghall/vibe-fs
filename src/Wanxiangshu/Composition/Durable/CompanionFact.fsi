@@ -107,7 +107,7 @@ module ContextFact =
                Reason: string |} ->
             AgentFact
 
-    val inline TodoCheckpointCommitted:
+    val inline ViewCheckpointCommitted:
         payload:
             {| SessionId: SessionId
                ToolCallId: ToolCallId |} ->

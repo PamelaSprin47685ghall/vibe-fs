@@ -41,7 +41,8 @@ where `backgrounds` is an array of `{ name, exited, exitCode }`; `stdout` and `s
 are this slice's deltas, not the transcript.
 
 The outcome the await hands back is
-`{ ok: true, status: 'completed' | 'aborted' | 'timeout', exitCode, stdout, stderr, truncated, bytes, durationMs }`.
+`{ ok: true, status: 'completed' | 'aborted' | 'timeout', reason, exitCode, stdout, stderr, truncated, bytes, durationMs }`.
+`reason` is null on completion and carries the abort/timeout explanation otherwise.
 
 Consequences, stated once:
 - Abort SIGKILLs the foreground process; `maxDuration` expiry does the same and reports
@@ -56,3 +57,5 @@ Stable failure codes: `RUNNABLE_SPEC_INCOMPLETE`, `RUN_COMMAND_UNSUPPORTED`,
 `RUN_WAIT_TIMEOUT`, `RUN_CHILD_UNKNOWN`, `RUN_PARK_UNSUPPORTED`.
 
 Mechanical rules belong in the callbacks; semantic forks belong in parked payloads.
+
+More worked examples: `run-recipes` (a minutes-long compile; an npm server + frontend test).

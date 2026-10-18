@@ -355,8 +355,8 @@ module JournalSurface =
             |> List.map (fun (sessionId, _) -> SessionId.value sessionId)
             |> List.toArray
 
-        let todoCheckpoints =
-            projection.AgentProjections.TodoCheckpoints
+        let viewCheckpoints =
+            projection.AgentProjections.ViewCheckpoints
             |> Map.toList
             |> List.map (fun (sessionId, window) ->
                 box
@@ -375,7 +375,7 @@ module JournalSurface =
 
         box
             {| sessions = sessions
-               todoCheckpoints = todoCheckpoints
+               viewCheckpoints = viewCheckpoints
                sessionProjections = sessionProjections |}
 
     let private journalOrError

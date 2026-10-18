@@ -184,22 +184,6 @@
       "notes": "JsTransactionCommitted commit cut: required-fact disagreement lands on trip; durable evidence preserved."
     },
     {
-      "id": "F11",
-      "ownerRequirement": "delegation",
-      "sourceSymbol": "Execution/Delegation/SyncDelegate/Runtime.fs :: SyncDelegateRuntime.deps / TripFatal field binding",
-      "operation": "dynamic (point-free capability binding TripFatal = FatalProcess.trip; no string literal; matched by alias definition)",
-      "triggerBranch": "Point-free capability binding: the field is the FatalProcess.trip function value itself. Bound once at SyncDelegate runtime construction,",
-      "inputSource": "Composition wiring (production default); tests may substitute a recorder,",
-      "exactIdentity": "n/a at binding; the invocation site F14 supplies the exact delegation identity,",
-      "phase": "n/a (binding time),",
-      "assertedInvariant": "Exactly one production value flows into deps.TripFatal so the checkpointCompletedHandoff fuse has a single owner (F14 consumer audited together),",
-      "commitDisposition": "n/a (binding); settlement duty sits at the F14 call,",
-      "scopeOfEffect": "Capability scope: SyncDelegateWorkflow.Dependencies consumers; physical effect only when F14 invokes,",
-      "evidenceType": "DelegationCompletion (W9, landed in worktree): TripFatal capability is now a typed, injected settlement-aware binding; the F14 consumer proves the contract. Regression: requirements/delegation/tests/031.test.mjs WHAT[DELEG-031] (7 tests). Scanner still resolves the alias one hop to F14.",
-      "formalTestId": "requirements/delegation/tests/031.test.mjs::WHAT[DELEG-031] DELEG_031_checkpoint_probe_reports_typed_settlement_with_exact_identity",
-      "status": "FixedWithRegression"
-    },
-    {
       "id": "F12",
       "ownerRequirement": "obligation-ledger",
       "sourceSymbol": "Mission/Obligation/Todo/MagicTodoMembrane.fs :: MagicTodoHostHooks.fatalInfrastructure",
@@ -232,22 +216,6 @@
       "formalTestId": null,
       "status": "ExcludedWithEvidence",
       "notes": "test-only bridge at CompressionSurface.diagnosticFatal — production has no caller; ctx014 keeps it for structured-event coverage."
-    },
-    {
-      "id": "F14",
-      "ownerRequirement": "delegation",
-      "sourceSymbol": "Execution/Delegation/SyncDelegate/Workflow.fs :: SyncDelegateWorkflow.checkpointCompletedOrCrash / Error branch",
-      "operation": "SyncDelegate.checkpointCompletedHandoff (fixed string via deps.TripFatal alias)",
-      "triggerBranch": "Only HandoffCheckpointCommitment.PhaseConflict(reason) reaches the fuse, via deps.TripFatal (one-hop alias of F11): the detail names the exact route + reason. Committed/NotCommitted/Unknown all return Ok and deliver the already-earned WorkRecord; NotCommitted/Unknown preserve pending-evidence for the next invocation durable re-read, never a re-execution. Then raise InvalidOperationException (harness return path).",
-      "inputSource": "ReusableHandoffPort.CheckpointCompleted result for the exact owner/handoff; error string is the port's failure,",
-      "exactIdentity": "Exact owner SessionId + PreparedDelegationHandoff,",
-      "phase": "Delegation completion checkpoint (post-child-completion, pre-parent-reuse), Committed-completion vs unwritten-evidence are NOT distinguished: the port returns Result<unit,string>, losing the commitment category. Per proposal §6 W9: migrate CheckpointCompletedHandoff/CheckpointCompleted to a typed commit contract preserving NotCommitted/Committed/Unknown; retain 'completed child' vs 'unwritten evidence' as separate facts; never re-run a completed subtask; never publish a reusable completion to the parent early,",
-      "assertedInvariant": "A finished delegation's completion checkpoint must be durable before the parent reuses it,",
-      "commitDisposition": "Typed HandoffCheckpointSettlement preserved at the call (settled.Commitment + settled.Identity.Route). The completed child is proven before the checkpoint; the commitment never rewrites that completion. Landed in worktree by DelegationCompletion (W9).",
-      "scopeOfEffect": "Whole current process,",
-      "evidenceType": "DelegationCompletion (W9, landed in worktree): typed HandoffCheckpointSettlement contract. Regression: requirements/delegation/tests/031.test.mjs WHAT[DELEG-031] — committed checkpoint advances frontier + delivers work record; uncommitted still delivers without reexecution; probe reports typed settlement with exact identity; duplicate completion idempotent; stale authority cannot claim; parent supersede leaves no orphan; Completed/Delete both orders settle exactly once (7 tests).",
-      "formalTestId": "requirements/delegation/tests/031.test.mjs::WHAT[DELEG-031] DELEG_031_committed_checkpoint_advances_frontier_and_delivers_work_record",
-      "status": "FixedWithRegression"
     },
     {
       "id": "F15",
@@ -513,22 +481,6 @@
       "scopeOfEffect": "Episode observers (all reject with same failure); process NOT fused on this path (rejection, not fatal),",
       "evidenceType": "requirements/capability-enforcement/tests/021.test.mjs WHAT[ENF-021]: 'repair settlement failure rejects every waiting observer without fatal or release' (was RED pre-fix per proposal §2.1: expected rejected/rejected, got fulfilled/fulfilled — now the fix's regression) + 'unknown abandon commit still rejects every observer without release' + 'late observers after settlement failure get the same failure and no new budget' + 'failed durable abandon retains its flight and never reports settlement',",
       "formalTestId": "requirements/capability-enforcement/tests/021.test.mjs::WHAT[ENF-021] repair settlement failure rejects every waiting observer without fatal or release",
-      "status": "FixedWithRegression"
-    },
-    {
-      "id": "F31",
-      "ownerRequirement": "delegation",
-      "sourceSymbol": "Execution/Delegation/Fork/Host/RunLifecycle.fs :: HostForkRunLifecycle.checkpointCompletedOrCrash / fail branches",
-      "operation": "HostForkRunLifecycle.checkpointCompletedHandoff (fixed string)",
-      "triggerBranch": "settleCompletedHandoff: only HandoffCheckpointCommitment.PhaseConflict(reason) trips FatalProcess.trip \"HostForkRunLifecycle.checkpointCompletedHandoff\" with the exact route + reason. Missing-port vs missing-handoff decided structurally in checkpointSlot (a prepared handoff without a port raises InvalidOperationException fail-closed, not via the fuse; None handoff = no checkpoint to write). NotCommitted/Unknown preserve pending-evidence, never re-execute. Then raise (harness return path).",
-      "inputSource": "ReusableHandoffPort.CheckpointCompleted result for the exact parent/handoff; missing-capability assembly state,",
-      "exactIdentity": "Exact parent SessionId + PreparedDelegationHandoff (run.Handoff) — when present; branch (a) has identity but no port,",
-      "phase": "Fork child completion checkpoint (pre-parent-completion-delivery),",
-      "assertedInvariant": "A completed child's completion checkpoint must be durable before the parent observes completion; a missing handoff capability is an assembly defect, not a retryable state,",
-      "commitDisposition": "Typed settlement at the call; pending completion delivered whatever the commitment says. Landed in worktree by DelegationCompletion (W9).",
-      "scopeOfEffect": "Whole current process,",
-      "evidenceType": "DelegationCompletion (W9, landed in worktree): same typed HandoffCheckpointSettlement migration covers the fork-host checkpoint path (RunLifecycle.fs). Regression: same WHAT[DELEG-031] suite (7 tests) + Completed/Delete both-orders test.",
-      "formalTestId": "requirements/delegation/tests/031.test.mjs::WHAT[DELEG-031] DELEG_031_completed_and_delete_in_both_orders_settle_exactly_once",
       "status": "FixedWithRegression"
     },
     {

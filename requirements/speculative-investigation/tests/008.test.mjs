@@ -9,8 +9,8 @@ const Strength = await import("../../../dist/Strength/Surface.js");
 
 const H = (text) => createHash('sha256').update(text).digest('hex')
 const frame = () => Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-  { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
-  { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
+  { toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+  { toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
 ] }]).value
 const request = (decisionId = 'd1', target = 'run-1') => Strength.eventRequested({
   decisionId, ownerSessionId: 'owner',
@@ -247,8 +247,8 @@ const { createLocalEventStore } = await import('../../verification-system/tests/
 const H = (text) => createHash('sha256').update(text).digest('hex')
 
 const frame = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-  { toolName: 'read', canonicalArguments: '{"filePath":"src/a.fs"}', canonicalResult: 'let a = 1' },
-  { toolName: 'grep', canonicalArguments: '{"pattern":"a"}', canonicalResult: 'src/a.fs:1:let a = 1' },
+  { toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"src/a.fs"}', canonicalResult: 'let a = 1' },
+  { toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"a"}', canonicalResult: 'src/a.fs:1:let a = 1' },
 ] }]).value
 // A persisted frame payload is the Store wire contract (encodeFrameBundlePayload):
 // version + digest + byte_length + batches[request_ordinal/exchanges[tool_name/arguments/result]].
@@ -438,7 +438,7 @@ test('WHAT[speculative-investigation-008] H03_replica_identity_flag_yields_Ineli
     // 1. 构造包含正数 estimated_readonly_rounds 与合法 self_note 的 Replica 帧
     const replicaExchanges = [
       {
-        toolName: 'read',
+        toolName: 'todowrite-for-predictor',
         canonicalArguments: JSON.stringify({
           filePath: 'src/Wanxiangshu/Strength/Runtime.fs',
           estimated_readonly_rounds: 3,
@@ -447,7 +447,7 @@ test('WHAT[speculative-investigation-008] H03_replica_identity_flag_yields_Ineli
         canonicalResult: 'let isExactReadonly capabilities = ...'
       },
       {
-        toolName: 'grep',
+        toolName: 'todowrite-for-predictor',
         canonicalArguments: JSON.stringify({
           pattern: 'exactReadonlyHostToolMap',
           estimated_readonly_rounds: 2,

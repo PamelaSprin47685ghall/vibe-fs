@@ -18,7 +18,5 @@
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateLedger.fsi"/>
     <Compile Include="Execution/Delegation/DelegatedToolEstimateLedger.fs"/>
-    <Compile Include="Execution/Delegation/HandoffLedger.fsi"/>
-    <Compile Include="Execution/Delegation/HandoffLedger.fs"/>
   </ItemGroup>
 </Project>

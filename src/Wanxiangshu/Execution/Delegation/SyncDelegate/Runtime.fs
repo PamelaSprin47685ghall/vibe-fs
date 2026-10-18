@@ -136,7 +136,6 @@ type SyncDelegateRuntime
         onDelegateReady: SessionId -> string -> unit,
         quiescence: ISessionQuiescenceGate,
         workRecordFor: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
-        handoff: ReusableHandoffPort,
         retryPort: SyncDelegateRetryPort,
         ?toolMapForRole: Role -> Map<string, bool>,
         ?workspaceDirectory: string,
@@ -275,7 +274,7 @@ type SyncDelegateRuntime
     let publishObservedAdmission
         (call: SyncDelegateCall)
         (observation: PromptDispatcher.PromptSendObservation option)
-        (result: Result<PreparedDelegationHandoff, string>)
+        (result: Result<unit, string>)
         =
         let evidence key outcome =
             { SessionId = call.Delegate
@@ -312,7 +311,7 @@ type SyncDelegateRuntime
         (call: SyncDelegateCall)
         (request: SyncDelegatePromptRequest)
         (onSendObserved: (PromptDispatcher.PromptSendObservation -> unit) option)
-        : Task<Result<PreparedDelegationHandoff, string>> =
+        : Task<Result<unit, string>> =
         taskResult {
             let requireLiveCall () =
                 match store.TryPeekCallByDelegate call.Delegate with
@@ -325,8 +324,6 @@ type SyncDelegateRuntime
 
             do! requireLiveCall ()
             let tools = toolMap (canonicalRole call.Role)
-            let route = DelegationHandoffRoute.syncRole call.OwnerScope call.Role
-            let! prepared = handoff.Prepare call.Owner route |> TaskResultCE.ofTask
 
             // EXEC-031: snapshot the child's XTrace head (one-past last part,
             // 0 when empty) at send. This is the inclusive start of the
@@ -338,15 +335,7 @@ type SyncDelegateRuntime
             for inv in call.Invocations do
                 inv.StartCursor <- Some startCursor
 
-            let providerPrompt =
-                // delegation-019: the parent delta rides the shared fork-child
-                // convention — localized CommissionerRecord prose header plus a
-                // `commissioner_record` TOML data field.
-                let commissionerProse =
-                    (HostForkProse.forkInstructions call.Owner).CommissionerRecord
-
-                DelegationHandoff.appendParentDelta commissionerProse request.ProviderPrompt prepared.ParentRecord
-                |> LlmFacing.render
+            let providerPrompt = LlmFacing.render request.ProviderPrompt
 
             let! identitySeed = issueCurrentOwnerIdentitySeed call.Owner call.Agent
             do! requireLiveCall ()
@@ -436,7 +425,7 @@ type SyncDelegateRuntime
             let! admissionRoot = call.AdmissionRoot.Task |> TaskResultCE.ofTask
 
             match admissionRoot with
-            | Some _ -> return prepared
+            | Some _ -> return ()
             | None -> return! Error "sync delegate call closed before physical admission"
         }
 
@@ -497,8 +486,6 @@ type SyncDelegateRuntime
                     | None -> ()
                 }
           SendPrompt = fun call request -> sendDelegatePrompt call request
-          CheckpointCompletedHandoff = fun parent prepared -> handoff.CheckpointCompleted parent prepared
-          TripFatal = FatalProcess.trip
           ResolveBoundAgent =
             fun childId ->
                 let projections = (AgentJournal.snapshot journal).AgentProjections

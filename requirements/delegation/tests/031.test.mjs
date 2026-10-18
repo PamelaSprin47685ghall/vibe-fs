@@ -29,79 +29,7 @@ const remainsPending = async (promise) =>
     new Promise((resolve) => setImmediate(() => resolve({ kind: 'pending' }))),
   ])
 
-test('WHAT[delegation-031] DELEG_031_committed_checkpoint_advances_frontier_and_delivers_work_record', async () => {
-  const owner = 'owner-deleg031-committed'
-  const h = await live(owner)
-  try {
-    await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
-    const pending = sync.invoke(h, owner, 'Engineer', 'FIRST-CHARGE')
-    await waitForPromptCount(h, owner, 'Engineer', 1)
-    assert.equal(sync.handoffFrontier(h, owner, 'Engineer'), null)
-    assert.equal(await settle(h, owner, 'Engineer', 'FIRST-ANSWER', 'run-first'), true)
-    const result = await pending
-    assert.equal(result.ok, true)
-    assert.match(result.value, /FIRST-ANSWER/)
-
-    // The production checkpoint for this exact parent+route commits: frontier advances.
-    const frontier = sync.handoffFrontier(h, owner, 'Engineer')
-    assert.notEqual(frontier, null)
-    assert.equal(typeof frontier, 'number')
-  } finally {
-    sync.dispose(h)
-  }
-})
-
-test('WHAT[delegation-031] a separate checkpoint after writer closure reports NotCommitted with the exact parent', async () => {
-  const owner = 'owner-deleg031-uncommitted'
-  const h = await live(owner)
-  try {
-    await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
-    const pending = sync.invoke(h, owner, 'Engineer', 'UNCOMMITTED-CHARGE')
-    await waitForPromptCount(h, owner, 'Engineer', 1)
-    // Settle the physically-completed child through the production turn
-    // path while the writer is healthy; the earned WorkRecord is delivered.
-    assert.equal(await settle(h, owner, 'Engineer', 'UNCOMMITTED-ANSWER', 'run-first'), true)
-    const result = await pending
-    assert.equal(result.ok, true)
-    assert.match(result.value, /UNCOMMITTED-ANSWER/)
-    const committedFrontier = sync.handoffFrontier(h, owner, 'Engineer')
-    assert.notEqual(committedFrontier, null)
-
-    sync.closeJournalWriter(h)
-    const unsettled = await sync.checkpointForHarness(h, owner, 'Engineer', committedFrontier + 10)
-    assert.equal(unsettled.commitment, 'NotCommitted')
-    assert.equal(unsettled.parent, owner)
-    assert.match(String(unsettled.reason), /closing|disposed|poisoned|not attempted/i)
-    assert.equal(sync.childCount(h), 1)
-  } finally {
-    sync.dispose(h)
-  }
-})
-
-test('WHAT[delegation-031] DELEG_031_checkpoint_probe_reports_typed_settlement_with_exact_identity', async () => {
-  const owner = 'owner-deleg031-probe'
-  const h = await live(owner)
-  try {
-    // Committed path: the production checkpoint reports Committed with the
-    // exact parent + route identity.
-    const first = await sync.checkpointForHarness(h, owner, 'Engineer', 7)
-    assert.equal(first.commitment, 'Committed')
-    assert.equal(first.parent, owner)
-    assert.match(first.route, /engineer/)
-    assert.equal(first.reason, null)
-
-    sync.closeJournalWriter(h)
-    const second = await sync.checkpointForHarness(h, owner, 'Engineer', 7)
-    assert.equal(second.commitment, 'NotCommitted')
-    assert.equal(second.parent, owner)
-    assert.equal(second.route, first.route)
-    assert.match(String(second.reason), /closing|disposed|poisoned|not attempted/i)
-  } finally {
-    sync.dispose(h)
-  }
-})
-
-test('WHAT[delegation-031] successive completed work reuses the child and never retreats the recorded frontier', async () => {
+test('WHAT[delegation-031] successive completed work reuses the child and delivers each bounded WorkRecord', async () => {
   const owner = 'owner-deleg031-duplicate'
   const h = await live(owner)
   try {
@@ -109,8 +37,6 @@ test('WHAT[delegation-031] successive completed work reuses the child and never 
     await waitForPromptCount(h, owner, 'Engineer', 1)
     assert.equal(await settle(h, owner, 'Engineer', 'FIRST-ANSWER', 'run-first'), true)
     assert.equal((await first).ok, true)
-    const frontierAfterFirst = sync.handoffFrontier(h, owner, 'Engineer')
-    assert.notEqual(frontierAfterFirst, null)
 
     const second = sync.invoke(h, owner, 'Engineer', 'SECOND')
     await waitForPromptCount(h, owner, 'Engineer', 2)
@@ -120,17 +46,10 @@ test('WHAT[delegation-031] successive completed work reuses the child and never 
     assert.match(secondResult.value, /SECOND-ANSWER/)
     assert.doesNotMatch(secondResult.value, /FIRST-ANSWER/)
     assert.equal(sync.childCount(h), 1)
-
-    // The checkpoint for an already-recorded window is at least the first
-    // frontier — never a retreat, never a second execution.
-    const frontierAfterSecond = sync.handoffFrontier(h, owner, 'Engineer')
-    assert.ok(frontierAfterSecond >= frontierAfterFirst)
   } finally {
     sync.dispose(h)
   }
 })
-
-test.todo('WHAT[delegation-031] actual sync and fork completion still deliver after NotCommitted or Unknown checkpoint, absorb duplicate terminals, re-read durable evidence without reexecution, and fuse only PhaseConflict (GAP-153)')
 
 test('WHAT[delegation-031] DELEG_031_stale_authority_completion_cannot_claim_a_new_call', async () => {
   const owner = 'owner-deleg031-stale'
@@ -179,9 +98,6 @@ test('WHAT[delegation-031] DELEG_031_parent_supersede_leaves_no_orphan_completio
     assert.equal(await settle(h, owner, 'Engineer', 'LATE-ANSWER', 'run-late'), false)
     const result = await pending
     assert.equal(result.ok, false)
-
-    // The abandoned call leaves no completed frontier behind.
-    assert.equal(sync.handoffFrontier(h, owner, 'Engineer'), null)
   } finally {
     sync.dispose(h)
   }

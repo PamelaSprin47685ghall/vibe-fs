@@ -80,8 +80,8 @@ test('WHAT[speculative-investigation-005] predictor text crosses as reasoning wi
 
 test('WHAT[speculative-investigation-005] STRENGTH_005_frame_bundle_accepts_only_complete_read_glob_grep_batches', () => {
   const good = Strength.frameTryBuild(H, [
-    batch(1, [exchange('read', '{"filePath":"a"}', 'alpha'), exchange('grep', '{"pattern":"x"}', 'a:1:x')]),
-    batch(2, [exchange('glob', '{"pattern":"**/*.fs"}', 'a.fs')]),
+    batch(1, [exchange('todowrite-for-predictor', '{"filePath":"a"}', 'alpha'), exchange('todowrite-for-predictor', '{"pattern":"x"}', 'a:1:x')]),
+    batch(2, [exchange('todowrite-for-predictor', '{"pattern":"**/*.fs"}', 'a.fs')]),
   ])
   assert.equal(good.ok, true)
   assert.equal(good.value.batches.length, 2)
@@ -91,6 +91,11 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_frame_bundle_accepts_only
     batch(1, [exchange('todowrite-for-predictor', '{"program":"..."}', 'readonly result')]),
   ])
   assert.equal(withJsPredictor.ok, true)
+  for (const retired of ['read', 'glob', 'grep']) {
+    const retiredOnly = Strength.frameTryBuild(H, [batch(1, [exchange(retired, '{}', 'ok')])])
+    assert.equal(retiredOnly.ok, false)
+    assert.equal(retiredOnly.error, 'UnsupportedTool')
+  }
   const writeOnly = Strength.frameTryBuild(H, [batch(1, [exchange('write', '{}', 'ok')])])
   assert.equal(writeOnly.ok, false)
   assert.equal(writeOnly.error, 'UnsupportedTool')
@@ -115,7 +120,7 @@ test('WHAT[speculative-investigation-005] host_completed_tool_part_message_build
       { type: 'step-start' },
       { type: 'reasoning', text: 'r' },
       { type: 'text', text: 'read preface' },
-      { type: 'tool', callID: 'call_1', tool: 'glob', state: { status: 'completed', input: { pattern: 'x' }, output: 'found 12' } },
+      { type: 'tool', callID: 'call_1', tool: 'todowrite-for-predictor', state: { status: 'completed', input: { pattern: 'x' }, output: 'found 12' } },
       { type: 'step-finish' },
     ],
   }]
@@ -125,7 +130,7 @@ test('WHAT[speculative-investigation-005] host_completed_tool_part_message_build
   const pristineHostMessages = JSON.parse(JSON.stringify(messages))
   const out = await Transform.transformApply(sha256, runtime, { messages }, true)
   assert.equal(out.kind, 'Ready', `expected a built frame, got ${out.kind} ${out.reason ?? ''}`)
-  assert.deepEqual(out.batches.flatMap((batch) => batch.exchanges.map((exchange) => exchange.toolName)), ['glob'])
+  assert.deepEqual(out.batches.flatMap((batch) => batch.exchanges.map((exchange) => exchange.toolName)), ['todowrite-for-predictor'])
   assert.equal(out.batches[0].exchanges[0].canonicalResult, 'found 12')
   assert.deepEqual(out.batches[0].assistantText, ['read preface'])
   assert.deepEqual(messages.filter(message => message.info.role === 'assistant').flatMap(message => message.parts).filter(part => part.type === 'text').map(part => part.text),
@@ -181,7 +186,7 @@ test('WHAT[speculative-investigation-005] host_completed_tool_part_message_build
 })
 
 test('WHAT[speculative-investigation-005] repeated frame construction and owner wire ID derivation are deterministic', () => {
-  const batches = [batch(1, [exchange('read', '{"filePath":"a"}', 'alpha')])]
+  const batches = [batch(1, [exchange('todowrite-for-predictor', '{"filePath":"a"}', 'alpha')])]
   const first = Strength.frameTryBuild(H, batches).value
   const second = Strength.frameTryBuild(H, batches).value
   assert.equal(first.digest, second.digest)
@@ -193,15 +198,15 @@ test('WHAT[speculative-investigation-005] repeated frame construction and owner 
 })
 test('WHAT[speculative-investigation-005] STRENGTH_005_repeated_identical_batches_are_two_batches_not_one', () => {
   const built = Strength.frameTryBuild(H, [
-    batch(1, [exchange('read', '{"filePath":"a"}', 'alpha')]),
-    batch(2, [exchange('read', '{"filePath":"a"}', 'alpha')]),
+    batch(1, [exchange('todowrite-for-predictor', '{"filePath":"a"}', 'alpha')]),
+    batch(2, [exchange('todowrite-for-predictor', '{"filePath":"a"}', 'alpha')]),
   ])
   assert.equal(built.ok, true)
   assert.equal(built.value.batches.length, 2)
   assert.equal(built.value.batches[1].exchanges[0].canonicalResult, 'alpha')
   // The digest binds batch boundaries and ordinals, so duplicated content in
   // two requests stays two exchanges rather than collapsing into one.
-  const collapsed = Strength.frameTryBuild(H, [batch(1, [exchange('read', '{"filePath":"a"}', 'alpha'), exchange('read', '{"filePath":"a"}', 'alpha')])])
+  const collapsed = Strength.frameTryBuild(H, [batch(1, [exchange('todowrite-for-predictor', '{"filePath":"a"}', 'alpha'), exchange('todowrite-for-predictor', '{"filePath":"a"}', 'alpha')])])
   assert.notEqual(collapsed.value.digest, built.value.digest)
 })
 test('WHAT[speculative-investigation-005] STRENGTH_005_media_mirror_fails_closed_instead_of_reconstructing_from_digest', async () => {
@@ -237,13 +242,13 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_oversized_complete_exchan
 
     const outcome = await Strength.transformApply(H, runtime, { messages: [
       user('u1', 'replica-oversize', [hostText('Continue.')]),
-      assistant('a1', 'replica-oversize', [hostResult('c1', 'read', { filePath: 'huge' }, huge)]),
+      assistant('a1', 'replica-oversize', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'huge' }, huge)]),
     ] }, true)
     assert.equal(outcome.kind, 'Ready', 'an oversized complete exchange is admitted as one real round')
     assert.equal(outcome.batches[0].exchanges[0].canonicalResult, huge, 'the oversized result survives verbatim')
 
     const built = Strength.frameTryBuild(H, [
-      { requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"huge"}', canonicalResult: huge }] },
+      { requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"huge"}', canonicalResult: huge }] },
     ])
     assert.equal(built.ok, true, 'an oversized bundle builds without any Delegate-specific byte ceiling')
     assert.ok(built.value.byteLength > 65536)
@@ -285,8 +290,8 @@ const storeWirePayload = (bundle, overrides = {}) => ({
 test('WHAT[speculative-investigation-005] STRENGTH_005_oversized_complete_exchange_survives_build_persist_load_and_render', async () => {
   const huge = 'x'.repeat(70000)
   const built = Strength.frameTryBuild(H, [
-    { requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"huge"}', canonicalResult: huge }] },
-    { requestOrdinal: 2, exchanges: [{ toolName: 'grep', canonicalArguments: '{"pattern":"huge"}', canonicalResult: 'huge:1' }] },
+    { requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"huge"}', canonicalResult: huge }] },
+    { requestOrdinal: 2, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"huge"}', canonicalResult: 'huge:1' }] },
   ])
   assert.equal(built.ok, true)
   const bundle = built.value
@@ -335,7 +340,7 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_tampered_digest_or_byte_l
   try {
     const durability = Strength.durabilityCreate(local.store)
     const bundle = Strength.frameTryBuild(H, [
-      { requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] },
+      { requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] },
     ]).value
 
     const loadWithPayload = async (decision, run, callId, overrides) => {
@@ -378,7 +383,7 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_tampered_digest_or_byte_l
 test('WHAT[speculative-investigation-005] STRENGTH_005_natural_tool_truncation_survives_build_persist_load_and_render', async () => {
   const truncatedResult = '[tool output truncated to the last 2000 lines]\n' + 'tail line\n'.repeat(2000)
   const built = Strength.frameTryBuild(H, [
-    { requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"build.log"}', canonicalResult: truncatedResult }] },
+    { requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"build.log"}', canonicalResult: truncatedResult }] },
   ])
   assert.equal(built.ok, true)
   const bundle = built.value
@@ -422,7 +427,7 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_natural_tool_truncation_s
     // appending reconstructed content yields a different digest, so a frame can
     // never silently swap the real result for a padded one.
     const padded = Strength.frameTryBuild(H, [
-      { requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"build.log"}', canonicalResult: truncatedResult + 'reconstructed tail' }] },
+      { requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"build.log"}', canonicalResult: truncatedResult + 'reconstructed tail' }] },
     ])
     assert.equal(padded.ok, true)
     assert.notEqual(padded.value.digest, bundle.digest)
@@ -443,8 +448,8 @@ const snapshot = (messages) => Projection.projectionSnapshot(Projection.semantic
 
 test('WHAT[speculative-investigation-005] STRENGTH_005_009_candidate_renders_concurrent_calls_then_results_with_stable_ids', () => {
   const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-    { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
-    { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
+    { toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+    { toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
   ] }]).value
   const base = [message('user', [text('base')])]
   const intent = Strength.candidate(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target', currentProviderRun: 'target', bundle }).value
@@ -460,7 +465,7 @@ test('WHAT[speculative-investigation-005] STRENGTH_005_009_candidate_renders_con
   assert.equal(Projection.renderWire(first.messages), Projection.renderWire(second.messages))
 })
 test('WHAT[speculative-investigation-005] STRENGTH_005_candidate_refuses_wrong_target_and_tampered_bundle', () => {
-  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
+  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
   const wrongTarget = Strength.candidate(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-a', currentProviderRun: 'target-b', bundle })
   assert.equal(wrongTarget.ok, false)
   assert.equal(wrongTarget.error, 'StrengthCandidateWrongTarget')
@@ -476,7 +481,7 @@ const Strength = await import('../../../dist/Strength/Surface.js')
 
 test('WHAT[speculative-investigation-005] frame counts complete canonical UTF-8 material without delegate byte ceiling', () => {
   for (const result of ['ASCII', '中文', '😀', '\uD800']) {
-    const batches = [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{}', canonicalResult: result }] }]
+    const batches = [{ requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{}', canonicalResult: result }] }]
     let canonical
     const digest = text => { canonical = text; return 'recorded-digest' }
     const built = Strength.frameTryBuild(digest, batches)
@@ -488,7 +493,7 @@ test('WHAT[speculative-investigation-005] frame counts complete canonical UTF-8 
 })
 
 test('WHAT[speculative-investigation-005] request ordinals must be contiguous and every owner identity component changes the derived call identity', () => {
-  const exchange = { toolName: 'read', canonicalArguments: '{}', canonicalResult: 'x' }
+  const exchange = { toolName: 'todowrite-for-predictor', canonicalArguments: '{}', canonicalResult: 'x' }
   for (const ordinals of [[0], [2], [1, 1], [1, 3]]) {
     assert.equal(Strength.frameTryBuild(text => text, ordinals.map(requestOrdinal => ({ requestOrdinal, exchanges: [exchange] }))).error, 'InvalidRequestOrdinal')
   }

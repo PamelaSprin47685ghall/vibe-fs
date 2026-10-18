@@ -185,8 +185,8 @@ test('WHAT[speculative-investigation-009] final owner encoding preserves physica
 })
 test('WHAT[speculative-investigation-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict', () => {
   const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-    { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
-    { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
+    { toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+    { toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
   ] }]).value
   const wrongTarget = Strength.candidate(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-a', currentProviderRun: 'target-b', bundle })
   assert.equal(wrongTarget.ok, false)
@@ -202,7 +202,7 @@ test('WHAT[speculative-investigation-009] STRENGTH_006_009_candidate_wrong_targe
   assert.equal(invalidAnchor.error, 'InvalidStrengthAnchor')
 })
 test('WHAT[speculative-investigation-009] STRENGTH_009_012_promoted_frames_leave_later_pair_anchor_messages_in_place', () => {
-  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
+  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
   const base = [msg('user', [text('u1')]), msg('assistant', [text('target-assistant')]), msg('user', [text('pair-anchor-stand-in')])]
   const promoted = Strength.promoted(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', beforeIndex: 1, isReplicaRequest: false, bundle }).value
   const renderedOutput = Projection.renderMessagesWithHostIds(snapshot(base), base, [promoted])
@@ -210,7 +210,7 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_012_promoted_frames_leave
   assert.equal(renderedOutput.messages.at(-1).parts[0].text, 'pair-anchor-stand-in')
 })
 test('WHAT[speculative-investigation-009] STRENGTH_009_replica_mirror_replaces_base_then_local_batches_append', () => {
-  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
+  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
   const mirrorMessages = [msg('user', [text('mirror-base')])]
   const mirror = Strength.projectionMirror({ decisionId: 'd1', targetProviderRun: 'target', semanticDigest: 'sem-a', rows: [{ message: mirrorMessages[0], hostMessageId: 'mirror-host-id', hostIsPhysical: true }] }).value
   const local = Strength.replicaLocal(H, { ownerSessionId: 'owner', decisionId: 'd1', bundle }).value
@@ -253,7 +253,7 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_local_batches_append_afte
   assert.equal(Strength.runtimeRegister(runtime, binding).ok, true)
   const outcome = await Strength.transformApply(H, runtime, { messages: [
     user('u1', 'replica-local', [hostText('Continue.')]),
-    assistant('a1', 'replica-local', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+    assistant('a1', 'replica-local', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
   ] }, true)
   assert.equal(outcome.kind, 'Ready')
   assert.equal(outcome.batches.length, 1)
@@ -272,7 +272,7 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_local_batches_append_afte
   assert.notEqual(localParts[0].callId, 'c1', 'the owner call id must be relocated into this decision')
   // The original arguments and the real result stay on the Host row itself.
   const localPart = outcome.output[1].parts[0]
-  assert.equal(localPart.tool, 'read')
+  assert.equal(localPart.tool, 'todowrite-for-predictor')
   assert.deepEqual(localPart.state.input, { filePath: 'a' })
   assert.equal(localPart.state.output, 'alpha')
 })
@@ -282,7 +282,7 @@ test('WHAT[speculative-investigation-009] replica request never ends on an assis
   assert.equal(Strength.runtimeRegister(runtime, binding).ok, true)
   const input = () => ({ messages: [
     user('u1', 'replica-tail', [hostText('Continue.')]),
-    assistant('a1', 'replica-tail', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+    assistant('a1', 'replica-tail', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
   ] })
   const first = await Strength.transformApply(H, runtime, input(), true)
   const second = await Strength.transformApply(H, runtime, input(), false)

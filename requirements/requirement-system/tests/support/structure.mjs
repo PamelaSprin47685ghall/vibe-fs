@@ -69,7 +69,7 @@ export function testFileProblems(files, liveClauses) {
 export function inspectRequirements(root) {
   const requirements = join(root, 'requirements')
   const index = readFileSync(join(requirements, 'INDEX.md'), 'utf8')
-  const packages = [...index.matchAll(/^\|[^\n]*`([a-z][a-z0-9-]*)`/gm)].map((match) => match[1])
+  const packages = [...index.matchAll(/^\| `([a-z][a-z0-9-]*)` \|/gm)].map((match) => match[1])
   const problems = []
   for (const entry of readdirSync(requirements, { withFileTypes: true })) {
     if (entry.isDirectory() && entry.name !== 'proposals' && !packages.includes(entry.name)) {

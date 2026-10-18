@@ -24,7 +24,6 @@ module HostForkChildDispatch =
         xTraceHead: (SessionId -> XTraceCursor) ->
         trackOwnedWork: ((unit -> Task) -> unit) ->
         runtime: ForkRuntime ->
-        handoffPort: ReusableHandoffPort option ->
         sendChildPrompt:
             (string
                 -> SessionId
@@ -36,7 +35,6 @@ module HostForkChildDispatch =
         sendBusyNudge:
             (string -> SessionId -> PromptAuthority.AuthorityExecutionProfile -> string -> Task<Result<unit, string>>) ->
         onRunStarted: (SessionId -> Role -> unit) ->
-        preparedHandoff: PreparedDelegationHandoff option ->
         agentId: string ->
         childId: SessionId ->
         role: Role ->

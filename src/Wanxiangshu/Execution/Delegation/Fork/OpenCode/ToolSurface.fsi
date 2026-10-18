@@ -92,7 +92,6 @@ module ForkToolSurface =
     val emitStopWithReason: obj -> string -> string -> string -> string -> Task
     val replayWorkCompletion: obj -> string -> string -> Task<obj>
     val workSnapshot: obj -> string -> obj array
-    val handoffSnapshot: obj -> obj array
     val coldWorkSnapshot: string -> string -> Task<obj array>
     val replayBinding: obj -> string -> string -> Task<obj>
     val emitTerminalForRoot: obj -> string -> string -> string -> string -> Task

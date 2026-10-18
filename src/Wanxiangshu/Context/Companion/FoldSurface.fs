@@ -199,9 +199,9 @@ module ContextFoldSurface =
                        WorkId = text (payload?WorkId)
                        IncumbencyId = text (payload?IncumbencyId) |}
             )
-        | "TodoCheckpointCommitted" ->
+        | "ViewCheckpointCommitted" ->
             AgentFact.Context(
-                ContextFactCases.TodoCheckpointCommitted
+                ContextFactCases.ViewCheckpointCommitted
                     {| SessionId = sessionId (payload?SessionId)
                        ToolCallId = ToolCallId.create (text (payload?ToolCallId)) |}
             )
@@ -490,8 +490,8 @@ module ContextFoldSurface =
     /// obligation-ledger-004: the compression checkpoint windows as plain JS,
     /// so a test can observe what the checkpoint facts actually wrote without
     /// reading the durable projection's internal representation.
-    let private todoCheckpointsToJs (projection: ProjectionSet) : obj =
-        projection.AgentProjections.TodoCheckpoints
+    let private viewCheckpointsToJs (projection: ProjectionSet) : obj =
+        projection.AgentProjections.ViewCheckpoints
         |> Map.toList
         |> List.map (fun (sessionId, window) ->
             SessionId.value sessionId,
@@ -505,7 +505,7 @@ module ContextFoldSurface =
     let private okState projection =
         box
             {| sessions = projectionToJs projection
-               todoCheckpoints = todoCheckpointsToJs projection |}
+               viewCheckpoints = viewCheckpointsToJs projection |}
 
     let private rejectionToJs (rejection: FoldRejection) : obj =
         box

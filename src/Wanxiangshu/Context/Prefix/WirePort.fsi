@@ -14,9 +14,9 @@ type WireSessionState =
         XTrace: XTraceProjectionState option
         Blog: BlogProjectionState option
         PrefixEpoch: ActivePrefixEpoch option
-        /// Successful todowrite checkpoints still on the raw side of the
+        /// Successful view declaration checkpoints still on the raw side of the
         /// committed prefix.
-        TodoCheckpoints: PhaseWindow.PhaseCommitWindow
+        ViewCheckpoints: PhaseWindow.PhaseCommitWindow
     }
 
 /// Single-snapshot view required by Wire for one call.

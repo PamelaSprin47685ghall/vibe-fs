@@ -74,14 +74,14 @@ export const collectManagerProviderToolEvidence = (scenario, opts = {}) => {
     requestCount: chatRequests.length,
     unionTools,
     assumeAdvertised: unionTools.includes('assume'),
-    todowriteAdvertised: unionTools.includes('todowrite'),
+    todowriteAdvertised: unionTools.includes('todowrite-for-manager'),
     samples: chatRequests.slice(0, 8),
   };
 };
 
 /**
  * Assert the Manager wire surface is the production one: independent `assume`,
- * Host-native `todowrite`, and the Manager spine.
+ * `todowrite-for-manager`, and the Manager spine.
  *
  * @param {{ managerProviderWire?: ReturnType<typeof collectManagerProviderToolEvidence> | null }} [opts]
  */
@@ -97,10 +97,10 @@ export const assertManagerToolSurface = (opts = {}) => {
   }
   if (!wire.todowriteAdvertised) {
     throw new Error(
-      `MANAGER_TOOL_SURFACE: Manager provider wire must advertise native todowrite: ${JSON.stringify(wire)}`,
+      `MANAGER_TOOL_SURFACE: Manager provider wire must advertise todowrite-for-manager: ${JSON.stringify(wire)}`,
     );
   }
-  for (const required of ['fork', 'horizon', 'join', 'resume', 'assume', 'deliver', 'todowrite']) {
+  for (const required of ['fork', 'horizon', 'join', 'resume', 'assume', 'deliver', 'todowrite-for-manager']) {
     if (!wire.unionTools.includes(required)) {
       throw new Error(`MANAGER_TOOL_SURFACE: missing Manager tool ${required}`);
     }

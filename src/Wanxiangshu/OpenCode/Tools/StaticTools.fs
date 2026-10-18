@@ -111,9 +111,8 @@ module StaticTools =
     let jsToolName (role: Role) : string =
         "todowrite-for-" + (string role).ToLowerInvariant()
 
-    /// Shared office boundary for lightweight cognitive utilities. Both the
-    /// custom assume tool and the Host-native todowrite surface consume this
-    /// predicate so schema visibility and execution admission cannot drift.
+    /// Shared office boundary for lightweight cognitive utilities (`assume`) so
+    /// schema visibility and execution admission cannot drift.
     let cognitiveUtilityRoleAllowed (role: Role) : bool =
         role <> Role.Blogger && role <> Role.Distiller
 
@@ -153,10 +152,7 @@ module StaticTools =
           "horizon"
           "fission"
           "skill"
-          "todowrite"
           "assume"
-          "defer"
-          "publish"
           "bash-honeypot"
           "review"
           "chronicle"
@@ -183,10 +179,7 @@ module StaticTools =
         |> List.map (fun name ->
             name,
             (name = "skill"
-             || name = "todowrite"
              || name = "assume"
-             || name = "defer"
-             || name = "publish"
              || (permissionOfToolName role name
                  |> Option.exists (fun permission -> Set.contains permission allowed))))
         |> Map.ofList
@@ -225,10 +218,8 @@ module StaticTools =
 
         | true, "skill", Role.Blogger -> "deny"
         | true, "skill", _ -> "allow"
-        | true, ("assume" | "todowrite"), role when not (cognitiveUtilityRoleAllowed role) -> "deny"
-        | true, ("assume" | "todowrite"), _ -> "allow"
-        | true, ("defer" | "publish"), Role.Blogger -> "deny"
-        | true, ("defer" | "publish"), _ -> "allow"
+        | true, "assume", role when not (cognitiveUtilityRoleAllowed role) -> "deny"
+        | true, "assume", _ -> "allow"
         | true, "todowrite-for-bookkeeper", _ -> "deny"
         | true, name, _ when name.StartsWith "todowrite-for-" -> jsPermission role name
         | true, _, _ -> defaultPermission allowed role name

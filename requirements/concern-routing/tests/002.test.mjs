@@ -1,17 +1,15 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import test from 'node:test'
-import * as concern from '../../../dist/Interaction/Concern/Surface.js'
 
-test('WHAT[concern-routing-002] projection announcement coverage is per recipient, including the owner', () => {
-  let state = concern.subscribe('owner', 'generation', 'build', 'build health', concern.empty()).state
-  for (const recipient of ['owner', 'peer', 'newcomer']) {
-    const prepared = concern.prepare(recipient, state)
-    assert.deepEqual(prepared.announcements, [{ id: 'build', concern: 'build health' }])
-    const placed = concern.place(recipient, prepared.announcedGenerations, [], state)
-    assert.equal(placed.ok, true)
-    state = placed.state
-    assert.deepEqual(concern.prepare(recipient, state).announcements, [])
-  }
+const root = process.cwd()
+const read = (path) => readFileSync(resolve(root, path), 'utf8')
+
+// Superseded by js.fork / js.join / js.deliver / js.ask: Pair Hint no longer prepares or injects concern announcements or messages.
+test('WHAT[concern-routing-002] PairProgrammingThoughtTransform no longer prepares concern fragments or carries ConcernPlacement on wire records', () => {
+  const transform = read('src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs')
+  const transformSig = read('src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fsi')
+  assert.doesNotMatch(transform, /prepareConcernFragments|concernInstructions|Interaction\.Concern/)
+  assert.doesNotMatch(transformSig, /ConcernPlacement|Interaction\.Concern/)
 })
-
-test.todo('WHAT[concern-routing-002] actual plugin delivers each live generation once to eligible peers through automatic session mailboxes (rework pending for concern-routing-001)')

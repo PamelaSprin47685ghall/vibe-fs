@@ -256,7 +256,6 @@ type HostForkRuntime
         ?onRunStarted: SessionId -> Role -> string option -> unit,
         ?parentWorkRecordFor: SessionId -> Task<string option>,
         ?childWorkRecordFor: SessionId -> Task<string option>,
-        ?handoff: ReusableHandoffPort,
         ?sessionSnapshot: ISessionSnapshotPort,
         ?cancelSignals: SessionId seq -> unit,
         /// Ownership of every handle this runtime forks. Host-owned hidden
@@ -498,8 +497,6 @@ type HostForkRuntime
         defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
 
     let childWorkRecordOfRun = childWorkRecordForRun
-
-    let handoffPort = handoff
 
     let xTraceHead (sessionId: SessionId) : XTraceCursor =
         journal
@@ -769,17 +766,6 @@ type HostForkRuntime
     member internal _.ChildWorkRecordOf = childWorkRecordOf
     member internal _.ChildWorkRecordOfRun = childWorkRecordOfRun
     member internal _.XTraceHead = xTraceHead
-    member internal _.HandoffPort = handoffPort
-
-    member internal _.PrepareHandoff(route: DelegationHandoffRoute) : Task<Result<PreparedDelegationHandoff, string>> =
-        match handoffPort with
-        | Some port ->
-            task {
-                let! prepared = port.Prepare parentId route
-                return Ok prepared
-            }
-        | None -> Task.FromResult(Error "reusable delegation handoff capability is unavailable")
-
     member internal _.TrackOwnedWork(work: unit -> Task) = startOwnedWork work |> ignore
     member internal _.SendChildPrompt = sendChildPrompt
     member internal _.SendBusyNudge = sendBusyNudge
@@ -862,7 +848,6 @@ type HostForkRuntime
                             journal
                             parentId
                             sessions
-                            handoffPort
                             run
                             outcome
                             workRecord
@@ -879,7 +864,6 @@ type HostForkRuntime
                             journal
                             parentId
                             sessions
-                            handoffPort
                             run
                             (sprintf "completion settlement faulted: %s" error.Message)
             }
@@ -891,8 +875,7 @@ type HostForkRuntime
             agentId: string,
             childId: SessionId,
             role: Role,
-            authorityRoot: AuthorityRootUserMessageId,
-            ?preparedHandoff: PreparedDelegationHandoff
+            authorityRoot: AuthorityRootUserMessageId
         ) =
         lock gate (fun () ->
             processOwnedAgents.Add agentId |> ignore
@@ -908,8 +891,6 @@ type HostForkRuntime
                 childWorkRecordOfRun
                 xTraceHead
                 (fun work -> startOwnedWork work |> ignore)
-                handoffPort
-                preparedHandoff
                 agentId
                 childId
                 role
@@ -921,7 +902,7 @@ type HostForkRuntime
 
     member this.FailRun(run: PendingHostRun, error: string) : Task =
         startOwnedWork (fun () ->
-            HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions handoffPort run error)
+            HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run error)
 
     member this.MarkReady(run: PendingHostRun) =
         // markReady is intentionally a no-op; do not perform an unnecessary WorkRecord read.

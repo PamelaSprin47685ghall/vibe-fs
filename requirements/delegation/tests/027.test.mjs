@@ -99,8 +99,6 @@ for (const replacement of ['active', 'finished', 'successor']) {
         assert.match(await forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', byname, 'ORIGINAL-WORK'), /carries this charge now/)
       }
       const original = forkTool.workSnapshot(runtime, owner)
-      const originalHandoff = forkTool.handoffSnapshot(runtime)
-      assert.ok(originalHandoff.length > 0, 'the completed attachment source established a real handoff frontier')
       const listeners = forkTool.terminalListenerCount(runtime)
       const completeOriginal = await forkTool.prepareTerminalDelivery(runtime, owner, 'ORIGINAL-DONE', 'original-provider')
       armAttachmentBlock = true
@@ -116,7 +114,6 @@ for (const replacement of ['active', 'finished', 'successor']) {
         await forkTool.executeManagerResume(runtime, toolModule, owner, '', byname, 'SUCCESSOR-WORK')
       }
       const beforeRelease = forkTool.workSnapshot(runtime, owner)
-      const handoffBeforeRelease = forkTool.handoffSnapshot(runtime)
       const countBeforeRelease = forkTool.promptCount(runtime)
       forkTool.acceptNextPrompt(runtime)
       release.resolve()
@@ -126,7 +123,6 @@ for (const replacement of ['active', 'finished', 'successor']) {
         assert.equal(forkTool.promptCount(runtime), countBeforeRelease + 1)
         assert.match(forkTool.prompt(runtime, countBeforeRelease), /ORIGINAL-GUIDANCE/)
         assert.deepEqual(forkTool.workSnapshot(runtime, owner), original)
-        assert.deepEqual(forkTool.handoffSnapshot(runtime), originalHandoff)
         assert.equal(forkTool.terminalListenerCount(runtime), listeners)
         forkTool.acceptNextPrompt(runtime)
         await forkTool.executeManagerResumeWithAttachment(runtime, toolModule, owner, byname, 'ORIGINAL-GUIDANCE', 'Source')
@@ -134,13 +130,11 @@ for (const replacement of ['active', 'finished', 'successor']) {
         assert.equal(forkTool.prompt(runtime, countBeforeRelease + 1), forkTool.prompt(runtime, countBeforeRelease))
         assert.notEqual(forkTool.promptEvidence(runtime, countBeforeRelease + 1).promptKey, forkTool.promptEvidence(runtime, countBeforeRelease).promptKey)
         assert.deepEqual(forkTool.workSnapshot(runtime, owner), original)
-        assert.deepEqual(forkTool.handoffSnapshot(runtime), originalHandoff)
         await completeOriginal()
       } else {
         assert.equal(result, '# The charge could not be placed.\n')
         assert.equal(forkTool.promptCount(runtime), countBeforeRelease, 'stale guidance never reaches Host')
         assert.deepEqual(forkTool.workSnapshot(runtime, owner), beforeRelease)
-        assert.deepEqual(forkTool.handoffSnapshot(runtime), handoffBeforeRelease)
         if (replacement === 'successor') {
           assert.doesNotMatch(forkTool.prompt(runtime, countBeforeRelease - 1), /ORIGINAL-GUIDANCE/)
           const completeSuccessor = await forkTool.prepareTerminalDelivery(runtime, owner, 'SUCCESSOR-DONE', 'successor-provider')

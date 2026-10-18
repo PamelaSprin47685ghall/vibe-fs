@@ -453,7 +453,6 @@ module PluginHostInterop =
         (childWorkRecordFor: (string -> Task<string option>) option)
         (childWorkRecordForRun:
             SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>)
-        (workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability)
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
@@ -501,7 +500,6 @@ module PluginHostInterop =
                 jsLifecyclePersistence
                 continueManagerLoop
                 (Some childWorkRecordForRun)
-                (Some workRecordCapability)
                 userNotify
 
         // Process-local join admission: JoinTool RequireCurrentProcessJoin → PluginRuntimeScope.

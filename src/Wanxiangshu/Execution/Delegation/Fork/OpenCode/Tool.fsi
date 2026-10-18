@@ -76,13 +76,7 @@ module ForkTool =
             val PersonCannotTakeCharge: string = "tool/fork/person-cannot-take-charge"
 
             [<Literal>]
-            val HandoffJournalRequired: string = "tool/fork/handoff-journal-required"
-
-            [<Literal>]
             val PersonSessionUnknown: string = "tool/fork/person-session-unknown"
-
-            [<Literal>]
-            val HandoffAppendFailed: string = "tool/fork/handoff-append-failed"
 
         [<RequireQualifiedAccess>]
         module Commission =

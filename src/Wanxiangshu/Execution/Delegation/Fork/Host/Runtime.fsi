@@ -30,7 +30,6 @@ type HostForkRuntime =
         ?onRunStarted: (SessionId -> Role -> string option -> unit) *
         ?parentWorkRecordFor: (SessionId -> Task<string option>) *
         ?childWorkRecordFor: (SessionId -> Task<string option>) *
-        ?handoff: ReusableHandoffPort *
         ?sessionSnapshot: ISessionSnapshotPort *
         ?cancelSignals: (SessionId seq -> unit) *
         ?ownership: HandleOwnership *
@@ -86,8 +85,6 @@ type HostForkRuntime =
     member internal ChildWorkRecordOf: (SessionId -> Task<string option>)
     member internal ChildWorkRecordOfRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
     member internal XTraceHead: (SessionId -> XTraceCursor)
-    member internal HandoffPort: ReusableHandoffPort option
-    member internal PrepareHandoff: route: DelegationHandoffRoute -> Task<Result<PreparedDelegationHandoff, string>>
     member internal TrackOwnedWork: work: (unit -> Task) -> unit
 
     member internal SendChildPrompt:
@@ -110,8 +107,7 @@ type HostForkRuntime =
         agentId: string *
         childId: SessionId *
         role: Role *
-        authorityRoot: AuthorityRootUserMessageId *
-        ?preparedHandoff: PreparedDelegationHandoff ->
+        authorityRoot: AuthorityRootUserMessageId ->
             PendingHostRun
 
     member FailRun: run: PendingHostRun * error: string -> Task

@@ -36,8 +36,8 @@ module ContextFact =
     let inline BloggerRequestAbandoned payload =
         AgentFact.Context(ContextFactCases.BloggerRequestAbandoned payload)
 
-    let inline TodoCheckpointCommitted payload =
-        AgentFact.Context(ContextFactCases.TodoCheckpointCommitted payload)
+    let inline ViewCheckpointCommitted payload =
+        AgentFact.Context(ContextFactCases.ViewCheckpointCommitted payload)
 
     let inline PrefixRebaseCommitted payload =
         AgentFact.Context(ContextFactCases.PrefixRebaseCommitted payload)

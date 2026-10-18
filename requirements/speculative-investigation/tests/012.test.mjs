@@ -70,7 +70,7 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_the_budget_is_the_owner_s
 
 test('WHAT[speculative-investigation-012] STRENGTH_012_candidate_and_promoted_semantic_bytes_have_no_mechanism_provenance', () => {
   const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-    { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+    { toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
   ] }]).value
   const base = [
     { role: 'user', parts: [{ kind: 'text', text: 'inspect the file' }] },
@@ -332,7 +332,7 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_fa
   const nonParticipating = [
     'fork', 'resume', 'commission', 'join', 'horizon', 'review', 'deliver',
     'fission', 'todowrite-for-plan', 'ask', 'devops', 'handoff',
-    'skill', 'todowrite', 'assume', 'defer',
+    'skill', 'assume', 'defer',
     'publish', 'chronicle', 'todowrite-for-bookkeeper', 'todowrite-for-predictor',
     'bash-honeypot', 'invalid', 'todowrite-for-orchestrator', 'todowrite-for-blogger',
   ]

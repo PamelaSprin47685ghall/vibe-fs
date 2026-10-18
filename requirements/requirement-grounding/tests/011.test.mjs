@@ -50,13 +50,15 @@ const writeProgram = "class Js extends JsProgram { async run() { await this.writ
 
 async function deliverKnowledge(hooks, directory, runtime, sessionID, providerID, established) {
   const path = join(directory, 'src', 'main.fs')
-  const tool = established ? 'todowrite-for-manager' : 'read'
-  const args = established
-    ? { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
-    : { filePath: path }
+  const tool = established ? 'todowrite-for-manager' : 'todowrite-for-engineer'
+  const args = { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
   const callID = `read-${sessionID}`
   const input = { tool, sessionID, callID }
   const authorityBefore = structuredClone(observeAuthority(runtime, sessionID).activeLogicalRun)
+  if (!established) {
+    const requested = await host.requestPaths({ handle: runtime.journal }, directory, sessionID, [path])
+    assert.equal(requested.ok, true, requested.error)
+  }
   await hooks['tool.execute.before'](input, { args })
   const output = established
     ? await hooks.tool[tool].execute(args, { sessionID, agent: 'manager' })

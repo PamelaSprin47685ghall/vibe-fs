@@ -350,7 +350,7 @@ module PrefixSurface =
     let private checkpointToJs (checkpoint: Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCheckpoint) : obj =
         box {| callId = ToolCallId.value checkpoint.ToolCallId |}
 
-    /// Append one successful todowrite checkpoint. The window is not trimmed by K;
+    /// Append one successful view declaration checkpoint. The window is not trimmed by K;
     /// only a committed prefix rebase can make older checkpoints unrecoverable.
     let appendCheckpoint (callId: string) (window: obj array) : obj array =
         let committed =

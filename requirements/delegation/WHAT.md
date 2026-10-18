@@ -94,7 +94,7 @@ attachment 只将指定同伴的历史 WorkRecord 作为只读数据放入首 pr
 
 复用 participant 的每个新工作是独立 direct-CE invocation，不建立 durable Stage/Phase/ActiveWorkUnit 或第二状态机。resume route 由 Byname 标识，SyncDelegate route 由 caller scope + dedicated role 标识；物理 SessionId 不拥有 handoff 连续性。
 
-输入为新 charge 加 parent delta LifecycleWorkRecord：窗口从上一已完成 work unit 的 parent frontier 到本次 admission 的 parent XTrace head；首次使用含 Opening 的当前 parent record。
+输入为新 charge（调用方在 charge 中显式提供上下文，SyncDelegate/dag 可直接拼接上游 `workRecord`，且 ANCHOR 编号共享同一进程地址空间；父到子 `DelegationHandoff` delta tracking 已退役）。
 
 同步调用等待自己完成，只返回自身 callee XTrace 范围内的 bounded delta record。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回 WorkRecord；完成结果只经 join/horizon 拉取。
 
@@ -106,17 +106,17 @@ run-scoped Completed/Failed/Aborted 均须保留因果身份；只有 session-wi
 
 ## [026] Effect truth 单向前进
 
-新 assignment 以 direct F# CE 表达。同步为 `prepare → dispatch → await own completion → checkpoint completed handoff`；异步 fork/resume 同步确认接收方的身份校验与持久接收，随后异步工作，不在 invocation 内等待 child 完成。发送前 claim 复用 PromptAuthority 事实，不另持久化程序状态。
+新 assignment 以 direct F# CE 表达。同步为 `dispatch → await own completion`；异步 fork/resume 同步确认接收方的身份校验与持久接收，随后异步工作，不在 invocation 内等待 child 完成。发送前 claim 复用 PromptAuthority 事实，不另持久化程序状态。
 
 仅 exact `AcceptedAssignment` 可宣告已承接，并发布为 join 可等待的运行任务；Submitted transport receipt 不足以证明接收。确定未发送或已拒绝时，返回调用失败并释放预留，不遗留运行中任务。
 
-acceptance unknown 或确认超时时，保留 durable Pending 与原 PromptKey，不伪造失败、不自动重发；返回明确的 `DispatchUncertain`，说明可能已接受、不要重复委托，且不得发布为 join 等待任务。已经发生的 effect 不得被后置失败否认为“未放置”。route 的 parent frontier 只由本次 interaction 已完成的 durable fact 推进。
+acceptance unknown 或确认超时时，保留 durable Pending 与原 PromptKey，不伪造失败、不自动重发；返回明确的 `DispatchUncertain`，说明可能已接受、不要重复委托，且不得发布为 join 等待任务。已经发生的 effect 不得被后置失败否认为“未放置”。
 
 Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真实 Host agent 运行经 `PendingRuns`/`PendingCompletionCount`/`PtyRuns` 可见，可 join 的 durable handle 经 journal 投影可见。重启后按 durable handle 重新收养的**空闲伴随句柄**（如 Manager 的 `devops`）只注册其身份、不代表有在跑任务，不得让 Join 误判为有工作而无限等待；无 journal 的纯 PTY 模式才以进程内 active run 计数作为 agent 工作信号。
 
 ## [027] Busy nudge 不承载新 assignment
 
-同一 logical route 同时至多一个 active work unit。对忙碌 participant 调用 `resume` 时，charge 作为 `BusyAgentNudge` 追加到既有 LogicalRun，在 Host 保存后进入下一次尚未开始准备的 LLM 请求，不中断当前输出或工具。Engineer 与固定 DevOps 均允许此行为；保留原 work 的 Root、身份、完成订阅与 handoff frontier，不创建新 assignment，不因提示文本与旧 charge 相同而假装发送成功。
+同一 logical route 同时至多一个 active work unit。对忙碌 participant 调用 `resume` 时，charge 作为 `BusyAgentNudge` 追加到既有 LogicalRun，在 Host 保存后进入下一次尚未开始准备的 LLM 请求，不中断当前输出或工具。Engineer 与固定 DevOps 均允许此行为；保留原 work 的 Root、身份与完成订阅，不创建新 assignment，不因提示文本与旧 charge 相同而假装发送成功。
 
 前一 work unit 完成后，`resume` 才承接下一项，不依赖 join 消费或重建 participant。忙碌提示的发送路径不得因异步准备期间任务结束而自动改走新 assignment。
 
@@ -128,19 +128,17 @@ Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真
 
 ## [029] 领域意图与物理能力单向注入
 
-委托领域只产生 typed intent；linkage、estimate、handoff frontier、child handle index 和 closed rejection 由委托纯 fold/decision 拥有。只有 durable composition 将意图包入外层持久事件并组合 projection。
+委托领域只产生 typed intent；linkage、estimate、child handle index 和 closed rejection 由委托纯 fold/decision 拥有。只有 durable composition 将意图包入外层持久事件并组合 projection。
 
 各委托/恢复 workflow 只消费委托拥有的 append/query/wait/clock/PTY capability。PTY adapter 不得读取 Host/fork runtime、process 实现或其 Gate、Dictionary、registry、TCS 状态；Temporal、CausalWait、Process 物理实现只由 composition 构造最窄能力并注入。
 
 ## [030] Fatal 使用必填注入能力
 
-handoff checkpoint 或 sync invariant 违例由委托 owner 构造 typed incident；先保留已发生 effect 与 durable settlement，再调用必填的 fatal capability。runtime 不直接引用物理 fatal adapter，不设 optional/default/global fallback；同一 incident 至多一次 report 和 kill。
+sync invariant 违例由委托 owner 构造 typed incident；先保留已发生 effect 与 durable settlement，再调用必填的 fatal capability。runtime 不直接引用物理 fatal adapter，不设 optional/default/global fallback；同一 incident 至多一次 report 和 kill。
 
 ## [031] Checkpoint 保留已完成事实
 
-完成 checkpoint 返回封闭 `HandoffCheckpointSettlement`，始终携带 exact parent + route：Committed、NotCommitted、Unknown 或 PhaseConflict。WriterUnavailable 为已知未写的 NotCommitted，WriteUnknown 为等待证据的 Unknown，frontier 后退/负值为 PhaseConflict。
-
-NotCommitted/Unknown 不否认 child 已完成：同步照常交付 WorkRecord，fork 照常交付 proven completion，不重跑 child。Unknown 不自动重试/重发，由下一 invocation 重读 durable frontier 收敛；只有 PhaseConflict 经注入 fuse 熔断。PrepareHandoff 未产出 prepared 就无 checkpoint 可写，不在 completion 路径再 fatal。
+（父到子 `DelegationHandoff` 及其 `HandoffCheckpointSettlement` 已随显式 charge 上下文传递与共享 ANCHOR 地址空间退役。）child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交付 bounded `WorkRecord`，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
 
 ## [032] Engineer 与 DevOps 不相互差遣
 

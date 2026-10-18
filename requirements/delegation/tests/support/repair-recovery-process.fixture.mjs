@@ -76,8 +76,6 @@ try {
   }
   assert.equal(sync.childCount(runtime), 1)
   assert.equal(sync.terminalListenerCount(runtime), 0)
-  const firstFrontier = sync.handoffFrontier(runtime, owner, 'Engineer')
-  assert.notEqual(firstFrontier, null)
   if (!scenario.startsWith('own-')) {
     const second = sync.startObserved(runtime, owner, 'SECOND-REPAIR-CHARGE')
     const secondCompletion = sync.observedCompletion(second)
@@ -103,7 +101,6 @@ try {
         successor.authorityRootUserMessageId, 'actual-repair-provider-run', staleText, '')
     assert.equal(staleAccepted, false, 'An actually accepted old repair cannot settle the next same-root invocation')
     assert.equal(await pendingAfterTurn(secondCompletion), 'pending')
-    assert.deepEqual(sync.handoffFrontier(runtime, owner, 'Engineer'), firstFrontier)
     const secondRepair = sync.observeRepairTurn(runtime, secondAccepted.sessionId, secondAccepted.physicalUserMessageId,
       secondAccepted.authorityRootUserMessageId, 'second-incomplete-provider-run', finish, delivery, true)
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 4)

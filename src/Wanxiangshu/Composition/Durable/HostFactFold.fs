@@ -4,7 +4,6 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
@@ -25,24 +24,6 @@ module HostFactFold =
             { Fact = "PairProgrammingGuidelineAnchored"
               Reason = sprintf "placement (%A, %A) already exists in this transcript (HOST-013 §8)" callGap resultGap }
 
-    let private applyConcernPlacement
-        sessionId
-        (placement: Wanxiangshu.Host.ConcernPlacementBatch option)
-        (projection: AgentProjectionSet)
-        =
-        match placement with
-        | None -> Ok projection
-        | Some batch ->
-            let concernBatch: Wanxiangshu.Interaction.Concern.ConcernPlacementBatch =
-                { AnnouncedGenerations = batch.AnnouncedGenerations
-                  DeliveredMessages = batch.DeliveredMessages }
-
-            ConcernProjection.applyPlacement sessionId concernBatch projection.Concern
-            |> Result.map (fun concern -> { projection with Concern = concern })
-            |> Result.mapError (fun reason ->
-                { Fact = "PairProgrammingGuidelineAnchored"
-                  Reason = reason })
-
     let fold (projection: AgentProjectionSet) (fact: HostFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match fact with
         | HostFactCases.PairProgrammingGuidelineAnchored payload ->
@@ -62,7 +43,6 @@ module HostFactFold =
                             Guidelines = Some updated }))
                 projection
             |> Result.mapError guidelineRejection
-            |> Result.bind (applyConcernPlacement payload.SessionId payload.ConcernPlacement)
 
         | HostFactCases.RequirementGroundingRequested payload ->
             Ok(

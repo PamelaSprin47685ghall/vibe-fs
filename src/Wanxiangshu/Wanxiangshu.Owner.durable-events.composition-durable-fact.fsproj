@@ -11,9 +11,7 @@
     <Compile Include="Composition/Durable/ChatExecutionFact.fsi"/>
     <Compile Include="Composition/Durable/ChatExecutionFact.fs"/>
 
-    <ProjectReference Include="Wanxiangshu.Owner.attention-regulation.interaction-attention-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.change-integration.change-facts.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-facts.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-syncdelegate-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>

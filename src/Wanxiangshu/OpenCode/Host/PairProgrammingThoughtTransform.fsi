@@ -5,7 +5,6 @@ open System.Threading.Tasks
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 
@@ -23,8 +22,7 @@ module PairProgrammingThoughtTransform =
           CallId: string
           MarkerText: string
           CallGap: TranscriptGap
-          ResultGap: TranscriptGap
-          ConcernPlacement: ConcernPlacementBatch option }
+          ResultGap: TranscriptGap }
 
     /// HOST-013 English canonical used by tests; production loads via session language.
     val text: string

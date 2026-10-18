@@ -4,7 +4,7 @@ import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
-integrationTest('WHAT[effect-accounting-008] todowrite commits its compression checkpoint only after native execution succeeds', async () => {
+integrationTest('WHAT[effect-accounting-008] programming surface with view commits its compression checkpoint only after execution succeeds', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'effect-008-todowrite'
     const callID = 'effect-008-todo-1'
@@ -12,22 +12,23 @@ integrationTest('WHAT[effect-accounting-008] todowrite commits its compression c
 
     const beforeOutput = {
       args: {
-        todos: [{ content: 'verify effect boundary', status: 'in_progress', priority: 'high' }],
+        program: 'class Js extends JsProgram { async run() { return {}; } }',
+        view: { prefixUntil: 1 },
       },
     }
 
-    await hooks['tool.execute.before']({ tool: 'todowrite', sessionID, callID }, beforeOutput)
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-engineer', sessionID, callID }, beforeOutput)
 
     const beforeSnapshot = journalSurface.JournalSurface_snapshot(runtime.journal)
-    assert.deepEqual(beforeSnapshot.todoCheckpoints, [], 'before admission must not commit a checkpoint')
+    assert.deepEqual(beforeSnapshot.viewCheckpoints, [], 'before admission must not commit a checkpoint')
 
     await hooks['tool.execute.after'](
-      { tool: 'todowrite', sessionID, callID, args: beforeOutput.args },
-      { title: 'todowrite', output: 'Todos updated', metadata: {} },
+      { tool: 'todowrite-for-engineer', sessionID, callID, args: beforeOutput.args },
+      { title: 'todowrite-for-engineer', output: 'ok', metadata: {} },
     )
 
     assert.deepEqual(
-      journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints,
+      journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
       [],
       'after runs while the Host tool part is still running',
     )
@@ -37,13 +38,24 @@ integrationTest('WHAT[effect-accounting-008] todowrite commits its compression c
         type: 'message.part.updated',
         properties: {
           sessionID,
-          part: { type: 'tool', tool: 'todowrite', callID, state: { status: 'completed' } },
+          part: {
+            type: 'tool',
+            tool: 'todowrite-for-engineer',
+            callID,
+            state: {
+              status: 'completed',
+              input: {
+                program: 'class Js extends JsProgram { async run() { return {}; } }',
+                view: { prefixUntil: 1 },
+              },
+            },
+          },
         },
       },
     })
 
     const afterSnapshot = journalSurface.JournalSurface_snapshot(runtime.journal)
-    assert.deepEqual(afterSnapshot.todoCheckpoints, [
+    assert.deepEqual(afterSnapshot.viewCheckpoints, [
       {
         sessionId: sessionID,
         checkpoints: [{ callId: callID }],
@@ -52,7 +64,7 @@ integrationTest('WHAT[effect-accounting-008] todowrite commits its compression c
   })
 })
 
-integrationTest('WHAT[effect-accounting-008] todowrite executor failure restores args but does not commit a compression checkpoint', async () => {
+integrationTest('WHAT[effect-accounting-008] programming surface failure does not commit a compression checkpoint', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
     const sessionID = 'effect-008-todowrite-failed'
     const callID = 'effect-008-todo-failed-1'
@@ -60,15 +72,16 @@ integrationTest('WHAT[effect-accounting-008] todowrite executor failure restores
 
     const beforeOutput = {
       args: {
-        todos: [{ content: 'this native write fails', status: 'in_progress', priority: 'high' }],
+        program: 'class Js extends JsProgram { async run() { return {}; } }',
+        view: { prefixUntil: 1 },
       },
     }
 
-    await hooks['tool.execute.before']({ tool: 'todowrite', sessionID, callID }, beforeOutput)
+    await hooks['tool.execute.before']({ tool: 'todowrite-for-engineer', sessionID, callID }, beforeOutput)
 
     await hooks['tool.execute.after'](
-      { tool: 'todowrite', sessionID, callID, args: beforeOutput.args },
-      { title: 'todowrite', output: 'native todo failure', metadata: {} },
+      { tool: 'todowrite-for-engineer', sessionID, callID, args: beforeOutput.args },
+      { title: 'todowrite-for-engineer', output: 'failure', metadata: {} },
     )
 
     await hooks.event({
@@ -76,12 +89,23 @@ integrationTest('WHAT[effect-accounting-008] todowrite executor failure restores
         type: 'message.part.updated',
         properties: {
           sessionID,
-          part: { type: 'tool', tool: 'todowrite', callID, state: { status: 'error' } },
+          part: {
+            type: 'tool',
+            tool: 'todowrite-for-engineer',
+            callID,
+            state: {
+              status: 'error',
+              input: {
+                program: 'class Js extends JsProgram { async run() { return {}; } }',
+                view: { prefixUntil: 1 },
+              },
+            },
+          },
         },
       },
     })
 
-    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints, [])
+    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints, [])
   })
 })
 

@@ -12,7 +12,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal
@@ -52,9 +51,6 @@ module DeliverTool =
 
     let private text (path: string) =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path Map.empty
-
-    let private pendingDeferred (journal: AgentJournal) (sessionId: SessionId) =
-        AgentProjection.pendingAttentionWorkPairs sessionId (AgentJournal.snapshot journal).AgentProjections
 
     /// The one lifecycle work this session owns. Lifecycle storage is the
     /// wanxiangli journal, independent of the workspace EventStore.
@@ -353,7 +349,7 @@ module DeliverTool =
         let toolCallId = ToolCallId.value prepared.Bound.ToolCallId
         let providerRunId = ProviderRunIdentity.value prepared.Bound.ProviderRun
 
-        let pending = pendingDeferred prepared.Bound.Journal prepared.SessionId
+        let pending: (string * string) list = []
 
         let confirmFirst () =
             task {

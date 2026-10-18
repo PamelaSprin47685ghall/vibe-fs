@@ -83,7 +83,7 @@ type ContextFactCases =
            MainSessionId: SessionId
            BloggerSessionId: SessionId
            Reason: string |}
-    | TodoCheckpointCommitted of
+    | ViewCheckpointCommitted of
         {| SessionId: SessionId
            ToolCallId: ToolCallId |}
     | PrefixRebaseCommitted of

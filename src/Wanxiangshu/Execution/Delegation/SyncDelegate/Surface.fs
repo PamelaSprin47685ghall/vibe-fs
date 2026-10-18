@@ -813,15 +813,6 @@ module SyncDelegateSurface =
                     range
                     providerRun
 
-            let workRecordCapability: DelegationWorkRecordCapability =
-                { ParentWorkRecord =
-                    fun sessionId -> LifecycleWorkRecordProjection.lifecycleWorkRecord (Some journal) sessionId true
-                  ParentWorkRecordBounded =
-                    fun sessionId range ->
-                        LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) sessionId range }
-
-            let handoffPort = DelegationHandoffLedger.port workRecordCapability journal
-
             let retryScript = RetryScript()
 
             let rootWorkspace =
@@ -871,7 +862,6 @@ module SyncDelegateSurface =
                             | None -> raise (InvalidOperationException "managed child has no Host parent"))),
                     gate,
                     workRecordFor,
-                    handoffPort,
                     retryPort,
                     workspaceDirectory = directory
                 )
@@ -897,8 +887,7 @@ module SyncDelegateSurface =
                     None,
                     None,
                     None,
-                    childWorkRecordForRun = workRecordFor,
-                    workRecordCapability = workRecordCapability
+                    childWorkRecordForRun = workRecordFor
                 )
 
             return
@@ -1995,23 +1984,6 @@ module SyncDelegateSurface =
         }
         :> Task
 
-    let handoffFrontier (value: obj) (owner: string) (role: string) : obj =
-        let harness = unbox<Harness> value
-        let parent = harness.OwnerSession owner
-
-        match roleOf role with
-        | Error _ -> null
-        | Ok role ->
-            let scope = ReuseScope.ofSession parent
-            let route = DelegationHandoffRoute.syncRole scope role
-            let key = DelegationHandoff.key parent route
-
-            (AgentJournal.snapshot harness.Journal)
-                .AgentProjections.DelegationCompletedHandoffs
-            |> Map.tryFind key
-            |> Option.map (fun (frontier: int64) -> box (float frontier))
-            |> Option.defaultValue null
-
     let batchOrder (roleName: string) (toolNames: string array) (currentCall: string) : obj =
         match roleOf roleName with
         | Error error -> box {| ok = false; error = error |}
@@ -2121,65 +2093,6 @@ module SyncDelegateSurface =
 
     let dispose (value: obj) : unit =
         unbox<Harness> value |> fun harness -> harness.Dispose()
-
-    /// delegation-031 probe: close the journal writer exactly once, so every later
-    /// append is a known NotAttempted (WriterClosing/WriterDisposed). The next
-    /// invocation must still deliver its earned WorkRecord — the uncommitted
-    /// checkpoint is pending-evidence, never a re-executed child.
-    /// This releases the harness journal writer (BeginRelease → WriterClosing
-    /// on the next append), which is exactly the production WriterUnavailable
-    /// path through DelegationHandoffLedger.checkpointCompleted.
-    let closeJournalWriter (value: obj) : unit =
-        let harness = unbox<Harness> value
-        harness.Journal.Writer.Release()
-
-    let private boxSettlement (settled: HandoffCheckpointSettlement) : obj =
-        let commitment, reason =
-            match settled.Commitment with
-            | HandoffCheckpointCommitment.Committed -> "Committed", null
-            | HandoffCheckpointCommitment.NotCommitted detail -> "NotCommitted", detail
-            | HandoffCheckpointCommitment.Unknown detail -> "Unknown", detail
-            | HandoffCheckpointCommitment.PhaseConflict detail -> "PhaseConflict", detail
-            | HandoffCheckpointCommitment.PersistenceFailed failure ->
-                let label =
-                    match failure with
-                    | JournalAppendFailure.WriterUnavailable _ -> "NotCommitted"
-                    | JournalAppendFailure.WriteUnknown _ -> "Unknown"
-                    | JournalAppendFailure.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
-                    | JournalAppendFailure.FactRejected _ -> "PhaseConflict"
-
-                label, JournalAppendFailure.describe failure
-
-        box
-            {| parent = SessionId.value settled.Identity.Parent
-               route = DelegationHandoffRoute.value settled.Identity.Route
-               commitment = commitment
-               reason = reason |}
-
-    /// delegation-031 probe: run the PRODUCTION checkpoint (the same
-    /// DelegationHandoffLedger.checkpointCompleted the runtime port calls) for
-    /// one prepared handoff and return the exact settlement it reports. No
-    /// second implementation: the port below is the ledger, not a re-model.
-    let checkpointForHarness (value: obj) (owner: string) (role: string) (parentEndExclusive: int) : Task<obj> =
-        task {
-            let harness = unbox<Harness> value
-
-            match roleOf role with
-            | Error error -> return raise (ArgumentException error)
-            | Ok syncRole ->
-                let parent = harness.OwnerSession owner
-                let scope = ReuseScope.ofSession parent
-                let route = DelegationHandoffRoute.syncRole scope syncRole
-
-                let prepared: PreparedDelegationHandoff =
-                    { Route = route
-                      ParentStartInclusive = XTraceCursor.create 0L
-                      ParentRecord = None
-                      ParentEndExclusive = XTraceCursor.create (int64 parentEndExclusive) }
-
-                let! settled = DelegationHandoffLedger.checkpointCompleted harness.Journal parent prepared
-                return boxSettlement settled
-        }
 
     /// delegation-031 probe: the parent supersede guard — abandon the pending call
     /// for this delegate so a stale completion afterwards cannot claim it.

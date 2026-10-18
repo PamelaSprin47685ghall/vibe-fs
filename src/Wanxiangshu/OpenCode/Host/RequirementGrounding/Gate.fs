@@ -11,47 +11,6 @@ open Wanxiangshu.Requirement.Grounding
 
 module RequirementGroundingGate =
 
-    [<Emit("typeof $0 === 'string'")>]
-    let private isString (value: obj) : bool = jsNative
-
-    let private textField (value: obj) name =
-        if isNull value || isNull value?(name) then
-            None
-        else
-            let text = string value?(name)
-            if String.IsNullOrWhiteSpace text then None else Some text
-
-    let private distinct values =
-        values |> List.choose id |> List.distinct
-
-    let private mutationPaths (toolName: string) (args: obj) =
-        match toolName.ToLowerInvariant() with
-        | "write"
-        | "edit"
-        | "patch"
-        | "apply_patch" -> distinct [ textField args "filePath"; textField args "path" ]
-        | "mv" -> distinct [ textField args "source"; textField args "destination" ]
-        | "rm" -> distinct [ textField args "path"; textField args "filePath" ]
-        | _ -> []
-
-    let private observationPaths (toolName: string) (args: obj) =
-        match toolName.ToLowerInvariant() with
-        | "read" ->
-            textField args "filePath"
-            |> Option.orElseWith (fun () -> textField args "path")
-            |> Option.toList
-        | _ -> []
-
-    let nativeReadObservations toolName (args: obj) (output: obj) =
-        if not (isString output) then
-            []
-        else
-            observationPaths toolName args
-            |> List.map (fun path ->
-                { Path = path
-                  ResultBytes = string output
-                  Coverage = GroundingReadCoverage.PartialFile })
-
     let private emptyDecision =
         { NeedsGrounding = false
           Requested = 0
@@ -132,28 +91,8 @@ module RequirementGroundingGate =
         (toolInput: obj)
         (toolOutput: obj)
         : Task<unit> =
-        let toolName =
-            if isNull toolInput || isNull toolInput?tool then
-                ""
-            else
-                string toolInput?tool
-
-        let sessionId =
-            if isNull toolInput || isNull toolInput?sessionID then
-                ""
-            else
-                string toolInput?sessionID
-
-        let args =
-            if isNull toolOutput || isNull toolOutput?args then
-                null
-            else
-                toolOutput?args
-
-        match workspace with
-        | None -> Task.FromResult(())
-        | Some _ when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(())
-        | Some root -> ignoreDecision (fun () -> request journal root sessionId (mutationPaths toolName args))
+        ignore (journal, workspace, toolInput, toolOutput)
+        Task.FromResult(())
 
     let after
         (journal: AgentJournal option)
@@ -161,30 +100,8 @@ module RequirementGroundingGate =
         (toolInput: obj)
         (toolOutput: obj)
         : Task<unit> =
-        let toolName =
-            if isNull toolInput || isNull toolInput?tool then
-                ""
-            else
-                string toolInput?tool
-
-        let sessionId =
-            if isNull toolInput || isNull toolInput?sessionID then
-                ""
-            else
-                string toolInput?sessionID
-
-        let args =
-            if isNull toolInput || isNull toolInput?args then
-                null
-            else
-                toolInput?args
-
-        match workspace with
-        | None -> Task.FromResult(())
-        | Some _ when String.IsNullOrWhiteSpace sessionId -> Task.FromResult(())
-        | Some root ->
-            let output = if isNull toolOutput then null else toolOutput?output
-            ignoreDecision (fun () -> decideRead journal root sessionId (nativeReadObservations toolName args output))
+        ignore (journal, workspace, toolInput, toolOutput)
+        Task.FromResult(())
 
     let programObservation
         (journal: AgentJournal option)

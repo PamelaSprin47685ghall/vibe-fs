@@ -59,7 +59,7 @@ try {
     if (scenario === 'prepared') {
       assert.deepEqual(await Strength.durabilityAppend(durability,
         Strength.eventBound('settlement', 'run', 'replica', 'anchor')), {ok: true})
-      const built = Strength.frameTryBuild(H, [{requestOrdinal: 1, exchanges: [{toolName: 'read',
+      const built = Strength.frameTryBuild(H, [{requestOrdinal: 1, exchanges: [{toolName: 'todowrite-for-predictor',
         canonicalArguments: '{"filePath":"owned"}', canonicalResult: '真实材料\r\n尾部  '}]}])
       assert.equal(built.ok, true)
       publishRequest = {ownerSessionId: 'owner', decisionId: 'settlement', targetProviderRun: 'run',

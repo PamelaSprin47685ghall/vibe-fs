@@ -38,7 +38,8 @@ await js.run(class extends js.Runnable { ... }) —— 工程成员。
 是本片增量，不是全程记录。
 
 await 交回的结局是
-`{ ok: true, status: 'completed' | 'aborted' | 'timeout', exitCode, stdout, stderr, truncated, bytes, durationMs }`。
+`{ ok: true, status: 'completed' | 'aborted' | 'timeout', reason, exitCode, stdout, stderr, truncated, bytes, durationMs }`。
+`reason` 在正常完成时为 null，其余情况带中止/超时的原因。
 
 后果，一次说清：
 - 中止用 SIGKILL 杀前台进程；`maxDuration` 到期时同样处理，并回报 status 'timeout'。
@@ -52,3 +53,5 @@ await 交回的结局是
 `RUN_WAIT_TIMEOUT`、`RUN_CHILD_UNKNOWN`、`RUN_PARK_UNSUPPORTED`。
 
 机械规则写进回调；语义分叉交给 parked 载荷。
+
+更多完整示例：`run-recipes`（分钟级长编译；npm 服务 + 前端测试）。

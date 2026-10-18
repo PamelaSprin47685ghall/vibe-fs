@@ -101,7 +101,6 @@ type ToolRuntimeScope
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
         ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>),
-        ?workRecordCapability: DelegationWorkRecordCapability,
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
         ?eventPort: IEventObservationPort
     ) =
@@ -144,10 +143,6 @@ type ToolRuntimeScope
 
     let childRecordForRun =
         defaultArg childWorkRecordForRun (fun _ _ _ -> Task.FromResult None)
-
-    let reusableHandoff =
-        workRecordCapability
-        |> Option.bind (fun cap -> journal |> Option.map (DelegationHandoffLedger.port cap))
 
     let terminalPort = eventPort
     // DSL-MUTABLE: resource — tool runtime dispose latch
@@ -384,7 +379,6 @@ type ToolRuntimeScope
             onRunStarted = onStarted,
             parentWorkRecordFor = (fun parentId -> parentRecord (SessionId.value parentId)),
             childWorkRecordFor = (fun childId -> childRecord (SessionId.value childId)),
-            ?handoff = reusableHandoff,
             ?sessionSnapshot = snapshot,
             cancelSignals = onCancelSignals,
             drainChildPtys = drainChildPtysFor

@@ -104,7 +104,7 @@ module ContextFactFold =
     // move atomically: retaining an old guideline/tip/grounding visibility
     // floor while the raw X prefix is replaced lets request-local prose
     // tunnel through any covered Host rows that intentionally survive the
-    // replacement (notably retained todowrite rounds).
+    // replacement (notably retained view-checkpoint rounds).
     let private foldPrefixRebaseCommitted
         sessionId
         previousEpoch
@@ -204,7 +204,7 @@ module ContextFactFold =
                       BloggerCycleProjection.abandon payload.RequestId payload.BloggerSessionId cycles
                   ) ]
 
-        | ContextFactCases.TodoCheckpointCommitted _ ->
+        | ContextFactCases.ViewCheckpointCommitted _ ->
             // The aggregate context bridge owns the cross-cutting checkpoint
             // window because it also has the canonical XTrace needed to prune
             // it after a committed prefix rebase.

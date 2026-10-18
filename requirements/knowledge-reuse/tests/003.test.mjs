@@ -67,12 +67,14 @@ test('WHAT[knowledge-reuse-003] production access recorder collects committed re
   }
 
   const tracker = casebook.createAccessTracker()
+  tracker.recordRead('read.txt', '')
+  tracker.recordRead('read.txt', '')
   for (const [tool, args] of [
-    ['read', { path: 'read.txt' }], ['create', { path: 'new.txt' }],
-    ['edit', { path: 'edited.txt' }], ['rm', { path: 'gone.txt' }],
-    ['mv', { source: 'old.txt', destination: 'moved.txt' }], ['read', { path: 'read.txt' }],
+    ['create', { path: 'new.txt' }],
+    ['rewrite', { path: 'edited.txt' }], ['delete', { path: 'gone.txt' }],
+    ['move', { source: 'old.txt', destination: 'moved.txt' }],
   ]) casebook.recordSubstantiveAccess(tracker, tool, args, true)
-  for (const tool of ['grep', 'glob', 'ls', 'symbol', 'executor']) {
+  for (const tool of ['read', 'write', 'edit', 'rm', 'mv', 'grep', 'glob', 'ls', 'symbol', 'executor']) {
     casebook.recordSubstantiveAccess(tracker, tool, { path: 'mention.txt', command: 'cat mention.txt' }, true)
   }
   assert.deepEqual(tracker.getRelatedPaths().sort(), ['edited.txt', 'gone.txt', 'moved.txt', 'new.txt', 'old.txt', 'read.txt'])
@@ -132,11 +134,11 @@ test('WHAT[knowledge-reuse-003] rejected mutations add no paths and do not erase
   }
 
   const tracker = casebook.createAccessTracker()
-  casebook.recordSubstantiveAccess(tracker, 'read', { path: 'read.txt' }, true)
-  for (const tool of ['write', 'create', 'edit', 'rm', 'delete']) {
+  tracker.recordRead('read.txt', '')
+  for (const tool of ['create', 'rewrite', 'delete']) {
     casebook.recordSubstantiveAccess(tracker, tool, { path: 'failed.txt' }, false)
   }
-  casebook.recordSubstantiveAccess(tracker, 'mv', { source: 'from.txt', destination: 'to.txt' }, false)
+  casebook.recordSubstantiveAccess(tracker, 'move', { source: 'from.txt', destination: 'to.txt' }, false)
   assert.deepEqual(tracker.getRelatedPaths(), ['read.txt'])
 })
 

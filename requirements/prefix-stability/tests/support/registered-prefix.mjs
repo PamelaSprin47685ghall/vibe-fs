@@ -111,7 +111,7 @@ export const coveredSession = async (hooks, runtime, directory, sessionID, testC
   const running = { info: { id: 'msg-covered-next-run', sessionID, parentID: physical, role: 'assistant', agent: 'manager', providerID: 'provider', modelID: 'manager-model', time: { created: 6 } }, parts: [] }
   await check('actual Chronicle execution and Host transcript commit the covered frame', async () => {
     Object.assign(checkpoint.info, { finish: 'tool-calls', time: { created: 4, completed: 5 } })
-    checkpoint.parts = [{ type: 'tool-call', tool: 'todowrite', callID: 'call-checkpoint', args: { todos: [] } }]
+    checkpoint.parts = [{ type: 'tool-call', tool: 'todowrite-for-manager', callID: 'call-checkpoint', args: { program: 'class Js extends JsProgram { async run() { return {}; } }', view: { prefixUntil: 1 } } }]
     messages.push(structuredClone(checkpoint), { info: { id: 'msg-checkpoint-result', sessionID, role: 'tool', time: { created: 5 } }, parts: [{ type: 'tool-result', callID: 'call-checkpoint', output: 'Todos updated' }] })
     push(structuredClone(messages.at(-1)))
     push(running)
@@ -130,12 +130,25 @@ export const coveredSession = async (hooks, runtime, directory, sessionID, testC
     assert.equal(facts(directory, 'BlogObservationCommitted')[0].NextCoverableTurnCutoffExclusive, 4)
   })
   await check('native checkpoint tool completion opens the real phase window', async () => {
-    const input = { tool: 'todowrite', sessionID, callID: 'call-checkpoint' }
-    const output = { args: { todos: [] } }
-    await hooks['tool.execute.before'](input, output)
-    await hooks['tool.execute.after']({ ...input, args: output.args }, { title: 'todowrite', output: 'Todos updated', metadata: {} })
-    await hooks.event({ event: { type: 'message.part.updated', properties: { sessionID, part: { type: 'tool', tool: 'todowrite', callID: input.callID, state: { status: 'completed' } } } } })
-    assert.equal(Journal.JournalSurface_snapshot(runtime.journal).todoCheckpoints[0].checkpoints[0].callId, input.callID)
+    const callID = 'call-checkpoint'
+    await hooks.event({
+      event: {
+        type: 'message.part.updated',
+        properties: {
+          sessionID,
+          part: {
+            type: 'tool',
+            tool: 'todowrite-for-manager',
+            callID,
+            state: {
+              status: 'completed',
+              input: { program: 'class Js extends JsProgram { async run() { return {}; } }', view: { prefixUntil: 1 } },
+            },
+          },
+        },
+      },
+    })
+    assert.equal(Journal.JournalSurface_snapshot(runtime.journal).viewCheckpoints[0].checkpoints[0].callId, callID)
   })
   return { sessionID, profile, messages, transform, push, clock: 10, blogger, bloggerPhysical, bloggerMessages, bloggerNext }
 }

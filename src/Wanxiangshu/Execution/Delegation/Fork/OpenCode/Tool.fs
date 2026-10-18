@@ -91,13 +91,7 @@ module ForkTool =
             let PersonCannotTakeCharge = "tool/fork/person-cannot-take-charge"
 
             [<Literal>]
-            let HandoffJournalRequired = "tool/fork/handoff-journal-required"
-
-            [<Literal>]
             let PersonSessionUnknown = "tool/fork/person-session-unknown"
-
-            [<Literal>]
-            let HandoffAppendFailed = "tool/fork/handoff-append-failed"
 
         [<RequireQualifiedAccess>]
         module Commission =
@@ -339,11 +333,8 @@ module ForkTool =
         (managed: ManagedAgent)
         =
         taskResult {
-            let route = DelegationHandoffRoute.forkByname request.Name
-            let! handoff = runtime.PrepareHandoff route
-
             let! rendered =
-                prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
+                prepareForkPromptWithRecord scope runtime role request None attachment
                 |> TaskResultCE.ofTask
 
             let! result =
@@ -355,8 +346,7 @@ module ForkTool =
                     None,
                     renderedPrompt = rendered,
                     byname = request.Name,
-                    ?expectedToolCalls = request.ExpectedToolCalls,
-                    preparedHandoff = handoff
+                    ?expectedToolCalls = request.ExpectedToolCalls
                 )
 
             return result
@@ -372,11 +362,8 @@ module ForkTool =
         agentId
         =
         taskResult {
-            let route = DelegationHandoffRoute.forkByname request.Name
-            let! handoff = runtime.PrepareHandoff route
-
             let! rendered =
-                prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
+                prepareForkPromptWithRecord scope runtime role request None attachment
                 |> TaskResultCE.ofTask
 
             return!
@@ -384,8 +371,7 @@ module ForkTool =
                     agentId,
                     request.Charge,
                     renderedPrompt = rendered,
-                    ?expectedToolCalls = request.ExpectedToolCalls,
-                    preparedHandoff = handoff
+                    ?expectedToolCalls = request.ExpectedToolCalls
                 )
         }
 

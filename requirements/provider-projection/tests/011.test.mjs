@@ -162,12 +162,25 @@ const productionDigest = async (callId, path) => {
     assert.equal(observation[0].NextCoveredPrefixDigest, sha256(Projection.renderSemantic(expectedPrefix)))
     assert.notEqual(observation[0].NextCoveredPrefixDigest, sha256(Projection.renderSemantic({ ...expectedPrefix, messages: expectedPrefix.messages.slice(0, 3) })))
     observationDigest = observation[0].NextCoveredPrefixDigest
-    const checkpointInput = { tool: 'todowrite', sessionID, callID: 'call-prefix-checkpoint' }
-    const checkpointOutput = { args: { todos: [] } }
-    await hooks['tool.execute.before'](checkpointInput, checkpointOutput)
-    await hooks['tool.execute.after']({ ...checkpointInput, args: checkpointOutput.args }, { title: 'todowrite', output: 'Todos updated', metadata: {} })
-    await hooks.event({ event: { type: 'message.part.updated', properties: { sessionID, part: { type: 'tool', tool: 'todowrite', callID: checkpointInput.callID, state: { status: 'completed' } } } } })
-    assert.equal(Journal.JournalSurface_snapshot(runtime.journal).todoCheckpoints[0].checkpoints[0].callId, checkpointInput.callID)
+    const checkpointCallID = 'call-prefix-checkpoint'
+    await hooks.event({
+      event: {
+        type: 'message.part.updated',
+        properties: {
+          sessionID,
+          part: {
+            type: 'tool',
+            tool: 'todowrite-for-manager',
+            callID: checkpointCallID,
+            state: {
+              status: 'completed',
+              input: { program: 'class Js extends JsProgram { async run() { return {}; } }', view: { prefixUntil: 1 } },
+            },
+          },
+        },
+      },
+    })
+    assert.equal(Journal.JournalSurface_snapshot(runtime.journal).viewCheckpoints[0].checkpoints[0].callId, checkpointCallID)
     const nextPhysical = 'msg-prefix-next-user'
     const continuation = await Dispatch.sendContinuation({
       SubscribeTerminal: () => ({ Dispose: () => {} }),

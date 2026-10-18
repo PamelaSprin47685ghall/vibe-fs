@@ -72,9 +72,6 @@ const allowList = (config, name) => {
     'bash',
     'bash-honeypot',
     'assume',
-    'todowrite',
-    'defer',
-    'publish',
     'fork',
     'resume',
     'commission',
@@ -94,7 +91,7 @@ const allowList = (config, name) => {
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 const HOST_UTILITY_ALLOW = ['skill']
-const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite', 'defer', 'publish']
+const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
@@ -133,14 +130,13 @@ test('WHAT[capability-enforcement-006] ASSUME_is_a_non_authority_utility_for_int
     )
   }
 })
-test('WHAT[capability-enforcement-006] TODOWRITE_has_the_same_non_authority_role_boundary_as_assume', () => {
+test('WHAT[capability-enforcement-006] TODOWRITE_is_retired_and_denied_for_all_roles', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
   for (const role of ROLES) {
-    const expected = role === 'Blogger' ? 'deny' : 'allow'
     assert.equal(
       evaluate(mergedRules(config, agentName(role)), 'todowrite', '*').action,
-      expected,
+      'deny',
       `${agentName(role)} todowrite permission`,
     )
   }
@@ -415,22 +411,21 @@ const { acceptAuthorityRoot, grantWorkOwned, withExecutablePlugin, withPlugin } 
 const TOOL_NAMES = [
   'fork', 'resume', 'commission', 'join', 'horizon', 'fission',
   'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
-  'bash-honeypot', 'assume', 'todowrite',
-  'defer',  'publish',
+  'bash-honeypot', 'assume',
   'review', 'chronicle', 'fetch', 'deliver',
 ]
 
-const HOST_OWNED_TOOL_NAMES = [ 'read', 'write', 'edit', 'glob', 'grep', 'skill', 'todowrite',
+const HOST_OWNED_TOOL_NAMES = [ 'read', 'write', 'edit', 'glob', 'grep', 'skill',
 ]
 const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
-const COGNITIVE_TOOLS = ['defer',  'publish']
+const COGNITIVE_TOOLS = []
 const ALLOWED = {
-  orchestrator: ['commission', 'join', 'horizon', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
+  orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'assume', ...COGNITIVE_TOOLS],
+  engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
   devops: [
     'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
-    'assume', 'todowrite', ...COGNITIVE_TOOLS,
+    'assume', ...COGNITIVE_TOOLS,
   ],
   blogger: ['chronicle'],
 }

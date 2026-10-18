@@ -13,7 +13,6 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
-open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Participant.Persona
@@ -171,12 +170,11 @@ module JournalPortObservationSurface =
             HandleProjection.tryFind (HandleId.Agent(AgentHandleId.create "hdl-port-obs")) handles
             |> Option.isSome)
 
-    let private attentionFact (sessionId: SessionId) : AgentFact =
-        AgentFact.Attention(
-            AttentionFactCases.DeferredWorkRecorded
+    let private estimateFact (sessionId: SessionId) : AgentFact =
+        AgentFact.Delegation(
+            DelegationFactCases.DelegatedToolEstimateReplaced
                 {| SessionId = sessionId
-                   OccurrenceId = "occ-port-obs"
-                   Text = "deferred port-observation probe" |}
+                   ExpectedToolCalls = 1 |}
         )
 
     let private missingPayloadFact (sessionId: SessionId) : AgentFact =
@@ -202,8 +200,8 @@ module JournalPortObservationSurface =
     /// Builds every port relevant to a scenario against one journal. Constructing
     /// all ports up front is intentional: the proofs say each member reads the
     /// journal when the member is invoked, not when the port is assembled.
-    let private portsOf (journal: AgentJournal) : AttentionJournalPort * TerminalPolicyPort * WireJournalPort =
-        AgentJournalPortAdapter.forAttention journal,
+    let private portsOf (journal: AgentJournal) : DelegatedToolEstimatePort * TerminalPolicyPort * WireJournalPort =
+        AgentJournalPortAdapter.forDelegatedToolEstimate journal,
         AgentJournalPortAdapter.forTerminalPolicy journal,
         AgentJournalPortAdapter.forWire journal
 
@@ -213,19 +211,18 @@ module JournalPortObservationSurface =
             use! journal = openJournal store writerTag
             let session = SessionId.create "ses-port-obs"
 
-            let attention, terminal, wire = portsOf journal
+            let estimate, terminal, wire = portsOf journal
 
             let pendingBefore =
-                (attention.Read()).BySession
-                |> Map.tryFind session
-                |> Option.map List.length
+                estimate.TryState session
+                |> Option.map DelegatedToolEstimateProjection.remaining
                 |> Option.defaultValue 0
 
             let poisonedBefore = terminal.IsPoisoned()
             let viewBefore = wire.ReadView session
             let stateBefore = Option.isSome viewBefore.State
 
-            let! appended = journal.AppendAgent (StreamId.Session session) None (attentionFact session)
+            let! appended = journal.AppendAgent (StreamId.Session session) None (estimateFact session)
 
             let folded =
                 match appended with
@@ -233,15 +230,13 @@ module JournalPortObservationSurface =
                 | Error _ -> false
 
             let pendingAfter =
-                (attention.Read()).BySession
-                |> Map.tryFind session
-                |> Option.map List.length
+                estimate.TryState session
+                |> Option.map DelegatedToolEstimateProjection.remaining
                 |> Option.defaultValue 0
 
             let freshAfter =
-                (AgentJournalPortAdapter.forAttention journal).Read().BySession
-                |> Map.tryFind session
-                |> Option.map List.length
+                (AgentJournalPortAdapter.forDelegatedToolEstimate journal).TryState session
+                |> Option.map DelegatedToolEstimateProjection.remaining
                 |> Option.defaultValue 0
 
             let poisonedAfter = terminal.IsPoisoned()
@@ -393,7 +388,7 @@ module JournalPortObservationSurface =
             let _, terminal, _ = portsOf journal
             let session = SessionId.create "ses-port-poison"
 
-            let! seeded = journal.AppendAgent (StreamId.Session session) None (attentionFact session)
+            let! seeded = journal.AppendAgent (StreamId.Session session) None (estimateFact session)
 
             let seededOk =
                 match seeded with
@@ -418,7 +413,7 @@ module JournalPortObservationSurface =
                 | Error(WriterUnavailable(eventId, WriterPoisoned _)) -> store.TryEvent eventId |> Option.isNone
                 | _ -> false
 
-            let! after = journal.AppendAgent (StreamId.Session session) None (attentionFact session)
+            let! after = journal.AppendAgent (StreamId.Session session) None (estimateFact session)
             let afterOutcome = appendOutcomeName after
             let revisionAfterPoisoned = string (JournalRevision.value journal.Revision)
 

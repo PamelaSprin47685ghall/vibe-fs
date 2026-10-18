@@ -72,9 +72,6 @@ const allowList = (config, name) => {
     'bash',
     'bash-honeypot',
     'assume',
-    'todowrite',
-    'defer',
-    'publish',
     'fork',
     'resume',
     'commission',
@@ -94,7 +91,7 @@ const allowList = (config, name) => {
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 const HOST_UTILITY_ALLOW = ['skill']
-const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite', 'defer', 'publish']
+const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
@@ -255,23 +252,22 @@ const { withPlugin } = await import("../../verification-system/tests/support/plu
 
 const TOOL_NAMES = [
   'fork', 'resume', 'commission', 'join', 'horizon', 'fission',
-  'bash-honeypot', 'assume', 'todowrite',
-  'defer',  'publish',
+  'bash-honeypot', 'assume',
   'review', 'chronicle', 'fetch', 'deliver',
   'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator',
 ]
 
 const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
 
-const COGNITIVE_TOOLS = ['defer',  'publish']
+const COGNITIVE_TOOLS = []
 
 const ALLOWED = {
-  orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'todowrite-for-manager', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  engineer: ['fission', 'fetch', 'bash-honeypot', 'todowrite-for-engineer', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
+  orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'todowrite-for-manager', 'assume', ...COGNITIVE_TOOLS],
+  engineer: ['fission', 'fetch', 'bash-honeypot', 'todowrite-for-engineer', 'assume', ...COGNITIVE_TOOLS],
   devops: [
     'join', 'horizon', 'todowrite-for-devops',
-    'assume', 'todowrite', ...COGNITIVE_TOOLS,
+    'assume', ...COGNITIVE_TOOLS,
   ],
   blogger: ['chronicle'],
 }

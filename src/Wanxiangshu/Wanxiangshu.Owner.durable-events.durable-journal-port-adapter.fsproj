@@ -8,8 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.journal-outcome-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.attention-regulation.interaction-attention-facts.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-linkage-projection.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.host-fact.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-facts.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-linkage-projection.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.host-fact.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.mission-obligation-todo-prefixepoch.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-trace-capture.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.prefix-stability.context-prefix-wire-port.fsproj"/>
@@ -29,7 +28,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.interaction-authority.opencode-host-chatadmission-intent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-joinguard-port.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-delegation.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-attention-concern.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-session-started-at.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-requirement-grounding.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.dispatch-runtime.fsproj"/>

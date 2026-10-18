@@ -10,9 +10,9 @@ export const user = (sessionID, messageID = `root-${sessionID}`) => ({ info: { i
 export const toolBatch = (sessionID, suffix) => ['pending', 'completed'].map(status => ({
   info: { id: `${status}-${suffix}`, sessionID, role: 'assistant', providerID: 'anthropic' },
   parts: [{
-    type: 'tool', tool: 'read', callID: `read-${suffix}`,
+    type: 'tool', tool: 'todowrite-for-engineer', callID: `read-${suffix}`,
     state: {
-      status, input: { filePath: 'README.md' },
+      status, input: { program: 'class Js extends JsProgram { async run() { return await this.cat("README.md"); } }' },
       ...(status === 'completed' ? { output: 'observed file', time: { start: 0, end: 0 } } : { time: { start: 0 } }),
     },
   }],

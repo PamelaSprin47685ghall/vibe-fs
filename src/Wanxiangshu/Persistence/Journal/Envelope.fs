@@ -15,9 +15,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 type StreamId =
@@ -370,12 +368,6 @@ module Envelope =
     let private chatExecutionFactDecoder =
         Decode.Auto.generateDecoderCached<ChatExecutionFactCases> (extra = extra)
 
-    let private attentionFactDecoder =
-        Decode.Auto.generateDecoderCached<AttentionFactCases> (extra = extra)
-
-    let private concernFactDecoder =
-        Decode.Auto.generateDecoderCached<ConcernFactCases> (extra = extra)
-
     let private cognitionFactDecoder =
         Decode.Auto.generateDecoderCached<LegacyCognitionFact> (extra = extra)
 
@@ -396,8 +388,6 @@ module Envelope =
             | "Fission" -> familyCase fissionFactDecoder AgentFact.Fission
             | "Delegation" -> familyCase delegationFactDecoder AgentFact.Delegation
             | "ChatExecution" -> familyCase chatExecutionFactDecoder AgentFact.ChatExecution
-            | "Attention" -> familyCase attentionFactDecoder AgentFact.Attention
-            | "Concern" -> familyCase concernFactDecoder AgentFact.Concern
             | "Cognition" -> familyCase cognitionFactDecoder AgentFact.Cognition
             | name -> Decode.fail ("Cannot find AgentFact case " + name))
 

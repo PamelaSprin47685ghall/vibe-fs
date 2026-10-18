@@ -13,9 +13,6 @@ module DelegationProjectionBridge =
             { Handles = s.Handles
               ToolEstimate = s.DelegatedToolEstimate })
 
-    let private handoffFrontier (projection: AgentProjectionSet) (key: string) : int64 option =
-        Map.tryFind key projection.DelegationCompletedHandoffs
-
     let private applyChange (projection: AgentProjectionSet) (change: DelegationProjectionChange) : AgentProjectionSet =
         match change with
         | ReplaceSessionState(sessionId, state) ->
@@ -34,10 +31,6 @@ module DelegationProjectionBridge =
         | IndexChildHandle(childSessionId, record) ->
             { projection with
                 HandleByChildSession = Map.add childSessionId record projection.HandleByChildSession }
-
-        | MoveHandoffFrontier(key, endExclusive) ->
-            { projection with
-                DelegationCompletedHandoffs = Map.add key endExclusive projection.DelegationCompletedHandoffs }
 
         | TerminatedChildWork(work, logicalRunId) ->
             let session =
@@ -151,7 +144,7 @@ module DelegationProjectionBridge =
         (projection: AgentProjectionSet)
         (fact: DelegationFactCases)
         : Result<AgentProjectionSet, FoldRejection> =
-        match DelegationFactFold.fold (sessionState projection) (handoffFrontier projection) fact with
+        match DelegationFactFold.fold (sessionState projection) fact with
         | Ok changes -> Ok(List.fold applyChange projection changes)
         | Error rejection ->
             FoldRejection.reject (DelegationFoldRejection.fact rejection) (DelegationFoldRejection.message rejection)

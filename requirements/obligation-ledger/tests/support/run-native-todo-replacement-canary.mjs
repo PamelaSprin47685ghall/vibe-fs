@@ -1,12 +1,10 @@
 // requirements/obligation-ledger/tests/support/run-native-todo-replacement-canary.mjs
 //
-// B5 canary for WHAT[obligation-ledger-002]: on the installed OpenCode Host,
-// the native todowrite executor replaces only the current session's
-// TodoTable with the exact submitted array; an empty-array todowrite is a
-// Host no-op (see the hostCompat note below). A strict mock provider drives
-// the real Host (`opencode serve`) with real todowrite tool calls while the
-// production wanxiangshu plugin is loaded, and the public SDK todo endpoint
-// (`GET /session/{id}/todo`) is the oracle — never a stub executor.
+// Canary for WHAT[obligation-ledger-002]: on the installed OpenCode Host,
+// programming-surface calls (`todowrite-for-engineer`) that declare a non-empty
+// `view` argument commit one durable `ViewCheckpointCommitted` fact per session,
+// while calls without `view` commit no checkpoint, and retired native `todowrite`
+// is not advertised on the Engineer provider wire.
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -27,20 +25,6 @@ const repoRoot = path.resolve(here, '../../../..')
 const opencodeVersion = execFileSync(OPENCODE_BIN, ['--version'], { encoding: 'utf8' }).trim().replace(/^v/, '')
 const pluginVersion = JSON.parse(fs.readFileSync(path.join(repoRoot, 'node_modules/@opencode-ai/plugin/package.json'), 'utf8')).version
 
-// The exact arrays the mock provider submits through real todowrite calls:
-// duplicate rows, Chinese content, multiline text and explicit priorities —
-// the shapes WHAT[obligation-ledger-002] forbids the plugin from rewriting.
-const sessionATodos = [
-  { content: '重复内容', status: 'pending', priority: 'low' },
-  { content: '重复内容', status: 'in_progress', priority: 'high' },
-  { content: '多行文本\n第二行\n第三行', status: 'pending', priority: 'medium' },
-  { content: 'unicode ☕ 与中文混排', status: 'completed', priority: 'low' },
-]
-const sessionBTodos = [
-  { content: 'B 独立待办', status: 'pending', priority: 'high' },
-  { content: 'B 第二行', status: 'in_progress', priority: 'low' },
-]
-
 const messageText = (body) => (body?.messages ?? [])
   .flatMap((message) => {
     if (typeof message?.content === 'string') return [message.content]
@@ -51,9 +35,19 @@ const messageText = (body) => (body?.messages ?? [])
 
 const hasToolResult = (body) => (body?.messages ?? []).some((message) => message?.role === 'tool')
 
-const todoCall = (id, todos) => buildToolCallChunks(id, 'todowrite', JSON.stringify({ todos }), 1)
+const jsViewCall = (id, view) =>
+  buildToolCallChunks(
+    id,
+    'todowrite-for-engineer',
+    JSON.stringify({
+      program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
+      ...(view === undefined ? {} : { view }),
+    }),
+    1,
+  )
 
 const providerRequests = []
+const advertisedToolNames = new Set()
 const provider = await startHttpServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`)
   if ((url.pathname === '/v1/models' || url.pathname === '/models') && request.method === 'GET') {
@@ -63,23 +57,25 @@ const provider = await startHttpServer(async (request, response) => {
   if (url.pathname === '/v1/chat/completions' && request.method === 'POST') {
     const body = await readRequestBody(request)
     providerRequests.push(body)
-    // A request carrying tool results means the native executor has already
-    // run the todowrite call; finish the turn with plain text.
+    for (const tool of body?.tools ?? []) {
+      const name = tool?.function?.name ?? tool?.name
+      if (typeof name === 'string') advertisedToolNames.add(name)
+    }
     if (hasToolResult(body)) {
       sendSSE(response, buildTextChunks(`ol002_round_${providerRequests.length}`, 'OL002_DONE', 1))
       return
     }
     const text = messageText(body)
-    if (text.includes('OL002_A_CLEAR')) {
-      sendSSE(response, todoCall('ol002-a-clear', []))
+    if (text.includes('OL002_A_NO_VIEW')) {
+      sendSSE(response, jsViewCall('ol002-a-no-view', undefined))
       return
     }
-    if (text.includes('OL002_A_SET')) {
-      sendSSE(response, todoCall('ol002-a-set', sessionATodos))
+    if (text.includes('OL002_A_VIEW')) {
+      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 1, extra: ['keep anchor 1'] }))
       return
     }
-    if (text.includes('OL002_B_SET')) {
-      sendSSE(response, todoCall('ol002-b-set', sessionBTodos))
+    if (text.includes('OL002_B_VIEW')) {
+      sendSSE(response, jsViewCall('ol002-b-view', { prefixUntil: 2 }))
       return
     }
     sendJSON(response, 500, { error: `unexpected prompt text: ${text.slice(0, 200)}` })
@@ -107,23 +103,12 @@ const prompt = (text) => ({
   parts: [{ type: 'text', text }],
 })
 
-const fetchTodos = async (baseUrl, sessionId) => {
-  const response = await fetch(`${baseUrl}/session/${sessionId}/todo`)
-  const text = await response.text()
-  assert.equal(response.status, 200, `GET /session/${sessionId}/todo: ${text}`)
-  return JSON.parse(text)
-}
-
-// Causal wait: every poll observes the provider's actual request log. The
-// wait ends exactly when the tool-result round for a marker has arrived —
-// the physical proof the native executor already ran that todowrite call.
-// The wall-clock deadline is only an upper bound, never the success signal.
 const waitForToolResultRound = async (marker, host) => {
   const deadline = Date.now() + 30000
   const matches = () => providerRequests.some((body) => {
     const text = messageText(body)
     return text.includes(marker) && hasToolResult(body)
-      && (marker !== 'OL002_A_SET' || !text.includes('OL002_A_CLEAR'))
+      && (marker !== 'OL002_A_VIEW' || !text.includes('OL002_A_NO_VIEW'))
   })
   while (Date.now() < deadline) {
     if (matches()) return
@@ -132,6 +117,30 @@ const waitForToolResultRound = async (marker, host) => {
   throw new Error(
     `timeout waiting for the tool-result round of ${marker}; host stderr tail:\n${host.stderrLog.slice(-4000)}`,
   )
+}
+
+const readViewCheckpointsBySession = (workDir) => {
+  const eventsDir = path.join(workDir, '.Herdchestra', 'wanxiangshu', 'events')
+  const bySession = {}
+  if (!fs.existsSync(eventsDir)) return bySession
+  for (const name of fs.readdirSync(eventsDir).filter((file) => file.endsWith('.ndjson'))) {
+    const lines = fs.readFileSync(path.join(eventsDir, name), 'utf8').split('\n').filter(Boolean)
+    for (const line of lines) {
+      const parsed = JSON.parse(line)
+      const fact = parsed?.fact ?? parsed?.Fact
+      const factCase = fact?.case ?? fact?.Case
+      if (factCase === 'ViewCheckpointCommitted') {
+        const payload = fact?.payload ?? fact?.Payload ?? {}
+        const sid = payload.SessionId ?? payload.sessionId
+        const cid = payload.ToolCallId ?? payload.toolCallId
+        if (sid && cid) {
+          bySession[sid] = bySession[sid] ?? []
+          bySession[sid].push(cid)
+        }
+      }
+    }
+  }
+  return bySession
 }
 
 const scenarioDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wanxiangshu-native-todo-canary-'))
@@ -159,51 +168,27 @@ try {
   }, 200))
   assert.ok(sessionA && sessionB && sessionA !== sessionB, 'public session create responses omitted distinct ids')
 
-  await request(host.baseUrl, 'POST', `/session/${sessionA}/prompt_async`, prompt('OL002_A_SET 为会话 A 提交完整待办列表'), 204)
-  await waitForToolResultRound('OL002_A_SET', host)
-  const aAfterSet = await fetchTodos(host.baseUrl, sessionA)
+  await request(host.baseUrl, 'POST', `/session/${sessionA}/prompt_async`, prompt('OL002_A_VIEW 为会话 A 提交带 view 的编程面调用'), 204)
+  await waitForToolResultRound('OL002_A_VIEW', host)
 
-  await request(host.baseUrl, 'POST', `/session/${sessionB}/prompt_async`, prompt('OL002_B_SET 为会话 B 提交自己的待办列表'), 204)
-  await waitForToolResultRound('OL002_B_SET', host)
-  const bAfterSet = await fetchTodos(host.baseUrl, sessionB)
-  const aAfterBSet = await fetchTodos(host.baseUrl, sessionA)
+  await request(host.baseUrl, 'POST', `/session/${sessionB}/prompt_async`, prompt('OL002_B_VIEW 为会话 B 提交带 view 的编程面调用'), 204)
+  await waitForToolResultRound('OL002_B_VIEW', host)
 
-  // Host compat fact: OpenCode 1.18.29 treats an empty-array todowrite as a
-  // no-op — the session's table keeps its current rows (the model's "clear"
-  // intent is submitted, but the executor does not clear). Probe
-  // probe-native-todo-clear-no-plugin.mjs settled this with two independent
-  // HOST-NO-OP verdicts on 2026-10-04; with and without the plugin chain the
-  // behavior is identical, so the plugin does not interfere.
-  await request(host.baseUrl, 'POST', `/session/${sessionA}/prompt_async`, prompt('OL002_A_CLEAR 清空会话 A 的待办'), 204)
-  await waitForToolResultRound('OL002_A_CLEAR', host)
-  const aAfterClear = await fetchTodos(host.baseUrl, sessionA)
-  const bAfterAClear = await fetchTodos(host.baseUrl, sessionB)
+  await request(host.baseUrl, 'POST', `/session/${sessionA}/prompt_async`, prompt('OL002_A_NO_VIEW 会话 A 无 view 调用不产生 checkpoint'), 204)
+  await waitForToolResultRound('OL002_A_NO_VIEW', host)
 
-  // Settled re-read after a quiescence window. The first read above is the
-  // immediate oracle point; this one observes whether the empty-array no-op
-  // is stable — under the calibrated Host semantics both reads must show the
-  // set content unchanged, and a future drift toward "clear on empty" (late
-  // projection) would surface here. hostStderrTail surfaces any plugin hook
-  // exception (journal append failure, event hook crash) that the swallowed
-  // tool-result path would otherwise hide.
-  await delay(1000)
-  const aAfterClearSettled = await fetchTodos(host.baseUrl, sessionA)
+  await delay(500)
+  const checkpointsBySession = readViewCheckpointsBySession(host.workDir)
 
   process.stdout.write(`${JSON.stringify({
     schemaVersion: 1,
     launched: `${OPENCODE_BIN} serve --port 0 --hostname 127.0.0.1`,
     versions: { opencode: opencodeVersion, plugin: pluginVersion },
-    // Host compat fact, settled 2026-10-04: OpenCode 1.18.29 empty-array
-    // todowrite is a no-op — probe probe-native-todo-clear-no-plugin.mjs,
-    // two independent HOST-NO-OP verdicts (with and without the plugin).
-    hostCompat: 'OpenCode 1.18.29 空数组 todowrite 为 no-op——探针 probe-native-todo-clear-no-plugin.mjs 两轮 HOST-NO-OP 定案，2026-10-04',
-    publicSdk: ['POST /api/session', 'POST /session/{id}/prompt_async', 'GET /session/{id}/todo'],
-    submitted: { sessionA: sessionATodos, sessionB: sessionBTodos, sessionAClear: [] },
+    sessions: { sessionA, sessionB },
     observed: {
-      afterASet: { sessionA: aAfterSet },
-      afterBSet: { sessionA: aAfterBSet, sessionB: bAfterSet },
-      afterAClear: { sessionA: aAfterClear, sessionB: bAfterAClear },
-      afterAClearSettled: { sessionA: aAfterClearSettled },
+      todowriteAdvertised: advertisedToolNames.has('todowrite'),
+      programmingToolAdvertised: advertisedToolNames.has('todowrite-for-engineer'),
+      checkpointsBySession,
     },
     hostStderrTail: host.stderrLog.slice(-4000),
     providerRequests: providerRequests.length,

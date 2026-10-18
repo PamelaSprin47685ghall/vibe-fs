@@ -233,7 +233,7 @@ module JsFragmentRegistry =
             + "The class must declare a positive maxDuration, next(ctx) and check(ctx); "
             + "the host runs each command, calls check once per interval slice, dispatches "
             + "onExit and enforces maxDuration. Returns "
-            + "{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }. "
+            + "{ ok, status, reason, exitCode, stdout, stderr, truncated, bytes, durationMs }. "
             + "next may spawn background children, wait for a port, send stdin to a child "
             + "({ send: { name, input } }) and signal them — the interactive form pty used to own."
           CanonicalExample =

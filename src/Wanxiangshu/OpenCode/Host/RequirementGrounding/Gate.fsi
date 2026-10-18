@@ -5,8 +5,6 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Requirement.Grounding
 
 module RequirementGroundingGate =
-    val nativeReadObservations: toolName: string -> args: obj -> output: obj -> GroundingFileRead list
-
     val decideMutation:
         journal: AgentJournal option ->
         workspace: string ->

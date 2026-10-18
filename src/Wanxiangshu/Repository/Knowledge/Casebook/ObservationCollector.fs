@@ -28,9 +28,13 @@ type CasebookObservationCollector() =
         let tracker = getTracker sessionId
         CasebookCapture.recordSubstantiveAccess tracker toolName args true
 
-        match CasebookCapture.capture toolName args output with
-        | None -> ()
-        | Some observation -> appendObservation sessionId observation
+    member _.RecordFileRead(sessionId: string, path: string, output: string) : unit =
+        let tracker = getTracker sessionId
+        let hash = CasebookCapture.contentHash output
+        tracker.RecordRead(path, hash)
+
+        if not (System.String.IsNullOrWhiteSpace path) && not (System.String.IsNullOrWhiteSpace output) then
+            appendObservation sessionId (Observation.FileRead(path, hash))
 
     member _.RecordSubstantive(sessionId: string, toolName: string, args: obj, committed: bool) : unit =
         let tracker = getTracker sessionId

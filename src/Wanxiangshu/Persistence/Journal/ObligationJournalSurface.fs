@@ -21,7 +21,7 @@ module ObligationJournalSurface =
         box
             {| ok = false
                error =
-                "appendMagicTodo is retired (obligation-ledger-007); Host-native todowrite owns the list and successful calls append TodoCheckpointCommitted only for context compression" |}
+                "appendMagicTodo is retired (obligation-ledger-007); programming-surface view declarations own context compression and successful calls append ViewCheckpointCommitted only for context compression" |}
 
     /// Retired alongside the projection it would have returned.
     let snapshotMagicTodo (handle: JournalHandle) : obj =

@@ -38,7 +38,7 @@
 | `participant-horizon` | machine knowledge 大于 participant experience；只有会改变合法行动的最小事实应穿过 horizon；Manager 并行来自派出多名 Engineer 而非自身分身。 |
 | `cognitive-environment` | 世界观、身份、自我职责与继承知识必须按稳定认知层组织，瞬时 runtime/mission 不能伪装成长期身份。 |
 | `cognitive-workspace` | 持久认知画板已退休；只保留负向边界，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
-| `attention-regulation` | participant 必须能显式结束 evidence churn、解除自创心理债、延后非阻塞旁支，而不把这些 speech act 冒充事实或 obligation。 |
+| `attention-regulation` | `enough`、`abandon` 与 `defer` 工具及 `Attention` 持久投影已退休；注意力动作并入 `assume` 与编程面 ANCHOR `view.extra`，本包只保留负向边界。 |
 | `action-affordance` | participant 在采取一个 action 的决策点必须知道该 act 的正边界、负边界、成功后果与参数意义。 |
 | `provider-language` | 语言由全局设置唯一决定，无会话绑定与持久化记录，改设置即改下一次渲染的语言；protocol identity 保持语言不变，核心角色双语 Prompt 语义同源一致。 |
 | `provider-projection` | 已决定可见的 typed semantic intent 必须经唯一确定性投影变成 provider representation，表示不能反向创造 authority。 |
@@ -47,7 +47,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `concern-routing` | participant 之间按 concern-addressed mailbox 通信；发送者不依赖身份拓扑，消息只在自然 Pair Hint 边界打断注意力。 |
+| `concern-routing` | concern-addressed 邮箱（`subscribe`、`publish`、自动订阅与 Pair Hint 消息捎带）已退休；跨参与者与用户交互并入编程面 `js.fork`/`js.join`/`js.deliver`/`js.ask`，本包只保留负向边界。 |
 | `interaction-authority` | 物理 user-shaped message 不等于 authority；历史事件保持原样且旧身份不升权，DevOps 恢复与续行锁定固定模型与单一执行权威。 |
 | `managed-chat-execution` | 每个物理消息的 durable acceptance、provider start、唯一终态与 exact settlement 必须由消息级执行 owner 统一管理。 |
 | `dispatch-protocol` | 已获授权的 interaction 穿过不可靠 Host 时必须避免 uncertain outcome 复制逻辑效果。 |
@@ -203,11 +203,11 @@ office-capability        → participant-identity
 capability-enforcement   → office-capability, participant-identity, attention-regulation, concern-routing
 participant-horizon      → 无
 cognitive-environment    → participant-identity, office-capability, attention-regulation, concern-routing
-attention-regulation     → participant-identity, durable-events
+attention-regulation     → participant-identity, cognitive-environment, repository-programming
 action-affordance        → office-capability, participant-horizon, cognitive-workspace, obligation-ledger
 provider-language        → session-ontology
 provider-projection      → participant-horizon, provider-language
-concern-routing          → participant-identity, participant-horizon, durable-events
+concern-routing          → participant-identity, delegation, repository-programming
 interaction-authority    → participant-identity, session-ontology
 managed-chat-execution   → durable-events, interaction-authority, participant-identity, execution-model-routing, execution-failure-policy, host-boundary
 dispatch-protocol        → interaction-authority, effect-accounting, host-boundary, durable-events, managed-chat-execution

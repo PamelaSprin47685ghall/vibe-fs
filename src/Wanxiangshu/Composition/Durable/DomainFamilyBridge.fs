@@ -121,7 +121,7 @@ module ContextProjectionBridge =
         |> Option.bind (fun session -> session.PrefixEpoch)
 
     let private checkpointWindowOf (projection: AgentProjectionSet) (sessionId: SessionId) =
-        projection.TodoCheckpoints
+        projection.ViewCheckpoints
         |> Map.tryFind sessionId
         |> Option.defaultValue PhaseWindow.emptyWindow
 
@@ -137,12 +137,12 @@ module ContextProjectionBridge =
         =
         let checkpoints =
             if List.isEmpty window.Checkpoints then
-                Map.remove sessionId projection.TodoCheckpoints
+                Map.remove sessionId projection.ViewCheckpoints
             else
-                Map.add sessionId window projection.TodoCheckpoints
+                Map.add sessionId window projection.ViewCheckpoints
 
         { projection with
-            TodoCheckpoints = checkpoints }
+            ViewCheckpoints = checkpoints }
 
     let private appendCheckpoint projection sessionId callId =
         checkpointWindowOf projection sessionId
@@ -156,7 +156,7 @@ module ContextProjectionBridge =
 
     let private clearCheckpointGeneration projection sessionId =
         { projection with
-            TodoCheckpoints = Map.remove sessionId projection.TodoCheckpoints }
+            ViewCheckpoints = Map.remove sessionId projection.ViewCheckpoints }
 
     let private applyChange (projection: AgentProjectionSet) (change: ContextProjectionChange) =
         match change with
@@ -211,7 +211,7 @@ module ContextProjectionBridge =
 
     let fold (projection: AgentProjectionSet) (fact: ContextFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match fact with
-        | ContextFactCases.TodoCheckpointCommitted payload ->
+        | ContextFactCases.ViewCheckpointCommitted payload ->
             Ok(appendCheckpoint projection payload.SessionId payload.ToolCallId)
         | ContextFactCases.PrefixRebaseCommitted payload ->
             foldOwned projection fact

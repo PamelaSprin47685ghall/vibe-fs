@@ -27,7 +27,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-projection.opencode-codec-providerwiredecode.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-diagnostics-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-association.fsproj"/>
-            <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-attention-concern.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.companion-host-blogger.fsproj"/>
 <Compile Include="Enforcer/Cycle/Recovery.fsi"/>
     <Compile Include="Enforcer/Cycle/Recovery.fs"/>

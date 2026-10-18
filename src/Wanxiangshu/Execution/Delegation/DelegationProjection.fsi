@@ -14,7 +14,6 @@ type DelegationSessionState =
 type DelegationProjectionChange =
     | ReplaceSessionState of sessionId: SessionId * state: DelegationSessionState
     | IndexChildHandle of childSessionId: SessionId * record: HandleRecord
-    | MoveHandoffFrontier of key: string * parentEndExclusive: int64
     | TerminatedChildHandle of parentSessionId: SessionId * childSessionId: SessionId
     | TerminatedChildWork of work: HandleWorkId * logicalRunId: LogicalRunId
 
@@ -25,8 +24,6 @@ type DelegationFoldRejection =
     | HandleNeverLinked of fact: string
     | HandleCompletionMissing of fact: string
     | WorkRejected of fact: string * reason: HandleTransitionRejection
-    | HandoffFrontierCannotRetreat of previous: int64 * requested: int64
-    | HandoffFrontierNegative of requested: int64
     | ToolEstimateNegative of expectedToolCalls: int
 
 /// delegation-029: Module providing default empty delegation session state.

@@ -33,14 +33,12 @@ module HostForkAgent =
             ?ownership: HandleOwnership *
             ?deferSend: bool *
             ?byname: string *
-            ?expectedToolCalls: int *
-            ?preparedHandoff: PreparedDelegationHandoff ->
+            ?expectedToolCalls: int ->
                 Task<Result<ForkResult, string>>
 
         member Reuse:
             agentId: string *
             prompt: string *
             ?renderedPrompt: string *
-            ?expectedToolCalls: int *
-            ?preparedHandoff: PreparedDelegationHandoff ->
+            ?expectedToolCalls: int ->
                 Task<Result<ForkResult, string>>

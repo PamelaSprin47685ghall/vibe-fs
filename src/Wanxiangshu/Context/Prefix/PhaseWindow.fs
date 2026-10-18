@@ -2,7 +2,7 @@ namespace Wanxiangshu.Context.Prefix
 
 open Wanxiangshu.Foundation.Identity
 
-/// Desired raw-history boundary selected by the latest todowrite checkpoint.
+/// Desired raw-history boundary selected by the latest view declaration checkpoint.
 [<RequireQualifiedAccess>]
 type PhaseWindowDecision =
     | NoPhases
@@ -11,7 +11,7 @@ type PhaseWindowDecision =
 [<RequireQualifiedAccess>]
 module PhaseWindow =
 
-    /// context-compression-028: the number of recent todowrite checkpoints whose
+    /// context-compression-028: the number of recent view declaration checkpoints whose
     /// semantic turns stay raw. Fixed system parameter, not a session setting.
     let retainCheckpoints = 3
 
@@ -21,7 +21,7 @@ module PhaseWindow =
 
     let emptyWindow: PhaseCommitWindow = { Checkpoints = [] }
 
-    /// Record one successful todowrite checkpoint. The same call identity
+    /// Record one successful view declaration checkpoint. The same call identity
     /// re-entering is a replay of the same fact, never a second checkpoint.
     let appendCheckpoint (callId: ToolCallId) (window: PhaseCommitWindow) : PhaseCommitWindow =
         if

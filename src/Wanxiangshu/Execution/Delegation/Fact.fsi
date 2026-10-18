@@ -91,10 +91,3 @@ module DelegationFact =
             {| SessionId: SessionId
                ToolCallId: ToolCallId |} ->
             AgentFact
-
-    val inline DelegationHandoffCompleted:
-        payload:
-            {| ParentEndExclusive: int64
-               ParentSessionId: SessionId
-               Route: DelegationHandoffRoute |} ->
-            AgentFact

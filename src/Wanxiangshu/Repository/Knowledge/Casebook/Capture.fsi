@@ -35,13 +35,6 @@ module CasebookCapture =
     /// Stable content fingerprint.
     val contentHash: text: string -> string
 
-    val ofReadExecution: args: obj -> output: string -> Observation option
-    val ofGlobExecution: args: obj -> output: string -> Observation option
-    val ofGrepExecution: args: obj -> output: string -> Observation option
-
-    /// Dispatch by tool name.
-    val capture: toolName: string -> args: obj -> output: string -> Observation option
-
     val ofExecCommand: command: string -> Observation option
 
     /// KR-003 / KR-014: Check if tool is substantive.

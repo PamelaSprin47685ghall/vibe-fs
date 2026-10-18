@@ -14,7 +14,6 @@ type PendingHostRun =
       ChildId: SessionId
       Role: Role
       StartCursor: XTraceCursor
-      Handoff: PreparedDelegationHandoff option
       AuthorityRoot: AuthorityRootUserMessageId
       Work: AdmittedWork option
       Source: TaskCompletionSource<AgentCompletionOutcome>

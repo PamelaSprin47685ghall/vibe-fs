@@ -44,11 +44,9 @@ type StrengthMirrorError =
 module StrengthFrame =
 
     /// The read-only evidence the replica is allowed to carry out of the owner's
-    /// batch: the Host-native read-only primitives plus the single dedicated
-    /// readonly JS surface. Anything else in a mixed owner batch is dropped by
-    /// the filter rather than failing the whole frame.
-    let private projectionTools =
-        set [ "read"; "glob"; "grep"; "todowrite-for-predictor" ]
+    /// batch: the single dedicated readonly JS surface. Anything else in a mixed
+    /// owner batch is dropped by the filter rather than failing the whole frame.
+    let private projectionTools = set [ "todowrite-for-predictor" ]
 
     /// The names a built frame may actually carry. The replica CALLS
     /// `todowrite-for-predictor`, but its exchange is projected back into the owner's

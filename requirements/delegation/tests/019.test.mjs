@@ -63,5 +63,3 @@ test('WHAT[delegation-019] absent and blank optional background fields do not ma
     assert.deepEqual(parse(document), {})
   }
 })
-
-test.todo('WHAT[delegation-019] actual fork first-prompt producers obtain the current durable parent record and preserve the typed instruction and data boundary end to end (GAP-153)')

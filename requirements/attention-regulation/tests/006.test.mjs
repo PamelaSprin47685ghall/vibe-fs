@@ -1,19 +1,18 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import test from 'node:test'
-import * as attention from '../../../dist/Interaction/Attention/Surface.js'
 
-test('WHAT[attention-regulation-006] deferred projection stores natural-language work and consumes only named occurrences', () => {
-  let state = attention.empty()
-  state = attention.record('session-a', 'first', 'deadline tomorrow; priority high is ordinary text', state)
-  state = attention.record('session-a', 'second', 'look later', state)
-  state = attention.record('session-b', 'first', 'independent work', state)
-  const after = attention.consume('session-a', ['first'], state)
-  assert.deepEqual(attention.pending('session-a', after), [{ occurrence: 'second', text: 'look later' }])
-  assert.deepEqual(attention.pending('session-b', after), [{ occurrence: 'first', text: 'independent work' }])
-  assert.equal(attention.pending('session-a', state).length, 2)
-  // Consuming an unknown occurrence is idempotent and never touches other entries.
-  const idempotent = attention.consume('session-a', ['missing'], after)
-  assert.deepEqual(attention.pending('session-a', idempotent), attention.pending('session-a', after))
+const root = process.cwd()
+const read = (path) => readFileSync(resolve(root, path), 'utf8')
+
+// Superseded by ANCHOR view.extra and assume: durable Fact, ProjectionUpdate, Fold, AgentJournalPortAdapter, and fact-map contain no Attention family.
+test('WHAT[attention-regulation-006] durable fact, fold, adapter, and ablation fact-map carry no Attention state', () => {
+  assert.doesNotMatch(read('src/Wanxiangshu/Composition/Durable/Fact.fs'), /\bAttention\b|AttentionFactCases/)
+  assert.doesNotMatch(read('src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs'), /applyAttention|AttentionProjection|AttentionFactCases/)
+  assert.doesNotMatch(read('src/Wanxiangshu/Composition/Durable/Fold.fs'), /AgentFact\.Attention|applyAttention/)
+  assert.doesNotMatch(read('src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs'), /forAttention|AttentionJournalPort/)
+
+  const factMap = JSON.parse(read('resources/ablation/fact-map.json'))
+  assert.equal('AgentFact.Attention' in (factMap.facts ?? {}), false)
 })
-
-test.todo('WHAT[attention-regulation-006] GAP-118 actual dependency and capability isolation exclude a hidden scheduler or cognitive workflow engine')

@@ -294,73 +294,6 @@ module HostForkRunLifecycle =
         stop.AuthorityRootUserMessageId.IsNone
         || TerminalStop.belongsTo run.AuthorityRoot stop
 
-    /// delegation-031: the handoff port travels with the prepared handoff as one slot
-    /// (`Some slot` proves the capability was present at PrepareHandoff time).
-    /// A run whose `Handoff` slot is `None` has no completion checkpoint to
-    /// write — capability absence is therefore decided here structurally, not by
-    /// a late fatal, and `complete` never re-checks a construction-time fact.
-    /// Prepared-handoff capability arbitration: `Some port`/`Some handoff`
-    /// pair married, capability-absent prepared handoff → structural
-    /// invariant violation. Kept at module level so `checkpointSlot` stays
-    /// single-level — the nested match is delegated here, not inlined.
-    let private checkpointSlotFor
-        (handoffPort: ReusableHandoffPort option)
-        (handoff: PreparedDelegationHandoff)
-        : (ReusableHandoffPort * PreparedDelegationHandoff) option =
-        match handoffPort with
-        | Some port -> Some(port, handoff)
-        | None ->
-            raise (
-                InvalidOperationException
-                    "reusable fork run has no handoff capability: prepared handoff without a handoff port"
-            )
-
-    let private checkpointSlot (handoffPort: ReusableHandoffPort option) (run: PendingHostRun) =
-        match run.Handoff with
-        | None -> None
-        | Some handoff -> checkpointSlotFor handoffPort handoff
-
-    /// Commitment switchboard for a CheckpointCompleted settlement. Non-conflict
-    /// outcomes are sunk to unit; PhaseConflict is the retained inventor's
-    /// authority — it trips the process because no settlement path exists at
-    /// that level.
-    let private checkpointOutcomePort (settled: HandoffCheckpointSettlement) : Task =
-        task {
-            match settled.Commitment with
-            | HandoffCheckpointCommitment.Committed
-            | HandoffCheckpointCommitment.NotCommitted _
-            | HandoffCheckpointCommitment.PersistenceFailed _
-            | HandoffCheckpointCommitment.Unknown _ -> ()
-            | HandoffCheckpointCommitment.PhaseConflict reason ->
-                let detail =
-                    sprintf
-                        "delegation completed-handoff invariant cut at route %s: %s"
-                        (DelegationHandoffRoute.value settled.Identity.Route)
-                        reason
-
-                FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
-        }
-        :> Task
-
-    let private settleCompletedHandoff
-        (handoffPort: ReusableHandoffPort option)
-        (parentId: SessionId)
-        (run: PendingHostRun)
-        : Task =
-        match checkpointSlot handoffPort run with
-        | None -> Task.FromResult(()) :> Task
-        | Some(port, handoff) ->
-            task {
-                // delegation-031: the checkpoint returns its own settlement — a pending
-                // completion is delivered whatever the commitment says. The child
-                // already finished; NotCommitted/Unknown preserve pending-evidence
-                // for the next invocation's durable re-read and never re-execute
-                // the child. Only the PhaseConflict invariant cut escalates.
-                let! settled = port.CheckpointCompleted parentId handoff
-                return! checkpointOutcomePort settled
-            }
-            :> Task
-
     /// P0-RECOVERY-JOIN-001: only proven terminals may claim the cell.
     /// Aborted is observation — never recordCompletion / SetResult / mailbox.
     /// Claim runs only after JoinableCompletion proof succeeds (fail closed).
@@ -538,7 +471,6 @@ module HostForkRunLifecycle =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (handoffPort: ReusableHandoffPort option)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
         (workRecord: string option)
@@ -567,13 +499,6 @@ module HostForkRunLifecycle =
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
         | Completed result ->
             task {
-                // delegation-031: settlement is attempted before delivery, but the
-                // proven completion is delivered whatever the commitment says —
-                // neither announced early (this await precedes the SetResult
-                // below) nor forgotten. Only PhaseConflict escalates, after
-                // which no delivery can follow.
-                do! settleCompletedHandoff handoffPort parentId run
-
                 let agentOutcome =
                     AgentCompletion.completed
                         run.AgentId
@@ -621,8 +546,6 @@ module HostForkRunLifecycle =
         (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
         (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
-        (handoffPort: ReusableHandoffPort option)
-        (handoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
@@ -641,7 +564,6 @@ module HostForkRunLifecycle =
               ChildId = childId
               Role = role
               StartCursor = xTraceHead childId
-              Handoff = handoff
               AuthorityRoot = authorityRoot
               Work = Some work
               Source = HostPendingRun.completionSource ()
@@ -680,7 +602,6 @@ module HostForkRunLifecycle =
                                         journal
                                         parentId
                                         sessions
-                                        handoffPort
                                         run
                                         outcome
                                         workRecord
@@ -757,7 +678,6 @@ module HostForkRunLifecycle =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (handoffPort: ReusableHandoffPort option)
         (run: PendingHostRun)
         (error: string)
         =

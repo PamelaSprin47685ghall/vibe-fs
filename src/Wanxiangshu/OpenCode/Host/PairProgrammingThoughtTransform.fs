@@ -11,7 +11,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
@@ -216,8 +215,7 @@ module PairProgrammingThoughtTransform =
           CallId: string
           MarkerText: string
           CallGap: TranscriptGap
-          ResultGap: TranscriptGap
-          ConcernPlacement: ConcernPlacementBatch option }
+          ResultGap: TranscriptGap }
 
     /// Process-local fallback when journal is unavailable (tests / no workspace).
     /// Keyed by transcript identity; append-only within process.
@@ -994,8 +992,7 @@ module PairProgrammingThoughtTransform =
                   CallId = ToolCallId.value pair.CallId
                   MarkerText = pair.MarkerText
                   CallGap = pair.CallGap
-                  ResultGap = pair.ResultGap
-                  ConcernPlacement = None })
+                  ResultGap = pair.ResultGap })
 
     let private readDurableVisibleHistory
         (journal: AgentJournal)
@@ -1012,8 +1009,7 @@ module PairProgrammingThoughtTransform =
                   CallId = ToolCallId.value pair.CallId
                   MarkerText = pair.MarkerText
                   CallGap = pair.CallGap
-                  ResultGap = pair.ResultGap
-                  ConcernPlacement = None })
+                  ResultGap = pair.ResultGap })
 
     let private readMemoryHistory (key: string) : PairProgrammingGuidelineWire list =
         match memoryLedger.TryGetValue key with
@@ -1037,12 +1033,6 @@ module PairProgrammingThoughtTransform =
         (pair: PairProgrammingGuidelineWire)
         : Task<Result<unit, string>> =
         task {
-            let hostConcernPlacement =
-                pair.ConcernPlacement
-                |> Option.map (fun batch ->
-                    { Wanxiangshu.Host.ConcernPlacementBatch.AnnouncedGenerations = batch.AnnouncedGenerations
-                      Wanxiangshu.Host.ConcernPlacementBatch.DeliveredMessages = batch.DeliveredMessages })
-
             let fact =
                 HostFact.PairProgrammingGuidelineAnchored
                     {| SessionId = sessionId
@@ -1051,7 +1041,7 @@ module PairProgrammingThoughtTransform =
                        MarkerText = pair.MarkerText
                        CallGap = pair.CallGap
                        ResultGap = pair.ResultGap
-                       ConcernPlacement = hostConcernPlacement |}
+                       ConcernPlacement = None |}
 
             match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
             | Ok _ -> return Ok()
@@ -1079,7 +1069,6 @@ module PairProgrammingThoughtTransform =
         (append: PairProgrammingGuidelineWire -> Task<Result<unit, string>>)
         (sessionId: string option)
         (markerText: string)
-        (concernPlacement: ConcernPlacementBatch option)
         (realMessages: obj list)
         (callGap: TranscriptGap)
         (resultGap: TranscriptGap)
@@ -1098,8 +1087,7 @@ module PairProgrammingThoughtTransform =
                       CallId = stableCallId sessionId ordinal
                       MarkerText = markerText
                       CallGap = callGap
-                      ResultGap = resultGap
-                      ConcernPlacement = concernPlacement }
+                      ResultGap = resultGap }
 
                 let! rendered = replayMessages realMessages (visibleHistory @ [ candidate ])
                 do! append candidate
@@ -1166,7 +1154,6 @@ module PairProgrammingThoughtTransform =
         append
         sessionId
         markerText
-        concernPlacement
         realMessages
         =
         taskResult {
@@ -1186,7 +1173,6 @@ module PairProgrammingThoughtTransform =
                         append
                         sessionId
                         markerText
-                        concernPlacement
                         realMessages
                         callGap
                         resultGap
@@ -1209,7 +1195,6 @@ module PairProgrammingThoughtTransform =
         (journal: AgentJournal option)
         (sessionId: string option)
         (markerText: string)
-        (concernPlacement: ConcernPlacementBatch option)
         (rawMessages: obj list)
         : Task<Result<obj list * bool, string>> =
         taskResult {
@@ -1288,7 +1273,6 @@ module PairProgrammingThoughtTransform =
                         append
                         sessionId
                         markerText
-                        concernPlacement
                         realMessages
         }
 
@@ -1371,36 +1355,6 @@ module PairProgrammingThoughtTransform =
 
             return document
         }
-
-    let private concernInstructions language (prepared: ConcernPreparedFragments) =
-        let announcements =
-            prepared.Announcements
-            |> List.map (fun (id, concern) ->
-                ProviderProse.render
-                    language
-                    "concern-routing/subscription-announcement"
-                    (Map [ "id", id; "concern", concern ]))
-
-        let messages =
-            prepared.Messages
-            |> List.map (fun (id, message) ->
-                ProviderProse.render language "concern-routing/message-delivery" (Map [ "id", id; "message", message ]))
-
-        match announcements @ messages with
-        | [] -> []
-        | fragments ->
-            ProviderProse.render language "concern-routing/pair-heading" Map.empty
-            :: fragments
-
-    let private prepareConcernFragments journal projectionSessionIdOpt language =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
-            let recipient = SessionId.create sessionId
-            let state = (AgentJournal.snapshot durable).AgentProjections.Concern
-            let prepared = ConcernProjection.prepareFragments recipient state
-
-            concernInstructions language prepared, Some prepared.Batch
-        | _ -> [], None
 
     let private terminateSessionIfPresent
         (terminateSession: SessionTermination)
@@ -1562,15 +1516,9 @@ module PairProgrammingThoughtTransform =
                 | Some text -> LlmFacing.withInstruction text markerDocument
                 | None -> markerDocument
 
-            let concernInstructions, concernPlacement =
-                prepareConcernFragments journal projectionSessionIdOpt language
+            let markerText = LlmFacing.render markerDocument
 
-            let markerText =
-                markerDocument
-                |> LlmFacing.withInstructions concernInstructions
-                |> LlmFacing.render
-
-            let! injectResult = tryInjectCore journal projectionSessionIdOpt markerText concernPlacement messages
+            let! injectResult = tryInjectCore journal projectionSessionIdOpt markerText messages
 
             do!
                 applyInjectResult
@@ -1614,6 +1562,6 @@ module PairProgrammingThoughtTransform =
         (rawMessages: obj list)
         : Task<Result<obj list, string>> =
         task {
-            let! result = tryInjectCore journal sessionId markerText None rawMessages
+            let! result = tryInjectCore journal sessionId markerText rawMessages
             return Result.map fst result
         }

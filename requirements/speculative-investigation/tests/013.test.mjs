@@ -64,9 +64,9 @@ test('WHAT[speculative-investigation-013] STRENGTH_013_two_owners_transforms_kee
   assert.equal(Strength.runtimeRegister(runtime, ownerBinding('owner-b', 'replica-b', 'd-b', 1)).ok, true)
 
   // Interleaved transforms: each owner's request collects only its own calls.
-  const a1 = await Strength.transformApply(H, runtime, oneExchange('replica-a', 'call-a1', 'read', { filePath: 'a.md' }, 'alpha'), true)
+  const a1 = await Strength.transformApply(H, runtime, oneExchange('replica-a', 'call-a1', 'todowrite-for-predictor', { filePath: 'a.md' }, 'alpha'), true)
   assert.equal(a1.kind, 'Ready')
-  const b1 = await Strength.transformApply(H, runtime, oneExchange('replica-b', 'call-b1', 'grep', { pattern: 'b' }, 'hit-b'), true)
+  const b1 = await Strength.transformApply(H, runtime, oneExchange('replica-b', 'call-b1', 'todowrite-for-predictor', { pattern: 'b' }, 'hit-b'), true)
   assert.equal(b1.kind, 'Ready')
 
   // Call ids and ordinals never leak across owners: each owner's first request
@@ -82,12 +82,12 @@ test('WHAT[speculative-investigation-013] STRENGTH_013_two_owners_transforms_kee
 
   // Budgets are per owner: owner-b's budget (1) is spent while owner-a (3) keeps
   // admitting its own rounds.
-  const b2 = await Strength.transformApply(H, runtime, oneExchange('replica-b', 'call-b2', 'glob', { pattern: '**/*.fs' }, 'b.fs'), true)
+  const b2 = await Strength.transformApply(H, runtime, oneExchange('replica-b', 'call-b2', 'todowrite-for-predictor', { pattern: '**/*.fs' }, 'b.fs'), true)
   assert.equal(b2.kind, 'Retired')
   assert.equal(b2.reason, 'provider-request-budget-reached')
   assert.deepEqual(b2.aborted, ['replica-b'])
 
-  const a2 = await Strength.transformApply(H, runtime, oneExchange('replica-a', 'call-a2', 'read', { filePath: 'a2.md' }, 'alpha2'), true)
+  const a2 = await Strength.transformApply(H, runtime, oneExchange('replica-a', 'call-a2', 'todowrite-for-predictor', { filePath: 'a2.md' }, 'alpha2'), true)
   assert.equal(a2.kind, 'Ready', "owner-a's budget is not consumed by owner-b")
   assert.equal(a2.batches[0].requestOrdinal, 1)
 
@@ -879,7 +879,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(here, '../../..')
 const runnerPath = path.join(here, '../../host-boundary/tests/support/run-readonly-delegation-schema-canary.mjs')
 
-const expectedEngineerWireTools = ['todowrite-for-engineer', 'skill', 'todowrite', 'assume', 'defer', 'publish', 'bash-honeypot']
+const expectedEngineerWireTools = ['todowrite-for-engineer', 'skill', 'assume', 'bash-honeypot']
 
 const PARTICIPATING_TOOLS = new Set([
   'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
