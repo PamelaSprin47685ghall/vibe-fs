@@ -179,7 +179,7 @@ export class NativeTestSupervision {
     if (typeof request.contextToken !== 'string' || !/^[a-f0-9]{32}$/.test(request.contextToken)) {
       return [this.reply(request, false, 'Invalid registered context token')]
     }
-    if (entry.usedTokens.has(request.contextToken) || entry.pending || entry.allowance) {
+    if (entry.usedTokens.has(request.contextToken) || entry.pending || (entry.allowance && !entry.allowance.ended)) {
       return [this.reply(request, false, 'Physical wait was already declared for this invocation')]
     }
     entry.usedTokens.add(request.contextToken)
@@ -189,7 +189,7 @@ export class NativeTestSupervision {
 
   bindPending(entry, now) {
     const request = entry.pending
-    if (!request) return []
+    if (!request || entry.allowance) return []
     const matching = entry.invocations.filter(value => value.name === request.name)
     if (matching.length === 0) return []
     entry.pending = null

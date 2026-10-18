@@ -1,0 +1,52 @@
+[
+  {
+    "file": "GAP140-B1-FINAL700-CONSUMERS-20261019.tgz",
+    "bytes": 5871824,
+    "sha256": "a9bbef9db52a61f4f30e70a838b2135e33b81c2e600123ada2476fc4d0afe51a"
+  },
+  {
+    "file": "GAP140-B1-INDEPENDENT-ORIGINAL-CONSUMER-20261019.tgz",
+    "bytes": 5319680,
+    "sha256": "a34b9a7194e4b91884ee81c3e8bb17c11b3d9a02c638058a7f80cd40876ace29"
+  },
+  {
+    "file": "GAP140-B1-INDEPENDENT-PRODUCTION700-20261019.tgz",
+    "bytes": 2959915,
+    "sha256": "775eff01255ed2e3c65ad1a066715448eecf633a89548052cc933bdcc18e3bf4"
+  },
+  {
+    "file": "GAP140-B1-INDEPENDENT-PRODUCTION706-20261019.tgz",
+    "bytes": 2953856,
+    "sha256": "8b978a6a38ae6d3523029f5531828c1978dbb2d1afc691200e1b478cfa8951b8"
+  },
+  {
+    "file": "GAP140-B1-INDEPENDENT-PROTOTYPE-20261019.tgz",
+    "bytes": 5033828,
+    "sha256": "e804384ed1dde960e28a9cb75cd02079c7fc3ae860376f390fcb65ee2984183b"
+  },
+  {
+    "file": "GAP140-B1-RELATED-697-700-BASELINE-20261019.tgz",
+    "bytes": 13740008,
+    "sha256": "99224599e01cc9a25cda0f227c6905523c716d5698916f68a757b80e9f4b9953"
+  },
+  {
+    "file": "GAP140-B1-ROOT-DELIVERY706-20261019.tgz",
+    "bytes": 3522350,
+    "sha256": "330fea322ea663db07eb98babe416f1f104391f5c3bda1311bed8a48d0ad24c4"
+  },
+  {
+    "file": "GAP140-B2-CROSS-OS700-COMPACT-20261019.tgz",
+    "bytes": 3097905,
+    "sha256": "e8a9e9fb3f76b4430234903d4921085de5dc4ee3ef6ab8fd8054f31270e33fc3"
+  },
+  {
+    "file": "GAP140-CORRECTED005-697-700-20261019.tgz",
+    "bytes": 1086092,
+    "sha256": "fac321cffd12ee10a123b5edc8d7897f85503a356deabb6fd2095e256d2961e4"
+  },
+  {
+    "file": "R1-ENDED-PENDING-NONAUTHOR-jrg5yx8q.tgz",
+    "bytes": 53710,
+    "sha256": "d8cb51c59bf3a2c8fbb28a6ba9db42dffdf347d76d61fc41d61417a2139b0169"
+  }
+]

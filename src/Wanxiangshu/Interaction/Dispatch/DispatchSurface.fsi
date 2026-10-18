@@ -132,6 +132,19 @@ module DispatchSurface =
         attachRegistration: (obj -> unit) ->
             Task<obj>
 
+    val sendGateContinuationWithAcceptance:
+        port: obj ->
+        handle: JournalHandle ->
+        directory: string ->
+        session: string ->
+        text: string ->
+        continuation: string ->
+        gateKind: string ->
+        terminalProviderRun: string ->
+        onAccepted: (string -> unit) ->
+        attachRegistration: (obj -> unit) ->
+            Task<obj>
+
     val sendGateNudgesConcurrently:
         port: obj ->
         handle: JournalHandle ->

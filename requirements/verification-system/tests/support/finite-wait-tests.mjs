@@ -168,6 +168,38 @@ export function registerFiniteWaitTests() {
     assert.equal(m.owner.nextDeadline().at, 1099)
   })
 
+  test('WHAT[verification-system-006] the next physical request waits for the previous native completion after end ACK', () => {
+    const m = model()
+    m.owner.observe(native('test:dequeue', 1))
+    assert.equal(m.owner.control(begin())[0].ok, true)
+    m.at(20)
+    assert.equal(m.owner.control(begin({ phase: 'end' }))[0].ok, true)
+    const next = begin({ contextToken: 'b'.repeat(32), requestId: 2 })
+    assert.deepEqual(m.owner.control(next), [])
+    assert.equal(m.owner.nextDeadline().at, 1000, 'queued control cannot replace the previous absolute bound')
+    assert.deepEqual(m.owner.observe(native('test:complete', 2)), [])
+    assert.equal(m.owner.nextDeadline().at, 120, 'unbound control grants no provisional time')
+    m.at(30)
+    assert.deepEqual(m.owner.observe(native('test:dequeue', 3)),
+      [m.owner.reply(next, true)])
+    assert.equal(m.owner.nextDeadline().at, 1030)
+    assert.equal(m.owner.control(next)[0].ok, false, 'one native invocation cannot be renewed')
+  })
+
+  test('WHAT[verification-system-006] ended physical waits admit only one pending token and never renew the old invocation', () => {
+    const m = model()
+    m.owner.observe(native('test:dequeue', 1))
+    assert.equal(m.owner.control(begin())[0].ok, true)
+    assert.equal(m.owner.control(begin({ contextToken: 'b'.repeat(32), requestId: 2 }))[0].ok, false)
+    assert.equal(m.owner.control(begin({ phase: 'end' }))[0].ok, true)
+    assert.equal(m.owner.control(begin())[0].ok, false, 'the spent context token remains spent after end')
+    const next = begin({ contextToken: 'c'.repeat(32), requestId: 3, name: 'next probe', fullName: 'next probe' })
+    assert.deepEqual(m.owner.control(next), [])
+    assert.equal(m.owner.control(begin({ contextToken: 'd'.repeat(32), requestId: 4 }))[0].ok, false)
+    m.at(1000)
+    assert.throws(() => m.owner.observe(native('test:complete', 2)), /deadline expired/)
+  })
+
   test('WHAT[verification-system-006] every late transition loses before delayed timer dispatch', () => {
     for (const event of ['begin', 'end', 'complete', 'drain', 'summary', 'exit']) {
       const m = model()

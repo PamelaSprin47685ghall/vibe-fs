@@ -185,7 +185,7 @@ C/R7-A 的剩余整体验收由下列 CUT-00-R3 取得归因后再裁决；R1/R2
 <a id="adjacent-repairs"></a>
 ## 3. 相邻行为修复
 
-GAP-085、159 的列明范围已交付。GAP-159 旧实际公共入口确会安装错误的 Engineer 身份，但未复现成功的 Predictor Fission 越权，两者分开记账。GAP-140 目前未证明会实际重发命令，真实后果仍须由其消费者验证。
+GAP-085、159的列明范围已交付。GAP-159旧实际公共入口确会安装错误的Engineer身份，但未复现成功的Predictor Fission越权，两者分开记账。GAP-140已在刻意绕过session Scheduler的真实SyncDelegate消费者复现重复恢复发送，旧680也有同脚本证据；普通公开Host调度可达性仍未证明，不将两者混写。
 
 <a id="gap085"></a>
 ### GAP-085 规则自覆盖
@@ -213,6 +213,12 @@ GAP-085、159 的列明范围已交付。GAP-159 旧实际公共入口确会安�
 ### GAP-140 持久失败预算
 
 **2026-10-19 进度：** [G140-A报告](DURABLE-FAILURE-BUDGET-GAP140-2026-10-19.md)已验持久Spec、顺序入账与完整身份保留、来源root成功边界、实际故障/12轮和冷预算。697最终相关101文件693 pass / 0普通fail / 7skip / 62TODO，固定包及非作者C/J01/T通过。整卡仍DOING：既存并发命令有facts2/send2/count1，下一步先做G140-B真实writer/dispatch owner原型；实际普通冷Workflow缺Host-stop零发送仍待验。不能把局部证据写成整卡或GAP-139完成。
+
+**B拆包追加：** [G140-B1](SINGLE-JOURNAL-RECOVERY-G140-B1-2026-10-19.md)已按同live Journal的non-idle范围验收：候选700实际send2→1、两次观察及时完成，事实仍2。独立固定包22项通过，六项永久回归已绿；R1自引入双通道竞争已补修，702原七文件323/0。704相邻142文件609pass/1普通fail/6skip/93TODO，唯一普通失败仍为旧GAP124，未写成整套通过。005夹具已保持原件并补非法改写拒绝；697/700双Host均验证。整卡仍DOING。B2跨OS已确证同身份facts2；不同身份两条count1导致冷积分拒一条，不能把cold boot成功算账正确。
+
+**B2施工次序：** 先做现有StoreLock内fresh Current/纯领域决定/fresh parents/物理提交及release的私有reference原型，再定canonical freshness/frontier合同与017成本验收，然后迁领域命令、lazy init/seq/NoWrite/poison及durable prompt claim的跨Journal/OS发送权。现ReloadLocal全重放，不能直接接生产，也不能把陌生suffix简单续到旧规范顺序末尾。预热writer原型不代证初始化；预算结果仍不产生Host-stop或发送权。真实并发、故障、普通冷Workflow和固定包非作者复核全部通过前不关整卡。
+
+706收尾：长期夹具已退出内部DU读取，改走既有DispatchSurface的真实HostSessionNudge调用与JSON输出。700→706仅此Surface一个包文件变化，其余2075字节相同；新增JS边界套件后148文件653pass/1旧GAP124fail/6skip/95TODO，完整排空及收尾通过，仍不称整个套件绿色。
 
 **范围与前置：** 先定每个 LogicalRun 的预算事实、重复身份和新失败的区别；统一记录、重放和实际重试准入。可升级事件版本；无依据旧记录明确拒绝或另作有输入清单的离线迁移，不按今天默认值猜旧预算。
 

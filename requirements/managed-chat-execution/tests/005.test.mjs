@@ -295,6 +295,7 @@ test('WHAT[managed-chat-execution-005] transform durably starts the real assista
     const sessionID = 'ses-start-before-transform'
     const messageID = 'msg-start-before-transform'
     const request = await acceptedRequest(hooks, sessionID, messageID)
+    const originalRequest = structuredClone(request)
     const assistant = assistantMessage(sessionID, messageID, 'assistant-start-before-transform')
     runtime.pushHostMessage(sessionID, assistant)
     await hooks.event({ event: { type: 'message.updated', properties: { info: assistant.info } } })
@@ -311,9 +312,10 @@ test('WHAT[managed-chat-execution-005] transform durably starts the real assista
 
     assistant.info.time.completed = 3
     runtime.pushHostMessage(sessionID, assistantMessage(sessionID, messageID, 'assistant-tool-followup'))
-    await hooks['experimental.chat.messages.transform']({}, {
-      messages: [{ info: request.messages[0].info, parts: [{ type: 'text', text: 'controlled tool result' }] }],
-    })
+    await assert.rejects(hooks['experimental.chat.messages.transform']({}, {
+      messages: [{ info: originalRequest.messages[0].info, parts: [{ type: 'text', text: 'controlled tool result' }] }],
+    }), /Confirmed Host material identity conflict/)
+    await hooks['experimental.chat.messages.transform']({}, originalRequest)
     assert.equal(providerStartFacts(directory).length, 1, 'the next Host assistant run reuses the physical execution phase')
     assertNoReplacementPrompt(runtime, created, sessionID)
   })

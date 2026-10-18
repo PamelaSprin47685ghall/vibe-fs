@@ -1,4 +1,46 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { runVerificationToolProbe } from '../../../scripts/lib/verification-tool-probe.mjs'
+import { withFinitePhysicalWait } from '../../verification-system/tests/support/finite-physical-wait.mjs'
+import { writeRoutingHome } from '../../verification-system/tests/support/routing-home.mjs'
+
+test('WHAT[provider-attempt-recovery-003] duplicate recovery observations in one live Journal share a physical send and settle', async t => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'recovery-single-send-')))
+  const store = join(root, 'store')
+  mkdirSync(store)
+  const home = writeRoutingHome(join(root, 'home'))
+  const env = { ...process.env, HOME: home, USERPROFILE: home }
+  delete env.NODE_TEST_CONTEXT
+  delete env.NODE_OPTIONS
+  delete env.WANXIANGSHU_NO_FATAL_EXIT
+  const fixture = fileURLToPath(new URL('./support/concurrent-recovery.fixture.mjs', import.meta.url))
+  const product = fileURLToPath(new URL('../../../', import.meta.url))
+  const receipt = join(root, 'physical.json')
+  let completed = false
+  try {
+    await withFinitePhysicalWait(t, { operation: 'concurrent recovery physical send', limitMs: 15000 }, async () => {
+      await runVerificationToolProbe(process.execPath, [fixture, product, store, receipt], { cwd: root, env, signal: t.signal })
+      const measured = JSON.parse(readFileSync(receipt, 'utf8'))
+      assert.equal(measured.accepted, true)
+      assert.equal(measured.closed, true)
+      assert.equal(measured.sendDelta, 1)
+      assert.deepEqual(measured.handled, [true, true])
+      t.diagnostic(JSON.stringify({ physicalPid: measured.pid, sendDelta: measured.sendDelta, failureFacts: measured.failureFacts.length }))
+    })
+    completed = true
+  } catch (error) {
+    writeFileSync(join(root, 'stdout.log'), error.stdout ?? '')
+    writeFileSync(join(root, 'stderr.log'), error.stderr ?? '')
+    throw error
+  } finally {
+    if (completed) rmSync(root, { recursive: true, force: true })
+    else t.diagnostic('CONCURRENT_RECOVERY_EVIDENCE: retained ' + root)
+  }
+})
 
 {
 const { default: assert } = await import("node:assert/strict");

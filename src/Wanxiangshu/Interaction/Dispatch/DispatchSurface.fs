@@ -611,6 +611,54 @@ module DispatchSurface =
             onAccepted
             attachRegistration
 
+    let private gateContinuationView outcome =
+        let kind, key, error =
+            match outcome with
+            | HostSessionNudge.GateContinuationOutcome.Sent key -> "Sent", PromptKey.value key, null
+            | HostSessionNudge.GateContinuationOutcome.AlreadyAdmitted -> "AlreadyAdmitted", null, null
+            | HostSessionNudge.GateContinuationOutcome.Retired -> "Retired", null, null
+            | HostSessionNudge.GateContinuationOutcome.Failed error -> "Failed", null, error
+
+        box
+            {| kind = kind
+               key = key
+               error = error |}
+
+    let sendGateContinuationWithAcceptance
+        (port: obj)
+        (handle: JournalHandle)
+        (directory: string)
+        (session: string)
+        (text: string)
+        (continuation: string)
+        (gateKind: string)
+        (terminalProviderRun: string)
+        (onAccepted: string -> unit)
+        (attachRegistration: obj -> unit)
+        : Task<obj> =
+        match PromptAuthority.tryParseContinuationKind continuation with
+        | None ->
+            HostSessionNudge.GateContinuationOutcome.Failed(sprintf "Unknown continuation kind: %s" continuation)
+            |> gateContinuationView
+            |> Task.FromResult
+        | Some kind ->
+            let observer: ContinuationAcceptanceObserver =
+                { Notify = PhysicalUserMessageId.value >> onAccepted
+                  AttachDisposable = box >> attachRegistration }
+
+            HostSessionNudge.trySendGateContinuationObserved
+                (sessionPort port)
+                (rootWorkspaceReader (box directory))
+                (SessionId.create session)
+                text
+                kind
+                (Some directory)
+                (Some handle.Journal)
+                gateKind
+                (ProviderRunIdentity.create terminalProviderRun)
+                (Some observer)
+            |> TaskValue.map gateContinuationView
+
     let sendGateNudgesConcurrently
         (port: obj)
         (handle: JournalHandle)

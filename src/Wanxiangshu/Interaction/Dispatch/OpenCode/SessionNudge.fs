@@ -88,7 +88,7 @@ module HostSessionNudge =
             | false, None, _ -> return Error "No journal: a continuation cannot be claimed"
             | false, Some _, None -> return Error "No active authority profile"
             | false, Some durable, Some profile ->
-                let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+                let rt = PromptJournalAdapter.forJournal durable
 
                 return!
                     rt.SendContinuation
@@ -148,7 +148,7 @@ module HostSessionNudge =
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<GateContinuationOutcome> =
-        let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+        let rt = PromptJournalAdapter.forJournal durable
 
         if rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun then
             Task.FromResult GateContinuationOutcome.AlreadyAdmitted
@@ -240,7 +240,7 @@ module HostSessionNudge =
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<Result<PhysicalUserMessageId, string>> =
-        let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+        let rt = PromptJournalAdapter.forJournal durable
 
         let acceptedPhysical =
             TaskCompletionSource<PhysicalUserMessageId>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -350,7 +350,7 @@ module HostSessionNudge =
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<InteractionRepairSendOutcome> =
-        let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+        let rt = PromptJournalAdapter.forJournal durable
 
         if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
             Task.FromResult InteractionRepairSendOutcome.AlreadyAdmitted
@@ -475,7 +475,7 @@ module HostSessionNudge =
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<IdleContinuationOutcome> =
-        let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+        let rt = PromptJournalAdapter.forJournal durable
 
         if rt.GateNudgeAlreadyAdmitted profile continuation gateKind terminalProviderRun then
             Task.FromResult IdleContinuationOutcome.AlreadyAdmitted
@@ -668,7 +668,7 @@ module HostSessionNudge =
         (durable: AgentJournal)
         (profile: PromptAuthority.AuthorityExecutionProfile)
         : Task<IdleContinuationOutcome> =
-        let rt = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
+        let rt = PromptJournalAdapter.forJournal durable
 
         if rt.RepairAlreadyClaimed profile requestId terminalProviderRun repairKind then
             Task.FromResult IdleContinuationOutcome.AlreadyAdmitted

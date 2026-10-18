@@ -1,6 +1,6 @@
 # GAP-140 持久失败预算
 
-状态：G140-A 已按下列范围验收；GAP-140 整卡继续施工，G140-B 原子命令/发送和缺 Host-stop 的冷 Workflow 验收仍未闭合。R12-U1 继续暂缓。本报告不代表 GAP-139 已闭合。
+状态：G140-A 已按下列范围验收；[G140-B1](SINGLE-JOURNAL-RECOVERY-G140-B1-2026-10-19.md)已验同一live Journal的non-idle恢复发送及观察者接管。GAP-140整卡继续施工，B2领域原子命令、跨Journal/OS的durable发送权和缺Host-stop的普通冷Workflow仍未闭合。R12-U1继续暂缓。本报告不代表GAP-139已闭合。
 
 ## 已冻结合同
 
@@ -42,7 +42,7 @@ G140-A 处理持久预算模型、顺序 writer、成功身份和冷重放，交
 
 003新增可执行 TODO 保留“事实必须一条”的失败断言和 NDJSON。计数去重不能替代命令仲裁，正常顺序重复绿色也不能覆盖这个红。GAP-140 整卡继续 DOING。
 
-后续先做真实 writer 原型，再接生产：
+以下为B拆包前计划；B1的原型、生产候选700、观察者接管与剩余边界见新报告，B2按其freshness前置继续施工。原并发facts1强断言仍红，不用B1单发关闭本节。后续真实writer原型与生产接线要求：
 
 1. 在现有 writer 的串行接纳点定义一次领域决策：读取该次新快照，同步返回 NoWrite 或待提交事实及结果。budget owner 继续独占判断，Journal 不重写一份去重键；不加全局锁或第二套预算账。
 2. 同时确认 store gate 内跨 writer/进程的新快照与提交边界。当前 IEventStore.Append 只收预造 events，现有 NoNewWrite 不能替代领域动态决策；单 writer 队列的证明不能冒充跨 writer 原子性。

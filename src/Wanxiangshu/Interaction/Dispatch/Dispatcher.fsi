@@ -55,7 +55,8 @@ module PromptDispatcher =
             sessionId: SessionId -> expected: PromptAuthority.AuthorityExecutionProfile -> Result<unit, string>
 
         member internal RunGateNudgeOnce:
-            scope: string * send: (unit -> Task<Result<PromptKey, string>>) -> Task<Result<PromptKey, string>>
+            scope: string * send: (unit -> Task<Result<PromptKey, string>>) * onJoined: (unit -> unit) ->
+                Task<Result<PromptKey, string>>
 
         member AcceptManagedChatIntent:
             intent: ChatAdmissionIntent.Decision ->

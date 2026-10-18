@@ -258,7 +258,7 @@ module PromptDispatcher =
             |> ignore
 
         member internal this.RunGateNudgeOnce
-            (scope: string, send: unit -> Task<Result<PromptKey, string>>)
+            (scope: string, send: unit -> Task<Result<PromptKey, string>>, onJoined: unit -> unit)
             : Task<Result<PromptKey, string>> =
             let completion, ownsFlight =
                 lock gateNudgeFlights (fun () ->
@@ -275,8 +275,15 @@ module PromptDispatcher =
 
             if ownsFlight then
                 this.StartGateNudge(scope, completion, send)
+                completion.Task
+            else
+                task {
+                    let! result = completion.Task
 
-            completion.Task
+                    result |> Result.iter (fun _ -> onJoined ())
+
+                    return result
+                }
 
         member private _.AppendManagedPromptAccepted
             (promptKey: PromptKey)

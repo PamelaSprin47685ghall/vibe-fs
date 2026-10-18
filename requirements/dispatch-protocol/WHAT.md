@@ -34,6 +34,8 @@
 
 协议坚守至多一次（at-most-one）逻辑执行保障与未知结果 fail-closed 原则。terminal-scoped gate nudge 的 `(SessionId, LogicalRunId, Origin, PayloadDigest)` exact occasion 在同一 dispatcher runtime 内只允许一条 claim→send flight；并发观察者必须等待同一个 PromptKey 与结果，不能各自消费 ClaimSequence、写 claim 或调用 Host。flight 完成后，只有 durable projection 证明前次已明确 Abandoned 才能开启新 sequence；Pending、Submitted、PhysicalAccepted 均不可重发。禁止伪造物理投递的 exactly-once，禁止以时间窗口粗暴替代 PromptKey 校验，禁止为消除挂起状态而盲目重发。
 
+HostSessionNudge 对同一 live Journal 共用上述发送 runtime。它只合并在途发送，不保存权限或投影；每次判断仍读取 Journal。不同 Journal、重启后的新实例和跨进程仲裁不由该进程内资源证明。合并发送的调用方仍按现行 exact physical observer 的独立 lease 接管规则注册；不因共享 flight 静默丢弃接管请求，也不把传输结果当成物理落地。
+
 ## [009] Detached 在 durable claim 后立即交还控制
 
 在分离模式（`AwaitMode.Detached`）下，调度器在完成 durable claim 记录与宿主异步调用入栈后即刻返回 `PromptKey`，调用方不得阻塞等待模型容量调度、provider 执行或物理落地证据。若异步入栈后续发生致命拒绝，系统应触发进程级审计报错，且保留 Claim 待决记录而不自动重试。需要同步获知传输拒绝分支的场景必须显式使用 `AwaitMode.Await`。物理消息落地后的 durable execution 由 `managed-chat-execution` 独占，dispatch 不创建或推进 execution facts。

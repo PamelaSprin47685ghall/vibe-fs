@@ -1,4 +1,44 @@
 import test from 'node:test'
+import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { runVerificationToolProbe } from '../../../scripts/lib/verification-tool-probe.mjs'
+import { withFinitePhysicalWait } from '../../verification-system/tests/support/finite-physical-wait.mjs'
+
+for (const scenario of ['accepted', 'physical-before-receipt', 'attach-throws', 'send-fails', 'unknown']) {
+  test(`WHAT[dispatch-protocol-008] shared live Journal gate ${scenario} preserves exact physical observer ownership`, async t => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'gate-joiner-')))
+    const directory = join(root, 'store')
+    mkdirSync(directory)
+    const fixture = fileURLToPath(new URL('./support/gate-joiner.fixture.mjs', import.meta.url))
+    const product = fileURLToPath(new URL('../../../', import.meta.url))
+    const receipt = join(root, 'result.json')
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    delete env.NODE_OPTIONS
+    delete env.WANXIANGSHU_NO_FATAL_EXIT
+    let completed = false
+    try {
+      await withFinitePhysicalWait(t, { operation: `gate joiner ${scenario}`, limitMs: 15000 }, async () => {
+        await runVerificationToolProbe(process.execPath, [fixture, product, directory, scenario, receipt], { cwd: root, env, signal: t.signal })
+        const measured = JSON.parse(readFileSync(receipt, 'utf8'))
+        assert.equal(measured.accepted, true)
+        assert.equal(measured.closed, true)
+        t.diagnostic(JSON.stringify(measured))
+      })
+      completed = true
+    } catch (error) {
+      writeFileSync(join(root, 'stdout.log'), error.stdout ?? '')
+      writeFileSync(join(root, 'stderr.log'), error.stderr ?? '')
+      throw error
+    } finally {
+      if (completed) rmSync(root, { recursive: true, force: true })
+      else t.diagnostic('GATE_JOINER_EVIDENCE: retained ' + root)
+    }
+  })
+}
 
 {
 const { default: assert } = await import("node:assert/strict");

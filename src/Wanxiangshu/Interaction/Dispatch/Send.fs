@@ -802,7 +802,7 @@ module PromptDispatcherSend =
 
             this.RunGateNudgeOnce(
                 scope,
-                fun () ->
+                (fun () ->
                     this.SendContinuationWithDigest
                         port
                         sessionId
@@ -814,7 +814,10 @@ module PromptDispatcherSend =
                         awaitMode
                         onAccepted
                         None
-                        None
+                        None),
+                fun () ->
+                    onAccepted
+                    |> Option.iter (this.ObserveGateNudgeAcceptance profile continuation gateKind terminalProviderRun)
             )
 
         member this.SendContinuationWithTools

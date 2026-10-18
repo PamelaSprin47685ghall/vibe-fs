@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Composition.Durable
 
 open System.Threading.Tasks
+open Fable.Core
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -9,6 +10,19 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Persistence.Journal
 
 module PromptJournalAdapter =
+
+    [<Emit("new WeakMap()")>]
+    let private newRuntimeCache () : obj = jsNative
+
+    [<Emit("$0.get($1)")>]
+    let private tryRuntime (cache: obj) (journal: AgentJournal) : PromptDispatcher.Runtime option = jsNative
+
+    [<Emit("$0.set($1, $2)")>]
+    let private rememberRuntime (cache: obj) (journal: AgentJournal) (runtime: PromptDispatcher.Runtime) : unit =
+        jsNative
+
+    // DSL-MUTABLE: resource — one dispatch runtime per live Journal, not a durable authority cache.
+    let private runtimes = newRuntimeCache ()
 
     let create (journal: AgentJournal) : IPromptJournal =
         { new IPromptJournal with
@@ -83,3 +97,11 @@ module PromptJournalAdapter =
 
                             return appended |> Result.map ignore
                         } } }
+
+    let forJournal (journal: AgentJournal) =
+        match tryRuntime runtimes journal with
+        | Some runtime -> runtime
+        | None ->
+            let runtime = PromptDispatcher.forPrompts (create journal)
+            rememberRuntime runtimes journal runtime
+            runtime

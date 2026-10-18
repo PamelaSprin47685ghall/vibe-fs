@@ -44,3 +44,13 @@
 ## 剩余边界
 
 CUT-00-R1 按本卡范围完成。Bun 正式事件来源仍归 R2，旧 `6cc27…` 隔离失败仍归 R3；本包不解释它们。Bun 未监督的 context 兼容探针通过，不作正式 Bun 验收。其他平台和容量承诺归 CUT-04-R9。R12-U1 继续暂缓。
+
+## 后续复核：相邻调用的双通道竞争
+
+G140-B1 的700相关142文件中，008的第四个有界探针在4ms即被拒为重复申请，物理 child 尚未开始。实际顺序是前一用例收到 end ACK、下一真实 TestContext 已开始，socket begin 先于上一用例的 native complete 到达。689的模型一直保留旧 allowance 至 complete，却把这时的合法新请求也当成重复；这是本代理先前R1修改引入的竞态，不归G140产品。
+
+补修只允许一个新token暂存，旧 allowance 未end时仍拒绝；只要旧 allowance尚存，bindPending就不授权。旧绝对截止不变，匹配native complete清除后，下一次真实dequeue才能授权。同名下一用例、重复token、单pending、缺complete到期均有永久反例；前两项原红保留。
+
+非作者以真实node:test上下文和Unix socket控制原native事件的交付顺序，在Node26及实际最低Node22.13都重现旧NACK/第二action不执行，新版则两个action执行且无native失败；没有合成native事件。另10组边界两runtime通过，包括不预借额度、不续期、跨文件截止、取消、嵌套和终止拒绝。首版额外假设summary扁平字段的夹具红单独保留，已按实际native事件校正，不归实现。
+
+主仓702完整原R1七文件 **323 pass / 0fail / 0skip / 0TODO**，7/7完成排空、owned收尾通过；新增两项计入006，原321项范围未缩减。固定700产品包与702产品字节一致，本次只改验证设施。源码、确定性先红/绿、完整正式原件、最低版本实际复跑和PID/socket收尾在[G140-B1取证](evidence/G140-B1/README.md)。R2/R3/R12仍未关闭。
