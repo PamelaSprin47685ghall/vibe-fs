@@ -2,6 +2,14 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第三十批：第二轮三小时，R7-B真实背压交付（2026-10-18）
+
+输入主仓fa88bd65a、库e024678/0.6.7，两仓干净。socket与blocking ReadStream原型被否决，最终非阻塞FIFO读端配阻塞写端，Worker出口取得完整FileSink write/flush回执，R7-A extent保留。新原型死锁、清理遗漏及实现的启动close异常无人处理均已修，和原有缓存缺口、测试误判分项记在[本包报告](PROCESS-BACKPRESSURE-2026-10-18.md)。库df14f48/0.6.8正常推送原交付分支，22files/压缩107426bytes，SHA7e587393。
+
+全库354项349pass/0fail/5skip/0TODO，Node物理84pass/4Bun专用skip、Bun88/88。三名非作者核对真实源码、精确安装包、32流空闲I/O/取消/同号fd复用、四场双路128MiB/hash及Linux两Host各14场景。主仓629精确包SHA0d60ceea，2076files/展开13399152bytes；正式七文件76pass/0fail/1integration skip、owned accepted=true，真实Host1/1、隔离Node/Bun run/wire各26、Bun128MiB五次、完整PTY124/124，安装/归档不变且消费目录清理。扩大115文件796项759pass/5普通fail/6skip/26TODO，五fail均work011，非作者旧6cc27/当前精确包/工作区原样对照同现，未当新增回退也未销项。format/check/diff通过，主仓随本原子提交正常推送master；未部署Host。
+
+旧6cc27完整隔离025亦有新复验124/124；两次新绿不解释原首轮失败，C/R7-A及CUT-00-R3保持原边界。Linux最终自有执行进程为空，远端剩余自有生成目录递归删除被工具要求人工确认，暂留待处理。R12-U1继续暂缓，完整wire预算B仍待下一包。
+
 ## 第二十九批：R7-A修复真实输出截断，保留整体验收边界（2026-10-18）
 
 非作者24场精确回执矩阵确认旧0.6.4丢3/12、C候选0.6.6丢7/12；不能因旧问题而宣称本轮无回退。真实Worker旧closed许可提前清组的4场反例与收齐再清的4场正控定位到Bun写出缓存。修至库44a750e/0.6.7：两路Transform readable end及target close后冻结extent，外侧逐路实际observed恰相等才自然清组，再等EOF。严格schema、短数/超数、主动中断、Discard/控制/启动失败各有明确结果，不增加计时补丁或重发。

@@ -10,7 +10,7 @@
 
 三小时施工已完成[Bun挂起定因与夹具修正](GUIDANCE-BUN-LIFETIME-2026-10-18.md)和[Process纯契约及实际消费者](PROCESS-CONTRACT-2026-10-18.md)，非作者复审已核对。新增无界Bun启动器已删除，原生物理证据不替代正式监督；正式Bun适配单列CUT-00-R2，Node验证包装器的既有有界等待问题另列CUT-00-R1，不与暂缓的R12-U1混记。
 
-本窗口已继续接入[Process C](PROCESS-RUNTIME-2026-10-18.md)，并修复其扩大复审找到的[输出提前清组R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md)，最终库0.6.7，真实精确包、128MiB及非作者复验均有证据。完整隔离PTY的一次运行未通过，至少late-not-started(bun)失败，完整权威汇总缺失；C/R7-A整体验收为REVIEW，未宣布项目通过。R7-B实际上游背压和完整wire预算仍待施工，当前实际状态只看[看板](BOARD.md#source-audit-repairs)。
+本窗口已继续接入[Process C](PROCESS-RUNTIME-2026-10-18.md)、修复[输出提前清组R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md)，并交付[实际背压R7-B](PROCESS-BACKPRESSURE-2026-10-18.md)。当前库0.6.8；真实精确包、32路空闲I/O、128MiB字节/hash及macOS/Linux非作者复验通过，当前主包完整PTY124/124。旧6cc27隔离PTY首轮失败仍未归因，C/R7-A保持REVIEW；扩大组work011五fail修前同现，另作独立处置，不宣布项目全绿。下一P1为完整wire预算，实际状态只看[看板](BOARD.md#source-audit-repairs)。
 
 ## 入口：五份文件，各管一件事
 
@@ -32,7 +32,7 @@ Lifecycle 已通过 `wanxiangli/work`、`eventstore`、`durable-work` 接回主�
 
 建板基线中，`wanxiangli/process`、`trace`、`ownership` 已有独立实现与测试，主仓尚只接入前三个生命周期入口。随后 CUT-02/03/04 已合入接线；本次完整源码复核发现部分产品义务尚未承接，状态与反例以最新看板和上述报告为准。导入包、基础测试通过或历史 DONE 均不能单独证明职责已迁完。
 
-主仓当前锁定并跟踪 `vendor/wanxiangli-0.6.7.tgz`，0.5.2是建板历史基线。旁边的`wanxiangli/`是另一Git仓，不是主仓源码依赖；新成员只克隆主仓也必须能构建。位置变化不应影响npm消费。[分发要求](../../requirements/distribution/WHAT.md)。全部修复的双版比较见[2026-10-16独立复审](REGRESSION-REVIEW-2026-10-16.md)，后续归因和证据见[修复记录](REPAIR-PROGRESS-2026-10-15.md)。
+主仓当前锁定并跟踪 `vendor/wanxiangli-0.6.8.tgz`，0.5.2是建板历史基线。旁边的`wanxiangli/`是另一Git仓，不是主仓源码依赖；新成员只克隆主仓也必须能构建。位置变化不应影响npm消费。[分发要求](../../requirements/distribution/WHAT.md)。全部修复的双版比较见[2026-10-16独立复审](REGRESSION-REVIEW-2026-10-16.md)，后续归因和证据见[修复记录](REPAIR-PROGRESS-2026-10-15.md)。
 
 ### 第一批怎么分人
 
