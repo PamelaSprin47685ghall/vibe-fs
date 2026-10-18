@@ -25,6 +25,18 @@ integrationTest('WHAT[cognitive-environment-015] installed Host delivers ephemer
   assert.deepEqual(JSON.parse(output.trim()), { providerRequests: 2, chronicleCompleted: true, historyClean: true, journalClean: true })
 })
 
+integrationTest('WHAT[cognitive-environment-015] the retired v1 tip argument is rejected by the enforcer on the real hook path', () => {
+  const output = execFileSync(process.execPath, [
+    join(root, 'requirements/cognitive-environment/tests/support/run-chronicle-provider-canary.mjs'),
+    '--legacy-tip',
+  ], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 45000,
+  })
+  assert.deepEqual(JSON.parse(output.trim()), { legacyTipRejected: true })
+})
+
 integrationTest('WHAT[cognitive-environment-015] a late actual provider callback failure cannot turn into a successful canary', () => {
   assert.throws(() => execFileSync(process.execPath, [join(root, 'requirements/cognitive-environment/tests/support/run-chronicle-provider-canary.mjs'), '--late-provider-error'], {
     cwd: root, encoding: 'utf8', timeout: 45000, stdio: 'pipe',

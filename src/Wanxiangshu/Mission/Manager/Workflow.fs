@@ -159,19 +159,23 @@ module ManagerWorkflow =
         }
         :> Task
 
-    /// Algorithm H8 entry two: after a Relayed retirement on an S4 work whose
-    /// successor has not been reviewed yet, the successor prompt is the first
-    /// visible instruction. The retirement id names the cut and the committed
-    /// retirement fence carries the provider run that made it; no run identity
-    /// is invented.
+    /// Algorithm H8 entry two: an S4 work whose open tenure has not been reviewed
+    /// yet starts from the successor prompt, and the last committed retirement is
+    /// the occasion: a Relayed retirement opened the successor itself, a Delivered
+    /// retirement is the cut Change handed the same Work over from after a machine
+    /// conflict or a rebase that invalidated the candidate
+    /// (change-integration-005/013). Either way the retirement id names the cut
+    /// and the committed retirement fence carries the provider run that made it;
+    /// no run identity is invented, and a work with no retirement (the first
+    /// tenure) gets its authority from the job's own prompt, not from here.
     let private successorPromptContext
         (workspaceDirectory: string option)
         (sessionIdText: string)
         : (string * string) option =
         lifecycleWork workspaceDirectory sessionIdText
         |> Option.bind (fun work ->
-            match work.Sequence, List.tryLast work.Retirements with
-            | [ "S4" ], Some retirement when retirement.Outcome = "Relayed" && not work.Reviewed ->
+            match work.Sequence, work.ActiveId, List.tryLast work.Retirements with
+            | [ "S4" ], Some _, Some retirement when not work.Reviewed ->
                 Some(retirement.RetirementId, retirement.Fence.ProviderRunId)
             | _ -> None)
 

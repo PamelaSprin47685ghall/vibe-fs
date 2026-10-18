@@ -23,6 +23,14 @@ module JsDescriptionAssets =
 module JsToolSpec =
     val admissionFor: roleName: string -> ToolAdmission
 
+    /// The directory one session's js-* surface executes in: the path its owner
+    /// registered for that session, else the given fallback. See ToolHost.fs.
+    val rootForSession:
+        sessionDirectories: System.Collections.Generic.Dictionary<string, string> ->
+        fallback: string ->
+        sessionId: string ->
+            string
+
     val create:
         factory: HostToolFactory ->
         surface: JsSurface ->
@@ -30,6 +38,7 @@ module JsToolSpec =
         persistence: IJsTransactionPersistence option ->
         lifecyclePersistence: IJsLifecyclePersistence option ->
         fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
+        rootOf: (string -> string) ->
             ToolSpec
 
     val createWithAdmission:
@@ -40,4 +49,5 @@ module JsToolSpec =
         persistence: IJsTransactionPersistence option ->
         lifecyclePersistence: IJsLifecyclePersistence option ->
         fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
+        rootOf: (string -> string) ->
             ToolSpec

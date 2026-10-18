@@ -84,9 +84,9 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 候选 probe 尚未成功提交时也不得形成“必须先成功才能变小”的死锁：当当前物理 WorkMain 已选择 `UsePrefixProbe`，XWire 必须把该 attempt 标记为 typed tentative cold horizon，并让同一 `messages.transform` 中位于 XWire 之后的 historical auxiliary projectors（Strength speculation、pair guideline、requirement grounding）跳过本次注入。该状态只能作为当前调用的返回值顺序消费，严禁写入跨 callback 的 process-local marker；只有 probe 成功后，`PrefixRebaseCommitted` 才成为跨请求 durable horizon 事实。
 
-## [020] `todowrite` 是 checkpoint，不享有永久 raw 豁免
+## [020] view 声明是 checkpoint，不享有永久 raw 豁免
 
-成功的原生 `todowrite` 形成 compression checkpoint；它所在的完整 semantic turn 只因固定的 K 窗口而保持 raw，不因工具名获得永久豁免。正常 cutoff 以所选 checkpoint 的 turn 起点为边界，因此窗口内 call/result 自然完整保留；一旦 `PrefixRebaseCommitted` 已越过某个旧 checkpoint，该回合可以与其他 covered 历史一样由 LWR 替换，任何后续 checkpoint 都不得把它恢复出来。所有真实用户消息仍按 [017] 永久 raw。
+成功完成的 `todowrite-for-<role>` 调用在 `state.input.view` 为非空对象时形成 compression checkpoint（判定门禁见 obligation-ledger-001）；它所在的完整 semantic turn 只因固定的 K 窗口而保持 raw，不因工具名获得永久豁免。正常 cutoff 以所选 checkpoint 的 turn 起点为边界，因此窗口内 call/result 自然完整保留；一旦 `PrefixRebaseCommitted` 已越过某个旧 checkpoint，该回合可以与其他 covered 历史一样由 LWR 替换，任何后续 checkpoint 都不得把它恢复出来。所有真实用户消息仍按 [017] 永久 raw。
 
 ## [021] Y retry 由失败会话当场拥有，禁止等待未来 X material
 
@@ -122,9 +122,9 @@ Blogger claim/release conflict、semantic cut与compression invariant必须携�
 
 repair episode 的 durable abandon 失败时，rendezvous 进入终态失败：所有已接收未完成的观察者、入队请求与后续到达的旧/新 observer 都以同一异常拒绝；不发送 terminal 通知，不释放 exact flight，不重新打开预算。episode 以失败态保留注册，防止同一请求以新 budget 重启。
 
-## [028] todowrite checkpoint 的固定 K 窗口
+## [028] view checkpoint 的固定 K 窗口
 
-设成功的原生 `todowrite` checkpoint 按顺序为 `T1..TN`，`Bi` 为包含 `Ti` 的完整 semantic turn 起始边界（canonical XTrace generation + stable Host identity）。K 是系统固定参数 `K = 3`，包含本次 checkpoint；它不是逐次输入，也不由模型提供，因此 checkpoint 事实只记录调用身份，不记录 K。
+设成功声明 `view` 的编程面 checkpoint 按顺序为 `T1..TN`，`Bi` 为包含 `Ti` 的完整 semantic turn 起始边界（canonical XTrace generation + stable Host identity）。K 是系统固定参数 `K = 3`，包含本次 checkpoint；它不是逐次输入，也不由模型提供，因此 checkpoint 事实只记录调用身份，不记录 K。
 
 ```text
 N = 0：不给新 cutoff，沿用当前已提交前缀与原始尾部。
@@ -132,19 +132,19 @@ N > 0：j = max(1, N − K + 1)
 desired cutoff exclusive = Bj
 ```
 
-因此窗口保留最近三次 `todowrite` 所属的完整 semantic turn，从这三次里最早的一次之前开始压缩；不足三次时从最早的 checkpoint 之前开始。
+因此窗口保留最近三次 view checkpoint 所属的完整 semantic turn，从这三次里最早的一次之前开始压缩；不足三次时从最早的 checkpoint 之前开始。
 
 checkpoint projection 不能提前遗忘尚未被 committed prefix 越过的旧 checkpoint；只有真实 `PrefixRebaseCommitted` 才能永久裁掉其 cutoff 之前的 checkpoint。于是尚存 raw 的历史可以不额外压缩，却绝不能把已经替换成 LWR 的内容恢复出来。保留调用所属整回合，绝不在 call/result 中间切断。同一 semantic turn 内多个顺序 checkpoint 可以共享 `Bi`。
 
 ## [029] coverage 落后不丢 raw，frame 不跨界冒用，紧急 Probe 是明示例外
 
-actual cutoff 必须同时满足：当前 generation、完整 semantic turn、连续 PrefixCoverage、有精确截断能力的已冻结 Blogger/LWR 材料、Opening floor、不得越过当前请求正在回答的最新消息所在回合、不得回退已提交 cutoff。该请求边界是 canonical XTrace 当前 generation 的最新语义回合，不是最后一条 `role=user` 消息：一条 user 消息可驱动整段 agent loop，其后每个 provider step 回答的是自身的 assistant/tool 历史；若以那条 user 消息为界，loop 内的 checkpoint 窗口永远不折叠，raw 历史无界增长。Blogger 落后时：新的 `todowrite` checkpoint 仍可成功提交，但未覆盖的普通历史继续原样保留，不把 RawGap 冒充前缀覆盖。一个 Blogger frame 覆盖区间跨过 desired 边界时，必须使用可验证的完整材料子集，否则本次不前移。真实 WorkMain 失败后，既有 Probe 可在完整 coverage 与合法语义边界证明下越过正常 K 窗口，但必须作为 Probe 冷边界明确记录；这是紧急恢复例外，不是常规策略。
+actual cutoff 必须同时满足：当前 generation、完整 semantic turn、连续 PrefixCoverage、有精确截断能力的已冻结 Blogger/LWR 材料、Opening floor、不得越过当前请求正在回答的最新消息所在回合、不得回退已提交 cutoff。该请求边界是 canonical XTrace 当前 generation 的最新语义回合，不是最后一条 `role=user` 消息：一条 user 消息可驱动整段 agent loop，其后每个 provider step 回答的是自身的 assistant/tool 历史；若以那条 user 消息为界，loop 内的 checkpoint 窗口永远不折叠，raw 历史无界增长。Blogger 落后时：新的 view checkpoint 仍可成功提交，但未覆盖的普通历史继续原样保留，不把 RawGap 冒充前缀覆盖。一个 Blogger frame 覆盖区间跨过 desired 边界时，必须使用可验证的完整材料子集，否则本次不前移。真实 WorkMain 失败后，既有 Probe 可在完整 coverage 与合法语义边界证明下越过正常 K 窗口，但必须作为 Probe 冷边界明确记录；这是紧急恢复例外，不是常规策略。
 
 ## [030] assume 调用永久以原始 Host 消息穿透 LWR
 
 `assume` 是短小但高价值的判断承诺点。任何 prefix replacement 若覆盖了 `assume` tool call，都必须从原始 Host 消息中按 exact call id 找到该调用，并把承载该 call id 的调用消息与对应 result 消息原封不动保留；不得把 assumption 文本抽出来重写、不得重新渲染参数、不得用摘要替代固定结果。
 
-这条规则与 todowrite K 窗口独立：todowrite 的固定 K 窗口只决定正常 cutoff 希望推进到哪里；`assume` 不形成 checkpoint、不改变 cutoff，但即使 committed cutoff 已越过它，其原始 call/result 仍穿透 LWR 保留。若同一物理 Host 消息还承载其它 parts，为避免拆改原始消息，该整条物理消息一并保留；这不是其它工具获得永久豁免。
+这条规则与 view checkpoint 的 K 窗口独立：该固定 K 窗口只决定正常 cutoff 希望推进到哪里；`assume` 不形成 checkpoint、不改变 cutoff，但即使 committed cutoff 已越过它，其原始 call/result 仍穿透 LWR 保留。若同一物理 Host 消息还承载其它 parts，为避免拆改原始消息，该整条物理消息一并保留；这不是其它工具获得永久豁免。
 
 ## [031] ANCHOR 编址、视图声明与 token 经济
 

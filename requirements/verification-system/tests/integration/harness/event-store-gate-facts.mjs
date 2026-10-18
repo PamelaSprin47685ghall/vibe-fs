@@ -1,6 +1,6 @@
 /**
  * Append named verification-system-004 gate facts into the local process EventStore.
- * Shock-cut model: `.git/wanxiangshu/events/<WriterId>.ndjson`; no Git ODB/ref append.
+ * Shock-cut model: `.Herdchestra/wanxiangshu/events/<WriterId>.ndjson`; no Git ODB/ref append.
  */
 
 import { join } from 'node:path'
@@ -10,7 +10,7 @@ import * as eventStore from '../../../../../dist/Persistence/EventStore/Surface.
 export const hexId = (n) => n.toString(16).padStart(40, '0')
 
 export function openGateFactStore(workDir) {
-  const store = eventStore.create(join(workDir, '.git'), `verification-gate-${process.pid}`)
+  const store = eventStore.create(join(workDir, '.Herdchestra'), `verification-gate-${process.pid}`)
   let seq = 0
   let lastId = null
   let serial = Promise.resolve()

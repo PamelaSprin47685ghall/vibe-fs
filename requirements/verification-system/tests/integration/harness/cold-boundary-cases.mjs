@@ -50,13 +50,13 @@ const REQUEST_KIND_SWITCHED = body(
 
 // MANAGER-LOOP: the retired iteration ends with narrative and tool traffic, its
 // authority turn carries the guidance occurrence the Host had appended, and (in the
-// nudge variant) a non-authority nudge the projection had injected. The next iteration
-// keeps every one of those messages, in order, and appends its own fresh-head prompt
-// (work-008 retains raw messages, tool calls, results, nudge, late
-// parts and the internal loop wake); only the retired guidance occurrence and the
-// companion frame may disappear (context-compression-019 / GAP-022). Structural only:
-// typed authority-revision retention is proved by the unit projection tests and the
-// long-stroke root-only oracle.
+// nudge variant) a non-authority nudge the projection had injected. work-008 makes the
+// successor projection STRIP the predecessor's assistant/tool traffic and keep the user
+// 原文 plus its own tenure's interactions, so the next iteration sends the authority
+// root, whatever its own tenure observed, and its own fresh-head resource. Only the
+// retired guidance occurrence and the companion frame are additionally normalized away
+// (context-compression-019 / GAP-022). Structural only: typed authority-revision
+// retention is proved by the unit projection tests and the long-stroke root-only oracle.
 const GUIDANCE_SUFFIX = '\0\uFEFF<system>\n# # Wait-cost calibration: priced interval.\n</system>';
 // Production memory-preamble (en.md) — line-broken with `# ` prefixes as Host renders it.
 const COMPANION_PREAMBLE =
@@ -70,12 +70,11 @@ const MANAGER_TRAFFIC = [
   { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
 ];
 const MANAGER_RETIRED = body('test-model', [SYSTEM, ...MANAGER_TRAFFIC]);
-// The same messages with the retired occurrence gone and the successor's own prompt appended.
+// The successor projection: the predecessor's traffic is stripped, the authority root
+// (guidance occurrence retired) stays, and the successor's own resource is appended.
 const MANAGER_NEXT = body('test-model', [
   SYSTEM,
   user('Round 1'),
-  assistant('assessment evidence'),
-  { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
   user('Round 2'),
 ]);
 const MANAGER_RETIRED_WITH_NUDGE = body('test-model', [SYSTEM, ...MANAGER_TRAFFIC, user('work nudge')]);
@@ -89,8 +88,13 @@ const MANAGER_RETIRED_WITH_COMPANION = body('test-model', [
   { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
 ]);
 
-const decide = (previous, next, boundary = null) =>
-  sealDecision({ previousWire: previous === null ? null : wireOf(previous), body: next, boundary });
+const decide = (previous, next, boundary = null, stripAdmitted = false) =>
+  sealDecision({
+    previousWire: previous === null ? null : wireOf(previous),
+    body: next,
+    boundary,
+    stripAdmitted,
+  });
 
 /** A SOURCE boundary, as an author writes it and `validateBoundary` checks it. */
 const at = (kind) => ({ kind, lane: 'coder', turn: 'Round 2', step: 0 });
@@ -199,6 +203,82 @@ export const coldBoundaryCases = [
       // A shorter request means the plugin dropped messages the provider already saw.
       // COMPANION-009 exists to make that explicit rather than silent.
       assertEq(decide(APPENDED, FIRST).broken, 'undeclared');
+    },
+  },
+
+  {
+    name: 'speculative-investigation a retired readonly-replay block is injected drift, not a seal break',
+    fn: () => {
+      const replayCall = {
+        role: 'assistant',
+        parts: [{ kind: 'tool-call', callId: 'replay-1', name: 'todowrite-for-manager', args: '{}' }],
+      };
+      const replayResult = {
+        role: 'tool',
+        parts: [{ kind: 'tool-result', callId: 'replay-1', result: '# ok\n\n[data]\ninspected = true' }],
+      };
+      const dotAck = { role: 'assistant', parts: [{ kind: 'text', text: '.' }] };
+
+      const withReplay = wireOf(body('test-model', [
+        SYSTEM,
+        user('Round 1'),
+        assistant('caller row'),
+      ]));
+      // The retained prefix with the replay block present, versus the same prefix with the
+      // block retired by the horizon advance.
+      const before = wireOf(body('test-model', [SYSTEM, user('Round 1'), assistant('caller row')]));
+      const retired = wireOf(body('test-model', [SYSTEM, user('Round 1')]));
+
+      assertTrue(typeof withReplay.messages.length === 'number', 'fixture decodes');
+      assertEq(
+        sealDecision({
+          previousWire: { ...before, messages: [before.messages[0], before.messages[1], replayCall, replayResult, dotAck, before.messages[2]] },
+          body: body('test-model', [SYSTEM, user('Round 1'), assistant('caller row')]),
+        }).held,
+        true,
+        'the retired replay block does not break the seal',
+      );
+      // Anything outside the derived shape stays undeclared: an unclosed call, a different
+      // ack, or a dropped ordinary row.
+      const unclosed = { ...before, messages: [before.messages[0], before.messages[1], replayCall, dotAck, before.messages[2]] };
+      assertEq(
+        sealDecision({ previousWire: unclosed, body: body('test-model', [SYSTEM, user('Round 1'), assistant('caller row')]) }).broken,
+        'undeclared',
+        'a call without its own result is not the replay block',
+      );
+      const foreignAck = { ...before, messages: [before.messages[0], before.messages[1], replayCall, replayResult, { role: 'assistant', parts: [{ kind: 'text', text: 'ack' }] }, before.messages[2]] };
+      assertEq(
+        sealDecision({ previousWire: foreignAck, body: body('test-model', [SYSTEM, user('Round 1'), assistant('caller row')]) }).broken,
+        'undeclared',
+        'a non-dot ack is not the replay block',
+      );
+      assertEq(decide(before, retired).broken, 'undeclared', 'a dropped ordinary row still breaks');
+    },
+  },
+
+  {
+    name: 'context-compression-019 a retired guidance occurrence is intended drift, not a seal break',
+    fn: () => {
+      const withOccurrence = body('test-model', [
+        SYSTEM,
+        user(`Round 1${GUIDANCE_SUFFIX}`),
+        assistant('r1'),
+      ]);
+      const retired = body('test-model', [SYSTEM, user('Round 1'), assistant('r1')]);
+
+      // The occurrence is appended to a user message's terminal part and retired later
+      // without rewriting that message; the seal is occurrence-normalized on both sides.
+      assertEq(decide(withOccurrence, retired).held, true, 'retired occurrence');
+      assertEq(decide(retired, withOccurrence).held, true, 'occurrence appended');
+      assertEq(decide(withOccurrence, withOccurrence).held, true, 'unchanged');
+
+      // Only that exact shape is normalized: the message the occurrence was attached to
+      // is still compared byte for byte.
+      const rewritten = body('test-model', [SYSTEM, user('Round 1 rewritten'), assistant('r1')]);
+      assertEq(decide(withOccurrence, rewritten).broken, 'undeclared', 'rewritten message');
+      assertEq(decide(retired, rewritten).broken, 'undeclared', 'rewritten message, no occurrence');
+      const droppedReply = body('test-model', [SYSTEM, user(`Round 1${GUIDANCE_SUFFIX}`)]);
+      assertEq(decide(withOccurrence, droppedReply).broken, 'undeclared', 'dropped reply');
     },
   },
 
@@ -321,7 +401,7 @@ export const coldBoundaryCases = [
   // ── pure manager loop ───────────────────────────────────────────────────
 
   {
-    name: 'MANAGER-LOOP a new iteration keeps the retained history and retires only its injection',
+    name: 'MANAGER-LOOP a new iteration reseals after the successor projection strips the predecessor traffic',
     fn: () => {
       assertEq(decide(MANAGER_RETIRED, MANAGER_NEXT, at('manager-loop')).resealed, 'manager-loop');
       assertEq(
@@ -332,15 +412,13 @@ export const coldBoundaryCases = [
       assertEq(
         decide(MANAGER_RETIRED_WITH_NUDGE, MANAGER_NEXT, at('manager-loop')).broken,
         'manager-loop-rewrote-fixed',
-        'a retained nudge may not be dropped: work-008 keeps it',
+        'user input stays: the nudge is a user message, not strippable traffic',
       );
 
       const beforeFallback = body('test-model', [hostSystem('test-model'), ...MANAGER_TRAFFIC]);
       const afterFallback = body('test-model-b', [
         hostSystem('test-model-b'),
         user('Round 1'),
-        assistant('assessment evidence'),
-        { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
         user('Round 2'),
       ]);
       assertEq(
@@ -352,13 +430,14 @@ export const coldBoundaryCases = [
   },
 
   {
-    name: 'MANAGER-LOOP a new iteration fails when retained history is rewritten, dropped or padded',
+    name: 'MANAGER-LOOP a new iteration fails when the authority user sequence is rewritten or dropped',
     fn: () => {
-      // Dropping the retained tool traffic is no longer an iteration; it is a rewrite.
+      // work-008 admits stripping the predecessor's assistant/tool traffic — that is the
+      // successor projection, not a break.
       const leakedAssistant = body('test-model', [SYSTEM, user('Round 1'), assistant('assessment evidence')]);
       assertEq(
-        decide(MANAGER_RETIRED, leakedAssistant, at('manager-loop')).broken,
-        'manager-loop-rewrote-fixed',
+        decide(MANAGER_RETIRED, leakedAssistant, at('manager-loop')).resealed,
+        'manager-loop',
       );
 
       const leakedTool = body('test-model', [
@@ -367,26 +446,29 @@ export const coldBoundaryCases = [
         { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
       ]);
       assertEq(
-        decide(MANAGER_RETIRED, leakedTool, at('manager-loop')).broken,
-        'manager-loop-rewrote-fixed',
+        decide(MANAGER_RETIRED, leakedTool, at('manager-loop')).resealed,
+        'manager-loop',
       );
 
-      // A novel user wake inside the retained prefix is exactly what the contract forbids.
-      const wakePrompt = body('test-model', [SYSTEM, user('Round 1'), user('continue the Road')]);
+      // A user the predecessor sent may not disappear: the authority sequence is input,
+      // never traffic. A novel user cannot be told from the successor's own resource by
+      // shape alone — that is the strict matcher's job (an undeclared user text has no
+      // declared turn), so it is not claimed here.
+      const droppedUser = body('test-model', [SYSTEM, user('continue the Road')]);
       assertEq(
-        decide(MANAGER_RETIRED, wakePrompt, at('manager-loop')).broken,
+        decide(MANAGER_RETIRED, droppedUser, at('manager-loop')).broken,
         'manager-loop-rewrote-fixed',
       );
 
-      const paddedPrefix = body('test-model', [
+      // The authority root is the handover's fixed point: a successor that re-sends the
+      // predecessor's root behind a new head has rewritten authority, not continued it.
+      const rootBehindANewHead = body('test-model', [
         SYSTEM,
+        user('Round 2'),
         user('Round 1'),
-        user('a synthetic wake'),
-        assistant('assessment evidence'),
-        { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
       ]);
       assertEq(
-        decide(MANAGER_RETIRED, paddedPrefix, at('manager-loop')).broken,
+        decide(MANAGER_RETIRED, rootBehindANewHead, at('manager-loop')).broken,
         'manager-loop-rewrote-fixed',
       );
     },
@@ -428,6 +510,42 @@ export const coldBoundaryCases = [
         decide(MANAGER_RETIRED, resystemed, at('manager-loop')).broken,
         'manager-loop-rewrote-fixed',
       );
+    },
+  },
+
+  {
+    name: 'MANAGER-LOOP the successor strip is admitted only across a durable tenure boundary',
+    fn: () => {
+      // A reusable entry (the Manager's nudge ladder) spans the iteration change, so its
+      // next delivery legitimately arrives stripped — but only when the session really
+      // crossed a tenure boundary in between, which the caller reads from the journal.
+      assertEq(
+        decide(MANAGER_RETIRED, MANAGER_NEXT, null, true).resealed,
+        'successor-strip',
+        'tenure boundary crossed: the strip is the successor projection',
+      );
+      assertEq(
+        decide(MANAGER_RETIRED, MANAGER_NEXT, null, false).broken,
+        'undeclared',
+        'no tenure boundary: the same wire movement stays fail-closed',
+      );
+
+      // The admission is still the strip SHAPE, never a blanket exemption: a rewritten
+      // user, a changed plan or a changed system prompt stays undeclared even across the
+      // boundary.
+      const rewrittenUser = body('test-model', [SYSTEM, user('DIFFERENT'), user('Round 2')]);
+      assertEq(decide(MANAGER_RETIRED, rewrittenUser, null, true).broken, 'undeclared');
+      const retooled = body('test-model', MANAGER_NEXT.messages, ['todowrite-for-engineer', 'fetch']);
+      assertEq(decide(MANAGER_RETIRED, retooled, null, true).broken, 'undeclared');
+      const resystemed = body('test-model', [
+        { role: 'system', content: 'Other.' },
+        user('Round 1'),
+        user('Round 2'),
+      ]);
+      assertEq(decide(MANAGER_RETIRED, resystemed, null, true).broken, 'undeclared');
+
+      // A declared boundary still owns its own break; the strip admission never shadows it.
+      assertEq(decide(MANAGER_RETIRED, MANAGER_NEXT, at('manager-loop'), true).resealed, 'manager-loop');
     },
   },
 

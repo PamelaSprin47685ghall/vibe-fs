@@ -69,8 +69,8 @@
 
 成功返回固定的笃定提示，不回显 `assumption`，避免把同一句判断再塞回上下文。描述保留“先抽象→笃定→执行→验证；只有新增证据才重开判断”的纪律，但不得把该纪律扩张成持久记忆或事实证明。
 
-## [015] todowrite 完全保持宿主形状
+## [015] 宿主原生 todowrite 退役，宿主形状不被改写
 
-原生 `todowrite` 由 Host executor 物理执行，其工具名、参数 schema、待办行字段与描述完全保持宿主原样，模型直接读写 Host 的 `todos`。
+宿主原生 `todowrite` 已不再是待办写入面，也不产生压缩 checkpoint；待办写入与 compression checkpoint 归携带非空 `view` 声明的编程面调用（`todowrite-for-<role>`，见 obligation-ledger-001）。
 
-插件不得为它改写、重命名、增补或隐藏任何参数与描述，也不得注入压缩协议字段；成功的调用只让插件在 Host 终态之后追加一条压缩 checkpoint 事实（见 obligation-ledger）。
+插件不得为已退役的宿主工具改写、重命名、增补或隐藏任何参数与描述，也不得注入压缩协议字段。

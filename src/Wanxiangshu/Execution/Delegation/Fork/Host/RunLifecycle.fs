@@ -300,6 +300,19 @@ module HostForkRunLifecycle =
         stop.AuthorityRootUserMessageId.IsNone
         || TerminalStop.belongsTo run.AuthorityRoot stop
 
+    /// The synchronous sticky replay at install time must never settle a brand-new
+    /// run with a predecessor's stored terminal. A replayed terminal is accepted
+    /// only when it addresses this run: Completed needs the same child and
+    /// authority root, Failed needs the exact authority root (no authority-less
+    /// allowance — the live path keeps that allowance, the replay does not), and
+    /// Aborted is observation only. Live delivery (after the run is armed) keeps
+    /// the existing guards untouched.
+    let private replayedTerminalAddressesRun (run: PendingHostRun) (outcome: TerminalOutcome) : bool =
+        match outcome with
+        | TerminalOutcome.Completed result -> completionBelongsToRun run result
+        | TerminalOutcome.Failed stop -> TerminalStop.belongsTo run.AuthorityRoot stop
+        | TerminalOutcome.Aborted _ -> false
+
     /// P0-RECOVERY-JOIN-001: only proven terminals may claim the cell.
     /// Aborted is observation — never recordCompletion / SetResult / mailbox.
     /// Claim runs only after JoinableCompletion proof succeeds (fail closed).
@@ -635,43 +648,60 @@ module HostForkRunLifecycle =
 
         lock gate (fun () -> pendingRuns.[agentId] <- run)
 
+        // DSL-MUTABLE: algorithm-scratch — install-time replay window flag
+        let mutable armed = false
+
+        let deliverTerminal (outcome: TerminalOutcome) =
+            trackOwnedWork (fun () ->
+                task {
+                    // EXEC-006: a work-record read is bounded auxiliary
+                    // evidence. Its failure is an empty work_record, never
+                    // a reason to lose a proven terminal that already
+                    // happened on the child.
+                    let! workRecord =
+                        task {
+                            try
+                                return! workRecordForOutcome childWorkRecordForRun run outcome
+                            with error ->
+                                logError
+                                    "FORK-WORKRECORD"
+                                    (sprintf "run %s work-record read faulted: %s" run.AgentId error.Message)
+
+                                return None
+                        }
+
+                    try
+                        do! complete gate pendingRuns journal parentId sessions run outcome workRecord
+                    with error ->
+                        // A terminal the child proved must still resolve
+                        // this run's only completion promise even when
+                        // settlement faulted: settle an explicit joinable
+                        // failure (never silence, never a stranded Source).
+                        do! recoverFailedSettlement gate pendingRuns journal parentId run error
+                }
+                :> Task)
+
         let subscription =
-            sessions.SubscribeFutureTerminal(
+            // Sticky subscription: a terminal that fired between prompt acceptance
+            // and run installation (e.g. a pre-provider admission failure settling
+            // synchronously inside chat.message) must be replayed here, or the run
+            // is stranded and the parent's join never settles. Until the run is
+            // armed, every delivery is a replay (or a same-tick race) and must
+            // address this run — a predecessor's stored terminal must not settle a
+            // brand-new run. Once armed, the existing guards own the live path.
+            sessions.SubscribeTerminal(
                 childId,
                 (fun _ outcome ->
-                    trackOwnedWork (fun () ->
-                        task {
-                            // EXEC-006: a work-record read is bounded auxiliary
-                            // evidence. Its failure is an empty work_record, never
-                            // a reason to lose a proven terminal that already
-                            // happened on the child.
-                            let! workRecord =
-                                task {
-                                    try
-                                        return! workRecordForOutcome childWorkRecordForRun run outcome
-                                    with error ->
-                                        logError
-                                            "FORK-WORKRECORD"
-                                            (sprintf "run %s work-record read faulted: %s" run.AgentId error.Message)
-
-                                        return None
-                                }
-
-                            try
-                                do! complete gate pendingRuns journal parentId sessions run outcome workRecord
-                            with error ->
-                                // A terminal the child proved must still resolve
-                                // this run's only completion promise even when
-                                // settlement faulted: settle an explicit joinable
-                                // failure (never silence, never a stranded Source).
-                                do! recoverFailedSettlement gate pendingRuns journal parentId run error
-                        }
-                        :> Task))
+                    if not armed && not (replayedTerminalAddressesRun run outcome) then
+                        ()
+                    else
+                        deliverTerminal outcome)
             )
 
         let disposeImmediately =
             lock gate (fun () ->
                 run.Subscription <- Some subscription
+                armed <- true
                 run.Finished)
 
         if disposeImmediately then

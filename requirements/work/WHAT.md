@@ -78,7 +78,7 @@ sequence 为 S4 时，deliver 是两次调用。第一次只落确认。另一�
 
 新 work 只读写自己的 wanxiangli work journal。它不读取既有 AgentJournal、旧 EventStore lifecycle envelope 或 Relay 事件文件，也不把旧字节翻译成新事实。
 
-- 允许后果：新开立只向 `<git-common-dir>/wanxiangshu/work.sqlite` 的对应 work stream 追加 wanxiangli 规范 record；旧持久层仍可承担其它子系统，但不是 work lifecycle 的读取来源。
+- 允许后果：新开立只向 `<主工作树>/.Herdchestra/wanxiangshu/work.sqlite` 的对应 work stream 追加 wanxiangli 规范 record；旧持久层仍可承担其它子系统，但不是 work lifecycle 的读取来源。
 - 禁止后果：不得增加能把旧日志翻译进新事实的路径，不得让 CanonicalIntegrator/EventStore 投影与 wanxiangli 同时回答同一 work lifecycle 状态，也不得用测试把旧字节当成合法输入。
 - 失败后果：翻译层写入必须拒绝。
 
@@ -257,7 +257,7 @@ Manager 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾�
 
 底稿 `P` 是模型唯一可读写的持久化文件产物，其路径由系统确定性派生。
 
-- 允许后果：系统以 `workId` 派生安全编码的 `canonical-work-key`，路径固定为 `<git-common-dir>/wanxiangshu/plan/<canonical-work-key>/plan.md`。`todowrite-for-plan` 是标准的 JS 编程面工具（接受单一参数 `program: string`，在沙箱中执行继承自 `JsProgram` 的类并实现 `async run()`），仅作用于该单一底稿 `P`。它直接模仿其它 `js-*` 工具的锚点编辑法，但因为作用域严格限定于单一底稿 `P`，严禁且无需传入任何路径参数：提供 `file(matches)` 读快照与锚点切片、`edit(changes)` 局部修改与 `rewrite(newText)` 全量覆盖能力；无 `glob`/`grep` 仓库检索能力。写入采用排他临时文件写入、flush 后原子替换的方式发布。
+- 允许后果：系统以 `workId` 派生安全编码的 `canonical-work-key`，路径固定为 `<主工作树>/.Herdchestra/wanxiangshu/plan/<canonical-work-key>/plan.md`。`todowrite-for-plan` 是标准的 JS 编程面工具（接受单一参数 `program: string`，在沙箱中执行继承自 `JsProgram` 的类并实现 `async run()`），仅作用于该单一底稿 `P`。它直接模仿其它 `js-*` 工具的锚点编辑法，但因为作用域严格限定于单一底稿 `P`，严禁且无需传入任何路径参数：提供 `file(matches)` 读快照与锚点切片、`edit(changes)` 局部修改与 `rewrite(newText)` 全量覆盖能力；无 `glob`/`grep` 仓库检索能力。写入采用排他临时文件写入、flush 后原子替换的方式发布。
 - 允许后果：交给模型的 `todowrite-for-plan` 工具描述复用其它 `js-*` 的同一套教程面：有序锚点、`text(from, to)`、精确 `edit`、结构重组，以及一份按底稿职责成形的样例。教程按本工具的无路径签名填写：`file(matches = [])`、`edit(changes)`、`rewrite(newText)`。`P` 的单一作用域、禁路径和写前评审只作为作用域约束放在教程前面，不另写一套锚点用法。
 - 禁止后果：模型不得在工具参数中使用多余字段，只传递 `program`。在 `JsProgram` 的 `file`、`edit`、`rewrite` 方法中严禁传入任何路径参数，若调用时尝试传入路径参数，沙箱必须直接报错拒绝。严禁路径穿越（path traversal）、符号链接逃逸、不安全 ID 注入或根目录漂移。`todowrite-for-plan` 严禁提供任何超出 `P` 之外的文件系统能力，严禁暴露目录列表或仓库文件读写。写盘完成后取消读回校验。
 - 禁止后果：工具描述不得另写精简教程替代共享教程，不得在教程或样例中教模型传入路径参数，不得把运行时内部对象暴露给模型。
@@ -303,7 +303,7 @@ work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规�
 
 一次宿主投影中的当前任期、轮次、退休历史和推进记录必须来自同一次 records 读取；其他连接在读取之后提交的事实只能出现在下一次投影。固定 DevOps 的身份与模型目标分别投影为 DevOpsId 和 DevOpsTarget，恢复路由只能读取后者，不能把身份字符串作为模型目标。
 
-- 允许后果：每次状态变化先在 Work 候选上完整验证，随后把一条规范 JSON record 作为 UTF-8 BLOB 原子写入 `<git-common-dir>/wanxiangshu/work.sqlite` 的 workId stream；同流 revision 连续，requestId 绑定同一 record。JSON 对象键按 Unicode 码点稳定排序，opening/retirement cursor 必须是 JS safe integer。读取时由同一组 records 重建 Work 并校验规范编码、摘要与全部领域跃迁。
+- 允许后果：每次状态变化先在 Work 候选上完整验证，随后把一条规范 JSON record 作为 UTF-8 BLOB 原子写入 `<主工作树>/.Herdchestra/wanxiangshu/work.sqlite` 的 workId stream；同流 revision 连续，requestId 绑定同一 record。JSON 对象键按 Unicode 码点稳定排序，opening/retirement cursor 必须是 JS safe integer。读取时由同一组 records 重建 Work 并校验规范编码、摘要与全部领域跃迁。
 - 禁止后果：规则校验失败不得进入 SQLite append。严禁让旧 EventStore envelope、CanonicalIntegrator 投影或进程内缓存成为第二份 lifecycle 权威；严禁自动修复、跳过损坏 record 或把 Conflict/Unknown 当成功。
 - 失败后果：非法命令在 append 前拒绝且零写；revision/request 冲突显式返回 Conflict；已知未写返回 NotWritten；COMMIT 结果不明返回 Unknown 并要求重开后核对。读到损坏历史时整份拒绝。
 
@@ -340,7 +340,7 @@ work lifecycle 的唯一 durable owner 是 wanxiangli：Work 负责规则和规�
 当用户在 Plan mode 会话中敲入首条 prompt 时，系统开启规划任务。
 
 - 允许后果：系统读取会话 sessionId，核验 owner role 为 `Plan`，以一条 durable record 原子追加两条事实：
-  1. `WorkOpened(workId, root)`，其中 `workId = sessionId`，root 为 `<git-common-dir>/wanxiangshu`；
+  1. `WorkOpened(workId, root)`，其中 `workId = sessionId`，root 为 Git 证明的当前工作树根目录（见 [046]）；
   2. `IncumbencyOpened(workId, incumbencyId, S1, openingCursor)`。openingCursor 取开立这一刻已观察到的 XTrace 头序号，不加一，不加十。缺这一序号则拒绝，不写空游标。
   首任任期始于 `S1`。DevOpsBound 不属于开立，首次 devops 调查成功收敛时再按 [028]/[042] 绑定。若该 work 已存在且 root/sequence 相同，入口重读 durable work 后幂等成功，不因后到调用观察到不同 head 再开一次；并发开立收到 Conflict 或 Unknown 时也必须先重读，只有持久事实能证明同一 work 已开立才算成功。入口挂点在消息 transform pipeline 的 Plan 分支（`resolveTenure` 之前）。
 - 禁止后果：非 Plan 会话严禁触发本入口。严禁凭同名物理会话或自然语言内容猜测已有 work。严禁在入口之外的位置追加首条 `WorkOpened` 或首个 `IncumbencyOpened`。
@@ -396,7 +396,7 @@ provider 上下文由剥除后留下的本任消息、用户原文与显式资�
 
 ## [046] durable 结果的观察与启动条件
 
-work host 观察 durable 执行结果时原样保留调用方传入的 requestId，replay 沿用原 id，不铸造替代。物理启动只对 committed 的 DeliveryRequested 为真；Committed 的其它 kind、Replayed、Unknown、NotWritten 与 Conflict 一律不得启动。work journal 固定位于 `<git-common-dir>/wanxiangshu/work.sqlite`，不在事件流目录内。
+work host 观察 durable 执行结果时原样保留调用方传入的 requestId，replay 沿用原 id，不铸造替代。物理启动只对 committed 的 DeliveryRequested 为真；Committed 的其它 kind、Replayed、Unknown、NotWritten 与 Conflict 一律不得启动。work journal 固定位于 `<主工作树>/.Herdchestra/wanxiangshu/work.sqlite`，不在事件流目录内。
 
 Manager 开立的 root 取 Git 证明的当前工作树根目录，不取插件进入时的任意子目录。同一工作树的多个入口必须指向同一 root；不同 linked worktree 即使共用 git-common-dir，也不能因此冒充同一工作根。无法确认工作树根时拒绝开立，不以路径猜测替代。
 

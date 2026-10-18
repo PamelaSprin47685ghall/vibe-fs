@@ -104,7 +104,7 @@ grounding 由 `requirement-grounding` package 拥有。
 ### 9. Mission / relay
 | Package | 一句话 WHY |
 |---|---|
-| [obligation-ledger](obligation-ledger/WHAT.md) | mission 持续维护「仍欠世界什么」，不用 phase/status 伪装进度。 |
+| [obligation-ledger](obligation-ledger/WHAT.md) | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的非空 `view` 声明；插件不维护第二份待办真相。 |
 | [work](work/WHAT.md) | Work 与 Plan 共用一套生命周期：S1–S3 一段 deliver，S4 两段 deliver；review 返回 pairs，后继剥除前任 assistant 与 tool。 |
 
 ### 10. Feedback
@@ -120,7 +120,7 @@ grounding 由 `requirement-grounding` package 拥有。
 |---|---|
 | [repository-investigation](repository-investigation/WHAT.md) | repository claim 由可定位可追溯真实 observation 建立。 |
 | [knowledge-reuse](knowledge-reuse/WHAT.md) | 历史 repository knowledge 是 best-effort cache/hint，不冒充当前证明。 |
-| [repository-programming](repository-programming/WHAT.md) | repository mutation 用 capability-projected、sandboxed、all-or-nothing surface。 |
+| [repository-programming](repository-programming/WHAT.md) | repository mutation 用 capability-projected、sandboxed、As-Is 逐笔落盘 surface。 |
 | [requirement-grounding](requirement-grounding/WHAT.md) | 代码路径触碰时自动把相关 requirement 文档与测试按 read 语义投影进当前开发上下文。 |
 
 ### 12. Optimization / epistemics

@@ -86,7 +86,7 @@ const sandbox = () => {
 }
 const localStore = () => {
   const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
+  const commonDir = join(owned, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
   return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
@@ -162,6 +162,87 @@ test('WHAT[repository-programming-016] JS010_016_primitive_return_uses_data_fiel
     assert.equal(parseToml(toml).data, 42)
   } finally {
     cleanup()
+  }
+})
+}
+
+{
+// Where the surface executes. The Host creates a Manager and her forked children
+// rooted at the directory their owner registered — for a Change road that is the
+// job's own worktree (`OrchestratorHost.directoryFor` → `HostForkRuntime.CreateChildSession`).
+// The programming surface must execute in that same directory: writing into the
+// plugin's project directory instead puts the road's deliverable into the target's
+// own checkout, leaves the job worktree empty, and makes the candidate a no-op
+// commit whose publish rebase cannot conflict.
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const { existsSync, mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const { createRegistered, execute } = await import("../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js");
+
+const toolModule = () => {
+  const tool = (definition) => definition
+  tool.schema = {
+    string: () => ({ type: 'string', describe: (text) => ({ type: 'string', description: text }) }),
+    any: () => ({ type: 'any', optional: () => ({ type: 'any', optional: true }) }),
+    number: () => ({ type: 'number', optional: () => ({ type: 'number', optional: true }) }),
+    array: (item) => ({ type: 'array', item, describe: (description) => ({ type: 'array', item, description }) }),
+    object: (shape) => ({ type: 'object', shape }),
+  }
+  return { tool }
+}
+
+const sandbox = (prefix) => {
+  const dir = mkdtempSync(join(tmpdir(), prefix))
+  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+const writeProgram = (target) => `class Js extends JsProgram {
+  async run() {
+    await this.write('${target}', 'Published by long-stroke canary\\n');
+    return { written: true };
+  }
+}`
+
+test('WHAT[repository-programming-016] the surface executes in the directory its session registered, not the plugin workspace', async () => {
+  const project = sandbox('wxs-root-project-')
+  const worktree = sandbox('wxs-root-worktree-')
+  try {
+    const registered = createRegistered(
+      toolModule(), 'Coder', 'en', project.dir, null, { 'ses-road': worktree.dir },
+    )
+    const result = await execute(registered, { program: writeProgram('publish_proof.txt') }, { sessionID: 'ses-road' })
+
+    assert.equal(result.startsWith('# ok\n'), true, result)
+    assert.equal(
+      readFileSync(join(worktree.dir, 'publish_proof.txt'), 'utf8'),
+      'Published by long-stroke canary\n',
+      'the road session writes inside its own worktree',
+    )
+    assert.equal(
+      existsSync(join(project.dir, 'publish_proof.txt')),
+      false,
+      'the target’s checkout must stay untouched by a road session',
+    )
+  } finally {
+    project.cleanup()
+    worktree.cleanup()
+  }
+})
+
+test('WHAT[repository-programming-016] an unregistered session keeps the plugin workspace fallback', async () => {
+  const project = sandbox('wxs-root-fallback-')
+  try {
+    const registered = createRegistered(
+      toolModule(), 'Coder', 'en', project.dir, null, { 'ses-other': project.dir },
+    )
+    const result = await execute(registered, { program: writeProgram('fallback.txt') }, { sessionID: 'ses-unregistered' })
+
+    assert.equal(result.startsWith('# ok\n'), true, result)
+    assert.equal(readFileSync(join(project.dir, 'fallback.txt'), 'utf8'), 'Published by long-stroke canary\n')
+  } finally {
+    project.cleanup()
   }
 })
 }

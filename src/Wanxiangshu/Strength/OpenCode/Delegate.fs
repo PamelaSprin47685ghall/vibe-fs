@@ -182,8 +182,29 @@ module StrengthDelegate =
             )
         | _ -> Error "Strength ports are not fully bound"
 
-    let private tryResolvePhysicalUserMessage (rawMessages: obj list) : Result<PhysicalUserMessageId, string> =
-        match ProviderWireCapture.lastUserMessageId rawMessages with
+    /// The physical user message this request answers, as the Host gave it.
+    ///
+    /// PROMPT-001 / HOST-010: delegation binds a Host assistant run by the
+    /// physical user message it answers. The transform pipeline already read that
+    /// identity from the Host payload *before* any projection rewrite (the frame's
+    /// `PhysicalUserMessageId`); re-deriving it from the outgoing wire is not
+    /// equivalent, because projection owners may legitimately address their own
+    /// rows with content-derived ids. A Companion projection's trailing delta row
+    /// is exactly that: role=user, marked `source = "physical-delta"` (so the
+    /// synthetic-row filter does not exclude it), but its id is a projection
+    /// identity (`CompanionIdentity.newWorkMessageId`). No Host snapshot ever
+    /// holds an assistant child under that id, so the binding could never
+    /// succeed and every request skipped with a misleading "not uniquely bound".
+    /// The wire read stays the fallback for a transform the Host did not stamp.
+    let private resolvePhysicalUserMessage
+        (rawMessages: obj list)
+        (hostPhysicalUserMessageId: PhysicalUserMessageId option)
+        : Result<PhysicalUserMessageId, string> =
+        let resolved =
+            hostPhysicalUserMessageId
+            |> Option.orElseWith (fun () -> ProviderWireCapture.lastUserMessageId rawMessages)
+
+        match resolved with
         | Some physical -> Ok physical
         | None -> Error "owner transform has no physical user message"
 
@@ -316,12 +337,13 @@ module StrengthDelegate =
         (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (durableStrength: StrengthProjection)
+        (hostPhysicalUserMessageId: PhysicalUserMessageId option)
         (output: obj)
         : Task<Result<OwnerSurface, string>> =
         taskResult {
             let ports, owner = bound
             let rawMessages = ProviderWireDecode.messagesFromTransformOutput output
-            let! physical = tryResolvePhysicalUserMessage rawMessages
+            let! physical = resolvePhysicalUserMessage rawMessages hostPhysicalUserMessageId
             let! initialMessages = ports.Snapshots.GetMessages owner
             let! messages, target = tryResolveAssistantRun ports owner physical initialMessages
             let projections = AgentJournal.snapshot ports.Durable
@@ -1174,13 +1196,23 @@ module StrengthDelegate =
         (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (predictorConfigured: bool)
+        (hostPhysicalUserMessageId: PhysicalUserMessageId option)
         (output: obj)
         : Task<CaptureOutcome> =
         task {
             let ports, _ = bound
             let! durableStrength = loadDurableProjectionOrThrow ports strengthScope "capture"
 
-            match! resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output with
+            match!
+                resolveSurface
+                    bound
+                    strengthScope
+                    tryAttemptPlan
+                    syncDelegateRuntime
+                    durableStrength
+                    hostPhysicalUserMessageId
+                    output
+            with
             | Error reason -> return CaptureOutcome.Skipped reason
             | Ok resolved -> return! captureOnSurface strengthScope predictorConfigured resolved
         }
@@ -1194,6 +1226,7 @@ module StrengthDelegate =
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (predictorConfigured: bool)
         (projectionSessionIdOpt: string option)
+        (hostPhysicalUserMessageId: PhysicalUserMessageId option)
         (timerPort: ITimerPort option)
         (output: obj)
         : Task<CaptureOutcome> =
@@ -1212,6 +1245,7 @@ module StrengthDelegate =
                         tryAttemptPlan
                         syncDelegateRuntime
                         predictorConfigured
+                        hostPhysicalUserMessageId
                         output
         }
 
@@ -1821,13 +1855,23 @@ module StrengthDelegate =
         (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (predictorConfigured: bool)
+        (hostPhysicalUserMessageId: PhysicalUserMessageId option)
         (output: obj)
         : Task<unit> =
         task {
             let ports, _ = bound
             let! durableStrength = loadDurableProjectionOrThrow ports strengthScope "start"
 
-            match! resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output with
+            match!
+                resolveSurface
+                    bound
+                    strengthScope
+                    tryAttemptPlan
+                    syncDelegateRuntime
+                    durableStrength
+                    hostPhysicalUserMessageId
+                    output
+            with
             | Error err ->
                 Diagnostic.emit
                     "strength-delegation-skip"
@@ -1868,13 +1912,21 @@ module StrengthDelegate =
         (bound: BoundPorts * SessionId)
         (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
+        (hostPhysicalUserMessageId: PhysicalUserMessageId option)
         (output: obj)
         : Task<unit> =
         task {
             let! durableStrength = loadDurableProjectionOrThrow (fst bound) strengthScope "start"
 
             let! surfaceResult =
-                resolveSurface bound strengthScope tryAttemptPlan syncDelegateRuntime durableStrength output
+                resolveSurface
+                    bound
+                    strengthScope
+                    tryAttemptPlan
+                    syncDelegateRuntime
+                    durableStrength
+                    hostPhysicalUserMessageId
+                    output
 
             match surfaceResult with
             | Error err ->
@@ -1893,11 +1945,19 @@ module StrengthDelegate =
         (tryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option)
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (predictorConfigured: bool)
+        (hostPhysicalUserMessageId: PhysicalUserMessageId option)
         (output: obj)
         : Task<unit> =
         match boundResult with
         | Ok bound when strengthScope.StrengthFuseReason.IsNone ->
-            executeApplyOnBound bound strengthScope tryAttemptPlan syncDelegateRuntime predictorConfigured output
+            executeApplyOnBound
+                bound
+                strengthScope
+                tryAttemptPlan
+                syncDelegateRuntime
+                predictorConfigured
+                hostPhysicalUserMessageId
+                output
         | Ok(_, sessionId) ->
             Diagnostic.emit
                 "strength-delegation-skip"
@@ -1917,6 +1977,7 @@ module StrengthDelegate =
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (predictorConfigured: bool)
         (projectionSessionIdOpt: string option)
+        (hostPhysicalUserMessageId: PhysicalUserMessageId option)
         (timerPort: ITimerPort option)
         (output: obj)
         (request: DelegationRequest)
@@ -1936,6 +1997,7 @@ module StrengthDelegate =
                 bound
                 tryAttemptPlan
                 syncDelegateRuntime
+                hostPhysicalUserMessageId
                 output
 
     let tryCaptureAndStart
@@ -1947,6 +2009,7 @@ module StrengthDelegate =
         (syncDelegateRuntime: SyncDelegateRuntime option)
         (predictorConfigured: bool)
         (projectionSessionIdOpt: string option)
+        (hostPhysicalUserMessageId: PhysicalUserMessageId option)
         (timerPort: ITimerPort option)
         (output: obj)
         : Task<unit> =
@@ -1961,6 +2024,7 @@ module StrengthDelegate =
                     syncDelegateRuntime
                     predictorConfigured
                     projectionSessionIdOpt
+                    hostPhysicalUserMessageId
                     timerPort
                     output
 
@@ -1990,6 +2054,7 @@ module StrengthDelegate =
                         tryAttemptPlan
                         syncDelegateRuntime
                         predictorConfigured
+                        hostPhysicalUserMessageId
                         output
             | CaptureOutcome.Captured request ->
                 Diagnostic.emit
@@ -2008,6 +2073,7 @@ module StrengthDelegate =
                         syncDelegateRuntime
                         predictorConfigured
                         projectionSessionIdOpt
+                        hostPhysicalUserMessageId
                         timerPort
                         output
                         request

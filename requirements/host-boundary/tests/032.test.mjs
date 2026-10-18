@@ -540,7 +540,7 @@ test('WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_opt
         additionalProperties: false,
       },
     }
-    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('fetch', definition)
 
     const props = definition.parameters.properties
     // 估计字段：integer、范围 [0, 2147483647]、7.1 事实性估计说明，且必填
@@ -750,7 +750,7 @@ test('WHAT[host-boundary-032] C21_collaboration_prose_follows_language_binding_a
       description: '原始工具描述',
       parameters: { type: 'object', properties: {}, required: [] },
     }
-    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('fetch', definition)
     assert.ok(
       definition.description.includes('调查展望：estimated_readonly_rounds 估计当前整批完成后的连续只读查证轮数'),
       'Chinese collaboration prose required under zh-CN preference',
@@ -761,13 +761,13 @@ test('WHAT[host-boundary-032] C21_collaboration_prose_follows_language_binding_a
       'English prose must not arrive under a Chinese preference',
     )
     const zhSnapshot = structuredClone(definition)
-    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('fetch', definition)
     assert.deepEqual(definition, zhSnapshot, 'Chinese decoration must be idempotent')
 
     // 语言切换后只剩当前语言一段，不叠加
     process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
     language.refreshGlobalLanguage()
-    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', definition)
+    PluginHooksSurface.decorateReadonlyDelegationToolDefinition('fetch', definition)
     assert.ok(definition.description.includes('Investigation outlook: estimated_readonly_rounds estimates'))
     assert.equal(
       definition.description.includes('调查展望：estimated_readonly_rounds'),
@@ -803,8 +803,8 @@ test('WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_requi
   // 经 Fable 编译后为纯 JavaScript Error 对象，未提供如 .code 等结构化错误码。
   // 因此此处保留正则表达式精确匹配自然语言异常文案，作为当前在宿主边界能够区分不同 Schema 拒绝原因的唯一起效判定信号。
   assert.throws(
-    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', budgetConflict),
-    /^Tool read defines a conflicting estimated_readonly_rounds property that differs from the readonly delegation protocol$/,
+    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('fetch', budgetConflict),
+    /^Tool fetch defines a conflicting estimated_readonly_rounds property that differs from the readonly delegation protocol$/,
     'a same-name property that differs from the protocol must fail, not be overwritten',
   )
 
@@ -820,8 +820,8 @@ test('WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_requi
     },
   }
   assert.throws(
-    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', noteConflict),
-    /^Tool read defines a conflicting self_note property that differs from the readonly delegation protocol$/,
+    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('fetch', noteConflict),
+    /^Tool fetch defines a conflicting self_note property that differs from the readonly delegation protocol$/,
     'a same-name note that differs from the protocol must fail',
   )
 
@@ -831,8 +831,8 @@ test('WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_requi
     parameters: { type: 'object', properties: { path: { type: 'string' } }, required: 'path' },
   }
   assert.throws(
-    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', badRequired),
-    /^Tool read parameters schema required field is not an array$/,
+    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('fetch', badRequired),
+    /^Tool fetch parameters schema required field is not an array$/,
     'a non-array required must fail loudly instead of publishing a partial protocol',
   )
 
@@ -842,8 +842,8 @@ test('WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_requi
     parameters: { type: 'object' },
   }
   assert.throws(
-    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('read', missingProperties),
-    /^Tool read parameters schema missing object properties$/,
+    () => PluginHooksSurface.decorateReadonlyDelegationToolDefinition('fetch', missingProperties),
+    /^Tool fetch parameters schema missing object properties$/,
     'a root schema that cannot be legally extended must fail loudly',
   )
 })
@@ -872,7 +872,7 @@ const clearPredictorState = () => {
 test('WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_but_preserved_as_evidence', async () => {
   setPredictorState('configured')
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const tool = 'read'
+    const tool = 'fetch'
     const sessionID = 'ses-c23'
     await openIncumbency(runtime, sessionID)
     const callID = 'call-c23-1'
@@ -966,7 +966,7 @@ test('WHAT[host-boundary-032] C25_frozen_delegation_fields_fail_atomically_witho
     await assert.rejects(
       async () => {
         await hooks['tool.execute.before'](
-          { tool: 'read', sessionID, callID: 'call-c25' },
+          { tool: 'fetch', sessionID, callID: 'call-c25' },
           { args: frozenArgs },
         )
       },
@@ -1006,8 +1006,8 @@ test('WHAT[host-boundary-032] C26_concurrent_delegation_restores_do_not_crosstal
     ])
 
     await Promise.all([
-      hooks['tool.execute.before']({ tool: 'read', sessionID: call1.sessionID, callID: call1.callID }, call1.output),
-      hooks['tool.execute.before']({ tool: 'read', sessionID: call2.sessionID, callID: call2.callID }, call2.output),
+      hooks['tool.execute.before']({ tool: 'fetch', sessionID: call1.sessionID, callID: call1.callID }, call1.output),
+      hooks['tool.execute.before']({ tool: 'fetch', sessionID: call2.sessionID, callID: call2.callID }, call2.output),
     ])
 
     assert.equal('estimated_readonly_rounds' in call1.output.args, false)
@@ -1018,12 +1018,12 @@ test('WHAT[host-boundary-032] C26_concurrent_delegation_restores_do_not_crosstal
     // 乱序恢复也不串值
     await Promise.all([
       hooks['tool.execute.after'](
-        { tool: 'read', sessionID: call2.sessionID, callID: call2.callID, args: call2.output.args },
-        { title: 'read', output: 'out2', metadata: {} },
+        { tool: 'fetch', sessionID: call2.sessionID, callID: call2.callID, args: call2.output.args },
+        { title: 'fetch', output: 'out2', metadata: {} },
       ),
       hooks['tool.execute.after'](
-        { tool: 'read', sessionID: call1.sessionID, callID: call1.callID, args: call1.output.args },
-        { title: 'read', output: 'out1', metadata: {} },
+        { tool: 'fetch', sessionID: call1.sessionID, callID: call1.callID, args: call1.output.args },
+        { title: 'fetch', output: 'out1', metadata: {} },
       ),
     ])
 
@@ -1084,7 +1084,7 @@ test('WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protoco
 test('WHAT[host-boundary-032] C28_unconfigured_predictor_leaves_tool_definitions_undecorated', async () => {
   clearPredictorState()
   await withExecutablePlugin(async (hooks) => {
-    for (const toolID of ['todowrite-for-manager', 'read', 'write']) {
+    for (const toolID of ['todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops', 'fetch']) {
       const originalDescription = `Description for ${toolID}`
       const output = {
         description: originalDescription,
@@ -1125,7 +1125,7 @@ test('WHAT[host-boundary-032] C29_configured_predictor_decorates_every_tool_thro
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   try {
     await withExecutablePlugin(async (hooks) => {
-      for (const toolID of ['todowrite-for-manager', 'read', 'write']) {
+      for (const toolID of ['todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops', 'fetch']) {
         const originalDescription = `Description for ${toolID}`
         const output = {
           description: originalDescription,
@@ -1221,17 +1221,17 @@ test('WHAT[host-boundary-032] C30_configured_decoration_through_hook_is_idempote
   try {
     await withExecutablePlugin(async (hooks) => {
       const output = {
-        description: 'Description for read',
+        description: 'Description for fetch',
         parameters: {
           type: 'object',
           properties: { path: { type: 'string' } },
           required: ['path'],
         },
       }
-      await hooks['tool.definition']({ toolID: 'read' }, output)
+      await hooks['tool.definition']({ toolID: 'fetch' }, output)
       const firstSnapshot = structuredClone(output)
-      await hooks['tool.definition']({ toolID: 'read' }, output)
-      await hooks['tool.definition']({ toolID: 'read' }, output)
+      await hooks['tool.definition']({ toolID: 'fetch' }, output)
+      await hooks['tool.definition']({ toolID: 'fetch' }, output)
       assert.deepEqual(
         output,
         firstSnapshot,
@@ -1253,7 +1253,7 @@ test('WHAT[host-boundary-032] C31_invalid_predictor_configuration_fails_closed_w
   try {
     await withExecutablePlugin(async (hooks) => {
       const output = {
-        description: 'Description for read',
+        description: 'Description for fetch',
         parameters: {
           type: 'object',
           properties: { path: { type: 'string' } },
@@ -1262,7 +1262,7 @@ test('WHAT[host-boundary-032] C31_invalid_predictor_configuration_fails_closed_w
       }
       await assert.rejects(
         async () => {
-          await hooks['tool.definition']({ toolID: 'read' }, output)
+          await hooks['tool.definition']({ toolID: 'fetch' }, output)
         },
         /execution-model-routing: Predictor model configuration is invalid: predictor candidates must be \[model, reasoning\] pairs/,
         'invalid Predictor configuration must fail closed on the tool.definition hook',
@@ -1274,13 +1274,13 @@ test('WHAT[host-boundary-032] C31_invalid_predictor_configuration_fails_closed_w
       )
       assert.equal(
         output.description,
-        'Description for read',
+        'Description for fetch',
         'no collaboration prose may be appended on the fail-closed path',
       )
 
       // 修复配置后同一 hook 立即恢复装饰：失败只属于那一回，无缓存状态
       setPredictorState('configured')
-      await hooks['tool.definition']({ toolID: 'read' }, output)
+      await hooks['tool.definition']({ toolID: 'fetch' }, output)
       assert.equal(
         output.parameters.properties.estimated_readonly_rounds.type,
         'integer',
@@ -1301,14 +1301,14 @@ test('WHAT[host-boundary-032] C32_decoration_gate_shares_the_single_predictor_co
       'the shared query must report the unconfigured state',
     )
     const output = {
-      description: 'Description for read',
+      description: 'Description for fetch',
       parameters: {
         type: 'object',
         properties: { path: { type: 'string' } },
         required: ['path'],
       },
     }
-    await hooks['tool.definition']({ toolID: 'read' }, output)
+    await hooks['tool.definition']({ toolID: 'fetch' }, output)
     assert.equal(
       output.parameters.properties?.estimated_readonly_rounds,
       undefined,
@@ -1324,14 +1324,14 @@ test('WHAT[host-boundary-032] C32_decoration_gate_shares_the_single_predictor_co
       'the shared query must report the configured state',
     )
     const output = {
-      description: 'Description for read',
+      description: 'Description for fetch',
       parameters: {
         type: 'object',
         properties: { path: { type: 'string' } },
         required: ['path'],
       },
     }
-    await hooks['tool.definition']({ toolID: 'read' }, output)
+    await hooks['tool.definition']({ toolID: 'fetch' }, output)
     assert.equal(
       output.parameters.properties.estimated_readonly_rounds.type,
       'integer',
@@ -1345,7 +1345,7 @@ test('WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_
   try {
     await withExecutablePlugin(async (hooks) => {
       const makeDefinition = () => ({
-        description: 'Description for read',
+        description: 'Description for fetch',
         parameters: {
           type: 'object',
           properties: { path: { type: 'string' } },
@@ -1354,7 +1354,7 @@ test('WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_
       })
 
       const configuredOutput = makeDefinition()
-      await hooks['tool.definition']({ toolID: 'read' }, configuredOutput)
+      await hooks['tool.definition']({ toolID: 'fetch' }, configuredOutput)
       assert.equal(
         configuredOutput.parameters.properties.estimated_readonly_rounds.type,
         'integer',
@@ -1363,7 +1363,7 @@ test('WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_
 
       clearPredictorState()
       const revertedOutput = makeDefinition()
-      await hooks['tool.definition']({ toolID: 'read' }, revertedOutput)
+      await hooks['tool.definition']({ toolID: 'fetch' }, revertedOutput)
       assert.equal(
         revertedOutput.parameters.properties?.estimated_readonly_rounds,
         undefined,
@@ -1371,13 +1371,13 @@ test('WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_
       )
       assert.equal(
         revertedOutput.description,
-        'Description for read',
+        'Description for fetch',
         'removing the configuration must stop the collaboration prose',
       )
 
       setPredictorState('configured')
       const reconfiguredOutput = makeDefinition()
-      await hooks['tool.definition']({ toolID: 'read' }, reconfiguredOutput)
+      await hooks['tool.definition']({ toolID: 'fetch' }, reconfiguredOutput)
       assert.equal(
         reconfiguredOutput.parameters.properties.estimated_readonly_rounds.type,
         'integer',
@@ -1394,8 +1394,8 @@ test('WHAT[host-boundary-032] C44_registered_hooks_restore_exact_argument_identi
   try {
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
       const calls = [
-        { tool: 'read', args: { estimated_readonly_rounds: 2, path: 'first.txt', self_note: 'first', limit: 10 } },
-        { tool: 'read', args: { path: 'middle.txt', self_note: 'middle', limit: 20, estimated_readonly_rounds: 3 } },
+        { tool: 'fetch', args: { estimated_readonly_rounds: 2, path: 'first.txt', self_note: 'first', limit: 10 } },
+        { tool: 'fetch', args: { path: 'middle.txt', self_note: 'middle', limit: 20, estimated_readonly_rounds: 3 } },
         { tool: 'todowrite-for-manager', args: { self_note: 'review', path: 'review.txt', contract: { original: true }, estimated_readonly_rounds: 4, limit: 30 } },
       ].map((call, index) => ({
         ...call,
@@ -1767,7 +1767,7 @@ test('WHAT[host-boundary-032] C35_unknown_tool_call_leaves_persisted_history_unt
           parts: [
             {
               type: 'tool',
-              tool: 'read',
+              tool: 'fetch',
               callID: 'call-c35-unknown',
               state: { status: 'completed', input: { path: 'src/Old.fs' }, output: 'old contents' },
             },
@@ -1926,7 +1926,7 @@ test('WHAT[host-boundary-032] C37_tool_results_are_never_rewritten_by_the_restor
 
 test('WHAT[host-boundary-032] C38_restore_only_touches_protocol_fields_never_business_arguments', async () => {
   await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
-    const tool = 'read'
+    const tool = 'fetch'
     const sessionID = 'ses-c38'
     await openIncumbency(runtime, sessionID)
     const callID = 'call-c38-1'
@@ -1996,11 +1996,11 @@ test('WHAT[host-boundary-032] C39_legacy_delegate_readonly_rounds_rejected_by_to
     const sessionID = 'ses-c39'
     await openIncumbency(runtime, sessionID)
 
-    // 1. 参与工具（read）仅携带旧字段 delegate_readonly_rounds 时，必须在 tool.execute.before 真实路径触发 MixedProtocolFields 拒绝
+    // 1. 参与工具（fetch）仅携带旧字段 delegate_readonly_rounds 时，必须在 tool.execute.before 真实路径触发 MixedProtocolFields 拒绝
     await assert.rejects(
       async () => {
         await hooks['tool.execute.before'](
-          { tool: 'read', sessionID, callID: 'call-c39-legacy-only' },
+          { tool: 'fetch', sessionID, callID: 'call-c39-legacy-only' },
           { args: { path: 'src/App.fs', delegate_readonly_rounds: 2 } },
         )
       },
@@ -2012,7 +2012,7 @@ test('WHAT[host-boundary-032] C39_legacy_delegate_readonly_rounds_rejected_by_to
     await assert.rejects(
       async () => {
         await hooks['tool.execute.before'](
-          { tool: 'read', sessionID, callID: 'call-c39-mixed' },
+          { tool: 'fetch', sessionID, callID: 'call-c39-mixed' },
           {
             args: {
               path: 'src/App.fs',
@@ -2046,35 +2046,35 @@ test('WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_a
     const sessionID = 'ses-c40'
     await openIncumbency(runtime, sessionID)
 
-    // 负向 1：非评审工具 read 意外携带 contract（同时携带合法的只读估计字段）
+    // 负向 1：非评审参与工具 fetch 意外携带 contract（同时携带合法的只读估计字段）
     // sanitizeSnapshot 必须将 Contract 清洗为 None，因此只有只读估计字段能进入 vault，contract 绝不进入 vault。
     // 在后续 transform 恢复 provider 历史时，contract 字段必须保持不存在（undefined），不被恢复。
-    const readCallID = 'call-c40-read'
-    const readBeforeOutput = {
+    const participatingCallID = 'call-c40-fetch'
+    const participatingBeforeOutput = {
       args: {
         path: 'src/App.fs',
-        contract: 'unexpected-contract-on-read',
+        contract: 'unexpected-contract-on-fetch',
         estimated_readonly_rounds: 2,
         self_note: 'note-c40',
       },
     }
 
     await hooks['tool.execute.before'](
-      { tool: 'read', sessionID, callID: readCallID },
-      readBeforeOutput,
+      { tool: 'fetch', sessionID, callID: participatingCallID },
+      participatingBeforeOutput,
     )
 
     // 若非参与工具（如 join）仅携带 contract 而没有任何只读估计字段，sanitizeSnapshot 将三项全部清洗为 None，commitRecordedSnapshot 直接跳过，完全不入 vault
-    const readOnlyContractCallID = 'call-c40-read-only-contract'
-    const readOnlyContractOutput = {
+    const contractOnlyCallID = 'call-c40-contract-only'
+    const contractOnlyOutput = {
       args: {
         taskID: 'task-c40-1',
         contract: 'unexpected-contract-only',
       },
     }
     await hooks['tool.execute.before'](
-      { tool: 'join', sessionID, callID: readOnlyContractCallID },
-      readOnlyContractOutput,
+      { tool: 'join', sessionID, callID: contractOnlyCallID },
+      contractOnlyOutput,
     )
 
     // 负向 2：非参与工具（如 review / join）若携带 estimated_readonly_rounds / self_note
@@ -2105,14 +2105,14 @@ test('WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_a
           parts: [
             {
               type: 'tool',
-              tool: 'read',
-              callID: readCallID,
+              tool: 'fetch',
+              callID: participatingCallID,
               state: { status: 'completed', input: { path: 'src/App.fs' }, output: 'ok' },
             },
             {
               type: 'tool',
               tool: 'join',
-              callID: readOnlyContractCallID,
+              callID: contractOnlyCallID,
               state: { status: 'completed', input: { taskID: 'task-c40-1' }, output: 'ok' },
             },
             {
@@ -2128,26 +2128,26 @@ test('WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_a
 
     await hooks['experimental.chat.messages.transform']({}, transformed)
 
-    const restoredRead = transformed.messages[0].parts[0].state.input
+    const restoredParticipating = transformed.messages[0].parts[0].state.input
     assert.equal(
-      restoredRead.contract,
+      restoredParticipating.contract,
       undefined,
-      'non-review tool read unexpected contract must be sanitized to None and never restored from vault',
+      'non-review tool fetch unexpected contract must be sanitized to None and never restored from vault',
     )
     assert.equal(
-      restoredRead.estimated_readonly_rounds,
+      restoredParticipating.estimated_readonly_rounds,
       2,
       'participating tool estimate must be restored normally from vault',
     )
     assert.equal(
-      restoredRead.self_note,
+      restoredParticipating.self_note,
       'note-c40',
       'participating tool note must be restored normally from vault',
     )
 
-    const restoredReadOnlyContract = transformed.messages[0].parts[1].state.input
+    const restoredContractOnly = transformed.messages[0].parts[1].state.input
     assert.equal(
-      restoredReadOnlyContract.contract,
+      restoredContractOnly.contract,
       undefined,
       'non-participating tool carrying only contract must have empty vault entry and never restore contract',
     )
@@ -2213,7 +2213,7 @@ test('WHAT[host-boundary-032] C41_unconfigured_predictor_no_interference_passthr
   // 导致非参与工具或未配置环境下的协议字段可能逃脱清洗或被非预期篡改。
   //
   // 【可区分的 observable】
-  // 1. 未配置时调用参与工具 read（即使漏填 estimated_readonly_rounds）正常执行，不抛 MissingEstimate；
+  // 1. 未配置时调用参与工具 fetch（即使漏填 estimated_readonly_rounds）正常执行，不抛 MissingEstimate；
   // 2. 若入参显式带有 estimated_readonly_rounds 与 self_note，toolBefore 不得对其进行 hide 剥离，输出 args 原样保留；
   // 3. transform 执行后，消息历史中绝不存在从 vault 恢复的协议字段。
   //
@@ -2221,8 +2221,8 @@ test('WHAT[host-boundary-032] C41_unconfigured_predictor_no_interference_passthr
   // 变异点 A（破坏 toolBefore 未配置门控）：
   //   修改 src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:411-412，将 `isDelegationActive` 改为忽略配置：
   //   `let isDelegationActive = isParticipatingTool`
-  //   预期结果：未配置下对漏填估计的调用（call-c41-read-omitted）将因触发校验抛出 MissingEstimate 异常而飘红，
-  //   对携带估计的调用（call-c41-read-passthrough）将因字段被 hide 导致 passthroughOutput 断言失败飘红。
+  //   预期结果：未配置下对漏填估计的调用（call-c41-fetch-omitted）将因触发校验抛出 MissingEstimate 异常而飘红，
+  //   对携带估计的调用（call-c41-fetch-passthrough）将因字段被 hide 导致 passthroughOutput 断言失败飘红。
   // 变异点 B（破坏 sanitizeSnapshot 未配置门控）：
   //   修改 src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:333-335，将 `isDelegationActive` 设为 `true`：
   //   预期结果：协议字段绕过清洗录入 Vault，下游 transform 错误恢复出字段，导致 restored 断言变红。
@@ -2235,7 +2235,7 @@ test('WHAT[host-boundary-032] C41_unconfigured_predictor_no_interference_passthr
       // 观察点 1：未配置时参与工具漏填必填字段，不校验、不抛错，业务参数透传
       const omittedOutput = { args: { path: 'src/UnconfiguredOmitted.fs' } }
       await hooks['tool.execute.before'](
-        { tool: 'read', sessionID, callID: 'call-c41-read-omitted' },
+        { tool: 'fetch', sessionID, callID: 'call-c41-fetch-omitted' },
         omittedOutput,
       )
       assert.equal(
@@ -2253,7 +2253,7 @@ test('WHAT[host-boundary-032] C41_unconfigured_predictor_no_interference_passthr
         },
       }
       await hooks['tool.execute.before'](
-        { tool: 'read', sessionID, callID: 'call-c41-read-passthrough' },
+        { tool: 'fetch', sessionID, callID: 'call-c41-fetch-passthrough' },
         passthroughOutput,
       )
       assert.equal(
@@ -2276,8 +2276,8 @@ test('WHAT[host-boundary-032] C41_unconfigured_predictor_no_interference_passthr
             parts: [
               {
                 type: 'tool',
-                tool: 'read',
-                callID: 'call-c41-read-passthrough',
+                tool: 'fetch',
+                callID: 'call-c41-fetch-passthrough',
                 state: {
                   status: 'completed',
                   input: { path: 'src/UnconfiguredPassthrough.fs' },
@@ -2348,7 +2348,7 @@ test('WHAT[host-boundary-032] C42_mid_flight_predictor_revocation_restores_param
   //
   // 【当时条件】
   // 1. toolBefore 执行时 Predictor 为已配置状态（configured）；
-  // 2. 参与工具 read 携带合法的只读估计与短记，toolBefore 成功校验、录入快照并 hide 剥离字段；
+  // 2. 参与工具 fetch 携带合法的只读估计与短记，toolBefore 成功校验、录入快照并 hide 剥离字段；
   // 3. 在 toolBefore 之后、toolAfter 之前，Predictor 配置被撤销（变为 unconfigured）；
   // 4. toolAfter 随后被触发执行。
   //
@@ -2377,8 +2377,8 @@ test('WHAT[host-boundary-032] C42_mid_flight_predictor_revocation_restores_param
       const sessionID = 'ses-c42'
       await openIncumbency(runtime, sessionID)
 
-      const callID = 'call-c42-read-revocation'
-      const toolInput = { tool: 'read', sessionID, callID }
+      const callID = 'call-c42-fetch-revocation'
+      const toolInput = { tool: 'fetch', sessionID, callID }
       const toolOutput = {
         args: {
           path: 'src/MidFlightRevocation.fs',
@@ -2440,7 +2440,7 @@ test('WHAT[host-boundary-032] C43_participating_tool_missing_estimate_rejected_b
   //
   // 【当时成立条件】
   // 1. Predictor 已配置（globalThis.__wanxiangshu_test_predictor_state = 'configured'）；
-  // 2. 被调用的工具经 InvestigationEstimateContract.classifyTool 判定为参与工具（如 'read' 为 EstimateAfterCall）；
+  // 2. 被调用的工具经 InvestigationEstimateContract.classifyTool 判定为参与工具（如 'fetch' 为 EstimateAfterCall）；
   // 3. 本次调用的 arguments 完全缺失协议字段（既无 estimated_readonly_rounds 也无 self_note，例如仅有 { path: 'src/MissingEstimateRepro.fs' }）。
   //
   // 【本该发生什么】
@@ -2485,7 +2485,7 @@ test('WHAT[host-boundary-032] C43_participating_tool_missing_estimate_rejected_b
   //    - 独立佐证 C：requirements/host-boundary/WHAT.md [032] 第 148 行参数清理与非法输入 before 阶段拒绝条款。
   //
   // 【可区分的 observable】
-  // 1. 参与工具 read 在 Predictor 已配置且 arguments 没有任何协议字段时，调用 hooks['tool.execute.before']
+  // 1. 参与工具 fetch 在 Predictor 已配置且 arguments 没有任何协议字段时，调用 hooks['tool.execute.before']
   //    必须被拒绝（reject），抛出的错误信息精确匹配 MissingEstimate 文案；
   // 2. 拒绝发生后，toolOutput.args 对象的内容与键结构完全未被改写或污染（业务零副作用）；
   // 3. 对照组：非参与工具 join 在 Predictor 已配置且缺少协议字段时，toolBefore 属于 no-op 路径，必须正常放行通过、不抛错。
@@ -2495,7 +2495,7 @@ test('WHAT[host-boundary-032] C43_participating_tool_missing_estimate_rejected_b
   //   修改 src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs:414，在条件中加回协议字段存在性守卫：
   //   `let hasProtocolFields = hasOwnProperty toolOutput?args "estimated_readonly_rounds" || hasOwnProperty toolOutput?args "self_note"`
   //   `if isDelegationActive && hasProtocolFields && not (isNull toolOutput) && not (isNull toolOutput?args) then`
-  //   预期结果：当调用 read 时完全未传协议字段，`hasProtocolFields` 为 false 导致校验被跳过，
+  //   预期结果：当调用 fetch 时完全未传协议字段，`hasProtocolFields` 为 false 导致校验被跳过，
   //   `hooks['tool.execute.before']` 将不会抛出异常而成功 resolve，
   //   导致本测试中的 `await assert.rejects(...)` 失败变红！
   // 变异点 2（守卫只看 Predictor 配置而不判定是否为参与工具）：
@@ -2510,7 +2510,7 @@ test('WHAT[host-boundary-032] C43_participating_tool_missing_estimate_rejected_b
       const sessionID = 'ses-c43'
       await openIncumbency(runtime, sessionID)
 
-      // 观察点 1：参与工具（read）在 Predictor 配置下完全未传两个协议字段
+      // 观察点 1：参与工具（fetch）在 Predictor 配置下完全未传两个协议字段
       const participatingOutput = {
         args: {
           path: 'src/MissingEstimateRepro.fs',
@@ -2522,7 +2522,7 @@ test('WHAT[host-boundary-032] C43_participating_tool_missing_estimate_rejected_b
       await assert.rejects(
         async () => {
           await hooks['tool.execute.before'](
-            { tool: 'read', sessionID, callID: 'call-c43-missing-estimate' },
+            { tool: 'fetch', sessionID, callID: 'call-c43-missing-estimate' },
             participatingOutput,
           )
         },
@@ -2575,7 +2575,7 @@ test('WHAT[host-boundary-032] C48_configured_before_repeats_only_for_the_same_hi
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
       const sessionID = 'ses-c48'
       await openIncumbency(runtime, sessionID)
-      for (const tool of ['read', 'todowrite-for-manager']) {
+      for (const tool of ['fetch', 'todowrite-for-manager']) {
         const args = { self_note: 'original note', path: 'file.txt', estimated_readonly_rounds: 2 }
         const businessContract = { native: true }
         args.contract = tool === 'todowrite-for-manager' ? 'original review' : businessContract
@@ -2588,11 +2588,11 @@ test('WHAT[host-boundary-032] C48_configured_before_repeats_only_for_the_same_hi
         assert.equal(output.args, args)
         const businessView = tool === 'todowrite-for-manager' ? { path: 'file.txt' } : { path: 'file.txt', contract: businessContract }
         assert.deepEqual(args, businessView, 'the repeated callback keeps only the business view')
-        if (tool === 'read') assert.equal(args.contract, businessContract, 'a non-review contract belongs to the business tool')
+        if (tool === 'fetch') assert.equal(args.contract, businessContract, 'a non-review contract belongs to the business tool')
         await hooks['tool.execute.after']({ ...input, args }, { title: tool, output: 'result', metadata: {} })
         assert.deepEqual(args, original)
         assert.deepEqual(Reflect.ownKeys(args), keys)
-        if (tool === 'read') assert.equal(args.contract, businessContract)
+        if (tool === 'fetch') assert.equal(args.contract, businessContract)
       }
     })
   } finally {
@@ -2605,7 +2605,7 @@ test('WHAT[host-boundary-032] C49_hidden_arguments_do_not_exempt_other_call_iden
   try {
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
       await Promise.all(['ses-c49', 'ses-c49-other'].map((sessionID) => openIncumbency(runtime, sessionID)))
-      const input = { tool: 'read', sessionID: 'ses-c49', callID: 'call-c49' }
+      const input = { tool: 'fetch', sessionID: 'ses-c49', callID: 'call-c49' }
       const args = { estimated_readonly_rounds: 2, self_note: 'original note', path: 'file.txt' }
       const original = structuredClone(args)
       const keys = Reflect.ownKeys(args)
@@ -2613,7 +2613,7 @@ test('WHAT[host-boundary-032] C49_hidden_arguments_do_not_exempt_other_call_iden
       const attempts = [
         [{ ...input, callID: 'other-call' }, args],
         [{ ...input, sessionID: 'ses-c49-other' }, args],
-        [{ ...input, tool: 'glob' }, args],
+        [{ ...input, tool: 'todowrite-for-manager' }, args],
         [input, { path: 'other-object.txt' }],
         [{ ...input, callID: 'fresh-call' }, { path: 'missing-estimate.txt' }],
       ]
@@ -2621,7 +2621,7 @@ test('WHAT[host-boundary-032] C49_hidden_arguments_do_not_exempt_other_call_iden
         await assert.rejects(hooks['tool.execute.before'](otherInput, { args: otherArgs }), /Invalid investigation estimate arguments:/)
         assert.equal(Object.hasOwn(args, 'estimated_readonly_rounds'), false, 'rejection leaves the original pending call hidden')
       }
-      await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output: 'result', metadata: {} })
+      await hooks['tool.execute.after']({ ...input, args }, { title: 'fetch', output: 'result', metadata: {} })
       assert.deepEqual(args, original)
       assert.deepEqual(Reflect.ownKeys(args), keys)
     })
@@ -2637,14 +2637,14 @@ test('WHAT[host-boundary-032] C50_same_call_with_reintroduced_protocol_fields_is
       const sessionID = 'ses-c50'
       await openIncumbency(runtime, sessionID)
       for (const estimate of ['not a number', 0]) {
-        const input = { tool: 'read', sessionID, callID: `call-c50-${estimate}` }
+        const input = { tool: 'fetch', sessionID, callID: `call-c50-${estimate}` }
         const args = { estimated_readonly_rounds: 2, self_note: 'original note', path: 'file.txt' }
         const original = structuredClone(args)
         const keys = Reflect.ownKeys(args)
         await hooks['tool.execute.before'](input, { args })
         args.estimated_readonly_rounds = estimate
         await assert.rejects(hooks['tool.execute.before'](input, { args }), /Invalid investigation estimate arguments:/)
-        await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output: 'result', metadata: {} })
+        await hooks['tool.execute.after']({ ...input, args }, { title: 'fetch', output: 'result', metadata: {} })
         assert.deepEqual(args, original)
         assert.deepEqual(Reflect.ownKeys(args), keys)
       }
@@ -2660,12 +2660,12 @@ test('WHAT[host-boundary-032] C51_missing_call_identity_does_not_grant_hidden_re
     await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
       const sessionID = 'ses-c51'
       await openIncumbency(runtime, sessionID)
-      for (const input of [{ tool: 'read', sessionID }, { tool: 'read', callID: 'call-c51' }]) {
+      for (const input of [{ tool: 'fetch', sessionID }, { tool: 'fetch', callID: 'call-c51' }]) {
         const args = { estimated_readonly_rounds: 2, self_note: 'original note', path: 'file.txt' }
         const original = structuredClone(args)
         await hooks['tool.execute.before'](input, { args })
         await assert.rejects(hooks['tool.execute.before'](input, { args }), /Invalid investigation estimate arguments:/)
-        await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output: 'result', metadata: {} })
+        await hooks['tool.execute.after']({ ...input, args }, { title: 'fetch', output: 'result', metadata: {} })
         assert.deepEqual(args, original)
       }
     })
@@ -2730,7 +2730,7 @@ test('WHAT[host-boundary-032] C53_concurrent_calls_sharing_arguments_have_only_o
   }
 })
 
-for (const [predictor, tool] of [['unconfigured', 'todowrite-for-manager'], ['configured', 'todowrite-for-manager'], ['configured', 'read']]) {
+for (const [predictor, tool] of [['unconfigured', 'todowrite-for-manager'], ['configured', 'todowrite-for-manager'], ['configured', 'fetch']]) {
   test(`WHAT[host-boundary-032] C54_late_after_does_not_restore_new_owner_${predictor}_${tool}`, async () => {
     setPredictorState(predictor)
     try {
@@ -2776,14 +2776,14 @@ for (const [predictor, tool] of [['unconfigured', 'todowrite-for-manager'], ['co
   })
 }
 
-for (const [tool, field] of [['join', 'estimated_readonly_rounds'], ['join', 'self_note'], ['read', 'contract']]) {
+for (const [tool, field] of [['join', 'estimated_readonly_rounds'], ['join', 'self_note'], ['fetch', 'contract']]) {
   test(`WHAT[host-boundary-032] C55_business_getter_is_not_read_by_protocol_capture_${tool}_${field}`, async () => {
     setPredictorState('configured')
     try {
       await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
         const sessionID = `ses-c55-${tool}-${field}`
         await openIncumbency(runtime, sessionID)
-        const args = tool === 'read'
+        const args = tool === 'fetch'
           ? { estimated_readonly_rounds: 2, self_note: 'original note', path: 'file.txt' }
           : { taskID: 'native-task' }
         let reads = 0
@@ -2803,7 +2803,7 @@ for (const [tool, field] of [['join', 'estimated_readonly_rounds'], ['join', 'se
         assert.equal(reads, 0)
         assert.equal(output.args, args)
         assert.deepEqual(Object.getOwnPropertyDescriptor(args, field), descriptors[field])
-        if (tool === 'read') {
+        if (tool === 'fetch') {
           assert.equal(Object.hasOwn(args, 'estimated_readonly_rounds'), false)
           assert.equal(Object.hasOwn(args, 'self_note'), false)
         } else {

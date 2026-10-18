@@ -253,35 +253,42 @@ module DurableWorkHost =
     /// confirmation identity, projection cut, and advance history the
     /// recovery points need.
     type InspectedWork =
-        { Opened: bool
-          Sequence: string list
-          Stage: string
-          ActiveId: string option
-          OpeningStage: string option
-          Reviewed: bool
-          ReviewOutcome: string option
-          OpeningCursor: float option
-          PredecessorRange: (float * float) option
-          LastRetirementCursor: float option
-          DeliveryAuthorized: bool
-          Delivered: bool
-          PendingDelivery: bool
-          PendingOperationId: string option
-          PendingExecSessionId: string option
-          PendingDigest: string option
-          PendingPath: string option
-          RoundCount: int
-          RetiredRuns: string list
-          DevOpsId: string option
-          DevOpsTarget: string option
-          Authority: string
-          Confirmed: bool
-          BlockerDigest: string option
-          Root: string option
-          Retirements: HostRetirement list
-          Confirmation: HostRunFence option
-          ProjectionCut: HostRunFence option
-          Advances: HostAdvance list }
+        {
+            Opened: bool
+            Sequence: string list
+            Stage: string
+            ActiveId: string option
+            OpeningStage: string option
+            Reviewed: bool
+            ReviewOutcome: string option
+            /// The review outcome of the most recently retired tenure. `Reviewed`
+            /// and `ReviewOutcome` describe the OPEN tenure; a delivered work has
+            /// none, yet the review that qualified its candidate is still the
+            /// durable fact of the round that delivered it.
+            LastRetiredReview: string option
+            OpeningCursor: float option
+            PredecessorRange: (float * float) option
+            LastRetirementCursor: float option
+            DeliveryAuthorized: bool
+            Delivered: bool
+            PendingDelivery: bool
+            PendingOperationId: string option
+            PendingExecSessionId: string option
+            PendingDigest: string option
+            PendingPath: string option
+            RoundCount: int
+            RetiredRuns: string list
+            DevOpsId: string option
+            DevOpsTarget: string option
+            Authority: string
+            Confirmed: bool
+            BlockerDigest: string option
+            Root: string option
+            Retirements: HostRetirement list
+            Confirmation: HostRunFence option
+            ProjectionCut: HostRunFence option
+            Advances: HostAdvance list
+        }
 
     let private optionalText (value: string) : string option = if value = "" then None else Some value
 
@@ -399,6 +406,11 @@ module DurableWorkHost =
         | _ when isNull (rounds.[rounds.Length - 1]?retirementCursor) -> None
         | _ -> Some(unbox<float> (rounds.[rounds.Length - 1]?retirementCursor))
 
+    let private lastRetiredReviewOf (rounds: obj array) : string option =
+        match rounds with
+        | [||] -> None
+        | _ -> optionalText (textOf rounds.[rounds.Length - 1]?reviewOutcome)
+
     let private projectedWork (snapshot: obj) (work: obj) : InspectedWork =
         let active: obj = snapshot?active
         let pending: obj = snapshot?pendingDelivery
@@ -420,6 +432,7 @@ module DurableWorkHost =
           OpeningStage = openingStageOf active
           Reviewed = outcome.IsSome
           ReviewOutcome = outcome
+          LastRetiredReview = lastRetiredReviewOf rounds
           OpeningCursor = openingCursorOf active
           PredecessorRange = predecessorRangeOf activeId rounds
           LastRetirementCursor = lastRetirementCursorOf rounds

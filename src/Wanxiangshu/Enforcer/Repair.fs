@@ -13,10 +13,12 @@ open Wanxiangshu.Persistence.Journal
 module EnforcerRepair =
 
     /// Item 15: stable minimal repair instruction (no dynamic context resend).
+    /// The v2 codec rejects a call whose tip fields are absent (behavior-diagnosis-006/018),
+    /// so the instruction names the full record the provider must declare.
     let RepairInstruction =
         LlmFacing.renderInstructions
             [ "Protocol repair"
-              "Call the chronicle tool exactly once with a non-empty entry. Do not answer in prose." ]
+              "Call the chronicle tool exactly once with the full record: charge, occurrence, settlement, consequence, tipName, opinion, and advice. Do not answer in prose." ]
 
     let tryOpenByBlogger
         (journal: AgentJournal)

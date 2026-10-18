@@ -144,6 +144,17 @@ type ToolRuntimeScope
     let childRecordForRun =
         defaultArg childWorkRecordForRun (fun _ _ -> Task.FromResult None)
 
+    /// change-integration-005/013: the head cursor this process observed for one
+    /// session, read from the same journal projection the Manager deliver used for
+    /// its retirement cursor. A missing projection is not a guessed cursor, so the
+    /// hand-off it feeds fails closed.
+    let observedHeadCursor (sessionId: SessionId) : int64 option =
+        journal
+        |> Option.bind (fun durable ->
+            AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
+            |> Option.bind (fun session -> session.XTrace)
+            |> Option.map (XTraceProjection.headCursor >> XTraceCursor.sequence))
+
     let terminalPort = eventPort
     // DSL-MUTABLE: resource — tool runtime dispose latch
     let mutable disposed = false
@@ -1450,6 +1461,7 @@ type ToolRuntimeScope
                       RootWorkspace = rootWorkspace
                       WaitObserver = waitObserver
                       Journal = journal
+                      ObservedHeadCursor = observedHeadCursor
                       SessionSnapshot = snapshot
                       OnChildCreated = fun _ role childId -> registerChild sessionId role childId
                       RegisterChildDirectory = fun childId path -> sessionDirectories.[SessionId.value childId] <- path

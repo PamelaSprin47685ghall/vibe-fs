@@ -814,6 +814,8 @@ OpenCode/Host/ModelCapacity/Surface.fsi
 OpenCode/Host/ModelCapacity/Surface.fs
 OpenCode/Host/ModelRouting.fsi
 OpenCode/Host/ModelRouting.fs
+OpenCode/Host/ExternalToolNamespace.fsi
+OpenCode/Host/ExternalToolNamespace.fs
 OpenCode/Host/ManagedAgentConfig.fsi
 OpenCode/Host/ManagedAgentConfig.fs
 OpenCode/Host/ManagedAgentConfigSurface.fsi
@@ -1448,6 +1450,10 @@ OpenCode/Host/ManagerReviewContract.fsi
 OpenCode/Host/ManagerReviewContract.fs
 OpenCode/Host/ReadonlyDelegationContract.fsi
 OpenCode/Host/ReadonlyDelegationContract.fs
+# ExternalToolAdmission resolves the office authority through ToolRuntimeScope and
+# reads HostToolContext, so the flat order puts it after both and before PluginHooks.
+OpenCode/Host/ExternalToolAdmission.fsi
+OpenCode/Host/ExternalToolAdmission.fs
 OpenCode/Plugin/PluginHooks.fsi
 OpenCode/Plugin/PluginHooks.fs
 OpenCode/Plugin/SpikePlugin.fsi

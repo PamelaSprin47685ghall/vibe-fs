@@ -668,8 +668,8 @@ module XTrace =
     let forWorkRecord (items: XTraceItem list) : XTraceItem list =
         items |> List.filter (fun item -> isWorkRecordPart item.Part)
 
-    /// COMPANION-014 Opening 区间投影：保留 constitutive commitment（含 BlindPlan T1
-    /// call/result）。区间本身已是 OpeningMaterial；不过滤 tool。
+    /// COMPANION-014 / work-record-009 Opening 区间投影：区间本身已是 OpeningMaterial，
+    /// 不过滤 raw tool call/result；Opening 边界不由 planning checkpoint 决定。
     let forOpening (items: XTraceItem list) : XTraceItem list = items
 
     // ── canonical rendering ────────────────────────────────────────────────

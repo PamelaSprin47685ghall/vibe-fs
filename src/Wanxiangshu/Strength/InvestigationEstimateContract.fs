@@ -26,18 +26,18 @@ module InvestigationEstimateContract =
         | NoEstimate
         | Unreviewed
 
+    /// The participating list carries exactly the names that can still reach this
+    /// function: the Host hands it a tool definition (or a tool execution) only for a
+    /// tool the session may actually call. The direct filesystem tools
+    /// (read/glob/grep/edit/write/mv/rm) are retired — the plugin registers no name
+    /// for them and every role permission object denies the unregistered rest with
+    /// `*: deny` — and a read-only replica session's whole Host tool face is
+    /// `todowrite-for-predictor` (StrengthReplicaTools.exactReadonlyHostToolMap).
     let classifyTool (toolName: string) : InvestigationToolPolicy =
         match toolName with
-        | "read"
-        | "glob"
-        | "grep"
         | "todowrite-for-manager"
         | "todowrite-for-engineer"
         | "todowrite-for-devops"
-        | "edit"
-        | "write"
-        | "mv"
-        | "rm"
         | "fetch" -> InvestigationToolPolicy.EstimateAfterCall
 
         | "fork"
@@ -50,13 +50,10 @@ module InvestigationEstimateContract =
         | "todowrite-for-plan"
         | "ask"
         | "devops"
-        | "handoff"
         | "deliver"
 
         | "skill"
         | "assume"
-        | "defer"
-        | "publish"
         | "chronicle"
         | "todowrite-for-bookkeeper"
         | "todowrite-for-predictor"

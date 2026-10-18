@@ -25,7 +25,7 @@
 - 在 `chronicle`（Blogger 日志工具）等具有单一专职用途的工具上，注入调查参数完全违反了其生命周期契约；
 - 在计划询问、协调交接或认知辅助工具（如 `ask`、`devops`、`deliver`、`assume` 等）上，强加只读文件查证估计破坏了其原有交互边界。
 
-新合同改为严格的**逐工具判定表（第 5.2 节参与工具，共 11 个）**：只有在调用后确实合理存在连续文件系统查证展望的工具（如 read/glob/grep、文件编辑修改 edit/write/mv/rm、综合操作 todowrite-for-manager/todowrite-for-engineer/todowrite-for-devops 与案例检索 fetch），才装饰估计协议。其余所有未参与工具保持原定义完全无增量，也不截取其同名业务字段。这大幅降低了模型的输入负担与注意力分散。
+新合同改为严格的**逐工具判定表（第 5.2 节参与工具，共 4 个）**：只有在调用后确实合理存在连续只读查证展望的工具（综合操作 todowrite-for-manager/todowrite-for-engineer/todowrite-for-devops 与案例检索 fetch），才装饰估计协议。退役的直接文件系统工具（read/glob/grep/edit/write/mv/rm）不再出现在 provider wire 上，也不再作为死分支留在判定表里。其余所有未参与工具保持原定义完全无增量，也不截取其同名业务字段。这大幅降低了模型的输入负担与注意力分散。
 
 ## 为什么短记改为建议性未来调查展望
 
@@ -59,9 +59,9 @@
 ### 为什么 E2E Oracle 保持硬编码，严禁改为从编译产物动态计算？
 
 - **约束**：端到端（E2E）长 stroke 测试必须充当无偏私的黑盒检查员，在真实 provider wire 字节层面上检验工具描述、参数模式与契约落地情况。
-- **选择**：`requirements/verification-system/tests/e2e/support/long-stroke-oracles.mjs`（约 L1075-1078）中的参与工具集合 `PARTICIPATING_TOOLS` 显式字面量硬编码列出全部 11 个工具名，严禁通过导入 `dist/` 或调用 `InvestigationEstimateContract.js` 的分类函数来动态生成该集合。
+- **选择**：`requirements/verification-system/tests/e2e/support/long-stroke-oracles.mjs`（约 L1108-1114）中的参与工具集合 `PARTICIPATING_TOOLS` 显式字面量硬编码列出全部 4 个现行参与工具名，严禁通过导入 `dist/` 或调用 `InvestigationEstimateContract.js` 的分类函数来动态生成该集合。
 - **替代方案**：像 `run-readonly-delegation-schema-canary.mjs` 那样从编译产物动态算出参与工具名单，以消除测试与实现间的字面量同步成本。
-- **否决理由**：从被测系统内部逻辑派生自己的预期是纸糊的假验证。如果 `PARTICIPATING_TOOLS` 从 `InvestigationEstimateContract.js` 动态计算，一旦分类逻辑发生严重退化（例如将写工具 `edit` 错误划分为 `NoEstimate`），被测系统与 oracle 会同时把参与集合算成 10 个工具，E2E 门禁将自欺欺人地绿灯通过，导致核心安全不变量被静默击穿。E2E 的身份是黑盒观察者，字面量漂移的防护应当且已经由前置阶梯承担：016 测项中的三消费端一致性循环比对，以及 canary 中 `EXPECTED_PARTICIPATING_NAMES` 的硬核对。
+- **否决理由**：从被测系统内部逻辑派生自己的预期是纸糊的假验证。如果 `PARTICIPATING_TOOLS` 从 `InvestigationEstimateContract.js` 动态计算，一旦分类逻辑发生严重退化（例如将参与工具 `todowrite-for-engineer` 错误划分为 `NoEstimate`），被测系统与 oracle 会同时把参与集合算成 3 个工具，E2E 门禁将自欺欺人地绿灯通过，导致核心安全不变量被静默击穿。E2E 的身份是黑盒观察者，字面量漂移的防护应当且已经由前置阶梯承担：016 测项中的三消费端一致性循环比对，以及 canary 中 `EXPECTED_PARTICIPATING_NAMES` 的硬核对。
 - **重新考虑的条件**：除非测试框架引入了完全独立于主系统源码、拥有自身双重输入源验证的独立第三方规范定义系统，否则 E2E 测试中的断言基准必须维持独立硬编码。
 
 ### 为什么 Replica §7.4 执行约束走 system transform 追加，而不走 bootstrap 消息注入？
@@ -171,7 +171,7 @@
 ## 核心不变量
 
 1. **事实估计与上限转换**：主模型给出任务位置的事实性估计，宿主经显式转换作为内部只读执行上限；协议剥离一切意图与信任叙事。
-2. **逐工具判定**：仅第 5.2 节清单中的 11 个参与工具有协议增量，其余工具保持无增量，不侵犯同名业务字段。
+2. **逐工具判定**：仅第 5.2 节清单中的 4 个参与工具有协议增量，其余工具保持无增量，不侵犯同名业务字段。
 3. **建议性短记**：短记填与不填、填什么形态，都不构成调用失败；短记单路传递，不升格为特权指令。
 4. **同身份只读防递归**：同伴共享 owner 身份与语言，严格限制于只读 JS 编程面 `todowrite-for-predictor`（能力 {Read, Glob}）；防递归由真实身份保证，不依赖副本填写 0 的假约定。
 5. **批次封口与参与 max**：整批封口后只对参与子集取 max；未参与工具不影响聚合；非参与调用不读取、不校验。

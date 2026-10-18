@@ -36,7 +36,6 @@ test('WHAT[repository-programming-003] JS002_same_capabilities_share_mechanics_b
   assert.notDeepEqual(engineer.examples, devops.examples)
 })
 
-test.todo('WHAT[repository-programming-003] changing an actual Attempt execution tier preserves its role programming surface')
 
 test('WHAT[repository-programming-003] JS010_each_filesystem_role_gets_exactly_one_distinct_ultra_example', () => {
   for (const role of ['Engineer', 'DevOps']) {

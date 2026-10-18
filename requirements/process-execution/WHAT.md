@@ -2,7 +2,7 @@
 
 ## [001] 终端四动词
 
-终端分别提供 `open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`，对应打开、写入、读取增量与发送信号；不同物理动作不合并为模糊口令。
+终端的打开、写入、读取增量与发送信号是四个不同的物理动作，不合并为模糊口令；模型面把它们投影为 `js.run` 的 `spawn`（`next()` 返回）、`send`、`check` 观察窗与 `signal` 四种形态（见 repository-programming-058）。
 
 ## [002] 动作与观察分离
 
@@ -26,7 +26,7 @@
 
 ## [007] 持续终端与单次运行分离
 
-支持多轮写入、读取和信号的持续终端，与单次有界执行 `run` 分别定义交互契约，不混用生命周期。
+支持多轮写入、读取和信号的持续交互形态，与单次有界执行形态在同一 `js.run` 编程面上分别定义契约（持续形态用 `spawn`/`send`/`check`/`signal`，单次形态用命令字符串 `next`），不混用两者的完成语义。
 
 ## [008] 完成事实的独立通道
 
@@ -42,7 +42,7 @@ stdout/stderr 的内存缓冲有明确上限，超过阈值即切换外部流式
 
 ## [011] 单次执行参数校验
 
-`run` 在执行前校验 `command`、`deadline_seconds`、`output_budget_bytes`、`world_lock`。它只执行物理命令，不承担模型摘要或蒸馏职责。
+`js.run` 在执行前校验 Runnable 规格（必选正数 `maxDuration` 与 `next`、`check`）与命令形态；进程契约另校验 `deadline_seconds`、`output_budget_bytes` 等非法参数，均在创建物理进程前拒绝。它只执行物理命令，不承担模型摘要或蒸馏职责。
 
 ## [012] 纯契约与物理实现分离
 
@@ -68,6 +68,6 @@ stdout/stderr 的内存缓冲有明确上限，超过阈值即切换外部流式
 
 预计产生大输出的执行须先取得唯一许可，其判定与输出估计一致。等待按 FIFO，支持按 Token 幂等取消；同一时刻只有一个大输出执行占用相应资源。
 
-## [017] run 同步时限政策
+## [017] run 工具的同步时限政策已退役，时限归 Runnable 规格
 
-`deadline_seconds` 缺省 1.0 秒。显式值严格大于 10 秒的请求在创建物理进程之前被拒绝，回执走 instruction-plane 并指引改用 `open-terminal` 持续终端通道（配合 `send-terminal` / `read-terminal` / `signal-terminal`）；未超限的值（含恰好 10）仍按 [004] 取运行预估与管理员硬顶的较小值。
+Host 原生 `run` 工具的 1.0 秒默认时限与“显式值大于 10 秒即拒绝”的政策已随该工具整体退役（repository-programming-058）。每物理执行的时限现由 `js.run` 规格的必选正数 `maxDuration`（毫秒）表达，不存在人工 10 秒上限；有效硬顶仍按 [004] 取运行预估与管理员硬顶的较小值。

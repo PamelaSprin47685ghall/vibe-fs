@@ -12,6 +12,7 @@ import { compileScenario } from '../../e2e/support/scenario-schema.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { walk } from '../../../../../scripts/lib/walk.mjs';
+import { normalInstruction } from '../../../../../dist/Context/Companion/ProjectionSurface.js';
 
 /** The forest itself, so a scenario added later is covered without being registered. */
 const SCENARIO_ROOT = fileURLToPath(new URL('../../e2e/scenarios', import.meta.url));
@@ -191,11 +192,26 @@ delivery = "provider-error"
   {
     name: 'COMPANION-002 every scenario declares its Companion turn',
     fn: () => {
+      // The marker is DERIVED, never re-typed prose: the comment lead comes from the
+      // production-rendered companion instruction (`ProjectionSurface.normalInstruction`,
+      // which the Host renders as `# ` comments), and the head comes from the live
+      // companion prompt resource. The retired dense work-log literal that used to stand
+      // here could be satisfied by a scenario whose Companion turn no wire can reach.
+      const lead = /^#\s*/.exec(String(normalInstruction))?.[0];
+      assertTrue(typeof lead === 'string' && lead.length > 0, 'production renders companion instructions as comments');
+      const resource = readFileSync(
+        new URL('../../../../../resources/provider/lifecycle/companion/normal/en.md', import.meta.url),
+        'utf8',
+      );
+      const head = resource.split('\n')[0].split('. ')[0].trim();
+      assertTrue(head.length > 0, 'the live companion prompt resource has a first instruction');
+      const marker = `${lead}${head}`;
+
       const missing = walk(SCENARIO_ROOT, ['.toml']).filter(
-        (file) => !readFileSync(file, 'utf8').includes('# Write the dense work-log continuation now'),
+        (file) => !readFileSync(file, 'utf8').includes(marker),
       );
 
-      assertEq(missing.length, 0, `no Companion turn declared in: ${missing.join(', ')}`);
+      assertEq(missing.length, 0, `no Companion turn declared in: ${missing.join(', ')} (marker: ${JSON.stringify(marker)})`);
     },
   },
 ];

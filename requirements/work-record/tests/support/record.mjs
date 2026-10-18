@@ -17,3 +17,18 @@ export async function commitFrame(handle, session, { from, through, body, id }) 
   assert.equal(result.ok, true, result.error)
   return written
 }
+
+// Split a rendered LWR into its canonical sections. A section runs from its
+// heading line to the next heading, so a clause can assert which section owns a
+// byte sequence instead of only that the record contains it somewhere.
+export function sectionsOf(rendered) {
+  const headings = [...rendered.matchAll(/^(Opening|Chronicle|Recent work)\n/gm)]
+  const sections = {}
+  headings.forEach((heading, index) => {
+    const start = heading.index + heading[0].length
+    const next = headings[index + 1]
+    const body = next ? rendered.slice(start, next.index) : rendered.slice(start)
+    sections[heading[1]] = body.replace(/\n+$/, '')
+  })
+  return sections
+}

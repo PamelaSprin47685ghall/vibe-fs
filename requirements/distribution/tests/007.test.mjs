@@ -6,7 +6,11 @@ import path from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
+  ROOT_FILE_WHITELIST,
+  ROOT_OPTIONAL_FILES,
+  ROOT_REQUIRED_FILES,
   REPO_ROOT,
+  classifyMember,
   deriveExpectedClosure,
   validateArchiveEntries,
   validateArtifact,
@@ -161,3 +165,143 @@ test('WHAT[distribution-007] the archive validator accepts the complete declared
 })
 
 test.todo('WHAT[distribution-007] GAP-210: full release executes clean build, complete tests and real pack/extract/isolated consume on one generation')
+
+test('WHAT[distribution-007] the explicit member contract classifies root metadata, payload, bundles and violations', () => {
+  // The boundary is the contract's, stated in WHAT[003]/[004]; the checker must
+  // implement exactly these three member families and nothing else.
+  assert.deepEqual(ROOT_REQUIRED_FILES, ['package.json'])
+  assert.deepEqual(ROOT_OPTIONAL_FILES, ['README.md', 'LICENSE'])
+  assert.deepEqual(ROOT_FILE_WHITELIST, [...ROOT_REQUIRED_FILES, ...ROOT_OPTIONAL_FILES])
+
+  assert.equal(classifyMember('package.json').kind, 'root-required')
+  assert.equal(classifyMember('README.md').kind, 'root-optional')
+  assert.equal(classifyMember('LICENSE').kind, 'root-optional')
+  assert.equal(classifyMember('node_modules/wanxiangli/dist/lifecycle/Work.js').kind, 'bundle')
+
+  // A non-contract package-root member is rejected by the contract itself, not
+  // only because some closure happened to forget it.
+  assert.equal(classifyMember('SECURITY.md').code, 'non-contract-root-member')
+  assert.equal(classifyMember('CHANGELOG.md').code, 'non-contract-root-member')
+  assert.equal(classifyMember('SECURITY.md').allowed, false)
+
+  const real = deriveExpectedClosure()
+  for (const required of ROOT_REQUIRED_FILES) {
+    assert.ok(real.has(required), `required root member absent from the declared closure: ${required}`)
+  }
+  for (const optional of ROOT_OPTIONAL_FILES) {
+    assert.equal(
+      real.has(optional),
+      exists(optional),
+      `optional root member ${optional} must be in the closure exactly when the source tree has it`,
+    )
+  }
+})
+
+test('WHAT[distribution-007] a contract violation archive goes red on non-contract root members, banned prefixes and payload extras, and the same closure stays green without them', async () => {
+  const tar = await import('tar')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxs-member-contract-'))
+  const pkgRoot = path.join(dir, 'package')
+  try {
+    const payload = new Map([
+      ['package.json', '{"name":"wanxiangshu"}'],
+      ['README.md', '# Wanxiangshu'],
+      ['dist/entry.js', 'export default {}\n'],
+    ])
+    const violations = new Map([
+      ['SECURITY.md', '# security policy'],
+      ['src/App.fs', '// source leak'],
+      ['artifacts/rogue.js', 'export default 1'],
+    ])
+
+    const expected = new Map()
+    for (const [name, text] of payload) {
+      const bytes = Buffer.from(text)
+      expected.set(name, {
+        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+        size: bytes.length,
+      })
+    }
+
+    const writeArchive = async (archiveName, include) => {
+      for (const [name, text] of [...payload, ...violations]) {
+        if (!include(name)) continue
+        fs.mkdirSync(path.dirname(path.join(pkgRoot, name)), { recursive: true })
+        fs.writeFileSync(path.join(pkgRoot, name), text)
+      }
+      const archive = path.join(dir, archiveName)
+      await tar.c({ gzip: true, file: archive, cwd: dir }, ['package'])
+      return archive
+    }
+
+    // Clean control first: the same payload closure without any contract violation.
+    fs.rmSync(pkgRoot, { recursive: true, force: true })
+    const cleanArchive = await writeArchive('clean.tgz', (name) => payload.has(name))
+    const clean = await validateArchiveEntries(cleanArchive, expected)
+    assert.deepEqual(clean.issues, [], 'contract-conformant archive must stay green')
+
+    // Violation archive: every violation must be reported by the contract.
+    fs.rmSync(pkgRoot, { recursive: true, force: true })
+    const badArchive = await writeArchive('violations.tgz', () => true)
+    const bad = await validateArchiveEntries(badArchive, expected)
+    const codesByPath = new Map()
+    for (const issue of bad.issues) {
+      if (!codesByPath.has(issue.path)) codesByPath.set(issue.path, new Set())
+      codesByPath.get(issue.path).add(issue.code)
+    }
+
+    assert.ok(
+      codesByPath.get('SECURITY.md')?.has('non-contract-root-member'),
+      `non-contract root member must be rejected by name: ${JSON.stringify(bad.issues)}`,
+    )
+    assert.ok(
+      codesByPath.get('src/App.fs')?.has('infiltrated-member'),
+      'banned prefix must be rejected with infiltrated-member',
+    )
+    assert.ok(
+      codesByPath.get('artifacts/rogue.js')?.has('extra-member'),
+      'a non-payload member outside the closure must be rejected as extra-member',
+    )
+    for (const name of payload.keys()) {
+      assert.equal(codesByPath.has(name), false, `contract member must not be rejected: ${name}`)
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[distribution-007] a contract-required root member missing from the archive is a missing-member failure', async () => {
+  const tar = await import('tar')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxs-required-member-'))
+  try {
+    fs.mkdirSync(path.join(dir, 'package/dist'), { recursive: true })
+    const content = new Map([
+      ['README.md', '# Wanxiangshu'],
+      ['dist/entry.js', 'export default {}\n'],
+    ])
+    const expected = new Map()
+    for (const [name, text] of content) {
+      const bytes = Buffer.from(text)
+      fs.writeFileSync(path.join(dir, 'package', name), bytes)
+      expected.set(name, {
+        sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
+        size: bytes.length,
+      })
+    }
+    expected.set('package.json', {
+      sha256: crypto.createHash('sha256').update('{"name":"wanxiangshu"}').digest('hex'),
+      size: 20,
+    })
+
+    const archive = path.join(dir, 'missing-manifest.tgz')
+    await tar.c({ gzip: true, file: archive, cwd: dir }, ['package'])
+
+    const { issues } = await validateArchiveEntries(archive, expected)
+    assert.deepEqual(
+      issues.filter((issue) => issue.path === 'package.json').map((issue) => issue.code),
+      ['missing-member'],
+      'the required root member must be reported when the archive lacks it',
+    )
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})

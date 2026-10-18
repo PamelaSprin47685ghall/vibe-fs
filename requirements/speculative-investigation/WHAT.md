@@ -4,7 +4,7 @@
 
 未配置 Predictor 模型时，系统对本机制保持无功能基线：不装饰任何工具 schema、不追加说明、不产生委托授权、不创建 Replica，全部会话的 provider 可见字节、工具权限、retry 流程、评审终结逻辑与控制流与不存在本机制时完全一致。
 
-已配置 Predictor 模型时，仅对第 5.2 节参与工具（read/glob/grep/todowrite-for-manager/todowrite-for-engineer/todowrite-for-devops/edit/write/mv/rm/fetch 共 11 个）装饰参数：必选原生整数 `estimated_readonly_rounds` 与可选参数 `self_note`，并在原工具描述之后幂等追加事实性估计说明；原有的必选项、功能说明与安全约束保持原样。
+已配置 Predictor 模型时，仅对第 5.2 节参与工具（todowrite-for-manager/todowrite-for-engineer/todowrite-for-devops/fetch 共 4 个）装饰参数：必选原生整数 `estimated_readonly_rounds` 与可选参数 `self_note`，并在原工具描述之后幂等追加事实性估计说明；原有的必选项、功能说明与安全约束保持原样。参与清单只登记当前真的能出现在 provider wire 上的工具名：直接文件系统工具（read/glob/grep/edit/write/mv/rm）已退役，插件不再为其注册宿主工具名，未登记的内建工具被 `* = deny` 拒绝，只读副本会话的宿主工具面恰好是 `todowrite-for-predictor`。
 
 所有未参与工具（如 fork/join/chronicle/horizon/review/fission/assume 等）及未判定动态工具均保持原有定义，无任何本协议增量，也不截取其同名业务字段。
 
@@ -68,7 +68,7 @@
 来源整批可能包含非只读调用；Frame 构造必须过滤保留其中的只读交换（read/glob/grep/todowrite-for-predictor），而不是直接因整批混入非只读工具而拒绝整个帧（UnsupportedTool）。只有过滤后既无合法只读交换也无实际正文时，才按无材料（NoMaterial）正常处理。
 过滤后仍有材料的批次按原顺序连续编号为 1..N；被筛空的首批或中间批次不留下编号空隙。材料编号不承担 provider 请求预算记账，失败请求与真实外发轮数仍由准入账本记录。
 
-同伴自己看到的交换保留其真实调用名 `todowrite-for-predictor`；回传注入主人会话时，该交换按主人的角色投影为其自己的 `js-<role>` 工具名（如 devops 主人即 `todowrite-for-devops`），使主人看到的是它本可自行调用、结果形态一致的证据，而非一个它无权调用的工具。该重命名只发生在面向主人的投影渲染处，Frame 的材料 digest、持久化 payload 与同伴自身的 transcript 均保持原名不变。
+同伴自己看到的交换保留其真实调用名 `todowrite-for-predictor`；回传注入主人会话时，该交换按主人的角色投影为其自己的 `todowrite-for-<role>` 工具名（如 devops 主人即 `todowrite-for-devops`），使主人看到的是它本可自行调用、结果形态一致的证据，而非一个它无权调用的工具。该重命名只发生在面向主人的投影渲染处，Frame 的材料 digest、持久化 payload 与同伴自身的 transcript 均保持原名不变。
 候选首次投递与后续 replay 使用同一工具命名规则。逻辑 call/result 行在追踪与上下文投影阶段保持完整，最终 Host 外发边界才合并为原生 assistant completed `tool` parts；不能把 Host 不消费的通用 `tool-call/tool-result` 行当作已经交付。真实工具输出始终保留原始文本字节，内容看似 JSON 也不得解析成对象、数字或 null。
 
 新字段随真实 arguments 保存。不存在 Delegate 专属的字节、token、短记长度或批次大小上限，不存在按长度丢弃、保留小前缀、"过大退回零步"或等价替身规则；超过任何历史大小的完整交换仍可构建、持久化、映射与恢复。
@@ -223,9 +223,9 @@ CLI 先校验参数、登记版本、备份路径和活库禁令，再加载迁�
 
 2. **逐工具判定（classifyTool）**：
    工具策略采用严格的三态联合类型，禁止任何形式的前缀匹配（如 `js-` 前缀）或名称模糊匹配（如包含 read/search）：
-   - `EstimateAfterCall`（参与工具，共 11 个）：`read`、`glob`、`grep`、`todowrite-for-manager`、`todowrite-for-engineer`、`todowrite-for-devops`、`edit`、`write`、`mv`、`rm`、`fetch`。调用完成后允许主模型提供后续只读查证估计；
-   - `NoEstimate`（不参与工具，显式白名单共 24 个）：`fork`、`resume`、`commission`、`join`、`horizon`、`review`、`deliver`、`fission`、`todowrite-for-plan`、`ask`、`devops`、`handoff`、`skill`、`todowrite`、`assume`、`defer`、`publish`、`chronicle`、`todowrite-for-bookkeeper`、`todowrite-for-predictor`、`bash-honeypot`、`invalid`、`todowrite-for-orchestrator`、`todowrite-for-blogger`。本协议不向其装饰任何字段与说明；
-   - `Unreviewed`（未判定工具）：所有不在上述 35 个固定名称表内的工具（包括带有已知前缀的衍生工具名如 `read-extra`、`globbing`、`grepper`、`edit_file`、`writer`、`run_command`、`fetch_data`、`js-devops-v2`、`fork_child`、`resume_parent`、`custom_tool` 等）一律判定为未判定，保持原有业务行为，不增加协议字段。
+   - `EstimateAfterCall`（参与工具，共 4 个）：`todowrite-for-manager`、`todowrite-for-engineer`、`todowrite-for-devops`、`fetch`。调用完成后允许主模型提供后续只读查证估计；已退役的直接文件系统工具（`read`/`glob`/`grep`/`edit`/`write`/`mv`/`rm`）不在表内，落回未判定；
+   - `NoEstimate`（不参与工具，显式白名单共 20 个）：`fork`、`resume`、`commission`、`join`、`horizon`、`review`、`deliver`、`fission`、`todowrite-for-plan`、`ask`、`devops`、`skill`、`assume`、`chronicle`、`todowrite-for-bookkeeper`、`todowrite-for-predictor`、`bash-honeypot`、`invalid`、`todowrite-for-orchestrator`、`todowrite-for-blogger`。本协议不向其装饰任何字段与说明；
+   - `Unreviewed`（未判定工具）：所有不在上述 24 个固定名称表内的工具（包括带有已知前缀的衍生工具名如 `read-extra`、`globbing`、`grepper`、`edit_file`、`writer`、`run_command`、`fetch_data`、`js-devops-v2`、`fork_child`、`resume_parent`、`custom_tool` 等）一律判定为未判定，保持原有业务行为，不增加协议字段。
 
 3. **入参容器与协议混合排斥**：
    - 参与工具的参数容器必须是普通非空、非数组的 JavaScript 对象（`isPlainObject`），传入 `null`、`undefined`、数字、字符串或数组等非普通对象一律拒绝；
@@ -253,10 +253,10 @@ CLI 先校验参数、登记版本、备份路径和活库禁令，再加载迁�
    - `InvalidArgumentObject`：入参不是合法的普通对象。
 
 7. **字段所有权与透传**：
-   协议字段 `estimated_readonly_rounds` 与建议性字段 `self_note` 的解析责任仅归本协议及 11 个参与工具所有；短记本身不校验、不拒绝；未参与（NoEstimate）及未判定（Unreviewed）工具的同名业务参数原样透传，本协议不读取、不校验、不拦截、亦不破坏其原有的业务参数传递与持久化证据。
+   协议字段 `estimated_readonly_rounds` 与建议性字段 `self_note` 的解析责任仅归本协议及 4 个参与工具所有；短记本身不校验、不拒绝；未参与（NoEstimate）及未判定（Unreviewed）工具的同名业务参数原样透传，本协议不读取、不校验、不拦截、亦不破坏其原有的业务参数传递与持久化证据。
 
 8. **三消费端单一判定来源与行为一致性**：
-   逐工具判定函数 `classifyTool` 是全系统唯一的分类来源，供 schema 装饰端（`ReadonlyDelegationContract.decorateDefinition`）、调用边界端（`PluginHooks` 的 `toolBefore`/`toolAfter` 参数暂存与收窄拦截）和来源批次端（`StrengthDelegate.tryCapture` 批次估计聚合）三处共同使用，严禁在各端重复硬编码工具集合或 `Set<string>`。对任何工具名称（至少包括参与工具 `read`、显式不参与工具 `chronicle`、未在表内的未知工具 `js-foo-unknown` 与合成占位工具 `invalid`），三端在「是否装饰协议字段」、「是否在调用边界参与收窄与暂存」、「是否在来源批次中读取并聚合估计」上的行为判定必须完全一致。在协议未开启（未配置 Predictor）时，调用边界端与来源批次端均不拦截、不剥离、不校验任何工具的参数，参数原样透传；在协议开启（已配置 Predictor）时，调用边界端仅对参与工具执行必选校验与剥离隐藏，且对完全缺失估计字段的参与调用无条件按参数错误拒绝，绝不带缺陷放行或静默退化为无估计机会。
+   逐工具判定函数 `classifyTool` 是全系统唯一的分类来源，供 schema 装饰端（`ReadonlyDelegationContract.decorateDefinition`）、调用边界端（`PluginHooks` 的 `toolBefore`/`toolAfter` 参数暂存与收窄拦截）和来源批次端（`StrengthDelegate.tryCapture` 批次估计聚合）三处共同使用，严禁在各端重复硬编码工具集合或 `Set<string>`。对任何工具名称（至少包括参与工具 `todowrite-for-engineer`、显式不参与工具 `chronicle`、未在表内的未知工具 `js-foo-unknown` 与合成占位工具 `invalid`），三端在「是否装饰协议字段」、「是否在调用边界参与收窄与暂存」、「是否在来源批次中读取并聚合估计」上的行为判定必须完全一致。在协议未开启（未配置 Predictor）时，调用边界端与来源批次端均不拦截、不剥离、不校验任何工具的参数，参数原样透传；在协议开启（已配置 Predictor）时，调用边界端仅对参与工具执行必选校验与剥离隐藏，且对完全缺失估计字段的参与调用无条件按参数错误拒绝，绝不带缺陷放行或静默退化为无估计机会。
 
 9. **已知工具差集清点与未判定候选显式登记**：
    系统通过机械方式清点仓库已知工具名权威来源（`StaticTools.knownToolNames`）与 `classifyTool` 已判定工具名单的差集。任何未判定工具必须显式可见并登记为待审阅候选；门禁严禁 fail-open（空差集无条件放行通过），亦不得在存在差集时未经登记无条件失败，防止新工具加入仓库时通过“未知默认不加”而静默逃避协议审阅。

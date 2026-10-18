@@ -21,16 +21,16 @@ const openPlanStore = async (root, workId) => {
 }
 
 test('WHAT[work-029] Plan path derivation resolves deterministically and rejects path traversal', () => {
-  const root = '/workspace/test-repo/.git/wanxiangshu'
+  const root = '/workspace/test-repo/.Herdchestra/wanxiangshu'
 
   // Valid work IDs
   const valid1 = surface.PlanningSurface.resolvePlanPath(root, 'work-alpha')
   assert.equal(valid1.ok, true)
-  assert.equal(valid1.path, '/workspace/test-repo/.git/wanxiangshu/plan/work-alpha/plan.md')
+  assert.equal(valid1.path, '/workspace/test-repo/.Herdchestra/wanxiangshu/plan/work-alpha/plan.md')
 
   const valid2 = surface.PlanningSurface.resolvePlanPath(root, 'task_42-v1')
   assert.equal(valid2.ok, true)
-  assert.equal(valid2.path, '/workspace/test-repo/.git/wanxiangshu/plan/task_42-v1/plan.md')
+  assert.equal(valid2.path, '/workspace/test-repo/.Herdchestra/wanxiangshu/plan/task_42-v1/plan.md')
 
   // Insecure work IDs / path traversal attempts MUST be rejected
   const traversalAttempts = [

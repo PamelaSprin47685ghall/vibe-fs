@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Persistence.EventStore
 
-open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
 /// Git object identity exists only at the remote-sync membrane.
@@ -19,44 +18,6 @@ module RootOid =
     let value (RootOid oid) = oid
 
 type StoreSnapshot = { RootOid: RootOid }
-
-type TreeEntry =
-    { Mode: string
-      Name: string
-      Oid: GitObjectId }
-
-/// Minimal Git object/ref capability used only by WriterStreamSync/GitGateway.
-type IGitRawStore =
-    abstract WriteBlob: content: byte[] -> Task<GitObjectId>
-    abstract WriteTree: entries: TreeEntry list -> Task<GitObjectId>
-    abstract ReadObject: oid: GitObjectId -> Task<byte[] option>
-    abstract ReadTree: oid: GitObjectId -> Task<TreeEntry list option>
-    abstract ReadRef: refName: string -> Task<GitObjectId option>
-    abstract CompareAndSwapRef: refName: string * expectedOld: GitObjectId option * newOid: GitObjectId -> Task<bool>
-
-[<RequireQualifiedAccess>]
-module GitTree =
-    [<Literal>]
-    let TreeMode = "40000"
-
-    let normalizeMode mode =
-        if mode = "040000" || mode = "40000" then TreeMode else mode
-
-    let isTreeMode mode = normalizeMode mode = TreeMode
-
-    let canonicalOrder (entries: TreeEntry list) =
-        entries
-        |> List.map (fun entry ->
-            { entry with
-                Mode = normalizeMode entry.Mode })
-        |> List.sortWith (fun a b ->
-            let key entry =
-                if isTreeMode entry.Mode then
-                    entry.Name + "/"
-                else
-                    entry.Name
-
-            compare (key a) (key b))
 
 [<RequireQualifiedAccess>]
 module StoreRef =
@@ -101,11 +62,3 @@ type PublishError =
     | PublishFailed of reason: string
     | IncompletePayloadClosure
     | AppendSettlementFailed of EventId * AppendError
-
-[<RequireQualifiedAccess>]
-type ConvergeError =
-    | StorageInvalid of StorageInvalid
-    | Transport of reason: string
-    | ConvergeCasRejected
-    | ConvergeRetryExhausted
-    | ConvergeBudgetExhausted

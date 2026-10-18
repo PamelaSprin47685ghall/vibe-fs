@@ -1,9 +1,45 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 
 const commonDirCache = new Map(); // workDir -> git common dir (immutable per checkout)
+const primaryWorktreeCache = new Map();
+
+export const primaryWorktree = (workDir) => {
+  const cached = primaryWorktreeCache.get(workDir);
+  if (cached !== undefined) return cached;
+  if (!fs.existsSync(workDir)) {
+    primaryWorktreeCache.set(workDir, workDir);
+    return workDir;
+  }
+  try {
+    const stdout = execFileSync('git', ['-C', workDir, 'worktree', 'list', '--porcelain', '-z'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    const fields = stdout.split('\0');
+    if (fields[0] && fields[0].startsWith('worktree ')) {
+      const p = fields[0].slice('worktree '.length);
+      let resolved;
+      try {
+        resolved = fs.realpathSync(p);
+      } catch {
+        resolved = path.resolve(p);
+      }
+      primaryWorktreeCache.set(workDir, resolved);
+      return resolved;
+    }
+  } catch {
+    // fallback when not a repo
+  }
+  const fallback = path.resolve(workDir);
+  primaryWorktreeCache.set(workDir, fallback);
+  return fallback;
+};
+
+export const stateRoot = (workDir) => path.join(primaryWorktree(workDir), '.Herdchestra');
 
 export const gitCommonDir = (workDir) => {
   const cached = commonDirCache.get(workDir);
@@ -21,7 +57,7 @@ export const gitCommonDir = (workDir) => {
   return resolved;
 };
 
-export const eventsDir = (workDir) => path.join(gitCommonDir(workDir), 'wanxiangshu', 'events');
+export const eventsDir = (workDir) => path.join(stateRoot(workDir), 'wanxiangshu', 'events');
 
 /** Journal Envelope object nested under EventStore `payload`, or null. */
 export function journalEnvelopeFromEventText(text) {
@@ -496,7 +532,50 @@ export function storeTip(workDir) {
   return readLocalSnapshot(workDir).token;
 }
 
-const readLocalSnapshot = (workDir) => {
+/**
+ * The wanxiangli work journal, as fact records.
+ *
+ * Measured 2026-10-18: the unified lifecycle facts (`WorkOpened`, `IncumbencyOpened`,
+ * `Reviewed`, `ConfirmationCommitted`, `IncumbencyRetired`) are written ONLY to
+ * `<workDir>/.Herdchestra/wanxiangshu/work.sqlite` (`journal_entries`, `stream` = the
+ * session id, `body` = a JSON batch whose `events[]` carry `type` plus the payload), never
+ * to the plugin's events ndjson. Every fact reader here therefore merges both sources, or
+ * a loop oracle would wait forever on facts that already exist.
+ *
+ * Read-only, and `[]` when the file or the stream is absent. `node:sqlite` is loaded on
+ * first use: the fact-barrier gate cases pin this module's import cost.
+ */
+export const workJournalEvents = (workDir, { sessionId = null } = {}) => {
+  const file = path.join(workDir, '.Herdchestra', 'wanxiangshu', 'work.sqlite');
+  if (!fs.existsSync(file)) return [];
+  let database = null;
+  try {
+    database = new (createRequire(import.meta.url)('node:sqlite').DatabaseSync)(file, { readOnly: true });
+    const rows = database.prepare('select stream, revision, body from journal_entries').all();
+    const scope = typeof sessionId === 'string' && sessionId !== '' ? sessionId : null;
+    const events = [];
+    for (const row of rows) {
+      if (scope !== null && row.stream !== scope) continue;
+      const text = typeof row.body === 'string' ? row.body : Buffer.from(row.body).toString('utf8');
+      let batch = null;
+      try { batch = JSON.parse(text); } catch { continue; }
+      for (const event of batch?.events ?? []) {
+        if (typeof event?.type !== 'string') continue;
+        events.push({ stream: row.stream, revision: row.revision, type: event.type, payload: event });
+      }
+    }
+    return events.sort((left, right) =>
+      left.stream === right.stream
+        ? left.revision - right.revision
+        : String(left.stream).localeCompare(String(right.stream)));
+  } catch {
+    return [];
+  } finally {
+    try { database?.close(); } catch {}
+  }
+};
+
+const readLocalSnapshot = (workDir, { sessionId = null } = {}) => {
   const directory = eventsDir(workDir);
   if (!fs.existsSync(directory)) return { lines: [], factCounts: new Map(), token: null };
 
@@ -547,6 +626,19 @@ const readLocalSnapshot = (workDir) => {
     tallyEnvelopeAndEvent(envelope, parsed, factCounts);
   }
 
+  // The unified lifecycle facts live in the wanxiangli work journal, not in the plugin's
+  // event stream (see `workJournalEvents`). They enter the same snapshot as `{type,
+  // payload}` records so every reader — counts, payload lookup, diagnostics — sees one
+  // journal.
+  for (const event of workJournalEvents(workDir, { sessionId })) {
+    // The events-journal envelope shape (`Fact: [name, payload]`), so payload lookup,
+    // counts and the label histograms read both sources with one rule. The stream is
+    // carried as the event's session identity: the unified journal is per session, and a
+    // session-scoped read must be able to attribute a fact to the road that wrote it.
+    lines.push(JSON.stringify({ Fact: [event.type, event.payload], sessionID: event.stream }));
+    factCounts.set(event.type, (factCounts.get(event.type) ?? 0) + 1);
+  }
+
   const token = lines.length === 0
     ? null
     : createHash('sha256').update(lines.join('\n')).digest('hex');
@@ -555,15 +647,22 @@ const readLocalSnapshot = (workDir) => {
 };
 
 /** Canonical event JSON texts from every local process writer file. */
-export const journalEventLines = (workDir) => readLocalSnapshot(workDir).lines;
+export const journalEventLines = (workDir, { sessionId = null } = {}) =>
+  readLocalSnapshot(workDir, { sessionId }).lines;
 const journalEventTexts = journalEventLines;
 
 /**
- * Payloads of the named fact case wherever it nests inside EventStore journal envelopes.
- * Accepts either workDir or an array of event JSON texts / Envelope-like objects.
+ * Payloads of the named fact case: either nested inside an EventStore journal
+ * envelope (`payload.Fact`) or carried by the unified EventStore domain event
+ * whose `event_type` names the fact (the shape the Strength stream persists).
+ * The event rules mirror `tallyEnvelopeAndEvent` exactly so payload counts and
+ * `countFactCase` agree. Accepts either workDir or an array of event JSON
+ * texts / Envelope-like objects.
  */
-export function factPayloads(workDirOrLines, caseName) {
-  const lines = typeof workDirOrLines === 'string' ? journalEventLines(workDirOrLines) : workDirOrLines;
+export function factPayloads(workDirOrLines, caseName, { sessionId = null } = {}) {
+  const lines = typeof workDirOrLines === 'string'
+    ? journalEventLines(workDirOrLines, { sessionId })
+    : workDirOrLines;
   const found = [];
   const walk = (value) => {
     if (Array.isArray(value)) {
@@ -573,25 +672,36 @@ export function factPayloads(workDirOrLines, caseName) {
       for (const child of Object.values(value)) walk(child);
     }
   };
+  const collect = (envelope, event) => {
+    if (envelope) {
+      if (envelope.Fact !== undefined) walk(envelope.Fact);
+      if (typeof envelope.type === 'string' && envelope.type === caseName) found.push(envelope);
+    }
+    if (typeof event?.event_type === 'string' && event.event_type === caseName) found.push(event.payload);
+    if (typeof event?.type === 'string' && event.type === caseName) found.push(event.payload);
+  };
   for (const line of lines) {
-    const envelope =
-      typeof line === 'string'
-        ? journalEnvelopeFromEventText(line)
-        : line && typeof line === 'object'
-          ? line.payload && typeof line.payload === 'object'
-            ? line.payload
-            : line
-          : null;
-    if (envelope) walk(envelope.Fact);
+    if (typeof line === 'string') {
+      let event = null;
+      try {
+        event = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      collect(journalEnvelopeFromEventText(event), event);
+    } else if (line && typeof line === 'object') {
+      const envelope = line.payload && typeof line.payload === 'object' ? line.payload : line;
+      collect(envelope, line);
+    }
   }
   return found;
 }
 
-export const countFactCase = (workDirOrLines, caseName) => {
+export const countFactCase = (workDirOrLines, caseName, { sessionId = null } = {}) => {
   if (typeof workDirOrLines === 'string') {
-    return readLocalSnapshot(workDirOrLines).factCounts.get(caseName) ?? 0;
+    return readLocalSnapshot(workDirOrLines, { sessionId }).factCounts.get(caseName) ?? 0;
   }
-  return factPayloads(workDirOrLines, caseName).length;
+  return factPayloads(workDirOrLines, caseName, { sessionId }).length;
 };
 
 const digFactLabel = (fact) => {
@@ -620,8 +730,8 @@ const factLabelFromEvent = (text) => {
 /**
  * Strict domain fact reading without text.includes fallback.
  */
-export function readJournal(workDir, factName, renewOn = []) {
-  const snap = readLocalSnapshot(workDir);
+export function readJournal(workDir, factName, renewOn = [], { sessionId = null } = {}) {
+  const snap = readLocalSnapshot(workDir, { sessionId });
   const texts = snap.lines;
   let named = 0;
   if (factName !== undefined) {
@@ -690,9 +800,9 @@ export function watchJournal(workDir, onChange) {
 
   attachEvents();
   if (eventsWatcher === null) {
-    const common = gitCommonDir(workDir);
-    const wanxiangshu = path.join(common, 'wanxiangshu');
-    const watchRoot = fs.existsSync(wanxiangshu) ? wanxiangshu : common;
+    const root = stateRoot(workDir);
+    const wanxiangshu = path.join(root, 'wanxiangshu');
+    const watchRoot = fs.existsSync(wanxiangshu) ? wanxiangshu : (fs.existsSync(root) ? root : primaryWorktree(workDir));
     try {
       parentWatcher = fs.watch(watchRoot, attachEvents);
       parentWatcher.unref?.();

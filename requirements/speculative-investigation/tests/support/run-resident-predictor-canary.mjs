@@ -145,6 +145,28 @@ const promptOwner = async (messageID, text, targetSession = session, agent = 'ma
     clearTimeout(timer)
   }
 }
+
+/**
+ * SPEC_INV_013 binding evidence.
+ *
+ * `strength-` records are emitted only with WANXIANGSHU_DIAG=1, and the Host
+ * stderr ring is per process — this canary restarts the Host, so a single read at
+ * the end would only ever observe the last lifetime. Sample after every phase and
+ * accumulate unique records instead.
+ *
+ * The assertions those records carry:
+ *  - no `strength-provider-run-unbound` / `owner provider run is not uniquely bound`:
+ *    binding a Host physical user message must never fail against the outgoing wire,
+ *    because a projection owner may address its own rows with content-derived ids;
+ *  - one `strength-delegation-requested` per durable decision: the capture must stay
+ *    observable, so a diagnostic whitelist may not drop the record.
+ */
+const strengthRecords = new Set()
+const sampleStrength = () => {
+  for (const line of String(currentHost.stderrLog ?? '').split('\n')) {
+    if (line.includes('"operation":"strength-')) strengthRecords.add(line)
+  }
+}
 try {
   await currentHost.start({ scenarioDir, providerUrl: `http://127.0.0.1:${provider.address().port}/v1`, pluginPaths: [path.join(root, 'dist/OpenCode/Plugin/Plugin.js')], routingSource: `export const routingProtocol = 2\nexport const hasTheoreticalCapacity = () => true\nexport const predictorConfiguration = () => ({ state: 'configured', reason: null })\nexport default function route() { return { model: 'test/test-model', reasoning: 'none' } }\n` })
   const created = await request(currentHost, 'POST', '/session', { title: 'resident predictor canary' })
@@ -159,6 +181,7 @@ try {
   assert.equal(residents.length, 1, 'one readonly resident before restart')
   const residentChildId = residents[0].id
   assert.equal(residents[0].parentID, session, 'predictor physical parent is the main session')
+  sampleStrength()
 
   // Process restart: stop host, launch new host with same scenarioDir/storage
   await currentHost.stop()
@@ -169,6 +192,7 @@ try {
   const restarted = await promptOwner('msg_assignment_restart', 'Review the fixture a third time post restart.')
   assert.ok(restarted.info.time.completed)
   assert.ok(restarted.parts.some(part => part.text === 'Restart smoke complete.'))
+  sampleStrength()
 
   assert.equal(replicaRequests.length, 7, 'decision 1 has 3 requests, decision 2 has 2 (1 malformed tool + 1 todowrite-for-predictor, budget reached), decision 3 has 2 (total 7 across 3 decisions)')
   for (const body of replicaRequests) {
@@ -274,6 +298,7 @@ try {
   const subResult = await promptOwner('msg_assignment_sub_owner', 'Review the fixture from this sub-session.', subOwner, 'engineer')
   assert.ok(subResult.info.time.completed)
   assert.ok(subResult.parts.some(part => part.text === 'Sub-owner smoke complete.'))
+  sampleStrength()
   const finalEvents = fs.readdirSync(path.join(workspace, '.Herdchestra/wanxiangshu/events')).flatMap(file =>
     fs.readFileSync(path.join(workspace, '.Herdchestra/wanxiangshu/events', file), 'utf8').trim().split('\n').map(line => JSON.parse(line)),
   )
@@ -399,7 +424,16 @@ try {
   // Stderr must be clean of errors, fuses, or invalid bundles
   assert.doesNotMatch(currentHost.stderrLog, /failed ref=|fuse|bundle invalid|InvalidRequestOrdinal/i, 'stderr must contain no failed ref, fuse, or bundle invalid')
 
-  console.log(`RESIDENT_PREDICTOR_CANARY ${JSON.stringify({ managerAssignments: 3, subOwnerAssignments: 1, predictorRequests: replicaRequests.length, residentChild: transcripts[0].child, readableBootstrapMessages: transcripts[0].prompts.length, boundDecisions: 4, preparedDecisions: 4, bareContinueMessages: 0, predictorTools: ['todowrite-for-predictor'], restarted: true, sourceIdentityVerified: true, decisionMaterialIsolated: true, subOwnerFlattened: true, mainReceivedExchanges: 5, promotedReplayTraced: true, textDemotedToReasoning: true, nativeReasoningExcluded: true, textRoundtripExact: true })}`)
+  // SPEC_INV_013 binding evidence, accumulated across every Host lifetime by
+  // `sampleStrength` (see its comment for what each record asserts).
+  sampleStrength()
+  const strengthLines = [...strengthRecords]
+  const runBindingUnbound = strengthLines.filter(line => line.includes('"strength-provider-run-unbound"')).length
+  const unboundSkip = strengthLines.filter(line => line.includes('owner provider run is not uniquely bound')).length
+  const delegationRequested = strengthLines.filter(line =>
+    line.includes('"strength-delegation-requested"')).length
+
+  console.log(`RESIDENT_PREDICTOR_CANARY ${JSON.stringify({ managerAssignments: 3, subOwnerAssignments: 1, predictorRequests: replicaRequests.length, residentChild: transcripts[0].child, readableBootstrapMessages: transcripts[0].prompts.length, boundDecisions: 4, preparedDecisions: 4, bareContinueMessages: 0, predictorTools: ['todowrite-for-predictor'], restarted: true, sourceIdentityVerified: true, decisionMaterialIsolated: true, subOwnerFlattened: true, mainReceivedExchanges: 5, promotedReplayTraced: true, textDemotedToReasoning: true, nativeReasoningExcluded: true, textRoundtripExact: true, strengthProviderRunUnbound: runBindingUnbound, strengthUnboundSkip: unboundSkip, strengthDelegationRequested: delegationRequested })}`)
 } catch (error) {
   console.error(currentHost.stdoutLog.slice(-5000))
   console.error(currentHost.stderrLog.slice(-5000))

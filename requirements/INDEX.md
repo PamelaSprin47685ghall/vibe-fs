@@ -87,7 +87,7 @@
 
 | Package | 一句话 WHY |
 |---|---|
-| `obligation-ledger` | 宿主待办由 OpenCode 原生 todowrite 执行；插件不改写工具定义与参数，只按 Host 终态追加压缩 checkpoint，不维护第二份 todo 真相。 |
+| `obligation-ledger` | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的非空 `view` 声明；插件不改写工具定义与参数，只按 Host 终态追加 checkpoint，不维护第二份 todo 真相。 |
 | `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，交棒由前任声明的 ANCHOR 视图承担，不注入机器物化的合成记录。Plan 的编程面、devops 调查、任期隔离、阶段资源、review 与持权交付，以及 Manager/Plan 禁止静默停止、ask 显式用户等待同属本包。 |
 
 
@@ -104,7 +104,7 @@
 |---|---|
 | `repository-investigation` | repository claim 必须由可定位、可追溯的真实观察建立，reasoning 不能冒充 evidence acquisition。 |
 | `knowledge-reuse` | 过去的 repository knowledge 可作为 best-effort cache/hint 复用，但不能冒充当前证明；双基线引用与真实 diff 驱动 Bookkeeper 刷新，废除严格 replay 循环。 |
-| `repository-programming` | repository 变换需要能力投影、可组合、sandboxed、all-or-nothing 的 programming surface，而不是多套漂移 RPC；事务 ReadSnapshots 与案例实质访问严格分离，统一直接文件与编程工具。 |
+| `repository-programming` | repository 变换需要能力投影、可组合、sandboxed、As-Is 逐笔落盘的 programming surface，而不是多套漂移 RPC；事务 ReadSnapshots 与案例实质访问严格分离，直接文件工具已退役，编程面是唯一文件契约。 |
 | `requirement-grounding` | 代码路径触碰时，适用 requirement package 必须在 effect 前以可重放 read 语义进入当前 participant horizon。 |
 
 ## 12. Optional optimization / epistemics
@@ -129,40 +129,40 @@
 |---|---|---|---|
 | 1 | `requirement-system` | 13 | requirement-system-001 ~ 008、010 ~ 011、015、017 ~ 018 |
 | 2 | `verification-system` | 20 | verification-system-001 ~ 012、014 ~ 021 |
-| 3 | `feature-ablation` | 4 | feature-ablation-001 ~ 004（节点注册表、三态语义、消融 DAG、配置集） |
+| 3 | `feature-ablation` | 5 | feature-ablation-001 ~ 005（节点注册表、三态语义、消融 DAG、配置集、编译分片注册） |
 | 4 | `js-semantic-surface` | 6 | js-semantic-surface-001 ~ 006 |
 | 5 | `structured-workflow` | 19 | structured-workflow-001 ~ 019 |
 | 6 | `time-capability` | 8 | time-capability-001 ~ 008 |
 | 7 | `causal-wait` | 9 | causal-wait-001 ~ 009 |
 | 8 | `session-ontology` | 14 | session-ontology-001 ~ 012、014 ~ 015 |
-| 9 | `managed-session-lifecycle` | 27 | managed-session-lifecycle-001 ~ 022、managed-session-lifecycle-023（身份替换后旧活跃会话显式收束）、managed-session-lifecycle-024（固定 DevOps 崩溃恢复单一权威与进程排空）、managed-session-lifecycle-025（固定 DevOps 每次工作返回时 PTY 进程彻底收束与记账清理）、managed-session-lifecycle-026（Main 收束级联 Attached InternalLeaf 的 execution 结算）、managed-session-lifecycle-027（Session 收束的作用域保留取消与延后归还） |
-| 10 | `host-boundary` | 32 | host-boundary-001 ~ 031、host-boundary-032（Contract 提示字段解耦与参数清理安全） |
+| 9 | `managed-session-lifecycle` | 28 | managed-session-lifecycle-001 ~ 022、managed-session-lifecycle-023（身份替换后旧活跃会话显式收束）、managed-session-lifecycle-024（固定 DevOps 崩溃恢复单一权威与进程排空）、managed-session-lifecycle-025（固定 DevOps 每次工作返回时 PTY 进程彻底收束与记账清理）、managed-session-lifecycle-026（Main 收束级联 Attached InternalLeaf 的 execution 结算）、managed-session-lifecycle-027（Session 收束的作用域保留取消与延后归还）、managed-session-lifecycle-028（子完成投递必达与 join guard 有出口） |
+| 10 | `host-boundary` | 33 | host-boundary-001 ~ 031、host-boundary-032（Contract 提示字段解耦与参数清理安全）、host-boundary-033（旧租约保持到可见输入进入下一步与流式/非 join 工具保留） |
 | 11 | `participant-identity` | 10 | participant-identity-001 ~ 009、participant-identity-010（活跃身份解析与历史身份隔离解码） |
-| 12 | `execution-model-routing` | 19 | execution-model-routing-001 ~ 017、execution-model-routing-018（新角色集合模型路由解耦）、execution-model-routing-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型） |
+| 12 | `execution-model-routing` | 20 | execution-model-routing-001 ~ 017、execution-model-routing-018（新角色集合模型路由解耦）、execution-model-routing-019（固定 DevOps 模型绑定持久性与禁止借 resume 换模型）、execution-model-routing-020（多席位路由与外部占位模型被租约覆盖） |
 | 13 | `office-capability` | 13 | office-capability-001、003 ~ 007、011 ~ 012、015 ~ 016、office-capability-017（DevOps 执行与固有非架构级自修授权）、office-capability-018（Sphinx 程控探究与内部标准 Engineer）、office-capability-019（Plan 规划角色与四工具权限集） |
-| 14 | `capability-enforcement` | 23 | capability-enforcement-001 ~ 007、009 ~ 020、023 ~ 026；008/021/022 已归相应所有者，编号不复用 |
+| 14 | `capability-enforcement` | 26 | capability-enforcement-001 ~ 026（008 四层同构、021 Blogger repair 单一 owner、022 Fission 仅准入已证明 Engineer 均在本包 WHAT 内） |
 | 15 | `participant-horizon` | 15 | participant-horizon-001 ~ 014、participant-horizon-015（Manager 并行来自派出多名 Engineer 而非自身分身） |
 | 16 | `cognitive-environment` | 15 | cognitive-environment-001 ~ 013、015 ~ 016 |
 | 57 | `cognitive-workspace` | 10 | cognitive-workspace-001 ~ 010 |
 | 17 | `attention-regulation` | 6 | attention-regulation-001 ~ 006 |
-| 18 | `action-affordance` | 14 | action-affordance-001 ~ 014 |
+| 18 | `action-affordance` | 15 | action-affordance-001 ~ 015 |
 | 19 | `provider-language` | 13 | provider-language-001 ~ 013 |
 | 20 | `provider-projection` | 14 | provider-projection-001 ~ 014 |
 | 21 | `concern-routing` | 7 | concern-routing-001 ~ 007 |
 | 22 | `interaction-authority` | 23 | interaction-authority-001 ~ 020、interaction-authority-021（历史事件不可变与旧身份不升权）、interaction-authority-022（DevOps 恢复与续行锁定固定模型与执行权威）、interaction-authority-023（ProviderRetryAttempt 的 repair 抑制随 attempt 终结而失效） |
 | 23 | `managed-chat-execution` | 15 | managed-chat-execution-001 ~ 014、managed-chat-execution-015（Provider 启动边界拒绝的精确定夺） |
 | 24 | `dispatch-protocol` | 15 | dispatch-protocol-001 ~ 015 |
-| 25 | `durable-events` | 25 | durable-events-001 ~ 025 |
+| 25 | `durable-events` | 28 | durable-events-001 ~ 028 |
 | 26 | `effect-accounting` | 10 | effect-accounting-001 ~ 008、010、012 |
 | 27 | `durable-convergence` | 11 | durable-convergence-001 ~ 011 |
 | 28 | `delegation` | 30 | delegation-001 ~ 015、017、019 ~ 032 |
 | 29 | `intra-participant-parallelism` | 16 | intra-participant-parallelism-001 ~ 015、017 |
-| 30 | `process-execution` | 16 | process-execution-001 ~ 016；通用工具结果边界归 host-boundary |
+| 30 | `process-execution` | 17 | process-execution-001 ~ 017；通用工具结果边界归 host-boundary |
 | 31 | `change-integration` | 14 | change-integration-001 ~ 009、011、013 ~ 015、017 |
 | 32 | `semantic-trace` | 12 | semantic-trace-001 ~ 010、semantic-trace-011（Fission keyed convergence 与多 Present 轨迹归并）、semantic-trace-012（独立 Invocation 范围与 Resume 边界） |
 | 33 | `work-record` | 17 | work-record-001 ~ 016、work-record-017（Fission 汇聚生成单次 Invocation Canonical Record） |
-| 34 | `context-compression` | 31 | context-compression-001 ~ 027、context-compression-028（逐次 todowrite K 窗口）、context-compression-029（coverage 落后不丢 raw 与紧急 Probe 例外）、context-compression-030（assume call/result 永久原文穿透 LWR）、context-compression-031（ANCHOR 编址、视图声明与 token 经济） |
-| 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015；todowrite checkpoint 窗口见 context-compression-028 |
+| 34 | `context-compression` | 31 | context-compression-001 ~ 027、context-compression-028（逐次 view checkpoint K 窗口）、context-compression-029（coverage 落后不丢 raw 与紧急 Probe 例外）、context-compression-030（assume call/result 永久原文穿透 LWR）、context-compression-031（ANCHOR 编址、视图声明与 token 经济） |
+| 35 | `prefix-stability` | 15 | prefix-stability-001 ~ 015；view checkpoint 窗口见 context-compression-028 |
 | 36 | `execution-failure-policy` | 14 | execution-failure-policy-001 ~ 014 |
 | 37 | `provider-attempt-recovery` | 24 | provider-attempt-recovery-001 ~ 023、provider-attempt-recovery-024（加载期 Blogger stale 请求的同源未启动执行定夺） |
 | 38 | `host-provider-failure-ownership` | 7 | host-provider-failure-ownership-001 ~ 007 |
@@ -170,17 +170,17 @@
 | 40 | `degeneration-guard` | 13 | degeneration-guard-001 ~ 013 |
 | 41 | `obligation-ledger` | 7 | obligation-ledger-001 ~ 007 |
 | 42 | `work` | 50 | work-001 ~ 049（011 起是内核合同；020 起是 Plan 编程面、devops 调查、任期隔离、阶段资源、review 与交付；027 禁止长程静默停止；040 起是唯一任期、DevOps 绑定、资源交接、durable 回执及恢复；049 是 ask 显式人类等待；050 是 Plan 编程面的 js.ask 与 S1 门禁） |
-| 46 | `behavior-diagnosis` | 20 | behavior-diagnosis-001 ~ 020 |
+| 46 | `behavior-diagnosis` | 19 | behavior-diagnosis-001 ~ 019 |
 | 47 | `guidance-delivery` | 11 | guidance-delivery-001 ~ 009、011 ~ 012 |
 | 48 | institutional-learning（已退役） | 0 | 随 WP-036 整包退役，目录与条款已删除 |
 | 49 | `repository-investigation` | 9 | repository-investigation-001 ~ 009 |
 | 50 | `knowledge-reuse` | 16 | knowledge-reuse-001 ~ 016 |
 | 51 | `repository-programming` | 60 | 原 001 ~ 027 不变；028 起 programPromise/deadline 可重置、029 起 As-Is 逐笔落盘与失败清单形态、030 ~ 036 park/unpark/abandon 全周期、037 ~ 039 Parked 渲染/投影/现场表、040 ~ 044 rm/mv POSIX 与双语四层接线、045 ~ 047 九个文件原语、where 歧义即 park 与组合教学、048 ~ 049 parked source 与 unpark 自由值、050 ~ 052 js.run 宿主循环/多进程代数/wget 断点续传剧本、053 view 声明捕获、054 deliver 显式终值、055 vm 并行边界、056 委托原语 fork/join/fission/dag（全部返回数据信封，dag 节点失败 park）、057 ls 的 ignore 语义与 glob/grep 退役、058 js.run 的交互形态与唯一执行面、059 js.deliver 的终值记录、060 "js" 机器词汇的终局裁决 |
 | 52 | `requirement-grounding` | 12 | requirement-grounding-001 ~ 012 |
-| 53 | `speculative-investigation` | 14 | speculative-investigation-001 ~ 014 |
+| 53 | `speculative-investigation` | 17 | speculative-investigation-001 ~ 016、speculative-investigation-020（编号 017~019 未启用） |
 | 54 | `epistemic-reasoning` | 0 | 旧001 ~ 036仅保留历史，现行替代关系见 sphinx-v2/SUPERSEDES.md |
 | 55 | `sphinx-v2` | 36 | sphinx-v2-001 ~ 036（取代 epistemic-reasoning 旧内核条款，关系见 SUPERSEDES.md） |
-| 56 | `distribution` | 10 | distribution-001 ~ 009、distribution-010（打包资源与活动注册同步） |
+| 56 | `distribution` | 11 | distribution-001 ~ 011（010 打包资源与活动注册同步、011 安装产物闭包在场） |
 
 # 依赖骨架
 

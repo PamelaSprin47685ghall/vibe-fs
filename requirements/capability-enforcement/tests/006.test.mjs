@@ -408,27 +408,6 @@ const { markerSource, markerToolName } = await import("../../../dist/OpenCode/Ho
 const { permissions } = await import("../../../dist/Participant/Persona/OfficeCapabilitySurface.js");
 const { acceptAuthorityRoot, grantWorkOwned, withExecutablePlugin, withPlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 
-const TOOL_NAMES = [
-  'fork', 'resume', 'commission', 'join', 'horizon', 'fission',
-  'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
-  'bash-honeypot', 'assume',
-  'review', 'chronicle', 'fetch', 'deliver',
-]
-
-const HOST_OWNED_TOOL_NAMES = [ 'read', 'write', 'edit', 'glob', 'grep', 'skill',
-]
-const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
-const COGNITIVE_TOOLS = []
-const ALLOWED = {
-  orchestrator: ['commission', 'join', 'horizon', 'assume', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'assume', ...COGNITIVE_TOOLS],
-  engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', ...COGNITIVE_TOOLS],
-  devops: [
-    'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
-    'assume', ...COGNITIVE_TOOLS,
-  ],
-  blogger: ['chronicle'],
-}
 const withSession = (messages, sessionID = 'ses-capability-manager') =>
   messages.map((message, index) => ({
     ...message,
@@ -439,11 +418,6 @@ const withSession = (messages, sessionID = 'ses-capability-manager') =>
       sessionID,
     },
   }))
-const fullConfig = () => ({
-  agent: Object.fromEntries(
-    ROLE_NAMES.map((role) => [role, {}]),
-  ),
-})
 
 integrationTest('WHAT[capability-enforcement-006] MANAGER_pair_guidance_rides_cursor_suffix_without_synthetic_skill_row', async () => {
   assert.equal(markerToolName, 'skill')

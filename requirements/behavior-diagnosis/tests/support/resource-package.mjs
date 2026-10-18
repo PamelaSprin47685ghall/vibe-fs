@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -10,6 +10,8 @@ export async function withRulebookPackage(run) {
   try {
     cpSync(join(root, 'dist'), join(directory, 'dist'), { recursive: true })
     writeFileSync(join(directory, 'package.json'), '{"type":"module"}\n')
+    mkdirSync(join(directory, 'node_modules'), { recursive: true })
+    symlinkSync(join(root, 'node_modules/wanxiangli'), join(directory, 'node_modules/wanxiangli'), 'junction')
     const rulebook = join(directory, 'resources/enforcer')
     mkdirSync(rulebook, { recursive: true })
     const write = (name, file, content) => {

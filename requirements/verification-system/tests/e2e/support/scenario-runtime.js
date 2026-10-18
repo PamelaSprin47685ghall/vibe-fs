@@ -37,10 +37,19 @@ import { wireOf } from './provider-wire.js';
 
 export class ScenarioRuntime {
   /** @param scenario the `{ entries, faults, boundaries }` shape `compileScenario` returns */
-  constructor(scenario) {
+  constructor(scenario, { tenureBoundaryCount = null } = {}) {
     this.scenario = scenario;
     this.bindings = new Map();
     this.deliveries = emptyDeliveries();
+    /**
+     * Durable tenure-boundary count per session, as of that session's last answered chat
+     * delivery. The successor projection (work-008) may only strip a predecessor's
+     * assistant/tool traffic when the session actually crossed an `IncumbencyOpened` /
+     * retirement boundary in between, so the seal needs the count from the journal rather
+     * than a guess from the wire.
+     */
+    this.tenureBoundaryCount = tenureBoundaryCount;
+    this.sealTenures = new Map();
     // Keyed by the explicit harness session context, not by a private copy of that question.
     // OpenCode sends the session id as a provider header
     // (`../opencode/packages/opencode/src/session/llm/request.ts:197`); the HTTP adapter
@@ -158,6 +167,8 @@ export class ScenarioRuntime {
     const sessionId = sessionIdOf(context);
     if (sessionId !== null && runtimeKeyOf(body, this.bindings, context).kind === 'chat') {
       this.seals.set(sessionId, wireOf(body));
+      const tenure = this.tenureBoundaryCount?.(sessionId);
+      if (typeof tenure === 'number') this.sealTenures.set(sessionId, tenure);
     }
   }
 
@@ -212,8 +223,17 @@ export class ScenarioRuntime {
       previousWire: this.seals.get(sessionId) ?? null,
       body,
       boundary: boundaryFor(this.scenario.boundaries, entry),
+      stripAdmitted: this.#crossedTenureBoundary(sessionId),
     });
     if (decision.resealed !== undefined) this.firedBoundaries.add(entry.id);
     return decision;
+  }
+
+  /** Whether the session crossed a tenure boundary since its last answered delivery. */
+  #crossedTenureBoundary(sessionId) {
+    const previous = this.sealTenures.get(sessionId);
+    if (previous === undefined) return false;
+    const current = this.tenureBoundaryCount?.(sessionId);
+    return typeof current === 'number' && current > previous;
   }
 }

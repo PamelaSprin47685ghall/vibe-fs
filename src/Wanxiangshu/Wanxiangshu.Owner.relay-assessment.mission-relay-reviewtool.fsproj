@@ -22,7 +22,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.relay-incumbency.mission-relay-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.planning.mission-planning-eventstore.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-eventstore-storetypes.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.relay-retirement.composition-turn-workflow.fsproj"/>
     <Compile Include="Mission/Work/OpenCode/ReviewBackendManager.fsi"/>
     <Compile Include="Mission/Work/OpenCode/ReviewBackendManager.fs"/>
     <Compile Include="Mission/Work/OpenCode/ReviewShell.fsi"/>

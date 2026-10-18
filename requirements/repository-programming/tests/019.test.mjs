@@ -25,7 +25,7 @@ const sandbox = () => {
 
 const localStore = () => {
   const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
+  const commonDir = join(owned, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
   return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }

@@ -127,9 +127,12 @@ test('WHAT[distribution-009] parsePackResult rejects malformed json, wrong count
 test('WHAT[distribution-009] validateArtifact rejects non-regular entry (symbolic link) in archive stream', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-symlink-test-'))
   const src = path.join(tmp, 'src')
-  fs.mkdirSync(path.join(src, 'package'), { recursive: true })
-  fs.writeFileSync(path.join(src, 'package', 'real.txt'), 'content')
-  fs.symlinkSync('real.txt', path.join(src, 'package', 'link.txt'))
+  // Members live under a payload prefix (WHAT[distribution-004]): a root-level
+  // member outside the metadata contract is rejected for that reason alone,
+  // which would mask the non-regular-entry violation under test.
+  fs.mkdirSync(path.join(src, 'package/dist'), { recursive: true })
+  fs.writeFileSync(path.join(src, 'package/dist/real.txt'), 'content')
+  fs.symlinkSync('real.txt', path.join(src, 'package/dist/link.txt'))
 
   const tgzPath = path.join(tmp, 'archive.tgz')
   await tar.c({ gzip: true, file: tgzPath, cwd: src }, ['package'])
@@ -144,8 +147,8 @@ test('WHAT[distribution-009] validateArtifact rejects non-regular entry (symboli
 test('WHAT[distribution-009] validateArtifact rejects path traversal in archive stream', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wx-traversal-test-'))
   const src = path.join(tmp, 'src')
-  fs.mkdirSync(path.join(src, 'package'), { recursive: true })
-  fs.writeFileSync(path.join(src, 'package', 'test.txt'), 'content')
+  fs.mkdirSync(path.join(src, 'package/dist'), { recursive: true })
+  fs.writeFileSync(path.join(src, 'package/dist/test.txt'), 'content')
 
   const tgzPath = path.join(tmp, 'archive.tgz')
   // We can write a custom tar file or test validateArchiveEntries with direct checkPathTraversal

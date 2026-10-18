@@ -6,6 +6,14 @@
 // compares complete closure (manifest outputs dist + git tracked resources + root files)
 // and content digests, extracts into an isolated temporary directory,
 // and executes an isolated external consumer test without borrowing repo node_modules.
+//
+// The member boundary enforced here is the normative contract of
+// requirements/distribution/WHAT.md [003]/[004]/[007]:
+//   1. payload          -> the manifest `files` whitelist prefixes (dist/, resources/)
+//   2. package metadata -> required: package.json; optional: README.md, LICENSE
+//   3. explicit bundles -> node_modules/<bundleDependencies entry>/**
+// The constants and verdicts below implement that contract; they are not an
+// independent whitelist of convenience.
 
 import { execFileSync, spawn } from 'node:child_process'
 import crypto from 'node:crypto'
@@ -26,7 +34,14 @@ const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = path.resolve(MODULE_DIR, '..')
 export const DEFAULT_PACK_RUN_DIR = path.join(REPO_ROOT, '.fable-build/verify-logs/package')
 
-export const ROOT_FILE_WHITELIST = ['package.json', 'README.md', 'LICENSE']
+/** WHAT[distribution-003]: root members that must exist in the source tree and the archive. */
+export const ROOT_REQUIRED_FILES = ['package.json']
+
+/** WHAT[distribution-004]: root members the contract allows, shipped only when present. */
+export const ROOT_OPTIONAL_FILES = ['README.md', 'LICENSE']
+
+/** Every package-root member the member contract permits. */
+export const ROOT_FILE_WHITELIST = [...ROOT_REQUIRED_FILES, ...ROOT_OPTIONAL_FILES]
 
 export const BANNED_PREFIXES = [
   'src/',
@@ -95,36 +110,70 @@ export function checkPathTraversal(member) {
   }
 }
 
-export function isBannedMember(member) {
+/**
+ * Contract verdict for one archive member path (WHAT[distribution-004]).
+ *
+ * Structural part of the boundary — package-root metadata, banned prefixes and
+ * declared bundles. Payload membership (dist/**, resources/**) is decided by the
+ * declared byte closure in `validateArchiveEntries`, so members outside the
+ * structural rules but outside the payload are reported there as `extra-member`.
+ *
+ * @returns {{ allowed: true, kind: 'package-root' | 'root-required' | 'root-optional' | 'bundle' | 'other' }
+ *          | { allowed: false, code: string }}
+ */
+export function classifyMember(member) {
   const norm = normalizeMemberPath(member)
-  if (!norm) return false
+  if (!norm) {
+    // The tarball root prefix itself ('package/'), not a member.
+    return { allowed: true, kind: 'package-root' }
+  }
+
+  const isRootLevel = !norm.includes('/')
+  if (isRootLevel) {
+    if (ROOT_REQUIRED_FILES.includes(norm)) return { allowed: true, kind: 'root-required' }
+    if (ROOT_OPTIONAL_FILES.includes(norm)) return { allowed: true, kind: 'root-optional' }
+  }
 
   if (norm === 'node_modules' || norm.startsWith('node_modules/')) {
     const allowed = ALLOWED_BUNDLED_PREFIXES.some(
       (prefix) => norm === prefix || norm.startsWith(`${prefix}/`),
     )
-    if (!allowed) return true
+    return allowed
+      ? { allowed: true, kind: 'bundle' }
+      : { allowed: false, code: 'infiltrated-member' }
   }
 
   for (const banned of BANNED_PREFIXES) {
     const cleanBanned = banned.endsWith('/') ? banned.slice(0, -1) : banned
     if (norm === cleanBanned || norm.startsWith(`${cleanBanned}/`)) {
-      return true
+      return { allowed: false, code: 'infiltrated-member' }
     }
   }
 
   for (const pat of BANNED_PATTERNS) {
     if (pat.test(norm)) {
-      return true
+      return { allowed: false, code: 'infiltrated-member' }
     }
   }
 
-  return false
+  // Root-level name outside the metadata contract, e.g. SECURITY.md or
+  // CHANGELOG.md: rejected even though npm may auto-include it when present.
+  if (isRootLevel) {
+    return { allowed: false, code: 'non-contract-root-member' }
+  }
+
+  return { allowed: true, kind: 'other' }
+}
+
+export function isBannedMember(member) {
+  return !classifyMember(member).allowed
 }
 
 /**
  * Derives expected package member closure.
- * expected = (manifest.outputs || disk dist) U (git tracked resources) U (root whitelist present)
+ * expected = (payload: manifest.outputs || disk dist + git tracked resources)
+ *          U (root metadata: [003] required files, [004] optional files present on disk)
+ *          U (declared bundles, per-file)
  * Returns Map<relativeMemberPath, { sha256, size, fullSourcePath }>
  */
 export function deriveExpectedClosure({ root = REPO_ROOT } = {}) {
@@ -156,7 +205,19 @@ export function deriveExpectedClosure({ root = REPO_ROOT } = {}) {
     })
   }
 
-  // 3. Root whitelist files (only if they exist on disk)
+  // 3. Package-root metadata (WHAT[distribution-003]/[004]). Contract-required
+  // root files must exist: their absence is a contract violation, not a smaller
+  // closure. Allowed optional root files join the closure only when present.
+  for (const rootFile of ROOT_REQUIRED_FILES) {
+    if (!fs.existsSync(path.join(resolvedRoot, rootFile))) {
+      throw createVerificationError(
+        'missing-root-member',
+        rootFile,
+        `Contract-required package-root member is missing from the source tree: ${rootFile}`,
+      )
+    }
+  }
+
   for (const rootFile of ROOT_FILE_WHITELIST) {
     const fullSourcePath = path.join(resolvedRoot, rootFile)
     if (fs.existsSync(fullSourcePath)) {
@@ -270,6 +331,8 @@ export function deriveExpectedClosure({ root = REPO_ROOT } = {}) {
  * - no path traversal
  * - no duplicate entries
  * - ordinary files only (reject links, special entries, directories with content)
+ * - member contract (WHAT[distribution-004]): only root metadata, payload and
+ *   declared bundles; non-contract root members and banned prefixes are rejected
  * - content sha256 match against expected closure
  * - no missing, no extra members
  *
@@ -326,13 +389,18 @@ export async function validateArchiveEntries(tarballPath, expectedClosure) {
         return
       }
 
-      if (isBannedMember(member)) {
+      const verdict = classifyMember(member)
+      if (!verdict.allowed) {
         issues.push({
-          code: 'infiltrated-member',
+          code: verdict.code,
           path: member,
-          message: `Archive contains infiltrated/banned member: ${member}`,
+          message: `Archive member violates the [004] member contract (${verdict.code}): ${member}`,
         })
-        return
+        // A root member outside the contract is also reported by the closure
+        // comparison below, which never contains it.
+        if (verdict.code !== 'non-contract-root-member') {
+          return
+        }
       }
 
       if (seenMembers.has(member)) {

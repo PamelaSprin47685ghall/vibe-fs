@@ -320,8 +320,8 @@ const assistant = (sessionID, parentID, id, created, parts = []) => ({
   info: { sessionID, parentID, id, role: 'assistant', time: { created } }, parts,
 })
 const tool = callID => ({
-  type: 'tool', tool: 'read', callID,
-  state: { status: 'completed', input: { filePath: 'a', estimated_readonly_rounds: 2 }, output: 'alpha' },
+  type: 'tool', tool: 'todowrite-for-engineer', callID,
+  state: { status: 'completed', input: { program: 'class Js extends JsProgram { async run() { return { inspected: true } } }', estimated_readonly_rounds: 2 }, output: 'alpha' },
 })
 
 test('WHAT[speculative-investigation-009] registered Replica hook closes the provider projection without admitting a synthetic physical input', async () => {

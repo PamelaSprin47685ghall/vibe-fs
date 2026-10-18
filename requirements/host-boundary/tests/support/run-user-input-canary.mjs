@@ -139,7 +139,7 @@ const handleProvider = async (request, response) => {
           response.write(`data: ${JSON.stringify({ ...prefix, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`)
         } else {
           for (const chunk of buildToolCallChunks('child-tool', 'todowrite-for-engineer', JSON.stringify({
-            program: 'class Js extends JsProgram { async run() { return "CHILD_TOOL_RESULT"; } }',
+            program: 'class Js extends JsProgram { async run() { return "CHILD_TOOL_RESULT"; } }', estimated_readonly_rounds: 0,
           }), 1)) response.write(`data: ${JSON.stringify(chunk)}\n\n`)
         }
         childFinished = true
@@ -172,7 +172,8 @@ const handleProvider = async (request, response) => {
       sendSSE(response, buildToolCallChunks('chronicle', 'chronicle', JSON.stringify({
         charge: 'Preserve the user input evidence.', occurrence: 'A fresh user input arrived.',
         settlement: 'The current output was not interrupted.', consequence: 'The next request received the input.',
-        tip: chronicle.function.parameters.properties.tip.enum[0],
+        tipName: 'user-input-evidence', opinion: 'User input must not interrupt running work.',
+        advice: 'Carry the user input into the next step.',
       }), 1))
     } else sendSSE(response, buildTextChunks('auxiliary', 'Auxiliary response.', 1))
     return
@@ -194,7 +195,7 @@ const handleProvider = async (request, response) => {
       }), 1))
     } else if (step === 1) sendSSE(response, buildToolCallChunks('join-guided-child', 'join', '{}', 1))
     else {
-      assert.ok(JSON.stringify(body.messages).includes('CHILD_WORK_DONE'))
+      assert.ok(JSON.stringify(body.messages).includes('Ada has returned'))
       sendSSE(response, buildTextChunks('human', 'HUMAN_ANSWER', 1))
     }
     return
@@ -256,7 +257,7 @@ const prompt = (messageID, text) => ({
 })
 const results = []
 const waitForManagerJoin = () => new Promise((resolve, reject) => {
-  const snapshot = path.join(workspace, '.wanxiangshu/diagnostics/causal-waits.json')
+  const snapshot = path.join(workspace, '.Herdchestra/diagnostics/causal-waits.json')
   const observe = () => {
     if (!fs.existsSync(snapshot)) return
     const waits = JSON.parse(fs.readFileSync(snapshot, 'utf8'))
@@ -327,8 +328,7 @@ export default function route(role, running) {
     assert.equal(activeResponseClosedEarly, false)
     assert.equal(observations.some(({ kind, value }) =>
       kind === 'host.abort' && [sessionID, childSessionID].includes(value.sessionID)), false)
-    const commonDirectory = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: workspace, encoding: 'utf8' }).trim()
-    const works = await coldWorkSnapshot(commonDirectory, sessionID)
+    const works = await coldWorkSnapshot(path.join(workspace, '.Herdchestra'), sessionID)
     assert.equal(works.length, 1, 'guidance must not create another logical work unit')
     const originalRoot = observations.find(({ kind, value }) => kind === 'message.accepted' && value.sessionID === childSessionID && value.origin === 'AgentOwnerRoot')
     assert.equal(works[0].root, originalRoot.value.messageID)

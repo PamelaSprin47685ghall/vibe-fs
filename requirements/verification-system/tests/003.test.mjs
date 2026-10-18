@@ -178,7 +178,11 @@ test('WHAT[verification-system-003] Long Stroke keeps one Manager loop and two e
 
   assert.ok(!result.scenario.entries.some((entry) => entry.id.startsWith('manager-resume.')));
   const currentActions = result.scenario.entries.filter((entry) => entry.turnId === 'manager-current-action');
-  assert.deepEqual(currentActions.map((entry) => entry.step), Array.from({ length: 11 }, (_, index) => index));
+  // The ladder is one reusable family with a FIXED declared bound: every cursor from 0 to
+  // the bound exists and is optional (a bounded runtime cursor may land on any of them, and
+  // an unbounded nudge stream must fail closed rather than be answered by a default). The
+  // bound is the same one the Long Stroke compile literal pins in `014.test.mjs`.
+  assert.deepEqual(currentActions.map((entry) => entry.step), Array.from({ length: 24 }, (_, index) => index));
   assert.ok(currentActions.every((entry) => entry.optional === true));
   assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-current-action.')));
   assert.ok(!result.scenario.entries.some((entry) => entry.id.startsWith('manager-repair-resume.')));

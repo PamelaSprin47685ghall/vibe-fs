@@ -117,6 +117,28 @@ module JsToolSpec =
     [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
+    /// The directory one session's js-* surface executes in.
+    ///
+    /// The Host creates a Manager and her forked children rooted at the directory
+    /// their owner registered — for a Change road that is the job's own worktree
+    /// (`OrchestratorHost.directoryFor` → `HostForkRuntime.CreateChildSession`).
+    /// The surface must execute where its session lives: resolving the plugin's
+    /// project directory instead writes every road mutation into the target's own
+    /// working tree, leaves the job worktree empty, and turns the candidate into a
+    /// no-op commit whose publish rebase cannot conflict.
+    ///
+    /// A registered path is used as given, never existence-checked into the
+    /// fallback: a worktree released under a live session must fail the write
+    /// closed, not silently redirect it onto the target's checkout.
+    let rootForSession
+        (sessionDirectories: System.Collections.Generic.Dictionary<string, string>)
+        (fallback: string)
+        (sessionId: string)
+        : string =
+        match System.String.IsNullOrWhiteSpace sessionId, sessionDirectories.TryGetValue sessionId with
+        | false, (true, path) when not (System.String.IsNullOrWhiteSpace path) -> path
+        | _ -> fallback
+
     /// Build a ToolSpec for one generated surface.
     ///
     /// `workspaceRoot` is where the tool executes; `persistence` enables the
@@ -130,6 +152,7 @@ module JsToolSpec =
         (persistence: IJsTransactionPersistence option)
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
+        (rootOf: string -> string)
         : ToolSpec =
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
 
@@ -211,11 +234,16 @@ module JsToolSpec =
                         // 10 s sandbox deadline; 1 MiB output bound (JS-054).
                         let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
 
+                        // The session's own directory wins over the plugin workspace:
+                        // a road's deliverable belongs in the worktree that session was
+                        // created in, not in the target's checkout.
+                        let root = rootOf ctx.SessionId
+
                         let! outcome =
                             JsToolWorkflow.execute
                                 ctx.SessionId
                                 surface.Capabilities
-                                workspaceRoot
+                                root
                                 surface.BaseClassSource
                                 input
                                 10000
@@ -237,8 +265,9 @@ module JsToolSpec =
         (persistence: IJsTransactionPersistence option)
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
+        (rootOf: string -> string)
         : ToolSpec =
         let spec =
-            create factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation
+            create factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation rootOf
 
         { spec with Admission = admission }

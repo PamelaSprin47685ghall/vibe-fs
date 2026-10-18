@@ -92,6 +92,11 @@ type RelayPort =
         CreateManagerSession: ManagerStart -> Task<Result<SessionId, string>>
         ActivateManager: ManagerJobId -> Task<Result<unit, string>>
         AwaitLoopSignal: ManagerJobId -> Task<Result<ManagerLoopSignal, string>>
+        /// The continuation the road owes after its last committed retirement: the
+        /// successor tenure of a relay, or — after a delivered hand-off — the same
+        /// Work's next tenure, which Change opens before anything may publish again
+        /// (change-integration-005/013). Every continuation is a real tenure; a work
+        /// with no continuation holds no loop signal instead (`AwaitLoopSignal`).
         ContinueLoop: ManagerJobId -> Task<Result<IncumbencyId, string>>
         PrepareCandidate: ManagerJobId -> Task<Result<CommitHash, string>>
         TerminateWorkResources: ManagerJobId -> Task<unit>

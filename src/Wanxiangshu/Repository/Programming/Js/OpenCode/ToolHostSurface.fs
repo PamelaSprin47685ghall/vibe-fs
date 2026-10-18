@@ -18,6 +18,22 @@ module JsToolHostSurface =
     [<Emit("$0.execute($1, $2)")>]
     let private invokeRegistered (registered: obj) (args: obj) (context: obj) : Task<obj> = jsNative
 
+    [<Emit("$0===undefined||$0===null")>]
+    let private isNullish (value: obj) : bool = jsNative
+
+    [<Emit("Object.entries($0).map(function (entry) { return [String(entry[0]), String(entry[1])] })")>]
+    let private sessionDirectoryEntries (value: obj) : (string * string) array = jsNative
+
+    /// The per-session directories this registration resolves against, mirroring
+    /// the plugin's live map (session id → the directory its owner registered).
+    let private sessionDirectoryMap (value: obj) : System.Collections.Generic.Dictionary<string, string> =
+        let map = System.Collections.Generic.Dictionary<string, string>()
+
+        if not (isNullish value) then
+            for key, directory in sessionDirectoryEntries value do
+                map.[key] <- directory
+
+        map
 
     let createRegistered
         (toolModule: obj)
@@ -25,6 +41,7 @@ module JsToolHostSurface =
         (language: string)
         (workspaceRoot: string)
         (store: obj)
+        (sessionDirectories: obj)
         : obj =
         match JsGeneratorSurface.typedRole role language with
         | None -> null
@@ -44,7 +61,14 @@ module JsToolHostSurface =
             let factory = ToolHostCodec.factory toolModule
 
             let spec =
-                JsToolSpec.create factory surface workspaceRoot persistence lifecyclePersistence None
+                let rootOf =
+                    if isNullish sessionDirectories then
+                        fun _ -> workspaceRoot
+                    else
+                        let map = sessionDirectoryMap sessionDirectories
+                        JsToolSpec.rootForSession map workspaceRoot
+
+                JsToolSpec.create factory surface workspaceRoot persistence lifecyclePersistence None rootOf
 
             let registered = ToolHostCodec.register factory spec
             box (JsRegisteredToolHandle(spec, registered))

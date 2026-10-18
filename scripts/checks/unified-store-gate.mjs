@@ -93,7 +93,6 @@ const INTEGRATION_KERNEL_PATH =
 export const PHYSICAL_HISTORY_OBSERVER_PATHS = Object.freeze([
   'src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs',
   'src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs',
-  'src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs',
   'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs',
   'src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs',
   'src/Wanxiangshu/Verification/TemporalSurface.fs',

@@ -34,6 +34,16 @@ const messageText = (body) => (body?.messages ?? [])
   .join('\n')
 
 const hasToolResult = (body) => (body?.messages ?? []).some((message) => message?.role === 'tool')
+const isTitleRequest = (body) => {
+  const messages = Array.isArray(body?.messages) ? body.messages : []
+  return messages.some(
+    (message) =>
+      typeof message?.content === 'string' &&
+      (message.content.startsWith('Generate a title for this conversation:') ||
+        message.content.includes('title generator')),
+  )
+}
+const isChronicleRequest = (body) => (body?.tools ?? []).some((tool) => (tool?.function?.name ?? tool?.name) === 'chronicle')
 
 const jsViewCall = (id, view) =>
   buildToolCallChunks(
@@ -61,6 +71,17 @@ const provider = await startHttpServer(async (request, response) => {
       const name = tool?.function?.name ?? tool?.name
       if (typeof name === 'string') advertisedToolNames.add(name)
     }
+    if (isTitleRequest(body)) {
+      sendSSE(response, buildTextChunks(`title_${Date.now()}`, 'OL002 Title', 1))
+      return
+    }
+    if (isChronicleRequest(body)) {
+      sendSSE(response, buildToolCallChunks(`chronicle_${providerRequests.length}`, 'chronicle', JSON.stringify({
+        charge: 'Preserve observation', occurrence: 'Occurrence', settlement: 'Settlement',
+        consequence: 'Consequence', tipName: 'tip', opinion: 'opinion', advice: 'advice',
+      }), 1))
+      return
+    }
     if (hasToolResult(body)) {
       sendSSE(response, buildTextChunks(`ol002_round_${providerRequests.length}`, 'OL002_DONE', 1))
       return
@@ -71,11 +92,11 @@ const provider = await startHttpServer(async (request, response) => {
       return
     }
     if (text.includes('OL002_A_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 1, extra: ['keep anchor 1'] }))
+      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 100, extra: ['keep anchor 1'] }))
       return
     }
     if (text.includes('OL002_B_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-b-view', { prefixUntil: 2 }))
+      sendSSE(response, jsViewCall('ol002-b-view', { prefixUntil: 100 }))
       return
     }
     sendJSON(response, 500, { error: `unexpected prompt text: ${text.slice(0, 200)}` })
@@ -115,7 +136,7 @@ const waitForToolResultRound = async (marker, host) => {
     await delay(200)
   }
   throw new Error(
-    `timeout waiting for the tool-result round of ${marker}; host stderr tail:\n${host.stderrLog.slice(-4000)}`,
+    `timeout waiting for the tool-result round of ${marker};\n=== HOST STDOUT ===\n${host.stdoutLog}\n=== HOST STDERR ===\n${host.stderrLog}`,
   )
 }
 
@@ -126,18 +147,31 @@ const readViewCheckpointsBySession = (workDir) => {
   for (const name of fs.readdirSync(eventsDir).filter((file) => file.endsWith('.ndjson'))) {
     const lines = fs.readFileSync(path.join(eventsDir, name), 'utf8').split('\n').filter(Boolean)
     for (const line of lines) {
-      const parsed = JSON.parse(line)
-      const fact = parsed?.fact ?? parsed?.Fact
-      const factCase = fact?.case ?? fact?.Case
-      if (factCase === 'ViewCheckpointCommitted') {
-        const payload = fact?.payload ?? fact?.Payload ?? {}
-        const sid = payload.SessionId ?? payload.sessionId
-        const cid = payload.ToolCallId ?? payload.toolCallId
-        if (sid && cid) {
-          bySession[sid] = bySession[sid] ?? []
-          bySession[sid].push(cid)
+      try {
+        const parsed = JSON.parse(line)
+        const fact = parsed?.payload?.Fact ?? parsed?.fact ?? parsed?.Fact
+        const findCheckpoint = (node) => {
+          if (!node) return null
+          if (Array.isArray(node)) {
+            if (node.length >= 2 && node[0] === 'ViewCheckpointCommitted') {
+              const p = node[1] ?? {}
+              const sid = Array.isArray(p.SessionId) ? p.SessionId[1] : p.SessionId ?? p.sessionId
+              const cid = Array.isArray(p.ToolCallId) ? p.ToolCallId[1] : p.ToolCallId ?? p.toolCallId
+              return { sid, cid }
+            }
+            for (const child of node) {
+              const found = findCheckpoint(child)
+              if (found) return found
+            }
+          }
+          return null
         }
-      }
+        const checkpoint = findCheckpoint(fact)
+        if (checkpoint?.sid && checkpoint?.cid) {
+          bySession[checkpoint.sid] = bySession[checkpoint.sid] ?? []
+          bySession[checkpoint.sid].push(checkpoint.cid)
+        }
+      } catch {}
     }
   }
   return bySession

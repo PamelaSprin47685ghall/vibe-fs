@@ -19,7 +19,7 @@ open Wanxiangshu.Context.Trace
 /// participant 的既有责任重新注入；不得改写成 `commissioner_record` / `attached_work_record`。
 ///
 /// Opening 仍必须 captured（锚点/gap 起点）；本标志只影响渲染段。
-/// tool call/result 不得作为 raw 进入 Recent；T1 constitutive 属 Opening。
+/// tool call/result 不得作为 raw 进入 Recent；constitutive Opening material 属 Opening。
 type LifecycleWorkRecord =
     { Opening: XTraceOpeningEvidence
       Frames: string list
@@ -84,7 +84,7 @@ module LifecycleWorkRecord =
               Frames = frames
               Gap = gap }
 
-    /// Attach the trace owner's canonical rendering of BlindPlan constitutive evidence.
+    /// Attach the trace owner's canonical rendering of the Opening interval material.
     let withConstitutive (opening: XTraceOpeningEvidence) (constitutiveBody: string) : XTraceOpeningEvidence =
         { opening with
             ConstitutiveBody = constitutiveBody }

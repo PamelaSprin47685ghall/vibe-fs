@@ -55,6 +55,59 @@ const requestRecordOf = (body, context) => {
   return record;
 };
 
+/**
+ * The Host's continuation of an attempt the plugin deliberately stopped.
+ *
+ * Measured 2026-10-18 on the Long Stroke release tier: after the HumanRoot Manager's
+ * closing `deliver`, the plugin's relay projection decides the arriving continuation
+ * belongs to the RETIRED attempt — its wire still carries the cut tool call, so the
+ * acceptance evidence in it is that attempt's own, never a successor's
+ * (`NarrativeTransform.staleRetirement`) — and answers by interrupting the attempt and
+ * emptying the conversation (`RelayNarrativeTransform.project` →
+ * `HostMessageProjection.replaceMessagesInPlace outObj []`, disposition
+ * `RetiredAttemptStopped`). That mutation cannot cancel the HTTP call, so the provider
+ * still receives the request, and OpenCode puts the agent's system prompt back in front
+ * of the emptied array: ONE `system` message, the agent's tool surface, and no
+ * conversation at all. The same disposition starts the successor incarnation
+ * (`ManagerWorkflow.continueAfterRetiredAttempt`), whose own resource arrives as the
+ * NEXT physical request.
+ *
+ * Such a wire cannot be a declared turn: every scenario entry is keyed by the user
+ * message it answers (`runtime-key.js` `turnOf`), and this request has none. It is
+ * answered the way a provider with nothing to say answers (empty assistant, `stop`) and
+ * recorded as infrastructure; it consumes no expectation, so no scenario step can be
+ * satisfied by it. The signal is structural — a wire carrying the system prompt and no
+ * user/assistant/tool message — never prose matched out of a synthetic payload.
+ *
+ * Fail-closed is preserved by the scenario itself: if production ever dropped the user
+ * message of a REAL turn, the entries declared for that lane would go unanswered and
+ * `expectSatisfied` would report them as declared-but-never-reached.
+ */
+const isStoppedRetiredAttemptWire = (body) => {
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
+  return messages.length > 0 && messages.every((message) => message?.role === 'system');
+};
+
+/**
+ * The Host's own small-model call over the OpenAI Responses API.
+ *
+ * Measured 2026-10-18 (release tier): one such request appears per run — `POST
+ * /v1/responses`, a small model, `tools=[]`, and no `messages` array at all (the Responses
+ * shape carries `input` instead). Every scenario entry is keyed on the chat-completions
+ * message array, so this shape can never be a declared turn; the request is the Host's own
+ * infrastructure (its title/summary call for a session whose configured model uses that
+ * API). It is answered with a minimal, valid Responses object and recorded as
+ * infrastructure, consuming no expectation.
+ *
+ * Fail-closed is unaffected: a real turn always arrives as chat/completions, so a turn
+ * whose content vanished still surfaces through `expectSatisfied`.
+ */
+const isResponsesApiWire = (body) =>
+  body !== null
+  && typeof body === 'object'
+  && !Array.isArray(body?.messages)
+  && (Array.isArray(body?.input) || typeof body?.input === 'string');
+
 export class StrictMockProvider {
   constructor(options = {}) {
     this._quiet = Boolean(options.quiet);
@@ -181,6 +234,8 @@ export class StrictMockProvider {
   }
 
   get requests() { return this._state.requests; }
+  /** Requests the plugin stopped before it said anything (see `isStoppedRetiredAttemptWire`). */
+  get infrastructureRequests() { return this._state.infrastructure; }
   get url() { return this._url; }
   get port() { return this._port; }
   get unexpectedRequests() { return this._state.unexpected; }
@@ -405,11 +460,69 @@ export class StrictMockProvider {
       console.error(`[MOCK-TRACE] tools=${JSON.stringify(tools)} msgs=${(parsed.messages || []).length} chars=${JSON.stringify(parsed.messages || []).length} lastUser=${lastUser}`);
     }
 
+    if (isStoppedRetiredAttemptWire(parsed)) {
+      return this._dispatchStoppedRetiredAttempt(res, parsed, context);
+    }
+
+    if (isResponsesApiWire(parsed)) {
+      return this._dispatchResponsesApi(res, parsed, context);
+    }
+
     if (this._scenario !== null) return this._dispatchScenario(res, parsed, context);
 
     // No scenario attached: every chat request is unexpected (ARCH-004). A strict
     // mock must be told what the model may say; an empty script answers nothing.
     this._recordUnexpected(res, parsed, 'no-scenario-attached', [], '', context);
+  }
+
+  /**
+   * Answer a request the plugin stopped before it said anything (see
+   * `isStoppedRetiredAttemptWire`). No expectation is consumed: the replaced attempt's
+   * own deliveries were already answered, and the successor's resource is a later
+   * physical request that must match its own declaration.
+   */
+  /**
+   * Answer the Host's own Responses-API call (see `isResponsesApiWire`). No expectation is
+   * consumed and nothing is matched: the shape cannot express a declared turn.
+   */
+  _dispatchResponsesApi(res, parsed, context) {
+    const sessionId = context?.sessionId ?? null;
+    this._state.infrastructure.push({ reason: 'responses-api', sessionId });
+    if (!this._quiet) {
+      console.error(
+        `[MOCK-INFRA] responses-API call answered as infrastructure session=${sessionId ?? '(none)'}`,
+      );
+    }
+    const id = ++this._state.responseCounter;
+    return sendJSON(res, 200, {
+      id: `resp_${id}`,
+      object: 'response',
+      created_at: Math.floor(Date.now() / 1000),
+      status: 'completed',
+      model: typeof parsed?.model === 'string' ? parsed.model : 'mock',
+      output: [
+        {
+          id: `msg_${id}`,
+          type: 'message',
+          role: 'assistant',
+          status: 'completed',
+          content: [{ type: 'output_text', text: '', annotations: [] }],
+        },
+      ],
+      output_text: '',
+      usage: { input_tokens: 1, output_tokens: 0, total_tokens: 1 },
+    });
+  }
+
+  _dispatchStoppedRetiredAttempt(res, parsed, context) {
+    const sessionId = context?.sessionId ?? null;
+    this._state.infrastructure.push({ reason: 'stopped-retired-attempt', sessionId });
+    if (!this._quiet) {
+      console.error(
+        `[MOCK-INFRA] stopped retired attempt: the relay projection emptied this wire session=${sessionId ?? '(none)'}`,
+      );
+    }
+    return respond(this._state, res, { respond: { type: 'text', text: '', emptyAssistant: true } }, parsed);
   }
 
   _recordUnexpected(res, parsed, reason, candidates = [], detail = '', context = {}) {

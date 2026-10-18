@@ -22,7 +22,7 @@ type XTraceProjectionState =
         {
             /// InitialCharge, inline: first task prompt, bounded and
             /// human-sized; fold materialises the LWR Opening section without a
-            /// second read. BlindPlan interval end = WorkRecordStart (COMPANION-014).
+            /// second read. Opening interval end = WorkRecordStart (COMPANION-014).
             Opening: XTraceOpeningEvidence option
             /// Semantic parts. Stored newest-first so replay cons is O(1);
             /// `XTraceProjection.parts` restores oldest-first cursor order.

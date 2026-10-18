@@ -636,7 +636,6 @@ test('WHAT[durable-events-019] canonical integrator and exact physical or proof 
   assert.deepEqual([...PHYSICAL_HISTORY_OBSERVER_PATHS], [
     'src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs',
     'src/Wanxiangshu/Persistence/EventStore/EventKWayMerge.fs',
-    'src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs',
     'src/Wanxiangshu/Persistence/EventStore/RetentionSurface.fs',
     'src/Wanxiangshu/Persistence/EventStore/MergeSurface.fs',
     'src/Wanxiangshu/Verification/TemporalSurface.fs',

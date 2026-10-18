@@ -20,15 +20,15 @@
 #     ↓
 #   harvest → provider-error → recovery provider-error → FailureRecorded eq 2 → success
 #     ↓
-#   Iteration #1: audit assigns work on low dimension → current-action nudge → RetirementCommitted(Continue) → IncumbencyOpened
+#   Iteration #1: audit assigns work on low dimension → current-action nudge → IncumbencyRetired(Continue) → IncumbencyOpened
 #     ↓
-#   Iteration #2: 8×10 independent audit → RetirementCommitted(Continue) → CandidateReady
+#   Iteration #2: 8×10 independent audit → IncumbencyRetired(Continue) → CandidateReady
 #     ↓
 #   stale target forces rebase → ConflictDetected (no restart)
 #     ↓
-#   Iteration #3: same authority, fresh IncumbencyOpened → low-score work assigned → repairs conflict → RetirementCommitted(Continue)
+#   Iteration #3: same authority, fresh IncumbencyOpened → low-score work assigned → repairs conflict → IncumbencyRetired(Continue)
 #     ↓
-#   Iteration #4: same authority, fresh IncumbencyOpened → independent re-audit 8×10 → RetirementCommitted(Accepted) → RebasedCandidateReady → Published
+#   Iteration #4: same authority, fresh IncumbencyOpened → independent re-audit 8×10 → IncumbencyRetired(Accepted) → RebasedCandidateReady → Published
 #     ↓
 #   orch join / expectSatisfied / oracleLongStroke
 #
@@ -43,10 +43,10 @@
 #   [x] durable recovery/continuation       — same PID FailureRecorded + assertDurableRecovery
 #   [x] publish conflict / stale target     — gitConflictProof on manager-loop.1 (no restart) + assertPublishConflict
 #   [x] successful reconciliation           — Orchestrator-tagged Published eq 1 + assertSuccessfulReconciliation
-#   [x] later successful retirement         — RetirementCommitted after resources converge + assertRetirementCommitted
+#   [x] later successful retirement         — IncumbencyRetired after resources converge + assertIncumbencyRetired
 #
 # Yield / hang risks (estimated):
-#   - RetirementCommitted waitFact: waits for recursive resource closure
+#   - IncumbencyRetired waitFact: waits for recursive resource closure
 #   - ConflictDetected / Published: rebase+barrier lag; timeouts mirror orch-unhappy (60–90s caps)
 #   - interrupt requires holdChildC1UntilLabor; without hold, drain completes child and skips user_message
 #   - non-10 assessment assigns work; the next iteration independently re-audits before publication
@@ -234,14 +234,16 @@ flow = [
   { wait = "engineer.2", timeoutMs = 60000 },
   { awaitIdle = { after = "engineer.2" }, timeoutMs = 60000 },
   { awaitIdle = { after = "manager-interrupt.0" }, timeoutMs = 60000 },
-  { waitFact = { name = "HandleCompleted", gte = 1 }, timeoutMs = 60000 },
+    # The live child-completion fact is `HandleWorkCompleted` (observed once per delivered
+  # child in the run); the legacy `HandleCompleted` case is not written any more.
+  { waitFact = { name = "HandleWorkCompleted", gte = 1 }, timeoutMs = 60000 },
 
   # Bounded current-action cursors are verified by durable retirement and the
   # Host cognitive-tool canary (assume) rather than one incidental transport step number.
-  # HumanRoot preflow baseline: +2 RetirementCommitted(Continue+Accepted) / +2 IncumbencyOpened.
+  # HumanRoot preflow baseline: +2 IncumbencyRetired(Continue+Accepted) / +2 IncumbencyOpened.
   # A Continue retirement is followed by another ordinary IncumbencyOpened event
   # and a physically observed provider request; Accepted exits.
-  { waitFact = { name = "RetirementCommitted", gte = 3 }, timeoutMs = 60000 },
+  { waitFact = { name = "IncumbencyRetired", gte = 3 }, timeoutMs = 60000 },
   { waitFact = { name = "IncumbencyOpened", gte = 4 }, timeoutMs = 60000 },
 
   # Iteration #2 independently audits the current snapshot at 8×10 and retires
@@ -252,7 +254,7 @@ flow = [
   # The Manager owner opens iteration #2 through the same manager-assess resource.
   # Durable facts order every later incarnation; prompt text never encodes an index.
   { waitFact = { name = "Reviewed", gte = 4 }, timeoutMs = 60000 },
-  { waitFact = { name = "RetirementCommitted", gte = 4 }, timeoutMs = 60000 },
+  { waitFact = { name = "IncumbencyRetired", gte = 4 }, timeoutMs = 60000 },
   { waitFact = { name = "CandidateReady", eq = 1 }, timeoutMs = 60000 },
   { waitFact = { name = "ConflictDetected", gte = 1 }, timeoutMs = 60000 },
 
@@ -268,14 +270,14 @@ flow = [
   { awaitIdle = { after = "engineer-resolve.1" }, timeoutMs = 60000 },
   # The conflict repair uses the same manager-work resource and a fresh owned handle;
   # the owner harvests and retires it without an external continuation prompt.
-  { waitFact = { name = "RetirementCommitted", gte = 5 }, timeoutMs = 60000 },
+  { waitFact = { name = "IncumbencyRetired", gte = 5 }, timeoutMs = 60000 },
 
   # Iteration #4 independently re-audits the repaired snapshot at 8×10 from the
   # same authority. A fresh certificate (Outcome Accepted) is required before
   # rebase completion/publish can proceed; Accepted exits with no further iteration.
   { waitFact = { name = "IncumbencyOpened", gte = 6 }, timeoutMs = 60000 },
   { waitFact = { name = "Reviewed", gte = 6 }, timeoutMs = 60000 },
-  { waitFact = { name = "RetirementCommitted", gte = 6 }, timeoutMs = 60000 },
+  { waitFact = { name = "IncumbencyRetired", gte = 6 }, timeoutMs = 60000 },
   { waitFact = { name = "RebasedCandidateReady", gte = 1 }, timeoutMs = 90000 },
   { waitFact = { name = "Published", eq = 1 }, timeoutMs = 90000 },
 
@@ -362,7 +364,7 @@ internal = true
 user = "# Protocol repair"
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Protocol repair.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Protocol repair.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tipName = "durable-transition-over-transcript", opinion = "Compressing the transcript is safe only because the durable transition, not the narration, is what later context can honestly rely on.", advice = "Keep recording the causal spine as facts and let the tip name the reusable lesson, so a compressed horizon loses no decision-bearing state." } }
 
 # A Continue retirement opens the next iteration on the same session: system, tools
 # and root authority stay fixed, the predecessor's history is retained in order, and
@@ -388,6 +390,10 @@ user = "HUMANROOT_MANAGER_LOOP_CANARY: run the independent HumanRoot manager ass
 # iterations. The binder returns low review on first delivery (Continue) and
 # perfect on second (Accepted); step-1 deliver is identical. Provider-visible
 # user stays the original authority because the wake is stripped.
+# The retirement is the two-stage deliver of work-006: the first call commits the
+# confirmation and does not end, a second call with a different toolCallId reads
+# the review outcome and retires. Step 2 is that closing call; it never injects a
+# user message, so the same turn keeps owning the cursor.
 [[turn]]
 id = "humanroot-loop"
 lane = "humanroot-manager"
@@ -400,6 +406,10 @@ tools = ["review", "deliver"]
 
   [[turn.step]]
   runtimeStep = 1
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 2
   respond = { type = "tool-call", tool = "deliver", args = {} }
 
 [[turn]]
@@ -459,7 +469,22 @@ user = "# The account is not yet ready to entrust."
 
 # The initial authority prompt drives iteration #1. Later incarnations use the
 # owner-controlled manager-assess resource below; both carry the same Manager tools.
+# After the join harvests the owned work the same turn closes its iteration: the
+# two-stage deliver of work-006 needs the confirmation call (step 3) and the
+# closing call with a different toolCallId (step 4) before the retirement exists.
 [[turn]]
+# ── the candidate/rebase ownership seam (measured 2026-10-18, release tier) ─────────────
+# Road surfaces root at the PROJECT workspace, the candidate comes from the Change job's
+# worktree: every `publish_proof.txt` in a run (root workspace and the job worktree
+# `tmp/wanxiangshu-*`) carries the target-side content, the child's write lands in the root
+# workspace, and the Change job's branch is created at the pre-conflict commit and then
+# fast-forwards over the target — so the rebase is clean and no conflict can be detected
+# until the two roots agree. The Manager cannot produce the deliverable itself: its own
+# assess resource declares `todowrite-for-manager` a review-only READ tool, "disabled and
+# rejected once accepted". A write rung on the manager ladder was tried and reverted.
+# Acceptance evidence for whichever side fixes the seam is unchanged: the job worktree's
+# branch must carry a real diff against the target (base != target head, candidate commit
+# exists) before ConflictDetected can be recorded.
 id = "manager-loop"
 lane = "manager"
 user = "# Run the long stroke: ship publish_proof.txt — join-wake, provider fallback, accept the assessment obligation then retire so publish can proceed."
@@ -476,6 +501,16 @@ tools = ["fork", "resume", "join", "horizon", "review", "deliver"]
   [[turn.step]]
   runtimeStep = 2
   respond = { type = "tool-call", tool = "join", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 3
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 4
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
 
 # A successor incarnation whose last provider-visible user message is the
 # owner-controlled manager-assess resource. The ladder mirrors manager-loop —
@@ -592,12 +627,25 @@ user = "Interrupt the active join."
 [[turn]]
 id = "manager-current-action"
 internal = true
-user = "# The reviewed defects are now entrusted to you."
+# The Manager idle nudge is the `work/manager-continue` document followed by the
+# resource of the session's current action (202926d72). The trailing resource varies
+# with the work state; this declaration pins the nudge preamble plus the default
+# `runtime/manager-work` face that a session with no lifecycle work receives.
+user = [
+  "# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply contains a progress report. Continue the pending task: inspect the remaining goals, review findings and owned resources, then take the next action. Use `deliver` for a proved handoff or completion. For a temporary wait on background work, use `join`. Do not silently stop or claim that work will continue in the background after this conversation ends.",
+  "# The gaps confirmed by review are now entrusted to you. Review-only read tools are now disabled; do not inspect, search, or process repository code yourself anymore. Arrange source changes and test writing through Engineer (note that Engineer has no bash access; git, compile, and test operations cannot be performed). Real command execution, git operations, compilation, and test verification can only be performed by resuming the fixed DevOps (name = `devops`) for authorized execution, direct ordinary repair, and checks against the final changed state.",
+]
+# The re-anchored current-action resource carries the review-only read tools DISABLED (its
+# own text says so), so this ladder cannot host a close arc: production refuses every
+# `deliver` it answers with "Cannot finish without a review". The road it keeps the Manager
+# awake for has to be retired on the owner's own lane instead (see the strength canary
+# turns below).
 tools = ["join", "assume", "deliver"]
 
-  # Host tips and owner nudges can place this exact resource at any bounded runtime
-  # cursor. The binder maps the first observed cursor to the assumption, one cursor
-  # per work episode to join, and every later cursor to deliver.
+  # Delivery 1 is the nudge itself; later deliveries re-anchor the same resource after
+  # the Manager answers, so any bounded runtime cursor may land here. The binder maps
+  # the first observed cursor to the assumption, one cursor per work episode to join,
+  # and every later cursor to deliver.
   [[turn.step]]
   runtimeStep = 0
   optional = true
@@ -653,6 +701,74 @@ tools = ["join", "assume", "deliver"]
   optional = true
   respond = { type = "tool-call", tool = "deliver", args = {} }
 
+  # The Manager stays awake until its work closes, so the nudge cursor is bounded
+  # only by the run itself (sources: work/manager-continue). Every cursor past the
+  # declared ladder is a close attempt.
+  [[turn.step]]
+  runtimeStep = 11
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 12
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 13
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 14
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 15
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 16
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 17
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 18
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 19
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 20
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 21
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 22
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
+  [[turn.step]]
+  runtimeStep = 23
+  optional = true
+  respond = { type = "tool-call", tool = "deliver", args = {} }
+
 [[turn]]
 id = "engineer"
 lane = "engineer"
@@ -660,15 +776,22 @@ user = "# Write publish_proof.txt."
 tools = ["todowrite-for-engineer"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = { program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }", estimated_readonly_rounds = 0 } }
 
   # Read probe on the programming surface: ordinary Engineer mainline, not Strength Replica.
   # Unique path makes message.part.updated correlation unambiguous in the real Host SSE stream.
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = { program = "class Js extends JsProgram { async run() { return await this.cat('read_probe.txt'); } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { return await this.cat('read_probe.txt'); } }", estimated_readonly_rounds = 0 } }
 
   [[turn.step]]
-  respond = { type = "text", text = "Engineer finished." }
+  # A subagent is settled as completed only by `js.deliver` (repository-programming-054/059):
+  # a plain `return` leaves the delivery cell empty and the child reports `undelivered`,
+  # so no `HandleCompleted` is written and the join never closes.
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { return this.deliver({ file: 'publish_proof.txt', written: true }) } }", estimated_readonly_rounds = 0 } }
+
+  # The delivery tool result asks the provider once more; the child closes its turn here.
+  [[turn.step]]
+  respond = { type = "text", text = "Engineer delivered." }
 
 [[turn]]
 id = "engineer-resolve"
@@ -677,7 +800,11 @@ user = "# Resolve the conflicted publish_proof.txt so it contains exactly: Publi
 tools = ["todowrite-for-engineer"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = { program = "class Js extends JsProgram { async run() { this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }", estimated_readonly_rounds = 0 } }
+
+  [[turn.step]]
+  # Same rule for the repair child: only `js.deliver` settles it as completed.
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = {  program = "class Js extends JsProgram { async run() { return this.deliver({ file: 'publish_proof.txt', resolved: true }) } }", estimated_readonly_rounds = 0 } }
 
   [[turn.step]]
   respond = { type = "text", text = "Conflict file resolved." }
@@ -695,464 +822,20 @@ internal = true
 user = "# Call the chronicle tool exactly once now"
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Long stroke.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
+  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Long stroke.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tipName = "durable-transition-over-transcript", opinion = "Compressing the transcript is safe only because the durable transition, not the narration, is what later context can honestly rely on.", advice = "Keep recording the causal spine as facts and let the tip name the reusable lesson, so a compressed horizon loses no decision-bearing state." } }
 
-# The companion's delta cycles: the combined normal delta instruction head plus
-# the injected work-record TOML. One step per cycle; the step of a request is
-# counted from the request itself, so each Blogger session's Nth cycle lands
-# here on its own step N.
-[[turn]]
-id = "blogger"
-internal = true
-user = "# Write the dense work-log continuation now"
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Long stroke.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Long stroke continued.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 2.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 3.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 4.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 5.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 6.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 7.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 8.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 9.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 10.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 11.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 12.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 13.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 14.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 15.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 16.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 17.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 18.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 19.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 20.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 21.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 22.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 23.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 24.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 25.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 26.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 27.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 28.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 29.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 30.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 31.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 32.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 33.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 34.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 35.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 36.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 37.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 38.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 39.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 40.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 41.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 42.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 43.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 44.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 45.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 46.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 47.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 48.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 49.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 50.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 51.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 52.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 53.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 54.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
-  [[turn.step]]
-  respond = { type = "tool-call", tool = "chronicle", args = { charge = "Preserve the meaningful transition from this Blogger cycle.", occurrence = "Blogger cycle 55.", settlement = "This occurrence is now the durable state established by the cycle.", consequence = "Later context may rely on this transition after raw history is compressed.", tip = "primitive-obsession" } }
-
+# The companion's delta cycles reuse the bootstrap declaration above: production rebuilds
+# the Blogger provider view for every cycle (the frame list grows by one, the delta
+# advances) and the rebuilt wire still carries the SAME normal instruction — the
+# `[[new_work_to_record]]` TOML is appended to it — so each cycle keys back to
+# `blogger-bootstrap.0` with its own delivery count, and the `frame-commit` boundary
+# declared below admits the rebuild. The dense-head step ladder this replaced was dead
+# by measurement: its prompt text existed nowhere in src/resources/dist, and no wire
+# could reach it.
 
 [[epoch]]
-turn = "blogger"
+turn = "blogger-bootstrap"
 step = 0
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 1
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 2
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 3
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 4
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 5
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 6
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 7
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 8
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 9
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 10
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 11
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 12
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 13
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 14
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 15
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 16
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 17
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 18
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 19
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 20
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 21
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 22
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 23
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 24
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 25
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 26
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 27
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 28
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 29
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 30
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 31
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 32
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 33
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 34
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 35
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 36
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 37
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 38
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 39
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 40
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 41
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 42
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 43
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 44
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 45
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 46
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 47
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 48
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 49
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 50
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 51
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 52
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 53
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 54
-reason = "frame-commit"
-
-[[epoch]]
-turn = "blogger"
-step = 55
 reason = "frame-commit"
 
 # First Wanxiangshu-owned provider failure.
@@ -1270,31 +953,10 @@ tools = ["todowrite-for-manager"]
   [[turn.step]]
   respond = { type = "text", text = "Companion survey received; the publish can proceed." }
 
-  # XTrace capture carrier: the next transform after the successor commits the
-  # captured frames and StrengthFramesTraced. The model closes the canary road
-  # in prose; a request with no tools still advances the capture.
-  [[turn.step]]
-  respond = { type = "text", text = "Companion survey traced; the canary road is complete." }
+  # The declared rung after this prose reply was removed: a text reply ends the
+  # assistant turn, so no request could ever land on it (measured). The frames
+  # capture is proven by the durable StrengthFramesTraced fact, never by a request count.
 
-# Every companion request shares ONE wire shape: the replica inherits the
-# owner's agent (manager), so its session auto-binds the `manager` alias, and
-# the request carries only the permitted `todowrite-for-predictor` face with the
-# delegation/readonly-investigation prose as its LAST user message. The
-# companion's own completed exchanges render BEFORE that trailing prose, so the
-# continuation round lands on the same step-0 key as the bootstrap and no
-# second declaration may exist (an equal-length duplicate is ambiguous). The
-# three physical deliveries of this one declaration are:
-#   delivery 1 = canary bootstrap        → read large_probe.txt
-#   delivery 2 = canary continuation     → early-end prose (WHAT[003]/[005])
-#   delivery 3 = recovery bootstrap      → read (its N+1 is refused at the
-#                                          transform gate, no physical send)
-# bindReplicaSequence supplies the per-delivery respond (the same pattern
-# bindManagerLoopSequence uses); a static step cannot vary by delivery.
-# 014.test.mjs waits for this step's first delivery during the preflow and
-# asserts the canary decision's DelegationRequested/Bound are exactly 1; the
-# second delivery (the companion's continuation) is design behavior, and exact
-# repetition is covered downstream (main-flow replica chats [1, 2], owner
-# counts [4, 5], requested/bound == 2).
 [[turn]]
 id = "strength-canary-replica"
 internal = true
@@ -1331,7 +993,7 @@ tools = ["todowrite-for-manager"]
   # capture phase before the fault; the Prepared candidate re-renders
   # identically on the retry (DELEGATE-10).
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite-for-manager", args = { program = "class Js extends JsProgram { async run() { return { inspected: true } } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-manager", args = {  program = "class Js extends JsProgram { async run() { return { inspected: true } } }", estimated_readonly_rounds = 0 } }
 
   [[turn.step]]
   respond = { type = "text", text = "Recovered delegation consumed; continuing the road." }
@@ -1339,21 +1001,10 @@ tools = ["todowrite-for-manager"]
   # XTrace capture carrier for the recovery decision, symmetrical to the
   # canary owner's step 3: StrengthFramesTraced needs one more physical step
   # after the successor before the road closes in prose.
-  [[turn.step]]
-  respond = { type = "text", text = "Recovery trace committed; continuing the main road." }
 
-# The recovery decision's companion: estimated_readonly_rounds 1, so its bootstrap
-# is the only admitted round and the N+1 outbound request is refused at the
-# transform gate before any physical send. Its bootstrap request is wire-identical
-# to the canary companion's (manager agent, todowrite-for-predictor, same prose) and is
-# answered by the shared strength-canary-replica step 0 above; a second
-# declaration would be an equal-length ambiguous duplicate. Physical arrival is
-# proven by bindDelegationReplicas' session-scoped chat counts [1, 2].
-
-# Candidate frames render into the owner's request before the target assistant
-# output (WHAT[speculative-investigation-008]) — a mid-conversation insertion
-# that breaks the append-only seal for that one delivery. Declared optional:
-# admitted when it fires, tolerated if a future host projection appends instead.
+# ── strength delegation declarations (restored verbatim after the rung cleanup) ──────────
+# The prefix-probe boundaries admit the mid-insertion the owner's continuation performs, and
+# the recovery leg's fault is what makes its retried delivery a second physical attempt.
 [[epoch]]
 turn = "strength-canary-owner"
 step = 1
@@ -1366,24 +1017,12 @@ step = 1
 reason = "prefix-probe"
 optional = true
 
-# The companion's continuation round rebuilds its provider view: the frozen
-# owner mirror, then the companion's own completed exchange, then the trailing
-# readonly-investigation prose relocated to the end. That per-round rebuild is
-# a deliberate relocation (not an append), and it lands on the same step-0
-# entry as the bootstrap — declared here. The prefix-probe admission keeps the
-# provider plan (todowrite-for-predictor) fixed while the message prefix is rebuilt.
-# Optional: a future projection that appends in place is admitted rather than
-# fatal.
 [[epoch]]
 turn = "strength-canary-replica"
 step = 0
 reason = "prefix-probe"
 optional = true
 
-# DELEGATE 14.5 recovery leg: the owner's continuation delivery is refused at
-# the transport. 500 + retryable means the HOST drives the retry (PAR-019);
-# attempts = [1] fails exactly the first delivery. The 400 non-retryable pair
-# (manager-loop.2 / continue.0) asserted by 003.test.mjs stays untouched.
 [[fault]]
 turn = "strength-recovery-owner"
 step = 1

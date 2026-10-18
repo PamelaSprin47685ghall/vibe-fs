@@ -845,6 +845,13 @@ module PluginHooks =
                     let sessionId = toolField toolInput "sessionID"
                     let toolName = toolField toolInput "tool"
 
+                    // capability-enforcement-002/007: a Host-declared external
+                    // (MCP) tool holds no office capability, so it is advertised
+                    // but fails closed here, before any stage.
+                    match toolRegistration with
+                    | Some registration -> do! ExternalToolAdmission.before registration.Runtime sessionId toolName
+                    | None -> ()
+
                     match toolRegistration with
                     | Some registration when toolName <> "ask" && registration.Runtime.IsWaitingForUser sessionId ->
                         invalidOp (

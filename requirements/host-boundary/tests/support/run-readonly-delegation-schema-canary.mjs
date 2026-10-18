@@ -5,15 +5,15 @@
  *  - the production plugin is loaded by a real OpenCode host against a mock
  *    provider, with a Predictor model configured in the isolated
  *    `wanxiangshu.mjs` (the only enablement condition);
- *  - the provider wire is inspected: participating tools must carry the
- *    required `estimated_readonly_rounds` integer budget and the optional
- *    `self_note`, including Host built-ins whose definition carries an Effect
- *    argument schema and no JSON schema (`read`, `glob`, `grep`, …);
- *  - original tool constraints survive decoration (built-in `required` entries
- *    are preserved);
- *  - a built-in tool call that carries the protocol fields still executes: the
- *    arguments are hidden before the Host decodes them with the tool's own
- *    Effect schema, and the provider-wire history keeps the original call.
+ *  - the provider wire is inspected: the engineer session's participating tool
+ *    (`todowrite-for-engineer`) must carry the required
+ *    `estimated_readonly_rounds` integer budget and the optional `self_note`,
+ *    while every non-participating tool on the wire stays untouched;
+ *  - original tool constraints survive decoration (the tool's own `required`
+ *    entries are preserved);
+ *  - a tool call that carries the protocol fields still executes: the arguments
+ *    are hidden before the Host decodes them with the tool's own schema, and the
+ *    provider-wire history keeps the original call.
  *
  * Prints one JSON summary on stdout; the wrapping test asserts on it.
  */
@@ -54,11 +54,10 @@ const READ_PROGRAM = `class Js extends JsProgram { async run() { return await th
 const BUDGET = 2
 const SELF_NOTE = 'checking the canary fixture'
 
+// The live participating set: the retired direct filesystem tools can no longer
+// reach a provider wire, so only the session's own programming surface and the
+// conditional office fetch tool carry the protocol.
 const EXPECTED_PARTICIPATING_NAMES = [
-  'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
-  'edit', 'write', 'mv', 'rm', 'fetch',
-]
-const EXPECTED_ACTIVE_PARTICIPATING_NAMES = [
   'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops', 'fetch',
 ]
 
@@ -67,12 +66,12 @@ const PARTICIPATING_TOOLS = new Set(EXPECTED_PARTICIPATING_NAMES)
 
 assert.equal(
   PARTICIPATING_TOOLS.size,
-  11,
-  `expected exactly 11 participating tools, got ${PARTICIPATING_TOOLS.size}`,
+  4,
+  `expected exactly 4 participating tools, got ${PARTICIPATING_TOOLS.size}`,
 )
 assert.ok(
-  EXPECTED_ACTIVE_PARTICIPATING_NAMES.every((name) => known.has(name)),
-  'all active participating tools must be known canonical tools from ToolSurface',
+  EXPECTED_PARTICIPATING_NAMES.every((name) => known.has(name)),
+  'every participating tool must be a known canonical tool from ToolSurface',
 )
 
 const isTitleRequest = (body) => {

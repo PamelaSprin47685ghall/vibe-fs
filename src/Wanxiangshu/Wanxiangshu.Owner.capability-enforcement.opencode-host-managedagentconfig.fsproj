@@ -45,6 +45,10 @@
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.opencode-tools-bookkeepertool.fsproj"/>
+    <Compile Include="OpenCode/Host/ExternalToolNamespace.fsi"/>
+    <Compile Include="OpenCode/Host/ExternalToolNamespace.fs"/>
+    <Compile Include="OpenCode/Host/ExternalToolAdmission.fsi"/>
+    <Compile Include="OpenCode/Host/ExternalToolAdmission.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fsi"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfigSurface.fsi"/>

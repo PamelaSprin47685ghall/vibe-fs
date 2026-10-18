@@ -125,5 +125,3 @@ test('WHAT[repository-programming-026] case capture records mutations only after
     cleanup()
   }
 })
-
-test.todo('WHAT[repository-programming-026] actual program reads and commit outcomes feed case access without copying conflict snapshots')

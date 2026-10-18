@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import {
   REPO_ROOT,
   deriveExpectedClosure,
+  parsePackResult,
   validateArchiveEntries,
   validateArtifact,
 } from '../../../scripts/verify-package.mjs'
@@ -111,4 +112,33 @@ integrationTest('WHAT[distribution-008] repository runtime resources include bot
   )
 })
 
-test.todo('WHAT[distribution-008] GAP-210: every declared resource is available from the exact installed artifact')
+integrationTest(
+  'WHAT[distribution-008] GAP-210: every declared resource is available from the exact installed artifact',
+  async () => {
+    const { execFileSync } = await import('node:child_process')
+    const runDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxs-package-008-'))
+    try {
+      const expectedClosure = deriveExpectedClosure({ root })
+      const packJson = execFileSync(
+        'npm',
+        ['pack', '--json', '--ignore-scripts', '--pack-destination', runDir],
+        { cwd: root, encoding: 'utf8' },
+      )
+      const filename = parsePackResult(packJson, 'wanxiangshu').filename
+      const tarball = path.join(runDir, filename)
+      assert.ok(fs.existsSync(tarball), `packed tarball must exist: ${filename}`)
+
+      const validation = await validateArchiveEntries(tarball, expectedClosure)
+      assert.deepEqual(
+        validation.issues,
+        [],
+        `artifact closure issues: ${JSON.stringify(validation.issues.slice(0, 5))}`,
+      )
+
+      const artifact = await validateArtifact(tarball, expectedClosure)
+      assert.equal(artifact.ok, true, 'the packed artifact must satisfy its declared closure')
+    } finally {
+      fs.rmSync(runDir, { recursive: true, force: true })
+    }
+  },
+)

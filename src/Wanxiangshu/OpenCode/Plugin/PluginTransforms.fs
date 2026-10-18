@@ -143,7 +143,7 @@ module PluginTransforms =
           ApplyXWire: obj -> Task<PrefixPresentationHorizon>
           FreezeProviderAttemptPlan: string option -> PhysicalUserMessageId option -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
-          ApplyReadonlyDelegation: string option -> obj -> Task<unit>
+          ApplyReadonlyDelegation: string option -> PhysicalUserMessageId option -> obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
           InjectBloggerChronicle:
@@ -595,7 +595,7 @@ module PluginTransforms =
                         (ProviderWireDecode.projectionSessionIdFromMessages outObj)
             }
 
-        let applyReadonlyDelegation projectionSessionIdOpt outObj =
+        let applyReadonlyDelegation projectionSessionIdOpt hostPhysicalUserMessageId outObj =
             StrengthDelegate.tryCaptureAndStart
                 snapshotOpt
                 journal
@@ -605,6 +605,7 @@ module PluginTransforms =
                 scope.SyncDelegateRuntime
                 (predictorConfigured ())
                 projectionSessionIdOpt
+                hostPhysicalUserMessageId
                 (Some boot.Timer)
                 outObj
 
@@ -1316,7 +1317,12 @@ module PluginTransforms =
                               if frame.Horizon = PrefixPresentationHorizon.Current then
                                   do! caps.InjectPairGuideline frame.SessionId frame.SessionStartedAt frame.OutObj
                                   do! caps.ProjectRequirementGrounding frame.SessionId frame.OutObj
-                                  do! caps.ApplyReadonlyDelegation frame.SessionId frame.OutObj
+
+                                  do!
+                                      caps.ApplyReadonlyDelegation
+                                          frame.SessionId
+                                          frame.PhysicalUserMessageId
+                                          frame.OutObj
 
                               return Some frame
                           } }
@@ -1352,6 +1358,7 @@ module PluginTransforms =
                   Horizon = PrefixPresentationHorizon.Current }
 
             do! runOrdinaryStages stages frame
+
         }
 
     let createWithCaps

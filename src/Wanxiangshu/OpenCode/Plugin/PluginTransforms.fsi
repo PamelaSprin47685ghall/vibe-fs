@@ -33,7 +33,8 @@ module PluginTransforms =
             FreezeProviderAttemptPlan:
                 string option -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option -> Task<unit>
             ApplyEnforcerContinuation: string option -> obj -> Task<unit>
-            ApplyReadonlyDelegation: string option -> obj -> Task<unit>
+            ApplyReadonlyDelegation:
+                string option -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option -> obj -> Task<unit>
             InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
             ProjectRequirementGrounding: string option -> obj -> Task<unit>
             InjectBloggerChronicle:

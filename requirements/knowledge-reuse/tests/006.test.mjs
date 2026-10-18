@@ -198,7 +198,6 @@ const installBookkeeperRuntime = (port, ownerSessionIds) => {
   assert.equal(installed.ok, true, installed.error)
 }
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
-const openStore = (dir, writerId) => eventStore.create(join(dir, '.git'), writerId)
 
 test('WHAT[knowledge-reuse-006] CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-refresh-'))

@@ -17,11 +17,3 @@
 /src/Wanxiangshu/Process/LargeGate.fs
 /src/Wanxiangshu/Process/LargeGateSurface.fs
 /src/Wanxiangshu/Host/Contract/ToolResultBound.fs
-/src/Wanxiangshu/OpenCode/Tools/PtyTool.fs
-/src/Wanxiangshu/OpenCode/Tools/ExecutorTool.fs
-/resources/provider/tool/run/**
-/resources/provider/tool/open-terminal/**
-/resources/provider/tool/read-terminal/**
-/resources/provider/tool/send-terminal/**
-/resources/provider/tool/signal-terminal/**
-/src/Wanxiangshu/OpenCode/Tools/ExecutorToolSurface.fs

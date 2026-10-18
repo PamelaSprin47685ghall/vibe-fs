@@ -163,13 +163,45 @@ module ManagedAgentConfig =
             agents?(name) <- created
             created
 
-    let private applyNamedOwnedFields (agents: obj) (inventory: ManagedAgentInventory) (name: string) : unit =
+    /// capability-enforcement-007: a Host-declared external (MCP) tool namespace
+    /// is a Host-config fact, not an office capability, so it never enters
+    /// `Roles.permissions` (capability-enforcement-006) and the plugin keeps no
+    /// per-source permission table for it (capability-enforcement-007). The
+    /// projection only stops masking the namespaces the live Host config itself
+    /// declares; hiding them would make this plugin a second, silent permission
+    /// authority over the Host's own tool registry. Execution stays closed:
+    /// `ExternalToolAdmission` refuses these tools at the runtime gate.
+    ///
+    /// The internal companion (Blogger, exactly { chronicle }, ENFORCER-010) and
+    /// the hidden Bookkeeper leaf (deny-all) keep their closed faces, and an
+    /// office entry this projection never wrote receives nothing.
+    /// `patterns` is this config application's own resolved set — never the
+    /// process-wide declared set — so one workspace's `mcp` map can never widen
+    /// another workspace's wire (capability-enforcement-003).
+    let private assignHostExternalNamespaces (agents: obj) (name: string) (role: Role) (patterns: string list) : unit =
+        let permission = (ensureAgentEntry agents name)?permission
+
+        if StaticTools.hostExternalNamespaceAllowedForRole role && not (isNull permission) then
+            patterns |> List.iter (fun pattern -> permission?(pattern) <- box "allow")
+
+    let private applyHostExternalNamespaces (agents: obj) (name: string) (patterns: string list) : unit =
+        if not (ManagedAgentCatalog.isBookkeeperName name) then
+            ManagedAgent.tryParse name
+            |> Option.iter (fun managed -> assignHostExternalNamespaces agents name managed.Role patterns)
+
+    let private applyNamedOwnedFields
+        (agents: obj)
+        (inventory: ManagedAgentInventory)
+        (patterns: string list)
+        (name: string)
+        : unit =
         if not (AblationGate.primaryAgentAllowed (AblationGate.registry ()) name) then
             let entry = ensureAgentEntry agents name
             entry?hidden <- true
         elif Option.isSome (ownedConfigForName inventory name) then
             let owned = Option.get (ownedConfigForName inventory name)
             assignOwnedFields (ensureAgentEntry agents name) owned
+            applyHostExternalNamespaces agents name patterns
 
     let private ensureExperimental (config: obj) : obj =
         if isNull config?experimental then
@@ -183,8 +215,18 @@ module ManagedAgentConfig =
         (ensureExperimental config)?chatMaxRetries <- 0
 
     let private applyAgentsOwnedFields (config: obj) (agents: obj) (inventory: ManagedAgentInventory) : unit =
+        // capability-enforcement-007: this application's own declared external
+        // namespaces. The projection writes exactly these, while the runtime
+        // admission gate keeps every namespace this process has ever declared
+        // (`declare` is monotone) so a live session's map can never outlive the
+        // gate that closes its execution (capability-enforcement-002).
+        let namespaces = ExternalToolNamespace.resolve config
+        let patterns = ExternalToolNamespace.patternsOf namespaces
+
+        ExternalToolNamespace.declare namespaces
+
         for name in ManagedAgent.requiredNames do
-            applyNamedOwnedFields agents inventory name
+            applyNamedOwnedFields agents inventory patterns name
 
         config?compaction <- createObj [ "auto" ==> false ]
         disableHostChatRetry config

@@ -203,7 +203,7 @@ const withAdmissionFixture = async (status, body) => {
   let host
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(
-      join(fx.repo, '.git'), 'writer-clean-gate', 'runtime-clean-gate', 4242, '2026-01-01T00:00:00Z',
+      join(fx.repo, '.Herdchestra'), 'writer-clean-gate', 'runtime-clean-gate', 4242, '2026-01-01T00:00:00Z',
     )
     assert.equal(opened.ok, true, opened.error)
     handle = opened.journal

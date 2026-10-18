@@ -161,9 +161,12 @@ module ToolRegistry =
                 None
         )
 
-    /// capability-enforcement-005 / STRENGTH-004: Host-native read/glob/grep are
-    /// the entire replica surface. todowrite-for-predictor is the single plugin tool a live
-    /// replica may execute; every other plugin tool stays denied.
+    /// capability-enforcement-005 / STRENGTH-004: a live replica's whole Host
+    /// tool face is the readonly JS surface `todowrite-for-predictor`
+    /// (StrengthReplicaTools.exactReadonlyHostToolMap: wildcard deny plus that
+    /// single allow; the replica reads through the JS members, never through a
+    /// Host-native read/glob/grep tool). It is the only plugin tool a live
+    /// replica may execute; every other plugin tool stays denied here.
     let private replicaStage (gate: ToolGateFacts) (spec: ToolSpec) (ctx: HostToolContext) : Task<string option> =
         Task.FromResult(
             if not (gate.IsStrengthReplica ctx) then
@@ -584,11 +587,20 @@ module ToolRegistry =
         let jsProse: JsCanonicalDescription.Prose =
             JsDescriptionAssets.load providerLanguage
 
+        /// Where the programming surface of one session executes. A Manager, child
+        /// or DevOps session is created rooted at the directory its owner
+        /// registered (a Change road's worktree), so the surface follows the
+        /// session instead of the plugin's project directory.
+        let jsRootOf (sessionId: string) =
+            JsToolSpec.rootForSession sessionDirectories (defaultArg workspaceDirectory "") sessionId
+
         let groundingObservation (ctx: HostToolContext) (reads: JsExplicitFileRead list) effectPaths =
             match workspaceDirectory with
             | None -> Task.FromResult(())
             | Some _ when System.String.IsNullOrWhiteSpace ctx.SessionId -> Task.FromResult(())
-            | Some root ->
+            | Some _ ->
+                let root = jsRootOf ctx.SessionId
+
                 let observed =
                     reads
                     |> List.map (fun read ->
@@ -629,6 +641,7 @@ module ToolRegistry =
                         jsTransactionPersistence
                         jsLifecyclePersistence
                         (Some groundingObservation)
+                        jsRootOf
 
                 // Delegation seam: the programming surface's delegation members
                 // return data envelopes built from the delegation shard's
@@ -742,6 +755,7 @@ module ToolRegistry =
                 jsTransactionPersistence
                 jsLifecyclePersistence
                 (Some groundingObservation)
+                jsRootOf
 
         // Lifecycle uses its own wanxiangli journal. The common directory is
         // data passed to that owner, not a borrowed workspace EventStore.

@@ -40,6 +40,90 @@ import { extractToolNames } from './strict-mock-matches.js';
 import {
   source as pairProgrammingThoughtSource,
 } from '../../../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js';
+import { createHash } from 'node:crypto';
+import { sanitizeMessage } from '../../../../../dist/OpenCode/Host/HostMessageProjection.js';
+
+/**
+ * The Host's own rendering of an assistant row that carries no content at all.
+ *
+ * Measured 2026-10-18 (Long Stroke release tier): the plugin stops a retired attempt by
+ * emptying its message array (`RelayNarrativeTransform.project` → disposition
+ * `RetiredAttemptStopped`), the Host still answers that physical attempt, and its row
+ * survives into the successor's context — a part-less assistant message, which
+ * `HostMessageProjection.sanitizeMessages` re-renders with exactly this placeholder text.
+ *
+ * Such a row is not a model step: no model reply ever existed for it, so no scenario can
+ * declare one, and counting it would push every later step of that turn onto the wrong
+ * declaration. The constant is DERIVED from the production surface at load time rather
+ * than re-typed here (the HOST-013 rule above), so a rewording of the placeholder cannot
+ * silently make every `...`-shaped reply a non-step.
+ */
+const hostNoContentAssistantText = (() => {
+  const sanitized = sanitizeMessage({ role: 'assistant', parts: [] });
+  const text = sanitized?.parts?.find((part) => part?.type === 'text')?.text;
+  return typeof text === 'string' && text !== '' ? text : null;
+})();
+
+/**
+ * The Host's synthetic dot ack, derived from the same production projection: a part-less
+ * assistant row that carries a reasoning part is rendered with exactly this text
+ * (`HostMessageProjection.fallbackText`), which is also the row its companion-frame
+ * intersperse inserts. Exported so the seal's normalization reads the same derived value.
+ */
+export const hostDotAckText = (() => {
+  const sanitized = sanitizeMessage({ role: 'assistant', parts: [{ type: 'reasoning', text: 'probe' }] });
+  const text = sanitized?.parts?.find((part) => part?.type === 'text')?.text;
+  return typeof text === 'string' && text !== '' ? text : null;
+})();
+
+/**
+ * The Host's inserted readonly-replay block, measured on the provider wire.
+ *
+ * Production emits one `call` + one `result` row per BUNDLE BATCH of the promoted strength
+ * frames (`Strength/OpenCode/Replay.fs` `expectedHostIds`: `StrengthFrame.hostMessageId …`
+ * per `batch.RequestOrdinal`), so the block's size is per-decision (the canary decision
+ * carries two batches, recovery decisions one) — it is a sequence of pairs, not a fixed
+ * triple. The wire strips `info`, so the surviving discriminator is production's own
+ * generated call identity: each inserted call id is the frame digest (`Frame.fs`
+ * `hostMessageId` = `sha256` of the joined owner/decision/ordinal/half/digest coordinates),
+ * whose shape is derived here from the production digest surface. The Host's own tool calls
+ * carry `call_*` ids, so a real model step never matches.
+ *
+ * The trailing dot ack is NOT part of the insertion: `HostMessageProjection.sanitizeMessages`
+ * synthesizes it only between two consecutive `role=user` rows, so a block that ends before
+ * the next user row has none. It is therefore skipped when present, never required.
+ */
+const strengthReplayIdPattern = (() => {
+  // Production's inserted rows carry `StrengthFrame.hostMessageId` ids (`Frame.fs`: the
+  // sha256 hex of the joined owner/decision/ordinal/half/digest coordinates), so the shape
+  // is the digest alphabet and length — taken here from the same hashing the harness
+  // already uses for wire identities rather than by importing the production module.
+  const digest = createHash('sha256').update('strength-replay-id-probe').digest('hex');
+  return new RegExp(`^[0-9a-f]{${digest.length}}$`);
+})();
+
+const isInsertedReplayCall = (message) => {
+  const calls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+  return strengthReplayIdPattern !== null
+    && message?.role === 'assistant'
+    && calls.length === 1
+    && typeof calls[0]?.id === 'string'
+    && strengthReplayIdPattern.test(calls[0].id);
+};
+
+/** How many rows this inserted replay pair occupies, or 0 when it is not one. */
+const insertedReplayPairLength = (messages, index) => {
+  const call = messages[index];
+  if (!isInsertedReplayCall(call)) return 0;
+  const result = messages[index + 1];
+  if (result?.role !== 'tool' || result.tool_call_id !== call.tool_calls[0].id) return 0;
+  const ack = messages[index + 2];
+  const hasAck =
+    ack?.role === 'assistant'
+    && ack.content === hostDotAckText
+    && !Array.isArray(ack.tool_calls);
+  return hasAck ? 3 : 2;
+};
 
 // ── lane ────────────────────────────────────────────────────────────────────
 
@@ -186,6 +270,13 @@ const isAssistant = (message) => {
   };
   const toolCalls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
   if (toolCalls.length > 0 && toolCalls.every(isGuidelineToolCall)) return false;
+  // The Host's no-content placeholder (see `hostNoContentAssistantText`): a stopped
+  // retired attempt leaves one such row behind, and it is not a model step.
+  if (
+    hostNoContentAssistantText !== null
+    && toolCalls.length === 0
+    && message.content === hostNoContentAssistantText
+  ) return false;
   return true;
 };
 
@@ -231,6 +322,11 @@ export function stepOf(body) {
 
   let step = 0;
   for (let cursor = index + 1; cursor < messages.length; cursor += 1) {
+    const replayRows = insertedReplayPairLength(messages, cursor);
+    if (replayRows > 0) {
+      cursor += replayRows - 1;
+      continue;
+    }
     if (isAssistant(messages[cursor])) step += 1;
   }
   return step;

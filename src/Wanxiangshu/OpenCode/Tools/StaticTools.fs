@@ -116,6 +116,15 @@ module StaticTools =
     let cognitiveUtilityRoleAllowed (role: Role) : bool =
         role <> Role.Blogger && role <> Role.Distiller
 
+    /// capability-enforcement-006/007: a Host-declared external (MCP) tool
+    /// namespace is not an office capability, so it never enters
+    /// `Roles.permissions` (capability-enforcement-006) and no per-source
+    /// permission table is kept for it (capability-enforcement-007). It follows
+    /// the Host utility surface (`skill`) instead: every projected office role
+    /// keeps it except the internal companion, whose tool face is exactly
+    /// { chronicle }.
+    let hostExternalNamespaceAllowedForRole (role: Role) : bool = role <> Role.Blogger
+
     /// JS-001: a role whose capability set includes any programming-surface
     /// permission gets its todowrite-for-* tool allowed in the permission
     /// matrix. Fork/Join count: the Orchestrator's only programming surface is
@@ -166,8 +175,7 @@ module StaticTools =
           "todowrite-for-bookkeeper"
           "todowrite-for-plan"
           "ask"
-          "devops"
-          "deliver" ]
+          "devops" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     /// The office half comes from the one reverse lookup; utility tools keep

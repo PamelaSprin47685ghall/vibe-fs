@@ -155,10 +155,13 @@ const userMessage = (id, sessionId, parts) => ({ info: { id, role: 'user', sessi
 const assistantMessage = (id, sessionId, parentId, parts) => ({
   info: { id, role: 'assistant', sessionID: sessionId, parentID: parentId, time: { created: 1 } }, parts,
 })
+// The engineer session's own programming surface is the live tool that carries
+// the estimate: the direct filesystem tools are retired and never reach the wire.
+const PARTICIPATING_TOOL = 'todowrite-for-engineer'
 const budgetCall = (callId, rounds) =>
   hostToolCall(
     callId,
-    'read',
+    PARTICIPATING_TOOL,
     rounds > 0
       ? { filePath: 'a.md', estimated_readonly_rounds: rounds, self_note: 'inspect the file' }
       : { filePath: 'a.md', estimated_readonly_rounds: rounds },
@@ -169,7 +172,7 @@ const budgetCall = (callId, rounds) =>
 // call but no paired result, so the domain collector cannot complete a batch.
 const pendingCall = (callId, rounds) => ({
   type: 'tool',
-  tool: 'read',
+  tool: PARTICIPATING_TOOL,
   callID: callId,
   state: {
     status: 'pending',
@@ -251,10 +254,10 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
       // frozen at plugin construction: tool decoration sees the configured
       // state and decorates participating tools per contract.
       const schemaOutput = {
-        description: 'read a file',
+        description: 'engineer programming surface',
         parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
       }
-      await hooks['tool.definition']({ toolID: 'read' }, schemaOutput)
+      await hooks['tool.definition']({ toolID: PARTICIPATING_TOOL }, schemaOutput)
 
       const props = schemaOutput.parameters.properties
       assert.equal(props.estimated_readonly_rounds?.type, 'integer')
@@ -262,7 +265,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
       assert.equal(props.estimated_readonly_rounds?.maximum, 2147483647)
       assert.ok(
         schemaOutput.parameters.required.includes('estimated_readonly_rounds'),
-        'read must require estimated_readonly_rounds',
+        `${PARTICIPATING_TOOL} must require estimated_readonly_rounds`,
       )
 
       assert.equal(props.self_note?.type, 'string')
@@ -283,7 +286,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
         false,
         'legacy delegate_readonly_rounds must not be required',
       )
-      assert.ok(schemaOutput.description.startsWith('read a file'))
+      assert.ok(schemaOutput.description.startsWith('engineer programming surface'))
 
       // Removing configuration immediately refuses a fresh positive estimate.
       globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
@@ -315,10 +318,10 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
       // authorization from the same real wiring.
       globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
       const bareOutput = {
-        description: 'read a file',
+        description: 'engineer programming surface',
         parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
       }
-      await hooks['tool.definition']({ toolID: 'read' }, bareOutput)
+      await hooks['tool.definition']({ toolID: PARTICIPATING_TOOL }, bareOutput)
       assert.equal(
         bareOutput.parameters.properties.estimated_readonly_rounds,
         undefined,
@@ -341,7 +344,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_real_transform_wiring_hol
       )
       assert.equal(
         bareOutput.description,
-        'read a file',
+        'engineer programming surface',
         'an unconfigured Predictor leaves tool description unmodified',
       )
       await hooks['experimental.chat.messages.transform']({}, { messages: [seedUser, seedAssistant] })
@@ -364,10 +367,10 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_tool_definition_decorates
       try {
         process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
         const schemaOutput = {
-          description: 'read a file',
+          description: 'engineer programming surface',
           parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
         }
-        await hooks['tool.definition']({ toolID: 'read' }, schemaOutput)
+        await hooks['tool.definition']({ toolID: PARTICIPATING_TOOL }, schemaOutput)
 
         const props = schemaOutput.parameters.properties
         assert.equal(props.estimated_readonly_rounds?.type, 'integer')
@@ -375,7 +378,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_tool_definition_decorates
         const decoratedDescription = schemaOutput.description
 
         // Idempotency: repeating decoration on the same definition does not duplicate required fields or stack prose
-        await hooks['tool.definition']({ toolID: 'read' }, schemaOutput)
+        await hooks['tool.definition']({ toolID: PARTICIPATING_TOOL }, schemaOutput)
         assert.equal(
           schemaOutput.parameters.required.filter((x) => x === 'estimated_readonly_rounds').length,
           1,
@@ -389,7 +392,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_tool_definition_decorates
           description: '读取文件',
           parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
         }
-        await hooks['tool.definition']({ toolID: 'read' }, schemaOutputZh)
+        await hooks['tool.definition']({ toolID: PARTICIPATING_TOOL }, schemaOutputZh)
         const zhProps = schemaOutputZh.parameters.properties
         assert.equal(zhProps.estimated_readonly_rounds?.type, 'integer')
         assert.equal(zhProps.estimated_readonly_rounds?.minimum, 0)
@@ -881,9 +884,11 @@ const runnerPath = path.join(here, '../../host-boundary/tests/support/run-readon
 
 const expectedEngineerWireTools = ['todowrite-for-engineer', 'skill', 'assume', 'bash-honeypot']
 
+// The live participating set: the names the Host can still hand the plugin on a
+// real provider wire. The direct filesystem tools are retired, so the engineer
+// session's own programming surface is the one participating tool it carries.
 const PARTICIPATING_TOOLS = new Set([
-  'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
-  'edit', 'write', 'mv', 'rm', 'fetch',
+  'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops', 'fetch',
 ])
 
 const checkOpencodeExecutable = () => {
@@ -894,11 +899,12 @@ const checkOpencodeExecutable = () => {
 }
 
 /// WHAT[speculative-investigation-013]: with a Predictor model configured, the
-/// plugin decorates the definitions the real Host hands it. A Host built-in
-/// tool carries an Effect argument schema and no JSON schema, so the protocol
-/// must be published through the provider-visible JSON schema the plugin
-/// renders itself — and the built-in must still execute with its original
-/// arguments, with the wire history keeping the call the model actually made.
+/// plugin decorates the definitions the real Host hands it. The engineer wire
+/// carries the plugin's own tool definitions only (the Host built-ins are denied
+/// for every role), so the protocol is published on the participating
+/// `todowrite-for-engineer` definition — and the decorated call must still
+/// execute with the model's own arguments, with the wire history keeping the
+/// call the model actually made.
 integrationTest(
   'WHAT[speculative-investigation-013] SPEC_INV_013_configured_predictor_decorates_builtin_tools_on_real_host',
   async (t) => {
@@ -949,7 +955,7 @@ integrationTest(
       )
 
       if (PARTICIPATING_TOOLS.has(name)) {
-        // Participating tools (11 tools): must carry estimated_readonly_rounds & self_note
+        // Participating tools: must carry estimated_readonly_rounds & self_note
         assert.ok(
           view.properties.includes('estimated_readonly_rounds'),
           `participating tool ${name} must expose estimated_readonly_rounds on the provider wire`,
@@ -988,7 +994,7 @@ integrationTest(
         // so summary.tools contains the engineer session tools. Its review contract and delegation
         // coexistence invariant is verified via direct decoration below.
       } else {
-        // Non-participating tools (including 28 NoEstimate tools and unreviewed Host tools such as question/todo/web):
+        // Non-participating tools (the NoEstimate whitelist plus every unreviewed name):
         // Must carry ZERO increment: no protocol properties, not required, no collaboration prose.
         assert.equal(
           view.properties.includes('estimated_readonly_rounds'),
@@ -1069,7 +1075,6 @@ integrationTest(
     // Decoration extends the schema; it never replaces the tool's own contract.
     assert.ok(summary.tools['todowrite-for-engineer'].required.includes('program'), 'todowrite-for-engineer must still require program')
     assert.ok(summary.tools.assume.required.includes('assumption'), 'assume must still require assumption')
-    assert.ok(summary.tools.defer.required.includes('new_work'), 'defer must still require new_work')
     // The decorated call really executed with the model's own arguments, and the
     // provider-wire history kept them.
     assert.equal(summary.followUpObserved, true, 'the built-in tool call must settle into a follow-up request')
@@ -1133,8 +1138,25 @@ integrationTest('WHAT[speculative-investigation-013] resident_manager_predictor_
     cwd: path.resolve(import.meta.dirname, '../../..'),
     encoding: 'utf8',
     timeout: 180000,
-    env: { ...process.env },
+    // WANXIANGSHU_DIAG=1 makes the `strength-` records observable: the wrapper
+    // asserts the binding stream below, so the canary must not run blind.
+    env: { ...process.env, WANXIANGSHU_DIAG: '1' },
   })
   assert.equal(launched.status, 0, `resident predictor canary failed:\n${launched.stdout}\n${launched.stderr}`)
-  assert.match(launched.stdout, /RESIDENT_PREDICTOR_CANARY /, 'resident predictor canary produced no evidence')
+  const marker = 'RESIDENT_PREDICTOR_CANARY '
+  const line = launched.stdout.split('\n').find(entry => entry.startsWith(marker))
+  assert.ok(line, 'resident predictor canary produced no evidence')
+  const summary = JSON.parse(line.slice(marker.length))
+  // HOST-010 / PROMPT-001: the companion (replica) session's own request carries a
+  // projection-addressed trailing user row, so binding the Host physical user
+  // message from the outgoing wire can never succeed. The delegate must resolve it
+  // from the Host-provided identity instead; zero unbound records is the observable
+  // that it does, and the capture record proves the decision actually started.
+  assert.equal(
+    summary.strengthProviderRunUnbound,
+    0,
+    `no request may fail to bind its Host physical user message:\n${launched.stderr}`,
+  )
+  assert.equal(summary.strengthUnboundSkip, 0, 'no skip may report an unbound owner provider run')
+  assert.equal(summary.strengthDelegationRequested, 4, 'each of the four decisions must report its capture')
 })
