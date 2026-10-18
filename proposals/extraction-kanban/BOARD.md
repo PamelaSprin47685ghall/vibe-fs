@@ -18,13 +18,15 @@ BACKLOG → READY → DOING → LIB_READY → INTEGRATING → REVIEW → DONE
 | DOING | 一个 owner 正在准备/实现最小闭环 | 独立职责、产物和拆除测试通过，改 LIB_READY |
 | LIB_READY | 基础库已证明独立，主仓该职责尚未全部切换 | 已取得被测精确包与接线预约，改 INTEGRATING |
 | INTEGRATING | 在独立主仓候选上接线和清旧 | 受影响链与旧退出证据完整，进入 REVIEW |
-| REVIEW | 非作者审查，候选已固定 | 集成到最新 master 并核验后的范围才改 DONE |
-| DONE | 本卡范围内旧 owner 已退出；有主线提交和证据 | 出现新反例另开关联修复卡，不抹去原证据 |
+| REVIEW | 本卡必要证据齐备，候选已固定，进入非作者审查 | 复核及最终主仓集成候选核验通过，满足下述清单后才改 DONE |
+| DONE | 冻结范围的证据门禁通过；拆分/接收卡四类证据齐备，有主线提交 | 出现新反例关联修复卡并注明失效承诺；历史 DONE 不再代证当前完整职责 |
 | DECISION | 抽取收益或产品去留尚需裁决 | 形成明确的抽取子范围后转 BACKLOG/READY，或记 RETAINED/REMOVED |
 | OPTIONAL | 不在当前主线完成条件中 | 明确授权和真实前提具备后转 BACKLOG/READY |
 | RETAINED / REMOVED | 已批准保留 / 已批准并完成删除 | 写清主线提交、理由及承接义务；两者均不记为“抽取成功” |
 
 BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因、解除证据和下一检查人。受阻的公共预约主动释放或明确保留，不默认霸占。支持性卡 CUT-00、32、33、37 可不经过 LIB_READY，但仍须真实接线/使用与评审。
+
+拆分/接收卡按[上游拆分交付清单](UPSTREAM-DELIVERY-CHECKLIST.md#done-gate)判定 DONE：真实消费者、公开产物、关键反例、旧职责退出缺一不可。相关失败、TODO/skip、未运行或失效证据不能计通过；不得在失败后自行缩小承诺或仅挂子卡就关闭父卡。事先定义的调查、取证与原型子卡按各自结果验收，不代替生产父项。本次只收紧流转规则，不批量改写历史卡片状态。
 
 ## 总看板
 

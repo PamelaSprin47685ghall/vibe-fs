@@ -12,13 +12,15 @@
 
 [resources 与 time/wait 接收评估](UPSTREAM-INTAKE-ASSESSMENT-2026-10-18.md)已完成只读调查：库原有 Node/Bun 测试各 75/75，但安装包反例发现参数裁剪、声明不符和输入能力被改写，另有等待职责残留与依赖闭包缺口。两项均暂缓直接接收；按已见范围分别预算 4–8、12–24 有效工程小时，尚未施工。[新的接收计划](REMAINING-REPAIRS-2026-10-16.md#upstream-intake)按完整职责拆分、风险选择证据、固定上游批次，不将未来模块持续加入当前 16 包。
 
+[拆分质量复盘](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#delivery-quality-judgment)已记录交付偏粗、DONE 过早及成本后移的判断与证据边界。[上游拆分交付检查清单](UPSTREAM-DELIVERY-CHECKLIST.md)为拆分与接收卡规定四类必要证据：真实消费者、公开产物、关键反例、旧职责退出。缺项、相关失败或未证承诺均不得标 DONE；净改进可以按现有规则交付，完成判定仍须逐项成立。
+
 三小时施工已完成[Bun挂起定因与夹具修正](GUIDANCE-BUN-LIFETIME-2026-10-18.md)和[Process纯契约及实际消费者](PROCESS-CONTRACT-2026-10-18.md)，非作者复审已核对。新增无界Bun启动器已删除，原生物理证据不替代正式监督；正式Bun适配单列CUT-00-R2，Node验证包装器的既有有界等待问题另列CUT-00-R1，不与暂缓的R12-U1混记。
 
 本窗口已继续接入[Process C](PROCESS-RUNTIME-2026-10-18.md)、修复[输出提前清组R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md)，并交付[实际背压R7-B](PROCESS-BACKPRESSURE-2026-10-18.md)、[work011夹具](WORK-REVIEW-FIXTURE-2026-10-18.md)、[完整wire预算R6-B](PROCESS-WIRE-BUDGET-2026-10-18.md)和[真实取消R6-E](PROCESS-CANCELLATION-2026-10-18.md)。当前库0.6.8，取消精确主包4d594fd已通过Node/Bun真实注册消费、五次128MiB和完整PTY124/124。旧6cc27隔离PTY首轮失败仍未归因，C/R7-A保持REVIEW，不宣布项目全绿。下一P1为终结事实R6-D，实际状态只看[看板](BOARD.md#source-audit-repairs)。
 
 [R6-D原型与接线计划](PROCESS-TERMINATION-2026-10-18.md)已通过纯编译正反控、真实目标/Git/监管丢失及非作者Node/Bun复验。生产仍未修signal混同；下一包D1接单次执行及文本Git，D2独立处理binary GitRawRunner，不把原型当已部署修复。
 
-## 入口：五份文件，各管一件事
+## 施工入口
 
 | 文件 | 用途 | 谁改 |
 |---|---|---|
@@ -26,6 +28,7 @@
 | [CARDS.md](CARDS.md) | CUT-00—CUT-38 的完整职责卡：切什么、不切什么、怎么证伪、何时删旧 | 该卡 owner；改边界须让相邻卡评审 |
 | [COVERAGE.md](COVERAGE.md) | 主仓需求、源码区域、新库草稿和原施工计划的归属与冲突 | owner 提交，协调者合并 |
 | [TEMPLATES.md](TEMPLATES.md) | 认领、契约、证据、PR、交接和异常处置模板 | 通用模板由协调者维护 |
+| [UPSTREAM-DELIVERY-CHECKLIST.md](UPSTREAM-DELIVERY-CHECKLIST.md) | 上游拆分与本地接收的四类证据、收据及 DONE 门槛 | owner 提交证据，非作者复核，协调者登记状态 |
 | 本文 | 日常操作、分支、交付、验收和回退方法 | 共同工作约定 |
 
 后续单卡的详细材料放在 `cards/CUT-NN.md`，证据索引放在 `evidence/CUT-NN/README.md`；按需创建，不先制造几十个空文档。子卡确有独立 owner 时使用 `CUT-NN-a`，先给看板加行与前置再开工。卡号永久保留，不重排、不复用。
@@ -137,7 +140,7 @@ git -C "$WXL_WT" rev-parse HEAD
 | G. 旧 owner 退出 | 每个旧符号的调用者去向、实现/工程/过期测试清理，历史数据处置 | 同时保留两个可写账本，用同步器维持一致 |
 | H. 审查与集成 | 候选与最新主线比较、证据范围、已知不足、回退方案 | 用测试数量或“全绿”一句话代替风险判断 |
 
-“库就绪”可以独立提交，以便其他人消费，但不能把主卡标成“已抽干”。接线若尚有必要旧路径，应明确缩小已完成职责或登记子卡；不能在 DONE 后暗留原职责。
+“库就绪”可以独立提交，以便其他人消费，但不能把主卡标成“已抽干”。接线若尚有必要旧路径，应单列已经完成的子范围及未完成义务，父卡保持未完成；必要范围变化须先按产品裁决规则处理，不能为关闭卡片自行删掉承诺。DONE 按[交付清单](UPSTREAM-DELIVERY-CHECKLIST.md#done-gate)判定。
 
 ## 7. 契约协作，不把团队锁成一条长队
 
@@ -198,7 +201,7 @@ git push -u origin HEAD
 
 必须阻止合入：本卡引入的未解释回归；真实效果可能重复；用户原文丢失；权限扩大；历史被错误读取/覆盖；资源提前释放；新库反向依赖；依赖无法干净安装；相关失败或取消被藏成 TODO/skip。涉及已知范围缩减，须先得到明确产品裁决，不能由卡 owner 自批。
 
-历史无关 TODO/skip 可以保留，但列出原条款和未完成范围。直接涉及本卡承诺的物理证明缺失时，不把本卡标 DONE；可以缩小且明确标示本轮已完成范围。既有失败未完成运行不能伪造通过数；当前 verify 返回 FAIL 就如实记录 FAIL。
+历史无关 TODO/skip 可以保留，但列出原条款和未完成范围。拆分/接收卡的四类证据及相关风险门禁只要缺一项，就不能标 DONE；已完成子范围单列，父卡承诺继续保留。获准合入的净改进不等于完整迁移已验收，不能在失败后自行缩小范围换取 DONE。既有失败未完成运行不能伪造通过数；当前 verify 返回 FAIL 就如实记录 FAIL。
 
 通常执行顺序：
 
