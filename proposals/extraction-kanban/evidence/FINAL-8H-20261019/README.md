@@ -12,6 +12,7 @@
 | `G140-B2-KNOWN-WRITER-FRONTIER-INDEPENDENT-20261019.tgz` | `4ca2a58e8fdb98ee6afc9766ffa08fc69c0d3a93d795400253537f82916ec124` | 非作者原脚本复跑、单点heads诊断、物理文件、706确切包及安装未改证明 |
 | `R3-EXISTING-EVIDENCE-AUDIT.md` | `d3bc67639042afa16ad149a4c95315705f8daa210353a94cb862f141b92a63fd` | 原首红不是R1正式监督入口；缺内部断言，不能推定原因；只读、无新测试 |
 | `R3-EXISTING-INPUTS-20261019.tgz` | `11c7868c4a7f1bbf96d6218e02f76ea280a3d682bb414a4d5a2e11b03964eb21` | 既存原截短日志、保留的后续脚本、6cc27精确包及后来完整124/124原件；不混称同一次执行 |
+| `NODE2213-B1-FORMAL-712.tgz` | `41ba537ecca789ae78e2cfaf2cdcf65a8d882dbf446e93e2cbd286f2c35acb1e` | 实际Node22.13二文件正式18/0普通fail+2TODO、owned accepted；最初新鲜度拒绝、712构建/pack、二进制摘要及包同一回执 |
 
 历史原件为904字节、两行，SHA256 `2e2e8bd3ba8e30cba169da5b9b8236a6173e8474902ad814dde7051f1c40e6d0`，长期用例已保存同字节副本。667的append是带cut成功，不能称旧authority已解码；706的raw读取成功也不等于FactCodec或活跃身份许可。两版live append差异归680的有意收紧，先前“raw reader缺失”review泛化已撤回。
 

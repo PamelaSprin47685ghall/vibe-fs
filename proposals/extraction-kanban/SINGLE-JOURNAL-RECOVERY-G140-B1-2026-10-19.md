@@ -47,6 +47,8 @@ idle/admission 使用 `SendIdleGateNudge` 和 quiescence permit，没有因为�
 
 八小时收尾的710选集为 **148文件655 pass / 0普通fail / 6skip / 95TODO**，148/148完成排空、owned accepted；因既存待证项仍退出1。021新增负控先错误假定events目录存在，只有该夹具断言红，显式建立空目录后转绿；review也提前发现并修正结构化error误当字符串的测试笔误。710发行包SHA与706完全相同，2076文件零变化。raw审计已验，FactCodec历史解码TODO未移除；详见八小时收尾记录和真实旧原件档。
 
+最低Node22.13最终补验原003/008正式文件为18pass/0普通fail/2TODO、2/2完成、owned accepted，整组exit1。首次因tracked Markdown改变生成corpus输入被新鲜度门禁拒绝，0项执行；正常刷新712后再运行，没有skip门禁。712实际发行包仍与706整tar相同。此为额外运行时维度，不重复累计18项或关闭两项TODO。
+
 首代原型还静默丢掉加入者的观察者登记，虽与旧版同为一个 Physical 等待者待决，却改变了接管归属；非作者发现后已在交付前修正。原型首次增第三参数漏括号的编译红、永久并发夹具未给 unresolved top-level await 保留诊断出口的首红分别归施工与夹具，不归产品缺陷。物理通知广播的额外断言在697也为红，属于过强 review 假设，不据此改通用 callback 合同。
 
 ## 下一包与验收边界

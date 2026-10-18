@@ -1,0 +1,36 @@
+{
+  "finalGeneration": 713,
+  "buildFreshness": {
+    "ok": true,
+    "generation": 713,
+    "sources": 1825,
+    "artifacts": 895,
+    "compilerInputDigest": "dd06599a6ecf4eb0fa8970523cadc5cddee4caf2dee16d4e1be508b4d6e8a3a1",
+    "generatedInputDigest": "0fcba5f94a81832115cd9a5bc326e48b5fa7c936cdf344ec228abb82ae38d8cd",
+    "artifactInputDigest": "47a7556e8b1e1d2ea4a9494b01ff246459ae8301414733cebb1894d782fa4e25"
+  },
+  "finalPackageSha256": "8572c309c3c5e64011e51972a70058c044b5cfd1478a650a460e64f2de4d2be2",
+  "baseline706Sha256": "8572c309c3c5e64011e51972a70058c044b5cfd1478a650a460e64f2de4d2be2",
+  "packageTarBytesIdentical": true,
+  "formalRelated": {
+    "files": 148,
+    "passed": 655,
+    "ordinaryFailed": 0,
+    "skip": 6,
+    "todo": 95,
+    "completedFiles": 148,
+    "ownedAccepted": true,
+    "exitCode": 1
+  },
+  "minimumNode2213": {
+    "files": 2,
+    "passed": 18,
+    "ordinaryFailed": 0,
+    "skip": 0,
+    "todo": 2,
+    "completedFiles": 2,
+    "ownedAccepted": true,
+    "exitCode": 1
+  },
+  "acceptance": "partial; TODO and skipped proofs remain open; repeated runtime checks are not summed"
+}
