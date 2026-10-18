@@ -55,6 +55,8 @@ G140-B2 先在现有 StoreLock 内做私有正确性原型：fresh canonical Cur
 
 生产前先解决 canonical freshness 合同。现 `ReloadLocal` 会验证、k-way merge 并从初态全量重放；解码缓存不等于增量 Current，直接接进每次命令违反 durable-events[017]。新 writer 流还能插入已有规范序列之前，不能把陌生 suffix 随意接到末尾。原型可明确用全重放作参考，不能据此直接上线。
 
+收尾进一步以真实落盘及注册MergeSurface验证：已知writer也能重排旧canonical前缀。A先写50、B写60(parent50)，A仍持head50再写10(parent50)，合法物理append令`[50,60]→[50,10,60]`；fresh C写10(parent60)正控保前缀。Node/Bun和非作者独立复跑一致。不是merge回退，证明单靠文件追加或认识writer不足以增量刷新。该证据是同OS新handle/实际流排序，不冒称Journal原子命令、业务Current或跨OS已修。
+
 按下列次序推进，每步各自留证：
 
 1. 私有 reference 原型先用已暖 writer，真实两 Journal、两OS在相同 stale快照后并发：同身份只一事实；不同身份合法count1/2；冲突reason拒绝但writer健康；冷读无cut。此范围不偷带 lazy init 已解结论。

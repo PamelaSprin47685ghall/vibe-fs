@@ -182,6 +182,8 @@ C/R7-A 的剩余整体验收由下列 CUT-00-R3 取得归因后再裁决；R1/R2
 - **验收条件：** 得到能解释原失败的因果证据，明确产品、夹具、监督或环境归属；修正或明确运行前提后，原有效反例及完整文件通过。若需产品修改，先归到确切 owner 的修复包并完成验收，再裁决 C/R7-A 是否退出 REVIEW；外层截断本身不能解释内层失败。
 - **停止与保留：** 一轮对照没有新因果证据时，交付完整现场、排除项和下一项可区分的假设，不无依据地重复扩大套件；本包仍未验收，C/R7-A 保持 REVIEW。不阻塞无关包，也不重开 R12-U1 或修改 Unknown 语义。
 
+八小时收尾只读复核：原首红是原生`node --test`返回1、signal null，并非正式5秒监督；已知Bun late-not-started叶失败，未知是被外层打印截掉的内部断言与物理原因。R1的stdout/native帧与endACK竞争没有同现场因果证据。原截短日志、保留的后续脚本（明确不冒称首轮源码）及同包后续124/124完整原件已长期归档，见[收尾证据](evidence/FINAL-8H-20261019/README.md)。没有新增动态测试，没有销R3或R7-A。
+
 <a id="adjacent-repairs"></a>
 ## 3. 相邻行为修复
 
@@ -221,6 +223,8 @@ GAP-085、159的列明范围已交付。GAP-159旧实际公共入口确会安装
 706收尾：长期夹具已退出内部DU读取，改走既有DispatchSurface的真实HostSessionNudge调用与JSON输出。700→706仅此Surface一个包文件变化，其余2075字节相同；新增JS边界套件后148文件653pass/1个021夹具fail/6skip/95TODO，完整排空及收尾通过。最终真实667写盘→706新OS读证伪了“raw reader缺失”：旧用例误用新live append构造旧历史，已改用冻结旧原件并增加新写拒绝反例，历史类型解码TODO仍在。更早红不覆盖；[八小时收尾记录](EIGHT-HOUR-CONSTRUCTION-2026-10-19.md)单列新结果及归因。
 
 710最终相关选集148文件655pass/0普通fail/6skip/95TODO，全部排空、owned accepted；整组仍因待证退出1。710包与706连tar SHA都相同，产品未改。下一包保持B2 reference原型与canonical freshness，随后领域原子命令、durable跨OS发送权和普通冷Workflow；不把B1单Journal单发冒称跨OS修复。
+
+B2 freshness前置反例已补：固定706的真实EventStore两个writer及注册MergeSurface，在Node/Bun和非作者独立复跑均证实，连已知writer的合法append也会使规范顺序`[50,60]→[50,10,60]`；物理A文件原前缀不变，A仍见head50、B已见head60。fresh C以head60为父的正控为`[50,60,10]`。因此不能仅拒绝陌生writer就假定旧canonical前缀稳定；必须验证父边/frontier，或在canonical owner处理重排。观察是同OS的新冷handle及实际物理流的MergeSurface排序，不是业务Current、跨OS或原子命令原型验收，也不是merge算法错误。材料见收尾证据，B2继续DOING。
 
 **范围与前置：** 先定每个 LogicalRun 的预算事实、重复身份和新失败的区别；统一记录、重放和实际重试准入。可升级事件版本；无依据旧记录明确拒绝或另作有输入清单的离线迁移，不按今天默认值猜旧预算。
 

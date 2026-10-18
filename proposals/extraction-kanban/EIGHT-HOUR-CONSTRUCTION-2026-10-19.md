@@ -31,6 +31,12 @@
 
 本次旧历史原件、复审原文、测试选集、首红/最终日志、包同一性和干净快照消费记录见[evidence/FINAL-8H-20261019](evidence/FINAL-8H-20261019/README.md)。构建、提交与普通推送分别留证；未发布registry，未部署Host。
 
+## 窗口末尾的前置取证
+
+B2补了一个有效反例：真实EventStore两个writer，A写50、B写60(parent50)后，stale A合法追加10(parent50)，其物理文件只追加、旧字节不变，规范顺序却由`[50,60]`变为`[50,10,60]`。fresh C追加10(parent60)的正控保持`[50,60,10]`。固定706在Node26/Bun1.3.14及非作者原样复跑一致；公开heads额外证明A仍见50、B已见60。它说明已知writer也可能改变canonical前缀，不是merge算法错误。新handle同OS、实际writer流经注册MergeSurface的观察，不冒称业务Current、跨OS或B2原子命令原型验收。没有产品修改，B2继续DOING。
+
+R3限定只读复核确认原首红使用原生`node --test`、返回1且signal null；R1正式监督的5秒窗口和ACK竞争没有同现场因果证据。已知Bun late-not-started失败，未知是缺失的内部断言/物理原因。原日志及同包后续完整124/124证据已长期归档；保留的脚本后来改过选项，明确不把它的当前SHA称为首轮脚本。未跑新PTY测试，R3 READY、C/R7-A REVIEW及R12暂缓均不变。
+
 ## 接下来的顺序
 
 1. **G140-B2，P1且较难。** 真跨OS反例已成立：同身份写两条；不同身份各写count1，冷积分只保留last-good1。先做已暖writer的锁内fresh Current与纯决定reference原型，再解决canonical frontier及重排/增量成本；当前ReloadLocal全重放不能直接放进每轮生产命令。随后迁移领域原子命令、生命周期及Unknown结算，再验durable跨OS发送权和缺Host-stop的普通冷Workflow。不得用进程内锁或预算结果冒充跨OS发送许可。
