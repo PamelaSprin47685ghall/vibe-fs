@@ -1213,7 +1213,7 @@ module PluginTransforms =
                   // 3. Relay projection cut + manager-loop opening. This MUST run
                   // before every trace/compaction owner so retired raw history
                   // cannot be reintroduced later in the composition.
-                  { Name = "relay-projection-cut"
+                  { Name = "work-projection-cut"
                     Run =
                       fun frame ->
                           task {

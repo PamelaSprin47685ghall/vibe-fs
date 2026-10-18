@@ -573,6 +573,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         =
         String.concat
             "\n"
+            // Durable identity tag: it feeds the AdvanceCommitted id, so it is a
+            // stable machine vocabulary — renaming it would break replay of
+            // existing records. Not a user-visible term.
             [ "relay-authority-revision-v1"
               SessionId.value record.ManagerSessionId
               ProviderRunIdentity.value callerProviderRun
@@ -687,6 +690,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         : Task<Result<string, string>> =
         taskResult {
             let expectedRevision = AuthorityRevision.create work.Authority
+            // Durable gate identity (the nudge's payload digest binds it), so it
+            // stays stable like the authority-revision tag above.
             let gateKind = "relay-authority-update:" + AuthorityRevision.value nextRevision
 
             let! _physicalAuthorityMessage =

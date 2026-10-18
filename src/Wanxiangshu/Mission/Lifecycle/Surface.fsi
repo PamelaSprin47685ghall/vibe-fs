@@ -3,7 +3,6 @@ namespace Wanxiangshu.Mission.Lifecycle
 open System.Threading.Tasks
 
 module LifecycleSurface =
-    val authorityInitial: workId: string -> string
     val observeDurable: requestId: string -> durableResult: obj -> obj
     val mayStartDelivery: durableResult: obj -> bool
     val journalPath: gitCommonDir: string -> string
