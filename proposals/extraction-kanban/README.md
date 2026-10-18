@@ -12,6 +12,8 @@
 
 本窗口已继续接入[Process C](PROCESS-RUNTIME-2026-10-18.md)、修复[输出提前清组R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md)，并交付[实际背压R7-B](PROCESS-BACKPRESSURE-2026-10-18.md)、[work011夹具](WORK-REVIEW-FIXTURE-2026-10-18.md)、[完整wire预算R6-B](PROCESS-WIRE-BUDGET-2026-10-18.md)和[真实取消R6-E](PROCESS-CANCELLATION-2026-10-18.md)。当前库0.6.8，取消精确主包4d594fd已通过Node/Bun真实注册消费、五次128MiB和完整PTY124/124。旧6cc27隔离PTY首轮失败仍未归因，C/R7-A保持REVIEW，不宣布项目全绿。下一P1为终结事实R6-D，实际状态只看[看板](BOARD.md#source-audit-repairs)。
 
+[R6-D原型与接线计划](PROCESS-TERMINATION-2026-10-18.md)已通过纯编译正反控、真实目标/Git/监管丢失及非作者Node/Bun复验。生产仍未修signal混同；下一包D1接单次执行及文本Git，D2独立处理binary GitRawRunner，不把原型当已部署修复。
+
 ## 入口：五份文件，各管一件事
 
 | 文件 | 用途 | 谁改 |

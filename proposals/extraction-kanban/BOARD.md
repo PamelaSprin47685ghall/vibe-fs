@@ -103,7 +103,9 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-02-R6-A](PROCESS-CONTRACT-2026-10-18.md) | GAP-091及Process契约统一、独立编译与消费者切换 | DONE | f0bfa9bbb四文件纯闭包、真实Git/PTY消费者及隐藏入口退出已验；Node128文件897pass/0普通fail/25skip/72TODO、Bun72pass、真实Host及2e500包通过。非作者独立编译2/2、实际Node/Bun冷接管与无owner拒绝3/3；正式包装器既有缺口归CUT-00-R1，不关闭整个Process | root | review_process_a |
 | [CUT-02-R6-B](PROCESS-WIRE-BUDGET-2026-10-18.md) | GAP-092 完整wire总预算与执行前拒绝 | DONE | 双语最小预算、实际TOML与Host窗口、BOM和预取消已验；129文件911pass/0普通fail/15skip/29TODO，正式96pass/1skip，真实Host及独立编译通过。b1f7804固定包Node/Bun各46/46、128MiB五次、PTY124/124，非作者双语各18观察；R6-D/E旧P1单列，随本原子提交交付 | root | review_guidance_r3、review_process_a |
 | [CUT-02-R6-E](PROCESS-CANCELLATION-2026-10-18.md) | P1：真实取消监听及排队准入 | DONE | 真实await监听、局部typed取消及许可交接零启动已修；正式113pass/1skip、10/10/owned accepted，Bun79/79、真实Host1/1。4d594fd精确包双运行时各61+4通过、128MiB五次、PTY124/124；非作者各8观察通过，R6-D/R12不销项，随本原子提交交付 | root | review_guidance_r3 |
-| [CUT-02-R6-D](PROCESS-WIRE-BUDGET-2026-10-18.md) | P1：保留原生exit与signal区别 | READY | 旧0d60与预算候选Node/Bun四腿均证实exit143与SIGTERM在主仓变相同143；纯结果契约、Wait/Runner和Git/工具消费者须原子切换，先做R6-E | root（计划） | review_process_a |
+| [CUT-02-R6-D](PROCESS-TERMINATION-2026-10-18.md) | P1：保留原生exit与signal区别 | DOING | E已交付；本轮纯契约正/三负编译、Node/Bun各26原型session+2当前生产对照和非作者复验通过。生产仍143混同；D1接线、真实采集fault与D2另列，原型不销P1 | root | review_process_a（方案）、review_guidance_r3（原型） |
+| [CUT-02-R6-D1](PROCESS-TERMINATION-2026-10-18.md) | 目标终结事实及单次执行/文本Git消费者 | READY | 原型可行；下一包按契约→Host/Wait→Runner/Output→工具预算→Git/Change/hook原子接线，删除128+signal/-1及错误转1；目标退出不代替scope/输出结束 | root（下一包） | 已作方案复审，生产待审 |
+| [CUT-02-R6-D2](PROCESS-TERMINATION-2026-10-18.md) | 二进制GitRawRunner的原生事实 | READY | 依赖D1公共词汇；execFile/binary stdin/stdout独立接线，缺status不能取1，未知读取不能当不存在，存储/冷恢复另验；D1不关闭此包 | root（后续） | 待生产复审 |
 | [CUT-02-R6-C](PROCESS-RUNTIME-2026-10-18.md) | Node/Bun环境、参数和stdin的真实回执边界 | REVIEW | 环境/argv/stdin及第二跳实现与非作者复审通过；0.6.6放大原有提前清组竞态，继续由R7-A修到0.6.7。最终82项双运行时、347库项、900主仓普通项及精确消费者通过；完整隔离025仍有失败未归因，验收不销项；Bun背压与正式监督另列 | root | review_process_a、review_bun_adapter_c |
 | [CUT-02-R7](REMAINING-REPAIRS-2026-10-16.md#bun-capture) | P1：输出真实性与Bun上游背压 | REVIEW | R7-A/B实现及非作者限定范围验收通过；当前0.6.8主包完整PTY124/124，但旧6cc27首轮隔离失败仍未归因，父项不以新绿覆盖旧失败；不延伸完整RSS或脱组监管保证 | root | 三名非作者分界复核 |
 | [CUT-02-R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md) | P1：逐路extent阻止自然清组截断 | REVIEW | 实现及非作者复审通过：0.6.7双运行时各82/82、精确包26项及128MiB矩阵12/12。后续0.6.8保留extent并通过独立包及完整PTY；旧6cc27首轮隔离失败未归因，验收仍不销项，R7-B所列范围另包DONE | root | review_process_a、review_bun_adapter_c |
@@ -130,7 +132,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-04-R8](REMAINING-REPAIRS-2026-10-16.md#detached-processes) | 主动脱组后代监管原型 | BACKLOG | 明确平台和机制，真实setsid、无关进程隔离、Host强杀；原型成立再接生产，不扩PID扫描冒充全树监管 | root（计划） | 待非作者复审 |
 | [CUT-04-R9](REMAINING-REPAIRS-2026-10-16.md#detached-processes) | 声明平台、运行时与容量实测 | BACKLOG | 对最终协议逐平台精确包/PTY/恢复/收尾及背压/RSS；不把本机结果当Linux/Windows/断电证明 | root（计划） | 待复审 |
 
-2026-10-18施工：用户已授权不迁就旧版本，可改接口、协议、格式并清旧。R3/A/R6-B/R7-B所列范围DONE，work011夹具小包已交付；C/R7-A整体验收REVIEW，旧PTY失败不因新包完整复验通过而抹去。下一P1为真实取消R6-E，再做终结事实R6-D。GAP-085/159/140、Trace产品链与Bootstrap各自推进；R12-U1继续暂缓。[当前唯一施工计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)。
+2026-10-18施工：用户已授权不迁就旧版本，可改接口、协议、格式并清旧。R3/A/R6-B/R6-E/R7-B所列范围DONE，work011夹具小包已交付；C/R7-A整体验收REVIEW，旧PTY失败不因新包完整复验通过而抹去。R6-D原型可行，下一P1为D1生产接线，再处理D2独立binary Git。GAP-085/159/140、Trace产品链与Bootstrap各自推进；R12-U1继续暂缓。[当前唯一施工计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)。
 
 ## 波次：什么时候拉哪张卡
 

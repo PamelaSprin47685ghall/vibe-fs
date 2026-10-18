@@ -2,6 +2,12 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第三十四批：R6-D纯契约和物理原型，生产待接（2026-10-18）
+
+输入5bf2767b9，生产与库不变。原型用Confirmed Exited/Signaled或Unconfirmed保留目标证据，停止请求、输出和Fault分别表达；Git只接受无stop/fault且完整输出的正常Exited，真实1不丢，signal/Unknown不造1。独立Fable正例及三个预期诊断负控通过；根与非作者Node/Bun各26手动session+2当前生产对照通过，包含高码/三种终结信号、真实Git1与SIGTERM、早关FD、目标23后KILL范围、监管者缺回执保Unknown。不是标准requirement总计，不把受控Fault当物理故障或把原型hook当生产取消/超时链。
+
+初版重载/不支持API编译失败、绝对Git pathspec128及默认“已停止”失真分别修正并留证；非作者的受限ps EPERM正确失败后经审批复验，未当消失证据。归档SHA56a49bc8及全部原始/最终日志见[原型与施工计划](PROCESS-TERMINATION-2026-10-18.md)。当前精确生产4d594fd仍返回[143,143]，D1生产接线/物理采集故障、D2独立binary Git尚待施工；没有关闭P1。只交付报告、计划和证据索引，正常推送master，未部署或发布，R12-U1继续暂缓。
+
 ## 第三十三批：真实取消监听及许可交接（2026-10-18）
 
 预算修复已在3c8f385c7正常推送。共享并行新增且已暂存的LOCAL-UPSTREAM-FIRST-FOUR-DIFF报告随该提交包含，未改其正文；本批使用显式文件清单提交，不混入并行改动。新确认的旧P1 R6-E现已修：ExecutorTool的finally包实际await，Runner在明确的许可/物理等待owner映射同token取消，并于取得许可后再检查；排队不偷释放，交接取消不启动，非取消错误保留。原5项2pass/3fail、首个OCE判型失配候选4fail、编译期输入变动及测试前提问题分别保留，不冒称原拆分错误，详见[取消报告](PROCESS-CANCELLATION-2026-10-18.md)。

@@ -29,7 +29,7 @@
 | 3 | CUT-02-R6-C：Node/Bun物理行为 | 环境、参数和stdin结果各自有真实因果证明 | 中 |
 | 新P1 | CUT-02-R7-A → R7-B：输出extent与实际上游背压 | A/B实现及独立限定验收通过，0.6.8已接；旧隔离失败另保留 | 已交付所列范围 |
 | 4 | CUT-02-R6-B：完整结果总预算 | 所列范围DONE：执行前拒绝不足预算，完整编码结果严格受限 | 已交付所列范围 |
-| 新P1 | CUT-02-R6-E → R6-D | E取消监听/排队已交付；D须原子保留确切终结事实与未知 | D中高 |
+| 新P1 | CUT-02-R6-E → R6-D1 → R6-D2 | E已交付；D原型可行，先接单次执行及文本消费者，再接独立binary Git | D中高，分包 |
 | 独立支线 | GAP-085、GAP-159、GAP-140 | 分别修正规则作用域、统一权限、重建预算事实契约 | 低至中 |
 | 5A | CUT-03-R7 → CUT-06-R5 → CUT-03-R8 → CUT-03-R9 | Opening → 实际范围消费者 → compaction/reanchor → Fission完整链 | 高，分包 |
 | 5B | CUT-04-R7 | 实际Bootstrap恢复、准入与终结的崩溃矩阵 | 中高 |
@@ -85,7 +85,7 @@ Trace与Bootstrap的只读调查、无公共文件重叠的独立支线可以并
 
 ### CUT-02-R6-E → R6-D：先补真实取消，再改终结事实
 
-R6-E为新确认旧P1：工具在等待前移除了Abort listener，排队后取消仍会启动；先修实际await作用域、排队及运行中取消错误映射，证明零迟发、继任许可和物理取消，不伪造完成。然后R6-D原子替换有歧义的exitCode int，用Exited(code)/Signaled(nativeName)贯穿Host、Wait、Runner、内存/Spool和Git/工具消费者，删除128+signal及旧期望，重算最小wire预算。两包分别交付、分别复审；具体反例、范围和验收见预算报告。R12-U1继续暂缓。
+R6-E已在5bf2767b9交付。R6-D的[纯契约及真实原型](PROCESS-TERMINATION-2026-10-18.md)已通过两Host和非作者复验，生产尚未接线：D1用Exited/Signaled与Unconfirmed分开保留目标事实，停止请求、输出和Fault独立，接Host/Wait/Runner、内存/Spool、工具及文本Git/Change/hook，删128+signal、-1及错误转1并重算wire预算；D2另接独立binary GitRawRunner与存储调用者。目标退出不能代替scope结束或输出完整，非法回执也不证明未启动。各包按新报告矩阵分别验收，不把原型作生产完成。R12-U1继续暂缓。
 
 <a id="bun-capture"></a>
 ## 新确认P1：CUT-02-R7 Bun Capture上游背压
