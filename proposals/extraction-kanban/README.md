@@ -10,6 +10,8 @@
 
 用户已允许必要的不兼容重构；旧事实不能猜测修复，活动资源不能因升级抹账。当前继续不合并 upstream，[差异报告](LOCAL-UPSTREAM-FIRST-FOUR-DIFF-2026-10-18.md)用于将来的职责裁决，不在本轮替换依赖或工具面。C/R7-A 的旧隔离失败继续保留，R12-U1 暂缓。
 
+[resources 与 time/wait 接收评估](UPSTREAM-INTAKE-ASSESSMENT-2026-10-18.md)已完成只读调查：库原有 Node/Bun 测试各 75/75，但安装包反例发现参数裁剪、声明不符和输入能力被改写，另有等待职责残留与依赖闭包缺口。两项均暂缓直接接收；按已见范围分别预算 4–8、12–24 有效工程小时，尚未施工。[新的接收计划](REMAINING-REPAIRS-2026-10-16.md#upstream-intake)按完整职责拆分、风险选择证据、固定上游批次，不将未来模块持续加入当前 16 包。
+
 三小时施工已完成[Bun挂起定因与夹具修正](GUIDANCE-BUN-LIFETIME-2026-10-18.md)和[Process纯契约及实际消费者](PROCESS-CONTRACT-2026-10-18.md)，非作者复审已核对。新增无界Bun启动器已删除，原生物理证据不替代正式监督；正式Bun适配单列CUT-00-R2，Node验证包装器的既有有界等待问题另列CUT-00-R1，不与暂缓的R12-U1混记。
 
 本窗口已继续接入[Process C](PROCESS-RUNTIME-2026-10-18.md)、修复[输出提前清组R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md)，并交付[实际背压R7-B](PROCESS-BACKPRESSURE-2026-10-18.md)、[work011夹具](WORK-REVIEW-FIXTURE-2026-10-18.md)、[完整wire预算R6-B](PROCESS-WIRE-BUDGET-2026-10-18.md)和[真实取消R6-E](PROCESS-CANCELLATION-2026-10-18.md)。当前库0.6.8，取消精确主包4d594fd已通过Node/Bun真实注册消费、五次128MiB和完整PTY124/124。旧6cc27隔离PTY首轮失败仍未归因，C/R7-A保持REVIEW，不宣布项目全绿。下一P1为终结事实R6-D，实际状态只看[看板](BOARD.md#source-audit-repairs)。

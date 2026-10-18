@@ -136,6 +136,8 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 
 2026-10-18 复盘修订：依据[修复原因与改进措施](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#repair-retrospective)，已完成项退出待施工顺序；每包明确范围、关键反例、验收及排除项。下一 P1 为 D1，再接 D2；验证设施与旧失败取证独立，Trace 按 R7→R5→R8→R9，Bootstrap 另包，脱组分原型/接线两包。C/R7-A 保持 REVIEW，R12-U1 继续暂缓。本次只更新文档，不新增验收结论、不合并 upstream。[当前唯一施工计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)。
 
+2026-10-18 上游样本评估：CUT-05 resources 与 CUT-21 time/wait 的[只读接收评估](UPSTREAM-INTAKE-ASSESSMENT-2026-10-18.md)完成，两项接收均暂缓。resources 需修参数裁剪并验证实际资源入口；time/wait 需对齐公开合同、能力边界和旧算法归属后再接线。原卡施工列及当前 16 包状态不变；未认领新的生产修改，未合并 upstream。[候选范围、反例、验收与预算](REMAINING-REPAIRS-2026-10-16.md#intake-candidates)已补入现行计划。
+
 ## 波次：什么时候拉哪张卡
 
 波次不是日期排期，也不是整波完成才能开始下一波。以表中实际前置和编辑面为准，满足一张就拉一张。
