@@ -734,6 +734,7 @@ Repository/Programming/Js/TransactionStore.fsi
 Repository/Programming/Js/TransactionStore.fs
 Repository/Programming/Js/OpenCode/ParkedSites.fsi
 Repository/Programming/Js/OpenCode/ParkedSites.fs
+Repository/Programming/Js/Anchor/AnchorModel.fsi
 Repository/Programming/Js/Anchor/AnchorModel.fs
 Repository/Programming/Js/Anchor/AnchorLedger.fsi
 Repository/Programming/Js/Anchor/AnchorLedger.fs

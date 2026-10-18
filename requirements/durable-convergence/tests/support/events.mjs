@@ -14,7 +14,7 @@ export const event = (id, parents = [], payload = {}) => ({
 
 export async function withStore(run) {
   const root = mkdtempSync(join(tmpdir(), 'wxs-convergence-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir)
   const store = eventStore.create(commonDir, 'writer-proof')
   try {

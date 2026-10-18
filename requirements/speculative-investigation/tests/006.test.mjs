@@ -213,7 +213,7 @@ test('WHAT[speculative-investigation-006] STRENGTH_006_durability_port_rejects_c
 })
 test('WHAT[speculative-investigation-006] prepared_cut_reopen_observes_only_durable_receipts', async () => {
   const base = makeDir('wxs-strength-cut-reopen-')
-  const commonDir = join(base, '.git')
+  const commonDir = join(base, '.Herdchestra')
   const local = createLocalEventStore({ commonDir })
   try {
     const durability = Strength.durabilityCreate(local.store)
@@ -360,7 +360,7 @@ const child = fileURLToPath(new URL('./support/append-settlement-child.mjs', imp
 for (const scenario of ['store', 'append', 'prepared', 'duplicate']) {
   test(`WHAT[speculative-investigation-006] actual_${scenario}_release_failure_keeps_strength_settlement_evidence`, async t => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'strength-settlement-')))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     const sourceWriter = randomUUID()
     const env = {...process.env}
     delete env.NODE_TEST_CONTEXT

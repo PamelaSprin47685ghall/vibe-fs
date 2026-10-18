@@ -141,7 +141,7 @@ const inventory = (root) => {
 }
 
 const eventJournalBytes = (workspace) => {
-  const events = join(workspace, '.git', 'wanxiangshu', 'events')
+  const events = join(workspace, '.Herdchestra', 'wanxiangshu', 'events')
   return readdirSync(events)
     .filter((name) => name.endsWith('.ndjson'))
     .reduce((total, name) => total + statSync(join(events, name)).size, 0)

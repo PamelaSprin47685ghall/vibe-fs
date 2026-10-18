@@ -53,7 +53,6 @@ const CONTRACT_SHARDS = [
 
 const FOCUSED_RUNTIME_SHARDS = [
   'eventstore-core-runtime',
-  'eventstore-git-runtime',
 ]
 
 // B4 expansion (2026-10-04, volume-02 build direction): the locality
@@ -355,16 +354,6 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
     // Host adapter; IGitRawStore stays in the physical-port contract and is
     // never exposed through EventStore.Port.Contract). Each probe names a
     // real public member of the higher layer.
-    const GIT_RUNTIME_PROBE = [
-      'namespace Wanxiangshu.Probe',
-      '',
-      'open Wanxiangshu.Persistence.EventStore',
-      '',
-      'module ProbeGitRuntimeUsage =',
-      '    let runner = ProcessGitRawStore.createDefaultRunner',
-      '',
-    ].join('\n')
-
     const HOST_ADAPTER_PROBE = [
       'namespace Wanxiangshu.Probe',
       '',
@@ -401,16 +390,11 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
     // Isolation evidence: the real owner sources keep their bytes and mtime.
     const realStoreTypes = joinPath(SOURCE_ROOT, 'Persistence/EventStore/StoreTypes.fs')
     const realModel = joinPath(SOURCE_ROOT, 'Persistence/EventStore/Model.fs')
-    const realGitRuntime = joinPath(SOURCE_ROOT, 'Persistence/EventStore/ProcessGitRawStore.fs')
     const realHostAdapter = joinPath(SOURCE_ROOT, 'OpenCode/Host/WorkspaceEventStore.fs')
-    const before = [digestOf(realStoreTypes), digestOf(realModel), digestOf(realGitRuntime), digestOf(realHostAdapter)]
+    const before = [digestOf(realStoreTypes), digestOf(realModel), digestOf(realHostAdapter)]
 
-    // Negative A: the port contract must not admit the Git runtime
-    // implementation. Positive control: the same probe compiles in the
-    // eventstore-git-runtime closure, so the symbol and its qualified usage
-    // are valid.
-    const gitRuntimePositive = isolate('eventstore-git-runtime', GIT_RUNTIME_PROBE)
-    const gitRuntimeNegative = isolate('eventstore-port-contract', GIT_RUNTIME_PROBE)
+    // durable-events [009]/[011]: the Git runtime implementation and its
+    // shard are retired, so only the host-adapter boundary is probed here.
     // Negative B: the model contract must not admit the Host adapter.
     // Positive control: the same probe compiles in the host workspace
     // event-store closure that owns the adapter.
@@ -424,24 +408,6 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
         stdio: 'pipe',
         compilePlan: plan,
       })
-
-      const gitPositive = await compileIsolated(gitRuntimePositive)
-      assert.equal(
-        gitPositive.ok,
-        true,
-        'probe compiles in the git-runtime closure (symbol and usage are valid): '
-          + String(gitPositive.stdout ?? '').slice(-400),
-      )
-
-      const gitNegative = await compileIsolated(gitRuntimeNegative)
-      assert.equal(
-        gitNegative.ok,
-        false,
-        'the git-runtime probe must fail in the eventstore-port-contract closure',
-      )
-      const gitOutput = String(gitNegative.stdout ?? '') + String(gitNegative.stderr ?? '')
-      assert.match(gitOutput, /ProcessGitRawStore/, 'the diagnostic names the git runtime implementation module')
-      assert.match(gitOutput, /is not defined/, 'the diagnostic is a not-defined rejection, not a syntax or toolchain error')
 
       const hostPositive = await compileIsolated(hostAdapterPositive)
       assert.equal(
@@ -462,11 +428,9 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
       assert.match(hostOutput, /is not defined/, 'the diagnostic is a not-defined rejection, not a syntax or toolchain error')
 
       // Isolation evidence: the real owner sources were never touched.
-      const after = [digestOf(realStoreTypes), digestOf(realModel), digestOf(realGitRuntime), digestOf(realHostAdapter)]
+      const after = [digestOf(realStoreTypes), digestOf(realModel), digestOf(realHostAdapter)]
       assert.deepEqual(after, before, 'the real owner sources are untouched (bytes and mtime)')
     } finally {
-      rmSync(gitRuntimePositive.iso, { recursive: true, force: true })
-      rmSync(gitRuntimeNegative.iso, { recursive: true, force: true })
       rmSync(hostAdapterPositive.iso, { recursive: true, force: true })
       rmSync(hostAdapterNegative.iso, { recursive: true, force: true })
     }

@@ -20,7 +20,7 @@ test('WHAT[knowledge-reuse-009] absent marker disables feature and rejects the a
 test('WHAT[knowledge-reuse-009] actual lifecycle finalization without a marker does not publish a case', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-casebook-off-'))
   execFileSync('git', ['init', '--quiet', dir])
-  const store = eventStore.create(join(dir, '.git'), 'off-writer')
+  const store = eventStore.create(join(dir, '.Herdchestra'), 'off-writer')
   try {
     lifecycle.enable(dir)
     lifecycle.notePrompt('off', 'Q')

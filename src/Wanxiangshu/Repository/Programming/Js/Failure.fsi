@@ -69,6 +69,7 @@ type JsFailure =
     | RunChildUnknown of string
     | RunParkUnsupported
     | RunHostUnavailable
+    | AskRefused of string
 
 module JsFailure =
     val code: failure: JsFailure -> string

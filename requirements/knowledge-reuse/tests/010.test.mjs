@@ -67,7 +67,7 @@ const installBookkeeperRuntime = (port, ownerSessionIds) => {
   assert.equal(installed.ok, true, installed.error)
 }
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
-const openStore = (dir, writerId) => eventStore.create(join(dir, '.git'), writerId)
+const openStore = (dir, writerId) => eventStore.create(join(dir, '.Herdchestra'), writerId)
 
 test('WHAT[knowledge-reuse-010] CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-fin-'))
@@ -156,7 +156,7 @@ test('WHAT[knowledge-reuse-010] CASE010_finalize_uses_synthesizer_not_raw_noteAn
     assert.equal(createCalls.length, 1)
     assert.equal(programCalls.length >= 1, true)
 
-    const handle = eventStore.create(join(dir, '.git'), 'bookkeeper-synthesis-finalize-read')
+    const handle = eventStore.create(join(dir, '.Herdchestra'), 'bookkeeper-synthesis-finalize-read')
     const fetched = await casebook.fetchCase(handle, 10, key)
     assert.equal(fetched.value.q, CANONICAL_Q)
     assert.notEqual(fetched.value.a, rawA)
@@ -190,7 +190,7 @@ test('WHAT[knowledge-reuse-010] CASE010_cleanup_never_synthesizes', async () => 
     lifecycle.cleanup(key)
     assert.equal(createCalls.length, 0)
     assert.equal(programCalls.length, 0)
-    const handle = eventStore.create(join(dir, '.git'), 'bookkeeper-synthesis-cleanup-read')
+    const handle = eventStore.create(join(dir, '.Herdchestra'), 'bookkeeper-synthesis-cleanup-read')
     const fetched = await casebook.fetchCase(handle, 10, key)
     assert.equal(fetched.value, null)
     eventStore.dispose(handle)
@@ -383,7 +383,7 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q1')), true)
     assert.equal(bookkeeperPort.prompts.some((text) => String(text).includes('Q3')), true)
 
-    const store = eventStore.create(join(dir, '.git'), 'g6-engineer-charge-fetch')
+    const store = eventStore.create(join(dir, '.Herdchestra'), 'g6-engineer-charge-fetch')
     const fetched = await casebook.fetchCase(store, 10, delegateId)
     assert.equal(fetched.ok, true)
     assert.notEqual(fetched.value, null, 'Case exists after finalize')
@@ -466,7 +466,7 @@ test('WHAT[knowledge-reuse-010] actual reusable Engineer results can be manually
     assert.equal(bookkeeperPort.createCalls.length, 1, 'exactly one detached Bookkeeper sibling lane')
     assert.equal(bookkeeperPort.programCalls.length >= 1, true, 'todowrite-for-bookkeeper invoked')
 
-    const store = eventStore.create(join(dir, '.git'), 'g6-host-fetch')
+    const store = eventStore.create(join(dir, '.Herdchestra'), 'g6-host-fetch')
     const published = await casebook.fetchCase(store, 10, delegateId)
     assert.equal(published.ok, true)
     assert.notEqual(published.value, null, 'Case exists after ReuseScope close')
@@ -518,11 +518,11 @@ const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-lifecycle-'))
   execFileSync('git', ['init', '--quiet', dir])
   mkdirSync(join(dir, '.wanxiang', 'casebook'), { recursive: true })
-  const handle = eventStore.create(join(dir, '.git'), 'lifecycle-wiring')
+  const handle = eventStore.create(join(dir, '.Herdchestra'), 'lifecycle-wiring')
   return {
     dir,
     handle,
-    reopen: (writerId) => eventStore.create(join(dir, '.git'), writerId),
+    reopen: (writerId) => eventStore.create(join(dir, '.Herdchestra'), writerId),
     cleanup: () => {
       eventStore.dispose(handle)
       rmSync(dir, { recursive: true, force: true })
@@ -611,7 +611,7 @@ test('WHAT[knowledge-reuse-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup',
     lifecycle.noteAnswer(key, rawA)
     assert.equal((await lifecycle.tryFinalize(dir, key)).ok, true)
 
-    const handle = eventStore.create(join(dir, '.git'), 'universal-lifecycle-read')
+    const handle = eventStore.create(join(dir, '.Herdchestra'), 'universal-lifecycle-read')
     const fetched = await casebook.fetchCase(handle, 10, key)
     assert.equal(fetched.value.q, CANONICAL_Q)
     assert.notEqual(fetched.value.a, rawA)
@@ -649,7 +649,7 @@ test('WHAT[knowledge-reuse-010] G6_G_cancel_session_cleanup_no_publication', asy
     lifecycle.collect(key, 'read', { path: 'x.txt' }, 'body')
     lifecycle.noteAnswer(key, 'A')
     lifecycle.cleanup(key)
-    const handle = eventStore.create(join(dir, '.git'), 'universal-cancel-read')
+    const handle = eventStore.create(join(dir, '.Herdchestra'), 'universal-cancel-read')
     assert.equal((await casebook.fetchCase(handle, 10, key)).value, null)
     eventStore.dispose(handle)
   } finally {

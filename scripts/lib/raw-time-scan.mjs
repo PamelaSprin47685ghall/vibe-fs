@@ -58,6 +58,7 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Persistence/EventStore/WriterStreamSync.fs',
   'Persistence/Journal/EventStoreJournalWriter.fs',
   'Process/JsSandbox.fs',
+  'Process/JsRunLoop.fs',
   'Process/NodeProcessWait.fs',
   'Process/ProcessRunner.fs',
   'Process/Pty.fs',
@@ -66,6 +67,8 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Repository/Investigation/Semble/Stdio.fs',
   'Repository/Programming/Js/OpenCode/BookkeeperTool.fs',
   'Repository/Programming/Js/OpenCode/ToolHost.fs',
+  'Repository/Programming/Js/OpenCode/ToolWorkflow.fs',
+  'OpenCode/Host/PluginSessionScope.fs',
   'Sphinx/McpServer.fs',
 ])
 

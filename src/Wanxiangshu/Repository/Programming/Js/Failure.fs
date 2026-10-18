@@ -74,6 +74,7 @@ type JsFailure =
     | RunChildUnknown of string
     | RunParkUnsupported
     | RunHostUnavailable
+    | AskRefused of string
 
 module JsFailure =
 
@@ -141,6 +142,7 @@ module JsFailure =
         | JsFailure.RunChildUnknown _ -> "RUN_CHILD_UNKNOWN"
         | JsFailure.RunParkUnsupported -> "RUN_PARK_UNSUPPORTED"
         | JsFailure.RunHostUnavailable -> "RUN_HOST_UNAVAILABLE"
+        | JsFailure.AskRefused _ -> "ASK_REFUSED"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
     let private reasonWithMessage fallback prefix message =
@@ -203,6 +205,7 @@ module JsFailure =
         | JsFailure.RunChildUnknown name -> "no background process with this name: " + name
         | JsFailure.RunParkUnsupported -> "park verdict requires the orchestrated execution path"
         | JsFailure.RunHostUnavailable -> "js.run has no host loop in this execution path"
+        | JsFailure.AskRefused detail -> reasonWithMessage "ask was refused" "" detail
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
     let render (failure: JsFailure) : string =
@@ -270,4 +273,5 @@ module JsFailure =
         | "RUN_CHILD_UNKNOWN" -> JsFailure.RunChildUnknown(after "no background process with this name: ")
         | "RUN_PARK_UNSUPPORTED" -> JsFailure.RunParkUnsupported
         | "RUN_HOST_UNAVAILABLE" -> JsFailure.RunHostUnavailable
+        | "ASK_REFUSED" -> JsFailure.AskRefused text
         | _ -> JsFailure.ProgramFailed text

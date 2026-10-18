@@ -187,7 +187,7 @@ const toolMessage = (id, sessionId, parts) => ({ info: { id, role: 'tool', sessi
 // event_type names the fact. Reading the durable line is the observation:
 // the capture phase must have appended exactly the authorization it admitted.
 const durableEventsOfType = (directory, eventType) => {
-  const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
+  const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
   if (!existsSync(eventsDir)) return []
   const events = []
   for (const name of readdirSync(eventsDir)) {
@@ -219,7 +219,7 @@ const withTimeout = async (promise, message) => {
 }
 
 const durableFactLineCount = (directory) => {
-  const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
+  const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
   if (!existsSync(eventsDir)) return 0
   let lines = 0
   for (const name of readdirSync(eventsDir)) {

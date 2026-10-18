@@ -81,6 +81,30 @@ module JsToolWorkflow =
         fileAccessObservation: FileAccessObservation option ->
             Task<JsToolOutcome>
 
+    /// Run a program whose api is caller-supplied while the park lifecycle,
+    /// race and outcome stay workflow-owned (the plan tenure sandbox).
+    val runWithParkApi:
+        sessionId: string ->
+        baseClassSource: string ->
+        modelSource: string ->
+        makeApi: (Wanxiangshu.Process.JsSandbox.ParkState -> obj) ->
+        deadlineMs: int ->
+        deadlineEpochMs: int64 ->
+        outputBoundBytes: int ->
+            Task<JsToolOutcome>
+
+    /// Resume a parked site from any owning surface.
+    val resumeParked:
+        handle: string ->
+        value: obj ->
+        baseClassSource: string ->
+        deadlineMs: int ->
+        outputBoundBytes: int ->
+            Task<JsToolOutcome>
+
+    /// Abandon a parked site from any owning surface.
+    val abandonParked: handle: string -> deadlineMs: int -> outputBoundBytes: int -> Task<JsToolOutcome>
+
 /// JS-016: stable LLM-visible result shapes, rendered as Synthetic TOML
 /// (the only rendering owner; ARCH-010). Success is `# ok` plus data/fs;
 /// failure is `# failed` plus code/reason; a parked payload renders as a

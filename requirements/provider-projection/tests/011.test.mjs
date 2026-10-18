@@ -150,8 +150,8 @@ const productionDigest = async (callId, path) => {
     })
     await hooks['experimental.chat.messages.transform']({ sessionID: blogger }, { messages: structuredClone(bloggerMessages) })
     assert.ok(Journal.JournalSurface_snapshot(runtime.journal).sessionProjections[sessionID].blog, JSON.stringify(Journal.JournalSurface_snapshot(runtime.journal)))
-    const observation = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'BlogObservationCommitted')).filter(Boolean)
-    assert.equal(observation.length, 1, JSON.stringify(journalFacts(join(directory, '.git'))))
+    const observation = journalFacts(join(directory, '.Herdchestra')).map(fact => payloadFor(fact, 'BlogObservationCommitted')).filter(Boolean)
+    assert.equal(observation.length, 1, JSON.stringify(journalFacts(join(directory, '.Herdchestra'))))
     assert.equal(observation[0].NextCoverableTurnCutoffExclusive, 4)
     expectedPrefix = Projection.semanticProjection([
       { role: 'user', parts: [{ kind: 'text', text: 'opening assignment' }] },
@@ -207,7 +207,7 @@ const productionDigest = async (callId, path) => {
       parts: [],
     })
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: structuredClone(messages) })
-    const rebases = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
+    const rebases = journalFacts(join(directory, '.Herdchestra')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
     assert.equal(rebases.length, 0, 'CTX-029: a boundary-crossing prefix must stay uncommitted')
   }
   await withRestartablePlugin(async (start, directory, host) => {
@@ -220,9 +220,9 @@ const productionDigest = async (callId, path) => {
     await host.withRuntime(async (runtime) => {
       const state = Journal.JournalSurface_snapshot(runtime.journal).sessionProjections[sessionID]
       assert.equal(state.prefixEpoch ?? null, null, 'CTX-029: no committed epoch may exist without a promotable probe')
-      const rebases = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
+      const rebases = journalFacts(join(directory, '.Herdchestra')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
       assert.deepEqual(rebases, [], 'CTX-029: reopening must not resurrect an uncommitted boundary-crossing prefix')
-      const replayed = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'BlogObservationCommitted')).filter(Boolean)
+      const replayed = journalFacts(join(directory, '.Herdchestra')).map(fact => payloadFor(fact, 'BlogObservationCommitted')).filter(Boolean)
       assert.equal(replayed[0].NextCoveredPrefixDigest, observationDigest, 'the durable coverage digest survives reopen unchanged')
     })
   })

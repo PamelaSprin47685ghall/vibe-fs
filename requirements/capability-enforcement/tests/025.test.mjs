@@ -255,7 +255,7 @@ test('WHAT[capability-enforcement-025] P11_plugin_reopen_evaluates_durable_incum
     assert.equal(unacceptedBeforeOutput.args, originalArgs)
     assert.deepEqual(originalArgs, { program: expectedArgs.program })
     await restartedPlugin['tool.execute.after'](
-      { tool: 'todowrite-for-manager', sessionID, sessionUnaccepted, callID: 'call-p11-unacc', args: originalArgs },
+      { tool: 'todowrite-for-manager', sessionID: sessionUnaccepted, callID: 'call-p11-unacc', args: originalArgs },
       { title: 'todowrite-for-manager', output: '', metadata: {} },
     )
     assert.deepEqual(originalArgs, expectedArgs, 'after reopening, after must restore the public contract hint')

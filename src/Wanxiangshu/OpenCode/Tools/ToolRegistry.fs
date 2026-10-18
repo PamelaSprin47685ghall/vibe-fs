@@ -3,6 +3,7 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger.Runtime
@@ -401,15 +402,60 @@ module ToolRegistry =
         | Some(ToolAdmission.PrivateAttachment _)
         | None -> fun _ -> false
 
-    let private createPlanSandboxApi (currentContent: string) (stagedMutation: string option ref) =
-        createObj
-            [ "js"
-              ==> createObj
-                      [ "read" ==> fun (_: obj) -> currentContent
-                        "edit"
-                        ==> fun (_path: string) (newText: string) ->
-                            stagedMutation.Value <- Some newText
-                            createObj [ "ok" ==> true ] ] ]
+    /// A refused `js.ask` must reject the program's await with the stable
+    /// failure sentinel instead of resolving to a data object.
+    [<Emit("Promise.reject(Object.assign(new Error($1), { __jsFailure: { code: $0, reason: $1 } }))")>]
+    let private rejectedJsFailure (code: string) (reason: string) : obj = jsNative
+
+    let private createPlanSandboxApi
+        (currentContent: string)
+        (stagedMutation: string option ref)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        (askInvoke: (string -> Task<Result<unit, string>>) option)
+        =
+        let members =
+            [ "read" ==> fun (_: obj) -> currentContent
+              "edit"
+              ==> fun (_path: string) (newText: string) ->
+                  stagedMutation.Value <- Some newText
+                  createObj [ "ok" ==> true ] ]
+
+        let askMembers =
+            match parkState, askInvoke with
+            | Some state, Some invoke ->
+                [ "ask"
+                  ==> fun (question: obj) (stack: obj) ->
+                      if state.AbandonRequested then
+                          rejectedJsFailure
+                              (JsFailure.code JsFailure.CannotParkWhileAbandoning)
+                              (JsFailure.reason JsFailure.CannotParkWhileAbandoning)
+                      else
+                          task {
+                              let text = string question
+
+                              if System.String.IsNullOrWhiteSpace text then
+                                  let failure = JsFailure.InvalidArgument "ask requires a question"
+                                  return rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
+                              else
+                                  let! asked = invoke text
+
+                                  match asked with
+                                  | Ok() ->
+                                      if not (isNull stack) then
+                                          state.ParkStack <- string stack
+
+                                      return
+                                          Wanxiangshu.Process.JsSandbox.suspendProgram
+                                              state
+                                              (createObj [ "question" ==> text ])
+                                  | Error reason ->
+                                      let failure = JsFailure.AskRefused reason
+                                      return rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
+                          }
+                          |> box ]
+            | _ -> []
+
+        createObj [ "js" ==> createObj (members @ askMembers) ]
 
     let private writePlanFile root sessionId newText value =
         match PlanPath.rewritePlanAtomic root sessionId newText with
@@ -452,7 +498,7 @@ module ToolRegistry =
 
             // DSL-MUTABLE: algorithm-scratch — staged mutation accumulator for Plan sandbox
             let stagedMutation = ref None
-            let api = createPlanSandboxApi currentContent stagedMutation
+            let api = createPlanSandboxApi currentContent stagedMutation None None
             let baseClassSource = JsCanonicalDescription.runtimePlanBaseClass prose
             let deadlineMs = 10000
             let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
@@ -623,8 +669,109 @@ module ToolRegistry =
         let planningAdmission: ToolAdmission =
             ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
 
+        // 只有 S1 阶段的 Plan 可以提问；阶段门禁由 AskUser 与 durable work 共同兜底。
+        let planDeadlineMs = 10000
+        let planOutputBoundBytes = 1 <<< 20
+
+        let planBaseClassSource () =
+            JsCanonicalDescription.runtimePlanBaseClass jsProse
+
+        let executePlanProgramWithPark (root: string) (ctx: HostToolContext) (programSource: string) : Task<string> =
+            task {
+                let currentContent =
+                    match PlanPath.readPlan root ctx.SessionId with
+                    | Ok c -> c
+                    | Error _ -> ""
+
+                // DSL-MUTABLE: algorithm-scratch — staged plan mutation
+                let stagedMutation = ref None
+
+                let makeApi (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
+                    createPlanSandboxApi
+                        currentContent
+                        stagedMutation
+                        (Some parkState)
+                        (Some(fun question -> runtime.AskUser(ctx, question)))
+
+                let now = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+
+                let! outcome =
+                    JsToolWorkflow.runWithParkApi
+                        ctx.SessionId
+                        (planBaseClassSource ())
+                        programSource
+                        makeApi
+                        planDeadlineMs
+                        (now + int64 planDeadlineMs)
+                        planOutputBoundBytes
+
+                match outcome with
+                | JsToolWorkflow.JsToolOutcome.Succeeded(value, _, _, _, _) ->
+                    let hasReviewed =
+                        match planGitCommonDir with
+                        | Some gitCommonDir ->
+                            match resolveActiveTenure gitCommonDir ctx.SessionId with
+                            | Ok reviewed -> reviewed
+                            | Error _ -> false
+                        | None -> false
+
+                    return
+                        match stagedMutation.Value with
+                        | None -> JsToolsResult.render outcome
+                        | Some _ -> commitPlanMutation root ctx.SessionId hasReviewed stagedMutation.Value value
+                | _ -> return JsToolsResult.render outcome
+            }
+
         let executeJsPlanTool (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
-            runPlanProgramCore jsProse planGitCommonDir planRoot ctx.SessionId (args.OptionalText "program")
+            task {
+                let program = args.OptionalText "program"
+
+                let unpark = if isNull (args.Raw?unpark) then null else args.Raw?unpark
+
+                let abandon = if isNull (args.Raw?abandon) then null else args.Raw?abandon
+
+                match program, unpark, abandon with
+                | Some source, _, _ ->
+                    match planRoot with
+                    | Some root -> return! executePlanProgramWithPark root ctx source
+                    | None ->
+                        return
+                            JsToolsResult.render (
+                                JsToolWorkflow.JsToolOutcome.Failed(
+                                    JsFailure.ProgramFailed "The plan workspace is unavailable",
+                                    [],
+                                    [],
+                                    [],
+                                    []
+                                )
+                            )
+                | None, unparkValue, _ when not (isNull unparkValue) ->
+                    let! outcome =
+                        JsToolWorkflow.resumeParked
+                            (string (unparkValue?handle))
+                            (unparkValue?value)
+                            (planBaseClassSource ())
+                            planDeadlineMs
+                            planOutputBoundBytes
+
+                    return JsToolsResult.render outcome
+                | None, _, abandonValue when not (isNull abandonValue) ->
+                    let! outcome =
+                        JsToolWorkflow.abandonParked (string (abandonValue?handle)) planDeadlineMs planOutputBoundBytes
+
+                    return JsToolsResult.render outcome
+                | _ ->
+                    return
+                        JsToolsResult.render (
+                            JsToolWorkflow.JsToolOutcome.Failed(
+                                JsFailure.InvalidArgument "no program, unpark, or abandon input",
+                                [],
+                                [],
+                                [],
+                                []
+                            )
+                        )
+            }
 
         // planning-010: the real delegation capability — the SyncDelegate
         // runtime runs the bound fixed DevOps for this work synchronously and
@@ -970,6 +1117,15 @@ module ToolRegistry =
             }
 
         let planningSpecs () =
+            let planUnparkSchema =
+                ToolHostCodec.objectSchemaOf
+                    [ "handle", ToolHostCodec.stringSchema factory
+                      "value", ToolHostCodec.anySchema factory ]
+                    factory
+
+            let planAbandonSchema =
+                ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
+
             [ { Name = "todowrite-for-plan"
                 Description =
                   JsCanonicalDescription.renderPlan
@@ -979,7 +1135,9 @@ module ToolRegistry =
                   [ "program",
                     ToolHostCodec.stringSchemaDescribed
                         (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
-                        factory ]
+                        factory
+                    "unpark", planUnparkSchema
+                    "abandon", planAbandonSchema ]
                 Admission = planningAdmission
                 Execute = fun args ctx -> executeJsPlanTool args ctx }
               { Name = "devops"

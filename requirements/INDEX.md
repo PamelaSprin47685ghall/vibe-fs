@@ -169,7 +169,7 @@
 | 39 | `crash-reconciliation` | 21 | crash-reconciliation-001 ~ 019、crash-reconciliation-020（固定 DevOps 崩溃恢复单一逻辑权威与命令去重）、crash-reconciliation-021（进程本地表是缓存，durable 投影是存在性真源） |
 | 40 | `degeneration-guard` | 13 | degeneration-guard-001 ~ 013 |
 | 41 | `obligation-ledger` | 7 | obligation-ledger-001 ~ 007 |
-| 42 | `work` | 49 | work-001 ~ 049（011 起是内核合同；020 起是 Plan 编程面、devops 调查、任期隔离、阶段资源、review 与交付；027 禁止长程静默停止；040 起是唯一任期、DevOps 绑定、资源交接、durable 回执及恢复；049 是 ask 显式人类等待。新增测试为静态稿，未运行） |
+| 42 | `work` | 50 | work-001 ~ 049（011 起是内核合同；020 起是 Plan 编程面、devops 调查、任期隔离、阶段资源、review 与交付；027 禁止长程静默停止；040 起是唯一任期、DevOps 绑定、资源交接、durable 回执及恢复；049 是 ask 显式人类等待；050 是 Plan 编程面的 js.ask 与 S1 门禁） |
 | 46 | `behavior-diagnosis` | 20 | behavior-diagnosis-001 ~ 020 |
 | 47 | `guidance-delivery` | 11 | guidance-delivery-001 ~ 009、011 ~ 012 |
 | 48 | institutional-learning（已退役） | 0 | 随 WP-036 整包退役，目录与条款已删除 |

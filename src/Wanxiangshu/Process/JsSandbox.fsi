@@ -67,6 +67,10 @@ module JsSandbox =
     /// Install the park signal the workflow races against the program promise.
     val installParkSignal: parkState: ParkState -> Task<obj>
 
+    /// Suspend the program through the shared park channel; returns the
+    /// deferred promise the program awaits.
+    val suspendProgram: parkState: ParkState -> payload: obj -> obj
+
     /// Resolve the deferred promise the program is awaiting at `await js.park`
     /// with the injected unpark value.
     val unpark: parkState: ParkState -> value: obj -> unit

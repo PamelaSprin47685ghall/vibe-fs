@@ -422,7 +422,7 @@ Lifecycle 的 SQLite 连接由宿主边界按实际 JavaScript 运行时选择�
 
 ## [049] ask：向用户提问与显式暂停
 
-Plan 可以使用 `ask(question)` 请求继续目标所必需的用户输入；Manager 禁用 `ask`。它不调用 DevOps，不假装拿到了用户回答，也不完成工作。
+只有 S1 阶段的 Plan 可以使用 `ask(question)` 请求继续目标所必需的用户输入；其他阶段与其他角色一律禁用（Manager 同样禁用）。它不调用 DevOps，不假装拿到了用户回答，也不完成工作。
 
 - 真实呈现询问并成功登记 `UserQuestionAsked` 后，返回“你的询问已经发出”一类占位回执。事实绑定 session、logical run、authority root、提问所依据的物理输入、provider run、tool call 与原问题。占位回执不是用户原文，也不是完成报告。
 - 在 Host 已确认同一个 ask 工具结果的 `message.part.updated/completed` 上，立即调用 `InterruptAttempt`，不靠延时器猜测完成顺序，不在返回结果前销毁工具。不得使用逻辑终止、关闭 authority 或递归取消子资源替代。重复终态不重复中断；别的 call、别的会话或已回答提问的迟到事件不许中断新执行。
@@ -431,3 +431,7 @@ Plan 可以使用 `ask(question)` 请求继续目标所必需的用户输入；M
 - 用户答复沿既有 HumanMessage 准入继续同一任务，不强制新建会话、不触发 `Reopened`、不重置评审资格，也不让用户另行调用恢复工具。若显示、存储或 interrupt 失败，必须明确报告实际完成到哪一步，不伪造“正在等待/已经继续”的事实。
 
 本轮仅静态修改实现与测试；[027]、[049] 的完整宿主行为尚未运行验收。尤其需复验工具结果先落地、再 interrupt 的实际顺序，以及用户回复与旧终态交错时的恢复行为。
+
+## [050] js.ask：Plan 编程面的提问成员
+
+Plan 的编程面（`todowrite-for-plan`）携带 `js.ask(question)`：程序内调用即登记 durable 问题并通知用户，然后经统一 park 通道挂起，工具返回 parked 载荷；程序不继续执行，直到恢复。阶段门禁与 [049] 相同：只有 S1 阶段的 Plan 可以提问，其他阶段以 `ASK_REFUSED` 拒绝；拒绝以失败哨兵进入程序，程序可捕获或让其失败。恢复沿用同一工具的三态入参：`{ unpark: { handle, value } }` 让 await 取到注入值，`{ abandon: { handle } }` 展开为 ABANDONED；等待期间的新调用受等待门禁拒绝，只有真实用户输入解锁。parked 载荷携带完整程序与执行点 source 标记（与生成面同规）。

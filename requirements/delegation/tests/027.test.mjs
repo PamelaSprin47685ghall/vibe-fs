@@ -74,8 +74,12 @@ for (const replacement of ['active', 'finished', 'successor']) {
     const preparing = Promise.withResolvers()
     const release = Promise.withResolvers()
     let attachmentSession
+    // The same work-record read port is exercised by settle and by the
+    // attachment preparation; only the latter may block here, otherwise the
+    // fixture deadlocks before guidance even starts.
+    let armAttachmentBlock = false
     const runtime = await forkTool.createRuntimeWithWorkRecordRead(directory, [{ sessionId: owner, agent: 'manager' }], async session => {
-      if (session === attachmentSession) {
+      if (armAttachmentBlock && session === attachmentSession) {
         preparing.resolve()
         await release.promise
       }
@@ -99,6 +103,7 @@ for (const replacement of ['active', 'finished', 'successor']) {
       assert.ok(originalHandoff.length > 0, 'the completed attachment source established a real handoff frontier')
       const listeners = forkTool.terminalListenerCount(runtime)
       const completeOriginal = await forkTool.prepareTerminalDelivery(runtime, owner, 'ORIGINAL-DONE', 'original-provider')
+      armAttachmentBlock = true
       const guidance = forkTool.executeManagerResumeWithAttachment(runtime, toolModule, owner, byname, 'ORIGINAL-GUIDANCE', 'Source')
       await preparing.promise
       assert.equal(forkTool.promptCount(runtime), 1, 'attachment preparation has not sent guidance')

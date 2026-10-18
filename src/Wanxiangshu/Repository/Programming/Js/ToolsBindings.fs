@@ -623,20 +623,8 @@ module JsToolsBindings =
         if parkState.AbandonRequested then
             failureObj JsFailure.CannotParkWhileAbandoning
         else
-            parkState.ParkRequested <- true
-            parkState.ParkPayload <- payload
             parkState.ParkStack <- currentStack ()
-
-            if not (isNull parkState.ParkSignalResolve) then
-                emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
-
-            // The deferred promise: the host keeps the resolve/reject
-            // closures in ParkState. The program awaits this promise, so it
-            // suspends here until resumed (unpark) or abandoned.
-            emitJsExpr
-                (parkState)
-                "(() => { const state = $0; return new Promise((resolve, reject) => { state.ParkDeferredResolve = resolve; state.ParkDeferredReject = reject; }); })()"
-            : obj
+            Wanxiangshu.Process.JsSandbox.suspendProgram parkState payload
 
     let private candidateObjects (content: string) (spans: (int * int) list) =
         spans

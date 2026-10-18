@@ -67,7 +67,7 @@ export const append = async (handle, raw) => {
 export const current = (handle, inquiry) => persistence.canonicalCurrent(handle, digest, inquiry)
 export const withStore = async action => {
   const root = mkdtempSync(join(tmpdir(), 'sphinx-v2-roundtrip-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir)
   const handles = new Set()
   let serial = 0

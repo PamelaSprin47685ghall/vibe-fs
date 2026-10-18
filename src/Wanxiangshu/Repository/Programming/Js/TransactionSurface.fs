@@ -101,7 +101,8 @@ module JsTransactionSurface =
            JsFailure.RunWaitTimeout, "RunWaitTimeout"
            JsFailure.RunChildUnknown "srv", "RunChildUnknown"
            JsFailure.RunParkUnsupported, "RunParkUnsupported"
-           JsFailure.RunHostUnavailable, "RunHostUnavailable" |]
+           JsFailure.RunHostUnavailable, "RunHostUnavailable"
+           JsFailure.AskRefused "S2 stage", "AskRefused" |]
         |> Array.map (fun (failure, name) ->
             box
                 {| name = name

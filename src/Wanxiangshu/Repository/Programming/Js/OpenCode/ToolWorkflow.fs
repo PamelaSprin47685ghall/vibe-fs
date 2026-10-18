@@ -432,7 +432,14 @@ module JsToolWorkflow =
     /// program starts; if the program suspends at `await js.park(payload)` the
     /// signal wins the race and the workflow registers the site. A successful
     /// registration records the Parked lifecycle audit trace (best-effort).
-    let private runProgramWithPark
+    /// The buffers one run owns; `makeApi` decides which members see them.
+    type private RunBuffers =
+        { Staging: ResizeArray<JsStagedMutation>
+          ReadSnapshots: ResizeArray<JsReadSnapshot>
+          ExplicitReads: ResizeArray<JsExplicitFileRead>
+          Ledger: JsAsIsLedger }
+
+    let private runProgramCore
         (sessionId: string)
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -444,6 +451,7 @@ module JsToolWorkflow =
         (persistence: IJsTransactionPersistence option)
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: FileAccessObservation option)
+        (makeApi: RunBuffers -> Wanxiangshu.Process.JsSandbox.ParkState -> obj)
         : Task<JsToolOutcome> =
         task {
             // DSL-MUTABLE: algorithm-scratch — JS as-is write ledger. Every
@@ -456,6 +464,12 @@ module JsToolWorkflow =
             let explicitReads = ResizeArray<JsExplicitFileRead>()
             let ledger = JsToolsBindings.createLedger persistence
 
+            let buffers: RunBuffers =
+                { Staging = staging
+                  ReadSnapshots = readSnapshots
+                  ExplicitReads = explicitReads
+                  Ledger = ledger }
+
             // DSL-MUTABLE: resource — park lifecycle state shared by the api
             // member and the workflow. Process-live, never durable.
             let parkState: Wanxiangshu.Process.JsSandbox.ParkState =
@@ -467,19 +481,7 @@ module JsToolWorkflow =
                   ParkStack = null
                   AbandonRequested = false }
 
-            let api =
-                let runHost: JsToolsBindings.JsRunHost =
-                    { Loop = fun parkState runnableClass stack -> JsRunLoop.execute parkState root runnableClass stack }
-
-                JsToolsBindings.createApiWithPark
-                    capabilities
-                    root
-                    staging
-                    readSnapshots
-                    explicitReads
-                    ledger
-                    parkState
-                    (Some runHost)
+            let api = makeApi buffers parkState
 
             // Install the park signal the workflow races against the program
             // promise before the program starts: the async IIFE body runs
@@ -580,6 +582,55 @@ module JsToolWorkflow =
                         | Error failure -> return Failed(failure, rewritten, created, removed, moved)
                         | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
         }
+
+    /// The generated-surface api factory: bindings own the file members and
+    /// the host loop.
+    let private bindingsApiFactory
+        (capabilities: Set<JsCapability>)
+        (root: string)
+        (buffers: RunBuffers)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
+        : obj =
+        let runHost: JsToolsBindings.JsRunHost =
+            { Loop = fun parkState runnableClass stack -> JsRunLoop.execute parkState root runnableClass stack }
+
+        JsToolsBindings.createApiWithPark
+            capabilities
+            root
+            buffers.Staging
+            buffers.ReadSnapshots
+            buffers.ExplicitReads
+            buffers.Ledger
+            parkState
+            (Some runHost)
+
+    let private runProgramWithPark
+        (sessionId: string)
+        (capabilities: Set<JsCapability>)
+        (root: string)
+        (baseClassSource: string)
+        (modelSource: string)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        (persistence: IJsTransactionPersistence option)
+        (lifecyclePersistence: IJsLifecyclePersistence option)
+        (fileAccessObservation: FileAccessObservation option)
+        : Task<JsToolOutcome> =
+        runProgramCore
+            sessionId
+            capabilities
+            root
+            baseClassSource
+            modelSource
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
+            (fun buffers parkState -> bindingsApiFactory capabilities root buffers parkState)
+
 
     /// Resume a parked site (algorithm E). `handle` must exist; the deferred
     /// promise is resolved with `value`, the handle is removed (one-shot), and
@@ -703,6 +754,51 @@ module JsToolWorkflow =
 
             return Failed(JsFailure.Abandoned, [], [], [], [])
         }
+
+    /// Run a program whose api is supplied by the caller but whose park
+    /// lifecycle, race and outcome rendering stay workflow-owned. The plan
+    /// tenure sandbox uses this so `js.ask` suspends through the same site
+    /// table as the generated surfaces.
+    let runWithParkApi
+        (sessionId: string)
+        (baseClassSource: string)
+        (modelSource: string)
+        (makeApi: Wanxiangshu.Process.JsSandbox.ParkState -> obj)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        : Task<JsToolOutcome> =
+        runProgramCore
+            sessionId
+            Set.empty
+            ""
+            baseClassSource
+            modelSource
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            None
+            None
+            None
+            (fun _ parkState -> makeApi parkState)
+
+    /// Resume a parked site from any owning surface (generated or plan).
+    let resumeParked
+        (handle: string)
+        (value: obj)
+        (baseClassSource: string)
+        (deadlineMs: int)
+        (outputBoundBytes: int)
+        : Task<JsToolOutcome> =
+        match JsParkedSites.tryFind handle with
+        | None -> Task.FromResult(Failed(JsFailure.HandleUnknown handle, [], [], [], []))
+        | Some site -> unparkSite site value baseClassSource deadlineMs outputBoundBytes
+
+    /// Abandon a parked site from any owning surface.
+    let abandonParked (handle: string) (deadlineMs: int) (outputBoundBytes: int) : Task<JsToolOutcome> =
+        match JsParkedSites.tryFind handle with
+        | None -> Task.FromResult(Failed(JsFailure.HandleUnknown handle, [], [], [], []))
+        | Some site -> abandonSite site deadlineMs outputBoundBytes
 
     /// Execute one js-* tool invocation under the three-state input protocol
     /// (PLAN S2 step 5). The `input` object carries one of:

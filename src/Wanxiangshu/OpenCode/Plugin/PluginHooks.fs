@@ -446,7 +446,18 @@ module PluginHooks =
 
             let settleUserQuestion rawInput =
                 task {
-                    match toolTerminalObservation "ask" rawInput, toolRegistration with
+                    // `js.ask` inside a plan program records the same durable
+                    // question under the plan tool's call id, so both the
+                    // native ask tool and the plan programming tool complete
+                    // as the interrupt boundary.
+                    let observation =
+                        toolTerminalObservation "ask" rawInput
+                        |> Option.orElseWith (fun () ->
+                            toolTerminalObservation
+                                (Wanxiangshu.Repository.Programming.Js.JsToolGenerator.toolNameFor "plan")
+                                rawInput)
+
+                    match observation, toolRegistration with
                     | Some(sessionId, callId, "completed", Some providerRun), Some registration ->
                         // completed 工具部件是占位回执已被 Host 接受的因果边界；不靠定时器猜。
                         let! result =

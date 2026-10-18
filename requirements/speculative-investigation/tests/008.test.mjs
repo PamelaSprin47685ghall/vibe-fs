@@ -278,7 +278,7 @@ test('WHAT[speculative-investigation-008] demoted predictor text survives durabl
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const directory = mkdtempSync(join(tmpdir(), 'predictor-text-'))
-  let local = createLocalEventStore({ commonDir: join(directory, '.git'), writerId: 'before' })
+  let local = createLocalEventStore({ commonDir: join(directory, '.Herdchestra'), writerId: 'before' })
   const value = Strength.frameTryBuild(H, [
     { requestOrdinal: 1, assistantText: ['核对结果𠀀'], exchanges: [
       { toolName: 'todowrite-for-predictor', canonicalArguments: '{}', canonicalResult: 'actual result' },
@@ -305,7 +305,7 @@ test('WHAT[speculative-investigation-008] demoted predictor text survives durabl
     })
     await append(durability, promotion.event)
     local.close()
-    local = createLocalEventStore({ commonDir: join(directory, '.git'), writerId: 'after' })
+    local = createLocalEventStore({ commonDir: join(directory, '.Herdchestra'), writerId: 'after' })
     durability = Strength.durabilityCreate(local.store)
     projection = (await Strength.durabilityLoadProjection(durability)).value
     const loaded = await Strength.durabilityLoadBundleForDecision(durability, projection, 'text-decision')

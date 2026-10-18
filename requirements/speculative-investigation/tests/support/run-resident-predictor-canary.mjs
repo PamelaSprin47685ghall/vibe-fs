@@ -189,8 +189,8 @@ try {
   assert.deepEqual(transcripts[0].prompts, [instruction, instruction, instruction])
   assert.doesNotMatch(currentHost.stderrLog, /ActiveRunIdentityConflict|prompt_async failed|failed ref=|fuse|bundle invalid/i)
 
-  const eventFiles = fs.readdirSync(path.join(workspace, '.git/wanxiangshu/events'))
-  const events = eventFiles.flatMap(file => fs.readFileSync(path.join(workspace, '.git/wanxiangshu/events', file), 'utf8').trim().split('\n').map(line => JSON.parse(line)))
+  const eventFiles = fs.readdirSync(path.join(workspace, '.Herdchestra/wanxiangshu/events'))
+  const events = eventFiles.flatMap(file => fs.readFileSync(path.join(workspace, '.Herdchestra/wanxiangshu/events', file), 'utf8').trim().split('\n').map(line => JSON.parse(line)))
   const bound = events.filter(event => event.event_type === 'DelegationBound')
   assert.equal(bound.length, 3, 'exactly 3 Bound decisions')
 
@@ -274,8 +274,8 @@ try {
   const subResult = await promptOwner('msg_assignment_sub_owner', 'Review the fixture from this sub-session.', subOwner, 'engineer')
   assert.ok(subResult.info.time.completed)
   assert.ok(subResult.parts.some(part => part.text === 'Sub-owner smoke complete.'))
-  const finalEvents = fs.readdirSync(path.join(workspace, '.git/wanxiangshu/events')).flatMap(file =>
-    fs.readFileSync(path.join(workspace, '.git/wanxiangshu/events', file), 'utf8').trim().split('\n').map(line => JSON.parse(line)),
+  const finalEvents = fs.readdirSync(path.join(workspace, '.Herdchestra/wanxiangshu/events')).flatMap(file =>
+    fs.readFileSync(path.join(workspace, '.Herdchestra/wanxiangshu/events', file), 'utf8').trim().split('\n').map(line => JSON.parse(line)),
   )
   const subRequested = finalEvents.filter(row =>
     row.event_type === 'DelegationRequested' && row.payload.owner_session_id === subOwner,

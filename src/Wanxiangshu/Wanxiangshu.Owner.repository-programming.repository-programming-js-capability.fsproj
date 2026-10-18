@@ -27,6 +27,7 @@
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fs"/>
+    <Compile Include="Repository/Programming/Js/Anchor/AnchorModel.fsi"/>
     <Compile Include="Repository/Programming/Js/Anchor/AnchorModel.fs"/>
     <Compile Include="Repository/Programming/Js/Anchor/AnchorLedger.fsi"/>
     <Compile Include="Repository/Programming/Js/Anchor/AnchorLedger.fs"/>

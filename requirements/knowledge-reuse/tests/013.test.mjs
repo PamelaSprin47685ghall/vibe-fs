@@ -734,8 +734,11 @@ for (const scenario of ['valid', 'valid-unknown', 'malformed', 'malformed-unknow
       assert.deepEqual(physical.counts, { append: 1, fsync: 1, close: 1, release: 1 })
       assert.equal(physical.lockReleased, true)
       assert.equal(physical.openDescriptors, 0)
-      assert.equal(existsSync(join(directory, '.git', 'wanxiangshu.lock')), false)
-      const operationBytes = readFileSync(join(directory, '.git', 'wanxiangshu', 'events', 'operation-0000.ndjson'), 'base64')
+      assert.equal(existsSync(join(directory, '.Herdchestra', 'wanxiangshu.lock')), false)
+      const operationBytes = readFileSync(
+        join(directory, '.Herdchestra', 'wanxiangshu', 'events', 'operation-0000.ndjson'),
+        'base64',
+      )
       assert.deepEqual(physical.files, { ...receipt.beforeFiles, 'operation-0000.ndjson': operationBytes })
       assert.equal(receipt.bootJournalAvailable, true, 'the actual Boot owns its workspace journal')
       assert.ok(Object.hasOwn(receipt.beforeFiles, 'setup-0000.ndjson'), 'the prior Case has original canonical bytes')
@@ -782,7 +785,10 @@ for (const scenario of ['valid', 'valid-unknown', 'malformed', 'malformed-unknow
       assert.equal(cold.preserved, true)
       assert.deepEqual(cold.before, receipt.before)
       assert.equal(cold.current === null, fatal)
-      assert.deepEqual(readdirSync(join(directory, '.git', 'wanxiangshu', 'events')).sort(), Object.keys(physical.files).sort())
+      assert.deepEqual(
+        readdirSync(join(directory, '.Herdchestra', 'wanxiangshu', 'events')).sort(),
+        Object.keys(physical.files).sort(),
+      )
       t.diagnostic(JSON.stringify({ scenario, nativePid: measured.pid, coldPid: cold.pid,
         terminal: measured.signal ?? measured.exitCode, originalBootPhysicalAndCold: true }))
       completed = true

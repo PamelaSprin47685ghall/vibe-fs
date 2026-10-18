@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as handles from '../../../dist/Execution/Delegation/Handle/Surface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import { realpathSync } from 'node:fs'
-import { mkdtempSync } from 'node:fs'
+import { mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -12,7 +12,8 @@ import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurfa
 test('WHAT[interaction-authority-022] actual road decision preserves an established DevOps model on a conflicting rebind', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'devops-rebind-'))
   execFileSync('git', ['init'], { cwd: directory })
-  const store = workspace.acquire(realpathSync(join(directory, '.git')))
+  mkdirSync(join(directory, '.Herdchestra'), { recursive: true })
+  const store = workspace.acquire(realpathSync(join(directory, '.Herdchestra')))
   const opened = await lifecycle.seedOpen(store, 'plan', 'road-fixed', directory, 1n)
   assert.equal(opened.ok, true)
   const bound = await lifecycle.bindDevOps(store, 'road-fixed', 'devops:road-fixed', 'provider/fixed-model:high')

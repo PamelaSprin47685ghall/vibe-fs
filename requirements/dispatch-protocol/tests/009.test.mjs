@@ -82,7 +82,7 @@ const waitForSettledClaims = async (handle, session, count, message) => {
 }
 
 const journalLines = (base, writerId) => {
-  const eventsDir = join(base, '.git', 'wanxiangshu', 'events')
+  const eventsDir = join(base, '.Herdchestra', 'wanxiangshu', 'events')
   const legacy = join(eventsDir, `${writerId}.ndjson`)
   const target = existsSync(legacy) ? legacy : join(eventsDir, `${writerId}-0000.ndjson`)
   return readFileSync(target, 'utf8')
@@ -93,7 +93,7 @@ const journalLines = (base, writerId) => {
 const openGitJournal = async (base, writerId, runtimeId) => {
   execFileSync('git', ['init', '--quiet', base])
   const opened = await journal.JournalSurface_bootWithWriterId(
-    join(base, '.git'),
+    join(base, '.Herdchestra'),
     writerId,
     runtimeId,
     4242,

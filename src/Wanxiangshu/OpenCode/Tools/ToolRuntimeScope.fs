@@ -948,6 +948,9 @@ type ToolRuntimeScope
             )
         then
             Task.FromResult(Error "ask requires an unfinished work with an active incumbency")
+        elif not (work |> Option.exists (fun current -> current.Stage = "S1")) then
+            // 产品裁决：只有 S1 阶段的 Plan 可以向用户中断提问。
+            Task.FromResult(Error "ask is allowed only in the S1 planning stage")
         elif not (questionRequests.Add sid) then
             Task.FromResult(Error "a question is already being sent for this session")
         else

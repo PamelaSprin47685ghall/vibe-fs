@@ -1208,6 +1208,14 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
               planFileAlgorithm prose (runtimePlanReadSource prose) runtimeRaiseFailure
               planEditAlgorithm prose (runtimePlanReadSource prose) runtimeRaiseFailure
               planRewriteAlgorithm prose runtimeRaiseFailure
+              fill
+                  """  async ask(question) {
+    const stack = new Error().stack;
+    const result = await this._api.js.ask(question, stack);
+    {{rethrow_host}}
+    return result;
+  }"""
+                  [ "rethrow_host", rethrowHost ]
               runStub prose ]
 
         String.concat "\n\n" (classOpen :: methods @ [ "}" ])
@@ -1221,6 +1229,11 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
   }"""
                   [ "comment_host_capability", prose.CommentHostCapability ]
               planRewriteStub prose
+              fill
+                  """  async ask(question) {
+    // {{comment_host_capability}}
+  }"""
+                  [ "comment_host_capability", prose.CommentHostCapability ]
               runStub prose ]
 
         String.concat "\n\n" (classOpen :: methods @ [ "}" ])

@@ -38,7 +38,7 @@ const observe = async (store) => {
 
 test('WHAT[durable-convergence-007] retained rich history rebuilds the exact live production Current', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-integrator-parity-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
 
   try {
@@ -93,7 +93,7 @@ test('WHAT[durable-convergence-007] retained rich history rebuilds the exact liv
         await transaction.appendPrepared(liveStore, {
           transactionId: 'parity-transaction',
           workspaceRoot: '/parity-workspace',
-          mutations: [{ path: 'a.txt', originalText: 'before', newText: 'after' }],
+          mutation: { kind: 'rewrite', path: 'a.txt', originalText: 'before', newText: 'after' },
         }),
         'append JsTransaction fact',
       )

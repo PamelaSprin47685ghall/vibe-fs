@@ -353,6 +353,22 @@ module JsSandbox =
 
         signal :?> Task<obj>
 
+    /// Suspend the program through the shared park channel: mark the request,
+    /// fire the signal the workflow races against, and hand back the deferred
+    /// promise the program awaits until unpark resolves it (or abandon
+    /// rejects it). Callers own the abandon-window refusal and the stack
+    /// capture so this stays the one suspension mechanism.
+    let suspendProgram (parkState: ParkState) (payload: obj) : obj =
+        parkState.ParkRequested <- true
+        parkState.ParkPayload <- payload
+
+        if not (isNull parkState.ParkSignalResolve) then
+            emitJsExpr (parkState.ParkSignalResolve, payload) "$0($1)" |> ignore
+
+        emitJsExpr
+            parkState
+            "(function(state) { return new Promise(function(resolve, reject) { state.ParkDeferredResolve = resolve; state.ParkDeferredReject = reject; }); })($0)"
+
     /// Resolve the deferred promise the program is awaiting at `await js.park`.
     /// Called by `unpark` with the injected value; the program continues as if
     /// the await returned that value.
