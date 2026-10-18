@@ -101,38 +101,34 @@ test('WHAT[execution-model-routing-020] EMR_020_template_readonly_delegate_reads
 })
 
 test('WHAT[execution-model-routing-020] EMR_020_shared_predictor_configuration_is_owned_by_the_loaded_module', async () => {
+  const { execFileSync } = await import('node:child_process')
   const root = await mkdtemp(join(tmpdir(), 'wanxiangshu-shared-predictor-'))
   const configDirectory = join(root, '.config', 'opencode')
-  const previousHome = process.env.HOME
-  const previousProfile = process.env.USERPROFILE
-  const previousOverride = globalThis.__wanxiangshu_test_predictor_state
-  const previousConfiguration = globalThis.__wxs_owned_predictor_configuration
   try {
     await mkdir(configDirectory, { recursive: true })
     await writeFile(join(configDirectory, 'wanxiangshu.mjs'), `export const routingProtocol = 2
 export default function route() { return { model: 'provider/model', reasoning: 'none' } }
 export const predictorConfiguration = () => ({ state: globalThis.__wxs_owned_predictor_configuration, reason: null })
 `)
-    process.env.HOME = root
-    process.env.USERPROFILE = root
-    globalThis.__wxs_owned_predictor_configuration = 'unconfigured'
-    await routing.initialize()
-    globalThis.__wanxiangshu_test_predictor_state = 'configured'
-    assert.deepEqual(routing.sharedPredictorConfiguration(), { kind: 'NotConfigured', reason: null },
+    const script = `
+      import * as routing from ${JSON.stringify(new URL('../../../dist/OpenCode/Host/ModelRoutingSurface.js', import.meta.url).href)};
+      globalThis.__wxs_owned_predictor_configuration = 'unconfigured';
+      await routing.initialize();
+      globalThis.__wanxiangshu_test_predictor_state = 'configured';
+      const first = routing.sharedPredictorConfiguration();
+      globalThis.__wxs_owned_predictor_configuration = 'configured';
+      globalThis.__wanxiangshu_test_predictor_state = 'unconfigured';
+      process.stdout.write(JSON.stringify({ pid: process.pid, first, second: routing.sharedPredictorConfiguration() }));
+    `
+    const observed = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+      env: { ...process.env, HOME: root, USERPROFILE: root }, encoding: 'utf8', timeout: 5000,
+    }))
+    assert.notEqual(observed.pid, process.pid)
+    assert.deepEqual(observed.first, { kind: 'NotConfigured', reason: null },
       'an unrelated global flag cannot invent a configured Predictor')
-    globalThis.__wxs_owned_predictor_configuration = 'configured'
-    globalThis.__wanxiangshu_test_predictor_state = 'unconfigured'
-    assert.deepEqual(routing.sharedPredictorConfiguration(), { kind: 'Configured', reason: null },
+    assert.deepEqual(observed.second, { kind: 'Configured', reason: null },
       'an unrelated global flag cannot disable the actual configured slot')
   } finally {
-    if (previousHome === undefined) delete process.env.HOME
-    else process.env.HOME = previousHome
-    if (previousProfile === undefined) delete process.env.USERPROFILE
-    else process.env.USERPROFILE = previousProfile
-    if (previousOverride === undefined) delete globalThis.__wanxiangshu_test_predictor_state
-    else globalThis.__wanxiangshu_test_predictor_state = previousOverride
-    if (previousConfiguration === undefined) delete globalThis.__wxs_owned_predictor_configuration
-    else globalThis.__wxs_owned_predictor_configuration = previousConfiguration
     await rm(root, { recursive: true, force: true })
   }
 })

@@ -223,6 +223,23 @@ const { join } = await import('node:path')
 const journal = await import('../../../dist/Persistence/Journal/Surface.js')
 const { withGuidanceHost, toolBody, separator } = await import('./support/guidance-host.mjs')
 
+test('WHAT[prefix-stability-014] a failed guidance assertion ends its exact mock provider step before another single-slot fixture starts', async () => {
+  const previousDecision = globalThis.__wanxiangshu_test_routing_decision
+  globalThis.__wanxiangshu_test_routing_decision = (role, running) => running.length === 0
+    ? { model: `provider/${role}-model`, reasoning: 'none' }
+    : null
+  try {
+    const failure = new Error('controlled guidance assertion failure')
+    await assert.rejects(withGuidanceHost('completed', async () => { throw failure }, 'failed-body'), error => error === failure)
+    await withGuidanceHost('completed', async host => {
+      assert.deepEqual(host.cold().projection, await host.current())
+    }, 'after-failed-body')
+  } finally {
+    if (previousDecision === undefined) delete globalThis.__wanxiangshu_test_routing_decision
+    else globalThis.__wanxiangshu_test_routing_decision = previousDecision
+  }
+})
+
 for (const status of ['completed', 'error']) {
   test(`WHAT[prefix-stability-014] registered Host ${status} tool presentation leaves physical snapshot and durable originals unchanged`, async () => {
     await withGuidanceHost(status, async host => {

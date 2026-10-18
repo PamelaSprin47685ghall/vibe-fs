@@ -6,9 +6,10 @@
 // `scripts/architecture-gate.mjs` scans `['.mjs']`, so this file is still gated.
 
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { writeRoutingHome } from './routing-home.mjs'
 
 if (!process.env.WANXIANGSHU_PROVIDER_LANGUAGE || process.env.WANXIANGSHU_PROVIDER_LANGUAGE === 'undefined') {
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
@@ -57,44 +58,7 @@ const withJournalRuntime = async (directory, action) => {
 }
 
 const setupRoutingHome = (directory) => {
-  const routingHome = join(directory, 'routing-home')
-  const routingDir = join(routingHome, '.config', 'opencode')
-  mkdirSync(routingDir, { recursive: true })
-  writeFileSync(
-    join(routingDir, 'wanxiangshu.mjs'),
-    `export const routingProtocol = 2
-export default function route(role, running, previous, purpose) {
-  if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
-  if (Array.isArray(globalThis.__wanxiangshu_test_routing_seen)) {
-    globalThis.__wanxiangshu_test_routing_seen.push({ role, running: running.map((item) => ({ ...item })) })
-  }
-  if (typeof globalThis.__wanxiangshu_test_routing_decision === 'function') {
-    return globalThis.__wanxiangshu_test_routing_decision(role, running, previous, purpose)
-  }
-  return { model: 'provider/' + role + '-model', reasoning: 'none' }
-}
-
-// + execution-model-routing-020: the read-only Predictor
-// configuration existence query, mirroring resources/wanxiangshu.mjs. The
-// scheduler is a process singleton (ModelRouting.initialize imports it once
-// per test process and never reloads), so the two observable states are
-// driven by a test-owned dynamic source instead of rewriting this file per
-// incarnation. The default is unconfigured: every existing fixture consumer
-// keeps the no-decoration baseline, and tests opt in explicitly.
-export const predictorConfiguration = () => {
-  const state = globalThis.__wanxiangshu_test_predictor_state ?? 'unconfigured'
-  if (state === 'configured') return { state: 'configured', reason: null }
-  if (state === 'invalid') {
-    return {
-      state: 'invalid',
-      reason: globalThis.__wanxiangshu_test_predictor_reason ?? 'test Predictor configuration is invalid',
-    }
-  }
-  return { state: 'unconfigured', reason: null }
-}\n`,
-    'utf8',
-  )
-  return routingHome
+  return writeRoutingHome(join(directory, 'routing-home'))
 }
 
 export const configureManagedPlugin = (hooks) => {

@@ -21,7 +21,7 @@
 // which kills healthy multi-test files and fans hundreds of listeners out from one signal.
 // It runs node:test files that load the compiled distribution under dist/.
 
-import { lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { availableParallelism, tmpdir } from 'node:os'
 import { PassThrough } from 'node:stream'
@@ -31,6 +31,7 @@ import { run } from 'node:test'
 import { createCompactReporter } from './compact-reporter.mjs'
 import { createRunState, applyEvent, summarize } from './test-run-state.mjs'
 import { createWorkerCostObserver } from './worker-cost-observation.mjs'
+import { writeRoutingHome } from './routing-home.mjs'
 
 import { parseConcurrency } from '../../../../scripts/lib/concurrency-cap.mjs'
 
@@ -241,29 +242,7 @@ async function main() {
   process.env.DOTNET_CLI_HOME ??= process.env.HOME
   const runnerTestHome = suppliedHome ?? realpathSync(mkdtempSync(join(tmpdir(), 'wxs-runner-home-')))
   try {
-    const runnerRoutingDir = join(runnerTestHome, '.config', 'opencode')
-    mkdirSync(runnerRoutingDir, { recursive: true })
-    writeFileSync(
-      join(runnerRoutingDir, 'wanxiangshu.mjs'),
-      `export const routingProtocol = 2
-export default function route(role, running, previous, purpose) {
-  if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
-  return { model: 'provider/' + role + '-model', reasoning: 'none' }
-}
-
-export const predictorConfiguration = () => {
-  const state = globalThis.__wanxiangshu_test_predictor_state ?? 'unconfigured'
-  if (state === 'configured') return { state: 'configured', reason: null }
-  if (state === 'invalid') {
-    return {
-      state: 'invalid',
-      reason: globalThis.__wanxiangshu_test_predictor_reason ?? 'test Predictor configuration is invalid',
-    }
-  }
-  return { state: 'unconfigured', reason: null }
-}\n`,
-      'utf8',
-    )
+    writeRoutingHome(runnerTestHome)
     process.env.HOME = runnerTestHome
     process.env.USERPROFILE = runnerTestHome
     if (originalHome) process.env.DOTNET_CLI_HOME = originalHome
