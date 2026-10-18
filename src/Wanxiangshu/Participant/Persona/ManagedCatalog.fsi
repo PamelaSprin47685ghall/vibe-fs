@@ -14,6 +14,7 @@ module ManagedAgentCatalog =
     val bookkeeperNames: string list
     val bookkeeperName: string
     val isBookkeeperName: string -> bool
+    val isRoleName: string -> bool
     val requiredNames: string list
     val managerForkableNames: string list
     val orchestratorForkableNames: string list

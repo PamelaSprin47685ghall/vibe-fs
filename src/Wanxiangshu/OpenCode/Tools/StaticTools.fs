@@ -281,8 +281,7 @@ module StaticTools =
     /// System prompt for B-record distillation with chronicle tool protocol.
     let bloggerAgentConfig (prompt: string) : obj = hiddenAgent Role.Blogger prompt
 
-    /// InternalLeaf Bookkeeper Host stub (AGENT-002): hidden; ToolRegistry gates js-bookkeeper by attachment.
-    let bookkeeperAgentConfig (prompt: string) : obj =
+    let private internalAgentConfig (prompt: string) : obj =
         let pairs =
             [ yield "*", box "deny"
               yield "external_directory", box "allow"
@@ -296,6 +295,11 @@ module StaticTools =
               "prompt", box prompt
               "temperature", box 1.0
               "options", box (createObj [ "temperature", box 1.0 ]) ]
+
+    /// InternalLeaf Bookkeeper Host stub (AGENT-002): ToolRegistry gates js-bookkeeper by attachment.
+    let bookkeeperAgentConfig (prompt: string) : obj = internalAgentConfig prompt
+
+    let predictorAgentConfig () : obj = internalAgentConfig ""
 
     let devopsAgentConfig (prompt: string option) : obj = primaryAgent Role.DevOps prompt
 

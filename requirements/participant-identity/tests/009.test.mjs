@@ -54,6 +54,27 @@ test('WHAT[participant-identity-009] production plugin replaces identity only af
   assert.equal(concurrent.persona, 'Operator')
   assert.equal(concurrent.activeLogicalRun, replacement.operatorLogicalRun)
 })
+
+for (const fixture of ['mixed', 'with-cut', 'same-event']) {
+test(`WHAT[participant-identity-009] real old ${fixture} journal preserves the exact failed-event cut and prior-run identity boundary`, () => {
+  const child = spawnSync(process.execPath, [fileURLToPath(
+    new URL('./support/unknown-identity-plugin-scenario.mjs', import.meta.url),
+  ), fixture], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env: { ...process.env, WANXIANGSHU_NO_FATAL_EXIT: '1', WANXIANGSHU_PROVIDER_LANGUAGE: 'en' },
+  })
+  assert.equal(child.error, undefined, child.error?.message)
+  assert.equal(child.status, 0, `subprocess exited ${child.status}\n${child.stdout}\n${child.stderr}`)
+  const result = JSON.parse(child.stdout)
+  assert.equal(result.ok, true)
+  assert.equal(result.originalDigest, fixture === 'same-event'
+    ? '51577bb621c510efd797db610b352071bb4aa00ddb8a40a8cb8d3cc8327d94fb' : fixture === 'with-cut'
+    ? '7a6ca9b312e0bb1b38546b521dc06390a7716bd56c4adf71903318105a3f0008'
+    : 'a9709c18a6a1a6256f04f0acf384945d002b5904a90dc8f2c4577fc1a8c36ef5')
+  assert.deepEqual(result.healthyRoles, fixture === 'same-event' ? ['engineer'] : fixture === 'with-cut' ? [] : ['engineer', 'manager'])
+})
+}
 }
 
 {

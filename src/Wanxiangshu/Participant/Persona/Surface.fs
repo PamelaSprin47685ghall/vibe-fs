@@ -152,7 +152,10 @@ module PersonaSurface =
         (origin: string)
         : obj =
         let parsedRole =
-            if roleLabel = "bookkeeper" then
+            if
+                roleLabel = canonicalManagedName
+                && (roleLabel = "bookkeeper" || roleLabel = "predictor")
+            then
                 Some None
             else
                 historicalRoleOf roleLabel |> Option.map Some

@@ -138,9 +138,16 @@ module IntegratorEngine =
                 Currents = Map.add rule.Name reset state.Currents
                 Faults = Map.remove key state.Faults }
 
+    let private applyCutForFailedEvent state payload rule failed =
+        let key = faultKey rule failed
+
+        match Map.tryFind key state.Faults with
+        | Some fault when fault.FailedEventId <> payload.FailedEventId -> state
+        | _ -> applyCutForRule state payload rule key
+
     let private applyCut (program: IntegrationRule list) (state: IntegratorState) (payload: CutPayload) =
         match tryRule program payload.Rule, Map.tryFind (eventKey payload.FailedEventId) state.Events with
-        | Some rule, Some failed -> applyCutForRule state payload rule (faultKey rule failed)
+        | Some rule, Some failed -> applyCutForFailedEvent state payload rule failed
         | _ -> state
 
     let private evaluateBusinessRule

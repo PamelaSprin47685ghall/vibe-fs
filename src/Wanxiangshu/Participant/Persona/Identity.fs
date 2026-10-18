@@ -45,6 +45,7 @@ type private PersonaCatalogVersion = PersonaCatalogVersion of int
 type private ParticipantKind =
     | ManagedRole of Role
     | Bookkeeper
+    | Predictor
 
 type ParticipantIdentity =
     private
@@ -70,24 +71,27 @@ module ParticipantIdentity =
     let private roleOfKind kind =
         match kind with
         | ManagedRole role -> Some role
-        | Bookkeeper -> None
+        | Bookkeeper
+        | Predictor -> None
 
     let private roleLabelOfKind kind =
         match kind with
         | ManagedRole role -> Roles.roleLabel role
         | Bookkeeper -> "bookkeeper"
+        | Predictor -> "predictor"
 
     let private personaV1 kind =
         match kind with
         | ManagedRole role -> PersonaCatalog.personaV1 role
         | Bookkeeper -> PersonaCatalog.bookkeeperPersonaV1 ()
+        | Predictor -> Persona.render Persona.Predictor
 
     let private parseKnownCanonicalName
         (name: string)
         : Result<PersonaName * ParticipantKind, ParticipantIdentityError> =
         match name.ToLowerInvariant() with
         | "bookkeeper" -> Ok(PersonaName "bookkeeper", Bookkeeper)
-        | "predictor" -> Ok(PersonaName "predictor", ManagedRole Role.Engineer)
+        | "predictor" -> Ok(PersonaName "predictor", Predictor)
         | roleName when (Roles.tryParseRole roleName).IsSome ->
             let role = (Roles.tryParseRole roleName).Value
             Ok(PersonaName(Roles.roleLabel role), ManagedRole role)
@@ -243,6 +247,14 @@ module ParticipantIdentity =
     let legacyAgentOwnerRootUnprovableMessage =
         "legacy AuthorityRootAccepted v1 AgentOwnerRoot cannot prove participant identity"
 
+    let private upgradeLegacyHumanRoot (input: LegacyAuthorityRootIdentityV1Input) (name, kind) =
+        match roleOfKind kind with
+        | Some role when String.Equals(input.CanonicalRole, Roles.roleLabel role, StringComparison.OrdinalIgnoreCase) ->
+            Ok(create name kind (personaV1 kind) (PersonaCatalogVersion 1) PersonaOrigin.ResolvedAtRoot)
+        | expected ->
+            let label = expected |> Option.map Roles.roleLabel |> Option.defaultValue "none"
+            Error(ParticipantIdentityError.LegacyRoleMismatch(label, input.CanonicalRole))
+
     let upgradeLegacyV1Root
         (input: LegacyAuthorityRootIdentityV1Input)
         : Result<ParticipantIdentityEvidence, ParticipantIdentityError> =
@@ -251,6 +263,5 @@ module ParticipantIdentity =
             Error(ParticipantIdentityError.UnprovableLegacyAuthorityIdentity legacyAgentOwnerRootUnprovableMessage)
         | "HumanRoot" ->
             parseCanonicalName input.SelectedAgent
-            |> Result.map (fun (name, kind) ->
-                create name kind (personaV1 kind) (PersonaCatalogVersion 1) PersonaOrigin.ResolvedAtRoot)
+            |> Result.bind (upgradeLegacyHumanRoot input)
         | authorityKind -> Error(ParticipantIdentityError.UnsupportedLegacyAuthorityKind authorityKind)

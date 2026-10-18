@@ -82,6 +82,9 @@ module ManagedAgentCatalog =
 
     let isBookkeeperName (name: string) : bool = name.ToLowerInvariant() = "bookkeeper"
 
+    let isRoleName (name: string) : bool =
+        allRoles |> List.exists (fun role -> nameOf role = name)
+
     /// Canonical managed agent names using single role versions.
     let requiredNames: string list =
         (allRoles |> List.map Roles.roleLabel) @ [ "bookkeeper"; "predictor" ]

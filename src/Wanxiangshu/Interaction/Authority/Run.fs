@@ -41,7 +41,7 @@ module PromptAuthorityRun =
 
     let private admitPublicRole participantIdentity =
         match ParticipantIdentity.role participantIdentity with
-        | None -> Error "public authority participant identity cannot be Bookkeeper"
+        | None -> Error "public authority requires an office identity"
         | Some _ -> Ok participantIdentity
 
     /// Claim a prompt that will become a new Authority Root (PROMPT-004

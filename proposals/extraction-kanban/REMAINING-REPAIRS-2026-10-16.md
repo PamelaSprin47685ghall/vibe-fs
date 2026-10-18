@@ -33,7 +33,7 @@
 |---|---|---|
 | 已交付，退出待施工顺序 | [D1 → D2终结事实](#process-termination) | 声明范围验收；不关闭完整Process、PTY或R12。输入尾17及停止完整性已修，原红保留 |
 | 独立验证支线 | [CUT-00-R1](#finite-verification)、[R2](#bun-verification)、[R3](#isolated-pty-evidence) | 分别修正式等待、建立 Bun 监督、解释旧隔离失败；不以任一项代证另外两项 |
-| 独立行为修复 | [GAP-159、140](#adjacent-repairs) | GAP-085列明范围已交付，退出待施工顺序；继续显式权限、持久失败预算，不并入Process提交 |
+| 独立行为修复 | [GAP-140](#adjacent-repairs) | GAP-085、159列明范围已交付，退出待施工顺序；继续持久失败预算，不并入Process提交 |
 | 按范围契约顺序 | [CUT-03-R7 → CUT-06-R5 → CUT-03-R8 → CUT-03-R9](#trace-product-chain) | Opening、真实取材消费者、压缩重锚、Fission 汇聚，各自闭环 |
 | 现有接管能力上补真实启动链 | [CUT-04-R7](#bootstrap-recovery) | 两个真实 Host 的 Bootstrap 崩溃矩阵和持久收尾 |
 | R7 之后，先原型再决定实现 | [CUT-04-R8-A → R8-B](#detached-processes) | 主动脱组可行性与生产接线分开；B 依赖 A 的肯定结论及冻结承诺 |
@@ -183,7 +183,7 @@ C/R7-A 的剩余整体验收由下列 CUT-00-R3 取得归因后再裁决；R1/R2
 <a id="adjacent-repairs"></a>
 ## 3. 相邻行为修复
 
-三包编辑面独立时可以分别推进。GAP-159 目前确认的是配置负例，不预先宣称实际越权；GAP-140 目前也未证明会实际重发命令。真实后果须由各自消费者验证。
+GAP-085、159 的列明范围已交付。GAP-159 旧实际公共入口确会安装错误的 Engineer 身份，但未复现成功的 Predictor Fission 越权，两者分开记账。GAP-140 目前未证明会实际重发命令，真实后果仍须由其消费者验证。
 
 <a id="gap085"></a>
 ### GAP-085 规则自覆盖
@@ -198,6 +198,8 @@ C/R7-A 的剩余整体验收由下列 CUT-00-R3 取得归因后再裁决；R1/R2
 
 <a id="gap159"></a>
 ### GAP-159 显式 office 权限
+
+2026-10-19交付：Predictor 私有身份、模型配置与公开准入统一，正常 Engineer/Replica 保留；另修复本轮670/673两项未交付的冷恢复回退。最终候选680，35正式文件327通过、0普通失败、15既存TODO，owned accepted；非作者精确包、真实Host、类型和三份旧原件正反控通过。GAP-159按下列原定子式范围关闭，退出待施工顺序，不关闭完整GAP-158。见[实现、归因、升级与验收](PREDICTOR-OFFICE-GAP159-2026-10-19.md)。
 
 **范围与前置：** 先核对活跃 office、身份和 authority，令配置、展示与 Fission 实际准入使用同一能力裁决；清理误将 Predictor 映射为 Engineer 的路径。
 

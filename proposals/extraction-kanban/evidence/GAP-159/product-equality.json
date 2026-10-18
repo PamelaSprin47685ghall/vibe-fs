@@ -1,0 +1,25 @@
+{
+  "candidate": 680,
+  "sha256": "7d218a541e0a3df334eaa34e1bf7018ca08906062d07e6fed22c68caae886ff6",
+  "files": 2076,
+  "workingTreeDifferences": [],
+  "installedDifferences": [],
+  "changedSince678": [
+    "dist/Persistence/EventStore/IntegratorEngine.js"
+  ],
+  "changedSince667": [
+    "dist/Composition/Durable/JournalIntegration.js",
+    "dist/Interaction/Authority/Model.js",
+    "dist/Interaction/Authority/Run.js",
+    "dist/OpenCode/Host/ManagedAgentConfig.js",
+    "dist/OpenCode/Host/ManagedAgentConfigSurface.js",
+    "dist/OpenCode/Tools/StaticTools.js",
+    "dist/Participant/Persona/Identity.js",
+    "dist/Participant/Persona/ManagedCatalog.js",
+    "dist/Participant/Persona/Surface.js",
+    "dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js",
+    "dist/Persistence/EventStore/IntegratorEngine.js",
+    "dist/Verification/JournalPortObservationSurface.js"
+  ],
+  "libraryChanged": []
+}

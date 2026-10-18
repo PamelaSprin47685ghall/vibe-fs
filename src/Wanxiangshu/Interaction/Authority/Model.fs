@@ -48,7 +48,7 @@ module PromptAuthority =
         member this.CanonicalRole =
             match ParticipantIdentity.role this.ParticipantIdentity with
             | Some role -> role
-            | None -> invalidOp "public authority participant identity cannot be Bookkeeper"
+            | None -> invalidOp "public authority requires an office identity"
 
         member this.Persona = ParticipantIdentity.persona this.ParticipantIdentity
 
@@ -116,7 +116,7 @@ module PromptAuthority =
         let participantIdentity = identitySeedParticipantIdentity identitySeed
 
         match authorityKind, identitySeed, ParticipantIdentity.role participantIdentity with
-        | _, _, None -> Error "public authority participant identity cannot be Bookkeeper"
+        | _, _, None -> Error "public authority requires an office identity"
         | RootAuthorityKind.HumanRoot, RootSelection _, Some _ when
             ParticipantIdentity.origin participantIdentity = PersonaOrigin.ResolvedAtRoot
             ->

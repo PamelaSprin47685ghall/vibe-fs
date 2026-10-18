@@ -1,0 +1,160 @@
+{
+  "card": "GAP-159",
+  "base": "4c771cadd",
+  "candidate": 680,
+  "tarballSHA256": "7d218a541e0a3df334eaa34e1bf7018ca08906062d07e6fed22c68caae886ff6",
+  "library": {
+    "commit": "8bb1021",
+    "version": "0.6.12",
+    "changed": false
+  },
+  "formal": {
+    "files": [
+      "requirements/participant-identity/tests/001.test.mjs",
+      "requirements/participant-identity/tests/002.test.mjs",
+      "requirements/participant-identity/tests/003.test.mjs",
+      "requirements/participant-identity/tests/004.test.mjs",
+      "requirements/participant-identity/tests/005.test.mjs",
+      "requirements/participant-identity/tests/007.test.mjs",
+      "requirements/participant-identity/tests/008.test.mjs",
+      "requirements/participant-identity/tests/009.test.mjs",
+      "requirements/participant-identity/tests/010.test.mjs",
+      "requirements/office-capability/tests/003.test.mjs",
+      "requirements/office-capability/tests/007.test.mjs",
+      "requirements/office-capability/tests/015.test.mjs",
+      "requirements/office-capability/tests/016.test.mjs",
+      "requirements/intra-participant-parallelism/tests/003.test.mjs",
+      "requirements/intra-participant-parallelism/tests/013.test.mjs",
+      "requirements/intra-participant-parallelism/tests/017.test.mjs",
+      "requirements/interaction-authority/tests/003.test.mjs",
+      "requirements/capability-enforcement/tests/002.test.mjs",
+      "requirements/capability-enforcement/tests/005.test.mjs",
+      "requirements/capability-enforcement/tests/006.test.mjs",
+      "requirements/capability-enforcement/tests/010.test.mjs",
+      "requirements/capability-enforcement/tests/011.test.mjs",
+      "requirements/capability-enforcement/tests/023.test.mjs",
+      "requirements/durable-events/tests/006.test.mjs",
+      "requirements/durable-events/tests/019.test.mjs",
+      "requirements/durable-events/tests/020.test.mjs",
+      "requirements/durable-events/tests/021.test.mjs",
+      "requirements/durable-events/tests/024.test.mjs",
+      "requirements/semantic-trace/tests/007.test.mjs",
+      "requirements/knowledge-reuse/tests/011.test.mjs",
+      "requirements/knowledge-reuse/tests/013.test.mjs",
+      "requirements/repository-programming/tests/006.test.mjs",
+      "requirements/sphinx-v2/tests/019.test.mjs",
+      "requirements/speculative-investigation/tests/003.test.mjs",
+      "requirements/execution-model-routing/tests/020.test.mjs"
+    ],
+    "pass": 327,
+    "fail": 0,
+    "todo": 15,
+    "skip": 0,
+    "exitCode": 1,
+    "allFilesDrained": true,
+    "ownedAccepted": true,
+    "wholeSuiteAccepted": false
+  },
+  "scope": "Predictor office configuration, identity and actual Fission admission; exact Journal fault/cut refusal and old-history controls required by this repair",
+  "independent": {
+    "hosts": [
+      "Node 26.6.0",
+      "Bun 1.3.14"
+    ],
+    "reviewers": [
+      "d1_review_git",
+      "d1_review_tests",
+      "d1_review_host"
+    ],
+    "final680": "Only IntegratorEngine differs from678; same authentic old producer programs passed two hosts and two cold processes; unchanged typed/20-case evidence is reused, not counted as new compilation or runs",
+    "source680": "Private exact-failed-event helper extraction independently reviewed as equivalent; ignored fixture delivery gap explicitly fixed"
+  },
+  "archives": [
+    {
+      "file": "GAP159-670-TYPED-CONSUMERS-INDEPENDENT.tgz",
+      "sha256": "bb46fbf2c819860f33e822cc16dcc01f93f47d9ae8caf4c53c2e9b53298ab0a7",
+      "bytes": 3232674
+    },
+    {
+      "file": "GAP159-673-OLD-PRODUCER-CUT-RED.tgz",
+      "sha256": "1eae021db8ad3c646a2ce0917d4e10507c677d32429d04e2b57bcbef16288ece",
+      "bytes": 11069
+    },
+    {
+      "file": "GAP159-678-FINAL-TYPED-COLD-INDEPENDENT.tgz",
+      "sha256": "9ae19b3b77f1a733fd0e9742acc57d0f9801a2256258968be31e583f10548c8b",
+      "bytes": 3606699
+    },
+    {
+      "file": "GAP159-680-COLD-ADDENDUM.tgz",
+      "sha256": "69a761ec6c600abf6b147908c2b6a2e80f7615631faf7409d1020b0724d8ff2b",
+      "bytes": 3209689
+    },
+    {
+      "file": "GAP159-HOST-INDEPENDENT-FINAL673-20261019.tgz",
+      "sha256": "1ed4a1adcfd6358f34da8e61c1bc52c167fb6c491c04172a9e6ec34d93c9ee97",
+      "bytes": 12782863
+    },
+    {
+      "file": "GAP159-HOST-INDEPENDENT-FINAL678-20261019.tgz",
+      "sha256": "a0e0ab2e4d56e24fb09d431f4cc97afb40c5681f7b87377cb4265a14922eb4af",
+      "bytes": 8920264
+    },
+    {
+      "file": "GAP159-PUBLIC-BASELINE-667-20261019.tgz",
+      "sha256": "72ed5b63ce66db44a5d7f6ccc1362db431c577b083fd34374f453a384159d04d",
+      "bytes": 6096118
+    },
+    {
+      "file": "ROOT-VERIFICATION.tgz",
+      "sha256": "0acfd7c8c8333d610eddb550bf83535326390ad1b1c3aae084a44475ec7011ee",
+      "bytes": 242188
+    },
+    {
+      "file": "gap159-design-review-evidence-20261019.tgz",
+      "sha256": "92d82610522565d309212b937cc379bd6aeae4cd75f7f89cf2c86f9d41529773",
+      "bytes": 5693
+    },
+    {
+      "file": "gap159-independent-670-evidence-20261019.tgz",
+      "sha256": "99f3db6c3d9fc4edf9013118ccfdb071d5f58eaa62c761d737e4a05cce7da9a5",
+      "bytes": 28429
+    },
+    {
+      "file": "gap159-independent-673-evidence-20261019.tgz",
+      "sha256": "4a72df9c9f095c6480627cb31e965ec93c34562c544fe35a0748df769f1dc231",
+      "bytes": 50707
+    }
+  ],
+  "remaining": [
+    "Full GAP-158 and all15 existing TODO",
+    "One-time generic full-replay fallback cost on undecodable refusal",
+    "Arbitrary fabricated-cut authentication",
+    "CUT-00 runtime supervision",
+    "R12-U1 deferred"
+  ],
+  "deployed": false,
+  "stagedFixtures": [
+    {
+      "file": "old667-mixed-journal.ndjson",
+      "sha256": "a9709c18a6a1a6256f04f0acf384945d002b5904a90dc8f2c4577fc1a8c36ef5"
+    },
+    {
+      "file": "old667-predictor-later-cut.ndjson",
+      "sha256": "7a6ca9b312e0bb1b38546b521dc06390a7716bd56c4adf71903318105a3f0008"
+    },
+    {
+      "file": "old667-same-event-cut.ndjson",
+      "sha256": "51577bb621c510efd797db610b352071bb4aa00ddb8a40a8cb8d3cc8327d94fb"
+    }
+  ],
+  "stagedConsumer": {
+    "tree": "a703983c6763001eade0360bc178e6d6224de145",
+    "pass": 5,
+    "fail": 0,
+    "todo": 0,
+    "skip": 0,
+    "entry": "participant-identity009",
+    "claim": "native clean index snapshot and fixed680 package consumption, not formal supervisor"
+  }
+}

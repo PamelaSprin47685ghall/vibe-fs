@@ -74,7 +74,7 @@ module ProviderFailureSurface =
             requiredText "identitySeed.participantIdentity.canonicalRole" (field value "canonicalRole")
 
         let role =
-            if roleLabel = "bookkeeper" then
+            if roleLabel = "bookkeeper" || roleLabel = "predictor" then
                 None
             else
                 Roles.tryParseRole roleLabel

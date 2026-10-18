@@ -64,7 +64,7 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 ## [015] business fold 不变量与失败拒绝
 
-业务折叠规则对关键事件不变量进行严格校验（如不可重复捕获、游标单调递增、摘要与哈希匹配等）。若任一不变量不满足，当前事实必须被语义拒绝，并触发持久化重置机制，防止脏状态污染投影。
+业务折叠规则对关键事件不变量进行严格校验（如不可重复捕获、游标单调递增、摘要与哈希匹配等）。违反不变量时，当前事实必须被语义拒绝，并按 [021] 的可证明范围持久化切尾。Journal 载荷无法解码时，不得猜测该事实所代表的身份或未决义务，也不得用空 reset 清除故障；追加在 preparation 阶段拒绝，既存原件与故障作用域保留。
 
 ## [016] Git 物理概念不外泄至领域层
 
@@ -88,7 +88,9 @@ Git 对象数据库绝不是在线事件存储。仅在用户执行 Git 远程�
 
 ## [021] semantic failure 写入 durable cut-tail 且当前进程 fatal
 
-当注册的业务折叠规则对合法信封返回语义错误时，系统在持久化保留该错误事实的同时紧随写入 `ProjectionCutTail` 重置事件，以隔离故障作用域。产生坏事实的当前进程必须立即 fatal 退出以防内存状态被污染，由重启后的下一代进程从重置后的 `Current` 安全接续。
+当注册的业务折叠规则对合法信封返回语义错误，并能证明切尾范围时，系统在持久化保留该错误事实的同时紧随写入 `ProjectionCutTail` 重置事件，以隔离故障作用域。产生坏事实的当前进程必须立即 fatal 退出以防内存状态被污染，由重启后的下一代进程从重置后的 `Current` 安全接续。Journal 事实还须能解码，无法解码时不得产生切尾，不得把拒绝当作已 settle 的 semantic cut；已有坏历史只阻塞其 EventStreamId，不释放未证实关闭的 run。其他注册规则仍按各自的切尾契约裁决。
+
+重放切尾时，现存故障的失败事件必须与 `failed_event_id` 精确一致。同一作用域中针对另一事件的 cut 不得清除该故障；健康作用域与合法的同事件 cut 继续正常积分。
 
 ## [022] EventStore contract/runtime 编译闭包必须单向且有界
 
@@ -102,7 +104,7 @@ Git 同步所需 object/ref 类型与 `IGitRawStore` 只能位于独立 physical
 
 ## [024] semantic cut fatal 必须先settle再经mandatory capability执行
 
-semantic fold失败必须先durable写入对应bad fact与`ProjectionCutTail`，取得committed或unknown settlement evidence，再构造typed fatal incident。caller只持有构造时必填的fatal capability；不得直接引用`FatalProcess` physical implementation、optional/default fallback、module-global binding或service locator。同一incident只有一个report owner与一个kill owner，重复调用及fatal-before-settlement一律拒绝。
+满足 [021] 切尾条件的 semantic fold 失败必须先 durable 写入对应 bad fact 与 `ProjectionCutTail`，取得 committed 或 unknown settlement evidence，再构造 typed fatal incident。caller 只持有构造时必填的 fatal capability；不得直接引用 `FatalProcess` physical implementation、optional/default fallback、module-global binding 或 service locator。同一 incident 只有一个 report owner 与一个 kill owner，重复调用及 fatal-before-settlement 一律拒绝。不可解码的 Journal preparation 拒绝没有上述 incident；无物理追加不得报告 CommitUnknown，若同时发生真实 release 失败，仍须保留 release 错误与原 preparation 拒绝。
 
 ## [025] persistence cut stores禁optional fatal hook，唯一fatal owner在composition
 

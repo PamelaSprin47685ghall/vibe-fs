@@ -279,7 +279,7 @@ const EXPECTED = {
   devops: { role: 'devops', persona: 'Operator' },
   blogger: { role: 'blogger', persona: 'Chronicler' },
   bookkeeper: { role: 'bookkeeper', persona: 'Curator' },
-  predictor: { role: 'engineer', persona: 'Engineer' },
+  predictor: { role: 'predictor', persona: 'Predictor' },
 }
 const expectedView = (name, origin = 'ResolvedAtRoot') => ({
   name,

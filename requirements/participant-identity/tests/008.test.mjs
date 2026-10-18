@@ -337,6 +337,31 @@ test('WHAT[participant-identity-008] current v2 durable identity recovers exact 
     error: '',
   })
 })
+test('WHAT[participant-identity-008] rejects old Predictor authority and mismatched legacy office evidence', () => {
+  const current = JSON.parse(factCodec.encode(authorityFact(createRoot())))
+  authorityCase(current)[1].IdentitySeed[1].SelectedAgent = 'predictor'
+  const currentResult = factCodec.decode(JSON.stringify(current))
+  assert.equal(currentResult.ok, false)
+  assert.match(currentResult.error, /Role mismatch/)
+
+  for (const selected of ['predictor', 'devops', 'bookkeeper']) {
+    const legacy = JSON.parse(legacyHumanRootLine(createRoot()))
+    const payload = authorityCase(legacy)[1]
+    payload.SelectedAgent = selected
+    payload.CanonicalRole = 'engineer'
+    const result = factCodec.decode(JSON.stringify(legacy))
+    assert.equal(result.ok, false, `${selected} cannot recover Engineer authority from a legacy claim`)
+    assert.match(result.error, /CanonicalRole mismatch/)
+  }
+
+  const validDevOps = JSON.parse(legacyHumanRootLine(createRoot()))
+  authorityCase(validDevOps)[1].SelectedAgent = 'devops'
+  authorityCase(validDevOps)[1].CanonicalRole = 'devops'
+  const devops = factCodec.decode(JSON.stringify(validDevOps))
+  assert.equal(devops.ok, true)
+  assert.equal(devops.payload.IdentitySeed.participantIdentity.role, 'devops')
+})
+
 test('WHAT[participant-identity-008] supported legacy HumanRoot deterministically recovers its upgraded identity', () => {
   const profile = createRoot()
   const legacy = legacyHumanRootLine(profile)
@@ -508,7 +533,7 @@ const EXPECTED = {
   devops: { role: 'devops', persona: 'Operator' },
   blogger: { role: 'blogger', persona: 'Chronicler' },
   bookkeeper: { role: 'bookkeeper', persona: 'Curator' },
-  predictor: { role: 'engineer', persona: 'Engineer' },
+  predictor: { role: 'predictor', persona: 'Predictor' },
 }
 const expectedView = (name, origin = 'ResolvedAtRoot') => ({
   name,

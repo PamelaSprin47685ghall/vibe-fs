@@ -610,5 +610,22 @@ module JournalPortObservationSurface =
             | Error failure -> return failwithf "unexpected native journal failure: %A" failure
         }
 
+    let appendActualJournalHandle (value: obj) (child: string) : Task<unit> =
+        task {
+            let journal = (unbox<ActualJournalHandle> value).Journal
+            let parent = SessionId.create "native-settlement"
+
+            let! appended =
+                AgentJournal.appendAgent
+                    (StreamId.Session parent)
+                    None
+                    (handleLinkedFact parent (SessionId.create child))
+                    journal
+
+            appended
+            |> Result.defaultWith (fun failure -> failwithf "native handle append rejected: %A" failure)
+            |> ignore
+        }
+
     let disposeActualJournal (value: obj) : Task<unit> =
         (unbox<ActualJournalHandle> value).Dispose()

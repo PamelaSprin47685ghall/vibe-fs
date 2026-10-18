@@ -67,7 +67,7 @@ module ManagedAgentConfig =
         | None -> Ok()
 
     let private catalogBinding (name: string) : Result<(string * ManagedAgentBinding) option, ConfigGateError> =
-        if ManagedAgentCatalog.isBookkeeperName name then
+        if not (ManagedAgentCatalog.isRoleName name) then
             Ok None
         else
             ManagedAgent.tryParse name
@@ -144,6 +144,8 @@ module ManagedAgentConfig =
         if ManagedAgentCatalog.isBookkeeperName name then
             let language = ProviderLanguageBinding.readGlobalPreference ()
             Some(StaticTools.bookkeeperAgentConfig (PromptResources.loadBookkeeperSystemFor language))
+        elif name = "predictor" then
+            Some(StaticTools.predictorAgentConfig ())
         else
             dynamicConfigForName inventory name
 

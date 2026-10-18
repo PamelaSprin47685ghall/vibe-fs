@@ -35,4 +35,5 @@ module JournalPortObservationSurface =
     val observeActualJournal: value: obj -> obj
     val containsActualJournalEvent: value: obj -> eventId: string -> bool
     val appendActualJournal: value: obj -> Task<obj>
+    val appendActualJournalHandle: value: obj -> child: string -> Task<unit>
     val disposeActualJournal: value: obj -> Task<unit>

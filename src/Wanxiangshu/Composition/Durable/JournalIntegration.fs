@@ -80,5 +80,9 @@ module JournalIntegration =
                         |> Result.mapError (fun rejection ->
                             sprintf "Journal fact '%s' rejected: %s" rejection.Fact rejection.Reason))
                     |> Result.map box
-          PlanCut = fun _ _ _ _ -> Ok { ResetJson = "{}" }
+          PlanCut =
+            fun _ failed _ _ ->
+                EventStoreJournalCodec.tryDecode failed
+                |> Result.map (fun _ -> { ResetJson = "{}" })
+                |> Result.mapError (fun error -> "Journal cut requires a decodable failed event: " + error)
           ApplyCut = fun current _ -> Ok current }

@@ -19,7 +19,8 @@ if (mode === 'cold') {
   let journal
   try {
     journal = await journals.openActualJournalWithStore(handle, writerId, new Date().toISOString())
-    assert.equal(fs.readFileSync(source, 'base64'), request.bytes)
+    assert.equal(fs.existsSync(source), request.facts.length > 0)
+    assert.equal(fs.existsSync(source) ? fs.readFileSync(source, 'base64') : '', request.bytes)
     for (const fact of request.facts) {
       assert.deepEqual(store.read(handle, fact.id), fact)
     }
@@ -31,9 +32,10 @@ if (mode === 'cold') {
     assert.deepEqual(projection, request.projection)
     assert.equal(fs.existsSync(sourceFile), false)
     assert.equal(fs.existsSync(lock), false)
-    assert.deepEqual(fs.readdirSync(path.dirname(source)).sort(), [`${request.sourceWriter}-0000.ndjson`])
+    const files = fs.existsSync(path.dirname(source)) ? fs.readdirSync(path.dirname(source)).sort() : []
+    assert.deepEqual(files, request.facts.length > 0 ? [`${request.sourceWriter}-0000.ndjson`] : [])
     fs.writeSync(1, JSON.stringify({ pid: process.pid, parentPid: process.ppid, writerId,
-      projection, bytes: fs.readFileSync(source, 'base64'), preserved: true }) + '\n')
+      projection, bytes: fs.existsSync(source) ? fs.readFileSync(source, 'base64') : '', preserved: true }) + '\n')
   } finally {
     if (journal) await journals.disposeActualJournal(journal)
     store.dispose(handle)
@@ -42,12 +44,13 @@ if (mode === 'cold') {
   assert.equal(mode, 'measure')
   const business = scenario.startsWith('business-')
   const variant = business ? scenario.slice('business-'.length) : scenario
-  assert.ok(['valid', 'valid-release', 'malformed', 'malformed-release'].includes(variant))
+  assert.ok(['valid', 'valid-release', 'malformed', 'malformed-release', 'semantic', 'semantic-release'].includes(variant))
   assert.equal(process.env.WANXIANGSHU_NO_FATAL_EXIT, undefined)
   assert.equal(process.env.NODE_TEST_CONTEXT, undefined)
   const malformed = variant.startsWith('malformed')
+  const semantic = variant.startsWith('semantic')
   const release = variant.endsWith('-release')
-  const failureOrdinal = business ? 2 : 1
+  const failureOrdinal = semantic ? 3 : business ? 2 : 1
   const cause = new Error(`original Journal ${business ? 'business' : 'initialization'} owned Release completed before response failed`)
   const originals = { appendFileSync: fs.appendFileSync, openSync: fs.openSync,
     fsyncSync: fs.fsyncSync, closeSync: fs.closeSync, rmSync: fs.rmSync }
@@ -102,8 +105,8 @@ if (mode === 'cold') {
   let observations = 0
   const observe = observation => {
     observations += 1
-    const bytes = fs.readFileSync(sourceFile)
-    const facts = bytes.toString('utf8').trimEnd().split('\n').map(JSON.parse).map(dto)
+    const bytes = fs.existsSync(sourceFile) ? fs.readFileSync(sourceFile) : Buffer.alloc(0)
+    const facts = bytes.length === 0 ? [] : bytes.toString('utf8').trimEnd().split('\n').map(JSON.parse).map(dto)
     const error = observation.append.error
     const receipt = { pid: process.pid, parentPid: process.ppid, writerId, scenario, observations,
       ordinal: observation.append.ordinal,
@@ -112,6 +115,8 @@ if (mode === 'cold') {
       cuts: observation.append.cuts, appendError: error === null ? null : {
         code: error.code, phase: error.phase, causeSame: error.cause === cause,
         requested: error.requested, prepared: error.prepared, cleanupFailures: error.cleanupFailures,
+        ...(error.reason === undefined ? {} : { reason: error.reason }),
+        ...(error.priorRejection === null || error.priorRejection === undefined ? {} : { priorRejection: error.priorRejection }),
       }, facts, bytes: bytes.toString('base64'),
       heads: [...new Set(facts.map(fact => fact.stream))].map(stream => ({ stream,
         head: store.head(handle, stream), heads: store.heads(handle, stream) })),
@@ -133,11 +138,16 @@ if (mode === 'cold') {
     journal = await journals.openActualJournalWithStore(port, writerId, new Date().toISOString())
     const initial = journals.observeActualJournal(journal)
     assert.equal(fs.existsSync(sourceFile), false)
+    if (semantic) {
+      await journals.appendActualJournalHandle(journal, 'native-child-before')
+      await journals.appendActualJournalHandle(journal, 'native-child-conflict')
+      assert.fail('The real semantic cut must terminate the producer')
+    }
     const first = await journals.appendActualJournal(journal)
     const afterFirst = journals.observeActualJournal(journal)
     let second = null
     let afterSecond = null
-    if (release) {
+    if (release && !malformed) {
       assert.strictEqual(first.error.cause, cause)
       const beforeSecond = { ...counts }
       second = await journals.appendActualJournal(journal)
@@ -145,6 +155,15 @@ if (mode === 'cold') {
       assert.deepEqual(counts, beforeSecond)
       assert.strictEqual(second.error.cause, cause)
       assert.equal(second.error.failedEventId, business ? first.error.eventId : initial.initEventId)
+    }
+    if (malformed) {
+      const beforeSecond = { ...counts }
+      second = await journals.appendActualJournal(journal)
+      afterSecond = journals.observeActualJournal(journal)
+      assert.deepEqual(counts, beforeSecond)
+      assert.equal(second.kind, 'NotAttempted')
+      assert.equal(second.error.failedEventId, business ? first.error.eventId : initial.initEventId)
+      if (release) assert.strictEqual(second.error.cause, cause)
     }
     fs.writeFileSync(path.join(root, 'journal-returned.json'), JSON.stringify({ initial, first,
       afterFirst, second, afterSecond, projection: journals.observeActualJournalProjection(journal) },

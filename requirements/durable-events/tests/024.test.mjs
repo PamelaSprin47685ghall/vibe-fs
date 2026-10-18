@@ -280,7 +280,155 @@ for (const binding of ['wire', 'mcp']) {
 const journalPhysicalCoordinator = fileURLToPath(new URL('./support/journal-physical-coordinator.mjs', import.meta.url))
 const journalPhysicalChild = fileURLToPath(new URL('./support/journal-physical-child.mjs', import.meta.url))
 
-for (const scenario of ['valid', 'valid-release', 'malformed', 'malformed-release']) {
+for (const business of [false, true]) {
+  for (const release of [false, true]) {
+    const scenario = (business ? 'business-' : '') + 'malformed' + (release ? '-release' : '')
+    test(`WHAT[durable-events-024] undecodable Journal ${scenario} refuses a cut without inventing append or fatal evidence`, async t => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'journal-decode-rejection-')))
+      const commonDir = join(root, '.git')
+      const writer = randomUUID()
+      const env = { ...process.env }
+      delete env.NODE_TEST_CONTEXT
+      delete env.NODE_OPTIONS
+      delete env.WANXIANGSHU_NO_FATAL_EXIT
+      const probe = async (entry, args) => JSON.parse(await runVerificationToolProbe(process.execPath,
+        [entry, ...args], { cwd: root, env, signal: t.signal }))
+      let completed = false
+      try {
+        const measured = await probe(journalPhysicalCoordinator, [commonDir, writer, scenario])
+        assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, { exitCode: 0, signal: null })
+        assert.equal(measured.cleanupRequested, false)
+        assert.deepEqual(measured.reports, [])
+        assert.notEqual(measured.pid, measured.coordinatorPid)
+        assert.notEqual(measured.pid, process.pid)
+        assert.equal(measured.receipts.length, business ? 2 : 1)
+        const receipt = measured.receipts.at(-1)
+        const count = business ? 1 : 0
+        assert.deepEqual(receipt.counts, { append: count, fsync: count, close: count,
+          release: business ? 2 : 1, injected: release ? 1 : 0 })
+        assert.deepEqual(receipt.requested, [{ ...receipt.originalRequested[0], payload: {} }])
+        assert.deepEqual(receipt.cuts, [])
+        assert.equal(receipt.facts.length, count)
+        const rejection = release ? receipt.appendError.priorRejection : receipt.appendError
+        assert.equal(rejection.code, 'AppendFailed')
+        assert.match(rejection.reason, /Journal cut requires a decodable failed event/)
+        assert.equal(receipt.appendError.code, release ? 'AppendNotAttempted' : 'AppendFailed')
+        if (release) {
+          assert.equal(receipt.appendError.phase, 'StoreRelease')
+          assert.equal(receipt.appendError.causeSame, true)
+          assert.equal(receipt.appendError.prepared, null)
+          assert.deepEqual(receipt.appendError.cleanupFailures, [])
+        }
+        assert.equal(receipt.lockReleased, true)
+        assert.equal(receipt.openDescriptors, 0)
+        assert.equal(receipt.syncedDescriptors, 0)
+        assert.equal(receipt.initial.revision, '0')
+        assert.equal(receipt.initial.waitCompleted, false)
+        assert.equal(measured.returned.afterFirst.revision, '0')
+        assert.equal(measured.returned.afterFirst.poisoned, true)
+        assert.equal(measured.returned.afterFirst.lastCommittedLocalSeq, business ? '1' : '0')
+        assert.equal(measured.returned.afterFirst.waitCompleted, false)
+        assert.equal(measured.returned.first.kind, 'NotAttempted')
+        assert.equal(measured.returned.second.kind, 'NotAttempted')
+        assert.equal(measured.returned.second.error.failedEventId,
+          business ? measured.returned.first.error.eventId : receipt.initial.initEventId)
+        assert.notEqual(measured.returned.second.error.eventId, measured.returned.first.error.eventId)
+        assert.equal(measured.returned.afterSecond.revision, '0')
+        assert.equal(measured.returned.afterSecond.lastCommittedLocalSeq, business ? '1' : '0')
+        assert.equal(measured.returned.afterSecond.poisoned, true)
+        const source = join(commonDir, 'wanxiangshu/events', writer + '-0000.ndjson')
+        assert.equal(existsSync(source), business)
+        assert.equal(business ? readFileSync(source, 'base64') : '', receipt.bytes)
+        const coldWriter = randomUUID()
+        const cold = await probe(journalPhysicalChild, ['cold', commonDir, coldWriter, scenario,
+          JSON.stringify({ sourceWriter: writer, bytes: receipt.bytes, facts: receipt.facts,
+            heads: receipt.heads, projection: receipt.projection })])
+        assert.notEqual(cold.pid, measured.pid)
+        assert.equal(cold.preserved, true)
+        assert.equal(cold.bytes, receipt.bytes)
+        assert.deepEqual(cold.projection, receipt.projection)
+        t.diagnostic(JSON.stringify({ scenario, pid: measured.pid, coldPid: cold.pid,
+          counts: receipt.counts, rejection: receipt.appendError }))
+        completed = true
+      } finally {
+        if (completed) rmSync(root, { recursive: true, force: true })
+        else t.diagnostic('JOURNAL_DECODE_REJECTION_EVIDENCE: retained ' + root)
+      }
+    })
+  }
+}
+
+for (const scenario of ['semantic', 'semantic-release']) {
+  test(`WHAT[durable-events-024] decodable Journal ${scenario} settles bad fact and cut before actual fatal and cold replay`, async t => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'journal-decodable-cut-')))
+    const commonDir = join(root, '.git')
+    const writer = randomUUID()
+    const env = { ...process.env }
+    delete env.NODE_TEST_CONTEXT
+    delete env.NODE_OPTIONS
+    delete env.WANXIANGSHU_NO_FATAL_EXIT
+    const probe = async (entry, args) => JSON.parse(await runVerificationToolProbe(process.execPath,
+      [entry, ...args], { cwd: root, env, signal: t.signal }))
+    let completed = false
+    try {
+      const measured = await probe(journalPhysicalCoordinator, [commonDir, writer, scenario])
+      assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, { exitCode: null, signal: 'SIGKILL' })
+      assert.equal(measured.cleanupRequested, false)
+      assert.equal(measured.returned, null)
+      assert.notEqual(measured.pid, process.pid)
+      assert.notEqual(measured.pid, measured.coordinatorPid)
+      assert.equal(measured.receipts.length, 3)
+      const receipt = measured.receipts[2]
+      assert.deepEqual(receipt.requested, receipt.originalRequested)
+      assert.equal(receipt.facts.length, 4)
+      assert.equal(receipt.cuts.length, 1)
+      const bad = receipt.facts[2]
+      const cut = receipt.facts[3]
+      assert.deepEqual(bad, receipt.originalRequested[0])
+      const firstLink = receipt.facts[1].payload.Fact[1][1]
+      const badLink = bad.payload.Fact[1][1]
+      assert.equal(firstLink[0], 'HandleLinked')
+      assert.equal(badLink[0], 'HandleLinked')
+      assert.deepEqual(badLink[1].Handle, firstLink[1].Handle)
+      assert.notDeepEqual(badLink[1].ChildSessionId, firstLink[1].ChildSessionId)
+      assert.equal(cut.type, 'ProjectionCutTail')
+      assert.equal(cut.payload.rule, 'Journal')
+      assert.equal(cut.payload.failed_event_id, bad.id)
+      assert.deepEqual(cut.parents, [bad.id])
+      assert.equal(receipt.cuts[0].failedEventId, bad.id)
+      assert.equal(receipt.cuts[0].cutEventId, cut.id)
+      assert.deepEqual(receipt.counts, { append: 3, fsync: 3, close: 3, release: 3,
+        injected: scenario.endsWith('-release') ? 1 : 0 })
+      assert.equal(receipt.lockReleased, true)
+      assert.equal(receipt.openDescriptors, 0)
+      assert.equal(receipt.syncedDescriptors, 0)
+      assert.equal(measured.reports.length, 1)
+      assert.equal(measured.reports[0].operation, 'journal-semantic-cut')
+      assert.match(measured.reports[0].result, scenario.endsWith('-release') ? /StoreRelease/ : /semantic cut/)
+      if (scenario.endsWith('-release')) {
+        assert.equal(receipt.appendError.code, 'CommitUnknown')
+        assert.equal(receipt.appendError.phase, 'StoreRelease')
+        assert.equal(receipt.appendError.causeSame, true)
+        assert.deepEqual(receipt.appendError.prepared, { durableEvents: [bad, cut], cuts: receipt.cuts })
+      } else assert.equal(receipt.appendError, null)
+      const cold = await probe(journalPhysicalChild, ['cold', commonDir, randomUUID(), scenario,
+        JSON.stringify({ sourceWriter: writer, bytes: receipt.bytes, facts: receipt.facts,
+          heads: receipt.heads, projection: receipt.projection })])
+      assert.notEqual(cold.pid, measured.pid)
+      assert.equal(cold.preserved, true)
+      assert.equal(cold.bytes, receipt.bytes)
+      assert.deepEqual(cold.projection, receipt.projection)
+      t.diagnostic(JSON.stringify({ scenario, pid: measured.pid, coldPid: cold.pid,
+        counts: receipt.counts, cutId: cut.id }))
+      completed = true
+    } finally {
+      if (completed) rmSync(root, { recursive: true, force: true })
+      else t.diagnostic('JOURNAL_DECODABLE_CUT_EVIDENCE: retained ' + root)
+    }
+  })
+}
+
+for (const scenario of ['valid', 'valid-release']) {
   test(`WHAT[durable-events-024] original Journal RuntimeStarted ${scenario} settles before its physical terminal and independent cold replay`, async t => {
     assert.equal(typeof journals.openActualJournalWithStore, 'function')
     assert.equal(typeof journals.observeActualJournalProjection, 'function')
@@ -288,7 +436,6 @@ for (const scenario of ['valid', 'valid-release', 'malformed', 'malformed-releas
     const commonDir = join(root, '.git')
     const sourceWriter = randomUUID()
     const sourceFile = join(commonDir, 'wanxiangshu', 'events', `${sourceWriter}-0000.ndjson`)
-    const malformed = scenario.startsWith('malformed')
     const release = scenario.endsWith('-release')
     const env = { ...process.env }
     delete env.NODE_TEST_CONTEXT
@@ -310,8 +457,7 @@ for (const scenario of ['valid', 'valid-release', 'malformed', 'malformed-releas
       assert.notEqual(measured.pid, process.pid)
       assert.notEqual(measured.pid, measured.coordinatorPid)
       assert.equal(measured.cleanupRequested, false)
-      assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, malformed
-        ? { exitCode: null, signal: 'SIGKILL' } : { exitCode: 0, signal: null })
+      assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, { exitCode: 0, signal: null })
       assert.equal(measured.receipts.length, scenario === 'valid' ? 2 : 1)
       const firstReceipt = measured.receipts[0]
       const receipt = measured.receipts.at(-1)
@@ -321,7 +467,7 @@ for (const scenario of ['valid', 'valid-release', 'malformed', 'malformed-releas
       assert.equal(original.stream, 'journal/workspace')
       assert.equal(original.type, 'JournalEnvelope')
       assert.notDeepEqual(original.payload, {})
-      assert.deepEqual(firstReceipt.requested, [{ ...original, payload: malformed ? {} : original.payload }])
+      assert.deepEqual(firstReceipt.requested, [original])
       assert.deepEqual(firstReceipt.facts[0], firstReceipt.requested[0])
       const count = scenario === 'valid' ? 2 : 1
       assert.deepEqual(receipt.counts, { append: count, fsync: count, close: count, release: count,
@@ -331,7 +477,7 @@ for (const scenario of ['valid', 'valid-release', 'malformed', 'malformed-releas
       assert.equal(receipt.syncedDescriptors, 0)
       assert.equal(existsSync(join(commonDir, 'wanxiangshu.lock')), false)
       assert.equal(readFileSync(sourceFile, 'base64'), receipt.bytes)
-      assert.equal(receipt.facts.length, malformed || scenario === 'valid' ? 2 : 1)
+      assert.equal(receipt.facts.length, scenario === 'valid' ? 2 : 1)
       for (const frontier of receipt.heads) {
         const finalFact = receipt.facts.filter(fact => fact.stream === frontier.stream).at(-1)
         assert.equal(frontier.head, finalFact.id)
@@ -339,33 +485,13 @@ for (const scenario of ['valid', 'valid-release', 'malformed', 'malformed-releas
       }
       assert.equal(firstReceipt.initial.revision, '0')
       assert.equal(firstReceipt.initial.waitCompleted, false)
-      assert.equal(firstReceipt.cuts.length, malformed ? 1 : 0)
+      assert.equal(firstReceipt.cuts.length, 0)
       if (release) {
         assert.deepEqual(firstReceipt.appendError, { code: 'CommitUnknown', phase: 'StoreRelease',
           causeSame: true, requested: firstReceipt.requested,
           prepared: { durableEvents: firstReceipt.facts, cuts: firstReceipt.cuts }, cleanupFailures: [] })
       } else assert.equal(firstReceipt.appendError, null)
-      if (malformed) {
-        const [cut] = firstReceipt.cuts
-        const cutFact = receipt.facts[1]
-        assert.equal(cut.rule, 'Journal')
-        assert.equal(cut.failedEventId, initializationId)
-        assert.equal(cut.cutEventId, cutFact.id)
-        assert.equal(cutFact.type, 'ProjectionCutTail')
-        assert.equal(cutFact.payload.rule, 'Journal')
-        assert.equal(cutFact.payload.failed_event_id, initializationId)
-        assert.deepEqual(cutFact.parents, [initializationId])
-        assert.notEqual(cutFact.stream, original.stream)
-        assert.deepEqual(receipt.projection, { runtimeId: null, runtimeStartCount: 0,
-          sessionCount: 0, hasNativeSession: false })
-        assert.equal(measured.returned, null)
-        assert.equal(measured.reports.length, 1)
-        assert.equal(measured.reports[0].operation, 'runtime-started-semantic-cut')
-        if (release) {
-          assert.match(measured.reports[0].result, /semantic cut append settled unknown at StoreRelease/)
-          assert.match(measured.reports[0].result, /original Journal initialization owned Release completed before response failed/)
-        } else assert.match(measured.reports[0].result, /RuntimeStarted semantic cut:/)
-      } else {
+      {
         assert.deepEqual(measured.reports, [])
         assert.equal(measured.returned.first.kind, release ? 'NotAttempted' : 'Committed')
         const { afterFirst, afterSecond, first, second } = measured.returned
@@ -414,7 +540,7 @@ for (const scenario of ['valid', 'valid-release', 'malformed', 'malformed-releas
   })
 }
 
-for (const variant of ['valid', 'valid-release', 'malformed', 'malformed-release']) {
+for (const variant of ['valid', 'valid-release']) {
   const scenario = 'business-' + variant
   test(`WHAT[durable-events-024] original AgentJournal business ${variant} preserves legal initialization before its physical terminal and cold replay`, async t => {
     assert.equal(typeof eventStore.createAppendPayloadStoreAt, 'function')
@@ -422,7 +548,6 @@ for (const variant of ['valid', 'valid-release', 'malformed', 'malformed-release
     const commonDir = join(root, '.git')
     const sourceWriter = randomUUID()
     const sourceFile = join(commonDir, 'wanxiangshu', 'events', `${sourceWriter}-0000.ndjson`)
-    const malformed = variant.startsWith('malformed')
     const release = variant.endsWith('-release')
     const env = { ...process.env }
     delete env.NODE_TEST_CONTEXT
@@ -467,10 +592,10 @@ for (const variant of ['valid', 'valid-release', 'malformed', 'malformed-release
       assert.notEqual(original.stream, initialization.originalRequested[0].stream)
       assert.equal(original.type, 'JournalEnvelope')
       assert.notDeepEqual(original.payload, {})
-      assert.deepEqual(business.requested, [{ ...original, payload: malformed ? {} : original.payload }])
+      assert.deepEqual(business.requested, [original])
       assert.deepEqual(business.facts[0], initialization.facts[0])
       assert.deepEqual(business.facts[1], business.requested[0])
-      assert.equal(business.facts.length, malformed ? 3 : 2)
+      assert.equal(business.facts.length, 2)
       assert.deepEqual(business.counts, { append: 2, fsync: 2, close: 2, release: 2,
         injected: release ? 1 : 0 })
       for (const receipt of measured.receipts) {
@@ -495,9 +620,7 @@ for (const variant of ['valid', 'valid-release', 'malformed', 'malformed-release
         assert.deepEqual(frontier.heads, [finalFact.id])
       }
 
-      const projection = malformed
-        ? initialization.projection
-        : { runtimeId: 'native-' + sourceWriter, runtimeStartCount: 1,
+      const projection = { runtimeId: 'native-' + sourceWriter, runtimeStartCount: 1,
           sessionCount: 1, hasNativeSession: true }
       assert.deepEqual(business.projection, projection)
       const coldWriter = randomUUID()
@@ -515,36 +638,14 @@ for (const variant of ['valid', 'valid-release', 'malformed', 'malformed-release
       assert.equal(existsSync(join(commonDir, 'wanxiangshu', 'events', `${coldWriter}.ndjson`)), false)
       assert.equal(existsSync(join(commonDir, 'wanxiangshu.lock')), false)
 
-      assert.equal(business.cuts.length, malformed ? 1 : 0)
+      assert.equal(business.cuts.length, 0)
       if (release) {
         assert.deepEqual(business.appendError, { code: 'CommitUnknown', phase: 'StoreRelease',
           causeSame: true, requested: business.requested,
           prepared: { durableEvents: business.facts.slice(1), cuts: business.cuts }, cleanupFailures: [] })
       } else assert.equal(business.appendError, null)
-      assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, malformed
-        ? { exitCode: null, signal: 'SIGKILL' } : { exitCode: 0, signal: null })
-      if (malformed) {
-        const [cut] = business.cuts
-        const cutFact = business.facts[2]
-        assert.equal(cut.rule, 'Journal')
-        assert.equal(cut.failedEventId, original.id)
-        assert.equal(cut.cutEventId, cutFact.id)
-        assert.equal(cutFact.type, 'ProjectionCutTail')
-        assert.equal(cutFact.payload.rule, 'Journal')
-        assert.equal(cutFact.payload.failed_event_id, original.id)
-        assert.deepEqual(cutFact.parents, [original.id])
-        assert.notEqual(cutFact.stream, original.stream)
-        assert.equal(measured.returned, null)
-        assert.equal(measured.reports.length, 1)
-        assert.equal(measured.reports[0].operation, 'journal-semantic-cut')
-        if (release) {
-          assert.match(measured.reports[0].result, /semantic cut append settled unknown at StoreRelease/)
-          assert.match(measured.reports[0].result, /original Journal business owned Release completed before response failed/)
-        } else {
-          assert.ok(measured.reports[0].result.includes(`journal semantic cut at ${original.id}:`))
-          assert.match(measured.reports[0].result, /fact 'semantic-cut' rejected:/)
-        }
-      } else {
+      assert.deepEqual({ exitCode: measured.exitCode, signal: measured.signal }, { exitCode: 0, signal: null })
+      {
         assert.deepEqual(measured.reports, [])
         const { first, afterFirst, second, afterSecond } = measured.returned
         assert.equal(first.kind, release ? 'CommitUnknown' : 'Committed')
