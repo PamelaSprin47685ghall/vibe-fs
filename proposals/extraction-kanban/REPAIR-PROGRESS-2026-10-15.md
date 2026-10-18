@@ -2,6 +2,14 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第三十二批：完整wire预算与真实注册消费者（2026-10-18）
+
+R6-B从ebfbe3d83开始，保留共享新增文档提交d2db5a0c3。预算现包含TOML/转义/事实/说明及原文；双语最小可接纳额度en215、zh-CN211，过小先明确拒绝、零启动。与唯一Host2000行/51200字节窗共同计量，不改注册层规则；保留原始UTF-8尾部和BOM，runner预先取消返回取消请求事实。本轮候选的过度删尾、失败编译、夹具前提和review纠正分项保留，不冒充修前问题。
+
+构建639；129文件955项911pass/0普通fail/15skip/29TODO，Bun独立HOME四文件46/46；正式九文件96pass/0fail/1integration skip、9/9完成且owned accepted=true，额外真实独立编译及OpenCode Host各1/1，format/static/diff通过。固定主包SHA b1f7804，2076files/展开13402186bytes、内含库0.6.8；独立安装依赖及Host peer后，Node/Bun各46/46、Bun128MiB五次、完整PTY124/124，产品/归档不变且目录清理。非作者同包双语各18观察及旧新原生事实对照已完成，借依赖的范围明示。详细日志和失败归因见[预算报告](PROCESS-WIRE-BUDGET-2026-10-18.md)。随本原子提交正常推送master，未部署Host或发布registry。
+
+新确认的两个旧P1不随预算关闭：R6-E工具提前解绑Abort，排队取消后仍启动，先单独修；R6-D原生exit143和SIGTERM丢失区别，须原子调整纯结果及全部消费者。C/R7-A旧首轮隔离失败、正式监督及其它产品链仍保留；R12-U1继续暂缓。Linux自有生成目录删除仍待远端工具人工确认，无自有运行进程。
+
 ## 第三十一批：修正work011的测试输入，保留生产身份门禁（2026-10-18）
 
 R7-B扩大组的五fail由非作者三路原样对照确认修前同现。补真实ToolPart身份、使用Host实际原件、按SDK封装successor消息；不改生产绑定与捕获规则。原始三路5红、仅id的3/2分层保留；独立诊断误删retirement-run的5绿已撤回，作者提前取gate造成的新顺序错误也已修正，不混入原问题。最终完整Work160项159pass/0fail/1TODO，非作者shared011独立5pass/0fail/1TODO，详见[报告](WORK-REVIEW-FIXTURE-2026-10-18.md)。产品字节沿用0d60精确包，未部署Host；已有in-flight中断TODO和R12-U1不销项。

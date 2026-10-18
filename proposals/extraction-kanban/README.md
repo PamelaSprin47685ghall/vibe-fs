@@ -10,7 +10,7 @@
 
 三小时施工已完成[Bun挂起定因与夹具修正](GUIDANCE-BUN-LIFETIME-2026-10-18.md)和[Process纯契约及实际消费者](PROCESS-CONTRACT-2026-10-18.md)，非作者复审已核对。新增无界Bun启动器已删除，原生物理证据不替代正式监督；正式Bun适配单列CUT-00-R2，Node验证包装器的既有有界等待问题另列CUT-00-R1，不与暂缓的R12-U1混记。
 
-本窗口已继续接入[Process C](PROCESS-RUNTIME-2026-10-18.md)、修复[输出提前清组R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md)，并交付[实际背压R7-B](PROCESS-BACKPRESSURE-2026-10-18.md)。当前库0.6.8；真实精确包、32路空闲I/O、128MiB字节/hash及macOS/Linux非作者复验通过，当前主包完整PTY124/124。旧6cc27隔离PTY首轮失败仍未归因，C/R7-A保持REVIEW；扩大组work011五fail修前同现，另作独立处置，不宣布项目全绿。下一P1为完整wire预算，实际状态只看[看板](BOARD.md#source-audit-repairs)。
+本窗口已继续接入[Process C](PROCESS-RUNTIME-2026-10-18.md)、修复[输出提前清组R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md)，并交付[实际背压R7-B](PROCESS-BACKPRESSURE-2026-10-18.md)、[work011夹具](WORK-REVIEW-FIXTURE-2026-10-18.md)和[完整wire预算R6-B](PROCESS-WIRE-BUDGET-2026-10-18.md)。当前库0.6.8，预算精确主包b1f7804已通过Node/Bun真实注册消费、五次128MiB和完整PTY124/124。旧6cc27隔离PTY首轮失败仍未归因，C/R7-A保持REVIEW，不宣布项目全绿。下一P1为真实取消R6-E及终结事实R6-D，实际状态只看[看板](BOARD.md#source-audit-repairs)。
 
 ## 入口：五份文件，各管一件事
 

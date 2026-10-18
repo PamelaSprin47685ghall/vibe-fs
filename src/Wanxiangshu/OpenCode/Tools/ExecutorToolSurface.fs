@@ -89,3 +89,6 @@ module ExecutorToolSurface =
 
     let formatSpooledOutcome (exitCode: int) (summary: string) : string =
         ExecutorTool.formatSpooledOutcome exitCode summary
+
+    let retainOutputTail (limitBytes: int) (output: string) : string =
+        ExecutorTool.retainOutputTail limitBytes output

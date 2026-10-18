@@ -43,9 +43,9 @@ const parseToml = (text) =>
       }),
   )
 
-const SPOOL_COMMAND = "printf 'abcdefghijklmnopqrstuvwxyz0123456789'"
+const SPOOL_COMMAND = "printf '%04096d' 0"
 
-const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 4 }
+const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 256 }
 
 test('WHAT[process-execution-005] the real supervised host preserves literal environment overrides and direct argv', async () => {
   const sentinel = 'WANXIANGSHU_PROCESS_HOST_SENTINEL'
@@ -135,7 +135,7 @@ test('WHAT[process-execution-011] RUN_blank_session_surfaces_natural_execution_c
 })
 
 test('WHAT[process-execution-011] RUN_deadline_overrun_returns_the_fixed_timeout_consequence', async () => {
-  const result = await run({ command: 'sleep 5', deadline_seconds: 0.01, output_budget_bytes: 16 })
+  const result = await run({ command: 'sleep 5', deadline_seconds: 0.01, output_budget_bytes: 256 })
   assert.doesNotMatch(result, /TimeoutExceeded|\berror\s*=/)
   assert.match(result, /(?:Termination was requested|已请求终止)/)
   assert.doesNotMatch(result, /was stopped|已被停止/)

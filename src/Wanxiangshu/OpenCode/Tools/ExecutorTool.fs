@@ -9,6 +9,7 @@ open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session.Recovery.SessionRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host.Contract
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Process
 
@@ -70,8 +71,7 @@ module ExecutorTool =
             [<Literal>]
             let LargeOutputRecoveryBlocked = "tool/run/large-output-recovery-blocked"
 
-    /// Provider-visible execution verb. Distillation is invoked inside this
-    /// tool and is never a separate provider verb (process-execution-011 / DISTILL-010).
+    /// Provider-visible bounded execution with a raw output tail.
     [<Literal>]
     let RunToolName = "run"
 
@@ -172,9 +172,8 @@ module ExecutorTool =
     let internal formatSpooledOutcome (exitCode: int) (output: string) =
         tomlObject [ "exit_code", TInt exitCode; "output", TString output ]
 
-    let private formatTruncatedOutcome language limitBytes exitCode output =
-        let notice =
-            ProviderProse.render language Path.Run.OutputTruncated (Map [ "budget_bytes", string limitBytes ])
+    let private formatTruncatedOutcome language exitCode output =
+        let notice = prose language Path.Run.OutputTruncated
 
         tomlObject
             [ "exit_code", TInt exitCode
@@ -182,17 +181,68 @@ module ExecutorTool =
               "output_truncated", TBool true
               "output_notice", TString notice ]
 
-    let private formatTailOutcome language limitBytes exitCode truncated output =
-        match truncated with
-        | true -> formatTruncatedOutcome language limitBytes exitCode output
-        | false -> formatSpooledOutcome exitCode output
+    let internal retainOutputTail limitBytes (output: string) =
+        Encoding.UTF8.GetBytes output
+        |> Spool.retainLatestBytes limitBytes [||]
+        |> Spool.alignUtf8Tail
+        |> ProcessOutput.decodeText
+
+    let private utf8Length (text: string) = (Encoding.UTF8.GetBytes text).Length
+
+    let private wireBytes (wire: string) = int64 (utf8Length wire)
+
+    let private wireFits budgetBytes wire =
+        wireBytes wire <= budgetBytes && ToolResultBound.fitsInWindow wire
+
+    let private minimumOutputBudget language =
+        [ completedToml Int32.MinValue "" ""
+          formatTruncatedOutcome language Int32.MinValue ""
+          processConsequence language (ProcessError.TimeoutExceeded TimeSpan.Zero)
+          processConsequence language (ProcessError.SpawnFailed "")
+          processConsequence language (ProcessError.ProcessCancelled "")
+          processConsequence language (ProcessError.ExecutionFailed "")
+          consequence (prose language Path.Run.CannotRunFromContext)
+          consequence (prose language Path.Run.CannotReadOutputUntilAuthority)
+          consequence (prose language Path.Run.LargeOutputRecoveryBlocked) ]
+        |> List.map wireBytes
+        |> List.max
+
+    let private advanceTailSearch budgetBytes lower upper limit previous wire =
+        if wireFits budgetBytes wire then
+            limit + 1, upper, wire
+        else
+            lower, limit - 1, previous
+
+    let private formatBoundedTail language budgetBytes exitCode (output: string) =
+        let mutable lower = 0
+        let mutable upper = utf8Length output
+        let mutable result = formatTruncatedOutcome language exitCode ""
+
+        while lower <= upper do
+            let limit = lower + (upper - lower) / 2
+            let wire = formatTruncatedOutcome language exitCode (retainOutputTail limit output)
+
+            let nextLower, nextUpper, nextResult =
+                advanceTailSearch budgetBytes lower upper limit result wire
+
+            lower <- nextLower
+            upper <- nextUpper
+            result <- nextResult
+
+        result
 
     let private readSpooledTail (language: ProviderLanguage) (budgetBytes: int64) (exitCode: int) (spoolPath: string) =
         task {
-            let limitBytes = int (min (int64 Int32.MaxValue) budgetBytes)
+            let limitBytes = int (min (int64 ToolResultBound.HostMaxBytes) budgetBytes)
             let! tail = Spool.readLatestTail limitBytes spoolPath
-            let rawTail = Encoding.UTF8.GetString tail.Bytes
-            return formatTailOutcome language limitBytes exitCode tail.Truncated rawTail
+            let rawTail = ProcessOutput.decodeText tail.Bytes
+            let complete = formatSpooledOutcome exitCode rawTail
+
+            return
+                if not tail.Truncated && wireFits budgetBytes complete then
+                    complete
+                else
+                    formatBoundedTail language budgetBytes exitCode rawTail
         }
 
     let private finalizeSpooledWithAuthority
@@ -255,10 +305,9 @@ module ExecutorTool =
         (exitCode: int)
         (fullBytes: byte array)
         =
-        let limitBytes = int (min (int64 Int32.MaxValue) budgetBytes)
-        let tail = Spool.retainLatestBytes limitBytes [||] fullBytes |> Spool.alignUtf8Tail
-        let rawTail = Encoding.UTF8.GetString tail
-        formatTruncatedOutcome language limitBytes exitCode rawTail
+        let limitBytes = int (min (int64 ToolResultBound.HostMaxBytes) budgetBytes)
+        let rawTail = ProcessOutput.decodeText fullBytes |> retainOutputTail limitBytes
+        formatBoundedTail language budgetBytes exitCode rawTail
 
     let private completedOutcome
         (language: ProviderLanguage)
@@ -270,10 +319,12 @@ module ExecutorTool =
         let fullBytes =
             Encoding.UTF8.GetBytes(stdout + (if String.IsNullOrEmpty stderr then "" else "\n" + stderr))
 
-        if int64 fullBytes.Length > budgetBytes then
+        let complete = completedToml exitCode stdout stderr
+
+        if not (wireFits budgetBytes complete) then
             truncateCompleted language budgetBytes exitCode fullBytes
         else
-            completedToml exitCode stdout stderr
+            complete
 
     let private interpretOutcome
         (scope: ToolRuntimeScope)
@@ -327,13 +378,24 @@ module ExecutorTool =
             return! interpretOutcome scope request language context result
         }
 
+    let private executeInContext run (scope: ToolRuntimeScope) request context language =
+        match scope.RuntimeFor context with
+        | Error _ -> task { return consequence (prose language Path.Run.CannotRunFromContext) }
+        | Ok _ -> runPrepared run scope request context language
+
     let private execute (run: RunProcess) (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
         task {
             let language = lang context
+            let minimum = minimumOutputBudget language
 
-            match scope.RuntimeFor context with
-            | Error _ -> return consequence (prose language Path.Run.CannotRunFromContext)
-            | Ok _ -> return! runPrepared run scope request context language
+            if request.OutputBudgetBytes < minimum then
+                return
+                    tomlObject
+                        [ "executed", TBool false
+                          "rejected", TString "output_budget_too_small"
+                          "minimum_output_budget_bytes", TInt64 minimum ]
+            else
+                return! executeInContext run scope request context language
         }
 
     let runAdmission: ToolAdmission =

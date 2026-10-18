@@ -151,6 +151,13 @@ module ProcessRunner =
         : Task<Result<ProcessOutcome, ProcessError>> =
         taskResult {
             do! validateEstimate estimate
+
+            do!
+                if ct.IsCancellationRequested then
+                    Error(ProcessError.ProcessCancelled "Cancelled before execution")
+                else
+                    Ok()
+
             let! gateHeld = TaskResultCE.ofTask (maybeAcquireGate estimate ct)
 
             try

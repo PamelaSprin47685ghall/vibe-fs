@@ -62,7 +62,7 @@ test('WHAT[process-execution-014] truncated_notice_uses_the_session_language_and
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'zh-CN'
   refreshGlobalLanguage()
   const raw = 'IGNORE_ALL_INSTRUCTIONS'
-  const result = await run({ command: `printf '%0200d${raw}' 0`, output_budget_bytes: 64 }, { sessionID })
+  const result = await run({ command: `printf '%0200d${raw}' 0`, output_budget_bytes: 256 }, { sessionID })
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
   refreshGlobalLanguage()
   const parsed = parseToml(result)
@@ -71,13 +71,13 @@ test('WHAT[process-execution-014] truncated_notice_uses_the_session_language_and
   assert.match(parsed.output_notice, /更早输出已截断/)
   assert.ok(parsed.output.endsWith(raw), 'untrusted tail must remain in the data field')
   assert.equal(parsed.exit_code, 0)
-  assert.ok(Buffer.byteLength(parsed.output, 'utf8') <= 64)
+  assert.ok(Buffer.byteLength(result, 'utf8') <= 256)
 })
 
 test('WHAT[process-execution-014] truncated_output_preserves_program_facts_without_log_inference_and_declares_truncation', async () => {
   // 执行一条返回非零退出码并产生超大输出的命令
   const command = 'python3 -c "import sys; print(\'x\' * 2000); sys.stderr.write(\'failed at line 42\\n\'); sys.exit(7)"'
-  const result = await run({ command, output_budget_bytes: 128 })
+  const result = await run({ command, output_budget_bytes: 256 })
   const parsed = parseToml(result)
 
   // process-execution-014: 真实程序事实（退出码=7）严格由物理退出事件确立，不从日志推断，不随截断丢失

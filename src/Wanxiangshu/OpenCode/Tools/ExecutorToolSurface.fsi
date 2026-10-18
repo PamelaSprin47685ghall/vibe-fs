@@ -2,14 +2,13 @@ namespace Wanxiangshu.OpenCode
 
 open System.Threading.Tasks
 
-/// JS-native semantic surface for the provider execution verb (process-execution-011 /
-/// DISTILL-010). The name is a string constant; distillation is invoked
-/// inside `run` and is never a separate provider tool. A JS test never
+/// JS-native semantic surface for bounded execution and raw output tailing.
+/// A JS test never
 /// constructs `runSpec`, a ToolHostCodec factory, ToolRuntimeScope or a
 /// recovery union: those remain owner-private here.
 module ExecutorToolSurface =
 
-    /// Provider-visible execution verb. Distillation is not a provider tool.
+    /// Provider-visible execution verb.
     val runToolName: string
 
     /// Plain metadata for the provider-visible run contract.
@@ -22,3 +21,4 @@ module ExecutorToolSurface =
     val run: toolModule: obj -> sessions: obj -> args: obj -> context: obj -> recovery: string -> Task<string>
 
     val formatSpooledOutcome: exitCode: int -> summary: string -> string
+    val retainOutputTail: limitBytes: int -> output: string -> string

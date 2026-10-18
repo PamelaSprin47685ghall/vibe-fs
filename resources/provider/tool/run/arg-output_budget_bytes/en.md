@@ -1,4 +1,4 @@
-The raw-output allowance for this execution, measured in bytes. It is an
-attention budget, not a prediction of output size. Oversized output retains a
-bounded tail with a truncation notice; earlier content may be absent. No model
-selects the important lines or summarizes what was omitted.
+The UTF-8 byte budget for the complete result, including process facts, quoting,
+the truncation notice and raw output. A budget too small for the required facts
+is rejected before the command starts, with the minimum budget reported. Large
+output retains a raw tail; earlier content may be absent. No model summarizes it.

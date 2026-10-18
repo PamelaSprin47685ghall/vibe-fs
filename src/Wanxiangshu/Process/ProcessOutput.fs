@@ -2,7 +2,7 @@ namespace Wanxiangshu.Process
 
 open System
 open System.Collections.Generic
-open System.Text
+open Fable.Core.JsInterop
 
 /// stdout/stderr aggregation, byte counting and spool-threshold handling.
 module ProcessOutput =
@@ -80,6 +80,9 @@ module ProcessOutput =
         else
             parts |> Seq.toArray |> Array.concat
 
+    let decodeText (bytes: byte array) : string =
+        emitJsExpr bytes "new TextDecoder('utf-8', { ignoreBOM: true }).decode($0)"
+
     let buildResult (collector: OutputCollector) (exitCode: int) : ProcessOutcome =
         match collector.Spool with
         | Some active ->
@@ -87,7 +90,7 @@ module ProcessOutput =
         | None ->
             let stdoutBytes = concatBytes collector.Stdout
             let stderrBytes = concatBytes collector.Stderr
-            let stdoutText = Encoding.UTF8.GetString(stdoutBytes, 0, stdoutBytes.Length)
-            let stderrText = Encoding.UTF8.GetString(stderrBytes, 0, stderrBytes.Length)
+            let stdoutText = decodeText stdoutBytes
+            let stderrText = decodeText stderrBytes
 
             ProcessOutcome.Completed(exitCode, stdoutText, stderrText, false)

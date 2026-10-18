@@ -1,1 +1,1 @@
-The command stopped before it could finish.
+Cancellation was requested. Completion has not been confirmed.

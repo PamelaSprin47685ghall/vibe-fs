@@ -16,4 +16,5 @@ module ProcessOutput =
     val addStdout: collector: OutputCollector -> bytes: byte array -> unit
     val addStderr: collector: OutputCollector -> bytes: byte array -> unit
     val discard: collector: OutputCollector -> unit
+    val decodeText: bytes: byte array -> string
     val buildResult: collector: OutputCollector -> exitCode: int -> ProcessOutcome

@@ -72,3 +72,4 @@ module ExecutorTool =
     val runSpec: run: Wanxiangshu.Process.RunProcess -> factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
 
     val internal formatSpooledOutcome: exitCode: int -> output: string -> string
+    val internal retainOutputTail: limitBytes: int -> output: string -> string
