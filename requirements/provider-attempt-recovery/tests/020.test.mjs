@@ -46,6 +46,7 @@ const failureFact = ({ run, count, logical = RUN, root = ROOT, reason = 'provide
     authorityRoot: root,
     providerRun: run,
     consecutiveFailureCount: count,
+    budgetSpec: { version: 1, limit: 12 },
     reason,
   })
 const exhaustedFact = ({ count }) =>
@@ -70,10 +71,12 @@ test('WHAT[provider-attempt-recovery-020] budget_replay_exposes_domain_evidence_
     authorityRoot: ROOT,
     failures: 1,
     dedupeKeys: 1,
+    budgetSpec: { version: 1, limit: 12 },
     exhausted: false,
   })
   assert.deepEqual(Object.keys(first).sort(), [
     'authorityRoot',
+    'budgetSpec',
     'dedupeKeys',
     'exhausted',
     'failures',

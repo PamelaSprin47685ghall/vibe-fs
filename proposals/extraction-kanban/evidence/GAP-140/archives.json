@@ -1,0 +1,42 @@
+[
+  {
+    "file": "GAP140-ROOT-VERIFICATION-697-20261019.tgz",
+    "bytes": 3068203,
+    "sha256": "74b8e1ea0565238eae74103a820a96e59c82e040a230d682c4576023de989efe"
+  },
+  {
+    "file": "GAP140-INDEPENDENT-CJT-20261019.tgz",
+    "bytes": 5891375,
+    "sha256": "7f3293bb6d13142691e71502c6cf219e67b50bc737865b42c4a074950a682757"
+  },
+  {
+    "file": "GAP140-HOST-WRITER-AND-WORKFLOW-692-20261019.tgz",
+    "bytes": 3778863,
+    "sha256": "2157fcd474af7da5f5191805611508f66f17fec9e5f81d28ef983fdbd30d1b96"
+  },
+  {
+    "file": "GAP140-HOST-FINAL697-20261019.tgz",
+    "bytes": 3683547,
+    "sha256": "0fc0264bf63b9dde4153ed051cc87d8c5ea4c6ddbe254a1a0ac749d2945746eb"
+  },
+  {
+    "file": "gap140-692-legacy-word-evidence-20261019.tgz",
+    "bytes": 36446,
+    "sha256": "fcc52c7a79479bf691417f88e7659796f36c4cb15200a8747dc639e495d694c6"
+  },
+  {
+    "file": "gap140-695-codec-evidence-20261019.tgz",
+    "bytes": 13077,
+    "sha256": "a5b382cfe52d071a08911fb1ca714acf08ec9c3ecb04d145581f8fafb8adb125"
+  },
+  {
+    "file": "gap140-concurrent-old-evidence-20261019.tgz",
+    "bytes": 8958,
+    "sha256": "c01010f93b5cc5d045387ddc18a3f448095898c68ba22fb248632c27a482a450"
+  },
+  {
+    "file": "gap140-old-consumer-concurrent-evidence-20261019.tgz",
+    "bytes": 11948,
+    "sha256": "b29e7b39175846008ce8350dfc5de35765985417a1407b898380de070bc3250b"
+  }
+]

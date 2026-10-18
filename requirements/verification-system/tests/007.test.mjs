@@ -143,6 +143,7 @@ const advanceAgentFact = (run, count) => ({
     AuthorityRootUserMessageId: 'msg_u1',
     ProviderRun: run,
     ConsecutiveFailureCount: count,
+    BudgetSpec: { Version: 1, Limit: 12 },
     Reason: 'provider_error',
   },
 })

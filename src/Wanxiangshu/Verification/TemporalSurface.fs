@@ -215,6 +215,9 @@ module TemporalSurface =
                        LogicalRunId = logicalRunOf (payload?LogicalRunId)
                        AuthorityRootUserMessageId = authorityRootOf (payload?AuthorityRootUserMessageId)
                        ProviderRun = providerRunOf (payload?ProviderRun)
+                       BudgetSpec =
+                        { Version = intValue (payload?BudgetSpec?Version)
+                          Limit = intValue (payload?BudgetSpec?Limit) }
                        ConsecutiveFailureCount = intValue (payload?ConsecutiveFailureCount)
                        Reason = text (payload?Reason) |}
             )
@@ -284,7 +287,7 @@ module TemporalSurface =
             {| logicalRun = LogicalRunId.value state.LogicalRunId
                authorityRoot = AuthorityRootUserMessageId.value state.AuthorityRootUserMessageId
                failures = state.Budget.ConsecutiveFailureCount
-               dedupeKeys = state.RecentFailureKeys.Length
+               dedupeKeys = state.ObservedFailures.Length
                exhausted = state.Exhausted |}
 
     let private authorityProfileToJs (profile: PromptAuthority.AuthorityExecutionProfile) : obj =
@@ -364,6 +367,7 @@ module TemporalSurface =
                            AuthorityRootUserMessageId =
                             AuthorityRootUserMessageId.value payload.AuthorityRootUserMessageId
                            ProviderRun = ProviderRunIdentity.value payload.ProviderRun
+                           BudgetSpec = payload.BudgetSpec
                            ConsecutiveFailureCount = payload.ConsecutiveFailureCount
                            Reason = payload.Reason |} |}
         | Fact.Agent(AgentFact.ProviderFailure(ProviderFailureFactCases.RetryExhausted payload)) ->
@@ -841,6 +845,8 @@ module TemporalSurface =
         | ProviderFailureAdvanceRejection.DifferentRun -> "DifferentRun"
         | ProviderFailureAdvanceRejection.NoActiveBudget -> "NoActiveBudget"
         | ProviderFailureAdvanceRejection.InvalidTransition -> "InvalidTransition"
+        | ProviderFailureAdvanceRejection.InvalidBudget -> "InvalidBudget"
+        | ProviderFailureAdvanceRejection.ConflictingObservation -> "ConflictingObservation"
 
     let providerFailureForAuthority (logicalRun: string) (authorityRoot: string) : obj =
         ProviderFailureHandle(
@@ -851,7 +857,18 @@ module TemporalSurface =
     let applyFailure (identity: obj) (count: int) (current: obj) : obj =
         let state = (current :?> ProviderFailureHandle).State
 
-        match ProviderFailureProjection.applyFailure (providerFailureIdentity identity) count state with
+        let spec =
+            { Version = intValue (identity?budgetSpec?version)
+              Limit = intValue (identity?budgetSpec?limit) }
+
+        match
+            ProviderFailureProjection.applyFailure
+                (providerFailureIdentity identity)
+                spec
+                count
+                (text (identity?reason))
+                state
+        with
         | Ok updated ->
             box
                 {| ok = true

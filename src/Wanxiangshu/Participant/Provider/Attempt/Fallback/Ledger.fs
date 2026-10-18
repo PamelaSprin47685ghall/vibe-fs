@@ -16,17 +16,14 @@ type FailureAdmissionOutcome =
 /// Single writer: policy-authorized provider failure → durable dedupe → budget advance/exhaust.
 module ProviderFailureLedger =
 
-    let private replayLatestFailure
-        (budgetLimit: int)
-        (identity: FailedProviderAttemptIdentity)
-        (current: ProviderFailureProjection)
-        =
+    let private replayLatestFailure (identity: FailedProviderAttemptIdentity) (current: ProviderFailureProjection) =
         let exactLatest =
-            current.RecentFailureKeys
-            |> List.tryHead
-            |> Option.contains (FailedProviderAttemptIdentity.dedupeKey identity)
+            (current.ObservedFailures
+             |> List.tryHead
+             |> Option.exists (fun observed -> observed.Key = FailedProviderAttemptIdentity.dedupeKey identity))
+            && not current.LastTransitionWasSuccess
 
-        match exactLatest, ProviderFailureProjection.mayRetry budgetLimit current with
+        match exactLatest, ProviderFailureProjection.mayRetry current with
         | true, true -> FailureAdmissionOutcome.RetryAuthorized
         | true, false -> FailureAdmissionOutcome.RetryExhausted
         | false, _ -> FailureAdmissionOutcome.EpisodeSuperseded
@@ -53,27 +50,26 @@ module ProviderFailureLedger =
 
     let private completeAdvance
         (port: ProviderFailureJournalPort)
-        (budgetLimit: int)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (current: ProviderFailureProjection)
-        (nextBudget: ProviderFailureBudget.FailureBudget)
         : Task<Result<FailureAdmissionOutcome, string>> =
         task {
-            match ProviderFailureBudget.verdict budgetLimit nextBudget with
-            | ProviderFailureBudget.MayRetry _ -> return Ok FailureAdmissionOutcome.RetryAuthorized
-            | ProviderFailureBudget.Exhausted _ ->
-                return! appendExhausted port sessionId providerRun current nextBudget.ConsecutiveFailureCount
+            if ProviderFailureProjection.mayRetry current then
+                return Ok FailureAdmissionOutcome.RetryAuthorized
+            else
+                return! appendExhausted port sessionId providerRun current current.Budget.ConsecutiveFailureCount
         }
 
     let private appendFailureRecorded
         (port: ProviderFailureJournalPort)
-        (budgetLimit: int)
+        (spec: ProviderFailureBudgetSpec)
         (sessionId: SessionId)
         (providerRun: ProviderRunIdentity)
         (reason: string)
         (current: ProviderFailureProjection)
         (nextCount: int)
+        (updated: ProviderFailureProjection)
         : Task<Result<FailureAdmissionOutcome, string>> =
         task {
             let recorded =
@@ -82,6 +78,7 @@ module ProviderFailureLedger =
                        LogicalRunId = current.LogicalRunId
                        AuthorityRootUserMessageId = current.AuthorityRootUserMessageId
                        ProviderRun = providerRun
+                       BudgetSpec = spec
                        ConsecutiveFailureCount = nextCount
                        Reason = reason |}
 
@@ -89,15 +86,7 @@ module ProviderFailureLedger =
 
             match appended with
             | Error failure -> return Error failure
-            | Ok _ ->
-                return!
-                    completeAdvance
-                        port
-                        budgetLimit
-                        sessionId
-                        providerRun
-                        current
-                        { ConsecutiveFailureCount = nextCount }
+            | Ok _ -> return! completeAdvance port sessionId providerRun updated
         }
 
     let private checkRecoveryLicence
@@ -115,13 +104,14 @@ module ProviderFailureLedger =
         (rejection: ProviderFailureAdvanceRejection)
         : Result<FailureAdmissionOutcome, string> =
         match rejection with
-        | ProviderFailureAdvanceRejection.AlreadyObserved ->
-            Ok(replayLatestFailure ProviderFailureBudget.DefaultBudget identity current)
+        | ProviderFailureAdvanceRejection.AlreadyObserved -> Ok(replayLatestFailure identity current)
         | ProviderFailureAdvanceRejection.AlreadyExhausted -> Ok FailureAdmissionOutcome.RetryExhausted
         | ProviderFailureAdvanceRejection.DifferentRun
         | ProviderFailureAdvanceRejection.NoActiveBudget -> Ok FailureAdmissionOutcome.NoActiveRun
+        | ProviderFailureAdvanceRejection.InvalidBudget
+        | ProviderFailureAdvanceRejection.ConflictingObservation
         | ProviderFailureAdvanceRejection.InvalidTransition ->
-            Error "Provider failure advance violates validation (consecutive failure count is not the successor)"
+            Error "Provider failure advance violates validation (budget, count or observed identity conflicts)"
 
     let private recordReadyFailure
         (port: ProviderFailureJournalPort)
@@ -138,20 +128,25 @@ module ProviderFailureLedger =
                     current.AuthorityRootUserMessageId
                     providerRun
 
-            let nextCount = current.Budget.ConsecutiveFailureCount + 1
+            let key = FailedProviderAttemptIdentity.dedupeKey identity
 
-            match ProviderFailureProjection.applyFailure identity nextCount current with
-            | Error rejection -> return outcomeForAdvanceRejection identity current rejection
-            | Ok _ ->
-                return!
-                    appendFailureRecorded
-                        port
-                        ProviderFailureBudget.DefaultBudget
-                        sessionId
-                        providerRun
-                        reason
-                        current
-                        nextCount
+            let appendNewFailure () =
+                let spec =
+                    current.BudgetSpec
+                    |> Option.defaultWith (fun () ->
+                        { Version = 1
+                          Limit = ProviderFailureBudget.DefaultBudget })
+
+                let nextCount = current.Budget.ConsecutiveFailureCount + 1
+
+                match ProviderFailureProjection.applyFailure identity spec nextCount reason current with
+                | Error rejection -> Task.FromResult(outcomeForAdvanceRejection identity current rejection)
+                | Ok updated -> appendFailureRecorded port spec sessionId providerRun reason current nextCount updated
+
+            match current.ObservedFailures |> List.tryFind (fun observed -> observed.Key = key) with
+            | Some observed when observed.Reason = reason -> return Ok(replayLatestFailure identity current)
+            | Some _ -> return Error "Provider failure identity conflicts with its recorded reason"
+            | None -> return! appendNewFailure ()
         }
 
     let private recordAfterLicenceCheck
@@ -204,18 +199,28 @@ module ProviderFailureLedger =
         (providerRun: ProviderRunIdentity)
         (current: ProviderFailureProjection)
         : Task<Result<unit, string>> =
-        if current.Budget.ConsecutiveFailureCount = 0 then
-            Task.FromResult(Ok())
-        else
-            appendSuccessFact port sessionId providerRun current
+        let identity =
+            ProviderFailureBudget.attemptIdentity
+                sessionId
+                current.LogicalRunId
+                current.AuthorityRootUserMessageId
+                providerRun
+
+        match ProviderFailureProjection.recordSuccess identity current with
+        | Ok _ -> appendSuccessFact port sessionId providerRun current
+        | Error ProviderFailureAdvanceRejection.AlreadyObserved -> Task.FromResult(Ok())
+        | Error _ -> Task.FromResult(Error "Provider success conflicts with its recorded failure identity")
 
     let recordConfirmedSuccess
         (port: ProviderFailureJournalPort)
         (sessionId: SessionId)
+        (authorityRoot: AuthorityRootUserMessageId)
         (providerRun: ProviderRunIdentity)
         : Task<Result<unit, string>> =
         task {
             match port.CurrentState sessionId with
             | None -> return Error "NoActiveRun: no provider failure state for session"
+            | Some current when current.AuthorityRootUserMessageId <> authorityRoot ->
+                return Error "Provider success belongs to a different authority root"
             | Some current -> return! recordSuccessForCurrent port sessionId providerRun current
         }

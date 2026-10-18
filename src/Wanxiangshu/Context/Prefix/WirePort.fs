@@ -55,5 +55,6 @@ type WireJournalPort =
       ReadBlob: BlobRef -> Task<Result<string, string>>
       WriteBlob: string -> Task<Result<WireBlobRecord, string>>
       CurrentProjection: XTraceProjectionState -> Task<Result<ProviderProjection.ProviderSemanticProjection, string>>
-      RecordConfirmedSuccess: SessionId -> ProviderRunIdentity -> Task<Result<unit, string>>
+      RecordConfirmedSuccess:
+          SessionId -> AuthorityRootUserMessageId -> ProviderRunIdentity -> Task<Result<unit, string>>
       CommitPrefixRebase: SessionId -> ProviderRunIdentity -> WirePrefixRebasePayload -> Task<Result<unit, string>> }

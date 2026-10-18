@@ -30,7 +30,7 @@ module Retry =
 
     let private decision (input: RetryAttempt) =
         let budget =
-            if ProviderFailureProjection.mayRetry ProviderFailureBudget.DefaultBudget input.Current then
+            if ProviderFailureProjection.mayRetry input.Current then
                 ProviderRecoveryBudget.Available
             else
                 ProviderRecoveryBudget.Exhausted

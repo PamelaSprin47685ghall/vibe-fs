@@ -198,7 +198,14 @@ module ProviderFailureSurface =
             {| logicalRun = LogicalRunId.value projection.LogicalRunId
                authorityRoot = AuthorityRootUserMessageId.value projection.AuthorityRootUserMessageId
                failures = projection.Budget.ConsecutiveFailureCount
-               dedupeKeys = List.length projection.RecentFailureKeys
+               dedupeKeys = List.length projection.ObservedFailures
+               budgetSpec =
+                projection.BudgetSpec
+                |> Option.map (fun spec ->
+                    box
+                        {| version = spec.Version
+                           limit = spec.Limit |})
+                |> optionObj
                exhausted = projection.Exhausted |}
 
     let private projectionHandleView (projection: ProviderFailureProjection) : obj =
@@ -206,7 +213,14 @@ module ProviderFailureSurface =
             {| logicalRun = LogicalRunId.value projection.LogicalRunId
                authorityRoot = AuthorityRootUserMessageId.value projection.AuthorityRootUserMessageId
                failures = projection.Budget.ConsecutiveFailureCount
-               dedupeKeys = List.length projection.RecentFailureKeys
+               dedupeKeys = List.length projection.ObservedFailures
+               budgetSpec =
+                projection.BudgetSpec
+                |> Option.map (fun spec ->
+                    box
+                        {| version = spec.Version
+                           limit = spec.Limit |})
+                |> optionObj
                exhausted = projection.Exhausted
                handle = box (ProjectionHandle projection) |}
 
@@ -216,15 +230,7 @@ module ProviderFailureSurface =
         if not (isNullish handle) then
             (unbox<ProjectionHandle> handle).Value
         else
-            { LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
-              AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
-              Budget = { ConsecutiveFailureCount = intValue (field value "failures") }
-              RecentFailureKeys = []
-              LastTransitionWasSuccess = false
-              Exhausted =
-                match field value "exhausted" with
-                | value when isNullish value -> false
-                | value -> unbox<bool> value }
+            invalidArg "current" "provider failure projection requires its opaque evidence handle"
 
     let private rejectionName (rejection: ProviderFailureAdvanceRejection) : string =
         match rejection with
@@ -233,9 +239,15 @@ module ProviderFailureSurface =
         | ProviderFailureAdvanceRejection.DifferentRun -> "DifferentRun"
         | ProviderFailureAdvanceRejection.NoActiveBudget -> "NoActiveBudget"
         | ProviderFailureAdvanceRejection.InvalidTransition -> "InvalidTransition"
+        | ProviderFailureAdvanceRejection.InvalidBudget -> "InvalidBudget"
+        | ProviderFailureAdvanceRejection.ConflictingObservation -> "ConflictingObservation"
 
-    let private applyFailure (identity: obj) (count: int) (current: obj) : obj =
-        match ProviderFailureProjection.applyFailure (identityOf identity) count (projectionOf current) with
+    let private specOf (spec: obj) : ProviderFailureBudgetSpec =
+        { Version = intValue (field spec "version")
+          Limit = intValue (field spec "limit") }
+
+    let private projectionResult result : obj =
+        match result with
         | Ok projection ->
             box
                 {| ok = true
@@ -244,6 +256,10 @@ module ProviderFailureSurface =
             box
                 {| ok = false
                    error = rejectionName rejection |}
+
+    let private applyFailure (identity: obj) (count: int) (current: obj) (spec: obj) (reason: string) : obj =
+        ProviderFailureProjection.applyFailure (identityOf identity) (specOf spec) count reason (projectionOf current)
+        |> projectionResult
 
     /// Pure provider failure budget API. Every method accepts/returns JSON values;
     /// only the identity key helper intentionally consumes an opaque semantic identity.
@@ -271,7 +287,7 @@ module ProviderFailureSurface =
                read = (fun value -> budgetOf value |> budgetView) |}
 
     /// Durable provider failure projection API. The projection state itself is carried
-    /// by an opaque handle so its bounded dedupe keys never become public JSON.
+    /// by an opaque handle so its observed identities never become public JSON.
     let providerFailureProjection =
         box
             {| forAuthority =
@@ -280,19 +296,19 @@ module ProviderFailureSurface =
                         (LogicalRunId.create logicalRun)
                         (AuthorityRootUserMessageId.create authorityRoot)
                     |> projectionHandleView)
-               applyFailure = (fun identity count current -> applyFailure identity count current)
+               applyFailure =
+                (fun identity count current spec reason -> applyFailure identity count current spec reason)
                applyExhausted =
-                (fun current ->
+                (fun finalCount current ->
                     projectionOf current
-                    |> ProviderFailureProjection.applyExhausted
-                    |> projectionHandleView)
+                    |> ProviderFailureProjection.applyExhausted finalCount
+                    |> projectionResult)
                recordSuccess =
-                (fun current ->
+                (fun identity current ->
                     projectionOf current
-                    |> ProviderFailureProjection.recordSuccess
-                    |> projectionHandleView)
-               mayRetry =
-                (fun budgetLimit current -> ProviderFailureProjection.mayRetry budgetLimit (projectionOf current))
+                    |> ProviderFailureProjection.recordSuccess (identityOf identity)
+                    |> projectionResult)
+               mayRetry = (fun current -> ProviderFailureProjection.mayRetry (projectionOf current))
                read = (fun current -> projectionOf current |> projectionView) |}
 
     let authorityRootAccepted (value: obj) : obj =
@@ -322,6 +338,7 @@ module ProviderFailureSurface =
                logicalRun = text (field value "logicalRun")
                authorityRoot = text (field value "authorityRoot")
                providerRun = text (field value "providerRun")
+               budgetSpec = field value "budgetSpec"
                consecutiveFailureCount = intValue (field value "consecutiveFailureCount")
                reason =
                 match text (field value "reason") with
@@ -367,6 +384,7 @@ module ProviderFailureSurface =
                    LogicalRunId = LogicalRunId.create (text (field value "logicalRun"))
                    AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (text (field value "authorityRoot"))
                    ProviderRun = ProviderRunIdentity.create (text (field value "providerRun"))
+                   BudgetSpec = specOf (field value "budgetSpec")
                    ConsecutiveFailureCount = intValue (field value "consecutiveFailureCount")
                    Reason = text (field value "reason") |}
         | "RetryExhausted" ->
@@ -551,12 +569,9 @@ module ProviderFailureSurface =
         }
 
     /// Record one confirmed provider failure through the production ledger using
-    /// an opaque JournalHandle. Only `ExecutionFailurePolicy` may licence the
-    /// advance against the single `ProviderFailureBudget.DefaultBudget`, and no
-    /// F# Result/DU crosses the boundary.
+    /// an opaque JournalHandle and the real policy licence.
     let recordConfirmedFailure
         (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
-        (budget: int)
         (session: string)
         (providerRun: string)
         (reason: string)
@@ -572,11 +587,9 @@ module ProviderFailureSurface =
 
                 match ProviderFailureEvidence.currentState failureState with
                 | None -> Task.FromResult(Ok FailureAdmissionOutcome.NoActiveRun)
-                | Some _ when budget <> ProviderFailureBudget.DefaultBudget ->
-                    Task.FromResult(Error "provider failure budget must equal the declared default")
                 | Some current ->
                     let providerFailureBudget =
-                        if ProviderFailureProjection.mayRetry ProviderFailureBudget.DefaultBudget current then
+                        if ProviderFailureProjection.mayRetry current then
                             ProviderRecoveryBudget.Available
                         else
                             ProviderRecoveryBudget.Exhausted
@@ -614,6 +627,29 @@ module ProviderFailureSurface =
                     box
                         {| ok = true
                            outcome = outcomeName outcome |}
+                | Error error -> box {| ok = false; error = error |}
+        }
+
+    let recordConfirmedSuccess
+        (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
+        (session: string)
+        (authorityRoot: string)
+        (providerRun: string)
+        : Task<obj> =
+        task {
+            let port =
+                Wanxiangshu.Composition.Durable.AgentJournalPortAdapter.forProviderFailure handle.Journal
+
+            let! result =
+                ProviderFailureLedger.recordConfirmedSuccess
+                    port
+                    (SessionId.create session)
+                    (AuthorityRootUserMessageId.create authorityRoot)
+                    (ProviderRunIdentity.create providerRun)
+
+            return
+                match result with
+                | Ok() -> box {| ok = true |}
                 | Error error -> box {| ok = false; error = error |}
         }
 
@@ -740,4 +776,11 @@ module ProviderFailureSurface =
         | Some current ->
             box
                 {| failures = current.Budget.ConsecutiveFailureCount
+                   budgetSpec =
+                    current.BudgetSpec
+                    |> Option.map (fun spec ->
+                        box
+                            {| version = spec.Version
+                               limit = spec.Limit |})
+                    |> optionObj
                    exhausted = current.Exhausted |}

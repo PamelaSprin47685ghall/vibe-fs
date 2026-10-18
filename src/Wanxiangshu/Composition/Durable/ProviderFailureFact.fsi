@@ -11,6 +11,7 @@ module ProviderFailureFact =
                LogicalRunId: LogicalRunId
                AuthorityRootUserMessageId: AuthorityRootUserMessageId
                ProviderRun: ProviderRunIdentity
+               BudgetSpec: ProviderFailureBudgetSpec
                ConsecutiveFailureCount: int
                Reason: string |} ->
             AgentFact

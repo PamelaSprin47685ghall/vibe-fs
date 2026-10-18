@@ -11,6 +11,7 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Host
 open Wanxiangshu.Composition.Durable.Fact
+open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Fact serialization (PERSIST-005).
 module FactCodec =
@@ -191,6 +192,10 @@ module FactCodec =
                 Error(sprintf "ChatExecution %s schema version is unsupported: %d" caseName schemaVersion)
 
         match fact with
+        | Agent(AgentFact.ProviderFailure(ProviderFailureFactCases.FailureRecorded payload)) when
+            not (ProviderFailureBudgetSpec.isValid payload.BudgetSpec)
+            ->
+            Error "unsupported provider failure BudgetSpec: requires Version=1 and a positive Limit"
         | Agent(AgentFact.ChatExecution(ChatExecutionFactCases.Accepted payload)) ->
             validate "Accepted" payload.SchemaVersion
         | Agent(AgentFact.ChatExecution(ChatExecutionFactCases.ProviderStarted payload)) ->

@@ -4,6 +4,8 @@
 
 Each Logical Run owns its consecutive provider-failure count and fixed participant (SelectedAgent, Role and Persona identity). A new run starts with no failures inherited from a previous run.
 
+The first FailureRecorded commits its required BudgetSpec (Version=1, positive integer Limit) together with the failure. Later records in that run must use the same spec, including after success resets the streak. Replay and retry consume that persisted limit. Missing or unsupported budget evidence is rejected; today's default must not supply an old limit.
+
 ## [002] Corrupt budget evidence fails closed
 
 The budget counts consecutive failures only. Invalid persisted bytes return a decode error and reject the envelope; they must neither escape as an uncaught exception nor become an unknown submission.
@@ -11,6 +13,8 @@ The budget counts consecutive failures only. Invalid persisted bytes return a de
 ## [003] One failure advances once
 
 A single authority records confirmed failures and exhaustion. Deduplicate by `(SessionId, LogicalRunId, AuthorityRootUserMessageId, ProviderRun)`: the latest failure replays the same admission without another fact or count; an older failure returns `EpisodeSuperseded` and starts no recovery. Each retry has fresh PhysicalUserMessageId and ProviderRunIdentity; one failure permits at most one physical send.
+
+An identical persisted failure is idempotent; a different count, reason or BudgetSpec for the same identity is invalid. Keep observed failure and success identities for the whole Logical Run. Success resets only the streak; repeated old success must not clear a newer failure.
 
 ## [004] Failure accounting and request-kind evidence
 
@@ -23,6 +27,8 @@ For Accepted without ProviderStarted, accepted origin may establish WorkMain or 
 ## [005] Bounded automatic retry
 
 Automatic retry has a finite consecutive-failure limit. At the limit the run is exhausted and sends no further automatic physical request. Later recovery requires a new Authority Root or explicit user action.
+
+The failure that reaches the persisted limit already exhausts the run. RetryExhausted only confirms that exact folded count and limit. Its absence or unknown acknowledgement must not reopen retry, and a late success must not reopen an exhausted run.
 
 ## [006] Fixed participant, separate model routing
 

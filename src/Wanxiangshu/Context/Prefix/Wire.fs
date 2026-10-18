@@ -378,7 +378,7 @@ module XWire =
         (plan: AttemptPlan)
         : Task<Result<unit, string>> =
         if ProviderRequestKind.clearsFailureCountOnSuccess plan.Profile.RequestKind then
-            port.RecordConfirmedSuccess sessionId providerRun
+            port.RecordConfirmedSuccess sessionId plan.Profile.AuthorityRootUserMessageId providerRun
         else
             Task.FromResult(Ok())
 

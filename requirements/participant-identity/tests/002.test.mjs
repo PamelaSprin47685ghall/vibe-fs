@@ -32,7 +32,7 @@ test('WHAT[participant-identity-002] durable provider failure fold preserves the
   for (const count of [1, 2]) {
     const providerRun = `provider-${count}`
     events.push(envelope(count + 1, 'ProviderFailure', 'FailureRecorded', {
-      ...scope, ProviderRun: providerRun, ConsecutiveFailureCount: count, Reason: 'provider_error',
+      ...scope, ProviderRun: providerRun, ConsecutiveFailureCount: count, Reason: 'provider_error', BudgetSpec: { Version: 1, Limit: 12 },
     }, providerRun))
     const folded = Temporal.fold(events)
     assert.equal(folded.ok, true, JSON.stringify(folded.error))

@@ -18,7 +18,7 @@ test.todo('WHAT[context-compression-022] normal, retry, Squash and crash recover
 test('WHAT[context-compression-022] CTX_022_durable_projection_keeps_newest_failure_count', () => {
   let state = projection.forAuthority('run-newest-covers', 'root-1')
 
-  const first = projection.applyFailure(budget.attemptIdentity('ses-1', 'run-newest-covers', 'root-1', 'provider-run-1'), 1, state)
+  const first = projection.applyFailure(budget.attemptIdentity('ses-1', 'run-newest-covers', 'root-1', 'provider-run-1'), 1, state, { version: 1, limit: 12 }, 'provider_error')
   assert.equal(first.ok, true)
   assert.equal(projection.read(first.value).failures, 1)
 
@@ -26,6 +26,8 @@ test('WHAT[context-compression-022] CTX_022_durable_projection_keeps_newest_fail
     budget.attemptIdentity('ses-1', 'run-newest-covers', 'root-1', 'provider-run-2'),
     2,
     first.value,
+    { version: 1, limit: 12 },
+    'provider_error',
   )
   assert.equal(second.ok, true)
   assert.equal(projection.read(second.value).failures, 2)
@@ -35,29 +37,33 @@ test('WHAT[context-compression-022] CTX_022_durable_projection_keeps_newest_fail
     budget.attemptIdentity('ses-1', 'run-newest-covers', 'root-1', 'provider-run-1'),
     1,
     second.value,
+    { version: 1, limit: 12 },
+    'provider_error',
   )
   assert.equal(replay.ok, false)
   assert.equal(replay.error, 'AlreadyObserved')
   assert.equal(projection.read(second.value).failures, 2)
 
   // Success on the business path resets the durable count.
-  assert.equal(projection.read(projection.recordSuccess(second.value)).failures, 0)
+  assert.equal(projection.read(projection.recordSuccess(budget.attemptIdentity('ses-1', 'run-newest-covers', 'root-1', 'success'), second.value).value).failures, 0)
 })
 
 test('WHAT[context-compression-022] CTX_022_projection_retry_follows_the_failure_budget', () => {
   let state = projection.forAuthority('run-budget-follows', 'root-1')
-  assert.equal(projection.mayRetry(budget.defaultBudget, state), true)
+  assert.equal(projection.mayRetry(state), true)
 
   for (let count = 1; count <= budget.defaultBudget; count++) {
     const applied = projection.applyFailure(
       budget.attemptIdentity('ses-1', 'run-budget-follows', 'root-1', `provider-run-${count}`),
       count,
       state,
+      { version: 1, limit: 12 },
+      'provider_error',
     )
     assert.equal(applied.ok, true)
     state = applied.value
   }
 
   assert.equal(projection.read(state).failures, budget.defaultBudget)
-  assert.equal(projection.mayRetry(budget.defaultBudget, state), false)
+  assert.equal(projection.mayRetry(state), false)
 })

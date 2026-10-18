@@ -22,5 +22,6 @@ module ProviderFailureLedger =
     val recordConfirmedSuccess:
         port: ProviderFailureJournalPort ->
         sessionId: SessionId ->
+        authorityRoot: AuthorityRootUserMessageId ->
         providerRun: ProviderRunIdentity ->
             Task<Result<unit, string>>

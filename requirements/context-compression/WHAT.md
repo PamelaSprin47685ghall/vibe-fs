@@ -22,7 +22,7 @@
 
 ## [006] 重试材料当次决策，失败预算有界
 
-每个物理 retry attempt 拥有全新 physical identity；其是否包含 prefix/squash 恢复材料是由当前 attempt 的 retry-policy 从 journal 已提交事实（是否允许 probe/squash 以及材料是否可用）做出的不可变决策，不依赖历史位置、奇偶或跨回调瞬态状态。X 在 retry policy 允许 probe 时实际执行候选选择，由 `PrefixProbeSelection` 的 `Ok probe | Error NoCandidateReason` 证明材料是否可用；Y 则以当前 typed Blogger request 与 durable frames 判定是否先执行 squash（`BloggerRetryPolicy.nextRequest` 纯函数）。若本次物理 attempt 没有可用材料，则发送普通主请求，严禁将恢复决策留给未来无关请求，也严禁等待未来 X material 再补做 retry。每次确认失败经 `ProviderFailureLedger` 记账并推进 `ProviderFailureBudget` 连续失败计数；`verdict` 为 `Exhausted`（单一 `DefaultBudget`）时停止自动重试。业务主请求（`WorkMain | BloggerMain` 的有效成功）一旦成功，清零连续失败计数。
+每个物理 retry attempt 拥有全新 physical identity；其是否包含 prefix/squash 恢复材料是由当前 attempt 的 retry-policy 从 journal 已提交事实（是否允许 probe/squash 以及材料是否可用）做出的不可变决策，不依赖历史位置、奇偶或跨回调瞬态状态。X 在 retry policy 允许 probe 时实际执行候选选择，由 `PrefixProbeSelection` 的 `Ok probe | Error NoCandidateReason` 证明材料是否可用；Y 则以当前 typed Blogger request 与 durable frames 判定是否先执行 squash（`BloggerRetryPolicy.nextRequest` 纯函数）。若本次物理 attempt 没有可用材料，则发送普通主请求，严禁将恢复决策留给未来无关请求，也严禁等待未来 X material 再补做 retry。每次确认失败经 `ProviderFailureLedger` 记账并推进连续失败计数；以该 LogicalRun 首次失败持久化的 `BudgetSpec` 限额裁决，达到限额即停止自动重试。仅首次建立预算时选用产品默认值，重放与后续裁决不得重选。业务主请求（`WorkMain | BloggerMain` 的有效成功）清零未耗尽的连续失败计数，保留限额与已观察身份；重复旧成功不清掉新失败，已耗尽状态不重新开放。
 
 ## [007] 按 RequestKind 分派结局
 

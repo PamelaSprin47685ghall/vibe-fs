@@ -43,7 +43,7 @@ const rootFact = ({ kind = 'HumanRoot', logical = RUN, root = ROOT } = {}) =>
     identitySeed: ROOT_SELECTION_IDENTITY_SEED,
   })
 
-const failureFact = ({ run, count, logical = RUN, root = ROOT, reason = 'provider_error' }) =>
+const failureFact = ({ run, count, logical = RUN, root = ROOT, reason = 'provider_error', limit = 12 }) =>
   providerFailureRecorded({
     session: SESSION,
     logicalRun: logical,
@@ -51,6 +51,7 @@ const failureFact = ({ run, count, logical = RUN, root = ROOT, reason = 'provide
     providerRun: run,
     consecutiveFailureCount: count,
     reason,
+    budgetSpec: { version: 1, limit },
   })
 
 const exhaustedFact = ({ count }) =>
@@ -68,7 +69,7 @@ const budgetOf = (projection) => providerFailureProjection.read(projection)
 
 test('WHAT[provider-attempt-recovery-007] a_valid_record_moves_the_durable_budget', () => {
   const before = providerFailureProjection.forAuthority(RUN, ROOT)
-  const applied = providerFailureProjection.applyFailure(identityFor('run_1'), 1, before)
+  const applied = providerFailureProjection.applyFailure(identityFor('run_1'), 1, before, { version: 1, limit: 12 }, 'provider_error')
 
   assert.equal(applied.ok, true, applied.ok ? '' : applied.error)
   assert.deepEqual(providerFailureProjection.read(applied.value), {
@@ -76,6 +77,7 @@ test('WHAT[provider-attempt-recovery-007] a_valid_record_moves_the_durable_budge
     authorityRoot: 'msg_u1',
     failures: 1,
     dedupeKeys: 1,
+    budgetSpec: { version: 1, limit: 12 },
     exhausted: false,
   })
 })
@@ -95,19 +97,24 @@ test('WHAT[provider-attempt-recovery-007] each_rejection_names_a_different_cause
     identityFor('run_1'),
     1,
     providerFailureProjection.forAuthority(RUN, ROOT),
+    { version: 1, limit: 12 },
+    'provider_error',
   )
   assert.equal(base.ok, true)
   const current = base.value
+  const exhausted = providerFailureProjection.applyFailure(identityFor('last'), 1, providerFailureProjection.forAuthority(RUN, ROOT), { version: 1, limit: 1 }, 'provider_error').value
 
   assert.deepEqual(
     {
-      duplicate: providerFailureProjection.applyFailure(identityFor('run_1'), 2, current).error,
-      badCount: providerFailureProjection.applyFailure(identityFor('run_3'), 4, current).error,
-      otherRun: providerFailureProjection.applyFailure(identityFor('run_4', { logical: 'run_other' }), 2, current).error,
+      duplicate: providerFailureProjection.applyFailure(identityFor('run_1'), 1, current, { version: 1, limit: 12 }, 'provider_error').error,
+      badCount: providerFailureProjection.applyFailure(identityFor('run_3'), 4, current, { version: 1, limit: 12 }, 'provider_error').error,
+      otherRun: providerFailureProjection.applyFailure(identityFor('run_4', { logical: 'run_other' }), 2, current, { version: 1, limit: 12 }, 'provider_error').error,
       afterExhausted: providerFailureProjection.applyFailure(
         identityFor('run_5'),
         2,
-        providerFailureProjection.applyExhausted(current),
+        exhausted,
+        { version: 1, limit: 1 },
+        'provider_error',
       ).error,
     },
     {
@@ -150,17 +157,68 @@ test('WHAT[provider-attempt-recovery-007] ordered facts with intervening success
   assert.deepEqual({ failures: budgetOf(folded.value).failures }, { failures: 1 })
 })
 
-test('WHAT[provider-attempt-recovery-007] a new failure fact after exhaustion stops durable replay', { todo: 'GAP-140: the fold currently absorbs AlreadyExhausted instead of rejecting a new failure fact' }, () => {
+test('WHAT[provider-attempt-recovery-007] a new failure fact after exhaustion stops durable replay', () => {
+  const prefix = [rootFact(), failureFact({ run: 'first', count: 1, limit: 1 }), exhaustedFact({ count: 1 })]
+  assert.equal(foldFacts(prefix).ok, true)
   const folded = foldFacts([
-    rootFact(), failureFact({ run: 'first', count: 1 }), exhaustedFact({ count: 1 }),
-    failureFact({ run: 'new-after-exhaustion', count: 2 }),
+    ...prefix, failureFact({ run: 'new-after-exhaustion', count: 2, limit: 1 }),
   ])
   assert.equal(folded.ok, false)
 })
 
-test('WHAT[provider-attempt-recovery-007] durable replay refuses a count above its failure limit', { todo: 'GAP-140 / 37-D1: persisted facts do not establish a limit and the fold accepts the over-budget successor' }, () => {
-  const failures = Array.from({ length: budget.defaultBudget + 1 }, (_, index) => failureFact({ run: `run-${index}`, count: index + 1 }))
-  assert.equal(foldFacts([rootFact(), ...failures]).ok, false)
+test('WHAT[provider-attempt-recovery-007] durable replay uses its persisted limit and exhausts without a second marker', () => {
+  for (const limit of [1, 3, 15]) {
+    const failures = Array.from({ length: limit }, (_, index) => failureFact({ run: `run-${index}`, count: index + 1, limit }))
+    const atLimit = foldFacts([rootFact(), ...failures])
+    assert.equal(atLimit.ok, true)
+    assert.equal(budgetOf(atLimit.value).exhausted, true)
+    assert.equal(budgetOf(atLimit.value).budgetSpec.limit, limit)
+    assert.equal(foldFacts([rootFact(), ...failures, failureFact({ run: 'over', count: limit + 1, limit })]).ok, false)
+    assert.equal(foldFacts([rootFact(), ...failures, failures.at(-1)]).ok, true)
+  }
+})
+
+test('WHAT[provider-attempt-recovery-007] conflicting duplicates and a changed limit stop replay', () => {
+  const first = failureFact({ run: 'first', count: 1, limit: 3 })
+  assert.equal(foldFacts([rootFact(), first, first]).ok, true)
+  for (const changed of [
+    failureFact({ run: 'first', count: 2, limit: 3 }),
+    failureFact({ run: 'first', count: 1, limit: 4 }),
+    failureFact({ run: 'first', count: 1, limit: 3, reason: 'different' }),
+    failureFact({ run: 'second', count: 2, limit: 4 }),
+  ]) assert.equal(foldFacts([rootFact(), first, changed]).ok, false)
+})
+
+test('WHAT[provider-attempt-recovery-007] success preserves identities and cannot be replayed to clear newer failures', () => {
+  const first = failureFact({ run: 'first', count: 1, limit: 3 })
+  const success = providerSuccessRecorded({ session: SESSION, logicalRun: RUN, authorityRoot: ROOT, providerRun: 'success' })
+  const next = failureFact({ run: 'second', count: 1, limit: 3 })
+  const folded = foldFacts([rootFact(), first, success, next, first, success])
+  assert.equal(folded.ok, true)
+  assert.equal(budgetOf(folded.value).failures, 1)
+  assert.equal(budgetOf(folded.value).dedupeKeys, 2)
+  assert.deepEqual(budgetOf(folded.value).budgetSpec, { version: 1, limit: 3 })
+})
+
+test('WHAT[provider-attempt-recovery-007] exhaustion confirmation cannot invent or change the boundary', () => {
+  assert.equal(foldFacts([rootFact(), exhaustedFact({ count: 1 })]).ok, false)
+  assert.equal(foldFacts([rootFact(), failureFact({ run: 'first', count: 1, limit: 3 }), exhaustedFact({ count: 1 })]).ok, false)
+  assert.equal(foldFacts([rootFact(), failureFact({ run: 'first', count: 1, limit: 1 }), exhaustedFact({ count: 2 })]).ok, false)
+})
+
+test('WHAT[provider-attempt-recovery-007] zero-count success is idempotent after a failure and exhausted success does not reopen', () => {
+  const success = providerSuccessRecorded({ session: SESSION, logicalRun: RUN, authorityRoot: ROOT, providerRun: 'success-zero' })
+  const failure = failureFact({ run: 'failure', count: 1, limit: 3 })
+  const folded = foldFacts([rootFact(), success, failure, success])
+  assert.equal(folded.ok, true)
+  assert.equal(budgetOf(folded.value).failures, 1)
+  assert.equal(foldFacts([rootFact(), success, failureFact({ run: 'success-zero', count: 1, limit: 3 })]).ok, false)
+  const conflictingSuccess = providerSuccessRecorded({ session: SESSION, logicalRun: RUN, authorityRoot: ROOT, providerRun: 'failure' })
+  assert.equal(foldFacts([rootFact(), failure, conflictingSuccess]).ok, false)
+  const atLimit = foldFacts([rootFact(), failureFact({ run: 'last', count: 1, limit: 1 }), success])
+  assert.equal(atLimit.ok, true)
+  assert.equal(budgetOf(atLimit.value).failures, 1)
+  assert.equal(budgetOf(atLimit.value).exhausted, true)
 })
 
 test('WHAT[provider-attempt-recovery-007] an_advance_naming_another_run_is_absorbed_not_applied', () => {

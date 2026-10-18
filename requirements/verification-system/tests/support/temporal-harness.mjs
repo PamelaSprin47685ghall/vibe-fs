@@ -327,6 +327,7 @@ export const fallbackFacts = {
       AuthorityRootUserMessageId: root,
       ProviderRun: run,
       ConsecutiveFailureCount: count,
+      BudgetSpec: { Version: 1, Limit: 12 },
       Reason: reason,
     },
   }),

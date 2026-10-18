@@ -13,6 +13,8 @@ type ProviderFailureFoldRejection =
     | RetryExhaustedWithoutBudget
     | SuccessRecordedWithoutBudget
     | InvalidTransition
+    | InvalidExhaustion
+    | ConflictingSuccess
 
 [<RequireQualifiedAccess>]
 module ProviderFailureFoldRejection =
@@ -20,8 +22,10 @@ module ProviderFailureFoldRejection =
         match rejection with
         | ProviderFailureFoldRejection.FailureRecordedWithoutBudget
         | ProviderFailureFoldRejection.InvalidTransition -> "FailureRecorded"
-        | ProviderFailureFoldRejection.RetryExhaustedWithoutBudget -> "RetryExhausted"
-        | ProviderFailureFoldRejection.SuccessRecordedWithoutBudget -> "SuccessRecorded"
+        | ProviderFailureFoldRejection.RetryExhaustedWithoutBudget
+        | ProviderFailureFoldRejection.InvalidExhaustion -> "RetryExhausted"
+        | ProviderFailureFoldRejection.SuccessRecordedWithoutBudget
+        | ProviderFailureFoldRejection.ConflictingSuccess -> "SuccessRecorded"
 
     let message (rejection: ProviderFailureFoldRejection) : string =
         match rejection with
@@ -32,7 +36,11 @@ module ProviderFailureFoldRejection =
         | ProviderFailureFoldRejection.SuccessRecordedWithoutBudget ->
             "success has no budget to clear: requires an accepted Authority Root"
         | ProviderFailureFoldRejection.InvalidTransition ->
-            "provider failure violates validation (consecutive failure count is not valid successor)"
+            "provider failure violates validation (budget, count or observed identity conflicts)"
+        | ProviderFailureFoldRejection.InvalidExhaustion ->
+            "retry exhausted does not confirm the persisted failure limit"
+        | ProviderFailureFoldRejection.ConflictingSuccess ->
+            "provider success conflicts with an observed failure identity"
 
 module ProviderFailureFactFold =
 
@@ -50,6 +58,7 @@ module ProviderFailureFactFold =
                LogicalRunId: LogicalRunId
                AuthorityRootUserMessageId: AuthorityRootUserMessageId
                ProviderRun: ProviderRunIdentity
+               BudgetSpec: ProviderFailureBudgetSpec
                ConsecutiveFailureCount: int
                Reason: string |})
         (current: ProviderFailureProjection)
@@ -60,13 +69,22 @@ module ProviderFailureFactFold =
               AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
               ProviderRun = payload.ProviderRun }
 
-        match ProviderFailureProjection.applyFailure identity payload.ConsecutiveFailureCount current with
+        match
+            ProviderFailureProjection.applyFailure
+                identity
+                payload.BudgetSpec
+                payload.ConsecutiveFailureCount
+                payload.Reason
+                current
+        with
         | Ok updated -> Ok [ ProviderFailureProjectionChange.ProviderFailuresSet(payload.SessionId, updated) ]
         | Error ProviderFailureAdvanceRejection.AlreadyObserved
-        | Error ProviderFailureAdvanceRejection.AlreadyExhausted
         | Error ProviderFailureAdvanceRejection.DifferentRun -> Ok []
         | Error ProviderFailureAdvanceRejection.NoActiveBudget ->
             Error ProviderFailureFoldRejection.FailureRecordedWithoutBudget
+        | Error ProviderFailureAdvanceRejection.AlreadyExhausted
+        | Error ProviderFailureAdvanceRejection.InvalidBudget
+        | Error ProviderFailureAdvanceRejection.ConflictingObservation
         | Error ProviderFailureAdvanceRejection.InvalidTransition ->
             Error ProviderFailureFoldRejection.InvalidTransition
 
@@ -77,6 +95,7 @@ module ProviderFailureFactFold =
                LogicalRunId: LogicalRunId
                AuthorityRootUserMessageId: AuthorityRootUserMessageId
                ProviderRun: ProviderRunIdentity
+               BudgetSpec: ProviderFailureBudgetSpec
                ConsecutiveFailureCount: int
                Reason: string |})
         : Result<ProviderFailureProjectionChange list, ProviderFailureFoldRejection> =
@@ -96,8 +115,16 @@ module ProviderFailureFactFold =
         | None -> Error ProviderFailureFoldRejection.RetryExhaustedWithoutBudget
         | Some current when isSuperseded current payload.LogicalRunId payload.AuthorityRootUserMessageId -> Ok []
         | Some current ->
-            let updated = ProviderFailureProjection.applyExhausted current
-            Ok [ ProviderFailureProjectionChange.ProviderFailuresSet(payload.SessionId, updated) ]
+            ProviderFailureProjection.applyExhausted payload.FinalConsecutiveFailureCount current
+            |> Result.map (fun updated ->
+                [ ProviderFailureProjectionChange.ProviderFailuresSet(payload.SessionId, updated) ])
+            |> Result.mapError (fun _ -> ProviderFailureFoldRejection.InvalidExhaustion)
+
+    let private applySuccess identity sessionId current =
+        match ProviderFailureProjection.recordSuccess identity current with
+        | Ok updated -> Ok [ ProviderFailureProjectionChange.ProviderFailuresSet(sessionId, updated) ]
+        | Error ProviderFailureAdvanceRejection.AlreadyObserved -> Ok []
+        | Error _ -> Error ProviderFailureFoldRejection.ConflictingSuccess
 
     let private foldSuccessRecorded
         (providerFailuresOf: SessionId -> ProviderFailureProjection option)
@@ -111,8 +138,14 @@ module ProviderFailureFactFold =
         | None -> Error ProviderFailureFoldRejection.SuccessRecordedWithoutBudget
         | Some current when isSuperseded current payload.LogicalRunId payload.AuthorityRootUserMessageId -> Ok []
         | Some current ->
-            let updated = ProviderFailureProjection.recordSuccess current
-            Ok [ ProviderFailureProjectionChange.ProviderFailuresSet(payload.SessionId, updated) ]
+            let identity =
+                ProviderFailureBudget.attemptIdentity
+                    payload.SessionId
+                    payload.LogicalRunId
+                    payload.AuthorityRootUserMessageId
+                    payload.ProviderRun
+
+            applySuccess identity payload.SessionId current
 
     let fold
         (providerFailuresOf: SessionId -> ProviderFailureProjection option)

@@ -47,6 +47,7 @@ const failureFact = ({ run, count, logical = RUN, root = ROOT, reason = 'provide
     authorityRoot: root,
     providerRun: run,
     consecutiveFailureCount: count,
+    budgetSpec: { version: 1, limit: 12 },
     reason,
   })
 const exhaustedFact = ({ count }) =>
@@ -69,6 +70,7 @@ test('WHAT[provider-attempt-recovery-001] an_accepted_authority_root_creates_the
     authorityRoot: 'msg_u1',
     failures: 0,
     dedupeKeys: 0,
+    budgetSpec: null,
     exhausted: false,
   })
 })
@@ -118,7 +120,6 @@ async function acceptHumanRoot(journal, userMessageId) {
 async function admit(journal, providerRunName) {
   const recorded = await failureOwner.recordConfirmedFailure(
     journal,
-    budget.defaultBudget,
     SESSION,
     providerRunName,
     'provider_error',
@@ -142,7 +143,6 @@ test('WHAT[provider-attempt-recovery-001] no_active_run_records_nothing_and_writ
     // budget belongs to a Logical Run; there is no run yet).
     const outcome = await failureOwner.recordConfirmedFailure(
       journal,
-      budget.defaultBudget,
       SESSION,
       'msg_asst_ghost',
       'provider_error',
@@ -162,7 +162,7 @@ test('WHAT[provider-attempt-recovery-001] separate authority projections keep in
   const { budget, providerFailureProjection } = await import('../../../dist/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.js')
   const first = providerFailureProjection.forAuthority('run-first', 'root-first')
   const second = providerFailureProjection.forAuthority('run-second', 'root-second')
-  const advanced = providerFailureProjection.applyFailure(budget.attemptIdentity('session-first', 'run-first', 'root-first', 'provider-first'), 1, first)
+  const advanced = providerFailureProjection.applyFailure(budget.attemptIdentity('session-first', 'run-first', 'root-first', 'provider-first'), 1, first, { version: 1, limit: 12 }, 'provider_error')
   assert.equal(advanced.ok, true)
   assert.equal(providerFailureProjection.read(advanced.value).failures, 1)
   assert.equal(providerFailureProjection.read(second).failures, 0)

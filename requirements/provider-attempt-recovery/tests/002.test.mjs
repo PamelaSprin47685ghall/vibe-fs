@@ -53,23 +53,23 @@ const legacySucceeded = JSON.stringify({
   }]]],
 })
 
-test('WHAT[provider-attempt-recovery-002] legacy_fallback_bytes_decode_one_way_and_never_re_encode_offsets', () => {
-  const advance = codec.deserialize(legacyAdvance)
-  assert.equal(advance.ok, true, advance.ok ? '' : advance.error)
-  assert.match(advance.value.line, /FailureRecorded/)
-  assert.match(advance.value.line, /"ConsecutiveFailureCount":1/)
-  assert.doesNotMatch(advance.value.line, /Offset/)
-
-  const exhausted = codec.deserialize(legacyExhausted)
-  assert.equal(exhausted.ok, true, exhausted.ok ? '' : exhausted.error)
-  assert.match(exhausted.value.line, /RetryExhausted/)
-  assert.match(exhausted.value.line, /"FinalConsecutiveFailureCount":12/)
-  assert.doesNotMatch(exhausted.value.line, /Offset/)
-
-  const succeeded = codec.deserialize(legacySucceeded)
-  assert.equal(succeeded.ok, true, succeeded.ok ? '' : succeeded.error)
-  assert.match(succeeded.value.line, /SuccessRecorded/)
-  assert.doesNotMatch(succeeded.value.line, /Offset/)
+test('WHAT[provider-attempt-recovery-002] legacy fallback bytes without a persisted budget are explicitly rejected', () => {
+  for (const line of [legacyAdvance, legacyExhausted, legacySucceeded]) {
+    const decoded = codec.deserialize(line)
+    assert.equal(decoded.ok, false)
+    assert.match(decoded.error, /legacy Fallback.*budget/)
+  }
+  const current = JSON.parse(legacyAdvance)
+  current.Fact[1] = ['ProviderFailure', ['FailureRecorded', {
+    ...current.Fact[1][1][1], BudgetSpec: { Version: 1, Limit: 3 },
+  }]]
+  delete current.Fact[1][1][1].PreviousOffset
+  delete current.Fact[1][1][1].NextOffset
+  assert.equal(codec.deserialize(JSON.stringify(current)).ok, true)
+  for (const spec of [undefined, { Version: 1 }, { Limit: 3 }, { Version: 2, Limit: 3 }, { Version: 1, Limit: 0 }, { Version: 1, Limit: -1 }, { Version: 1, Limit: 1.5 }]) {
+    current.Fact[1][1][1].BudgetSpec = spec
+    assert.equal(codec.deserialize(JSON.stringify(current)).ok, false)
+  }
 })
 }
 
@@ -119,6 +119,7 @@ const failureFact = ({ run, count, logical = RUN, root = ROOT, reason = 'provide
     authorityRoot: root,
     providerRun: run,
     consecutiveFailureCount: count,
+    budgetSpec: { version: 1, limit: 12 },
     reason,
   })
 const exhaustedFact = ({ count }) =>
@@ -142,6 +143,7 @@ test('WHAT[provider-attempt-recovery-002] a_fresh_budget_starts_at_zero_with_no_
       authorityRoot: 'msg_u1',
       failures: 0,
       dedupeKeys: 0,
+      budgetSpec: null,
       exhausted: false,
     },
   )

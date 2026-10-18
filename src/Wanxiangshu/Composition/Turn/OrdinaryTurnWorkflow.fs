@@ -65,7 +65,14 @@ module OrdinaryTurnWorkflow =
             match journal, clearingKind with
             | Some durable, Some _ ->
                 let port = AgentJournalPortAdapter.forProviderFailure durable
-                let! _ = ProviderFailureLedger.recordConfirmedSuccess port turn.SessionId turn.ProviderRun
+
+                let! _ =
+                    ProviderFailureLedger.recordConfirmedSuccess
+                        port
+                        turn.SessionId
+                        turn.AuthorityRootUserMessageId
+                        turn.ProviderRun
+
                 return ()
             | _ -> return ()
         }

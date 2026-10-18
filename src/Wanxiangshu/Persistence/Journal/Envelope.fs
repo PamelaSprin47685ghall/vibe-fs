@@ -182,55 +182,14 @@ module Envelope =
     let private promptFactDecoder =
         Decode.Auto.generateDecoderCached<PromptFactCases> (extra = extra)
 
-    [<RequireQualifiedAccess>]
-    type private LegacyFallbackDto =
-        | FallbackCursorAdvanced of
-            {| SessionId: SessionId
-               LogicalRunId: LogicalRunId
-               AuthorityRootUserMessageId: AuthorityRootUserMessageId
-               ProviderRun: ProviderRunIdentity
-               PreviousOffset: byte
-               NextOffset: byte
-               ConsecutiveFailureCount: int
-               Reason: string |}
-        | FallbackExhausted of
-            {| SessionId: SessionId
-               LogicalRunId: LogicalRunId
-               AuthorityRootUserMessageId: AuthorityRootUserMessageId
-               FinalConsecutiveFailureCount: int
-               FinalOffset: byte |}
-        | FallbackSucceeded of
-            {| SessionId: SessionId
-               LogicalRunId: LogicalRunId
-               AuthorityRootUserMessageId: AuthorityRootUserMessageId
-               ProviderRun: ProviderRunIdentity |}
-
     let private providerFailureFactDecoder =
         Decode.Auto.generateDecoderCached<ProviderFailureFactCases> (extra = extra)
-
-    let private legacyFallbackDecoder: Decoder<ProviderFailureFactCases> =
-        Decode.Auto.generateDecoderCached<LegacyFallbackDto> (extra = extra)
-        |> Decode.map (function
-            | LegacyFallbackDto.FallbackCursorAdvanced payload ->
-                ProviderFailureFactCases.FailureRecorded
-                    {| SessionId = payload.SessionId
-                       LogicalRunId = payload.LogicalRunId
-                       AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
-                       ProviderRun = payload.ProviderRun
-                       ConsecutiveFailureCount = payload.ConsecutiveFailureCount
-                       Reason = payload.Reason |}
-            | LegacyFallbackDto.FallbackExhausted payload ->
-                ProviderFailureFactCases.RetryExhausted
-                    {| SessionId = payload.SessionId
-                       LogicalRunId = payload.LogicalRunId
-                       AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
-                       FinalConsecutiveFailureCount = payload.FinalConsecutiveFailureCount |}
-            | LegacyFallbackDto.FallbackSucceeded payload ->
-                ProviderFailureFactCases.SuccessRecorded
-                    {| SessionId = payload.SessionId
-                       LogicalRunId = payload.LogicalRunId
-                       AuthorityRootUserMessageId = payload.AuthorityRootUserMessageId
-                       ProviderRun = payload.ProviderRun |})
+        |> Decode.andThen (function
+            | ProviderFailureFactCases.FailureRecorded payload when
+                not (ProviderFailureBudgetSpec.isValid payload.BudgetSpec)
+                ->
+                Decode.fail "unsupported provider failure BudgetSpec: requires Version=1 and a positive Limit"
+            | fact -> Decode.succeed fact)
 
     let private executionFactDecoder =
         Decode.Auto.generateDecoderCached<ExecutionFactCases> (extra = extra)
@@ -301,7 +260,7 @@ module Envelope =
         |> Decode.andThen (function
             | "Prompt" -> familyCase promptFactDecoder AgentFact.Prompt
             | "ProviderFailure" -> familyCase providerFailureFactDecoder AgentFact.ProviderFailure
-            | "Fallback" -> familyCase legacyFallbackDecoder AgentFact.ProviderFailure
+            | "Fallback" -> Decode.fail "legacy Fallback facts have no supported persisted budget evidence"
             | "Execution" -> familyCase executionFactDecoder AgentFact.Execution
             | "Orchestrator" -> familyCase orchestratorFactDecoder AgentFact.Orchestrator
             | "Companion" -> familyCase companionFactDecoder AgentFact.Companion

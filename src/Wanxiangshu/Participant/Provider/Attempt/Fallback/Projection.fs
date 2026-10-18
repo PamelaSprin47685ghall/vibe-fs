@@ -3,12 +3,18 @@ namespace Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation.Identity
 
-/// Durable provider failure projection for one Logical Run.
+type ObservedProviderFailure =
+    { Key: string
+      Count: int
+      Reason: string }
+
 type ProviderFailureProjection =
     { LogicalRunId: LogicalRunId
       AuthorityRootUserMessageId: AuthorityRootUserMessageId
       Budget: ProviderFailureBudget.FailureBudget
-      RecentFailureKeys: string list
+      BudgetSpec: ProviderFailureBudgetSpec option
+      ObservedFailures: ObservedProviderFailure list
+      SuccessKeys: string list
       Exhausted: bool
       LastTransitionWasSuccess: bool }
 
@@ -19,68 +25,105 @@ type ProviderFailureAdvanceRejection =
     | DifferentRun
     | NoActiveBudget
     | InvalidTransition
+    | InvalidBudget
+    | ConflictingObservation
 
 module ProviderFailureProjection =
-
-    [<Literal>]
-    let private DedupeWindow = 32
 
     let forAuthority (logicalRunId: LogicalRunId) (authorityRoot: AuthorityRootUserMessageId) =
         { LogicalRunId = logicalRunId
           AuthorityRootUserMessageId = authorityRoot
           Budget = ProviderFailureBudget.forNewAuthorityRoot
-          RecentFailureKeys = []
+          BudgetSpec = None
+          ObservedFailures = []
+          SuccessKeys = []
           Exhausted = false
           LastTransitionWasSuccess = false }
 
-    let private remember key keys =
-        key :: (keys |> List.filter ((<>) key)) |> List.truncate DedupeWindow
+    let private isDifferentRun (identity: FailedProviderAttemptIdentity) (current: ProviderFailureProjection) =
+        identity.LogicalRunId <> current.LogicalRunId
+        || identity.AuthorityRootUserMessageId <> current.AuthorityRootUserMessageId
 
     /// Apply one failure record.
     let applyFailure
         (identity: FailedProviderAttemptIdentity)
+        (spec: ProviderFailureBudgetSpec)
         (consecutiveFailureCount: int)
+        (reason: string)
         (current: ProviderFailureProjection)
         : Result<ProviderFailureProjection, ProviderFailureAdvanceRejection> =
         let key = FailedProviderAttemptIdentity.dedupeKey identity
 
-        if current.Exhausted then
-            Error AlreadyExhausted
-        elif
-            identity.LogicalRunId <> current.LogicalRunId
-            || identity.AuthorityRootUserMessageId <> current.AuthorityRootUserMessageId
-        then
-            Error DifferentRun
-        elif List.contains key current.RecentFailureKeys then
+        match current.ObservedFailures |> List.tryFind (fun observed -> observed.Key = key) with
+        | _ when isDifferentRun identity current -> Error DifferentRun
+        | _ when
+            not (ProviderFailureBudgetSpec.isValid spec)
+            || (current.BudgetSpec |> Option.exists ((<>) spec))
+            ->
+            Error InvalidBudget
+        | _ when List.contains key current.SuccessKeys -> Error ConflictingObservation
+        | Some observed when observed.Count = consecutiveFailureCount && observed.Reason = reason ->
             Error AlreadyObserved
-        elif
-            not (ProviderFailureBudget.isValidRecord current.Budget.ConsecutiveFailureCount consecutiveFailureCount)
-        then
+        | Some _ -> Error ConflictingObservation
+        | None when current.Exhausted -> Error AlreadyExhausted
+        | None when
+            consecutiveFailureCount > spec.Limit
+            || not (ProviderFailureBudget.isValidRecord current.Budget.ConsecutiveFailureCount consecutiveFailureCount)
+            ->
             Error InvalidTransition
-        else
+        | None ->
             Ok
                 { current with
                     Budget = { ConsecutiveFailureCount = consecutiveFailureCount }
-                    RecentFailureKeys = remember key current.RecentFailureKeys
+                    BudgetSpec = Some spec
+                    ObservedFailures =
+                        { Key = key
+                          Count = consecutiveFailureCount
+                          Reason = reason }
+                        :: current.ObservedFailures
+                    Exhausted = consecutiveFailureCount = spec.Limit
                     LastTransitionWasSuccess = false }
 
     /// Terminal exhausted state.
-    let applyExhausted (current: ProviderFailureProjection) = { current with Exhausted = true }
+    let applyExhausted (finalCount: int) (current: ProviderFailureProjection) =
+        match current.BudgetSpec with
+        | Some spec when
+            current.Exhausted
+            && finalCount = spec.Limit
+            && finalCount = current.Budget.ConsecutiveFailureCount
+            ->
+            Ok current
+        | _ -> Error InvalidTransition
 
     /// Success clears the budget streak.
-    let recordSuccess (current: ProviderFailureProjection) =
-        { current with
-            Budget = ProviderFailureBudget.recordSuccess current.Budget
-            RecentFailureKeys = []
-            LastTransitionWasSuccess = true }
+    let recordSuccess (identity: FailedProviderAttemptIdentity) (current: ProviderFailureProjection) =
+        let key = FailedProviderAttemptIdentity.dedupeKey identity
 
-    let private budgetMayRetry (budgetLimit: int) (budget: ProviderFailureBudget.FailureBudget) =
-        match ProviderFailureBudget.verdict budgetLimit budget with
-        | ProviderFailureBudget.MayRetry _ -> true
-        | ProviderFailureBudget.Exhausted _ -> false
+        let budget =
+            if current.Exhausted then
+                current.Budget
+            else
+                ProviderFailureBudget.recordSuccess current.Budget
 
-    let mayRetry (budgetLimit: int) (current: ProviderFailureProjection) =
-        if current.Exhausted then
-            false
+        if isDifferentRun identity current then
+            Error DifferentRun
+        elif List.contains key current.SuccessKeys then
+            Error AlreadyObserved
+        elif current.ObservedFailures |> List.exists (fun observed -> observed.Key = key) then
+            Error ConflictingObservation
         else
-            budgetMayRetry budgetLimit current.Budget
+            Ok
+                { current with
+                    Budget = budget
+                    SuccessKeys = key :: current.SuccessKeys
+                    LastTransitionWasSuccess = true }
+
+    let mayRetry (current: ProviderFailureProjection) =
+        match current.BudgetSpec with
+        | _ when current.Exhausted -> false
+        | None ->
+            current.Budget.ConsecutiveFailureCount = 0
+            && List.isEmpty current.ObservedFailures
+        | Some spec ->
+            ProviderFailureBudgetSpec.isValid spec
+            && spec.Limit > current.Budget.ConsecutiveFailureCount

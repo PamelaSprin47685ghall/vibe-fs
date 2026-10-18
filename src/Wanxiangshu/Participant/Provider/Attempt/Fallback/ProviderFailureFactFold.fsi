@@ -12,6 +12,8 @@ type ProviderFailureFoldRejection =
     | RetryExhaustedWithoutBudget
     | SuccessRecordedWithoutBudget
     | InvalidTransition
+    | InvalidExhaustion
+    | ConflictingSuccess
 
 [<RequireQualifiedAccess>]
 module ProviderFailureFoldRejection =

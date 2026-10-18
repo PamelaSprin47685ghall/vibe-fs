@@ -244,7 +244,7 @@ module JournalSurface =
             {| logicalRun = LogicalRunId.value state.LogicalRunId
                authorityRoot = AuthorityRootUserMessageId.value state.AuthorityRootUserMessageId
                consecutiveFailureCount = state.Budget.ConsecutiveFailureCount
-               recentFailureKeyCount = state.RecentFailureKeys.Length
+               recentFailureKeyCount = state.ObservedFailures.Length
                exhausted = state.Exhausted |}
 
     let private authorityProfileToJs (profile: PromptAuthority.AuthorityExecutionProfile) : obj =

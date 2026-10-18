@@ -27,7 +27,10 @@ module ProviderFailureSurface =
         handle: JournalHandle -> session: string -> physicalMessage: string -> agent: string -> Task<obj>
 
     val recordConfirmedFailure:
-        handle: JournalHandle -> budget: int -> session: string -> providerRun: string -> reason: string -> Task<obj>
+        handle: JournalHandle -> session: string -> providerRun: string -> reason: string -> Task<obj>
+
+    val recordConfirmedSuccess:
+        handle: JournalHandle -> session: string -> authorityRoot: string -> providerRun: string -> Task<obj>
 
     /// provider-attempt-recovery-021: the durable `ProviderRetryAttempt` dispatch fact of one failed
     /// physical attempt — the fact the recovery target settlement consumes.

@@ -50,6 +50,7 @@ const failureFact = ({ run, count, logical = RUN, root = ROOT, reason = 'provide
     authorityRoot: root,
     providerRun: run,
     consecutiveFailureCount: count,
+    budgetSpec: { version: 1, limit: 12 },
     reason,
   })
 
@@ -68,9 +69,9 @@ const budgetOf = (projection) => providerFailureProjection.read(projection)
 
 test('WHAT[provider-attempt-recovery-009] duplicate domain failure identity cannot advance the pure projection again', () => {
   let current = providerFailureProjection.forAuthority(RUN, ROOT)
-  const first = providerFailureProjection.applyFailure(identityFor('run_same'), 1, current)
+  const first = providerFailureProjection.applyFailure(identityFor('run_same'), 1, current, { version: 1, limit: 12 }, 'provider_error')
   assert.equal(first.ok, true)
-  assert.deepEqual(providerFailureProjection.applyFailure(identityFor('run_same'), 2, first.value), {
+  assert.deepEqual(providerFailureProjection.applyFailure(identityFor('run_same'), 1, first.value, { version: 1, limit: 12 }, 'provider_error'), {
     ok: false,
     error: 'AlreadyObserved',
   })

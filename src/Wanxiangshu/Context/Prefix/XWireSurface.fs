@@ -794,7 +794,7 @@ module XWireSurface =
                           ReadBlob = readBlobFn
                           WriteBlob = writeBlobFn
                           CurrentProjection = fun _ -> failwith "not used in candidate"
-                          RecordConfirmedSuccess = fun _ _ -> failwith "not used in candidate"
+                          RecordConfirmedSuccess = fun _ _ _ -> failwith "not used in candidate"
                           CommitPrefixRebase = fun _ _ _ -> failwith "not used in candidate" }
 
                     let sessionId =

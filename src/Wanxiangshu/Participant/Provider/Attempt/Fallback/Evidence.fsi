@@ -8,4 +8,4 @@ module ProviderFailureEvidence =
     val currentState: state: ProviderFailureProjection option -> ProviderFailureProjection option
     val tryCurrentState: state: ProviderFailureProjection option -> ProviderFailureProjection option
     val currentBudget: state: ProviderFailureProjection option -> ProviderFailureBudget.FailureBudget option
-    val mayRetry: budgetLimit: int -> state: ProviderFailureProjection option -> bool
+    val mayRetry: state: ProviderFailureProjection option -> bool

@@ -57,6 +57,7 @@ const failureFact = ({ run, count, logical = RUN, root = ROOT, reason = 'provide
     authorityRoot: root,
     providerRun: run,
     consecutiveFailureCount: count,
+    budgetSpec: { version: 1, limit: 12 },
     reason,
   })
 
@@ -135,25 +136,28 @@ test('WHAT[provider-attempt-recovery-004] success_is_a_durable_fact_that_zeroes_
   )
 })
 
-test('WHAT[provider-attempt-recovery-004] recording_success_clears_the_dedupe_window_too', () => {
+test('WHAT[provider-attempt-recovery-004] recording success keeps previous failure identity sealed', () => {
   const advanced = providerFailureProjection.applyFailure(
     identityFor('run_1'),
     1,
     providerFailureProjection.forAuthority(RUN, ROOT),
+    { version: 1, limit: 12 },
+    'provider_error',
   )
   assert.equal(advanced.ok, true)
 
-  const afterSuccess = providerFailureProjection.recordSuccess(advanced.value)
+  const afterSuccess = providerFailureProjection.recordSuccess(identityFor('run_success'), advanced.value).value
   assert.deepEqual(providerFailureProjection.read(afterSuccess), {
     logicalRun: 'run_L',
     authorityRoot: 'msg_u1',
     failures: 0,
-    dedupeKeys: 0,
+    dedupeKeys: 1,
+    budgetSpec: { version: 1, limit: 12 },
     exhausted: false,
   })
 
-  const again = providerFailureProjection.applyFailure(identityFor('run_1'), 1, afterSuccess)
-  assert.equal(again.ok, true)
+  const again = providerFailureProjection.applyFailure(identityFor('run_1'), 1, afterSuccess, { version: 1, limit: 12 }, 'provider_error')
+  assert.deepEqual(again, { ok: false, error: 'AlreadyObserved' })
 })
 
 test('WHAT[provider-attempt-recovery-004] an_accepted_execution_without_a_start_fact_still_names_its_ordinary_kind', async () => {

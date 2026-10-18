@@ -212,6 +212,8 @@ GAP-085、159 的列明范围已交付。GAP-159 旧实际公共入口确会安�
 <a id="gap140"></a>
 ### GAP-140 持久失败预算
 
+**2026-10-19 进度：** [G140-A报告](DURABLE-FAILURE-BUDGET-GAP140-2026-10-19.md)已验持久Spec、顺序入账与完整身份保留、来源root成功边界、实际故障/12轮和冷预算。697最终相关101文件693 pass / 0普通fail / 7skip / 62TODO，固定包及非作者C/J01/T通过。整卡仍DOING：既存并发命令有facts2/send2/count1，下一步先做G140-B真实writer/dispatch owner原型；实际普通冷Workflow缺Host-stop零发送仍待验。不能把局部证据写成整卡或GAP-139完成。
+
 **范围与前置：** 先定每个 LogicalRun 的预算事实、重复身份和新失败的区别；统一记录、重放和实际重试准入。可升级事件版本；无依据旧记录明确拒绝或另作有输入清单的离线迁移，不按今天默认值猜旧预算。
 
 - **先跑的反例：** [provider-attempt-recovery-007](../../requirements/provider-attempt-recovery/tests/007.test.mjs) 中耗尽后新 FailureRecorded 仍被吸收，以及历史预算缺依据。重复同身份、预算边界前后、新 run 和成功重置为成对正反控。

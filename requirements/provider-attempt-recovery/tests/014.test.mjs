@@ -21,7 +21,6 @@ async function acceptHumanRoot(journal, userMessageId) {
 async function admit(journal, providerRunName) {
   const recorded = await failureOwner.recordConfirmedFailure(
     journal,
-    budget.defaultBudget,
     SESSION,
     providerRunName,
     'provider_error',
@@ -47,7 +46,6 @@ test('WHAT[provider-attempt-recovery-014] ledger replay preserves one licensed f
     // the continuation's only occasion.
     const first = await failureOwner.recordConfirmedFailure(
       journal,
-      budget.defaultBudget,
       SESSION,
       'msg_asst_seq_1',
       'provider_error',
@@ -57,7 +55,6 @@ test('WHAT[provider-attempt-recovery-014] ledger replay preserves one licensed f
     // This exercises ledger replay, not the physical send or Host-stop gate.
     const second = await failureOwner.recordConfirmedFailure(
       journal,
-      budget.defaultBudget,
       SESSION,
       'msg_asst_seq_1',
       'provider_error',
