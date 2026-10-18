@@ -20,7 +20,7 @@
 
 ## [005] 编程面与推荐诚实性
 
-公开基类、描述和示例只包含当前可执行成员，不暴露宿主私有接口或注入键；说明钩子不得推荐当前 Provider 不可见的工具。
+公开基类、描述和示例只包含当前可执行成员，不暴露宿主私有接口或注入键。（原直连宿主文件工具的说明钩子 `BuiltinToolDescriptionHook` 已随直连工具整体退役，现行契约归生成的 js 编程面。）
 
 ## [006] 沙箱隔离与无 Ambient OS 权限
 
@@ -94,7 +94,7 @@ CAS 还原（rollbackPlan：restore 与 removeCreated，逆序）保留为实现
 
 ## [020] 文件变换的 POSIX 语义
 
-`mv` 移动或重命名文件及目录，支持覆盖，源缺失报错；`rm` 删除文件或空目录，拒绝非空目录。参数错误与操作系统失败给稳定可读结果。
+编程面成员 `mv(from, to)` 移动或重命名文件及目录，支持覆盖，源缺失报错；`rm(path)` 删除文件或空目录，拒绝非空目录。参数错误与操作系统失败给稳定可读结果。（原独立宿主插件工具 `mv`/`rm` `ToolSpec` 与 `FileMutationSurface` 已退役，由 `Move`/`Remove` 权限投影的 js 成员承担同一契约。）
 
 ## [021] 禁止手写 per-role 工具变体
 
@@ -130,11 +130,11 @@ CAS 还原（rollbackPlan：restore 与 removeCreated，逆序）保留为实现
 
 ## [026] 事务快照与案例实质访问分离
 
-ReadSnapshots 只用于事务隔离与冲突检测，不直接作为案例关联文件。案例只记录显式读取（`cat`/`read`）的规范路径及已提交的修改、创建、删除、移动路径；内部扫描不算实质访问。提交前 effectPaths 是意图，未提交、校验失败或回滚均不追加修改访问。
+ReadSnapshots 只用于事务隔离与冲突检测，不直接作为案例关联文件。案例只记录显式读取（`cat`）的规范路径及已提交的修改、创建、删除、移动路径；内部扫描（`ls`/`stat`）不算实质访问。提交前 effectPaths 是意图，未提交、校验失败或回滚均不追加修改访问。
 
 ## [027] Engineer 与 DevOps 的统一文件面
 
-两者按已授予能力获得直接 Read/Write/Edit/Glob/Grep/Move/Remove 工具及生成的 todowrite-for-engineer/todowrite-for-devops。直接与可编程文件操作共享路径边界、UTF-8 校验、符号链接防护和 As-Is 逐笔落盘写语义（每笔写即原子落盘、跨笔不回滚、失败保留已落盘改动）。
+直接文件系统宿主工具（`read`/`write`/`edit`/`glob`/`grep`/`patch`）及独立插件 `mv`/`rm` `ToolSpec` 已整体退役；`Read`/`Write`/`Edit`/`Glob`/`Grep`/`Move`/`Remove` 权限不再投影独立宿主工具名，而是统一通过生成的 `todowrite-for-engineer` 与 `todowrite-for-devops` 投影 `cat`/`where`/`whereAll`/`write`/`mkdir`/`ls`/`stat`/`mv`/`rm` 成员，共享路径边界、UTF-8 校验、符号链接防护和 As-Is 逐笔落盘写语义（每笔写即原子落盘、跨笔不回滚、失败保留已落盘改动）。
 
 Manager 的 `todowrite-for-manager` 只读文件能力为 Read/Glob，并持有委托原语 Fork/Join；能力过滤同样到达真实 API；评审及当前事实准入遵循 capability-enforcement-025，不因生成工具而取得修改或执行权。
 

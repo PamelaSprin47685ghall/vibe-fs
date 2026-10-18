@@ -451,10 +451,10 @@ function runEventProbeSessionAndToolNormalisation() {
     type: 'message.part.updated',
     properties: {
       sessionID: 'child',
-      part: { type: 'tool', tool: 'write', state: { status: 'completed' } },
+      part: { type: 'tool', tool: 'todowrite-for-engineer', state: { status: 'completed' } },
     },
   });
-  assertEq(completedTool.toolName, 'write', 'tool name extracted');
+  assertEq(completedTool.toolName, 'todowrite-for-engineer', 'tool name extracted');
   assertEq(completedTool.toolStatus, 'completed', 'tool completion extracted');
 }
 

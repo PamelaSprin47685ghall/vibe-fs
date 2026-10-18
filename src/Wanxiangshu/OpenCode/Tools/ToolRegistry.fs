@@ -84,17 +84,6 @@ module ToolRegistry =
 
         ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] fields
 
-    /// mv / rm expose their refusals by code; the other tools keep the
-    /// prose-only shape their existing consumers already match on.
-    let private carriesRefusalCode (specName: string) =
-        match specName with
-        | "mv"
-        | "rm" -> true
-        | _ -> false
-
-    let private refusalCodeFor (specName: string) (path: string) =
-        if carriesRefusalCode specName then Some path else None
-
     let private denyRole (ctx: HostToolContext) (specName: string) (role: Role) =
         let path =
             if specName = "fission" then
@@ -102,7 +91,7 @@ module ToolRegistry =
             else
                 Path.DeniedRole
 
-        denied ctx specName path (Map [ "tool", specName; "role", sprintf "%A" role ]) (refusalCodeFor specName path)
+        denied ctx specName path (Map [ "tool", specName; "role", sprintf "%A" role ]) None
 
     /// The current capability decides; the denial stays action-focused and never
     /// echoes internal loop state.
@@ -255,7 +244,7 @@ module ToolRegistry =
                         spec.Name
                         Path.DeniedUnestablished
                         Map.empty
-                        (refusalCodeFor spec.Name Path.DeniedUnestablished)
+                        None
         }
 
     /// capability-enforcement-006: the attachment IS the authority. Resolving a
@@ -344,8 +333,6 @@ module ToolRegistry =
           ToolAdmission.OfficeRole(fun _ role ->
               OfficeCapability.isAllowed role ToolPermission.Finality
               || OfficeCapability.isAllowed role ToolPermission.Deliver)
-          "mv", FileMutationTools.mvAdmission
-          "rm", FileMutationTools.rmAdmission
           "bash-honeypot", BashHoneypotTool.admission
           "assume", AssumeTool.admission
           "defer", AttentionTools.admission
@@ -1330,8 +1317,6 @@ module ToolRegistry =
               // Plan lifecycle reads its own durable owner directly.
               yield ReviewShell.spec factory runtime
               yield deliverSpec ()
-              yield FileMutationTools.mvSpec factory
-              yield FileMutationTools.rmSpec factory
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
               yield! AttentionTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forAttention)

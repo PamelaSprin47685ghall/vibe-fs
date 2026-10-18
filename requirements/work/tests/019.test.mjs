@@ -5,6 +5,7 @@ import test from 'node:test'
 import { acceptAuthorityRoot, injectAcceptedAssessment, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { permissionOfToolName } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { rolePermissionRules } from '../../../dist/OpenCode/Tools/ToolSurface.js'
+import { generateRole } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 import { manager, plan } from '../../../dist/Foundation/RolesSurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as workspaceEvents from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
@@ -153,12 +154,20 @@ test('WHAT[work-019] 工具名→权限映射维护在唯一目录，禁止按�
   // 未知名字不得按后缀（js-）或启发式规则放行。
   assert.equal(permissionName(permissionOfToolName(manager, 'todowrite-for-manager')), null)
   assert.equal(permissionName(permissionOfToolName(manager, 'js-unknown')), null)
-  // 角色层投影：Manager 的 read 固定 deny（评审只读由 todowrite-for-manager 承载）。
-  assert.equal(rolePermissionRules('manager').read, 'deny')
+  // 直接文件工具已退役：Manager 的 read 不再出现在任何投影里，默认 `*` 为 deny，
+  // 评审只读由 todowrite-for-manager 的成员承载。
+  assert.equal(permissionName(permissionOfToolName(manager, 'read')), null)
+  assert.equal(rolePermissionRules('manager')['*'], 'deny')
+  assert.equal('read' in rolePermissionRules('manager'), false)
 })
 
 test('WHAT[work-019] 评审未接纳前 Manager 的写工具在执行门投影上被拒绝', () => {
   const rules = rolePermissionRules('manager')
-  assert.equal(rules.edit, 'deny')
-  assert.equal(rules.write, 'deny')
+  // 直接 write/edit 工具已退役，规则表默认 deny；Manager 的编程面也不携带写成员。
+  assert.equal(rules['*'], 'deny')
+  assert.equal('edit' in rules, false)
+  assert.equal('write' in rules, false)
+  const surface = generateRole('manager', 'en')
+  assert.equal(surface.baseClassSource.includes('async write('), false)
+  assert.equal(surface.baseClassSource.includes('async edit('), false)
 })

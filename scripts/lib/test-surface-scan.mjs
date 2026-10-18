@@ -827,22 +827,7 @@ export const SURFACE_MANIFEST = [
     representation: 'opaque-capability',
     kind: 'resource',
   },
-  {
-    module: 'OpenCode/Tools/FileToolsSurface.js',
-    owner: 'repository-programming',
-    laws: ['REPOSITORY-PROGRAMMING-007', 'REPOSITORY-PROGRAMMING-010'],
-    source: 'src/Wanxiangshu/OpenCode/Tools/FileToolsSurface.fs',
-    representation: 'opaque-capability',
-    kind: 'resource',
-  },
-  {
-    module: 'OpenCode/Tools/FileMutationSurface.js',
-    owner: 'repository-programming',
-    laws: ['REPOSITORY-PROGRAMMING-020'],
-    source: 'src/Wanxiangshu/OpenCode/Tools/FileMutationSurface.fs',
-    representation: 'opaque-capability',
-    kind: 'resource',
-  },
+
   {
     module: 'Context/Companion/Blogger/FrameSurface.js',
     owner: 'context-compression',

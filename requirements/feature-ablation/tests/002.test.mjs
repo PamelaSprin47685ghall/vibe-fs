@@ -40,15 +40,15 @@ test('WHAT[feature-ablation-002] ABL_002_tri_state_semantics_distinction', () =>
     ['WANXIANGSHU_ABLATION_speculative_investigation', 'active'],
   ], () => {
     Ablation.load()
-    assert.equal(Ablation.allowsTool('read'), true, 'active node tool must be allowed')
-    assert.equal(Ablation.allowsToolSchema('read'), true, 'active node tool schema must be allowed')
+    assert.equal(Ablation.allowsTool('skill'), true, 'active node tool must be allowed')
+    assert.equal(Ablation.allowsToolSchema('skill'), true, 'active node tool schema must be allowed')
   })
 
   // 3. borrowed 状态：仅 resources/ablation/nodes.json 与 manifest 明示的借用面可运行；不得触发完整包级下游语义
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-14']], () => {
     Ablation.load()
-    // station-14 中 delegation 处于 borrowed/ablated 切面：允许读，但不允许完整 async fork/fission 语义
-    assert.equal(Ablation.allowsTool('read'), true, 'borrowed foundation tool read must be allowed')
+    // station-14 中 action-affordance 已 active 而 delegation 仍 ablated：允许基础 affordance 工具，但不允许下游 async fork/fission 语义
+    assert.equal(Ablation.allowsTool('skill'), true, 'active foundation tool skill must be allowed')
     assert.equal(Ablation.allowsTool('fork'), false, 'borrowed package full downstream tool fork must be denied')
     assert.equal(Ablation.fissionVisible(), false, 'borrowed package downstream fission must remain ablated')
   })
@@ -99,16 +99,16 @@ test('WHAT[feature-ablation-002] ABL_002_station_05_denies_downstream_tools', ()
     assert.equal(Ablation.allowsTool('fission'), false)
     assert.equal(Ablation.allowsTool('review'), false)
     assert.equal(Ablation.allowsTool('commission'), false)
-    assert.equal(Ablation.allowsTool('read'), true)
+    assert.equal(Ablation.allowsTool('skill'), true)
   })
 })
 
 test('WHAT[feature-ablation-002] ABL_002_station_14_keeps_engineer_surface_and_ablates_manager_tools', () => {
   withEnv([['WANXIANGSHU_ABLATION_PROFILE', 'station-14']], () => {
     Ablation.load()
-    assert.equal(Ablation.allowsTool('read'), true)
-    assert.equal(Ablation.allowsTool('glob'), true)
-    assert.equal(Ablation.allowsTool('grep'), true)
+    assert.equal(Ablation.allowsTool('skill'), true)
+    assert.equal(Ablation.allowsTool('bash-honeypot'), true)
+    assert.equal(Ablation.allowsTool('horizon'), true)
     assert.equal(Ablation.allowsTool('fork'), false)
     assert.equal(Ablation.allowsTool('todowrite-for-manager'), false)
     assert.equal(Ablation.allowsPrimaryAgent('manager'), false)
@@ -210,12 +210,12 @@ test('WHAT[feature-ablation-002] ABL_002_ablated_package_tool_is_refused_at_the_
   const { integrationTest } = await import('../../verification-system/tests/support/tier-gate.mjs')
   const { acceptAuthorityRoot, withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
 
-  // 单点覆盖 repository-programming：mv/rm 映射到该节点。消融门在 admission 与工具体之前
+  // 单点覆盖 repository-programming：todowrite-for-engineer 映射到该节点。消融门在 admission 与工具体之前
   // 拒绝，因此本用例不依赖 Engineer 的具体授权，也不产生任何文件副作用。
   // station-05 marks repository-programming ablated, which also ablates its
   // downstream interaction-authority (the Prompt fact). The registry is
   // therefore switched after the authority root is admitted: the fixture
-  // precondition writes under the active default, then the rm execute gate
+  // precondition writes under the active default, then the todowrite-for-engineer execute gate
   // reads the ablated profile at call time.
   const override = 'WANXIANGSHU_ABLATION_PROFILE'
   const previous = process.env[override]
@@ -226,8 +226,8 @@ test('WHAT[feature-ablation-002] ABL_002_ablated_package_tool_is_refused_at_the_
         await acceptAuthorityRoot(runtime, 'ses-ablation-gate', 'engineer')
         process.env[override] = 'station-05'
         Ablation.resetRegistry()
-        const result = await hooks.tool.rm.execute(
-          { path: 'ablation-probe' },
+        const result = await hooks.tool['todowrite-for-engineer'].execute(
+          { program: 'class Js extends JsProgram { async run() { return null; } }' },
           { sessionID: 'ses-ablation-gate', agent: 'engineer' },
         )
         assert.match(result, /消融|ablated/i)

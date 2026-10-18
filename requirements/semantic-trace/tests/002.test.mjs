@@ -17,7 +17,7 @@ const partDescriptor = {
   turn: 0,
   partIndex: 0,
   kind: 'tool_call',
-  toolName: 'read',
+  toolName: 'todowrite-for-engineer',
   textRef: 'blob-1',
   textDigest: 'digest-1',
   providerRun: 'provider-run-1',
@@ -29,7 +29,7 @@ test('WHAT[semantic-trace-002] copied semantic evidence excludes transport metad
   const projection = unwrap(trace.appendPart(trace.emptyProjection(), partDescriptor))
   const evidence = trace.orderedSemanticParts(projection)[0]
   assert.equal(evidence.providerRun, 'provider-run-1')
-  assert.equal(evidence.toolName, 'read')
+  assert.equal(evidence.toolName, 'todowrite-for-engineer')
   for (const forbidden of ['usage', 'cost', 'timestamp', 'elapsed', 'directory', 'finishReason', 'runtimeId', 'tokens', 'uiDelta']) {
     assert.equal(Object.hasOwn(evidence, forbidden), false, `semantic evidence must not carry ${forbidden}`)
   }
@@ -138,9 +138,9 @@ test('WHAT[semantic-trace-002] capture mapper copies text and reasoning semantic
   assert.deepEqual(trace.mapPart(trace.reasoningPart('considering')), { kind: 'reasoning', text: 'considering' })
 })
 test('WHAT[semantic-trace-002] capture mapper drops transport call identities', () => {
-  assert.deepEqual(trace.mapPart(trace.toolCallPart('call-1', 'read', '{}')), {
+  assert.deepEqual(trace.mapPart(trace.toolCallPart('call-1', 'todowrite-for-engineer', '{}')), {
     kind: 'tool-call',
-    name: 'read',
+    name: 'todowrite-for-engineer',
     args: '{}',
   })
   assert.deepEqual(trace.mapPart(trace.toolResultPart('call-1', 'output')), {

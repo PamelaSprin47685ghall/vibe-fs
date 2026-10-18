@@ -1,1 +1,0 @@
-rm: path is required

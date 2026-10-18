@@ -879,7 +879,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(here, '../../..')
 const runnerPath = path.join(here, '../../host-boundary/tests/support/run-readonly-delegation-schema-canary.mjs')
 
-const builtins = ['read', 'glob', 'grep', 'edit', 'write']
+const expectedEngineerWireTools = ['todowrite-for-engineer', 'skill', 'todowrite', 'assume', 'defer', 'publish', 'bash-honeypot']
 
 const PARTICIPATING_TOOLS = new Set([
   'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
@@ -928,10 +928,10 @@ integrationTest(
 
     const summary = JSON.parse(line.slice(marker.length))
 
-    for (const tool of builtins) {
+    for (const tool of expectedEngineerWireTools) {
       assert.ok(
         summary.visibleTools.includes(tool),
-        `built-in ${tool} must be visible on the provider wire; observed ${summary.visibleTools.join(', ')}`,
+        `expected engineer wire tool ${tool} must be visible on the provider wire; observed ${summary.visibleTools.join(', ')}`,
       )
     }
 
@@ -1067,14 +1067,16 @@ integrationTest(
       'todowrite-for-manager must not require self_note',
     )
     // Decoration extends the schema; it never replaces the tool's own contract.
-    assert.ok(summary.tools.read.required.includes('filePath'), 'read must still require filePath')
-    assert.ok(summary.tools.write.required.includes('content'), 'write must still require content')
-    assert.ok(summary.tools.edit.required.includes('oldString'), 'edit must still require oldString')
-    assert.ok(summary.tools.grep.required.includes('pattern'), 'grep must still require pattern')
+    assert.ok(summary.tools['todowrite-for-engineer'].required.includes('program'), 'todowrite-for-engineer must still require program')
+    assert.ok(summary.tools.assume.required.includes('assumption'), 'assume must still require assumption')
+    assert.ok(summary.tools.defer.required.includes('new_work'), 'defer must still require new_work')
     // The decorated call really executed with the model's own arguments, and the
     // provider-wire history kept them.
     assert.equal(summary.followUpObserved, true, 'the built-in tool call must settle into a follow-up request')
-    assert.equal(summary.historicalArguments?.filePath, 'canary-sample.txt')
+    assert.equal(
+      summary.historicalArguments?.program,
+      "class Js extends JsProgram { async run() { return await this.cat('canary-sample.txt'); } }",
+    )
     assert.equal(summary.historicalArguments?.estimated_readonly_rounds, 2)
     assert.equal(summary.historicalArguments?.self_note, 'checking the canary fixture')
     assert.equal(

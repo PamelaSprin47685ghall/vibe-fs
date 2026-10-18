@@ -26,55 +26,9 @@ test('WHAT[repository-programming-007] an acquired view remains unchanged after 
   }
 })
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
-const { default: test } = await import("node:test");
-const { read, write, edit, toolName } = await import("../../../dist/OpenCode/Tools/FileToolsSurface.js");
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-filetools-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-test('WHAT[repository-programming-007] FILETOOLS_read_returns_content_for_existing_file', async () => {
-  const { dir, cleanup } = sandbox()
-  const path = join(dir, 'note.txt')
-  writeFileSync(path, 'hello world')
-
-  const output = await read(dir, JSON.stringify({ filePath: path }))
-  assert.equal(output.result, 'hello world')
-  assert.equal(output.truncated, false)
-  assert.equal(toolName('read'), 'read')
-  cleanup()
-})
-test('WHAT[repository-programming-007] FILETOOLS_read_reports_missing_file', async () => {
-  const { dir, cleanup } = sandbox()
-  const path = join(dir, 'nope.txt')
-  const output = await read(dir, JSON.stringify({ filePath: path }))
-  assert.equal(output.result, `File not found: ${path}`)
-  cleanup()
-})
-test('WHAT[repository-programming-007] FILETOOLS_read_accepts_a_bare_string_payload', async () => {
-  const { dir, cleanup } = sandbox()
-  const path = join(dir, 'bare.txt')
-  writeFileSync(path, 'bare payload')
-  const output = await read(dir, JSON.stringify(path))
-  assert.equal(output.result, 'bare payload')
-  cleanup()
-})
-test('WHAT[repository-programming-007] FILETOOLS_read_falls_back_to_raw_payload_when_not_json', async () => {
-  const { dir, cleanup } = sandbox()
-  const path = join(dir, 'raw.txt')
-  writeFileSync(path, 'raw content')
-  const output = await read(dir, path)
-  assert.equal(output.result, 'raw content')
-  cleanup()
-})
-}
-
+// Superseded note: `FileToolsSurface` (`read`/`write`/`edit`) was retired with the direct
+// filesystem tools; `cat`/`where`/`write`/`ls`/`mv`/`rm` on the js programming surface are
+// the contract now.
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");

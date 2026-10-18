@@ -117,7 +117,7 @@ try {
     model: { providerID: 'cursor', modelID: 'default' },
     parts: [{
       type: 'text',
-      text: 'Call the read tool exactly once on AGENTS.md with limit 5. After it returns, state SUCCESS if you received file content, otherwise state INTERRUPT. Do not call read again.',
+      text: 'Call the todowrite-for-engineer tool exactly once to read AGENTS.md (using await this.cat("AGENTS.md")). After it returns, state SUCCESS if you received file content, otherwise state INTERRUPT. Do not call todowrite-for-engineer again.',
     }],
   });
 
@@ -130,11 +130,11 @@ try {
   }
 
   assert.ok(summary, 'Cursor Pair Hint canary produced no session state');
-  assert.equal(summary.tools.length, 1, `read must execute exactly once; got ${summary.tools.length}`);
-  assert.equal(summary.tools[0].state?.status, 'completed', 'read must remain completed');
+  assert.equal(summary.tools.length, 1, `todowrite-for-engineer must execute exactly once; got ${summary.tools.length}`);
+  assert.equal(summary.tools[0].state?.status, 'completed', 'todowrite-for-engineer must remain completed');
   assert.match(summary.text, /SUCCESS/i, `model must consume the completed result: ${summary.text}`);
   assert.equal(
-    summary.reasoning.some((text) => /previous .*interrupt|was interrupted|returned .*interrupt|read .* interrupted/i.test(text)),
+    summary.reasoning.some((text) => /previous .*interrupt|was interrupted|returned .*interrupt|(?:read|todowrite-for-engineer) .* interrupted/i.test(text)),
     false,
     `model must not reinterpret the completed result as interrupt: ${JSON.stringify(summary.reasoning)}`,
   );

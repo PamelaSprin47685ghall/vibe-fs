@@ -8,37 +8,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
 
-/// Coexistence seam between builtin filesystem fallbacks and generated js-*.
-/// GrandRewrite keeps read/edit/write/glob/grep as normal primitive fallback:
-/// their Host descriptions are left untouched. Preference for intent-level
-/// programs is taught inside the generated js-* contract and its Ultra Example.
-module BuiltinToolDescriptionHook =
-
-    [<Emit("$0===undefined||$0===null")>]
-    let private isUndefined (value: obj) : bool = jsNative
-
-    /// The builtin filesystem tools the hook may annotate (凡存在者).
-    let BuiltinFilesystemTools =
-        set [ "read"; "edit"; "write"; "glob"; "grep"; "patch" ]
-
-    let annotate (builtinName: string) (description: string) (jsRoleToolName: string) : string =
-        ignore builtinName
-        ignore jsRoleToolName
-        description
-
-    /// JS-003: the hook must not recommend a tool the provider cannot see.
-    /// `visibleToolNames` is the current Attempt's tool set; a recommendation
-    /// outside it is a lying hook and fails closed.
-    let validateRecommendation (jsRoleToolName: string) (visibleToolNames: Set<string>) : Result<unit, string> =
-        if Set.contains jsRoleToolName visibleToolNames then
-            Ok()
-        else
-            Error(
-                ProviderProse.render
-                    (ProviderLanguageBinding.readGlobalPreference ())
-                    JsCanonicalDescription.Path.HookNotVisible
-                    (Map [ "tool", jsRoleToolName ])
-            )
 
 /// PROMPT-019: load already-localized js-program prose. Domain assembles;
 /// this module binds language.

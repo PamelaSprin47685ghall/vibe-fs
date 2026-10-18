@@ -319,7 +319,7 @@ test('WHAT[host-boundary-026] tool registration compiles without signal routing 
   for (const id of [
     'interaction-attention-fold',
     'interaction-concern-fold',
-    'opencode-tools-filemutationtools',
+    'opencode-tools-executortoolsurface',
     'opencode-tools-bookkeepertool',
     'opencode-tools-fetchtool',
   ]) {

@@ -578,8 +578,9 @@ export function assertNativeReadProbeTimeline(scenario) {
     const part = event?.properties?.part;
     return event?.type === 'message.part.updated'
       && part?.type === 'tool'
-      && part?.tool === 'read'
-      && part?.state?.input?.filePath === 'read_probe.txt';
+      && part?.tool === 'todowrite-for-engineer'
+      && typeof part?.state?.input?.program === 'string'
+      && part.state.input.program.includes('read_probe.txt');
   });
   assert.ok(probeUpdates.length >= 1, 'long-stroke read probe: message.part.updated missing');
 
@@ -615,7 +616,7 @@ export function assertNativeReadProbeTimeline(scenario) {
     .filter((event) => {
       const part = event?.properties?.part;
       return event?.type === 'message.part.updated'
-        && ['read', 'glob', 'grep'].includes(part?.tool)
+        && ['todowrite-for-engineer', 'todowrite-for-predictor', 'todowrite-for-manager'].includes(part?.tool)
         && ['completed', 'error'].includes(part?.state?.status);
     })
     .map((event) => {
@@ -1106,7 +1107,7 @@ const requestModel = (request) => {
 
 const PARTICIPATING_TOOLS = new Set([
   'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
-  'edit', 'write', 'mv', 'rm', 'fetch', 'run',
+  'edit', 'write', 'mv', 'rm', 'fetch',
 ]);
 
 const toolNameOfCall = (call) => call?.function?.name ?? call?.name ?? '';
@@ -1218,12 +1219,12 @@ export async function bindDelegationReplicas(scenario, ctx) {
  // Assert replica provider request carries only allowed readonly tools
       if (Array.isArray(request?.tools) && request.tools.length > 0) {
         const toolNames = request.tools.map((t) => t?.function?.name ?? t?.name).filter(Boolean);
-        const disallowed = ['write', 'edit', 'run', 'fork', 'join', 'mv', 'rm', 'bash', 'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager'];
+        const disallowed = ['read', 'glob', 'grep', 'write', 'edit', 'run', 'fork', 'join', 'mv', 'rm', 'bash', 'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager'];
         for (const disallowedTool of disallowed) {
           assert.ok(!toolNames.includes(disallowedTool), `replica ${id} must never carry ${disallowedTool}`);
         }
-        const allowedSet = new Set(['read', 'glob', 'grep', 'todowrite-for-predictor']);
-        assert.ok(toolNames.every((t) => allowedSet.has(t)), `replica ${id} tools must be subset of {read, glob, grep, todowrite-for-predictor}, got: ${toolNames.join(', ')}`);
+        const allowedSet = new Set(['todowrite-for-predictor']);
+        assert.ok(toolNames.every((t) => allowedSet.has(t)), `replica ${id} tools must be subset of {todowrite-for-predictor}, got: ${toolNames.join(', ')}`);
       }
     }
   }
@@ -1404,7 +1405,7 @@ const toolFunctionShape = (tool) => {
  * world this scenario drives:
  *
  *   1. tool enumeration — on at least one real provider request, only
- *      participating tools (the 12 tools in PARTICIPATING_TOOLS) expose the
+ *      participating tools (the 11 tools in PARTICIPATING_TOOLS) expose the
  *      required `estimated_readonly_rounds` and keep `self_note` out of
  *      `required`; non-participating tools remain untouched with zero
  *      protocol increment. The world declares a stdio MCP fixture by name

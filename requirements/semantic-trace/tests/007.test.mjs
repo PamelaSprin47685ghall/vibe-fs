@@ -7,7 +7,7 @@ test('WHAT[semantic-trace-007] durable materialization survives reopening with e
   await withReopenableJournal(async (handle, reopen) => {
     const messages = [
       { role: 'user', parts: [trace.semanticText('原话\r\n"task" <tag> /path')] },
-      { role: 'assistant', parts: [trace.semanticToolCall('read', '{"path":"a"}'), trace.semanticToolResult('line 1\nline 2\n')] },
+      { role: 'assistant', parts: [trace.semanticToolCall('todowrite-for-engineer', '{"program":"await this.cat(\'a\')"}'), trace.semanticToolResult('line 1\nline 2\n')] },
     ]
     assert.equal((await trace.captureProjection(handle, 'raw-history', { messages })).ok, true)
     const before = await trace.currentProjection(handle, 'raw-history')
@@ -83,7 +83,7 @@ const trace = await import("../../../dist/Context/Trace/SemanticTraceSurface.js"
 
 test('WHAT[semantic-trace-007] canonical flatten preserves semantic part and role order', () => {
   const flat = trace.flatten([
-    { role: 'user', parts: [trace.semanticText('task'), trace.semanticToolCall('read', '{}')] },
+    { role: 'user', parts: [trace.semanticText('task'), trace.semanticToolCall('todowrite-for-engineer', '{}')] },
     { role: 'assistant', parts: [trace.semanticReasoning('considered'), trace.semanticText('done')] },
   ])
   assert.deepEqual(flat.map((entry) => entry.role), ['user', 'user', 'assistant', 'assistant'])

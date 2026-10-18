@@ -18,16 +18,6 @@ module JsToolHostSurface =
     [<Emit("$0.execute($1, $2)")>]
     let private invokeRegistered (registered: obj) (args: obj) (context: obj) : Task<obj> = jsNative
 
-    let builtinTools () : string array =
-        BuiltinToolDescriptionHook.BuiltinFilesystemTools |> Set.toArray
-
-    let annotate (builtinName: string) (description: string) (jsRoleToolName: string) : string =
-        BuiltinToolDescriptionHook.annotate builtinName description jsRoleToolName
-
-    let validateRecommendation (jsRoleToolName: string) (visibleToolNames: string array) : obj =
-        match BuiltinToolDescriptionHook.validateRecommendation jsRoleToolName (Set.ofArray visibleToolNames) with
-        | Ok() -> box {| ok = true |}
-        | Error message -> box {| ok = false; error = message |}
 
     let createRegistered
         (toolModule: obj)

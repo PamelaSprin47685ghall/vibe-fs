@@ -20,7 +20,7 @@ const collect = async receipt => {
 export default {
   id: 'wanxiangshu-grounding-owner-provider-canary',
   async server() {
-    const opened = await grounding.createJournal(path.join(workspace, '.git'))
+    const opened = await grounding.createJournal(path.join(workspace, '.Herdchestra'))
     assert.equal(opened.ok, true, opened.error)
     return {
       async 'tool.execute.after'(input, output) {

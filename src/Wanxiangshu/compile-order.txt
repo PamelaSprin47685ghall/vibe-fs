@@ -824,8 +824,6 @@ OpenCode/Tools/StaticTools.fsi
 OpenCode/Tools/StaticTools.fs
 OpenCode/Tools/NodeFs.fsi
 OpenCode/Tools/NodeFs.fs
-OpenCode/Tools/FileTools.fsi
-OpenCode/Tools/FileTools.fs
 OpenCode/Codec/OpencodeTypes.fsi
 OpenCode/Codec/OpencodeTypes.fs
 OpenCode/Host/ModelCapacity/Model.fsi
@@ -1215,8 +1213,6 @@ OpenCode/Tools/ChronicleTool.fsi
 OpenCode/Tools/ChronicleTool.fs
 Enforcer/BlogSurface.fsi
 Enforcer/BlogSurface.fs
-OpenCode/Tools/FileMutationTools.fsi
-OpenCode/Tools/FileMutationTools.fs
 OpenCode/Tools/BashHoneypotTool.fsi
 OpenCode/Tools/BashHoneypotTool.fs
 OpenCode/Tools/AssumeTool.fsi
@@ -1378,10 +1374,6 @@ Repository/Programming/Js/WorkflowSurface.fsi
 Repository/Programming/Js/WorkflowSurface.fs
 Repository/Programming/Js/OpenCode/ToolHostSurface.fsi
 Repository/Programming/Js/OpenCode/ToolHostSurface.fs
-OpenCode/Tools/FileToolsSurface.fsi
-OpenCode/Tools/FileToolsSurface.fs
-OpenCode/Tools/FileMutationSurface.fsi
-OpenCode/Tools/FileMutationSurface.fs
 OpenCode/Host/SessionRecoveryHostSurface.fsi
 OpenCode/Host/SessionRecoveryHostSurface.fs
 Execution/Session/ChatExecution/StatusSurface.fsi

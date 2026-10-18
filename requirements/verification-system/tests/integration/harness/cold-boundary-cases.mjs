@@ -23,7 +23,7 @@ const hostSystem = (model) => ({
 const user = (text) => ({ role: 'user', content: text });
 const assistant = (text) => ({ role: 'assistant', content: text });
 
-const body = (model, messages, tools = ['write']) => ({
+const body = (model, messages, tools = ['todowrite-for-engineer']) => ({
   model,
   tools: tools.map((name) => ({ type: 'function', function: { name } })),
   messages,
@@ -45,7 +45,7 @@ const EPOCH_REBASED = body('test-model', [SYSTEM, user('[companion memory]'), us
 const REQUEST_KIND_SWITCHED = body(
   'test-model',
   [SYSTEM, user('Round 1'), assistant('r1'), user('Compile')],
-  ['read', 'write', 'return'],
+  ['todowrite-for-engineer', 'return'],
 );
 
 // MANAGER-LOOP: the retired iteration ends with narrative and tool traffic, its
@@ -181,7 +181,7 @@ export const coldBoundaryCases = [
       assertEq(decide(FIRST, EPOCH_REBASED).broken, 'undeclared', 'rewritten prefix');
       assertEq(decide(FIRST, SIDE_SWITCHED).broken, 'undeclared', 'model change alone');
       assertEq(
-        decide(FIRST, body('test-model', [SYSTEM, user('Round 1')], ['write', 'read'])).broken,
+        decide(FIRST, body('test-model', [SYSTEM, user('Round 1')], ['todowrite-for-engineer', 'fetch'])).broken,
         'undeclared',
         'tool set change',
       );
@@ -241,7 +241,7 @@ export const coldBoundaryCases = [
   {
     name: 'FALLBACK-004 a side switch may not change tools either',
     fn: () => {
-      const retooled = body('test-model-b', [SYSTEM, user('Round 1')], ['write', 'read']);
+      const retooled = body('test-model-b', [SYSTEM, user('Round 1')], ['todowrite-for-engineer', 'fetch']);
       assertEq(decide(FIRST, retooled, at('fallback-side')).broken, 'fallback-side-rewrote-messages');
     },
   },
@@ -267,7 +267,7 @@ export const coldBoundaryCases = [
       // prefix. The system prompt is deliberately exempt: Host 1.18.9 injects the
       // model name into it (system.ts:67), so a fallback side switch — the usual
       // companion of a recovery attempt — changes the system bytes by construction.
-      const retooled = body('test-model-b', [SYSTEM, user('[companion memory]'), user('Round 2')], ['write', 'read']);
+      const retooled = body('test-model-b', [SYSTEM, user('[companion memory]'), user('Round 2')], ['todowrite-for-engineer', 'fetch']);
       assertEq(
         decide(FIRST, retooled, at('prefix-probe')).broken,
         'prefix-probe-rewrote-fixed',
@@ -308,8 +308,7 @@ export const coldBoundaryCases = [
     name: 'PROMPT-012 a request-kind switch may not rewrite the message prefix',
     fn: () => {
       const rewritten = body('test-model', [SYSTEM, user('DIFFERENT'), user('Compile')], [
-        'read',
-        'write',
+        'todowrite-for-engineer',
         'return',
       ]);
       assertEq(
@@ -418,7 +417,7 @@ export const coldBoundaryCases = [
         'manager-loop-rewrote-fixed',
       );
 
-      const retooled = body('test-model', MANAGER_NEXT.messages, ['write', 'read']);
+      const retooled = body('test-model', MANAGER_NEXT.messages, ['todowrite-for-engineer', 'fetch']);
       assertEq(
         decide(MANAGER_RETIRED, retooled, at('manager-loop')).broken,
         'manager-loop-rewrote-fixed',

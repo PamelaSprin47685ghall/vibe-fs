@@ -12,13 +12,14 @@ test('WHAT[office-capability-006] synthetic examples exercise the sample trace c
 
 test('WHAT[office-capability-006] synthetic Manager checker rejects personal mutation even when delegation is also present', () => {
   const example = CASES.find((item) => item.id === 'manager-mixed-mission')
-  for (const name of ['read', 'edit', 'todowrite-for-devops', 'fission']) {
+  for (const name of ['todowrite-for-engineer', 'todowrite-for-devops', 'fission']) {
     const invalid = {
       ...example.pass_example,
       toolCalls: [...example.pass_example.toolCalls, { name, args: { filePath: 'src/bug.ts' } }],
     }
     assert.equal(evaluateCase(example, invalid).ok, false, name)
   }
+  assert.equal(evaluateCase(example, { ...example.pass_example, mutations: true }).ok, false, 'mutations=true')
 })
 
 test('WHAT[office-capability-006] synthetic Manager checker rejects retired coder delegation', () => {
@@ -36,9 +37,9 @@ test('WHAT[office-capability-006] synthetic Manager checker rejects retired code
 test('WHAT[office-capability-006] synthetic repair checker requires repair followed by revalidation', () => {
   const example = CASES.find((item) => item.id === 'devops-inherent-repair')
   for (const toolCalls of [
-    [{ name: 'todowrite-for-devops' }],
-    [{ name: 'todowrite-for-devops' }, { name: 'edit' }],
-    [{ name: 'todowrite-for-devops' }, { name: 'edit' }, { name: 'todowrite-for-devops' }, { name: 'fork' }],
+    [{ name: 'todowrite-for-devops', args: { program: 'js.run' } }],
+    [{ name: 'todowrite-for-devops', args: { program: 'js.run' } }, { name: 'todowrite-for-devops', args: { program: "this.write('src/bug.ts', 'fixed')" } }],
+    [{ name: 'todowrite-for-devops', args: { program: 'js.run' } }, { name: 'todowrite-for-devops', args: { program: "this.write('src/bug.ts', 'fixed')" } }, { name: 'todowrite-for-devops', args: { program: 'js.run' } }, { name: 'fork' }],
   ]) {
     assert.equal(evaluateCase(example, { role: 'devops', toolCalls }).ok, false)
   }

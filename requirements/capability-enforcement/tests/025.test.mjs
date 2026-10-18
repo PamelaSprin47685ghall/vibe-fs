@@ -46,10 +46,14 @@ test('WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_
 })
 
 test('WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny', () => {
+  // Direct read/glob/grep host tools are retired from knownToolNames and covered
+  // by the wildcard "*": "deny" rule; rolePredicate also fails closed on them.
   const managerPerms = rolePermissionRules('manager')
-  assert.equal(managerPerms.read, 'deny', 'Native read must be projected as deny for Manager')
-  assert.equal(managerPerms.glob, 'deny', 'Native glob must be projected as deny for Manager')
-  assert.equal(managerPerms.grep, 'deny', 'Native grep must be projected as deny for Manager')
+  assert.equal(managerPerms['*'], 'deny', 'Manager wildcard default must deny retired native tools')
+  for (const retired of ['read', 'glob', 'grep']) {
+    assert.equal(retired in managerPerms, false, `Retired ${retired} must not appear as an explicit Manager permission key`)
+    assert.equal(rolePredicate(retired, 'manager'), false, `Role predicate must deny retired ${retired} for Manager`)
+  }
 })
 
 test('WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role', () => {

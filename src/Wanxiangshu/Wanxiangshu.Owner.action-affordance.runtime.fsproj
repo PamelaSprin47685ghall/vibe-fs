@@ -20,11 +20,7 @@
 
     <Compile Include="OpenCode/Tools/ToolContext.fsi"/>
     <Compile Include="OpenCode/Tools/ToolContext.fs"/>
-    <Compile Include="OpenCode/Tools/FileTools.fsi"/>
-    <Compile Include="OpenCode/Tools/FileTools.fs"/>
     <Compile Include="OpenCode/Tools/ToolSurface.fsi"/>
     <Compile Include="OpenCode/Tools/ToolSurface.fs"/>
-    <Compile Include="OpenCode/Tools/FileToolsSurface.fsi"/>
-    <Compile Include="OpenCode/Tools/FileToolsSurface.fs"/>
   </ItemGroup>
 </Project>

@@ -22,7 +22,7 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 ## rm/mv 编程面（WHAT[repository-programming-040]）
 
-`rm`/`mv` 由 Remove/Move capability 投影，与 `write` 同属 as-is 逐笔落盘路径：rm 删文件或空目录，mv 按 POSIX 语义移动或重命名并支持覆盖。越界报 `PATH_DENIED` 且源存活；成功渲染报 `removed = [...]` 与 `moved = ["from -> to"]`。每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影。
+独立宿主 `mv`/`rm` `ToolSpec`（及 `FileTools`/`FileMutationTools`）已退役，`rm`/`mv` 仅由 Remove/Move capability 在 js 编程面上投影，与 `write` 同属 as-is 逐笔落盘路径：rm 删文件或空目录，mv 按 POSIX 语义移动或重命名并支持覆盖。越界报 `PATH_DENIED` 且源存活；成功渲染报 `removed = [...]` 与 `moved = ["from -> to"]`。每次 rm/mv 各记一笔 durable 条目，Prepared/Committed 成对排空 pending 投影。
 
 ## js.run 工程执行循环（WHAT[repository-programming-050]、[051]、[052]）
 

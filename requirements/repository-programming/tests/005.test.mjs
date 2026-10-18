@@ -95,11 +95,14 @@ test('WHAT[repository-programming-005] JS_description_retains_no_unsubstituted_p
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
-const { mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
+const { mkdtempSync, rmSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
-const { annotate, validateRecommendation, builtinTools, createRegistered, name, description, execute } = await import("../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js");
+const { createRegistered, name, description } = await import("../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js");
 
+// Superseded note: BuiltinToolDescriptionHook (`builtinTools`, `annotate`, `validateRecommendation`)
+// was retired with the direct Host filesystem tools (`read`/`write`/`edit`/`glob`/`grep`/`patch`);
+// the js programming surface (`cat`/`where`/`write`/`ls`/`mv`/`rm`) is the sole contract now.
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-host-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
@@ -126,22 +129,6 @@ const toolModule = () => {
   return { tool }
 }
 
-test('WHAT[repository-programming-005] JS003_builtin_fallback_descriptions_are_left_untouched', () => {
-  assert.deepEqual([...builtinTools()].sort(), ['edit', 'glob', 'grep', 'patch', 'read', 'write'])
-  for (const builtinName of builtinTools()) {
-    const original = `${builtinName} primitive fallback`
-    const visible = annotate(builtinName, original, 'todowrite-for-coder')
-    assert.equal(visible, original)
-    assert.doesNotMatch(visible, /DEPRECATED|js-coder/i)
-  }
-  assert.equal(annotate('join', 'Join a session', 'todowrite-for-coder'), 'Join a session')
-})
-test('WHAT[repository-programming-005] JS003_hook_must_not_recommend_invisible_tools', () => {
-  assert.equal(validateRecommendation('todowrite-for-coder', ['todowrite-for-coder', 'read']).ok, true)
-  const denied = validateRecommendation('todowrite-for-coder', ['read'])
-  assert.equal(denied.ok, false)
-  assert.equal(denied.error.includes('not provider-visible') || denied.error.includes('不可见'), true)
-})
 test('WHAT[repository-programming-005] JS073_spec_carries_generated_name_and_honest_description', () => {
   const { dir, cleanup } = sandbox()
   try {

@@ -16,13 +16,16 @@ module StaticTools =
         | ToolPermission.Join -> [ "join" ]
         | ToolPermission.Horizon -> [ "horizon" ]
         | ToolPermission.Fission -> [ "fission" ]
-        | ToolPermission.Read -> [ "read" ]
-        | ToolPermission.Write -> [ "write" ]
-        | ToolPermission.Edit -> [ "edit" ]
-        | ToolPermission.Glob -> [ "glob" ]
-        | ToolPermission.Grep -> [ "grep" ]
-        | ToolPermission.Move -> [ "mv" ]
-        | ToolPermission.Remove -> [ "rm" ]
+        // The direct filesystem tools are retired: Read/Write/Edit/Glob/Grep/
+        // Move/Remove stay as permissions (they gate the programming surface's
+        // cat/write/ls/mv/rm members) but project no host tool name.
+        | ToolPermission.Read -> []
+        | ToolPermission.Write -> []
+        | ToolPermission.Edit -> []
+        | ToolPermission.Glob -> []
+        | ToolPermission.Grep -> []
+        | ToolPermission.Move -> []
+        | ToolPermission.Remove -> []
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
         // Exec grants the programming surface's `js.run` loop; the Host-native
         // `run` tool is retired (repository-programming [050]-[052] supersede it).
@@ -149,18 +152,11 @@ module StaticTools =
           "join"
           "horizon"
           "fission"
-          "read"
-          "write"
-          "edit"
-          "glob"
-          "grep"
           "skill"
           "todowrite"
           "assume"
           "defer"
           "publish"
-          "mv"
-          "rm"
           "bash-honeypot"
           "review"
           "chronicle"
@@ -220,7 +216,7 @@ module StaticTools =
         | true, ("ask" | "devops" | "review" | "deliver" | "todowrite-for-plan"), Role.Plan -> "allow"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
-        | true, ("read" | "grep" | "glob"), Role.Manager -> "deny"
+
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "resume", Role.Orchestrator -> "deny"
         | true, "commission", Role.Orchestrator -> "allow"

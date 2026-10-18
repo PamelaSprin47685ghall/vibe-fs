@@ -1,66 +1,8 @@
 import test from 'node:test'
 
-{
-const { default: assert } = await import("node:assert/strict");
-const { mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
-const { tmpdir } = await import("node:os");
-const { join } = await import("node:path");
-const { default: test } = await import("node:test");
-const { read, write, edit, toolName } = await import("../../../dist/OpenCode/Tools/FileToolsSurface.js");
-
-const sandbox = () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-filetools-'))
-  return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
-}
-
-test('WHAT[repository-programming-010] FILETOOLS_write_creates_file_and_reports_size', async () => {
-  const { dir, cleanup } = sandbox()
-  const path = join(dir, 'out.txt')
-  const output = await write(dir, JSON.stringify({ filePath: path, content: 'written by test' }))
-  assert.equal(readFileSync(path, 'utf8'), 'written by test')
-  assert.match(output.result, /^Wrote .+ \(\d+ bytes\)$/)
-  assert.equal(output.truncated, false)
-  cleanup()
-})
-test('WHAT[repository-programming-010] FILETOOLS_write_refuses_unparseable_payload', async () => {
-  const { dir, cleanup } = sandbox()
-  const output = await write(dir, 'not json at all')
-  assert.match(output.result, /^Failed to parse JSON payload for write tool: /)
-  cleanup()
-})
-test('WHAT[repository-programming-010] FILETOOLS_edit_replaces_exact_match', async () => {
-  const { dir, cleanup } = sandbox()
-  const path = join(dir, 'edit.txt')
-  writeFileSync(path, 'alpha beta gamma')
-  const output = await edit(dir, JSON.stringify({ filePath: path, oldString: 'beta', newString: 'BETA' }))
-  assert.equal(output.result, `Edited ${path}`)
-  assert.equal(readFileSync(path, 'utf8'), 'alpha BETA gamma')
-  cleanup()
-})
-test('WHAT[repository-programming-010] FILETOOLS_edit_reports_missing_file', async () => {
-  const { dir, cleanup } = sandbox()
-  const path = join(dir, 'missing.txt')
-  const output = await edit(dir, JSON.stringify({ filePath: path, oldString: 'x', newString: 'y' }))
-  assert.equal(output.result, `File not found: ${path}`)
-  cleanup()
-})
-test('WHAT[repository-programming-010] FILETOOLS_edit_reports_absent_old_string', async () => {
-  const { dir, cleanup } = sandbox()
-  const path = join(dir, 'no-match.txt')
-  writeFileSync(path, 'nothing to replace')
-  const output = await edit(dir, JSON.stringify({ filePath: path, oldString: 'zzz', newString: 'y' }))
-  assert.equal(output.result, `oldString not found in file ${path}`)
-  assert.equal(readFileSync(path, 'utf8'), 'nothing to replace')
-  cleanup()
-})
-test('WHAT[repository-programming-010] FILETOOLS_edit_refuses_unparseable_payload', async () => {
-  const { dir, cleanup } = sandbox()
-  const output = await edit(dir, '{broken')
-  assert.match(output.result, /^Invalid edit payload: /)
-  cleanup()
-})
-}
-
+// Superseded note: `FileToolsSurface` (`read`/`write`/`edit`) was retired with the direct
+// filesystem tools; `cat`/`where`/`write`/`ls`/`mv`/`rm` on the js programming surface are
+// the contract now.
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");

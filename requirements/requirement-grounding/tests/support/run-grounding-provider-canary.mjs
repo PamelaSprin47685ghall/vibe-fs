@@ -141,6 +141,7 @@ try {
     extraEnv: {
       WXS_GROUNDING_CANARY_COLLECTOR: `${provider.url}/collector`, WXS_GROUNDING_CANARY_WORKSPACE: workspace,
       WXS_GROUNDING_CANARY_SOURCE: sourcePath, WXS_GROUNDING_CANARY_DIST: path.join(root, 'dist'),
+        WANXIANGSHU_PROVIDER_LANGUAGE: 'zh-CN',
     },
   })
   assert.equal((await api('/global/health')).version, version)

@@ -73,13 +73,8 @@ const allowList = (config, name) => {
     'bash-honeypot',
     'assume',
     'todowrite',
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
+    'defer',
+    'publish',
     'fork',
     'resume',
     'commission',
@@ -91,27 +86,25 @@ const allowList = (config, name) => {
     'fetch',
     'deliver',
     'skill',
+    'todowrite-for-manager',
+    'todowrite-for-orchestrator',
+    'todowrite-for-engineer',
+    'todowrite-for-devops',
   ]
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 const HOST_UTILITY_ALLOW = ['skill']
-const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite']
+const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite', 'defer', 'publish']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review'],
-  Orchestrator: ['commission', 'join', 'horizon'],
-  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
+  Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
+  Engineer: ['bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
     'join',
     'horizon',
+    'todowrite-for-devops',
   ],
   Blogger: ['chronicle'],
 }
@@ -262,10 +255,10 @@ const { withPlugin } = await import("../../verification-system/tests/support/plu
 
 const TOOL_NAMES = [
   'fork', 'resume', 'commission', 'join', 'horizon', 'fission',
-  'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
   'bash-honeypot', 'assume', 'todowrite',
   'defer',  'publish',
   'review', 'chronicle', 'fetch', 'deliver',
+  'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator',
 ]
 
 const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
@@ -273,11 +266,11 @@ const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
 const COGNITIVE_TOOLS = ['defer',  'publish']
 
 const ALLOWED = {
-  orchestrator: ['commission', 'join', 'horizon', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
+  orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'todowrite-for-manager', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
+  engineer: ['fission', 'fetch', 'bash-honeypot', 'todowrite-for-engineer', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
   devops: [
-    'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
+    'join', 'horizon', 'todowrite-for-devops',
     'assume', 'todowrite', ...COGNITIVE_TOOLS,
   ],
   blogger: ['chronicle'],

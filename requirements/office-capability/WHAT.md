@@ -30,7 +30,7 @@ Engineer 不是真实命令执行器；DevOps 不代作架构或产品决定、�
 
 ## [007] Manager 的直接操作边界
 
-Manager 不修改工作树、不执行命令、不使用 Fission；原生 read/grep/glob 始终拒绝。评审接纳前可通过专用只读工具 `todowrite-for-manager` 直接取证，接纳后关闭；该工具不提供副本语义，当前事实门禁见 capability-enforcement-025。
+Manager 不修改工作树、不执行命令、不使用 Fission；直接文件工具（`read`/`grep`/`glob` 等）已退役且始终拒绝。评审接纳前可通过专用只读工具 `todowrite-for-manager` 直接取证，接纳后关闭；该工具不提供副本语义，当前事实门禁见 capability-enforcement-025。
 
 Manager 只能新建 Engineer，续做既有 Engineer 或调用固定 DevOps；续做不得改变已有身份、绑定、控制权或创建替代 DevOps，具体语义见 delegation-003/024。
 

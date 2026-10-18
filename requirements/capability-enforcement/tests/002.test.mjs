@@ -80,13 +80,6 @@ const allowList = (config, name) => {
     'bash-honeypot',
     'assume',
     'todowrite',
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
     'fork',
     'resume',
     'commission',
@@ -123,15 +116,8 @@ const ROLE_ALLOW = {
     'todowrite-for-manager',
   ],
   Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
-  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
+  Engineer: ['bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
     'join',
     'horizon',
     'todowrite-for-devops',
@@ -155,6 +141,9 @@ test('WHAT[capability-enforcement-002] AGENT_006_role_tool_matrix_reaches_the_ho
   }
 })
 test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_the_host_schema_matrix', () => {
+  // Edit and Grep remain office permissions but project no separate JS capability
+  // (string replacement uses Read + Write; content search uses Read + Glob).
+  const DIRECT_PERMISSION_ONLY = new Set(['Edit', 'Grep'])
   const permissionOf = (toolName) =>
     ({
       fork: 'Fork',
@@ -163,13 +152,6 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
       join: 'Join',
       horizon: 'Horizon',
       fission: 'Fission',
-      read: 'Read',
-      write: 'Write',
-      edit: 'Edit',
-      glob: 'Glob',
-      grep: 'Grep',
-      mv: 'Move',
-      rm: 'Remove',
       'bash-honeypot': 'BashHoneypot',
       review: 'ReviewAssessment',
       chronicle: 'Chronicle',
@@ -191,7 +173,7 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
   }
 
   for (const role of ROLES) {
-    const fromRoles = permissions(role.toLowerCase())
+    const fromRoles = permissions(role.toLowerCase()).filter((p) => (role === 'Manager' ? true : !DIRECT_PERMISSION_ONLY.has(p)))
     const config = buildConfig()
     configureManagedAgents(config)
     const nonDomainUtilities = [...hostUtilityAllowFor(role), ...cognitiveUtilityAllowFor(role)]
@@ -271,19 +253,17 @@ test('WHAT[capability-enforcement-002] TOOLSPEC_engineer_and_devops_tools_have_o
   assert.equal(rolePredicate('bash-honeypot', 'devops'), false)
   assert.equal(rolePredicate('bash-honeypot', 'manager'), false)
 
-  // mv & rm: Engineer and DevOps (Move / Remove permission)
-  assert.equal(rolePredicate('mv', 'engineer'), true)
-  assert.equal(rolePredicate('mv', 'devops'), true)
-  assert.equal(rolePredicate('mv', 'manager'), false)
-  assert.equal(rolePredicate('rm', 'engineer'), true)
-  assert.equal(rolePredicate('rm', 'devops'), true)
-  assert.equal(rolePredicate('rm', 'manager'), false)
+  // todowrite-for-engineer: Engineer only (carries cat/ls/stat/where/whereAll/mkdir/write/mv/rm/fission)
+  assert.equal(rolePredicate('todowrite-for-engineer', 'engineer'), true)
+  assert.equal(rolePredicate('todowrite-for-engineer', 'devops'), false)
+  assert.equal(rolePredicate('todowrite-for-engineer', 'manager'), false)
 
-  // todowrite-for-devops: DevOps only (carries js.run via Exec; Host-native run & pty are retired)
+  // todowrite-for-devops: DevOps only (carries cat/ls/stat/where/whereAll/mkdir/write/mv/rm + js.run via Exec; direct file/exec/pty tools are retired)
   assert.equal(rolePredicate('todowrite-for-devops', 'devops'), true)
   assert.equal(rolePredicate('todowrite-for-devops', 'engineer'), false)
   assert.equal(rolePredicate('todowrite-for-devops', 'manager'), false)
-  for (const retired of ['run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal']) {
+  for (const retired of ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal']) {
+    assert.equal(rolePredicate(retired, 'engineer'), false, `retired ${retired} must be denied for engineer`)
     assert.equal(rolePredicate(retired, 'devops'), false, `retired ${retired} must be denied`)
   }
 })

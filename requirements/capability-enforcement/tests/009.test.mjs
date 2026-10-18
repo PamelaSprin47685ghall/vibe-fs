@@ -115,8 +115,9 @@ test('WHAT[capability-enforcement-009] TOOLSPEC_review_and_finality_tools_have_o
 })
 test('WHAT[capability-enforcement-009] TOOLSPEC_unknown_tools_and_host_natives_fail_closed', () => {
   assert.equal(rolePredicate('nonexistent-tool', 'engineer'), false)
-  assert.equal(rolePredicate('read', 'engineer'), false)
-  assert.equal(rolePredicate('write', 'engineer'), false)
+  for (const retired of ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm']) {
+    assert.equal(rolePredicate(retired, 'engineer'), false, `retired ${retired} must fail closed`)
+  }
   assert.equal(rolePredicate('skill', 'engineer'), false)
 })
 }

@@ -26,14 +26,14 @@ test('WHAT[semantic-trace-005] canonical render is deterministic and omits prove
   const items = [
     { cursor: trace.cursor(0), role: 'user', provenance: 'run-secret/msg-secret', part: trace.semanticText('Fix it.') },
     { cursor: trace.cursor(1), role: 'assistant', provenance: 'run-secret/msg-secret', part: trace.semanticReasoning('considered') },
-    { cursor: trace.cursor(2), role: 'assistant', provenance: 'run-secret/msg-secret', part: trace.semanticToolCall('read', '{}') },
+    { cursor: trace.cursor(2), role: 'assistant', provenance: 'run-secret/msg-secret', part: trace.semanticToolCall('todowrite-for-engineer', '{}') },
   ]
   const first = trace.render(items)
   assert.equal(trace.render(items), first)
   assert.equal(trace.render(items.map((item) => ({ ...item, provenance: 'other-transport' }))), first)
   assert.notEqual(trace.render([{ ...items[0], part: trace.semanticText('Different task') }]), trace.render([items[0]]))
   assert.match(first, /user: Fix it\./)
-  assert.match(first, /\[tool call\] read \{\}/)
+  assert.match(first, /\[tool call\] todowrite-for-engineer \{\}/)
   assert.equal(first.includes('secret'), false)
   assert.equal(trace.render([]), '')
 })
@@ -43,7 +43,7 @@ test('WHAT[semantic-trace-005] composition bridge maps XTraceRange [start, end) 
   projection = unwrap(trace.appendOpening(projection, 'ship cut-03', ['req-1', 'req-2']))
   projection = unwrap(trace.appendPart(projection, partDescriptor(1, { role: 'user', kind: 'text', providerRun: undefined })))
   projection = unwrap(trace.appendPart(projection, partDescriptor(2, { kind: 'reasoning' })))
-  projection = unwrap(trace.appendPart(projection, partDescriptor(3, { kind: 'tool_call', toolName: 'read' })))
+  projection = unwrap(trace.appendPart(projection, partDescriptor(3, { kind: 'tool_call', toolName: 'todowrite-for-engineer' })))
   projection = unwrap(trace.appendTerminal(projection, {
     textRef: 'blob-term',
     textDigest: 'digest-term',
@@ -94,7 +94,7 @@ test('WHAT[semantic-trace-005] lossless envelope and >512 KiB chunking preserve 
   const items = [
     { cursor: trace.cursor(1), role: 'user', provenance: 'g:0/msg:u1/part:0', part: trace.semanticText(userRaw) },
     { cursor: trace.cursor(2), role: 'assistant', provenance: 'g:0/msg:a1/part:0', part: trace.semanticReasoning('internal chain of thought') },
-    { cursor: trace.cursor(3), role: 'assistant', provenance: 'g:0/msg:a1/part:1', part: trace.semanticToolCall('read', '{"filePath":"/a.txt"}') },
+    { cursor: trace.cursor(3), role: 'assistant', provenance: 'g:0/msg:a1/part:1', part: trace.semanticToolCall('todowrite-for-engineer', '{"program":"await this.cat(\'a.txt\')"}') },
     { cursor: trace.cursor(4), role: 'assistant', provenance: 'g:0/msg:a1/part:2', part: trace.semanticToolResult(largeToolResult) },
     { cursor: trace.cursor(5), role: 'assistant', provenance: 'g:0/msg:a1/part:3', part: trace.semanticMedia('image/png', 'sha256-media') },
     { cursor: trace.cursor(6), role: 'assistant', provenance: 'g:0/msg:a2/part:0', part: trace.semanticText('Final prose statement.') },
@@ -115,7 +115,7 @@ test('WHAT[semantic-trace-005] lossless envelope and >512 KiB chunking preserve 
   assert.equal(roundTripped.length, 6)
   assert.deepEqual(roundTripped[0].part, { kind: 'text', text: userRaw })
   assert.deepEqual(roundTripped[1].part, { kind: 'reasoning', text: 'internal chain of thought' })
-  assert.deepEqual(roundTripped[2].part, { kind: 'tool-call', name: 'read', args: '{"filePath":"/a.txt"}' })
+  assert.deepEqual(roundTripped[2].part, { kind: 'tool-call', name: 'todowrite-for-engineer', args: '{"program":"await this.cat(\'a.txt\')"}' })
   assert.equal(roundTripped[3].part.kind, 'tool-result')
   assert.equal(roundTripped[3].part.result.length, largeToolResult.length)
   assert.equal(roundTripped[3].part.result, largeToolResult)

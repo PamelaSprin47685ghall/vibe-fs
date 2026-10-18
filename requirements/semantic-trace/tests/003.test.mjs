@@ -59,8 +59,8 @@ test('WHAT[semantic-trace-003] stable tool-part identity remains idempotent with
       message: {
         info: { id: hostMessageId, role: 'tool' },
         parts: [{
-          id: 'same-host-tool-part', type: 'tool', tool: 'read', callID: 'same-tool-call',
-          state: { status: 'completed', input: { path: 'sample' }, output: 'stable tool output' },
+          id: 'same-host-tool-part', type: 'tool', tool: 'todowrite-for-engineer', callID: 'same-tool-call',
+          state: { status: 'completed', input: { program: "class Js extends JsProgram { async run() { return await this.cat('sample'); } }" }, output: 'stable tool output' },
         }],
       },
     })

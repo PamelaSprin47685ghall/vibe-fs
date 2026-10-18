@@ -16,4 +16,6 @@ test('WHAT[repository-programming-027] both working roles receive the same gener
   assert.deepEqual(devops.members, engineer.members)
 })
 
-test.todo('WHAT[repository-programming-027] registered direct tools and programming tools enforce the same path, encoding, symlink and transaction boundaries')
+// Superseded note: direct Host filesystem tools (`read`/`write`/`edit`/`glob`/`grep`/`patch`)
+// and plugin `mv`/`rm` ToolSpecs are retired; Engineer and DevOps share the unified js
+// programming surface (`cat`/`where`/`write`/`ls`/`mv`/`rm`).

@@ -183,13 +183,11 @@ test('WHAT[host-boundary-032] C09_concurrent_tool_invocations_do_not_mix_contrac
 test('WHAT[host-boundary-032] C02_definition_decoration_leaves_native_and_non_review_tools_unmodified', async () => {
   await withExecutablePlugin(async (hooks) => {
     const nonReviewTools = [
-      'read',
-      'write',
-      'edit',
-      'glob',
-      'grep',
       'todowrite-for-engineer',
       'todowrite-for-devops',
+      'todowrite-for-plan',
+      'fetch',
+      'skill',
       'bash-honeypot',
       'assume',
     ]
@@ -1629,7 +1627,7 @@ integrationTest(
       `provider-visible set must include the plugin tool todowrite-for-manager; observed: ${visibleToolNames.join(',')}`,
     )
     assert.ok(
-      ['skill', 'read', 'glob', 'grep'].some((name) => visibleToolNames.includes(name)),
+      visibleToolNames.includes('skill'),
       `provider-visible set must include host builtin tools; observed: ${visibleToolNames.join(',')}`,
     )
     assert.equal(

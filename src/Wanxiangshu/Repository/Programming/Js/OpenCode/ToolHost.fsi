@@ -7,14 +7,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
 
-/// Coexistence seam between builtin filesystem fallbacks and generated js-*.
-/// GrandRewrite keeps read/edit/write/glob/grep as normal primitive fallback:
-/// their Host descriptions are left untouched. Preference for intent-level
-/// programs is taught inside the generated js-* contract and its Ultra Example.
-module BuiltinToolDescriptionHook =
-    val BuiltinFilesystemTools: Set<string>
-    val annotate: builtinName: string -> description: string -> jsRoleToolName: string -> string
-    val validateRecommendation: jsRoleToolName: string -> visibleToolNames: Set<string> -> Result<unit, string>
 
 /// PROMPT-019: load already-localized js-program prose. Domain assembles;
 /// this module binds language.

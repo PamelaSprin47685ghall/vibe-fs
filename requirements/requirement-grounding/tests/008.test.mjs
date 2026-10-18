@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import test from 'node:test'
 import * as grounding from '../../../dist/OpenCode/Host/RequirementGroundingSurface.js'
 import * as catalog from '../../../dist/Requirement/Grounding/Surface.js'
-import { openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { acceptAuthorityRoot, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const prepareWorkspace = (dir) => {
   mkdirSync(join(dir, 'requirements', 'alpha'), { recursive: true })
@@ -22,8 +22,8 @@ const sandbox = () => {
 }
 
 const toolBatch = (providerID, path) => [
-  { info: { id: 'c1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'pending', input: { filePath: path }, time: { start: 0 } } }] },
-  { info: { id: 'r1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'completed', input: { filePath: path }, output: 'before\n', time: { start: 0, end: 0 } } }] },
+  { info: { id: 'c1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'source', state: { status: 'pending', input: { program: `class Js extends JsProgram { async run() { return await this.cat(${JSON.stringify(path)}); } }` }, time: { start: 0 } } }] },
+  { info: { id: 'r1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'source', state: { status: 'completed', input: { program: `class Js extends JsProgram { async run() { return await this.cat(${JSON.stringify(path)}); } }` }, output: 'before\n', time: { start: 0, end: 0 } } }] },
 ]
 
 test('WHAT[requirement-grounding-008] mutation grounding is weak observation and never becomes tool admission', async () => {
@@ -69,9 +69,11 @@ const assertRegisteredMutationContinues = async (brokenMapping) => {
     }
 
     const sessionID = brokenMapping ? 'mutation-broken-mapping' : 'mutation-not-grounded'
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
     await openIncumbency(runtime, sessionID)
-    const input = { tool: 'write', sessionID, callID: 'write-once' }
-    const args = { filePath: sourcePath, content: 'changed by controlled Host continuation\n' }
+    const expectedContent = 'changed by controlled Host continuation\n'
+    const input = { tool: 'todowrite-for-engineer', sessionID, callID: 'write-once' }
+    const args = { program: `class Js extends JsProgram { async run() { await this.write('src/main.fs', ${JSON.stringify(expectedContent)}); return 'file written'; } }` }
     const originalInput = structuredClone(input)
     const originalArgs = structuredClone(args)
     const keys = Reflect.ownKeys(args)
@@ -84,13 +86,13 @@ const assertRegisteredMutationContinues = async (brokenMapping) => {
     assert.deepEqual(Reflect.ownKeys(args), keys)
     assert.equal(readFileSync(sourcePath, 'utf8'), 'before\n')
 
-    // The Host continuation is controlled here; the registered hooks are real.
-    writeFileSync(output.args.filePath, output.args.content, 'utf8')
+    const execResult = await hooks.tool['todowrite-for-engineer'].execute(output.args, { sessionID, agent: 'engineer' })
+    assert.match(String(execResult), /file written/)
     await hooks['tool.execute.after'](
       { ...input, args },
-      { title: 'write', output: 'file written', metadata: {} },
+      { title: 'todowrite-for-engineer', output: execResult, metadata: {} },
     )
-    assert.equal(readFileSync(sourcePath, 'utf8'), originalArgs.content)
+    assert.equal(readFileSync(sourcePath, 'utf8'), expectedContent)
     assert.equal(output.args, args)
     assert.deepEqual(args, originalArgs)
     assert.deepEqual(Reflect.ownKeys(args), keys)

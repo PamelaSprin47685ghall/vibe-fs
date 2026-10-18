@@ -38,7 +38,7 @@ assert.equal(opencodeVersion, fixture.targetVersion);
 assert.ok(productionPluginPath, 'production plugin must be available');
 
 const REVIEW_TOOLS = ['todowrite-for-manager'];
-const CONTROL_TOOLS = ['read', 'grep', 'glob', 'todowrite-for-engineer', 'todowrite-for-devops'];
+const CONTROL_TOOLS = ['todowrite-for-engineer', 'todowrite-for-devops'];
 const CONTRACT_TOKEN = 'do-not-use-except-for-review';
 const CANCEL_ARGUMENTS = {
   program: 'class Js extends JsProgram { async run() { await new Promise(() => {}); return null; } }',
@@ -193,14 +193,14 @@ const provider = await startHttpServer(async (request, response) => {
     if (!isManagerRequest(request, body)) {
       const chronicle = (body.tools ?? []).find((tool) => (tool?.function?.name ?? tool?.name) === 'chronicle');
       if (chronicle) {
-        const tip = chronicle.function?.parameters?.properties?.tip?.enum?.[0];
-        assert.equal(typeof tip, 'string', 'Blogger wire must publish a legal chronicle tip');
         sendSSE(response, buildToolCallChunks(`chronicle_${providerRequests.length}`, 'chronicle', JSON.stringify({
           charge: 'Preserve the canary observation that matters after this sidecar turn.',
           occurrence: 'The Manager canary inspected its tool contract.',
           settlement: 'The inspected contract is represented in the current canary record.',
           consequence: 'The sidecar can finish without inventing additional work.',
-          tip,
+          tipName: 'canary-observation-preserved',
+          opinion: 'The inspected tool contract should stay represented in the current canary record.',
+          advice: 'Finish the sidecar turn once the current canary observation is recorded.',
         }), 1));
         return;
       }

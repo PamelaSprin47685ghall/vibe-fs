@@ -6,8 +6,11 @@ const { default: test } = await import("node:test");
 const { mkdtempSync, readFileSync, rmSync, writeFileSync } = await import("node:fs");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
-const { annotate, validateRecommendation, builtinTools, createRegistered, name, description, execute } = await import("../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js");
+const { createRegistered, execute } = await import("../../../dist/Repository/Programming/Js/OpenCode/ToolHostSurface.js");
 
+// Superseded note: `annotate`, `validateRecommendation`, and `builtinTools` were retired from
+// `ToolHostSurface` alongside the direct Host filesystem tools; the js programming surface
+// (`cat`/`where`/`write`/`ls`/`mv`/`rm`) is the sole contract now.
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-host-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }

@@ -6,6 +6,7 @@ import {
   installDefaultResources,
   validate as validateManagedAgents,
 } from '../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js'
+import { generateRole } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 
 installDefaultResources()
 
@@ -82,13 +83,8 @@ const allowList = (config, name) => {
     'bash-honeypot',
     'assume',
     'todowrite',
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
+    'defer',
+    'publish',
     'fork',
     'resume',
     'commission',
@@ -100,30 +96,27 @@ const allowList = (config, name) => {
     'fetch',
     'deliver',
     'skill',
+    'todowrite-for-manager',
+    'todowrite-for-orchestrator',
+    'todowrite-for-engineer',
+    'todowrite-for-devops',
   ]
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 
 const HOST_UTILITY_ALLOW = ['skill']
 
-const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite']
+const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite', 'defer', 'publish']
 
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review'],
-  Orchestrator: ['commission', 'join', 'horizon'],
-  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
+  Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
+  Engineer: ['bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
     'join',
     'horizon',
     'todowrite-for-devops',
@@ -134,7 +127,20 @@ const ROLE_ALLOW = {
 test('WHAT[capability-enforcement-023] devops_host_schema_contains_direct_mutation_tools', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
-  for (const tool of ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'todowrite-for-devops']) {
-    assert.equal(evaluate(mergedRules(config, 'devops'), tool, '*').action, 'allow', `devops must allow ${tool}`)
+  assert.equal(evaluate(mergedRules(config, 'devops'), 'todowrite-for-devops', '*').action, 'allow', 'devops must allow todowrite-for-devops')
+  for (const retired of ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm']) {
+    assert.equal(retired in config.agent.devops.permission, false, `retired ${retired} must not be projected in devops permission`)
+    assert.equal(evaluate(mergedRules(config, 'devops'), retired, '*').action, 'deny', `retired ${retired} must be denied by default`)
+  }
+  const surface = generateRole('devops', 'en')
+  assert.ok(surface, 'DevOps must generate a JS programming surface')
+  assert.equal(surface.toolName, 'todowrite-for-devops')
+  assert.deepEqual(
+    surface.capabilities.slice().sort(),
+    ['Exec', 'Glob', 'Join', 'Move', 'Read', 'Remove', 'Write'],
+  )
+  const memberNames = surface.members.map((m) => m.memberName)
+  for (const member of ['cat', 'ls', 'stat', 'where', 'whereAll', 'mkdir', 'write', 'mv', 'rm', 'run', 'join']) {
+    assert.ok(memberNames.includes(member), `todowrite-for-devops must expose ${member}`)
   }
 })

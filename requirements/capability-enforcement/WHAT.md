@@ -100,7 +100,7 @@ Fission 能力在运行入口（Admission Gate）的准入逻辑严格限定为�
 
 ## [023] DevOps 角色固有直接源码修改与测试编写权能，禁止 allowRepair 等逐次授权开关
 
-DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, Edit, Glob, Grep, Move, Remove）与真实执行能力（Exec，经 `todowrite-for-devops` 的 `js.run` 投影）。在执行验证过程中遇到非架构级缺陷时，DevOps 拥有直接调查、修改源码、补充回归测试并重新验证的固有法定授权。系统严禁引入 `allowRepair`、`managerApprovedMutation`、`canFixAfterFailure` 等逐次审批参数，亦不得保留「只有 Manager 明确允许才可以改源码」的提示词暗门。
+DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, Edit, Glob, Grep, Move, Remove）与真实执行能力（Exec），经 `todowrite-for-devops` 编程面（`cat`/`ls`/`stat`/`where`/`whereAll`/`mkdir`/`write`/`mv`/`rm`/`run`/`join`）统一投影，不另设直接文件 Host 工具。在执行验证过程中遇到非架构级缺陷时，DevOps 拥有直接调查、修改源码、补充回归测试并重新验证的固有法定授权。系统严禁引入 `allowRepair`、`managerApprovedMutation`、`canFixAfterFailure` 等逐次审批参数，亦不得保留「只有 Manager 明确允许才可以改源码」的提示词暗门。
 
 ## [024] Fork 与 Resume 权能分离：Manager fork 仅准入 Engineer，固定 DevOps 仅允许经 resume 续做且同一道路至多一个活跃工作单元
 
@@ -110,7 +110,7 @@ DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, 
 
 ## [025] Manager 评审专用只读工具固定可见与当前事实收口
 
-Manager 评审专用只读工具（`todowrite-for-manager`）在模型 Schema 中固定可见；运行时由当前事实收口准入门禁：已接纳评审且仍有 findings、退任冻结或存在清理阻塞时拒绝执行。已接纳空集 findings 的末任 Manager 保留只读收尾能力，可读、清理并收口，但不得开新工作。原生 `read`/`grep`/`glob` 与 `todowrite-for-engineer`/`todowrite-for-devops` 对 Manager 的跨角色绕路调用始终拒绝。工具名到既有语义权限的映射必须维护在唯一目录中，禁止按后缀或启发式规则推测授权。
+Manager 评审专用只读工具（`todowrite-for-manager`）在模型 Schema 中固定可见；运行时由当前事实收口准入门禁：已接纳评审且仍有 findings、退任冻结或存在清理阻塞时拒绝执行。已接纳空集 findings 的末任 Manager 保留只读收尾能力，可读、清理并收口，但不得开新工作。已退役的直接文件工具（`read`/`grep`/`glob` 等）不进入 Host 工具目录且由默认 `* = deny` 与角色门禁拒绝；`todowrite-for-engineer`/`todowrite-for-devops` 对 Manager 的跨角色绕路调用始终拒绝。工具名到既有语义权限的映射必须维护在唯一目录中，禁止按后缀或启发式规则推测授权。
 
 ## [026] Review 接纳前禁止向固定 DevOps 派工
 

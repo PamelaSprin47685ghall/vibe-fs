@@ -619,8 +619,8 @@ test('WHAT[speculative-investigation-016] source batch capture rejects participa
 test('WHAT[speculative-investigation-016] every tool on the known tool surface receives the classification the protocol list prescribes', () => {
   // 已知工具名清单来源于公开 ToolSurface 契约
   const knownToolsFromSurface = ToolSurface.toolSpecNames();
-  assert.ok(knownToolsFromSurface.length >= 30, `knownToolNames must cover active tool surface, got ${knownToolsFromSurface.length}`);
-  assert.ok(knownToolsFromSurface.includes("read"), "knownToolNames must include 'read'");
+  assert.ok(knownToolsFromSurface.length >= 23, `knownToolNames must cover active tool surface, got ${knownToolsFromSurface.length}`);
+  assert.ok(knownToolsFromSurface.includes("todowrite-for-engineer"), "knownToolNames must include 'todowrite-for-engineer'");
   assert.ok(knownToolsFromSurface.includes("chronicle"), "knownToolNames must include 'chronicle'");
   assert.ok(knownToolsFromSurface.includes("fork"), "knownToolNames must include 'fork'");
   assert.ok(knownToolsFromSurface.includes("todowrite-for-devops"), "knownToolNames must include 'todowrite-for-devops'");

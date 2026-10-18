@@ -657,15 +657,15 @@ tools = ["join", "assume", "deliver"]
 id = "engineer"
 lane = "engineer"
 user = "# Write publish_proof.txt."
-tools = ["todowrite-for-engineer", "read"]
+tools = ["todowrite-for-engineer"]
 
   [[turn.step]]
   respond = { type = "tool-call", tool = "todowrite-for-engineer", args = { program = "class Js extends JsProgram { async run() { await this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
 
-  # Native-read failure probe: ordinary Engineer mainline, not Strength Replica.
+  # Read probe on the programming surface: ordinary Engineer mainline, not Strength Replica.
   # Unique path makes message.part.updated correlation unambiguous in the real Host SSE stream.
   [[turn.step]]
-  respond = { type = "tool-call", tool = "read", args = { filePath = "read_probe.txt" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = { program = "class Js extends JsProgram { async run() { return await this.cat('read_probe.txt'); } }" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Engineer finished." }
@@ -674,10 +674,10 @@ tools = ["todowrite-for-engineer", "read"]
 id = "engineer-resolve"
 internal = true
 user = "# Resolve the conflicted publish_proof.txt so it contains exactly: Published by long-stroke canary"
-tools = ["write"]
+tools = ["todowrite-for-engineer"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "write", args = { filePath = "publish_proof.txt", content = "Published by long-stroke canary\n" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = { program = "class Js extends JsProgram { async run() { this.write('publish_proof.txt', 'Published by long-stroke canary\\n'); return { written: true }; } }" } }
 
   [[turn.step]]
   respond = { type = "text", text = "Conflict file resolved." }
@@ -1303,7 +1303,7 @@ tools = ["todowrite-for-predictor"]
 forbiddenTools = ["todowrite-for-manager"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "todowrite-for-predictor", args = { program = "class Js extends JsProgram { async run() { const f = await this.file('large_probe.txt'); return f.text('^', '$'); } }" } }
+  respond = { type = "tool-call", tool = "todowrite-for-predictor", args = { program = "class Js extends JsProgram { async run() { return await this.cat('large_probe.txt'); } }" } }
 
 [[turn]]
 id = "strength-recovery-owner-title"

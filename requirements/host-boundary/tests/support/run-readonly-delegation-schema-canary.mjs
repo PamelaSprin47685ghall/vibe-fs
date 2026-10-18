@@ -50,12 +50,16 @@ export default function route(role, running, previous, purpose) {
 const READ_FILE = 'canary-sample.txt'
 const FILE_BODY = 'readonly delegation schema canary\n'
 const CALL_ID = 'call_read_delegated_0'
+const READ_PROGRAM = `class Js extends JsProgram { async run() { return await this.cat('${READ_FILE}'); } }`
 const BUDGET = 2
 const SELF_NOTE = 'checking the canary fixture'
 
 const EXPECTED_PARTICIPATING_NAMES = [
   'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
-  'edit', 'write', 'mv', 'rm', 'fetch', 'run',
+  'edit', 'write', 'mv', 'rm', 'fetch',
+]
+const EXPECTED_ACTIVE_PARTICIPATING_NAMES = [
+  'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops', 'fetch',
 ]
 
 const known = new Set(toolSpecNames())
@@ -63,12 +67,12 @@ const PARTICIPATING_TOOLS = new Set(EXPECTED_PARTICIPATING_NAMES)
 
 assert.equal(
   PARTICIPATING_TOOLS.size,
-  12,
-  `expected exactly 12 participating tools, got ${PARTICIPATING_TOOLS.size}`,
+  11,
+  `expected exactly 11 participating tools, got ${PARTICIPATING_TOOLS.size}`,
 )
 assert.ok(
-  EXPECTED_PARTICIPATING_NAMES.every((name) => known.has(name)),
-  'all participating tools must be known canonical tools from ToolSurface',
+  EXPECTED_ACTIVE_PARTICIPATING_NAMES.every((name) => known.has(name)),
+  'all active participating tools must be known canonical tools from ToolSurface',
 )
 
 const isTitleRequest = (body) => {
@@ -85,11 +89,11 @@ const providerRequests = []
 const wireTools = new Map()
 let sessionID = null
 
-// The engineer session is identified on the wire by carrying the built-in
-// `read` tool; unrelated sessions (companion, chronicle) reuse the provider and
-// may arrive first, so neither arrival order nor request counting identifies it.
+// The engineer session is identified on the wire by carrying `todowrite-for-engineer`;
+// unrelated sessions (companion, chronicle) reuse the provider and may arrive first,
+// so neither arrival order nor request counting identifies it.
 const isEngineerRequest = (body) =>
-  (body?.tools ?? []).some((tool) => (tool?.function?.name ?? tool?.name) === 'read')
+  (body?.tools ?? []).some((tool) => (tool?.function?.name ?? tool?.name) === 'todowrite-for-engineer')
 
 const provider = http.createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`)
@@ -127,10 +131,10 @@ const provider = http.createServer(async (request, response) => {
 
       const args = JSON.stringify(
         BUDGET > 0
-          ? { filePath: READ_FILE, estimated_readonly_rounds: BUDGET, self_note: SELF_NOTE }
-          : { filePath: READ_FILE, estimated_readonly_rounds: BUDGET },
+          ? { program: READ_PROGRAM, estimated_readonly_rounds: BUDGET, self_note: SELF_NOTE }
+          : { program: READ_PROGRAM, estimated_readonly_rounds: BUDGET },
       )
-      sendSSE(response, buildToolCallChunks(CALL_ID, 'read', args, 10))
+      sendSSE(response, buildToolCallChunks(CALL_ID, 'todowrite-for-engineer', args, 10))
       return
     }
 
@@ -209,7 +213,7 @@ const summary = () => {
     tools: Object.fromEntries(wireTools),
     participatingTools: participating,
     nonParticipatingTools: nonParticipating,
-    read: wireTools.get('read') ?? null,
+    engineerTool: wireTools.get('todowrite-for-engineer') ?? null,
     followUpObserved: followUp !== undefined,
     historicalArguments,
     toolResultPreview: typeof toolResult?.content === 'string' ? toolResult.content.slice(0, 400) : null,

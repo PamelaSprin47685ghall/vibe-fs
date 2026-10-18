@@ -7,7 +7,7 @@
  *   - tool.execute.after
  *
  * Observes the sole manager review tool (todowrite-for-manager)
- * and control tools (read, grep, glob, todowrite-for-engineer, todowrite-for-devops), recording:
+ * and control tools (todowrite-for-engineer, todowrite-for-devops), recording:
  *   - schema decoration with contract (type, enum, required)
  *   - before: args reference identity and unchanged business arguments
  *   - after: original argument values, object identity and key order
@@ -41,7 +41,7 @@ const productionPluginPath =
 const EXECUTOR_THROW_SENTINEL = 'T180-EXECUTOR-THROW-SENTINEL';
 const EXECUTOR_THROW_MESSAGE = 'T180-EXECUTOR-THROW: intentional executor rejection';
 const REVIEW_TOOLS = Object.freeze(['todowrite-for-manager']);
-const CONTROL_TOOLS = Object.freeze(['read', 'grep', 'glob', 'todowrite-for-engineer', 'todowrite-for-devops']);
+const CONTROL_TOOLS = Object.freeze(['todowrite-for-engineer', 'todowrite-for-devops']);
 
 const emit = async (kind, value) => {
   if (!collectorUrl) return;

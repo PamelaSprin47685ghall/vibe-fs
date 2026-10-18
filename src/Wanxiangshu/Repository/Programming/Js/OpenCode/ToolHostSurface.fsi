@@ -7,9 +7,7 @@ open System.Threading.Tasks
 [<RequireQualifiedAccess>]
 module JsToolHostSurface =
 
-    val builtinTools: unit -> string array
-    val annotate: builtinName: string -> description: string -> jsRoleToolName: string -> string
-    val validateRecommendation: jsRoleToolName: string -> visibleToolNames: string array -> obj
+
 
     val createRegistered:
         toolModule: obj -> role: string -> language: string -> workspaceRoot: string -> store: obj -> obj
