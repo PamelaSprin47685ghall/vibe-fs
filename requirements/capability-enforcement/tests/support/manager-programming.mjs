@@ -35,14 +35,19 @@ test('WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_re
   assert.equal(surface.toolName, 'todowrite-for-manager')
   assert.deepEqual(
     surface.capabilities.sort(),
-    ['Fork', 'Glob', 'Grep', 'Join', 'Read'],
-    'Manager capabilities must be {Read, Glob, Grep} plus the delegation primitives',
+    ['Fork', 'Glob', 'Join', 'Read'],
+    'Manager capabilities must be {Read, Glob} plus the delegation primitives {Fork, Join}',
   )
 
   // 四层同构第 1 层：生成的 JsProgram 基类中不声明任何写方法
   assert.equal(surface.baseClassSource.includes('edit('), false, 'BaseClass must not declare edit')
   assert.equal(surface.baseClassSource.includes('write('), false, 'BaseClass must not declare write')
   assert.equal(surface.baseClassSource.includes('rewrite('), false, 'BaseClass must not declare rewrite')
+  assert.equal(surface.baseClassSource.includes('glob('), false, 'BaseClass must not declare retired glob')
+  assert.equal(surface.baseClassSource.includes('grep('), false, 'BaseClass must not declare retired grep')
+  assert.equal(surface.baseClassSource.includes('fork('), true, 'BaseClass must declare fork')
+  assert.equal(surface.baseClassSource.includes('dag('), true, 'BaseClass must declare dag')
+  assert.equal(surface.baseClassSource.includes('join('), true, 'BaseClass must declare join')
 
   // 四层同构第 2 层：描述文档不包含写入/修改暗示
   assert.doesNotMatch(surface.description, /edit\(path|rewrite\(path|write\(path/, 'Description must not advertise write methods')
@@ -61,8 +66,6 @@ test('WHAT[capability-enforcement-025] J02_manager_create_api_omits_mutation_met
 
     // 已授予只读成员正常暴露
     assert.equal(typeof binding.js.read, 'function', 'read must be constructed')
-    assert.equal(typeof binding.js.glob, 'function', 'glob must be constructed')
-    assert.equal(typeof binding.js.grep, 'function', 'grep must be constructed')
     assert.equal(typeof binding.js.cat, 'function', 'cat must be constructed')
     assert.equal(typeof binding.js.ls, 'function', 'ls must be constructed')
     assert.equal(typeof binding.js.stat, 'function', 'stat must be constructed')
@@ -71,14 +74,18 @@ test('WHAT[capability-enforcement-025] J02_manager_create_api_omits_mutation_met
     assert.equal(typeof binding.js.fork, 'function', 'fork must be constructed')
     assert.equal(typeof binding.js.join, 'function', 'join must be constructed')
 
-    // 未授予的写 API 在 api.js 中直接不存在（undefined），绝非存在而抛错
+    // 已退役的 glob/grep 与未授予的写/执行 API 在 api.js 中直接不存在（undefined）
+    assert.equal('glob' in binding.js, false, 'retired glob property must not exist')
+    assert.equal('grep' in binding.js, false, 'retired grep property must not exist')
+    assert.equal(binding.js.glob, undefined)
+    assert.equal(binding.js.grep, undefined)
     assert.equal('edit' in binding.js, false, 'edit property must not exist')
     assert.equal('write' in binding.js, false, 'write property must not exist')
     assert.equal(binding.js.edit, undefined)
     assert.equal(binding.js.write, undefined)
     assert.deepEqual(
       Object.keys(binding.js).sort(),
-      ['cat', 'fork', 'glob', 'grep', 'join', 'ls', 'read', 'stat', 'where', 'whereAll'],
+      ['cat', 'fork', 'join', 'ls', 'read', 'stat', 'where', 'whereAll'],
     )
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -143,14 +150,18 @@ test('WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_
   const devopsSurface = generateRole('devops', 'en')
   assert.ok(engSurface.capabilities.includes('Edit'))
   assert.ok(engSurface.capabilities.includes('Write'))
+  assert.ok(engSurface.capabilities.includes('Fission'))
   assert.ok(devopsSurface.capabilities.includes('Edit'))
   assert.ok(devopsSurface.capabilities.includes('Write'))
+  assert.ok(devopsSurface.capabilities.includes('Exec'))
+  assert.ok(devopsSurface.capabilities.includes('Join'))
 
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j05-'))
   try {
     const engApi = roleApi('engineer', dir)
     assert.equal(typeof engApi.js.edit, 'function', 'Engineer must retain edit api')
     assert.equal(typeof engApi.js.write, 'function', 'Engineer must retain write api')
+    assert.equal(typeof engApi.js.fission, 'function', 'Engineer must expose fission api')
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -235,10 +246,17 @@ test('WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_ro
     )
     assert.notEqual(absoluteRes.text, 'super-secret-outside-content', 'external secret content must not be reachable')
 
-    // 4. glob 越界探测：仅在工作树内安全遍历，对越界 pattern 不泄漏 root 外部文件（返回空匹配列表）
-    const globRes = await api.js.glob('../**')
-    assert.equal(globRes.ok, true)
-    assert.deepEqual(globRes.paths, [], 'glob for ../** must not enumerate outside workspace root')
+    // 4. ls 越界探测：父目录路径与外部绝对路径严格返回 PATH_DENIED，不泄漏 root 外部文件
+    const lsEscapeRes = api.js.ls('..')
+    assert.equal(lsEscapeRes.ok, false)
+    assert.equal(lsEscapeRes.code, 'PATH_DENIED', 'ls for .. must fail with PATH_DENIED')
+
+    const lsOutsideRes = api.js.ls(outsideDir)
+    assert.equal(lsOutsideRes.ok, false, 'ls for absolute path outside root must fail')
+    assert.ok(
+      lsOutsideRes.code === 'PATH_DENIED' || lsOutsideRes.code === 'FILE_NOT_FOUND',
+      `ls for absolute path outside root must fail with PATH_DENIED or FILE_NOT_FOUND, got ${lsOutsideRes.code}`,
+    )
   } finally {
     rmSync(dir, { recursive: true, force: true })
     rmSync(outsideDir, { recursive: true, force: true })
@@ -275,7 +293,8 @@ test('WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_
 test('WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_search_errors_and_output_limits', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-j10-'))
   try {
-    writeFileSync(join(dir, 'sample.txt'), 'literal [unclosed-bracket and regex text', 'utf8')
+    const sampleText = 'literal [unclosed-bracket and regex text'
+    writeFileSync(join(dir, 'sample.txt'), sampleText, 'utf8')
 
     const api = roleApi('manager', dir)
 
@@ -284,30 +303,59 @@ test('WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_se
     assert.equal(miss.ok, false)
     assert.equal(miss.code, 'FILE_NOT_FOUND')
 
-    // 2. Grep needle Exact/Regex 语义：
-    // 字符串 needle 经 anchorOf 确定性走 AnchorSpec.Exact 字面量搜索分支，非正则编译；
-    // 即使包含正则元字符（如 [）也按字面量匹配，返回 ok=true 且命中字面量结果
-    const exactHit = await api.js.grep('[unclosed-bracket', '*.txt')
+    const lsMiss = api.js.ls('nonexistent-dir')
+    assert.equal(lsMiss.ok, false)
+    assert.equal(lsMiss.code, 'FILE_NOT_FOUND')
+
+    // 2. ls + cat + whereAll 组合搜索语义（WHAT[repository-programming-057]）：
+    // 字符串 needle 按归一化精确字面量搜索，即使包含正则元字符（如 [）也按字面量匹配
+    const listed = api.js.ls('.')
+    assert.equal(listed.ok, true)
+    assert.deepEqual(listed.entries, ['sample.txt'])
+    const catRes = api.js.cat('sample.txt')
+    assert.equal(catRes.ok, true)
+    const exactHit = api.js.whereAll(catRes.text, '[unclosed-bracket')
     assert.equal(exactHit.ok, true, 'string needle must be treated as exact literal search')
-    assert.equal(exactHit.matches.length, 1)
-    assert.equal(exactHit.matches[0].text, '[unclosed-bracket')
+    assert.equal(exactHit.spans.length, 1)
+    const [begin, end] = exactHit.spans[0]
+    assert.equal(catRes.text.slice(begin, end), '[unclosed-bracket')
 
-    // 3. 空字符串 needle 触发 requireNonEmptyExact，明确返回 EMPTY_ANCHOR_CONTENT
-    const emptyNeedle = await api.js.grep('', '*.txt')
-    assert.equal(emptyNeedle.ok, false)
-    assert.equal(emptyNeedle.code, 'EMPTY_ANCHOR_CONTENT', 'empty string needle must fail with EMPTY_ANCHOR_CONTENT')
+    // 3. 空或纯空白 needle 返回空匹配列表
+    const emptyNeedle = api.js.whereAll(catRes.text, '   ')
+    assert.equal(emptyNeedle.ok, true)
+    assert.deepEqual(emptyNeedle.spans, [])
 
-    // 4. 空 RegExp needle 的真实 JS 规范行为：ECMAScript 规范规定 new RegExp('').source 恒为 '(?:)'，
-    // 因此在 JS 运行时 toString(find.source) 不视为空，而是作为合法正则 /(?:)/ 执行零宽匹配，返回 ok=true 且 matches 包含各行匹配结果；
-    // 空 needle 的失败边界已由上面的空字符串 needle ('')、空 glob pattern ('') 以及 RESULT_TOO_LARGE 完整覆盖。
-    const emptyRegexNeedle = await api.js.grep(new RegExp(''), '*.txt')
-    assert.equal(emptyRegexNeedle.ok, true, 'new RegExp("") in JS has source "(?:)" and returns ok=true')
-    assert.ok(Array.isArray(emptyRegexNeedle.matches), 'matches must be an array')
+    // 4. 非法参数（null/undefined）明确返回 INVALID_ARGUMENT
+    const invalidWhereAll = api.js.whereAll(null, 'some-needle')
+    assert.equal(invalidWhereAll.ok, false)
+    assert.equal(invalidWhereAll.code, 'INVALID_ARGUMENT', 'null content must fail with INVALID_ARGUMENT')
 
-    // 5. 空 glob pattern 明确返回 INVALID_ANCHOR_PATTERN
-    const badPattern = await api.js.grep('some-needle', '')
-    assert.equal(badPattern.ok, false)
-    assert.equal(badPattern.code, 'INVALID_ANCHOR_PATTERN', 'empty glob pattern must fail with INVALID_ANCHOR_PATTERN')
+    // 5. JsProgram.file 锚点搜索错误边界：空字符串 pattern 明确返回 EMPTY_ANCHOR_CONTENT，非法正则返回 INVALID_ANCHOR_PATTERN
+    const emptyAnchorOutcome = await run(
+      dir,
+      'manager',
+      'en',
+      `class Js extends JsProgram { async run() { const f = await this.file('sample.txt', [['a', 'b', '']]); return f.text('^', '$'); } }`,
+      2000,
+      Date.now() + 60_000,
+      1 << 20,
+      null,
+    )
+    assert.equal(caseName(emptyAnchorOutcome), 'Failed')
+    assert.equal(failureCode(emptyAnchorOutcome), 'EMPTY_ANCHOR_CONTENT')
+
+    const invalidAnchorOutcome = await run(
+      dir,
+      'manager',
+      'en',
+      `class Js extends JsProgram { async run() { const f = await this.file('sample.txt', [['a', 'b', 123]]); return f.text('^', '$'); } }`,
+      2000,
+      Date.now() + 60_000,
+      1 << 20,
+      null,
+    )
+    assert.equal(caseName(invalidAnchorOutcome), 'Failed')
+    assert.equal(failureCode(invalidAnchorOutcome), 'INVALID_ANCHOR_PATTERN')
 
     // 6. 结果超限返回 RESULT_TOO_LARGE
     const bigProgram = `class Js extends JsProgram {

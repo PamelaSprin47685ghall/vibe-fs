@@ -233,9 +233,10 @@ test('WHAT[repository-programming-014] JS014_as_is_grep_snapshot_does_not_block_
     writeFileSync(join(dir, 'source.txt'), 'needle', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const listing = await this.grep('needle', '*.txt');
-    this.write('output.txt', String(listing.matches.length));
-    return { count: listing.matches.length };
+    const entries = await this.ls('.');
+    const txtFiles = entries.filter((entry) => entry.endsWith('.txt'));
+    this.write('output.txt', String(txtFiles.length));
+    return { count: txtFiles.length };
   }
 }`
     const outcome = await runObserved(

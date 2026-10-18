@@ -18,7 +18,7 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 读同一 
 
 ## [005] request-specific replica/leaf 可进一步收窄：StrengthReplica 只 {Read; Glob; Grep} 与只读 todowrite-for-predictor
 
-用于投机调查的 `StrengthReplica` 仅保留唯一专用的只读 JS 编程面 `todowrite-for-predictor`（能力面 {Read; Glob; Grep}）。其运行时工具映射在 deny 全部工具后精准放行这一项；原生 `read`/`glob`/`grep` 与其余修改、执行工具（包括 write, edit, run, fork, join 以及角色特权 js-* 面）在副本内全部 fail-closed。
+用于投机调查的 `StrengthReplica` 仅保留唯一专用的只读 JS 编程面 `todowrite-for-predictor`（能力面 {Read; Glob}；`grep` 成员已按 repository-programming [057] 退役，内容搜索由 walk + `whereAll` 组合完成）。其运行时工具映射在 deny 全部工具后精准放行这一项；原生 `read`/`glob`/`grep` 与其余修改、执行工具（包括 write, edit, run, fork, join 以及角色特权 js-* 面）在副本内全部 fail-closed。
 
 ## [006] internal-only participants/actions 不进无资格 participant 的工具面
 
@@ -30,7 +30,7 @@ Host 侧展示给模型的工具 Schema 与运行时执行拦截 Gate 读同一 
 
 ## [008] js-* 编程面四层同构：capability → base-class member → description → example → runtime gate
 
-针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。编程面四层同构原则不变；`todowrite-for-manager` 面向 Manager 且仅限当前未接纳评审的只读能力（Read/Glob/Grep），其能力过滤必须到达真实执行 API 层。
+针对 JS 文件系统能力：若角色缺少对应 capability，则代码生成器生成的基类中不包含对应方法、工具描述中不提及该方法、示例代码中不展示该方法，且底层运行时 Gate 同样拦截对该方法的调用。编程面四层同构原则不变；`todowrite-for-manager` 面向 Manager，只读文件能力为 Read/Glob，另持有委托原语 Fork/Join（无任何写或执行成员），其能力过滤必须到达真实执行 API 层。
 
 ## [009] 工具名引用完整性：same tool name → 唯一 schema owner + 唯一 semantic contract
 

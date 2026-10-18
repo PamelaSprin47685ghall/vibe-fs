@@ -31,26 +31,24 @@ const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 
 const fsPermissionsOf = (role) =>
   rolePermissions(role.toLowerCase()).filter((n) =>
-    ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec', 'Fork', 'Join'].includes(n),
+    ['Read', 'Write', 'Edit', 'Glob', 'Move', 'Remove', 'Exec', 'Fork', 'Join', 'Fission'].includes(n),
   )
 
 const MEMBERS_BY_PERMISSION = {
   Read: ['file', 'cat', 'stat', 'whereAll', 'where'],
-  Glob: ['glob', 'ls'],
-  Grep: ['grep'],
+  Glob: ['ls'],
   Edit: ['edit', 'rewrite'],
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
   Exec: ['run'],
-  Fork: ['fork'],
+  Fork: ['fork', 'dag'],
   Join: ['join'],
+  Fission: ['fission'],
 }
 
 const BINDING_BY_MEMBER = {
   file: 'js.read',
-  glob: 'js.glob',
-  grep: 'js.grep',
   edit: 'js.edit',
   rewrite: 'js.edit',
   write: 'js.write',
@@ -64,15 +62,19 @@ const BINDING_BY_MEMBER = {
   where: 'js.where',
   run: 'js.run',
   fork: 'js.fork',
+  dag: 'js.dag',
   join: 'js.join',
+  fission: 'js.fission',
 }
 
 const MEMBER_ORDER = [
-  'file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv',
+  'file', 'edit', 'rewrite', 'write', 'rm', 'mv',
   'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
   'run',
   'fork',
+  'dag',
   'join',
+  'fission',
 ]
 
 const layersOf = (s) =>
@@ -103,12 +105,12 @@ test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_ca
   assert.equal(isNone(orchestrator), false, 'Orchestrator gets the delegation-only surface')
   assert.deepEqual(
     orchestrator.members.map((fragment) => fragment.memberName),
-    ['fork', 'join'],
+    ['fork', 'dag', 'join'],
   )
 })
 
 test('WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
-  for (const role of ['Manager', 'Orchestrator', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'DevOps', 'Distiller', 'Blogger']) {
+  for (const role of ['Manager', 'Orchestrator', 'Engineer', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'DevOps', 'Distiller', 'Blogger']) {
     const fsPerms = fsPermissionsOf(role)
     const result = surface(role, rolePermissions(role.toLowerCase()))
     if (fsPerms.length === 0) {
@@ -125,7 +127,7 @@ test('WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_pe
 
 test('WHAT[repository-programming-001] JS001_non_fs_permissions_never_produce_members', () => {
   for (const name of PERMISSION_NAMES.filter(
-    (n) => !['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec', 'Fork', 'Join'].includes(n),
+    (n) => !['Read', 'Write', 'Edit', 'Glob', 'Move', 'Remove', 'Exec', 'Fork', 'Join', 'Fission'].includes(n),
   )) {
     const result = generate('Engineer', caps(toolPermissionByName[name]), 'en')
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)

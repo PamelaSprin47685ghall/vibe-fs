@@ -51,12 +51,11 @@ const ToolPermission = toolPermissionByName
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 
 const fsPermissionsOf = (role) =>
-  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove'].includes(n))
+  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Move', 'Remove'].includes(n))
 
 const MEMBERS_BY_PERMISSION = {
   Read: ['file', 'cat', 'stat', 'whereAll', 'where'],
-  Glob: ['glob', 'ls'],
-  Grep: ['grep'],
+  Glob: ['ls'],
   Edit: ['edit', 'rewrite'],
   Write: ['write', 'mkdir'],
   Move: ['mv'],
@@ -66,8 +65,6 @@ const MEMBERS_BY_PERMISSION = {
 
 const BINDING_BY_MEMBER = {
   file: 'js.read',
-  glob: 'js.glob',
-  grep: 'js.grep',
   edit: 'js.edit',
   rewrite: 'js.edit',
   write: 'js.write',
@@ -83,7 +80,7 @@ const BINDING_BY_MEMBER = {
 }
 
 const MEMBER_ORDER = [
-  'file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv',
+  'file', 'edit', 'rewrite', 'write', 'rm', 'mv',
   'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
   'run',
 ]
@@ -109,7 +106,7 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
   const layers = layersOf(result)
   assert.deepEqual(
     Object.keys(layers).sort(),
-    ['cat', 'edit', 'file', 'glob', 'grep', 'ls', 'mkdir', 'rewrite', 'stat', 'where', 'whereAll', 'write'],
+    ['cat', 'edit', 'file', 'ls', 'mkdir', 'rewrite', 'stat', 'where', 'whereAll', 'write'],
   )
   for (const [member, layer] of Object.entries(layers)) {
     assert.equal(layer.inBaseClass, true, `${member} in base class`)
@@ -124,16 +121,16 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
   assert.equal(result.description.includes('_api'), false)
   assert.equal(result.description.includes('__jsFailure'), false)
   assert.equal(result.examples.length, 1, 'one responsibility-shaped Ultra Example')
-  assert.match(result.examples[0], /oldApi → newApi/)
+  assert.match(result.examples[0], /oldApi -> newApi/)
 })
 
 test('WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers', () => {
   const result = surface('Engineer', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
-  assert.deepEqual(memberNames(result), ['file', 'glob', 'grep', 'cat', 'ls', 'stat', 'whereAll', 'where'])
+  assert.deepEqual(memberNames(result), ['file', 'cat', 'ls', 'stat', 'whereAll', 'where'])
   assert.equal(result.description.includes('edit(path'), false)
   assert.equal(result.description.includes('rewrite(path'), false)
-  assert.equal(result.description.includes('write(path'), false)
+  assert.equal(result.description.includes('write(path, content)'), false)
   assert.equal(result.baseClassSource.includes('js.edit'), false)
   assert.equal(result.baseClassSource.includes('js.write'), false)
   assert.equal(result.examples.some((example) => example.includes('this.rewrite')), false)
@@ -150,26 +147,26 @@ test('WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_r
   ]) {
     assert.equal(editOnly.description.includes(unavailable), false, `Edit-only surface leaked ${unavailable}`)
   }
-  assert.doesNotMatch(editOnly.description, /(^|[^A-Za-z0-9_])write\(path/m)
+  assert.doesNotMatch(editOnly.description, /(^|[^A-Za-z0-9_])write\(path, content\)/m)
 
   const readEdit = surface('Engineer', ['Read', 'Edit'])
   assert.deepEqual(memberNames(readEdit), ['file', 'edit', 'rewrite', 'cat', 'stat', 'whereAll', 'where'])
   assert.equal(readEdit.description.includes('file(matches) + text() + rewrite()'), true)
-  assert.doesNotMatch(readEdit.description, /(^|[^A-Za-z0-9_])write\(path/m)
+  assert.doesNotMatch(readEdit.description, /(^|[^A-Za-z0-9_])write\(path, content\)/m)
 
   const editWrite = surface('Engineer', ['Edit', 'Write'])
   assert.deepEqual(memberNames(editWrite), ['edit', 'rewrite', 'write', 'mkdir'])
   assert.equal(editWrite.description.includes('file(matches)'), false)
   assert.equal(editWrite.description.includes('file(path'), false)
   assert.equal(editWrite.description.includes('FileView.text'), false)
-  assert.match(editWrite.description, /(^|[^A-Za-z0-9_])write\(path/m)
+  assert.match(editWrite.description, /(^|[^A-Za-z0-9_])write\(path, content\)/m)
 })
 
 test('WHAT[repository-programming-002] JS004_member_gate_binds_present_members_only', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
   assert.equal(memberBinding('Engineer', perms, 'file'), 'js.read')
-  assert.equal(memberBinding('Engineer', perms, 'glob'), 'js.glob')
-  assert.equal(memberBinding('Engineer', perms, 'grep'), 'js.grep')
+  assert.equal(memberBinding('Engineer', perms, 'glob'), undefined)
+  assert.equal(memberBinding('Engineer', perms, 'grep'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'cat'), 'js.cat')
   assert.equal(memberBinding('Engineer', perms, 'ls'), 'js.ls')
   assert.equal(memberBinding('Engineer', perms, 'stat'), 'js.stat')

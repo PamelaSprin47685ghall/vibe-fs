@@ -28,9 +28,20 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 Exec capability 投影出 `run` 成员与全局 `js.Runnable`。模型写 `await js.run(class extends js.Runnable { ... })`；宿主拥有循环：校验规格（`maxDuration`/`next`/`check` 缺一即 `RUNNABLE_SPEC_INCOMPLETE`）、执行命令、按 `interval` 时间片调用 `check`、派发 `onExit`、执行 `maxDuration` 上界。`check` 可 `{ abort }` 或 `{ park }`；park 走与 `js.park` 相同的挂起通道与 source 标记，恢复值 `'abort'` 中止。`next` 支持命令字符串/`null`/`{ spawn, name }`/`{ signal, name }`/`{ waitFor: { port, timeoutMs } }`；后台进程在 `check` 的 `backgrounds` 观察面可见，run 结束时全部 SIGKILL。成功结局是 `{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }`；每路输出保留头尾各 128 KiB 并如实报总字节。host 失败经 `__jsFailure` 哨兵成为稳定失败码。双语教学在 `tool/js-program/run-rules`，wget Ultra Example 在 `tool/js-program/ultra-devops`。
 
-## fork/join 委托原语（WHAT[repository-programming-056]）
+## 委托原语：fork / join / fission / dag（WHAT[repository-programming-056]）
 
-Fork/Join capability 投影出 `fork(payload)` 与 `join()`：`payload` 与宿主 fork 工具同字段（`charge`/`name`/`calling`/`keywords`），返回 fork 回执文本；`join()` 按本会话成员收拢子工作并返回 join 收执批次。接线层（ToolRegistry）在每次编程调用期间安装进程内委托宿主，fork/join 分别驱动该角色已注册的生产 fork/join spec，调用结束即清除；没有宿主时成员以 `DELEGATION_UNAVAILABLE` 拒绝。Orchestrator 无文件权限但持有 Fork/Join，因此获得仅委托的编程面；`hasFsCapability` 与 `admissionFor` 同步把 Fork/Join 计入授权。DAG 声明糖未交付：需要一个结构化 join 聚合层（per-child 结果映射），本轮不以空实现占位。双语教学在 `tool/js-program/delegation-rules`。
+**所有 js.* 成员返回数据，绝不返回渲染后的 prose**（宿主在工具结果与 parked 边界统一渲染）。委托成员统一信封：`{ ok: true, ... }` / `{ ok: false, code }`。
+
+- `fork(payload)`：字符串或 `{ charge, name?, calling?, keywords? }`（缺名由 charge 派生），返回 `{ ok, name, agentId, outcome }`。
+- `join()`：按成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, workRecord }], byName }`。
+- `fission({ charge, lanes })`：同身份多 lane，返回 `{ ok, groupId, lanes: [{ index, sessionId }] }`；owner 的 `join()` 收拢本组。
+- `dag({ nodes: [{ id, charge, deps? }] })`：基类编译成波次 `fork` + 一次 `join`，下游 prompt 带依赖记录；返回 `{ ok, results, skipped }`；**节点失败即 park**（`where` 同通道），注入 `"retry"`/`"skip"`/任意值/`{ abort }` 决定。
+
+实现边界：delegation shard 新增结构化入口 `ForkTool.executeReceipt` / `JoinTool.executeReceipt` / `FissionTool.executeReceipt`（返回数据与稳定 kebab 码），宿主 `fork`/`join`/`fission` 工具的 prose 输出保持不变；ToolRegistry 在每次编程调用期间安装进程内委托宿主驱动这些入口，调用结束即清除；未安装宿主时成员返回 `{ ok:false, code:"DELEGATION_UNAVAILABLE" }` 而不抛出。Orchestrator 无文件权限但持有 Fork/Join，因此获得仅委托的编程面；`hasFsCapability`/`admissionFor` 把 Fork/Join/Fission 计入授权。双语教学在 `tool/js-program/delegation-rules`。
+
+## ls 的 ignore 语义与组合搜索（WHAT[repository-programming-057]）
+
+`ls` 应用 gitignore 语义（逐级 `.gitignore` 加根 `.git/info/exclude`，与库里的 `glob` 共用同一 ignore 引擎，经新的公开入口暴露），因此「从工作区根开始递归 `ls`」等价旧 `glob`，「walk + `cat` + `whereAll`」等价旧 `grep`；组合写法见双语资源 `tool/js-program/recipes`。`glob`/`grep` 两个 js 成员据此彻底退役。
 
 ## 持久化机制（WHAT[repository-programming-012]、[013]、[015]、[019]、[029]）
 

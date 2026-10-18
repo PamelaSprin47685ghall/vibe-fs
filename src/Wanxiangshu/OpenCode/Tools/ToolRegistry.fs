@@ -407,6 +407,9 @@ module ToolRegistry =
     [<Emit("Promise.reject(Object.assign(new Error($1), { __jsFailure: { code: $0, reason: $1 } }))")>]
     let private rejectedJsFailure (code: string) (reason: string) : obj = jsNative
 
+    [<Emit("typeof $0 === 'string'")>]
+    let private isStringValue (value: obj) : bool = jsNative
+
     let private createPlanSandboxApi
         (currentContent: string)
         (stagedMutation: string option ref)
@@ -638,40 +641,97 @@ module ToolRegistry =
                         jsLifecyclePersistence
                         (Some groundingObservation)
 
-                // Delegation seam: the programming surface's fork/join members
-                // drive the exact production fork/join specs registered for
-                // this role. The host is process-live for the duration of one
-                // programming call; capability gating stays on the surface.
-                let delegationSpecs =
-                    match role with
-                    | Role.Manager -> Some(Some(ForkTool.managerSpec factory runtime), JoinTool.spec runtime)
-                    | Role.Orchestrator -> Some(Some(ForkTool.orchestratorSpec factory runtime), JoinTool.spec runtime)
-                    | Role.DevOps -> Some(None, JoinTool.spec runtime)
-                    | _ -> None
+                // Delegation seam: the programming surface's delegation members
+                // return data envelopes built from the delegation shard's
+                // structured entries. The host tool prose (fork/join/fission)
+                // is untouched; the host is process-live for one programming
+                // call and capability gating stays on the surface.
+                { spec with
+                    Execute =
+                        fun args ctx ->
+                            let envelopeOk (fields: (string * obj) list) : obj =
+                                createObj (("ok" ==> true) :: fields)
 
-                match delegationSpecs with
-                | None -> spec
-                | Some(forkSpec, joinSpec) ->
-                    { spec with
-                        Execute =
-                            fun args ctx ->
-                                let host: JsDelegationHost =
-                                    { Fork =
-                                        fun payload ->
-                                            match forkSpec with
-                                            | None -> Task.FromResult "fork is not permitted for this role"
-                                            | Some fork -> fork.Execute (ToolHostCodec.argumentsOfRaw payload) ctx
-                                      Join =
-                                        fun () -> joinSpec.Execute (ToolHostCodec.argumentsOfRaw (createObj [])) ctx }
+                            let refusal (code: string) : obj =
+                                createObj [ "ok" ==> false; "code" ==> code ]
 
-                                JsDelegationBridge.install ctx.SessionId host
+                            let host: JsDelegationHost =
+                                { Fork =
+                                    fun payload ->
+                                        task {
+                                            let raw =
+                                                if isStringValue payload then
+                                                    createObj [ "charge" ==> payload ]
+                                                else
+                                                    payload
 
-                                task {
-                                    try
-                                        return! spec.Execute args ctx
-                                    finally
-                                        JsDelegationBridge.clear ctx.SessionId
-                                } })
+                                            let! receipt =
+                                                ForkTool.executeReceipt runtime ctx (ToolHostCodec.argumentsOfRaw raw)
+
+                                            return
+                                                match receipt with
+                                                | Ok placed ->
+                                                    envelopeOk
+                                                        [ "name" ==> placed.Name
+                                                          "agentId" ==> placed.AgentId
+                                                          "outcome" ==> placed.Outcome ]
+                                                | Error code -> refusal code
+                                        }
+                                  Join =
+                                    fun () ->
+                                        task {
+                                            let! receipt = JoinTool.executeReceipt runtime ctx
+
+                                            return
+                                                match receipt with
+                                                | Ok records ->
+                                                    let toObj (record: JoinTool.JoinRecord) =
+                                                        createObj
+                                                            [ "name" ==> record.Name
+                                                              "agentId" ==> record.AgentId
+                                                              "role" ==> record.Role
+                                                              "status" ==> record.Status
+                                                              "workRecord" ==> record.WorkRecord ]
+
+                                                    envelopeOk
+                                                        [ "records" ==> (records |> List.map toObj |> Array.ofList)
+                                                          "byName" ==>
+                                                            createObj
+                                                                [ for record in records -> record.Name ==> box (toObj record) ] ]
+                                                | Error code -> refusal code
+                                        }
+                                  Fission =
+                                    fun payload ->
+                                        task {
+                                            let! receipt =
+                                                FissionTool.executeReceipt
+                                                    runtime
+                                                    ctx
+                                                    (ToolHostCodec.argumentsOfRaw payload)
+
+                                            return
+                                                match receipt with
+                                                | Ok group ->
+                                                    envelopeOk
+                                                        [ "groupId" ==> group.GroupId
+                                                          "lanes" ==>
+                                                            (group.Lanes
+                                                             |> List.map (fun (index, sessionId) ->
+                                                                 createObj
+                                                                     [ "index" ==> index
+                                                                       "sessionId" ==> sessionId ])
+                                                             |> Array.ofList) ]
+                                                | Error code -> refusal code
+                                        } }
+
+                            JsDelegationBridge.install ctx.SessionId host
+
+                            task {
+                                try
+                                    return! spec.Execute args ctx
+                                finally
+                                    JsDelegationBridge.clear ctx.SessionId
+                            } })
 
         let generatedJsSpecs () =
             [ for role in Roles.all do

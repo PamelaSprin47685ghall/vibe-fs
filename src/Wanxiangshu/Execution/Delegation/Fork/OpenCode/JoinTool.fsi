@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
+open System.Threading.Tasks
 open Wanxiangshu.OpenCode
 
 /// join() waits for the owning runtime's next physical completion batch.
@@ -32,5 +33,16 @@ module JoinTool =
         [<Literal>]
         val UnavailableFromContext: string = "tool/join/unavailable-from-context"
 
+    type JoinRecord =
+        { Name: string
+          AgentId: string
+          Role: string
+          Status: string
+          WorkRecord: string }
+
     val admission: ToolAdmission
     val spec: scope: ToolRuntimeScope -> ToolSpec
+
+    val executeReceipt:
+        scope: ToolRuntimeScope -> context: HostToolContext ->
+            Task<Result<JoinRecord list, string>>

@@ -335,12 +335,12 @@ const TOOL_NAMES = [
   'review', 'chronicle', 'fetch', 'deliver',
 ]
 const PLUGIN_TOOL_NAMES = [
-  'ask', 'todowrite-for-plan',
+  'ask', 'devops', 'todowrite-for-plan',
   'fork', 'resume', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
   'join', 'horizon', 'fission', 'review', 'deliver', 'run',
   'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
   'defer',  'publish',
-  'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-predictor',
+  'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator', 'todowrite-for-predictor',
 ]
 const HOST_OWNED_TOOL_NAMES = [ 'read', 'write', 'edit', 'glob', 'grep', 'skill', 'todowrite',
 ]
@@ -396,7 +396,7 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_host_schemas_are_prese
       fork: ['calling', 'name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
       resume: ['name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
       commission: ['calling', 'name', 'charge', 'expected_tool_calls'],
-      chronicle: ['charge', 'occurrence', 'settlement', 'consequence', 'evidence', 'tip'],
+      chronicle: ['charge', 'occurrence', 'settlement', 'consequence', 'tipName', 'opinion', 'advice', 'evidence'],
       'bash-honeypot': [],
       assume: ['assumption'],
       defer: ['new_work'],

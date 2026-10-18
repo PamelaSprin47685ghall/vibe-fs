@@ -11,7 +11,7 @@ test('WHAT[repository-programming-027] both working roles receive the same gener
   assert.equal(engineer.baseClassSource, devops.baseClassSource)
   assert.deepEqual(
     engineer.members.map(m => m.memberName),
-    ['file', 'glob', 'grep', 'edit', 'rewrite', 'write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where'],
+    ['file', 'edit', 'rewrite', 'write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where'],
   )
   assert.deepEqual(devops.members, engineer.members)
 })

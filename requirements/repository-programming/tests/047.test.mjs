@@ -84,9 +84,13 @@ test('WHAT[repository-programming-047] grep and glob remain composable with the 
     writeFileSync(join(dir, 'a.txt'), 'needle a\n', 'utf8')
     writeFileSync(join(dir, 'b.txt'), 'needle b\n', 'utf8')
     writeFileSync(join(dir, 'c.js'), 'needle c\n', 'utf8')
-    const outcome = await runProgram(dir, `    const paths = await this.glob('*.txt');
-    const hits = await this.grep('needle', '*.txt');
-    return { pathCount: paths.paths.length, hitCount: hits.matches.length };`)
+    const outcome = await runProgram(dir, `    const paths = (await this.ls('.')).filter((entry) => entry.endsWith('.txt'));
+    let hitCount = 0;
+    for (const path of paths) {
+      const text = await this.cat(path);
+      hitCount += this.whereAll(text, 'needle').length;
+    }
+    return { pathCount: paths.length, hitCount };`)
     assert.equal(caseName(outcome), 'Succeeded')
     assert.match(render(outcome), /pathCount = 2/)
     assert.match(render(outcome), /hitCount = 2/)

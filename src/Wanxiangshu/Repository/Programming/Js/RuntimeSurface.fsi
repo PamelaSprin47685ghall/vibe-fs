@@ -15,7 +15,8 @@ module JsRuntimeSurface =
 
     val api: handle: obj -> obj
     /// Test hook: install a process-live delegation host for one session.
-    val installDelegationHost: sessionId: string -> fork: obj -> join: obj -> unit
+    /// Each callback returns a data envelope object (never prose).
+    val installDelegationHost: sessionId: string -> fork: obj -> join: obj -> fission: obj -> unit
     val clearDelegationHost: sessionId: string -> unit
     val clearDelegationHosts: unit -> unit
     val stagedCount: handle: obj -> int

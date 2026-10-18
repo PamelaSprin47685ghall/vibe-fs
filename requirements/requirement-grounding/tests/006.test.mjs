@@ -323,10 +323,33 @@ test('WHAT[requirement-grounding-006] registered program grep keeps scan freshne
     mkdirSync(join(directory, 'requirements', 'alpha'), { recursive: true })
     writeFileSync(join(directory, 'requirements', 'alpha', 'WHAT.md'), 'GREPPED-MATERIAL\n')
     writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
+    mkdirSync(join(directory, 'src'), { recursive: true })
+    writeFileSync(join(directory, 'src', 'GREPPED-target.fs'), 'source\n')
     const sessionID = 'grounding-discovery-only'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
-    const args = { program: "class Js extends JsProgram { async run() { return await this.grep('GREPPED', 'requirements/alpha/WHAT.md'); } }" }
+    const args = {
+      program: `class Js extends JsProgram {
+        async walk(dir = ".") {
+          const found = [];
+          for (const entry of await this.ls(dir)) {
+            const full = dir === "." ? entry : dir + "/" + entry;
+            if (entry.endsWith("/")) found.push(...(await this.walk(full.slice(0, -1))));
+            else found.push(full);
+          }
+          return found;
+        }
+        async run() {
+          const hits = [];
+          for (const path of await this.walk("src")) {
+            for (const [begin, end] of this.whereAll(path, "GREPPED")) {
+              hits.push({ path, text: path.slice(begin, end) });
+            }
+          }
+          return hits;
+        }
+      }`,
+    }
     const input = { tool: 'todowrite-for-manager', sessionID, callID: 'grep-only' }
     await hooks['tool.execute.before'](input, { args })
     const output = await hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
@@ -339,6 +362,36 @@ test('WHAT[requirement-grounding-006] registered program grep keeps scan freshne
     const projected = { messages: [{ info: { id: 'grep-result', sessionID, role: 'assistant' }, parts: [{ type: 'tool', tool: input.tool, callID: input.callID, state: { status: 'completed', input: args, output } }] }] }
     await hooks['experimental.chat.messages.transform']({ sessionID }, projected)
     assert.equal(projected.messages[0].parts[0].state.output.includes('requirement_source_path ='), false, 'candidate discovery must not request grounding')
+
+    const composeArgs = {
+      program: `class Js extends JsProgram {
+        async walk(dir = ".") {
+          const found = [];
+          for (const entry of await this.ls(dir)) {
+            const full = dir === "." ? entry : dir + "/" + entry;
+            if (entry.endsWith("/")) found.push(...(await this.walk(full.slice(0, -1))));
+            else found.push(full);
+          }
+          return found;
+        }
+        async run() {
+          const hits = [];
+          for (const path of (await this.walk("requirements/alpha")).filter((p) => p.endsWith("WHAT.md"))) {
+            const text = await this.cat(path);
+            for (const [begin, end] of this.whereAll(text, "GREPPED")) {
+              hits.push({ path, text: text.slice(begin, end) });
+            }
+          }
+          return hits;
+        }
+      }`,
+    }
+    const composeInput = { tool: 'todowrite-for-manager', sessionID, callID: 'compose-search' }
+    await hooks['tool.execute.before'](composeInput, { args: composeArgs })
+    const composeOutput = await hooks.tool['todowrite-for-manager'].execute(composeArgs, { sessionID, agent: 'manager' })
+    assert.match(composeOutput, /text = "GREPPED"/)
+    const composePersisted = readdirSync(events).map(name => readFileSync(join(events, name), 'utf8')).join('\n')
+    assert.equal(composePersisted.includes('RequirementGroundingReadObserved'), true, 'ls + cat + whereAll composition records the explicit file read')
   })
 })
 

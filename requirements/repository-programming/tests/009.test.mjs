@@ -19,12 +19,20 @@ test('WHAT[repository-programming-009] JS010_bindings_grep_returns_matches', asy
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'one two one', 'utf8')
-    const result = await apiOf(createApi(dir)).js.grep('one', '*.txt')
-    assert.equal(result.ok, true)
-    assert.deepEqual(result.matches.map((m) => m.text), ['one', 'one'])
-    assert.deepEqual(result.matches.map((m) => m.path), ['a.txt', 'a.txt'])
-    assert.deepEqual(result.matches.map((m) => m.line), [1, 1])
-    assert.equal('truncated' in result, false)
+    const api = apiOf(createApi(dir))
+    assert.equal(api.js.grep, undefined)
+    const listed = api.js.ls('.')
+    assert.equal(listed.ok, true)
+    const hits = []
+    for (const entry of listed.entries.filter((e) => e.endsWith('.txt'))) {
+      const read = api.js.cat(entry)
+      assert.equal(read.ok, true)
+      for (const [begin, end] of api.js.whereAll(read.text, 'one').spans) {
+        hits.push({ path: entry, text: read.text.slice(begin, end) })
+      }
+    }
+    assert.deepEqual(hits.map((m) => m.text), ['one', 'one'])
+    assert.deepEqual(hits.map((m) => m.path), ['a.txt', 'a.txt'])
   } finally {
     cleanup()
   }

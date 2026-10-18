@@ -77,12 +77,12 @@ module JsGeneratorSurface =
         | JsCapability.Write -> "Write"
         | JsCapability.Edit -> "Edit"
         | JsCapability.Glob -> "Glob"
-        | JsCapability.Grep -> "Grep"
         | JsCapability.Move -> "Move"
         | JsCapability.Remove -> "Remove"
         | JsCapability.Exec -> "Exec"
         | JsCapability.Fork -> "Fork"
         | JsCapability.Join -> "Join"
+        | JsCapability.Fission -> "Fission"
         | JsCapability.Park -> "Park"
 
     let private languageOf (value: string) = ProviderLanguage.parse value

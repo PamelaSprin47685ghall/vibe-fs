@@ -33,9 +33,6 @@ module JsToolsBindings =
     [<Emit("$0 === undefined || $0 === null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
-    [<Emit("typeof $0 === 'string'")>]
-    let private isString (value: obj) : bool = jsNative
-
     let private failureObj (failure: JsFailure) : obj =
         createObj
             [ "ok" ==> false
@@ -106,21 +103,6 @@ module JsToolsBindings =
                     Ok()
         }
 
-    /// Interpret a JS find value: string → Exact anchor, RegExp → Regex anchor.
-    let private anchorOf (find: obj) : Result<AnchorSpec, JsFailure> =
-        if isString find then
-            Ok(AnchorSpec.Exact(string find))
-        elif System.String.IsNullOrEmpty(string (find?source)) then
-            Error JsFailure.AnchorEmptyContent
-        else
-            Ok(AnchorSpec.Regex(string (find?source)))
-
-    /// Exact empty text is a domain guard, separate from anchor parsing.
-    let private requireNonEmptyExact (spec: AnchorSpec) : Result<unit, JsFailure> =
-        match spec with
-        | AnchorSpec.Exact text when System.String.IsNullOrEmpty text -> Error JsFailure.AnchorEmptyContent
-        | _ -> Ok()
-
     let private makeReadMember
         (root: string)
         (readSnapshots: ResizeArray<JsReadSnapshot>)
@@ -148,71 +130,6 @@ module JsToolsBindings =
             }
             |> renderOutcome
 
-    let private makeGlobMember (root: string) =
-        "glob"
-        ==> fun (pattern: string) ->
-            task {
-                let! globRes = JsGlobFs.glob root pattern
-
-                return
-                    match globRes with
-                    | Ok listing -> createObj [ "ok" ==> true; "paths" ==> (List.toArray listing.Paths) ]
-                    | Error failure -> failureObj failure
-            }
-
-    let private renderGrepListing (readSnapshots: ResizeArray<JsReadSnapshot>) (listing: JsAnchorFs.JsGrepListing) =
-        listing.ReadSnapshots |> List.iter readSnapshots.Add
-
-        let matches =
-            listing.Matches
-            |> List.map (fun hit ->
-                createObj
-                    [ "path" ==> hit.Path
-                      "line" ==> hit.Line
-                      "column" ==> hit.Column
-                      "text" ==> hit.Text ])
-
-        createObj [ "ok" ==> true; "matches" ==> (List.toArray matches) ]
-
-    let private executeGrep
-        (root: string)
-        (readSnapshots: ResizeArray<JsReadSnapshot>)
-        (spec: AnchorSpec)
-        (pattern: string)
-        =
-        task {
-            let! grepRes = JsAnchorFs.grep root spec pattern
-
-            return
-                match grepRes with
-                | Error failure -> failureObj failure
-                | Ok listing -> renderGrepListing readSnapshots listing
-        }
-
-    let private runGrep (root: string) (readSnapshots: ResizeArray<JsReadSnapshot>) (needle: obj) (pattern: string) =
-        task {
-            if
-                isUndefined pattern
-                || not (isString pattern)
-                || System.String.IsNullOrEmpty pattern
-            then
-                return failureObj JsFailure.AnchorInvalidPattern
-            else
-                let specRes =
-                    result {
-                        let! spec = anchorOf needle
-                        do! requireNonEmptyExact spec
-                        return spec
-                    }
-
-                match specRes with
-                | Error e -> return failureObj e
-                | Ok spec -> return! executeGrep root readSnapshots spec pattern
-        }
-
-    let private makeGrepMember (root: string) (readSnapshots: ResizeArray<JsReadSnapshot>) =
-        "grep"
-        ==> fun (needle: obj) (pattern: string) -> runGrep root readSnapshots needle pattern
 
     let createLedger (persistence: IJsTransactionPersistence option) : JsAsIsLedger =
         { Persistence = persistence
@@ -445,8 +362,14 @@ module JsToolsBindings =
             result {
                 let! full = resolveInside root path
                 do! ensureRealPathInside root path full
-                let! entries = JsMutationFs.listDirectory full
-                return createObj [ "ok" ==> true; "entries" ==> (List.toArray entries) ]
+                let! entries = JsGlobFs.visibleEntries root path
+
+                let names =
+                    entries
+                    |> List.map (fun entry -> if entry.IsDir then entry.Name + "/" else entry.Name)
+                    |> List.toArray
+
+                return createObj [ "ok" ==> true; "entries" ==> names ]
             }
             |> renderOutcome
 
@@ -742,7 +665,14 @@ module JsToolsBindings =
         "join"
         ==> fun () ->
             match host with
-            | Some delegation -> box (delegation.Join())
+            | Some delegation -> box (delegation.Join ())
+            | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+
+    let private makeFissionMember (host: JsDelegationHost option) =
+        "fission"
+        ==> fun (payload: obj) ->
+            match host with
+            | Some delegation -> box (delegation.Fission payload)
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
     let private createApiCore
@@ -765,11 +695,7 @@ module JsToolsBindings =
                   makeWhereMember parkState
 
               if Set.contains JsCapability.Glob capabilities then
-                  makeGlobMember root
                   makeLsMember root
-
-              if Set.contains JsCapability.Grep capabilities then
-                  makeGrepMember root readSnapshots
 
               if Set.contains JsCapability.Edit capabilities then
                   makeEditMember root staging ledger
@@ -792,6 +718,9 @@ module JsToolsBindings =
 
               if Set.contains JsCapability.Join capabilities then
                   makeJoinMember delegationHost
+
+              if Set.contains JsCapability.Fission capabilities then
+                  makeFissionMember delegationHost
 
               match parkState with
               | Some state -> makeParkMember state

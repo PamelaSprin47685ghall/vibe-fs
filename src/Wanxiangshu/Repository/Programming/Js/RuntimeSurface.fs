@@ -28,12 +28,12 @@ module JsRuntimeSurface =
                   JsCapability.Write
                   JsCapability.Edit
                   JsCapability.Glob
-                  JsCapability.Grep
                   JsCapability.Move
                   JsCapability.Remove
                   JsCapability.Exec
                   JsCapability.Fork
                   JsCapability.Join
+                  JsCapability.Fission
                   JsCapability.Park ]
 
         let api =
@@ -55,12 +55,12 @@ module JsRuntimeSurface =
         | "Write" -> Some JsCapability.Write
         | "Edit" -> Some JsCapability.Edit
         | "Glob" -> Some JsCapability.Glob
-        | "Grep" -> Some JsCapability.Grep
         | "Move" -> Some JsCapability.Move
         | "Remove" -> Some JsCapability.Remove
         | "Exec" -> Some JsCapability.Exec
         | "Fork" -> Some JsCapability.Fork
         | "Join" -> Some JsCapability.Join
+        | "Fission" -> Some JsCapability.Fission
         | "Park" -> Some JsCapability.Park
         | _ -> None
 
@@ -86,11 +86,12 @@ module JsRuntimeSurface =
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api
 
     /// Test hook: install a process-live delegation host for one session.
-    let installDelegationHost (sessionId: string) (fork: obj) (join: obj) : unit =
+    let installDelegationHost (sessionId: string) (fork: obj) (join: obj) (fission: obj) : unit =
         JsDelegationBridge.install
             sessionId
-            { Fork = fun payload -> unbox<Task<string>> (emitJsExpr (fork, payload) "$0($1)")
-              Join = fun () -> unbox<Task<string>> (emitJsExpr join "$0()") }
+            { Fork = fun payload -> unbox<Task<obj>> (emitJsExpr (fork, payload) "$0($1)")
+              Join = fun () -> unbox<Task<obj>> (emitJsExpr join "$0()")
+              Fission = fun payload -> unbox<Task<obj>> (emitJsExpr (fission, payload) "$0($1)") }
 
     let clearDelegationHost (sessionId: string) : unit = JsDelegationBridge.clear sessionId
 

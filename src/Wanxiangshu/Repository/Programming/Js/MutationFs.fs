@@ -102,8 +102,6 @@ module JsMutationFs =
     [<Import("mkdirSync", "node:fs")>]
     let private mkdirSync (path: string) : unit = jsNative
 
-    [<Import("join", "node:path")>]
-    let private pathJoin (a: string) (b: string) : string = jsNative
 
     [<Emit("$0.isDirectory()")>]
     let private statIsDirectory (stat: obj) : bool = jsNative
@@ -160,25 +158,6 @@ module JsMutationFs =
             else
                 Error(JsFailure.FileReadFailed fromPath)
 
-    /// Enumerate one directory, POSIX `ls` order. Directory entries carry a
-    /// trailing slash so the caller can tell them apart without another
-    /// stat. A missing path is FILE_NOT_FOUND; a file path is not a listing.
-    let listDirectory (path: string) : Result<string list, JsFailure> =
-        try
-            let names = readdirSync path |> Array.sort
-
-            names
-            |> Array.map (fun name ->
-                let entry = pathJoin path name
-                let stat = lstatSync entry
-                if statIsDirectory stat then name + "/" else name)
-            |> Array.toList
-            |> Ok
-        with error ->
-            if string error?code = "ENOENT" then
-                Error(JsFailure.FileNotFound path)
-            else
-                Error(JsFailure.FileReadFailed path)
 
     /// One path's metadata. A missing path is a normal observation
     /// (`exists = false`), not a failure; the caller decides what absence

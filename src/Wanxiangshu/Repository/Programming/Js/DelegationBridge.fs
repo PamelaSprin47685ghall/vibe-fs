@@ -4,8 +4,9 @@ open System.Collections.Generic
 open System.Threading.Tasks
 
 type JsDelegationHost =
-    { Fork: obj -> Task<string>
-      Join: unit -> Task<string> }
+    { Fork: obj -> Task<obj>
+      Join: unit -> Task<obj>
+      Fission: obj -> Task<obj> }
 
 /// Process-live delegation seam. One host per session; the wiring installs it
 /// around a generated tool execution and clears it afterwards. Single-threaded

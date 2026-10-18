@@ -54,7 +54,7 @@
 
 进程表只是常驻身份的缓存。重启恢复仅认 durable DelegationBound 记录的 ReplicaSessionId，并核对 Host 中的 agent、title 与物理 family children；无关联不收养其他会话，多个候选、属性冲突或查询失败明确拒绝，不以查询失败为丢失证据再建一个。仅确认原 child 永久丢失时才替换，并释放原登记的容量。物理 parent 一律压平到 Host 证明的 family root；逻辑 owner、身份继承与语言仍属于实际工作的 owner，两者不可混用。
 
-同伴只能调用唯一专用的只读 JS 编程面 `todowrite-for-predictor`（能力严格限定为 {Read, Glob, Grep}）；`read`/`glob`/`grep` 原生工具不在同伴的可调用集合内，全部只读查证经该 JS 面完成。其模型可见工具 schema 与底层执行门禁同源：会话级权限规则在 deny 全部工具后精准放行此项。尝试写入、调用其他工具、借 fork/MCP/通用 JS 工具（如 `todowrite-for-engineer`、`todowrite-for-devops` 等）绕过只读能力，均 fail closed 且不产生任何实际效果；shell 命令不因"看起来只读"而入列。
+同伴只能调用唯一专用的只读 JS 编程面 `todowrite-for-predictor`（能力严格限定为 {Read, Glob}；`grep` 成员已按 repository-programming [057] 退役，内容搜索经 walk + `whereAll` 组合完成）；`read`/`glob`/`grep` 原生工具不在同伴的可调用集合内，全部只读查证经该 JS 面完成。其模型可见工具 schema 与底层执行门禁同源：会话级权限规则在 deny 全部工具后精准放行此项。尝试写入、调用其他工具、借 fork/MCP/通用 JS 工具（如 `todowrite-for-engineer`、`todowrite-for-devops` 等）绕过只读能力，均 fail closed 且不产生任何实际效果；shell 命令不因"看起来只读"而入列。
 
 准入与副本能力均采用现行角色集合 `Roles.all`，不得各自维护角色白名单。现行角色的副本能力一律为上述只读集合；普通请求的角色权限不变。Blogger 等内部会话仍由 root-work、request-kind 与防递归门禁限制，不能靠角色名称发起嵌套委托。
 

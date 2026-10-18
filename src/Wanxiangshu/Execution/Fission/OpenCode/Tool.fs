@@ -51,6 +51,11 @@ module FissionTool =
         [<Literal>]
         let SharedCompletion = "tool/fission/shared-completion"
 
+    type FissionReceipt =
+        { GroupId: string
+          LaneCount: int
+          Lanes: (int * string) list }
+
     let private languageOf (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
 
@@ -865,3 +870,225 @@ module FissionTool =
           Arguments = [ "prompts", ToolHostCodec.stringArraySchema factory ]
           Admission = admission
           Execute = execute scope }
+
+    let private classifyAdmissionOutcomeReceipt =
+        function
+        | Error FissionRejectReason.InvalidOrigin -> Error "fission-unavailable"
+        | Error FissionRejectReason.AlreadyFissioned -> Error "not-ready"
+        | Error FissionRejectReason.CapacityExceeded -> Error "fission-unavailable"
+        | Error(FissionRejectReason.RuntimeUnavailable msg) when
+            msg.StartsWith("lane create failed:", StringComparison.Ordinal)
+            || msg.StartsWith("lane start failed:", StringComparison.Ordinal)
+            ->
+            Error "lane-start-failed"
+        | Error _ -> Error "fission-unavailable"
+        | Ok admission -> Ok admission
+
+    let private runAdmissionReceipt
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (ctx: HostToolContext)
+        (parsed: ParsedFissionPrompts)
+        (toolCallId: ToolCallId)
+        (owner: SessionId)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (ownerRuntime: HostForkRuntime)
+        (preAgents: (string * SessionId) list)
+        (prePtys: string list)
+        : Task<Result<FissionReceipt, string>> =
+        task {
+            let groupId = groupIdFor owner toolCallId
+
+            let directory =
+                scope.DirectoryFor ctx.SessionId |> Option.orElse scope.WorkspaceDirectory
+
+            let preCompletionIds =
+                (preAgents |> List.map (fst >> FissionExternalId.agent))
+                @ (prePtys |> List.map FissionExternalId.pty)
+
+            let deps: FissionAdmissionDependencies =
+                { ParentOf = scope.Sessions.TryGetParentSession
+                  OwnerWorkRecord = parentWorkRecordPort scope
+                  CreateLane = createLanePort scope groupId owner profile.SelectedAgent directory parsed.Count
+                  StartLane = startLanePort scope durable profile directory
+                  AbortLane = abortLanePort scope
+                  SilentInterruptOwner = silentInterruptOwnerPort scope }
+
+            let hooks: FissionAdmissionHooks =
+                { OnLanesCreated =
+                    onLanesCreatedHook durable groupId toolCallId parsed.Count preCompletionIds ctx.ProviderRunId
+                  OnFailed = onFailedHook durable groupId ctx.ProviderRunId }
+
+            let admissionRuntime = FissionAdmission.createWithHooks deps hooks
+
+            let! admissionAttempt = FissionAdmission.admit admissionRuntime owner parsed
+
+            match classifyAdmissionOutcomeReceipt admissionAttempt with
+            | Error code -> return Error code
+            | Ok admission ->
+                installPreFissionBroadcasts
+                    scope
+                    durable
+                    profile
+                    groupId
+                    owner
+                    admission.Lanes
+                    preAgents
+                    prePtys
+                    ownerRuntime
+
+                let lanes =
+                    admission.Lanes
+                    |> List.sortBy (fun lane -> lane.Index)
+                    |> List.map (fun lane -> lane.Index, SessionId.value lane.SessionId)
+
+                return
+                    Ok
+                        { GroupId = groupId
+                          LaneCount = parsed.Count
+                          Lanes = lanes }
+        }
+
+    let private admitWhenEventPortReadyReceipt
+        (scope: ToolRuntimeScope)
+        (durable: AgentJournal)
+        (ctx: HostToolContext)
+        (parsed: ParsedFissionPrompts)
+        (toolCallId: ToolCallId)
+        (owner: SessionId)
+        (profile: PromptAuthority.AuthorityExecutionProfile)
+        (ownerRuntime: HostForkRuntime)
+        : Task<Result<FissionReceipt, string>> =
+        task {
+            let preAgents = ownerRuntime.SnapshotOutstandingAgentRuns()
+            let prePtys = ownerRuntime.SnapshotOutstandingPtyRuns()
+
+            if
+                (not (List.isEmpty preAgents) || not (List.isEmpty prePtys))
+                && scope.EventPort.IsNone
+            then
+                return Error "not-ready"
+            else
+                return!
+                    runAdmissionReceipt
+                        scope
+                        durable
+                        ctx
+                        parsed
+                        toolCallId
+                        owner
+                        profile
+                        ownerRuntime
+                        preAgents
+                        prePtys
+        }
+
+    let private executeWhenIdleReceipt
+        (scope: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (parsed: ParsedFissionPrompts)
+        (toolCallId: ToolCallId)
+        (durable: AgentJournal)
+        (owner: SessionId)
+        : Task<Result<FissionReceipt, string>> =
+        task {
+            let activeProfile =
+                PromptAuthorityProjectionQueries.activeProfile owner (AgentJournal.snapshot durable).AgentProjections
+
+            match activeProfile, scope.RuntimeFor ctx with
+            | None, _
+            | _, Error _ -> return Error "context-unavailable"
+            | Some profile, _ when
+                profile.CanonicalRole <> Role.Engineer
+                || not (OfficeCapability.isAllowed profile.CanonicalRole ToolPermission.Fission)
+                ->
+                return Error "fission-unavailable"
+            | Some profile, Ok ownerRuntime ->
+                return! admitWhenEventPortReadyReceipt scope durable ctx parsed toolCallId owner profile ownerRuntime
+        }
+
+    let private executeWithJournalReceipt
+        (scope: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (parsed: ParsedFissionPrompts)
+        (toolCallId: ToolCallId)
+        (durable: AgentJournal)
+        : Task<Result<FissionReceipt, string>> =
+        task {
+            let caller = SessionId.create ctx.SessionId
+            let owner = scope.LogicalOwnerFor caller
+            let fissionState = (AgentJournal.snapshot durable).AgentProjections.Fission
+
+            if FissionRuntime.tryLane caller |> Option.isSome then
+                return Error "not-ready"
+            elif FissionProjection.tryActiveForOwner owner fissionState |> Option.isSome then
+                return Error "not-ready"
+            else
+                return! executeWhenIdleReceipt scope ctx parsed toolCallId durable owner
+        }
+
+    let private executeParsedReceipt
+        (scope: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (parsed: ParsedFissionPrompts)
+        : Task<Result<FissionReceipt, string>> =
+        task {
+            match ctx.ToolCallId, scope.Journal with
+            | None, _
+            | _, None -> return Error "context-unavailable"
+            | Some _, Some _ when String.IsNullOrWhiteSpace ctx.SessionId -> return Error "context-unavailable"
+            | Some toolCallId, Some durable -> return! executeWithJournalReceipt scope ctx parsed toolCallId durable
+        }
+
+    let private decodePromptsForReceipt (args: HostToolArguments) : string list =
+        let explicit = args.Texts "prompts"
+
+        if not (List.isEmpty explicit) then
+            explicit
+        else
+            let charge = args.Text "charge"
+
+            match args.OptionalNonNegativeInteger "lanes" with
+            | Ok(Some laneCount) when laneCount >= 2 && not (String.IsNullOrWhiteSpace charge) ->
+                List.replicate laneCount charge
+            | _ -> []
+
+    let private executeForSubsessionReceipt
+        (scope: ToolRuntimeScope)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        : Task<Result<FissionReceipt, string>> =
+        task {
+            let prompts = decodePromptsForReceipt args
+
+            match FissionPrompt.parse prompts with
+            | Error FissionRejectReason.TooFewLanes
+            | Error(FissionRejectReason.EmptyLanePrompt _) -> return Error "invalid-prompt"
+            | Error _ -> return Error "fission-unavailable"
+            | Ok parsed -> return! executeParsedReceipt scope ctx parsed
+        }
+
+    let private executeForCallerReceipt
+        (scope: ToolRuntimeScope)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        (caller: SessionId)
+        : Task<Result<FissionReceipt, string>> =
+        task {
+            match! scope.Sessions.TryGetParentSession caller with
+            | Error _ -> return Error "fission-unavailable"
+            | Ok None -> return Error "fission-unavailable"
+            | Ok(Some _) -> return! executeForSubsessionReceipt scope args ctx
+        }
+
+    let executeReceipt
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (args: HostToolArguments)
+        : Task<Result<FissionReceipt, string>> =
+        task {
+            if String.IsNullOrWhiteSpace context.SessionId then
+                return Error "context-unavailable"
+            else
+                return! executeForCallerReceipt scope args context (SessionId.create context.SessionId)
+        }

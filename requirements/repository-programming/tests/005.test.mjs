@@ -73,7 +73,7 @@ test('WHAT[repository-programming-005] JS002_description_embeds_spec_base_class_
     'Anchors locate',
     'Define exactly one class named Js',
     'Ultra Example',
-    'oldApi → newApi',
+    'oldApi -> newApi',
     'Mechanical branches belong inside the program',
   ]) {
     assert.equal(coder.description.includes(token), true, `coder description missing: ${token}`)

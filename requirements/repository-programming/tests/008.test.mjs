@@ -35,9 +35,11 @@ test('WHAT[repository-programming-008] JS007_bindings_glob_lists_matching_paths'
     mkdirSync(join(dir, 'src'))
     writeFileSync(join(dir, 'src', 'a.fs'), 'x', 'utf8')
     writeFileSync(join(dir, 'src', 'b.txt'), 'y', 'utf8')
-    const result = await apiOf(createApi(dir)).js.glob('src/*.fs')
+    const api = apiOf(createApi(dir))
+    assert.equal(api.js.glob, undefined)
+    const result = api.js.ls('src')
     assert.equal(result.ok, true)
-    assert.deepEqual(result.paths, ['src/a.fs'])
+    assert.deepEqual(result.entries.filter((e) => e.endsWith('.fs')).map((e) => `src/${e}`), ['src/a.fs'])
     assert.equal('truncated' in result, false)
   } finally {
     cleanup()

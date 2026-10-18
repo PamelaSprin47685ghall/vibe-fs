@@ -81,10 +81,11 @@ module JsToolGenerator =
                     |> Map.ofList }
 
     /// Dedicated readonly projection for the StrengthReplica JS surface (JS-PREDICTOR).
-    /// Role is not a public office Role; capabilities are exactly {Read, Glob, Grep}.
+    /// Role is not a public office Role; capabilities are exactly {Read, Glob}
+    /// (grep retired in favour of walk + whereAll, [057]).
     let generatePredictor (prose: JsCanonicalDescription.Prose) : JsSurface =
         let roleName = "predictor"
-        let jsCapabilities = set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ]
+        let jsCapabilities = set [ JsCapability.Read; JsCapability.Glob ]
         let members = membersFor jsCapabilities
 
         { ToolName = toolNameFor roleName

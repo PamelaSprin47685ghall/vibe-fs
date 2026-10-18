@@ -945,3 +945,225 @@ module ForkTool =
                     | Error message -> return consequence message
                     | Ok request -> return! executeOrchestrator scope request context
                 } }
+
+    let private commitNewManagerForkReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        (managed: ManagedAgent)
+        role
+        attachment
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let handleId = ToolHostCodec.newHandleId ()
+
+            let! placement =
+                taskResult {
+                    do! recordFissionAffinity scope context handleId
+                    let! result = runManagerFork scope runtime role request language attachment handleId managed
+                    announceChild runtime context handleId
+                    return result
+                }
+
+            return
+                match placement with
+                | Error _ -> Error "placement-failed"
+                | Ok(ForkResult.DispatchUncertain _) -> Error "dispatch-uncertain"
+                | Ok(ForkResult.NotFound _) -> Error "placement-failed"
+                | Ok(ForkResult.Created agentId) ->
+                    Ok
+                        { Name = request.Name.Trim()
+                          AgentId = agentId
+                          Outcome = "created" }
+                | Ok(ForkResult.Nudged agentId) ->
+                    Ok
+                        { Name = request.Name.Trim()
+                          AgentId = agentId
+                          Outcome = "nudged" }
+        }
+
+    let private finishNewManagerForkReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        (managed: ManagedAgent)
+        role
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            match! resolveAttachment scope handles request with
+            | Error _ -> return Error "placement-failed"
+            | Ok attachment ->
+                return! commitNewManagerForkReceipt scope runtime context request language managed role attachment
+        }
+
+    let private placeNewManagerForkReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        (managed: ManagedAgent)
+        : Task<Result<ForkReceipt, string>> =
+        let role = managed.Role
+
+        if hasKeywords request && not (warmStartAllowed role) then
+            Task.FromResult(Error "warm-start-unavailable")
+        else
+            finishNewManagerForkReceipt scope runtime context request language handles managed role
+
+    let private createNewManagerForkReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        : Task<Result<ForkReceipt, string>> =
+        let derived = derivedForkCalling request.Name
+
+        if callingConflictsWithDerived request derived then
+            Task.FromResult(Error "calling-conflict")
+        else
+            match tryCalling managerCallingBindings derived with
+            | None -> Task.FromResult(Error "unknown-calling")
+            | Some managed -> placeNewManagerForkReceipt scope runtime context request language handles managed
+
+    let private executeManagerReceiptAfterGuards
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        language
+        : Task<Result<ForkReceipt, string>> =
+        match scope.RuntimeFor context with
+        | Error _ -> Task.FromResult(Error "context-unavailable")
+        | Ok runtime ->
+            let handles = agentHandles scope context
+
+            let existingByname =
+                handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+
+            match existingByname with
+            | Some _ -> Task.FromResult(Error "name-already-belongs")
+            | None -> createNewManagerForkReceipt scope runtime context request language handles
+
+    let private executeManagerReceipt
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let language = lang context
+
+            if String.IsNullOrWhiteSpace request.Name then
+                return Error "name-required"
+            elif String.IsNullOrWhiteSpace request.Charge then
+                return Error "charge-required"
+            elif isSelfAttachment request then
+                return Error "placement-failed"
+            else
+                let parentSessionId =
+                    if String.IsNullOrWhiteSpace context.SessionId then
+                        SessionId.create ""
+                    else
+                        scope.LogicalOwnerFor(SessionId.create context.SessionId)
+
+                let isDevOps =
+                    String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
+
+                if boundDevOpsDispatchClosed scope parentSessionId isDevOps then
+                    return Error "placement-failed"
+                else
+                    return! executeManagerReceiptAfterGuards scope request context language
+        }
+
+    let private finishCommissionNewReceipt
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (request: Request)
+        (managed: ManagedAgent)
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let managerId = ManagerJobId.create (ToolHostCodec.newHandleId ())
+            let host = scope.OrchestratorHostFor context.SessionId
+
+            match!
+                host.ForkManagerJob(
+                    managerId,
+                    managed.Name,
+                    request.Charge,
+                    byname = request.Name,
+                    ?expectedToolCalls = request.ExpectedToolCalls
+                )
+            with
+            | Ok _ ->
+                return
+                    Ok
+                        { Name = request.Name.Trim()
+                          AgentId = ""
+                          Outcome = "commissioned" }
+            | Error _ -> return Error "placement-failed"
+        }
+
+    let private executeOrchestratorReceipt
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            if String.IsNullOrWhiteSpace context.SessionId then
+                return Error "context-unavailable"
+            elif String.IsNullOrWhiteSpace request.Name then
+                return Error "name-required"
+            elif String.IsNullOrWhiteSpace request.Charge then
+                return Error "charge-required"
+            else
+                let existingByname = orchestratorExistingByname scope request
+                let hasCalling = not (String.IsNullOrWhiteSpace request.Calling)
+
+                if
+                    hasCalling
+                    && not (
+                        String.Equals(
+                            request.Calling.Trim(),
+                            derivedCommissionCalling,
+                            StringComparison.OrdinalIgnoreCase
+                        )
+                    )
+                then
+                    return Error "unknown-calling"
+                else
+                    match existingByname with
+                    | Some _ -> return Error "name-already-belongs"
+                    | None ->
+                        match tryCalling orchestratorCallingBindings derivedCommissionCalling with
+                        | None -> return Error "unknown-calling"
+                        | Some managed -> return! finishCommissionNewReceipt scope context request managed
+        }
+
+    let executeReceipt
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (args: HostToolArguments)
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let! roleOpt = scope.EnsureRoleFor context
+
+            match roleOpt with
+            | None -> return Error "not-a-delegation-role"
+            | Some role ->
+                let language = lang context
+
+                match decode language args with
+                | Error _ -> return Error "placement-failed"
+                | Ok request ->
+                    match role with
+                    | Role.Manager -> return! executeManagerReceipt scope request context
+                    | Role.Orchestrator -> return! executeOrchestratorReceipt scope request context
+                    | _ -> return Error "not-a-delegation-role"
+        }

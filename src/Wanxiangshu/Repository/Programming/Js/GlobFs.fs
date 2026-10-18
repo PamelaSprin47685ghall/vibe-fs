@@ -45,3 +45,24 @@ module JsGlobFs =
             let! (result: obj) = unbox<Task<obj>> (api?glob (pattern))
             return ofResult result
         }
+
+    type JsVisibleEntry = { Name: string; IsDir: bool }
+
+    /// JS-007 / [057]: one-directory listing with the library's gitignore
+    /// semantics. The library resolves the path inside the root and refuses
+    /// boundary escapes itself.
+    let visibleEntries (root: string) (path: string) : Result<JsVisibleEntry list, JsFailure> =
+        let api = createFilesystem Filesystem root
+        let result: obj = api?visibleEntries (path)
+
+        if unbox<bool> (result?ok) then
+            let entries = unbox<obj array> (result?entries)
+
+            entries
+            |> Array.map (fun entry ->
+                { Name = string (entry?name)
+                  IsDir = unbox<bool> (entry?isDir) })
+            |> Array.toList
+            |> Ok
+        else
+            Error(JsFailure.ofWire (string (result?code)) (string (result?reason)))

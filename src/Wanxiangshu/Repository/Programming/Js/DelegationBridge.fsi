@@ -3,12 +3,13 @@ namespace Wanxiangshu.Repository.Programming.Js
 open System.Threading.Tasks
 
 /// Process-live delegation seam for the programming surface: the wiring layer
-/// (which owns the production fork/join tool specs) installs one host per
-/// session; the generated `js.fork`/`js.join` members call it. Fork returns the
-/// real fork receipt text; join waits for this session's children.
+/// (which owns the production fork/join/fission entries) installs one host per
+/// session; the generated delegation members call it. Every call returns the
+/// structured envelope object — data, never rendered prose.
 type JsDelegationHost =
-    { Fork: obj -> Task<string>
-      Join: unit -> Task<string> }
+    { Fork: obj -> Task<obj>
+      Join: unit -> Task<obj>
+      Fission: obj -> Task<obj> }
 
 module JsDelegationBridge =
     val install: sessionId: string -> host: JsDelegationHost -> unit

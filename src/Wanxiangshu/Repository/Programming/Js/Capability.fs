@@ -11,7 +11,6 @@ type JsCapability =
     | Write
     | Edit
     | Glob
-    | Grep
     | Move
     | Remove
     /// Host-owned long-running command engineering (`js.run`).
@@ -20,6 +19,8 @@ type JsCapability =
     /// caller's children (`join`).
     | Fork
     | Join
+    /// Same-identity multi-lane execution (`js.fission`).
+    | Fission
     | Park
 
 module JsCapability =
@@ -32,12 +33,12 @@ module JsCapability =
         | ToolPermission.Write -> Some JsCapability.Write
         | ToolPermission.Edit -> Some JsCapability.Edit
         | ToolPermission.Glob -> Some JsCapability.Glob
-        | ToolPermission.Grep -> Some JsCapability.Grep
         | ToolPermission.Move -> Some JsCapability.Move
         | ToolPermission.Remove -> Some JsCapability.Remove
         | ToolPermission.Exec -> Some JsCapability.Exec
         | ToolPermission.Fork -> Some JsCapability.Fork
         | ToolPermission.Join -> Some JsCapability.Join
+        | ToolPermission.Fission -> Some JsCapability.Fission
         | _ -> None
 
     let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
@@ -76,36 +77,6 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.read" }
 
-    let glob: JsCapabilityFragment =
-        { Capability = JsCapability.Glob
-          MemberName = "glob"
-          Signature = "async glob(pattern)"
-          Description =
-            "glob(pattern) — gitignore-style path enumeration. Returns "
-            + "{ paths }. Does not grant Read on those paths."
-          CanonicalExample =
-            "class Js extends JsProgram {\n"
-            + "  async run() {\n"
-            + "    return await this.glob(\"src/**/*.fs\");\n"
-            + "  }\n"
-            + "}"
-          RuntimeBindingKey = "js.glob" }
-
-    let grep: JsCapabilityFragment =
-        { Capability = JsCapability.Grep
-          MemberName = "grep"
-          Signature = "async grep(needle, pattern)"
-          Description =
-            "grep(needle, pattern) — search UTF-8 files selected by the same "
-            + "gitignore-style glob. needle is a non-empty string or RegExp. Returns "
-            + "{ matches } with 1-based line/column. Does not grant file()."
-          CanonicalExample =
-            "class Js extends JsProgram {\n"
-            + "  async run() {\n"
-            + "    return await this.grep(/TODO:.+/, \"src/**/*.js\");\n"
-            + "  }\n"
-            + "}"
-          RuntimeBindingKey = "js.grep" }
 
     let edit: JsCapabilityFragment =
         { Capability = JsCapability.Edit
@@ -336,24 +307,50 @@ module JsFragmentRegistry =
           MemberName = "fork"
           Signature = "async fork(payload)"
           Description =
-            "fork(payload) — delegate one charge to a child work. `payload` carries the same "
-            + "fields as the host fork tool: charge (required), name, calling, keywords. "
-            + "Returns the fork receipt text; the child runs in its own session."
+            "fork(payload) — delegate one charge to a child work. `payload` is a string (the "
+            + "charge) or { charge, name?, calling?, keywords? }; a missing name is derived from "
+            + "the charge. Returns the data envelope { ok, name, agentId, outcome } "
+            + "(outcome: created | nudged | commissioned) or { ok: false, code }."
           CanonicalExample =
             "class Js extends JsProgram {\n"
             + "  async run() {\n"
-            + "    return await this.fork({ charge: \"index the parser module\", name: \"parser-index\" });\n"
+            + "    const placed = await this.fork(\"index the parser module\");\n"
+            + "    if (!placed.ok) return placed;\n"
+            + "    return await this.join();\n"
             + "  }\n"
             + "}"
           RuntimeBindingKey = "js.fork" }
+
+    let dag: JsCapabilityFragment =
+        { Capability = JsCapability.Fork
+          MemberName = "dag"
+          Signature = "async dag({ nodes })"
+          Description =
+            "dag({ nodes: [{ id, charge, deps?, lanes? }] }) — declarative dependency sugar the "
+            + "base class compiles into fork waves plus one join per wave; dependent nodes receive "
+            + "their dependencies' records. Returns { ok, results: { [id]: record }, skipped }. "
+            + "A failed node parks with { dag, node, code, deps, done, pending }: inject "
+            + "\"retry\", \"skip\", a replacement result, or { abort: reason }."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    return await this.dag({ nodes: [\n"
+            + "      { id: \"spec\", charge: \"write the interface spec\" },\n"
+            + "      { id: \"impl\", charge: \"implement it\", deps: [\"spec\"] },\n"
+            + "    ] });\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.dag" }
 
     let join: JsCapabilityFragment =
         { Capability = JsCapability.Join
           MemberName = "join"
           Signature = "async join()"
           Description =
-            "join() — wait for this session's children and return the join receipt batch. "
-            + "Membership-scoped: it joins the children this caller created, not an explicit handle list."
+            "join() — wait for this session's children and return "
+            + "{ ok, records: [{ name, agentId, role, status, workRecord }], byName } "
+            + "(status: completed | failed | abandoned) or { ok: false, code }. Membership-scoped: "
+            + "it collects the children this caller created, not an explicit handle list."
           CanonicalExample =
             "class Js extends JsProgram {\n"
             + "  async run() {\n"
@@ -362,6 +359,24 @@ module JsFragmentRegistry =
             + "  }\n"
             + "}"
           RuntimeBindingKey = "js.join" }
+
+    let fission: JsCapabilityFragment =
+        { Capability = JsCapability.Fission
+          MemberName = "fission"
+          Signature = "async fission({ charge, lanes })"
+          Description =
+            "fission({ charge, lanes }) — run the same identity over several lanes of one charge; "
+            + "the host binds and converges the lanes. Returns { ok, groupId, lanes: "
+            + "[{ index, sessionId }] } or { ok: false, code }. The owner's join() collects the "
+            + "lanes of this group."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const group = await this.fission({ charge: \"explore three designs\", lanes: 3 });\n"
+            + "    return await this.join();\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.fission" }
 
     /// park fragment — the pause/resume mechanism (PLAN S1 B.7/B.17). Unlike
     /// the filesystem members this is not a ToolPermission projection: it is a
@@ -389,8 +404,6 @@ module JsFragmentRegistry =
     /// is the deterministic projection; never rebuild member order elsewhere.
     let all: JsCapabilityFragment list =
         [ read
-          glob
-          grep
           edit
           rewrite
           write
@@ -404,7 +417,9 @@ module JsFragmentRegistry =
           where
           run
           fork
+          dag
           join
+          fission
           park ]
 
     let byCapability: Map<JsCapability, JsCapabilityFragment list> =

@@ -8,12 +8,12 @@ type JsCapability =
     | Write
     | Edit
     | Glob
-    | Grep
     | Move
     | Remove
     | Exec
     | Fork
     | Join
+    | Fission
     | Park
 
 module JsCapability =
@@ -30,8 +30,6 @@ type JsCapabilityFragment =
 
 module JsFragmentRegistry =
     val read: JsCapabilityFragment
-    val glob: JsCapabilityFragment
-    val grep: JsCapabilityFragment
     val edit: JsCapabilityFragment
     val rewrite: JsCapabilityFragment
     val write: JsCapabilityFragment
@@ -46,6 +44,8 @@ module JsFragmentRegistry =
     val run: JsCapabilityFragment
     val fork: JsCapabilityFragment
     val join: JsCapabilityFragment
+    val dag: JsCapabilityFragment
+    val fission: JsCapabilityFragment
     val park: JsCapabilityFragment
     val all: JsCapabilityFragment list
     val byCapability: Map<JsCapability, JsCapabilityFragment list>

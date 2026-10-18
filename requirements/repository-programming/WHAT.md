@@ -8,7 +8,7 @@
 
 每项文件系统 capability 在公开基类、工具描述、canonical examples 与运行时门禁中一致投影；缺失能力在四层均不可用，伪造调用也须拒绝。一项能力可生成固定顺序的同权成员族，不产生第二份授权。
 
-主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`。旧成员 `file`/`glob`/`grep`/`edit`/`rewrite` 在本期保留，退役由后续阶段统一执行。
+主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`，Exec → `run`，Fork → `fork`/`dag`，Join → `join`，Fission → `fission`。`glob`/`grep` 成员按 [057] 彻底退役；`file`/`edit`/`rewrite` 在本期保留，退役由后续阶段执行。
 
 ## [003] 确定性生成
 
@@ -142,7 +142,7 @@ ReadSnapshots 只用于事务隔离与冲突检测，不直接作为案例关联
 
 两者按已授予能力获得直接 Read/Write/Edit/Glob/Grep/Move/Remove 工具及生成的 todowrite-for-engineer/todowrite-for-devops。直接与可编程文件操作共享路径边界、UTF-8 校验、符号链接防护和 As-Is 逐笔落盘写语义（每笔写即原子落盘、跨笔不回滚、失败保留已落盘改动）。
 
-Manager 的 `todowrite-for-manager` 仅提供 Read/Glob/Grep，能力过滤同样到达真实 API；评审及当前事实准入遵循 capability-enforcement-025，不因生成工具而取得修改或执行权。
+Manager 的 `todowrite-for-manager` 只读文件能力为 Read/Glob，并持有委托原语 Fork/Join；能力过滤同样到达真实 API；评审及当前事实准入遵循 capability-enforcement-025，不因生成工具而取得修改或执行权。
 
 ## [028] programPromise 暴露与 deadline 可重置
 
@@ -232,7 +232,7 @@ rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INV
 
 ## [045] 文件原语：cat/ls/stat/write/mkdir
 
-`cat(path)` 读严格 UTF-8 文件并登记读快照；缺失报 `FILE_NOT_FOUND`，非法编码报 `INVALID_UTF8`。`ls(path)` 只列一层，排序返回，目录条目以 `/` 结尾；非递归需求用 `glob` 组合。`stat(path)` 返回 `{ exists, size, mtime, isDir }`，缺失是正常观察而非失败。`mkdir(path)` 非递归，已存在报 `DIRECTORY_EXISTS`，父目录缺失报 `PARENT_DIRECTORY_MISSING`；它不产生 durable mutation 条目。
+`cat(path)` 读严格 UTF-8 文件并登记读快照；缺失报 `FILE_NOT_FOUND`，非法编码报 `INVALID_UTF8`。`ls(path)` 只列一层，排序返回，目录条目以 `/` 结尾，并应用 `.gitignore` 语义（[057]）；递归需求按 [047] 的组合写法展开。`stat(path)` 返回 `{ exists, size, mtime, isDir }`，缺失是正常观察而非失败。`mkdir(path)` 非递归，已存在报 `DIRECTORY_EXISTS`，父目录缺失报 `PARENT_DIRECTORY_MISSING`；它不产生 durable mutation 条目。
 
 `write(path, content)` 覆盖或创建，一次原子写、即写即生效（[010]）。五个原语都继承路径边界、符号链接防护、写前 `FILE_CHANGED` 与 as-is 逐笔落盘；底层文件系统效果与稳定失败映射归 MutationFs 原语。
 
@@ -244,7 +244,7 @@ rm/mv 相关稳定失败码（`DIRECTORY_NOT_EMPTY`、`CROSS_DEVICE_MOVE`、`INV
 
 ## [047] 原语组合与教学资源
 
-原语只提供动词，不提供编辑 DSL：find/replace = `cat → where → 拼接 → write`；批量替换 = 一次 `whereAll` 加反向拼接；append = `cat + write`；锚点切片 = 两次 `where`（第二次带 `from`）；递归枚举 = `glob`；grep 找候选。`cat`/`ls`/`stat`/`write`/`mkdir`/`where`/`whereAll` 与既有 rm/mv 共享同一路径边界与 as-is 纪律。
+原语只提供动词，不提供编辑 DSL：find/replace = `cat → where → 拼接 → write`；批量替换 = 一次 `whereAll` 加反向拼接；append = `cat + write`；锚点切片 = 两次 `where`（第二次带 `from`）；**递归枚举 = `ls` 递归组合**（`walk` 写法见双语资源 `tool/js-program/recipes`）；**内容搜索 = walk + `cat` + `whereAll`**。`cat`/`ls`/`stat`/`write`/`mkdir`/`where`/`whereAll` 与 rm/mv 共享同一路径边界与 as-is 纪律。
 
 教学资源 `tool/js-program/header` 与 `tool/js-program/park` 双语成对，声明主原语、组合模式、where 歧义契约与 unpark 自由值契约；`tool/js-program/contract` 不再声称 all-or-nothing 提交，失败经验与 as-is 语义一致。
 
@@ -290,10 +290,25 @@ ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, 
 
 同一程序内 `Promise.all` / `Promise.allSettled` 直接表达 IO 并行，不需要新原语：vm 单线程事件循环天然把每次 api 调用串行化，宿主不加锁、不排队、不互斥。独立分支的效果各自 as-is 落盘；一个分支失败不清除兄弟分支已落地的改动。同一文件的写竞态由程序作者自负（Unix 哲学），宿主只保单笔写原子与写前校验。
 
-## [056] fork/join 委托原语
+## [056] 委托原语：fork / join / fission / dag
 
-Fork/Join capability 投影出 `fork(payload)` 与 `join()`：`payload` 与宿主 fork 工具同字段（`charge` 必填、`name`、`calling`、`keywords`），返回 fork 回执文本；`join()` 按本会话成员收拢子工作，返回 join 收执批次。接线层在每次编程调用期间安装进程内委托宿主——fork 驱动该角色已注册的生产 fork spec、join 驱动 join spec——调用结束后清除；未安装宿主时两成员以 `DELEGATION_UNAVAILABLE` 拒绝，不静默降级。
+**所有 js.* 成员的返回值都是数据，绝不返回渲染后的 prose**（宿主在工具结果与 parked 载荷边界统一把值渲染给模型）。委托成员统一用信封：
 
-委托面按能力投影：Orchestrator 没有文件权限，但持有 Fork/Join，因此获得仅含委托（fork/join/park）的编程面；`hasFsCapability`/`jsToolSpec.admissionFor` 同步把 Fork/Join 计入编程面授权，四层保持一致。失败的 fork 以回执文本返回（与宿主工具同语义），不抛出。
+```
+{ ok: true, ... } / { ok: false, code: "<stable kebab code>" }
+```
 
-DAG 声明式糖本轮不交付：现有 `join()` 是成员归属收拢而非显式 handle 列表，且 join 收执是渲染文本而非结构化 per-child 结果；DAG 需要结构化聚合层，属于后续设计项，不用空实现占位。
+- `fork(payload)`：`payload` 是字符串（任务）或 `{ charge, name?, calling?, keywords? }`；缺 `name` 时由 charge 派生（派生名冲突报 `name-already-belongs`）。成功返回 `{ ok, name, agentId, outcome }`，`outcome ∈ created | nudged | commissioned`。拒绝码：`name-required`/`charge-required`/`unknown-calling`/`calling-conflict`/`name-already-belongs`/`warm-start-unavailable`/`context-unavailable`/`not-a-delegation-role`/`placement-failed`/`dispatch-uncertain`。
+- `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, workRecord }], byName }`；`status ∈ completed | failed | abandoned`。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
+- `fission({ charge, lanes })`：同身份多 lane 的任务分片执行（宿主负责 lane 绑定与收拢），返回 `{ ok, groupId, lanes: [{ index, sessionId }] }`；owner 的 `join()` 收拢本组 lane。拒绝码：`fission-unavailable`/`lane-start-failed`/`not-ready`/`context-unavailable`/`invalid-prompt`。
+- `dag({ nodes: [{ id, charge, deps?, lanes? }] })`：纯声明糖，由基类编译成波次 `fork` + 一次 `join`；下游节点的 prompt 带上依赖记录。成功返回 `{ ok, results: { [id]: record }, skipped: [id...] }`。**节点失败 → `park`**（与 `where` 同一条恢复通道），payload 为 `{ dag, node, code, deps, done, pending }`；注入值语义：`"retry"` 重跑、`"skip"` 跳过（下游看到 null）、其他值直接作为该节点结果、`{ abort: reason }` 使程序失败。
+
+实现边界：delegation shard 提供结构化入口（`ForkTool.executeReceipt`/`JoinTool.executeReceipt`/`FissionTool.executeReceipt`，返回数据与上述稳定码；宿主 `fork`/`join`/`fission` 工具的 prose 输出保持不变）；接线层在每次编程调用期间安装进程内委托宿主驱动这些入口，调用结束清除；未安装宿主时成员以 `{ ok:false, code:"DELEGATION_UNAVAILABLE" }` 拒绝，不静默降级。
+
+委托面按能力投影：Orchestrator 没有文件权限但持有 Fork/Join，因此获得仅含委托（fork/join/dag/park）的编程面；`hasFsCapability`/`jsToolSpec.admissionFor` 同步把 Fork/Join/Fission 计入编程面授权，四层一致。
+
+## [057] ls 的 ignore 语义与 glob/grep 退役
+
+`ls(path)` 在列出条目时应用 gitignore 语义：逐级 `.gitignore`（含否定模式与目录剪枝）加上根 `.git/info/exclude`，与 `JsGlobFs.glob` 使用同一实现（`wanxiangli/fs` 的 ignore 引擎，经新的公开入口暴露），因此「从工作区根开始的 `ls` 递归组合」等价于旧 `glob`，而「walk + `cat` + `whereAll`」等价于旧 `grep`。组合写法见双语资源 `tool/js-program/recipes`。
+
+据此彻底退役 `glob`/`grep` 两个 js 成员：fragment、运行时绑定、四层投影、描述与规则资源一并删除；`Grep` capability 不再投影任何成员。`file`/`edit`/`rewrite` 暂留（Plan tenure 编程面仍在其上）。

@@ -50,10 +50,8 @@ module JsCanonicalDescription =
         val ReadRules: string = "tool/js-program/rules-read"
 
         [<Literal>]
-        val GlobRules: string = "tool/js-program/rules-glob"
+        val Recipes: string = "tool/js-program/recipes"
 
-        [<Literal>]
-        val GrepRules: string = "tool/js-program/rules-grep"
 
         [<Literal>]
         val EditRules: string = "tool/js-program/rules-edit"
@@ -217,8 +215,7 @@ module JsCanonicalDescription =
           VerbRewrite: string
           VerbCreate: string
           ReadRules: string
-          GlobRules: string
-          GrepRules: string
+          Recipes: string
           EditRules: string
           WriteRules: string
           MutationRules: string

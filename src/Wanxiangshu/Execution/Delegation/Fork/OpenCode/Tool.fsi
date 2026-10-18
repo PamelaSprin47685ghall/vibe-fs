@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 open Wanxiangshu.OpenCode
+open System.Threading.Tasks
+open Wanxiangshu.Execution.Delegation.Fork
 
 /// Manager fork & resume / Orchestrator commission. One typed request backs
 /// every public tool; each tool exposes its own schema; PTY is absent.
@@ -148,3 +150,7 @@ module ForkTool =
     val managerSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
     val resumeSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
     val orchestratorSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
+
+    val executeReceipt:
+        scope: ToolRuntimeScope -> context: HostToolContext -> args: HostToolArguments ->
+            Task<Result<ForkReceipt, string>>
