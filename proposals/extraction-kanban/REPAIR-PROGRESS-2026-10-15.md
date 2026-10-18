@@ -2,6 +2,10 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第三十一批：修正work011的测试输入，保留生产身份门禁（2026-10-18）
+
+R7-B扩大组的五fail由非作者三路原样对照确认修前同现。补真实ToolPart身份、使用Host实际原件、按SDK封装successor消息；不改生产绑定与捕获规则。原始三路5红、仅id的3/2分层保留；独立诊断误删retirement-run的5绿已撤回，作者提前取gate造成的新顺序错误也已修正，不混入原问题。最终完整Work160项159pass/0fail/1TODO，非作者shared011独立5pass/0fail/1TODO，详见[报告](WORK-REVIEW-FIXTURE-2026-10-18.md)。产品字节沿用0d60精确包，未部署Host；已有in-flight中断TODO和R12-U1不销项。
+
 ## 第三十批：第二轮三小时，R7-B真实背压交付（2026-10-18）
 
 输入主仓fa88bd65a、库e024678/0.6.7，两仓干净。socket与blocking ReadStream原型被否决，最终非阻塞FIFO读端配阻塞写端，Worker出口取得完整FileSink write/flush回执，R7-A extent保留。新原型死锁、清理遗漏及实现的启动close异常无人处理均已修，和原有缓存缺口、测试误判分项记在[本包报告](PROCESS-BACKPRESSURE-2026-10-18.md)。库df14f48/0.6.8正常推送原交付分支，22files/压缩107426bytes，SHA7e587393。

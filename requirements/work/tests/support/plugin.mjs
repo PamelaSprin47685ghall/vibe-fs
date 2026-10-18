@@ -24,7 +24,7 @@ export const withReview = async (body, {ownerId, session = 'review-manager'} = {
       parts: [
         {type: 'reasoning', text: 'private reasoning is not public evidence'},
         {type: 'text', text: before},
-        {type: 'tool', tool: 'review', callID: call, state: {status: 'pending', input}},
+        {id: `part-${run}-${call}`, sessionID: session, messageID: run, type: 'tool', tool: 'review', callID: call, state: {status: 'pending', input}},
         {type: 'text', text: after},
       ],
     })

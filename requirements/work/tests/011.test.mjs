@@ -24,11 +24,7 @@ test('WHAT[work-011] actual Promoted deliver confirms then retires without abort
     assert.match(result, /Finished\. Do not continue work\./)
     assert.deepEqual(runtime.abortedIds, [])
     assert.equal(runtime.prompts.length, 0)
-    const output = {messages: [
-      {info: {id: 'user-root', role: 'user', sessionID: session, model: {providerID: 'provider', modelID: 'manager-model'}}, parts: [{type: 'text', text: 'Deliver the requested behavior and verification.'}]},
-      {info: {id: 'review-run', role: 'assistant', parentID: 'user-root', time: {created: 2, completed: 2}}, parts: [{type: 'text', text: 'review closed'}]},
-      {info: {id: 'retirement-run', role: 'assistant', parentID: 'user-root', time: {created: 3}}, parts: [{type: 'text', text: 'Old closing tail'}]},
-    ]}
+    const output = {messages: structuredClone(runtime.messages)}
     await hooks['experimental.chat.messages.transform']({sessionID: session}, output)
     // Delivered has no successor. The transform must not stop this attempt
     // and must not abort the session.
@@ -108,7 +104,7 @@ test('WHAT[work-011] physical prompt after Accepted deliver invalidates certific
       id: 'run-review', role: 'assistant', parentID: rootID, time: { created: 2 },
       parts: [
         { type: 'text', text: 'All criteria perfect.' },
-        { type: 'tool', tool: 'review', callID: 'call-review', state: { status: 'pending', input: findings } },
+        { id: 'part-call-review', sessionID, messageID: 'run-review', type: 'tool', tool: 'review', callID: 'call-review', state: { status: 'pending', input: findings } },
       ],
     }
     runtime.pushHostMessage(sessionID, review)
@@ -192,7 +188,7 @@ test('WHAT[work-011] a post-cut wake after a fresh successor root is cleared wit
       id: 'run-review', role: 'assistant', parentID: rootID, time: { created: 2 },
       parts: [
         { type: 'text', text: 'All criteria perfect.' },
-        { type: 'tool', tool: 'review', callID: 'call-review', state: { status: 'pending', input: findings } },
+        { id: 'part-call-review', sessionID, messageID: 'run-review', type: 'tool', tool: 'review', callID: 'call-review', state: { status: 'pending', input: findings } },
       ],
     }
     runtime.pushHostMessage(sessionID, review)

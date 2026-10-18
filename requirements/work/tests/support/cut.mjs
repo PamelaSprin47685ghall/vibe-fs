@@ -41,9 +41,11 @@ export const withSuccessor = async body => withReview(async context => {
   // aborting the session.
   assert.deepEqual(runtime.abortedIds.filter(id => id === session), [])
   assert.equal(runtime.prompts.length, 1)
-  const gate = structuredClone(runtime.messages.at(-1))
-  assert.ok(gate.metadata?.wanxiangshu_prompt_key, 'successor must be the real owner-dispatched prompt')
+  const { parts, ...info } = structuredClone(runtime.messages.at(-1))
+  const gate = { info, parts }
+  assert.ok(gate.info.metadata?.wanxiangshu_prompt_key, 'successor must be the real owner-dispatched prompt')
   assert.ok(messageId(gate))
+  assert.equal(history.some(message => messageId(message) === messageId(gate)), false)
   runtime.pushHostMessage(session, {
     info: {
       id: 'successor-provider-run', role: 'assistant', sessionID: session,
