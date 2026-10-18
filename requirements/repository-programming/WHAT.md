@@ -314,3 +314,7 @@ Host 原生 `run` 工具与四个 pty 工具（`open-terminal`/`send-terminal`/`
 ## [059] js.deliver 的终值记录
 
 程序经 `js.deliver(value)` 结束时，宿主把该终值记进进程内按会话的交付格（与 parked 现场同命：重启即丢，durable 终值在调用结算时另写）：子会话的完成载荷（`AgentCompletionPayload.WorkRecord`）直接由交付格终值的规范文本构造，取代从 XTrace + BlogFrame 物化的 LWR 记录；subagent 程序必须显式调用 `js.deliver`，普通 `return` 保持交付格为空，结算时 `join()` 记录报告 `status: "undelivered"`（`js.dag` 据此在 `node-undelivered` 处 park）。`value` 必须是 JSON 兼容数据，缺失或非法仍以 `INVALID_RETURN_VALUE` 失败（[054]）。交付格只在进程内被同一会话的完成路径读取一次（`take`）或窥视（`peek`），调用结算后清理。
+
+## [060] "js" 机器词汇的终局
+
+模型视野之外的名字一律保留 `js` 前缀，不做改名：durable 流名（`js-tools/transactions`、`js-tools/lifecycle-audit`）、资源目录（`js-program`、`js-plan`、`js-bookkeeper`）、`RuntimeBindingKey`（`js.cat`、`js.where`、`js.park` …）与包装器内部哨兵（`__jsParked`/`__jsDelivered`/`__jsAbandoned`/`__jsFailure`）。理由：这些名字是 durable 身份与机器对机器契约（流名改名等于数据迁移，哨兵改名等于重放保真风险），而模型看到的是 `todowrite-for-ROLE` 工具名与成员名——模型面与机器面本就应当分离。此裁决与第 28 轮改名（门面级命名即教学）不冲突：改的是模型面，不动机器面。
