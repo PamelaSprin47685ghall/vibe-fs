@@ -296,12 +296,30 @@ module ProcessSurface =
         (ledger :?> SessionStartLedger).Read(sessionId)
 
 
-    let command (fileName: string) (arguments: obj) (workingDirectory: obj) (stdin: obj) : obj =
+    [<Emit("""
+        ((value) => {
+            const prototype = Object.getPrototypeOf(value);
+            if (prototype !== Object.prototype && prototype !== null) throw new TypeError('Environment must be a data object');
+            if (Object.getOwnPropertySymbols(value).length !== 0) throw new TypeError('Environment keys must be strings');
+            return Object.getOwnPropertyNames(value).map(key => {
+                const descriptor = Object.getOwnPropertyDescriptor(value, key);
+                if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'string') throw new TypeError('Environment values must be data strings');
+                return [key, descriptor.value];
+            });
+        })($0)
+    """)>]
+    let private environmentEntries (value: obj) : (string * string) array = jsNative
+
+    let command (fileName: string) (arguments: obj) (workingDirectory: obj) (stdin: obj) (environment: obj) : obj =
         CommandHandle
             { FileName = fileName
               Arguments = stringArrayOf arguments |> Array.toList
               WorkingDirectory = optionString workingDirectory
-              Environment = None
+              Environment =
+                if isNullish environment then
+                    None
+                else
+                    Some(environmentEntries environment |> Map.ofArray)
               Stdin = optionString stdin }
         :> obj
 
@@ -314,6 +332,10 @@ module ProcessSurface =
             {| fileName = command.FileName
                arguments = command.Arguments |> List.toArray
                workingDirectory = optionObj command.WorkingDirectory
+               environment =
+                command.Environment
+                |> Option.map (fun values -> emitJsExpr (Map.toArray values) "Object.fromEntries($0)")
+                |> optionObj
                stdin = optionObj command.Stdin |}
 
     let estimate (runtimeSeconds: float) (outputBytes: float) (memory: string) : obj =

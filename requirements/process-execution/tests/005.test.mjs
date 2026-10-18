@@ -73,7 +73,8 @@ const {
 } = await import('../../../dist/Process/Surface.js')
 
 test('WHAT[process-execution-005] EXEC_010_process_request_carries_all_fields', () => {
-  const cmd = command('sh', ['-lc', 'echo hi'], '/tmp/wx', 'input')
+  const environment = Object.fromEntries([['__proto__', 'literal'], ['EMPTY', '']])
+  const cmd = command('sh', ['-lc', 'echo hi'], '/tmp/wx', 'input', environment)
   const cmdView = commandView(cmd)
   const estView = estimateView(estimate(42, 65536, 'large'))
 
@@ -81,6 +82,7 @@ test('WHAT[process-execution-005] EXEC_010_process_request_carries_all_fields', 
   assert.deepEqual(cmdView.arguments, ['-lc', 'echo hi'])
   assert.equal(cmdView.workingDirectory, '/tmp/wx')
   assert.equal(cmdView.stdin, 'input')
+  assert.deepEqual(cmdView.environment, environment)
   assert.equal(estView.runtimeSeconds, 42)
   assert.equal(estView.outputBytes, 65536)
   assert.equal(estView.memory, 'large')

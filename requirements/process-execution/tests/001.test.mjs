@@ -416,13 +416,17 @@ test('WHAT[process-execution-001] SUPERVISOR_signalName_maps_every_signal_to_a_k
     ['QUIT', 'SIGQUIT'], ['USR1', 'SIGUSR1'], ['USR2', 'SIGUSR2'],
   ]) assert.equal(supervisorSignalName(wire), expected)
 })
-test('WHAT[process-execution-001] SUPERVISOR_ensureSpawn_reuses_one_loader_and_faults_without_bun_pty', async () => {
+test('WHAT[process-execution-001] SUPERVISOR_ensureSpawn_reuses_one_loader_and_observes_runtime_availability', async () => {
   const supervisor = supervisorCreate()
   const first = supervisorEnsureSpawn(supervisor)
   const second = supervisorEnsureSpawn(supervisor)
   assert.equal(first, second, 'loader task is cached')
-  await assert.rejects(first)
-  assert.throws(() => supervisorSpawnSync(supervisor, 'echo hi', ''), /bun-pty is not loaded/)
+  if (globalThis.Bun) {
+    await first
+  } else {
+    await assert.rejects(first)
+    assert.throws(() => supervisorSpawnSync(supervisor, 'echo hi', ''), /bun-pty is not loaded/)
+  }
 })
 test('WHAT[process-execution-001] SUPERVISOR_spawnSync_fails_fast_when_loader_never_ran', () => {
   assert.throws(() => supervisorSpawnSync(supervisorCreate(), 'echo hi', ''), /bun-pty is not loaded/)

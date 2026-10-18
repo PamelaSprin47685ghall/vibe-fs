@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import * as runtime from '../../../dist/Process/Surface.js'
 
 const {
   describeRun,
@@ -45,6 +46,56 @@ const parseToml = (text) =>
 const SPOOL_COMMAND = "printf 'abcdefghijklmnopqrstuvwxyz0123456789'"
 
 const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 4 }
+
+test('WHAT[process-execution-005] the real supervised host preserves literal environment overrides and direct argv', async () => {
+  const sentinel = 'WANXIANGSHU_PROCESS_HOST_SENTINEL'
+  const previous = process.env[sentinel]
+  process.env[sentinel] = 'explicit-host-inheritance'
+  try {
+    const environment = Object.fromEntries([['__proto__', 'literal'], ['constructor', 'data'], ['EMPTY', ''], [sentinel, 'explicit-override']])
+    const args = ['hello world', ';touch never', '$(not-a-command)', '', '用户🧭']
+    const script = 'process.stdout.write(JSON.stringify({args:process.argv.slice(1),env:process.env}))'
+    const request = runtime.command(process.execPath, ['-e', script, ...args], process.cwd(), undefined, environment)
+    const result = await runtime.run(request, runtime.estimate(10, 65536, 'medium'), runtime.context(undefined, 30000), runtime.createCancellationToken(false))
+    assert.equal(result.ok, true, JSON.stringify(result))
+    assert.equal(result.value.kind, 'Completed')
+    assert.equal(result.value.exitCode, 0)
+    const actual = JSON.parse(result.value.stdout)
+    assert.deepEqual(actual.args, args)
+    for (const [key, value] of Object.entries(environment)) assert.equal(actual.env[key], value, key)
+    assert.equal(actual.env.PATH, process.env.PATH)
+  } finally {
+    if (previous === undefined) delete process.env[sentinel]
+    else process.env[sentinel] = previous
+  }
+})
+
+test('WHAT[process-execution-005] environment encoding rejects accessors without evaluating them', async () => {
+  let reads = 0
+  const environment = Object.defineProperty({}, 'VALUE', { get() { reads++; return 'never' } })
+  assert.throws(() => runtime.command(process.execPath, [], undefined, undefined, environment), /data strings/)
+  assert.equal(reads, 0)
+})
+
+test('WHAT[process-execution-005] invalid explicit environment is rejected instead of silently running with ambient values', async () => {
+  const { mkdtempSync, existsSync, rmSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-env-reject-'))
+  const marker = join(directory, 'effect')
+  const script = `require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'ran')`
+  try {
+    for (const [key, value] of [['BROKEN=KEY', 'value'], ['', 'value'], ['PATH', 'bad\0override'], ['VALUE', '\ud800']]) {
+      const environment = Object.fromEntries([[key, value]])
+      const request = runtime.command(process.execPath, ['-e', script], directory, undefined, environment)
+      const result = await runtime.run(request, runtime.estimate(10, 1024, 'medium'), runtime.context(undefined, 30000), runtime.createCancellationToken(false))
+      assert.equal(result.ok, false, JSON.stringify({ key, result }))
+      assert.equal(existsSync(marker), false)
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
 
 test('WHAT[process-execution-011] RUN_surface_names_the_provider_execution_verb', () => {
   assert.equal(runToolName, 'run')

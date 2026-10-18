@@ -70,7 +70,7 @@ module NodeProcessHost =
 
     [<Emit("""
         ((envEntries) => {
-            const out = {};
+            const out = Object.create(null);
             if (process && process.env) {
                 for (const k of Object.keys(process.env)) {
                     const v = process.env[k];
@@ -83,9 +83,7 @@ module NodeProcessHost =
                 for (const pair of envEntries) {
                     const k = pair[0];
                     const v = pair[1];
-                    if (typeof k === 'string' && k.length > 0 && !k.includes('=') && !k.includes('\0') && typeof v === 'string' && !v.includes('\0')) {
-                        out[k] = v;
-                    }
+                    out[k] = v;
                 }
             }
             return out;

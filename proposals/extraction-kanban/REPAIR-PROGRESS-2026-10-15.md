@@ -2,6 +2,14 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第二十八批：Process C 真实运行时及监管第二跳（2026-10-18）
+
+库从10bbb32/0.6.4修至ca238c0/0.6.6并推送原交付分支，主仓换固定vendor/lock。Bun使用原生I/O，Node路径保持；主仓环境覆盖保留字面特殊键，非法显式覆盖交唯一库校验拒绝，不静默替换为ambient。stdin先建立部分消费/真实断管前提，再明确验证Unknown/EPIPE且不重发。0.6.5基础入口虽绿，真实监管目标第二跳仍丢键，作为本轮接线遗漏继续修正并保留失败候选，最终未交付0.6.5。
+
+最终库Node/Bun各71/71，全库337项336pass/0fail/1Linuxskip；真实独立编译及共享路径负控3/3。非作者自写精确安装消费者的Node/Bun各4组验证最终target特殊env/argv、无消费者ENOENT清理、完整字节与真实同组TERM/KILL；22files及SHA4a6d7f8不变。主仓128文件997项900pass/0普通fail/25skip/72TODO；最终Bun011为14/14，真实OpenCode1/1。主包2076files/13,384,236bytes、SHAc9d93ad3，独立Node/Bun真实run/wire各26项及完整PTY124/124通过，安装文件和archive前后不变。详见[本包报告](PROCESS-RUNTIME-2026-10-18.md)。
+
+非作者另确认原有Bun Capture在首次读取前可缓存至少64MiB，旧包/候选/Node对照已归因，单列P1 CUT-02-R7并列原型计划；扩大128MiB计数差异在新旧包均复现，尚须无库原生对照，不归为已确认的新回退，也不以通过的小输出或块大小冒称大输出/背压完成。Bun九文件106pass/6fail/4导入错误如实保留；两包同有fs故障拦截不命中。C维持REVIEW，未宣布全项目通过。正式Node定向四文件31pass/0fail/1skip、4/4完成、收尾accepted=true，format/check通过。库和主仓正常提交推送；三小时窗口继续独立小包，R12-U1暂缓，未部署Host。
+
 ## 第二十七批：R3 / A 非作者复审（2026-10-18）
 
 用户授权后，`review_guidance_r3`、`review_process_a`独立只读审查。R3模拟终态、HOME及EMR-020边界未发现问题；新增无界Bun启动器却能在导入阶段永久挂起，确认为本轮新增P2，已删除入口和WHAT正式声明，单列CUT-00-R2。Bun原生证据保留，不改写成正式监督通过。A未确认新增产品回退，独立Fable正反编译2/2、真实Node/Bun冷接管及无owner拒绝3/3；沙箱物理诊断失败单列，不记通过。

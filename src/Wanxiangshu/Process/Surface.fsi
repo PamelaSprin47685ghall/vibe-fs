@@ -39,7 +39,7 @@ module ProcessSurface =
     val appendSessionStart: ledger: obj -> sessionId: string -> startedAt: string -> unit
     val readSessionStart: ledger: obj -> sessionId: string -> obj
 
-    val command: fileName: string -> arguments: obj -> workingDirectory: obj -> stdin: obj -> obj
+    val command: fileName: string -> arguments: obj -> workingDirectory: obj -> stdin: obj -> environment: obj -> obj
     val commandView: value: obj -> obj
     val estimate: runtimeSeconds: float -> outputBytes: float -> memory: string -> obj
     val estimateView: value: obj -> obj
