@@ -2,6 +2,16 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第二十三批：当前版本深测与剩余项校正（2026-10-18）
+
+输入干净主仓`7cf6f6fd0`、库`10bbb32 / 0.6.4`。按四模块及实际消费者选取304个编号文件，三个不重叠默认组共2545项：2375 pass / 0普通fail / 30 skip / 140 TODO；全部计划文件完成、runner exit0、进程组收尾accepted=true，使用WXS_ACCEPT_TODO明确保留未完成证明。真实OpenCode Host与Trace opaque正反编译各1/1，库Node291/291；独立构建、真实组合、Node/Bun安装包及强杀恢复42项/41pass/0fail/1Linux skip。具体命令、分组、日志和优先级见[深测报告](DEEP-TEST-2026-10-18.md)。
+
+本轮唯一代码修正为PTY测试worker显式`execArgv: []`：初次15项Bun场景因继承Node测试钩子而在业务前退出，原失败保留；修后完整134文件为818pass/0fail。未改生产或库源码，精确主包仍为2076文件/13,375,692字节及2e0f994058540b58a1c31c2bef1dc8954ccc1b0abaf6ca4871ac2e61e2da5c30，真实pack/隔离默认入口、新鲜度、format/check均通过。没有以夹具失败否定PTY产品，也没有放宽业务断言。
+
+当前Bun库Process53pass/4fail、Supervision12/12，历史四项差异仍在；误将Node专用SQLite六文件直接交给Bun的入口错误单列，不算六个产品缺陷，实际Bun安装消费者通过。Bun WorkRecord三个文件84/84；但prefix014整文件两次20pass/5timeout/1skip，单选1/1、末七项7/7、含同代冲突九项9/9，新增CUT-17-R3待定位，不能沿用上轮Bun25pass当作本次全绿。未延时、加skip或改生产来消除失败，不无证归于拆分或上轮修复。
+
+Process总预算和纯契约边界两个失败TODO复现；GAP-085/140/159相邻四个失败断言分列。纠正当前表仍列待修的CUT-06串文P1，以及GAP-141“无capability仍Accepted”的过时局部描述；后者023现在2pass/1boot TODO，完整boot仍待证。三个Process P2保持B→C→A，先收窄新Bun超时的确切来源；完整Trace/Ownership产品链、旧历史和平台证明不借此关闭。R12-U1继续暂缓，未部署用户Host。
+
 ## 第二十二批：CUT-17-R2 指导入口独立复审（2026-10-17，已验收）
 
 从干净 `7c50ed590` 对比 `2aaaf6077`。非作者确认R1新增四个P1：空白重放叠加、跨代原文误报歧义、g1首次捕获借旧代误删新编辑、g0物理编辑被还原并绕过原件冲突。均有旧精确包正控，归于本代理上轮修复；未无证据归为拆分问题。此前人工呈现wire回灌Host的O1被记P1，现撤回为review来源前提误判。最终删捕获前还原，物理原件直接typed capture；Pair/Grounding只负责已确认原件上的呈现重放。新增13项正式先红反例，末尾资格/当前可见缺证拒绝和当前捕获代绑定收紧，公式由Trace owner拥有；不回退、不移位、不改codec/持久格式/库包。网络竞态、README残留、R2试制错误、时序遗漏和工具relay裁剪的空真分别记录，未通过放宽正文断言消除失败。

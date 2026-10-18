@@ -109,8 +109,9 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-06-R4](WORK-RECORD-HISTORY-2026-10-17.md#r4-review) | R2 独立复审：并发事实下的完成因果边界 | DONE | 并发晚摘要/原件、多head父边及完成歧义已修；1311项0普通失败、Bun核心91pass/1TODO、真实checkpoint/消费者/冷恢复、旧R2包升级及229980精确包独立Node/Bun消费通过。三名非作者复验完成，撤回的五个越界白盒用例不计正式验收；GAP-111/109、旧缺边历史与R12-U1边界保留，随本原子提交交付 | root | r2_freeze_review、r2_replay_review、r2_consumer_review |
 | [CUT-17-R1](GUIDANCE-INGRESS-2026-10-17.md) | GAP-108 指导呈现回流的真实 Host 路径核查 | DONE | 正常Host原件隔离成立，原直接capture TODO改为保真负控和实际Host证明；引用误删P1已修。1350项相关回归0普通失败、实际Host网络/持久/冷读、Trace正反编译及f047精确包隔离Node/Bun消费通过；旧错历史及完整CUT-17不销项，R12-U1暂缓，随本原子提交交付 | root | root自审；未做非作者复审 |
 | [CUT-17-R2](GUIDANCE-INGRESS-2026-10-17.md#r2-review) | R1 独立复审：来源身份、Host 链路与验收归因 | DONE | 四项R1回退已修，捕获前还原删除，原件/呈现职责分开；O1撤为review误判。600核心Node/Bun25pass/1skip、真实Host1/1、1363项0普通失败及2e0f精确包非作者Node/Bun各12组暖/新OS冷读通过；三名非作者复验完成，旧错历史/完整CUT-17不销项，R12-U1暂缓，随本原子提交交付 | root | g108r_provenance、g108r_host、g108r_evidence |
+| [CUT-17-R3](DEEP-TEST-2026-10-18.md) | Bun指导整文件超时与前序组合差异定位 | READY | 10-18两次整文件20pass/5timeout/1skip，单选1/1、末七项7/7、含冲突九项9/9；Node及真实Host通过。先定位确切调用、fixture释放/owner与原生运行时，再做同环境旧版对照；尚未归为生产回退，不放宽timeout或断言 | root（计划） | 待认领 |
 
-2026-10-17 当前顺序：CUT-06-R1/R3/R2/R4及CUT-17-R1/R2所列范围已验收；接着三个Process P2按R6-B → R6-C → R6-A各自闭环。旧历史关联及完整Trace/Ownership产品链分别施工，主动脱组另做原型，R12-U1暂缓。[当前排期与验收范围](REMAINING-REPAIRS-2026-10-16.md#post-t01-plan)。公共文件、两仓发布及主仓集成仍串行，不能用局部修复关闭整张关联卡。
+2026-10-18深测：304文件/2545项中2375pass/0普通fail/30skip/140TODO，真实Host、独立编译、库Node及实际Node/Bun交付另列；测试worker继承execArgv的15项启动失败已修，生产包2e0f不变。新CUT-17-R3先收窄，当前不能称Bun指导整文件全绿。此前CUT-06及CUT-17的限定范围验收保留，三个Process P2仍按R6-B→R6-C→R6-A。完整Trace/Ownership产品链、历史、平台及R12-U1不销项。[最新深测与排期](REMAINING-REPAIRS-2026-10-16.md#deep-test-current)。公共文件、两仓发布及主仓集成仍串行，不能用局部修复关闭整张关联卡。
 
 ## 波次：什么时候拉哪张卡
 

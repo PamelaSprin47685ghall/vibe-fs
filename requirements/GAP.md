@@ -178,7 +178,7 @@ GAP-099的本地新focused反例：SessionHostPort所属`host-session-contract`�
 | GAP-138 | dispatch-protocol；chat admission | PARTIAL | 非法PromptKey/Agent被当Missing而获得权限的真实反例及封闭错误类型修复已迁入；待新基线验证合法Missing和历史读取兼容。 |
 | GAP-139 | provider-attempt-recovery | PARTIAL | 实际ledger/fold、retry admission、LWR与stop fence已有用例；Host组合、所有exact授权、完整失败/成功来源及boot sweep仍缺证。直接retain/condemn不能证明生产会正确选择。GAP-223修复把在线idle限定为公开SDK所证的exact已完成assistant；尚无assistant的Accepted输入与真实重启boot sweep仍需独立owner及物理证据，不能借旧Guard终结收据代替。 |
 | GAP-140 | provider-attempt-recovery-007 | PARTIAL | 新FailureRecorded在RetryExhausted后被吸收、历史后继可超过当前默认上限的失败TODO保留；需确定历史预算依据，新记录严拒与旧重放幂等分开处理。 |
-| GAP-141 | provider-attempt-recovery-023 | PARTIAL | 无恢复capability实际只发布manual提示而仍Accepted；与本包终态要求及上游managed-chat-execution允许manual/blocked的范围冲突，保留失败TODO，不能测试手补状态。 |
+| GAP-141 | provider-attempt-recovery-023 | PARTIAL | 2026-10-18校正：旧“无恢复capability只发布manual而仍Accepted”的局部反例已不成立。023真实SessionRecoveryHost在idle sweep下经PreProviderSettlement写Terminal/Failed，测试2pass/0fail/1boot TODO；Surface只读真实投影，未手补状态。完整boot sweep及上游manual/blocked的其余恢复范围仍须各自核对，不把局部终结扩大为全链闭合，见[本轮证据](../proposals/extraction-kanban/DEEP-TEST-2026-10-18.md)。 |
 | GAP-142 | provider-attempt-recovery 测试入口编译 | PARTIAL | 旧局部工程遗漏Retry/Workflow直接依赖已定位；本批须按最新shard重验证相同闭包，不能只靠全量构建掩盖。 |
 | GAP-143 | host-provider-failure-ownership | PARTIAL | 真实配置hook和安装版canary保留；纯呈现分类器尚无生产消费证据，不能证明实际UI、持久终态、停止admission与exact一次处理。 |
 | GAP-144 | host-provider-failure-ownership-002 | PARTIAL | 旧固定OpenCode/plugin1.18.29在配置0重试时，一次assistant run仍发两次provider请求；真实canary失败TODO保留。需区分SDK与Host外层重试，选择兼容Host或裁决恢复所有权，不修改个人配置绕过。 |

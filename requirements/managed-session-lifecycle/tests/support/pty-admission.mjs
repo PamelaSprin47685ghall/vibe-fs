@@ -12,6 +12,7 @@ export const withAdmissionWorkers = (label, action, { realBackend = false, runti
     const start = () => new Promise((resolve, reject) => {
       const process = fork(fileURLToPath(new URL(realBackend ? './pty-admission-real-worker.mjs' : './pty-admission-worker.mjs', import.meta.url)), [workspace, 'devops-pty', `physical-${label}-devops`], {
         stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
+        execArgv: [],
         ...(runtime ? { execPath: runtime } : {}),
       })
       let stderr = ''
