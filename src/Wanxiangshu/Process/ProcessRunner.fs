@@ -45,14 +45,29 @@ module ProcessRunner =
         if gateHeld then
             LargeGate.release ()
 
-    let private maybeAcquireGate (estimate: ProcessEstimate) (ct: CancellationToken) : Task<bool> =
-        if estimate.EstimatedMemory = EstimatedMemory.Large then
-            task {
-                do! LargeGate.acquire ct
-                return true
-            }
+    let private checkCancellation (ct: CancellationToken) =
+        if ct.IsCancellationRequested then
+            Error(ProcessError.ProcessCancelled "Cancelled before execution")
         else
-            Task.FromResult false
+            Ok()
+
+    let private acquireLargeGate (ct: CancellationToken) : Task<Result<bool, ProcessError>> =
+        task {
+            try
+                do! LargeGate.acquire ct
+                return Ok true
+            with _ when ct.IsCancellationRequested ->
+                return Error(ProcessError.ProcessCancelled "Cancelled while queued")
+        }
+
+    let private maybeAcquireGate
+        (estimate: ProcessEstimate)
+        (ct: CancellationToken)
+        : Task<Result<bool, ProcessError>> =
+        if estimate.EstimatedMemory = EstimatedMemory.Large then
+            acquireLargeGate ct
+        else
+            Task.FromResult(Ok false)
 
     let private killQuietly (child: ChildProcess) =
         try
@@ -95,8 +110,6 @@ module ProcessRunner =
                     |> Result.mapError ProcessError.SpawnFailed
             with
             | _ when ct.IsCancellationRequested -> return Error(ProcessError.ProcessCancelled "Cancelled by token")
-            | :? OperationCanceledException when ct.IsCancellationRequested ->
-                return Error(ProcessError.ProcessCancelled "Cancelled by token")
             | ex -> return Error(ProcessError.ExecutionFailed ex.Message)
         }
 
@@ -124,7 +137,11 @@ module ProcessRunner =
                 return
                     outcomeAfterWait collector budget waited child.Failure.Value
                     |> discardFailedOutput collector
-            with error ->
+            with
+            | _ when ct.IsCancellationRequested ->
+                discard collector
+                return Error(ProcessError.ProcessCancelled "Cancelled by token")
+            | error ->
                 discard collector
                 return raise error
         }
@@ -152,15 +169,12 @@ module ProcessRunner =
         taskResult {
             do! validateEstimate estimate
 
-            do!
-                if ct.IsCancellationRequested then
-                    Error(ProcessError.ProcessCancelled "Cancelled before execution")
-                else
-                    Ok()
+            do! checkCancellation ct
 
-            let! gateHeld = TaskResultCE.ofTask (maybeAcquireGate estimate ct)
+            let! gateHeld = maybeAcquireGate estimate ct
 
             try
+                do! checkCancellation ct
                 return! runAfterGate hostSpawn cmd estimate ctx ct
             finally
                 releaseGateIfHeld gateHeld

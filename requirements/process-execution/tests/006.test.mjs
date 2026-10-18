@@ -1,6 +1,93 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { verifyPtyScope } from './support/pty-scope.mjs'
+import { nodeCommand } from './support/executor.mjs'
+
+test('WHAT[process-execution-006] a waiter fault without token cancellation keeps its original error', async () => {
+  const runtime = await import('../../../dist/Process/Surface.js')
+  const child = runtime.childCreate(() => { throw new Error('Controlled kill failure') })
+  try {
+    await assert.rejects(runtime.runWithHostLauncher(async () => child,
+      runtime.command('unused', [], null, null), runtime.estimate(0.01, 1024, 'medium'),
+      runtime.context(null, 10000), runtime.createCancellationToken(false)), /Controlled kill failure/)
+    assert.equal(runtime.childView(child).killCount, 1)
+  } finally {
+    runtime.childExit(child, 0)
+  }
+})
+
+test('WHAT[process-execution-006] the registered DevOps tool observes real Host abort during execution without claiming physical completion', { timeout: 20000 }, async () => {
+  const { withExecutablePlugin, acceptAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const { existsSync, readFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { setTimeout: delay } = await import('node:timers/promises')
+  const { refreshGlobalLanguage } = await import('../../../dist/Participant/Provider/LanguageSurface.js')
+  const until = async observe => {
+    const end = performance.now() + 5000
+    while (performance.now() < end) {
+      if (observe()) return
+      await delay(10)
+    }
+    assert.fail('The real process did not reach its expected physical state')
+  }
+  const alive = pid => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch (error) {
+      if (error.code === 'ESRCH') return false
+      throw error
+    }
+  }
+  await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+    const sessionID = 'registered-abort-devops'
+    const messageID = 'registered-abort-user'
+    await acceptAuthorityRoot(runtime, sessionID, 'devops', messageID)
+    await hooks['chat.message']({ sessionID, messageID, agent: 'devops' }, {
+      message: { id: messageID, role: 'user', agent: 'devops' },
+      parts: [{ type: 'text', text: 'Check command cancellation.' }],
+    })
+    const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+    try {
+      for (const language of ['en', 'zh-CN']) {
+        process.env.WANXIANGSHU_PROVIDER_LANGUAGE = language
+        refreshGlobalLanguage()
+        const ready = join(directory, `abort-ready-${language}`)
+        const controller = new AbortController()
+        const modelsBefore = created.length
+        const promptsBefore = runtime.prompts.length
+        const pending = hooks.tool.run.execute({
+          command: nodeCommand(`const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${ready}.pending`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${ready}.pending`)}, ${JSON.stringify(ready)}); setInterval(() => {}, 1000)`),
+          output_budget_bytes: 256,
+        }, { sessionID, agent: 'devops', messageID: 'registered-abort-assistant', callID: `abort-${language}`, abort: controller.signal })
+        let pid
+        try {
+          await until(() => existsSync(ready))
+          pid = Number(readFileSync(ready, 'utf8'))
+          assert.ok(Number.isInteger(pid) && pid > 0)
+          assert.equal(alive(pid), true)
+          controller.abort()
+          const wire = await pending
+          assert.match(wire, language === 'en' ? /Cancellation was requested/ : /已请求取消/)
+          assert.doesNotMatch(wire, /exit_code|SpawnFailed|ExecutionFailed/)
+          assert.ok(Buffer.byteLength(wire) <= 256)
+          assert.equal(created.length, modelsBefore)
+          assert.equal(runtime.prompts.length, promptsBefore)
+          await until(() => !alive(pid))
+        } finally {
+          controller.abort()
+          if (!pid && existsSync(ready)) pid = Number(readFileSync(ready, 'utf8'))
+          if (pid && alive(pid)) process.kill(pid, 'SIGKILL')
+          await pending.catch(() => {})
+        }
+      }
+    } finally {
+      if (previousLanguage === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+      else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
+      refreshGlobalLanguage()
+    }
+  })
+})
 
 test('WHAT[process-execution-006] Ctrl-Z stops the direct target while its group supervisor can still apply KILL', t =>
   verifyPtyScope(t, 'direct-stop', evidence => {

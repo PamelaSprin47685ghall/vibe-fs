@@ -2,6 +2,79 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as runtime from '../../../dist/Process/Surface.js'
 
+{
+  const gate = await import('../../../dist/Process/LargeGateSurface.js')
+  const { run } = await import('./support/executor.mjs')
+  const tick = () => new Promise(resolve => setImmediate(resolve))
+  const trackedAbort = () => {
+    const controller = new AbortController()
+    const listeners = new Set()
+    const events = []
+    const add = controller.signal.addEventListener.bind(controller.signal)
+    const remove = controller.signal.removeEventListener.bind(controller.signal)
+    controller.signal.addEventListener = (type, listener, options) => {
+      if (type === 'abort') {
+        listeners.add(listener)
+        events.push('add')
+      }
+      return add(type, listener, options)
+    }
+    controller.signal.removeEventListener = (type, listener, options) => {
+      if (type === 'abort') {
+        listeners.delete(listener)
+        events.push('remove')
+      }
+      return remove(type, listener, options)
+    }
+    return { controller, listeners, events }
+  }
+
+  test('WHAT[process-execution-011] the real Host abort listener stays attached while queued and detaches after cancellation', async () => {
+    await gate.acquire(gate.createToken(false))
+    const { controller, listeners, events } = trackedAbort()
+    const pending = run({ command: 'printf should-not-start', world_lock: true, output_budget_bytes: 256 }, {
+      context: { sessionID: 'queued-cancel', abort: controller.signal },
+    })
+    let timer
+    try {
+      await tick()
+      assert.equal(listeners.size, 1)
+      controller.abort()
+      const wire = await Promise.race([pending, new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Queued cancellation must settle before the holder releases')), 1000)
+      })])
+      assert.match(wire, /(?:Cancellation was requested|已请求取消)/)
+      assert.doesNotMatch(wire, /should-not-start|exit_code|SpawnFailed/)
+      assert.ok(Buffer.byteLength(wire) <= 256)
+      assert.equal(gate.getCount(), 0)
+      assert.equal(listeners.size, 0)
+      assert.deepEqual(events, ['add', 'remove'])
+    } finally {
+      clearTimeout(timer)
+      controller.abort()
+      gate.release()
+      await pending.catch(() => {})
+    }
+    assert.equal(gate.getCount(), 1)
+    const wire = await run({ command: 'printf successor', world_lock: true, output_budget_bytes: 256 })
+    assert.match(wire, /successor/)
+    assert.equal(gate.getCount(), 1)
+  })
+
+  for (const command of ['printf complete', 'exit 7']) {
+    test(`WHAT[process-execution-011] Host abort cleanup follows command completion: ${command}`, async () => {
+      const { controller, listeners, events } = trackedAbort()
+      const wire = await run({ command, output_budget_bytes: 256 }, { context: { sessionID: 'completed-cancel', abort: controller.signal } })
+      assert.match(wire, /exit_code = /)
+      assert.equal(listeners.size, 0)
+      assert.deepEqual(events, ['add', 'remove'])
+      controller.abort()
+      await tick()
+      assert.deepEqual(events, ['add', 'remove'])
+    })
+  }
+}
+
 const {
   describeRun,
   run: executeRun,

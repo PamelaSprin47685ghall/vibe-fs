@@ -370,10 +370,12 @@ module ExecutorTool =
                   HardLimit = scope.ProcessHardLimit }
 
             let! result =
-                try
-                    run command estimate processContext cancellation.Token
-                finally
-                    detachAbort ()
+                task {
+                    try
+                        return! run command estimate processContext cancellation.Token
+                    finally
+                        detachAbort ()
+                }
 
             return! interpretOutcome scope request language context result
         }

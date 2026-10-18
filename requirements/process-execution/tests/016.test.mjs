@@ -1,6 +1,46 @@
 import test from 'node:test'
 
 {
+  const { default: assert } = await import('node:assert/strict')
+  const gate = await import('../../../dist/Process/LargeGateSurface.js')
+  const runtime = await import('../../../dist/Process/Surface.js')
+  const tick = () => new Promise(resolve => setImmediate(resolve))
+
+  for (const handoff of [false, true]) {
+    test(`WHAT[process-execution-016] cancellation ${handoff ? 'at permit handoff' : 'while queued'} returns a typed result without starting or stealing a permit`, async () => {
+      assert.equal(gate.getCount(), 1)
+      await gate.acquire(gate.createToken(false))
+      const token = runtime.createCancellationToken(false)
+      let starts = 0
+      const pending = runtime.runWithHostLauncher(async () => {
+        starts++
+        throw new Error('A cancelled request must not reach its host')
+      }, runtime.command('unused', [], null, null), runtime.estimate(10, 1024, 'large'), runtime.context(null, 10000), token)
+      let holder = true
+      try {
+        await tick()
+        if (handoff) {
+          gate.release()
+          holder = false
+        }
+        runtime.cancel(token)
+        const result = await pending
+        assert.equal(result.ok, false)
+        assert.equal(result.error.kind, 'ProcessCancelled')
+        assert.equal(starts, 0)
+        assert.equal(gate.getCount(), handoff ? 1 : 0)
+      } finally {
+        if (holder) gate.release()
+        await pending.catch(() => {})
+      }
+      assert.equal(gate.getCount(), 1)
+      assert.equal(await gate.runLargeEstimate(() => assert.equal(gate.getCount(), 0)), true)
+      assert.equal(gate.getCount(), 1)
+    })
+  }
+}
+
+{
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 

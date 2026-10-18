@@ -2,6 +2,14 @@
 
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
+## 第三十三批：真实取消监听及许可交接（2026-10-18）
+
+预算修复已在3c8f385c7正常推送。共享并行新增且已暂存的LOCAL-UPSTREAM-FIRST-FOUR-DIFF报告随该提交包含，未改其正文；本批使用显式文件清单提交，不混入并行改动。新确认的旧P1 R6-E现已修：ExecutorTool的finally包实际await，Runner在明确的许可/物理等待owner映射同token取消，并于取得许可后再检查；排队不偷释放，交接取消不启动，非取消错误保留。原5项2pass/3fail、首个OCE判型失配候选4fail、编译期输入变动及测试前提问题分别保留，不冒称原拆分错误，详见[取消报告](PROCESS-CANCELLATION-2026-10-18.md)。
+
+643完整Process256项254pass/0fail/1skip/1TODO；最终645正式十文件113pass/0fail/1integration skip、10/10且owned accepted，Bun六文件79/79、真实Host1/1、format/static/diff通过。4d594fd固定主包2076files/展开13402497bytes，库仍0.6.8；独立安装普通依赖及声明peer，Node/Bun各61+4通过、Bun128MiB五次、完整PTY124/124，产品/归档不变且目录清理。非作者同包各8观察通过，包括双语真实context.abort、目标ESRCH、非取消故障及继任物理启动正控。随本原子提交正常推送master，未部署Host或发布registry。
+
+下一P1 R6-D仍需原子修改终结事实、Wait/Runner和实际Git/工具消费者，不把143与SIGTERM合并、不用-1/1替未确认状态。旧PTY首轮失败、正式监督、其他产品链和Linux生成目录清理边界保留，R12-U1继续暂缓。
+
 ## 第三十二批：完整wire预算与真实注册消费者（2026-10-18）
 
 R6-B从ebfbe3d83开始，保留共享新增文档提交d2db5a0c3。预算现包含TOML/转义/事实/说明及原文；双语最小可接纳额度en215、zh-CN211，过小先明确拒绝、零启动。与唯一Host2000行/51200字节窗共同计量，不改注册层规则；保留原始UTF-8尾部和BOM，runner预先取消返回取消请求事实。本轮候选的过度删尾、失败编译、夹具前提和review纠正分项保留，不冒充修前问题。

@@ -57,7 +57,9 @@ export async function verifyDrainingStop(t, reason) {
   assert.equal(alive(grandchild), true)
   if (reason === 'cancel') {
     runtime.cancel(token)
-    await assert.rejects(running)
+    const result = await running
+    assert.equal(result.ok, false)
+    assert.equal(result.error.kind, 'ProcessCancelled')
   } else {
     const result = await running
     assert.equal(result.ok, false)
