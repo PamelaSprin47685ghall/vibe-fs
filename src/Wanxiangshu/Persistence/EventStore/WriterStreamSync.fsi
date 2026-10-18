@@ -12,8 +12,11 @@ module WriterStreamSync =
     val retentionMilliseconds: unit -> float
     val isWriterActiveAt: nowMs: float -> lastActivityMs: float -> bool
     val tryCachedLocalSnapshot: commonDir: string -> StoreSnapshot option
-    val materializeLocalAt: raw: IGitRawStore -> commonDir: string -> nowMs: float -> Task<StoreSnapshot>
-    val materializeLocal: raw: IGitRawStore -> commonDir: string -> Task<StoreSnapshot>
+
+    val materializeLocalAt:
+        raw: IGitRawStore -> commonDir: string -> nowMs: float -> Task<Result<StoreSnapshot, ConvergeError>>
+
+    val materializeLocal: raw: IGitRawStore -> commonDir: string -> Task<Result<StoreSnapshot, ConvergeError>>
 
     val syncWriterStreamsAt:
         raw: IGitRawStore ->

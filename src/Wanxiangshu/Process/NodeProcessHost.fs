@@ -203,9 +203,10 @@ module NodeProcessHost =
         jsNative
 
     [<Emit("""
-        (function(SupervisedProcess, executable, args, cwd, env, stdinText, onStdout, onStderr, onClose, onFailure, onRejected) {
+        (function(SupervisedProcess, executable, args, cwd, env, stdinBytes, onStdout, onStderr, onClose, onFailure, onRejected) {
             let session;
             let killRequested = false;
+            const input = stdinBytes == null ? null : Uint8Array.from(stdinBytes);
             try {
                 session = new SupervisedProcess({
                     executable,
@@ -254,10 +255,10 @@ module NodeProcessHost =
                         return;
                     }
                     if (killRequested) requestKill();
-                    if (typeof stdinText === 'string' && stdinText.length > 0) {
-                        const encoded = new TextEncoder().encode(stdinText);
-                        for (let pos = 0; pos < encoded.byteLength; pos += 16777216) {
-                            const part = encoded.slice(pos, Math.min(pos + 16777216, encoded.byteLength));
+                    if (input !== null) {
+                        for (let pos = 0; pos < input.byteLength; pos += 16777216) {
+                            if (killRequested) break;
+                            const part = input.slice(pos, Math.min(pos + 16777216, input.byteLength));
                             const w = await session.write(part);
                             if (!w || w.kind !== 'Written') {
                                 onFailure(String(w && w.error && w.error.message || 'Process input was not delivered'));
@@ -302,7 +303,7 @@ module NodeProcessHost =
         (args: string array)
         (cwd: string)
         (envObj: obj)
-        (stdinText: obj)
+        (stdinBytes: obj)
         (onStdout: byte[] -> unit)
         (onStderr: byte[] -> unit)
         (onClose: unit -> unit)
@@ -346,9 +347,9 @@ module NodeProcessHost =
 
         resolveAbsoluteCwd raw pathJoin
 
-    let private stdinValue (stdinOpt: string option) : obj =
+    let private stdinValue (stdinOpt: byte[] option) : obj =
         match stdinOpt with
-        | Some text -> box text
+        | Some bytes -> box bytes
         | None -> null
 
     let private invokeKill (killObj: obj) =
@@ -420,10 +421,10 @@ module NodeProcessHost =
         (executable: string)
         (cwd: string)
         (envObj: obj)
-        (cmd: Command)
+        (arguments: string list)
+        (stdin: byte[] option)
         (onStdout: byte[] -> unit)
         (onStderr: byte[] -> unit)
-        (ct: CancellationToken)
         : Task<Result<ChildProcess, ProcessResult>> =
         task {
             // DSL-MUTABLE: algorithm-scratch — exit callback list accumulator
@@ -438,10 +439,10 @@ module NodeProcessHost =
                 startProcessSession
                     SupervisedProcessCtor
                     executable
-                    (cmd.Arguments |> List.toArray)
+                    (arguments |> List.toArray)
                     cwd
                     envObj
-                    (stdinValue cmd.Stdin)
+                    (stdinValue stdin)
                     onStdout
                     onStderr
                     onClose
@@ -458,7 +459,6 @@ module NodeProcessHost =
         (ctx: ProcessContext)
         (onStdout: byte[] -> unit)
         (onStderr: byte[] -> unit)
-        (ct: CancellationToken)
         =
         task {
             let envObj = buildEnv cmd.Environment
@@ -470,7 +470,8 @@ module NodeProcessHost =
             if isNull executable then
                 return Error(ProcessResult.NotStarted(NoExecution.InvalidRequest "Invalid executable name"))
             else
-                return! launchExecutableSession executable cwd envObj cmd onStdout onStderr ct
+                let stdin = cmd.Stdin |> Option.map System.Text.Encoding.UTF8.GetBytes
+                return! launchExecutableSession executable cwd envObj cmd.Arguments stdin onStdout onStderr
         }
 
     let spawn
@@ -484,7 +485,21 @@ module NodeProcessHost =
             if ct.IsCancellationRequested then
                 return Error(ProcessResult.NotStarted NoExecution.CancelledBeforeStart)
             else
-                return! spawnOrReject cmd ctx onStdout onStderr ct
+                return! spawnOrReject cmd ctx onStdout onStderr
+        }
+
+    let spawnBinary fileName arguments (workingDirectory: string) stdin onStdout onStderr =
+        task {
+            let envObj = buildEnv None
+            let cwd = resolveAbsoluteCwd (box workingDirectory) pathJoin
+
+            let executable =
+                resolveExecutablePath fileName cwd envObj pathJoin statSync accessSync
+
+            if isNull executable then
+                return Error(ProcessResult.NotStarted(NoExecution.InvalidRequest "Invalid executable name"))
+            else
+                return! launchExecutableSession executable cwd envObj arguments stdin onStdout onStderr
         }
 
     let tempPath () : string =

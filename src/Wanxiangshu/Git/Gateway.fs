@@ -18,13 +18,16 @@ type GitGatewayLocalStage = unit -> Task<Result<StoreSnapshot, ConvergeError>>
 
 [<RequireQualifiedAccess>]
 module GitGateway =
-    type private PushFailure = Rejected of ConvergeError | ExecutionFailed of ProcessResult
+    type private PushFailure =
+        | Rejected of ConvergeError
+        | ExecutionFailed of ProcessResult
 
     let private execute (run: GitGatewayRunner) args =
         task {
             let! result = run args
             return Result.mapError (ProcessResult.describe >> ConvergeError.Transport) result
         }
+
     let private trackingRef remote = StoreRef.remoteTracking remote
 
     let private transportError stdout stderr =
@@ -123,8 +126,8 @@ module GitGateway =
         }
 
     let private readTrackedRemote (raw: IGitRawStore) remote =
-        task {
-            let! expected = raw.ReadRef(trackingRef remote)
+        taskResult {
+            let! expected = raw.ReadRef(trackingRef remote) |> TaskResult.mapError ConvergeError.GitStorage
 
             return expected |> Option.map (fun oid -> { RootOid = RootOid.create oid }), expected
         }
@@ -229,7 +232,8 @@ module GitGateway =
             task {
                 match pushResult with
                 | Ok() -> return Ok mergedSnapshot
-                | Error(ExecutionFailed failure) -> return Error(ConvergeError.Transport(ProcessResult.describe failure))
+                | Error(ExecutionFailed failure) ->
+                    return Error(ConvergeError.Transport(ProcessResult.describe failure))
                 | Error _ when budgetExhausted () -> return Error ConvergeError.ConvergeBudgetExhausted
                 | Error _ when retriesLeft > 0 -> return! rediscoverAndContinue retriesLeft
                 | Error _ when maxRetries <= 0 -> return Error ConvergeError.ConvergeCasRejected
@@ -246,12 +250,12 @@ module GitGateway =
             }
 
         let convergeWithoutObservedRemote () =
-            task {
+            taskResult {
                 let! tracked = readTrackedRemote raw remote
                 let trackedSnapshot, expected = tracked
 
                 match trackedSnapshot, WriterStreamSync.tryCachedLocalSnapshot commonDir with
-                | Some trackedValue, Some cached when sameSnapshot trackedValue cached -> return Ok cached
+                | Some trackedValue, Some cached when sameSnapshot trackedValue cached -> return cached
                 | _ -> return! loop trackedSnapshot expected false maxRetries
             }
 
@@ -292,5 +296,6 @@ module GitGateway =
                 match res with
                 | ProcessResult.Observed { Output = Some(CapturedOutput.Spooled(path, _, _)) } -> Spool.delete path
                 | _ -> ()
+
                 return ProcessResult.requireText res
             }

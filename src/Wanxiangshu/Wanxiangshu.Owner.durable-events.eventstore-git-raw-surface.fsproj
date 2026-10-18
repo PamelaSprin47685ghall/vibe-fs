@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>persistence</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>eventstore-git-raw-surface</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>durable-events</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>eventstore-git-raw-surface</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-git-runtime.fsproj"/>
+    <Compile Include="Persistence/EventStore/GitRawSurface.fsi"/>
+    <Compile Include="Persistence/EventStore/GitRawSurface.fs"/>
+  </ItemGroup>
+</Project>

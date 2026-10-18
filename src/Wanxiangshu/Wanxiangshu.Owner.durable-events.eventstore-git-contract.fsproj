@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-append-result-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
     <Compile Include="Persistence/EventStore/GitTypes.fsi"/>
     <Compile Include="Persistence/EventStore/GitTypes.fs"/>
   </ItemGroup>

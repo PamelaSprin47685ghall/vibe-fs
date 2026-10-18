@@ -26,6 +26,15 @@ module NodeProcessHost =
         ct: CancellationToken ->
             Task<Result<ChildProcess, ProcessResult>>
 
+    val spawnBinary:
+        fileName: string ->
+        arguments: string list ->
+        workingDirectory: string ->
+        stdin: byte[] option ->
+        onStdout: (byte[] -> unit) ->
+        onStderr: (byte[] -> unit) ->
+            Task<Result<ChildProcess, ProcessResult>>
+
     val tempPath: unit -> string
     val writeFile: path: string -> data: byte array -> unit
     val appendFile: path: string -> data: byte array -> unit

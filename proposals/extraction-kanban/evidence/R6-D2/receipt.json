@@ -1,0 +1,135 @@
+{
+  "card": "CUT-02-R6-D2",
+  "relatedRepair": "CUT-02-R6-D1 stopped capture",
+  "mainBase": "54c7a9266",
+  "mainHeadBeforeCommit": "7793cfd70",
+  "libraryBase": "df14f48 / 0.6.8",
+  "libraryCommit": "8bb1021",
+  "libraryVersion": "0.6.12",
+  "libraryBranch": "codex/repair-four-modules-20261015",
+  "libraryPushed": true,
+  "libraryTarballSHA256": "a039ba669299c6919776196fd9b462624bcbe515d03593804596dbc86f43ac56",
+  "fixedProductGeneration": 663,
+  "fixedTarballSHA256": "3c0afec4f5aee947cff92a5a2e633a41d4e9728daa515f27295e634ed9b324e0",
+  "productFiles": 2076,
+  "cleanInstalledSubtreeFiles": 2904,
+  "productDifferences": [],
+  "finalIntegration": {
+    "generation": 664,
+    "fixedProductGeneration": 663,
+    "productFiles": 2076,
+    "differences": [],
+    "logSHA256": "a57e082beb509a12b122f961e140e7d04dae3b8456106f9b05e7f2467833a98a"
+  },
+  "requirementBinary": {
+    "files": 1,
+    "pass": 19,
+    "fail": 0,
+    "todo": 0,
+    "ownedAccepted": true,
+    "bunNativePass": 19,
+    "independentBunPass": 19
+  },
+  "textAndD1": {
+    "files": 12,
+    "pass": 229,
+    "fail": 0,
+    "todo": 0,
+    "ownedAccepted": true
+  },
+  "closure": {
+    "files": 2,
+    "pass": 20,
+    "fail": 0,
+    "todo": 0,
+    "ownedAccepted": true
+  },
+  "host": {
+    "files": 1,
+    "pass": 27,
+    "fail": 0,
+    "todo": 0,
+    "ownedAccepted": true
+  },
+  "storage": {
+    "files": 6,
+    "pass": 52,
+    "fail": 0,
+    "todo": 3,
+    "skip": 0,
+    "exit": 1,
+    "ownedAccepted": true,
+    "acceptance": "partial; does not close GAP-151 or the changed-file verification matrix"
+  },
+  "typedConsumer": {
+    "unchangedRealSignatures": 15,
+    "newCompileCount": 0,
+    "reusedCompilerNegatives": 5,
+    "nodePass": true,
+    "bunPass": true
+  },
+  "actualConsumers": {
+    "writerSyncGatewayPerHost": 10,
+    "physicalBeforeAfterCuts": 4,
+    "hookNativeFailure": 1,
+    "automaticResends": 0
+  },
+  "nonAuthorReviewers": [
+    "d1_review_git",
+    "d1_review_tests"
+  ],
+  "prototypeAndConsumerAcceptance": "d1_review_host; not counted as non-author pump review",
+  "diagnostics": {
+    "controlledSourceEventIsNativeOsError": false,
+    "directoryFdEisdirCoversPumpReadError": false,
+    "privateGeneratedCheckpointIsStableSemanticTest": false,
+    "staticReportOnlyFindings": 526,
+    "controlPyramids": 0
+  },
+  "performance": "Changed Hook around 1.03-1.14s vs D1 around 0.20-0.25s; explicit P2 follow-up, not no-regression claim",
+  "unclosed": [
+    "R12-U1 (deferred)",
+    "GAP-151",
+    "GAP-215",
+    "CUT-00-R1/R2/R3",
+    "C/R7-A complete acceptance",
+    "Bootstrap and platform/capacity boundaries",
+    "P2 Git command cost"
+  ],
+  "archives": {
+    "D2-068-069-OBSERVABLE-COMPARISON.tgz": "5c914dfa6d6ea9bb77b3467e69765a39c3798c463c5c51316843a4eb36534c68",
+    "D2-FINAL-663-INDEPENDENT.tgz": "096b9160f02b9f668d0f4454a10d69d8670e3ba144a1ca3f4e73c46632746db3",
+    "D2-LAST17-661-INVESTIGATION.tgz": "06f29df82cdf7a1229404aacb99e09ff4168c4213fb5de491fc9c6fd11e65b3a",
+    "D2-LAST17-661-RETAINED-RED.tgz": "0bdaf3c480d9afa33b732ae209d0663f99a56ca54532c7f900a9be1a9aaf63f9",
+    "D2-LAST17-662-EOF-READABLE.tgz": "e2703225a67de1e67378c3637561b60fa4cea2bb215011b8636d259814a70483",
+    "D2-LAST17-662-LOW-TRACE.tgz": "d5a56f4b09949a1f29f3f981c3355da7f0a61d83285e48e3ae7666c040c90487",
+    "D2-LIB-0610-INDEPENDENT-EVIDENCE.tgz": "eba71aba4542dfbdf065d009cf1a7a8c676b1b0a7bd5853d1d9c34631b22bfd9",
+    "D2-LIB-0612-CHECKPOINTS.tgz": "28f8b3c3e0fbc55e1d098d3d77cfd54ea84f7a90c78295e479c5b3a6b7565046",
+    "D2-TYPED-659-BLOCKER-EVIDENCE.tgz": "4dc9614ad84cc0666492a02b48ccd8faa4f1fc62b2a39002dee87750944c505e",
+    "D2-TYPED-660-INDEPENDENT-EVIDENCE.tgz": "a34ae068c3fb656e73bc2b53f8d0edfd604aef6d4fc10816e2fdf0926a1cc8f6",
+    "D2-TYPED-661-INDEPENDENT-EVIDENCE.tgz": "4a00f93ba1dbb4196907b2ed29852f2c469c3405b9e5af365ce67c4aee724942",
+    "d2-baseline-review-evidence-final-20261018.tgz": "94c24bf3b26d35635a0762bc63f1343c004b15186b544cdceb783efee38e7703",
+    "d2-eventpump-private-prototype-662-20261019.tgz": "cdfe8b0334c3a9369b72eabc3c1cba85c8d20ed156e3ed586d873de633c07195",
+    "d2-host-review-659-evidence-20261019.tgz": "950c698d1dfd7305774b3f5775a1210a0dcaacd33df5161e3a1dfd6b4a4ac094",
+    "d2-host-review-660-evidence-20261019.tgz": "16c4e038dd068612e0866f4d4b8e757e56102a13c7666090653ef3a592ca98a4",
+    "d2-host-review-661-evidence-20261019.tgz": "e77c34695fbf2707b7063505b9572a2a807a2f0d2fa1f682d90842f34a089853",
+    "d2-host-review-663-consumers-20261019.tgz": "3af5a7f4b431bbd620558e9c07bf2a8e86bb1f18dbac6f9fcae6387867246ce6",
+    "d2-input-boundary-prototypes-compact-20261019.tgz": "4654136580b252c69e1a803a7e0c5927ed6579799f59441d7ae27b6cd2283545",
+    "d2-library-0611-guard-review-evidence-20261019.tgz": "16aad3527dcd348ea77825f22731a17669301d3ebf0767db2f1d28631daf6e47",
+    "d2-library-host-0611-evidence-compact-20261019.tgz": "88ba7fcfe356f372aa9ebf9163445dcaaab57ba2b81937c015ca4cc467ee8a35",
+    "d2-library-host-0612-acceptance-compact-20261019.tgz": "ec3bca7a5f0d7c0a4778d1280f0e1457793c8b8dbee5a31ef6101c1524109ce5",
+    "d2-object-native-review-with-pack-evidence-20261018.tgz": "b36e62a16082fe823180489e10da614eedd2e587d52ef9407dcdd50468617b77",
+    "d2-raw-final-review-659-evidence-20261019.tgz": "8cba78e5752db0fe4d8963daf4b5a8b52f627fd5ea3c6f1b685623d38e4ad74c",
+    "d2-raw-final-review-660-evidence-20261019.tgz": "f4f4456363edd89f9dd34db8afc72994ac0cc5497c9f23efe25542e580ec867a",
+    "d2-raw-final-review-661-evidence-20261019.tgz": "e8c22d6651aa9c8fa5d38f314ff3e17611e1d5429fe14a020ce1b4aedcce7515",
+    "d2-raw-final-review-663-evidence-20261019.tgz": "04711e016aaf5979020ff795d38d501181764979d5dc62043b05e19716a70154",
+    "d2-ref-native-review-evidence-20261018.tgz": "366f096ae36ee86e15975acbb2ad4854fe09c580a5126eca0452d8aae99a6251",
+    "d2-stopped-capture-baseline-20261018.tgz": "f2557bd8e61cf89d88e67e72688bc2f5655f663102be575eb013083495302d01",
+    "d2-tree-header-review-evidence-20261019.tgz": "5990cf146da57d52392ccc4175af4c54885f4817a13a78e7b463e92b855c9bc5",
+    "d2-worker-input-bridge-evidence-20261019.tgz": "f2c327d29edda4d1497b9d466793330285e6c197c2c26e85190132d45b26f54b",
+    "d2-write-boundary-review-evidence-20261019.tgz": "f7e655a0ad528556bd33f15e71ea81e467f9c10c1342c0824232ad0837fa4552",
+    "root-verification-663.tgz": "26e925cc8c78c8361efc7963023df5b63294071d5878d0cc6bd549244c5c620d"
+  },
+  "deployment": "not performed",
+  "registryPublication": "not performed"
+}

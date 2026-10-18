@@ -2,449 +2,528 @@ namespace Wanxiangshu.Persistence.EventStore
 
 open System
 open System.Text
+open System.Threading
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
+open Wanxiangshu.Process
 
-/// Async git runner: `(args, stdinBytes) -> Task<exitCode * stdoutBytes * stderrText>`.
-/// `args` are `git` argv after `-C <repo>` (added by the default runner).
-type GitRawRunner = string list * byte[] option -> Task<int * byte[] * string>
+type GitRawRequest =
+    { Arguments: string list
+      Input: byte[] option
+      OutputLimit: int }
 
-module private ProcessGitTree =
-    let sortEntries (entries: TreeEntry list) : TreeEntry list = GitTree.canonicalOrder entries
+type GitRawRunner = GitRawRequest -> Task<GitRawResult>
 
-module private ProcessGitTreeHash =
+module private GitBinaryReply =
+    type Reply =
+        { Code: int
+          Output: GitRawOutput
+          Result: GitRawResult }
+
+    let copyBytes (bytes: byte[]) : byte[] = emitJsExpr bytes "Uint8Array.from($0)"
+
+    let fail operation reason result =
+        Error
+            { Operation = operation
+              Reason = reason
+              Result = result }
+
+    let invalid operation reason =
+        fail operation reason (GitRawResult.NotStarted(NoExecution.InvalidRequest reason))
+
+    let private complete operation result =
+        match result with
+        | GitRawResult.Observed({ End = EndEvidence.Confirmed(ProgramEnd.Exited code)
+                                  StopRequested = None
+                                  Fault = None } as observation) when observation.Output.Complete ->
+            Ok
+                { Code = code
+                  Output = observation.Output
+                  Result = result }
+        | GitRawResult.Observed _ -> fail operation "Execution or complete output was not confirmed" result
+        | _ -> fail operation "Git did not start" result
+
+    let private unknown error =
+        GitRawResult.Observed
+            { End = EndEvidence.Unconfirmed
+              StopRequested = None
+              Output =
+                { Stdout = Array.empty
+                  Stderr = Array.empty
+                  Complete = false }
+              Fault = Some error }
+
+    let execute (run: GitRawRunner) operation args input outputLimit =
+        task {
+            let! result =
+                task {
+                    try
+                        return!
+                            run
+                                { Arguments = args
+                                  Input = input
+                                  OutputLimit = outputLimit }
+                    with error ->
+                        return unknown error.Message
+                }
+
+            return complete operation result
+        }
+
+    let requireZero operation reply =
+        if reply.Code = 0 then
+            Ok reply
+        else
+            fail operation (sprintf "Git exited with code %d" reply.Code) reply.Result
+
+    let utf8 operation reply bytes =
+        try
+            let text: string =
+                emitJsExpr bytes "new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode($0)"
+
+            Ok text
+        with _ ->
+            fail operation "Git returned invalid UTF-8" reply.Result
+
+    let isOid text : bool =
+        emitJsExpr text "/^[0-9a-f]{40}$/.test($0)"
+
+    let oid operation reply =
+        result {
+            let! text = utf8 operation reply reply.Output.Stdout
+
+            if text.Length = 41 && text.[40] = '\n' && isOid (text.Substring(0, 40)) then
+                return GitObjectId.create (text.Substring(0, 40))
+            else
+                return! fail operation "Git returned an invalid object id" reply.Result
+        }
+
+    let validateOid operation oid =
+        let text = (GitObjectId.value oid).ToLowerInvariant()
+
+        if isOid text then
+            Ok text
+        else
+            invalid operation "Expected a 40-digit hexadecimal object id"
+
+    let private presentMetadata operation reply objectType sizeText =
+        let validSize: bool =
+            emitJsExpr
+                sizeText
+                "/^(0|[1-9][0-9]*)$/.test($0) && Number.isSafeInteger(Number($0)) && Number($0) <= 2147483647"
+
+        if validSize && List.contains objectType [ "blob"; "tree"; "commit"; "tag" ] then
+            Ok(objectType, int (float sizeText))
+        else
+            fail operation "Git returned invalid object metadata" reply.Result
+
+    let metadata operation tip reply (line: string) =
+        match line.Split(' ') with
+        | [| actual; "missing" |] when actual = tip ->
+            fail operation "Git did not return the requested object; physical absence was not confirmed" reply.Result
+        | [| actual; objectType; sizeText |] when actual = tip -> presentMetadata operation reply objectType sizeText
+        | _ -> fail operation "Git returned invalid object metadata" reply.Result
+
+    let checkMetadata operation tip reply =
+        result {
+            let! text = utf8 operation reply reply.Output.Stdout
+
+            if not (text.EndsWith "\n") || text.IndexOf('\n') <> text.Length - 1 then
+                return! fail operation "Git returned an incomplete metadata record" reply.Result
+
+            return! metadata operation tip reply (text.Substring(0, text.Length - 1))
+        }
+
+    let captureLimit operation reply (bytes: int64) =
+        if bytes > int64 Int32.MaxValue then
+            fail operation "Object representation exceeds byte[] capacity" reply.Result
+        else
+            Ok(int bytes)
+
+module private GitBinaryTree =
     [<Import("createHash", "node:crypto")>]
     let private createHash (algorithm: string) : obj = jsNative
 
-    /// Content digest of a tree entry list — the writtenTreeCache key, not an oid.
-    /// Same bytes in, same digest out; a cache key must be small and deterministic.
-    let sha256Hex (data: byte[]) : string =
+    let cacheKey (bytes: byte[]) : string =
         let hash = createHash "sha256"
-        hash?update (box data) |> ignore
-        unbox<string> (hash?digest (box "hex"))
+        hash?update bytes |> ignore
+        unbox<string> (hash?digest "hex")
 
-/// Where a repository keeps its objects and refs: immutable facts about a path, so they are
-/// resolved once per repository per process. Asking `git rev-parse` per store instance meant one
-/// process spawn every time a session opened the store — measured 27 `--git-common-dir` spawns in
-/// a single canary, all answering the same question about the same directory.
-module private ProcessGitLayout =
-    // DSL-MUTABLE: resource — git layout answer cache by key
-    let private answers = Collections.Generic.Dictionary<string, Task<string option>>()
+    let private validName (name: string) =
+        not (String.IsNullOrEmpty name)
+        && name <> "."
+        && name <> ".."
+        && name.IndexOfAny [| '/'; '\u0000' |] < 0
+        && (emitJsExpr
+                name
+                "new TextDecoder('utf-8', {fatal: true, ignoreBOM: true}).decode(new TextEncoder().encode($0)) === $0"
+        : bool)
 
-    let resolve (key: string) (ask: unit -> Task<string option>) : Task<string option> =
-        match answers.TryGetValue key with
-        | true, cached -> cached
-        | _ ->
-            let answer = ask ()
-            answers.[key] <- answer
-            answer
+    let private validEntry (entry: TreeEntry) =
+        validName entry.Name
+        && GitBinaryReply.isOid (GitObjectId.value entry.Oid)
+        && List.contains (GitTree.normalizeMode entry.Mode) [ "40000"; "100644"; "100755"; "120000" ]
 
-module private ProcessGitOid =
-    let ofStdout (code: int) (stdout: string) : GitObjectId option =
-        let trimmed = stdout.Trim()
+    let validate (entries: TreeEntry list) =
+        List.forall validEntry entries
+        && (entries |> List.map (fun entry -> entry.Name) |> Set.ofList |> Set.count) = entries.Length
 
-        if code <> 0 || String.IsNullOrWhiteSpace trimmed || trimmed.Length <> 40 then
-            None
+    let payload (entries: TreeEntry list) =
+        entries
+        |> List.map (fun entry ->
+            let mode =
+                if GitTree.isTreeMode entry.Mode then
+                    "040000"
+                else
+                    entry.Mode
+
+            let objectType = if GitTree.isTreeMode entry.Mode then "tree" else "blob"
+            sprintf "%s %s %s\t%s\u0000" mode objectType (GitObjectId.value entry.Oid) entry.Name)
+        |> String.concat ""
+        |> Encoding.UTF8.GetBytes
+
+    let private checkedEntry mode objectType oid name =
+        let entry =
+            { Mode = GitTree.normalizeMode mode
+              Name = name
+              Oid = GitObjectId.create oid }
+
+        let expectedType = if GitTree.isTreeMode mode then "tree" else "blob"
+
+        if validEntry entry && objectType = expectedType then
+            Some entry
         else
-            Some(GitObjectId.create trimmed)
+            None
 
-module private ProcessGitLsTree =
-    let private entryFromMeta (name: string) (parts: string[]) : TreeEntry option =
-        match parts with
-        | [| mode; _objectType; oidText |] when oidText.Length = 40 ->
-            Some
-                { Mode = GitTree.normalizeMode mode
-                  Name = name
-                  Oid = GitObjectId.create oidText }
+    let private entryFromFields name fields =
+        match fields with
+        | [| mode; objectType; oid |] -> checkedEntry mode objectType oid name
         | _ -> None
 
-    let parseRow (row: string) : TreeEntry option =
-        match row.IndexOf('\t') with
-        | tab when tab < 0 -> None
-        | tab ->
-            let meta = row.Substring(0, tab)
-            let name = row.Substring(tab + 1)
-            entryFromMeta name (meta.Split([| ' ' |], StringSplitOptions.RemoveEmptyEntries))
+    let private row (text: string) =
+        let tab = text.IndexOf '\t'
 
-module private ProcessGitExec =
-    let complete (tcs: TaskCompletionSource<int * byte[] * string>) (error: obj) (stdout: obj) (_stderr: obj) : unit =
-        if isNull error then
-            let outBytes: byte[] = emitJsExpr stdout "Buffer.from($0)"
-            AsyncSupport.trySetResult tcs (0, outBytes, "") |> ignore
-        else
-            let status: int =
-                emitJsExpr error "($0 && typeof $0.status === 'number') ? $0.status : 1"
-
-            let outBytes: byte[] =
-                emitJsExpr error "($0 && $0.stdout) ? Buffer.from($0.stdout) : Buffer.alloc(0)"
-
-            let errText: string =
-                emitJsExpr
-                    error
-                    """
-                    (function (e) {
-                      if (!e || e.stderr == null) return (e && e.message) || String(e);
-                      return Buffer.from(e.stderr).toString('utf8');
-                    })($0)
-                    """
-
-            AsyncSupport.trySetResult tcs (status, outBytes, errText) |> ignore
-
-/// Production `IGitRawStore` over a real Git object database + refs (§2.3 / §9).
-/// Plumbing only (`hash-object` / `mktree` / `cat-file` / `ls-tree` / `update-ref`).
-/// Never touches HEAD, index, commits, branches, or tags as store history.
-///
-/// ── why this instance memoizes ───────────────────────────────────────────────
-///
-/// Every CLI fallback is one `git` spawn (~2.5ms), and a single-event append
-/// measured **24 spawns / ~60ms** against 0.5ms for the identical EventStore logic on the
-/// in-memory raw store. Twelve of those spawns were `ls-tree` of six distinct oids and seven
-/// were `mktree` of trees already written moments earlier: the delta snapshot and the merge
-/// rebuild the same shard path, so the same immutable object was re-read and re-written through
-/// a fresh process each time. The runner is now async so a spawn yields the Host event loop,
-/// but spawn count still dominates wall time — memoize immutable oids.
-///
-/// Git objects are content-addressed and immutable, which is what makes memoization exact
-/// rather than a heuristic: an oid's bytes cannot change, and `mktree` of the same entry list
-/// cannot yield a different oid. Absence is deliberately NOT cached — an object we have not
-/// written yet may appear later.
-type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
-    let zeroOid = String('0', 40)
-
-    // DSL-MUTABLE: resource — git object content cache (immutable oid → bytes)
-    let objectCache = Collections.Generic.Dictionary<string, byte[]>()
-    // DSL-MUTABLE: resource — git tree entry cache (immutable oid → entries)
-    let treeCache = Collections.Generic.Dictionary<string, TreeEntry list>()
-    // DSL-MUTABLE: resource — written tree cache (content digest → oid)
-    let writtenTreeCache = Collections.Generic.Dictionary<string, GitObjectId>()
-
-    let utf8 (bytes: byte[]) = Encoding.UTF8.GetString(bytes)
-
-    let runText (args: string list) : Task<int * string * string> =
-        task {
-            let! code, stdout, stderr = run (args, None)
-            return code, utf8 stdout, stderr
-        }
-
-    let runWithStdin (args: string list) (stdin: byte[]) : Task<int * string * string> =
-        task {
-            let! code, stdout, stderr = run (args, Some stdin)
-            return code, utf8 stdout, stderr
-        }
-
-    let ensureOk (label: string) (code: int) (stdout: string) (stderr: string) =
-        if code <> 0 then
-            let detail = if String.IsNullOrWhiteSpace stderr then stdout else stderr
-
-            failwith (sprintf "git %s failed (%d): %s" label code (detail.Trim()))
-
-    /// The ODB directory, resolved once. `--git-path objects` answers correctly for a worktree,
-    /// a bare repo and an alternates-free submodule alike, which is why it is asked rather than
-    /// assembled from `_repoPath`.
-    let objectsDirectory =
-        lazy
-            (ProcessGitLayout.resolve (_repoPath + "\u001fobjects") (fun () ->
-                task {
-                    let! code, stdout, _ = runText [ "rev-parse"; "--git-path"; "objects" ]
-                    let trimmed = stdout.Trim()
-
-                    if code <> 0 || trimmed = "" then return None
-                    elif trimmed.StartsWith "/" then return Some trimmed
-                    else return Some(_repoPath + "/" + trimmed)
-                }))
-
-    /// The git directory that owns refs, resolved once. `--git-common-dir` rather than
-    /// `--git-dir`: a linked worktree keeps its own HEAD but shares `refs/`, and the store ref is
-    /// shared state, not per-worktree state.
-    let refsDirectory =
-        lazy
-            (ProcessGitLayout.resolve (_repoPath + "\u001fcommon") (fun () ->
-                task {
-                    let! code, stdout, _ = runText [ "rev-parse"; "--path-format=absolute"; "--git-common-dir" ]
-
-                    let trimmed = stdout.Trim()
-
-                    if code <> 0 || not (trimmed.StartsWith "/") then
-                        return None
-                    else
-                        return Some trimmed
-                }))
-
-    let writeBlobViaCli (content: byte[]) =
-        task {
-            let! code, stdout, stderr = runWithStdin [ "hash-object"; "-w"; "--stdin" ] content
-            ensureOk "hash-object" code stdout stderr
-
-            match ProcessGitOid.ofStdout code stdout with
-            | Some oid -> return oid
-            | None -> return failwith (sprintf "hash-object returned invalid oid: %s" (stdout.Trim()))
-        }
-
-    let writeTreeViaCli (sorted: TreeEntry list) (lines: string) =
-        task {
-            let payload = Encoding.UTF8.GetBytes(if lines = "" then "" else lines + "\n")
-            let! code, stdout, stderr = runWithStdin [ "mktree" ] payload
-            ensureOk "mktree" code stdout stderr
-            return ProcessGitOid.ofStdout code stdout
-        }
-
-    let writeTreeUncached (sorted: TreeEntry list) (lines: string) =
-        task {
-            match! objectsDirectory.Force() with
-            | Some objects ->
-                let! oid = GitObjectDatabase.writeTree objects sorted
-                return Some(GitObjectId.create oid)
-            | None -> return! writeTreeViaCli sorted lines
-        }
-
-    let rememberWrittenTree (cacheKey: string) (sorted: TreeEntry list) (written: GitObjectId option) =
-        match written with
-        | Some oid ->
-            writtenTreeCache.[cacheKey] <- oid
-            treeCache.[GitObjectId.value oid] <- sorted
-            oid
-        | None -> failwith "tree write returned an invalid oid"
-
-    let tryReadLooseObject (tip: string) (objects: string option) =
-        match objects with
-        | Some dir -> GitObjectDatabase.tryReadObject dir tip
-        | None -> Task.FromResult None
-
-    let cacheObjectBytes (tip: string) (bytes: byte[]) =
-        objectCache.[tip] <- bytes
-        Some bytes
-
-    let cacheCatFileBytes (tip: string) (code: int) (stdoutBytes: byte[]) =
-        if code <> 0 then
+        if tab < 0 then
             None
         else
-            objectCache.[tip] <- stdoutBytes
-            Some stdoutBytes
+            entryFromFields (text.Substring(tab + 1)) (text.Substring(0, tab).Split(' '))
 
-    let readAndCacheTypedObject (tip: string) (objectType: string) =
-        match objectType with
-        | "blob"
-        | "tree" as typed ->
-            task {
-                let! code, stdoutBytes, _ = run ([ "cat-file"; typed; tip ], None)
-                return cacheCatFileBytes tip code stdoutBytes
-            }
-        | _ -> Task.FromResult None
+    let private parseRows operation (reply: GitBinaryReply.Reply) (text: string) =
+        let rows = text.Substring(0, text.Length - 1).Split('\u0000') |> Array.toList
+        let parsed = rows |> List.choose row
 
-    let readObjectFromPack (tip: string) =
-        task {
-            let! typeCode, typeOut, _ = runText [ "cat-file"; "-t"; tip ]
+        if parsed.Length = rows.Length && validate parsed then
+            Ok(GitTree.canonicalOrder parsed)
+        else
+            GitBinaryReply.fail operation "Git returned invalid or duplicate tree entries" reply.Result
 
-            if typeCode <> 0 then
-                return None
+    let parse operation reply =
+        result {
+            let! text = GitBinaryReply.utf8 operation reply reply.Output.Stdout
+
+            if text = "" then
+                return []
+            elif not (text.EndsWith "\u0000") then
+                return! GitBinaryReply.fail operation "Git returned an incomplete tree record" reply.Result
             else
-                return! readAndCacheTypedObject tip (typeOut.Trim())
+                return! parseRows operation reply text
         }
 
-    let rememberLooseOrPack (tip: string) (loose: byte[] option) =
-        match loose with
-        | Some bytes -> Task.FromResult(cacheObjectBytes tip bytes)
-        | None -> readObjectFromPack tip
+type ProcessGitRawStore(_repoPath: string, run: GitRawRunner) =
+    let objects = Collections.Generic.Dictionary<string, byte[]>()
+    let trees = Collections.Generic.Dictionary<string, TreeEntry list>()
+    let writtenTrees = Collections.Generic.Dictionary<string, GitObjectId>()
 
-    let readObjectUncached (tip: string) =
-        task {
-            let! objects = objectsDirectory.Force()
-            let! loose = tryReadLooseObject tip objects
-            return! rememberLooseOrPack tip loose
+    let execute operation args input limit =
+        GitBinaryReply.execute run operation args input limit
+
+    let runZero operation args input limit =
+        taskResult {
+            let! reply = execute operation args input limit
+            return! GitBinaryReply.requireZero operation reply
         }
 
-    let tryReadLooseTree (tip: string) (objects: string option) =
-        match objects with
-        | Some dir -> GitObjectDatabase.tryReadTree dir tip
-        | None -> Task.FromResult None
+    let readMetadata tip =
+        taskResult {
+            let! reply =
+                runZero "cat-file" [ "cat-file"; "--batch-check" ] (Some(Encoding.UTF8.GetBytes(tip + "\n"))) 66560
 
-    let rememberTreeEntries (tip: string) (entries: TreeEntry list) =
-        let sorted = ProcessGitTree.sortEntries entries
-        treeCache.[tip] <- sorted
-        Some sorted
+            let! metadata = GitBinaryReply.checkMetadata "cat-file" tip reply
+            return reply, metadata
+        }
 
-    let readTreeFromLsTree (tip: string) =
-        task {
-            let! code, stdout, _ = runText [ "ls-tree"; "--full-tree"; "-z"; tip ]
+    let writeBlob content =
+        taskResult {
+            let! reply = runZero "hash-object" [ "hash-object"; "-w"; "--stdin" ] (Some content) 66560
+            let! oid = GitBinaryReply.oid "hash-object" reply
+            return oid
+        }
 
-            if code <> 0 then
+    let writeTree entries =
+        taskResult {
+            if not (GitBinaryTree.validate entries) then
+                return! GitBinaryReply.invalid "mktree" "Invalid or duplicate tree entries"
+
+            let sorted = GitTree.canonicalOrder entries
+            let payload = GitBinaryTree.payload sorted
+            let key = GitBinaryTree.cacheKey payload
+
+            match writtenTrees.TryGetValue key with
+            | true, oid -> return oid
+            | _ ->
+                let! reply = runZero "mktree" [ "mktree"; "-z" ] (Some payload) 66560
+                let! oid = GitBinaryReply.oid "mktree" reply
+                writtenTrees.[key] <- oid
+                trees.[GitObjectId.value oid] <- sorted
+                return oid
+        }
+
+    let readObjectBody tip metadataReply objectType size =
+        taskResult {
+            let! limit = GitBinaryReply.captureLimit "cat-file" metadataReply (int64 size + 65536L)
+            let! reply = runZero "cat-file" [ "cat-file"; objectType; tip ] None limit
+            let bytes = reply.Output.Stdout
+
+            if bytes.Length <> size then
+                return! GitBinaryReply.fail "cat-file" "Git returned truncated or excess object bytes" reply.Result
+
+            objects.[tip] <- GitBinaryReply.copyBytes bytes
+            return bytes
+        }
+
+    let readObjectUncached tip =
+        taskResult {
+            let! metadataReply, (objectType, size) = readMetadata tip
+            return! readObjectBody tip metadataReply objectType size
+        }
+
+    let readObject oid =
+        taskResult {
+            let! tip = GitBinaryReply.validateOid "cat-file" oid
+
+            match objects.TryGetValue tip with
+            | true, bytes -> return GitBinaryReply.copyBytes bytes
+            | _ -> return! readObjectUncached tip
+        }
+
+    let readTreeEntries tip metadataReply size =
+        taskResult {
+            let! limit = GitBinaryReply.captureLimit "ls-tree" metadataReply (3L * int64 size + 66560L)
+            let! reply = runZero "ls-tree" [ "ls-tree"; "--full-tree"; "-z"; tip ] None limit
+            let! entries = GitBinaryTree.parse "ls-tree" reply
+
+            if (size = 0) <> List.isEmpty entries then
+                return! GitBinaryReply.fail "ls-tree" "Tree output disagrees with object metadata" reply.Result
+
+            trees.[tip] <- entries
+            return entries
+        }
+
+    let readTreeUncached tip =
+        taskResult {
+            let! metadataReply, metadata = readMetadata tip
+
+            match metadata with
+            | "tree", size -> return! readTreeEntries tip metadataReply size
+            | _ -> return! GitBinaryReply.fail "ls-tree" "Expected a tree object" metadataReply.Result
+        }
+
+    let readTree oid =
+        taskResult {
+            let! tip = GitBinaryReply.validateOid "ls-tree" oid
+
+            match trees.TryGetValue tip with
+            | true, entries -> return entries
+            | _ -> return! readTreeUncached tip
+        }
+
+    let readRef (refName: string) =
+        taskResult {
+            if not (refName.StartsWith "refs/") then
+                return! GitBinaryReply.invalid "rev-parse" "Expected a full ref name"
+
+            let! _ = runZero "check-ref-format" [ "check-ref-format"; refName ] None 66560
+            let! exists = execute "show-ref" [ "show-ref"; "--exists"; refName ] None 66560
+
+            if exists.Code = 2 && exists.Output.Stdout.Length = 0 then
                 return None
+            elif exists.Code = 129 then
+                return! GitBinaryReply.fail "show-ref" "Git >= 2.43 is required for exact ref lookup" exists.Result
             else
-                let entries =
-                    stdout.Split([| '\u0000' |], StringSplitOptions.RemoveEmptyEntries)
-                    |> Array.choose ProcessGitLsTree.parseRow
-                    |> Array.toList
-
-                return rememberTreeEntries tip entries
-        }
-
-    let rememberLooseTreeOrCli (tip: string) (loose: TreeEntry list option) =
-        match loose with
-        | Some entries -> Task.FromResult(rememberTreeEntries tip entries)
-        | None -> readTreeFromLsTree tip
-
-    let readTreeUncached (tip: string) =
-        task {
-            let! objects = objectsDirectory.Force()
-            let! loose = tryReadLooseTree tip objects
-            return! rememberLooseTreeOrCli tip loose
-        }
-
-    let expectedOidText (expectedOld: GitObjectId option) =
-        match expectedOld with
-        | None -> zeroOid
-        | Some oid -> GitObjectId.value oid
-
-    let compareAndSwapViaCli (refName: string) (expectedOld: GitObjectId option) (next: string) =
-        task {
-            let! code, _, _ = runText [ "update-ref"; refName; next; expectedOidText expectedOld ]
-            return code = 0
+                let! _ = GitBinaryReply.requireZero "show-ref" exists
+                let! reply = runZero "rev-parse" [ "rev-parse"; "--verify"; "--quiet"; refName ] None 66560
+                let! oid = GitBinaryReply.oid "rev-parse" reply
+                return Some oid
         }
 
     interface IGitRawStore with
-        member _.WriteBlob(content: byte[]) =
-            task {
-                match! objectsDirectory.Force() with
-                | Some objects ->
-                    let! oid = GitObjectDatabase.writeBlob objects content
-                    return GitObjectId.create oid
-                | None -> return! writeBlobViaCli content
-            }
+        member _.WriteBlob content =
+            writeBlob (GitBinaryReply.copyBytes content)
 
-        member _.WriteTree(entries: TreeEntry list) =
-            task {
-                let sorted = ProcessGitTree.sortEntries entries
+        member _.WriteTree entries = writeTree entries
+        member _.ReadObject oid = readObject oid
+        member _.ReadTree oid = readTree oid
+        member _.ReadRef refName = readRef refName
 
-                let lines =
-                    sorted
-                    |> List.map (fun entry ->
-                        let mode =
-                            if GitTree.isTreeMode entry.Mode then
-                                "040000"
-                            else
-                                entry.Mode
+module private GitBinaryProcess =
+    type private Capture(limit: int) =
+        let stdout = ResizeArray<byte[]>()
+        let stderr = ResizeArray<byte[]>()
+        // DSL-MUTABLE: resource — this execution owns its bounded capture.
+        let mutable size = 0
+        let mutable collecting = true
 
-                        let objectType = if GitTree.isTreeMode entry.Mode then "tree" else "blob"
+        let store (chunks: ResizeArray<byte[]>) (bytes: byte[]) =
+            let available = min bytes.Length (limit - size)
 
-                        sprintf "%s %s %s\t%s" mode objectType (GitObjectId.value entry.Oid) entry.Name)
-                    |> String.concat "\n"
+            if available > 0 then
+                chunks.Add bytes.[0 .. available - 1]
 
-                let cacheKey = ProcessGitTreeHash.sha256Hex (Encoding.UTF8.GetBytes lines)
+            size <- size + available
 
-                match writtenTreeCache.TryGetValue cacheKey with
-                | true, oid -> return oid
-                | _ ->
-                    let! written = writeTreeUncached sorted lines
-                    return rememberWrittenTree cacheKey sorted written
-            }
+            if available < bytes.Length then
+                failwith "Git output exceeded its combined byte limit"
 
-        member _.ReadObject(oid: GitObjectId) =
-            task {
-                let tip = GitObjectId.value oid
+        member _.Stdout bytes =
+            if collecting then
+                store stdout bytes
 
-                match objectCache.TryGetValue tip with
-                | true, bytes -> return Some bytes
-                | _ -> return! readObjectUncached tip
-            }
+        member _.Stderr bytes =
+            if collecting then
+                store stderr bytes
 
-        member _.ReadTree(oid: GitObjectId) =
-            task {
-                let tip = GitObjectId.value oid
+        member _.Read complete =
+            { Stdout = stdout |> Seq.toArray |> Array.concat
+              Stderr = stderr |> Seq.toArray |> Array.concat
+              Complete = complete }
 
-                match treeCache.TryGetValue tip with
-                | true, entries -> return Some entries
-                | _ -> return! readTreeUncached tip
-            }
+        member _.Close() =
+            collecting <- false
+            stdout.Clear()
+            stderr.Clear()
 
-        member _.ReadRef(refName: string) =
-            task {
-                match! refsDirectory.Force() with
-                | Some gitDir ->
-                    let! oid = GitObjectDatabase.tryReadRef gitDir refName
-                    return oid |> Option.map GitObjectId.create
-                | None ->
-                    let! code, stdout, _ = runText [ "rev-parse"; "--verify"; "--quiet"; refName ]
-                    return ProcessGitOid.ofStdout code stdout
-            }
+    let private observe (child: NodeProcessHost.ChildProcess) (capture: Capture) stop =
+        let ending = child.Observe()
 
-        member _.CompareAndSwapRef(refName, expectedOld, newOid) =
-            task {
-                let next = GitObjectId.value newOid
+        let fault =
+            child.Failure.Value
+            |> Option.orElse (
+                if child.Exited.Value && ending = EndEvidence.Unconfirmed then
+                    Some "Target end was not confirmed"
+                else
+                    None
+            )
 
-                match! refsDirectory.Force() with
-                | Some gitDir ->
-                    return!
-                        GitObjectDatabase.compareAndSwapRef
-                            gitDir
-                            refName
-                            (expectedOld |> Option.map GitObjectId.value)
-                            next
-                | None -> return! compareAndSwapViaCli refName expectedOld next
-            }
+        match child.Rejection.Value with
+        | Some reason -> GitRawResult.NotStarted reason
+        | None ->
+            GitRawResult.Observed
+                { End = ending
+                  StopRequested = stop
+                  Output = capture.Read(child.Exited.Value && fault.IsNone && stop.IsNone)
+                  Fault = fault }
+
+    let private stopAfterFailure (child: NodeProcessHost.ChildProcess) message =
+        child.Failure.Value <- child.Failure.Value |> Option.orElse (Some message)
+
+        try
+            child.Kill()
+        with _ ->
+            ()
+
+    let private wait child capture deadline budget =
+        task {
+            try
+                let! waited = NodeProcessWait.waitForExit child deadline CancellationToken.None
+
+                let stop =
+                    waited.StopRequested
+                    |> Option.map (fun _ -> StopRequest.DeadlineStopRequested budget)
+
+                return observe child capture stop
+            with error ->
+                stopAfterFailure child error.Message
+                return observe child capture None
+        }
+
+    let private start repoPath request (capture: Capture) deadline budget =
+        task {
+            match!
+                NodeProcessHost.spawnBinary
+                    "git"
+                    ("-C" :: repoPath :: request.Arguments)
+                    repoPath
+                    request.Input
+                    capture.Stdout
+                    capture.Stderr
+            with
+            | Error(ProcessResult.NotStarted reason) -> return GitRawResult.NotStarted reason
+            | Error(ProcessResult.Observed observation) ->
+                return
+                    GitRawResult.Observed
+                        { End = observation.End
+                          StopRequested = observation.StopRequested
+                          Output = capture.Read false
+                          Fault = observation.Fault }
+            | Ok child -> return! wait child capture deadline budget
+        }
+
+    let private tryStart repoPath request capture deadline budget =
+        task {
+            try
+                return! start repoPath request capture deadline budget
+            with error ->
+                return
+                    GitRawResult.Observed
+                        { End = EndEvidence.Unconfirmed
+                          StopRequested = None
+                          Output = capture.Read false
+                          Fault = Some error.Message }
+        }
+
+    let run repoPath (budget: TimeSpan) (request: GitRawRequest) =
+        task {
+            let capture = Capture(request.OutputLimit)
+            let deadline = Deadline.ofBudget DateTimeOffset.UtcNow budget
+
+            try
+                return! tryStart repoPath request capture deadline budget
+            finally
+                capture.Close()
+        }
 
 [<RequireQualifiedAccess>]
 module ProcessGitRawStore =
+    [<Import("resolve", "node:path")>]
+    let private absolutePath (path: string) : string = jsNative
 
-    // ── why this uses execFile, not the Process module ───────────────────────
-    //
-    // The Process module's typed `Command` protocol is text-oriented:
-    //   • `Command.Stdin`               is `string option`  — no binary stdin
-    //   • `ProcessOutcome.Completed.stdout` is `string` (UTF-8 decoded)
-    //
-    // ProcessGitRawStore needs **binary** I/O:
-    //   • `hash-object -w --stdin`  accepts arbitrary blob bytes (images, …)
-    //   • `cat-file blob <oid>`     returns arbitrary blob bytes
-    //
-    // Routing through `ProcessRunner.run` would corrupt non-UTF-8 blob content.
-    // Extending `Command` with a `StdinBytes` field and adding a binary-output
-    // variant of `ProcessRunner` would work but changes the stable public
-    // protocol for every `Command` construction site — a larger change than
-    // this routing task.  The `execFile` callback with `encoding: "buffer"`
-    // preserves raw bytes and is the correct tool for this store.
+    let createRunner repoPath (hardLimit: TimeSpan) : GitRawRunner =
+        let repository = absolutePath repoPath
 
-    [<Import("execFile", "node:child_process")>]
-    let private execFile
-        (fileName: string)
-        (arguments: string array)
-        (options: obj)
-        (callback: obj -> obj -> obj -> unit)
-        : unit =
-        jsNative
+        fun request ->
+            if
+                Double.IsNaN hardLimit.TotalMilliseconds
+                || Double.IsInfinity hardLimit.TotalMilliseconds
+                || hardLimit <= TimeSpan.Zero
+            then
+                Task.FromResult(
+                    GitRawResult.NotStarted(NoExecution.InvalidRequest "Git hard limit must be finite and positive")
+                )
+            elif request.OutputLimit < 0 then
+                Task.FromResult(
+                    GitRawResult.NotStarted(NoExecution.InvalidRequest "Git output limit must be non-negative")
+                )
+            else
+                GitBinaryProcess.run repository hardLimit request
 
-    /// Default async runner: `git -C <repoPath> …` with binary stdout/stdin.
-    /// Uses `execFile` (callback) so the Node event loop can run other work while git runs.
-    let createDefaultRunner (repoPath: string) : GitRawRunner =
-        fun (args: string list, stdin: byte[] option) ->
-            let tcs = TaskCompletionSource<int * byte[] * string>()
-            let argv = Array.append [| "-C"; repoPath |] (args |> List.toArray)
+    let createDefaultRunner repoPath =
+        createRunner repoPath (TimeSpan.FromSeconds 120.0)
 
-            let options =
-                match stdin with
-                | Some bytes ->
-                    createObj
-                        [ "encoding", box "buffer"
-                          "input", box bytes
-                          "maxBuffer", box (64 * 1024 * 1024)
-                          "timeout", box 120000
-                          "killSignal", box "SIGTERM" ]
-                | None ->
-                    createObj
-                        [ "encoding", box "buffer"
-                          "maxBuffer", box (64 * 1024 * 1024)
-                          "timeout", box 120000
-                          "killSignal", box "SIGTERM" ]
-
-            try
-                execFile "git" argv options (fun error stdout stderr -> ProcessGitExec.complete tcs error stdout stderr)
-            with ex ->
-                AsyncSupport.trySetResult tcs (1, Array.empty, ex.Message) |> ignore
-
-            tcs.Task
-
-    let createWithRunner (repoPath: string) (run: GitRawRunner) : IGitRawStore =
+    let createWithRunner repoPath run : IGitRawStore =
         ProcessGitRawStore(repoPath, run) :> IGitRawStore
 
-    let create (repoPath: string) : IGitRawStore =
+    let create repoPath =
         createWithRunner repoPath (createDefaultRunner repoPath)

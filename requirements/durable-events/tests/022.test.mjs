@@ -128,7 +128,8 @@ test('WHAT[durable-events-022] EventStore contracts exclude physical and Strengt
     for (const projectPath of plan.projectPaths) {
       const provider = projectByPath.get(resolve(projectPath))
       assert.ok(
-        ALLOWED_CONTRACT_CLOSURE_SHARDS.has(provider?.shard),
+        ALLOWED_CONTRACT_CLOSURE_SHARDS.has(provider?.shard)
+          || (shard === 'eventstore-git-contract' && provider?.shard === 'process-processrequest'),
         `${shard} contract closure contains non-contract shard ${provider?.shardKey ?? basename(projectPath)}`,
       )
     }

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>process</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>process-node-host-adapter</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>process-execution</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>process-node-host-adapter</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-processrequest.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.time-capability.process-deadline-contract.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj"/>
+    <Compile Include="Process/NodeProcessHost.fsi"/>
+    <Compile Include="Process/NodeProcessHost.fs"/>
+    <Compile Include="Process/NodeProcessWait.fsi"/>
+    <Compile Include="Process/NodeProcessWait.fs"/>
+  </ItemGroup>
+</Project>

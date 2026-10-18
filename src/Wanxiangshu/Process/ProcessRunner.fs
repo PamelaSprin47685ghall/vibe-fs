@@ -23,21 +23,39 @@ module ProcessRunner =
             Some "hard limit must be finite and positive"
         else None
 
-    let private observe (child: ChildProcess) collector stop =
+    let private observe (child: ChildProcess) collector (stop: StopRequest option) =
         let ending = child.Observe()
+
         let fault =
             child.Failure.Value
-            |> Option.orElse (if child.Exited.Value && ending = EndEvidence.Unconfirmed && child.Rejection.Value.IsNone then Some "Target end was not confirmed" else None)
+            |> Option.orElse (
+                if
+                    child.Exited.Value
+                    && ending = EndEvidence.Unconfirmed
+                    && child.Rejection.Value.IsNone
+                then
+                    Some "Target end was not confirmed"
+                else
+                    None
+            )
+
         let output =
-            if child.Exited.Value && fault.IsNone then Some(buildResult collector)
+            if child.Exited.Value && fault.IsNone && stop.IsNone then
+                Some(buildResult collector)
             else
                 discard collector
                 None
+
         match child.Rejection.Value with
         | Some reason ->
             discard collector
             ProcessResult.NotStarted reason
-        | None -> ProcessResult.Observed { End = ending; StopRequested = stop; Output = output; Fault = fault }
+        | None ->
+            ProcessResult.Observed
+                { End = ending
+                  StopRequested = stop
+                  Output = output
+                  Fault = fault }
 
     let private stopQuietly (child: ChildProcess) =
         try child.Kill()

@@ -52,6 +52,7 @@ import "wanxiangshu"
 
 - Node.js `>= 22.13.0`（`engines.node`；Lifecycle 的 Node 路径使用内建 `node:sqlite`）
 - OpenCode Host，peer 依赖 `@opencode-ai/plugin`（`>= 1.17.4`）
+- Git `>= 2.43`：独立Hook同步用确切ref存在性状态区分缺失与读取失败；不支持该能力时明确报错。
 - 从源码构建时：.NET SDK（`global.json`）与 `dotnet tool restore`（Fable、Fantomas）
 
 `packageManager` = `npm@11.12.1`。安装依赖使用 `npm ci`（已提交 `package-lock.json`）。

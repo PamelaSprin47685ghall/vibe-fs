@@ -1,6 +1,14 @@
 # D1：单次执行与文本消费者
 
-状态：D1验收完成，随本原子提交交付。输入主仓 `25651051f`、库 `df14f48 / 0.6.8`。施工期间另一轮文档提交已到 `6d67600bb`，原样保留，其文档不并入本包。只修改本地 D1，不合并上游；D2 二进制 GitRawRunner、PTY 持久清账、旧自然 Unknown 和 R12-U1 不在本包关闭范围。
+状态：54c7a9266后发现的停止输出完整性回退已修正，随D2原子提交再次验收D1声明范围。输入主仓 `25651051f`、库 `df14f48 / 0.6.8`；另一轮文档提交原样保留。D2 二进制 GitRawRunner、PTY 持久清账、旧自然 Unknown 和 R12-U1 不在D1关闭范围。
+
+## 交付后复审纠正
+
+非作者在固定652包复现：目标已exit23，后代每次实际写出后记录私有计数，deadline强停时Bun已确认写出21168128字节，但Runner把21110784字节spool作为完整输出，少57344字节；Node本次计数相等，不冒称Node也实际丢字节。缺最终extent时scope/capture Closed并不足以授权完整性。此为D1新协议引入，旧timeout路径本会discard；原229项和固定包检查未覆盖该断言，不能用此前通过掩盖缺口。文本Runner现只在无StopRequest且无fault的自然收束后交付完整输出；D2同时保留partial bytes但Complete=false。原反例已封存于[D2证据](evidence/R6-D2/d2-stopped-capture-baseline-20261018.tgz)，660修正物理正反对照及与663主仓代码字节同一性分别见该目录host660、host663档。
+
+另根侧长期replay脚本的仓库路径多退一级，属于本轮验收脚本错误，未影响先前实际运行的日志或固定包字节。修正后已真实重放12/12文件229pass/0fail/0TODO、owned accepted，原/tmp路径与长期脚本分开记账。
+
+最终663再次以长期脚本取得229pass/0fail/0TODO、12/12、owned accepted；Native/Bun输入修正及所有证据见[D2报告](PROCESS-BINARY-D2-2026-10-18.md)。原652收据保留其历史输入与当时成绩，不代证后来修正；本轮追加收据记录在R6-D2，不覆盖旧档。
 
 ## 契约与施工范围
 

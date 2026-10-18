@@ -2,6 +2,7 @@ namespace Wanxiangshu.Persistence.EventStore
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Process
 
 type GitObjectId
 
@@ -23,13 +24,36 @@ type TreeEntry =
       Name: string
       Oid: GitObjectId }
 
+type GitRawOutput =
+    { Stdout: byte[]
+      Stderr: byte[]
+      Complete: bool }
+
+type GitRawObservation =
+    { End: EndEvidence
+      StopRequested: StopRequest option
+      Output: GitRawOutput
+      Fault: string option }
+
+[<RequireQualifiedAccess>]
+type GitRawResult =
+    | NotStarted of NoExecution
+    | Observed of GitRawObservation
+
+type GitStorageFailure =
+    { Operation: string
+      Reason: string
+      Result: GitRawResult }
+
+module GitStorageFailure =
+    val describe: failure: GitStorageFailure -> string
+
 type IGitRawStore =
-    abstract WriteBlob: content: byte[] -> Task<GitObjectId>
-    abstract WriteTree: entries: TreeEntry list -> Task<GitObjectId>
-    abstract ReadObject: oid: GitObjectId -> Task<byte[] option>
-    abstract ReadTree: oid: GitObjectId -> Task<TreeEntry list option>
-    abstract ReadRef: refName: string -> Task<GitObjectId option>
-    abstract CompareAndSwapRef: refName: string * expectedOld: GitObjectId option * newOid: GitObjectId -> Task<bool>
+    abstract WriteBlob: content: byte[] -> Task<Result<GitObjectId, GitStorageFailure>>
+    abstract WriteTree: entries: TreeEntry list -> Task<Result<GitObjectId, GitStorageFailure>>
+    abstract ReadObject: oid: GitObjectId -> Task<Result<byte[], GitStorageFailure>>
+    abstract ReadTree: oid: GitObjectId -> Task<Result<TreeEntry list, GitStorageFailure>>
+    abstract ReadRef: refName: string -> Task<Result<GitObjectId option, GitStorageFailure>>
 
 [<RequireQualifiedAccess>]
 module GitTree =
@@ -57,6 +81,7 @@ type PublishError =
 [<RequireQualifiedAccess>]
 type ConvergeError =
     | StorageInvalid of StorageInvalid
+    | GitStorage of GitStorageFailure
     | Transport of reason: string
     | ConvergeCasRejected
     | ConvergeRetryExhausted

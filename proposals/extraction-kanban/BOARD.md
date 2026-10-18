@@ -105,9 +105,9 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-02-R6-A](PROCESS-CONTRACT-2026-10-18.md) | GAP-091及Process契约统一、独立编译与消费者切换 | DONE | f0bfa9bbb四文件纯闭包、真实Git/PTY消费者及隐藏入口退出已验；Node128文件897pass/0普通fail/25skip/72TODO、Bun72pass、真实Host及2e500包通过。非作者独立编译2/2、实际Node/Bun冷接管与无owner拒绝3/3；正式包装器既有缺口归CUT-00-R1，不关闭整个Process | root | review_process_a |
 | [CUT-02-R6-B](PROCESS-WIRE-BUDGET-2026-10-18.md) | GAP-092 完整wire总预算与执行前拒绝 | DONE | 双语最小预算、实际TOML与Host窗口、BOM和预取消已验；129文件911pass/0普通fail/15skip/29TODO，正式96pass/1skip，真实Host及独立编译通过。b1f7804固定包Node/Bun各46/46、128MiB五次、PTY124/124，非作者双语各18观察；R6-D/E旧P1单列，随本原子提交交付 | root | review_guidance_r3、review_process_a |
 | [CUT-02-R6-E](PROCESS-CANCELLATION-2026-10-18.md) | P1：真实取消监听及排队准入 | DONE | 真实await监听、局部typed取消及许可交接零启动已修；正式113pass/1skip、10/10/owned accepted，Bun79/79、真实Host1/1。4d594fd精确包双运行时各61+4通过、128MiB五次、PTY124/124；非作者各8观察通过，R6-D/R12不销项，随本原子提交交付 | root | review_guidance_r3 |
-| [CUT-02-R6-D](PROCESS-TERMINATION-2026-10-18.md) | P1：保留原生exit与signal区别 | DOING | D1单次执行与文本消费者已验收；binary Git存储D2尚未交付，父D不销项。scope/capture、PTY持久结算、R12仍归原owner | root | review_process_a（方案）、review_guidance_r3（原型）、D1非作者组 |
-| [CUT-02-R6-D1](PROCESS-TERMINATION-D1-2026-10-18.md) | 目标终结事实及单次执行/文本 Git 消费者 | DONE | 固定652干净包Node/Bun各19真实目标、41组Git边界及真实绑定工作流、npm根Plugin各3/3、同F#程序声明→固定包运行通过；正式直接12/12为229/0，补充integration80/0/2TODO且exit1如实保留。四类证据长期归档；随本原子提交交付，不销D2/GAP-151/215/R12 | root | d1_review_host、d1_review_git、d1_review_tests |
-| [CUT-02-R6-D2](REMAINING-REPAIRS-2026-10-16.md#process-d2) | 二进制 GitRawRunner 的原生事实 | READY | 依赖 D1 公共词汇；Node/Bun 原生 Git128/Runner1 已复现，生产未改。binary 字节往返、信号/缺回执不作缺对象、新进程冷读及固定包另验；不借 D1 文本消费者销项 | root（后续） | review_process_a 核对反例，生产待审 |
+| [CUT-02-R6-D](PROCESS-TERMINATION-2026-10-18.md) | P1：保留原生exit与signal区别 | DONE | D1/D2声明的文本与binary原生终结事实已验收，随本主线提交交付；scope/capture、PTY持久结算、R12及完整Process不随D关闭 | root | review_process_a（方案）、review_guidance_r3（原型）；D1/D2复审见子项 |
+| [CUT-02-R6-D1](PROCESS-TERMINATION-D1-2026-10-18.md) | 目标终结事实及单次执行/文本 Git 消费者 | DONE | 54c7a9266后发现的stop假完整回退已修；652红、660物理反例和663字节承接均长期保留。最终663相关229/0/0TODO、12/12、owned accepted；replay路径修正，原652收据不覆盖，不销R12 | root | d1_review_host、d1_review_git、d1_review_tests |
+| [CUT-02-R6-D2](PROCESS-BINARY-D2-2026-10-18.md) | 二进制 GitRawRunner 的原生事实 | DONE | 随本提交交付，库8bb1021/0.6.12已正常推原分支；663原017 Node正式及Bun原生/非作者各19/0、独立闭包20/0、Host27/0，真实消费者/四cut/冷读/精确包通过，旧ODB及raw CAS退出。661/662尾17红经EOF余量确证iterator漏交后修正，受控事件不冒称OS读错。存储52/0另3TODO与P2性能代价保留 | root；d1_review_host（原型/包验收） | d1_review_git、d1_review_tests（非作者）；host消费者验收不作算法非作者 |
 | [CUT-02-R6-C](PROCESS-RUNTIME-2026-10-18.md) | Node/Bun环境、参数和stdin的真实回执边界 | REVIEW | 环境/argv/stdin及第二跳实现与非作者复审通过；0.6.6放大原有提前清组竞态，继续由R7-A修到0.6.7。最终82项双运行时、347库项、900主仓普通项及精确消费者通过；完整隔离025仍有失败未归因，验收不销项；Bun背压与正式监督另列 | root | review_process_a、review_bun_adapter_c |
 | [CUT-02-R7](REMAINING-REPAIRS-2026-10-16.md#bun-capture) | P1：输出真实性与Bun上游背压 | REVIEW | R7-A/B实现及非作者限定范围验收通过；当前0.6.8主包完整PTY124/124，但旧6cc27首轮隔离失败仍未归因，父项不以新绿覆盖旧失败；不延伸完整RSS或脱组监管保证 | root | 三名非作者分界复核 |
 | [CUT-02-R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md) | P1：逐路extent阻止自然清组截断 | REVIEW | 实现及非作者复审通过：0.6.7双运行时各82/82、精确包26项及128MiB矩阵12/12。后续0.6.8保留extent并通过独立包及完整PTY；旧6cc27首轮隔离失败未归因，验收仍不销项，R7-B所列范围另包DONE | root | review_process_a、review_bun_adapter_c |
@@ -137,6 +137,8 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-04-R9](REMAINING-REPAIRS-2026-10-16.md#platform-capacity) | 声明平台、运行时与有限容量实测 | BACKLOG | 先冻结版本、并发/输出规模及资源阈值，再验证精确包/PTY/恢复/背压/收尾；RSS 与队列分开。脱组仅在 R8-B 已交付的平台纳入，不承诺未测平台或无限规模 | root（计划） | 待复审 |
 
 2026-10-18 复盘修订：依据[修复原因与改进措施](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#repair-retrospective)，已完成项退出待施工顺序；每包明确范围、关键反例、验收及排除项。下一 P1 为 D1，再接 D2；验证设施与旧失败取证独立，Trace 按 R7→R5→R8→R9，Bootstrap 另包，脱组分原型/接线两包。C/R7-A 保持 REVIEW，R12-U1 继续暂缓。本次只更新文档，不新增验收结论、不合并 upstream。[当前唯一施工计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)。
+
+2026-10-19施工交付：D1停止完整性及D2 binary Git声明范围随本提交验收，候选663、库8bb1021/0.6.12。原661/662尾17红、EOF因果证据、修复回退及review误判分开长期记录；独立闭包20/0、原017两Host19/0、D1相关229/0、Host27/0，存储3TODO与P2延迟代价保留。D1/D2退出待施工顺序，其余P1按现行计划继续；R12-U1仍暂缓。
 
 2026-10-18 上游样本评估：CUT-05 resources 与 CUT-21 time/wait 的[只读接收评估](UPSTREAM-INTAKE-ASSESSMENT-2026-10-18.md)完成，两项接收均暂缓。resources 需修参数裁剪并验证实际资源入口；time/wait 需对齐公开合同、能力边界和旧算法归属后再接线。原卡施工列及当前 16 包状态不变；未认领新的生产修改，未合并 upstream。[候选范围、反例、验收与预算](REMAINING-REPAIRS-2026-10-16.md#intake-candidates)已补入现行计划。
 

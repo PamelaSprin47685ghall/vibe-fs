@@ -8,9 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.eventstore-git-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-async-support.fsproj"/>
-    <Compile Include="Persistence/EventStore/GitObjectDatabase.fsi"/>
-    <Compile Include="Persistence/EventStore/GitObjectDatabase.fs"/>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-node-host-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.intra-participant-parallelism.foundation-taskresult.fsproj"/>
     <Compile Include="Persistence/EventStore/ProcessGitRawStore.fsi"/>
     <Compile Include="Persistence/EventStore/ProcessGitRawStore.fs"/>
   </ItemGroup>

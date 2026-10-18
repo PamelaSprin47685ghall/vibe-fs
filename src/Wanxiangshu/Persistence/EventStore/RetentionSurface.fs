@@ -6,6 +6,7 @@ open System.Text
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
+open Wanxiangshu.Process
 
 [<RequireQualifiedAccess>]
 module RetentionSurface =
@@ -91,44 +92,45 @@ module RetentionSurface =
                 trees.[oid] <- canonical
                 GitObjectId.create oid
 
+            let unavailable operation =
+                let reason = "Requested object was not added to this fixture"
+
+                Error
+                    { Operation = operation
+                      Reason = reason
+                      Result = GitRawResult.NotStarted(NoExecution.InvalidRequest reason) }
+
             let raw =
                 { new IGitRawStore with
                     member _.WriteBlob bytes =
                         let oid = putBlob bytes
                         protocol.Add(sprintf "WriteBlob %s" (GitObjectId.value oid))
-                        Task.FromResult oid
+                        Task.FromResult(Ok oid)
 
                     member _.WriteTree entries =
                         let oid = putTree entries
                         protocol.Add(sprintf "WriteTree %s" (GitObjectId.value oid))
-                        Task.FromResult oid
+                        Task.FromResult(Ok oid)
 
                     member _.ReadObject oid =
                         let value = GitObjectId.value oid
                         protocol.Add(sprintf "ReadObject %s" value)
 
                         match blobs.TryGetValue value with
-                        | true, bytes -> Task.FromResult(Some bytes)
-                        | _ -> Task.FromResult None
+                        | true, bytes -> Task.FromResult(Ok bytes)
+                        | _ -> Task.FromResult(unavailable "ReadObject")
 
                     member _.ReadTree oid =
                         let value = GitObjectId.value oid
                         protocol.Add(sprintf "ReadTree %s" value)
 
                         match trees.TryGetValue value with
-                        | true, entries -> Task.FromResult(Some entries)
-                        | _ -> Task.FromResult None
+                        | true, entries -> Task.FromResult(Ok entries)
+                        | _ -> Task.FromResult(unavailable "ReadTree")
 
                     member _.ReadRef refName =
                         protocol.Add(sprintf "ReadRef %s" refName)
-                        Task.FromResult None
-
-                    member _.CompareAndSwapRef(refName, expectedOld, newOid) =
-                        let expected =
-                            expectedOld |> Option.map GitObjectId.value |> Option.defaultValue "-"
-
-                        protocol.Add(sprintf "CompareAndSwapRef %s %s %s" refName expected (GitObjectId.value newOid))
-                        Task.FromResult false }
+                        Task.FromResult(Ok None) }
 
             let remoteWriterName = remoteWriterId + ".ndjson"
             let remoteBlob = remoteWriterText |> Encoding.UTF8.GetBytes |> putBlob

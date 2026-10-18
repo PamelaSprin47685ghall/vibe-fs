@@ -67,6 +67,7 @@ export async function verifyDrainingStop(t, reason) {
     assert.equal(result.kind, 'Observed')
     assert.deepEqual(result.ending, { kind: 'Exited', exitCode: 23 })
     assert.equal(result.stopRequested.kind, 'DeadlineStopRequested')
+    assert.equal(result.output, null, 'a forced scope close is not complete output evidence')
   }
   await until(() => !alive(grandchild), 'the same-group pipe holder must actually terminate')
 }

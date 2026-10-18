@@ -43,7 +43,12 @@ module HookSync =
             Some { RootOid = RootOid.create (GitObjectId.create oid) }
 
     let private formatError remote error =
-        sprintf "Wanxiang EventStore sync failed for remote '%s': %A" remote error
+        let detail =
+            match error with
+            | ConvergeError.GitStorage failure -> GitStorageFailure.describe failure
+            | other -> sprintf "%A" other
+
+        sprintf "Wanxiang EventStore sync failed for remote '%s': %s" remote detail
 
     let private failureMessage remote result =
         match result with

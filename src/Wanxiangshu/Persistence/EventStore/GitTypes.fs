@@ -2,6 +2,7 @@ namespace Wanxiangshu.Persistence.EventStore
 
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Process
 
 /// Git object identity exists only at the remote-sync membrane.
 type GitObjectId = private GitObjectId of string
@@ -25,14 +26,63 @@ type TreeEntry =
       Name: string
       Oid: GitObjectId }
 
+type GitRawOutput =
+    { Stdout: byte[]
+      Stderr: byte[]
+      Complete: bool }
+
+type GitRawObservation =
+    { End: EndEvidence
+      StopRequested: StopRequest option
+      Output: GitRawOutput
+      Fault: string option }
+
+[<RequireQualifiedAccess>]
+type GitRawResult =
+    | NotStarted of NoExecution
+    | Observed of GitRawObservation
+
+type GitStorageFailure =
+    { Operation: string
+      Reason: string
+      Result: GitRawResult }
+
+module GitStorageFailure =
+    let private stderrDiagnostic bytes =
+        let prefix = bytes |> Array.truncate 4096 |> System.Text.Encoding.UTF8.GetString
+        let marker = if bytes.Length > 4096 then " (truncated)" else ""
+
+        if prefix = "" then
+            ""
+        else
+            sprintf "\nstderr%s: %s" marker prefix
+
+    let describe failure =
+        let facts =
+            match failure.Result with
+            | GitRawResult.NotStarted reason -> sprintf "not started: %A" reason
+            | GitRawResult.Observed observation ->
+                sprintf
+                    "end=%A; stop=%A; output_complete=%b; fault=%A"
+                    observation.End
+                    observation.StopRequested
+                    observation.Output.Complete
+                    observation.Fault
+
+        let diagnostic =
+            match failure.Result with
+            | GitRawResult.Observed observation -> stderrDiagnostic observation.Output.Stderr
+            | _ -> ""
+
+        sprintf "git %s: %s (%s)%s" failure.Operation failure.Reason facts diagnostic
+
 /// Minimal Git object/ref capability used only by WriterStreamSync/GitGateway.
 type IGitRawStore =
-    abstract WriteBlob: content: byte[] -> Task<GitObjectId>
-    abstract WriteTree: entries: TreeEntry list -> Task<GitObjectId>
-    abstract ReadObject: oid: GitObjectId -> Task<byte[] option>
-    abstract ReadTree: oid: GitObjectId -> Task<TreeEntry list option>
-    abstract ReadRef: refName: string -> Task<GitObjectId option>
-    abstract CompareAndSwapRef: refName: string * expectedOld: GitObjectId option * newOid: GitObjectId -> Task<bool>
+    abstract WriteBlob: content: byte[] -> Task<Result<GitObjectId, GitStorageFailure>>
+    abstract WriteTree: entries: TreeEntry list -> Task<Result<GitObjectId, GitStorageFailure>>
+    abstract ReadObject: oid: GitObjectId -> Task<Result<byte[], GitStorageFailure>>
+    abstract ReadTree: oid: GitObjectId -> Task<Result<TreeEntry list, GitStorageFailure>>
+    abstract ReadRef: refName: string -> Task<Result<GitObjectId option, GitStorageFailure>>
 
 [<RequireQualifiedAccess>]
 module GitTree =
@@ -56,7 +106,10 @@ module GitTree =
                 else
                     entry.Name
 
-            compare (key a) (key b))
+            Array.compareWith
+                compare
+                (System.Text.Encoding.UTF8.GetBytes(key a))
+                (System.Text.Encoding.UTF8.GetBytes(key b)))
 
 [<RequireQualifiedAccess>]
 module StoreRef =
@@ -105,6 +158,7 @@ type PublishError =
 [<RequireQualifiedAccess>]
 type ConvergeError =
     | StorageInvalid of StorageInvalid
+    | GitStorage of GitStorageFailure
     | Transport of reason: string
     | ConvergeCasRejected
     | ConvergeRetryExhausted

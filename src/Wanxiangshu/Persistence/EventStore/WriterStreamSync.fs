@@ -205,8 +205,8 @@ module WriterStreamSync =
         (cacheFiles: Map<string, CachedFile>)
         (name: string)
         (statIdentity: string)
-        : Task<TreeEntry> =
-        task {
+        : Task<Result<TreeEntry, ConvergeError>> =
+        taskResult {
             match cachedOid cacheFiles name statIdentity with
             | Some oid ->
                 return
@@ -214,7 +214,7 @@ module WriterStreamSync =
                       Name = name
                       Oid = oid }
             | None ->
-                let! oid = raw.WriteBlob(readBytes name)
+                let! oid = raw.WriteBlob(readBytes name) |> TaskResult.mapError ConvergeError.GitStorage
 
                 return
                     { Mode = blobMode
@@ -231,7 +231,7 @@ module WriterStreamSync =
         commonDir
         (cache: MaterializationCache option)
         (writerMetadata: ProcessEventLog.WriterPhysicalMetadata list)
-        : Task<MaterializedWriter list> =
+        : Task<Result<MaterializedWriter list, ConvergeError>> =
         let cached = cacheFiles (fun value -> value.Writers) cache
         let stats = ProcessEventLog.writerPhysicalStats commonDir |> Map.ofList
 
@@ -244,7 +244,7 @@ module WriterStreamSync =
             | None -> failwith ("writer segment stat missing: " + name)
 
         let rec resolveFiles remaining acc =
-            task {
+            taskResult {
                 match remaining with
                 | [] -> return List.rev acc
                 | name :: tail ->
@@ -253,7 +253,7 @@ module WriterStreamSync =
             }
 
         let rec resolveWriters (remaining: ProcessEventLog.WriterPhysicalMetadata list) acc =
-            task {
+            taskResult {
                 match remaining with
                 | [] -> return List.rev acc
                 | metadata :: tail ->
@@ -381,8 +381,12 @@ module WriterStreamSync =
 
         active
 
-    let materializeLocalAt (raw: IGitRawStore) (commonDir: string) (nowMs: float) : Task<StoreSnapshot> =
-        task {
+    let materializeLocalAt
+        (raw: IGitRawStore)
+        (commonDir: string)
+        (nowMs: float)
+        : Task<Result<StoreSnapshot, ConvergeError>> =
+        taskResult {
             let cache = readMaterializationCache commonDir
             let writerMetadata = ProcessEventLog.writerPhysicalMetadata commonDir
 
@@ -420,8 +424,15 @@ module WriterStreamSync =
             let! resolvedWriters = materializeWriters raw commonDir cache activeAfter
             let writers = removeExpiredLocalWriters nowMs resolvedWriters commonDir
 
-            let! writerTree = raw.WriteTree(writers |> List.collect (fun writer -> writer.Entries))
-            let! manifestBlob = writerManifestText writers |> Encoding.UTF8.GetBytes |> raw.WriteBlob
+            let! writerTree =
+                raw.WriteTree(writers |> List.collect (fun writer -> writer.Entries))
+                |> TaskResult.mapError ConvergeError.GitStorage
+
+            let! manifestBlob =
+                writerManifestText writers
+                |> Encoding.UTF8.GetBytes
+                |> raw.WriteBlob
+                |> TaskResult.mapError ConvergeError.GitStorage
 
             let! root =
                 raw.WriteTree
@@ -431,6 +442,7 @@ module WriterStreamSync =
                       { Mode = blobMode
                         Name = "writer-manifest"
                         Oid = manifestBlob } ]
+                |> TaskResult.mapError ConvergeError.GitStorage
 
             let snapshot = { RootOid = RootOid.create root }
 
@@ -454,15 +466,11 @@ module WriterStreamSync =
             return snapshot
         }
 
-    let materializeLocal (raw: IGitRawStore) (commonDir: string) : Task<StoreSnapshot> =
+    let materializeLocal (raw: IGitRawStore) (commonDir: string) : Task<Result<StoreSnapshot, ConvergeError>> =
         materializeLocalAt raw commonDir (currentTimeMs ())
 
-    let private readRequiredTree (raw: IGitRawStore) (oid: GitObjectId) (label: string) =
-        task {
-            match! raw.ReadTree oid with
-            | Some entries -> return Ok entries
-            | None -> return Error(asStorage (sprintf "missing %s tree" label))
-        }
+    let private readRequiredTree (raw: IGitRawStore) (oid: GitObjectId) =
+        raw.ReadTree oid |> TaskResult.mapError ConvergeError.GitStorage
 
     let private requireBlobMode (entry: TreeEntry) =
         if entry.Mode = blobMode then
@@ -473,11 +481,8 @@ module WriterStreamSync =
     let private readBlobEntry (raw: IGitRawStore) (entry: TreeEntry) =
         taskResult {
             do! requireBlobMode entry
-            let! bytesOpt = TaskResultCE.ofTask (raw.ReadObject entry.Oid)
-
-            match bytesOpt with
-            | None -> return! Error(asStorage (sprintf "missing sync blob: %s" entry.Name))
-            | Some bytes -> return entry.Name, bytes
+            let! bytes = raw.ReadObject entry.Oid |> TaskResult.mapError ConvergeError.GitStorage
+            return entry.Name, bytes
         }
 
     let private readBlobList
@@ -505,8 +510,7 @@ module WriterStreamSync =
         let readManifestEntry manifest =
             taskResult {
                 do! requireBlobMode manifest
-                let! bytesOpt = TaskResultCE.ofTask (raw.ReadObject manifest.Oid)
-                let! bytes = bytesOpt |> Result.requireSome (asStorage "missing writer-manifest blob")
+                let! bytes = raw.ReadObject manifest.Oid |> TaskResult.mapError ConvergeError.GitStorage
                 return! parseManifestBytes bytes
             }
 
@@ -625,7 +629,7 @@ module WriterStreamSync =
         manifestEntry
         =
         taskResult {
-            let! writerEntries = readRequiredTree raw writerTree.Oid "writers"
+            let! writerEntries = readRequiredTree raw writerTree.Oid
             let! manifestOpt = readOptionalManifest raw manifestEntry
             let manifest = manifestOpt |> Option.defaultValue Map.empty
 
@@ -670,7 +674,7 @@ module WriterStreamSync =
         (snapshot: StoreSnapshot)
         : Task<Result<RemoteWriter list, ConvergeError>> =
         taskResult {
-            let! rootEntries = readRequiredTree raw (RootOid.value snapshot.RootOid) "root"
+            let! rootEntries = readRequiredTree raw (RootOid.value snapshot.RootOid)
 
             let writers =
                 rootEntries
@@ -750,7 +754,7 @@ module WriterStreamSync =
         taskResult {
             // Materialization owns expiry deletion. Any unreachable objects created
             // before validation are harmless Git objects and no ref points at them.
-            let! snapshot = materializeLocalAt raw commonDir nowMs |> TaskResultCE.ofTask
+            let! snapshot = materializeLocalAt raw commonDir nowMs
             do! validateUnion commonDir nowMs []
             return snapshot
         }
@@ -769,7 +773,7 @@ module WriterStreamSync =
                 let cache = readMaterializationCache commonDir
                 let! writers = readRemote raw cache commonDir nowMs snapshot
                 do! importRemote commonDir nowMs writers
-                return! materializeLocalAt raw commonDir nowMs |> TaskResultCE.ofTask
+                return! materializeLocalAt raw commonDir nowMs
             }
 
     let private syncRemoteChoice (raw: IGitRawStore) (commonDir: string) nowMs (remote: StoreSnapshot option) =
@@ -833,5 +837,5 @@ module WriterStreamSync =
         : Task<Result<StoreSnapshot, ConvergeError>> =
         taskResult {
             do! importRemote commonDir nowMs writers
-            return! materializeLocalAt raw commonDir nowMs |> TaskResultCE.ofTask
+            return! materializeLocalAt raw commonDir nowMs
         }

@@ -985,6 +985,15 @@ export const SURFACE_MANIFEST = [
     kind: 'resource',
   },
   {
+    module: 'Persistence/EventStore/GitRawSurface.js',
+    owner: 'durable-events',
+    laws: ['PROC-017'],
+    lawOwners: { 'PROC-017': 'process-execution' },
+    source: 'src/Wanxiangshu/Persistence/EventStore/GitRawSurface.fs',
+    representation: 'opaque-capability',
+    kind: 'resource',
+  },
+  {
     module: 'Process/DeadlineSurface.js',
     owner: 'time-capability',
     laws: ['TIME-002', 'TIME-005'],
