@@ -645,12 +645,7 @@ class JsProgram {"""
                   rmStub prose
               if has capabilities JsCapability.Move then
                   mvStub prose
-              if has capabilities JsCapability.Exec then
-                  fill
-                      """  async run(RunnableClass) {
-    // {{comment_host_capability}}
-  }"""
-                      [ "comment_host_capability", prose.CommentHostCapability ]
+              
               if has capabilities JsCapability.Fork then
                   forkStub prose
                   dagStub prose

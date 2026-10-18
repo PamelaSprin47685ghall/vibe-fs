@@ -46,7 +46,7 @@ verify:release 覆盖构建、真实 npm pack、解包和消费者验证。校�
 
 ## [011] 独立生命周期依赖的可复现交付
 
-`wanxiangshu` 只通过 npm artifact 依赖 `wanxiangli`，不从其源码目录、dist 或 npm link 取生产代码。源码 checkout 使用仓库内跟踪的精确 tgz 完成 `npm ci`；最终 `wanxiangshu` tarball 将同一版本作为 bundled dependency 自包含交付。package-lock 的版本与 integrity 必须对应该 tgz。删除源码侧 `wanxiangli/` 目录后，构建、测试和 pack 不受影响；删除消费者顶层另装的 `wanxiangli` 后，安装产物仍可真实加载 lifecycle。
+`wanxiangshu` 经 `file:wanxiangli` 协议依赖 Git submodule 提供的源码，构建、测试与 pack 使用该源码版本；仓库内不跟踪任何 `wanxiangli` 归档（`scripts/wanxiangli-source.mjs check` 机械拒绝跟踪的 `.tgz`，`.gitignore` 声明 `*.tgz`）。源码 checkout 须初始化 submodule，`npm ci` 把 `node_modules/wanxiangli` 安装为指向源码目录的链接，package-lock 记录 `resolved: "wanxiangli"` 的 link 条目而非归档 integrity。最终 `wanxiangshu` tarball 把同一版本作为 bundled dependency 实体化进归档、自包含交付。删除消费者顶层另装的 `wanxiangli` 后，安装产物仍可真实加载 lifecycle。
 
 ## [010] 活跃注册一致
 

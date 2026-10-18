@@ -185,6 +185,7 @@ module JsRunLoop =
         (truncated: bool)
         (bytes: int)
         (durationMs: int64)
+        (steps: int)
         (reason: string)
         : obj =
         createObj
@@ -199,7 +200,8 @@ module JsRunLoop =
               "stderr" ==> stderr
               "truncated" ==> truncated
               "bytes" ==> bytes
-              "durationMs" ==> float durationMs ]
+              "durationMs" ==> float durationMs
+              "steps" ==> float steps ]
 
     let private awaitJs (value: obj) : Task<obj> = unbox<Task<obj>> (promiseOf value)
 
@@ -398,9 +400,22 @@ module JsRunLoop =
             SignalChild(string (getProperty raw "name"), parseSignalName raw)
         elif hasProperty raw "send" then
             let send = getProperty raw "send"
-            let inputValue = getProperty send "input"
-            let input = if isNullish inputValue then "" else string inputValue
-            SendChild(string (getProperty send "name"), input)
+
+            if isString send then
+                // Flat spelling { send: input, name }: the tool description once
+                // promised it, so it stays a legal alias of the nested form.
+                SendChild(string (getProperty raw "name"), string send)
+            else
+                let inputValue = getProperty send "input"
+                let input = if isNullish inputValue then "" else string inputValue
+                let nameValue = getProperty send "name"
+
+                if isNullish nameValue then
+                    // Nested payload without its own name falls back to the
+                    // top-level name: { send: { input }, name }.
+                    SendChild(string (getProperty raw "name"), input)
+                else
+                    SendChild(string nameValue, input)
         elif hasProperty raw "waitFor" then
             let waitFor = getProperty raw "waitFor"
             WaitForPort(int (unbox<float> (getProperty waitFor "port")), parseWaitForTimeout waitFor)
@@ -821,6 +836,7 @@ module JsRunLoop =
                         output.Truncated
                         output.TotalBytes
                         (nowMs () - startedMs)
+                        step
                         outcomeReason
         }
 
