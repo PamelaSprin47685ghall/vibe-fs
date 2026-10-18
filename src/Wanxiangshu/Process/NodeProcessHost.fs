@@ -176,9 +176,9 @@ module NodeProcessHost =
                 }
             };
             const reportClose = state => {
-                const expectedUnknownExit = killRequested && state && state.failure
-                    && state.failure.code === 'UNKNOWN_TARGET_EXIT';
-                if (state && state.failure && !expectedUnknownExit) {
+                const expectedKillFailure = killRequested && state && state.failure
+                    && (state.failure.code === 'UNKNOWN_TARGET_EXIT' || state.failure.code === 'OUTPUT_INTERRUPTED');
+                if (state && state.failure && !expectedKillFailure) {
                     onFailure(String(state.failure.message || 'Process supervision failed'));
                 }
                 const exitInfo = state && state.exit;

@@ -8,7 +8,9 @@
 
 **当前入口：** [2026-10-18深测](DEEP-TEST-2026-10-18.md)已在主仓 `70c7d52ac` 交付；用户随后明确允许不兼容的大改，[修复计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)已重新组织为Bun指导挂起→Process契约/运行时/完整预算，再逐包补齐Trace与Bootstrap。旧API、旧协议和旧输出格式不再是默认兼容约束；旧事实不能猜测修复，活动资源也不能因升级抹账。原报告保留证据，状态只在[关联修复卡](BOARD.md#source-audit-repairs)维护，R12-U1继续暂缓。
 
-三小时施工已完成[Bun挂起定因与夹具修正](GUIDANCE-BUN-LIFETIME-2026-10-18.md)和[Process纯契约及实际消费者](PROCESS-CONTRACT-2026-10-18.md)，非作者复审已核对。新增无界Bun启动器已删除，原生物理证据不替代正式监督；正式Bun适配单列CUT-00-R2。Process C正在做原生适配与精确库包接入；验证包装器的既有有界等待问题另列CUT-00-R1，不与暂缓的R12-U1混记。
+三小时施工已完成[Bun挂起定因与夹具修正](GUIDANCE-BUN-LIFETIME-2026-10-18.md)和[Process纯契约及实际消费者](PROCESS-CONTRACT-2026-10-18.md)，非作者复审已核对。新增无界Bun启动器已删除，原生物理证据不替代正式监督；正式Bun适配单列CUT-00-R2，Node验证包装器的既有有界等待问题另列CUT-00-R1，不与暂缓的R12-U1混记。
+
+本窗口已继续接入[Process C](PROCESS-RUNTIME-2026-10-18.md)，并修复其扩大复审找到的[输出提前清组R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md)，最终库0.6.7，真实精确包、128MiB及非作者复验均有证据。完整隔离PTY的一次运行未通过，至少late-not-started(bun)失败，完整权威汇总缺失；C/R7-A整体验收为REVIEW，未宣布项目通过。R7-B实际上游背压和完整wire预算仍待施工，当前实际状态只看[看板](BOARD.md#source-audit-repairs)。
 
 ## 入口：五份文件，各管一件事
 
@@ -30,7 +32,7 @@ Lifecycle 已通过 `wanxiangli/work`、`eventstore`、`durable-work` 接回主�
 
 建板基线中，`wanxiangli/process`、`trace`、`ownership` 已有独立实现与测试，主仓尚只接入前三个生命周期入口。随后 CUT-02/03/04 已合入接线；本次完整源码复核发现部分产品义务尚未承接，状态与反例以最新看板和上述报告为准。导入包、基础测试通过或历史 DONE 均不能单独证明职责已迁完。
 
-主仓当前锁定并跟踪 `vendor/wanxiangli-0.6.4.tgz`，0.5.2 是建板历史基线。旁边的 `wanxiangli/` 是另一 Git 仓，不是主仓源码依赖；新成员只克隆主仓也必须能构建。位置变化不应影响 npm 消费。[分发要求](../../requirements/distribution/WHAT.md)。全部修复的双版比较见[2026-10-16 独立复审](REGRESSION-REVIEW-2026-10-16.md)，后续归因和证据见[修复记录](REPAIR-PROGRESS-2026-10-15.md)。
+主仓当前锁定并跟踪 `vendor/wanxiangli-0.6.7.tgz`，0.5.2是建板历史基线。旁边的`wanxiangli/`是另一Git仓，不是主仓源码依赖；新成员只克隆主仓也必须能构建。位置变化不应影响npm消费。[分发要求](../../requirements/distribution/WHAT.md)。全部修复的双版比较见[2026-10-16独立复审](REGRESSION-REVIEW-2026-10-16.md)，后续归因和证据见[修复记录](REPAIR-PROGRESS-2026-10-15.md)。
 
 ### 第一批怎么分人
 

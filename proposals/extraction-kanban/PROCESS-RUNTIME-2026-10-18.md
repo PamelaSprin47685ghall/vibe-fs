@@ -44,3 +44,5 @@ I/O文件有每个child的事件状态，不称无状态；只共享这项实现
 正式Node定向四文件31pass/0fail/1integration skip、4/4完成、owned收尾accepted=true，日志`process-c-20261018-formal-scoped.log`；最终format/check通过。Bun正式监督仍归CUT-00-R2，Node正式包装器有界等待归CUT-00-R1；本轮未放宽静默窗、伪造verdict或消除原Unknown。
 
 环境/argv/stdin及声明的真实监管接线已验证，扩大Bun大输出仍需分层归因，C维持REVIEW，不关闭Process父卡、GAP-092、Bun背压、主动脱组、完整Bootstrap或其他平台。库与主仓正常提交推送；这是有限范围修复，未宣布项目通过，未部署用户Host。
+
+后续更新：上述0.6.6大输出已由[R7-A](PROCESS-OUTPUT-EXTENT-2026-10-18.md)定位到提前清组并修至0.6.7，旧红新绿、精确安装128MiB矩阵12/12及主仓五次原反例均通过，不能再把它写成未归因。当前C/R7-A仍为REVIEW的验收边界还包括最终6cc27精确包完整隔离025首轮失败：至少Bun late-not-started失败，内层权威汇总缺失；同包单例补验不覆盖首轮。上文保留当时0.6.6证据，不冒称它就是最终0.6.7验收状态。
