@@ -50,21 +50,17 @@ module Events =
         let stickyOrder = Queue<string>()
         let stickyCap = 256
 
+        let dispatchRegistration sessionId outcome registration =
+            try
+                registration.Listener sessionId outcome
+            with error ->
+                logError
+                    "EVENT-DISPATCH"
+                    (sprintf "terminal listener faulted for session %s: %s" (SessionId.value sessionId) error.Message)
+
         let notifyRegistration sessionId outcome registration =
             if registration.Live then
-                // Fan-out isolation: one subscriber's fault must not starve later
-                // subscribers (the Fork lifecycle that records the completion cell)
-                // nor travel back into the publisher that already committed this
-                // turn's terminal. The fault is recorded, not swallowed.
-                try
-                    registration.Listener sessionId outcome
-                with error ->
-                    logError
-                        "EVENT-DISPATCH"
-                        (sprintf
-                            "terminal listener faulted for session %s: %s"
-                            (SessionId.value sessionId)
-                            error.Message)
+                dispatchRegistration sessionId outcome registration
 
         let trimSticky () =
             while stickyOrder.Count > stickyCap do

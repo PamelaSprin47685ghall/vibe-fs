@@ -85,15 +85,17 @@ module internal WanxiangliTrace =
     let private getField (_target: obj) (_name: string) : obj = jsNative
 
     type ProjectionBridge =
-        { TraceId: string
-          /// Trace record lines, stored NEWEST-first so each append is an O(1)
-          /// prepend. `recordsOldestFirst` reverses to chronological order for
-          /// the wanxiangli constructor and the `traceRecords` surface.
-          Records: string list
-          OpeningCutCursor: int
-          /// (sequence, cutCursor) pairs, stored newest-first.
-          PartCuts: (int64 * int) list
-          RecordCount: int }
+        {
+            TraceId: string
+            /// Trace record lines, stored NEWEST-first so each append is an O(1)
+            /// prepend. `recordsOldestFirst` reverses to chronological order for
+            /// the wanxiangli constructor and the `traceRecords` surface.
+            Records: string list
+            OpeningCutCursor: int
+            /// (sequence, cutCursor) pairs, stored newest-first.
+            PartCuts: (int64 * int) list
+            RecordCount: int
+        }
 
     /// Oldest-first record lines for the trace constructor / inspection.
     let recordsOldestFirst (bridge: ProjectionBridge) : string list =

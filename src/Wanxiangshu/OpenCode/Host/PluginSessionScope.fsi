@@ -13,9 +13,9 @@ open Wanxiangshu.Foundation.Identity
 /// in SharedState; everything here is per-instance and dies with the scope.
 type PluginSessionScope =
     new:
-        journal: Wanxiangshu.Persistence.Journal.AgentJournal option
-            * isModelLeaseExternallyOwned: (SessionId -> bool)
-            * jsLifecyclePersistence: Wanxiangshu.Repository.Programming.Js.IJsLifecyclePersistence option ->
+        journal: Wanxiangshu.Persistence.Journal.AgentJournal option *
+        isModelLeaseExternallyOwned: (SessionId -> bool) *
+        jsLifecyclePersistence: Wanxiangshu.Repository.Programming.Js.IJsLifecyclePersistence option ->
             PluginSessionScope
 
     /// Cross-instance session directory map alias.

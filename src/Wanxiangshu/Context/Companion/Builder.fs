@@ -8,8 +8,7 @@ open Wanxiangshu.Participant.Provider.Projection
 
 /// Which physical request the Companion is about to make.
 [<RequireQualifiedAccess>]
-type CompanionRequestKind =
-    | Normal
+type CompanionRequestKind = | Normal
 
 /// One message in the Companion's provider-visible projection.
 type CompanionProjectedMessage =
@@ -132,8 +131,7 @@ module CompanionProjectionBuilder =
         (previousTips: (string * string) list)
         (normalInstructionLines: string list)
         : ProjectionIntent option =
-        let fullRebuild =
-            Option.isSome physicalDelta || not (List.isEmpty previousTips)
+        let fullRebuild = Option.isSome physicalDelta || not (List.isEmpty previousTips)
 
         if List.isEmpty frameBodies && not fullRebuild then
             None

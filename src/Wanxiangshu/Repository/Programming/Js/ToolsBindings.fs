@@ -359,6 +359,18 @@ module JsToolsBindings =
     let private isWhitespaceChar (ch: char) =
         ch = ' ' || ch = '\t' || ch = '\n' || ch = '\r' || ch = '\012' || ch = '\011'
 
+    let private appendPendingSpace (sb: StringBuilder) (pendingSpace: bool) =
+        if pendingSpace && sb.Length > 0 then
+            sb.Append(' ') |> ignore
+
+    let private accumulateCollapsedChar (sb: StringBuilder) (pendingSpace: bool) (ch: char) =
+        if isWhitespaceChar ch then
+            true
+        else
+            appendPendingSpace sb pendingSpace
+            sb.Append(ch) |> ignore
+            false
+
     /// Collapse a whitespace run to one space and drop leading/trailing
     /// whitespace. This is the canonical `where` needle normalization.
     let private collapseWhitespace (text: string) =
@@ -367,19 +379,39 @@ module JsToolsBindings =
         let mutable pendingSpace = false
 
         for ch in text do
-            if isWhitespaceChar ch then
-                pendingSpace <- true
-            else
-                if pendingSpace && sb.Length > 0 then
-                    sb.Append(' ') |> ignore
-
-                pendingSpace <- false
-                sb.Append(ch) |> ignore
+            pendingSpace <- accumulateCollapsedChar sb pendingSpace ch
 
         sb.ToString()
 
     /// Normalize content and keep the original offset of every normalized
     /// character. A whitespace run maps to its first original character.
+    let private appendNormalizedSpace
+        (sb: StringBuilder)
+        (offsets: ResizeArray<int>)
+        (previousWasSpace: bool)
+        (index: int)
+        =
+        if not previousWasSpace && sb.Length > 0 then
+            sb.Append(' ') |> ignore
+            offsets.Add index
+            true
+        else
+            previousWasSpace
+
+    let private accumulateNormalizedChar
+        (sb: StringBuilder)
+        (offsets: ResizeArray<int>)
+        (previousWasSpace: bool)
+        (index: int)
+        (ch: char)
+        =
+        if isWhitespaceChar ch then
+            appendNormalizedSpace sb offsets previousWasSpace index
+        else
+            sb.Append ch |> ignore
+            offsets.Add index
+            false
+
     let private normalizeWithMap (text: string) =
         let sb = StringBuilder()
         let offsets = ResizeArray<int>()
@@ -388,47 +420,71 @@ module JsToolsBindings =
 
         for index in 0 .. text.Length - 1 do
             let ch = text.[index]
-
-            if isWhitespaceChar ch then
-                if not previousWasSpace && sb.Length > 0 then
-                    sb.Append(' ') |> ignore
-                    offsets.Add index
-                    previousWasSpace <- true
-            else
-                sb.Append ch |> ignore
-                offsets.Add index
-                previousWasSpace <- false
+            previousWasSpace <- accumulateNormalizedChar sb offsets previousWasSpace index ch
 
         sb.ToString(), offsets
 
     /// All non-overlapping normalized matches, mapped back to original
     /// UTF-16 offsets. `fromIndex` is an original content offset.
+    let private recordSpanMatch
+        (offsets: ResizeArray<int>)
+        (spans: ResizeArray<int * int>)
+        (targetLength: int)
+        (fromIndex: int)
+        (found: int)
+        =
+        let beginIndex = offsets.[found]
+        let endIndex = offsets.[found + targetLength - 1] + 1
+
+        if beginIndex >= fromIndex then
+            spans.Add(beginIndex, endIndex)
+
+    let private scanNextSpan
+        (normalized: string)
+        (target: string)
+        (offsets: ResizeArray<int>)
+        (spans: ResizeArray<int * int>)
+        (fromIndex: int)
+        (cursor: int)
+        =
+        let found = normalized.IndexOf(target, cursor)
+
+        if found < 0 then
+            normalized.Length
+        else
+            recordSpanMatch offsets spans target.Length fromIndex found
+            found + max 1 target.Length
+
+    let private collectWhereSpans (content: string) (target: string) (fromIndex: int) =
+        let normalized, offsets = normalizeWithMap content
+        // DSL-MUTABLE: algorithm-scratch — match scan cursor
+        let mutable cursor = 0
+        let spans = ResizeArray<int * int>()
+
+        while cursor <= normalized.Length - target.Length do
+            cursor <- scanNextSpan normalized target offsets spans fromIndex cursor
+
+        List.ofSeq spans
+
     let private whereSpans (content: string) (needle: string) (fromIndex: int) =
         let target = collapseWhitespace needle
 
         if target.Length = 0 then
             []
         else
-            let normalized, offsets = normalizeWithMap content
-            // DSL-MUTABLE: algorithm-scratch — match scan cursor
-            let mutable cursor = 0
-            let spans = ResizeArray<int * int>()
+            collectWhereSpans content target fromIndex
 
-            while cursor <= normalized.Length - target.Length do
-                let found = normalized.IndexOf(target, cursor)
+    let private computeRowCell (aChar: char) (bChar: char) (leftDist: int) (aboveDist: int) (diagDist: int) =
+        let substitution = if aChar = bChar then 0 else 1
+        min (min (leftDist + 1) (aboveDist + 1)) (diagDist + substitution)
 
-                if found < 0 then
-                    cursor <- normalized.Length
-                else
-                    let beginIndex = offsets.[found]
-                    let endIndex = offsets.[found + target.Length - 1] + 1
+    let private computeDistanceRow (aChar: char) (b: string) (i: int) (previous: int[]) (current: int[]) =
+        current.[0] <- i
 
-                    if beginIndex >= fromIndex then
-                        spans.Add(beginIndex, endIndex)
+        for j in 1 .. b.Length do
+            current.[j] <- computeRowCell aChar b.[j - 1] current.[j - 1] previous.[j] previous.[j - 1]
 
-                    cursor <- found + max 1 target.Length
-
-            List.ofSeq spans
+        Array.blit current 0 previous 0 current.Length
 
     let private editDistance (left: string) (right: string) =
         let a = if left.Length > 200 then left.Substring(0, 200) else left
@@ -443,16 +499,74 @@ module JsToolsBindings =
         let current = Array.zeroCreate<int> (b.Length + 1)
 
         for i in 1 .. a.Length do
-            current.[0] <- i
-
-            for j in 1 .. b.Length do
-                let substitution = if a.[i - 1] = b.[j - 1] then 0 else 1
-
-                current.[j] <- min (min (current.[j - 1] + 1) (previous.[j] + 1)) (previous.[j - 1] + substitution)
-
-            Array.blit current 0 previous 0 current.Length
+            computeDistanceRow a.[i - 1] b i previous current
 
         previous.[b.Length]
+
+    type private NearestCandidate =
+        { Distance: int
+          Start: int
+          End: int
+          Text: string }
+
+    let private considerBetterCandidate
+        (currentBest: NearestCandidate)
+        (distance: int)
+        (start: int)
+        (endOffset: int)
+        (text: string)
+        =
+        if distance < currentBest.Distance then
+            { Distance = distance
+              Start = start
+              End = endOffset
+              Text = text }
+        else
+            currentBest
+
+    let private scanLineCandidate
+        (target: string)
+        (offset: int)
+        (line: string)
+        (scanned: int)
+        (best: NearestCandidate)
+        =
+        if scanned >= 2000 || System.String.IsNullOrWhiteSpace line then
+            scanned, best
+        else
+            let trimmed = line.Trim()
+            let distance = editDistance trimmed target
+            scanned + 1, considerBetterCandidate best distance offset (offset + line.Length) trimmed
+
+    let private scanNearestLine (content: string) (target: string) =
+        let lines = content.Split('\n')
+        // DSL-MUTABLE: algorithm-scratch — nearest-line scan state
+        let mutable offset = 0
+        let mutable scanned = 0
+
+        // DSL-MUTABLE: algorithm-scratch — nearest candidate so far
+        let mutable best =
+            { Distance = System.Int32.MaxValue
+              Start = 0
+              End = 0
+              Text = "" }
+
+        for line in lines do
+            let nextScanned, nextBest = scanLineCandidate target offset line scanned best
+            scanned <- nextScanned
+            best <- nextBest
+            offset <- offset + line.Length + 1
+
+        best
+
+    let private renderNearestMatch (best: NearestCandidate) : obj =
+        if best.Distance = System.Int32.MaxValue then
+            null
+        else
+            createObj
+                [ "span" ==> jsSpan best.Start best.End
+                  "text" ==> best.Text
+                  "distance" ==> best.Distance ]
 
     /// Diagnostic for a zero-match where: the closest single line, bounded to
     /// the first 2000 non-empty lines so a huge file cannot dominate cost.
@@ -462,41 +576,7 @@ module JsToolsBindings =
         if target.Length = 0 then
             null
         else
-            let lines = content.Split('\n')
-            // DSL-MUTABLE: algorithm-scratch — nearest-line scan state
-            let mutable offset = 0
-            let mutable bestDistance = System.Int32.MaxValue
-            // DSL-MUTABLE: algorithm-scratch — nearest match span state
-            let mutable bestStart = 0
-            // DSL-MUTABLE: algorithm-scratch — nearest match span/scan state
-            let mutable bestEnd = 0
-            let mutable bestText = ""
-            let mutable scanned = 0
-
-            for line in lines do
-                if scanned < 2000 then
-                    let trimmed = line.Trim()
-
-                    if trimmed.Length > 0 then
-                        let distance = editDistance trimmed target
-
-                        if distance < bestDistance then
-                            bestDistance <- distance
-                            bestStart <- offset
-                            bestEnd <- offset + line.Length
-                            bestText <- trimmed
-
-                        scanned <- scanned + 1
-
-                offset <- offset + line.Length + 1
-
-            if bestDistance = System.Int32.MaxValue then
-                null
-            else
-                createObj
-                    [ "span" ==> jsSpan bestStart bestEnd
-                      "text" ==> bestText
-                      "distance" ==> bestDistance ]
+            renderNearestMatch (scanNearestLine content target)
 
     /// Shared suspension path: park(payload) and where ambiguity both fire
     /// the same signal and await the same deferred promise.
@@ -519,6 +599,61 @@ module JsToolsBindings =
                   "context" ==> content.Substring(contextStart, contextEnd - contextStart) ])
         |> Array.ofList
 
+    let private resolveStartIndex (fromIndex: obj) =
+        if isUndefined fromIndex then
+            0
+        else
+            max 0 (int (unbox<float> fromIndex))
+
+    let private assignParkStack (state: Wanxiangshu.Process.JsSandbox.ParkState) (stack: obj) =
+        if not (isNull stack) then
+            state.ParkStack <- string stack
+
+    let private whereNearestDiagnostic (content: string) (needle: string) (spans: (int * int) list) : obj =
+        if List.isEmpty spans then
+            nearestLine content needle
+        else
+            null
+
+    let private suspendAmbiguity
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        (needle: string)
+        (content: string)
+        (spans: (int * int) list)
+        (stack: obj)
+        =
+        assignParkStack state stack
+
+        let payload =
+            createObj
+                [ "needle" ==> needle
+                  "candidates" ==> candidateObjects content spans
+                  "nearest" ==> whereNearestDiagnostic content needle spans ]
+
+        suspend state payload
+
+    let private parkOrRejectAmbiguity
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        (needle: string)
+        (content: string)
+        (spans: (int * int) list)
+        (stack: obj)
+        =
+        match parkState with
+        | None -> failureObj (JsFailure.InvalidArgument "where requires a park-capable surface")
+        | Some state -> suspendAmbiguity state needle content spans stack
+
+    let private dispatchWhereOutcome
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        (needle: string)
+        (content: string)
+        (spans: (int * int) list)
+        (stack: obj)
+        =
+        match spans with
+        | [ beginIndex, endIndex ] -> createObj [ "ok" ==> true; "span" ==> jsSpan beginIndex endIndex ]
+        | _ -> parkOrRejectAmbiguity parkState needle content spans stack
+
     /// whereAll(content, needle, from?): every normalized match as [start, end].
     let private makeWhereAllMember () =
         "whereAll"
@@ -526,12 +661,7 @@ module JsToolsBindings =
             if isNull content || isNull needle then
                 failureObj (JsFailure.InvalidArgument "whereAll requires string content and needle")
             else
-                let start =
-                    if isUndefined fromIndex then
-                        0
-                    else
-                        max 0 (int (unbox<float> fromIndex))
-
+                let start = resolveStartIndex fromIndex
                 let spans = whereSpans content needle start
 
                 createObj
@@ -551,34 +681,9 @@ module JsToolsBindings =
             if isNull content || isNull needle then
                 failureObj (JsFailure.InvalidArgument "where requires string content and needle")
             else
-                let start =
-                    if isUndefined fromIndex then
-                        0
-                    else
-                        max 0 (int (unbox<float> fromIndex))
-
+                let start = resolveStartIndex fromIndex
                 let spans = whereSpans content needle start
-
-                match spans with
-                | [ beginIndex, endIndex ] -> createObj [ "ok" ==> true; "span" ==> jsSpan beginIndex endIndex ]
-                | _ ->
-                    match parkState with
-                    | None -> failureObj (JsFailure.InvalidArgument "where requires a park-capable surface")
-                    | Some state ->
-                        if not (isNull stack) then
-                            state.ParkStack <- string stack
-
-                        let payload =
-                            createObj
-                                [ "needle" ==> needle
-                                  "candidates" ==> candidateObjects content spans
-                                  "nearest"
-                                  ==> (if List.isEmpty spans then
-                                           nearestLine content needle
-                                       else
-                                           null) ]
-
-                        suspend state payload
+                dispatchWhereOutcome parkState needle content spans stack
 
     /// PLAN S2 step 4: the park member. `await js.park(payload)` suspends the
     /// program at this await point through the shared suspension path.
@@ -617,7 +722,7 @@ module JsToolsBindings =
         "join"
         ==> fun () ->
             match host with
-            | Some delegation -> box (delegation.Join ())
+            | Some delegation -> box (delegation.Join())
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
     let private makeFissionMember (host: JsDelegationHost option) =

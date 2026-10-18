@@ -339,6 +339,18 @@ module JoinTool =
           Admission = admission
           Execute = execute scope }
 
+    let private findDurableAgentRole (scope: ToolRuntimeScope) (root: SessionId) (agentId: string) : string option =
+        scope.Journal
+        |> Option.bind (fun journal ->
+            AgentJournal.handleProjection journal root
+            |> HandleProjection.tryFind (HandleController.agentHandle agentId))
+        |> Option.map (fun handle -> Roles.roleLabel handle.CanonicalRole)
+
+    let private findRuntimeAgentRole (runtime: HostForkRuntime) (agentId: string) : string option =
+        match runtime.TryFindAgentOrAdopt agentId with
+        | Some(_, role, _) -> Some(Roles.roleLabel role)
+        | None -> None
+
     let private resolveAgentRole
         (scope: ToolRuntimeScope)
         (root: SessionId)
@@ -349,19 +361,15 @@ module JoinTool =
         match fallback with
         | Some role -> Roles.roleLabel role
         | None ->
-            let durableRole =
-                scope.Journal
-                |> Option.bind (fun journal ->
-                    AgentJournal.handleProjection journal root
-                    |> HandleProjection.tryFind (HandleController.agentHandle agentId))
-                |> Option.map (fun handle -> Roles.roleLabel handle.CanonicalRole)
+            findDurableAgentRole scope root agentId
+            |> Option.orElseWith (fun () -> findRuntimeAgentRole runtime agentId)
+            |> Option.defaultValue ""
 
-            match durableRole with
-            | Some role -> role
-            | None ->
-                match runtime.TryFindAgentOrAdopt agentId with
-                | Some(_, role, _) -> Roles.roleLabel role
-                | None -> ""
+    let private decideCompletedStatus (workRecord: string) =
+        if String.IsNullOrWhiteSpace workRecord then
+            "undelivered"
+        else
+            "completed"
 
     let private mapJoinItem
         (resolveName: string -> string)
@@ -376,11 +384,7 @@ module JoinTool =
             { Name = resolveName payload.AgentId
               AgentId = payload.AgentId
               Role = Roles.roleLabel payload.Role
-              Status =
-                if String.IsNullOrWhiteSpace workRecord then
-                    "undelivered"
-                else
-                    "completed"
+              Status = decideCompletedStatus workRecord
               WorkRecord = workRecord }
         | JoinItem.AgentItem(AgentFailedItem payload) ->
             { Name = resolveName payload.AgentId
@@ -426,9 +430,7 @@ module JoinTool =
 
         let deliveredCount = NonEmptyBatch.length batch - List.length remaining
 
-        let deliveredList =
-            NonEmptyBatch.toList batch
-            |> List.take deliveredCount
+        let deliveredList = NonEmptyBatch.toList batch |> List.take deliveredCount
 
         deliveredList
         |> NonEmptyBatch.tryOfList
@@ -577,12 +579,13 @@ module JoinTool =
         (attempt: JoinAttemptLease)
         (permit: FamilyRecoveryPermit)
         : Task<Result<JoinRecord list, string>> =
-        if scope.IsRole(context, Role.Orchestrator) then
-            executeOrchestratorJoinReceipt scope context sessionId attempt
-        else
-            match scope.RuntimeFor context with
-            | Error _ -> Task.FromResult(Error "context-unavailable")
-            | Ok runtime -> executeAgentWithRuntimeReceipt scope context language sessionId attempt permit runtime
+        let isOrchestrator = scope.IsRole(context, Role.Orchestrator)
+        let runtimeResult = scope.RuntimeFor context
+
+        match isOrchestrator, runtimeResult with
+        | true, _ -> executeOrchestratorJoinReceipt scope context sessionId attempt
+        | false, Error _ -> Task.FromResult(Error "context-unavailable")
+        | false, Ok runtime -> executeAgentWithRuntimeReceipt scope context language sessionId attempt permit runtime
 
     let private executeAfterSessionReceipt
         (scope: ToolRuntimeScope)
@@ -610,10 +613,7 @@ module JoinTool =
                 return! executeWhenReadyReceipt scope context language sessionId attempt permit
         }
 
-    let executeReceipt
-        (scope: ToolRuntimeScope)
-        (context: HostToolContext)
-        : Task<Result<JoinRecord list, string>> =
+    let executeReceipt (scope: ToolRuntimeScope) (context: HostToolContext) : Task<Result<JoinRecord list, string>> =
         task {
             let language = lang context
 

@@ -912,14 +912,11 @@ type ToolRuntimeScope
             notify: string -> Task<Result<unit, string>>,
             request: UserQuestionAskedPayload
         ) =
-        task {
+        taskResult {
             try
                 this.ClearQuestionInterrupts sid
                 let! shown = notify request.Question
-
-                match shown with
-                | Error reason -> return Error reason
-                | Ok() -> return! this.RecordShownQuestion(durable, sid, sessionIdText, request)
+                return! this.RecordShownQuestion(durable, sid, sessionIdText, request)
             finally
                 questionRequests.Remove sid |> ignore
         }
@@ -997,15 +994,19 @@ type ToolRuntimeScope
                     Error "ask requires active Plan authority, exact call evidence, a question, and user notification"
         }
 
-    member private _.RunQuestionInterrupt(sessionId: SessionId, key: SessionId * ProviderRunIdentity * ToolCallId) =
+    member private _.PruneFailedQuestionInterrupt
+        (key: SessionId * ProviderRunIdentity * ToolCallId, stopped: Result<unit, string>)
+        =
+        if Result.isError stopped then
+            questionInterrupts.Remove key |> ignore
+
+        stopped
+
+    member private this.RunQuestionInterrupt(sessionId: SessionId, key: SessionId * ProviderRunIdentity * ToolCallId) =
         task {
             try
                 let! stopped = sessions.InterruptAttempt sessionId
-
-                if Result.isError stopped then
-                    questionInterrupts.Remove key |> ignore
-
-                return stopped
+                return this.PruneFailedQuestionInterrupt(key, stopped)
             with ex ->
                 questionInterrupts.Remove key |> ignore
                 return Error ex.Message

@@ -44,5 +44,7 @@ module FissionTool =
     val spec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
 
     val executeReceipt:
-        scope: ToolRuntimeScope -> context: HostToolContext -> args: HostToolArguments ->
+        scope: ToolRuntimeScope ->
+        context: HostToolContext ->
+        args: HostToolArguments ->
             Task<Result<FissionReceipt, string>>

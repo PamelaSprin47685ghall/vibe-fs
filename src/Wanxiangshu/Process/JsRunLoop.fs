@@ -108,6 +108,15 @@ module JsRunLoop =
     let private waitForDefaultMs = 30000
     let private probeIntervalMs = 100
 
+    let private appendBoundedChunk (head: string) (tail: string) (chunk: string) : string * string =
+        if head.Length >= outputHeadLimit then
+            head, tail + chunk
+        elif chunk.Length <= outputHeadLimit - head.Length then
+            head + chunk, tail
+        else
+            let room = outputHeadLimit - head.Length
+            head + chunk.Substring(0, room), tail + chunk.Substring room
+
     type private OutputBuffer() =
         // DSL-MUTABLE: algorithm-scratch — bounded head/tail capture for one stream
         let mutable head = ""
@@ -123,16 +132,9 @@ module JsRunLoop =
         member _.Append(chunk: string) =
             totalBytes <- totalBytes + utf8Bytes chunk
 
-            if head.Length < outputHeadLimit then
-                let room = outputHeadLimit - head.Length
-
-                if chunk.Length <= room then
-                    head <- head + chunk
-                else
-                    head <- head + chunk.Substring(0, room)
-                    tail <- tail + chunk.Substring room
-            else
-                tail <- tail + chunk
+            let newHead, newTail = appendBoundedChunk head tail chunk
+            head <- newHead
+            tail <- newTail
 
             if tail.Length > outputTailLimit then
                 tail <- tail.Substring(tail.Length - outputTailLimit)
@@ -253,18 +255,20 @@ module JsRunLoop =
 
     /// Wait until the child exits or one time slice elapses. Returns true when
     /// the child has exited.
-    let private waitSlice (managed: ManagedChild) (sliceMs: int) : Task<bool> =
-        task {
-            if managed.Exited then
-                return true
-            else
-                let! winner = unbox<Task<obj>> (raceWorkTimeout (box managed.Exit.Task) sliceMs)
+    let private resolveSliceWaitOutcome (managed: ManagedChild) (winner: obj) : bool =
+        if hasProperty winner "timeout" then
+            managed.Exited
+        else
+            true
 
-                if hasProperty winner "timeout" then
-                    return managed.Exited
-                else
-                    return true
-        }
+    let private waitSlice (managed: ManagedChild) (sliceMs: int) : Task<bool> =
+        if managed.Exited then
+            Task.FromResult true
+        else
+            task {
+                let! winner = unbox<Task<obj>> (raceWorkTimeout (box managed.Exit.Task) sliceMs)
+                return resolveSliceWaitOutcome managed winner
+            }
 
     /// Await exit after a kill, up to the grace window.
     let private awaitExit (managed: ManagedChild) (graceMs: int) : Task<unit> =
@@ -279,20 +283,22 @@ module JsRunLoop =
 
     /// Race one host call against the remaining run budget. `None` means the
     /// budget expired first.
-    let private raceDeadline (work: Task<obj>) (timeoutMs: int) : Task<obj option> =
-        task {
-            if timeoutMs <= 0 then
-                return None
-            else
-                let! winner = unbox<Task<obj>> (raceWorkTimeout (box work) timeoutMs)
+    let private classifyRaceWinner (winner: obj) : obj option =
+        if hasProperty winner "timeout" then
+            None
+        elif hasProperty winner "error" then
+            raise (System.Exception(string (getProperty winner "error")))
+        else
+            Some(getProperty winner "value")
 
-                if hasProperty winner "timeout" then
-                    return None
-                elif hasProperty winner "error" then
-                    return raise (System.Exception(string (getProperty winner "error")))
-                else
-                    return Some(getProperty winner "value")
-        }
+    let private raceDeadline (work: Task<obj>) (timeoutMs: int) : Task<obj option> =
+        if timeoutMs <= 0 then
+            Task.FromResult None
+        else
+            task {
+                let! winner = unbox<Task<obj>> (raceWorkTimeout (box work) timeoutMs)
+                return classifyRaceWinner winner
+            }
 
     type private Verdict =
         | Continue
@@ -311,6 +317,165 @@ module JsRunLoop =
         else
             Continue
 
+    let private dispatchParkSignal
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        (stack: string)
+        (payload: obj)
+        : unit =
+        state.ParkRequested <- true
+        state.ParkPayload <- payload
+
+        if not (isNull stack) then
+            state.ParkStack <- stack
+
+        if not (isNull state.ParkSignalResolve) then
+            emitJsExpr (state.ParkSignalResolve, payload) "$0($1)" |> ignore
+
+    let private interpretInjectedResume (injected: obj) : string =
+        if isString injected && string injected = "abort" then
+            "abort"
+        else
+            "continue"
+
+    type private SliceAction =
+        | SliceContinue
+        | SliceAbort of string
+        | SlicePark of obj
+
+    let private checkVerdictOf (raw: obj) : SliceAction =
+        match verdictOf raw with
+        | Continue -> SliceContinue
+        | Abort reason -> SliceAbort reason
+        | Park payload -> SlicePark payload
+
+    type private ForegroundSliceTransition =
+        | KeepWaiting
+        | CompletedNormal
+        | CompletedTimeout
+        | TerminatedAbort of string
+        | TerminatedParkAbort
+        | TerminatedUnsupported
+
+    let private interpretForegroundParkDecision (decision: string) : ForegroundSliceTransition =
+        match decision with
+        | "abort" -> TerminatedParkAbort
+        | "unsupported" -> TerminatedUnsupported
+        | _ -> KeepWaiting
+
+    type private StepCommand =
+        | EndOfRun
+        | RunCommand of string
+        | SpawnChild of name: string * command: string
+        | SignalChild of name: string * signal: string
+        | SendChild of name: string * input: string
+        | WaitForPort of port: int * timeoutMs: int
+        | InvalidCommand
+
+    let private parseSignalName (raw: obj) : string =
+        let value = getProperty raw "signal"
+
+        if isString value && string value <> "" then
+            string value
+        else
+            "SIGTERM"
+
+    let private parseWaitForTimeout (waitFor: obj) : int =
+        let value = getProperty waitFor "timeoutMs"
+
+        if isNullish value || not (isFiniteNumber value) then
+            waitForDefaultMs
+        else
+            int (unbox<float> value)
+
+    let private parseStepCommand (raw: obj) : StepCommand =
+        if isNullish raw then
+            EndOfRun
+        elif isString raw then
+            RunCommand(string raw)
+        elif hasProperty raw "spawn" then
+            SpawnChild(string (getProperty raw "name"), string (getProperty raw "spawn"))
+        elif hasProperty raw "signal" then
+            SignalChild(string (getProperty raw "name"), parseSignalName raw)
+        elif hasProperty raw "send" then
+            let send = getProperty raw "send"
+            let inputValue = getProperty send "input"
+            let input = if isNullish inputValue then "" else string inputValue
+            SendChild(string (getProperty send "name"), input)
+        elif hasProperty raw "waitFor" then
+            let waitFor = getProperty raw "waitFor"
+            WaitForPort(int (unbox<float> (getProperty waitFor "port")), parseWaitForTimeout waitFor)
+        else
+            InvalidCommand
+
+    type private PortProbeOutcome =
+        | PortReady
+        | PortTimedOut
+        | PortDeadline
+        | PortAborted
+        | PortUnsupported
+        | PortPending
+
+    let private decidePortProbe
+        (connected: bool)
+        (elapsed: int64)
+        (timeoutMs: int64)
+        (deadlineReached: bool)
+        : PortProbeOutcome =
+        if connected then PortReady
+        elif elapsed >= timeoutMs then PortTimedOut
+        elif deadlineReached then PortDeadline
+        else PortPending
+
+    let private interpretPortVerdict (verdict: SliceAction) (decision: string) : PortProbeOutcome =
+        match verdict with
+        | SliceAbort _ -> PortAborted
+        | SlicePark _ when decision = "abort" -> PortAborted
+        | SlicePark _ when decision = "unsupported" -> PortUnsupported
+        | _ -> PortPending
+
+    type private RunnableValidated =
+        { Instance: obj
+          MaxDurationMs: int64
+          IntervalMs: int
+          HasOnExit: bool }
+
+    let private parseIntervalMs (intervalValue: obj) : int =
+        if isNullish intervalValue || not (isFiniteNumber intervalValue) then
+            defaultIntervalMs
+        else
+            max minimumIntervalMs (int (unbox<float> intervalValue))
+
+    let private validateRunnableSpec (runnableClass: obj) : Result<RunnableValidated, obj> =
+        if not (isFunction runnableClass) then
+            Error(failure "RUNNABLE_SPEC_INCOMPLETE" "js.run expects a class extending js.Runnable")
+        else
+            let instance = construct runnableClass
+            let maxDurationValue = getProperty instance "maxDuration"
+            let hasNext = isFunction (getProperty instance "next")
+            let hasCheck = isFunction (getProperty instance "check")
+            let intervalValue = getProperty instance "interval"
+            let intervalMs = parseIntervalMs intervalValue
+
+            if
+                isNullish maxDurationValue
+                || not (isFiniteNumber maxDurationValue)
+                || unbox<float> maxDurationValue <= 0.0
+            then
+                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must declare a positive maxDuration")
+            elif not hasNext then
+                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement next(ctx)")
+            elif not hasCheck then
+                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement check(ctx)")
+            else
+                let maxDurationMs = int64 (unbox<float> maxDurationValue)
+                let hasOnExit = isFunction (getProperty instance "onExit")
+
+                Ok
+                    { Instance = instance
+                      MaxDurationMs = maxDurationMs
+                      IntervalMs = intervalMs
+                      HasOnExit = hasOnExit }
+
     /// Suspend the run through the shared park channel and wait for the
     /// injected value. The injected string 'abort' aborts; anything else
     /// resumes the loop. Returns "unsupported" when the run has no park state.
@@ -320,17 +485,11 @@ module JsRunLoop =
         (payload: obj)
         : Task<string> =
         task {
-            match parkState with
-            | None -> return "unsupported"
-            | Some state ->
-                state.ParkRequested <- true
-                state.ParkPayload <- payload
-
-                if not (isNull stack) then
-                    state.ParkStack <- stack
-
-                if not (isNull state.ParkSignalResolve) then
-                    emitJsExpr (state.ParkSignalResolve, payload) "$0($1)" |> ignore
+            if parkState.IsNone then
+                return "unsupported"
+            else
+                let state = parkState.Value
+                dispatchParkSignal state stack payload
 
                 let deferred: obj =
                     emitJsExpr
@@ -338,11 +497,331 @@ module JsRunLoop =
                         "(function(state) { return new Promise(function(resolve, reject) { state.ParkDeferredResolve = resolve; state.ParkDeferredReject = reject; }); })($0)"
 
                 let! injected = awaitJs deferred
+                return interpretInjectedResume injected
+        }
 
-                if isString injected && string injected = "abort" then
-                    return "abort"
+    let private executeValidated
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        (root: string)
+        (stack: string)
+        (spec: RunnableValidated)
+        : Task<obj> =
+        task {
+            let instance = spec.Instance
+            let maxDurationMs = spec.MaxDurationMs
+            let intervalMs = spec.IntervalMs
+            let hasOnExit = spec.HasOnExit
+            let startedMs = nowMs ()
+            let deadlineMs = startedMs + maxDurationMs
+            let children = Dictionary<string, ManagedChild>()
+            let output = OutputBuffer()
+            // DSL-MUTABLE: algorithm-scratch — loop step cursor
+            let mutable step = 0
+            // DSL-MUTABLE: algorithm-scratch — overall loop state
+            let mutable running = true
+            let mutable status = "completed"
+            // DSL-MUTABLE: algorithm-scratch — abort/timeout explanation
+            let mutable outcomeReason: string = null
+            let mutable lastExitCode: int option = None
+            // DSL-MUTABLE: algorithm-scratch — failure/outcome slot for this run
+            let mutable result: obj = null
+            let scratch = ManagedChild("wait", null)
+
+            let checkContext (managed: ManagedChild) : obj =
+                // The slice deltas of the foreground command and every
+                // background child land in one observation window, so a
+                // spawned REPL's replies are visible from check.
+                let stdoutParts = ResizeArray<string>()
+                let stderrParts = ResizeArray<string>()
+                stdoutParts.Add(managed.SliceStdout.Take())
+                stderrParts.Add(managed.SliceStderr.Take())
+
+                for entry in children.Values |> Seq.sortBy (fun child -> child.Name) do
+                    stdoutParts.Add(entry.SliceStdout.Take())
+                    stderrParts.Add(entry.SliceStderr.Take())
+
+                createObj
+                    [ "root" ==> root
+                      "stdout" ==> String.concat "" stdoutParts
+                      "stderr" ==> String.concat "" stderrParts
+                      "exited" ==> managed.Exited
+                      "exitCode" ==> (if managed.Exited then box managed.ExitCode else null)
+                      "backgrounds" ==> (children.Values |> Seq.map childView |> Seq.toArray)
+                      "elapsedMs" ==> float (nowMs () - startedMs)
+                      "remainingMs" ==> float (max 0L (deadlineMs - nowMs ())) ]
+
+            let exitContext (managed: ManagedChild) : obj =
+                createObj
+                    [ "root" ==> root
+                      "exitCode" ==> (if managed.Exited then box managed.ExitCode else null)
+                      "stdout" ==> managed.Stdout.Text
+                      "stderr" ==> managed.Stderr.Text
+                      "elapsedMs" ==> float (nowMs () - startedMs) ]
+
+            let interpretParkDecision (decision: string) : string =
+                if decision = "unsupported" then
+                    result <- failure "RUN_PARK_UNSUPPORTED" "park verdict requires the orchestrated execution path"
+
+                    "unsupported"
                 else
-                    return "continue"
+                    decision
+
+            let parkOrAbort (payload: obj) : Task<string> =
+                if not (isNull result) then
+                    Task.FromResult "stop"
+                else
+                    task {
+                        let! decision = parkAtCheck parkState stack payload
+                        return interpretParkDecision decision
+                    }
+
+            let finishManaged (managed: ManagedChild) : Task<unit> =
+                task {
+                    if not managed.Exited then
+                        let! _ = awaitExit managed signalGraceMs
+                        ()
+                }
+
+            let checkForegroundSlice (managed: ManagedChild) : Task<ForegroundSliceTransition> =
+                task {
+                    let! verdictRaw = awaitJs (callCheck instance (checkContext managed))
+
+                    match checkVerdictOf verdictRaw with
+                    | SliceContinue -> return KeepWaiting
+                    | SliceAbort reason -> return TerminatedAbort reason
+                    | SlicePark payload ->
+                        let! decision = parkOrAbort payload
+                        return interpretForegroundParkDecision decision
+                }
+
+            let foregroundSliceAfterWait (managed: ManagedChild) (exited: bool) : Task<ForegroundSliceTransition> =
+                if exited then
+                    Task.FromResult CompletedNormal
+                else
+                    checkForegroundSlice managed
+
+            let stepForegroundSlice (managed: ManagedChild) : Task<ForegroundSliceTransition> =
+                task {
+                    let remaining = deadlineMs - nowMs ()
+
+                    if remaining <= 0L then
+                        return CompletedTimeout
+                    else
+                        let slice = int (min (int64 intervalMs) remaining)
+                        let! exited = waitSlice managed slice
+                        return! foregroundSliceAfterWait managed exited
+                }
+
+            let applyForegroundTransition
+                (managed: ManagedChild)
+                (transition: ForegroundSliceTransition)
+                : Task<bool * bool> =
+                task {
+                    match transition with
+                    | KeepWaiting -> return false, false
+                    | CompletedNormal -> return true, false
+                    | CompletedTimeout ->
+                        status <- "timeout"
+                        outcomeReason <- "maxDuration exceeded"
+                        killManaged managed "SIGKILL"
+                        do! finishManaged managed
+                        return true, false
+                    | TerminatedAbort reason ->
+                        status <- "aborted"
+                        outcomeReason <- reason
+                        killManaged managed "SIGKILL"
+                        do! finishManaged managed
+                        return true, true
+                    | TerminatedParkAbort ->
+                        status <- "aborted"
+                        outcomeReason <- "check park resumed with 'abort'"
+                        killManaged managed "SIGKILL"
+                        do! finishManaged managed
+                        return true, true
+                    | TerminatedUnsupported ->
+                        killManaged managed "SIGKILL"
+                        do! finishManaged managed
+                        return true, false
+                }
+
+            let settleForegroundChild (managed: ManagedChild) : Task<unit> =
+                task {
+                    lastExitCode <- Some managed.ExitCode
+                    output.Append managed.Stdout.Text
+                    output.Append managed.Stderr.Text
+                    let! _ = awaitJs (callOnExit instance (exitContext managed))
+                    ()
+                }
+
+            let runForeground (command: string) : Task<unit> =
+                task {
+                    let managed = startChild root "foreground" command
+                    // DSL-MUTABLE: algorithm-scratch — per-command loop state
+                    let mutable finished = false
+                    let mutable aborted = false
+
+                    while not finished && isNull result do
+                        let! transition = stepForegroundSlice managed
+                        let! (isFinished, isAborted) = applyForegroundTransition managed transition
+                        finished <- isFinished
+                        aborted <- isAborted
+
+                    if isNull result && hasOnExit then
+                        do! settleForegroundChild managed
+                    elif isNull result then
+                        lastExitCode <- Some managed.ExitCode
+                        output.Append managed.Stdout.Text
+                        output.Append managed.Stderr.Text
+
+                    if aborted || status = "timeout" then
+                        running <- false
+                }
+
+            let escalateKill (managed: ManagedChild) : Task<unit> =
+                task {
+                    if not managed.Exited then
+                        killManaged managed "SIGKILL"
+                        let! _ = awaitExit managed signalGraceMs
+                        ()
+                }
+
+            let signalChildProcess (name: string) (signalName: string) : Task<unit> =
+                task {
+                    match children.TryGetValue name with
+                    | false, _ -> result <- failure "RUN_CHILD_UNKNOWN" ("signal names an unknown background: " + name)
+                    | true, managed ->
+                        killManaged managed signalName
+                        let! _ = awaitExit managed signalGraceMs
+                        do! escalateKill managed
+                        children.Remove name |> ignore
+                }
+
+            let normalizeChildInput (input: string) : string =
+                if input = "" || input.EndsWith "\n" then
+                    input
+                else
+                    input + "\n"
+
+            let sendChildInput (name: string) (input: string) : unit =
+                match children.TryGetValue name with
+                | false, _ -> result <- failure "RUN_CHILD_UNKNOWN" ("send names an unknown background: " + name)
+                | true, managed ->
+                    let payload = normalizeChildInput input
+
+                    writeChildStdin managed.Child payload
+
+            let samplePortSlice () : Task<PortProbeOutcome> =
+                task {
+                    let slice = int (min (int64 intervalMs) (max 1L (deadlineMs - nowMs ())))
+                    let! _ = unbox<Task<unit>> (delay (min slice probeIntervalMs))
+                    let! verdictRaw = awaitJs (callCheck instance (checkContext scratch))
+                    let verdict = checkVerdictOf verdictRaw
+
+                    let! decision =
+                        match verdict with
+                        | SlicePark payload -> parkOrAbort payload
+                        | _ -> Task.FromResult "continue"
+
+                    return interpretPortVerdict verdict decision
+                }
+
+            let probePortSlice (port: int) (waitStarted: int64) (timeoutMs: int) : Task<PortProbeOutcome> =
+                task {
+                    let! connected = unbox<Task<bool>> (probePort netConnect port)
+
+                    let initialOutcome =
+                        decidePortProbe connected (nowMs () - waitStarted) (int64 timeoutMs) (nowMs () >= deadlineMs)
+
+                    if initialOutcome <> PortPending then
+                        return initialOutcome
+                    else
+                        return! samplePortSlice ()
+                }
+
+            let waitForPortCondition (port: int) (timeoutMs: int) : Task<unit> =
+                task {
+                    let waitStarted = nowMs ()
+                    // DSL-MUTABLE: algorithm-scratch — waitFor poll state
+                    let mutable ready = false
+                    let mutable failureReason: string option = None
+
+                    let applyPortOutcome (outcome: PortProbeOutcome) : unit =
+                        match outcome with
+                        | PortReady -> ready <- true
+                        | PortTimedOut -> failureReason <- Some "timeout"
+                        | PortDeadline ->
+                            status <- "timeout"
+                            outcomeReason <- "maxDuration exceeded"
+                            failureReason <- Some "deadline"
+                        | PortAborted -> failureReason <- Some "abort"
+                        | PortUnsupported -> failureReason <- Some "unsupported"
+                        | PortPending -> ()
+
+                    while not ready && failureReason.IsNone && isNull result do
+                        let! outcome = probePortSlice port waitStarted timeoutMs
+                        applyPortOutcome outcome
+
+                    if failureReason = Some "timeout" && isNull result then
+                        result <- failure "RUN_WAIT_TIMEOUT" "waitFor condition was not met before its timeout"
+                    elif failureReason = Some "abort" then
+                        status <- "aborted"
+                        outcomeReason <- "check aborted while waiting for the port"
+                        running <- false
+                    elif failureReason = Some "deadline" || failureReason = Some "unsupported" then
+                        running <- false
+                }
+
+            let executeStepCommand (cmd: StepCommand) : Task<unit> =
+                task {
+                    match cmd with
+                    | EndOfRun -> running <- false
+                    | RunCommand c -> do! runForeground c
+                    | SpawnChild(name, c) -> children.[name] <- startChild root name c
+                    | SignalChild(name, sigName) -> do! signalChildProcess name sigName
+                    | SendChild(name, input) -> sendChildInput name input
+                    | WaitForPort(port, timeoutMs) -> do! waitForPortCondition port timeoutMs
+                    | InvalidCommand ->
+                        result <-
+                            failure
+                                "RUN_COMMAND_UNSUPPORTED"
+                                "next() must return a command string, null, { spawn, name }, { send: { name, input } }, { signal, name } or { waitFor: { port, timeoutMs } }"
+                }
+
+            let applyStepOutcome (stepOutcome: obj option) : Task<unit> =
+                task {
+                    match stepOutcome with
+                    | None ->
+                        status <- "timeout"
+                        outcomeReason <- "maxDuration exceeded inside next(ctx)"
+                        running <- false
+                    | Some raw -> do! executeStepCommand (parseStepCommand raw)
+                }
+
+            while running && isNull result do
+                let ctx = createObj [ "root" ==> root; "step" ==> step ]
+                let remaining = deadlineMs - nowMs ()
+                let! stepOutcome = raceDeadline (awaitJs (callNext instance ctx)) (int remaining)
+                step <- step + 1
+                do! applyStepOutcome stepOutcome
+
+            for entry in children.Values |> Seq.toArray do
+                killManaged entry "SIGKILL"
+                let! _ = awaitExit entry signalGraceMs
+                ()
+
+            if not (isNull result) then
+                return result
+            else
+                return
+                    outcome
+                        status
+                        lastExitCode
+                        output.Text
+                        ""
+                        output.Truncated
+                        output.TotalBytes
+                        (nowMs () - startedMs)
+                        outcomeReason
         }
 
     /// Execute one Runnable class. `root` is the shell working directory;
@@ -354,323 +833,6 @@ module JsRunLoop =
         (runnableClass: obj)
         (stack: string)
         : Task<obj> =
-        task {
-            if not (isFunction runnableClass) then
-                return failure "RUNNABLE_SPEC_INCOMPLETE" "js.run expects a class extending js.Runnable"
-            else
-                let instance = construct runnableClass
-                let maxDurationValue = getProperty instance "maxDuration"
-                let hasNext = isFunction (getProperty instance "next")
-                let hasCheck = isFunction (getProperty instance "check")
-
-                if
-                    isNullish maxDurationValue
-                    || not (isFiniteNumber maxDurationValue)
-                    || unbox<float> maxDurationValue <= 0.0
-                then
-                    return failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must declare a positive maxDuration"
-                elif not hasNext then
-                    return failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement next(ctx)"
-                elif not hasCheck then
-                    return failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement check(ctx)"
-                else
-                    let maxDurationMs = int64 (unbox<float> maxDurationValue)
-                    let intervalValue = getProperty instance "interval"
-
-                    let intervalMs =
-                        if isNullish intervalValue || not (isFiniteNumber intervalValue) then
-                            defaultIntervalMs
-                        else
-                            max minimumIntervalMs (int (unbox<float> intervalValue))
-
-                    let hasOnExit = isFunction (getProperty instance "onExit")
-                    let startedMs = nowMs ()
-                    let deadlineMs = startedMs + maxDurationMs
-                    let children = Dictionary<string, ManagedChild>()
-                    let output = OutputBuffer()
-                    // DSL-MUTABLE: algorithm-scratch — loop step cursor
-                    let mutable step = 0
-                    // DSL-MUTABLE: algorithm-scratch — overall loop state
-                    let mutable running = true
-                    let mutable status = "completed"
-                    // DSL-MUTABLE: algorithm-scratch — abort/timeout explanation
-                    let mutable outcomeReason: string = null
-                    let mutable lastExitCode: int option = None
-                    // DSL-MUTABLE: algorithm-scratch — failure/outcome slot for this run
-                    let mutable result: obj = null
-                    let scratch = ManagedChild("wait", null)
-
-                    let checkContext (managed: ManagedChild) : obj =
-                        // The slice deltas of the foreground command and every
-                        // background child land in one observation window, so a
-                        // spawned REPL's replies are visible from check.
-                        let stdoutParts = ResizeArray<string>()
-                        let stderrParts = ResizeArray<string>()
-                        stdoutParts.Add(managed.SliceStdout.Take())
-                        stderrParts.Add(managed.SliceStderr.Take())
-
-                        for entry in children.Values |> Seq.sortBy (fun child -> child.Name) do
-                            stdoutParts.Add(entry.SliceStdout.Take())
-                            stderrParts.Add(entry.SliceStderr.Take())
-
-                        createObj
-                            [ "root" ==> root
-                              "stdout" ==> String.concat "" stdoutParts
-                              "stderr" ==> String.concat "" stderrParts
-                              "exited" ==> managed.Exited
-                              "exitCode" ==> (if managed.Exited then box managed.ExitCode else null)
-                              "backgrounds" ==> (children.Values |> Seq.map childView |> Seq.toArray)
-                              "elapsedMs" ==> float (nowMs () - startedMs)
-                              "remainingMs" ==> float (max 0L (deadlineMs - nowMs ())) ]
-
-                    let exitContext (managed: ManagedChild) : obj =
-                        createObj
-                            [ "root" ==> root
-                              "exitCode" ==> (if managed.Exited then box managed.ExitCode else null)
-                              "stdout" ==> managed.Stdout.Text
-                              "stderr" ==> managed.Stderr.Text
-                              "elapsedMs" ==> float (nowMs () - startedMs) ]
-
-                    let parkOrAbort (payload: obj) : Task<string> =
-                        task {
-                            if isNull result then
-                                let! decision = parkAtCheck parkState stack payload
-
-                                match decision with
-                                | "unsupported" ->
-                                    result <-
-                                        failure
-                                            "RUN_PARK_UNSUPPORTED"
-                                            "park verdict requires the orchestrated execution path"
-
-                                    return "unsupported"
-                                | other -> return other
-                            else
-                                return "stop"
-                        }
-
-                    let rec runForeground (command: string) : Task<unit> =
-                        task {
-                            let managed = startChild root "foreground" command
-                            // DSL-MUTABLE: algorithm-scratch — per-command loop state
-                            let mutable finished = false
-                            let mutable aborted = false
-
-                            while not finished && isNull result do
-                                let remaining = deadlineMs - nowMs ()
-
-                                if remaining <= 0L then
-                                    status <- "timeout"
-                                    outcomeReason <- "maxDuration exceeded"
-                                    killManaged managed "SIGKILL"
-                                    do! finishManaged managed
-                                    finished <- true
-                                else
-                                    let slice = int (min (int64 intervalMs) remaining)
-                                    let! exited = waitSlice managed slice
-
-                                    if exited then
-                                        finished <- true
-                                    else
-                                        let! verdictRaw = awaitJs (callCheck instance (checkContext managed))
-
-                                        match verdictOf verdictRaw with
-                                        | Continue -> ()
-                                        | Abort reason ->
-                                            status <- "aborted"
-                                            outcomeReason <- reason
-                                            aborted <- true
-                                            killManaged managed "SIGKILL"
-                                            do! finishManaged managed
-                                            finished <- true
-                                        | Park payload ->
-                                            let! decision = parkOrAbort payload
-
-                                            match decision with
-                                            | "abort" ->
-                                                status <- "aborted"
-                                                outcomeReason <- "check park resumed with 'abort'"
-                                                aborted <- true
-                                                killManaged managed "SIGKILL"
-                                                do! finishManaged managed
-                                                finished <- true
-                                            | "unsupported" ->
-                                                killManaged managed "SIGKILL"
-                                                do! finishManaged managed
-                                                finished <- true
-                                            | _ -> ()
-
-                            if isNull result then
-                                lastExitCode <- Some managed.ExitCode
-                                output.Append managed.Stdout.Text
-                                output.Append managed.Stderr.Text
-
-                                if hasOnExit then
-                                    let! _ = awaitJs (callOnExit instance (exitContext managed))
-                                    ()
-
-                            if aborted || status = "timeout" then
-                                running <- false
-                        }
-
-                    and finishManaged (managed: ManagedChild) =
-                        task {
-                            if not managed.Exited then
-                                let! _ = awaitExit managed signalGraceMs
-                                ()
-                        }
-
-                    while running && isNull result do
-                        let ctx = createObj [ "root" ==> root; "step" ==> step ]
-
-                        let remaining = deadlineMs - nowMs ()
-                        let! stepOutcome = raceDeadline (awaitJs (callNext instance ctx)) (int remaining)
-
-                        let raw =
-                            match stepOutcome with
-                            | Some value -> value
-                            | None -> null
-
-                        if stepOutcome.IsNone then
-                            status <- "timeout"
-                            outcomeReason <- "maxDuration exceeded inside next(ctx)"
-                            running <- false
-
-                        step <- step + 1
-
-                        if stepOutcome.IsNone then
-                            ()
-                        elif isNullish raw then
-                            running <- false
-                        elif isString raw then
-                            do! runForeground (string raw)
-                        elif hasProperty raw "spawn" then
-                            let name = string (getProperty raw "name")
-                            let command = string (getProperty raw "spawn")
-                            children.[name] <- startChild root name command
-                        elif hasProperty raw "signal" then
-                            let name = string (getProperty raw "name")
-
-                            let signalName =
-                                let value = getProperty raw "signal"
-
-                                if isString value && string value <> "" then
-                                    string value
-                                else
-                                    "SIGTERM"
-
-                            match children.TryGetValue name with
-                            | true, managed ->
-                                killManaged managed signalName
-                                let! _ = awaitExit managed signalGraceMs
-
-                                if not managed.Exited then
-                                    killManaged managed "SIGKILL"
-                                    let! _ = awaitExit managed signalGraceMs
-                                    ()
-
-                                children.Remove name |> ignore
-                            | false, _ ->
-                                result <- failure "RUN_CHILD_UNKNOWN" ("signal names an unknown background: " + name)
-                        elif hasProperty raw "send" then
-                            // Interactive write to a spawned child's stdin. A
-                            // missing trailing newline is added (terminal
-                            // convention); the child's incremental output
-                            // arrives through the next check slice.
-                            let send = getProperty raw "send"
-                            let name = string (getProperty send "name")
-                            let inputValue = getProperty send "input"
-
-                            let input =
-                                if isNullish inputValue then "" else string inputValue
-
-                            match children.TryGetValue name with
-                            | true, managed ->
-                                let payload =
-                                    if input = "" || input.EndsWith "\n" then
-                                        input
-                                    else
-                                        input + "\n"
-
-                                writeChildStdin managed.Child payload
-                            | false, _ ->
-                                result <- failure "RUN_CHILD_UNKNOWN" ("send names an unknown background: " + name)
-                        elif hasProperty raw "waitFor" then
-                            let waitFor = getProperty raw "waitFor"
-                            let port = int (unbox<float> (getProperty waitFor "port"))
-
-                            let timeoutMs =
-                                let value = getProperty waitFor "timeoutMs"
-
-                                if isNullish value || not (isFiniteNumber value) then
-                                    waitForDefaultMs
-                                else
-                                    int (unbox<float> value)
-
-                            let waitStarted = nowMs ()
-                            // DSL-MUTABLE: algorithm-scratch — waitFor poll state
-                            let mutable ready = false
-                            let mutable failureReason: string option = None
-
-                            while not ready && failureReason.IsNone && isNull result do
-                                let! connected = unbox<Task<bool>> (probePort netConnect port)
-
-                                if connected then
-                                    ready <- true
-                                elif nowMs () - waitStarted >= int64 timeoutMs then
-                                    failureReason <- Some "timeout"
-                                elif nowMs () >= deadlineMs then
-                                    status <- "timeout"
-                                    outcomeReason <- "maxDuration exceeded"
-                                    failureReason <- Some "deadline"
-                                else
-                                    let slice = int (min (int64 intervalMs) (max 1L (deadlineMs - nowMs ())))
-                                    let! _ = unbox<Task<unit>> (delay (min slice probeIntervalMs))
-                                    let! verdictRaw = awaitJs (callCheck instance (checkContext scratch))
-
-                                    match verdictOf verdictRaw with
-                                    | Continue -> ()
-                                    | Abort _ -> failureReason <- Some "abort"
-                                    | Park payload ->
-                                        let! decision = parkOrAbort payload
-
-                                        if decision = "abort" then
-                                            failureReason <- Some "abort"
-                                        elif decision = "unsupported" then
-                                            failureReason <- Some "unsupported"
-
-                            match failureReason with
-                            | Some "timeout" when isNull result ->
-                                result <- failure "RUN_WAIT_TIMEOUT" "waitFor condition was not met before its timeout"
-                            | Some "deadline" -> running <- false
-                            | Some "abort" ->
-                                status <- "aborted"
-                                outcomeReason <- "check aborted while waiting for the port"
-                                running <- false
-                            | Some "unsupported" -> running <- false
-                            | _ -> ()
-                        else
-                            result <-
-                                failure
-                                    "RUN_COMMAND_UNSUPPORTED"
-                                    "next() must return a command string, null, { spawn, name }, { send: { name, input } }, { signal, name } or { waitFor: { port, timeoutMs } }"
-
-                    for entry in children.Values |> Seq.toArray do
-                        killManaged entry "SIGKILL"
-                        let! _ = awaitExit entry signalGraceMs
-                        ()
-
-                    if not (isNull result) then
-                        return result
-                    else
-                        return
-                            outcome
-                                status
-                                lastExitCode
-                                output.Text
-                                ""
-                                output.Truncated
-                                output.TotalBytes
-                                (nowMs () - startedMs)
-                                outcomeReason
-        }
+        match validateRunnableSpec runnableClass with
+        | Error fail -> Task.FromResult fail
+        | Ok spec -> executeValidated parkState root stack spec

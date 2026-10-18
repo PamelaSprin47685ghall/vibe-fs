@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Foundation
+namespace Wanxiangshu.Host
 
 open Fable.Core
 open Fable.Core.JsInterop

@@ -60,12 +60,14 @@ module ProviderProse =
 
     /// Replace `{{name}}` with values. Values are not translated. Leftover placeholders fail closed.
     let substitute (template: string) (substitutions: Map<string, string>) : string =
-        resources()?renderTemplate(template, substitutionsObject substitutions)
+        let api = resources ()
+        api?renderTemplate (template, substitutionsObject substitutions)
 
     /// Load the semantic pair, verify placeholder parity across languages,
     /// then substitute on the requested language.
     let render (language: ProviderLanguage) (semanticPath: string) (substitutions: Map<string, string>) : string =
-        resources()?render(ProviderLanguage.externalName language, semanticPath, substitutionsObject substitutions)
+        let api = resources ()
+        api?render (ProviderLanguage.externalName language, semanticPath, substitutionsObject substitutions)
 
     /// Instruction lines for LlmFacing: preserve blank lines as "".
     let instructionLines

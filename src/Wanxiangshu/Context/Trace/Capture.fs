@@ -534,15 +534,17 @@ module XTraceCapture =
 
     let private buildStableCaptureIndex (existing: XTracePartRef list) : StableCaptureIndex =
         let byProvenance = HashSet<string>()
-        let byHostToolPart = HashSet<HostToolPartId * ToolCallId option * ProviderRunIdentity option>()
+
+        let byHostToolPart =
+            HashSet<HostToolPartId * ToolCallId option * ProviderRunIdentity option>()
+
         let byLegacyProvenance = Dictionary<string, XTracePartRef list>()
 
-        for part in existing do
+        let indexPart (part: XTracePartRef) =
             byProvenance.Add part.Provenance |> ignore
 
             part.HostToolPartId
-            |> Option.iter (fun hostTool ->
-                byHostToolPart.Add((hostTool, part.ToolCallId, part.ProviderRun)) |> ignore)
+            |> Option.iter (fun hostTool -> byHostToolPart.Add((hostTool, part.ToolCallId, part.ProviderRun)) |> ignore)
 
             let previous =
                 match byLegacyProvenance.TryGetValue part.Provenance with
@@ -550,6 +552,9 @@ module XTraceCapture =
                 | false, _ -> []
 
             byLegacyProvenance.[part.Provenance] <- part :: previous
+
+        for part in existing do
+            indexPart part
 
         { ByProvenance = byProvenance
           ByHostToolPart = byHostToolPart

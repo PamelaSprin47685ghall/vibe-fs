@@ -65,9 +65,7 @@ module TerminalReporter =
                 eventPort.NotifyTerminal
                     turn.SessionId
                     (TerminalOutcome.Failed(
-                        TerminalStop.forAuthority
-                            turn.AuthorityRootUserMessageId
-                            "terminal trace capture failed"
+                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId "terminal trace capture failed"
                     ))
                 |> ignore
 

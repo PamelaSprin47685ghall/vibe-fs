@@ -22,8 +22,6 @@ Foundation/Identity.fsi
 Foundation/Identity.fs
 Foundation/Quiescence.fsi
 Foundation/Quiescence.fs
-Foundation/GlobMatch.fsi
-Foundation/GlobMatch.fs
 Mission/Work/Contract.fsi
 Mission/Work/Contract.fs
 Mission/Work/Review/Model.fsi
@@ -32,8 +30,8 @@ Mission/Work/Review/Surface.fsi
 Mission/Work/Review/Surface.fs
 Mission/Work/Retirement/Surface.fsi
 Mission/Work/Retirement/Surface.fs
-Foundation/CanonicalJson.fsi
-Foundation/CanonicalJson.fs
+Host/CanonicalJson.fsi
+Host/CanonicalJson.fs
 OpenCode/Host/Message.fsi
 OpenCode/Host/Message.fs
 OpenCode/Host/SessionContract.fsi

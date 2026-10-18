@@ -33,60 +33,66 @@ module OrdinaryTurnWorkflow =
         | Wait
         | Continue
 
+    let private isExplicitWaitOrOldTurn
+        (authority: PromptAuthority.PromptAuthorityProjection option)
+        (turn: ReconciledTurn)
+        : bool =
+        authority
+        |> Option.exists (fun state ->
+            let obsolete =
+                match state.ActiveLogicalRun with
+                | Some active -> active.AuthorityRootUserMessageId <> turn.AuthorityRootUserMessageId
+                | None -> state.LastAuthorityProfile.IsSome
+
+            obsolete
+            || (state.UserQuestions
+                |> Map.exists (fun _ question ->
+                    question.Request.AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                    && (question.Answer.IsNone || question.Request.ProviderRunId = turn.ProviderRun))))
+
+    let private isTurnWorkSettled (turn: ReconciledTurn) : bool =
+        turn.Directory
+        |> Option.bind (fun directory ->
+            let commonDir = RuntimePath.stateRoot directory
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value turn.SessionId))
+        |> Option.exists (fun work ->
+            work.Delivered
+            || List.contains (ProviderRunIdentity.value turn.ProviderRun) work.RetiredRuns)
+
+    let private classifyManagerOrPlanTurn (context: ReconciledTurnContext) : LongWorkGate =
+        let turn = context.Turn
+
+        match context.Failure, turn.Observation, turn.Outcome with
+        | None, None, ReconcileProgram.TurnCompleted -> Continue
+        | None, None, ReconcileProgram.TurnNeedsContinuation _ when
+            turn.Finish
+            |> Option.exists (fun finish ->
+                System.String.Equals(finish, "stop", System.StringComparison.OrdinalIgnoreCase))
+            ->
+            Continue
+        | _ -> Ordinary
+
     let private longWorkGate (journal: AgentJournal option) (context: ReconciledTurnContext) =
         let turn = context.Turn
 
-        match turn.Role with
-        | Some(Role.Manager | Role.Plan) ->
-            let authority =
-                journal
-                |> Option.bind (fun durable ->
-                    (AgentJournal.snapshot durable).AgentProjections.Sessions
-                    |> Map.tryFind turn.SessionId
-                    |> Option.bind (fun session -> session.PromptAuthority))
+        let isManaged =
+            match turn.Role with
+            | Some(Role.Manager | Role.Plan) -> true
+            | _ -> false
 
-            let explicitWaitOrOldTurn =
-                authority
-                |> Option.exists (fun state ->
-                    let obsolete =
-                        match state.ActiveLogicalRun with
-                        | Some active -> active.AuthorityRootUserMessageId <> turn.AuthorityRootUserMessageId
-                        | None -> state.LastAuthorityProfile.IsSome
+        let authority () =
+            journal
+            |> Option.bind (fun durable ->
+                (AgentJournal.snapshot durable).AgentProjections.Sessions
+                |> Map.tryFind turn.SessionId
+                |> Option.bind (fun session -> session.PromptAuthority))
 
-                    obsolete
-                    || (state.UserQuestions
-                        |> Map.exists (fun _ question ->
-                            question.Request.AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
-                            && (question.Answer.IsNone || question.Request.ProviderRunId = turn.ProviderRun))))
-
-            if explicitWaitOrOldTurn then
-                Wait
-            else
-                let settled =
-                    turn.Directory
-                    |> Option.bind (fun directory ->
-                        let commonDir = RuntimePath.stateRoot directory
-
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected
-                            commonDir
-                            (SessionId.value turn.SessionId))
-                    |> Option.exists (fun work ->
-                        work.Delivered
-                        || List.contains (ProviderRunIdentity.value turn.ProviderRun) work.RetiredRuns)
-
-                if settled then
-                    Wait
-                else
-                    match context.Failure, turn.Observation, turn.Outcome with
-                    | None, None, ReconcileProgram.TurnCompleted -> Continue
-                    | None, None, ReconcileProgram.TurnNeedsContinuation _ when
-                        turn.Finish
-                        |> Option.exists (fun finish ->
-                            System.String.Equals(finish, "stop", System.StringComparison.OrdinalIgnoreCase))
-                        ->
-                        Continue
-                    | _ -> Ordinary
-        | _ -> Ordinary
+        if not isManaged then
+            Ordinary
+        elif isExplicitWaitOrOldTurn (authority ()) turn || isTurnWorkSettled turn then
+            Wait
+        else
+            classifyManagerOrPlanTurn context
 
     let private bloggerReceiptKind (port: TurnObservationJournalPort) (turn: ReconciledTurn) =
         port.TryBloggerReceiptKind turn.SessionId turn.ProviderRun
@@ -307,27 +313,29 @@ module OrdinaryTurnWorkflow =
             // published instead — deferring would strand every parent waiting
             // on a fact that already happened. (managed-session-lifecycle:
             // terminal admission deferral)
+            let resolveOutstandingJoinCompletion () =
+                task {
+                    let! deferred =
+                        applyJoinGuardNudge
+                            sessionPort
+                            rootWorkspace
+                            eventPort
+                            journal
+                            joinGuardNudges
+                            quiescence
+                            context
+
+                    if deferred then
+                        return XTraceTerminalCompletion.RejectedEmptyOutput
+                    else
+                        return! completeAgent ()
+                }
+
             let! completion =
                 if not joinOutstanding then
                     completeAgent ()
                 else
-                    task {
-                        let! deferred =
-                            applyJoinGuardNudge
-                                sessionPort
-                                rootWorkspace
-                                eventPort
-                                journal
-                                joinGuardNudges
-                                quiescence
-                                context
-
-                        return!
-                            if deferred then
-                                Task.FromResult XTraceTerminalCompletion.RejectedEmptyOutput
-                            else
-                                completeAgent ()
-                    }
+                    resolveOutstandingJoinCompletion ()
 
             let terminalValid =
                 match completion with

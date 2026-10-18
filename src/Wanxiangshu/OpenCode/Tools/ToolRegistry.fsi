@@ -83,7 +83,6 @@ module ToolRegistry =
         jsTransactionPersistence: IJsTransactionPersistence option ->
         jsLifecyclePersistence: IJsLifecyclePersistence option ->
         continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) ->
-        childWorkRecordForRun:
-            (SessionId -> ProviderRunIdentity -> Task<string option>) option ->
+        childWorkRecordForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) option ->
         userNotify: (string -> string -> unit) option ->
             ToolRegistration

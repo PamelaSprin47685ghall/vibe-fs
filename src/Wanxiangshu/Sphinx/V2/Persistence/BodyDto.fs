@@ -4,6 +4,7 @@ open System
 open Fable.Core.JsInterop
 open Thoth.Json
 open Wanxiangshu.Foundation
+open Wanxiangshu.Host
 open Wanxiangshu.Sphinx.V2.Core
 
 /// @2 has one closed DTO per body. Decode the native ingress once, through the

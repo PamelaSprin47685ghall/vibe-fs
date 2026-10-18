@@ -196,6 +196,46 @@ module PluginHooks =
                             "$0?.tui?.showToast?.({ body: { title: $1, message: $2, variant: 'info' } })"
                         |> ignore)
 
+            let isToastAvailable () : bool =
+                emitJsExpr client "typeof $0?.tui?.showToast === 'function'"
+
+            let checkQuestionToastResult (response: obj) : Result<unit, string> =
+                if not (isNull response) && not (isNull response?error) then
+                    Error(string response?error)
+                else
+                    Ok()
+
+            let postQuestionToastUnchecked (question: string) : Task<Result<unit, string>> =
+                task {
+                    let title =
+                        ProviderProse.render
+                            (ProviderLanguageBinding.readGlobalPreference ())
+                            "tool/ask-title"
+                            Map.empty
+
+                    let! response =
+                        emitJsExpr
+                            (client, title, question)
+                            "$0.tui.showToast({ body: { title: $1, message: $2, variant: 'info' } })"
+                        |> unbox<Task<obj>>
+
+                    return checkQuestionToastResult response
+                }
+
+            let runGuardedToast (question: string) : Task<Result<unit, string>> =
+                task {
+                    try
+                        return! postQuestionToastUnchecked question
+                    with ex ->
+                        return Error ex.Message
+                }
+
+            let showQuestionToast (question: string) : Task<Result<unit, string>> =
+                if not (isToastAvailable ()) then
+                    Task.FromResult(Error "the Host cannot present a question to the user")
+                else
+                    runGuardedToast question
+
             let configureClient () : Task<ToolRegistration> =
                 task {
                     let! toolModule = importToolModule ()
@@ -213,8 +253,7 @@ module PluginHooks =
 
                     let parentWorkRecordFor, childWorkRecordFor = workRecord true, workRecord false
 
-                    let childRecordForRun =
-                        fun _ _ -> Task.FromResult None
+                    let childRecordForRun = fun _ _ -> Task.FromResult None
 
                     let casebookToolSpecs: ToolSpec list =
                         match workspaceDirectory with
@@ -258,33 +297,7 @@ module PluginHooks =
                                 })
                             userNotify
 
-                    toolRegistration.Runtime.AttachQuestionNotifier(fun question ->
-                        task {
-                            try
-                                let available: bool = emitJsExpr client "typeof $0?.tui?.showToast === 'function'"
-
-                                if not available then
-                                    return Error "the Host cannot present a question to the user"
-                                else
-                                    let title =
-                                        ProviderProse.render
-                                            (ProviderLanguageBinding.readGlobalPreference ())
-                                            "tool/ask-title"
-                                            Map.empty
-
-                                    let! response =
-                                        emitJsExpr
-                                            (client, title, question)
-                                            "$0.tui.showToast({ body: { title: $1, message: $2, variant: 'info' } })"
-                                        |> unbox<Task<obj>>
-
-                                    if not (isNull response) && not (isNull response?error) then
-                                        return Error(string response?error)
-                                    else
-                                        return Ok()
-                            with ex ->
-                                return Error ex.Message
-                        })
+                    toolRegistration.Runtime.AttachQuestionNotifier(fun question -> showQuestionToast question)
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
 
@@ -464,6 +477,11 @@ module PluginHooks =
                     Some(SessionId.value sessionId, ToolCallId.create callId, status)
                 | _ -> None
 
+            let requireUserQuestionInterrupted (result: Result<unit, string>) =
+                match result with
+                | Ok() -> ()
+                | Error reason -> invalidOp ("ask was sent, but its attempt interrupt failed: " + reason)
+
             let settleUserQuestion rawInput =
                 task {
                     // `js.ask` inside a plan program records the same durable
@@ -487,9 +505,7 @@ module PluginHooks =
                                 callId
                             )
 
-                        match result with
-                        | Ok() -> ()
-                        | Error reason -> invalidOp ("ask was sent, but its attempt interrupt failed: " + reason)
+                        requireUserQuestionInterrupted result
                     | Some(sessionId, _, "completed", None), Some registration when
                         registration.Runtime.IsWaitingForUser sessionId
                         ->
@@ -526,8 +542,7 @@ module PluginHooks =
 
             let requiredViewJournal () =
                 journal
-                |> Option.defaultWith (fun () ->
-                    invalidOp "view compression checkpoint requires a durable journal")
+                |> Option.defaultWith (fun () -> invalidOp "view compression checkpoint requires a durable journal")
 
             let removePendingViewCheckpoint key =
                 lock pendingViewCheckpointAppends (fun () -> pendingViewCheckpointAppends.Remove(key) |> ignore)

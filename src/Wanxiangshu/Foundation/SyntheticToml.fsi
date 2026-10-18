@@ -12,12 +12,14 @@ module SyntheticToml =
     val renderInt: value: int64 -> string
     val renderFloat: value: float -> string
     val renderKey: name: string -> string
+
     val encodeFs:
         rewritten: string list ->
         created: string list ->
         removed: string list ->
         moved: (string * string) list ->
             string list
+
     val document: instructions: string list -> body: string list -> string
     val renderStringByteCountPrefix: text: string -> length: int -> suffix: string -> int
     val byteCount: text: string -> int

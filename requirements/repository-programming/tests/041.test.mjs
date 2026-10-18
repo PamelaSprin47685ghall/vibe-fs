@@ -56,7 +56,7 @@ test('WHAT[repository-programming-041] JsToolSpec.execute call site passes the l
 test('WHAT[repository-programming-041] the workflow records Parked, Unparked and Abandoned audit events on the execute chain', () => {
   const workflow = read(join(SOURCE_ROOT, 'Repository/Programming/Js/OpenCode/ToolWorkflow.fs'))
 
-  assert.match(workflow, /recordLifecycle lifecyclePersistence JsLifecycleEventType\.Parked handle sessionId/)
+  assert.match(workflow, /recordLifecycle lifecyclePersistence JsLifecycleEventType\.Parked site\.Handle site\.SessionId/)
   assert.match(workflow, /recordLifecycle lifecyclePersistence JsLifecycleEventType\.Unparked handle sessionId/)
   assert.match(workflow, /recordLifecycle lifecyclePersistence JsLifecycleEventType\.Abandoned handle sessionId/)
 })

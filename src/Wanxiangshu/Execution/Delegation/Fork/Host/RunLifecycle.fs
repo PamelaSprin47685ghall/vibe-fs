@@ -231,6 +231,11 @@ module HostForkRunLifecycle =
             return interpretDispatchResult durable childId identitySeed prompt onAccepted sent
         }
 
+    let private chooseWorkRecord delivered observed =
+        match delivered with
+        | Some record -> Some record
+        | None -> observed
+
     let workRecordForOutcome
         (childWorkRecordForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (run: PendingHostRun)
@@ -240,11 +245,8 @@ module HostForkRunLifecycle =
         | TerminalOutcome.Completed result ->
             task {
                 let! observed = childWorkRecordForRun run.ChildId result.ProviderRun
-
-                return
-                    match JsDeliveredValues.tryTakeRendered (SessionId.value run.ChildId) with
-                    | Some delivered -> Some delivered
-                    | None -> observed
+                let delivered = JsDeliveredValues.tryTakeRendered (SessionId.value run.ChildId)
+                return chooseWorkRecord delivered observed
             }
         | _ -> Task.FromResult None
 
@@ -344,6 +346,61 @@ module HostForkRunLifecycle =
                 pendingRuns.Remove run.AgentId |> ignore
             | _ -> ())
 
+    let private resolveFinalCommittedOutcome
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (proof: JoinableCompletion)
+        (run: PendingHostRun)
+        (agentOutcome: AgentCompletionOutcome)
+        : Task<AgentCompletionOutcome> =
+        match journal with
+        | None -> Task.FromResult agentOutcome
+        | Some j -> committedOutcome (Some j) parentId proof run agentOutcome
+
+    let private isWorkCommittedOrRetired (work: HandleWorkRecord) =
+        match work.Lifecycle with
+        | CompletedAwaitingJoin _
+        | Retired -> true
+        | _ -> false
+
+    let private isCompletionCommitted
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        : bool =
+        journal
+        |> Option.exists (fun durable ->
+            run.Work
+            |> Option.exists (fun admitted ->
+                HandleProjection.tryWork (AdmittedWork.id admitted) (AgentJournal.handleProjection durable parentId)
+                |> Option.exists isWorkCommittedOrRetired))
+
+    let private releaseClaimedRunIfCommitted
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        =
+        if journal.IsNone || isCompletionCommitted journal parentId run then
+            removeClaimedRun gate pendingRuns run
+
+    let private deliverClaimSettlementFault (run: PendingHostRun) (error: exn) =
+        // The claim consumed this run's only completion promise. An
+        // unsettled Source strands the Fork await and the join ledger
+        // forever — settle an explicit failure even when settlement
+        // itself faulted.
+        let failedOutcome =
+            AgentCompletion.failed
+                run.AgentId
+                ("run-" + run.AgentId)
+                (Some run.Role)
+                (Some run.ChildId)
+                "PERSIST"
+                (sprintf "completion settlement faulted: %s" error.Message)
+
+        AsyncSupport.trySetResult run.Source failedOutcome |> ignore
+
     let private startClaimDelivery
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -355,47 +412,19 @@ module HostForkRunLifecycle =
         : Task =
         task {
             try
-                let! finalOutcome =
-                    match journal with
-                    | None -> Task.FromResult agentOutcome
-                    | Some j -> committedOutcome (Some j) parentId proof run agentOutcome
-
-                // Do not release the road while the exact completion commit is unknown.
-                let committed =
-                    journal
-                    |> Option.exists (fun durable ->
-                        run.Work
-                        |> Option.exists (fun admitted ->
-                            HandleProjection.tryWork
-                                (AdmittedWork.id admitted)
-                                (AgentJournal.handleProjection durable parentId)
-                            |> Option.exists (fun work ->
-                                match work.Lifecycle with
-                                | CompletedAwaitingJoin _
-                                | Retired -> true
-                                | _ -> false)))
-
-                if journal.IsNone || committed then
-                    removeClaimedRun gate pendingRuns run
-
+                let! finalOutcome = resolveFinalCommittedOutcome journal parentId proof run agentOutcome
+                releaseClaimedRunIfCommitted gate pendingRuns journal parentId run
                 run.Source.SetResult finalOutcome
             with error ->
-                // The claim consumed this run's only completion promise. An
-                // unsettled Source strands the Fork await and the join ledger
-                // forever — settle an explicit failure even when settlement
-                // itself faulted.
-                let failedOutcome =
-                    AgentCompletion.failed
-                        run.AgentId
-                        ("run-" + run.AgentId)
-                        (Some run.Role)
-                        (Some run.ChildId)
-                        "PERSIST"
-                        (sprintf "completion settlement faulted: %s" error.Message)
-
-                AsyncSupport.trySetResult run.Source failedOutcome |> ignore
+                deliverClaimSettlementFault run error
         }
         :> Task
+
+    let private disposeSubscriptionSafely (subscription: IDisposable option) =
+        try
+            subscription |> Option.iter (fun s -> s.Dispose())
+        with _ ->
+            ()
 
     let private deliverClaimedCompletion
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -415,12 +444,7 @@ module HostForkRunLifecycle =
                 // its PERSIST failure settlement) always runs, even when cleanup
                 // itself faults. The `do!` stays after the fault boundary, not in
                 // a `finally` (a `finally` in `task { }` cannot await).
-                try
-                    subscriptionToDispose
-                    |> Option.iter (fun subscription -> subscription.Dispose())
-                with _ ->
-                    ()
-
+                disposeSubscriptionSafely subscriptionToDispose
                 do! startClaimDelivery gate pendingRuns journal parentId run proof agentOutcome
             }
             :> Task
@@ -541,6 +565,41 @@ module HostForkRunLifecycle =
             Task.FromResult(())
         | Failed stop -> deliverFailedCompletion gate pendingRuns journal parentId run stop.Reason
 
+    let private recoverFailedSettlement
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (error: exn)
+        : Task =
+        task {
+            logError "FORK-SETTLEMENT" (sprintf "run %s completion settlement faulted: %s" run.AgentId error.Message)
+
+            try
+                do!
+                    deliverFailedCompletion
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        run
+                        (sprintf "completion settlement faulted: %s" error.Message)
+            with recovery ->
+                logError "FORK-SETTLEMENT" (sprintf "run %s failure delivery faulted: %s" run.AgentId recovery.Message)
+
+                AsyncSupport.trySetResult
+                    run.Source
+                    (AgentCompletion.failed
+                        run.AgentId
+                        ("run-" + run.AgentId)
+                        (Some run.Role)
+                        (Some run.ChildId)
+                        "PERSIST"
+                        (sprintf "completion settlement faulted: %s" error.Message))
+                |> ignore
+        }
+
     let installRun
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -599,49 +658,13 @@ module HostForkRunLifecycle =
                                 }
 
                             try
-                                do!
-                                    complete
-                                        gate
-                                        pendingRuns
-                                        journal
-                                        parentId
-                                        sessions
-                                        run
-                                        outcome
-                                        workRecord
+                                do! complete gate pendingRuns journal parentId sessions run outcome workRecord
                             with error ->
                                 // A terminal the child proved must still resolve
                                 // this run's only completion promise even when
                                 // settlement faulted: settle an explicit joinable
                                 // failure (never silence, never a stranded Source).
-                                logError
-                                    "FORK-SETTLEMENT"
-                                    (sprintf "run %s completion settlement faulted: %s" run.AgentId error.Message)
-
-                                try
-                                    do!
-                                        deliverFailedCompletion
-                                            gate
-                                            pendingRuns
-                                            journal
-                                            parentId
-                                            run
-                                            (sprintf "completion settlement faulted: %s" error.Message)
-                                with recovery ->
-                                    logError
-                                        "FORK-SETTLEMENT"
-                                        (sprintf "run %s failure delivery faulted: %s" run.AgentId recovery.Message)
-
-                                    AsyncSupport.trySetResult
-                                        run.Source
-                                        (AgentCompletion.failed
-                                            run.AgentId
-                                            ("run-" + run.AgentId)
-                                            (Some run.Role)
-                                            (Some run.ChildId)
-                                            "PERSIST"
-                                            (sprintf "completion settlement faulted: %s" error.Message))
-                                    |> ignore
+                                do! recoverFailedSettlement gate pendingRuns journal parentId run error
                         }
                         :> Task))
             )

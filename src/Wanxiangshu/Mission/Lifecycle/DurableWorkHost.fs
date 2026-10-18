@@ -56,16 +56,18 @@ module DurableWorkHost =
         if isGit path then
             invalidArg "stateRoot" "Lifecycle persistence cannot read or write inside .git"
 
+        let assertNotGitLink (candidate: string) =
+            if physicalPath candidate |> isGit then
+                invalidArg "stateRoot" "Lifecycle persistence cannot follow a link into .git"
+
         // 文件尚未存在时也核对已有父目录，防止通过链接回到旧 .git。
         let rec checkExisting candidate =
             if pathExists candidate then
-                if physicalPath candidate |> isGit then
-                    invalidArg "stateRoot" "Lifecycle persistence cannot follow a link into .git"
+                assertNotGitLink candidate
+            elif directoryOf candidate <> candidate then
+                checkExisting (directoryOf candidate)
             else
-                let parent = directoryOf candidate
-
-                if parent <> candidate then
-                    checkExisting parent
+                ()
 
         checkExisting path
 
@@ -394,13 +396,8 @@ module DurableWorkHost =
     let private lastRetirementCursorOf (rounds: obj array) : float option =
         match rounds with
         | [||] -> None
-        | rounds ->
-            let retirement = rounds.[rounds.Length - 1]?retirementCursor
-
-            if isNull retirement then
-                None
-            else
-                Some(unbox<float> retirement)
+        | _ when isNull (rounds.[rounds.Length - 1]?retirementCursor) -> None
+        | _ -> Some(unbox<float> (rounds.[rounds.Length - 1]?retirementCursor))
 
     let private projectedWork (snapshot: obj) (work: obj) : InspectedWork =
         let active: obj = snapshot?active
@@ -470,6 +467,18 @@ module DurableWorkHost =
         else
             useJournal gitCommonDir (fun journal -> inspectedFromJournal journal workId)
 
+    let private tryInspectWorkFromJournal (journal: obj) (workId: string) : Result<InspectedWork option, string> =
+        try
+            Ok(inspectedFromJournal journal workId)
+        with error ->
+            Error error.Message
+
+    let private safeInspectFromJournal (journal: obj) (workId: string) : Result<InspectedWork option, string> =
+        if String.IsNullOrEmpty workId then
+            Ok None
+        else
+            tryInspectWorkFromJournal journal workId
+
     /// 启动枚举共用一次连接和全库完整性检查，各工作流仍分别校验并报告错误。
     let inspectedMany (gitCommonDir: string) (workIds: string array) =
         if Array.isEmpty workIds then
@@ -477,17 +486,7 @@ module DurableWorkHost =
         else
             useJournal gitCommonDir (fun journal ->
                 workIds
-                |> Array.map (fun workId ->
-                    let result =
-                        try
-                            if String.IsNullOrEmpty workId then
-                                Ok None
-                            else
-                                Ok(inspectedFromJournal journal workId)
-                        with error ->
-                            Error error.Message
-
-                    workId, result))
+                |> Array.map (fun workId -> workId, safeInspectFromJournal journal workId))
 
     let private openingFailure (receipt: HostReceipt) =
         if receipt.Reason = "" then

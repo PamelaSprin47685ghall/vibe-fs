@@ -20,21 +20,21 @@ type CompletionMailbox(gate: obj) =
     // gate 仅为生命周期锚（与主仓原语义一致）；库实例不消费它。
     let view: obj = MailboxLibrary.library?completionMailbox ()
 
+    let decodeInterrupt (interrupt: string) : JoinInterruptReason =
+        match interrupt with
+        | "OperatorAbort" -> JoinInterruptReason.OperatorAbort
+        | "UserMessageArrived" -> JoinInterruptReason.UserMessageArrived
+        | _ -> JoinInterruptReason.DeadlineExpired
+
     let wakeOf (value: obj) : MailboxWakeReason =
         match string value with
         | "CompletionMayBeAvailable" -> MailboxWakeReason.CompletionMayBeAvailable
         | "MailboxCancelled" -> MailboxWakeReason.MailboxCancelled
         | _ ->
             // { LocalInterrupt: "OperatorAbort" | ... }
-            let interrupt = string (emitJsExpr (value, "LocalInterrupt") "$0[$1]")
-
-            let reason =
-                match interrupt with
-                | "OperatorAbort" -> JoinInterruptReason.OperatorAbort
-                | "UserMessageArrived" -> JoinInterruptReason.UserMessageArrived
-                | _ -> JoinInterruptReason.DeadlineExpired
-
-            MailboxWakeReason.LocalInterrupt reason
+            string (emitJsExpr (value, "LocalInterrupt") "$0[$1]")
+            |> decodeInterrupt
+            |> MailboxWakeReason.LocalInterrupt
 
     member _.PulseAgentHandle(handle: AgentHandleId) = view?pulseAgent (handle) |> ignore
 

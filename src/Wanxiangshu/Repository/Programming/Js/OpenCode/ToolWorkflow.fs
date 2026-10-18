@@ -242,6 +242,14 @@ module JsToolWorkflow =
     /// failed append fails the tool result with the stable
     /// TRANSACTION_PREPARE_*/COMMIT_* codes while the landed as-is writes
     /// stay reported, never rolled back ([013]).
+    let private recordFirstAppendFailure
+        (currentFailure: JsFailure option)
+        (appended: Result<'a, JsTransactionAppendFailure>)
+        =
+        match currentFailure, appended with
+        | None, Error failure -> Some(JsFailure.TransactionPersistenceFailed failure)
+        | _ -> currentFailure
+
     let private settleLedger (ledger: JsAsIsLedger) : Task<Result<unit, JsFailure>> =
         task {
             // DSL-MUTABLE: algorithm-scratch — first append failure for the outcome
@@ -249,11 +257,7 @@ module JsToolWorkflow =
 
             for pending in ledger.Appends do
                 let! appended = pending
-
-                if appendFailure.IsNone then
-                    match appended with
-                    | Error failure -> appendFailure <- Some(JsFailure.TransactionPersistenceFailed failure)
-                    | Ok _ -> ()
+                appendFailure <- recordFirstAppendFailure appendFailure appended
 
             match appendFailure with
             | Some failure -> return Error failure
@@ -278,6 +282,112 @@ module JsToolWorkflow =
         match observer with
         | None -> Task.FromResult(Ok())
         | Some observe -> invokeObservation observe readPaths effectPaths
+
+
+    let private checkReadOnlyMutation
+        (hasMutationCapability: bool)
+        (mutations: JsStagedMutation list)
+        : JsFailure option =
+        if not hasMutationCapability && not (List.isEmpty mutations) then
+            Some JsFailure.ReadOnlyMutationRejected
+        else
+            None
+
+    let private recordDeliveredValueIfNeeded
+        sessionId
+        (json: string)
+        (parsed: Result<LlmFacing.Data.Value, JsFailure>)
+        =
+        if JsToolsData.isDelivered json && Result.isOk parsed then
+            JsDeliveredValues.record sessionId (JsToolsData.parseDeliveredValue json)
+
+    let private decodeRunResult (sessionId: string) (decoded: Result<string, JsFailure>) =
+        match decoded with
+        | Error failure -> Error failure
+        | Ok json ->
+            let parsed = JsToolsData.parseOutcome json
+            recordDeliveredValueIfNeeded sessionId json parsed
+            parsed
+
+    let private settleExecutionOutcome
+        (observation: Result<unit, JsFailure>)
+        (ledgerOutcome: Result<unit, JsFailure>)
+        (value: LlmFacing.Data.Value)
+        (rewritten: string list)
+        (created: string list)
+        (removed: string list)
+        (moved: (string * string) list)
+        : JsToolOutcome =
+        match observation, ledgerOutcome with
+        | Error failure, _ -> Failed(failure, rewritten, created, removed, moved)
+        | _, Error failure -> Failed(failure, rewritten, created, removed, moved)
+        | Ok(), Ok() -> Succeeded(value, rewritten, created, removed, moved)
+
+    /// Best-effort lifecycle audit trace. A failed audit never fails the tool
+    /// call: the parked site is process-live and the audit is only a trace.
+    let private recordLifecycle
+        (lifecyclePersistence: IJsLifecyclePersistence option)
+        (eventType: JsLifecycleEventType)
+        (handle: string)
+        (sessionId: string)
+        : unit =
+        match lifecyclePersistence with
+        | None -> ()
+        | Some durable ->
+            let event: JsLifecycleEvent =
+                { EventType = eventType
+                  Handle = handle
+                  SessionId = sessionId
+                  At = System.DateTimeOffset.UtcNow.ToString("o") }
+
+            task {
+                let! _ = durable.AppendLifecycleEvent event
+                return ()
+            }
+            |> ignore
+
+    let private registerParkedSite
+        (site: JsParkedSites.JsParkedSite)
+        (lifecyclePersistence: IJsLifecyclePersistence option)
+        (baseClassSource: string)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
+        (rewritten: string list)
+        (created: string list)
+        (removed: string list)
+        (moved: (string * string) list)
+        : JsToolOutcome =
+        match JsParkedSites.register site with
+        | Error failure -> Failed(failure, rewritten, created, removed, moved)
+        | Ok _ ->
+            recordLifecycle lifecyclePersistence JsLifecycleEventType.Parked site.Handle site.SessionId
+
+            let source =
+                JsSandbox.sourceWithExecutionMarker baseClassSource site.ModelSource parkState.ParkStack
+
+            Parked(site.Handle, hostRealmPayload parkState.ParkPayload, source)
+
+    let private registerResumedParkedSite
+        (newSite: JsParkedSites.JsParkedSite)
+        (baseClassSource: string)
+        : JsToolOutcome =
+        match JsParkedSites.register newSite with
+        | Error failure -> Failed(failure, [], [], [], [])
+        | Ok _ ->
+            let source =
+                JsSandbox.sourceWithExecutionMarker
+                    baseClassSource
+                    newSite.ModelSource
+                    newSite.RunHandle.ParkState.ParkStack
+
+            Parked(newSite.Handle, hostRealmPayload newSite.RunHandle.ParkState.ParkPayload, source)
+
+    let private settleResumedExecutionOutcome
+        (ledgerOutcome: Result<unit, JsFailure>)
+        (value: LlmFacing.Data.Value)
+        : JsToolOutcome =
+        match ledgerOutcome with
+        | Error failure -> Failed(failure, [], [], [], [])
+        | Ok() -> Succeeded(value, [], [], [], [])
 
     /// Run a model program against root. `baseClassSource` is the generated
     /// JsProgram (JS-002); `modelSource` is the model's `class Js ... run()`.
@@ -356,18 +466,11 @@ module JsToolWorkflow =
                 // Program execution or return-value parsing failed; the writes
                 // that already landed stay on disk and are reported as-is.
                 return Failed(failure, rewritten, created, removed, moved)
+            | Ok _ when (checkReadOnlyMutation hasMutationCapability mutations).IsSome ->
+                return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
             | Ok value ->
-                if not hasMutationCapability && not (List.isEmpty mutations) then
-                    return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
-                else
-                    let! observation = observeFileAccess fileAccessObservation readPaths effectPaths
-
-                    match observation with
-                    | Error failure -> return Failed(failure, rewritten, created, removed, moved)
-                    | Ok() ->
-                        match ledgerOutcome with
-                        | Error failure -> return Failed(failure, rewritten, created, removed, moved)
-                        | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
+                let! observation = observeFileAccess fileAccessObservation readPaths effectPaths
+                return settleExecutionOutcome observation ledgerOutcome value rewritten created removed moved
         }
 
     let run
@@ -412,29 +515,6 @@ module JsToolWorkflow =
             outputBoundBytes
             persistence
             (Some fileAccessObservation)
-
-    /// Best-effort lifecycle audit trace. A failed audit never fails the tool
-    /// call: the parked site is process-live and the audit is only a trace.
-    let private recordLifecycle
-        (lifecyclePersistence: IJsLifecyclePersistence option)
-        (eventType: JsLifecycleEventType)
-        (handle: string)
-        (sessionId: string)
-        : unit =
-        match lifecyclePersistence with
-        | None -> ()
-        | Some durable ->
-            let event: JsLifecycleEvent =
-                { EventType = eventType
-                  Handle = handle
-                  SessionId = sessionId
-                  At = System.DateTimeOffset.UtcNow.ToString("o") }
-
-            task {
-                let! _ = durable.AppendLifecycleEvent event
-                return ()
-            }
-            |> ignore
 
     /// Run a new program with park support. `sessionId` tags the site so
     /// session close can reap it. The park signal is installed before the
@@ -526,9 +606,7 @@ module JsToolWorkflow =
                         JsSandbox.classifyResult json outputBoundBytes
                         |> Result.bind JsToolsData.parseOutcome
 
-                    if JsToolsData.isDelivered json && Result.isOk parsed then
-                        JsDeliveredValues.record sessionId (JsToolsData.parseDeliveredValue json)
-
+                    recordDeliveredValueIfNeeded sessionId json parsed
                     parsed
                 | Choice2Of2 _ ->
                     // Park won: the program suspended at `await js.park`.
@@ -572,30 +650,22 @@ module JsToolWorkflow =
                       SessionId = sessionId
                       ModelSource = modelSource }
 
-                match JsParkedSites.register site with
-                | Error failure -> return Failed(failure, rewritten, created, removed, moved)
-                | Ok _ ->
-                    // Record the Parked audit trace (best-effort; algorithm H3).
-                    recordLifecycle lifecyclePersistence JsLifecycleEventType.Parked handle sessionId
-
-                    let source =
-                        JsSandbox.sourceWithExecutionMarker baseClassSource modelSource parkState.ParkStack
-
-                    return Parked(handle, hostRealmPayload parkState.ParkPayload, source)
+                return
+                    registerParkedSite
+                        site
+                        lifecyclePersistence
+                        baseClassSource
+                        parkState
+                        rewritten
+                        created
+                        removed
+                        moved
+            | Ok _ when (checkReadOnlyMutation hasMutationCapability mutations).IsSome ->
+                return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
             | Ok value ->
-                if not hasMutationCapability && not (List.isEmpty mutations) then
-                    return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
-                else
-                    let! observation = observeFileAccess fileAccessObservation readPaths effectPaths
-
-                    match observation with
-                    | Error failure -> return Failed(failure, rewritten, created, removed, moved)
-                    | Ok() ->
-                        let! ledgerOutcome = settleLedger ledger
-
-                        match ledgerOutcome with
-                        | Error failure -> return Failed(failure, rewritten, created, removed, moved)
-                        | Ok() -> return Succeeded(value, rewritten, created, removed, moved)
+                let! observation = observeFileAccess fileAccessObservation readPaths effectPaths
+                let! ledgerOutcome = settleLedger ledger
+                return settleExecutionOutcome observation ledgerOutcome value rewritten created removed moved
         }
 
     /// The generated-surface api factory: bindings own the file members and
@@ -691,19 +761,7 @@ module JsToolWorkflow =
                 | Choice1Of2 _ ->
                     task {
                         let! decoded = JsSandbox.awaitResult site.RunHandle outputBoundBytes
-
-                        return
-                            match decoded with
-                            | Error failure -> Error failure
-                            | Ok json ->
-                                let parsed = JsToolsData.parseOutcome json
-
-                                if JsToolsData.isDelivered json && Result.isOk parsed then
-                                    JsDeliveredValues.record
-                                        site.SessionId
-                                        (JsToolsData.parseDeliveredValue json)
-
-                                parsed
+                        return decodeRunResult site.SessionId decoded
                     }
                 | Choice2Of2 _ -> task { return Ok(LlmFacing.Data.Value.String "{\"__jsParked\":true}") }
 
@@ -732,22 +790,10 @@ module JsToolWorkflow =
                       SessionId = site.SessionId
                       ModelSource = site.ModelSource }
 
-                match JsParkedSites.register newSite with
-                | Error failure -> return Failed(failure, [], [], [], [])
-                | Ok _ ->
-                    let source =
-                        JsSandbox.sourceWithExecutionMarker
-                            baseClassSource
-                            site.ModelSource
-                            site.RunHandle.ParkState.ParkStack
-
-                    return Parked(newHandle, hostRealmPayload site.RunHandle.ParkState.ParkPayload, source)
+                return registerResumedParkedSite newSite baseClassSource
             | Ok value ->
                 let! ledgerOutcome = settleLedger site.Ledger
-
-                match ledgerOutcome with
-                | Error failure -> return Failed(failure, [], [], [], [])
-                | Ok() -> return Succeeded(value, [], [], [], [])
+                return settleResumedExecutionOutcome ledgerOutcome value
         }
 
     /// Abandon a parked site (algorithm F): reject the deferred promise with
@@ -825,6 +871,39 @@ module JsToolWorkflow =
         | None -> Task.FromResult(Failed(JsFailure.HandleUnknown handle, [], [], [], []))
         | Some site -> abandonSite site deadlineMs outputBoundBytes
 
+    [<RequireQualifiedAccess>]
+    type private ToolWorkflowInvocation =
+        | Program of source: string
+        | Unpark of handle: string * value: obj
+        | Abandon of handle: string
+        | Invalid
+
+    let private parseWorkflowInvocation (input: obj) : ToolWorkflowInvocation =
+        if isNull input then
+            ToolWorkflowInvocation.Invalid
+        elif not (isNull input?program) then
+            ToolWorkflowInvocation.Program(string input?program)
+        elif not (isNull input?unpark) then
+            let unpark = input?unpark
+            ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value)
+        elif not (isNull input?abandon) then
+            ToolWorkflowInvocation.Abandon(string ((input?abandon)?handle))
+        else
+            ToolWorkflowInvocation.Invalid
+
+    let private resolveParkedSite (handle: string) : Result<JsParkedSites.JsParkedSite, JsFailure> =
+        match JsParkedSites.tryFind handle with
+        | Some site -> Ok site
+        | None -> Error(JsFailure.HandleUnknown handle)
+
+    let private dispatchResolvedParkedSite
+        (resolved: Result<JsParkedSites.JsParkedSite, JsFailure>)
+        (useSite: JsParkedSites.JsParkedSite -> Task<JsToolOutcome>)
+        : Task<JsToolOutcome> =
+        match resolved with
+        | Error failure -> Task.FromResult(Failed(failure, [], [], [], []))
+        | Ok site -> useSite site
+
     /// Execute one js-* tool invocation under the three-state input protocol
     /// (PLAN S2 step 5). The `input` object carries one of:
     ///   { program: string }
@@ -848,29 +927,8 @@ module JsToolWorkflow =
         (fileAccessObservation: FileAccessObservation option)
         : Task<JsToolOutcome> =
         task {
-            let programText =
-                if isNull input then
-                    None
-                else
-                    match input?program with
-                    | null -> None
-                    | value -> Some(string value)
-
-            let unparkHandle =
-                if isNull input || isNull (input?unpark) then
-                    None
-                else
-                    let unpark = input?unpark
-                    Some(string (unpark?handle), unpark?value)
-
-            let abandonHandle =
-                if isNull input || isNull (input?abandon) then
-                    None
-                else
-                    Some(string ((input?abandon)?handle))
-
-            match programText with
-            | Some programSource ->
+            match parseWorkflowInvocation input with
+            | ToolWorkflowInvocation.Program programSource ->
                 return!
                     runProgramWithPark
                         sessionId
@@ -884,26 +942,18 @@ module JsToolWorkflow =
                         persistence
                         lifecyclePersistence
                         fileAccessObservation
-            | None ->
-                match unparkHandle with
-                | Some(handle, value) ->
-                    match JsParkedSites.tryFind handle with
-                    | None -> return Failed(JsFailure.HandleUnknown handle, [], [], [], [])
-                    | Some site ->
-                        // Record the Unparked audit trace (best-effort).
+            | ToolWorkflowInvocation.Unpark(handle, value) ->
+                return!
+                    dispatchResolvedParkedSite (resolveParkedSite handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Unparked handle sessionId
-                        return! unparkSite site value baseClassSource deadlineMs outputBoundBytes
-                | None ->
-                    match abandonHandle with
-                    | Some handle ->
-                        match JsParkedSites.tryFind handle with
-                        | None -> return Failed(JsFailure.HandleUnknown handle, [], [], [], [])
-                        | Some site ->
-                            // Record the Abandoned audit trace (best-effort).
-                            recordLifecycle lifecyclePersistence JsLifecycleEventType.Abandoned handle sessionId
-                            return! abandonSite site deadlineMs outputBoundBytes
-                    | None ->
-                        return Failed(JsFailure.InvalidArgument "no program, unpark, or abandon input", [], [], [], [])
+                        unparkSite site value baseClassSource deadlineMs outputBoundBytes)
+            | ToolWorkflowInvocation.Abandon handle ->
+                return!
+                    dispatchResolvedParkedSite (resolveParkedSite handle) (fun site ->
+                        recordLifecycle lifecyclePersistence JsLifecycleEventType.Abandoned handle sessionId
+                        abandonSite site deadlineMs outputBoundBytes)
+            | ToolWorkflowInvocation.Invalid ->
+                return Failed(JsFailure.InvalidArgument "no program, unpark, or abandon input", [], [], [], [])
         }
 
 /// JS-016: stable LLM-visible result shapes, rendered as Synthetic TOML

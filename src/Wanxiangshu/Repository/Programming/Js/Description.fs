@@ -1537,11 +1537,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             | "manager" when
                 Set.isSubset
                     capabilities
-                    (set
-                        [ JsCapability.Read
-                          JsCapability.Glob
-                          JsCapability.Fork
-                          JsCapability.Join ])
+                    (set [ JsCapability.Read; JsCapability.Glob; JsCapability.Fork; JsCapability.Join ])
                 && not (Set.isEmpty capabilities)
                 ->
                 Some(set [ JsCapability.Read; JsCapability.Glob ], prose.UltraManagerInvestigation)

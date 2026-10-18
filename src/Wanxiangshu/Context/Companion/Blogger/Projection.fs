@@ -6,8 +6,7 @@ open Wanxiangshu.Foundation
 /// COMPANION-005: what a frame is. There is no Seed: the parent LWR is a child's
 /// input context, never a frame of the child's own work log (COMPANION-003).
 [<RequireQualifiedAccess>]
-type BlogFrameKind =
-    | Entry
+type BlogFrameKind = | Entry
 
 type BlogFrame =
     {

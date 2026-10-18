@@ -1375,6 +1375,7 @@ module PluginTransforms =
                 match determineTransformMode branches projectionSessionIdOpt outObj with
                 | StrengthReplica runtime ->
                     projectionSessionIdOpt |> Option.iter branches.RegisterOwned
+
                     let physicalUserMessageId =
                         outObj
                         |> ProviderWireDecode.messagesFromTransformOutput

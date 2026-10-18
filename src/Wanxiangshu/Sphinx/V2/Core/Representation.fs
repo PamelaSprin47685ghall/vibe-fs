@@ -2,6 +2,7 @@ namespace Wanxiangshu.Sphinx.V2.Core
 
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
+open Wanxiangshu.Host
 
 module Representation =
     let private record fields = createObj fields

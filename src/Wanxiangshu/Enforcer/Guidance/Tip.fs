@@ -98,27 +98,60 @@ module EnforcerTipGuidance =
     /// Read the authored tip body for one committed cycle and verify its digest
     /// (Algorithm R2). None when the record is missing, carries no tip-text ref,
     /// or the read fails / digest mismatches — never a guessed body.
+    let private verifyTipBlobDigest
+        (record: EnforcementCycleRecord)
+        (expectedDigest: BlobDigest)
+        (readResult: Result<string, string>)
+        : string option =
+        match readResult with
+        | Ok text when HostDigest.sha256Hex text = BlobDigest.value expectedDigest -> Some text
+        | Ok _ ->
+            Diagnostic.emit
+                "tip-guidance-digest-mismatch"
+                [ "tip", record.TipName; "cycle", ProviderRunIdentity.value record.ProviderRun ]
+
+            None
+        | Error error ->
+            Diagnostic.emit
+                "tip-guidance-blob-read-failed"
+                [ "tip", record.TipName
+                  "cycle", ProviderRunIdentity.value record.ProviderRun
+                  "result", error ]
+
+            None
+
     let private tryReadTipBody (journal: AgentJournal) (record: EnforcementCycleRecord) : Task<string option> =
         task {
             match record.TipTextRef, record.TipTextDigest with
             | Some tipRef, Some tipDigest ->
-                match! journal.Writer.BlobWriter.Read tipRef with
-                | Ok text when HostDigest.sha256Hex text = BlobDigest.value tipDigest -> return Some text
-                | Ok _ ->
-                    Diagnostic.emit
-                        "tip-guidance-digest-mismatch"
-                        [ "tip", record.TipName; "cycle", ProviderRunIdentity.value record.ProviderRun ]
-
-                    return None
-                | Error error ->
-                    Diagnostic.emit
-                        "tip-guidance-blob-read-failed"
-                        [ "tip", record.TipName
-                          "cycle", ProviderRunIdentity.value record.ProviderRun
-                          "result", error ]
-
-                    return None
+                let! readResult = journal.Writer.BlobWriter.Read tipRef
+                return verifyTipBlobDigest record tipDigest readResult
             | _ -> return None
+        }
+
+    let private presentTipGuidance (tipName: string) (presentation: TipPresentation) (text: string) : TipGuidance =
+        { TipName = tipName
+          Presentation = presentation
+          Text = text }
+
+    let private presentResolvedTipBody
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        (lang: ProviderLanguage)
+        (occurrence: string)
+        (tipName: string)
+        (body: string option)
+        : Task<TipGuidance option> =
+        task {
+            match body with
+            | None ->
+                // G5: an occurrence without a recoverable authored body is
+                // identity-only; the frontier is never advanced by a fake Full.
+                return Some(presentTipGuidance tipName TipPresentation.IdentityOnly (tipIdentityText tipName))
+            | Some text ->
+                let fullText = tipFullText lang tipName text
+                do! recordFullTipDelivered journal mainSessionId tipName occurrence
+                return Some(presentTipGuidance tipName TipPresentation.Full fullText)
         }
 
     let private guidanceForRecord
@@ -134,58 +167,35 @@ module EnforcerTipGuidance =
             if isNull tipName || tipName.Trim().Length = 0 then
                 return None
             elif isTipIdentityOnly journal mainSessionId occurrence tipName then
-                let guidance: TipGuidance =
-                    { TipName = tipName
-                      Presentation = TipPresentation.IdentityOnly
-                      Text = tipIdentityText tipName }
-
-                return Some guidance
+                return Some(presentTipGuidance tipName TipPresentation.IdentityOnly (tipIdentityText tipName))
             else
                 let! body = tryReadTipBody journal record
-
-                match body with
-                | None ->
-                    // G5: an occurrence without a recoverable authored body is
-                    // identity-only; the frontier is never advanced by a fake Full.
-                    let guidance: TipGuidance =
-                        { TipName = tipName
-                          Presentation = TipPresentation.IdentityOnly
-                          Text = tipIdentityText tipName }
-
-                    return Some guidance
-                | Some text ->
-                    let fullText = tipFullText lang tipName text
-                    do! recordFullTipDelivered journal mainSessionId tipName occurrence
-
-                    let guidance: TipGuidance =
-                        { TipName = tipName
-                          Presentation = TipPresentation.Full
-                          Text = fullText }
-
-                    return Some guidance
+                return! presentResolvedTipBody journal mainSessionId lang occurrence tipName body
         }
+
+    let private tryFindLatestTipRecord
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        : (string * EnforcementCycleRecord) option =
+        (AgentJournal.snapshot journal).AgentProjections.Sessions
+        |> Map.tryFind mainSessionId
+        |> Option.bind (fun session -> session.Enforcement)
+        |> Option.bind (fun enforcement ->
+            EnforcementProjection.recentTips enforcement
+            |> List.tryLast
+            |> Option.bind (fun tip ->
+                let run = ProviderRunIdentity.create tip.CycleId
+
+                EnforcementProjection.tryFindByProviderRun run enforcement
+                |> Option.map (fun record -> tip.CycleId, record)))
 
     let private guidanceForOwner (journal: AgentJournal) (mainSessionId: SessionId) : Task<TipGuidance option> =
         task {
-            match
-                (AgentJournal.snapshot journal).AgentProjections.Sessions
-                |> Map.tryFind mainSessionId
-            with
+            match tryFindLatestTipRecord journal mainSessionId with
             | None -> return None
-            | Some session ->
-                match session.Enforcement with
-                | None -> return None
-                | Some enforcement ->
-                    match EnforcementProjection.recentTips enforcement |> List.tryLast with
-                    | None -> return None
-                    | Some tip ->
-                        let run = ProviderRunIdentity.create tip.CycleId
-
-                        match EnforcementProjection.tryFindByProviderRun run enforcement with
-                        | None -> return None
-                        | Some record ->
-                            let lang = SessionProviderLanguage.languageOf mainSessionId
-                            return! guidanceForRecord journal mainSessionId lang tip.CycleId record
+            | Some(occurrence, record) ->
+                let lang = SessionProviderLanguage.languageOf mainSessionId
+                return! guidanceForRecord journal mainSessionId lang occurrence record
         }
 
     /// Resolve Main tip guidance for the auto-injected marker tip half.

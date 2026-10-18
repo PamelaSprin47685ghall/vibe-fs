@@ -81,8 +81,7 @@ type BloggerMainRequestContext =
     member this.ObservedPrefixEpochId = this.StoredObservedPrefixEpochId
 
 [<RequireQualifiedAccess>]
-type BloggerRequestContext =
-    | Main of BloggerMainRequestContext
+type BloggerRequestContext = Main of BloggerMainRequestContext
 
 [<RequireQualifiedAccess>]
 type BloggerTerminalRequestOwnership =

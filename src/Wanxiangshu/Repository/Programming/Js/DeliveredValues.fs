@@ -30,28 +30,27 @@ module JsDeliveredValues =
         | true, value -> value
         | false, _ -> null
 
+    let private renderNonBlank (text: string) : string option =
+        if String.IsNullOrWhiteSpace text then None else Some text
+
+    let private renderStructured (structured: LlmFacing.Data.Value) : string option =
+        (LlmFacing.empty
+         |> LlmFacing.withData (LlmFacing.Data.structuredValue structured)
+         |> LlmFacing.render)
+            .TrimEnd('\n')
+        |> renderNonBlank
+
+    let private renderPresentValue (value: obj) : string option =
+        match LlmFacing.Data.ofJs value with
+        | LlmFacing.Data.Value.Null -> None
+        | LlmFacing.Data.Value.String text -> renderNonBlank text
+        | structured -> renderStructured structured
+
     let render (value: obj) : string option =
         if isNullOrUndefined value then
             None
         else
-            match LlmFacing.Data.ofJs value with
-            | LlmFacing.Data.Value.Null -> None
-            | LlmFacing.Data.Value.String text ->
-                if String.IsNullOrWhiteSpace text then
-                    None
-                else
-                    Some text
-            | structured ->
-                let rendered =
-                    (LlmFacing.empty
-                     |> LlmFacing.withData (LlmFacing.Data.structuredValue structured)
-                     |> LlmFacing.render)
-                        .TrimEnd('\n')
-
-                if String.IsNullOrWhiteSpace rendered then
-                    None
-                else
-                    Some rendered
+            renderPresentValue value
 
     let tryTakeRendered (sessionId: string) : string option = take sessionId |> render
 

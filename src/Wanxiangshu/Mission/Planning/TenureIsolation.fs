@@ -76,7 +76,11 @@ module TenureIsolation =
             messages
             |> List.choose (fun message ->
                 let cursor = physicalCursor messageCursors message
-                if keepMessage tenure cursor message then Some message.Raw else None)
+
+                if keepMessage tenure cursor message then
+                    Some message.Raw
+                else
+                    None)
 
         { Messages = kept
           ReanchorRequested = tenure.IsFreshHandover }

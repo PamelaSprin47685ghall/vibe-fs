@@ -542,8 +542,7 @@ type SyncDelegateRuntime
             | Error error ->
                 store.FailCall(call, sprintf "sync delegate terminal trace capture failed: %A" error)
                 return true
-            | Ok _ ->
-                return SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn
+            | Ok _ -> return SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn
         }
 
     /// Actual acceptance observers bind attempts to the concrete invocation

@@ -5,8 +5,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Projection
 
 [<RequireQualifiedAccess>]
-type CompanionRequestKind =
-    | Normal
+type CompanionRequestKind = | Normal
 
 type CompanionProjectedMessage =
     { MessageId: string

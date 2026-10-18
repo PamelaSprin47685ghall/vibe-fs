@@ -22,8 +22,27 @@ module PluginRecoveryWiring =
             Diagnostic.emit "lifecycle-work-recovery-refused" [ "work_id", workId; "reason", error.Message ]
             None
 
+    let private chooseRecoveredWork
+        (workId: string, result: Result<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option, string>)
+        =
+        match result with
+        | Ok(Some work) -> Some(SessionId.create workId, work)
+        | Ok None -> None
+        | Error reason ->
+            Diagnostic.emit "lifecycle-work-recovery-refused" [ "work_id", workId; "reason", reason ]
+            None
+
+    let private queryInspectedWorks stateRoot workIds =
+        try
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspectedMany stateRoot workIds
+            |> Array.choose chooseRecoveredWork
+        with error ->
+            Diagnostic.emit "lifecycle-work-recovery-refused" [ "workspace", stateRoot; "reason", error.Message ]
+            [||]
+
     let private inspectRecoveryWorks (journal: AgentJournal) (workspace: string option) =
-        let stateRoot = workspace |> Option.map RuntimePath.stateRoot |> Option.defaultValue ""
+        let stateRoot =
+            workspace |> Option.map RuntimePath.stateRoot |> Option.defaultValue ""
 
         if String.IsNullOrWhiteSpace stateRoot then
             [||]
@@ -33,18 +52,7 @@ module PluginRecoveryWiring =
                 |> Seq.map (fun (KeyValue(sessionId, _)) -> SessionId.value sessionId)
                 |> Seq.toArray
 
-            try
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspectedMany stateRoot workIds
-                |> Array.choose (fun (workId, result) ->
-                    match result with
-                    | Ok(Some work) -> Some(SessionId.create workId, work)
-                    | Ok None -> None
-                    | Error reason ->
-                        Diagnostic.emit "lifecycle-work-recovery-refused" [ "work_id", workId; "reason", reason ]
-                        None)
-            with error ->
-                Diagnostic.emit "lifecycle-work-recovery-refused" [ "workspace", stateRoot; "reason", error.Message ]
-                [||]
+            queryInspectedWorks stateRoot workIds
 
     let private isFlightActive
         (bloggerHost: IBloggerRuntimeHost)
@@ -260,7 +268,10 @@ module PluginRecoveryWiring =
             let sessions =
                 works
                 |> Array.choose (fun (sessionId, work) ->
-                    if work.PendingDelivery then Some(SessionId.value sessionId) else None)
+                    if work.PendingDelivery then
+                        Some(SessionId.value sessionId)
+                    else
+                        None)
 
             for workId in sessions do
                 do! recoverDeliveryWork gitCommonDir workId snapshotPort discoveryPort retirementBlockers

@@ -738,6 +738,15 @@ module ModelRouting =
                 commit demand target
                 true
 
+        let rejectSaturatedDemand (demand: ExecutionAdmissionDemand) =
+            match admissionQueue.TryTake demand.Node with
+            | Some pending ->
+                AsyncSupport.trySetResult pending.Node.Completion ExecutionAdmissionAcquisition.QueueFull
+                |> ignore
+
+                true
+            | None -> false
+
         let schedulePendingDemand (demand: ExecutionAdmissionDemand) =
             if hasTheoreticalCapacityLocked (Roles.roleLabel demand.Role) demand.Purpose then
                 routeFreshOrPoison
@@ -751,13 +760,7 @@ module ModelRouting =
                     demand.Purpose
                 |> commitScheduled demand
             else
-                match admissionQueue.TryTake demand.Node with
-                | Some pending ->
-                    AsyncSupport.trySetResult pending.Node.Completion ExecutionAdmissionAcquisition.QueueFull
-                    |> ignore
-
-                    true
-                | None -> false
+                rejectSaturatedDemand demand
 
         let rec drainDemands () =
             ensureHealthy ()

@@ -129,8 +129,7 @@ module BlogFrameSurface =
         |> BlogProjection.frames
         |> List.map (fun frame ->
             match frame.Kind with
-            | BlogFrameKind.Entry -> "Entry"
-        )
+            | BlogFrameKind.Entry -> "Entry")
         |> List.toArray
 
     let coverableFrameKinds (state: obj) : string array =
@@ -138,8 +137,7 @@ module BlogFrameSurface =
         |> BlogProjection.coverableFrames
         |> List.map (fun frame ->
             match frame.Kind with
-            | BlogFrameKind.Entry -> "Entry"
-        )
+            | BlogFrameKind.Entry -> "Entry")
         |> List.toArray
 
     let coverage (state: obj) : obj =

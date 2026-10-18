@@ -260,33 +260,37 @@ type PluginSessionScope
 
             do! attempt (fun () -> JsParkedSites.reapSession sessionId)
 
+            let recordReapedAudit (durable: IJsLifecyclePersistence) (handle: string) =
+                attempt (fun () ->
+                    task {
+                        let event: JsLifecycleEvent =
+                            { EventType = JsLifecycleEventType.Reaped
+                              Handle = handle
+                              SessionId = sessionId
+                              At = System.DateTimeOffset.UtcNow.ToString("o") }
+
+                        match! durable.AppendLifecycleEvent event with
+                        | Ok _ -> ()
+                        | Error failure ->
+                            raise (
+                                InvalidOperationException(
+                                    sprintf
+                                        "session close failed to record the Reaped audit event for handle %s: %A"
+                                        handle
+                                        failure
+                                )
+                            )
+                    })
+
+            let recordAllReapedAudits (durable: IJsLifecyclePersistence) =
+                task {
+                    for handle in reapedHandles do
+                        do! recordReapedAudit durable handle
+                }
+
             match jsLifecyclePersistence with
             | None -> ()
-            | Some durable ->
-                for handle in reapedHandles do
-                    do! attempt (fun () ->
-                        task {
-                            let event: JsLifecycleEvent =
-                                { EventType = JsLifecycleEventType.Reaped
-                                  Handle = handle
-                                  SessionId = sessionId
-                                  At = System.DateTimeOffset.UtcNow.ToString("o") }
-
-                            let! appended = durable.AppendLifecycleEvent event
-
-                            match appended with
-                            | Ok _ -> return ()
-                            | Error failure ->
-                                return
-                                    raise (
-                                        InvalidOperationException(
-                                            sprintf
-                                                "session close failed to record the Reaped audit event for handle %s: %A"
-                                                handle
-                                                failure
-                                        )
-                                    )
-                        })
+            | Some durable -> do! recordAllReapedAudits durable
 
             // managed-session-lifecycle-027: scope close cancels the retained
             // continuation inputs this session owns; the last cancellation

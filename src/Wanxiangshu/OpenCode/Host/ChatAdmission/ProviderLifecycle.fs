@@ -70,8 +70,7 @@ module ProviderLifecycle =
                         OpenBloggerRequest.providerRequestKind request
                         |> Result.map Some
                         |> Result.mapError ProviderStartObservationError.BloggerRequestKindUnsupported
-                | None, Some(ProviderRequestKind.BloggerMain as established) ->
-                    return Some established
+                | None, Some(ProviderRequestKind.BloggerMain as established) -> return Some established
                 | None, None when execution.terminalDisposition.IsSome -> return None
                 | None, _ ->
                     return!

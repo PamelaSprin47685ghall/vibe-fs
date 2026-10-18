@@ -126,6 +126,7 @@ module HostSignalBootstrap =
                         None,
                         Some(fun sessionId outcome -> eventPort.NotifyTerminal sessionId outcome |> ignore)
                     )
+
                 scope.AttachChatRecoveryRuntime recovery
 
                 scope.AttachDurabilityActivation(fun () ->
@@ -601,8 +602,7 @@ module HostSignalBootstrap =
                                         | Error _ -> ()
 
                                         return settled
-                                    } }
-                )
+                                    } })
 
             // 本机持久化不安装 Git hooks，不改 SSH 配置，不发布运行状态 refs。
             let requireDurabilityActivation () = scope.ActivateDurability()
@@ -676,6 +676,11 @@ module HostSignalBootstrap =
 
             let continueUnmanagedChatMessage () = requireDurabilityActivation ()
 
+            let requireQuestionSettled (resumed: Result<unit, string>) =
+                match resumed with
+                | Ok() -> ()
+                | Error reason -> invalidOp ("Could not settle the user question: " + reason)
+
 
             let continueManagedChatMessage intent output =
                 match intent with
@@ -718,15 +723,16 @@ module HostSignalBootstrap =
                         | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence -> Some evidence.Key
                         | _ -> None
 
-                    match journal, humanInput with
-                    | Some durable, Some key ->
+                    let maybePair =
+                        match journal, humanInput with
+                        | Some durable, Some key -> Some(durable, key)
+                        | _ -> None
+
+                    for durable, key in Option.toList maybePair do
                         let! resumed =
                             UserQuestionJournal.observeHumanInput durable key.SessionId key.PhysicalUserMessageId
 
-                        match resumed with
-                        | Ok() -> ()
-                        | Error reason -> invalidOp ("Could not settle the user question: " + reason)
-                    | _ -> ()
+                        resumed |> requireQuestionSettled
 
                     requireDurabilityActivation ()
                 }

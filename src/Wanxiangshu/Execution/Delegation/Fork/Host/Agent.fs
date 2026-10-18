@@ -78,13 +78,7 @@ module HostForkAgent =
         Task.FromResult(
             Ok(
                 requirements,
-                ForkChildPayload.relay
-                    (forkInstructions runtime.ParentId)
-                    prompt
-                    None
-                    None
-                    requirements
-                    payload
+                ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt None None requirements payload
             )
         )
 
@@ -137,8 +131,7 @@ module HostForkAgent =
 
             match sent with
             | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
-                let run =
-                    runtime.InstallRun(agentId, childId, role, authorityRoot)
+                let run = runtime.InstallRun(agentId, childId, role, authorityRoot)
 
                 let result =
                     runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
@@ -189,15 +182,7 @@ module HostForkAgent =
 
                 return Ok(ForkResult.Created agentId)
             else
-                return!
-                    sendFirstPromptAndInstallRun
-                        runtime
-                        agentId
-                        role
-                        agentName
-                        identitySeed
-                        enrichedPrompt
-                        childId
+                return! sendFirstPromptAndInstallRun runtime agentId role agentName identitySeed enrichedPrompt childId
         }
 
     let private afterLinkage
@@ -366,15 +351,7 @@ module HostForkAgent =
         | true, _, _ -> Task.FromResult(Error "Parent cancellation is in progress")
         | false, Some true, _ -> Task.FromResult(Error(sprintf "RetiredHandle: %s" agentId))
         | false, _, Some childId ->
-            forkExistingChild
-                runtime
-                agentId
-                childId
-                role
-                prompt
-                enrichedPrompt
-                isFirstPrompt
-                expectedToolCalls
+            forkExistingChild runtime agentId childId role prompt enrichedPrompt isFirstPrompt expectedToolCalls
         | false, _, None ->
             forkNewChild
                 runtime
@@ -398,9 +375,7 @@ module HostForkAgent =
         match renderedPrompt with
         | Some rendered -> Task.FromResult(Some rendered)
         | None ->
-            Task.FromResult(
-                Some(ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt None None [] None)
-            )
+            Task.FromResult(Some(ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt None None [] None))
 
     let private reuseWithManagedAgent
         (runtime: HostForkRuntime)
@@ -449,18 +424,10 @@ module HostForkAgent =
                         enriched
         }
 
-    let private interpretDevOpsFirstSent
-        (runtime: HostForkRuntime)
-        agentId
-        childId
-        role
-        agentName
-        sent
-        =
+    let private interpretDevOpsFirstSent (runtime: HostForkRuntime) agentId childId role agentName sent =
         match sent with
         | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
-            let run =
-                runtime.InstallRun(agentId, childId, role, authorityRoot)
+            let run = runtime.InstallRun(agentId, childId, role, authorityRoot)
 
             let result =
                 runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
@@ -553,37 +520,13 @@ module HostForkAgent =
                 do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
 
                 return!
-                    reuseWithManagedAgent
-                        runtime
-                        agentId
-                        childId
-                        Role.DevOps
-                        agentName
-                        prompt
-                        renderedPrompt
-                        wasDormant
+                    reuseWithManagedAgent runtime agentId childId Role.DevOps agentName prompt renderedPrompt wasDormant
             | _, None when isDevOpsHandle ->
-                return!
-                    sendDevOpsFirstPrompt
-                        runtime
-                        agentId
-                        childId
-                        prompt
-                        renderedPrompt
-                        expectedToolCalls
+                return! sendDevOpsFirstPrompt runtime agentId childId prompt renderedPrompt expectedToolCalls
             | Some role, Some agentName ->
                 do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
 
-                return!
-                    reuseWithManagedAgent
-                        runtime
-                        agentId
-                        childId
-                        role
-                        agentName
-                        prompt
-                        renderedPrompt
-                        wasDormant
+                return! reuseWithManagedAgent runtime agentId childId role agentName prompt renderedPrompt wasDormant
             | None, _ -> return Error(sprintf "Unknown agent id: %s" agentId)
             | _, None -> return Error(sprintf "Agent handle '%s' has no active managed agent identity" agentId)
         }
@@ -688,12 +631,8 @@ module HostForkAgent =
             }
 
         member this.Reuse
-            (
-                agentId: string,
-                prompt: string,
-                ?renderedPrompt: string,
-                ?expectedToolCalls: int
-            ) : Task<Result<ForkResult, string>> =
+            (agentId: string, prompt: string, ?renderedPrompt: string, ?expectedToolCalls: int)
+            : Task<Result<ForkResult, string>> =
             task {
                 // GREEN-4: recovery ownership is SessionRecoveryWorkflow only.
                 // After join retires the prior work unit, reuse of the same
@@ -715,15 +654,7 @@ module HostForkAgent =
                 | false, _, Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                 | false, _, _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
                 | false, _, _, Some(childId, wasDormant) ->
-                    return!
-                        reuseLiveChild
-                            this
-                            agentId
-                            childId
-                            wasDormant
-                            prompt
-                            renderedPrompt
-                            expectedToolCalls
+                    return! reuseLiveChild this agentId childId wasDormant prompt renderedPrompt expectedToolCalls
             }
 
         member this.ActiveGuidanceProfile(agentId: string) =

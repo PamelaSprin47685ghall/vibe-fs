@@ -54,7 +54,7 @@ module SessionSnapshotPort =
         if isNull value then
             "null"
         else
-            Wanxiangshu.Foundation.CanonicalJson.canonicalJson value
+            Wanxiangshu.Host.CanonicalJson.canonicalJson value
 
     let private isToolKind (kind: string) =
         kind = "tool"

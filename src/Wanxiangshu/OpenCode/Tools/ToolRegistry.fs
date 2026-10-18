@@ -237,14 +237,7 @@ module ToolRegistry =
             | Some role when officeAdmission ctx role ->
                 return! executeAdmittedRole gate spec managerPermission args ctx role
             | Some role -> return denyRole ctx spec.Name role
-            | None ->
-                return
-                    denied
-                        ctx
-                        spec.Name
-                        Path.DeniedUnestablished
-                        Map.empty
-                        None
+            | None -> return denied ctx spec.Name Path.DeniedUnestablished Map.empty None
         }
 
     /// capability-enforcement-006: the attachment IS the authority. Resolving a
@@ -391,6 +384,52 @@ module ToolRegistry =
     [<Emit("typeof $0 === 'string'")>]
     let private isStringValue (value: obj) : bool = jsNative
 
+    let private recordParkStack (state: Wanxiangshu.Process.JsSandbox.ParkState) (stack: obj) =
+        if not (isNull stack) then
+            state.ParkStack <- string stack
+
+    let private finishPlanAskOutcome
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        (text: string)
+        (stack: obj)
+        (asked: Result<unit, string>)
+        =
+        match asked with
+        | Ok() ->
+            recordParkStack state stack
+            Wanxiangshu.Process.JsSandbox.suspendProgram state (createObj [ "question" ==> text ])
+        | Error reason ->
+            let failure = JsFailure.AskRefused reason
+            rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
+
+    let private performPlanAsk
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        (invoke: string -> Task<Result<unit, string>>)
+        (text: string)
+        (stack: obj)
+        : Task<obj> =
+        task {
+            if System.String.IsNullOrWhiteSpace text then
+                let failure = JsFailure.InvalidArgument "ask requires a question"
+                return rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
+            else
+                let! asked = invoke text
+                return finishPlanAskOutcome state text stack asked
+        }
+
+    let private handlePlanAsk
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        (invoke: string -> Task<Result<unit, string>>)
+        (question: obj)
+        (stack: obj)
+        : obj =
+        if state.AbandonRequested then
+            rejectedJsFailure
+                (JsFailure.code JsFailure.CannotParkWhileAbandoning)
+                (JsFailure.reason JsFailure.CannotParkWhileAbandoning)
+        else
+            performPlanAsk state invoke (string question) stack |> box
+
     let private createPlanSandboxApi
         (currentContent: string)
         (stagedMutation: string option ref)
@@ -408,35 +447,7 @@ module ToolRegistry =
             match parkState, askInvoke with
             | Some state, Some invoke ->
                 [ "ask"
-                  ==> fun (question: obj) (stack: obj) ->
-                      if state.AbandonRequested then
-                          rejectedJsFailure
-                              (JsFailure.code JsFailure.CannotParkWhileAbandoning)
-                              (JsFailure.reason JsFailure.CannotParkWhileAbandoning)
-                      else
-                          task {
-                              let text = string question
-
-                              if System.String.IsNullOrWhiteSpace text then
-                                  let failure = JsFailure.InvalidArgument "ask requires a question"
-                                  return rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
-                              else
-                                  let! asked = invoke text
-
-                                  match asked with
-                                  | Ok() ->
-                                      if not (isNull stack) then
-                                          state.ParkStack <- string stack
-
-                                      return
-                                          Wanxiangshu.Process.JsSandbox.suspendProgram
-                                              state
-                                              (createObj [ "question" ==> text ])
-                                  | Error reason ->
-                                      let failure = JsFailure.AskRefused reason
-                                      return rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
-                          }
-                          |> box ]
+                  ==> fun (question: obj) (stack: obj) -> handlePlanAsk state invoke question stack ]
             | _ -> []
 
         createObj [ "js" ==> createObj (members @ askMembers) ]
@@ -564,8 +575,7 @@ module ToolRegistry =
         (jsTransactionPersistence: IJsTransactionPersistence option)
         (jsLifecyclePersistence: IJsLifecyclePersistence option)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
-        (childWorkRecordForRun:
-            (SessionId -> ProviderRunIdentity -> Task<string option>) option)
+        (childWorkRecordForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) option)
         (userNotify: (string -> string -> unit) option)
         =
         let factory = ToolHostCodec.factory toolModule
@@ -628,8 +638,7 @@ module ToolRegistry =
                 { spec with
                     Execute =
                         fun args ctx ->
-                            let envelopeOk (fields: (string * obj) list) : obj =
-                                createObj (("ok" ==> true) :: fields)
+                            let envelopeOk (fields: (string * obj) list) : obj = createObj (("ok" ==> true) :: fields)
 
                             let refusal (code: string) : obj =
                                 createObj [ "ok" ==> false; "code" ==> code ]
@@ -674,9 +683,10 @@ module ToolRegistry =
 
                                                     envelopeOk
                                                         [ "records" ==> (records |> List.map toObj |> Array.ofList)
-                                                          "byName" ==>
-                                                            createObj
-                                                                [ for record in records -> record.Name ==> box (toObj record) ] ]
+                                                          "byName"
+                                                          ==> createObj
+                                                                  [ for record in records ->
+                                                                        record.Name ==> box (toObj record) ] ]
                                                 | Error code -> refusal code
                                         }
                                   Fission =
@@ -693,13 +703,13 @@ module ToolRegistry =
                                                 | Ok group ->
                                                     envelopeOk
                                                         [ "groupId" ==> group.GroupId
-                                                          "lanes" ==>
-                                                            (group.Lanes
-                                                             |> List.map (fun (index, sessionId) ->
-                                                                 createObj
-                                                                     [ "index" ==> index
-                                                                       "sessionId" ==> sessionId ])
-                                                             |> Array.ofList) ]
+                                                          "lanes"
+                                                          ==> (group.Lanes
+                                                               |> List.map (fun (index, sessionId) ->
+                                                                   createObj
+                                                                       [ "index" ==> index
+                                                                         "sessionId" ==> sessionId ])
+                                                               |> Array.ofList) ]
                                                 | Error code -> refusal code
                                         } }
 
@@ -751,6 +761,22 @@ module ToolRegistry =
         let planBaseClassSource () =
             JsCanonicalDescription.runtimePlanBaseClass jsProse
 
+        let resolveHasReviewed (planGitCommonDir: string option) (sessionId: string) : bool =
+            planGitCommonDir
+            |> Option.bind (fun gitCommonDir -> resolveActiveTenure gitCommonDir sessionId |> Result.toOption)
+            |> Option.defaultValue false
+
+        let commitOrRenderPlanOutcome root sessionId hasReviewed stagedMutation value outcome =
+            match stagedMutation with
+            | None -> JsToolsResult.render outcome
+            | Some _ -> commitPlanMutation root sessionId hasReviewed stagedMutation value
+
+        let finishPlanOutcome root sessionId hasReviewed stagedMutation outcome =
+            match outcome with
+            | JsToolWorkflow.JsToolOutcome.Succeeded(value, _, _, _, _) ->
+                commitOrRenderPlanOutcome root sessionId hasReviewed stagedMutation value outcome
+            | _ -> JsToolsResult.render outcome
+
         let executePlanProgramWithPark (root: string) (ctx: HostToolContext) (programSource: string) : Task<string> =
             task {
                 let currentContent =
@@ -780,22 +806,25 @@ module ToolRegistry =
                         (now + int64 planDeadlineMs)
                         planOutputBoundBytes
 
-                match outcome with
-                | JsToolWorkflow.JsToolOutcome.Succeeded(value, _, _, _, _) ->
-                    let hasReviewed =
-                        match planGitCommonDir with
-                        | Some gitCommonDir ->
-                            match resolveActiveTenure gitCommonDir ctx.SessionId with
-                            | Ok reviewed -> reviewed
-                            | Error _ -> false
-                        | None -> false
-
-                    return
-                        match stagedMutation.Value with
-                        | None -> JsToolsResult.render outcome
-                        | Some _ -> commitPlanMutation root ctx.SessionId hasReviewed stagedMutation.Value value
-                | _ -> return JsToolsResult.render outcome
+                let hasReviewed = resolveHasReviewed planGitCommonDir ctx.SessionId
+                return finishPlanOutcome root ctx.SessionId hasReviewed stagedMutation.Value outcome
             }
+
+        let executePlanProgramRoute (root: string option) (ctx: HostToolContext) (source: string) : Task<string> =
+            match root with
+            | Some rootDir -> executePlanProgramWithPark rootDir ctx source
+            | None ->
+                Task.FromResult(
+                    JsToolsResult.render (
+                        JsToolWorkflow.JsToolOutcome.Failed(
+                            JsFailure.ProgramFailed "The plan workspace is unavailable",
+                            [],
+                            [],
+                            [],
+                            []
+                        )
+                    )
+                )
 
         let executeJsPlanTool (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
             task {
@@ -809,20 +838,7 @@ module ToolRegistry =
                 let abandon = if isNull (args.Raw?abandon) then null else args.Raw?abandon
 
                 match program, unpark, abandon with
-                | Some source, _, _ ->
-                    match planRoot with
-                    | Some root -> return! executePlanProgramWithPark root ctx source
-                    | None ->
-                        return
-                            JsToolsResult.render (
-                                JsToolWorkflow.JsToolOutcome.Failed(
-                                    JsFailure.ProgramFailed "The plan workspace is unavailable",
-                                    [],
-                                    [],
-                                    [],
-                                    []
-                                )
-                            )
+                | Some source, _, _ -> return! executePlanProgramRoute planRoot ctx source
                 | None, unparkValue, _ when not (isNull unparkValue) ->
                     let! outcome =
                         JsToolWorkflow.resumeParked
@@ -1210,7 +1226,10 @@ module ToolRegistry =
                 ToolHostCodec.objectSchemaOf
                     [ "prefixUntil", ToolHostCodec.optionalNumberSchema factory
                       "extra",
-                      ToolHostCodec.arraySchemaOf (ToolHostCodec.anySchema factory) (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ())) factory ]
+                      ToolHostCodec.arraySchemaOf
+                          (ToolHostCodec.anySchema factory)
+                          (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
+                          factory ]
                     factory
 
             [ { Name = "todowrite-for-plan"
@@ -1273,6 +1292,11 @@ module ToolRegistry =
             let sequenceOf (ctx: HostToolContext) : string list option =
                 lifecycleWorkOf runtime ctx.SessionId |> Option.map (fun work -> work.Sequence)
 
+            let executeDeliverRoute (ctx: HostToolContext) (args: HostToolArguments) : Task<string> =
+                match sequenceOf ctx with
+                | Some [ "S1"; "S2"; "S3" ] -> planSpec.Execute args ctx
+                | _ -> managerSpec.Execute args ctx
+
             { managerSpec with
                 Admission =
                     ToolAdmission.OfficeRole(fun _ role ->
@@ -1301,9 +1325,7 @@ module ToolRegistry =
                                         [ "code", ToolHostCodec.TString Path.DeliverBlockedByParked
                                           "parked_handles", ToolHostCodec.TString handles ]
                             else
-                                match sequenceOf ctx with
-                                | Some [ "S1"; "S2"; "S3" ] -> return! planSpec.Execute args ctx
-                                | _ -> return! managerSpec.Execute args ctx
+                                return! executeDeliverRoute ctx args
                         } }
 
         let baseSpecs =

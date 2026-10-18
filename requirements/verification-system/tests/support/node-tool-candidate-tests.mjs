@@ -10,6 +10,7 @@ import { pipeline } from 'node:stream/promises'
 import test from 'node:test'
 import { create } from 'tar'
 import { fixturePhase } from './fixture-phase.mjs'
+import { firstMissingNpmProductionLibrary } from '../../../../scripts/lib/verification-node-tools.mjs'
 
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex')
 const prepareTools = async options => {
@@ -25,6 +26,7 @@ function selectedNpmRoot() {
   const candidates = process.env.WXS_VERIFICATION_NPM_CLI
     ? [process.env.WXS_VERIFICATION_NPM_CLI]
     : [path.join(path.dirname(process.execPath), 'npm'), ...String(process.env.PATH ?? '').split(path.delimiter).map(directory => path.join(directory, 'npm'))]
+  let lastFailure
   for (const candidate of candidates) {
     let cli
     try {
@@ -33,12 +35,30 @@ function selectedNpmRoot() {
       if (error.code === 'ENOENT') continue
       throw error
     }
-    if (path.basename(cli) !== 'npm-cli.js') continue
+    if (path.basename(cli) !== 'npm-cli.js') {
+      lastFailure = `Candidate ${candidate} realpath basename is not npm-cli.js: ${cli}`
+      continue
+    }
     const root = path.resolve(cli, '../..')
-    assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'package.json'))).name, 'npm')
+    let manifest
+    try {
+      manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+    } catch (error) {
+      lastFailure = `Candidate ${candidate} package manifest error: ${error.message}`
+      continue
+    }
+    if (manifest?.name !== 'npm') {
+      lastFailure = `Candidate ${candidate} package manifest name is not npm`
+      continue
+    }
+    const missing = firstMissingNpmProductionLibrary(root)
+    if (missing) {
+      lastFailure = missing.message
+      continue
+    }
     return root
   }
-  throw new Error('The selected bundle fixture requires a complete available npm package')
+  throw new Error('The selected bundle fixture requires a complete available npm package' + (lastFailure ? `: ${lastFailure}` : ''))
 }
 
 async function archiveTools(root) {

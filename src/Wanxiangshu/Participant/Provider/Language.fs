@@ -66,7 +66,8 @@ module ProviderLanguage =
             ProviderLanguage.English
 
     let tryParse (raw: string) : ProviderLanguage option =
-        let found: obj = library()?tryParseLanguage (raw)
+        let lib = library ()
+        let found: obj = lib?tryParseLanguage (raw)
 
         if isNull found then
             None
@@ -74,12 +75,19 @@ module ProviderLanguage =
             Some(ofExternalName (unbox<string> found))
 
     let parse (raw: string) : ProviderLanguage =
-        ofExternalName (unbox<string> (library()?parseLanguage raw))
+        let lib = library ()
+        ofExternalName (unbox<string> (lib?parseLanguage raw))
 
     let private observation (value: string option) : obj =
         match value with
         | Some raw -> box raw
         | None -> null
+
+    let private decodePreferenceResult (resolved: obj) : Result<ProviderLanguage, string> =
+        if unbox<bool> resolved?ok then
+            Ok(ofExternalName (unbox<string> resolved?value))
+        else
+            Error(unbox<string> resolved?error)
 
     /// The sole policy for interpreting the raw provider-language preference.
     let fromPreferenceObservation (observation: string option) : Result<ProviderLanguage, string> =
@@ -87,12 +95,9 @@ module ProviderLanguage =
         | None -> Ok ProviderLanguage.English
         | Some raw when String.IsNullOrWhiteSpace raw -> Ok ProviderLanguage.English
         | Some raw ->
-            let resolved: obj = library()?resolvePreference(raw, null, null, null, null)
-
-            if unbox<bool> resolved?ok then
-                Ok(ofExternalName (unbox<string> resolved?value))
-            else
-                Error(unbox<string> resolved?error)
+            let lib = library ()
+            let resolved: obj = lib?resolvePreference (raw, null, null, null, null)
+            decodePreferenceResult resolved
 
     /// Resolves global preference through the normative preference ladder:
     /// 1. Explicit environment variable (WANXIANGSHU_PROVIDER_LANGUAGE)
@@ -106,18 +111,18 @@ module ProviderLanguage =
         (posixLocale: string option)
         (intlLocale: string option)
         : Result<ProviderLanguage, string> =
+        let lib = library ()
+
         let resolved: obj =
-            library()?resolvePreference(
+            lib?resolvePreference (
                 observation explicit,
                 observation hostConfig,
                 observation vscodeNls,
                 observation posixLocale,
-                observation intlLocale)
+                observation intlLocale
+            )
 
-        if unbox<bool> resolved?ok then
-            Ok(ofExternalName (unbox<string> resolved?value))
-        else
-            Error(unbox<string> resolved?error)
+        decodePreferenceResult resolved
 
     /// HOST-026: child / attached / InternalLeaf language = owner | commissioner.
     let inheritFrom (owner: ProviderLanguage) : ProviderLanguage = owner
@@ -129,10 +134,12 @@ module GlobalProviderLanguage =
     /// Every Class A render reads it, so changing the setting changes the
     /// language of the next request even mid-session.
     let refresh (resolve: unit -> ProviderLanguage) : unit =
-        library()?refreshGlobalLanguage(fun () -> ProviderLanguage.externalName (resolve ()))
+        let lib = library ()
+        lib?refreshGlobalLanguage (fun () -> ProviderLanguage.externalName (resolve ()))
 
     let current () : ProviderLanguage =
-        let name: string = library()?currentGlobalLanguage ()
+        let lib = library ()
+        let name: string = lib?currentGlobalLanguage ()
 
         if name = "SimplifiedChinese" then
             ProviderLanguage.SimplifiedChinese

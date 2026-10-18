@@ -13,11 +13,7 @@ module PlanningSurface =
 
         unbox<int64> value
 
-    let assembleTenureMessages
-        (messages: obj)
-        (tenureObj: obj)
-        (messageCursors: obj)
-        : obj =
+    let assembleTenureMessages (messages: obj) (tenureObj: obj) (messageCursors: obj) : obj =
         let tenure =
             { WorkId = unbox<string> tenureObj?workId
               IncumbencyId = unbox<string> tenureObj?incumbencyId

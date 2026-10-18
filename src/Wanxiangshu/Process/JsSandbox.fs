@@ -301,6 +301,34 @@ module JsSandbox =
     let resetDeadline (handle: JsRunHandle) (deadlineEpochMs: int64) : unit =
         setDeadline handle.DeadlineRef deadlineEpochMs
 
+    let private extractFrameDigits (frame: string) : string option =
+        let marker = "evalmachine.<anonymous>:"
+        let at = frame.IndexOf marker
+
+        if at < 0 then
+            None
+        else
+            let rest = frame.Substring(at + marker.Length)
+            let colon = rest.IndexOf ':'
+            Some(if colon >= 0 then rest.Substring(0, colon) else rest)
+
+    let private parseModelLine (modelStartLine: int) (modelEndLine: int) (digits: string) : int option =
+        match System.Int32.TryParse digits with
+        | true, line when line >= modelStartLine && line <= modelEndLine -> Some(line - modelStartLine)
+        | _ -> None
+
+    let private tryResolveFrameLine (modelStartLine: int) (modelEndLine: int) (frame: string) : int option =
+        extractFrameDigits frame
+        |> Option.bind (parseModelLine modelStartLine modelEndLine)
+
+    let private locateSuspendedLine (modelStartLine: int) (modelEndLine: int) (stack: string) : int =
+        if isNull stack then
+            -1
+        else
+            stack.Split('\n')
+            |> Array.tryPick (tryResolveFrameLine modelStartLine modelEndLine)
+            |> Option.defaultValue -1
+
     /// Render the full model program with the suspended line marked. The
     /// wrapper places line 1 at `(async () => {`, the generated base class
     /// next, then the model source; `modelStartLine` is the base class line
@@ -314,24 +342,7 @@ module JsSandbox =
         // `const js = api.js;` prelude and the optional JsRunnable bind.
         let modelStartLine = baseClassSource.Split('\n').Length + 4
         let modelEndLine = modelStartLine + lines.Length - 1
-        // DSL-MUTABLE: algorithm-scratch — innermost model stack frame
-        let mutable currentLine = -1
-
-        if not (isNull stack) then
-            for frame in stack.Split('\n') do
-                if currentLine < 0 then
-                    let marker = "evalmachine.<anonymous>:"
-                    let at = frame.IndexOf marker
-
-                    if at >= 0 then
-                        let rest = frame.Substring(at + marker.Length)
-                        let colon = rest.IndexOf ':'
-                        let digits = if colon >= 0 then rest.Substring(0, colon) else rest
-
-                        match System.Int32.TryParse digits with
-                        | true, line when line >= modelStartLine && line <= modelEndLine ->
-                            currentLine <- line - modelStartLine
-                        | _ -> ()
+        let currentLine = locateSuspendedLine modelStartLine modelEndLine stack
 
         lines
         |> Array.mapi (fun index line -> (if index = currentLine then ">| " else " | ") + line)

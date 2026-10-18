@@ -37,8 +37,5 @@ module HostForkAgent =
                 Task<Result<ForkResult, string>>
 
         member Reuse:
-            agentId: string *
-            prompt: string *
-            ?renderedPrompt: string *
-            ?expectedToolCalls: int ->
+            agentId: string * prompt: string * ?renderedPrompt: string * ?expectedToolCalls: int ->
                 Task<Result<ForkResult, string>>

@@ -95,8 +95,7 @@ module CompanionProjectionSurface =
                text = message.Text
                physical = message.IsPhysical |}
 
-    let private planKind (_value: obj) : CompanionRequestKind =
-        CompanionRequestKind.Normal
+    let private planKind (_value: obj) : CompanionRequestKind = CompanionRequestKind.Normal
 
     type private ProjectionInput =
         { BloggerSessionId: SessionId

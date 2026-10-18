@@ -3,8 +3,7 @@ namespace Wanxiangshu.Mission.Planning
 open System.Threading.Tasks
 
 module PlanningSurface =
-    val assembleTenureMessages:
-        messages: obj -> tenureObj: obj -> messageCursors: obj -> obj
+    val assembleTenureMessages: messages: obj -> tenureObj: obj -> messageCursors: obj -> obj
 
     val validateWorkId: workId: string -> obj
     val canonicalWorkKey: workId: string -> obj

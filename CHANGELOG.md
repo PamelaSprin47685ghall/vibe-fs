@@ -1,5 +1,15 @@
 # Changelog — 版本历史
 
+## Unreleased — 全仓质量门归零：金字塔门 160 处压平、架构门两桥迁移、npm 夹具自包含选择
+
+- **控制金字塔门归零（160 处 / 32 文件）**：按 `scripts/checks/fsharp-control-pyramid-guide.mjs` 修复手册逐处压平嵌套决策——提取有真实职责的命名决策（如 `classifyRemoveError`、`decidePortProbe`、`chooseWorkRecord`、`settleExecutionOutcome`），Result/Option 机械传播改用 `result`/`option` CE，Fable `task` CE 不支持的「条件早退」改为显式分支或拆分为两段函数；`fsharp-control-pyramid-baseline.json` 保持空表（零债），未使用任何缩进/改名/注释类规避。全仓 scanner 复扫 0 命中。
+- **架构门归零**：`Foundation/CanonicalJson.fs(.fsi)` 迁至 `Host/CanonicalJson.fs(.fsi)`（命名空间 `Wanxiangshu.Foundation` → `Wanxiangshu.Host`，与 `Host/Digest.fs` 同域的 runtime-platform 桥惯例一致）；14 处消费者与 `compile-order.txt`、owner fsproj 的 Compile 路径同步，fsproj 文件名保持不变。`Foundation/GlobMatch.fs(.fsi)` 全仓零消费者（与 `JsGlobFs` 同桥冗余），连同其 owner fsproj、compile-order 条目与 `repository-programming-js-filesystem.fsproj` 的 ProjectReference 一并删除。
+- **消融门归零**：`resources/ablation/tool-map.json` 删除 7 条已退役直连工具（`read`/`write`/`edit`/`glob`/`grep`/`mv`/`rm`）的陈旧映射；`AblationToolMap.tryNode` 对未知工具的既有语义（无人认领即不拒绝）不变。
+- **npm 夹具自包含选择**：`verification-node-tools.mjs` 抽出可复用的声明生产依赖闭包检查 `firstMissingNpmProductionLibrary`/`assertSelfContainedNpmRoot`；`node-tool-candidate-tests.mjs` 与 `npm-install-fixture.mjs` 的候选 npm 选择改为「首个自包含安装」——本机 Arch 系统 npm（`@npmcli/fs` 声明 `semver` 但未随包分发）被跳过，`verification-system-016` 的 16 项夹具失败全部修复。
+- **fantomas 兼容**：`Prose.fs`/`ProviderResources.fs` 的 `resources()?method(...)`（函数应用接动态调用）是 fantomas 6.3.0 的解析死角，改为先绑定 `let api = resources ()` 再调用；全仓 37 个存量未格式化文件一次格式化，`format:check` 由红转绿。
+- **结构断言同步**（重构等价，非语义变更）：`repository-programming-031`（deliver 分派形态）、`repository-programming-041`（Parked 审计调用形态 `site.Handle site.SessionId`）、`structured-workflow-011`（CanonicalJson 新路径）三处源码结构正则随重构更新；`JsRunLoop`/`ToolsBindings` 的 `// DSL-MUTABLE:` 标注随重写恢复（structured-workflow-005 扫描 0 违规）。
+- **证据**：`node scripts/build.mjs` 绿（generation 291）；`node scripts/check.mjs` exit 0（20 门全绿）；`npm run format:check` 绿；全量 unit 套件 **865 文件 / 5113 passed / 0 failed / 114 skipped / 337 todo**；定向回归（repository-programming 031/041、structured-workflow 005/011、verification-system 016）**316 passed / 0 failed**。集成层（integration tier）既有红未随本批修复：18 项失败分属四簇——`.git` 旧根夹具（change-integration-002、crash-reconciliation-020、harness）、`WriterStreamSync.fs` 陈旧引用（durable-events-009）、rulebook 打包夹具缺 `wanxiangli` 解析（behavior-diagnosis-002/005、guidance-delivery-008）、以及需要固定 Host 版本的 canary（本机 opencode 1.19.0 vs `package.json` 固定 1.18.29），另 package 组独立失败；以上不属本批回归，另行立案。
+
 ## Unreleased — JS 工具当前工作区构建恢复
 
 - 补齐实现已有但签名遗漏的 `Prose.Rm/Mv`、对应资源路径与 `JsFailure.Abandoned`，不回退 rm/mv 或 abandon 功能。

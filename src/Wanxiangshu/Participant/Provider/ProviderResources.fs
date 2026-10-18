@@ -52,17 +52,23 @@ module ProviderResources =
         instance
 
     let relativePath (language: ProviderLanguage) (semanticPath: string) : string =
-        resources()?relativePath(ProviderLanguage.externalName language, semanticPath)
+        let api = resources ()
+        api?relativePath (ProviderLanguage.externalName language, semanticPath)
 
     let exists (language: ProviderLanguage) (semanticPath: string) : bool =
-        resources()?exists(ProviderLanguage.externalName language, semanticPath)
+        let api = resources ()
+        api?exists (ProviderLanguage.externalName language, semanticPath)
 
     let readText (language: ProviderLanguage) (semanticPath: string) : string =
-        resources()?readText(ProviderLanguage.externalName language, semanticPath)
+        let api = resources ()
+        api?readText (ProviderLanguage.externalName language, semanticPath)
 
     /// ARCH-016 Gate C hook: both locale leaves must exist for a semantic path.
     let requireLanguagePair (semanticPath: string) : unit =
-        resources()?requireLanguagePair semanticPath |> ignore
+        let api = resources ()
+        api?requireLanguagePair semanticPath |> ignore
 
     /// Layout smoke: provider tree root present.
-    let languageRootsPresent () : bool = resources()?resourceExists "provider"
+    let languageRootsPresent () : bool =
+        let api = resources ()
+        api?resourceExists "provider"

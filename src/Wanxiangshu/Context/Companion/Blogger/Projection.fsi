@@ -4,8 +4,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 
 [<RequireQualifiedAccess>]
-type BlogFrameKind =
-    | Entry
+type BlogFrameKind = | Entry
 
 type BlogFrame =
     {

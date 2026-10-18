@@ -19,9 +19,9 @@ open Wanxiangshu.Persistence.Journal
 /// physical resources, display caches, or bounded per-call deduplication.
 type PluginRuntimeScope =
     new:
-        journal: AgentJournal option
-            * isModelLeaseExternallyOwned: (SessionId -> bool)
-            * jsLifecyclePersistence: Wanxiangshu.Repository.Programming.Js.IJsLifecyclePersistence option ->
+        journal: AgentJournal option *
+        isModelLeaseExternallyOwned: (SessionId -> bool) *
+        jsLifecyclePersistence: Wanxiangshu.Repository.Programming.Js.IJsLifecyclePersistence option ->
             PluginRuntimeScope
 
     interface IDisposable

@@ -104,15 +104,15 @@ module ChronicleTool =
             do! terminateSessionIfPresent terminateSession ctx.SessionId
         }
 
+    let private validateTipSection (args: HostToolArguments) (field: string) : string option =
+        match ChronicleExecution.tryTipField field (args.Text field) with
+        | Error error -> Some error
+        | Ok _ -> None
+
     let private tipFieldError (args: HostToolArguments) : string option =
         match ChronicleExecution.tryTipName (args.Text "tipName") with
         | Error error -> Some error
-        | Ok _ ->
-            EnforcerCodec.tipSectionNames
-            |> List.tryPick (fun field ->
-                match ChronicleExecution.tryTipField field (args.Text field) with
-                | Error error -> Some error
-                | Ok _ -> None)
+        | Ok _ -> EnforcerCodec.tipSectionNames |> List.tryPick (validateTipSection args)
 
     let private resultForLesson language (args: HostToolArguments) : string =
         match tipFieldError args with

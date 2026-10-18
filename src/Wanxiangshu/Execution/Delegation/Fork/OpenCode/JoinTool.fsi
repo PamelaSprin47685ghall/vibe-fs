@@ -43,6 +43,4 @@ module JoinTool =
     val admission: ToolAdmission
     val spec: scope: ToolRuntimeScope -> ToolSpec
 
-    val executeReceipt:
-        scope: ToolRuntimeScope -> context: HostToolContext ->
-            Task<Result<JoinRecord list, string>>
+    val executeReceipt: scope: ToolRuntimeScope -> context: HostToolContext -> Task<Result<JoinRecord list, string>>

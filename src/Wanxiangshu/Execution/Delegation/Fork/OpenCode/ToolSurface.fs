@@ -1053,8 +1053,12 @@ module ForkToolSurface =
                 | Some root ->
                     do! captureTraceText harness.Journal childId providerRun answer
 
-                    if isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value childId)) then
-                        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record (SessionId.value childId) (box answer)
+                    if
+                        isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value childId))
+                    then
+                        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record
+                            (SessionId.value childId)
+                            (box answer)
 
                     match harness.Scope.RuntimeFor(managerContext harness owner) with
                     | Error _ -> return false
@@ -1159,8 +1163,12 @@ module ForkToolSurface =
                 | Some binding, Some root ->
                     do! captureTraceText harness.Journal childId providerRun answer
 
-                    if isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value childId)) then
-                        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record (SessionId.value childId) (box answer)
+                    if
+                        isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value childId))
+                    then
+                        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record
+                            (SessionId.value childId)
+                            (box answer)
 
                     return
                         fun () ->

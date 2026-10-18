@@ -23,7 +23,10 @@ type PluginRuntimeScope
         jsLifecyclePersistence: Wanxiangshu.Repository.Programming.Js.IJsLifecyclePersistence option
     ) =
     let blogger = PluginBloggerScope()
-    let sessions = PluginSessionScope(journal, isModelLeaseExternallyOwned, jsLifecyclePersistence)
+
+    let sessions =
+        PluginSessionScope(journal, isModelLeaseExternallyOwned, jsLifecyclePersistence)
+
     let recovery = PluginRecoveryScope(journal)
     // DSL-MUTABLE: resource — session cleanup hook list registered by composition
     let mutable sessionCleanups: (string -> unit) list = []

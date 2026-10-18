@@ -33,7 +33,10 @@ type CasebookObservationCollector() =
         let hash = CasebookCapture.contentHash output
         tracker.RecordRead(path, hash)
 
-        if not (System.String.IsNullOrWhiteSpace path) && not (System.String.IsNullOrWhiteSpace output) then
+        if
+            not (System.String.IsNullOrWhiteSpace path)
+            && not (System.String.IsNullOrWhiteSpace output)
+        then
             appendObservation sessionId (Observation.FileRead(path, hash))
 
     member _.RecordSubstantive(sessionId: string, toolName: string, args: obj, committed: bool) : unit =

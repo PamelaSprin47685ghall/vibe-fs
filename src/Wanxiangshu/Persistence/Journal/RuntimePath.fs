@@ -54,6 +54,18 @@ module RuntimePath =
     // DSL-MUTABLE: resource — 主工作树位置缓存，不保存任何业务事实。
     let private roots = Collections.Generic.Dictionary<string, string>()
 
+    let private parsePrimaryWorktree (first: string array) =
+        if first |> Array.contains "bare" then
+            invalidArg "workspace" "Runtime persistence requires a working tree, not a bare repository"
+        elif
+            (match Array.tryHead first with
+             | Some field -> not (field.StartsWith("worktree ", StringComparison.Ordinal))
+             | None -> true)
+        then
+            invalidOp "Git did not identify the primary working tree"
+        else
+            (Array.head first).Substring("worktree ".Length) |> canonicalPath |> outsideGit
+
     let private primaryWorktree (workspace: string) =
         let listing =
             try
@@ -64,15 +76,9 @@ module RuntimePath =
         match listing with
         | None -> workspace
         | Some text ->
-            let first = text.Split([| '\u0000' |]) |> Array.takeWhile (fun field -> field <> "")
-
-            if first |> Array.contains "bare" then
-                invalidArg "workspace" "Runtime persistence requires a working tree, not a bare repository"
-
-            match Array.tryHead first with
-            | Some field when field.StartsWith("worktree ", StringComparison.Ordinal) ->
-                field.Substring("worktree ".Length) |> canonicalPath |> outsideGit
-            | _ -> invalidOp "Git did not identify the primary working tree"
+            text.Split([| '\u0000' |])
+            |> Array.takeWhile (fun field -> field <> "")
+            |> parsePrimaryWorktree
 
     /// Git 只提供只读拓扑：主工作树和 linked worktree 共用主工作树下的状态。
     /// 没有 Git 仓库时使用给定目录；不回退到 .git、XDG 或旧日志。

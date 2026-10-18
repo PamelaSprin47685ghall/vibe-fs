@@ -970,17 +970,7 @@ module FissionTool =
                 return Error "not-ready"
             else
                 return!
-                    runAdmissionReceipt
-                        scope
-                        durable
-                        ctx
-                        parsed
-                        toolCallId
-                        owner
-                        profile
-                        ownerRuntime
-                        preAgents
-                        prePtys
+                    runAdmissionReceipt scope durable ctx parsed toolCallId owner profile ownerRuntime preAgents prePtys
         }
 
     let private executeWhenIdleReceipt
@@ -1040,18 +1030,19 @@ module FissionTool =
             | Some toolCallId, Some durable -> return! executeWithJournalReceipt scope ctx parsed toolCallId durable
         }
 
+    let private decodeLanesCharge (args: HostToolArguments) (charge: string) : string list =
+        match args.OptionalNonNegativeInteger "lanes" with
+        | Ok(Some laneCount) when laneCount >= 2 && not (String.IsNullOrWhiteSpace charge) ->
+            List.replicate laneCount charge
+        | _ -> []
+
     let private decodePromptsForReceipt (args: HostToolArguments) : string list =
         let explicit = args.Texts "prompts"
 
         if not (List.isEmpty explicit) then
             explicit
         else
-            let charge = args.Text "charge"
-
-            match args.OptionalNonNegativeInteger "lanes" with
-            | Ok(Some laneCount) when laneCount >= 2 && not (String.IsNullOrWhiteSpace charge) ->
-                List.replicate laneCount charge
-            | _ -> []
+            decodeLanesCharge args (args.Text "charge")
 
     let private executeForSubsessionReceipt
         (scope: ToolRuntimeScope)

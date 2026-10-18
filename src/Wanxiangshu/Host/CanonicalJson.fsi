@@ -1,4 +1,4 @@
-namespace Wanxiangshu.Foundation
+namespace Wanxiangshu.Host
 
 module CanonicalJson =
     val canonicalJson: value: obj -> string

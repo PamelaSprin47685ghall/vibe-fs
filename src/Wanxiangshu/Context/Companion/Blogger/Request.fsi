@@ -54,8 +54,7 @@ type BloggerMainRequestContext =
     member ObservedPrefixEpochId: PrefixEpochId
 
 [<RequireQualifiedAccess>]
-type BloggerRequestContext =
-    | Main of BloggerMainRequestContext
+type BloggerRequestContext = Main of BloggerMainRequestContext
 
 [<RequireQualifiedAccess>]
 type BloggerTerminalRequestOwnership =

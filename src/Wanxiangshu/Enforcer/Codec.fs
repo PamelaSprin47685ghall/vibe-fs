@@ -94,6 +94,18 @@ module EnforcerCodec =
 
     let private missingTipFieldError (fieldName: string) = MissingTipFieldPrefix + fieldName
 
+    let private validateTipNameText (rawText: string) : Result<string, string> =
+        let trimmed = rawText.Trim()
+
+        if trimmed.Length = 0 then
+            Error MissingTipNameError
+        elif trimmed.Contains "\n" || trimmed.Contains "\r" then
+            Error TipNameMultilineError
+        elif trimmed.Length > MaxTipNameChars then
+            Error TipNameTooLongError
+        else
+            Ok trimmed
+
     /// D2：tipName 判定序。缺键或 undefined → missing-tip-name；非 string
     /// （含 null）→ tip-field-not-a-string；trim 空 → missing-tip-name；
     /// 含换行或回车 → tip-name-multiline；超 200 字符 → tip-name-too-long。
@@ -102,20 +114,16 @@ module EnforcerCodec =
         match Map.tryFind "tipName" rawArgs with
         | None -> Error MissingTipNameError
         | Some value when isUndefined value -> Error MissingTipNameError
-        | Some value ->
-            match value with
-            | :? string as rawText ->
-                let trimmed = rawText.Trim()
+        | Some(:? string as rawText) -> validateTipNameText rawText
+        | Some _ -> Error TipFieldNotAStringError
 
-                if trimmed.Length = 0 then
-                    Error MissingTipNameError
-                elif trimmed.Contains "\n" || trimmed.Contains "\r" then
-                    Error TipNameMultilineError
-                elif trimmed.Length > MaxTipNameChars then
-                    Error TipNameTooLongError
-                else
-                    Ok trimmed
-            | _ -> Error TipFieldNotAStringError
+    let private validateTipFieldText (fieldName: string) (rawText: string) : Result<string, string> =
+        let trimmed = rawText.Trim()
+
+        if trimmed.Length = 0 then
+            Error(missingTipFieldError fieldName)
+        else
+            Ok trimmed
 
     /// D3：单节解码。缺键或空白 → missing-tip-field:<camelCase 字段名>；
     /// 非 string → tip-field-not-a-string；返回 trim 后文本。
@@ -123,16 +131,8 @@ module EnforcerCodec =
         match Map.tryFind fieldName rawArgs with
         | None -> Error(missingTipFieldError fieldName)
         | Some value when isUndefined value -> Error(missingTipFieldError fieldName)
-        | Some value ->
-            match value with
-            | :? string as rawText ->
-                let trimmed = rawText.Trim()
-
-                if trimmed.Length = 0 then
-                    Error(missingTipFieldError fieldName)
-                else
-                    Ok trimmed
-            | _ -> Error TipFieldNotAStringError
+        | Some(:? string as rawText) -> validateTipFieldText fieldName rawText
+        | Some _ -> Error TipFieldNotAStringError
 
     let private decodeTipSections (rawArgs: Map<string, obj>) : Result<string * string, string> =
         match decodeTipField "opinion" rawArgs, decodeTipField "advice" rawArgs with

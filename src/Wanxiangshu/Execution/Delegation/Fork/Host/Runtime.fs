@@ -819,28 +819,22 @@ type HostForkRuntime
             HandleProjection.isRetired handle projection
             || HandleProjection.isAbandoned handle projection)
 
+    member private this.DrainPtysIfDevOps(run: PendingHostRun) =
+        match run.Role, drainChildPtys with
+        | Role.DevOps, Some drain -> drain run.ChildId
+        | _ -> Task.FromResult(())
+
     member this.Complete(run: PendingHostRun, outcome: TerminalOutcome) =
         // Terminal delivery is a synchronous Host callback. The runtime owns the
         // async tail so shutdown can drain it before releasing the Journal.
         startOwnedWork (fun () ->
             task {
                 try
-                    match run.Role, drainChildPtys with
-                    | Role.DevOps, Some drain -> do! drain run.ChildId
-                    | _ -> ()
+                    do! this.DrainPtysIfDevOps run
 
                     let! workRecord = workRecordForOutcome run outcome
 
-                    do!
-                        HostForkRunLifecycle.complete
-                            gate
-                            pendingRuns
-                            journal
-                            parentId
-                            sessions
-                            run
-                            outcome
-                            workRecord
+                    do! HostForkRunLifecycle.complete gate pendingRuns journal parentId sessions run outcome workRecord
                 with error ->
                     // A proven terminal must still resolve this run's only
                     // completion promise even when settlement faulted: settle an
@@ -860,13 +854,7 @@ type HostForkRuntime
             :> Task)
         |> ignore
 
-    member this.InstallRun
-        (
-            agentId: string,
-            childId: SessionId,
-            role: Role,
-            authorityRoot: AuthorityRootUserMessageId
-        ) =
+    member this.InstallRun(agentId: string, childId: SessionId, role: Role, authorityRoot: AuthorityRootUserMessageId) =
         lock gate (fun () ->
             processOwnedAgents.Add agentId |> ignore
             processEstablishedAgents.Add agentId |> ignore)
@@ -890,8 +878,7 @@ type HostForkRuntime
         run
 
     member this.FailRun(run: PendingHostRun, error: string) : Task =
-        startOwnedWork (fun () ->
-            HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run error)
+        startOwnedWork (fun () -> HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run error)
 
     member this.MarkReady(run: PendingHostRun) =
         // markReady is intentionally a no-op; do not perform an unnecessary WorkRecord read.

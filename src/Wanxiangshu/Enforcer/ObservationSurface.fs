@@ -261,8 +261,7 @@ module ObservationSurface =
         BlogProjection.frames (blogStateOfJs state)
         |> List.map (fun frame ->
             match frame.Kind with
-            | BlogFrameKind.Entry -> "Entry"
-        )
+            | BlogFrameKind.Entry -> "Entry")
         |> List.toArray
 
     let coverage (state: obj) : obj =

@@ -266,29 +266,28 @@ module HostForkJoin =
         | LocalInterrupt reason -> Done(Ok(Interrupted reason))
         | CompletionMayBeAvailable -> Retry
 
+    let private decideOutcomeRaceWinner (outcome: AgentCompletionOutcome) =
+        // A settled Source is a PERSIST settlement failure (durable work
+        // still Active, run still pending) exactly when it is an AgentFailed
+        // with Code PERSIST. Any other settled Source means the durable
+        // completion committed and the normal drain path owns it.
+        match persistSettlementError outcome with
+        | Some error -> Done(Error error)
+        | None -> Retry
+
     let private decideJournalRaceWinner
         (winner: Choice<MailboxWakeReason, unit, JoinInterruptReason, AgentCompletionOutcome>)
         =
         match winner with
         | Choice1Of4 reason -> decideWakeReason reason
         | Choice3Of4 interruptReason -> Done(Ok(Interrupted interruptReason))
-        | Choice4Of4 outcome ->
-            // A settled Source is a PERSIST settlement failure (durable work
-            // still Active, run still pending) exactly when it is an AgentFailed
-            // with Code PERSIST. Any other settled Source means the durable
-            // completion committed and the normal drain path owns it.
-            match persistSettlementError outcome with
-            | Some error -> Done(Error error)
-            | None -> Retry
+        | Choice4Of4 outcome -> decideOutcomeRaceWinner outcome
         | Choice2Of4() -> Retry
 
     let private decideFissionRaceWinner (winner: Choice<unit, JoinInterruptReason, AgentCompletionOutcome>) =
         match winner with
         | Choice2Of3 reason -> Done(Ok(Interrupted reason))
-        | Choice3Of3 outcome ->
-            match persistSettlementError outcome with
-            | Some error -> Done(Error error)
-            | None -> Retry
+        | Choice3Of3 outcome -> decideOutcomeRaceWinner outcome
         | Choice1Of3() -> Retry
 
     let private applyJoinPoll (poll: JoinPoll) (retry: unit -> Task<Result<JoinWaitOutcome<JoinItem>, ForkError>>) =

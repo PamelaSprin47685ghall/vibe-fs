@@ -112,6 +112,30 @@ module JsMutationFs =
     [<Emit("$0.mtime.toISOString()")>]
     let private statMtime (stat: obj) : string = jsNative
 
+    let private removeDirectory (path: string) : Result<unit, JsFailure> =
+        let entries = readdirSync path
+
+        if entries.Length > 0 then
+            Error(JsFailure.DirectoryNotEmpty path)
+        else
+            rmdirSync path
+            Ok()
+
+    let private removeExistingEntry (path: string) : Result<unit, JsFailure> =
+        let stat = lstatSync path
+
+        if statIsDirectory stat then
+            removeDirectory path
+        else
+            unlinkSync path
+            Ok()
+
+    let private classifyRemoveError (path: string) (error: obj) : JsFailure =
+        match string error?code with
+        | "ENOTEMPTY" -> JsFailure.DirectoryNotEmpty path
+        | "ENOENT" -> JsFailure.FileNotFound path
+        | _ -> JsFailure.FileReadFailed path
+
     /// Delete a file or an empty directory; a non-empty directory is
     /// DIRECTORY_NOT_EMPTY, a missing target is FILE_NOT_FOUND. The caller
     /// (ToolsBindings) owns the path boundary (resolveInside) and the
@@ -121,26 +145,15 @@ module JsMutationFs =
     /// ledger belongs to the workflow's accounting channel.
     let removePath (path: string) : Result<unit, JsFailure> =
         try
-            let stat = lstatSync path
-
-            if statIsDirectory stat then
-                let entries = readdirSync path
-
-                if entries.Length > 0 then
-                    Error(JsFailure.DirectoryNotEmpty path)
-                else
-                    rmdirSync path
-                    Ok()
-            else
-                unlinkSync path
-                Ok()
+            removeExistingEntry path
         with error ->
-            if string error?code = "ENOTEMPTY" then
-                Error(JsFailure.DirectoryNotEmpty path)
-            elif string error?code = "ENOENT" then
-                Error(JsFailure.FileNotFound path)
-            else
-                Error(JsFailure.FileReadFailed path)
+            Error(classifyRemoveError path error)
+
+    let private classifyMoveError (fromPath: string) (error: obj) : JsFailure =
+        if string error?code = "EXDEV" then
+            JsFailure.CrossDeviceMove fromPath
+        else
+            JsFailure.FileReadFailed fromPath
 
     /// Move or rename a file or directory (POSIX mv) over renameSync
     /// (same-device atomic; overwrite allowed). A cross-device move (EXDEV)
@@ -153,11 +166,13 @@ module JsMutationFs =
             renameSync fromPath toPath
             Ok()
         with error ->
-            if string error?code = "EXDEV" then
-                Error(JsFailure.CrossDeviceMove fromPath)
-            else
-                Error(JsFailure.FileReadFailed fromPath)
+            Error(classifyMoveError fromPath error)
 
+    let private handleStatError (path: string) (error: obj) : Result<obj, JsFailure> =
+        if string error?code = "ENOENT" then
+            Ok(createObj [ "exists" ==> false; "size" ==> 0; "mtime" ==> null; "isDir" ==> false ])
+        else
+            Error(JsFailure.FileReadFailed path)
 
     /// One path's metadata. A missing path is a normal observation
     /// (`exists = false`), not a failure; the caller decides what absence
@@ -174,10 +189,13 @@ module JsMutationFs =
                       "isDir" ==> statIsDirectory stat ]
             )
         with error ->
-            if string error?code = "ENOENT" then
-                Ok(createObj [ "exists" ==> false; "size" ==> 0; "mtime" ==> null; "isDir" ==> false ])
-            else
-                Error(JsFailure.FileReadFailed path)
+            handleStatError path error
+
+    let private classifyMakeDirectoryError (path: string) (error: obj) : JsFailure =
+        match string error?code with
+        | "EEXIST" -> JsFailure.DirectoryExists path
+        | "ENOENT" -> JsFailure.ParentDirectoryMissing path
+        | _ -> JsFailure.FileReadFailed path
 
     /// Create exactly one directory (POSIX mkdir, non-recursive). An existing
     /// target is DIRECTORY_EXISTS; a missing parent is
@@ -187,7 +205,4 @@ module JsMutationFs =
             mkdirSync path
             Ok()
         with error ->
-            match string error?code with
-            | "EEXIST" -> Error(JsFailure.DirectoryExists path)
-            | "ENOENT" -> Error(JsFailure.ParentDirectoryMissing path)
-            | _ -> Error(JsFailure.FileReadFailed path)
+            Error(classifyMakeDirectoryError path error)
