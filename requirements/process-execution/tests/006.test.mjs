@@ -7,12 +7,15 @@ test('WHAT[process-execution-006] a waiter fault without token cancellation keep
   const runtime = await import('../../../dist/Process/Surface.js')
   const child = runtime.childCreate(() => { throw new Error('Controlled kill failure') })
   try {
-    await assert.rejects(runtime.runWithHostLauncher(async () => child,
+    const result = await runtime.runWithHostLauncher(async () => child,
       runtime.command('unused', [], null, null), runtime.estimate(0.01, 1024, 'medium'),
-      runtime.context(null, 10000), runtime.createCancellationToken(false)), /Controlled kill failure/)
+      runtime.context(null, 10000), runtime.createCancellationToken(false))
+    assert.equal(result.kind, 'Observed')
+    assert.deepEqual(result.ending, { kind: 'Unconfirmed' })
+    assert.match(result.fault, /Controlled kill failure/)
     assert.equal(runtime.childView(child).killCount, 1)
   } finally {
-    runtime.childExit(child, 0)
+    runtime.childExit(child, { kind: 'Exited', exitCode: 0 })
   }
 })
 
@@ -58,7 +61,7 @@ test('WHAT[process-execution-006] the registered DevOps tool observes real Host 
         const promptsBefore = runtime.prompts.length
         const pending = hooks.tool.run.execute({
           command: nodeCommand(`const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${ready}.pending`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${ready}.pending`)}, ${JSON.stringify(ready)}); setInterval(() => {}, 1000)`),
-          output_budget_bytes: 256,
+          output_budget_bytes: 512,
         }, { sessionID, agent: 'devops', messageID: 'registered-abort-assistant', callID: `abort-${language}`, abort: controller.signal })
         let pid
         try {
@@ -68,9 +71,9 @@ test('WHAT[process-execution-006] the registered DevOps tool observes real Host 
           assert.equal(alive(pid), true)
           controller.abort()
           const wire = await pending
-          assert.match(wire, language === 'en' ? /Cancellation was requested/ : /已请求取消/)
+          assert.match(wire, /stop_requested = "cancellation"/)
           assert.doesNotMatch(wire, /exit_code|SpawnFailed|ExecutionFailed/)
-          assert.ok(Buffer.byteLength(wire) <= 256)
+          assert.ok(Buffer.byteLength(wire) <= 512)
           assert.equal(created.length, modelsBefore)
           assert.equal(runtime.prompts.length, promptsBefore)
           await until(() => !alive(pid))
@@ -141,12 +144,7 @@ test('WHAT[process-execution-006] EXEC_011_kill_ack_grace_is_finite_not_MaxTimer
     /killSent then[\s\S]{0,80}waitSegment Deadline\.MaxTimerWaitMs/,
     'post-kill must not wait MaxTimerWaitMs',
   )
-  assert.match(
-    waitSrc,
-    /ExitCode = -1[\s\S]{0,40}TimedOut = true/,
-    'kill-ack expiry returns TimedOut with unknown exit code, not fake success',
-  )
-  assert.match(waitSrc, /KillNotAcknowledged/, 'kill-ack expiry exits the wait loop')
+  assert.doesNotMatch(waitSrc, /ExitCode|128\s*\+|= -1/, 'waiting cannot invent target status')
 })
 }
 
@@ -169,7 +167,7 @@ const makeEstimate = (runtimeSeconds = 10, outputBytes = 1024, memory = 'medium'
 const live = () => createCancellationToken(false)
 const cancelled = () => createCancellationToken(true)
 const okLauncher = (exitCode = 0, out = 'hello', err = '') => async (_command, _token) => [
-  exitCode,
+  { kind: 'Exited', exitCode },
   new TextEncoder().encode(out),
   new TextEncoder().encode(err),
 ]
@@ -180,8 +178,7 @@ test('WHAT[process-execution-006] EXEC_011_throwing_host_under_cancellation_maps
   }
   const result = await runWithHostLauncher(explodingHost, cmd, makeEstimate(), CTX, cancelled())
 
-  assert.equal(result.ok, false)
-  assert.equal(result.error.kind, 'ProcessCancelled')
+  assert.deepEqual(result, { kind: 'NotStarted', reason: { kind: 'CancelledBeforeStart' } })
 })
 }
 
@@ -212,14 +209,14 @@ const within = (promise, ms, label) =>
 const expired = () => createDeadline('2000-01-01T00:00:00Z', 1)
 const killCount = (child) => childView(child).killCount
 
-test('WHAT[process-execution-006] EXEC_011_D_mid_wait_cancellation_kills_once_and_rejects_without_hanging_on_exit', async () => {
+test('WHAT[process-execution-006] EXEC_011_D_mid_wait_cancellation_kills_once_and_returns_without_hanging_on_exit', async () => {
   const child = childCreate(undefined)
   const deadline = createDeadline(nowIso(), 60_000)
   const token = createCancellationToken(false)
   const wait = waitForExit(child, deadline, token)
 
   setTimeout(() => cancel(token), 30)
-  await assert.rejects(() => within(wait, 2_000, 'mid-wait cancel'))
+  assert.deepEqual(await within(wait, 2_000, 'mid-wait cancel'), { stopRequested: 'Cancellation' })
   assert.equal(killCount(child), 1, 'mid-wait cancel must Kill exactly once')
 })
 }

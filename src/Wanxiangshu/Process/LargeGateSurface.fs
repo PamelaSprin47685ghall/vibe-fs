@@ -40,7 +40,7 @@ module LargeGateSurface =
         let launcher (_command: Command) (_token: CancellationToken) =
             task {
                 observe ()
-                return 0, [||], [||]
+                return EndEvidence.Confirmed(ProgramEnd.Exited 0), [||], [||]
             }
 
         let command =
@@ -61,5 +61,5 @@ module LargeGateSurface =
 
         task {
             let! result = ProcessRunner.runWithLauncher launcher command estimate context CancellationToken.None
-            return Result.isOk result
+            return ProcessResult.requireText result |> Result.isOk
         }

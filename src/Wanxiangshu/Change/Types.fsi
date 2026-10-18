@@ -27,7 +27,7 @@ type GitPort =
       FfMerge: WorktreePath -> TargetRef -> CommitHash -> CommitHash -> Task<Result<CommitHash, string>>
       ConflictedFiles: WorktreePath -> Task<Result<string list, string>>
       RemoveWorktree: WorktreePath -> Task<Result<unit, string>>
-      HasRebaseHead: WorktreePath -> Task<bool>
+      HasRebaseHead: WorktreePath -> Task<Result<bool, string>>
       ListWorktrees: unit -> Task<Result<(WorktreePath * WorktreeIdentity option) list, string>>
       ListManagerBranches: unit -> Task<Result<WorktreeIdentity list, string>>
       DeleteBranch: WorktreeIdentity -> Task<Result<unit, string>>

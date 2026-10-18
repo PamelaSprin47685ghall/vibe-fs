@@ -5,7 +5,7 @@ open System.Threading.Tasks
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Process
 
-type GitGatewayRunner = string list -> Task<int * string * string>
+type GitGatewayRunner = string list -> Task<Result<TextProcessExit, ProcessResult>>
 
 /// Work that runs while the cross-process store lock is held: local writer
 /// reads, union validation, remote import and the final materialization.

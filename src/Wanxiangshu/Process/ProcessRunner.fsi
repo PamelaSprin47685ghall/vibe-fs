@@ -5,30 +5,30 @@ open System.Threading.Tasks
 
 module ProcessRunner =
     val runWithHost:
-        hostSpawn:
+        host:
             (Command
                 -> ProcessContext
                 -> (byte array -> unit)
                 -> (byte array -> unit)
                 -> CancellationToken
-                -> Task<Result<NodeProcessHost.ChildProcess, string>>) ->
+                -> Task<Result<NodeProcessHost.ChildProcess, ProcessResult>>) ->
         cmd: Command ->
         estimate: ProcessEstimate ->
         ctx: ProcessContext ->
         ct: CancellationToken ->
-            Task<Result<ProcessOutcome, ProcessError>>
+            Task<ProcessResult>
 
     val run:
         cmd: Command ->
         estimate: ProcessEstimate ->
         ctx: ProcessContext ->
         ct: CancellationToken ->
-            Task<Result<ProcessOutcome, ProcessError>>
+            Task<ProcessResult>
 
     val runWithLauncher:
-        launcher: (Command -> CancellationToken -> Task<int * byte array * byte array>) ->
+        launcher: (Command -> CancellationToken -> Task<EndEvidence * byte array * byte array>) ->
         cmd: Command ->
         estimate: ProcessEstimate ->
         ctx: ProcessContext ->
         ct: CancellationToken ->
-            Task<Result<ProcessOutcome, ProcessError>>
+            Task<ProcessResult>

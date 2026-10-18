@@ -34,31 +34,31 @@ type WorktreeResource =
 module WorktreeCommands =
     /// The branch a job's worktree lives on IS its stable identity (ORCH-006).
     val identityOf: jobId: ManagerJobId -> WorktreeIdentity
-    val isDirty: runner: (Command -> Task<int * string * string>) -> path: WorktreePath -> Task<Result<bool, string>>
+    val isDirty: runner: TextProcessRunner -> path: WorktreePath -> Task<Result<bool, string>>
 
     val create:
-        runner: (Command -> Task<int * string * string>) ->
+        runner: TextProcessRunner ->
         repo: string ->
         jobId: ManagerJobId ->
         path: WorktreePath ->
             Task<Result<WorktreeIdentity, string>>
 
-    val remove: runner: (Command -> Task<int * string * string>) -> path: WorktreePath -> Task<Result<unit, string>>
+    val remove: runner: TextProcessRunner -> repo: string -> path: WorktreePath -> Task<Result<unit, string>>
 
     val list:
-        runner: (Command -> Task<int * string * string>) ->
+        runner: TextProcessRunner ->
         repo: string ->
         unit ->
             Task<Result<(WorktreePath * WorktreeIdentity option) list, string>>
 
     val listBranches:
-        runner: (Command -> Task<int * string * string>) ->
+        runner: TextProcessRunner ->
         repo: string ->
         unit ->
             Task<Result<WorktreeIdentity list, string>>
 
     val deleteBranch:
-        runner: (Command -> Task<int * string * string>) ->
+        runner: TextProcessRunner ->
         repo: string ->
         identity: WorktreeIdentity ->
             Task<Result<unit, string>>

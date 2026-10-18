@@ -3,14 +3,18 @@ namespace Wanxiangshu.Process
 open System.Threading
 open System.Threading.Tasks
 
+module ProcessResultWire =
+    val read: obj -> ProcessResult
+
 module NodeProcessHost =
     type ChildProcess =
         { Process: obj
-          Exit: TaskCompletionSource<int>
+          Observe: unit -> EndEvidence
           Kill: unit -> unit
           Exited: bool ref
           OnExited: ResizeArray<unit -> unit>
-          Failure: string option ref }
+          Failure: string option ref
+          Rejection: NoExecution option ref }
 
     val notifyExited: child: ChildProcess -> unit
 
@@ -20,7 +24,7 @@ module NodeProcessHost =
         onStdout: (byte array -> unit) ->
         onStderr: (byte array -> unit) ->
         ct: CancellationToken ->
-            Task<Result<ChildProcess, string>>
+            Task<Result<ChildProcess, ProcessResult>>
 
     val tempPath: unit -> string
     val writeFile: path: string -> data: byte array -> unit

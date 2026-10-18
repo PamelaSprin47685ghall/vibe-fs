@@ -66,7 +66,7 @@ module ChangeSurface =
 
     val gitConflictedFilesResult: git: obj -> Task<obj>
 
-    val gitHasRebaseHead: git: obj -> path: string -> Task<bool>
+    val gitHasRebaseHead: git: obj -> path: string -> Task<obj>
 
     val gitReadHead: git: obj -> path: string -> Task<obj>
 

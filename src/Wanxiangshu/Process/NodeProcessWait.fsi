@@ -4,7 +4,8 @@ open System.Threading
 open System.Threading.Tasks
 
 module NodeProcessWait =
-    type WaitOutcome = { ExitCode: int; TimedOut: bool }
+    type StopCause = Cancellation | Deadline
+    type WaitOutcome = { StopRequested: StopCause option }
 
     val KillAckGraceMs: int
 

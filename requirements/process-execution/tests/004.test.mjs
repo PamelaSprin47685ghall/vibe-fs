@@ -1,8 +1,33 @@
 import test from 'node:test'
 
+test('WHAT[process-execution-004] normal high exit codes stay normal target exits', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const runtime = await import('../../../dist/Process/Surface.js')
+  for (const code of [0, 1, 7, 137, 143, 255]) {
+    const result = await runtime.run(
+      runtime.command(process.execPath, ['-e', `process.exit(${code})`], null, null),
+      runtime.estimate(10, 1024, 'medium'), runtime.context(null, 5000), runtime.createCancellationToken(false))
+    assert.equal(result.kind, 'Observed')
+    assert.deepEqual(result.ending, { kind: 'Exited', exitCode: code })
+    assert.deepEqual(result.output, { kind: 'InMemory', stdout: '', stderr: '' })
+    assert.equal(result.stopRequested, null)
+    assert.equal(result.fault, null)
+  }
+})
+
+test('WHAT[process-execution-004] a physical spawn rejection proves no target execution', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const runtime = await import('../../../dist/Process/Surface.js')
+  const result = await runtime.run(
+    runtime.command('/nonexistent-wanxiang-test-program', [], null, null),
+    runtime.estimate(10, 1024, 'medium'), runtime.context(null, 5000), runtime.createCancellationToken(false))
+  assert.equal(result.kind, 'NotStarted')
+  assert.equal(result.reason.kind, 'StartRejected')
+  assert.match(result.reason.reason, /ENOENT/)
+})
+
 test('WHAT[process-execution-004] target signal status does not use the supervisor KILL status', async () => {
   const assert = (await import('node:assert/strict')).default
-  const { constants } = await import('node:os')
   const runtime = await import('../../../dist/Process/Surface.js')
   for (const signal of ['SIGTERM', 'SIGINT', 'SIGKILL']) {
     const result = await runtime.run(
@@ -11,8 +36,9 @@ test('WHAT[process-execution-004] target signal status does not use the supervis
       runtime.context(undefined, 5000),
       runtime.createCancellationToken(false),
     )
-    assert.equal(result.ok, true)
-    assert.equal(result.value.exitCode, 128 + constants.signals[signal])
+    assert.equal(result.kind, 'Observed')
+    assert.deepEqual(result.ending, { kind: 'Signaled', signal })
+    assert.equal(result.fault, null)
   }
 })
 
@@ -97,7 +123,7 @@ const makeEstimate = (runtimeSeconds = 10, outputBytes = 1024, memory = 'medium'
 const live = () => createCancellationToken(false)
 const cancelled = () => createCancellationToken(true)
 const okLauncher = (exitCode = 0, out = 'hello', err = '') => async (_command, _token) => [
-  exitCode,
+  { kind: 'Exited', exitCode },
   new TextEncoder().encode(out),
   new TextEncoder().encode(err),
 ]
@@ -105,7 +131,7 @@ const okLauncher = (exitCode = 0, out = 'hello', err = '') => async (_command, _
 test('WHAT[process-execution-004] EXEC_011_slow_process_is_killed_and_reports_timeout', async () => {
   const hangingLauncher = (_command, token) =>
     new Promise((resolve) => {
-      token.register(() => resolve([-1, new Uint8Array(0), new Uint8Array(0)]))
+      token.register(() => resolve([{ kind: 'Unconfirmed' }, new Uint8Array(0), new Uint8Array(0)]))
     })
 
   const tightContext = context(undefined, 100)
@@ -117,16 +143,18 @@ test('WHAT[process-execution-004] EXEC_011_slow_process_is_killed_and_reports_ti
     live(),
   )
 
-  assert.equal(result.ok, false)
-  assert.equal(result.error.kind, 'TimeoutExceeded')
+  assert.equal(result.kind, 'Observed')
+  assert.deepEqual(result.ending, { kind: 'Unconfirmed' })
+  assert.deepEqual(result.stopRequested, { kind: 'DeadlineStopRequested', durationMs: 100 })
+  assert.equal(result.output, null)
 })
-test('WHAT[process-execution-004] EXEC_011_spawn_failure_maps_to_spawn_failed', async () => {
+test('WHAT[process-execution-004] EXEC_011_untyped_host_rejection_does_not_prove_zero_execution', async () => {
   const failingHost = async () => ({ ok: false, error: 'ENOENT: no such binary' })
   const result = await runWithHostLauncher(failingHost, cmd, makeEstimate(), CTX, live())
 
-  assert.equal(result.ok, false)
-  assert.equal(result.error.kind, 'SpawnFailed')
-  assert.match(result.error.reason, /ENOENT/)
+  assert.equal(result.kind, 'Observed')
+  assert.deepEqual(result.ending, { kind: 'Unconfirmed' })
+  assert.match(result.fault, /invalid child/)
 })
 test('WHAT[process-execution-004] EXEC_011_throwing_host_maps_to_execution_failed', async () => {
   const explodingHost = async () => {
@@ -134,9 +162,9 @@ test('WHAT[process-execution-004] EXEC_011_throwing_host_maps_to_execution_faile
   }
   const result = await runWithHostLauncher(explodingHost, cmd, makeEstimate(), CTX, live())
 
-  assert.equal(result.ok, false)
-  assert.equal(result.error.kind, 'ExecutionFailed')
-  assert.match(result.error.reason, /host exploded/)
+  assert.equal(result.kind, 'Observed')
+  assert.deepEqual(result.ending, { kind: 'Unconfirmed' })
+  assert.match(result.fault, /host exploded/)
 })
 }
 
@@ -170,16 +198,16 @@ const killCount = (child) => childView(child).killCount
 test('WHAT[process-execution-004] EXEC_011_B_deadline_kills_once_then_real_exit_is_timed_out', async () => {
   let child
   child = childCreate(() => {
-    setTimeout(() => childExit(child, 137), 15)
+    setTimeout(() => childExit(child, { kind: 'Signaled', signal: 'SIGKILL' }), 15)
   })
   const wait = waitForExit(child, expired(), createCancellationToken(false))
 
   const outcome = await within(wait, 2_000, 'deadline + kill-ack')
-  assert.deepEqual(outcome, { exitCode: 137, timedOut: true })
+  assert.deepEqual(outcome, { stopRequested: 'Deadline' })
   assert.equal(killCount(child), 1, 'deadline path Kill exactly once')
 })
 test(
-  'WHAT[process-execution-004] EXEC_011_C_kill_never_acked_ends_with_minus_one_timed_out',
+  'WHAT[process-execution-004] EXEC_011_C_kill_never_acked_preserves_stop_without_fabricating_exit',
   { timeout: 15_000 },
   async () => {
     assert.equal(killAckGraceMs, 1_000)
@@ -187,7 +215,7 @@ test(
     const wait = waitForExit(child, expired(), createCancellationToken(false))
 
     const outcome = await within(wait, 5_000, 'kill-ack timeout')
-    assert.deepEqual(outcome, { exitCode: -1, timedOut: true })
+    assert.deepEqual(outcome, { stopRequested: 'Deadline' })
     assert.equal(killCount(child), 1, 'deadline still Kill once before grace')
   },
 )

@@ -13,12 +13,12 @@ test('WHAT[process-execution-013] real large output retains the exact raw suffix
     accessed.push(member)
     throw new Error(`Unexpected session capability use: ${String(member)}`)
   } })
-  const wire = await run({ command: nodeCommand(`process.stdout.write(${JSON.stringify(original)})`), output_budget_bytes: 256 }, { sessions })
+  const wire = await run({ command: nodeCommand(`process.stdout.write(${JSON.stringify(original)})`), output_budget_bytes: 512 }, { sessions })
   const result = parse(wire)
   assert.equal(result.exit_code, 0)
   assert.ok(original.endsWith(result.output))
   assert.ok(result.output.endsWith(latest))
-  assert.ok(Buffer.byteLength(wire) <= 256)
+  assert.ok(Buffer.byteLength(wire) <= 512)
   assert.equal(result.output_truncated, true)
   assert.deepEqual(accessed, [])
 })
@@ -43,7 +43,7 @@ test('WHAT[process-execution-013] the registered plugin preserves budgets and cr
     const context = { sessionID, agent: 'devops', messageID: 'budget-assistant', callID: 'budget-command' }
     const modelsBefore = created.length
     const promptsBefore = runtime.prompts.length
-    for (const [budget, text] of [[0, 'never'], [256, 'ok'], [256, 'x'.repeat(2000)], [65536, '\n'.repeat(2500)]]) {
+    for (const [budget, text] of [[0, 'never'], [512, 'ok'], [512, 'x'.repeat(2000)], [65536, '\n'.repeat(2500)]]) {
       const wire = await hooks.tool.run.execute({ command: nodeCommand(`require('node:fs').writeFileSync(1, ${JSON.stringify(text)})`), output_budget_bytes: budget }, context)
       const result = parse(wire)
       if (budget === 0) {

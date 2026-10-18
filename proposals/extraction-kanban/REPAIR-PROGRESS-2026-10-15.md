@@ -1,5 +1,11 @@
 # 四模块修复记录
 
+## 第三十五批：R6-D1单次执行与文本消费者（2026-10-18）
+
+ProcessRequest→Host/Wait/Runner/Output→Executor预算→文本Git/Change/Gateway已切换新终结事实。原整数混同、失败查询继续写、未知push重试、spool空文本及提前/重复清理已退出。非作者发现本轮Unknown启动误写executed=true和Gateway漏独立工程依赖，均已修正并转绿，与原问题分开记账。
+
+最终652固定包SHA003bc8818969…，全新npm安装后Node/Bun各19真实目标、41组Git边界、真实Git绑定创建/释放、npm根Plugin各3/3，以及同F#程序真实fsi→固定包运行通过。正式直接12文件229pass/0fail/0TODO，12/12完整收尾；扩展15文件249/0/3TODO；补充integration80/0/2TODO、6/6收尾但最终exit1。GAP-151/215已有独立计划，未删改或冒称全套绿。完整Fable、静态及独立闭包正负编译通过，旧→新职责及可复取原日志/固定包在[D1施工报告](PROCESS-TERMINATION-D1-2026-10-18.md)与[evidence/R6-D1](evidence/R6-D1/receipt.json)。D1随本原子提交交付；父D、D2、R12及部署不随之完成。
+
 依据：[源码问题报告与修复计划](SOURCE-AUDIT-2026-10-15.md)。状态和认领只在 [BOARD.md](BOARD.md#source-audit-repairs) 维护。本文件记录实际修改、验收证据和剩余边界；未执行的测试不写通过。
 
 ## 第三十四批：R6-D纯契约和物理原型，生产待接（2026-10-18）

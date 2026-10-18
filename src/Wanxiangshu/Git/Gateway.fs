@@ -9,7 +9,7 @@ open Wanxiangshu.Process
 
 /// Hook-process Git transport helper. It is not a product-process remote API:
 /// OpenCode/Wanxiangshu never owns user fetch/pull/push triggers.
-type GitGatewayRunner = string list -> Task<int * string * string>
+type GitGatewayRunner = string list -> Task<Result<TextProcessExit, ProcessResult>>
 
 /// Work that runs while the cross-process store lock is held: local writer
 /// reads, union validation, remote import and the final materialization.
@@ -18,6 +18,13 @@ type GitGatewayLocalStage = unit -> Task<Result<StoreSnapshot, ConvergeError>>
 
 [<RequireQualifiedAccess>]
 module GitGateway =
+    type private PushFailure = Rejected of ConvergeError | ExecutionFailed of ProcessResult
+
+    let private execute (run: GitGatewayRunner) args =
+        task {
+            let! result = run args
+            return Result.mapError (ProcessResult.describe >> ConvergeError.Transport) result
+        }
     let private trackingRef remote = StoreRef.remoteTracking remote
 
     let private transportError stdout stderr =
@@ -58,11 +65,11 @@ module GitGateway =
         taskResult {
             let tracking = trackingRef remote
             let refspec = sprintf "+%s:%s" StoreRef.canonical tracking
-            let! code, stdout, stderr = run [ "fetch"; "--no-tags"; remote; refspec ] |> TaskResultCE.ofTask
-            do! requireExit0 stdout stderr code
-            let! verifyCode, verifyOut, verifyErr = run [ "rev-parse"; "--verify"; tracking ] |> TaskResultCE.ofTask
-            do! requireExit0 verifyOut verifyErr verifyCode
-            return! requireFetchedObjectId (verifyOut.Trim())
+            let! fetched = execute run [ "fetch"; "--no-tags"; remote; refspec ]
+            do! requireExit0 fetched.Stdout fetched.Stderr fetched.ExitCode
+            let! verified = execute run [ "rev-parse"; "--verify"; tracking ]
+            do! requireExit0 verified.Stdout verified.Stderr verified.ExitCode
+            return! requireFetchedObjectId (verified.Stdout.Trim())
         }
 
     let private materializeRemotePresence run remote =
@@ -83,12 +90,12 @@ module GitGateway =
         (remote: string)
         : Task<Result<StoreSnapshot option * GitObjectId option, ConvergeError>> =
         taskResult {
-            let! code, stdout, stderr = run [ "ls-remote"; "--refs"; remote; StoreRef.canonical ] |> TaskResultCE.ofTask
+            let! result = execute run [ "ls-remote"; "--refs"; remote; StoreRef.canonical ]
 
-            if code <> 0 then
-                return! Error(transportError stdout stderr)
+            if result.ExitCode <> 0 then
+                return! Error(transportError result.Stdout result.Stderr)
             else
-                return! afterLsRemote run remote stdout
+                return! afterLsRemote run remote result.Stdout
         }
 
     let private pushSnapshot
@@ -96,7 +103,7 @@ module GitGateway =
         (remote: string)
         (expectedRemote: GitObjectId option)
         (snapshot: StoreSnapshot)
-        : Task<Result<unit, ConvergeError>> =
+        : Task<Result<unit, PushFailure>> =
         task {
             let next = RootOid.value snapshot.RootOid
 
@@ -109,12 +116,10 @@ module GitGateway =
 
             // --no-verify avoids recursively entering pre-push; the hook process
             // also exports WANXIANG_GIT_SYNC_ACTIVE for every internal Git child.
-            let! code, stdout, stderr = run [ "push"; "--no-verify"; lease; remote; refspec ]
-
-            if code = 0 then
-                return Ok()
-            else
-                return Error(transportError stdout stderr)
+            match! run [ "push"; "--no-verify"; lease; remote; refspec ] with
+            | Error failure -> return Error(ExecutionFailed failure)
+            | Ok result when result.ExitCode = 0 -> return Ok()
+            | Ok result -> return Error(Rejected(transportError result.Stdout result.Stderr))
         }
 
     let private readTrackedRemote (raw: IGitRawStore) remote =
@@ -218,12 +223,13 @@ module GitGateway =
 
         and resolvePushOutcome
             (retriesLeft: int)
-            (pushResult: Result<unit, ConvergeError>)
+            (pushResult: Result<unit, PushFailure>)
             (mergedSnapshot: StoreSnapshot)
             =
             task {
                 match pushResult with
                 | Ok() -> return Ok mergedSnapshot
+                | Error(ExecutionFailed failure) -> return Error(ConvergeError.Transport(ProcessResult.describe failure))
                 | Error _ when budgetExhausted () -> return Error ConvergeError.ConvergeBudgetExhausted
                 | Error _ when retriesLeft > 0 -> return! rediscoverAndContinue retriesLeft
                 | Error _ when maxRetries <= 0 -> return Error ConvergeError.ConvergeCasRejected
@@ -284,7 +290,7 @@ module GitGateway =
                 let! res = run cmd (estimateFor args) ctx CancellationToken.None
 
                 match res with
-                | Ok(ProcessOutcome.Completed(code, stdout, stderr, _)) -> return (code, stdout, stderr)
-                | Ok(ProcessOutcome.Spooled(code, _, _, _)) -> return (code, "", "output spooled")
-                | Error err -> return (1, "", sprintf "%A" err)
+                | ProcessResult.Observed { Output = Some(CapturedOutput.Spooled(path, _, _)) } -> Spool.delete path
+                | _ -> ()
+                return ProcessResult.requireText res
             }

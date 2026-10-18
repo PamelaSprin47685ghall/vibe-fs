@@ -5,6 +5,7 @@ open System.Threading
 open System.Threading.Tasks
 open Wanxiangshu.Git
 open Wanxiangshu.Process
+open Wanxiangshu.Foundation
 
 /// Git command plumbing for the production Orchestrator host.
 module OrchestratorGit =
@@ -14,7 +15,7 @@ module OrchestratorGit =
           EstimatedOutput = OutputBytes 65536L
           EstimatedMemory = EstimatedMemory.Medium }
 
-    let createRunner (run: RunProcess) (cmd: Command) : Task<int * string * string> =
+    let createRunner (run: RunProcess) (cmd: Command) =
         task {
             let ctx =
                 { WorkingDirectory = cmd.WorkingDirectory
@@ -23,9 +24,9 @@ module OrchestratorGit =
             let! res = run cmd estimate ctx CancellationToken.None
 
             match res with
-            | Ok(ProcessOutcome.Completed(code, stdout, stderr, _)) -> return (code, stdout, stderr)
-            | Ok(ProcessOutcome.Spooled(code, _, _, _)) -> return (code, "", "output spooled")
-            | Error err -> return (1, "", sprintf "%A" err)
+            | ProcessResult.Observed { Output = Some(CapturedOutput.Spooled(path, _, _)) } -> Spool.delete path
+            | _ -> ()
+            return ProcessResult.requireText res
         }
 
     let command (dir: string) (args: string list) : Command =
@@ -39,17 +40,27 @@ module OrchestratorGit =
     /// over a bare REBASE_HEAD ref: a stale REBASE_HEAD can survive after a failed
     /// continue and would make `rebase --continue` report "no rebase in progress"
     /// while HasRebaseHead still returns true (ORCH-003 conflict resume).
-    let hasRebaseHead (runner: Command -> Task<int * string * string>) (worktree: string) : Task<bool> =
+    let private execute (runner: TextProcessRunner) cmd =
         task {
-            let! mergeCode, mergePath, _ = runner (command worktree [ "rev-parse"; "--git-path"; "rebase-merge" ])
-            let! applyCode, applyPath, _ = runner (command worktree [ "rev-parse"; "--git-path"; "rebase-apply" ])
+            let! result = runner cmd
+            return Result.mapError ProcessResult.describe result
+        }
 
-            let exists (code: int) (path: string) =
-                code = 0
-                && not (String.IsNullOrWhiteSpace path)
-                && System.IO.Directory.Exists(path.Trim())
-
-            return exists mergeCode mergePath || exists applyCode applyPath
+    let hasRebaseHead (runner: TextProcessRunner) (worktree: string) =
+        let pathFor name =
+            taskResult {
+                let! result = execute runner (command worktree [ "rev-parse"; "--git-path"; name ])
+                if result.ExitCode <> 0 || String.IsNullOrWhiteSpace result.Stdout then
+                    return! Error(sprintf "git rebase-state query failed: %s" result.Stderr)
+                else
+                    let path = result.Stdout.Trim()
+                    let absolute = if path.StartsWith "/" then path else System.IO.Path.Combine(worktree, path)
+                    return System.IO.Directory.Exists absolute
+            }
+        taskResult {
+            let! merge = pathFor "rebase-merge"
+            let! apply = pathFor "rebase-apply"
+            return merge || apply
         }
 
     /// After a manager terminal: stage everything, then either continue an
@@ -60,51 +71,51 @@ module OrchestratorGit =
     /// still unstaged (ORCH-003 conflict resume: Coder rewrote the file; Manager
     /// joined; finalize must stage then continue).
     let private continueRebase
-        (runner: Command -> Task<int * string * string>)
+        (runner: TextProcessRunner)
         (worktree: string)
         : Task<Result<unit, string>> =
-        task {
-            let! contCode, _, contErr = runner (command worktree [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
+        taskResult {
+            let! result = execute runner (command worktree [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
 
-            if contCode = 0 then
-                return Ok()
+            if result.ExitCode = 0 then
+                return ()
             else
-                return Error(sprintf "git rebase --continue failed: %s" contErr)
+                return! Error(sprintf "git rebase --continue failed: %s" result.Stderr)
         }
 
     // semantic-decorator-owner: change-integration
     // semantic-decorator-WHAT: change-integration-003
     // semantic-decorator-trace-relation: delete stale REBASE_HEAD exactly once before the single candidate commit attempt
-    // semantic-decorator-proof: requirements/change-integration/tests/git-operations.test.mjs::WHAT[change-integration-003] GIT_candidate_commit_deletes_stale_rebase_head_before_commit_and_surfaces_failure
-    // semantic-decorator-failure-policy: ignore stale-ref deletion outcome; surface commit stderr unless git reports nothing to commit
+    // semantic-decorator-proof: requirements/change-integration/tests/003.test.mjs::WHAT[change-integration-003] GIT_candidate_commit_deletes_stale_rebase_head_before_commit_and_surfaces_failure
+    // semantic-decorator-failure-policy: require successful stale-ref deletion; surface commit stderr unless git reports nothing to commit
     // semantic-decorator-cancel-policy: cancellation is owned by the injected command runner and stops before the next command
     // semantic-decorator-deadline-policy: each command uses the runner deadline; no sequence-level deadline extension
     // semantic-decorator-invocation-bound: 2
     let private commitCandidate
-        (runner: Command -> Task<int * string * string>)
+        (runner: TextProcessRunner)
         (managerId: string)
         (worktree: string)
         : Task<Result<unit, string>> =
-        task {
-            let! _ = runner (command worktree [ "update-ref"; "-d"; "REBASE_HEAD" ])
+        taskResult {
+            let! deleted = execute runner (command worktree [ "update-ref"; "-d"; "REBASE_HEAD" ])
+            do! if deleted.ExitCode = 0 then Ok() else Error(sprintf "git stale-ref cleanup failed: %s" deleted.Stderr)
 
-            let! commitCode, commitOut, commitErr =
-                runner (command worktree [ "commit"; "-m"; sprintf "candidate: %s" managerId ])
+            let! result = execute runner (command worktree [ "commit"; "-m"; sprintf "candidate: %s" managerId ])
 
-            if commitCode = 0 then
-                return Ok()
-            elif (commitOut + commitErr).Contains("nothing to commit") then
-                return Ok()
+            if result.ExitCode = 0 then
+                return ()
+            elif (result.Stdout + result.Stderr).Contains("nothing to commit") then
+                return ()
             else
-                return Error(sprintf "git commit failed: %s" commitErr)
+                return! Error(sprintf "git commit failed: %s" result.Stderr)
         }
 
     let private finalizeCommitOrRebase
-        (runner: Command -> Task<int * string * string>)
+        (runner: TextProcessRunner)
         (managerId: string)
         (worktree: string)
         : Task<Result<unit, string>> =
-        task {
+        taskResult {
             let! hasRb = hasRebaseHead runner worktree
 
             if hasRb then
@@ -114,50 +125,48 @@ module OrchestratorGit =
         }
 
     let private refuseConflictMarkers
-        (runner: Command -> Task<int * string * string>)
+        (runner: TextProcessRunner)
         (managerId: string)
         (worktree: string)
         : Task<Result<unit, string>> =
-        task {
-            let! grepCode, grepOut, _ =
-                runner (command worktree [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ])
+        taskResult {
+            let! result = execute runner (command worktree [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ])
 
             // git grep exit 0 = matches, 1 = no match, >1 = error
-            if grepCode = 0 && not (String.IsNullOrWhiteSpace grepOut) then
-                return Error(sprintf "conflict markers remain in worktree:\n%s" (grepOut.Trim()))
-            elif grepCode > 1 then
-                return Error "conflict-marker scan failed"
+            if result.ExitCode = 0 && not (String.IsNullOrWhiteSpace result.Stdout) then
+                return! Error(sprintf "conflict markers remain in worktree:\n%s" (result.Stdout.Trim()))
+            elif result.ExitCode > 1 then
+                return! Error "conflict-marker scan failed"
             else
                 return! finalizeCommitOrRebase runner managerId worktree
         }
 
     let private afterGitAdd
-        (runner: Command -> Task<int * string * string>)
+        (runner: TextProcessRunner)
         (managerId: string)
         (worktree: string)
         : Task<Result<unit, string>> =
-        task {
-            let! unmergedCode, unmergedOut, unmergedErr =
-                runner (command worktree [ "diff"; "--name-only"; "--diff-filter=U" ])
+        taskResult {
+            let! result = execute runner (command worktree [ "diff"; "--name-only"; "--diff-filter=U" ])
 
-            if unmergedCode <> 0 then
-                return Error(sprintf "conflict scan failed: %s" unmergedErr)
-            elif not (String.IsNullOrWhiteSpace unmergedOut) then
-                return Error(sprintf "unmerged paths remain after stage: %s" (unmergedOut.Trim()))
+            if result.ExitCode <> 0 then
+                return! Error(sprintf "conflict scan failed: %s" result.Stderr)
+            elif not (String.IsNullOrWhiteSpace result.Stdout) then
+                return! Error(sprintf "unmerged paths remain after stage: %s" (result.Stdout.Trim()))
             else
                 return! refuseConflictMarkers runner managerId worktree
         }
 
     let finalizeWorktree
-        (runner: Command -> Task<int * string * string>)
+        (runner: TextProcessRunner)
         (managerId: string)
         (worktree: string)
         : Task<Result<unit, string>> =
-        task {
-            let! addCode, _, addErr = runner (command worktree [ "add"; "-A" ])
+        taskResult {
+            let! result = execute runner (command worktree [ "add"; "-A" ])
 
-            if addCode <> 0 then
-                return Error(sprintf "git add failed: %s" addErr)
+            if result.ExitCode <> 0 then
+                return! Error(sprintf "git add failed: %s" result.Stderr)
             else
                 return! afterGitAdd runner managerId worktree
         }

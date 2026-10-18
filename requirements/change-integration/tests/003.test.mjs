@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { responseReceipt, absentState } from './support/process.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -16,11 +17,11 @@ const fakeRunner = (answers) => {
       if (!key.startsWith(prefix)) continue
       if (Array.isArray(response) && Array.isArray(response[0])) {
         const triple = response.length > 1 ? response.shift() : response[0]
-        return Promise.resolve(triple)
+        return Promise.resolve(responseReceipt(triple))
       }
-      return Promise.resolve(response)
+      return Promise.resolve(responseReceipt(response))
     }
-    return Promise.resolve([0, '', ''])
+    return Promise.resolve(absentState(command))
   }
   return { runner, calls }
 }
@@ -40,6 +41,51 @@ const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main
   ['merge --ff-only', [0, '', '']],
 ]
 const ff = (answers) => change.gitFfMerge(git(fakeRunner(answers).runner), WORKTREE, 'main', 'beef02', 'cafe01')
+
+for (const [name, receipt] of [
+  ['signal', { kind: 'Observed', ending: { kind: 'Signaled', signal: 'SIGTERM' }, output: null, fault: null, stopRequested: null }],
+  ['unknown', { kind: 'Observed', ending: { kind: 'Unconfirmed' }, output: null, fault: 'target receipt missing', stopRequested: null }],
+  ['stopped', { kind: 'Observed', ending: { kind: 'Exited', exitCode: 23 }, output: { kind: 'InMemory', stdout: '', stderr: '' }, fault: null, stopRequested: { kind: 'CancellationRequested' } }],
+  ['capture fault', { kind: 'Observed', ending: { kind: 'Exited', exitCode: 23 }, output: null, fault: 'capture disk failure', stopRequested: null }],
+  ['not started', { kind: 'NotStarted', reason: { kind: 'StartRejected', reason: 'ENOENT' } }],
+]) {
+  for (const stage of ['add -A', 'diff --name-only --diff-filter=U', 'grep -I', 'rev-parse --git-path rebase-merge', 'rev-parse --git-path rebase-apply', 'update-ref -d REBASE_HEAD']) {
+    test(`WHAT[change-integration-003] ${name} at ${stage} stops the real finalization sequence`, async () => {
+      const fake = fakeRunner([[stage, receipt]])
+      const result = await hostSurface.finalizeWorktree(fake.runner, 'manager-1', WORKTREE)
+      assert.equal(result.ok, false)
+      assert.ok(fake.calls.at(-1).args.join(' ').startsWith(stage))
+      assert.equal(fake.calls.some(call => ['commit', 'rebase'].includes(call.args[0])), false)
+      assert.match(result.error, /Process (?:end|not started)/)
+    })
+  }
+  for (const stage of ['rev-parse --git-path rebase-merge', 'rev-parse --git-path rebase-apply', 'update-ref -d REBASE_HEAD']) {
+    test(`WHAT[change-integration-003] ${name} at ${stage} stops the real rebase sequence`, async () => {
+      const fake = fakeRunner([[stage, receipt]])
+      const result = await change.gitRebase(git(fake.runner), WORKTREE, 'main')
+      assert.equal(result.ok, false)
+      assert.ok(fake.calls.at(-1).args.join(' ').startsWith(stage))
+      assert.equal(fake.calls.some(call => ['commit', 'rebase'].includes(call.args[0])), false)
+    })
+  }
+}
+
+test('WHAT[change-integration-003] failed stale-ref deletion stops before commit', async () => {
+  const fake = fakeRunner([['update-ref -d REBASE_HEAD', [1, '', 'cannot lock ref']]])
+  const result = await hostSurface.finalizeWorktree(fake.runner, 'manager-1', WORKTREE)
+  assert.equal(result.ok, false)
+  assert.match(result.error, /cannot lock ref/)
+  assert.equal(fake.calls.some(call => call.args[0] === 'commit'), false)
+})
+
+test('WHAT[change-integration-003] empty successful query is not evidence that rebase state is absent', async () => {
+  for (const finalize of [false, true]) {
+    const fake = fakeRunner([['rev-parse --git-path rebase-merge', [0, '', '']]])
+    const result = await (finalize ? hostSurface.finalizeWorktree(fake.runner, 'manager-1', WORKTREE) : change.gitRebase(git(fake.runner), WORKTREE, 'main'))
+    assert.equal(result.ok, false)
+    assert.equal(fake.calls.some(call => ['commit', 'rebase', 'update-ref'].includes(call.args[0])), false)
+  }
+})
 
 test('WHAT[change-integration-003] GIT_rebase_ok_on_zero_exit', async () => {
   const result = await change.gitRebase(git(fakeRunner([['rebase main', [0, '', '']]]).runner), WORKTREE, 'main')
@@ -120,13 +166,13 @@ test('WHAT[change-integration-003] GIT_has_rebase_head_true_only_when_git_path_d
   const { join } = await import('node:path')
   const dir = mkdtempSync(join(tmpdir(), 'wxs-rebase-head-'))
   const fake = fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}\n`, '']]])
-  assert.equal(await change.gitHasRebaseHead(git(fake.runner), WORKTREE), true)
+  assert.deepEqual(await change.gitHasRebaseHead(git(fake.runner), WORKTREE), { ok: true, value: true })
   assert.deepEqual(fake.calls.map((call) => call.args.join(' ')), [
     'rev-parse --git-path rebase-merge',
     'rev-parse --git-path rebase-apply',
   ])
-  assert.equal(await change.gitHasRebaseHead(git(fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}-gone\n`, '']]]).runner), WORKTREE), false)
-  assert.equal(await change.gitHasRebaseHead(git(fakeRunner([]).runner), WORKTREE), false)
+  assert.deepEqual(await change.gitHasRebaseHead(git(fakeRunner([['rev-parse --git-path rebase-merge', [0, `${dir}-gone\n`, '']]]).runner), WORKTREE), { ok: true, value: false })
+  assert.deepEqual(await change.gitHasRebaseHead(git(fakeRunner([]).runner), WORKTREE), { ok: true, value: false })
   rmSync(dir, { recursive: true, force: true })
 })
 }
@@ -397,9 +443,9 @@ const fakeRunner = (answers = []) => {
     calls.push({ args, cwd: command.workingDirectory })
     const key = args.join(' ')
     for (const [prefix, response] of answers) {
-      if (key.startsWith(prefix)) return Promise.resolve(response)
+      if (key.startsWith(prefix)) return Promise.resolve(responseReceipt(response))
     }
-    return Promise.resolve([0, '', ''])
+    return Promise.resolve(absentState(command))
   }
   return { runner, calls }
 }

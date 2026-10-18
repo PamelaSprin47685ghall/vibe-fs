@@ -46,7 +46,7 @@ for (const [name, text, budget] of [
 }
 
 test('WHAT[process-execution-015] the complete visible result including metadata fits the explicit budget', async () => {
-  const budget = 256
+  const budget = 512
   const wire = await run({ command: nodeCommand("process.stdout.write('x'.repeat(2000))"), output_budget_bytes: budget })
   assert.equal(parse(wire).exit_code, 0)
   assert.ok(Buffer.byteLength(wire, 'utf8') <= budget, `complete result is ${Buffer.byteLength(wire)} bytes for ${budget}`)
@@ -93,7 +93,7 @@ for (const language of ['en', 'zh-CN']) {
       assert.equal(below.executed, false)
       assert.equal(existsSync(marker), false)
       assert.equal(launches, 0)
-      for (const budget of [minimum, minimum + 1, 256, 549]) {
+      for (const budget of [minimum, minimum + 1, 512, 549]) {
         assert.ok(budget >= minimum)
         const wire = await run({ command, output_budget_bytes: budget }, { context })
         assert.equal(parse(wire).exit_code, 7)
@@ -103,14 +103,19 @@ for (const language of ['en', 'zh-CN']) {
       assert.ok(launches > 0, 'the observer must see the real accepted launch')
       const timeout = await run({ command: 'sleep 5', deadline_seconds: 0.01, output_budget_bytes: minimum }, { context })
       assert.ok(Buffer.byteLength(timeout) <= minimum)
-      assert.match(timeout, /Termination was requested|已请求终止/)
+      assert.equal(parse(timeout).stop_requested, 'deadline')
+      assert.equal(parse(timeout).deadline_ms, 10)
+      const signalWire = await run({ command: `exec ${nodeCommand("process.kill(process.pid, 'SIGTERM')")}`, output_budget_bytes: minimum }, { context })
+      assert.equal(parse(signalWire).signal, 'SIGTERM')
+      assert.equal(parse(signalWire).exit_code, undefined)
+      assert.ok(Buffer.byteLength(signalWire) <= minimum)
       const controller = new AbortController()
       controller.abort()
       const beforeCancellation = launches
       const cancelled = await run({ command, output_budget_bytes: minimum }, { context: { ...context, signal: controller.signal } })
       assert.equal(launches, beforeCancellation)
       assert.ok(Buffer.byteLength(cancelled) <= minimum)
-      assert.match(cancelled, /Cancellation was requested|已请求取消/)
+      assert.equal(parse(cancelled).not_started, 'cancelled_before_start')
       assert.doesNotMatch(cancelled, /command stopped|command 在完成前已停止/)
     } finally {
       childProcess.spawn = originalSpawn
@@ -124,6 +129,42 @@ for (const language of ['en', 'zh-CN']) {
   })
 }
 
+test('WHAT[process-execution-015] an uncertain worker start keeps uncertainty through real registration and bounded diagnostics', async () => {
+  const directory = mkdtempSync(join(tmpdir(), 'wxs-uncertain-start-'))
+  const marker = join(directory, 'must-not-run')
+  const originalSpawn = childProcess.spawn
+  const originalBunSpawn = globalThis.Bun?.spawn
+  let blockedStarts = 0
+  const block = () => {
+    blockedStarts++
+    throw new Error('Controlled uncertain worker start: ' + '\0中文'.repeat(500))
+  }
+  try {
+    childProcess.spawn = block
+    if (originalBunSpawn) globalThis.Bun.spawn = block
+    syncBuiltinESMExports()
+    const wire = await run({ command: nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'unexpected')`), output_budget_bytes: 512 })
+    const definition = registerBounded({ tool: value => value }, 'run', 'uncertain worker start', async () => wire)
+    const registered = await definition.execute({}, { sessionID: 'uncertain-start' })
+    assert.equal(registered, wire)
+    const result = parse(registered)
+    assert.ok(blockedStarts > 0)
+    assert.equal(existsSync(marker), false)
+    assert.equal(result.executed, undefined)
+    assert.equal(result.execution_unconfirmed, true)
+    assert.equal(result.end_unconfirmed, true)
+    assert.equal(result.output_complete, false)
+    assert.equal(result.fault_present, true)
+    assert.equal(result.diagnostic_truncated, true)
+    assert.ok(Buffer.byteLength(registered) <= 512)
+  } finally {
+    childProcess.spawn = originalSpawn
+    if (originalBunSpawn) globalThis.Bun.spawn = originalBunSpawn
+    syncBuiltinESMExports()
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
 for (const [name, text] of [
   ['NUL and controls', '\0\x01\x7f\r\n'.repeat(100)],
   ['quote escape transitions', "'''\"\\\n".repeat(100)],
@@ -132,7 +173,7 @@ for (const [name, text] of [
   ['empty', ''],
 ]) {
   test(`WHAT[process-execution-015] complete encoded ${name} remains bounded and preserves a raw suffix`, async () => {
-    const budget = 256
+    const budget = 512
     const wire = await run({ command: nodeCommand(`process.stdout.write(${JSON.stringify(text)})`), output_budget_bytes: budget })
     const result = parse(wire)
     assert.equal(result.exit_code, 0)

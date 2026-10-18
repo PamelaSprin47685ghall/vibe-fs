@@ -5,11 +5,11 @@ open Wanxiangshu.Change
 open Wanxiangshu.Process
 
 module GitOperations =
-    val createWithRepo: repoPath: string -> runner: (Command -> Task<int * string * string>) -> GitPort
-    val continueRebase: runner: (Command -> Task<int * string * string>) -> dir: string -> Task<Result<unit, string>>
-    val stageAll: runner: (Command -> Task<int * string * string>) -> dir: string -> Task<Result<unit, string>>
+    val createWithRepo: repoPath: string -> runner: TextProcessRunner -> GitPort
+    val continueRebase: runner: TextProcessRunner -> dir: string -> Task<Result<unit, string>>
+    val stageAll: runner: TextProcessRunner -> dir: string -> Task<Result<unit, string>>
 
     val candidateCommit:
-        runner: (Command -> Task<int * string * string>) -> dir: string -> msg: string -> Task<Result<unit, string>>
+        runner: TextProcessRunner -> dir: string -> msg: string -> Task<Result<unit, string>>
 
-    val createWithRunner: runner: (Command -> Task<int * string * string>) -> GitPort
+    val createWithRunner: runner: TextProcessRunner -> GitPort

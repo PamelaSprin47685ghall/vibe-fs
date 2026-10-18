@@ -32,7 +32,7 @@ import * as runtime from '../../../dist/Process/Surface.js'
   test('WHAT[process-execution-011] the real Host abort listener stays attached while queued and detaches after cancellation', async () => {
     await gate.acquire(gate.createToken(false))
     const { controller, listeners, events } = trackedAbort()
-    const pending = run({ command: 'printf should-not-start', world_lock: true, output_budget_bytes: 256 }, {
+    const pending = run({ command: 'printf should-not-start', world_lock: true, output_budget_bytes: 512 }, {
       context: { sessionID: 'queued-cancel', abort: controller.signal },
     })
     let timer
@@ -43,9 +43,9 @@ import * as runtime from '../../../dist/Process/Surface.js'
       const wire = await Promise.race([pending, new Promise((_, reject) => {
         timer = setTimeout(() => reject(new Error('Queued cancellation must settle before the holder releases')), 1000)
       })])
-      assert.match(wire, /(?:Cancellation was requested|已请求取消)/)
+      assert.match(wire, /not_started = "cancelled_before_start"/)
       assert.doesNotMatch(wire, /should-not-start|exit_code|SpawnFailed/)
-      assert.ok(Buffer.byteLength(wire) <= 256)
+      assert.ok(Buffer.byteLength(wire) <= 512)
       assert.equal(gate.getCount(), 0)
       assert.equal(listeners.size, 0)
       assert.deepEqual(events, ['add', 'remove'])
@@ -56,7 +56,7 @@ import * as runtime from '../../../dist/Process/Surface.js'
       await pending.catch(() => {})
     }
     assert.equal(gate.getCount(), 1)
-    const wire = await run({ command: 'printf successor', world_lock: true, output_budget_bytes: 256 })
+    const wire = await run({ command: 'printf successor', world_lock: true, output_budget_bytes: 512 })
     assert.match(wire, /successor/)
     assert.equal(gate.getCount(), 1)
   })
@@ -64,7 +64,7 @@ import * as runtime from '../../../dist/Process/Surface.js'
   for (const command of ['printf complete', 'exit 7']) {
     test(`WHAT[process-execution-011] Host abort cleanup follows command completion: ${command}`, async () => {
       const { controller, listeners, events } = trackedAbort()
-      const wire = await run({ command, output_budget_bytes: 256 }, { context: { sessionID: 'completed-cancel', abort: controller.signal } })
+      const wire = await run({ command, output_budget_bytes: 512 }, { context: { sessionID: 'completed-cancel', abort: controller.signal } })
       assert.match(wire, /exit_code = /)
       assert.equal(listeners.size, 0)
       assert.deepEqual(events, ['add', 'remove'])
@@ -118,7 +118,7 @@ const parseToml = (text) =>
 
 const SPOOL_COMMAND = "printf '%04096d' 0"
 
-const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 256 }
+const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 512 }
 
 test('WHAT[process-execution-005] the real supervised host preserves literal environment overrides and direct argv', async () => {
   const sentinel = 'WANXIANGSHU_PROCESS_HOST_SENTINEL'
@@ -130,10 +130,10 @@ test('WHAT[process-execution-005] the real supervised host preserves literal env
     const script = 'process.stdout.write(JSON.stringify({args:process.argv.slice(1),env:process.env}))'
     const request = runtime.command(process.execPath, ['-e', script, ...args], process.cwd(), undefined, environment)
     const result = await runtime.run(request, runtime.estimate(10, 65536, 'medium'), runtime.context(undefined, 30000), runtime.createCancellationToken(false))
-    assert.equal(result.ok, true, JSON.stringify(result))
-    assert.equal(result.value.kind, 'Completed')
-    assert.equal(result.value.exitCode, 0)
-    const actual = JSON.parse(result.value.stdout)
+    assert.equal(result.kind, 'Observed', JSON.stringify(result))
+    assert.equal(result.output.kind, 'InMemory')
+    assert.deepEqual(result.ending, { kind: 'Exited', exitCode: 0 })
+    const actual = JSON.parse(result.output.stdout)
     assert.deepEqual(actual.args, args)
     for (const [key, value] of Object.entries(environment)) assert.equal(actual.env[key], value, key)
     assert.equal(actual.env.PATH, process.env.PATH)
@@ -162,7 +162,9 @@ test('WHAT[process-execution-005] invalid explicit environment is rejected inste
       const environment = Object.fromEntries([[key, value]])
       const request = runtime.command(process.execPath, ['-e', script], directory, undefined, environment)
       const result = await runtime.run(request, runtime.estimate(10, 1024, 'medium'), runtime.context(undefined, 30000), runtime.createCancellationToken(false))
-      assert.equal(result.ok, false, JSON.stringify({ key, result }))
+      assert.equal(result.kind, 'Observed', JSON.stringify({ key, result }))
+      assert.equal(result.output, null)
+      assert.ok(result.fault)
       assert.equal(existsSync(marker), false)
     }
   } finally {
@@ -208,9 +210,9 @@ test('WHAT[process-execution-011] RUN_blank_session_surfaces_natural_execution_c
 })
 
 test('WHAT[process-execution-011] RUN_deadline_overrun_returns_the_fixed_timeout_consequence', async () => {
-  const result = await run({ command: 'sleep 5', deadline_seconds: 0.01, output_budget_bytes: 256 })
+  const result = await run({ command: 'sleep 5', deadline_seconds: 0.01, output_budget_bytes: 512 })
   assert.doesNotMatch(result, /TimeoutExceeded|\berror\s*=/)
-  assert.match(result, /(?:Termination was requested|已请求终止)/)
+  assert.match(result, /stop_requested = "deadline"/)
   assert.doesNotMatch(result, /was stopped|已被停止/)
 })
 
@@ -288,9 +290,9 @@ test('WHAT[process-execution-011] RUN_spooled_output_family_blocked_surfaces_rec
           runtime.context(target, 5000),
           runtime.createCancellationToken(false),
         )
-        assert.equal(result.ok, true, `${pathValue}: ${JSON.stringify(result)}`)
-        assert.equal(result.value.exitCode, native.status, pathValue)
-        assert.equal(result.value.stdout, native.stdout, pathValue)
+        assert.equal(result.kind, 'Observed', `${pathValue}: ${JSON.stringify(result)}`)
+        assert.deepEqual(result.ending, { kind: 'Exited', exitCode: native.status }, pathValue)
+        assert.equal(result.output.stdout, native.stdout, pathValue)
       }
     } finally {
       process.chdir(originalCwd)

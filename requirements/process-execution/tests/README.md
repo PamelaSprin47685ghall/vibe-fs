@@ -7,10 +7,10 @@
 - 008 真实 PTY mailbox 保持顺序并排空；尚未证明 Agent pulse 与 PTY 的完整双通道装配。
 - 009 真实输出计量、转 spool 和文件往返；补清理由缓冲清空测试留下的 spool。010 实际命令验证标准流与非零退出。
 - 011 验证 run 的非法预算用会产生文件副作用的真实命令，确认在执行前拒绝、未 spawn。直接调用工具规约仍不证明插件角色准入。
-- 012 撤下辅助模型自证，实际读取工程发现请求词汇、Node 进程、PTY 状态和 spool 同处一个编译单元，保留会失败的 TODO。修复需要正式拆分闭包，不在测试里另造一个“纯契约”。
-- 013 执行真实子进程，完整比较预期原始尾部，并让注入 session capability 的任何访问抛错。该路径不调用它；整个插件零模型会话仍待证，不能靠输出不含 Distiller 字样推断。
+- 012 独立Fable编译真实ProcessRequest/PtyTypes闭包，正例可注入RunProcess；物理Host/Runner/Spool和错误终结类型负例须产生相应诊断，另编译真实Gateway消费者。
+- 013 真实子进程验证原始尾部且注入session能力的任何访问抛错；实际已注册DevOps插件核对model/session/prompt计数不增加，此证明不扩展到全部工具。
 - 014 实测伪指令日志不会变成结构字段；真实 spooled 输出按原值精确往返，包括尾换行、CRLF、裸 CR、引号、反斜杠、Unicode 与控制字符。截断说明为本地化数据字段 output_notice，不进入指令面，原始输出不经 trim，退出码保持真实程序事实。
-- 015 覆盖中文/emoji 在多个小预算下的合法 UTF-8 原始后缀；完整返回结果仍超过显式预算，另有实际 TODO。不得只检查输出字段就宣布总预算通过。
-- 016 实际 LargeGate 验证 FIFO、取消及运行期间占用；补重复取消、Host spawn 失败后释放并可再次执行。纯 launcher 测试接缝会把抛错转换为已完成的非零退出，不能据此期待 ProcessError；新用例直接注入 Host spawn，区分正确的失败边界。排空 Promise 用事件循环让出，不用业务睡眠。
+- 015 验证UTF-8后缀及完整wire字节/行数，双语minimum-1零启动、minimum的正常/信号/停止结果及真实registerBounded；未知启动和故障诊断有界且不宣称已执行。
+- 016 实际LargeGate验证FIFO、排队及交接取消、失败释放和后继运行。单次执行取消为NotStarted或Observed中的停止请求；launcher使用显式EndEvidence，不把抛错变非零退出。
 
 已修复的两项结果表达偏差见 GAP-093；合同/实现与范围缺口见 GAP-091/092。正式构建后运行本包、requirement-system、相关时间和 Provider 投影用例；发布节点保留 TODO。

@@ -39,12 +39,10 @@ test('WHAT[process-execution-009] EXEC_011_collector_concatenates_stdout_stderr_
   outputAddStdout(collector, text('hello '))
   outputAddStderr(collector, text('warn\n'))
   outputAddStdout(collector, text('世界'))
-  assert.deepEqual(outputBuildResult(collector, 7), {
-    kind: 'Completed',
-    exitCode: 7,
+  assert.deepEqual(outputBuildResult(collector), {
+    kind: 'InMemory',
     stdout: 'hello 世界',
     stderr: 'warn\n',
-    spooled: false,
   })
 })
 test('WHAT[process-execution-009] EXEC_011_collector_ignores_empty_chunks', () => {
@@ -52,16 +50,15 @@ test('WHAT[process-execution-009] EXEC_011_collector_ignores_empty_chunks', () =
   outputAddStdout(collector, new Uint8Array(0))
   outputAddStdout(collector, undefined)
   assert.equal(outputView(collector).bytesObserved, 0)
-  assert.equal(outputBuildResult(collector, 0).stdout, '')
+  assert.equal(outputBuildResult(collector).stdout, '')
 })
 test('WHAT[process-execution-009] EXEC_011_collector_spools_when_byte_count_crosses_threshold', async () => {
   const collector = create(10, 2)
   outputAddStdout(collector, text('abcdefg'))
   assert.equal(outputView(collector).spooled, true, 'crossing the threshold must start a spool')
 
-  const outcome = outputBuildResult(collector, 3)
+  const outcome = outputBuildResult(collector)
   assert.equal(outcome.kind, 'Spooled')
-  assert.equal(outcome.exitCode, 3)
   assert.equal(outcome.totalBytes, 7)
   assert.equal(outcome.chunkCount, 1)
   assert.equal(await readSpool({ path: outcome.spoolPath }), 'abcdefg')
@@ -72,7 +69,7 @@ test('WHAT[process-execution-009] EXEC_011_collector_spool_accumulates_later_chu
   outputAddStdout(collector, text('abcdefg'))
   outputAddStderr(collector, text('x'))
 
-  const outcome = outputBuildResult(collector, 4)
+  const outcome = outputBuildResult(collector)
   assert.equal(outcome.kind, 'Spooled')
   assert.equal(outcome.totalBytes, 8)
   assert.equal(outcome.chunkCount, 1)
@@ -85,7 +82,7 @@ test('WHAT[process-execution-009] EXEC_011_collector_spooled_buffers_are_cleared
   const view = outputView(collector)
   assert.equal(view.stdoutChunks, 0)
   assert.equal(view.stderrChunks, 0)
-  spoolDelete(outputBuildResult(collector, 0).spoolPath)
+  spoolDelete(outputBuildResult(collector).spoolPath)
 })
 test('WHAT[process-execution-009] EXEC_011_spool_chunk_count_rounds_up', () => {
   assert.equal(spoolChunkCount(0), 0)
@@ -201,18 +198,18 @@ test('WHAT[process-execution-009] PTY_SESSION_mutable_state_roundtrips', () => {
       runtime.context(process.cwd(), 20000),
       runtime.createCancellationToken(false),
     )
-    assert.equal(result.ok, true)
-    assert.equal(result.value.kind, 'Spooled')
+    assert.equal(result.kind, 'Observed')
+    assert.equal(result.output.kind, 'Spooled')
     try {
-      assert.equal(result.value.exitCode, 0)
-      assert.equal(result.value.totalBytes, count * block.length)
+      assert.deepEqual(result.ending, { kind: 'Exited', exitCode: 0 })
+      assert.equal(result.output.totalBytes, count * block.length)
       const actual = createHash('sha256')
-      for await (const bytes of fs.createReadStream(result.value.spoolPath)) actual.update(bytes)
+      for await (const bytes of fs.createReadStream(result.output.spoolPath)) actual.update(bytes)
       const expected = createHash('sha256')
       for (let index = 0; index < count; index++) expected.update(block)
       assert.equal(actual.digest('hex'), expected.digest('hex'))
     } finally {
-      runtime.spoolDelete(result.value.spoolPath)
+      runtime.spoolDelete(result.output.spoolPath)
     }
   })
 
@@ -236,9 +233,9 @@ test('WHAT[process-execution-009] PTY_SESSION_mutable_state_roundtrips', () => {
         runtime.context(process.cwd(), 1000),
         runtime.createCancellationToken(false),
       )
-      assert.equal(result.ok, false)
-      assert.equal(result.error.kind, 'ExecutionFailed')
-      assert.match(result.error.reason, /capture disk is full/)
+      assert.equal(result.kind, 'Observed')
+      assert.equal(result.output, null)
+      assert.match(result.fault, /capture disk is full/)
       assert.ok(failedPath)
       assert.equal(fs.existsSync(failedPath), false)
     } finally {

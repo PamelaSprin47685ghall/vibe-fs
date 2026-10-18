@@ -1,0 +1,22 @@
+{
+  "card": "CUT-02-R6-D1",
+  "mainBase": "25651051f",
+  "headBeforeCommit": "32bee416e",
+  "libraryCommit": "df14f489d0a503ce300da6df6ef8f71910b477eb",
+  "libraryVersion": "0.6.8",
+  "fixedProductGeneration": 652,
+  "fixedTarballSHA256": "003bc8818969597f9afd6a1c0767c7aae271dd53e5f0392b146367d156ec3887",
+  "originalTarballFiles": 2076,
+  "cleanInstalledSubtreeFiles": 2904,
+  "installLockSHA256": "29beb11dee4da50fe3d1eaac925f7114751a997d057cde8ef30170f61d3cba91",
+  "archives": {
+    "independent-review.tgz": "00aae6e20162d2c40b9fa4213a9e3f0c6e75af688ff9fd207aa5aaab87c03ba2",
+    "git-review.tgz": "08240524bb5bf6253fb08ca74ba7ddef6e984fe3831c15e9da5c7ebe23f6ff31",
+    "root-verification.tgz": "f05528354c2ba6b227b022dc8b9f125164e8241b470d70cfc7e87c134790b199"
+  },
+  "formalChangedConsumers": {"filesPlanned": 12, "filesCompleted": 12, "pass": 229, "fail": 0, "todo": 0, "skip": 0, "exit": 0},
+  "supplementalIntegration": {"filesPlanned": 6, "filesCompleted": 6, "pass": 80, "fail": 0, "todo": 2, "skip": 0, "exit": 1},
+  "rawRelevantRegression": {"files": 15, "pass": 249, "fail": 0, "todo": 3},
+  "unclosed": ["CUT-02-R6-D2", "GAP-151", "GAP-215", "R12-U1"],
+  "deployment": "not performed"
+}

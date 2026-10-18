@@ -142,12 +142,25 @@ module ExecutorTool =
     let private consequence (message: string) =
         tomlObjectWithInstructions [ message ] []
 
-    let private processConsequence language (processError: ProcessError) =
-        match processError with
-        | ProcessError.TimeoutExceeded _ -> consequence (prose language Path.Run.Timeout)
-        | ProcessError.SpawnFailed _ -> consequence (prose language Path.Run.SpawnFailed)
-        | ProcessError.ProcessCancelled _ -> consequence (prose language Path.Run.Cancelled)
-        | ProcessError.ExecutionFailed _ -> consequence (prose language Path.Run.ExecutionFailed)
+    let private observationFields (observation: ProcessObservation) =
+        [ match observation.End with
+          | EndEvidence.Confirmed _ -> yield "executed", TBool true
+          | EndEvidence.Unconfirmed -> yield "execution_unconfirmed", TBool true
+          match observation.End with
+          | EndEvidence.Confirmed(ProgramEnd.Exited code) -> yield "exit_code", TInt code
+          | EndEvidence.Confirmed(ProgramEnd.Signaled signal) -> yield "signal", TString signal
+          | EndEvidence.Unconfirmed -> yield "end_unconfirmed", TBool true
+          match observation.StopRequested with
+          | Some StopRequest.CancellationRequested -> yield "stop_requested", TString "cancellation"
+          | Some(StopRequest.DeadlineStopRequested duration) ->
+              yield "stop_requested", TString "deadline"
+              yield "deadline_ms", TInt64(int64 duration.TotalMilliseconds)
+          | None -> ()
+          yield "output_complete", TBool observation.Output.IsSome
+          yield "fault_present", TBool observation.Fault.IsSome ]
+
+    let private observationConsequence observation message =
+        tomlObjectWithInstructions [ message ] (observationFields observation)
 
     let private directoryFor (scope: ToolRuntimeScope) (context: HostToolContext) =
         if String.IsNullOrWhiteSpace context.SessionId then
@@ -161,25 +174,25 @@ module ExecutorTool =
         else
             EstimatedMemory.Medium
 
-    let private completedToml (exitCode: int) (stdout: string) (stderr: string) =
+    let private completedToml observation (stdout: string) (stderr: string) =
         let fields =
-            [ "exit_code", TInt exitCode
-              "stdout", TString(if isNull stdout then "" else stdout)
-              "stderr", TString(if isNull stderr then "" else stderr) ]
+            observationFields observation @
+                [ "stdout", TString(if isNull stdout then "" else stdout)
+                  "stderr", TString(if isNull stderr then "" else stderr) ]
 
         tomlObject fields
 
-    let internal formatSpooledOutcome (exitCode: int) (output: string) =
-        tomlObject [ "exit_code", TInt exitCode; "output", TString output ]
+    let internal formatSpooledOutcome observation (output: string) =
+        tomlObject (observationFields observation @ [ "output", TString output ])
 
-    let private formatTruncatedOutcome language exitCode output =
+    let private formatTruncatedOutcome language observation output =
         let notice = prose language Path.Run.OutputTruncated
 
         tomlObject
-            [ "exit_code", TInt exitCode
-              "output", TString output
+            (observationFields observation @
+            [ "output", TString output
               "output_truncated", TBool true
-              "output_notice", TString notice ]
+              "output_notice", TString notice ])
 
     let internal retainOutputTail limitBytes (output: string) =
         Encoding.UTF8.GetBytes output
@@ -195,15 +208,23 @@ module ExecutorTool =
         wireBytes wire <= budgetBytes && ToolResultBound.fitsInWindow wire
 
     let private minimumOutputBudget language =
-        [ completedToml Int32.MinValue "" ""
-          formatTruncatedOutcome language Int32.MinValue ""
-          processConsequence language (ProcessError.TimeoutExceeded TimeSpan.Zero)
-          processConsequence language (ProcessError.SpawnFailed "")
-          processConsequence language (ProcessError.ProcessCancelled "")
-          processConsequence language (ProcessError.ExecutionFailed "")
-          consequence (prose language Path.Run.CannotRunFromContext)
-          consequence (prose language Path.Run.CannotReadOutputUntilAuthority)
-          consequence (prose language Path.Run.LargeOutputRecoveryBlocked) ]
+        let observations =
+            [ EndEvidence.Confirmed(ProgramEnd.Exited Int32.MaxValue)
+              EndEvidence.Confirmed(ProgramEnd.Signaled "SIGVTALRM")
+              EndEvidence.Unconfirmed ]
+            |> List.collect (fun ending ->
+                [ None; Some StopRequest.CancellationRequested; Some(StopRequest.DeadlineStopRequested(TimeSpan.FromMilliseconds 922337203685477.0)) ]
+                |> List.collect (fun stop ->
+                    [ None; Some "" ] |> List.map (fun fault ->
+                        { End = ending; StopRequested = stop; Output = None; Fault = fault })))
+        [ yield consequence (prose language Path.Run.CannotRunFromContext)
+          yield tomlObject [ "executed", TBool false; "not_started", TString "cancelled_before_start"; "diagnostic_truncated", TBool true; "diagnostic", TString "" ]
+          for observation in observations do
+              yield completedToml observation "" ""
+              yield formatTruncatedOutcome language observation ""
+              yield tomlObject (observationFields observation @ [ "diagnostic_truncated", TBool true; "diagnostic", TString "" ])
+              yield observationConsequence observation (prose language Path.Run.CannotReadOutputUntilAuthority)
+              yield observationConsequence observation (prose language Path.Run.LargeOutputRecoveryBlocked) ]
         |> List.map wireBytes
         |> List.max
 
@@ -213,14 +234,14 @@ module ExecutorTool =
         else
             lower, limit - 1, previous
 
-    let private formatBoundedTail language budgetBytes exitCode (output: string) =
+    let private formatBoundedTail language budgetBytes observation (output: string) =
         let mutable lower = 0
         let mutable upper = utf8Length output
-        let mutable result = formatTruncatedOutcome language exitCode ""
+        let mutable result = formatTruncatedOutcome language observation ""
 
         while lower <= upper do
             let limit = lower + (upper - lower) / 2
-            let wire = formatTruncatedOutcome language exitCode (retainOutputTail limit output)
+            let wire = formatTruncatedOutcome language observation (retainOutputTail limit output)
 
             let nextLower, nextUpper, nextResult =
                 advanceTailSearch budgetBytes lower upper limit result wire
@@ -231,18 +252,35 @@ module ExecutorTool =
 
         result
 
-    let private readSpooledTail (language: ProviderLanguage) (budgetBytes: int64) (exitCode: int) (spoolPath: string) =
+    let private diagnosticOutcome budgetBytes fields (diagnostic: string) =
+        let complete = tomlObject (fields @ [ "diagnostic", TString diagnostic ])
+        if wireFits budgetBytes complete then complete
+        else
+            let render detail = tomlObject (fields @ [ "diagnostic_truncated", TBool true; "diagnostic", TString detail ])
+            let mutable lower = 0
+            let mutable upper = utf8Length diagnostic
+            let mutable result = render ""
+            while lower <= upper do
+                let limit = lower + (upper - lower) / 2
+                let wire = render (retainOutputTail limit diagnostic)
+                let nextLower, nextUpper, nextResult = advanceTailSearch budgetBytes lower upper limit result wire
+                lower <- nextLower
+                upper <- nextUpper
+                result <- nextResult
+            result
+
+    let private readSpooledTail (language: ProviderLanguage) (budgetBytes: int64) observation (spoolPath: string) =
         task {
             let limitBytes = int (min (int64 ToolResultBound.HostMaxBytes) budgetBytes)
             let! tail = Spool.readLatestTail limitBytes spoolPath
             let rawTail = ProcessOutput.decodeText tail.Bytes
-            let complete = formatSpooledOutcome exitCode rawTail
+            let complete = formatSpooledOutcome observation rawTail
 
             return
                 if not tail.Truncated && wireFits budgetBytes complete then
                     complete
                 else
-                    formatBoundedTail language budgetBytes exitCode rawTail
+                    formatBoundedTail language budgetBytes observation rawTail
         }
 
     let private finalizeSpooledWithAuthority
@@ -250,16 +288,16 @@ module ExecutorTool =
         (language: ProviderLanguage)
         (root: SessionId)
         (budgetBytes: int64)
-        (exitCode: int)
+        (observation: ProcessObservation)
         (spoolPath: string)
         =
         task {
             let! recovery = scope.RequireCurrentProcessJoin root
 
             match recovery with
-            | FamilyRecovery.FamilyBlocked _ -> return consequence (prose language Path.Run.LargeOutputRecoveryBlocked)
+            | FamilyRecovery.FamilyBlocked _ -> return observationConsequence observation (prose language Path.Run.LargeOutputRecoveryBlocked)
             | FamilyRecovery.FamilyWaiting _
-            | FamilyRecovery.FamilyReady _ -> return! readSpooledTail language budgetBytes exitCode spoolPath
+            | FamilyRecovery.FamilyReady _ -> return! readSpooledTail language budgetBytes observation spoolPath
         }
 
     let private finalizeSpooledBody
@@ -267,12 +305,12 @@ module ExecutorTool =
         (language: ProviderLanguage)
         (context: HostToolContext)
         (budgetBytes: int64)
-        (exitCode: int)
+        (observation: ProcessObservation)
         (spoolPath: string)
         =
         task {
             if String.IsNullOrWhiteSpace context.SessionId then
-                return consequence (prose language Path.Run.CannotReadOutputUntilAuthority)
+                return observationConsequence observation (prose language Path.Run.CannotReadOutputUntilAuthority)
             else
                 return!
                     finalizeSpooledWithAuthority
@@ -280,8 +318,17 @@ module ExecutorTool =
                         language
                         (SessionId.create context.SessionId)
                         budgetBytes
-                        exitCode
+                        observation
                         spoolPath
+        }
+
+    let private readSpooledSafely scope language context budgetBytes observation spoolPath =
+        task {
+            try
+                return! finalizeSpooledBody scope language context budgetBytes observation spoolPath
+            with error ->
+                let failed = { observation with Output = None; Fault = Some error.Message }
+                return diagnosticOutcome budgetBytes (observationFields failed) error.Message
         }
 
     let private finalizeSpooled
@@ -289,12 +336,12 @@ module ExecutorTool =
         (language: ProviderLanguage)
         (context: HostToolContext)
         (budgetBytes: int64)
-        (exitCode: int)
+        (observation: ProcessObservation)
         (spoolPath: string)
         =
         task {
             try
-                return! finalizeSpooledBody scope language context budgetBytes exitCode spoolPath
+                return! readSpooledSafely scope language context budgetBytes observation spoolPath
             finally
                 Spool.delete spoolPath
         }
@@ -302,43 +349,66 @@ module ExecutorTool =
     let private truncateCompleted
         (language: ProviderLanguage)
         (budgetBytes: int64)
-        (exitCode: int)
+        (observation: ProcessObservation)
         (fullBytes: byte array)
         =
         let limitBytes = int (min (int64 ToolResultBound.HostMaxBytes) budgetBytes)
         let rawTail = ProcessOutput.decodeText fullBytes |> retainOutputTail limitBytes
-        formatBoundedTail language budgetBytes exitCode rawTail
+        formatBoundedTail language budgetBytes observation rawTail
 
     let private completedOutcome
         (language: ProviderLanguage)
         (budgetBytes: int64)
-        (exitCode: int)
+        (observation: ProcessObservation)
         (stdout: string)
         (stderr: string)
         =
         let fullBytes =
             Encoding.UTF8.GetBytes(stdout + (if String.IsNullOrEmpty stderr then "" else "\n" + stderr))
 
-        let complete = completedToml exitCode stdout stderr
+        let complete = completedToml observation stdout stderr
 
         if not (wireFits budgetBytes complete) then
-            truncateCompleted language budgetBytes exitCode fullBytes
+            truncateCompleted language budgetBytes observation fullBytes
         else
             complete
+
+    let private noExecutionDetail language reason =
+        match reason with
+        | NoExecution.InvalidRequest reason -> "invalid_request", reason
+        | NoExecution.CancelledBeforeStart -> "cancelled_before_start", prose language Path.Run.Cancelled
+        | NoExecution.StartRejected reason -> "start_rejected", reason
+
+    let private notStartedOutcome language budget reason =
+        let kind, message = noExecutionDetail language reason
+        task { return diagnosticOutcome budget [ "executed", TBool false; "not_started", TString kind ] message }
+
+    let private deleteSpooledOutput output =
+        match output with
+        | Some(CapturedOutput.Spooled(path, _, _)) -> Spool.delete path
+        | _ -> ()
+
+    let private observedOutcome scope request language context (observation: ProcessObservation) =
+        match observation.Output, observation.Fault with
+        | Some(CapturedOutput.InMemory(stdout, stderr)), None ->
+            task { return completedOutcome language request.OutputBudgetBytes observation stdout stderr }
+        | Some(CapturedOutput.Spooled(path, _, _)), None ->
+            finalizeSpooled scope language context request.OutputBudgetBytes observation path
+        | output, fault ->
+            deleteSpooledOutput output
+            let diagnostic = fault |> Option.defaultValue "Output was not delivered completely"
+            task { return diagnosticOutcome request.OutputBudgetBytes (observationFields observation) diagnostic }
 
     let private interpretOutcome
         (scope: ToolRuntimeScope)
         (request: Request)
         (language: ProviderLanguage)
         (context: HostToolContext)
-        (result: Result<ProcessOutcome, ProcessError>)
+        (result: ProcessResult)
         =
         match result with
-        | Error processError -> task { return processConsequence language processError }
-        | Ok(ProcessOutcome.Completed(exitCode, stdout, stderr, _)) ->
-            task { return completedOutcome language request.OutputBudgetBytes exitCode stdout stderr }
-        | Ok(ProcessOutcome.Spooled(exitCode, spoolPath, _totalBytes, _chunkCount)) ->
-            finalizeSpooled scope language context request.OutputBudgetBytes exitCode spoolPath
+        | ProcessResult.NotStarted reason -> notStartedOutcome language request.OutputBudgetBytes reason
+        | ProcessResult.Observed observation -> observedOutcome scope request language context observation
 
     let private runPrepared
         (run: RunProcess)

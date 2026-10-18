@@ -10,6 +10,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Process
 
 /// JS-native owner for the OrchestratorHost semantic harness.
 ///
@@ -58,8 +59,7 @@ module OrchestratorHostSurface =
     let private commandRunner (runner: obj) (command: Wanxiangshu.Process.Command) =
         task {
             let! raw = invokeRawRunner runner (commandObject command)
-            let values = unbox<obj array> raw
-            return int (stringOf values.[0]), stringOf values.[1], stringOf values.[2]
+            return raw |> ProcessResultWire.read |> ProcessResult.requireText
         }
 
     let private boolOf (value: obj) =
@@ -287,7 +287,7 @@ module OrchestratorHostSurface =
             fun path ->
                 task {
                     let! value = invokeRawTask raw "HasRebaseHead" [| box (WorktreePath.value path) |]
-                    return boolOf value
+                    return plainResult value boolOf
                 }
           ListWorktrees =
             fun () ->

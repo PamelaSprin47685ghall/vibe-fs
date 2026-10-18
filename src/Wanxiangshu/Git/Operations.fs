@@ -11,6 +11,12 @@ open Wanxiangshu.Process
 /// contained here; workflow sequencing stays in OrchestratorProgram.
 module GitOperations =
 
+    let private execute (runner: TextProcessRunner) cmd =
+        task {
+            let! result = runner cmd
+            return Result.mapError ProcessResult.describe result
+        }
+
     let private command repo args =
         { FileName = "git"
           Arguments = args
@@ -28,32 +34,32 @@ module GitOperations =
             stderr.Trim()
 
     let private verifyClean runner repo =
-        task {
-            let! code, stdout, stderr = runner (command repo [ "status"; "--porcelain" ])
+        taskResult {
+            let! result = execute runner (command repo [ "status"; "--porcelain" ])
 
-            if code <> 0 then
-                return Error(failure stdout stderr)
-            elif String.IsNullOrWhiteSpace stdout then
-                return Ok()
+            if result.ExitCode <> 0 then
+                return! Error(failure result.Stdout result.Stderr)
+            elif String.IsNullOrWhiteSpace result.Stdout then
+                return ()
             else
-                return Error "target worktree is dirty; refusing ff-only merge"
+                return! Error "target worktree is dirty; refusing ff-only merge"
         }
 
     let private verifyHead runner repo (expected: CommitHash) =
-        task {
-            let! code, stdout, stderr = runner (command repo [ "rev-parse"; "HEAD" ])
+        taskResult {
+            let! result = execute runner (command repo [ "rev-parse"; "HEAD" ])
 
-            if code <> 0 then
-                return Error(failure stdout stderr)
-            elif stdout.Trim() = CommitHash.value expected then
-                return Ok expected
+            if result.ExitCode <> 0 then
+                return! Error(failure result.Stdout result.Stderr)
+            elif result.Stdout.Trim() = CommitHash.value expected then
+                return expected
             else
-                return
+                return!
                     Error(
                         sprintf
                             "ff-only merge did not advance HEAD to candidate %s (got %s)"
                             (CommitHash.value expected)
-                            (stdout.Trim())
+                            (result.Stdout.Trim())
                     )
         }
 
@@ -63,19 +69,19 @@ module GitOperations =
     /// to report upward — ORCH-005 answers it by rebasing and re-reviewing, and the
     /// old post-rebase witness is discarded.
     let private isRefMoved (message: string) =
-        [ "cannot lock ref"; "update-ref"; "expected" ]
-        |> List.exists (fun marker -> message.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0)
+        [ "cannot lock ref"; "is at "; "but expected " ]
+        |> List.forall (fun marker -> message.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0)
 
     let private revParse runner repo (spec: string) (missing: string) =
-        task {
-            let! code, stdout, stderr = runner (command repo [ "rev-parse"; spec ])
+        taskResult {
+            let! result = execute runner (command repo [ "rev-parse"; spec ])
 
-            if code <> 0 then
-                return Error(stderrOr missing stderr)
-            elif String.IsNullOrWhiteSpace stdout then
-                return Error missing
+            if result.ExitCode <> 0 then
+                return! Error(stderrOr missing result.Stderr)
+            elif String.IsNullOrWhiteSpace result.Stdout then
+                return! Error missing
             else
-                return Ok(CommitHash.create (stdout.Trim()))
+                return CommitHash.create (result.Stdout.Trim())
         }
 
     let private targetSpec (target: TargetRef) =
@@ -88,23 +94,25 @@ module GitOperations =
             "<detached HEAD>"
 
     let private requirePublishBranch
-        (runner: Command -> Task<int * string * string>)
+        (runner: TextProcessRunner)
         repoPath
         (target: TargetRef)
         : Task<Result<unit, string>> =
-        task {
-            let! branchCode, branchOut, _ = runner (command repoPath [ "symbolic-ref"; "--short"; "HEAD" ])
+        taskResult {
+            let! result = execute runner (command repoPath [ "symbolic-ref"; "--quiet"; "--short"; "HEAD" ])
 
-            if branchCode <> 0 || branchOut.Trim() <> TargetRef.value target then
-                return
+            if result.ExitCode > 1 then
+                return! Error(stderrOr "cannot read publish branch" result.Stderr)
+            elif result.ExitCode <> 0 || result.Stdout.Trim() <> TargetRef.value target then
+                return!
                     Error(
                         sprintf
                             "publish branch mismatch: target repo is on '%s' but publish is frozen to '%s'"
-                            (checkedOutBranch branchCode branchOut)
+                            (checkedOutBranch result.ExitCode result.Stdout)
                             (TargetRef.value target)
                     )
             else
-                return Ok()
+                return ()
         }
 
     let private assertExpectedHead (currentHead: CommitHash) (expectedHead: CommitHash) =
@@ -114,14 +122,14 @@ module GitOperations =
             Ok()
 
     let private requireAncestor
-        (runner: Command -> Task<int * string * string>)
+        (runner: TextProcessRunner)
         repoPath
         (currentHead: CommitHash)
         (candidate: CommitHash)
         : Task<Result<unit, string>> =
-        task {
-            let! ancestorCode, _, ancestorError =
-                runner (
+        taskResult {
+            let! result =
+                execute runner (
                     command
                         repoPath
                         [ "merge-base"
@@ -130,10 +138,10 @@ module GitOperations =
                           CommitHash.value candidate ]
                 )
 
-            if ancestorCode <> 0 then
-                return Error(stderrOr "candidate is not a fast-forward of the target branch" ancestorError)
+            if result.ExitCode <> 0 then
+                return! Error(stderrOr "candidate is not a fast-forward of the target branch" result.Stderr)
             else
-                return Ok()
+                return ()
         }
 
     let private mergeFailure message =
@@ -143,20 +151,19 @@ module GitOperations =
             message
 
     let private mergeFf
-        (runner: Command -> Task<int * string * string>)
+        (runner: TextProcessRunner)
         repoPath
         (candidate: CommitHash)
         : Task<Result<CommitHash, string>> =
-        task {
-            let! mergeCode, mergeOut, mergeError =
-                runner (command repoPath [ "merge"; "--ff-only"; CommitHash.value candidate ])
+        taskResult {
+            let! result = execute runner (command repoPath [ "merge"; "--ff-only"; CommitHash.value candidate ])
 
-            if mergeCode = 0 then
+            if result.ExitCode = 0 then
                 return! verifyHead runner repoPath candidate
             else
-                let message = failure mergeOut mergeError
+                let message = failure result.Stdout result.Stderr
                 let classified = mergeFailure message
-                return Error classified
+                return! Error classified
         }
 
     /// ff-only publish inside the short Integration Gate (ORCH-005).
@@ -165,7 +172,7 @@ module GitOperations =
     /// the gate, so there is no legitimate "publish without an expectation" — and
     /// making it optional is what allowed a lost update.
     let private ffMerge
-        (runner: Command -> Task<int * string * string>)
+        (runner: TextProcessRunner)
         repoPath
         (worktree: WorktreePath)
         (target: TargetRef)
@@ -198,58 +205,66 @@ module GitOperations =
             return! mergeFf runner repoPath pinnedCandidate
         }
 
-    let continueRebase (runner: Command -> Task<int * string * string>) dir =
-        task {
+    let continueRebase (runner: TextProcessRunner) dir =
+        taskResult {
             // Stage any Manager/Coder resolution before continue (ORCH-003).
             // Predecessor's finalizeWorktree should already have staged, but a
             // missed finalize leaves unmerged paths; add here is idempotent.
-            let! addCode, _, addErr = runner (command dir [ "add"; "-A" ])
+            let! staged = execute runner (command dir [ "add"; "-A" ])
 
-            if addCode <> 0 then
-                return Error(failure "" addErr)
+            if staged.ExitCode <> 0 then
+                return! Error(failure staged.Stdout staged.Stderr)
             else
-                let! code, stdout, stderr = runner (command dir [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
+                let! result = execute runner (command dir [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
 
-                return if code = 0 then Ok() else Error(failure stdout stderr)
+                return! if result.ExitCode = 0 then Ok() else Error(failure result.Stdout result.Stderr)
         }
 
-    let stageAll (runner: Command -> Task<int * string * string>) dir =
-        task {
-            let! code, stdout, stderr = runner (command dir [ "add"; "-A" ])
-            return if code = 0 then Ok() else Error(failure stdout stderr)
+    let stageAll (runner: TextProcessRunner) dir =
+        taskResult {
+            let! result = execute runner (command dir [ "add"; "-A" ])
+            return! if result.ExitCode = 0 then Ok() else Error(failure result.Stdout result.Stderr)
         }
 
-    let candidateCommit (runner: Command -> Task<int * string * string>) dir (msg: string) =
-        task {
-            let! _ = runner (command dir [ "update-ref"; "-d"; "REBASE_HEAD" ])
-            let! code, stdout, stderr = runner (command dir [ "commit"; "-m"; msg ])
-            return if code = 0 then Ok() else Error(failure stdout stderr)
+    let candidateCommit (runner: TextProcessRunner) dir (msg: string) =
+        taskResult {
+            let! deleted = execute runner (command dir [ "update-ref"; "-d"; "REBASE_HEAD" ])
+            do! if deleted.ExitCode = 0 then Ok() else Error(failure deleted.Stdout deleted.Stderr)
+            let! result = execute runner (command dir [ "commit"; "-m"; msg ])
+            return! if result.ExitCode = 0 then Ok() else Error(failure result.Stdout result.Stderr)
         }
 
-    let private freshRebase (runner: Command -> Task<int * string * string>) dir (target: TargetRef) =
-        task {
+    let private freshRebase (runner: TextProcessRunner) dir (target: TargetRef) =
+        taskResult {
             // Clear stale REBASE_HEAD so the fresh rebase is not confused.
-            let! _ = runner (command dir [ "update-ref"; "-d"; "REBASE_HEAD" ])
-            let! code, stdout, stderr = runner (command dir [ "rebase"; TargetRef.value target ])
-            return if code = 0 then Ok() else Error(failure stdout stderr)
+            let! deleted = execute runner (command dir [ "update-ref"; "-d"; "REBASE_HEAD" ])
+            do! if deleted.ExitCode = 0 then Ok() else Error(failure deleted.Stdout deleted.Stderr)
+            let! result = execute runner (command dir [ "rebase"; TargetRef.value target ])
+            return! if result.ExitCode = 0 then Ok() else Error(failure result.Stdout result.Stderr)
         }
 
-    let private rebaseInProgress (runner: Command -> Task<int * string * string>) dir =
-        task {
+    let private rebaseInProgress (runner: TextProcessRunner) dir =
+        taskResult {
             // ORCH-003: continue only when rebase-merge/rebase-apply exists.
             // A bare REBASE_HEAD ref can be stale (no rebase in progress).
-            let! mergeCode, mergePath, _ = runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
-            let! applyCode, applyPath, _ = runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
+            let! merge = execute runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
+            do! if merge.ExitCode = 0 then Ok() else Error(failure merge.Stdout merge.Stderr)
+            do! if String.IsNullOrWhiteSpace merge.Stdout then Error "git rebase-state query returned no path" else Ok()
+            let! apply = execute runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
+            do! if apply.ExitCode = 0 then Ok() else Error(failure apply.Stdout apply.Stderr)
+            do! if String.IsNullOrWhiteSpace apply.Stdout then Error "git rebase-state query returned no path" else Ok()
 
-            let exists code path =
-                code = 0
-                && not (String.IsNullOrWhiteSpace path)
-                && System.IO.Directory.Exists(path.Trim())
+            let exists (path: string) =
+                if String.IsNullOrWhiteSpace path then false
+                else
+                    let path = path.Trim()
+                    let absolute = if path.StartsWith "/" then path else System.IO.Path.Combine(dir, path)
+                    System.IO.Directory.Exists absolute
 
-            return exists mergeCode mergePath || exists applyCode applyPath
+            return exists merge.Stdout || exists apply.Stdout
         }
 
-    let createWithRepo repoPath (runner: Command -> Task<int * string * string>) : GitPort =
+    let createWithRepo repoPath (runner: TextProcessRunner) : GitPort =
         { IsDirty = WorktreeCommands.isDirty runner
           CreateWorktree = WorktreeCommands.create runner repoPath
 
@@ -258,18 +273,20 @@ module GitOperations =
           // and treating that as the target.
           FreezeTargetBranch =
             fun () ->
-                task {
-                    let! code, stdout, stderr = runner (command repoPath [ "symbolic-ref"; "--short"; "HEAD" ])
+                taskResult {
+                    let! result = execute runner (command repoPath [ "symbolic-ref"; "--quiet"; "--short"; "HEAD" ])
 
-                    if code <> 0 || String.IsNullOrWhiteSpace stdout then
-                        return Error(stderrOr "cannot freeze target branch: repository HEAD is detached" stderr)
+                    if result.ExitCode > 1 then
+                        return! Error(stderrOr (sprintf "cannot freeze target branch: git exited %d" result.ExitCode) result.Stderr)
+                    elif result.ExitCode <> 0 || String.IsNullOrWhiteSpace result.Stdout then
+                        return! Error(stderrOr "cannot freeze target branch: repository HEAD is detached" result.Stderr)
                     else
-                        return Ok(TargetRef.create (stdout.Trim()))
+                        return TargetRef.create (result.Stdout.Trim())
                 }
 
           Rebase =
             fun worktree target ->
-                task {
+                taskResult {
                     let dir = WorktreePath.value worktree
                     let! inProgress = rebaseInProgress runner dir
 
@@ -281,21 +298,19 @@ module GitOperations =
 
           ConflictedFiles =
             fun worktree ->
-                task {
-                    let! code, stdout, stderr =
-                        runner (command (WorktreePath.value worktree) [ "diff"; "--name-only"; "--diff-filter=U" ])
+                taskResult {
+                    let! result = execute runner (command (WorktreePath.value worktree) [ "diff"; "--name-only"; "--diff-filter=U" ])
 
-                    if code <> 0 then
-                        return Error(failure stdout stderr)
+                    if result.ExitCode <> 0 then
+                        return! Error(failure result.Stdout result.Stderr)
                     else
                         return
-                            stdout.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
+                            result.Stdout.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
                             |> Array.toList
-                            |> Ok
                 }
 
           FfMerge = ffMerge runner repoPath
-          RemoveWorktree = WorktreeCommands.remove runner
+          RemoveWorktree = WorktreeCommands.remove runner repoPath
 
           HasRebaseHead =
             fun worktree ->

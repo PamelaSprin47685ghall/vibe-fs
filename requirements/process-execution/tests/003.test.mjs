@@ -101,7 +101,7 @@ test('WHAT[process-execution-003] NODE_EXIT_registered_callbacks_run_once_in_reg
   const observed = []
   childOnExit(child, () => observed.push('first'))
   childOnExit(child, () => observed.push('second'))
-  childExit(child, 0)
+  childExit(child, { kind: 'Exited', exitCode: 0 })
   assert.deepEqual(observed, ['first', 'second'])
 
   const failingChild = childCreate(undefined)
@@ -111,7 +111,7 @@ test('WHAT[process-execution-003] NODE_EXIT_registered_callbacks_run_once_in_reg
     throw new Error('exit callback failed')
   })
   childOnExit(failingChild, () => afterFailure.push('must-not-run'))
-  assert.throws(() => childExit(failingChild, 1), /exit callback failed/)
+  assert.throws(() => childExit(failingChild, { kind: 'Exited', exitCode: 1 }), /exit callback failed/)
   assert.deepEqual(afterFailure, ['failing'])
 })
 test('WHAT[process-execution-003] EXEC_011_A_natural_exit_before_deadline_returns_code_without_kill', async () => {
@@ -119,10 +119,10 @@ test('WHAT[process-execution-003] EXEC_011_A_natural_exit_before_deadline_return
   const deadline = createDeadline(nowIso(), 5_000)
   const wait = waitForExit(child, deadline, createCancellationToken(false))
 
-  setTimeout(() => childExit(child, 42), 20)
+  setTimeout(() => childExit(child, { kind: 'Exited', exitCode: 42 }), 20)
 
   const outcome = await within(wait, 2_000, 'natural exit')
-  assert.deepEqual(outcome, { exitCode: 42, timedOut: false })
+  assert.deepEqual(outcome, { stopRequested: null })
   assert.equal(killCount(child), 0, 'natural exit must not Kill')
 })
 }

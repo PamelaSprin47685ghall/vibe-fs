@@ -6,7 +6,66 @@ open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
-open Wanxiangshu.Foundation.AsyncSupport
+
+module ProcessResultWire =
+    let private field (source: obj) name: obj = if isNull source then null else source?(name)
+    let private text source name = string (field source name)
+    let private optionalText source name =
+        let value = field source name
+        if isNull value then None else Some(string value)
+
+    let private readNoExecution reason =
+        match text reason "kind" with
+        | "InvalidRequest" -> NoExecution.InvalidRequest(text reason "reason")
+        | "CancelledBeforeStart" -> NoExecution.CancelledBeforeStart
+        | "StartRejected" -> NoExecution.StartRejected(text reason "reason")
+        | _ -> failwith "Invalid no-execution receipt"
+
+    let private readExitCode ending =
+        let code = field ending "exitCode"
+        if emitJsExpr code "Number.isInteger($0) && $0 >= 0 && $0 <= 2147483647" then unbox<int> code
+        else failwith "Invalid exit code"
+
+    let private readEnd ending =
+        match text ending "kind" with
+        | "Exited" -> EndEvidence.Confirmed(ProgramEnd.Exited(readExitCode ending))
+        | "Signaled" -> EndEvidence.Confirmed(ProgramEnd.Signaled(text ending "signal"))
+        | "Unconfirmed" -> EndEvidence.Unconfirmed
+        | _ -> failwith "Invalid target end evidence"
+
+    let private readStopRequest stop =
+        match text stop "kind" with
+        | "CancellationRequested" -> StopRequest.CancellationRequested
+        | "DeadlineStopRequested" -> StopRequest.DeadlineStopRequested(TimeSpan.FromMilliseconds(unbox<float> (field stop "durationMs")))
+        | _ -> failwith "Invalid stop request"
+
+    let private readStop stop =
+        if isNull stop then None else Some(readStopRequest stop)
+
+    let private readCapturedOutput output =
+        match text output "kind" with
+        | "InMemory" -> CapturedOutput.InMemory(text output "stdout", text output "stderr")
+        | _ -> failwith "Expected in-memory text output"
+
+    let private readOutput output =
+        if isNull output then None else Some(readCapturedOutput output)
+
+    let private readReceipt raw =
+        match text raw "kind" with
+        | "NotStarted" -> ProcessResult.NotStarted(readNoExecution(field raw "reason"))
+        | "Observed" ->
+            ProcessResult.Observed
+                { End = readEnd(field raw "ending")
+                  StopRequested = readStop(field raw "stopRequested")
+                  Output = readOutput(field raw "output")
+                  Fault = optionalText raw "fault" }
+        | _ -> failwith "Invalid process receipt"
+
+    let read (raw: obj) =
+        try
+            readReceipt raw
+        with error ->
+            ProcessResult.Observed { End = EndEvidence.Unconfirmed; StopRequested = None; Output = None; Fault = Some error.Message }
 
 /// JS-host process adapter. Non-PTY child-process execution delegates to
 /// wanxiangli/supervision (SupervisedProcess); spool-file I/O stays here so the rest
@@ -144,7 +203,7 @@ module NodeProcessHost =
         jsNative
 
     [<Emit("""
-        (async function(SupervisedProcess, executable, args, cwd, env, stdinText, onStdout, onStderr, onClose, onFailure, constants) {
+        (function(SupervisedProcess, executable, args, cwd, env, stdinText, onStdout, onStderr, onClose, onFailure, onRejected) {
             let session;
             let killRequested = false;
             try {
@@ -159,48 +218,58 @@ module NodeProcessHost =
             } catch (err) {
                 return { ok: false, error: (err && err.message) ? String(err.message) : 'Failed to create SupervisedProcess' };
             }
-            const startResult = await session.started();
-            if (!startResult || startResult.kind === 'Failed') {
-                const msg = (startResult && startResult.error && startResult.error.message)
-                    ? String(startResult.error.message)
-                    : ('Failed to spawn process: ' + executable);
-                return { ok: false, error: msg };
-            }
             const requestKill = () => {
+                killRequested = true;
                 try {
                     const result = session.signal('SIGKILL');
-                    if (result.kind === 'Requested') killRequested = true;
                     if (result.kind === 'Failed') onFailure(String(result.error.message));
                 } catch (error) {
                     onFailure(error && error.message ? String(error.message) : String(error));
                 }
             };
             const reportClose = state => {
-                const expectedKillFailure = killRequested && state && state.failure
-                    && (state.failure.code === 'UNKNOWN_TARGET_EXIT' || state.failure.code === 'OUTPUT_INTERRUPTED');
-                if (state && state.failure && !expectedKillFailure) {
+                if (state && state.failure) {
                     onFailure(String(state.failure.message || 'Process supervision failed'));
                 }
-                const exitInfo = state && state.exit;
-                const signalNumber = exitInfo && exitInfo.signal && constants.signals[exitInfo.signal];
-                const code = (exitInfo && typeof exitInfo.code === 'number')
-                    ? exitInfo.code
-                    : (typeof signalNumber === 'number' ? 128 + signalNumber : -1);
-                onClose(code);
+                onClose();
+            };
+            const awaitClose = async () => {
+                while (true) {
+                    const waited = await session.wait(1000);
+                    if (waited.kind === 'Closed') {
+                        reportClose(waited.state);
+                        return;
+                    }
+                }
             };
             (async () => {
                 try {
+                    const started = await session.started();
+                    if (!started || started.kind !== 'Started') {
+                        const error = started && started.error;
+                        const message = String(error && error.message || 'Target start was not confirmed');
+                        if (error && error.operation === 'spawn') onRejected(message);
+                        else onFailure(message);
+                        await awaitClose();
+                        return;
+                    }
+                    if (killRequested) requestKill();
                     if (typeof stdinText === 'string' && stdinText.length > 0) {
                         const encoded = new TextEncoder().encode(stdinText);
                         for (let pos = 0; pos < encoded.byteLength; pos += 16777216) {
                             const part = encoded.slice(pos, Math.min(pos + 16777216, encoded.byteLength));
                             const w = await session.write(part);
-                            if (!w || w.kind !== 'Written') break;
+                            if (!w || w.kind !== 'Written') {
+                                onFailure(String(w && w.error && w.error.message || 'Process input was not delivered'));
+                                requestKill();
+                                break;
+                            }
                         }
                     }
                     session.endInput();
-                } catch (_) {
-                    try { session.endInput(); } catch (_) {}
+                } catch (error) {
+                    onFailure(String(error && error.message || error));
+                    requestKill();
                 }
             })();
             (async () => {
@@ -221,13 +290,7 @@ module NodeProcessHost =
                     onFailure(error && error.message ? String(error.message) : String(error));
                     requestKill();
                     session.discardOutput();
-                    while (true) {
-                        const waited = await session.wait(1000);
-                        if (waited.kind === 'Closed') {
-                            reportClose(waited.state);
-                            break;
-                        }
-                    }
+                    await awaitClose();
                 }
             })();
             return { ok: true, session, kill: requestKill };
@@ -242,26 +305,21 @@ module NodeProcessHost =
         (stdinText: obj)
         (onStdout: byte[] -> unit)
         (onStderr: byte[] -> unit)
-        (onClose: int -> unit)
+        (onClose: unit -> unit)
         (onFailure: string -> unit)
-        (constants: obj)
-        : Task<obj> =
+        (onRejected: string -> unit)
+        : obj =
         jsNative
 
-    /// Handle returned by spawn.
-    ///
-    /// `Exit` carries the target code, or 128 plus its native signal number.
-    /// `Exited` is set ONLY by the close/error handlers. `Kill` must not set it:
-    /// sending SIGKILL is not the process ending, and conflating the two makes
-    /// "kill sent" look like "exit observed" to every waiter.
-    /// DSL-state-combination: physical — child process exit receipt and callback buffer.
+    /// Exited means capture and scope closed. Observe reads the target separately.
     type ChildProcess =
         { Process: obj
-          Exit: TaskCompletionSource<int>
+          Observe: unit -> EndEvidence
           Kill: unit -> unit
           Exited: bool ref
           OnExited: (unit -> unit) ResizeArray
-          Failure: string option ref }
+          Failure: string option ref
+          Rejection: NoExecution option ref }
 
     let private notifyExitedList (callbacks: (unit -> unit) ResizeArray) =
         let cbs = callbacks |> Seq.toList
@@ -299,48 +357,64 @@ module NodeProcessHost =
         with _ ->
             ()
 
-    let private killIfStillRunning (exitedRef: bool ref) (killObj: obj) =
-        if not exitedRef.Value then
-            invokeKill killObj
-
     let private markProcessClosed
         (exitedRef: bool ref)
-        (exitTcs: TaskCompletionSource<int>)
         (onExited: (unit -> unit) ResizeArray)
-        (code: int)
+        ()
         =
         if not exitedRef.Value then
             exitedRef.Value <- true
-            trySetResult exitTcs code |> ignore
             notifyExitedList onExited
+
+    let private rememberFailure (failure: string option ref) message =
+        if failure.Value.IsNone then failure.Value <- Some message
+
+    let private unknownEnd native failure =
+        if not (isNull native) then rememberFailure failure "Invalid target end receipt"
+        EndEvidence.Unconfirmed
+
+    let private readNativeEnd native failure =
+        let validCode: bool = emitJsExpr native "Boolean($0 && Number.isInteger($0.code) && $0.code >= 0 && $0.code <= 2147483647 && $0.signal == null)"
+        let validSignal: bool = emitJsExpr (native, osConstants) "Boolean($0 && $0.code == null && typeof $0.signal === 'string' && Object.hasOwn($1.signals, $0.signal) && $0.signal !== 'SIGSTOP' && $0.signal !== 'SIGCONT')"
+        if validCode then EndEvidence.Confirmed(ProgramEnd.Exited(unbox<int> (native?code)))
+        elif validSignal then EndEvidence.Confirmed(ProgramEnd.Signaled(unbox<string> (native?signal)))
+        else unknownEnd native failure
+
+    let private rememberInspectionFailure (state: obj) failure =
+        let nativeFailure: obj = state?failure
+        if not (isNull nativeFailure) then rememberFailure failure (string (nativeFailure?message))
+
+    let private observeTarget session failure =
+        let state: obj = emitJsExpr session "$0.inspect()"
+        rememberInspectionFailure state failure
+        readNativeEnd (state?exit) failure
 
     let private finalizeStartedSession
         (started: obj)
-        (exitTcs: TaskCompletionSource<int>)
         (exitedRef: bool ref)
         (onExited: (unit -> unit) ResizeArray)
         (failure: string option ref)
-        (ct: CancellationToken)
-        : Result<ChildProcess, string> =
+        (rejection: NoExecution option ref)
+        : Result<ChildProcess, ProcessResult> =
         let ok = emitJsExpr started "Boolean($0 && $0.ok)"
 
         if not ok then
             let errText: string =
                 emitJsExpr started "String(($0 && $0.error) || 'Failed to spawn process')"
 
-            Error errText
+            Error(ProcessResult.Observed { End = EndEvidence.Unconfirmed; StopRequested = None; Output = None; Fault = Some errText })
         else
             let sessionObj: obj = emitJsExpr started "$0.session"
             let killObj: obj = emitJsExpr started "$0.kill"
-            use _ = ct.Register(fun () -> killIfStillRunning exitedRef killObj)
 
             Ok
                 { Process = sessionObj
-                  Exit = exitTcs
+                  Observe = fun () -> observeTarget sessionObj failure
                   Kill = (fun () -> invokeKill killObj)
                   Exited = exitedRef
                   OnExited = onExited
-                  Failure = failure }
+                  Failure = failure
+                  Rejection = rejection }
 
     let private launchExecutableSession
         (executable: string)
@@ -350,17 +424,17 @@ module NodeProcessHost =
         (onStdout: byte[] -> unit)
         (onStderr: byte[] -> unit)
         (ct: CancellationToken)
-        : Task<Result<ChildProcess, string>> =
+        : Task<Result<ChildProcess, ProcessResult>> =
         task {
-            let exitTcs = TaskCompletionSource<int>()
             // DSL-MUTABLE: algorithm-scratch — exit callback list accumulator
             let onExited = ResizeArray<unit -> unit>()
             // DSL-MUTABLE: cancellation — child process exit flag.
             let exitedRef = ref false
-            let onClose = markProcessClosed exitedRef exitTcs onExited
+            let onClose = markProcessClosed exitedRef onExited
             let failure = ref None
+            let rejection = ref None
 
-            let! started =
+            let started =
                 startProcessSession
                     SupervisedProcessCtor
                     executable
@@ -374,9 +448,9 @@ module NodeProcessHost =
                     (fun message ->
                         if failure.Value.IsNone then
                             failure.Value <- Some message)
-                    osConstants
+                    (fun reason -> rejection.Value <- Some(NoExecution.StartRejected reason))
 
-            return finalizeStartedSession started exitTcs exitedRef onExited failure ct
+            return finalizeStartedSession started exitedRef onExited failure rejection
         }
 
     let private spawnOrReject
@@ -394,7 +468,7 @@ module NodeProcessHost =
                 resolveExecutablePath cmd.FileName cwd envObj pathJoin statSync accessSync
 
             if isNull executable then
-                return Error(sprintf "Failed to spawn process: %s" cmd.FileName)
+                return Error(ProcessResult.NotStarted(NoExecution.InvalidRequest "Invalid executable name"))
             else
                 return! launchExecutableSession executable cwd envObj cmd onStdout onStderr ct
         }
@@ -405,10 +479,10 @@ module NodeProcessHost =
         (onStdout: byte[] -> unit)
         (onStderr: byte[] -> unit)
         (ct: CancellationToken)
-        : Task<Result<ChildProcess, string>> =
+        : Task<Result<ChildProcess, ProcessResult>> =
         task {
             if ct.IsCancellationRequested then
-                return Error "Cancelled before spawn"
+                return Error(ProcessResult.NotStarted NoExecution.CancelledBeforeStart)
             else
                 return! spawnOrReject cmd ctx onStdout onStderr ct
         }

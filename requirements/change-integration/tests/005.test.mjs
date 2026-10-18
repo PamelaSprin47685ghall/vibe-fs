@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { exited, responseReceipt, absentState } from './support/process.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 {
@@ -47,11 +48,11 @@ const fakeRunner = (answers) => {
       if (!key.startsWith(prefix)) continue
       if (Array.isArray(response) && Array.isArray(response[0])) {
         const triple = response.length > 1 ? response.shift() : response[0]
-        return Promise.resolve(triple)
+        return Promise.resolve(responseReceipt(triple))
       }
-      return Promise.resolve(response)
+      return Promise.resolve(responseReceipt(response))
     }
-    return Promise.resolve([0, '', ''])
+    return Promise.resolve(absentState(command))
   }
   return { runner, calls }
 }
@@ -284,9 +285,9 @@ const fakeRunner = (answers = []) => {
     calls.push({ args, cwd: command.workingDirectory })
     const key = args.join(' ')
     for (const [prefix, response] of answers) {
-      if (key.startsWith(prefix)) return Promise.resolve(response)
+      if (key.startsWith(prefix)) return Promise.resolve(responseReceipt(response))
     }
-    return Promise.resolve([0, '', ''])
+    return Promise.resolve(absentState(command))
   }
   return { runner, calls }
 }
@@ -322,15 +323,18 @@ test('WHAT[change-integration-005] WORKTREE_release_removes_worktree_and_branch_
     calls.filter(({ args }) => args[0] === 'branch'),
     [{ args: ['branch', '-D', 'manager/job-9'], cwd: '/repo' }])
 })
-test('WHAT[change-integration-005] WORKTREE_release_aggregates_both_failures', async () => {
-  const { git } = fakeGit([
+test('WHAT[change-integration-005] WORKTREE_release_stops_after_failed_remove_and_reuses_the_failure', async () => {
+  const { git, calls } = fakeGit([
     ['worktree remove', [1, '', 'rm failed']],
     ['branch -D', [1, '', 'branch failed']],
   ])
   const resource = await valueOf(change.worktreeCreate(git, 'job-9', PATH))
   const result = await change.worktreeRelease(resource)
   assert.equal(result.ok, false)
-  assert.equal(result.error, 'worktree=rm failed; branch=branch failed')
+  assert.equal(result.error, 'worktree=rm failed')
+  assert.deepEqual(await change.worktreeRelease(resource), result)
+  assert.equal(calls.filter(({ args }) => args[1] === 'remove').length, 1)
+  assert.equal(calls.filter(({ args }) => args[0] === 'branch').length, 0)
 })
 test('WHAT[change-integration-005] WORKTREE_release_reports_single_failure_side', async () => {
   const first = fakeGit([['worktree remove', [1, '', 'rm failed']]])
@@ -349,13 +353,13 @@ test('WHAT[change-integration-005] WORKTREE_unreleased_resource_disposes_by_rele
   await change.worktreeDispose(resource)
   assert.equal(calls.filter(({ args }) => args[1] === 'remove').length, 1)
 })
-test('WHAT[change-integration-005] WORKTREE_CMD_remove_force_flag_and_no_cwd', async () => {
+test('WHAT[change-integration-005] WORKTREE_CMD_remove_force_flag_and_bound_repo', async () => {
   const fake = fakeRunner([])
   const git = change.createGit('/repo', fake.runner)
   const result = await change.gitRemoveWorktree(git, PATH)
   assert.equal(result.ok, true)
   assert.deepEqual(fake.calls[0].args, ['worktree', 'remove', '--force', PATH])
-  assert.equal(fake.calls[0].cwd, undefined)
+  assert.equal(fake.calls[0].cwd, '/repo')
 })
 }
 
@@ -380,7 +384,10 @@ const realRunner = (command) => {
   const result = spawnSync(command.fileName, command.args, {
     cwd: command.workingDirectory,
     encoding: 'utf8'})
-  return Promise.resolve([result.status ?? 1, result.stdout ?? '', result.stderr ?? ''])
+  assert.equal(result.error, undefined)
+  assert.equal(result.signal, null)
+  assert.ok(Number.isInteger(result.status))
+  return Promise.resolve(exited(result.status, result.stdout ?? '', result.stderr ?? ''))
 }
 
 const createRealWorktree = async (repo, child, job) => {

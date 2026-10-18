@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { exited, responseReceipt, absentState } from './support/process.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 
 {
@@ -17,11 +18,11 @@ const fakeRunner = (answers) => {
       if (!key.startsWith(prefix)) continue
       if (Array.isArray(response) && Array.isArray(response[0])) {
         const triple = response.length > 1 ? response.shift() : response[0]
-        return Promise.resolve(triple)
+        return Promise.resolve(responseReceipt(triple))
       }
-      return Promise.resolve(response)
+      return Promise.resolve(responseReceipt(response))
     }
-    return Promise.resolve([0, '', ''])
+    return Promise.resolve(absentState(command))
   }
   return { runner, calls }
 }
@@ -33,7 +34,7 @@ const ok = (result) => {
   return result.value
 }
 const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main' } = {}) => [
-  ['symbolic-ref --short HEAD', [0, `${branch}\n`, '']],
+  ['symbolic-ref --quiet --short HEAD', [0, `${branch}\n`, '']],
   ['rev-parse HEAD', [0, `${candidate}\n`, '']],
   ['rev-parse refs/heads/main', [0, `${targetHead}\n`, '']],
   ['merge-base --is-ancestor', [0, '', '']],
@@ -42,18 +43,41 @@ const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main
 ]
 const ff = (answers) => change.gitFfMerge(git(fakeRunner(answers).runner), WORKTREE, 'main', 'beef02', 'cafe01')
 
+test('WHAT[change-integration-008] a held ref lock is not evidence that the target moved', async () => {
+  const answers = ffAnswers().map(([prefix, response]) => prefix === 'merge --ff-only'
+    ? [prefix, [1, '', "fatal: cannot lock ref 'HEAD': Unable to create 'HEAD.lock': File exists"]] : [prefix, response])
+  const result = await ff(answers)
+  assert.equal(result.ok, false)
+  assert.match(result.error, /HEAD.lock/)
+})
+
+test('WHAT[change-integration-008] execution failure with CAS words is not classified as ref movement', async () => {
+  const receipt = { kind: 'Observed', ending: { kind: 'Unconfirmed' }, stopRequested: null, output: null, fault: 'cannot lock ref is at x but expected y' }
+  const answers = ffAnswers().map(([prefix, response]) => prefix === 'merge --ff-only' ? [prefix, receipt] : [prefix, response])
+  const result = await ff(answers)
+  assert.equal(result.ok, false)
+  assert.match(result.error, /Process end/)
+})
+
+test('WHAT[change-integration-008] an abnormal branch query is not described as detached', async () => {
+  const result = await change.gitFreezeTargetBranch(git(fakeRunner([['symbolic-ref --quiet --short HEAD', [143, '', '']]]).runner))
+  assert.equal(result.ok, false)
+  assert.match(result.error, /git exited 143/)
+  assert.doesNotMatch(result.error, /detached/)
+})
+
 test('WHAT[change-integration-008] GIT_freeze_target_branch_reads_symbolic_ref', async () => {
-  const port = git(fakeRunner([['symbolic-ref --short HEAD', [0, 'main\n', '']]]).runner)
+  const port = git(fakeRunner([['symbolic-ref --quiet --short HEAD', [0, 'main\n', '']]]).runner)
   assert.equal((await change.gitFreezeTargetBranch(port)).value, 'main')
 })
 test('WHAT[change-integration-008] GIT_freeze_target_branch_refuses_detached_head', async () => {
-  const port = git(fakeRunner([['symbolic-ref --short HEAD', [128, '', 'fatal: ref HEAD is not a symbolic ref']]]).runner)
+  const port = git(fakeRunner([['symbolic-ref --quiet --short HEAD', [1, '', '']]]).runner)
   const result = await change.gitFreezeTargetBranch(port)
   assert.equal(result.ok, false)
-  assert.match(result.error, /fatal: ref HEAD is not a symbolic ref/)
+  assert.match(result.error, /repository HEAD is detached/)
 })
 test('WHAT[change-integration-008] GIT_freeze_target_branch_blank_stdout_is_detached', async () => {
-  const port = git(fakeRunner([['symbolic-ref --short HEAD', [0, '  \n', '']]]).runner)
+  const port = git(fakeRunner([['symbolic-ref --quiet --short HEAD', [0, '  \n', '']]]).runner)
   const result = await change.gitFreezeTargetBranch(port)
   assert.equal(result.ok, false)
   assert.match(result.error, /detached/)
@@ -86,7 +110,7 @@ test('WHAT[change-integration-008] GIT_ff_merge_refuses_when_repo_on_wrong_branc
 test('WHAT[change-integration-008] GIT_ff_merge_refuses_detached_with_placeholder', async () => {
   const result = await ff([
     ['rev-parse HEAD', [0, 'cafe01\n', '']],
-    ['symbolic-ref --short HEAD', [128, '', '']],
+    ['symbolic-ref --quiet --short HEAD', [1, '', '']],
   ])
   assert.equal(result.ok, false)
   assert.match(result.error, /<detached HEAD>/)
@@ -121,7 +145,7 @@ test('WHAT[change-integration-008] GIT_ff_merge_empty_candidate_head_is_an_error
 })
 test('WHAT[change-integration-008] GIT_ff_merge_verify_head_mismatch_reports_actual', async () => {
   const fake = fakeRunner([
-    ['symbolic-ref --short HEAD', [0, 'main\n', '']],
+    ['symbolic-ref --quiet --short HEAD', [0, 'main\n', '']],
     ['merge-base --is-ancestor', [0, '', '']],
     ['status --porcelain', [0, '', '']],
     ['merge --ff-only', [0, '', '']],
@@ -133,7 +157,7 @@ test('WHAT[change-integration-008] GIT_ff_merge_verify_head_mismatch_reports_act
   assert.match(result.error, /ff-only merge did not advance HEAD to candidate cafe01 \(got wrong00\)/)
 })
 test('WHAT[change-integration-008] GIT_create_with_runner_binds_dot_repo', async () => {
-  const fake = fakeRunner([['symbolic-ref --short HEAD', [0, 'main\n', '']]])
+  const fake = fakeRunner([['symbolic-ref --quiet --short HEAD', [0, 'main\n', '']]])
   const port = change.createGit('.', fake.runner)
   assert.equal((await change.gitFreezeTargetBranch(port)).ok, true)
   assert.equal(fake.calls[0].cwd, '.')
@@ -247,7 +271,10 @@ const realRunner = (command) => {
   const result = spawnSync(command.fileName, command.args, {
     cwd: command.workingDirectory,
     encoding: 'utf8'})
-  return Promise.resolve([result.status ?? 1, result.stdout ?? '', result.stderr ?? ''])
+  assert.equal(result.error, undefined)
+  assert.equal(result.signal, null)
+  assert.ok(Number.isInteger(result.status))
+  return Promise.resolve(exited(result.status, result.stdout ?? '', result.stderr ?? ''))
 }
 
 const fixture = () => {

@@ -25,33 +25,46 @@ module private WorktreeDisposal =
 /// orphan its job.
 type WorktreeResource
     private (path: WorktreePath, identity: WorktreeIdentity, git: GitPort, releaseOnDisposeInitially: bool) =
-    // DSL-MUTABLE: resource — one-shot worktree release latch
-    let mutable released = false
+    // DSL-MUTABLE: resource — shared physical release receipt, including failure.
+    let mutable release: Task<Result<unit, string>> option = None
     // DSL-MUTABLE: resource — durable-mark flag for worktree dispose policy
     let mutable releaseOnDispose = releaseOnDisposeInitially
+
+    let deleteAfterRemove result =
+        task {
+            match result with
+            | Error error -> return Error("worktree=" + error)
+            | Ok() ->
+                let! branch = git.DeleteBranch identity
+                return Result.mapError (fun error -> "branch=" + error) branch
+        }
+
+    let releaseOwned () =
+        task {
+            try
+                let! removed = git.RemoveWorktree path
+                return! deleteAfterRemove removed
+            with error -> return Error error.Message
+        }
+
+    let settleRelease (receipt: TaskCompletionSource<Result<unit, string>>) =
+        task {
+            let! result = releaseOwned()
+            receipt.SetResult result
+        }
 
     member _.Path = path
     member _.Identity = identity
     member _.MarkDurable() = releaseOnDispose <- false
 
-    member private _.ReleaseOutcome worktree branchResult =
-        match worktree, branchResult with
-        | Ok(), Ok() ->
-            released <- true
-            Ok()
-        | Error left, Error right -> Error(sprintf "worktree=%s; branch=%s" left right)
-        | Error error, _ -> Error("worktree=" + error)
-        | _, Error error -> Error("branch=" + error)
-
-    member this.Release() =
-        task {
-            if released then
-                return Ok()
-            else
-                let! worktree = git.RemoveWorktree path
-                let! branchResult = git.DeleteBranch identity
-                return this.ReleaseOutcome worktree branchResult
-        }
+    member _.Release() =
+        match release with
+        | Some operation -> operation
+        | None ->
+            let receipt = TaskCompletionSource<Result<unit, string>>()
+            release <- Some receipt.Task
+            settleRelease receipt |> ignore
+            receipt.Task
 
     member private this.DisposeRelease() =
         WorktreeDisposal.asValueTask (
@@ -91,6 +104,12 @@ type WorktreeResource
 /// built for.
 module WorktreeCommands =
 
+    let private execute (runner: TextProcessRunner) cmd =
+        task {
+            let! result = runner cmd
+            return Result.mapError ProcessResult.describe result
+        }
+
     /// The branch a job's worktree lives on IS its stable identity (ORCH-006).
     ///
     /// Spelled once. It used to appear in `WorktreeResource.Create`, `Adopt` and
@@ -115,22 +134,22 @@ module WorktreeCommands =
     let private failure stdout stderr =
         if String.IsNullOrWhiteSpace stderr then stdout else stderr
 
-    let isDirty (runner: Command -> Task<int * string * string>) (path: WorktreePath) =
-        task {
-            let! code, stdout, stderr = runner (command (Some(WorktreePath.value path)) [ "status"; "--porcelain" ])
+    let isDirty (runner: TextProcessRunner) (path: WorktreePath) =
+        taskResult {
+            let! result = execute runner (command (Some(WorktreePath.value path)) [ "status"; "--porcelain" ])
 
-            if code <> 0 then
-                return Error(failure stdout stderr)
+            if result.ExitCode <> 0 then
+                return! Error(failure result.Stdout result.Stderr)
             else
-                return Ok(not (String.IsNullOrWhiteSpace stdout))
+                return not (String.IsNullOrWhiteSpace result.Stdout)
         }
 
-    let create (runner: Command -> Task<int * string * string>) repo (jobId: ManagerJobId) (path: WorktreePath) =
-        task {
+    let create (runner: TextProcessRunner) repo (jobId: ManagerJobId) (path: WorktreePath) =
+        taskResult {
             let identity = identityOf jobId
 
-            let! code, stdout, stderr =
-                runner (
+            let! result =
+                execute runner (
                     command
                         (Some repo)
                         [ "worktree"
@@ -143,15 +162,15 @@ module WorktreeCommands =
             // Returns the identity rather than unit: it is what recovery locates the
             // worktree by, and a caller that had to re-derive it would be a second
             // copy of `identityOf`.
-            return outcome code stdout stderr |> Result.map (fun () -> identity)
+            do! outcome result.ExitCode result.Stdout result.Stderr
+            return identity
         }
 
-    let remove (runner: Command -> Task<int * string * string>) (path: WorktreePath) =
-        task {
-            let! code, stdout, stderr =
-                runner (command None [ "worktree"; "remove"; "--force"; WorktreePath.value path ])
+    let remove (runner: TextProcessRunner) repo (path: WorktreePath) =
+        taskResult {
+            let! result = execute runner (command (Some repo) [ "worktree"; "remove"; "--force"; WorktreePath.value path ])
 
-            return outcome code stdout stderr
+            return! outcome result.ExitCode result.Stdout result.Stderr
         }
 
     let private finishWorktree acc currentPath currentBranch =
@@ -176,29 +195,28 @@ module WorktreeCommands =
 
         loop [] None None lines
 
-    let list (runner: Command -> Task<int * string * string>) repo () =
-        task {
-            let! code, stdout, stderr = runner (command (Some repo) [ "worktree"; "list"; "--porcelain" ])
+    let list (runner: TextProcessRunner) repo () =
+        taskResult {
+            let! result = execute runner (command (Some repo) [ "worktree"; "list"; "--porcelain" ])
 
-            if code <> 0 then
-                return Error(failure stdout stderr)
+            if result.ExitCode <> 0 then
+                return! Error(failure result.Stdout result.Stderr)
             else
                 return
-                    stdout.Split([| '\n'; '\r' |], StringSplitOptions.None)
+                    result.Stdout.Split([| '\n'; '\r' |], StringSplitOptions.None)
                     |> Array.toList
                     |> parseList
-                    |> Ok
         }
 
-    let listBranches (runner: Command -> Task<int * string * string>) repo () =
-        task {
-            let! code, stdout, stderr = runner (command (Some repo) [ "branch"; "--list"; "manager/*" ])
+    let listBranches (runner: TextProcessRunner) repo () =
+        taskResult {
+            let! result = execute runner (command (Some repo) [ "branch"; "--list"; "manager/*" ])
 
-            if code <> 0 then
-                return Error(failure stdout stderr)
+            if result.ExitCode <> 0 then
+                return! Error(failure result.Stdout result.Stderr)
             else
                 return
-                    stdout.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
+                    result.Stdout.Split([| '\n'; '\r' |], StringSplitOptions.RemoveEmptyEntries)
                     // `git branch` prefixes a branch checked out in ANOTHER worktree
                     // with `+` (and the current branch of this repo with `*`). The
                     // manager worktree keeps its branch checked out, so an owned
@@ -210,12 +228,11 @@ module WorktreeCommands =
                     |> Array.filter (String.IsNullOrWhiteSpace >> not)
                     |> Array.map WorktreeIdentity.create
                     |> Array.toList
-                    |> Ok
         }
 
-    let deleteBranch (runner: Command -> Task<int * string * string>) repo (identity: WorktreeIdentity) =
-        task {
-            let! code, stdout, stderr = runner (command (Some repo) [ "branch"; "-D"; WorktreeIdentity.value identity ])
+    let deleteBranch (runner: TextProcessRunner) repo (identity: WorktreeIdentity) =
+        taskResult {
+            let! result = execute runner (command (Some repo) [ "branch"; "-D"; WorktreeIdentity.value identity ])
 
-            return outcome code stdout stderr
+            return! outcome result.ExitCode result.Stdout result.Stderr
         }

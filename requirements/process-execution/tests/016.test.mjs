@@ -25,8 +25,7 @@ import test from 'node:test'
         }
         runtime.cancel(token)
         const result = await pending
-        assert.equal(result.ok, false)
-        assert.equal(result.error.kind, 'ProcessCancelled')
+        assert.deepEqual(result, { kind: 'NotStarted', reason: { kind: 'CancelledBeforeStart' } })
         assert.equal(starts, 0)
         assert.equal(gate.getCount(), handoff ? 1 : 0)
       } finally {
@@ -66,9 +65,9 @@ test('WHAT[process-execution-016] a host spawn failure releases the large-output
     assert.equal(getCount(), 0)
     throw new Error('controlled host spawn failure')
   }, command('unused', [], null, null), estimate(1, 1024, 'large'), context(null, 1000), createCancellationToken(false))
-  assert.equal(failed.ok, false)
-  assert.equal(failed.error.kind, 'ExecutionFailed')
-  assert.match(failed.error.reason, /controlled host spawn failure/)
+  assert.equal(failed.kind, 'Observed')
+  assert.deepEqual(failed.ending, { kind: 'Unconfirmed' })
+  assert.match(failed.fault, /controlled host spawn failure/)
   assert.equal(getCount(), 1)
   assert.equal(await runLargeEstimate(() => assert.equal(getCount(), 0)), true)
   assert.equal(getCount(), 1)

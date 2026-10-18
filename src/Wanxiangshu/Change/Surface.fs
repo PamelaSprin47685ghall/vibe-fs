@@ -21,7 +21,7 @@ module ChangeSurface =
     type private ProjectionHandle(projection: OrchestratorProjection) =
         member _.Projection = projection
 
-    type private GitHandle(port: GitPort, repo: string, runner: Command -> Task<int * string * string>) =
+    type private GitHandle(port: GitPort, repo: string, runner: TextProcessRunner) =
         member _.Port = port
         member _.repo = repo
         member _.Runner = runner
@@ -1219,7 +1219,7 @@ module ChangeSurface =
                             Task.FromResult(Error "disk detached")
                         else
                             Task.FromResult(Ok())
-                  HasRebaseHead = fun _ -> Task.FromResult false
+                  HasRebaseHead = fun _ -> Task.FromResult(Ok false)
                   ListWorktrees = fun () -> Task.FromResult(Ok [])
                   ListManagerBranches = fun () -> Task.FromResult(Ok [])
                   DeleteBranch = fun _ -> Task.FromResult(Ok())
@@ -1530,11 +1530,10 @@ module ChangeSurface =
                args = command.Arguments |> List.toArray
                workingDirectory = optionObj command.WorkingDirectory |}
 
-    let private invokeRunner (runner: obj) (command: Command) : Task<int * string * string> =
+    let private invokeRunner (runner: obj) (command: Command) =
         task {
             let! raw = unbox<Task<obj>> (asPromise (apply1 runner (commandObject command)))
-            let values = unbox<obj array> raw
-            return int (string values.[0]), stringOf values.[1], stringOf values.[2]
+            return raw |> ProcessResultWire.read |> ProcessResult.requireText
         }
 
     let createGit (repo: string) (runner: obj) : obj =
@@ -1623,8 +1622,11 @@ module ChangeSurface =
             return resultObject result (fun values -> values |> List.toArray |> Array.map box |> box)
         }
 
-    let gitHasRebaseHead (git: obj) (path: string) : Task<bool> =
-        (git :?> GitHandle).Port.HasRebaseHead(WorktreePath.create path)
+    let gitHasRebaseHead (git: obj) (path: string) : Task<obj> =
+        task {
+            let! result = (git :?> GitHandle).Port.HasRebaseHead(WorktreePath.create path)
+            return resultObject result box
+        }
 
     let gitReadHead (git: obj) (path: string) : Task<obj> =
         task {

@@ -103,27 +103,26 @@ const makeEstimate = (runtimeSeconds = 10, outputBytes = 1024, memory = 'medium'
 const live = () => createCancellationToken(false)
 const cancelled = () => createCancellationToken(true)
 const okLauncher = (exitCode = 0, out = 'hello', err = '') => async (_command, _token) => [
-  exitCode,
+  { kind: 'Exited', exitCode },
   new TextEncoder().encode(out),
   new TextEncoder().encode(err),
 ]
 
 test('WHAT[process-execution-010] EXEC_011_successful_run_collects_stdout_and_exit_code', async () => {
   const result = await runWithLauncher(okLauncher(0, 'the output', ''), cmd, makeEstimate(), CTX, live())
-  assert.equal(result.ok, true)
-  assert.deepEqual(result.value, {
-    kind: 'Completed',
-    exitCode: 0,
+  assert.equal(result.kind, 'Observed')
+  assert.deepEqual(result.ending, { kind: 'Exited', exitCode: 0 })
+  assert.deepEqual(result.output, {
+    kind: 'InMemory',
     stdout: 'the output',
     stderr: '',
-    spooled: false,
   })
 })
 test('WHAT[process-execution-010] EXEC_011_nonzero_exit_is_still_an_ok_outcome', async () => {
   const result = await runWithLauncher(okLauncher(3, '', 'boom'), cmd, makeEstimate(), CTX, live())
-  assert.equal(result.ok, true)
-  assert.equal(result.value.kind, 'Completed')
-  assert.equal(result.value.exitCode, 3)
+  assert.equal(result.kind, 'Observed')
+  assert.equal(result.output.kind, 'InMemory')
+  assert.deepEqual(result.ending, { kind: 'Exited', exitCode: 3 })
 })
 }
 
@@ -157,13 +156,12 @@ test('WHAT[process-execution-010] CUT_02_non_pty_host_uses_one_supervised_proces
     context(process.cwd(), 60_000),
     createCancellationToken(false),
   )
-  assert.equal(outcome.ok, true)
-  assert.deepEqual(outcome.value, {
-    kind: 'Completed',
-    exitCode: 5,
+  assert.equal(outcome.kind, 'Observed')
+  assert.deepEqual(outcome.ending, { kind: 'Exited', exitCode: 5 })
+  assert.deepEqual(outcome.output, {
+    kind: 'InMemory',
     stdout: 'via-supervised-process',
     stderr: 'err-stream',
-    spooled: false,
   })
 })
 }

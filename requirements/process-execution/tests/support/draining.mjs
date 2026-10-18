@@ -58,12 +58,15 @@ export async function verifyDrainingStop(t, reason) {
   if (reason === 'cancel') {
     runtime.cancel(token)
     const result = await running
-    assert.equal(result.ok, false)
-    assert.equal(result.error.kind, 'ProcessCancelled')
+    assert.equal(result.kind, 'Observed')
+    assert.deepEqual(result.ending, { kind: 'Exited', exitCode: 23 })
+    assert.equal(result.stopRequested.kind, 'CancellationRequested')
+    assert.equal(result.output, null)
   } else {
     const result = await running
-    assert.equal(result.ok, false)
-    assert.equal(result.error.kind, 'TimeoutExceeded')
+    assert.equal(result.kind, 'Observed')
+    assert.deepEqual(result.ending, { kind: 'Exited', exitCode: 23 })
+    assert.equal(result.stopRequested.kind, 'DeadlineStopRequested')
   }
   await until(() => !alive(grandchild), 'the same-group pipe holder must actually terminate')
 }

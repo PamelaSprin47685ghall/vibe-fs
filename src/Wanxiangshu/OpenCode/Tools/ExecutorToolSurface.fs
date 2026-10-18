@@ -88,7 +88,11 @@ module ExecutorToolSurface =
         spec.Execute hostArgs hostContext
 
     let formatSpooledOutcome (exitCode: int) (summary: string) : string =
-        ExecutorTool.formatSpooledOutcome exitCode summary
+        ExecutorTool.formatSpooledOutcome
+            { End = EndEvidence.Confirmed(ProgramEnd.Exited exitCode)
+              StopRequested = None
+              Output = Some(CapturedOutput.InMemory("", ""))
+              Fault = None } summary
 
     let retainOutputTail (limitBytes: int) (output: string) : string =
         ExecutorTool.retainOutputTail limitBytes output

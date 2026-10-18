@@ -62,7 +62,7 @@ module ProcessSurface =
     val run: command: obj -> estimate: obj -> context: obj -> token: obj -> Task<obj>
 
     val childCreate: onKill: obj -> obj
-    val childExit: child: obj -> code: int -> unit
+    val childExit: child: obj -> ending: obj -> unit
     val childOnExit: child: obj -> callback: obj -> unit
     val childView: child: obj -> obj
     val waitOutcomeView: outcome: obj -> obj
@@ -71,7 +71,7 @@ module ProcessSurface =
     val outputCreate: estimate: obj -> obj
     val outputAddStdout: collector: obj -> bytes: obj -> unit
     val outputAddStderr: collector: obj -> bytes: obj -> unit
-    val outputBuildResult: collector: obj -> exitCode: int -> obj
+    val outputBuildResult: collector: obj -> obj
     val outputView: collector: obj -> obj
 
     val spoolChunkCount: bytes: float -> int

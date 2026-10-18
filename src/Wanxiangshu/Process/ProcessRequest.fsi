@@ -28,18 +28,36 @@ and ProcessContext =
     { WorkingDirectory: string option
       HardLimit: TimeSpan }
 
-and [<RequireQualifiedAccess>] ProcessOutcome =
-    | Completed of exitCode: int * stdout: string * stderr: string * spooled: bool
-    | Spooled of exitCode: int * spoolPath: string * totalBytes: int64 * chunkCount: int
+and [<RequireQualifiedAccess>] ProgramEnd = Exited of int | Signaled of string
+and [<RequireQualifiedAccess>] EndEvidence = Confirmed of ProgramEnd | Unconfirmed
+and [<RequireQualifiedAccess>] StopRequest =
+    | CancellationRequested
+    | DeadlineStopRequested of TimeSpan
+and [<RequireQualifiedAccess>] CapturedOutput =
+    | InMemory of stdout: string * stderr: string
+    | Spooled of path: string * bytes: int64 * chunks: int
+and [<RequireQualifiedAccess>] NoExecution =
+    | InvalidRequest of string
+    | CancelledBeforeStart
+    | StartRejected of string
+and ProcessObservation =
+    { End: EndEvidence
+      StopRequested: StopRequest option
+      Output: CapturedOutput option
+      Fault: string option }
+and [<RequireQualifiedAccess>] ProcessResult =
+    | NotStarted of NoExecution
+    | Observed of ProcessObservation
 
-and [<RequireQualifiedAccess>] ProcessError =
-    | TimeoutExceeded of duration: TimeSpan
-    | SpawnFailed of reason: string
-    | ProcessCancelled of reason: string
-    | ExecutionFailed of reason: string
+type TextProcessExit = { ExitCode: int; Stdout: string; Stderr: string }
+type TextProcessRunner = Command -> Task<Result<TextProcessExit, ProcessResult>>
 
 type RunProcess =
-    Command -> ProcessEstimate -> ProcessContext -> CancellationToken -> Task<Result<ProcessOutcome, ProcessError>>
+    Command -> ProcessEstimate -> ProcessContext -> CancellationToken -> Task<ProcessResult>
+
+module ProcessResult =
+    val requireText: ProcessResult -> Result<TextProcessExit, ProcessResult>
+    val describe: ProcessResult -> string
 
 module ProcessEstimate =
     val DefaultHardLimit: TimeSpan

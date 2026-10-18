@@ -38,19 +38,75 @@ type ProcessContext =
     }
 
 [<RequireQualifiedAccess>]
-type ProcessOutcome =
-    | Completed of exitCode: int * stdout: string * stderr: string * spooled: bool
-    | Spooled of exitCode: int * spoolPath: string * totalBytes: int64 * chunkCount: int
+type ProgramEnd =
+    | Exited of int
+    | Signaled of string
 
 [<RequireQualifiedAccess>]
-type ProcessError =
-    | TimeoutExceeded of duration: TimeSpan
-    | SpawnFailed of reason: string
-    | ProcessCancelled of reason: string
-    | ExecutionFailed of reason: string
+type EndEvidence =
+    | Confirmed of ProgramEnd
+    | Unconfirmed
+
+[<RequireQualifiedAccess>]
+type StopRequest =
+    | CancellationRequested
+    | DeadlineStopRequested of TimeSpan
+
+[<RequireQualifiedAccess>]
+type CapturedOutput =
+    | InMemory of stdout: string * stderr: string
+    | Spooled of path: string * bytes: int64 * chunks: int
+
+[<RequireQualifiedAccess>]
+type NoExecution =
+    | InvalidRequest of string
+    | CancelledBeforeStart
+    | StartRejected of string
+
+type ProcessObservation =
+    { End: EndEvidence
+      StopRequested: StopRequest option
+      Output: CapturedOutput option
+      Fault: string option }
+
+[<RequireQualifiedAccess>]
+type ProcessResult =
+    | NotStarted of NoExecution
+    | Observed of ProcessObservation
+
+type TextProcessExit =
+    { ExitCode: int
+      Stdout: string
+      Stderr: string }
+
+type TextProcessRunner = Command -> Task<Result<TextProcessExit, ProcessResult>>
 
 type RunProcess =
-    Command -> ProcessEstimate -> ProcessContext -> CancellationToken -> Task<Result<ProcessOutcome, ProcessError>>
+    Command -> ProcessEstimate -> ProcessContext -> CancellationToken -> Task<ProcessResult>
+
+module ProcessResult =
+    let requireText result =
+        match result with
+        | ProcessResult.Observed
+            { End = EndEvidence.Confirmed(ProgramEnd.Exited code)
+              StopRequested = None
+              Output = Some(CapturedOutput.InMemory(stdout, stderr))
+              Fault = None } ->
+            Ok { ExitCode = code; Stdout = stdout; Stderr = stderr }
+        | other -> Error other
+
+    let private outputDescription output =
+        match output with
+        | None -> "not delivered"
+        | Some(CapturedOutput.InMemory _) -> "complete text"
+        | Some(CapturedOutput.Spooled _) -> "mixed-channel spool cannot supply separate text streams"
+
+    let describe result =
+        match result with
+        | ProcessResult.NotStarted reason -> sprintf "Process not started: %A" reason
+        | ProcessResult.Observed observation ->
+            sprintf "Process end: %A; stop: %A; output: %s; fault: %A"
+                observation.End observation.StopRequested (outputDescription observation.Output) observation.Fault
 
 module ProcessEstimate =
 

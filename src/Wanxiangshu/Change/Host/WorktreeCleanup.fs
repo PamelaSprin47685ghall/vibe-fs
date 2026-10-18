@@ -11,10 +11,10 @@ open Wanxiangshu.Git
 /// ORCH-007 forbids substituting filesystem state for a durable fact, and the
 /// active-job set here comes from the projection.
 module OrchestratorSweep =
-    let private removeOne git path (cont: Task<Result<unit, string>>) =
+    let private removeOne git path (cont: unit -> Task<Result<unit, string>>) =
         task {
             match! git.RemoveWorktree path with
-            | Ok() -> return! cont
+            | Ok() -> return! cont ()
             | Error error ->
                 return Error(sprintf "stale worktree cleanup failed for %s: %s" (WorktreePath.value path) error)
         }
@@ -24,15 +24,15 @@ module OrchestratorSweep =
             task {
                 match remaining with
                 | [] -> return Ok()
-                | path :: tail -> return! removeOne git path (loop tail)
+                | path :: tail -> return! removeOne git path (fun () -> loop tail)
             }
 
         loop paths
 
-    let private deleteOne git identity (cont: Task<Result<unit, string>>) =
+    let private deleteOne git identity (cont: unit -> Task<Result<unit, string>>) =
         task {
             match! git.DeleteBranch identity with
-            | Ok() -> return! cont
+            | Ok() -> return! cont ()
             | Error error ->
                 return
                     Error(
@@ -45,7 +45,7 @@ module OrchestratorSweep =
             task {
                 match remaining with
                 | [] -> return Ok()
-                | identity :: tail -> return! deleteOne git identity (loop tail)
+                | identity :: tail -> return! deleteOne git identity (fun () -> loop tail)
             }
 
         loop identities

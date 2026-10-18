@@ -83,14 +83,14 @@ module ProcessOutput =
     let decodeText (bytes: byte array) : string =
         emitJsExpr bytes "new TextDecoder('utf-8', { ignoreBOM: true }).decode($0)"
 
-    let buildResult (collector: OutputCollector) (exitCode: int) : ProcessOutcome =
+    let buildResult (collector: OutputCollector) : CapturedOutput =
         match collector.Spool with
         | Some active ->
-            ProcessOutcome.Spooled(exitCode, active.Path, active.BytesWritten, Spool.chunkCount active.BytesWritten)
+            CapturedOutput.Spooled(active.Path, active.BytesWritten, Spool.chunkCount active.BytesWritten)
         | None ->
             let stdoutBytes = concatBytes collector.Stdout
             let stderrBytes = concatBytes collector.Stderr
             let stdoutText = decodeText stdoutBytes
             let stderrText = decodeText stderrBytes
 
-            ProcessOutcome.Completed(exitCode, stdoutText, stderrText, false)
+            CapturedOutput.InMemory(stdoutText, stderrText)

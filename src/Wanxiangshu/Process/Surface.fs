@@ -43,9 +43,10 @@ module ProcessSurface =
     type private RegistrationHandle(registration: CancellationTokenRegistration) =
         member _.Registration = registration
 
-    type internal ChildHandle(child: NodeProcessHost.ChildProcess, killCount: unit -> int) =
+    type internal ChildHandle(child: NodeProcessHost.ChildProcess, killCount: unit -> int, ending: EndEvidence ref) =
         member _.Child = child
         member _.KillCount = killCount
+        member _.Ending = ending
 
     type private OutputHandle(collector: ProcessOutput.OutputCollector) =
         member _.Collector = collector
@@ -420,18 +421,35 @@ module ProcessSurface =
 
     let disposeCancellationRegistration (_registration: obj) : unit = ()
 
-    let private launcherResult (value: obj) : Task<int * byte[] * byte[]> =
+    let private evidenceView evidence : obj =
+        match evidence with
+        | EndEvidence.Confirmed(ProgramEnd.Exited code) -> box {| kind = "Exited"; exitCode = code |}
+        | EndEvidence.Confirmed(ProgramEnd.Signaled signal) -> box {| kind = "Signaled"; signal = signal |}
+        | EndEvidence.Unconfirmed -> box {| kind = "Unconfirmed" |}
+
+    let private evidenceOf (value: obj) =
+        match string (property value "kind") with
+        | "Exited" ->
+            let code: obj = property value "exitCode"
+            if emitJsExpr code "Number.isInteger($0) && $0 >= 0 && $0 <= 2147483647" then
+                EndEvidence.Confirmed(ProgramEnd.Exited(unbox<int> code))
+            else failwith "Invalid exit code"
+        | "Signaled" -> EndEvidence.Confirmed(ProgramEnd.Signaled(string (property value "signal")))
+        | "Unconfirmed" -> EndEvidence.Unconfirmed
+        | _ -> failwith "Expected explicit target end evidence"
+
+    let private launcherResult (value: obj) : Task<EndEvidence * byte[] * byte[]> =
         task {
             let! raw = unbox<Task<obj>> (promiseOf value)
             let values = unbox<obj array> raw
-            return int (string values.[0]), bytesOf values.[1], bytesOf values.[2]
+            return evidenceOf values.[0], bytesOf values.[1], bytesOf values.[2]
         }
 
     let private launchWithJs
         (launcher: obj)
         (command: Command)
         (token: CancellationToken)
-        : Task<int * byte[] * byte[]> =
+        : Task<EndEvidence * byte[] * byte[]> =
         let register callback =
             token.Register(fun () -> call0 callback |> ignore) |> ignore
             null
@@ -443,52 +461,41 @@ module ProcessSurface =
 
         launcherResult (apply2 launcher (commandView (CommandHandle command :> obj)) tokenObject)
 
-    let private errorView (error: ProcessError) : obj =
-        match error with
-        | ProcessError.TimeoutExceeded duration ->
-            box
-                {| kind = "TimeoutExceeded"
-                   durationMs = duration.TotalMilliseconds |}
-        | ProcessError.SpawnFailed reason ->
-            box
-                {| kind = "SpawnFailed"
-                   reason = reason |}
-        | ProcessError.ProcessCancelled reason ->
-            box
-                {| kind = "ProcessCancelled"
-                   reason = reason |}
-        | ProcessError.ExecutionFailed reason ->
-            box
-                {| kind = "ExecutionFailed"
-                   reason = reason |}
-
     let outcomeView (outcome: obj) : obj =
-        match unbox<ProcessOutcome> outcome with
-        | ProcessOutcome.Completed(exitCode, stdout, stderr, spooled) ->
+        match unbox<CapturedOutput> outcome with
+        | CapturedOutput.InMemory(stdout, stderr) ->
             box
-                {| kind = "Completed"
-                   exitCode = exitCode
+                {| kind = "InMemory"
                    stdout = stdout
-                   stderr = stderr
-                   spooled = spooled |}
-        | ProcessOutcome.Spooled(exitCode, path, bytes, chunks) ->
+                   stderr = stderr |}
+        | CapturedOutput.Spooled(path, bytes, chunks) ->
             box
                 {| kind = "Spooled"
-                   exitCode = exitCode
                    spoolPath = path
                    totalBytes = float bytes
                    chunkCount = chunks |}
 
     let resultView (result: obj) : obj =
-        match unbox<Result<ProcessOutcome, ProcessError>> result with
-        | Ok outcome ->
+        match unbox<ProcessResult> result with
+        | ProcessResult.NotStarted reason ->
+            let view =
+                match reason with
+                | NoExecution.InvalidRequest reason -> box {| kind = "InvalidRequest"; reason = reason |}
+                | NoExecution.CancelledBeforeStart -> box {| kind = "CancelledBeforeStart" |}
+                | NoExecution.StartRejected reason -> box {| kind = "StartRejected"; reason = reason |}
+            box {| kind = "NotStarted"; reason = view |}
+        | ProcessResult.Observed observation ->
+            let stop =
+                observation.StopRequested |> Option.map (function
+                    | StopRequest.CancellationRequested -> box {| kind = "CancellationRequested" |}
+                    | StopRequest.DeadlineStopRequested duration -> box {| kind = "DeadlineStopRequested"; durationMs = duration.TotalMilliseconds |})
+                |> Option.defaultValue null
             box
-                {| ok = true
-                   value = outcomeView (box outcome) |}
-        | Error error ->
-            box
-                {| ok = false
-                   error = errorView error |}
+                {| kind = "Observed"
+                   ending = evidenceView observation.End
+                   stopRequested = stop
+                   output = observation.Output |> Option.map (box >> outcomeView) |> Option.defaultValue null
+                   fault = observation.Fault |> Option.defaultValue null |}
 
     let runWithLauncher (launcher: obj) (command: obj) (estimate: obj) (context: obj) (token: obj) : Task<obj> =
         task {
@@ -526,7 +533,7 @@ module ProcessSurface =
     /// manages its own process lifecycle uses this to construct the handle it
     /// returns to runWithHostLauncher.
     let childCreate (onKill: obj) : obj =
-        let exit = TaskCompletionSource<int>()
+        let ending = ref EndEvidence.Unconfirmed
         // DSL-MUTABLE: cancellation — child process exit flag.
         let exited = ref false
         let callbacks = ResizeArray<unit -> unit>()
@@ -541,19 +548,22 @@ module ProcessSurface =
 
         ChildHandle(
             { Process = null
-              Exit = exit
+              Observe = fun () -> ending.Value
               Kill = kill
               Exited = exited
               OnExited = callbacks
-              Failure = ref None },
-            (fun () -> killCount)
+              Failure = ref None
+              Rejection = ref None },
+            (fun () -> killCount),
+            ending
         )
         :> obj
 
-    let childExit (child: obj) (code: int) : unit =
+    let childExit (child: obj) (ending: obj) : unit =
         let value = childOf child
+        let evidence = evidenceOf ending
+        (child :?> ChildHandle).Ending.Value <- evidence
         value.Exited.Value <- true
-        value.Exit.SetResult code
         NodeProcessHost.notifyExited value
 
     let childOnExit (child: obj) (callback: obj) : unit =
@@ -570,9 +580,7 @@ module ProcessSurface =
     let waitOutcomeView (outcome: obj) : obj =
         let value = unbox<NodeProcessWait.WaitOutcome> outcome
 
-        box
-            {| exitCode = value.ExitCode
-               timedOut = value.TimedOut |}
+        box {| stopRequested = value.StopRequested |> Option.map string |> Option.defaultValue null |}
 
     let waitForExit (child: obj) (deadline: obj) (token: obj) : Task<obj> =
         task {
@@ -596,8 +604,8 @@ module ProcessSurface =
     let outputAddStderr (collector: obj) (bytes: obj) : unit =
         ProcessOutput.addStderr (outputOf collector) (bytesOf bytes)
 
-    let outputBuildResult (collector: obj) (exitCode: int) : obj =
-        outcomeView (box (ProcessOutput.buildResult (outputOf collector) exitCode))
+    let outputBuildResult (collector: obj) : obj =
+        outcomeView (box (ProcessOutput.buildResult (outputOf collector)))
 
     let outputView (collector: obj) : obj =
         let value = outputOf collector
@@ -1220,7 +1228,7 @@ module ProcessSurface =
             (_onStdout: byte[] -> unit)
             (_onStderr: byte[] -> unit)
             (parentToken: CancellationToken)
-            : Task<Result<NodeProcessHost.ChildProcess, string>> =
+            : Task<Result<NodeProcessHost.ChildProcess, ProcessResult>> =
             task {
                 let register callback =
                     parentToken.Register(fun () -> call0 callback |> ignore) |> ignore
@@ -1243,21 +1251,11 @@ module ProcessSurface =
                     )
 
                 if isNullish raw then
-                    return Error "host launcher returned no child"
-                elif not (isNullish (property raw "ok")) && not (unbox<bool> (property raw "ok")) then
-                    return Error(string (property raw "error"))
+                    return failwith "host launcher returned no child"
                 else
-                    let candidate =
-                        if raw :? ChildHandle then
-                            raw
-                        elif not (isNullish (property raw "value")) then
-                            property raw "value"
-                        else
-                            raw
-
-                    match candidate with
+                    match raw with
                     | :? ChildHandle as child -> return Ok child.Child
-                    | _ -> return Error "host launcher returned an invalid child"
+                    | _ -> return failwith "host launcher returned an invalid child"
             }
 
         task {
