@@ -7,7 +7,7 @@
 这是后续抽吸工作的共同蓝图，不是全系统已经审计完毕的声明。目录与需求包已经纳入分工；每卡开工仍需追踪实际调用者、在途状态和持久数据。包名、接口与删除清单中的待定项必须在该卡准备阶段落实，不用想象填空。
 
 <a id="delivery-handoff"></a>
-**拆分任务的交付依据与交接：** [交付检查清单](UPSTREAM-DELIVERY-CHECKLIST.md)补充原独立库 SPEC 与本指南 A—H 的证据检查，供上游维护者通过 PR 审查采纳，本地据此接收；[原要求对照](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#original-requirements-alignment)记录依据、修正和未决冲突。派发、接续或跨仓交接时，在现有任务说明或[交接单](TEMPLATES.md#handoff)附上适用规则、清单固定版本、[本卡范围](CARDS.md)与验收责任，不另设阅读回执。文档合并本身不代表现有 agent 已收到或执行。
+**拆分任务的交付依据与交接：** 原要求与[交付清单](UPSTREAM-DELIVERY-CHECKLIST.md#requirements-and-checklist)共同适用，分别说明设计约束和交付证明；重点不同不构成冲突，清单未复述的原条款仍然有效。清单供上游维护者通过 PR 审查采纳，本地据此接收；[原要求对照](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#original-requirements-alignment)记录依据和未决冲突。派发或跨仓交接时，在现有任务说明或[交接单](TEMPLATES.md#handoff)同时附上适用原条款、清单的位置与固定版本、[本卡范围](CARDS.md)和验收责任，不另设阅读回执。文档合并本身不代表现有 agent 已收到或执行。
 
 **当前入口：** [四模块报告与修复复盘](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#repair-retrospective)区分拆分缺口、修复回退、旧欠账和验证成本；[剩余计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)已按 `da8266cb6` 更新，每包列明范围、关键反例、验收及排除项。下一 P1 为终结事实 D1→D2，验证设施和旧失败取证独立，Trace 与 Bootstrap 按依赖推进，主动脱组分原型与生产接线。已完成包退出待施工顺序，状态只在[看板](BOARD.md#source-audit-repairs)维护。
 
@@ -32,6 +32,7 @@
 | [COVERAGE.md](COVERAGE.md) | 主仓需求、源码区域、新库草稿和原施工计划的归属与冲突 | owner 提交，协调者合并 |
 | [TEMPLATES.md](TEMPLATES.md) | 认领、契约、证据、PR、交接和异常处置模板 | 通用模板由协调者维护 |
 | [UPSTREAM-DELIVERY-CHECKLIST.md](UPSTREAM-DELIVERY-CHECKLIST.md) | 上游拆分与本地接收的四类证据、收据及 DONE 门槛 | owner 提交证据，非作者复核，协调者登记状态 |
+| [EXTRACTION-CONSTRAINT-REVIEW-PROMPT.md](EXTRACTION-CONSTRAINT-REVIEW-PROMPT.md) | 可转交同事的约束改进审查与执行任务 | 接手者审查后按维护权限落实，不表示自动检查已经生效 |
 | 本文 | 日常操作、分支、交付、验收和回退方法 | 共同工作约定 |
 
 后续单卡的详细材料放在 `cards/CUT-NN.md`，证据索引放在 `evidence/CUT-NN/README.md`；按需创建，不先制造几十个空文档。子卡确有独立 owner 时使用 `CUT-NN-a`，先给看板加行与前置再开工。卡号永久保留，不重排、不复用。
