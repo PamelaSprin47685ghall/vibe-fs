@@ -8,6 +8,8 @@
 
 初版重载/不支持API编译失败、绝对Git pathspec128及默认“已停止”失真分别修正并留证；非作者的受限ps EPERM正确失败后经审批复验，未当消失证据。归档SHA56a49bc8及全部原始/最终日志见[原型与施工计划](PROCESS-TERMINATION-2026-10-18.md)。当前精确生产4d594fd仍返回[143,143]，D1生产接线/物理采集故障、D2独立binary Git尚待施工；没有关闭P1。只交付报告、计划和证据索引，正常推送master，未部署或发布，R12-U1继续暂缓。
 
+窗口末尾D2补证：16生产编译条目加F#消费者直接调用既有默认binary Git runner，Node/Bun同空目录同参数的独立Git执行对照为原生128、Runner1；非作者核对成立。不是缺ref测试、精确包证明或bytes往返验收，生产未改，stderr仅保留于包装说明后缀。归档SHA15bb0ffc及两个探针前提失败在报告单列，D2仍READY。
+
 ## 第三十三批：真实取消监听及许可交接（2026-10-18）
 
 预算修复已在3c8f385c7正常推送。共享并行新增且已暂存的LOCAL-UPSTREAM-FIRST-FOUR-DIFF报告随该提交包含，未改其正文；本批使用显式文件清单提交，不混入并行改动。新确认的旧P1 R6-E现已修：ExecutorTool的finally包实际await，Runner在明确的许可/物理等待owner映射同token取消，并于取得许可后再检查；排队不偷释放，交接取消不启动，非取消错误保留。原5项2pass/3fail、首个OCE判型失配候选4fail、编译期输入变动及测试前提问题分别保留，不冒称原拆分错误，详见[取消报告](PROCESS-CANCELLATION-2026-10-18.md)。

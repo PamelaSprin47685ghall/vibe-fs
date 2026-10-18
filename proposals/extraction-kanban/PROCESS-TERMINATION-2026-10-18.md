@@ -78,6 +78,10 @@ Git的目标接口为`Command -> Task<Result<GitExited, GitRunFailure>>`，Gatew
 
 ## 原型错误与未完边界
 
+D2另补源码消费者实物反例：现有runtime owner的16个生产编译条目加Consumer.fs独立Fable编译，直接调用ProcessGitRawStore.createDefaultRunner。在同空目录、同参数的两次独立真实Git执行中，原生execFile为error.code=128且没有status，现有Runner却给1；Node/Bun均复现。该空目录不是Git仓库，不是缺ref正控；根因读取error.status再取默认1。生产源未改，没有作精确npm包消费，也没有以探针中的productUnchanged声明代替字节摘要验证。stderr只证实原文是包装说明的后缀，不称原样保留。
+
+源码、编译、原始失败及最终node-final.log/bun-final.log在`/private/tmp/process-git-raw-probe/`，归档`/private/tmp/process-git-raw-probe-evidence-20261018.tgz`，SHA-256 `15bb0ffcfc9bda8faeabe8b8a6d4226adc2cc32cea36939cff6ff845cd95e10d`。首编误用模块名Factory和首次误要求包装stderr与原文全等分别保留；修正探针前提，关键128→1断言未改。review_process_a只读核对调用链、证据与限制，没有另跑或计额外通过数。signal、ENOENT、超时、失败时非空binary stdout及真实bytes往返仍待D2验证；这项不是D1原型26session的一部分，D2尚未修复。
+
 初版TimeSpan.FromMilliseconds缺float注解，以及Fable不支持Double.IsFinite，均编译失败后修正；未以.NET编译替代。首轮Git grep绝对pathspec实际128，原生无库对照同样128/“outside the directory tree”，相对pathspec才为1；是本探针前提错误，不是native适配故障。默认Git错误曾写Execution was stopped，非作者指出失真，已改请求措辞并加断言。原始失败日志保留，不混成已通过数。
 
 D1下一步按表接生产，再补内存/Spool、正式取消/期限、输出失败、真实Git工作流与失败查询零后续写、双语wire最小额度和精确包；D2另包。review_process_a核对方案/编辑面，review_guidance_r3独立复验原型；第一段证据归因和查询错误防错意见已纳入，两次review不叠加成额外物理通过数。新类型、原型或非作者方案评审均不关闭P1，也不替代生产消费者验收。本轮未发布registry或部署Host。
