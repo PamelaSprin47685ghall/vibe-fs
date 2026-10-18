@@ -85,7 +85,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 |---|---|---|---|---|---|
 | [CUT-01-R1](SOURCE-AUDIT-2026-10-15.md#repair-lifecycle) | Journal 测试关闭同步、构造锁竞争和 Process 平台证明 | DONE | 库完整候选与精确包 Node/Bun 验证通过；未测平台不扩张 | root；audit_process（复审） | 交叉复审 |
 | [CUT-02-R1](SOURCE-AUDIT-2026-10-15.md#repair-process) | 无损输出、Draining 物理监管、相对 PATH；补 D-03 | DONE | 所选非 PTY 生产接线、192 项需求及实际安装包验收；原有 5 TODO 保留 | audit_process；audit_trace（监管）；root（集成） | 交叉复审 |
-| [CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) | 原件权威、完整 Opening、稳定 cut、Proxy 重入证明；补 D-02 | DOING | T-02/T-03/E-01 已修；D-02 对账及 T-01 原件接管已按 CUT-03-R6 验收。完整产品链的 GAP-101/108/109/111 等独立证明仍保留，不借存储迁移关闭整张卡 | root；audit_trace（已交接） | 交叉复审 |
+| [CUT-03-R1](SOURCE-AUDIT-2026-10-15.md#repair-trace) | 原件权威、完整 Opening、稳定 cut、Proxy 重入证明；补 D-02 | DOING | 原件接管及所列局部修复已验收；完整GAP-101/109/111由新R7、CUT-06-R5、R8/R9逐包承接。GAP-108入口范围已验，Bun差异另归CUT-17-R3，不借局部证明关闭父卡 | root；audit_trace（已交接） | 交叉复审 |
 | [CUT-04-R1](SOURCE-AUDIT-2026-10-15.md#repair-ownership) | PTY 真实终结、早到回执、持久预留/恢复、统一 blocker | DOING | O-02/O-03/O-04 已修；R6-A/B/C 已完成所列实现及独立复审；原自然 Unknown 按用户决定单列待办，脱离控制终端及整体闭合未完 | root（剩余监管/恢复）；audit_ownership（已交接） | 交叉复审 |
 | [CUT-01-R2](SOURCE-AUDIT-2026-10-15.md#second-review-fixes) | J-01：原生 statement 释放及 Unknown 后即时恢复写入 | DONE | 0.6.2 源码及精确包的非作者复验、真实 get 释放 oracle 和去 finalize 突变通过；新发现另记 R3，不覆盖 0.6.1 历史 | root | independent_journal_r2、independent_boundaries_r2 |
 | [CUT-04-R2](SOURCE-AUDIT-2026-10-15.md#second-review-fixes) | O-05/06/07、B-01：收尾确认、共享端口隔离、永久准入关闭及依赖声明 | DONE | 非作者确认原限定范围成立；真实 focused 778 与 0.6.2 主仓包消费通过；收尾新反例记 R3，O-01/T-01 不销项 | root | independent_pty_r2、independent_boundaries_r2 |
@@ -100,18 +100,28 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | [CUT-04-R6-C](PTY-RESTART-RECOVERY-2026-10-16.md#r12-u1-分层取证与本轮验收2026-10-17) | O-01 跨重启物理接管 | DONE | 已确认的发布缺陷已修；1232 项相关回归 0 普通失败，精确包 Node/Bun/OpenCode 消费通过，三名非作者复查完成。按用户决定验收本轮范围；R12-U1 单列待办，O-01/GAP-133 整体不销项 | root | r6c_protocol_review、r6c_ownership_review、r6c_observation_review |
 | [CUT-04-R12-U1](PTY-RESTART-RECOVERY-2026-10-16.md#r12-u1-分层取证与本轮验收2026-10-17) | 原自然 Unknown 追踪 | BACKLOG | 用户决定暂存；原 441 行没有内层现场，仍未唯一归因。已保全分层证据并实演 Unknown 捕获；有新现场或用户重启此包时再处理，不把未复现写成已修复 | root（后续） | 待重新认领 |
 | [CUT-03-R6](TRACE-ORIGINALS-2026-10-17.md) | T-01 原件捕获、冷恢复、消费者切换和旧路径退出 | DONE | 原 T-01 N3–N6、复审候选 N7–N9 及既有 T01-04/05/06 均已修并分开记录。库0.6.4、2270项0普通失败、两项integration、非作者Node/Bun及精确包仓外强杀恢复均通过；R12-U1、GAP-101 不销项，未部署用户Host | root | t01r_originals；capture/recovery 初审后参与修正 |
-| [CUT-02-R6-A](REMAINING-REPAIRS-2026-10-16.md) | GAP-091 纯契约及编译/消费者边界 | READY | 真实正反编译与注入能力证明，不能只改目录或外观入口 | root（计划） | 待非作者复审 |
-| [CUT-02-R6-B](REMAINING-REPAIRS-2026-10-16.md) | GAP-092 完整 wire 总预算 | READY | 先明确最小可接纳预算和预执行拒绝通道，再以实际编码限制完整结果 | root（计划） | 待非作者复审 |
-| [CUT-02-R6-C](REMAINING-REPAIRS-2026-10-16.md) | Bun 特殊 env、参数证明及 stdin 四项失败 | READY | 原生对照已完成；分别处理能力与测试假设，不放宽断言，不标全套通过 | root（计划） | 待非作者复审 |
+| [CUT-02-R6-A](REMAINING-REPAIRS-2026-10-16.md#process-contract) | GAP-091及Process契约统一、独立编译与消费者切换 | READY | 排R3后；先定窄能力、B预算拒绝和C写入语义，允许换接口并删旧入口；真实Fable正反编译、实际消费者及精确包 | root（计划） | 待非作者复审 |
+| [CUT-02-R6-B](REMAINING-REPAIRS-2026-10-16.md#process-contract) | GAP-092 完整wire总预算与执行前拒绝 | BACKLOG | A→C后接入；允许换结果格式并迁全部解析者，必要事实不丢，有效编码全量受限，非法预算零Spawn/零写入 | root（计划） | 待非作者复审 |
+| [CUT-02-R6-C](REMAINING-REPAIRS-2026-10-16.md#process-contract) | Node/Bun环境、参数和stdin的真实回执边界 | BACKLOG | A契约后；特殊键实际保真，参数用子进程正控，写入故障有确切先后，四项逐条闭合，不以二选一预期凑绿 | root（计划） | 待非作者复审 |
 | [CUT-06-R1](WORK-RECORD-RANGES-2026-10-17.md) | GAP-111 跨 invocation frame 的 bounded 取材与 coverage | DONE | 本原子提交修正范围与正式陈述，1199项0普通失败；Node/Bun核心28pass/0fail/2TODO，非作者源/消费者/独立新进程恢复及精确包外Node/Bun均通过，库0.6.4未变。只关闭本包范围，不关闭整项GAP-111/109 | root | gap111_review |
 | [CUT-06-R3](WORK-RECORD-RANGES-2026-10-17.md#independent-review) | GAP-111 独立复审：部分摘要及formal-only Terminal去重 | DONE | e7新回退与输入已有的formal-only重复均已修；最终核心Node/Bun各56pass/0fail/2TODO，相关1227项0普通失败；非作者570范围/冷进程/消费者及eeaa8b精确包外14材料组、真实Sync/Fork和新进程冷读通过，随本原子提交交付；R2不销项 | root | g111r_ranges、g111r_consumers、g111r_contracts |
 | [CUT-06-R2](WORK-RECORD-HISTORY-2026-10-17.md) | GAP-111 已完成范围的历史表示稳定性 | DONE | Terminal时原子固定WorkRecord摘要引用，真实Sync/Fork使用确切完成终点；Node/Bun核心69pass/1TODO、相关1239项0普通失败，非作者源/暖冷行为及旧精确包blob升级消费通过。575精确包df0ccd隔离默认入口和同包非作者Node/Bun实际消费者均通过，随本原子提交交付；历史关联缺失不自动迁移，R12-U1暂缓 | root | g111r_contracts |
 | [CUT-06-R4](WORK-RECORD-HISTORY-2026-10-17.md#r4-review) | R2 独立复审：并发事实下的完成因果边界 | DONE | 并发晚摘要/原件、多head父边及完成歧义已修；1311项0普通失败、Bun核心91pass/1TODO、真实checkpoint/消费者/冷恢复、旧R2包升级及229980精确包独立Node/Bun消费通过。三名非作者复验完成，撤回的五个越界白盒用例不计正式验收；GAP-111/109、旧缺边历史与R12-U1边界保留，随本原子提交交付 | root | r2_freeze_review、r2_replay_review、r2_consumer_review |
 | [CUT-17-R1](GUIDANCE-INGRESS-2026-10-17.md) | GAP-108 指导呈现回流的真实 Host 路径核查 | DONE | 正常Host原件隔离成立，原直接capture TODO改为保真负控和实际Host证明；引用误删P1已修。1350项相关回归0普通失败、实际Host网络/持久/冷读、Trace正反编译及f047精确包隔离Node/Bun消费通过；旧错历史及完整CUT-17不销项，R12-U1暂缓，随本原子提交交付 | root | root自审；未做非作者复审 |
 | [CUT-17-R2](GUIDANCE-INGRESS-2026-10-17.md#r2-review) | R1 独立复审：来源身份、Host 链路与验收归因 | DONE | 四项R1回退已修，捕获前还原删除，原件/呈现职责分开；O1撤为review误判。600核心Node/Bun25pass/1skip、真实Host1/1、1363项0普通失败及2e0f精确包非作者Node/Bun各12组暖/新OS冷读通过；三名非作者复验完成，旧错历史/完整CUT-17不销项，R12-U1暂缓，随本原子提交交付 | root | g108r_provenance、g108r_host、g108r_evidence |
-| [CUT-17-R3](DEEP-TEST-2026-10-18.md) | Bun指导整文件超时与前序组合差异定位 | READY | 10-18两次整文件20pass/5timeout/1skip，单选1/1、末七项7/7、含冲突九项9/9；Node及真实Host通过。先定位确切调用、fixture释放/owner与原生运行时，再做同环境旧版对照；尚未归为生产回退，不放宽timeout或断言 | root（计划） | 待认领 |
+| [CUT-17-R3](REMAINING-REPAIRS-2026-10-16.md#bun-guidance) | Bun指导整文件挂起的原因与生命周期修正 | READY | 队首；20pass/5timeout/1skip与单选/七项/九项对照已在深测报告。定位确切等待，允许重整fixture或生产owner，完整Node/Bun014、真实Host和新OS冷读验收，不靠加timeout/拆文件绕过 | root（计划） | 待非作者复审 |
+| [GAP-085](REMAINING-REPAIRS-2026-10-16.md#adjacent-repairs) | 规则包整个自子树的作用域校验 | READY | 独立支线；002漏拒反例、普通/否定规则、符号链接及真实grounding消费者，允许重写规范化，不只探WHAT.md | root（计划） | 待复审 |
+| [GAP-159](REMAINING-REPAIRS-2026-10-16.md#adjacent-repairs) | 显式office能力统一配置与真实Fission准入 | READY | 独立支线；Predictor不借Engineer权限，伪造/Manager/DevOps拒绝零效果与合法Engineer正控 | root（计划） | 待非作者复审 |
+| [GAP-140](REMAINING-REPAIRS-2026-10-16.md#adjacent-repairs) | 有持久依据的失败预算、耗尽与重放裁决 | READY | 独立支线；允许升事件版本并拒绝无依据旧记录，007两反例、精确去重/重置/冷重放/提交故障和实际无重发 | root（计划） | 待非作者复审 |
+| [CUT-03-R7](REMAINING-REPAIRS-2026-10-16.md#trace-product-chain) | 真Opening的完整原件范围与checkpoint语义 | READY | 对账现行WHAT并删过期阶段分支；实际Host捕获/提交/冷读逐字及范围、缺证/冲突/重复，work-record-008/009 | root（计划） | 待非作者复审 |
+| [CUT-06-R5](REMAINING-REPAIRS-2026-10-16.md#trace-product-chain) | inspect、Resume、Casebook与Fork/Join统一范围消费 | BACKLOG | CUT-03-R7后；真实入口同invocation/完成表示，暖冷一致，不借原materializer或单一消费者代证 | root（计划） | 待非作者复审 |
+| [CUT-03-R8](REMAINING-REPAIRS-2026-10-16.md#trace-product-chain) | 实际compaction/reanchor、coverage与呈现链 | BACKLOG | CUT-06-R5后；真实Host压缩、旧epoch拒绝、原文保留、提交故障、provider wire及冷恢复 | root（计划） | 待非作者复审 |
+| [CUT-03-R9](REMAINING-REPAIRS-2026-10-16.md#trace-product-chain) | 真实Fission汇聚与唯一完成前沿 | BACKLOG | R8后联合Fission owner；多lane乱序/迟到/取消/N−1 takeover及新OS冷读，Trace不另建lane状态机 | root（计划） | 待非作者复审 |
+| [CUT-04-R7](REMAINING-REPAIRS-2026-10-16.md#bootstrap-recovery) | 实际Bootstrap恢复、准入和持久终结 | READY | 可独立调查；两个真正Host的Reserve/物理启动/Started/Ended崩溃矩阵、认证与留账、命令不重发，协议切换有原实例退役步骤 | root（计划） | 待非作者复审 |
+| [CUT-04-R8](REMAINING-REPAIRS-2026-10-16.md#detached-processes) | 主动脱组后代监管原型 | BACKLOG | 明确平台和机制，真实setsid、无关进程隔离、Host强杀；原型成立再接生产，不扩PID扫描冒充全树监管 | root（计划） | 待非作者复审 |
+| [CUT-04-R9](REMAINING-REPAIRS-2026-10-16.md#detached-processes) | 声明平台、运行时与容量实测 | BACKLOG | 对最终协议逐平台精确包/PTY/恢复/收尾及背压/RSS；不把本机结果当Linux/Windows/断电证明 | root（计划） | 待复审 |
 
-2026-10-18深测：304文件/2545项中2375pass/0普通fail/30skip/140TODO，真实Host、独立编译、库Node及实际Node/Bun交付另列；测试worker继承execArgv的15项启动失败已修，生产包2e0f不变。新CUT-17-R3先收窄，当前不能称Bun指导整文件全绿。此前CUT-06及CUT-17的限定范围验收保留，三个Process P2仍按R6-B→R6-C→R6-A。完整Trace/Ownership产品链、历史、平台及R12-U1不销项。[最新深测与排期](REMAINING-REPAIRS-2026-10-16.md#deep-test-current)。公共文件、两仓发布及主仓集成仍串行，不能用局部修复关闭整张关联卡。
+2026-10-18重排：用户已授权不迁就旧版本，可破坏式改接口、协议、格式并清旧。当前顺序为CUT-17-R3→Process A→C→B；GAP-085/159/140各自成包，Trace R7→CUT-06-R5→R8→R9与Bootstrap调查独立推进，脱组原型及平台/容量另列。新卡仅是计划，未认领生产编辑面；旧格式可明确拒绝或单向迁移，不默认保留兼容层或双写，未决物理义务不因升级消失。[当前唯一施工计划](REMAINING-REPAIRS-2026-10-16.md#current-plan)。原深测结果及已验收范围保留，R12-U1继续暂缓。
 
 ## 波次：什么时候拉哪张卡
 
