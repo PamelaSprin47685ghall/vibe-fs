@@ -60,6 +60,10 @@ module JsRunLoop =
     [<Emit("try { if ($0.stdout) { $0.stdout.destroy(); } } catch (error) {} try { if ($0.stderr) { $0.stderr.destroy(); } } catch (error) {}")>]
     let private releaseChildStreams (child: obj) : unit = jsNative
 
+    /// Write to a spawned child's stdin; interactive use is `{ send, name, input }`.
+    [<Emit("try { if ($0.stdin) { $0.stdin.write($1); } } catch (error) {}")>]
+    let private writeChildStdin (child: obj) (input: string) : unit = jsNative
+
     [<Emit("new $0()")>]
     let private construct (cls: obj) : obj = jsNative
 
@@ -203,7 +207,7 @@ module JsRunLoop =
                     [ "shell" ==> true
                       "detached" ==> true
                       "cwd" ==> root
-                      "stdio" ==> [| "ignore"; "pipe"; "pipe" |] ])
+                      "stdio" ==> [| "pipe"; "pipe"; "pipe" |] ])
 
         let managed = ManagedChild(name, child)
 
@@ -393,10 +397,22 @@ module JsRunLoop =
                     let scratch = ManagedChild("wait", null)
 
                     let checkContext (managed: ManagedChild) : obj =
+                        // The slice deltas of the foreground command and every
+                        // background child land in one observation window, so a
+                        // spawned REPL's replies are visible from check.
+                        let stdoutParts = ResizeArray<string>()
+                        let stderrParts = ResizeArray<string>()
+                        stdoutParts.Add(managed.SliceStdout.Take())
+                        stderrParts.Add(managed.SliceStderr.Take())
+
+                        for entry in children.Values |> Seq.sortBy (fun child -> child.Name) do
+                            stdoutParts.Add(entry.SliceStdout.Take())
+                            stderrParts.Add(entry.SliceStderr.Take())
+
                         createObj
                             [ "root" ==> root
-                              "stdout" ==> managed.SliceStdout.Take()
-                              "stderr" ==> managed.SliceStderr.Take()
+                              "stdout" ==> String.concat "" stdoutParts
+                              "stderr" ==> String.concat "" stderrParts
                               "exited" ==> managed.Exited
                               "exitCode" ==> (if managed.Exited then box managed.ExitCode else null)
                               "backgrounds" ==> (children.Values |> Seq.map childView |> Seq.toArray)
@@ -548,6 +564,29 @@ module JsRunLoop =
                                 children.Remove name |> ignore
                             | false, _ ->
                                 result <- failure "RUN_CHILD_UNKNOWN" ("signal names an unknown background: " + name)
+                        elif hasProperty raw "send" then
+                            // Interactive write to a spawned child's stdin. A
+                            // missing trailing newline is added (terminal
+                            // convention); the child's incremental output
+                            // arrives through the next check slice.
+                            let send = getProperty raw "send"
+                            let name = string (getProperty send "name")
+                            let inputValue = getProperty send "input"
+
+                            let input =
+                                if isNullish inputValue then "" else string inputValue
+
+                            match children.TryGetValue name with
+                            | true, managed ->
+                                let payload =
+                                    if input = "" || input.EndsWith "\n" then
+                                        input
+                                    else
+                                        input + "\n"
+
+                                writeChildStdin managed.Child payload
+                            | false, _ ->
+                                result <- failure "RUN_CHILD_UNKNOWN" ("send names an unknown background: " + name)
                         elif hasProperty raw "waitFor" then
                             let waitFor = getProperty raw "waitFor"
                             let port = int (unbox<float> (getProperty waitFor "port"))
@@ -604,7 +643,7 @@ module JsRunLoop =
                             result <-
                                 failure
                                     "RUN_COMMAND_UNSUPPORTED"
-                                    "next() must return a command string, null, { spawn, name }, { signal, name } or { waitFor: { port, timeoutMs } }"
+                                    "next() must return a command string, null, { spawn, name }, { send: { name, input } }, { signal, name } or { waitFor: { port, timeoutMs } }"
 
                     for entry in children.Values |> Seq.toArray do
                         killManaged entry "SIGKILL"

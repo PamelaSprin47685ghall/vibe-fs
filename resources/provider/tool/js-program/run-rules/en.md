@@ -22,6 +22,10 @@ Optional:
 - `{ spawn, name }` — start a background process and continue immediately.
 - `{ signal, name }` — send the named signal (default `SIGTERM`) to that background;
   if it stays alive for 2 s, SIGKILL follows.
+- `{ send, name, input }` — write `input` to that background's stdin (a trailing
+  newline is added when missing); its incremental output arrives in the next
+  `check` slice. This is the interactive form: spawn a REPL/server, send a line,
+  read the delta, send the next line.
 - `{ waitFor: { port, timeoutMs } }` — wait until that TCP port accepts.
 
 `check(ctx)` returns:

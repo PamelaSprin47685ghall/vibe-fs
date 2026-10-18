@@ -20,6 +20,9 @@ await js.run(class extends js.Runnable { ... }) —— 工程成员。
 - `null` —— 没有更多工作；run 结束。
 - `{ spawn, name }` —— 启动后台进程并立即继续。
 - `{ signal, name }` —— 向该具名后台进程发送指定信号（默认 `SIGTERM`）；2 秒后仍存活则 SIGKILL。
+- `{ send, name, input }` —— 把 `input` 写进该后台进程的 stdin（缺行尾换行时补一个）；
+  它的增量输出在下一个 `check` 片到达。这就是交互形态：起一个 REPL/server，发一行、
+  读增量、再发下一行。
 - `{ waitFor: { port, timeoutMs } }` —— 等该 TCP 端口可接受连接。
 
 `check(ctx)` 返回：

@@ -28,6 +28,8 @@ park 现场表是独立的进程级静态表模块 JsParkedSites（ParkedSites.f
 
 Exec capability 投影出 `run` 成员与全局 `js.Runnable`。模型写 `await js.run(class extends js.Runnable { ... })`；宿主拥有循环：校验规格（`maxDuration`/`next`/`check` 缺一即 `RUNNABLE_SPEC_INCOMPLETE`）、执行命令、按 `interval` 时间片调用 `check`、派发 `onExit`、执行 `maxDuration` 上界。`check` 可 `{ abort }` 或 `{ park }`；park 走与 `js.park` 相同的挂起通道与 source 标记，恢复值 `'abort'` 中止。`next` 支持命令字符串/`null`/`{ spawn, name }`/`{ signal, name }`/`{ waitFor: { port, timeoutMs } }`；后台进程在 `check` 的 `backgrounds` 观察面可见，run 结束时全部 SIGKILL。成功结局是 `{ ok, status, exitCode, stdout, stderr, truncated, bytes, durationMs }`；每路输出保留头尾各 128 KiB 并如实报总字节。host 失败经 `__jsFailure` 哨兵成为稳定失败码。双语教学在 `tool/js-program/run-rules`，wget Ultra Example 在 `tool/js-program/ultra-devops`。
 
+`run`/`pty` 宿主工具已整体退役（[058]，GAP-234）：`js.run` 是唯一执行面，`{ send: { name, input } }` 写命名子进程 stdin，`check(ctx)` 的 `stdout`/`stderr` 是该时间片的增量（前台命令与后台子进程合并），因此 REPL/server 式的交互也走同一循环。
+
 ## 委托原语：fork / join / fission / dag（WHAT[repository-programming-056]）
 
 **所有 js.* 成员返回数据，绝不返回渲染后的 prose**（宿主在工具结果与 parked 边界统一渲染）。委托成员统一信封：`{ ok: true, ... }` / `{ ok: false, code }`。

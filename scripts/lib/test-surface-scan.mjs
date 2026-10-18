@@ -439,14 +439,7 @@ export const SURFACE_MANIFEST = [
     representation: 'opaque-capability',
     kind: 'resource',
   },
-  {
-    module: 'OpenCode/Tools/ExecutorToolSurface.js',
-    owner: 'process-execution',
-    laws: ['PROC-011'],
-    source: 'src/Wanxiangshu/OpenCode/Tools/ExecutorToolSurface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
+
   {
     module: 'Process/LargeGateSurface.js',
     owner: 'process-execution',

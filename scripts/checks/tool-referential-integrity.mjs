@@ -40,7 +40,7 @@ const ROLE_PREDICATE_ARM_RE = /\|\s*"([^"]+)"(?:\s+->|\s*\|)/g
 
 /** Registry gate logic compares spec.Name — not a ToolSpec owner site. */
 const TOOL_OWNER_SKIP = new Set(['ToolRegistry.fs'])
-TOOL_OWNER_SKIP.add('ExecutorTool.fs')
+
 
 /**
  * @typedef {{ code: string, path: string, detail?: string }} Violation

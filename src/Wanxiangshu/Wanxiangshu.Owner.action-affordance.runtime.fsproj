@@ -15,10 +15,9 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-tool-adapter.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-tools-toolruntimescope.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.process-execution.opencode-tools-ptytool.fsproj"/>
+
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-session-contract.fsproj"/>
-    <Compile Include="OpenCode/Tools/ExecutorToolSurface.fsi"/>
-    <Compile Include="OpenCode/Tools/ExecutorToolSurface.fs"/>
+
     <Compile Include="OpenCode/Tools/ToolContext.fsi"/>
     <Compile Include="OpenCode/Tools/ToolContext.fs"/>
     <Compile Include="OpenCode/Tools/FileTools.fsi"/>

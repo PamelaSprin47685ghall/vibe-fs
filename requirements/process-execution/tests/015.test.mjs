@@ -1,28 +1,46 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parse } from 'smol-toml'
-import { run, nodeCommand } from './support/executor.mjs'
+import * as toolResultBound from '../../../dist/Host/Contract/ToolResultBound.js'
+import { sandbox, runProgram, caseName, render, nodeCommand } from './support/executor.mjs'
 
-process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+// Host-native `run` tool is retired; `js.run` supersedes it (repository-programming [050]-[052])
+// and complete provider results are bounded to the UTF-8 window by ToolResultBound.
 
-for (const budget of [1, 3, 4, 7, 16, 64]) {
-  test(`WHAT[process-execution-015] raw UTF-8 tail fits ${budget} bytes without splitting a code point`, async () => {
-    const original = 'prefix-' + '中文🔥'.repeat(40)
-    const wire = await run({ command: nodeCommand(`process.stdout.write(${JSON.stringify(original)})`), output_budget_bytes: budget })
-    const result = parse(wire)
-    const output = result.output
-    assert.equal(result.exit_code, 0)
-    assert.equal(result.output_truncated, true)
-    assert.equal(output.includes('\uFFFD'), false)
-    assert.ok(Buffer.byteLength(output, 'utf8') <= budget)
-    assert.ok(original.endsWith(output))
-    assert.equal(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.from(output)), output)
+for (const offset of [0, 1, 2, 3, 4, 7]) {
+  test(`WHAT[process-execution-015] UTF-8 tail bound at alignment offset ${offset} fits HostMaxBytes without splitting a code point`, () => {
+    const original = 'a'.repeat(offset) + '中文🔥'.repeat(6000)
+    assert.ok(Buffer.byteLength(original, 'utf8') > toolResultBound.HostMaxBytes)
+    const bounded = toolResultBound.bound(original)
+    assert.ok(bounded.startsWith(toolResultBound.Marker))
+    const tail = bounded.slice(toolResultBound.Marker.length)
+    assert.equal(tail.includes('\uFFFD'), false)
+    assert.ok(Buffer.byteLength(tail, 'utf8') <= toolResultBound.ContentMaxBytes)
+    assert.ok(Buffer.byteLength(bounded, 'utf8') <= toolResultBound.HostMaxBytes)
+    assert.ok(original.endsWith(tail))
+    assert.equal(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.from(bounded)), bounded)
+    assert.equal(toolResultBound.fitsInWindow(bounded), true)
   })
 }
 
-test('WHAT[process-execution-015] the complete visible result including metadata fits the explicit budget', { todo: 'GAP-092: the current budget applies only to raw output, not its envelope' }, async () => {
-  const budget = 256
-  const wire = await run({ command: nodeCommand("process.stdout.write('x'.repeat(2000))"), output_budget_bytes: budget })
-  assert.equal(parse(wire).exit_code, 0)
-  assert.ok(Buffer.byteLength(wire, 'utf8') <= budget, `complete result is ${Buffer.byteLength(wire)} bytes for ${budget}`)
+test('WHAT[process-execution-015] the complete visible result bounded by ToolResultBound fits the HostMaxBytes and HostMaxLines budget', async () => {
+  const { dir, cleanup } = sandbox('wxs-proc-015-')
+  try {
+    const cmd = nodeCommand("process.stdout.write(('中文🔥line\\n').repeat(3000))")
+    const outcome = await runProgram(
+      dir,
+      `    return await js.run(class extends js.Runnable {
+      maxDuration = 5000;
+      interval = 50;
+      next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
+      check() { return true; }
+    });`,
+    )
+    assert.equal(caseName(outcome), 'Succeeded')
+    const wire = toolResultBound.bound(render(outcome))
+    assert.ok(Buffer.byteLength(wire, 'utf8') <= toolResultBound.HostMaxBytes)
+    assert.ok(wire.split('\n').length <= toolResultBound.HostMaxLines)
+    assert.equal(toolResultBound.fitsInWindow(wire), true)
+  } finally {
+    cleanup()
+  }
 })

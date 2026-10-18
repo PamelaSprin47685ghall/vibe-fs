@@ -100,7 +100,7 @@ Fission 能力在运行入口（Admission Gate）的准入逻辑严格限定为�
 
 ## [023] DevOps 角色固有直接源码修改与测试编写权能，禁止 allowRepair 等逐次授权开关
 
-DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, Edit, Glob, Grep, Move, Remove）与真实执行能力（Exec, Pty）。在执行验证过程中遇到非架构级缺陷时，DevOps 拥有直接调查、修改源码、补充回归测试并重新验证的固有法定授权。系统严禁引入 `allowRepair`、`managerApprovedMutation`、`canFixAfterFailure` 等逐次审批参数，亦不得保留「只有 Manager 明确允许才可以改源码」的提示词暗门。
+DevOps 角色原生具备完整的本地工程文件操作能力（Read, Write, Edit, Glob, Grep, Move, Remove）与真实执行能力（Exec，经 `todowrite-for-devops` 的 `js.run` 投影）。在执行验证过程中遇到非架构级缺陷时，DevOps 拥有直接调查、修改源码、补充回归测试并重新验证的固有法定授权。系统严禁引入 `allowRepair`、`managerApprovedMutation`、`canFixAfterFailure` 等逐次审批参数，亦不得保留「只有 Manager 明确允许才可以改源码」的提示词暗门。
 
 ## [024] Fork 与 Resume 权能分离：Manager fork 仅准入 Engineer，固定 DevOps 仅允许经 resume 续做且同一道路至多一个活跃工作单元
 

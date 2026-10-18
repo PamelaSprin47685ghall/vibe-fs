@@ -1204,8 +1204,7 @@ OpenCode/JoinResultRendererSurface.fsi
 OpenCode/JoinResultRendererSurface.fs
 Mission/Work/OpenCode/NarrativeTransform.fsi
 Mission/Work/OpenCode/NarrativeTransform.fs
-OpenCode/Tools/PtyTool.fsi
-OpenCode/Tools/PtyTool.fs
+
 Execution/Session/OpenCode/HorizonTool.fsi
 Execution/Session/OpenCode/HorizonTool.fs
 Execution/Session/OpenCode/HorizonSurface.fsi
@@ -1326,10 +1325,7 @@ OpenCode/Tools/ToolRuntimeScope.fsi
 OpenCode/Tools/ToolRuntimeScope.fs
 Execution/Delegation/Fork/OpenCode/JoinTool.fsi
 Execution/Delegation/Fork/OpenCode/JoinTool.fs
-OpenCode/Tools/ExecutorTool.fsi
-OpenCode/Tools/ExecutorTool.fs
-OpenCode/Tools/ExecutorToolSurface.fsi
-OpenCode/Tools/ExecutorToolSurface.fs
+
 Execution/Fission/OpenCode/Tool.fsi
 Execution/Fission/OpenCode/Tool.fs
 OpenCode/Tools/ToolRuntimeScopeSurface.fsi

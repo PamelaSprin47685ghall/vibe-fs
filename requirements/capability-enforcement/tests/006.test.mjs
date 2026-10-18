@@ -80,14 +80,9 @@ const allowList = (config, name) => {
     'grep',
     'mv',
     'rm',
-    'run',
     'fork',
     'resume',
     'commission',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
     'join',
     'horizon',
     'fission',
@@ -115,13 +110,8 @@ const ROLE_ALLOW = {
     'grep',
     'mv',
     'rm',
-    'run',
     'join',
     'horizon',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
   ],
   Blogger: ['chronicle'],
 }
@@ -342,7 +332,7 @@ const { default: test } = await import("node:test");
 const { admissionAuthority, privateAttachmentAdmits, rolePredicate } = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
 const { allRoleLabels } = await import("../../../dist/Foundation/RolesSurface.js");
 
-const OFFICE_TOOLS = ['fetch', 'review', 'join', 'chronicle', 'run', 'fork', 'resume']
+const OFFICE_TOOLS = ['fetch', 'review', 'join', 'chronicle', 'todowrite-for-devops', 'fork', 'resume']
 
 test('WHAT[capability-enforcement-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office', () => {
   assert.equal(admissionAuthority('todowrite-for-bookkeeper'), 'private-attachment')
@@ -434,7 +424,6 @@ const TOOL_NAMES = [
   'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
   'bash-honeypot', 'assume', 'todowrite',
   'defer',  'publish',
-  'run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
   'review', 'chronicle', 'fetch', 'deliver',
 ]
 
@@ -447,8 +436,7 @@ const ALLOWED = {
   manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
   engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
   devops: [
-    'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run',
-    'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
+    'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
     'assume', 'todowrite', ...COGNITIVE_TOOLS,
   ],
   blogger: ['chronicle'],

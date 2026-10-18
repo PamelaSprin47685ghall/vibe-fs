@@ -306,3 +306,7 @@ ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, 
 `ls(path)` 在列出条目时应用 gitignore 语义：逐级 `.gitignore`（含否定模式与目录剪枝）加上根 `.git/info/exclude`，与 `JsGlobFs.glob` 使用同一实现（`wanxiangli/fs` 的 ignore 引擎，经新的公开入口暴露），因此「从工作区根开始的 `ls` 递归组合」等价于旧 `glob`，而「walk + `cat` + `whereAll`」等价于旧 `grep`。组合写法见双语资源 `tool/js-program/recipes`。
 
 据此彻底退役 `glob`/`grep` 两个 js 成员：fragment、运行时绑定、四层投影、描述与规则资源一并删除；`Grep` capability 不再投影任何成员。旧 `file`/`edit`/`rewrite` 成员亦已从生成编程面退役（仅 Plan tenure 编程面 `todowrite-for-plan` 保留其专用无路径实现）。
+
+## [058] js.run 的交互形态（send）与唯一执行面
+
+Host 原生 `run` 工具与四个 pty 工具（`open-terminal`/`send-terminal`/`read-terminal`/`signal-terminal`）整体退役；`ToolPermission.Exec` 只投影编程面的 `run` 成员，`ToolPermission.Pty` 不再投影任何宿主工具。交互执行由 `js.run` 承担：`next()` 返回 `{ spawn, name }` 起后台子进程，`check(ctx)` 的 `stdout`/`stderr` 是**该时间片的增量**（前台命令与全部后台子进程的增量合并为一个观察窗），`{ send: { name, input } }` 写进命名子进程的 stdin（缺行尾换行时补一个），`{ signal, name }` 收割，`{ waitFor: { port, timeoutMs } }` 等端口就绪。`send` 指向未知后台名以 `RUN_CHILD_UNKNOWN` 失败；子进程 stdout 没有换行协议假设，增量就是字节。

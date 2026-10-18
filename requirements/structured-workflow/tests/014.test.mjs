@@ -576,9 +576,6 @@ test('WHAT[structured-workflow-014] NodeFs physical port and tool contracts have
   assert.ok(!jsToolBindingsRefs.includes('Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj'))
   assert.ok(!jsToolBindingsRefs.includes(nodeFsProject))
 
-  const ptyToolRefs = references('Wanxiangshu.Owner.process-execution.opencode-tools-ptytool.fsproj')
-  assert.ok(ptyToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))
-
   const joinToolRefs = references('Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj')
   assert.ok(joinToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))
 })

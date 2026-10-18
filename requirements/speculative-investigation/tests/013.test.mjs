@@ -883,7 +883,7 @@ const builtins = ['read', 'glob', 'grep', 'edit', 'write']
 
 const PARTICIPATING_TOOLS = new Set([
   'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
-  'edit', 'write', 'mv', 'rm', 'fetch', 'run',
+  'edit', 'write', 'mv', 'rm', 'fetch',
 ])
 
 const checkOpencodeExecutable = () => {
@@ -949,7 +949,7 @@ integrationTest(
       )
 
       if (PARTICIPATING_TOOLS.has(name)) {
-        // Participating tools (12 tools): must carry estimated_readonly_rounds & self_note
+        // Participating tools (11 tools): must carry estimated_readonly_rounds & self_note
         assert.ok(
           view.properties.includes('estimated_readonly_rounds'),
           `participating tool ${name} must expose estimated_readonly_rounds on the provider wire`,

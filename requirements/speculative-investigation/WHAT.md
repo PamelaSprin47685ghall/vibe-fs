@@ -4,9 +4,9 @@
 
 未配置 Predictor 模型时，系统对本机制保持无功能基线：不装饰任何工具 schema、不追加说明、不产生委托授权、不创建 Replica，全部会话的 provider 可见字节、工具权限、retry 流程、评审终结逻辑与控制流与不存在本机制时完全一致。
 
-已配置 Predictor 模型时，仅对第 5.2 节参与工具（read/glob/grep/todowrite-for-manager/todowrite-for-engineer/todowrite-for-devops/edit/write/mv/rm/fetch/run 共 12 个）装饰参数：必选原生整数 `estimated_readonly_rounds` 与可选参数 `self_note`，并在原工具描述之后幂等追加事实性估计说明；原有的必选项、功能说明与安全约束保持原样。
+已配置 Predictor 模型时，仅对第 5.2 节参与工具（read/glob/grep/todowrite-for-manager/todowrite-for-engineer/todowrite-for-devops/edit/write/mv/rm/fetch 共 11 个）装饰参数：必选原生整数 `estimated_readonly_rounds` 与可选参数 `self_note`，并在原工具描述之后幂等追加事实性估计说明；原有的必选项、功能说明与安全约束保持原样。
 
-所有未参与工具（如 fork/join/chronicle/horizon/review/fission/terminal 类工具/assume 等）及未判定动态工具均保持原有定义，无任何本协议增量，也不截取其同名业务字段。
+所有未参与工具（如 fork/join/chronicle/horizon/review/fission/assume 等）及未判定动态工具均保持原有定义，无任何本协议增量，也不截取其同名业务字段。
 
 估计填 0 表示当前批次完成后没有可合理展望的连续只读查证，与"未配置 Predictor"是两个可观察区分的不同状态；启用不依赖任何人工确认、指纹、外部开关或额外设置。
 
@@ -170,7 +170,7 @@ owner 取消或删除时级联取消并释放 Replica 与 capacity fence，未�
 
 真实 Host canary 必须按第 5 节的逐工具判定清单进行独立断言，不再要求对每个可见工具全量加字段：
 - 证明已配置 Predictor 时，仅第 5.2 节参与工具带有必填估计与可选短记；
-- 证明所有不参与工具（fork/join/chronicle/terminal/fission 等）原样无增量；
+- 证明所有不参与工具（fork/join/chronicle/fission 等）原样无增量；
 - 证明未参与工具的同名业务字段不被侵犯；
 - 证明同一工具在真实 provider wire 上原参数执行，且原始 arguments（含协议字段）同源恢复进入下一次历史。
 
@@ -223,9 +223,9 @@ CLI 先校验参数、登记版本、备份路径和活库禁令，再加载迁�
 
 2. **逐工具判定（classifyTool）**：
    工具策略采用严格的三态联合类型，禁止任何形式的前缀匹配（如 `js-` 前缀）或名称模糊匹配（如包含 read/search）：
-   - `EstimateAfterCall`（参与工具，共 12 个）：`read`、`glob`、`grep`、`todowrite-for-manager`、`todowrite-for-engineer`、`todowrite-for-devops`、`edit`、`write`、`mv`、`rm`、`fetch`、`run`。调用完成后允许主模型提供后续只读查证估计；
-   - `NoEstimate`（不参与工具，显式白名单共 24 个）：`fork`、`resume`、`commission`、`join`、`horizon`、`review`、`deliver`、`fission`、`open-terminal`、`send-terminal`、`read-terminal`、`signal-terminal`、`skill`、`todowrite`、`assume`、`defer`、`publish`、`chronicle`、`todowrite-for-bookkeeper`、`todowrite-for-predictor`、`bash-honeypot`、`invalid`、`todowrite-for-orchestrator`、`todowrite-for-blogger`。本协议不向其装饰任何字段与说明；
-   - `Unreviewed`（未判定工具）：所有不在上述 36 个固定名称表内的工具（包括带有已知前缀的衍生工具名如 `read-extra`、`globbing`、`grepper`、`edit_file`、`writer`、`run_command`、`fetch_data`、`js-devops-v2`、`fork_child`、`resume_parent`、`custom_tool` 等）一律判定为未判定，保持原有业务行为，不增加协议字段。
+   - `EstimateAfterCall`（参与工具，共 11 个）：`read`、`glob`、`grep`、`todowrite-for-manager`、`todowrite-for-engineer`、`todowrite-for-devops`、`edit`、`write`、`mv`、`rm`、`fetch`。调用完成后允许主模型提供后续只读查证估计；
+   - `NoEstimate`（不参与工具，显式白名单共 24 个）：`fork`、`resume`、`commission`、`join`、`horizon`、`review`、`deliver`、`fission`、`todowrite-for-plan`、`ask`、`devops`、`handoff`、`skill`、`todowrite`、`assume`、`defer`、`publish`、`chronicle`、`todowrite-for-bookkeeper`、`todowrite-for-predictor`、`bash-honeypot`、`invalid`、`todowrite-for-orchestrator`、`todowrite-for-blogger`。本协议不向其装饰任何字段与说明；
+   - `Unreviewed`（未判定工具）：所有不在上述 35 个固定名称表内的工具（包括带有已知前缀的衍生工具名如 `read-extra`、`globbing`、`grepper`、`edit_file`、`writer`、`run_command`、`fetch_data`、`js-devops-v2`、`fork_child`、`resume_parent`、`custom_tool` 等）一律判定为未判定，保持原有业务行为，不增加协议字段。
 
 3. **入参容器与协议混合排斥**：
    - 参与工具的参数容器必须是普通非空、非数组的 JavaScript 对象（`isPlainObject`），传入 `null`、`undefined`、数字、字符串或数组等非普通对象一律拒绝；
@@ -253,7 +253,7 @@ CLI 先校验参数、登记版本、备份路径和活库禁令，再加载迁�
    - `InvalidArgumentObject`：入参不是合法的普通对象。
 
 7. **字段所有权与透传**：
-   协议字段 `estimated_readonly_rounds` 与建议性字段 `self_note` 的解析责任仅归本协议及 12 个参与工具所有；短记本身不校验、不拒绝；未参与（NoEstimate）及未判定（Unreviewed）工具的同名业务参数原样透传，本协议不读取、不校验、不拦截、亦不破坏其原有的业务参数传递与持久化证据。
+   协议字段 `estimated_readonly_rounds` 与建议性字段 `self_note` 的解析责任仅归本协议及 11 个参与工具所有；短记本身不校验、不拒绝；未参与（NoEstimate）及未判定（Unreviewed）工具的同名业务参数原样透传，本协议不读取、不校验、不拦截、亦不破坏其原有的业务参数传递与持久化证据。
 
 8. **三消费端单一判定来源与行为一致性**：
    逐工具判定函数 `classifyTool` 是全系统唯一的分类来源，供 schema 装饰端（`ReadonlyDelegationContract.decorateDefinition`）、调用边界端（`PluginHooks` 的 `toolBefore`/`toolAfter` 参数暂存与收窄拦截）和来源批次端（`StrengthDelegate.tryCapture` 批次估计聚合）三处共同使用，严禁在各端重复硬编码工具集合或 `Set<string>`。对任何工具名称（至少包括参与工具 `read`、显式不参与工具 `chronicle`、未在表内的未知工具 `js-foo-unknown` 与合成占位工具 `invalid`），三端在「是否装饰协议字段」、「是否在调用边界参与收窄与暂存」、「是否在来源批次中读取并聚合估计」上的行为判定必须完全一致。在协议未开启（未配置 Predictor）时，调用边界端与来源批次端均不拦截、不剥离、不校验任何工具的参数，参数原样透传；在协议开启（已配置 Predictor）时，调用边界端仅对参与工具执行必选校验与剥离隐藏，且对完全缺失估计字段的参与调用无条件按参数错误拒绝，绝不带缺陷放行或静默退化为无估计机会。

@@ -332,10 +332,7 @@ module ToolRegistry =
         [ "fork", ForkTool.managerAdmission
           "resume", ForkTool.managerAdmission
           "commission", ForkTool.orchestratorAdmission
-          "open-terminal", PtyTool.admission
-          "send-terminal", PtyTool.admission
-          "read-terminal", PtyTool.admission
-          "signal-terminal", PtyTool.admission
+
           "join", JoinTool.admission
           "ask", ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Ask)
           "devops",
@@ -347,7 +344,6 @@ module ToolRegistry =
           ToolAdmission.OfficeRole(fun _ role ->
               OfficeCapability.isAllowed role ToolPermission.Finality
               || OfficeCapability.isAllowed role ToolPermission.Deliver)
-          "run", ExecutorTool.runAdmission
           "mv", FileMutationTools.mvAdmission
           "rm", FileMutationTools.rmAdmission
           "bash-honeypot", BashHoneypotTool.admission
@@ -1317,14 +1313,7 @@ module ToolRegistry =
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime
               yield ForkTool.resumeSpec factory runtime
-              let ptyContext: PtyTool.PtyRuntimeContext =
-                  { IsDevOps = fun ctx -> runtime.IsRole(ctx, Role.DevOps)
-                    ManagedAgentFor = runtime.ManagedAgentFor
-                    PtyCapabilityFor = runtime.PtyCapabilityFor
-                    DirectoryFor = runtime.DirectoryFor
-                    WorkspaceDirectory = runtime.WorkspaceDirectory }
 
-              yield! PtyTool.specs factory ptyContext
               yield ForkTool.orchestratorSpec factory runtime
               yield JoinTool.spec runtime
               yield askSpec
@@ -1341,7 +1330,6 @@ module ToolRegistry =
               // Plan lifecycle reads its own durable owner directly.
               yield ReviewShell.spec factory runtime
               yield deliverSpec ()
-              yield ExecutorTool.runSpec factory runtime
               yield FileMutationTools.mvSpec factory
               yield FileMutationTools.rmSpec factory
               yield BashHoneypotTool.spec

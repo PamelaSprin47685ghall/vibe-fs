@@ -22,7 +22,7 @@ const delegateSourcePath = path.join(repoRoot, 'src/Wanxiangshu/Strength/OpenCod
 
 const PARTICIPATING_TOOLS = [
   'read', 'glob', 'grep', 'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops',
-  'edit', 'write', 'mv', 'rm', 'fetch', 'run'
+  'edit', 'write', 'mv', 'rm', 'fetch'
 ];
 const PARTICIPATING_SET = new Set(PARTICIPATING_TOOLS);
 
@@ -146,8 +146,8 @@ test('WHAT[speculative-investigation-016] the production classifier admits exact
 
   const noEstimate = [
     'fork', 'resume', 'commission', 'join', 'horizon', 'review', 'deliver',
-    'fission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-    'skill', 'todowrite', 'assume', 'defer', 
+    'fission', 'todowrite-for-plan', 'ask', 'devops', 'handoff',
+    'skill', 'todowrite', 'assume', 'defer',
     'publish', 'chronicle', 'todowrite-for-bookkeeper', 'todowrite-for-predictor',
     'bash-honeypot', 'invalid', 'todowrite-for-orchestrator', 'todowrite-for-blogger'
   ];
@@ -623,7 +623,7 @@ test('WHAT[speculative-investigation-016] every tool on the known tool surface r
   assert.ok(knownToolsFromSurface.includes("read"), "knownToolNames must include 'read'");
   assert.ok(knownToolsFromSurface.includes("chronicle"), "knownToolNames must include 'chronicle'");
   assert.ok(knownToolsFromSurface.includes("fork"), "knownToolNames must include 'fork'");
-  assert.ok(knownToolsFromSurface.includes("run"), "knownToolNames must include 'run'");
+  assert.ok(knownToolsFromSurface.includes("todowrite-for-devops"), "knownToolNames must include 'todowrite-for-devops'");
 
   // 差集门禁：工具面里的每个已知工具都必须拿到已判定的策略，任何工具都不得
   // 静默落到 Unreviewed 而逃过协议审阅。

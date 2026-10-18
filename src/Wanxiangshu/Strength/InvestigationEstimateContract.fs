@@ -38,8 +38,8 @@ module InvestigationEstimateContract =
         | "write"
         | "mv"
         | "rm"
-        | "fetch"
-        | "run" -> InvestigationToolPolicy.EstimateAfterCall
+        | "fetch" -> InvestigationToolPolicy.EstimateAfterCall
+
         | "fork"
         | "resume"
         | "commission"
@@ -52,10 +52,7 @@ module InvestigationEstimateContract =
         | "devops"
         | "handoff"
         | "deliver"
-        | "open-terminal"
-        | "send-terminal"
-        | "read-terminal"
-        | "signal-terminal"
+
         | "skill"
         | "todowrite"
         | "assume"

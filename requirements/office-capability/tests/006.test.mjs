@@ -12,7 +12,7 @@ test('WHAT[office-capability-006] synthetic examples exercise the sample trace c
 
 test('WHAT[office-capability-006] synthetic Manager checker rejects personal mutation even when delegation is also present', () => {
   const example = CASES.find((item) => item.id === 'manager-mixed-mission')
-  for (const name of ['read', 'edit', 'run', 'fission']) {
+  for (const name of ['read', 'edit', 'todowrite-for-devops', 'fission']) {
     const invalid = {
       ...example.pass_example,
       toolCalls: [...example.pass_example.toolCalls, { name, args: { filePath: 'src/bug.ts' } }],
@@ -36,9 +36,9 @@ test('WHAT[office-capability-006] synthetic Manager checker rejects retired code
 test('WHAT[office-capability-006] synthetic repair checker requires repair followed by revalidation', () => {
   const example = CASES.find((item) => item.id === 'devops-inherent-repair')
   for (const toolCalls of [
-    [{ name: 'run' }],
-    [{ name: 'run' }, { name: 'edit' }],
-    [{ name: 'run' }, { name: 'edit' }, { name: 'run' }, { name: 'fork' }],
+    [{ name: 'todowrite-for-devops' }],
+    [{ name: 'todowrite-for-devops' }, { name: 'edit' }],
+    [{ name: 'todowrite-for-devops' }, { name: 'edit' }, { name: 'todowrite-for-devops' }, { name: 'fork' }],
   ]) {
     assert.equal(evaluateCase(example, { role: 'devops', toolCalls }).ok, false)
   }

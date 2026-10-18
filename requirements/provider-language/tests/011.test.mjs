@@ -70,24 +70,24 @@ test('WHAT[provider-language-011] tip and tool catalog hits must match across lo
   try {
     fx.writePair(
       'role/tip-demo',
-      'Avoid blind-edit and call open-terminal.',
-      '避免 blind-edit，并调用 open-terminal。',
+      'Avoid blind-edit and call todowrite-for-devops.',
+      '避免 blind-edit，并调用 todowrite-for-devops。',
     )
     const catalogs = {
       tipIdentities: ['blind-edit'],
-      toolNames: ['open-terminal'],
+      toolNames: ['todowrite-for-devops'],
     }
     assert.deepEqual(scanIdentifierParity(['role/tip-demo'], fx.providerAbs, catalogs), [])
 
     fx.writePair(
       'role/tip-demo',
-      'Avoid blind-edit and call open-terminal.',
-      '避免 盲目编辑，并调用 打开终端。',
+      'Avoid blind-edit and call todowrite-for-devops.',
+      '避免 盲目编辑，并调用 运维脚本。',
     )
     const red = scanIdentifierParity(['role/tip-demo'], fx.providerAbs, catalogs)
     assert.equal(red.length, 1)
     assert.equal(red[0].path, 'resources/provider/role/tip-demo')
-    assert.match(red[0].detail ?? '', /only-en: \[blind-edit, open-terminal\]/)
+    assert.match(red[0].detail ?? '', /only-en: \[blind-edit, todowrite-for-devops\]/)
     assert.match(red[0].detail ?? '', /only-zh-CN: \[\]/)
   } finally {
     fx.dispose()
@@ -95,9 +95,9 @@ test('WHAT[provider-language-011] tip and tool catalog hits must match across lo
 })
 
 test('WHAT[provider-language-011] protocol identifier extraction unions sources', () => {
-  const ids = extractProtocolIdentifiers('See `exit_code` then blind-edit via open-terminal.', {
+  const ids = extractProtocolIdentifiers('See `exit_code` then blind-edit via todowrite-for-devops.', {
     tipIdentities: ['blind-edit'],
-    toolNames: ['open-terminal'],
+    toolNames: ['todowrite-for-devops'],
   })
-  assert.deepEqual([...ids].sort(), ['blind-edit', 'exit_code', 'open-terminal'])
+  assert.deepEqual([...ids].sort(), ['blind-edit', 'exit_code', 'todowrite-for-devops'])
 })

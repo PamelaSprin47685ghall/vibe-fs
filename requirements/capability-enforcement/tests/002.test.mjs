@@ -6,6 +6,7 @@ const { default: test } = await import("node:test");
 const { permissions } = await import("../../../dist/Participant/Persona/OfficeCapabilitySurface.js");
 const { configure: configureManagedAgents, installDefaultResources, validate: validateManagedAgents } = await import("../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js");
 const { reviewToolPermissions } = await import("../../../dist/OpenCode/Tools/ToolSurface.js");
+const { generateRole } = await import("../../../dist/Repository/Programming/Js/GeneratorSurface.js");
 
 installDefaultResources()
 const ROLES = [
@@ -86,14 +87,9 @@ const allowList = (config, name) => {
     'grep',
     'mv',
     'rm',
-    'run',
     'fork',
     'resume',
     'commission',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
     'join',
     'horizon',
     'fission',
@@ -136,13 +132,8 @@ const ROLE_ALLOW = {
     'grep',
     'mv',
     'rm',
-    'run',
     'join',
     'horizon',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
     'todowrite-for-devops',
   ],
   Blogger: ['chronicle'],
@@ -169,10 +160,6 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
       fork: 'Fork',
       resume: 'Resume',
       commission: 'Fork',
-      'open-terminal': 'Pty',
-      'send-terminal': 'Pty',
-      'read-terminal': 'Pty',
-      'signal-terminal': 'Pty',
       join: 'Join',
       horizon: 'Horizon',
       fission: 'Fission',
@@ -184,7 +171,6 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
       mv: 'Move',
       rm: 'Remove',
       'bash-honeypot': 'BashHoneypot',
-      run: 'Exec',
       review: 'ReviewAssessment',
       chronicle: 'Chronicle',
       fetch: 'Fetch',
@@ -196,6 +182,10 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
     // 无评审契约的工具名称没有权限映射。
     const reviewPermissions = reviewToolPermissions(toolName)
     if (reviewPermissions.length > 0) return reviewPermissions
+    if (toolName.startsWith('todowrite-for-')) {
+      const generated = generateRole(toolName.slice('todowrite-for-'.length), 'en')
+      return generated ? generated.capabilities : []
+    }
     const single = permissionOf(toolName)
     return single ? [single] : []
   }
@@ -289,17 +279,13 @@ test('WHAT[capability-enforcement-002] TOOLSPEC_engineer_and_devops_tools_have_o
   assert.equal(rolePredicate('rm', 'devops'), true)
   assert.equal(rolePredicate('rm', 'manager'), false)
 
-  // pty tools: DevOps only
-  assert.equal(rolePredicate('open-terminal', 'devops'), true)
-  assert.equal(rolePredicate('open-terminal', 'engineer'), false)
-  assert.equal(rolePredicate('send-terminal', 'devops'), true)
-  assert.equal(rolePredicate('read-terminal', 'devops'), true)
-  assert.equal(rolePredicate('signal-terminal', 'devops'), true)
-
-  // run: DevOps only
-  assert.equal(rolePredicate('run', 'devops'), true)
-  assert.equal(rolePredicate('run', 'engineer'), false)
-  assert.equal(rolePredicate('run', 'manager'), false)
+  // todowrite-for-devops: DevOps only (carries js.run via Exec; Host-native run & pty are retired)
+  assert.equal(rolePredicate('todowrite-for-devops', 'devops'), true)
+  assert.equal(rolePredicate('todowrite-for-devops', 'engineer'), false)
+  assert.equal(rolePredicate('todowrite-for-devops', 'manager'), false)
+  for (const retired of ['run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal']) {
+    assert.equal(rolePredicate(retired, 'devops'), false, `retired ${retired} must be denied`)
+  }
 })
 test('WHAT[capability-enforcement-002] TOOLSPEC_plugin_owned_cognitive_utility_tools_admission', () => {
   // Native todowrite has no plugin ToolSpec; its role boundary is asserted from

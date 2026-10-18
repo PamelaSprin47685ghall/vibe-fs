@@ -106,7 +106,6 @@ module OfficeCapability =
                   ToolPermission.Move
                   ToolPermission.Remove
                   ToolPermission.Exec
-                  ToolPermission.Pty
                   ToolPermission.Join
                   ToolPermission.Horizon ]
         | Role.Distiller -> Set.empty

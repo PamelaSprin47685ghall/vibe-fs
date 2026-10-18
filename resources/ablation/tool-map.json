@@ -13,11 +13,7 @@
     "assume": "cognitive-environment",
     "todowrite": "obligation-ledger",
     "defer": "attention-regulation",
-    "open-terminal": "process-execution",
-    "send-terminal": "process-execution",
-    "read-terminal": "process-execution",
-    "signal-terminal": "process-execution",
-    "run": "process-execution",
+
     "read": "action-affordance",
     "write": "repository-programming",
     "edit": "repository-programming",

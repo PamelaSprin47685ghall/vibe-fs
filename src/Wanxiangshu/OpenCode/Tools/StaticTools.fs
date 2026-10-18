@@ -24,8 +24,12 @@ module StaticTools =
         | ToolPermission.Move -> [ "mv" ]
         | ToolPermission.Remove -> [ "rm" ]
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
-        | ToolPermission.Exec -> [ "run" ]
-        | ToolPermission.Pty -> [ "open-terminal"; "send-terminal"; "read-terminal"; "signal-terminal" ]
+        // Exec grants the programming surface's `js.run` loop; the Host-native
+        // `run` tool is retired (repository-programming [050]-[052] supersede it).
+        | ToolPermission.Exec -> []
+        // Pty is retired: interactive execution is the programming surface's
+        // `js.run` ({ spawn, name } + { send, name, input } + { signal, name }).
+        | ToolPermission.Pty -> []
         | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Chronicle -> [ "chronicle" ]
         | ToolPermission.Fetch -> [ "fetch" ]
@@ -141,10 +145,7 @@ module StaticTools =
         [ "fork"
           "resume"
           "commission"
-          "open-terminal"
-          "send-terminal"
-          "read-terminal"
-          "signal-terminal"
+
           "join"
           "horizon"
           "fission"
@@ -161,7 +162,6 @@ module StaticTools =
           "mv"
           "rm"
           "bash-honeypot"
-          "run"
           "review"
           "chronicle"
           "fetch"
@@ -224,10 +224,9 @@ module StaticTools =
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "resume", Role.Orchestrator -> "deny"
         | true, "commission", Role.Orchestrator -> "allow"
-        | true, ("open-terminal" | "send-terminal" | "read-terminal" | "signal-terminal"), Role.DevOps -> "allow"
         | true, "fork", Role.DevOps -> "deny"
         | true, "resume", Role.DevOps -> "deny"
-        | true, "run", Role.DevOps -> "allow"
+
         | true, "skill", Role.Blogger -> "deny"
         | true, "skill", _ -> "allow"
         | true, ("assume" | "todowrite"), role when not (cognitiveUtilityRoleAllowed role) -> "deny"

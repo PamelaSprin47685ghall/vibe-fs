@@ -3,10 +3,10 @@ import test from 'node:test'
 import { isAllowed } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 
 test('WHAT[office-capability-017] DevOps has source repair and real execution permissions without delegation or Fission', () => {
-  for (const permission of ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec', 'Pty']) {
+  for (const permission of ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec']) {
     assert.equal(isAllowed('devops', permission), true, permission)
   }
-  for (const permission of ['Fork', 'Resume', 'Fission']) {
+  for (const permission of ['Pty', 'Fork', 'Resume', 'Fission']) {
     assert.equal(isAllowed('devops', permission), false, permission)
   }
 })

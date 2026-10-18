@@ -89,14 +89,9 @@ const allowList = (config, name) => {
     'grep',
     'mv',
     'rm',
-    'run',
     'fork',
     'resume',
     'commission',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
     'join',
     'horizon',
     'fission',
@@ -129,13 +124,9 @@ const ROLE_ALLOW = {
     'grep',
     'mv',
     'rm',
-    'run',
     'join',
     'horizon',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
+    'todowrite-for-devops',
   ],
   Blogger: ['chronicle'],
 }
@@ -143,7 +134,7 @@ const ROLE_ALLOW = {
 test('WHAT[capability-enforcement-023] devops_host_schema_contains_direct_mutation_tools', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
-  for (const tool of ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run']) {
+  for (const tool of ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'todowrite-for-devops']) {
     assert.equal(evaluate(mergedRules(config, 'devops'), tool, '*').action, 'allow', `devops must allow ${tool}`)
   }
 })
