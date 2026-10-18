@@ -116,7 +116,6 @@ const cycle = await import("../../../dist/Context/Companion/Blogger/Runtime/Cycl
 
 const materialize = (over = {}) => ({ kind: 'materialize', requestId: 'req-1', blogger: 'ses-blogger', digest: 'ctx-1', ...over })
 const entry = (over = {}) => ({ kind: 'entry', requestId: 'req-1', run: 'msg-e1', ...over })
-const squash = (over = {}) => ({ kind: 'squash', requestId: 'req-s1', run: 'msg-s1', ...over })
 const state = (...actions) => cycle.scenario(actions)
 const ok = (...actions) => {
   const result = state(...actions)
@@ -141,11 +140,6 @@ test('WHAT[effect-accounting-008] C5_entry_commit_records_receipt_and_clears_ope
     receipts: 1,
     requestBindings: 1,
   })
-})
-test('WHAT[effect-accounting-008] C5_same_provider_run_cannot_be_both_entry_and_squash', () => {
-  const result = state(entry({ run: 'msg-same' }), squash({ run: 'msg-same' }))
-  assert.equal(result.ok, false)
-  assert.match(result.error, /already has/i)
 })
 test('WHAT[effect-accounting-008] C5_materialize_prompt_key_fill_in_after_send', () => {
   assert.deepEqual(ok(materialize({ requestId: 'req-key' }), materialize({ requestId: 'req-key', promptKey: 'pk-blog-1' })), {
@@ -276,7 +270,7 @@ test('WHAT[effect-accounting-008] Adapter Blogger Coordinator submits one receip
       bloggerSession,
       'request-blogger-effect-008',
     )
-    assert.equal(pluginHooks.firstBloggerEffect(decision), 'StartedSquash')
+    assert.equal(pluginHooks.firstBloggerEffect(decision), 'Started')
     assert.equal(pluginHooks.secondBloggerEffect(decision), 'SkippedInFlight')
     assert.equal(childListCalls, 2, 'SatelliteRuntime must inspect root and owner child listings')
     assert.equal(childCreates.length, 0, 'the exact restored Blogger child must be reused')

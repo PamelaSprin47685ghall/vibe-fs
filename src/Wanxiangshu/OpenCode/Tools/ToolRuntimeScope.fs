@@ -100,7 +100,7 @@ type ToolRuntimeScope
         childWorkRecordFor: (string -> Task<string option>) option,
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
-        ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>),
+        ?childWorkRecordForRun: (SessionId -> ProviderRunIdentity -> Task<string option>),
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
         ?eventPort: IEventObservationPort
     ) =
@@ -142,7 +142,7 @@ type ToolRuntimeScope
     // binding owns the capture vocabulary, the composition root supplies it.
 
     let childRecordForRun =
-        defaultArg childWorkRecordForRun (fun _ _ _ -> Task.FromResult None)
+        defaultArg childWorkRecordForRun (fun _ _ -> Task.FromResult None)
 
     let terminalPort = eventPort
     // DSL-MUTABLE: resource — tool runtime dispose latch

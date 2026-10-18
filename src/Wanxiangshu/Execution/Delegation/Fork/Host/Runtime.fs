@@ -244,7 +244,7 @@ type HostForkRuntime
     (
         parentId: SessionId,
         sessions: ISessionHostPort,
-        childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
+        childWorkRecordForRun: SessionId -> ProviderRunIdentity -> Task<string option>,
         createMailbox: obj -> ForkCompletionMailbox,
         clock: IClockPort,
         raceExit: Task -> int -> Task<bool>,
@@ -498,17 +498,8 @@ type HostForkRuntime
 
     let childWorkRecordOfRun = childWorkRecordForRun
 
-    let xTraceHead (sessionId: SessionId) : XTraceCursor =
-        journal
-        |> Option.bind (fun durable ->
-            AgentJournal.snapshot durable
-            |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
-            |> Option.bind (fun session -> session.XTrace))
-        |> Option.defaultValue XTraceProjection.empty
-        |> XTraceProjection.headCursor
-
     let workRecordForOutcome (run: PendingHostRun) (outcome: TerminalOutcome) =
-        HostForkRunLifecycle.workRecordForOutcome childWorkRecordOfRun xTraceHead run outcome
+        HostForkRunLifecycle.workRecordForOutcome childWorkRecordOfRun run outcome
 
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
@@ -765,7 +756,6 @@ type HostForkRuntime
     member internal _.ParentWorkRecordOf = parentWorkRecordOf
     member internal _.ChildWorkRecordOf = childWorkRecordOf
     member internal _.ChildWorkRecordOfRun = childWorkRecordOfRun
-    member internal _.XTraceHead = xTraceHead
     member internal _.TrackOwnedWork(work: unit -> Task) = startOwnedWork work |> ignore
     member internal _.SendChildPrompt = sendChildPrompt
     member internal _.SendBusyNudge = sendBusyNudge
@@ -889,7 +879,6 @@ type HostForkRuntime
                 parentId
                 sessions
                 childWorkRecordOfRun
-                xTraceHead
                 (fun work -> startOwnedWork work |> ignore)
                 agentId
                 childId

@@ -70,19 +70,6 @@ module ContextFact =
                ObservedPrefixEpochId: PrefixEpochId |} ->
             AgentFact
 
-    val inline BlogObservationsSquashed:
-        payload:
-            {| SessionId: SessionId
-               BloggerSessionId: SessionId
-               RequestId: BloggerRequestId
-               PreviousFrameEpochId: FrameEpochId
-               NextFrameEpochId: FrameEpochId
-               CoveredFrameCount: int
-               TextRef: BlobRef
-               TextDigest: BlobDigest
-               ProviderRun: ProviderRunIdentity |} ->
-            AgentFact
-
     val inline BloggerRequestMaterialized:
         payload:
             {| RequestId: BloggerRequestId

@@ -278,7 +278,7 @@ ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, 
 
 ## [054] deliver 显式终值
 
-`deliver(value)` 是生命周期成员，任何生成面无条件携带（与 park 同级）。调用即用该值结束程序：栈展开、不再执行后续语句，终值成为本次调用结果，与 `return` 等价；值必须是 JSON 兼容数据，缺失或非法时以 `INVALID_RETURN_VALUE` 失败。程序捕获内部交付哨兵后可以继续存活，此后的 return 值才是结果——捕获即知情取消。subagent 必须以 deliver 显式结束的强制判定属于会话层级（后续阶段），本期只交付程序级语义。描述与双语资源 `tool/js-program/deliver` 陈述同一契约。
+`deliver(value)` 是生命周期成员，任何生成面无条件携带（与 park 同级）。调用即用该值结束程序：栈展开、不再执行后续语句，终值成为本次调用结果并写入本会话交付格；值必须是 JSON 兼容数据，缺失或非法时以 `INVALID_RETURN_VALUE` 失败。程序捕获内部交付哨兵后可以继续存活，此后的 return 值才是结果——捕获即知情取消。subagent 程序必须以 `js.deliver` 显式交付终值：普通 `return` 保持交付格为空，子工作以 `undelivered` 状态结算（`js.dag` 据此以 `node-undelivered` 挂起）。描述与双语资源 `tool/js-program/deliver` 陈述同一契约。
 
 ## [055] vm 并行边界
 
@@ -293,7 +293,7 @@ ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, 
 ```
 
 - `fork(payload)`：`payload` 是字符串（任务）或 `{ charge, name?, calling?, keywords? }`；缺 `name` 时由 charge 派生（派生名冲突报 `name-already-belongs`）。成功返回 `{ ok, name, agentId, outcome }`，`outcome ∈ created | nudged | commissioned`。拒绝码：`name-required`/`charge-required`/`unknown-calling`/`calling-conflict`/`name-already-belongs`/`warm-start-unavailable`/`context-unavailable`/`not-a-delegation-role`/`placement-failed`/`dispatch-uncertain`。
-- `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, workRecord }], byName }`；`status ∈ completed | failed | abandoned`。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
+- `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, workRecord }], byName }`；`status ∈ completed | undelivered | failed | abandoned`。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
 - `fission({ charge, lanes })`：同身份多 lane 的任务分片执行（宿主负责 lane 绑定与收拢），返回 `{ ok, groupId, lanes: [{ index, sessionId }] }`；owner 的 `join()` 收拢本组 lane。拒绝码：`fission-unavailable`/`lane-start-failed`/`not-ready`/`context-unavailable`/`invalid-prompt`。
 - `dag({ nodes: [{ id, charge, deps?, lanes? }] })`：纯声明糖，由基类编译成波次 `fork` + 一次 `join`；下游节点的 prompt 带上依赖记录。成功返回 `{ ok, results: { [id]: record }, skipped: [id...] }`。**节点失败 → `park`**（与 `where` 同一条恢复通道），payload 为 `{ dag, node, code, deps, done, pending }`；注入值语义：`"retry"` 重跑、`"skip"` 跳过（下游看到 null）、其他值直接作为该节点结果、`{ abort: reason }` 使程序失败。
 
@@ -310,3 +310,7 @@ ctx：`next` 收到 `{ root, step }`；`check`/`onExit` 收到 `{ root, stdout, 
 ## [058] js.run 的交互形态（send）与唯一执行面
 
 Host 原生 `run` 工具与四个 pty 工具（`open-terminal`/`send-terminal`/`read-terminal`/`signal-terminal`）整体退役；`ToolPermission.Exec` 只投影编程面的 `run` 成员，`ToolPermission.Pty` 不再投影任何宿主工具。交互执行由 `js.run` 承担：`next()` 返回 `{ spawn, name }` 起后台子进程，`check(ctx)` 的 `stdout`/`stderr` 是**该时间片的增量**（前台命令与全部后台子进程的增量合并为一个观察窗），`{ send: { name, input } }` 写进命名子进程的 stdin（缺行尾换行时补一个），`{ signal, name }` 收割，`{ waitFor: { port, timeoutMs } }` 等端口就绪。`send` 指向未知后台名以 `RUN_CHILD_UNKNOWN` 失败；子进程 stdout 没有换行协议假设，增量就是字节。
+
+## [059] js.deliver 的终值记录
+
+程序经 `js.deliver(value)` 结束时，宿主把该终值记进进程内按会话的交付格（与 parked 现场同命：重启即丢，durable 终值在调用结算时另写）：子会话的完成载荷（`AgentCompletionPayload.WorkRecord`）直接由交付格终值的规范文本构造，取代从 XTrace + BlogFrame 物化的 LWR 记录；subagent 程序必须显式调用 `js.deliver`，普通 `return` 保持交付格为空，结算时 `join()` 记录报告 `status: "undelivered"`（`js.dag` 据此在 `node-undelivered` 处 park）。`value` 必须是 JSON 兼容数据，缺失或非法仍以 `INVALID_RETURN_VALUE` 失败（[054]）。交付格只在进程内被同一会话的完成路径读取一次（`take`）或窥视（`peek`），调用结算后清理。

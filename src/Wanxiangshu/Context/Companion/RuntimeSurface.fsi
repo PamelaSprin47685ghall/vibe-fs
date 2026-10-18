@@ -9,7 +9,6 @@ open System.Threading.Tasks
 module CompanionRuntimeSurface =
 
     val main: value: obj -> obj
-    val squash: value: obj -> obj
     val toml: value: obj -> string
 
     /// Isolate physical shared-flight state before a semantic runtime test.

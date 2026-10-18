@@ -163,18 +163,6 @@ const observation = (overrides = {}) => ({
   observedPrefixEpoch: 0,
   ...overrides,
 })
-const squashed = () => ({
-  case: 'BlogObservationsSquashed',
-  sessionId: 'ses_obs',
-  bloggerSessionId: 'ses_blogger',
-  requestId: 'req-squash',
-  previousFrameEpoch: 0,
-  nextFrameEpoch: 1,
-  coveredFrameCount: 1,
-  textRef: 'blobs/blob-squash',
-  textDigest: 'sha-squash',
-  run: 'run-squash',
-})
 
 test('WHAT[behavior-diagnosis-008] ENFORCER_072_score_vector_entry_refuses_with_tip_v2_message', () => {
   for (const tag of ['BlogEntryCommitted', 'BlogObservationCommitted']) {

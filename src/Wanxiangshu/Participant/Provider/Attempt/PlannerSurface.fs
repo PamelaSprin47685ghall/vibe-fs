@@ -50,8 +50,6 @@ module AttemptPlannerSurface =
         | "work-main" -> Some ProviderRequestKind.WorkMain
         | "bloggermain"
         | "blogger-main" -> Some ProviderRequestKind.BloggerMain
-        | "bloggersquash"
-        | "blogger-squash" -> Some ProviderRequestKind.BloggerSquash
         | "interactionrepair"
         | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
         | "strengthreplica"
@@ -68,7 +66,6 @@ module AttemptPlannerSurface =
         let requestKind =
             match bloggerPurpose with
             | "main" -> ProviderRequestKind.BloggerMain
-            | "squash" -> ProviderRequestKind.BloggerSquash
             | _ -> AttemptPlanner.ordinaryRequestKind promptOrigin
 
         ProviderRequestKind.label requestKind

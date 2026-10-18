@@ -96,6 +96,11 @@ module JsRuntimeSurface =
 
     let clearDelegationHosts () : unit = JsDelegationBridge.clearAll ()
 
+    /// Test hook: the raw value a program handed over through `js.deliver`.
+    let deliveredValue (sessionId: string) : obj = JsDeliveredValues.peek sessionId
+
+    let clearDeliveredValue (sessionId: string) : unit = JsDeliveredValues.clear sessionId
+
     let stagedCount (handle: obj) : int =
         (unbox<JsBindingsHandle> handle).Staging.Count
 

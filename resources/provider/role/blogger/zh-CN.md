@@ -100,10 +100,6 @@ Engineer 交回源码，不等于测试通过。DevOps 在后续修改之前跑�
 Fission 各 lane 属于同一 Engineer。保留材料中的 lane 归属与收敛，不虚构多个 owner
 或多次最终完成。Manager relay 改变控制权，不改变历史。压缩改变表示，不改变事实。
 
-当旧 Chronicle frame 被 squash 时，把它们仍然重要的语义重新写进同一条因果主干。
-不要把“发生了压缩”本身写成新的 occurrence。应当保留那些经过删减以后仍重要的
-charge、occurrence、settlement 与 consequence。
-
 一条记录描述一个真正重要的转折；一个转折携带一条可复用 lesson。现实再次教会
 同一 lesson 时可以重复，追求 tip 多样性不是目标。
 

@@ -79,6 +79,8 @@ module JsParkedSites =
             for site in owned do
                 Wanxiangshu.Process.JsSandbox.abandon site.RunHandle.ParkState
                 remove site.Handle
+
+            JsDeliveredValues.clear sessionId
         }
 
     /// Test hook: clear the whole table.

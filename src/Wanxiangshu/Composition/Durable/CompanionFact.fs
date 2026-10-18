@@ -27,9 +27,6 @@ module ContextFact =
     let inline BlogObservationCommitted payload =
         AgentFact.Context(ContextFactCases.BlogObservationCommitted payload)
 
-    let inline BlogObservationsSquashed payload =
-        AgentFact.Context(ContextFactCases.BlogObservationsSquashed payload)
-
     let inline BloggerRequestMaterialized payload =
         AgentFact.Context(ContextFactCases.BloggerRequestMaterialized payload)
 

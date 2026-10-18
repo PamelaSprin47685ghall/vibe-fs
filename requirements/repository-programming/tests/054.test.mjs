@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execute, caseName, render } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import { deliveredValue, clearDeliveredValue } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-deliver-'))
@@ -41,6 +42,7 @@ test('WHAT[repository-programming-054] deliver ends the program with its explici
 test('WHAT[repository-programming-054] catching the delivery sentinel keeps the program alive', async () => {
   const { dir, cleanup } = sandbox()
   try {
+    clearDeliveredValue('sess-054')
     const outcome = await runProgram(
       dir,
       `    try { await this.deliver({ final: true }); } catch (error) { /* knowingly cancelled */ }
@@ -50,7 +52,9 @@ test('WHAT[repository-programming-054] catching the delivery sentinel keeps the 
     const doc = render(outcome)
     assert.match(doc, /after = true/)
     assert.equal(doc.includes('final = true'), false)
+    assert.equal(deliveredValue('sess-054'), null, 'cancelled delivery leaves the session cell empty')
   } finally {
+    clearDeliveredValue('sess-054')
     cleanup()
   }
 })
@@ -58,11 +62,14 @@ test('WHAT[repository-programming-054] catching the delivery sentinel keeps the 
 test('WHAT[repository-programming-054] deliver without a JSON value fails as an invalid return', async () => {
   const { dir, cleanup } = sandbox()
   try {
+    clearDeliveredValue('sess-054')
     const outcome = await runProgram(dir, `    await this.deliver(undefined);`)
     assert.equal(caseName(outcome), 'Failed')
     assert.match(render(outcome), /# failed/)
     assert.match(render(outcome), /INVALID_RETURN_VALUE/)
+    assert.equal(deliveredValue('sess-054'), null, 'rejected delivery never populates the session cell')
   } finally {
+    clearDeliveredValue('sess-054')
     cleanup()
   }
 })

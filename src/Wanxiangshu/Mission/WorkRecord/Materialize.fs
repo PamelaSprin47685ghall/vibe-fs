@@ -379,19 +379,3 @@ module LifecycleWorkRecordProjection =
         match journal with
         | None -> Task.FromResult None
         | Some durable -> lifecycleWorkRecordBoundedFromSnapshot durable (AgentJournal.snapshot durable) sessionId range
-
-    let lifecycleWorkRecordBoundedForRun
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (range: XTraceRange)
-        (providerRun: ProviderRunIdentity)
-        : Task<string option> =
-        match journal with
-        | None -> Task.FromResult None
-        | Some durable ->
-            lifecycleWorkRecordBoundedFromSnapshotForRun
-                durable
-                (AgentJournal.snapshot durable)
-                sessionId
-                range
-                providerRun

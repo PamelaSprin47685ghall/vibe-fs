@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-filesystem.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
 
     <Compile Include="Repository/Programming/Js/Capability.fsi"/>
     <Compile Include="Repository/Programming/Js/Capability.fs"/>
@@ -25,6 +26,8 @@
     <Compile Include="Process/JsRunLoop.fs"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fsi"/>
     <Compile Include="Repository/Programming/Js/TransactionStore.fs"/>
+    <Compile Include="Repository/Programming/Js/DeliveredValues.fsi"/>
+    <Compile Include="Repository/Programming/Js/DeliveredValues.fs"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fsi"/>
     <Compile Include="Repository/Programming/Js/OpenCode/ParkedSites.fs"/>
     <Compile Include="Repository/Programming/Js/Anchor/AnchorModel.fsi"/>

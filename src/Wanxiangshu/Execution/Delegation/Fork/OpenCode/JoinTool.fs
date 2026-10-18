@@ -371,11 +371,17 @@ module JoinTool =
         : JoinRecord =
         match item with
         | JoinItem.AgentItem(AgentCompletedItem payload) ->
+            let workRecord = if isNull payload.WorkRecord then "" else payload.WorkRecord
+
             { Name = resolveName payload.AgentId
               AgentId = payload.AgentId
               Role = Roles.roleLabel payload.Role
-              Status = "completed"
-              WorkRecord = if isNull payload.WorkRecord then "" else payload.WorkRecord }
+              Status =
+                if String.IsNullOrWhiteSpace workRecord then
+                    "undelivered"
+                else
+                    "completed"
+              WorkRecord = workRecord }
         | JoinItem.AgentItem(AgentFailedItem payload) ->
             { Name = resolveName payload.AgentId
               AgentId = payload.AgentId

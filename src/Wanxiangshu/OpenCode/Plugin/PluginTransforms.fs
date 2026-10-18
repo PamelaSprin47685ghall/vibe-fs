@@ -696,10 +696,8 @@ module PluginTransforms =
             }
 
         // COMPANION-003: the Plan session is a top-level main session; nothing
-        // else owns its opening. Without opening evidence the bounded LWR_prev
-        // of a relay successor materializes to nothing and the handover loses
-        // the previous tenure's semantics. The opening is the first physical
-        // user instruction, captured once; a session that already has opening
+        // else owns its opening. The opening is the first physical user
+        // instruction, captured once; a session that already has opening
         // evidence is never rewritten.
         let planOpeningText (rawMessages: obj list) : string option =
             rawMessages
@@ -757,15 +755,12 @@ module PluginTransforms =
               IncumbencyId = incumbentId
               Stage = work.Stage
               OpeningCursor = work.OpeningCursor |> Option.defaultValue 0. |> int64
-              PreviousRange =
-                work.PredecessorRange
-                |> Option.map (fun (start, ending) -> int64 start, int64 ending)
               IsFreshHandover = not (PrefixEpochProjection.isTenureReanchored incumbentId epoch) }
 
         // The delivered Plan work is post-S3: the tenure is over and the
         // session waits for the user's execution command. It inherits nothing
         // from S3 or earlier: every assistant/tool interaction at-or-before the
-        // delivered retirement frontier is stripped, with no LWR_prev.
+        // delivered retirement frontier is stripped.
         let tenureForPostS3
             (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
             (sid: string)
@@ -774,27 +769,7 @@ module PluginTransforms =
               IncumbencyId = "post-s3"
               Stage = "S3"
               OpeningCursor = work.LastRetirementCursor |> Option.defaultValue -1. |> int64 |> (+) 1L
-              PreviousRange = None
               IsFreshHandover = false }
-
-        let previousTenureRecord
-            (durable: AgentJournal)
-            (sessionId: SessionId)
-            (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo)
-            =
-            match tenure.PreviousRange with
-            | Some(start, ending) ->
-                let range =
-                    XTraceRange.create
-                        (XTraceCursor.create start |> XTraceCursor.nextCursor)
-                        (XTraceCursor.create ending |> XTraceCursor.nextCursor)
-
-                Wanxiangshu.Mission.WorkRecord.LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshot
-                    durable
-                    (AgentJournal.snapshot durable)
-                    sessionId
-                    range
-            | None -> Task.FromResult None
 
         let isolatePlanTenure (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo) (sid: string) (outObj: obj) =
             task {
@@ -820,14 +795,11 @@ module PluginTransforms =
                 if tenure.OpeningCursor > XTraceCursor.sequence (XTraceProjection.headCursor trace) then
                     invalidOp "Plan opening cursor exceeds the captured XTrace frontier"
 
-                let! previousRecord = previousTenureRecord durable sessionId tenure
-
                 let assembled =
                     Wanxiangshu.Mission.Planning.TenureIsolation.assemble
                         (tenureMessagesOf rawMessages)
                         tenure
                         (XTraceProjection.hostMessageFirstCursors trace)
-                        previousRecord
 
                 if assembled.ReanchorRequested then
                     do! reanchorTenure durable sessionId tenure (tenureReanchorEpoch durable sessionId)

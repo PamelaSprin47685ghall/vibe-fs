@@ -53,7 +53,6 @@ module Surface =
         match requiredText "requestKind" value with
         | "work-main" -> ProviderRequestKind.WorkMain
         | "blogger-main" -> ProviderRequestKind.BloggerMain
-        | "blogger-squash" -> ProviderRequestKind.BloggerSquash
         | "interaction-repair" -> ProviderRequestKind.InteractionRepair
         | "strength-replica" -> ProviderRequestKind.StrengthReplica
         | kind -> invalidArg "requestKind" $"unknown provider request kind '{kind}'"

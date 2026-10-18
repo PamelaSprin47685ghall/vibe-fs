@@ -5,3 +5,5 @@
 每一任期在本任调用 `review` 之前，`todowrite-for-plan` 对底稿严格只读。此前调用 `edit` 或 `rewrite` 会被拒绝，并要求先调用 `review`。评审之后写权限解锁。接力开启的下一任期，在它自己的 `review` 之前重新锁定为只读。
 
 程序内 `await js.ask(question)` 向用户提问并暂停：本次工具调用返回 parked 载荷并中断 attempt；用户答复后用 `{ unpark: { handle, value } }` 恢复，await 的值就是注入值。只有 S1 阶段可以提问；其他阶段以 `ASK_REFUSED` 拒绝。
+
+调用还可带可选 `view: { prefixUntil, extra }`（与其他编程工具相同的 ANCHOR 视图声明）。声明它会为下一任请求记下一笔 durable 交接 checkpoint：`extra` 携带下一任期必须保留的散文或锚点引用。用它取代手写交接note。

@@ -30,7 +30,6 @@ type HostForkRunLifecycleHandle
               AgentId = agentId
               ChildId = SessionId.create childId
               Role = Role.Coder
-              StartCursor = XTraceCursor.create 0L
               AuthorityRoot = AuthorityRootUserMessageId.create "surface-authority-root"
               Work = None
               Source = HostPendingRun.completionSource ()

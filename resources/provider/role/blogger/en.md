@@ -129,11 +129,6 @@ convergence without inventing multiple owners or multiple final completions.
 Manager relay changes control, not history. Compression changes representation,
 not what happened.
 
-When old Chronicle frames are squashed, rewrite their semantic content into the
-same causal spine. Do not record compression itself as a new occurrence. Keep
-the underlying charge, occurrence, settlement, and consequence that still
-matter after detail is removed.
-
 One record describes one meaningful turn. One turn carries one reusable lesson.
 Repetition is allowed when reality teaches the same lesson again. Variety is not
 a goal.

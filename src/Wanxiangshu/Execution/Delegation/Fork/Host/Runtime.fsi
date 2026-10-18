@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
@@ -18,7 +17,7 @@ type HostForkRuntime =
     new:
         parentId: SessionId *
         sessions: ISessionHostPort *
-        childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
+        childWorkRecordForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) *
         createMailbox: (obj -> ForkCompletionMailbox) *
         clock: IClockPort *
         raceExit: (Task -> int -> Task<bool>) *
@@ -83,8 +82,7 @@ type HostForkRuntime =
     member internal ChildCreatedDir: (string -> SessionId -> string option -> unit)
     member internal ParentWorkRecordOf: (SessionId -> Task<string option>)
     member internal ChildWorkRecordOf: (SessionId -> Task<string option>)
-    member internal ChildWorkRecordOfRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
-    member internal XTraceHead: (SessionId -> XTraceCursor)
+    member internal ChildWorkRecordOfRun: (SessionId -> ProviderRunIdentity -> Task<string option>)
     member internal TrackOwnedWork: work: (unit -> Task) -> unit
 
     member internal SendChildPrompt:

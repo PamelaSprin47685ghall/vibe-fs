@@ -63,7 +63,6 @@ module ReliabilityDiagnosticsSurface =
         match requiredText "providerRequestKind" value with
         | "work-main" -> ProviderRequestKind.WorkMain
         | "blogger-main" -> ProviderRequestKind.BloggerMain
-        | "blogger-squash" -> ProviderRequestKind.BloggerSquash
         | "interaction-repair" -> ProviderRequestKind.InteractionRepair
         | "strength-replica" -> ProviderRequestKind.StrengthReplica
         | kind -> invalidArg "providerRequestKind" $"unknown provider request kind '{kind}'"

@@ -830,11 +830,7 @@ module XWireSurface =
 
                             rawFrames
                             |> Array.map (fun f ->
-                                { Kind =
-                                    if string f?kind = "Squash" then
-                                        BlogFrameKind.Squash
-                                    else
-                                        BlogFrameKind.Entry
+                                { Kind = BlogFrameKind.Entry
                                   Digest = BlobDigest.create (if isNullish f?digest then "" else string f?digest)
                                   TextRef = BlobRef.create (if isNullish f?ref then "" else string f?ref)
                                   CoveredFromSequence = if isNullish f?coveredFrom then 0L else int64 f?coveredFrom

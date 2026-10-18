@@ -38,7 +38,6 @@ module ToolRegistrySurface =
         match label.ToLowerInvariant() with
         | "work-main" -> Some ProviderRequestKind.WorkMain
         | "blogger-main" -> Some ProviderRequestKind.BloggerMain
-        | "blogger-squash" -> Some ProviderRequestKind.BloggerSquash
         | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
         | "strength-replica" -> Some ProviderRequestKind.StrengthReplica
         | _ -> None

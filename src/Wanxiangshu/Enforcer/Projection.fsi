@@ -32,8 +32,6 @@ module EnforcementProjection =
         record: EnforcementCycleRecord ->
             Result<EnforcementProjectionState, string>
 
-    val applySquash: count: int -> state: EnforcementProjectionState -> EnforcementProjectionState
-
     val tryFindByProviderRun:
         run: ProviderRunIdentity -> state: EnforcementProjectionState -> EnforcementCycleRecord option
 

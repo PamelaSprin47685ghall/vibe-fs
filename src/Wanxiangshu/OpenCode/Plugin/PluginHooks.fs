@@ -214,8 +214,7 @@ module PluginHooks =
                     let parentWorkRecordFor, childWorkRecordFor = workRecord true, workRecord false
 
                     let childRecordForRun =
-                        fun sid range run ->
-                            LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sid range run
+                        fun _ _ -> Task.FromResult None
 
                     let casebookToolSpecs: ToolSpec list =
                         match workspaceDirectory with

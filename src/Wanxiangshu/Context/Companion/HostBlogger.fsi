@@ -17,13 +17,4 @@ module internal CompanionHostBlogger =
           Journal: AgentJournal option
           Participant: string }
 
-    val coveredFrameCount: frameCount: int -> int
-
-    val tryBuildSquashContext:
-        mainSessionId: SessionId ->
-        bloggerSessionId: SessionId ->
-        observedEpoch: PrefixEpochId ->
-        blog: BlogProjectionState ->
-            BloggerRequestContext option
-
     val startFromContext: deps: BloggerDeps -> ctx: BloggerRequestContext -> Task<Result<PromptKey, string>>

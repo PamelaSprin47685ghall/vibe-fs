@@ -1,13 +1,10 @@
 namespace Wanxiangshu.Mission.Planning
 
-open System
-
 type ActiveTenureInfo =
     { WorkId: string
       IncumbencyId: string
       Stage: string
       OpeningCursor: int64
-      PreviousRange: (int64 * int64) option
       IsFreshHandover: bool }
 
 type TenureMessage =
@@ -23,47 +20,17 @@ type TenureAssemblyResult =
 
 module TenureIsolation =
 
-    /// A message already observed strictly before this opening is the
-    /// previous tenure. A message with no first-observation cursor has not
-    /// been captured yet; that absence is not a cursor on the Host message.
+    /// Assembles the physical message set for an active or post-S3 Plan tenure:
+    /// verbatim user messages `U` (role user, non-synthetic, in original order)
+    /// plus current-tenure physical messages whose first XTrace observation
+    /// cursor is `>= tenure.OpeningCursor` (or uncaptured with a stable Host
+    /// identity). All prior-tenure assistant/tool messages and synthetic rows
+    /// are stripped; handover is carried by the predecessor's ANCHOR view
+    /// declaration rather than a machine-materialized work record.
     let isCurrentTenurePhysical (openingCursor: int64) (cursor: int64 option) =
         match cursor with
         | None -> true
         | Some sequence -> sequence >= openingCursor
-
-    let insertBeforeCurrentTenure
-        (openingCursor: int64)
-        (messageCursors: Map<string, int64>)
-        (record: obj)
-        (messages: obj list)
-        (messageId: obj -> string option)
-        : obj list =
-        let rec place reversed pending rest =
-            match pending, rest with
-            | None, _ -> List.rev reversed @ rest
-            | Some pendingRecord, [] -> List.rev (pendingRecord :: reversed)
-            | Some pendingRecord, message :: tail -> placeMessage reversed pendingRecord message tail
-
-        and placeMessage reversed pendingRecord message tail =
-            let cursor =
-                messageId message |> Option.bind (fun id -> Map.tryFind id messageCursors)
-
-            if isCurrentTenurePhysical openingCursor cursor then
-                List.rev reversed @ (pendingRecord :: message :: tail)
-            else
-                place (message :: reversed) (Some pendingRecord) tail
-
-        place [] (Some record) messages
-
-    let private recordMessage (tenure: ActiveTenureInfo) (text: string) : obj =
-        box
-            {| info =
-                {| id = "lwr-prev-" + tenure.IncumbencyId
-                   sessionID = tenure.WorkId
-                   role = "user"
-                   synthetic = true
-                   source = "plan-tenure-record" |}
-               parts = [| box {| ``type`` = "text"; text = text |} |] |}
 
     let private physicalCursor (messageCursors: Map<string, int64>) (message: TenureMessage) =
         message.Id
@@ -98,65 +65,18 @@ module TenureIsolation =
         if tenure.OpeningCursor < 0L then
             invalidArg (nameof tenure) "Plan opening cursor cannot be negative"
 
-        match tenure.PreviousRange with
-        | Some(startCursor, endCursor) when startCursor < 0L || endCursor < startCursor ->
-            invalidArg (nameof tenure) "Plan previous range is invalid"
-        | _ -> ()
-
-    let private recordText (previousRecord: string option) =
-        match previousRecord with
-        | Some text when not (String.IsNullOrWhiteSpace text) -> text
-        | _ -> invalidOp "Plan previous work record is unavailable"
-
-    let private previousRecordMessage (tenure: ActiveTenureInfo) (previousRecord: string option) =
-        match tenure.PreviousRange with
-        | Some(startCursor, endCursor) when endCursor > startCursor ->
-            Some(recordMessage tenure (recordText previousRecord))
-        | _ -> None
-
-    let private placeBeforeCurrent
-        (tenure: ActiveTenureInfo)
-        (reversed: obj list)
-        (pendingRecord: obj option)
-        (cursor: int64 option)
-        (raw: obj)
-        : obj list * obj option =
-        match pendingRecord, cursor with
-        | Some record, Some sequence when isCurrentTenurePhysical tenure.OpeningCursor (Some sequence) ->
-            raw :: record :: reversed, None
-        | _ -> raw :: reversed, pendingRecord
-
-    let private step
-        (tenure: ActiveTenureInfo)
-        (messageCursors: Map<string, int64>)
-        (state: obj list * obj option)
-        (message: TenureMessage)
-        : obj list * obj option =
-        let cursor = physicalCursor messageCursors message
-
-        if keepMessage tenure cursor message then
-            let reversed, pendingRecord = state
-            placeBeforeCurrent tenure reversed pendingRecord cursor message.Raw
-        else
-            state
-
-    /// A record that never met a current physical message (the tenure made no
-    /// interaction yet) lands after the retained historical U.
-    let private finish (reversed: obj list) (pendingRecord: obj option) : obj list =
-        match pendingRecord with
-        | Some record -> List.rev (record :: reversed)
-        | None -> List.rev reversed
-
     let assemble
         (messages: TenureMessage list)
         (tenure: ActiveTenureInfo)
         (messageCursors: Map<string, int64>)
-        (previousRecord: string option)
         : TenureAssemblyResult =
         validateTenure tenure
 
-        let reversed, pendingRecord =
-            List.fold (step tenure messageCursors) ([], previousRecordMessage tenure previousRecord) messages
+        let kept =
+            messages
+            |> List.choose (fun message ->
+                let cursor = physicalCursor messageCursors message
+                if keepMessage tenure cursor message then Some message.Raw else None)
 
-        { Messages = finish reversed pendingRecord
+        { Messages = kept
           ReanchorRequested = tenure.IsFreshHandover }

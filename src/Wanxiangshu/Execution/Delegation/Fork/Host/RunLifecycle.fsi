@@ -2,7 +2,6 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -24,8 +23,7 @@ module HostForkRunLifecycle =
             Result<PromptAuthority.IdentitySeed, string>
 
     val workRecordForOutcome:
-        childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) ->
-        xTraceHead: (SessionId -> XTraceCursor) ->
+        childWorkRecordForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) ->
         run: PendingHostRun ->
         outcome: TerminalOutcome ->
             Task<string option>
@@ -81,8 +79,7 @@ module HostForkRunLifecycle =
         journal: AgentJournal option ->
         parentId: SessionId ->
         sessions: ISessionHostPort ->
-        childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) ->
-        xTraceHead: (SessionId -> XTraceCursor) ->
+        childWorkRecordForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) ->
         trackOwnedWork: ((unit -> Task) -> unit) ->
         agentId: string ->
         childId: SessionId ->

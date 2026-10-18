@@ -26,7 +26,6 @@ module FailureSurface =
         match requiredText "requestKind" value with
         | "WorkMain" -> ProviderRequestKind.WorkMain
         | "BloggerMain" -> ProviderRequestKind.BloggerMain
-        | "BloggerSquash" -> ProviderRequestKind.BloggerSquash
         | "InteractionRepair" -> ProviderRequestKind.InteractionRepair
         | "StrengthReplica" -> ProviderRequestKind.StrengthReplica
         | other -> invalidArg "requestKind" $"unknown provider request kind '{other}'"

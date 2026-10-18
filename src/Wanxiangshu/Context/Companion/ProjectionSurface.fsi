@@ -6,13 +6,10 @@ namespace Wanxiangshu.Context.Companion
 module CompanionProjectionSurface =
 
     val normalInstructionLines: string array
-    val squashInstructionLines: string array
     val normalInstruction: string
-    val squashInstruction: string
     val memoryPreamble: string
     val normal: string
 
-    val squash: count: int -> obj
     val workingRecord: body: string -> string
     val previousTip: fieldName: string -> cycleId: string -> string
     val newWork: items: obj array -> string
@@ -22,8 +19,7 @@ module CompanionProjectionSurface =
     val frameMessageId: sha256: obj -> value: obj -> string
     val instructionMessageId: sha256: obj -> value: obj -> string
 
-    /// Build one normal or squash request from durable frame bodies and the
-    /// physical delta. Squash intentionally ignores `delta` in production.
+    /// Build one normal request from durable frame bodies and the physical delta.
     val build: sha256: obj -> value: obj -> obj
 
     val projectionIntent: sha256: obj -> value: obj -> obj

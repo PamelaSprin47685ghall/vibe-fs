@@ -75,6 +75,12 @@ test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned op
       },
     )
 
+    const delivered = await hooks2.tool['todowrite-for-engineer'].execute(
+      { program: "class Js extends JsProgram { async run() { await this.deliver('Complete 9-item ruling materials report') } }" },
+      { sessionID: engineerSession, agent: 'engineer' },
+    )
+    assert.match(delivered, /^# ok\b/m)
+
     assistantMsg.info.finish = 'stop'
     assistantMsg.info.time.completed = 11
     assistantMsg.parts = [{ id: 'part-final-report', type: 'text', text: 'Complete 9-item ruling materials report' }]

@@ -781,7 +781,6 @@ module BloggerCoordinator =
     [<RequireQualifiedAccess>]
     type DecisionEffect =
         | Started
-        | StartedSquash
         | SkippedInFlight
         | OfferedParked
         | NoMaterial
@@ -808,17 +807,6 @@ module BloggerCoordinator =
                   "next_prefix_digest", box main.NextCoveredPrefixDigest
                   "frame_epoch", box (FrameEpochId.value main.FrameEpochId)
                   "observed_prefix_epoch", box (PrefixEpochId.value main.ObservedPrefixEpochId) ]
-        | BloggerRequestContext.Squash squash ->
-            "squash",
-            0L,
-            0L,
-            squash.FrameDigests,
-            createObj
-                [ "kind", box "squash"
-                  "frame_epoch", box (FrameEpochId.value squash.FrameEpochId)
-                  "covered_frame_count", box squash.CoveredFrameCount
-                  "frame_digests", box (squash.FrameDigests |> List.map BlobDigest.value |> Array.ofList)
-                  "observed_prefix_epoch", box (PrefixEpochId.value squash.ObservedPrefixEpochId) ]
 
     let private abandonStaleOpen
         (journal: AgentJournal)
@@ -1073,7 +1061,6 @@ module BloggerCoordinator =
 
     let private startedEffect (ctx: BloggerRequestContext) =
         match ctx with
-        | BloggerRequestContext.Squash _ -> DecisionEffect.StartedSquash
         | BloggerRequestContext.Main _ -> DecisionEffect.Started
 
     let private failAfterSend

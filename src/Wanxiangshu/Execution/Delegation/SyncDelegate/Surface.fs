@@ -806,13 +806,6 @@ module SyncDelegateSurface =
 
             let waitObserver = CausalWaitRuntime().Observer
 
-            let workRecordFor (sessionId: SessionId) (range: XTraceRange) (providerRun: ProviderRunIdentity) =
-                LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
-                    (Some journal)
-                    sessionId
-                    range
-                    providerRun
-
             let retryScript = RetryScript()
 
             let rootWorkspace =
@@ -861,7 +854,6 @@ module SyncDelegateSurface =
                                 owner.Sessions.SessionParents[SessionId.value child] <- SessionId.value parent
                             | None -> raise (InvalidOperationException "managed child has no Host parent"))),
                     gate,
-                    workRecordFor,
                     retryPort,
                     workspaceDirectory = directory
                 )
@@ -886,8 +878,7 @@ module SyncDelegateSurface =
                     None,
                     None,
                     None,
-                    None,
-                    childWorkRecordForRun = workRecordFor
+                    None
                 )
 
             return

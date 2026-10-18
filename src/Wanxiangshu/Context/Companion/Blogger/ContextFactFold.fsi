@@ -20,9 +20,7 @@ type ContextProjectionChange =
 type ContextFoldRejection =
     | BloggerRequestMaterializedRejected of reason: string
     | BlogObservationCommittedRejected of reason: string
-    | BlogObservationsSquashedRejected of reason: string
     | BlogObservationCommittedFrameRejected of rejection: BlogFoldRejection
-    | BlogObservationsSquashedFrameRejected of rejection: BlogFoldRejection
     | PrefixRebaseCommittedRejected of reason: string
     | ContextReanchoredRejected of reason: string
     | TenureReanchoredRejected of reason: string

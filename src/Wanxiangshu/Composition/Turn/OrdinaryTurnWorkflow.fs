@@ -98,14 +98,13 @@ module OrdinaryTurnWorkflow =
         match continuationKind, turn.Role with
         | Some PromptContinuationKind.InteractionRepair, _ -> Some ProviderRequestKind.InteractionRepair
         // A Blogger terminal without a durable cycle receipt did not prove a
-        // business Main or maintenance Squash success. Never clear the failure budget
+        // business Main success. Never clear the failure budget
         // from Role alone.
         | _, Some Role.Blogger -> None
         | _ -> Some ProviderRequestKind.WorkMain
 
     let private requestKindOfCompleted (port: TurnObservationJournalPort) (turn: ReconciledTurn) =
         match bloggerReceiptKind port turn with
-        | Some BlogFrameKind.Squash -> Some ProviderRequestKind.BloggerSquash
         | Some BlogFrameKind.Entry -> Some ProviderRequestKind.BloggerMain
         | None -> requestKindWithoutBloggerReceipt port turn
 

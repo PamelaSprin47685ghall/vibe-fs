@@ -5,7 +5,6 @@ open Wanxiangshu.Context.Companion.Blogger
 [<RequireQualifiedAccess>]
 module CompanionPrompt =
     val Normal: string
-    val Squash: string
     val MemoryPreamble: string
     val asCommentedInstruction: lines: string list -> string
     val workingRecordMessage: frameBody: string -> string

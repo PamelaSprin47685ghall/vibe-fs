@@ -92,7 +92,6 @@ module OpenBloggerRequest =
     let providerRequestKind (request: OpenBloggerRequest) =
         match request.RequestKind with
         | "main" -> Ok ProviderRequestKind.BloggerMain
-        | "squash" -> Ok ProviderRequestKind.BloggerSquash
         | unsupported -> Error unsupported
 
 type BloggerCycleProjectionState =

@@ -23,7 +23,7 @@ const { records, byName } = await js.join();
 ```
 
 - 结果：`{ ok: true, records: [{ name, agentId, role, status, workRecord }], byName: { [name]: record } }`。
-- `status` 为 `completed` | `failed` | `abandoned`；`workRecord` 是子工作终值记录（可能为空）。
+- `status` 为 `completed` | `undelivered` | `failed` | `abandoned`；`workRecord` 是子工作经 `js.deliver` 交付的终值记录（`undelivered`、`failed` 或 `abandoned` 时为空）。
 - 按成员归属收拢：收的是本会话创建的子工作。拒绝码：`context-unavailable`、`not-ready`、`nothing-to-join`、`join-in-progress`、`interrupted`、`abandoned`。
 
 ## fission

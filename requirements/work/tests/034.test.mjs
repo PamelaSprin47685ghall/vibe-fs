@@ -1,29 +1,32 @@
 import assert from 'node:assert/strict'
+import { join } from 'node:path'
 import test from 'node:test'
 import * as prefix from '../../../dist/Context/Prefix/Surface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import { clearAll } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import {
   assistantText,
   cursors,
   ids,
   msgId,
-  msgRole,
   msgText,
   syntheticLwr,
   toolResult,
   userText,
 } from './support/plan-messages.mjs'
 
-const assemble = (rawMessages, tenure, materializePrev, messageCursors) =>
-  surface.PlanningSurface.assembleTenureMessages(rawMessages, tenure, materializePrev, messageCursors)
+const assemble = (rawMessages, tenure, messageCursors) =>
+  surface.PlanningSurface.assembleTenureMessages(rawMessages, tenure, messageCursors)
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
 const framesOf = (text) => text.split('\n').filter((line) => line.length > 0).map((line) => JSON.parse(line))
 const eventsOf = (text) => framesOf(text).flatMap((frame) => frame.events ?? [])
 const incumbencyIdOf = (text) => [...eventsOf(text)].reverse().find((event) => event.type === 'IncumbencyOpened').incumbencyId
 
-test('WHAT[work-034] initial tenure (S1) assembles U + current messages with no LWR_prev and requests reanchor on first turn', () => {
+test('WHAT[work-034] initial tenure (S1) assembles U + current messages with no synthetic record and requests reanchor on first turn', () => {
   const rawMessages = [
     userText('u1', 'Initial user prompt'),
     userText('u2', 'Second user instruction'),
@@ -34,16 +37,11 @@ test('WHAT[work-034] initial tenure (S1) assembles U + current messages with no 
     incumbencyId: 'inc-1',
     stage: 'S1',
     openingCursor: 0n,
-    previousRange: null,
     isFreshHandover: true,
   }
 
-  const matPrev = () => {
-    throw new Error('materializePrev must not be called for initial tenure')
-  }
-
   // 1. First turn: no assistant/tool messages yet, isFreshHandover = true -> reanchorRequested = true
-  const firstTurn = assemble(rawMessages, tenure, matPrev, {})
+  const firstTurn = assemble(rawMessages, tenure, {})
   assert.equal(firstTurn.reanchorRequested, true, 'a fresh handover must request a reanchor once')
   assert.equal(firstTurn.messages.length, 2)
   assert.equal(msgId(firstTurn.messages[0]), 'u1')
@@ -59,7 +57,6 @@ test('WHAT[work-034] initial tenure (S1) assembles U + current messages with no 
   const secondTurn = assemble(
     subsequentMessages,
     tenureContinuing,
-    matPrev,
     cursors({ a1: 5n, t1: 6n }),
   )
   assert.equal(secondTurn.reanchorRequested, false, 'a continuing tenure must not re-request reanchor')
@@ -70,12 +67,11 @@ test('WHAT[work-034] initial tenure (S1) assembles U + current messages with no 
   )
 })
 
-test('WHAT[work-034] non-initial tenure strips prior assistant/tool messages, injects LWR_prev before the first current interaction, and preserves the current user reply after it', () => {
+test('WHAT[work-034] non-initial tenure strips prior assistant/tool messages, injects no lwr-prev-* row, and preserves the current user reply in chronological order', () => {
   // Real Host rows: historical U, prior S1 assistant+tool, a current user
-  // reply (feedback) and a current assistant row. The canonical cursor map
-  // carries first-observation evidence for every physical row, including the
-  // current user reply, so LWR_prev is injected before that reply — never
-  // moving it ahead of an older current assistant.
+  // reply (feedback) and a current assistant row. Prior assistant/tool rows
+  // observed before openingCursor are stripped; no synthetic lwr-prev-* row
+  // is ever injected.
   const rawMessages = [
     userText('u1', 'Initial user prompt'),
     assistantText('a-old', 'S1 assistant work', 'u1'),
@@ -90,46 +86,23 @@ test('WHAT[work-034] non-initial tenure strips prior assistant/tool messages, in
     incumbencyId: 'inc-2',
     stage: 'S2',
     openingCursor: 20n,
-    previousRange: [0n, 15n],
     isFreshHandover: false,
-  }
-
-  let matRangeCalledWith = null
-  const matPrev = (rangeObj) => {
-    matRangeCalledWith = rangeObj
-    return '# Previous Incumbency Work Record\nCompleted S1 diagnosis.'
   }
 
   const result = assemble(
     rawMessages,
     tenureS2,
-    matPrev,
     cursors({ 'a-old': 5n, 't-old': 8n, u2: 22n, 'a-current': 25n, 't-current': 26n }),
   )
 
-  // Verify previous range was passed to materialize
-  assert.ok(matRangeCalledWith != null)
-  assert.equal(matRangeCalledWith.start, 0n)
-  assert.equal(matRangeCalledWith.end, 15n)
-
-  // Assembled sequence: U1, LWR_prev, U2(current reply), a-current, t-current.
-  // a-old and t-old are stripped; LWR_prev is injected before the first
-  // retained current physical message whose first observation exceeds the
-  // opening cursor — here the current user reply u2 (cursor 22 > 20). The
-  // reply stays in chronological position before the newer current assistant.
   assert.deepEqual(
     ids(result.messages),
-    ['u1', 'lwr-prev-inc-2', 'u2', 'a-current', 't-current'],
+    ['u1', 'u2', 'a-current', 't-current'],
   )
 
-  const lwrMsg = result.messages[1]
-  assert.equal(msgId(lwrMsg), 'lwr-prev-inc-2')
-  assert.equal(msgRole(lwrMsg), 'user')
-  assert.equal(msgText(lwrMsg), '# Previous Incumbency Work Record\nCompleted S1 diagnosis.')
-  assert.equal(lwrMsg.info.synthetic, true)
-
-  // Prior assistant/tool messages must be completely gone
+  // Prior assistant/tool messages and any synthetic lwr-prev-* rows must be absent
   const assembledIds = ids(result.messages)
+  assert.ok(!assembledIds.some((id) => id.startsWith('lwr-prev-')), 'no lwr-prev-* row is injected')
   assert.ok(!assembledIds.includes('a-old'), 'prior assistant message must be stripped')
   assert.ok(!assembledIds.includes('t-old'), 'prior tool message must be stripped')
 })
@@ -143,11 +116,10 @@ test('WHAT[work-034] user messages U preserve original bytes and order verbatim 
     incumbencyId: 'inc-1',
     stage: 'S1',
     openingCursor: 0n,
-    previousRange: null,
     isFreshHandover: true,
   }
 
-  const result = assemble([originalUser1, originalUser2], tenure, () => '', {})
+  const result = assemble([originalUser1, originalUser2], tenure, {})
 
   assert.equal(result.messages.length, 2)
   // Strict identity and byte-for-byte content equality
@@ -158,9 +130,6 @@ test('WHAT[work-034] user messages U preserve original bytes and order verbatim 
 })
 
 test('WHAT[work-034] the first part immediately after the opening cursor survives tenure assembly', () => {
-  // The very first assistant/tool row whose first observation is exactly the
-  // opening cursor + 1 must survive — the boundary is strict `>` so the first
-  // current interaction is retained.
   const rawMessages = [
     userText('u1', 'go'),
     assistantText('a-first', 'first current assistant part', 'u1'),
@@ -171,20 +140,17 @@ test('WHAT[work-034] the first part immediately after the opening cursor survive
     incumbencyId: 'inc-2',
     stage: 'S2',
     openingCursor: 20n,
-    previousRange: [0n, 19n],
     isFreshHandover: false,
   }
   const result = assemble(
     rawMessages,
     tenure,
-    () => '# prev',
     cursors({ 'a-first': 21n, u2: 22n }),
   )
   const assembledIds = ids(result.messages)
   assert.ok(assembledIds.includes('a-first'), 'the first part right after opening must survive')
-  assert.ok(assembledIds.includes('u2'), 'the follow-up user reply must survive after LWR')
-  // LWR_prev is injected before the first retained current interaction (a-first).
-  assert.deepEqual(assembledIds, ['u1', 'lwr-prev-inc-2', 'a-first', 'u2'])
+  assert.ok(assembledIds.includes('u2'), 'the follow-up user reply must survive in order')
+  assert.deepEqual(assembledIds, ['u1', 'a-first', 'u2'])
 })
 
 test('WHAT[work-034] a current assistant row with a Host id but no first-observation entry stays', () => {
@@ -197,15 +163,14 @@ test('WHAT[work-034] a current assistant row with a Host id but no first-observa
     incumbencyId: 'inc-2',
     stage: 'S2',
     openingCursor: 20n,
-    previousRange: [0n, 19n],
     isFreshHandover: false,
   }
   // info.id is present. The empty cursor map means this physical message has
   // not been captured yet. That is not a missing identity, so assembly keeps
   // the row and does not fail the exchange.
-  const result = assemble(rawMessages, tenure, () => '# prev', {})
+  const result = assemble(rawMessages, tenure, {})
   assert.ok(ids(result.messages).includes('a-no-cursor'))
-  assert.equal(result.messages.filter((m) => msgId(m).startsWith('lwr-prev-')).length, 1)
+  assert.equal(result.messages.filter((m) => msgId(m).startsWith('lwr-prev-')).length, 0)
 })
 
 test('WHAT[work-034] a semantic assistant row with no Host info.id rejects assembly', () => {
@@ -222,18 +187,17 @@ test('WHAT[work-034] a semantic assistant row with no Host info.id rejects assem
     incumbencyId: 'inc-2',
     stage: 'S2',
     openingCursor: 20n,
-    previousRange: [0n, 19n],
     isFreshHandover: false,
   }
   assert.throws(
-    () => assemble(rawMessages, tenure, () => '# prev', {}),
+    () => assemble(rawMessages, tenure, {}),
     /no stable XTrace message identity/i,
   )
-  const stayed = assemble([userText('u1', 'go'), identified], tenure, () => '# prev', {})
+  const stayed = assemble([userText('u1', 'go'), identified], tenure, {})
   assert.ok(ids(stayed.messages).includes('a-uncaptured'))
 })
 
-test('WHAT[work-034] synthetic previous LWR rows are stripped and exactly one current record is injected', () => {
+test('WHAT[work-034] synthetic rows are stripped and no synthetic record is ever injected', () => {
   const rawMessages = [
     userText('u1', 'go'),
     syntheticLwr('inc-old', 'work-1', 'stale synthesized row'),
@@ -244,19 +208,17 @@ test('WHAT[work-034] synthetic previous LWR rows are stripped and exactly one cu
     incumbencyId: 'inc-2',
     stage: 'S2',
     openingCursor: 20n,
-    previousRange: [0n, 19n],
     isFreshHandover: false,
   }
   const result = assemble(
     rawMessages,
     tenure,
-    () => '# Fresh record',
     cursors({ 'a-current': 25n }),
   )
   const lwrRows = result.messages.filter((m) => msgId(m).startsWith('lwr-prev-'))
-  assert.equal(lwrRows.length, 1, 'exactly one current LWR_prev is injected')
-  assert.equal(msgId(lwrRows[0]), 'lwr-prev-inc-2')
+  assert.equal(lwrRows.length, 0, 'no synthetic lwr-prev-* row is injected')
   assert.ok(!result.messages.some((m) => msgId(m) === 'lwr-prev-inc-old'))
+  assert.deepEqual(ids(result.messages), ['u1', 'a-current'])
 })
 
 test('WHAT[work-034] durable Plan active state assembles U + current interactions in place', () => {
@@ -270,14 +232,13 @@ test('WHAT[work-034] durable Plan active state assembles U + current interaction
     incumbencyId: 'inc-2',
     stage: 'S2',
     openingCursor: 20n,
-    previousRange: [0n, 15n],
     isFreshHandover: false,
   }
-  const result = assemble(rawMessages, tenure, () => '# prev', cursors({ a1: 25n, u2: 26n }))
+  const result = assemble(rawMessages, tenure, cursors({ a1: 25n, u2: 26n }))
   assert.deepEqual(
     ids(result.messages),
-    ['u1', 'lwr-prev-inc-2', 'a1', 'u2'],
-    'U, LWR_prev and current interactions must be assembled in place with LWR injected before the first current interaction',
+    ['u1', 'a1', 'u2'],
+    'U and current interactions must be assembled in place in chronological order',
   )
   assert.equal(result.reanchorRequested, false, 'a continuing durable tenure must not re-request reanchor')
 })
@@ -295,14 +256,13 @@ test('WHAT[work-034] reanchorRequested is returned by assemble and is true only 
     incumbencyId: 'inc-1',
     stage: 'S1',
     openingCursor: 0n,
-    previousRange: null,
     isFreshHandover: true,
   }
-  const fresh = assemble(rawMessages, tenure, () => '', {})
+  const fresh = assemble(rawMessages, tenure, {})
   assert.equal(typeof fresh.reanchorRequested, 'boolean')
   assert.equal(fresh.reanchorRequested, true, 'a fresh handover must request a reanchor')
 
-  const continuing = assemble(rawMessages, { ...tenure, isFreshHandover: false }, () => '', {})
+  const continuing = assemble(rawMessages, { ...tenure, isFreshHandover: false }, {})
   assert.equal(continuing.reanchorRequested, false, 'a continuing tenure must not re-request reanchor on an empty stop')
 })
 
@@ -311,7 +271,6 @@ const tenureFor = (overrides) => ({
   incumbencyId: 'inc-2',
   stage: 'S2',
   openingCursor: 20n,
-  previousRange: [7n, 25n],
   isFreshHandover: false,
   ...overrides,
 })
@@ -342,30 +301,22 @@ test('WHAT[work-034] S1 retirement preserves its opening range for the next tenu
   assert.equal(view.openingCursor, 25)
 })
 
-test('WHAT[work-034] tenure assembly consumes PreviousRange into LWR_prev', () => {
+test('WHAT[work-034] tenure assembly strips prior interactions by openingCursor without materializing a previous record', () => {
   const rawMessages = [
     userText('u1', 'go'),
     assistantText('a-old', 'old work', 'u1'),
     assistantText('a-new', 'new work', 'u1'),
   ]
-  let seen = null
   const result = surface.PlanningSurface.assembleTenureMessages(
     rawMessages,
     tenureFor(),
-    (range) => {
-      seen = range
-      return 'prev record'
-    },
     cursors({ 'a-old': 9n, 'a-new': 30n }),
   )
-  assert.equal(seen.start, 7n)
-  assert.equal(seen.end, 25n)
   const assembledIds = ids(result.messages)
   assert.ok(!assembledIds.includes('a-old'))
   assert.ok(assembledIds.includes('a-new'))
-  assert.ok(assembledIds.some((id) => id.startsWith('lwr-prev-')))
-  // LWR_prev is injected before the first current interaction (a-new).
-  assert.deepEqual(assembledIds, ['u1', 'lwr-prev-inc-2', 'a-new'])
+  assert.ok(!assembledIds.some((id) => id.startsWith('lwr-prev-')))
+  assert.deepEqual(assembledIds, ['u1', 'a-new'])
 })
 
 test('WHAT[work-034] tenure reanchor event shape carries session, epochs, work and incumbency', () => {
@@ -390,22 +341,20 @@ test('WHAT[work-034] reanchorRequested is true on fresh handover and deduplicate
     incumbencyId: 'inc-1',
     stage: 'S1',
     openingCursor: 0n,
-    previousRange: null,
     isFreshHandover: true,
   }
-  const result = surface.PlanningSurface.assembleTenureMessages(rawMessages, tenure, () => '', {})
+  const result = surface.PlanningSurface.assembleTenureMessages(rawMessages, tenure, {})
   assert.equal(result.reanchorRequested, true)
 
   const continuing = surface.PlanningSurface.assembleTenureMessages(
     rawMessages,
     { ...tenure, isFreshHandover: false },
-    () => '',
     {},
   )
   assert.equal(continuing.reanchorRequested, false)
 })
 
-test('WHAT[work-034] successor projection strips earlier assistant and tool messages and inserts LWR_prev once', () => {
+test('WHAT[work-034] successor projection strips earlier assistant and tool messages and never inserts LWR_prev', () => {
   const rawMessages = [
     userText('u-history', 'Original user request'),
     assistantText('a-old', 'previous tenure answer'),
@@ -418,33 +367,24 @@ test('WHAT[work-034] successor projection strips earlier assistant and tool mess
     incumbencyId: 'inc-2',
     stage: 'S2',
     openingCursor: 20n,
-    previousRange: [1n, 19n],
     isFreshHandover: false,
   }
   const result = assemble(
     rawMessages,
     tenure,
-    () => '# Previous record',
     cursors({ 'a-old': 4n, 't-old': 5n, 'a-current': 25n }),
   )
   const lwrRows = result.messages.filter((m) => msgId(m).startsWith('lwr-prev-'))
-  assert.equal(lwrRows.length, 1, 'LWR_prev is inserted once')
-  assert.ok(ids(result.messages).includes('u-history'))
-  assert.ok(ids(result.messages).includes('a-current'), 'current-tenure message stays')
-  assert.ok(ids(result.messages).includes('a-uncaptured'), 'uncaptured physical message stays')
-  assert.ok(!ids(result.messages).includes('a-old'), 'earlier assistant message is stripped')
-  assert.ok(!ids(result.messages).includes('t-old'), 'earlier tool message is stripped')
-  const currentIndex = ids(result.messages).indexOf('a-current')
-  assert.equal(ids(result.messages)[currentIndex - 1], 'lwr-prev-inc-2')
+  assert.equal(lwrRows.length, 0, 'no synthetic LWR_prev is inserted')
+  assert.deepEqual(ids(result.messages), ['u-history', 'a-current', 'a-uncaptured'])
 })
 
-test('WHAT[work-034] post-S3 projection strips all S3-and-earlier context and injects no LWR_prev', () => {
+test('WHAT[work-034] post-S3 projection strips all S3-and-earlier context and injects no synthetic record', () => {
   // The delivered Plan work carries no active tenure. Its isolation is keyed on
   // the delivered retirement frontier: tenureForPostS3 sets OpeningCursor to
-  // frontier + 1 and PreviousRange to null (no predecessor record). So every
-  // assistant/tool exchange observed at-or-before the frontier is stripped, the
-  // historical user inputs survive, and — unlike a relay successor — no
-  // LWR_prev is injected.
+  // frontier + 1. Every assistant/tool exchange observed at-or-before the
+  // frontier is stripped, the historical user inputs survive, and no synthetic
+  // record is injected.
   const deliveredFrontier = 40n
   const rawMessages = [
     userText('u-history', 'Original user request'),
@@ -460,15 +400,11 @@ test('WHAT[work-034] post-S3 projection strips all S3-and-earlier context and in
     incumbencyId: 'post-s3',
     stage: 'S3',
     openingCursor: deliveredFrontier + 1n,
-    previousRange: null,
     isFreshHandover: false,
   }
   const result = assemble(
     rawMessages,
     tenure,
-    () => {
-      throw new Error('post-S3 must not materialize an LWR_prev')
-    },
     cursors({ 'a-s1': 5n, 't-s1': 8n, 'a-s2': 20n, 'a-s3': 38n, 'u-command': 41n, 'a-post': 42n }),
   )
   const kept = ids(result.messages)
@@ -483,4 +419,129 @@ test('WHAT[work-034] post-S3 projection strips all S3-and-earlier context and in
   for (const prior of ['a-s1', 't-s1', 'a-s2', 'a-s3']) {
     assert.ok(!kept.includes(prior), `${prior} (S3-and-earlier) must be stripped`)
   }
+})
+
+test('WHAT[work-034] a relaying tenure declaring view: { extra } commits ViewCheckpointCommitted and delivers the declared view to the successor request', async () => {
+  clearAll()
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const commonDir = journalSurface.JournalSurface_initializeStateRoot(directory)
+    const planRoot = join(commonDir, 'wanxiangshu')
+    const sessionID = 'ses-plan-view-handover-034'
+    await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root-034')
+
+    const userRoot = {
+      info: { id: 'user-plan-root-034', role: 'user', sessionID, agent: 'plan', time: { created: 1 } },
+      parts: [{ id: 'part-034-u1', type: 'text', text: 'Plan the tenure handover.' }],
+    }
+    const asstRoot = {
+      info: {
+        id: 'asst-plan-root-034',
+        sessionID,
+        parentID: 'user-plan-root-034',
+        role: 'assistant',
+        agent: 'plan',
+        providerID: 'provider',
+        modelID: 'plan-model',
+        time: { created: 2 },
+      },
+      parts: [],
+    }
+    runtime.pushHostMessage(sessionID, userRoot)
+    runtime.pushHostMessage(sessionID, asstRoot)
+    await hooks['chat.message']({ sessionID, agent: 'plan' }, { message: userRoot.info, parts: userRoot.parts })
+    await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: [structuredClone(userRoot)] })
+
+    const declaredExtra = 'HANDOVER_VIEW_034: keep anchor #1 and verify S1 trade-offs.'
+    const viewToolMsg = {
+      info: { id: 'run-034-view', role: 'assistant', sessionID, parentID: 'user-plan-root-034', time: { created: 2 } },
+      parts: [
+        {
+          id: 'part-034-view',
+          type: 'tool',
+          tool: 'todowrite-for-plan',
+          callID: 'call-034-view',
+          state: {
+            status: 'completed',
+            input: {
+              program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
+              view: { prefixUntil: 1, extra: [declaredExtra] },
+            },
+            output: 'ok',
+          },
+        },
+      ],
+    }
+    runtime.pushHostMessage(sessionID, viewToolMsg)
+    await hooks.tool['todowrite-for-plan'].execute(
+      {
+        program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
+        view: { prefixUntil: 1, extra: [declaredExtra] },
+      },
+      { sessionID, agent: 'plan', callID: 'call-034-view', messageID: 'run-034-view', providerRunID: 'run-034-view' },
+    )
+    await hooks.event({
+      event: {
+        type: 'message.part.updated',
+        properties: { sessionID, part: viewToolMsg.parts[0] },
+      },
+    })
+
+    assert.deepEqual(
+      journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
+      [{ sessionId: sessionID, checkpoints: [{ callId: 'call-034-view' }] }],
+      'relaying tenure view declaration commits a durable ViewCheckpointCommitted',
+    )
+
+    const relayMsg = {
+      info: { id: 'run-034-deliver', role: 'assistant', sessionID, parentID: 'user-plan-root-034', time: { created: 3 } },
+      parts: [
+        {
+          id: 'part-034-deliver',
+          type: 'tool',
+          tool: 'deliver',
+          callID: 'call-034-deliver',
+          state: { status: 'completed', input: {}, output: 'relayed' },
+        },
+      ],
+    }
+    runtime.pushHostMessage(sessionID, relayMsg)
+    await hooks.tool.deliver.execute(
+      {},
+      { sessionID, agent: 'plan', callID: 'call-034-deliver', messageID: 'run-034-deliver', providerRunID: 'run-034-deliver' },
+    )
+
+    const followup = {
+      info: { id: 'user-034-followup', role: 'user', sessionID, agent: 'plan', time: { created: 4 } },
+      parts: [{ id: 'part-034-u2', type: 'text', text: 'Proceed in the new tenure.' }],
+    }
+    const asstFollowup = {
+      info: {
+        id: 'asst-034-followup',
+        sessionID,
+        parentID: 'user-034-followup',
+        role: 'assistant',
+        agent: 'plan',
+        providerID: 'provider',
+        modelID: 'plan-model',
+        time: { created: 5 },
+      },
+      parts: [],
+    }
+    runtime.pushHostMessage(sessionID, followup)
+    runtime.pushHostMessage(sessionID, asstFollowup)
+    await hooks['chat.message']({ sessionID, agent: 'plan' }, { message: followup.info, parts: followup.parts })
+    const successorOut = {
+      messages: [structuredClone(userRoot), structuredClone(viewToolMsg), structuredClone(relayMsg), structuredClone(followup)],
+    }
+    await hooks['experimental.chat.messages.transform']({ sessionID }, successorOut)
+
+    assert.ok(
+      !successorOut.messages.some((m) => String(m?.info?.id ?? '').startsWith('lwr-prev-')),
+      'no lwr-prev-* message is injected for the successor tenure',
+    )
+    assert.ok(
+      JSON.stringify(successorOut.messages).includes(declaredExtra),
+      'successor request carries the predecessor declared view.extra text',
+    )
+  })
 })

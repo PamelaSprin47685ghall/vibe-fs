@@ -70,9 +70,9 @@ Coverage 出生门：若待覆盖区间的 Next ≤ Prev 或 NextCursor 无法�
 
 Observation 历史是诊断 tip 与 Blog frame 的不可拆心配对视图：前向 zip（tipᵢ ↔ frameᵢ），剩余侧 unpaired 追加；tip 锚定视图丢弃无 tip 的 frame，严禁发明假 tip，严禁维护平行独立的 tips 与 frames 数组作为权威历史。这里的 tip 指一次提交的三字段组（tipName 与 opinion、advice）；其身份为 tipName 原串，同名判定按 normalize 后比较。
 
-## [016] 历史压缩协同裁剪，不创造新 occurrence
+## [016] 配对观察历史可见性（Blogger squash 协同裁剪已随 [context-compression-031] 退役）
 
-执行 squash 压缩（`BlogObservationsSquashed`）时，将最老 K 个 frame 折叠为一个 Squash frame，并同步按 1:1 比例共同裁剪最老 `min(K, tips)` 条 RecentTips。squash frame 本身不新增 tip、不触发新的 Main 交付，仅作为历史表示形式的变换，严禁借历史压缩伪造新的诊断事件。无处置正文 ref 的旧 occurrence 交付时按 identity-only 处置、不触发新 Full。
+已提交的 `BlogObservationCommitted` 形成 `RecentTips` 与 `Entry` frame 的配对历史视图（`previous_enforcer_tip` 与 `historic_frame` 成对投影给 Blogger），无处置正文 ref 的旧 occurrence 交付时按 identity-only 处置、不触发新 Full。旧 `BlogObservationsSquashed` 协同裁剪已随 [context-compression-031] ANCHOR 视图声明退役。
 
 ## [017] 无效 cycle 的有界协议修复与 AABB 状态恢复
 

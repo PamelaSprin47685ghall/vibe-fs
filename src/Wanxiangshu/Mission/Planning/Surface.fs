@@ -16,22 +16,13 @@ module PlanningSurface =
     let assembleTenureMessages
         (messages: obj)
         (tenureObj: obj)
-        (materializePrev: obj -> string)
         (messageCursors: obj)
         : obj =
-        let previousRange =
-            if isNull tenureObj?previousRange then
-                None
-            else
-                let range = unbox<obj array> tenureObj?previousRange
-                Some(sequenceOfJs range.[0], sequenceOfJs range.[1])
-
         let tenure =
             { WorkId = unbox<string> tenureObj?workId
               IncumbencyId = unbox<string> tenureObj?incumbencyId
               Stage = unbox<string> tenureObj?stage
               OpeningCursor = sequenceOfJs tenureObj?openingCursor
-              PreviousRange = previousRange
               IsFreshHandover = unbox<bool> tenureObj?isFreshHandover }
 
         let cursors =
@@ -39,15 +30,6 @@ module PlanningSurface =
             |> unbox<obj array array>
             |> Array.map (fun entry -> unbox<string> entry.[0], sequenceOfJs entry.[1])
             |> Map.ofArray
-
-        let previousRecord =
-            previousRange
-            |> Option.map (fun (startCursor, endCursor) ->
-                materializePrev (
-                    box
-                        {| start = startCursor
-                           ``end`` = endCursor |}
-                ))
 
         let assembled =
             TenureIsolation.assemble
@@ -63,7 +45,6 @@ module PlanningSurface =
                            Raw = raw })))
                 tenure
                 cursors
-                previousRecord
 
         box
             {| messages = assembled.Messages |> List.toArray

@@ -138,6 +138,13 @@ module JsToolsData =
         with _ ->
             Error JsFailure.InvalidReturnValue
 
+    /// The raw JS value a program handed over through `js.deliver(value)`.
+    let parseDeliveredValue (json: string) : obj =
+        try
+            (JS.JSON.parse json)?value
+        with _ ->
+            null
+
     /// One decode for both endings: a delivered value is the program's result.
     let parseOutcome (json: string) : Result<LlmFacing.Data.Value, JsFailure> =
         if isDelivered json then parseDelivered json else parse json
@@ -515,8 +522,14 @@ module JsToolWorkflow =
                 | Choice1Of2 json ->
                     // The program finished first (Done, or a failure/timeout
                     // sentinel). Decode it like the plain path.
-                    JsSandbox.classifyResult json outputBoundBytes
-                    |> Result.bind JsToolsData.parseOutcome
+                    let parsed =
+                        JsSandbox.classifyResult json outputBoundBytes
+                        |> Result.bind JsToolsData.parseOutcome
+
+                    if JsToolsData.isDelivered json && Result.isOk parsed then
+                        JsDeliveredValues.record sessionId (JsToolsData.parseDeliveredValue json)
+
+                    parsed
                 | Choice2Of2 _ ->
                     // Park won: the program suspended at `await js.park`.
                     Ok(LlmFacing.Data.Value.String "{\"__jsParked\":true}")
@@ -682,7 +695,15 @@ module JsToolWorkflow =
                         return
                             match decoded with
                             | Error failure -> Error failure
-                            | Ok json -> JsToolsData.parseOutcome json
+                            | Ok json ->
+                                let parsed = JsToolsData.parseOutcome json
+
+                                if JsToolsData.isDelivered json && Result.isOk parsed then
+                                    JsDeliveredValues.record
+                                        site.SessionId
+                                        (JsToolsData.parseDeliveredValue json)
+
+                                parsed
                     }
                 | Choice2Of2 _ -> task { return Ok(LlmFacing.Data.Value.String "{\"__jsParked\":true}") }
 

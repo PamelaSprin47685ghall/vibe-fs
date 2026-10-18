@@ -114,8 +114,6 @@ module PrefixSurface =
         | "work-main" -> Some ProviderRequestKind.WorkMain
         | "bloggermain"
         | "blogger-main" -> Some ProviderRequestKind.BloggerMain
-        | "bloggersquash"
-        | "blogger-squash" -> Some ProviderRequestKind.BloggerSquash
         | "interactionrepair"
         | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
         | "strengthreplica"
@@ -125,7 +123,6 @@ module PrefixSurface =
     let requestKindLabels: string array =
         [| ProviderRequestKind.WorkMain
            ProviderRequestKind.BloggerMain
-           ProviderRequestKind.BloggerSquash
            ProviderRequestKind.InteractionRepair
            ProviderRequestKind.StrengthReplica |]
         |> Array.map ProviderRequestKind.label
@@ -144,7 +141,6 @@ module PrefixSurface =
         box
             {| workMain = "work-main"
                bloggerMain = "blogger-main"
-               bloggerSquash = "blogger-squash"
                interactionRepair = "interaction-repair"
                strengthReplica = "strength-replica"
                all = requestKindLabels

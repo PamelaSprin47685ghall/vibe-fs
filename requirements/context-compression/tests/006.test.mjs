@@ -29,16 +29,9 @@ test('WHAT[context-compression-006] role is fixed across retry attempts and cons
   }
 })
 
-test('WHAT[context-compression-006] retry policy includes squash only when BloggerMain fails and frames exist', () => {
-  // BloggerMain failed with frames => next request is BloggerSquash
-  assert.equal(compression.nextBloggerRequest('blogger-main', true), 'blogger-squash')
-
-  // BloggerMain failed without frames => next request is BloggerMain
+test('WHAT[context-compression-006] retry policy retries BloggerMain directly without a squash detour', () => {
+  assert.equal(compression.nextBloggerRequest('blogger-main', true), 'blogger-main')
   assert.equal(compression.nextBloggerRequest('blogger-main', false), 'blogger-main')
-
-  // BloggerSquash failed => always retries as BloggerMain (never infinite squash loops)
-  assert.equal(compression.nextBloggerRequest('blogger-squash', true), 'blogger-main')
-  assert.equal(compression.nextBloggerRequest('blogger-squash', false), 'blogger-main')
 })
 
 test('WHAT[context-compression-006] prefix probe is selected when policy allows and candidate exists', () => {

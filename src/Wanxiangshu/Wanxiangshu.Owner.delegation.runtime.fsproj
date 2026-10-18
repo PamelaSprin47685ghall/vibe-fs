@@ -77,8 +77,6 @@
     <Compile Include="Execution/Delegation/Fork/LifecycleSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Surface.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Surface.fs"/>
-    <Compile Include="Execution/Delegation/HandoffSurface.fsi"/>
-    <Compile Include="Execution/Delegation/HandoffSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/Restart.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Host/Restart.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/JoinSurface.fsi"/>

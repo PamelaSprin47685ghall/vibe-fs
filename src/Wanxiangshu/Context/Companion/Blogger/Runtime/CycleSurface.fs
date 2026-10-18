@@ -25,13 +25,9 @@ module BloggerCycleSurface =
           SelectedFrameDigests = []
           PromptKey = promptKey |> Option.map PromptKey.create }
 
-    let private receipt kind requestId run : BloggerCycleReceipt =
+    let private receipt requestId run : BloggerCycleReceipt =
         { ProviderRun = ProviderRunIdentity.create run
-          Kind =
-            if kind = "squash" then
-                BlogFrameKind.Squash
-            else
-                BlogFrameKind.Entry
+          Kind = BlogFrameKind.Entry
           RequestId = BloggerRequestId.create requestId }
 
     let private view state =
@@ -72,11 +68,10 @@ module BloggerCycleSurface =
                             (BloggerRequestId.create (text (action?requestId)))
                             (SessionId.create (text (action?blogger)))
                             state
-                | "entry"
-                | "squash" ->
+                | "entry" ->
                     match
                         BloggerCycleProjection.recordReceipt
-                            (receipt (text (action?kind)) (text (action?requestId)) (text (action?run)))
+                            (receipt (text (action?requestId)) (text (action?run)))
                             state
                     with
                     | Ok next -> state <- next

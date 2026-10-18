@@ -107,7 +107,7 @@ module HostForkPtySurface =
                 HostForkRuntime(
                     SessionId.create "pty-owner",
                     Unchecked.defaultof<ISessionHostPort>,
-                    (fun _ _ _ -> Task.FromResult None),
+                    (fun _ _ -> Task.FromResult None),
                     CompletionMailboxRuntime.create,
                     NodeTiming.nodeClockPort (),
                     NodeTiming.raceExit,
@@ -187,7 +187,7 @@ module HostForkPtySurface =
                     HostForkRuntime(
                         devopsSessionId,
                         Unchecked.defaultof<ISessionHostPort>,
-                        (fun _ _ _ -> Task.FromResult None),
+                        (fun _ _ -> Task.FromResult None),
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
@@ -209,7 +209,7 @@ module HostForkPtySurface =
                     HostForkRuntime(
                         engineerSessionId,
                         Unchecked.defaultof<ISessionHostPort>,
-                        (fun _ _ _ -> Task.FromResult None),
+                        (fun _ _ -> Task.FromResult None),
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
@@ -257,7 +257,7 @@ module HostForkPtySurface =
                     HostForkRuntime(
                         SessionId.create "manager-session",
                         dummySessions,
-                        (fun _ _ _ -> Task.FromResult None),
+                        (fun _ _ -> Task.FromResult None),
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,

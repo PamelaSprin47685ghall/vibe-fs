@@ -333,14 +333,9 @@ const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 test('WHAT[context-compression-012] COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
   assert.match(prompt.normalInstruction, /# Call the chronicle tool exactly once now/)
   assert.match(prompt.normalInstruction, /exactly once/)
-  assert.match(prompt.squashInstruction, /# Call the chronicle tool exactly once now to rewrite/)
-  assert.match(prompt.squashInstruction, /exactly once/)
   assert.equal(prompt.system, undefined, 'System is owned by PromptResources Blogger Role Law, not CompanionPrompt')
 })
-test('WHAT[context-compression-012] ENFORCER_030_squash_and_normal_require_tip_not_omit_scores', () => {
-  assert.match(prompt.squashInstruction, /tip/)
-  assert.match(prompt.squashInstruction, /output no ordinary assistant prose/i)
-  assert.doesNotMatch(prompt.squashInstruction, /omit all scores/)
+test('WHAT[context-compression-012] ENFORCER_030_normal_requires_tip_not_omit_scores', () => {
   assert.match(prompt.normalInstruction, /tip/)
   assert.doesNotMatch(prompt.normalInstruction, /omit.*scores/i)
 })

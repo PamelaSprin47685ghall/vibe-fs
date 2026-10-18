@@ -88,7 +88,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `obligation-ledger` | 宿主待办由 OpenCode 原生 todowrite 执行；插件不改写工具定义与参数，只按 Host 终态追加压缩 checkpoint，不维护第二份 todo 真相。 |
-| `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，非首任注入一次 LWR_prev。Plan 的编程面、devops 调查、任期隔离、阶段资源、review 与持权交付，以及 Manager/Plan 禁止静默停止、ask 显式用户等待同属本包。 |
+| `work` | Work 生命周期只有一套事件：S1–S3 一段 deliver，S4 两段 deliver；结果只有 Relayed 与 Delivered，评审只有 Promoted 与 Stayed；后继剥除前任 assistant 与 tool，交棒由前任声明的 ANCHOR 视图承担，不注入机器物化的合成记录。Plan 的编程面、devops 调查、任期隔离、阶段资源、review 与持权交付，以及 Manager/Plan 禁止静默停止、ask 显式用户等待同属本包。 |
 
 
 ## 10. Feedback
@@ -175,7 +175,7 @@
 | 48 | institutional-learning（已退役） | 0 | 随 WP-036 整包退役，目录与条款已删除 |
 | 49 | `repository-investigation` | 9 | repository-investigation-001 ~ 009 |
 | 50 | `knowledge-reuse` | 16 | knowledge-reuse-001 ~ 016 |
-| 51 | `repository-programming` | 58 | 原 001 ~ 027 不变；028 起 programPromise/deadline 可重置、029 起 As-Is 逐笔落盘与失败清单形态、030 ~ 036 park/unpark/abandon 全周期、037 ~ 039 Parked 渲染/投影/现场表、040 ~ 044 rm/mv POSIX 与双语四层接线、045 ~ 047 九个文件原语、where 歧义即 park 与组合教学、048 ~ 049 parked source 与 unpark 自由值、050 ~ 052 js.run 宿主循环/多进程代数/wget 断点续传剧本、053 view 声明捕获、054 deliver 显式终值、055 vm 并行边界、056 委托原语 fork/join/fission/dag（全部返回数据信封，dag 节点失败 park）、057 ls 的 ignore 语义与 glob/grep 退役、058 js.run 的交互形态与唯一执行面 |
+| 51 | `repository-programming` | 59 | 原 001 ~ 027 不变；028 起 programPromise/deadline 可重置、029 起 As-Is 逐笔落盘与失败清单形态、030 ~ 036 park/unpark/abandon 全周期、037 ~ 039 Parked 渲染/投影/现场表、040 ~ 044 rm/mv POSIX 与双语四层接线、045 ~ 047 九个文件原语、where 歧义即 park 与组合教学、048 ~ 049 parked source 与 unpark 自由值、050 ~ 052 js.run 宿主循环/多进程代数/wget 断点续传剧本、053 view 声明捕获、054 deliver 显式终值、055 vm 并行边界、056 委托原语 fork/join/fission/dag（全部返回数据信封，dag 节点失败 park）、057 ls 的 ignore 语义与 glob/grep 退役、058 js.run 的交互形态与唯一执行面、059 js.deliver 的终值记录 |
 | 52 | `requirement-grounding` | 12 | requirement-grounding-001 ~ 012 |
 | 53 | `speculative-investigation` | 14 | speculative-investigation-001 ~ 014 |
 | 54 | `epistemic-reasoning` | 0 | 旧001 ~ 036仅保留历史，现行替代关系见 sphinx-v2/SUPERSEDES.md |

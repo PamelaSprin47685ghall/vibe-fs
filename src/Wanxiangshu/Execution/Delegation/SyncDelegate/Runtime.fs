@@ -44,6 +44,7 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation.Outcome
 open Wanxiangshu.OpenCode
+open Wanxiangshu.Repository.Programming.Js
 
 module HostForkProse =
     let forkInstructions (sessionId: SessionId) : ForkChildInstructions =
@@ -107,8 +108,18 @@ module internal SyncDelegateInternals =
         (call: SyncDelegateCall)
         (turn: ReconciledTurn)
         : bool =
-        match CompletedTurnClassifier.partsSessionText turn.Parts with
-        | record when not (System.String.IsNullOrWhiteSpace record) ->
+        let resolved =
+            JsDeliveredValues.tryTakeRendered (SessionId.value turn.SessionId)
+            |> Option.orElseWith (fun () ->
+                let text = CompletedTurnClassifier.partsSessionText turn.Parts
+
+                if System.String.IsNullOrWhiteSpace text then
+                    None
+                else
+                    Some text)
+
+        match resolved with
+        | Some record when not (System.String.IsNullOrWhiteSpace record) ->
             captureResponse call turn
             noteDelegateIfRole call turn.SessionId record
             AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
@@ -135,7 +146,6 @@ type SyncDelegateRuntime
         attached: IAttachedSessionPort,
         onDelegateReady: SessionId -> string -> unit,
         quiescence: ISessionQuiescenceGate,
-        workRecordFor: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
         retryPort: SyncDelegateRetryPort,
         ?toolMapForRole: Role -> Map<string, bool>,
         ?workspaceDirectory: string,
@@ -150,7 +160,6 @@ type SyncDelegateRuntime
     let noteDelegatePrompt = defaultArg onDelegatePrompt (fun _ _ -> ())
     let noteDelegateAnswer = defaultArg onDelegateAnswer (fun _ _ -> ())
     let cleanupDelegateDraft = defaultArg onDelegateCleanup (fun _ -> ())
-    let projectWorkRecord = workRecordFor
 
     let bindContinuationAcceptance (source: ProviderAttemptSource) =
         store.TryPeekCallByDelegate source.SessionId
@@ -330,6 +339,7 @@ type SyncDelegateRuntime
             // per-invocation range; the exclusive end is the same head
             // captured at completion. All coalesced invocations in this
             // call share the same head and thus the same bounded record.
+            JsDeliveredValues.clear (sessionKey call.Delegate)
             let startCursor = xTraceFrontier call.Delegate |> XTraceCursor.sequence
 
             for inv in call.Invocations do
@@ -506,17 +516,6 @@ type SyncDelegateRuntime
 
         popAll ()
 
-    let resolveWorkRecord
-        (turnSessionId: SessionId)
-        (call: SyncDelegateCall)
-        (endCursor: XTraceCursor)
-        (providerRun: ProviderRunIdentity)
-        =
-        match call.Invocations |> List.tryHead |> Option.bind (fun inv -> inv.StartCursor) with
-        | None -> Task.FromResult None
-        | Some startCursor ->
-            projectWorkRecord turnSessionId (XTraceRange.create (XTraceCursor.create startCursor) endCursor) providerRun
-
     let noteDelegateIfRole (call: SyncDelegateCall) turnSessionId record =
         if
             call.Role = SyncDelegateRole.Inspector
@@ -525,42 +524,11 @@ type SyncDelegateRuntime
         then
             noteDelegateAnswer (sessionKey turnSessionId) record
 
-    let finishCompletedCall (turn: ReconciledTurn) (call: SyncDelegateCall) workRecord =
-        match workRecord with
-        | Some record when not (String.IsNullOrWhiteSpace record) ->
-            SyncDelegateInternals.captureResponse call turn
-            noteDelegateIfRole call turn.SessionId record
-            AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
-            true
-        | _ ->
-            // EXEC-031 / EXEC-026: fail closed. A Completed turn
-            // without a bounded WorkRecord is a protocol defect, not
-            // a licence to fall back to the last message (EXEC-028
-            // residual OneShot analog). The session stays reusable.
-            store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
-            true
-
-    /// delegation-031: the completion the child physically produced, independent of
-    /// whether its terminal trace durably committed. Used only when the
-    /// terminal capture itself reports the write was NotCommitted/Unknown: the
-    /// earned completion is delivered from the turn's own parts, never dropped
-    /// and never re-executed.
-    let finishCompletedCallFromTurn (turn: ReconciledTurn) (call: SyncDelegateCall) =
-        match CompletedTurnClassifier.partsSessionText turn.Parts with
-        | record when not (System.String.IsNullOrWhiteSpace record) ->
-            SyncDelegateInternals.captureResponse call turn
-            noteDelegateIfRole call turn.SessionId record
-            AsyncSupport.trySetResult call.Answer (Ok record) |> ignore
-            true
-        | _ ->
-            store.FailCall(call, "EXEC-031: Completed without bounded WorkRecord")
-            true
-
     let handleCompletedCall (turn: ReconciledTurn) (call: SyncDelegateCall) =
         task {
             // Completion marker for ManagerLife. HandleTurn
             // does not use Terminal to build the inspect payload;
-            // the bounded WorkRecord is the invocation's parts range.
+            // the terminal record comes from js.deliver (with turn parts fallback).
             match! XTraceCapture.captureTerminalWithReceipt (Some journal) turn with
             // delegation-031: the terminal trace write is settlement evidence, not
             // the completion itself. WriterUnavailable/WriteUnknown means the
@@ -570,13 +538,12 @@ type SyncDelegateRuntime
             | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriterUnavailable _))
             | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriteUnknown _))
             | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.NoNewWriteReleaseFailed _)) ->
-                return finishCompletedCallFromTurn turn call
+                return SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn
             | Error error ->
                 store.FailCall(call, sprintf "sync delegate terminal trace capture failed: %A" error)
                 return true
-            | Ok receipt ->
-                let! workRecord = resolveWorkRecord turn.SessionId call receipt.CurrentHead turn.ProviderRun
-                return finishCompletedCall turn call workRecord
+            | Ok _ ->
+                return SyncDelegateInternals.settleCompletedFromParts noteDelegateIfRole store call turn
         }
 
     /// Actual acceptance observers bind attempts to the concrete invocation

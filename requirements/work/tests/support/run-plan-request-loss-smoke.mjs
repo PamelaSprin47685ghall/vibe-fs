@@ -299,9 +299,9 @@ const run = async () => {
     // incumbency and opens the successor. The Host then emits a continuation
     // request (request 4) whose transform runs under the NEW tenure: it is the
     // relay successor's first assembled request. It must still carry the
-    // original instruction (U is never stripped) and, because the session now
-    // has opening evidence, a materialized LWR_prev — proving the handover is
-    // not lost or blocked. The successor is also re-anchored (fresh prefix epoch).
+    // original instruction (U is never stripped), with prior assistant/tool
+    // stripped and no synthetic lwr-prev-* row injected. The successor is also
+    // re-anchored (fresh prefix epoch).
     await waitForProviderCount(4)
 
     const relayBody = JSON.stringify(providerRequests[3].body)

@@ -16,7 +16,7 @@ A single authority records confirmed failures and exhaustion. Deduplicate by `(S
 
 Each confirmed failure adds one and, while budget remains, yields an exact typed failure licence. Business-main success records success and resets the count. Budget accounting neither changes roles nor decides provider health; [021] owns target settlement.
 
-Recovery inherits RequestKind from durable ProviderStarted matching `(SessionId, PhysicalUserMessageId)`, including subsequent tool steps; exact ProviderRun authorization is checked separately. Only proven BloggerMain or BloggerSquash may use session association to locate the main owner. Ordinary children retain WorkMain regardless of association.
+Recovery inherits RequestKind from durable ProviderStarted matching `(SessionId, PhysicalUserMessageId)`, including subsequent tool steps; exact ProviderRun authorization is checked separately. Only proven BloggerMain may use session association to locate the main owner. Ordinary children retain WorkMain regardless of association.
 
 For Accepted without ProviderStarted, accepted origin may establish WorkMain or InteractionRepair; Blogger still requires durable start evidence. Text, failure ordinal, role and session association cannot supply a missing kind.
 
@@ -44,7 +44,7 @@ The Host's transport-attempt number neither enters the domain failure count nor 
 
 ## [010] Blogger maintenance retry
 
-A licensed BloggerMain retry uses BloggerSquash first when durable frames exist and policy permits maintenance; without squash material it sends Main directly. Squash success preserves the failure count and continues to Main. Squash failure counts as failure and proceeds only through the next licensed retry.
+A licensed BloggerMain retry sends BloggerMain directly (`BloggerSquash` maintenance loop is retired in favour of ANCHOR view declarations `context-compression-031`). Non-blogger request kinds are rejected by `BloggerRetryPolicy.nextRequest`.
 
 ## [011] Immutable retry plan
 
@@ -68,13 +68,13 @@ StrengthReplica success and failure belong to the speculative branch; neither ad
 
 ## [016] Success accounting follows proven RequestKind
 
-Only successful WorkMain or BloggerMain records SuccessRecorded and clears consecutive failures. BloggerSquash, InteractionRepair and StrengthReplica do not. `finish=tool-calls` is a valid provider-attempt success even while the Host turn continues.
+Only successful WorkMain or BloggerMain records SuccessRecorded and clears consecutive failures. InteractionRepair and StrengthReplica do not. `finish=tool-calls` is a valid provider-attempt success even while the Host turn continues.
 
 Blogger kind requires the current typed request or BloggerCycleReceipt; continuation kind requires AcceptedContinuationIds. Role or terminal text cannot turn maintenance into business-main success.
 
 ## [017] Blogger retry replaces physical ownership
 
-Before retry, close the failed BloggerRequestMaterialized as BloggerRequestAbandoned. Every retry, including Main→Main, Main→Squash and Squash→Main, re-materializes typed context with a fresh agent-free PromptKey. An old key proves no ownership of the retry.
+Before retry, close the failed BloggerRequestMaterialized as BloggerRequestAbandoned. Every Main→Main retry re-materializes typed context with a fresh agent-free PromptKey. An old key proves no ownership of the retry.
 
 ## [018] Wait only for durable producer progress
 

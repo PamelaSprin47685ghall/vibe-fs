@@ -20,9 +20,7 @@ type ContextProjectionChange =
 type ContextFoldRejection =
     | BloggerRequestMaterializedRejected of reason: string
     | BlogObservationCommittedRejected of reason: string
-    | BlogObservationsSquashedRejected of reason: string
     | BlogObservationCommittedFrameRejected of rejection: BlogFoldRejection
-    | BlogObservationsSquashedFrameRejected of rejection: BlogFoldRejection
     | PrefixRebaseCommittedRejected of reason: string
     | ContextReanchoredRejected of reason: string
     | TenureReanchoredRejected of reason: string
@@ -34,8 +32,6 @@ module ContextFoldRejection =
         | ContextFoldRejection.BloggerRequestMaterializedRejected _ -> "BloggerRequestMaterialized"
         | ContextFoldRejection.BlogObservationCommittedRejected _
         | ContextFoldRejection.BlogObservationCommittedFrameRejected _ -> "BlogObservationCommitted"
-        | ContextFoldRejection.BlogObservationsSquashedRejected _
-        | ContextFoldRejection.BlogObservationsSquashedFrameRejected _ -> "BlogObservationsSquashed"
         | ContextFoldRejection.PrefixRebaseCommittedRejected _ -> "PrefixRebaseCommitted"
         | ContextFoldRejection.ContextReanchoredRejected _ -> "ContextReanchored"
         | ContextFoldRejection.TenureReanchoredRejected _ -> "TenureReanchored"
@@ -62,19 +58,15 @@ module ContextFoldRejection =
         | BlogFoldRejection.IngestCursorMismatch ->
             "entry's previous ingest cursor disagrees with the projection (PERSIST-010)"
         | BlogFoldRejection.CoverageRetreated -> "coverage moved backwards within one numbering (CTX-011)"
-        | BlogFoldRejection.CoveredFrameCountOutOfRange(claimed, available) ->
-            sprintf "squash claimed %d of %d available frames (CTX-012)" claimed available
 
     let message (rejection: ContextFoldRejection) : string =
         match rejection with
         | ContextFoldRejection.BloggerRequestMaterializedRejected reason -> reason
         | ContextFoldRejection.BlogObservationCommittedRejected reason -> reason
-        | ContextFoldRejection.BlogObservationsSquashedRejected reason -> reason
         | ContextFoldRejection.PrefixRebaseCommittedRejected reason -> reason
         | ContextFoldRejection.ContextReanchoredRejected reason -> reason
         | ContextFoldRejection.TenureReanchoredRejected reason -> reason
         | ContextFoldRejection.BlogObservationCommittedFrameRejected rejection -> blogFrameMessage rejection
-        | ContextFoldRejection.BlogObservationsSquashedFrameRejected rejection -> blogFrameMessage rejection
 
 module ContextFactFold =
 
@@ -262,44 +254,6 @@ module ContextFactFold =
                         [ ContextProjectionChange.EnforcementSet(sid, enfUpdated)
                           ContextProjectionChange.BloggerCyclesSet(sid, cycleUpdated)
                           ContextProjectionChange.BlogSet(sid, blogUpdated) ])))
-
-        | ContextFactCases.BlogObservationsSquashed payload ->
-            // Blog frames squash + Enforcement tip co-truncate on the same main session
-            // (payload.SessionId — same owner BlogObservationCommitted uses for Enforcement).
-            let sid = payload.SessionId
-
-            let enforcement =
-                enforcementOf sid
-                |> Option.defaultValue EnforcementProjection.empty
-                |> EnforcementProjection.applySquash payload.CoveredFrameCount
-
-            let cycles = bloggerCyclesOf sid |> Option.defaultValue BloggerCycleProjection.empty
-
-            BloggerCycleProjection.recordReceipt
-                { ProviderRun = payload.ProviderRun
-                  Kind = BlogFrameKind.Squash
-                  RequestId = payload.RequestId }
-                cycles
-            |> Result.mapError ContextFoldRejection.BlogObservationsSquashedRejected
-            |> Result.bind (fun cycleUpdated ->
-                blogOf sid
-                |> Option.defaultValue BlogProjection.empty
-                |> BlogProjection.applySquash
-                    payload.PreviousFrameEpochId
-                    payload.NextFrameEpochId
-                    payload.CoveredFrameCount
-                    { Kind = BlogFrameKind.Squash
-                      Digest = payload.TextDigest
-                      TextRef = payload.TextRef
-                      CoveredFromSequence = 0L
-                      CoveredThroughSequence = 0L
-                      // The collapse derives its own claim from the frames it replaces.
-                      CutoffExclusive = 0 }
-                |> Result.mapError ContextFoldRejection.BlogObservationsSquashedFrameRejected
-                |> Result.map (fun blogUpdated ->
-                    [ ContextProjectionChange.EnforcementSet(sid, enforcement)
-                      ContextProjectionChange.BloggerCyclesSet(sid, cycleUpdated)
-                      ContextProjectionChange.BlogSet(sid, blogUpdated) ]))
 
         | ContextFactCases.PrefixRebaseCommitted payload ->
             let current =

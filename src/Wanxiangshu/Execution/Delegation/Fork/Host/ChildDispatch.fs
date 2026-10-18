@@ -162,8 +162,7 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
-        (xTraceHead: SessionId -> XTraceCursor)
+        (childWorkRecordForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
         (onRunStarted: SessionId -> Role -> unit)
@@ -200,7 +199,6 @@ module HostForkChildDispatch =
                         parentId
                         sessions
                         childWorkRecordForRun
-                        xTraceHead
                         trackOwnedWork
                         agentId
                         childId
@@ -224,8 +222,7 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
-        (xTraceHead: SessionId -> XTraceCursor)
+        (childWorkRecordForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
         (sendChildPrompt:
@@ -258,7 +255,6 @@ module HostForkChildDispatch =
                         parentId
                         sessions
                         childWorkRecordForRun
-                        xTraceHead
                         trackOwnedWork
                         runtime
                         onRunStarted
@@ -285,8 +281,7 @@ module HostForkChildDispatch =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
-        (xTraceHead: SessionId -> XTraceCursor)
+        (childWorkRecordForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
         (sendChildPrompt:
@@ -328,7 +323,6 @@ module HostForkChildDispatch =
                         parentId
                         sessions
                         childWorkRecordForRun
-                        xTraceHead
                         trackOwnedWork
                         runtime
                         sendChildPrompt

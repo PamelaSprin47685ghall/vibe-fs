@@ -24,12 +24,7 @@ module BlogFrameSurface =
         if isNullish value then 0L else int64 (text value)
 
     let private frameOfJs (value: obj) : BlogFrame =
-        let kind =
-            match text value?kind with
-            | "Squash" -> BlogFrameKind.Squash
-            | _ -> BlogFrameKind.Entry
-
-        { Kind = kind
+        { Kind = BlogFrameKind.Entry
           Digest = BlobDigest.create (text value?digest)
           TextRef = BlobRef.create (text value?ref)
           CoveredFromSequence = int64Value value?coveredFrom
@@ -41,7 +36,6 @@ module BlogFrameSurface =
             {| kind =
                 match frame.Kind with
                 | BlogFrameKind.Entry -> "Entry"
-                | BlogFrameKind.Squash -> "Squash"
                digest = BlobDigest.value frame.Digest
                ref = BlobRef.value frame.TextRef
                coveredFrom = int frame.CoveredFromSequence
@@ -87,7 +81,6 @@ module BlogFrameSurface =
         | BlogFoldRejection.IngestCursorNotAdvanced -> "IngestCursorNotAdvanced"
         | BlogFoldRejection.IngestCursorMismatch -> "IngestCursorMismatch"
         | BlogFoldRejection.CoverageRetreated -> "CoverageRetreated"
-        | BlogFoldRejection.CoveredFrameCountOutOfRange _ -> "CoveredFrameCountOutOfRange"
 
     let private resultToJs (ok: 'a -> obj) (result: Result<'a, BlogFoldRejection>) : obj =
         match result with
@@ -117,16 +110,6 @@ module BlogFrameSurface =
             (stateOfJs state)
         |> resultToJs stateToJs
 
-    /// Apply one atomic BlogObservationsSquashed projection line.
-    let applySquash (request: obj) (state: obj) : obj =
-        BlogProjection.applySquash
-            (FrameEpochId.create (int64Value request?previousEpoch))
-            (FrameEpochId.create (int64Value request?nextEpoch))
-            (intValue request?count)
-            (frameOfJs request?frame)
-            (stateOfJs state)
-        |> resultToJs stateToJs
-
     /// Host compaction containment: retire PrefixCoverage while retaining frames
     /// and RecordCoverage.
     let applyReanchor (state: obj) : obj =
@@ -147,7 +130,7 @@ module BlogFrameSurface =
         |> List.map (fun frame ->
             match frame.Kind with
             | BlogFrameKind.Entry -> "Entry"
-            | BlogFrameKind.Squash -> "Squash")
+        )
         |> List.toArray
 
     let coverableFrameKinds (state: obj) : string array =
@@ -156,7 +139,7 @@ module BlogFrameSurface =
         |> List.map (fun frame ->
             match frame.Kind with
             | BlogFrameKind.Entry -> "Entry"
-            | BlogFrameKind.Squash -> "Squash")
+        )
         |> List.toArray
 
     let coverage (state: obj) : obj =
@@ -170,6 +153,3 @@ module BlogFrameSurface =
 
     let hasCoverage (state: obj) : bool =
         stateOfJs state |> BlogProjection.hasCoverage
-
-    let squashWidth (state: obj) : int =
-        stateOfJs state |> BlogProjection.squashWidth

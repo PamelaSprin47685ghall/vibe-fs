@@ -26,6 +26,41 @@ test('WHAT[delegation-024] pre-join resume preserves both public join WorkRecord
   })
 })
 
+test('WHAT[delegation-024] child completion record comes from delivered value and an undelivered child reports status undelivered', async () => {
+  const owner = 'delivered-and-undelivered-join'
+  await withForkRuntime(owner, async runtime => {
+    const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'DELIVER-CHARGE')
+    await forkTool.awaitPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+    assert.match(await first, /Ada/)
+    const childSession = forkTool.child(runtime)
+    forkTool.recordDeliveredValue(childSession, { summary: 'DELIVERED-RECORD', files: 2 })
+    assert.equal(await forkTool.settle(runtime, owner, 'RAW-PROSE-IGNORED', 'provider-delivered'), true)
+
+    const deliveredReceipt = await forkTool.executeJoinReceipt(runtime, owner)
+    assert.equal(deliveredReceipt.ok, true)
+    assert.equal(deliveredReceipt.records.length, 1)
+    assert.equal(deliveredReceipt.records[0].name, 'Ada')
+    assert.equal(deliveredReceipt.records[0].status, 'completed')
+    assert.match(deliveredReceipt.records[0].workRecord, /summary = "DELIVERED-RECORD"/)
+    assert.match(deliveredReceipt.records[0].workRecord, /files = 2/)
+    assert.doesNotMatch(deliveredReceipt.records[0].workRecord, /RAW-PROSE-IGNORED/)
+
+    const second = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'UNDELIVERED-CHARGE')
+    await forkTool.awaitPromptCount(runtime, 2)
+    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
+    assert.match(await second, /Ada/)
+    assert.equal(await forkTool.settleUndelivered(runtime, owner, 'PLAIN-RETURN-NO-DELIVER', 'provider-undelivered'), true)
+
+    const undeliveredReceipt = await forkTool.executeJoinReceipt(runtime, owner)
+    assert.equal(undeliveredReceipt.ok, true)
+    assert.equal(undeliveredReceipt.records.length, 1)
+    assert.equal(undeliveredReceipt.records[0].name, 'Ada')
+    assert.equal(undeliveredReceipt.records[0].status, 'undelivered')
+    assert.equal(undeliveredReceipt.records[0].workRecord, '')
+  })
+})
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { mkdtempSync } = await import("node:fs");
@@ -117,16 +152,6 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
   } finally {
     forkTool.disposeRuntime(runtime)
   }
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const handoff = await import("../../../dist/Execution/Delegation/HandoffSurface.js");
-
-test('WHAT[delegation-024] bounded child result never widens to an earlier invocation', () => {
-  assert.deepEqual(handoff.childRange(31, 44), { start: 31, end: 44 })
 })
 }
 

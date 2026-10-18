@@ -292,8 +292,6 @@ Foundation/SyntheticToml.fsi
 Foundation/SyntheticToml.fs
 Foundation/LlmFacing.fsi
 Foundation/LlmFacing.fs
-Execution/Delegation/Handoff.fsi
-Execution/Delegation/Handoff.fs
 Foundation/SyntheticTomlSurface.fsi
 Foundation/SyntheticTomlSurface.fs
 Repository/Investigation/WarmStart/Prompt.fsi
@@ -712,6 +710,8 @@ Process/JsRunLoop.fsi
 Process/JsRunLoop.fs
 Repository/Programming/Js/TransactionStore.fsi
 Repository/Programming/Js/TransactionStore.fs
+Repository/Programming/Js/DeliveredValues.fsi
+Repository/Programming/Js/DeliveredValues.fs
 Repository/Programming/Js/OpenCode/ParkedSites.fsi
 Repository/Programming/Js/OpenCode/ParkedSites.fs
 Repository/Programming/Js/Anchor/AnchorModel.fsi
@@ -760,8 +760,6 @@ Execution/Delegation/PtyPort.fsi
 Execution/Delegation/PtyPort.fs
 Execution/Delegation/Fork/Surface.fsi
 Execution/Delegation/Fork/Surface.fs
-Execution/Delegation/HandoffSurface.fsi
-Execution/Delegation/HandoffSurface.fs
 Resources/PromptCatalog.fsi
 Resources/PromptCatalog.fs
 Resources/PromptResources.fsi

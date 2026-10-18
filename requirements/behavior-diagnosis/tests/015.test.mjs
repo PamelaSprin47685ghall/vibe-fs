@@ -101,13 +101,6 @@ const entryFrame = (n) => observation.blogFrame({
   coveredFrom: n - 1,
   coveredThrough: n,
 })
-const squashFrame = (n) => observation.blogFrame({
-  kind: 'Squash',
-  digest: `sha-squash-${n}`,
-  ref: `blob-squash-${n}`,
-  coveredFrom: 0,
-  coveredThrough: 2,
-})
 const cycleRecord = (n, field) => ({
   mainSessionId: 'ses-main',
   bloggerSessionId: 'ses-blog',

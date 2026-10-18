@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Foundation
@@ -20,8 +19,7 @@ module HostForkChildDispatch =
         journal: AgentJournal option ->
         parentId: SessionId ->
         sessions: ISessionHostPort ->
-        childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) ->
-        xTraceHead: (SessionId -> XTraceCursor) ->
+        childWorkRecordForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) ->
         trackOwnedWork: ((unit -> Task) -> unit) ->
         runtime: ForkRuntime ->
         sendChildPrompt:

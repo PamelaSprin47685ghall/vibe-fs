@@ -522,18 +522,13 @@ module ForkToolSurface =
             let sessionPort = ForkSessionPort(abortSession, existingChildIds)
             let sessions = sessionPort :> ISessionHostPort
 
-            let childWorkRecordForRun sessionId range providerRun =
+            let childWorkRecordForRun (sessionId: SessionId) (_providerRun: ProviderRunIdentity) =
                 task {
                     match beforeWorkRecord with
                     | Some observe -> do! observe (SessionId.value sessionId)
                     | None -> ()
 
-                    return!
-                        LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
-                            (Some journal)
-                            sessionId
-                            range
-                            providerRun
+                    return None
                 }
 
             let parentWorkRecord sessionId =
@@ -1019,6 +1014,33 @@ module ForkToolSurface =
         let spec = JoinTool.spec harness.Scope
         spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)
 
+    let executeJoinReceipt (value: obj) (owner: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+            let! receipt = JoinTool.executeReceipt harness.Scope (managerContext harness owner)
+
+            return
+                match receipt with
+                | Error code -> box {| ok = false; code = code |}
+                | Ok records ->
+                    let toObj (record: JoinTool.JoinRecord) =
+                        createObj
+                            [ "name" ==> record.Name
+                              "agentId" ==> record.AgentId
+                              "role" ==> record.Role
+                              "status" ==> record.Status
+                              "workRecord" ==> record.WorkRecord ]
+
+                    createObj
+                        [ "ok" ==> true
+                          "records" ==> (records |> List.map toObj |> Array.ofList)
+                          "byName"
+                          ==> createObj [ for record in records -> record.Name ==> box (toObj record) ] ]
+        }
+
+    let recordDeliveredValue (sessionId: string) (deliveredValue: obj) : unit =
+        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record sessionId deliveredValue
+
     let settle (value: obj) (owner: string) (answer: string) (providerRun: string) : Task<bool> =
         task {
             let harness = unbox<ForkHarness> value
@@ -1030,6 +1052,9 @@ module ForkToolSurface =
                 | None -> return false
                 | Some root ->
                     do! captureTraceText harness.Journal childId providerRun answer
+
+                    if isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value childId)) then
+                        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record (SessionId.value childId) (box answer)
 
                     match harness.Scope.RuntimeFor(managerContext harness owner) with
                     | Error _ -> return false
@@ -1070,6 +1095,54 @@ module ForkToolSurface =
                             | Error _ -> return false
         }
 
+    let settleUndelivered (value: obj) (owner: string) (terminalText: string) (providerRun: string) : Task<bool> =
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match harness.Sessions.LatestChild with
+            | None -> return false
+            | Some childId ->
+                match harness.Sessions.LatestAuthorityRoot childId with
+                | None -> return false
+                | Some root ->
+                    do! captureTraceText harness.Journal childId providerRun terminalText
+                    Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.clear (SessionId.value childId)
+
+                    match harness.Scope.RuntimeFor(managerContext harness owner) with
+                    | Error _ -> return false
+                    | Ok runtime ->
+                        let agentRole =
+                            match
+                                runtime.List()
+                                |> fst
+                                |> List.tryFind (fun a ->
+                                    match runtime.TryChildSession a.AgentId with
+                                    | Some sid -> sid = childId
+                                    | None -> false)
+                            with
+                            | Some a -> a.Role
+                            | None ->
+                                if (SessionId.value childId).Contains("devops") then
+                                    Role.DevOps
+                                else
+                                    Role.Engineer
+
+                        harness.Sessions.Notify(
+                            childId,
+                            TerminalOutcome.Completed
+                                { SessionId = childId
+                                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create root
+                                  ProviderRun = ProviderRunIdentity.create providerRun
+                                  Role = agentRole
+                                  Directory = None
+                                  TerminalText = terminalText
+                                  TurnFormalText = terminalText }
+                        )
+
+                        do! runtime.AwaitObservedWork()
+                        return true
+        }
+
     let prepareTerminalDelivery (value: obj) (owner: string) (answer: string) (providerRun: string) =
         task {
             let harness = unbox<ForkHarness> value
@@ -1085,6 +1158,9 @@ module ForkToolSurface =
                 with
                 | Some binding, Some root ->
                     do! captureTraceText harness.Journal childId providerRun answer
+
+                    if isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value childId)) then
+                        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record (SessionId.value childId) (box answer)
 
                     return
                         fun () ->

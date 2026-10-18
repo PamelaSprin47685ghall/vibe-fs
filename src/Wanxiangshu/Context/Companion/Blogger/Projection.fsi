@@ -6,7 +6,6 @@ open Wanxiangshu.Foundation
 [<RequireQualifiedAccess>]
 type BlogFrameKind =
     | Entry
-    | Squash
 
 type BlogFrame =
     {
@@ -38,7 +37,6 @@ type BlogFoldRejection =
     | IngestCursorNotAdvanced
     | IngestCursorMismatch
     | CoverageRetreated
-    | CoveredFrameCountOutOfRange of claimed: int * available: int
 
 module BlogProjection =
     val empty: BlogProjectionState
@@ -46,7 +44,6 @@ module BlogProjection =
     val frames: state: BlogProjectionState -> BlogFrame list
     val coverableFrames: state: BlogProjectionState -> BlogFrame list
     val framesThroughCutoff: cutoffExclusive: int -> state: BlogProjectionState -> BlogFrame list
-    val squashWidth: state: BlogProjectionState -> int
 
     val applyEntry:
         frameEpoch: FrameEpochId ->
@@ -55,14 +52,6 @@ module BlogProjection =
         previousCutoff: int ->
         nextCutoff: int ->
         nextDigest: string ->
-        frame: BlogFrame ->
-        state: BlogProjectionState ->
-            Result<BlogProjectionState, BlogFoldRejection>
-
-    val applySquash:
-        previousEpoch: FrameEpochId ->
-        nextEpoch: FrameEpochId ->
-        count: int ->
         frame: BlogFrame ->
         state: BlogProjectionState ->
             Result<BlogProjectionState, BlogFoldRejection>

@@ -299,7 +299,7 @@ module JsFragmentRegistry =
           Description =
             "join() — wait for this session's children and return "
             + "{ ok, records: [{ name, agentId, role, status, workRecord }], byName } "
-            + "(status: completed | failed | abandoned) or { ok: false, code }. Membership-scoped: "
+            + "(status: completed | undelivered | failed | abandoned) or { ok: false, code }. Membership-scoped: "
             + "it collects the children this caller created, not an explicit handle list."
           CanonicalExample =
             "class Js extends JsProgram {\n"

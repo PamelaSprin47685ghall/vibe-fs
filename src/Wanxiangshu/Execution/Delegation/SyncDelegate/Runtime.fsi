@@ -47,7 +47,6 @@ type SyncDelegateRuntime =
         attached: IAttachedSessionPort *
         onDelegateReady: (SessionId -> string -> unit) *
         quiescence: ISessionQuiescenceGate *
-        workRecordFor: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
         retryPort: SyncDelegateRetryPort *
         ?toolMapForRole: (Role -> Map<string, bool>) *
         ?workspaceDirectory: string *

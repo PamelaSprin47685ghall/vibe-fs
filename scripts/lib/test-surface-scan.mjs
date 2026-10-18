@@ -327,14 +327,6 @@ export const SURFACE_MANIFEST = [
     kind: 'pure',
   },
   {
-    module: 'Execution/Delegation/HandoffSurface.js',
-    owner: 'delegation',
-    laws: ['DELEG-024'],
-    source: 'src/Wanxiangshu/Execution/Delegation/HandoffSurface.fs',
-    representation: 'json',
-    kind: 'pure',
-  },
-  {
     module: 'Execution/Delegation/Fork/Surface.js',
     owner: 'delegation',
     laws: ['DELEG-019'],

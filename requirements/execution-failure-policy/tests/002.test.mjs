@@ -342,7 +342,7 @@ const providerCases = [
     resolution: 'TerminalizeProviderStarted',
     breaker: 'RecordProviderPermanentFailure',
   },
-  ...['BloggerMain', 'BloggerSquash', 'InteractionRepair'].map((requestKind) => ({
+  ...['BloggerMain', 'InteractionRepair'].map((requestKind) => ({
     label: `${requestKind} remains provider-recoverable`,
     failure: 'ProviderTransient',
     facts: { ...provider, requestKind },

@@ -55,16 +55,6 @@ type ContextFactCases =
            TipTextDigest: BlobDigest option
            EvidenceRef: BlobRef option
            ObservedPrefixEpochId: PrefixEpochId |}
-    | BlogObservationsSquashed of
-        {| SessionId: SessionId
-           BloggerSessionId: SessionId
-           RequestId: BloggerRequestId
-           PreviousFrameEpochId: FrameEpochId
-           NextFrameEpochId: FrameEpochId
-           CoveredFrameCount: int
-           TextRef: BlobRef
-           TextDigest: BlobDigest
-           ProviderRun: ProviderRunIdentity |}
     | BloggerRequestMaterialized of
         {| RequestId: BloggerRequestId
            MainSessionId: SessionId

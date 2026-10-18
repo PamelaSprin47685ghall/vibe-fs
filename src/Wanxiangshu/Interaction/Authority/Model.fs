@@ -578,5 +578,4 @@ module PromptAuthority =
         | ProviderRequestKind.StrengthReplica -> strengthReplicaCapabilities role
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.BloggerMain
-        | ProviderRequestKind.BloggerSquash
         | ProviderRequestKind.InteractionRepair -> OfficeCapability.permissions role

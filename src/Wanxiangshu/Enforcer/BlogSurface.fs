@@ -72,90 +72,51 @@ module BlogSurface =
     /// Live Blogger host owns the process-local flight/episode rendezvous.
     let private hostOf (value: obj) : IBloggerRuntimeHost = unbox<IBloggerRuntimeHost> value
 
-    /// Real Blogger request context from a plain descriptor (Main/Squash shape
+    /// Real Blogger request context from a plain descriptor (Main shape
     /// shared with CompanionRuntimeSurface). Authority still comes from the
     /// durable profile; this only carries the exact live material.
     let private requestOf (value: obj) : BloggerRequestContext =
-        match text value?kind with
-        | "Squash" ->
-            let mainSessionId = SessionId.create (text value?mainSession)
-            let bloggerSessionId = SessionId.create (text value?bloggerSession)
-            let frameEpoch = FrameEpochId.create (int64Value value?frameEpoch)
-            let coveredFrameCount = intValue value?coveredFrameCount
+        let items =
+            match BloggerDeltaItemWire.tryListOfJs value?items with
+            | Ok parsed -> parsed
+            | Error error -> invalidArg "items" error
 
-            let frameDigests =
-                (if isNullish value?digests then
-                     [||]
-                 else
-                     unbox<string array> value?digests)
-                |> Array.toList
-                |> List.map BlobDigest.create
+        let mainSessionId = SessionId.create (text value?mainSession)
+        let bloggerSessionId = SessionId.create (text value?bloggerSession)
+        let toml = text value?toml
+        let previousIngested = int64Value value?previousIngested
+        let nextIngested = int64Value value?nextIngested
+        let deltaDigest = BlobDigest.create (HostDigest.sha256Hex toml)
 
-            let requestId =
-                if System.String.IsNullOrWhiteSpace(text value?requestId) then
-                    BloggerRequestContext.squashRequestId
-                        mainSessionId
-                        bloggerSessionId
-                        frameEpoch
-                        coveredFrameCount
-                        frameDigests
-                else
-                    BloggerRequestId.create (text value?requestId)
+        let requestId =
+            if System.String.IsNullOrWhiteSpace(text value?requestId) then
+                BloggerRequestContext.mainRequestId
+                    mainSessionId
+                    bloggerSessionId
+                    deltaDigest
+                    previousIngested
+                    nextIngested
+            else
+                BloggerRequestId.create (text value?requestId)
 
-            let candidate: BloggerSquashRequestInput =
-                { RequestId = requestId
-                  MainSessionId = mainSessionId
-                  BloggerSessionId = bloggerSessionId
-                  FrameEpochId = frameEpoch
-                  CoveredFrameCount = coveredFrameCount
-                  FrameDigests = frameDigests
-                  ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
+        let candidate: BloggerMainRequestInput =
+            { RequestId = requestId
+              MainSessionId = mainSessionId
+              BloggerSessionId = bloggerSessionId
+              Items = items
+              Toml = toml
+              PreviousIngestedThroughSequence = previousIngested
+              NextIngestedThroughSequence = nextIngested
+              PreviousCoverableTurnCutoffExclusive = intValue value?previousCutoff
+              NextCoverableTurnCutoffExclusive = intValue value?nextCutoff
+              NextCoveredPrefixDigest = text value?nextDigest
+              FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
+              DeltaDigest = deltaDigest
+              ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
 
-            match BloggerRequestMaterial.createSquash candidate with
-            | Ok verified -> BloggerRequestContext.Squash verified
-            | Error rejection -> invalidArg "request" (sprintf "squash request rejected: %A" rejection)
-        | _ ->
-            let items =
-                match BloggerDeltaItemWire.tryListOfJs value?items with
-                | Ok parsed -> parsed
-                | Error error -> invalidArg "items" error
-
-            let mainSessionId = SessionId.create (text value?mainSession)
-            let bloggerSessionId = SessionId.create (text value?bloggerSession)
-            let toml = text value?toml
-            let previousIngested = int64Value value?previousIngested
-            let nextIngested = int64Value value?nextIngested
-            let deltaDigest = BlobDigest.create (HostDigest.sha256Hex toml)
-
-            let requestId =
-                if System.String.IsNullOrWhiteSpace(text value?requestId) then
-                    BloggerRequestContext.mainRequestId
-                        mainSessionId
-                        bloggerSessionId
-                        deltaDigest
-                        previousIngested
-                        nextIngested
-                else
-                    BloggerRequestId.create (text value?requestId)
-
-            let candidate: BloggerMainRequestInput =
-                { RequestId = requestId
-                  MainSessionId = mainSessionId
-                  BloggerSessionId = bloggerSessionId
-                  Items = items
-                  Toml = toml
-                  PreviousIngestedThroughSequence = previousIngested
-                  NextIngestedThroughSequence = nextIngested
-                  PreviousCoverableTurnCutoffExclusive = intValue value?previousCutoff
-                  NextCoverableTurnCutoffExclusive = intValue value?nextCutoff
-                  NextCoveredPrefixDigest = text value?nextDigest
-                  FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
-                  DeltaDigest = deltaDigest
-                  ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
-
-            match BloggerRequestMaterial.createMain candidate with
-            | Ok verified -> BloggerRequestContext.Main verified
-            | Error rejection -> invalidArg "request" (sprintf "main request rejected: %A" rejection)
+        match BloggerRequestMaterial.createMain candidate with
+        | Ok verified -> BloggerRequestContext.Main verified
+        | Error rejection -> invalidArg "request" (sprintf "main request rejected: %A" rejection)
 
     /// Opaque journal capability from JS. `JournalSurface_boot` hands out a
     /// handle whose `Journal` member is internal to this assembly, so the
@@ -206,16 +167,6 @@ module BlogSurface =
                            deltaDigest = BlobDigest.value request.DeltaDigest
                            previousIngested = int request.PreviousIngestedThroughSequence
                            nextIngested = int request.NextIngestedThroughSequence
-                           frameEpoch = int (FrameEpochId.value request.FrameEpochId)
-                           observedEpoch = int (PrefixEpochId.value request.ObservedPrefixEpochId) |}
-            | Ok(BloggerRequestContext.Squash request) ->
-                return
-                    box
-                        {| ok = true
-                           kind = "Squash"
-                           requestId = BloggerRequestId.value request.RequestId
-                           coveredFrameCount = request.CoveredFrameCount
-                           digests = request.FrameDigests |> List.map BlobDigest.value |> List.toArray
                            frameEpoch = int (FrameEpochId.value request.FrameEpochId)
                            observedEpoch = int (PrefixEpochId.value request.ObservedPrefixEpochId) |}
         }
@@ -627,28 +578,14 @@ module BlogSurface =
                EvidenceRef = evidence |> Option.map BlobRef.create
                ObservedPrefixEpochId = PrefixEpochId.create (int64 (text value?observedPrefixEpoch)) |}
 
-    let private observationSquashPayload (value: obj) : ContextFactCases =
-        ContextFactCases.BlogObservationsSquashed
-            {| SessionId = SessionId.create (text value?sessionId)
-               BloggerSessionId = SessionId.create (text value?bloggerSessionId)
-               RequestId = BloggerRequestId.create (text value?requestId)
-               PreviousFrameEpochId = FrameEpochId.create (int64 (text value?previousFrameEpoch))
-               NextFrameEpochId = FrameEpochId.create (int64 (text value?nextFrameEpoch))
-               CoveredFrameCount = int (text value?coveredFrameCount)
-               TextRef = BlobRef.create (text value?textRef)
-               TextDigest = BlobDigest.create (text value?textDigest)
-               ProviderRun = ProviderRunIdentity.create (text value?run) |}
-
     let private factOfJs (value: obj) : Fact =
         match text value?case with
         | "BlogObservationCommitted" -> Fact.Agent(AgentFact.Context(observationPayload value))
-        | "BlogObservationsSquashed" -> Fact.Agent(AgentFact.Context(observationSquashPayload value))
         | other -> failwith $"BlogSurface: unknown fact '{other}'"
 
     let private factCase (value: Fact) : string =
         match value with
         | Fact.Agent(AgentFact.Context(ContextFactCases.BlogObservationCommitted _)) -> "BlogObservationCommitted"
-        | Fact.Agent(AgentFact.Context(ContextFactCases.BlogObservationsSquashed _)) -> "BlogObservationsSquashed"
         | _ -> "Unknown"
 
     /// Serialize the two observation facts with the production FactCodec.
@@ -710,13 +647,10 @@ module BlogSurface =
     let private sha256 (value: string) : string = HostDigest.sha256Hex value
 
     /// Build the complete Blogger projection plan from semantic frame/tip
-    /// inputs. The builder retains pairing, physical-delta ordering and
-    /// squash instruction placement behind the Blog owner boundary.
+    /// inputs. The builder retains pairing and physical-delta ordering
+    /// behind the Blog owner boundary.
     let buildProjectionPlan (value: obj) : obj =
-        let kind =
-            match text value?kind with
-            | "Squash" -> CompanionRequestKind.Squash(int (text value?count))
-            | _ -> CompanionRequestKind.Normal
+        let kind = CompanionRequestKind.Normal
 
         let frameBodies =
             arrayOf value?frameBodies
@@ -752,7 +686,6 @@ module BlogSurface =
                 physicalDelta
                 previousTips
                 (lines value?normalInstructionLines)
-                (lines value?squashInstructionLines)
 
         let messages =
             plan.Messages
@@ -844,10 +777,6 @@ module BlogSurface =
                    ingestedThroughSequence = context.NextIngestedThroughSequence
                    coverableTurnCutoffExclusive = context.NextCoverableTurnCutoffExclusive
                    nextCoveredPrefixDigest = context.NextCoveredPrefixDigest |}
-        | Some(BloggerRequestContext.Squash _) ->
-            box
-                {| ok = false
-                   error = "unexpected squash context" |}
         | None when nextSequence <= previousSequence ->
             box
                 {| ok = false

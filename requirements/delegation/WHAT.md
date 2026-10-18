@@ -96,7 +96,7 @@ attachment 只将指定同伴的历史 WorkRecord 作为只读数据放入首 pr
 
 输入为新 charge（调用方在 charge 中显式提供上下文，SyncDelegate/dag 可直接拼接上游 `workRecord`，且 ANCHOR 编号共享同一进程地址空间；父到子 `DelegationHandoff` delta tracking 已退役）。
 
-同步调用等待自己完成，只返回自身 callee XTrace 范围内的 bounded delta record。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回 WorkRecord；完成结果只经 join/horizon 拉取。
+同步调用等待自己完成，只返回本次调用的终值记录。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回 WorkRecord；完成结果只经 join/horizon 拉取，子→父 `WorkRecord` 来自 `js.deliver` 交付格终值（未交付的子工作在结构化 join 记录中报告 `status = "undelivered"`）。
 
 ## [025] Completion 以因果身份认领
 
@@ -138,7 +138,7 @@ sync invariant 违例由委托 owner 构造 typed incident；先保留已发生 
 
 ## [031] Checkpoint 保留已完成事实
 
-（父到子 `DelegationHandoff` 及其 `HandoffCheckpointSettlement` 已随显式 charge 上下文传递与共享 ANCHOR 地址空间退役。）child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交付 bounded `WorkRecord`，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
+（父到子 `DelegationHandoff` 及其 `HandoffCheckpointSettlement` 已随显式 charge 上下文传递与共享 ANCHOR 地址空间退役。）child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交付终值 `WorkRecord`，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
 
 ## [032] Engineer 与 DevOps 不相互差遣
 

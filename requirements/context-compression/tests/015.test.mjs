@@ -71,13 +71,6 @@ const entryFrame = (n) => blog.frame({
   coveredFrom: n - 1,
   coveredThrough: n,
 })
-const squashFrame = (n) => blog.frame({
-  kind: 'Squash',
-  digest: `sha-entry-${n}`,
-  ref: `blob-squash-${n}`,
-  coveredFrom: 0,
-  coveredThrough: 2,
-})
 const commitEntry = (state, { epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `digest-${cutoffTo}`, n = 1 }) =>
   blog.applyEntry(
     {
@@ -165,15 +158,13 @@ test('WHAT[context-compression-015] CTX_011_coverage_may_not_retreat', () => {
   assert.deepEqual(backwards, { ok: false, error: 'CoverageRetreated' })
 })
 test('WHAT[context-compression-015] PERSIST_010_entry_written_against_a_replaced_frame_epoch_is_refused', () => {
-  // A squash replaced the frame sequence. An entry still carrying the old epoch
-  // describes frames that no longer exist.
+  // An entry carrying a mismatched frame epoch must be refused.
   const first = commitEntry(blog.empty, { from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }).value
-  const squashed = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 1, frame: squashFrame(1) }, first).value
 
-  const stale = commitEntry(squashed, { epoch: 0, from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2 })
+  const stale = commitEntry(first, { epoch: 1, from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2 })
   assert.deepEqual(stale, { ok: false, error: 'StaleFrameEpoch' })
 
-  const current = commitEntry(squashed, { epoch: 1, from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2 })
+  const current = commitEntry(first, { epoch: 0, from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2 })
   assert.equal(current.ok, true, current.ok ? '' : current.error)
 })
 }

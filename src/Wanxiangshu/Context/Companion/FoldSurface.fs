@@ -154,19 +154,6 @@ module ContextFoldSurface =
                        EvidenceRef = optionalBlobRef (payload?EvidenceRef)
                        ObservedPrefixEpochId = prefixEpoch (payload?ObservedPrefixEpochId) |}
             )
-        | "BlogObservationsSquashed" ->
-            AgentFact.Context(
-                ContextFactCases.BlogObservationsSquashed
-                    {| SessionId = sessionId (payload?SessionId)
-                       BloggerSessionId = sessionId (payload?BloggerSessionId)
-                       RequestId = bloggerRequest (payload?RequestId)
-                       PreviousFrameEpochId = frameEpoch (payload?PreviousFrameEpochId)
-                       NextFrameEpochId = frameEpoch (payload?NextFrameEpochId)
-                       CoveredFrameCount = intValue (payload?CoveredFrameCount)
-                       TextRef = blobRef (payload?TextRef)
-                       TextDigest = blobDigest (payload?TextDigest)
-                       ProviderRun = providerRun (payload?ProviderRun) |}
-            )
         | "PrefixRebaseCommitted" ->
             AgentFact.Context(
                 ContextFactCases.PrefixRebaseCommitted

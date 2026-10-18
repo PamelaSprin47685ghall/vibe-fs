@@ -197,8 +197,9 @@ module WorkRecordSurface =
             let! rendered =
                 match optionalText range?ProviderRun with
                 | Some providerRun ->
-                    LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
-                        (Some handle.Journal)
+                    LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshotForRun
+                        handle.Journal
+                        (AgentJournal.snapshot handle.Journal)
                         (SessionId.create sessionId)
                         bounded
                         (ProviderRunIdentity.create providerRun)

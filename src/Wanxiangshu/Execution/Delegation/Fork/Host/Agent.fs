@@ -333,7 +333,6 @@ module HostForkAgent =
                         runtime.ParentId
                         runtime.Sessions
                         runtime.ChildWorkRecordOfRun
-                        runtime.XTraceHead
                         runtime.TrackOwnedWork
                         runtime.Runtime
                         runtime.SendChildPrompt
@@ -437,7 +436,6 @@ module HostForkAgent =
                         runtime.ParentId
                         runtime.Sessions
                         runtime.ChildWorkRecordOfRun
-                        runtime.XTraceHead
                         runtime.TrackOwnedWork
                         runtime.Runtime
                         runtime.SendChildPrompt

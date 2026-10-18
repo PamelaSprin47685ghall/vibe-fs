@@ -7,7 +7,7 @@ test('WHAT[capability-enforcement-003] request projections retain their kind and
   for (const [role, kind] of [
     ['engineer', 'work-main'], ['devops', 'work-main'], ['manager', 'work-main'],
     ['engineer', 'interaction-repair'], ['engineer', 'strength-replica'],
-    ['devops', 'strength-replica'], ['blogger', 'blogger-main'], ['blogger', 'blogger-squash'],
+    ['devops', 'strength-replica'], ['blogger', 'blogger-main'],
   ]) {
     const planned = plan({ role, kind })
     assert.equal(planned.ok, true, planned.error)

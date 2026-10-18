@@ -565,7 +565,7 @@ module ToolRegistry =
         (jsLifecyclePersistence: IJsLifecyclePersistence option)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
         (childWorkRecordForRun:
-            (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) option)
+            (SessionId -> ProviderRunIdentity -> Task<string option>) option)
         (userNotify: (string -> string -> unit) option)
         =
         let factory = ToolHostCodec.factory toolModule
@@ -799,6 +799,9 @@ module ToolRegistry =
 
         let executeJsPlanTool (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
             task {
+                if not (isNull (args.Raw?view)) then
+                    Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId (args.Raw?view)
+
                 let program = args.OptionalText "program"
 
                 let unpark = if isNull (args.Raw?unpark) then null else args.Raw?unpark
@@ -1201,6 +1204,15 @@ module ToolRegistry =
             let planAbandonSchema =
                 ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
+            // ANCHOR handover view (context-compression [031]): a retiring
+            // tenure declares what the successor request must keep.
+            let planViewSchema =
+                ToolHostCodec.objectSchemaOf
+                    [ "prefixUntil", ToolHostCodec.optionalNumberSchema factory
+                      "extra",
+                      ToolHostCodec.arraySchemaOf (ToolHostCodec.anySchema factory) (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ())) factory ]
+                    factory
+
             [ { Name = "todowrite-for-plan"
                 Description =
                   JsCanonicalDescription.renderPlan
@@ -1212,7 +1224,8 @@ module ToolRegistry =
                         (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
                         factory
                     "unpark", planUnparkSchema
-                    "abandon", planAbandonSchema ]
+                    "abandon", planAbandonSchema
+                    "view", planViewSchema ]
                 Admission = planningAdmission
                 Execute = fun args ctx -> executeJsPlanTool args ctx }
               { Name = "devops"

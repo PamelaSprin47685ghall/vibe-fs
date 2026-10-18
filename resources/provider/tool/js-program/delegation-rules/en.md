@@ -23,7 +23,7 @@ const { records, byName } = await js.join();
 ```
 
 - Result: `{ ok: true, records: [{ name, agentId, role, status, workRecord }], byName: { [name]: record } }`.
-- `status` is `completed` | `failed` | `abandoned`; `workRecord` is the child's terminal record (may be empty).
+- `status` is `completed` | `undelivered` | `failed` | `abandoned`; `workRecord` is the child's terminal record delivered via `js.deliver` (empty when `undelivered`, `failed`, or `abandoned`).
 - Membership-scoped: it collects the children this session created. Refusal codes: `context-unavailable`, `not-ready`, `nothing-to-join`, `join-in-progress`, `interrupted`, `abandoned`.
 
 ## fission

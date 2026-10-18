@@ -156,7 +156,6 @@ module JournalPayloadClosure =
                 @ (p.TipTextRef |> Option.toList |> List.choose payloadRefOfBlobRef)
                 @ (p.TipTextDigest |> Option.toList |> List.choose payloadRefOfBlobDigest)
                 @ (p.EvidenceRef |> Option.toList |> List.choose payloadRefOfBlobRef)
-            | Fact.Agent(AgentFact.Context(ContextFactCases.BlogObservationsSquashed p)) -> pair p.TextRef p.TextDigest
             | Fact.Agent(AgentFact.Context(ContextFactCases.BloggerRequestMaterialized p)) ->
                 pair p.ContextRef p.ContextDigest
                 @ (p.SelectedFrameDigests |> List.choose payloadRefOfBlobDigest)

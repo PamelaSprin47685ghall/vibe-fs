@@ -256,19 +256,18 @@ test('WHAT[semantic-trace-002] later parts and reanchor copies cannot move a ret
     [opening, retired, answer, followup],
     {
       workId: 'trace-tenure', incumbencyId: 'inc-current', stage: 'S2',
-      openingCursor: 4n, previousRange: [0n, 4n], isFreshHandover: false,
+      openingCursor: 4n, isFreshHandover: false,
     },
-    () => 'PREVIOUS_WORK_RECORD',
     trace.hostMessageFirstCursors(projection),
   )
   assert.deepEqual(
     result.messages.map((message) => message.info.id),
-    ['user-opening', 'lwr-prev-inc-current', 'current-answer', 'user-followup'],
+    ['user-opening', 'current-answer', 'user-followup'],
   )
-  assert.equal(result.messages[2], answer)
-  assert.equal(result.messages[3], followup)
+  assert.equal(result.messages[1], answer)
+  assert.equal(result.messages[2], followup)
   assert.deepEqual(result.messages.flatMap((message) => message.parts.map((part) => part.text)), [
-    'Original requirement', 'PREVIOUS_WORK_RECORD', 'CURRENT_ANSWER', 'CURRENT_FOLLOWUP',
+    'Original requirement', 'CURRENT_ANSWER', 'CURRENT_FOLLOWUP',
   ])
 })
 }

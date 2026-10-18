@@ -4,7 +4,7 @@ open System.Threading.Tasks
 
 module PlanningSurface =
     val assembleTenureMessages:
-        messages: obj -> tenureObj: obj -> materializePrev: (obj -> string) -> messageCursors: obj -> obj
+        messages: obj -> tenureObj: obj -> messageCursors: obj -> obj
 
     val validateWorkId: workId: string -> obj
     val canonicalWorkKey: workId: string -> obj

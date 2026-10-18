@@ -109,26 +109,6 @@ const entryFact = ({ epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `d-${cu
     run,
   )
 
-const squashFact = ({ previousEpoch, nextEpoch, count, n = 1, run = `msg_s${n}`, textDigest }) =>
-  next(
-    {
-      family: 'Context',
-      case: 'BlogObservationsSquashed',
-      payload: {
-        SessionId: SESSION,
-        BloggerSessionId: BLOGGER,
-        RequestId: `req-s${n}`,
-        PreviousFrameEpochId: previousEpoch,
-        NextFrameEpochId: nextEpoch,
-        CoveredFrameCount: count,
-        TextRef: `blob-s${n}`,
-        TextDigest: textDigest ?? (count === 1 ? 'sha-e1' : `sha-s${n}`),
-        ProviderRun: run,
-      },
-    },
-    run,
-  )
-
 const rebaseFact = ({ previousEpoch, nextEpoch, cutoff, seal = `seal-${cutoff}`, probe = `probe-${cutoff}`, run = `msg_p${cutoff}` }) =>
   next(
     {
@@ -223,28 +203,6 @@ test('WHAT[durable-events-015] HOST_008_duplicate_companion_link_to_a_different_
   assert.deepEqual(contextFold.replay(envelopes), result)
 })
 
-test('WHAT[durable-events-015] PERSIST_010_entry_and_squash_fold_into_the_blog_projection', () => {
-  const session = foldOk([
-    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
-    entryFact({ from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
-    squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1 }),
-  ])
-
-  assert.equal(Number(session.Blog.FrameEpochId), 1)
-  assert.deepEqual(coverageOf(session), { ingestedThroughSequence: 2, cutoff: 2, digest: 'd-2' })
-  assert.equal(session.PrefixEpoch == null, true)
-})
-
-test('WHAT[durable-events-015] PERSIST_010_single_frame_squash_accepts_the_new_terminal_blob_digest', () => {
-  const session = foldOk([
-    entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
-    squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1, textDigest: 'sha-squash-rewritten' }),
-  ])
-
-  assert.equal(Number(session.Blog.FrameEpochId), 1)
-  assert.deepEqual(session.Blog.FrameKinds, ['Squash'])
-})
-
 test('WHAT[durable-events-015] CTX_012_rebase_folds_into_the_prefix_projection_only', () => {
   const session = foldOk([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1 }),
@@ -260,13 +218,12 @@ test('WHAT[durable-events-015] CTX_012_rebase_folds_into_the_prefix_projection_o
 test('WHAT[durable-events-015] PERSIST_010_a_stale_frame_epoch_fails_the_fold_closed', () => {
   const result = contextFold.fold([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
-    squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1 }),
-    entryFact({ epoch: 0, from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
+    entryFact({ epoch: 1, from: 1, to: 2, cutoffFrom: 1, cutoffTo: 2, n: 2 }),
   ])
 
   assert.equal(result.ok, false)
   assert.equal(result.error.Fact, 'BlogObservationCommitted')
-  assert.match(result.error.Reason, /frame epoch 1 is in force but the line was written against 0/)
+  assert.match(result.error.Reason, /frame epoch 0 is in force but the line was written against 1/)
   assert.match(result.error.Reason, /PERSIST-010/)
 })
 
@@ -362,14 +319,13 @@ test('WHAT[durable-events-015] HOST_006_coverage_and_probes_both_recover_after_a
 test('WHAT[durable-events-015] PERSIST_010_context_recovery_facts_survive_NDJSON_and_still_fold', () => {
   const result = contextFold.replay([
     entryFact({ from: 0, to: 1, cutoffFrom: 0, cutoffTo: 1, n: 1 }),
-    squashFact({ previousEpoch: 0, nextEpoch: 1, count: 1 }),
     rebaseFact({ previousEpoch: 0, nextEpoch: 1, cutoff: 1, seal: 'seal-rt' }),
     reanchorFact({ previousEpoch: 1, nextEpoch: 2 }),
   ])
 
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
   const session = result.value.sessions[SESSION]
-  assert.equal(Number(session.Blog.FrameEpochId), 1)
+  assert.equal(Number(session.Blog.FrameEpochId), 0)
   assert.equal(Number(session.PrefixEpoch.EpochId), 2)
   assert.equal(session.PrefixEpoch.Snapshot == null, true)
   assert.deepEqual(coverageOf(session), { ingestedThroughSequence: 1, cutoff: 0, digest: '' })

@@ -255,3 +255,69 @@ test('WHAT[repository-programming-056] a failed dag node parks and the injected 
     cleanup()
   }
 })
+
+test('WHAT[repository-programming-056] an undelivered child reports status undelivered in join and parks dag on node-undelivered', async () => {
+  const { dir, cleanup } = sandbox()
+  const sessionId = `sess-dagundelivered-${Math.random().toString(36).slice(2, 8)}`
+  try {
+    const host = fakeHost()
+    const undeliveredJoin = async () => {
+      const records = host.pending.splice(0)
+      const mapped = records.map((entry) => ({
+        name: entry.name,
+        agentId: entry.agentId,
+        role: 'engineer',
+        status: entry.name === 'impl' ? 'undelivered' : 'completed',
+        workRecord: entry.name === 'impl' ? '' : `record:${entry.name}`,
+      }))
+      return {
+        ok: true,
+        records: mapped,
+        byName: Object.fromEntries(mapped.map((r) => [r.name, r])),
+      }
+    }
+    installDelegationHost(sessionId, host.fork, undeliveredJoin, host.fission)
+
+    const joinOutcome = await runProgram(
+      dir,
+      `    await this.fork({ charge: "implement it", name: "impl" });
+    return await this.join();`,
+      sessionId,
+    )
+    assert.equal(caseName(joinOutcome), 'Succeeded')
+    const joinDoc = render(joinOutcome)
+    assert.match(joinDoc, /status = "undelivered"/)
+    assert.match(joinDoc, /workRecord = ""/)
+
+    const parked = await runProgram(
+      dir,
+      `    return await this.dag({ nodes: [
+      { id: "spec", charge: "write the interface spec" },
+      { id: "impl", charge: "implement it", deps: ["spec"] },
+    ] });`,
+      sessionId,
+    )
+    assert.equal(caseName(parked), 'Parked')
+    const doc = render(parked)
+    assert.match(doc, /code = "node-undelivered"/)
+    assert.match(doc, /# parked/)
+
+    const resumed = await execute(
+      dir,
+      'Manager',
+      'en',
+      sessionId,
+      { unpark: { handle: parkedHandle(parked), value: { workRecord: 'manual-impl' } } },
+      3000,
+      Date.now() + 60_000,
+      1 << 20,
+      null,
+    )
+    assert.equal(caseName(resumed), 'Succeeded')
+    const resumedDoc = render(resumed)
+    assert.match(resumedDoc, /manual-impl/)
+  } finally {
+    clearDelegationHost(sessionId)
+    cleanup()
+  }
+})

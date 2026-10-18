@@ -11,7 +11,6 @@ module ExecutionFailurePolicy =
         function
         | ProviderRequestKind.WorkMain -> "WorkMain"
         | ProviderRequestKind.BloggerMain -> "BloggerMain"
-        | ProviderRequestKind.BloggerSquash -> "BloggerSquash"
         | ProviderRequestKind.InteractionRepair -> "InteractionRepair"
         | ProviderRequestKind.StrengthReplica -> "StrengthReplica"
 
@@ -30,7 +29,6 @@ module ExecutionFailurePolicy =
         match requestKind with
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.BloggerMain
-        | ProviderRequestKind.BloggerSquash
         | ProviderRequestKind.InteractionRepair -> true
         | ProviderRequestKind.StrengthReplica -> false
 

@@ -16,9 +16,6 @@ module BlogFrameSurface =
     /// carries the frame and the remaining fields are the frozen commit proof.
     val applyEntry: request: obj -> state: obj -> obj
 
-    /// Apply one atomic BlogObservationsSquashed projection line.
-    val applySquash: request: obj -> state: obj -> obj
-
     /// Host compaction containment: retire PrefixCoverage while retaining frames
     /// and RecordCoverage.
     val applyReanchor: state: obj -> obj
@@ -30,4 +27,3 @@ module BlogFrameSurface =
     val coverableFrameKinds: state: obj -> string array
     val coverage: state: obj -> obj
     val hasCoverage: state: obj -> bool
-    val squashWidth: state: obj -> int

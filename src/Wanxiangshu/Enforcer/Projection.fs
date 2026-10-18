@@ -64,32 +64,6 @@ module EnforcementProjection =
                 { ByProviderRun = Map.add record.ProviderRun record state.ByProviderRun
                   RecentTips = keepLast RecentTipLimit (state.RecentTips @ [ tip ]) }
 
-    /// Observation squash half of `BlogObservationsSquashed`.
-    ///
-    /// Co-truncate RecentTips when BlogObservationsSquashed collapses the oldest `count`
-    /// frames. Together with BlogProjection.applySquash this is the Journal substrate
-    /// for rulebook `BlogObservationsSquashed`: work-log frames and tips move as one
-    /// Observation history (see `ObservationProjection.observationsOf`).
-    ///
-    /// Assumption (1:1): each BlogObservationCommitted appends one Entry frame and one tip.
-    /// Squash frames do not add tips. On squash of the oldest `count` frames, drop the
-    /// oldest `min(count, tips.Length)` tips so tip history collapses with the covered
-    /// frame range (ENFORCER observation co-move; imperfect if a prior squash frame is
-    /// among the covered range, but improves residual vs independent tip lifetime).
-    let applySquash (count: int) (state: EnforcementProjectionState) : EnforcementProjectionState =
-        let n = List.length state.RecentTips
-
-        let drop =
-            if count <= 0 then 0
-            elif count < n then count
-            else n
-
-        if drop = 0 then
-            state
-        else
-            { state with
-                RecentTips = List.skip drop state.RecentTips }
-
     let tryFindByProviderRun (run: ProviderRunIdentity) (state: EnforcementProjectionState) =
         Map.tryFind run state.ByProviderRun
 

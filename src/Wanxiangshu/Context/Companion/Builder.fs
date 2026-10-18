@@ -10,7 +10,6 @@ open Wanxiangshu.Participant.Provider.Projection
 [<RequireQualifiedAccess>]
 type CompanionRequestKind =
     | Normal
-    | Squash of frameCount: int
 
 /// One message in the Companion's provider-visible projection.
 type CompanionProjectedMessage =
@@ -27,11 +26,6 @@ type CompanionProjectionPlan =
 /// COMPANION-005 / CTX-012: build provider-visible messages from durable frames.
 [<RequireQualifiedAccess>]
 module CompanionProjectionBuilder =
-
-    let private kindLabel (kind: CompanionRequestKind) =
-        match kind with
-        | CompanionRequestKind.Normal -> "normal"
-        | CompanionRequestKind.Squash _ -> "squash"
 
     /// ENFORCER-071: one low-trust previous tip message.
     /// Domain shape is (TipName, CycleId); Journal maps RecentTips into this.
@@ -61,12 +55,10 @@ module CompanionProjectionBuilder =
         loop tips frames []
 
     /// Normal: paired previous_enforcer_tip + historic_frame units + one user delta.
-    /// Squash: paired tip+frame units over oldest k frames + squash instruction LAST.
-    /// Tips cover normal / squash / restart / recovery / compaction rebuilds because
+    /// Tips cover normal / restart / recovery / compaction rebuilds because
     /// every rebuild path calls this builder with the same RecentTips projection.
     ///
-    /// HOST-010: last user message binds the outbound assistant. For normal that
-    /// is the combined delta message; for squash it is the instruction message.
+    /// HOST-010: last user message binds the outbound assistant (the combined delta message).
     let build
         (sha256: string -> string)
         (bloggerSessionId: SessionId)
@@ -76,12 +68,10 @@ module CompanionProjectionBuilder =
         (physicalDelta: (string * BloggerDeltaItem list) option)
         (previousTips: (string * string) list)
         (normalInstructionLines: string list)
-        (squashInstructionLines: string list)
         : CompanionProjectionPlan =
         let selected =
             match kind with
             | CompanionRequestKind.Normal -> frameBodies
-            | CompanionRequestKind.Squash count -> frameBodies |> List.truncate count
 
         let tipMsgs = previousTips |> List.map (tipMessage sha256 bloggerSessionId)
 
@@ -109,20 +99,11 @@ module CompanionProjectionBuilder =
         | CompanionRequestKind.Normal ->
             // Paired observation units then combined delta last (HOST-010).
             { Messages = pairedHistory @ deltaMessagesForPhysical }
-        | CompanionRequestKind.Squash _ ->
-            let instruction =
-                { MessageId = CompanionIdentity.instructionMessageId sha256 bloggerSessionId frameEpoch (kindLabel kind)
-                  Role = "user"
-                  Text = CompanionPrompt.asCommentedInstruction squashInstructionLines
-                  IsPhysical = false }
-
-            { Messages = pairedHistory @ [ instruction ] }
 
     let private projectionKey (bloggerSessionId: SessionId) (frameEpoch: FrameEpochId) (kind: CompanionRequestKind) =
         let request =
             match kind with
             | CompanionRequestKind.Normal -> "normal"
-            | CompanionRequestKind.Squash count -> "squash-" + string count
 
         $"companion:{SessionId.value bloggerSessionId}:{FrameEpochId.value frameEpoch}:{request}"
 
@@ -150,15 +131,9 @@ module CompanionProjectionBuilder =
         (physicalDelta: (string * BloggerDeltaItem list) option)
         (previousTips: (string * string) list)
         (normalInstructionLines: string list)
-        (squashInstructionLines: string list)
         : ProjectionIntent option =
-        let isSquash =
-            match kind with
-            | CompanionRequestKind.Squash _ -> true
-            | CompanionRequestKind.Normal -> false
-
         let fullRebuild =
-            Option.isSome physicalDelta || not (List.isEmpty previousTips) || isSquash
+            Option.isSome physicalDelta || not (List.isEmpty previousTips)
 
         if List.isEmpty frameBodies && not fullRebuild then
             None
@@ -173,7 +148,6 @@ module CompanionProjectionBuilder =
                     physicalDelta
                     previousTips
                     normalInstructionLines
-                    squashInstructionLines
                 |> fun plan -> plan.Messages
                 |> List.map projectionRow
 

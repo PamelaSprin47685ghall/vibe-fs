@@ -19,14 +19,14 @@ type AttemptOutcome =
 [<RequireQualifiedAccess>]
 module BloggerRetryPolicy =
 
-    /// Pure Blogger retry request selection based on material presence.
-    /// A failed Squash always returns to Main; a failed Main attempts Squash if squash material exists.
+    /// Pure Blogger retry request selection.
+    /// A failed BloggerMain always retries as BloggerMain.
     let nextRequest
         (failedKind: ProviderRequestKind)
         (hasSquashMaterial: bool)
         : Result<ProviderRequestKind, BloggerRetryError> =
-        match failedKind, hasSquashMaterial with
-        | ProviderRequestKind.BloggerMain, true -> Ok ProviderRequestKind.BloggerSquash
-        | ProviderRequestKind.BloggerMain, false -> Ok ProviderRequestKind.BloggerMain
-        | ProviderRequestKind.BloggerSquash, _ -> Ok ProviderRequestKind.BloggerMain
+        ignore hasSquashMaterial
+
+        match failedKind with
+        | ProviderRequestKind.BloggerMain -> Ok ProviderRequestKind.BloggerMain
         | _ -> Error BloggerRetryError.NoActiveBloggerRun

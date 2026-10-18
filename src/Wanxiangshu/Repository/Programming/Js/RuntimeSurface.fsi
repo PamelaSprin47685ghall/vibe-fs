@@ -19,6 +19,9 @@ module JsRuntimeSurface =
     val installDelegationHost: sessionId: string -> fork: obj -> join: obj -> fission: obj -> unit
     val clearDelegationHost: sessionId: string -> unit
     val clearDelegationHosts: unit -> unit
+    /// Test hook: the raw value a program handed over through `js.deliver`.
+    val deliveredValue: sessionId: string -> obj
+    val clearDeliveredValue: sessionId: string -> unit
     val stagedCount: handle: obj -> int
     val stagedKinds: handle: obj -> string array
     val readPaths: handle: obj -> string array

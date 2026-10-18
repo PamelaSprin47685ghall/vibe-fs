@@ -76,8 +76,6 @@ module CompressionSurface =
         | "work-main" -> Some ProviderRequestKind.WorkMain
         | "bloggermain"
         | "blogger-main" -> Some ProviderRequestKind.BloggerMain
-        | "bloggersquash"
-        | "blogger-squash" -> Some ProviderRequestKind.BloggerSquash
         | "interactionrepair"
         | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
         | "strengthreplica"

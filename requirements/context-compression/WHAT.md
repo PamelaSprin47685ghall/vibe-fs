@@ -18,7 +18,7 @@
 
 ## [004] 输出预算属 provider
 
-系统不计算 squash 应占用的 Token 数量，亦不检查压缩比例。对压缩输出的唯一内容校验为 `isValidTerminal`（非空且非纯 XML）。
+系统不计算输出应占用的 Token 数量，亦不检查压缩比例。对输出的唯一内容校验为 `isValidTerminal`（非空且非纯 XML）。
 
 ## [005] 失败不分类
 
@@ -26,15 +26,15 @@
 
 ## [006] 重试材料当次决策，失败预算有界
 
-每个物理 retry attempt 拥有全新 physical identity；其是否包含 prefix/squash 恢复材料是由当前 attempt 的 retry-policy 从 journal 已提交事实（是否允许 probe/squash 以及材料是否可用）做出的不可变决策，不依赖历史位置、奇偶或跨回调瞬态状态。X 在 retry policy 允许 probe 时实际执行候选选择，由 `PrefixProbeSelection` 的 `Ok probe | Error NoCandidateReason` 证明材料是否可用；Y 则以当前 typed Blogger request 与 durable frames 判定是否先执行 squash（`BloggerRetryPolicy.nextRequest` 纯函数）。若本次物理 attempt 没有可用材料，则发送普通主请求，严禁将恢复决策留给未来无关请求，也严禁等待未来 X material 再补做 retry。每次确认失败经 `ProviderFailureLedger` 记账并推进 `ProviderFailureBudget` 连续失败计数；`verdict` 为 `Exhausted`（单一 `DefaultBudget`）时停止自动重试。业务主请求（`WorkMain | BloggerMain` 的有效成功）一旦成功，清零连续失败计数。
+每个物理 retry attempt 拥有全新 physical identity；其是否包含 prefix 恢复材料是由当前 attempt 的 retry-policy 从 journal 已提交事实（是否允许 probe 以及材料是否可用）做出的不可变决策，不依赖历史位置、奇偶或跨回调瞬态状态。X 在 retry policy 允许 probe 时实际执行候选选择，由 `PrefixProbeSelection` 的 `Ok probe | Error NoCandidateReason` 证明材料是否可用；Y 的失败重试通过 `BloggerRetryPolicy.nextRequest` 纯函数直接重试 `BloggerMain`（旧 Blogger squash 循环已随 [031] ANCHOR 视图声明退役）。若本次物理 attempt 没有可用材料，则发送普通主请求，严禁将恢复决策留给未来无关请求，也严禁等待未来 X material 再补做 retry。每次确认失败经 `ProviderFailureLedger` 记账并推进 `ProviderFailureBudget` 连续失败计数；`verdict` 为 `Exhausted`（单一 `DefaultBudget`）时停止自动重试。业务主请求（`WorkMain | BloggerMain` 的有效成功）一旦成功，清零连续失败计数。
 
 ## [007] 按 RequestKind 分派结局
 
-每个 attempt 的结局按 `ProviderRequestKind` 进行确定性分派；RequestKind 必须来自 attempt 的 typed context / durable receipt / accepted continuation evidence，而非角色猜测或错误文本。同种 RequestKind 的同种结局必须产生完全一致的后继动作。`BloggerSquash` 与 `InteractionRepair` 成功不得清零连续失败计数；只有 `WorkMain | BloggerMain` 的有效成功可以清零。
+每个 attempt 的结局按 `ProviderRequestKind` 进行确定性分派；RequestKind 必须来自 attempt 的 typed context / durable receipt / accepted continuation evidence，而非角色猜测或错误文本。同种 RequestKind 的同种结局必须产生完全一致的后继动作。`InteractionRepair` 与 `StrengthReplica` 成功不得清零连续失败计数；只有 `WorkMain | BloggerMain` 的有效成功可以清零。
 
 ## [008] X 不发压缩请求
 
-主工作会话（Work Session）严禁向主模型发送请求压缩历史的指令。压缩操作仅在 Y 的 squash 或 X 的 prefix 替换投影中发生。仅 `WorkMain` 请求有资格携带 prefix probe。
+主工作会话（Work Session）严禁向主模型发送请求压缩历史的指令。上下文压缩由模型在 [031] ANCHOR `view` 声明中自主选择，或经 X 的 prefix 替换投影发生。仅 `WorkMain` 请求有资格携带 prefix probe。
 
 ## [009] 候选未提交不是事实
 
@@ -46,7 +46,7 @@
 
 ## [011] 提交语义分型
 
-X probe 的**物理 provider attempt** 一旦产生可用成功（包括 `finish=tool-calls`：Host turn 尚未结束、但该 provider attempt 已成功），必须先原子提交新 epoch 并继承 SealRoot，再允许下一次 provider request 组装；失败或不可用回应则无 rebase 事实。`PrefixRebaseCommitted` 的 durable append 成功是消费 attempt-local probe plan 的前置条件，append 失败必须 fail-closed，严禁“plan 已消费但 epoch 未提交”。一旦 epoch 已提交，后续每一个普通 `WorkMain` 都必须继续投影该 committed prefix；retry-policy 未允许 probe 只表示本次不得构造新 probe，绝不表示退回 raw X 历史。Y squash 成功时提交 squashed observation 并使 FrameEpoch 递增，失败时不修改现有 frames 与 coverage。`m=1` 时仍允许 `k=1` 的真实 rewrite；新的 squash terminal blob 是新的历史表示，其 `TextDigest` 可以且通常应与被替换 Entry 不同，不得把 digest 相等误作单帧 squash 的 PERSIST-010 条件。
+X probe 的**物理 provider attempt** 一旦产生可用成功（包括 `finish=tool-calls`：Host turn 尚未结束、但该 provider attempt 已成功），必须先原子提交新 epoch 并继承 SealRoot，再允许下一次 provider request 组装；失败或不可用回应则无 rebase 事实。`PrefixRebaseCommitted` 的 durable append 成功是消费 attempt-local probe plan 的前置条件，append 失败必须 fail-closed，严禁“plan 已消费但 epoch 未提交”。一旦 epoch 已提交，后续每一个普通 `WorkMain` 都必须继续投影该 committed prefix；retry-policy 未允许 probe 只表示本次不得构造新 probe，绝不表示退回 raw X 历史。
 
 ## [012] Blogger delta TOML 合同
 
@@ -54,11 +54,11 @@ Blogger delta 以 data-only TOML 形式冻结于 blob，指令头部仅在投影
 
 ## [013] 诊断不是控制输入
 
-可观测诊断日志严禁作为控制流输入，不得使用任何诊断字段驱动 retry、probe 或 squash 的分支决策。
+可观测诊断日志严禁作为控制流输入，不得使用任何诊断字段驱动 retry 或 probe 的分支决策。
 
-## [014] squash 只处理本 X 的 frames
+## [014] Blogger squash 压缩循环已退役（由 [031] ANCHOR 视图声明接管）
 
-Squash 仅压缩当前 X 会话自身的 frames，严禁混入父级 LWR 或跨会话上下文。
+旧 Blogger squash 压缩循环（`ProviderRequestKind.BloggerSquash`、`CompanionRequestKind.Squash`、`BlogObservationsSquashed`、`BlogProjection.applySquash`、`resources/provider/lifecycle/companion/squash`）已退役。上下文压缩由模型在 [031] ANCHOR `view` 声明中自主控制；Companion 投影仅构建 `Normal` 请求，将本会话已提交的 Chronicle `Entry` frames、`RecentTips` 与当前 delta 组装为确定性的 provider 视图。
 
 ## [015] busy/失败不推进 coverage
 
@@ -90,11 +90,11 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 ## [021] Y retry 由失败会话当场拥有，禁止等待未来 X material
 
-`BloggerMain` 的已确认失败在重试时，若 `BloggerRetryPolicy` 选中 Squash（存在可 squash frames），则该 Blogger 的下一次 continuation 必须先物化 `BloggerRequestContext.Squash` 并发送 `BloggerSquash`；不得先重发失败的 BloggerMain，也不得等待未来主 X transform 再补做 retry。`BloggerSquash` 成功提交后，下一次 provider step 必须从 durable Blog + XTrace 重新派生 BloggerMain；Squash 失败则记账失败并按策略继续后续物理重试。失败 request 的 durable open materialization 必须在任何 retry 前关闭，新物理 retry 必须重新绑定自己的 PromptKey。
+`BloggerMain` 的已确认失败在重试时，由 `BloggerRetryPolicy.nextRequest` 直接选中 `BloggerMain` 当场重发，严禁等待未来主 X transform 再补做 retry（旧 `BloggerSquash` 旁路已随 [014]/[031] 退役）。失败 request 的 durable open materialization 必须在任何 retry 前关闭，新物理 retry 必须重新绑定自己的 PromptKey。
 
 ## [022] BloggerMainContext 是唯一重建公式，canonical XTrace 是唯一输入宇宙
 
-正常 catch-up、squash 成功后的 Main、失败后的 Main retry 与 crash refresh 必须共用同一个 `BloggerMainContext` 推导：同一 Opening floor、同一 XTrace generation、同一 ingest 位置、同一 200 KiB chunk 与同一 coverage digest 规则。所有路径先通过 `XTraceMaterialization.currentProjection` 得到 canonical X，再进入 `BloggerMainContext`；严禁 normal transform 从 request-local provider presentation 计算 digest、而 retry 路径从 XTrace 重建，也严禁在 Coordinator、Enforcer 或 retry workflow 中复制第二套 next-main 算法。
+正常 catch-up、失败后的 Main retry 与 crash refresh 必须共用同一个 `BloggerMainContext` 推导：同一 Opening floor、同一 XTrace generation、同一 ingest 位置、同一 200 KiB chunk 与同一 coverage digest 规则。所有路径先通过 `XTraceMaterialization.currentProjection` 得到 canonical X，再进入 `BloggerMainContext`；严禁 normal transform 从 request-local provider presentation 计算 digest、而 retry 路径从 XTrace 重建，也严禁在 Coordinator、Enforcer 或 retry workflow 中复制第二套 next-main 算法。
 
 ## [023] retry/park 全事件驱动且时间无关
 
@@ -118,7 +118,7 @@ Blogger claim/release conflict、semantic cut与compression invariant必须携�
 
 ## [027] Blogger 请求构造权只属于 owner，恢复先解码再验证
 
-`BloggerMainRequestContext` 与 `BloggerSquashRequestContext` 的 record 字段只读：外部代码可以模式匹配与读取字段，但不能组装任意 `PreviousIngestedThroughSequence`／`NextIngestedThroughSequence`／`DeltaDigest`／`Toml`／epoch 组合。唯一构造入口是 `BloggerRequestMaterial.createMain`／`createSquash`（validating constructor），失败为 typed `BloggerRequestRejection`，永不产生部分 record。构造保证：`nextIngested > prevIngested`；`DeltaDigest = SHA256(Toml)`；epoch 为合法 generation；Squash 的 `CoveredFrameCount ≥ 1` 且与 `FrameDigests` 长度一致。`RequestId` 是 owner 在 materialization 时计算并冻结的 durable 身份（`mainRequestId`／`squashRequestId` canonical hash），构造与恢复只携带、不从 blob 内容重算。live 派生（`mainContextFromChunk`／`tryBuildSquashContext`）与恢复解码走同一构造器；恢复先解码未验证数据再验证，损坏／版本不兼容／I-O 不可用的 durable 输入分别成为 `CycleContextReloadRejection` 的独立分支（`BlobCorrupt`／`UnsupportedRequestKind`／`ItemsUndecodable`／`InvariantViolated`／`BlobUnreadable`），不得坍缩为 `None` 或零默认值。旧 epoch 请求不得借恢复取得当前提交权：恢复沿用 durable open 的 frozen epoch，commit 仍以 staged coverage 与 live projection 的一致性裁决。
+`BloggerMainRequestContext` 的 record 字段只读：外部代码可以模式匹配与读取字段，但不能组装任意 `PreviousIngestedThroughSequence`／`NextIngestedThroughSequence`／`DeltaDigest`／`Toml`／epoch 组合。唯一构造入口是 `BloggerRequestMaterial.createMain`（validating constructor），失败为 typed `BloggerRequestRejection`，永不产生部分 record。构造保证：`nextIngested > prevIngested`；`DeltaDigest = SHA256(Toml)`；epoch 为合法 generation。`RequestId` 是 owner 在 materialization 时计算并冻结的 durable 身份（`mainRequestId` canonical hash），构造与恢复只携带、不从 blob 内容重算。live 派生（`mainContextFromChunk`）与恢复解码走同一构造器；恢复先解码未验证数据再验证，损坏／版本不兼容／I-O 不可用的 durable 输入分别成为 `CycleContextReloadRejection` 的独立分支（`BlobCorrupt`／`UnsupportedRequestKind`／`ItemsUndecodable`／`BlobUnreadable`／`InvariantViolated`），永不静默降级为 `None` 或零值默认。
 
 repair episode 的 durable abandon 失败时，rendezvous 进入终态失败：所有已接收未完成的观察者、入队请求与后续到达的旧/新 observer 都以同一异常拒绝；不发送 terminal 通知，不释放 exact flight，不重新打开预算。episode 以失败态保留注册，防止同一请求以新 budget 重启。
 

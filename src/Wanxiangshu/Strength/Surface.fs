@@ -95,7 +95,6 @@ module StrengthSurface =
         match textOf value with
         | "work-main" -> Ok ProviderRequestKind.WorkMain
         | "blogger-main" -> Ok ProviderRequestKind.BloggerMain
-        | "blogger-squash" -> Ok ProviderRequestKind.BloggerSquash
         | "interaction-repair" -> Ok ProviderRequestKind.InteractionRepair
         | "strength-replica" -> Ok ProviderRequestKind.StrengthReplica
         | unknown -> Error(sprintf "unknown request kind: %s" unknown)

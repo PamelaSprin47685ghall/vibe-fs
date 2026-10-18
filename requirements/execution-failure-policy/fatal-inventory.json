@@ -352,23 +352,6 @@
       "status": "FixedWithRegression"
     },
     {
-      "id": "F23",
-      "ownerRequirement": "context-compression",
-      "sourceSymbol": "Enforcer/Continuation.fs :: EnforcerContinuation.dispositionAfterSquashCommit / CommitUnknown branch (.fs[:]Owned by sibling slice; do not edit.),",
-      "operation": "enforcer-cycle-commit-unknown (fixed string)",
-      "triggerBranch": "Squash commit outcome is CommitUnknown(reason): outcome uncertainty after the commit attempt,",
-      "inputSource": "EnforcerCycleCommit.commitSquash result for the exact squash context,",
-      "exactIdentity": "sessionKey + providerRun + squash context,",
-      "phase": "Squash-commit disposition (pre-main-commit),",
-      "assertedInvariant": "Unknown commit outcome must be preserved as uncertainty with request/commit evidence retained,",
-      "commitDisposition": "UNDER MIGRATION: the cited regression test was requirements/obligation-ledger/tests/028.test.mjs, deleted with the retired MagicTodo protocol. This row subject survives in the tree, but its exact-branch coverage is currently unproven and must be re-anchored to a surviving test before it may return to FixedWithRegression.",
-      "scopeOfEffect": "Whole current process,",
-      "evidenceType": "Owner slice owns the unknown-retention proof + squash-vs-main independent coverage,",
-      "formalTestId": null,
-      "status": "ExcludedWithEvidence",
-      "notes": "CycleCommitOutcome.CommitUnknown now Diagnostic.emit + CycleDisposition.CommitUnknown; pending evidence retained, no premature exit, no re-emitted effect."
-    },
-    {
       "id": "F24",
       "ownerRequirement": "context-compression",
       "sourceSymbol": "Enforcer/Continuation.fs :: EnforcerContinuation.dispositionAfterMainCommit / CommitUnknown branch (.fs[:]Owned by sibling slice; do not edit.),",

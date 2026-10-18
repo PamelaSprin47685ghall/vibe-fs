@@ -5,7 +5,6 @@ type ActiveTenureInfo =
       IncumbencyId: string
       Stage: string
       OpeningCursor: int64
-      PreviousRange: (int64 * int64) option
       IsFreshHandover: bool }
 
 type TenureMessage =
@@ -22,17 +21,8 @@ type TenureAssemblyResult =
 module TenureIsolation =
     val isCurrentTenurePhysical: openingCursor: int64 -> cursor: int64 option -> bool
 
-    val insertBeforeCurrentTenure:
-        openingCursor: int64 ->
-        messageCursors: Map<string, int64> ->
-        record: obj ->
-        messages: obj list ->
-        messageId: (obj -> string option) ->
-            obj list
-
     val assemble:
         messages: TenureMessage list ->
         tenure: ActiveTenureInfo ->
         messageCursors: Map<string, int64> ->
-        previousRecord: string option ->
             TenureAssemblyResult

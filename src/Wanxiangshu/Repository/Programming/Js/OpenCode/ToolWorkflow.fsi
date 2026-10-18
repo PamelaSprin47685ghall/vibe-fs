@@ -9,6 +9,7 @@ module JsToolsData =
     val parse: json: string -> Result<LlmFacing.Data.Value, JsFailure>
     val isDelivered: json: string -> bool
     val parseOutcome: json: string -> Result<LlmFacing.Data.Value, JsFailure>
+    val parseDeliveredValue: json: string -> obj
     val parseParkedPayload: json: string -> obj
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of

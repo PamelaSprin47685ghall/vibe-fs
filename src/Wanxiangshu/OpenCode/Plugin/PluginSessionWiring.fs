@@ -185,12 +185,6 @@ module PluginSessionWiring =
                     (attached :> IAttachedSessionPort),
                     registerDelegate,
                     scope.Sessions.Quiescence,
-                    (fun sessionId range providerRun ->
-                        LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
-                            (Some durable)
-                            sessionId
-                            range
-                            providerRun),
                     delegateRetryPort durable,
                     toolMapForRole =
                         (fun role ->

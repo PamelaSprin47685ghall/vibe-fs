@@ -34,6 +34,7 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Repository.Programming.Js
 open Fable.Core
 
 /// Per-run terminal lifecycle for HostForkRuntime: install, complete, fail.
@@ -231,17 +232,20 @@ module HostForkRunLifecycle =
         }
 
     let workRecordForOutcome
-        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
-        (xTraceHead: SessionId -> XTraceCursor)
+        (childWorkRecordForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
         =
         match outcome with
         | TerminalOutcome.Completed result ->
-            childWorkRecordForRun
-                run.ChildId
-                (DelegationHandoff.childRange run.StartCursor (xTraceHead run.ChildId))
-                result.ProviderRun
+            task {
+                let! observed = childWorkRecordForRun run.ChildId result.ProviderRun
+
+                return
+                    match JsDeliveredValues.tryTakeRendered (SessionId.value run.ChildId) with
+                    | Some delivered -> Some delivered
+                    | None -> observed
+            }
         | _ -> Task.FromResult None
 
     /// Idle existing child / first prompt for an AgentOwnerRoot work unit.
@@ -543,14 +547,15 @@ module HostForkRunLifecycle =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
-        (xTraceHead: SessionId -> XTraceCursor)
+        (childWorkRecordForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
         (trackOwnedWork: (unit -> Task) -> unit)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
         (authorityRoot: AuthorityRootUserMessageId)
         =
+        JsDeliveredValues.clear (SessionId.value childId)
+
         let work =
             match journal with
             | None -> invalidOp "a pending agent work requires a canonical journal"
@@ -563,7 +568,6 @@ module HostForkRunLifecycle =
               AgentId = agentId
               ChildId = childId
               Role = role
-              StartCursor = xTraceHead childId
               AuthorityRoot = authorityRoot
               Work = Some work
               Source = HostPendingRun.completionSource ()
@@ -585,7 +589,7 @@ module HostForkRunLifecycle =
                             let! workRecord =
                                 task {
                                     try
-                                        return! workRecordForOutcome childWorkRecordForRun xTraceHead run outcome
+                                        return! workRecordForOutcome childWorkRecordForRun run outcome
                                     with error ->
                                         logError
                                             "FORK-WORKRECORD"

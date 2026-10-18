@@ -4,7 +4,6 @@ namespace Wanxiangshu.Participant.Provider.Attempt
 type ProviderRequestKind =
     | WorkMain
     | BloggerMain
-    | BloggerSquash
     | InteractionRepair
     | StrengthReplica
 

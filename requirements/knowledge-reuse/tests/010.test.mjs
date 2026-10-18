@@ -318,6 +318,7 @@ const { default: test } = await import("node:test");
 const { parse: parseToml } = await import("smol-toml");
 const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
 const syncDelegate = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
+const jsWorkflow = await import("../../../dist/Repository/Programming/Js/WorkflowSurface.js");
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 const lifecycle = await import("../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js");
 const bookkeeper = await import("../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js");
@@ -356,10 +357,30 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
       }
 
       lifecycle.notePrompt(delegateId, question)
-      assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', answer, `asst_q${i + 1}`), true)
+      const delivered = await jsWorkflow.execute(
+        dir,
+        'Engineer',
+        'en',
+        delegateId,
+        {
+          program: `class Js extends JsProgram { async run() { await this.deliver({ question: ${JSON.stringify(question)}, answer: ${JSON.stringify(answer)}, turn: ${i + 1} }); } }`,
+        },
+        3000,
+        Date.now() + 60_000,
+        1 << 20,
+        null,
+      )
+      assert.equal(jsWorkflow.caseName(delivered), 'Succeeded', jsWorkflow.render(delivered))
+      assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', `RAW-PROSE-Q${i + 1}`, `asst_q${i + 1}`), true)
       const text = await pending
-      assert.match(text, /Recent work/, `Engineer Q${i + 1} must return the bounded Recent work section`)
+      assert.match(text, /\[data\]/, `Engineer Q${i + 1} must return the delivered LlmFacing.Data record`)
+      assert.match(text, new RegExp(`turn = ${i + 1}`), `Engineer Q${i + 1} must carry its own delivered turn`)
       assert.match(text, new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+      assert.equal(
+        text.includes(`RAW-PROSE-Q${i + 1}`),
+        false,
+        `Engineer Q${i + 1} must take the explicit js.deliver record rather than raw turn prose`,
+      )
       for (let prior = 0; prior < i; prior += 1) {
         assert.equal(
           text.includes(QUESTIONS[prior][1]),

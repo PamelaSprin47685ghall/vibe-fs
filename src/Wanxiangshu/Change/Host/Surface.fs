@@ -356,7 +356,7 @@ module OrchestratorHostSurface =
               TargetBranch = stringOf (field options "targetBranch")
               ParentWorkRecordFor = fun _ -> Task.FromResult None
               ChildWorkRecordFor = fun _ -> Task.FromResult None
-              ChildWorkRecordForRun = fun _ _ _ -> Task.FromResult None }
+              ChildWorkRecordForRun = fun _ _ -> Task.FromResult None }
 
         let host =
             OrchestratorHost(deps, SessionId.create (stringOf (field options "orchestratorId")))

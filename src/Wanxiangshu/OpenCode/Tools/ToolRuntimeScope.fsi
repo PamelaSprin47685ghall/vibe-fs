@@ -40,7 +40,7 @@ type ToolRuntimeScope =
         childWorkRecordFor: (string -> Task<string option>) option *
         snapshot: ISessionSnapshotPort option *
         cancelSignals: (SessionId seq -> unit) option *
-        ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
+        ?childWorkRecordForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) *
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) *
         ?eventPort: IEventObservationPort ->
             ToolRuntimeScope
