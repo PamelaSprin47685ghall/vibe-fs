@@ -30,8 +30,8 @@
 | SM-01 | 固定版本、语义处置、条款与测试锚点冲突、基线证据 | — | DONE | 68a6785f1 已落盘；20项职责和5项冲突均有目标、责任包与反例 |
 | SM-02A | 库历史整合、Journal/Process/Supervision/Trace 本地保证与上游 Work 规则并存 | SM-01 | LIB_READY | 核心 Node315/0/6skip，Bun273/0，独立编译及真实包外组合43/0；库提交待记录，未非作者复审 |
 | SM-02B | 新增模块接收：resources、time/wait、grounding、identity/events/fs 的实际边界 | SM-02A | LIB_READY | 七模块Node/Bun各191/0；独立编译及包外20/0；静止候选重包3/0，主仓未接线 |
-| SM-02C | 库构建、声明、隔离安装、可获取提交；正式测试监督器保留 | SM-02B | DOING | 待固定全部候选；运行依赖归档退出与15份历史证据归档的规则冲突已定位 |
-| SM-03 | 主仓依赖、源码 submodule、状态根、生命周期、退役 Git 状态同步 | SM-02C | BACKLOG | 未运行 |
+| SM-02C | 库构建、声明、隔离安装、可获取提交；正式测试监督器保留 | SM-02B | LIB_READY | f65e106：正式563项556pass/7skip/0fail/0TODO，16入口实际安装闭包3/0；未非作者复审 |
+| SM-03 | 主仓依赖、源码 submodule、状态根、生命周期、退役 Git 状态同步 | SM-02C | DOING | 固定库候选已交付，主仓冲突按处置表逐项处理 |
 | SM-04 | 新 js.run 接入物理执行、输出预算、取消、资源归属和真实收尾 | SM-03 | BACKLOG | 未运行 |
 | SM-05 | Trace/ANCHOR/前缀/显式子工作终值与现存历史消费者 | SM-03 | BACKLOG | 未运行 |
 | SM-06 | 身份和双侧门禁、失败预算与发送去重、结构化委派、Advisor/horizon | SM-04、SM-05 | BACKLOG | 未运行 |
@@ -114,6 +114,12 @@ SM-04 与 SM-05 的独立调查和测试可交错推进，公共接线串行。�
 - 七个新增模块Node/Bun各191pass/0fail，独立编译/真实安装消费20pass/0fail；停止构建后重包3pass/0fail。库长期原始证据见`evidence/semantic-merge-sm02b/README.md`。
 - 旧红、错误扫描前提和Bun调用范围错误均保留，不计通过。全库最终候选、所有导出闭包、非作者复审和主仓实际接线仍待。
 - 新发现的源码归档规则冲突进入SM-02C：上游拒绝任何tgz，但本地有15份固定历史红/绿取证归档；必须保留证据身份并禁止它们变成运行依赖，不通过删证据或改名取得绿色。
+
+### SM-02C 库固定候选
+
+- SM-02B库提交`57a5f1e`，SM-02C库提交`f65e1065196b020d5e28163166645cf44377322e`，版本0.8.1。正式npm test构建16入口并运行563项：556pass、7skip、0fail、0TODO；新增全部公开入口实际打包安装闭包3pass、0fail，Node/Bun包外导入全部16入口且每个包成员与产物逐字相同。
+- SC-06按根规则唯一例外清单固定15份历史证据的路径和SHA-256，实际索引/摘要检查通过；manifest禁止tarball依赖，实际包不包含evidence。原始失败日志不裁剪，日志换行/空格按原字节保存。
+- 原始长期证据在库`evidence/semantic-merge-sm02c/README.md`。主仓准备引用自有fork可获取的确切SHA；最低Node22.13、真实Host和非作者复审尚未完成，原CUT/GAP状态保留。
 
 ## 本次保留的未完成边界
 
