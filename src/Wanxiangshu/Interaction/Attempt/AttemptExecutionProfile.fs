@@ -38,13 +38,6 @@ type AttemptExecutionProfile =
         /// projection is built, which instruction is sent, and — through CTX-007
         /// — whether success resets the provider failure budget.
         RequestKind: ProviderRequestKind
-        /// CTX-010: which prefix this attempt sends.
-        ///
-        /// Part of the immutable profile because the candidate must be valid for
-        /// exactly one attempt. Held in mutable session state instead, a probe
-        /// would outlive the request that justified it, and CTX-012's "a failed
-        /// probe never became a fact" would stop being structurally true.
-        ProjectionChoice: XProjectionChoice
     }
 
     /// Convenience projections. Reading through the authority profile keeps
@@ -71,17 +64,13 @@ module InteractionAttempt =
     /// projection — four sources that can disagree, and did (the provider request
     /// occasionally carried the wrong tool set).
     ///
-    /// `requestKind` and `choice` cannot be derived and so must be supplied. The
-    /// probe is validated against the kind rather than trusted: CTX-010 permits one
-    /// only on a work main request, and enforcing that here means a Companion
-    /// request carrying a probe is not expressible rather than merely discouraged.
+    /// `requestKind` cannot be derived and so must be supplied. The
     let buildAttemptExecutionProfile
         (authority: PromptAuthority.AuthorityExecutionProfile)
         (physicalUserMessageId: PhysicalUserMessageId)
         (providerRun: ProviderRunIdentity)
         (origin: PromptAuthority.PromptOrigin)
         (requestKind: ProviderRequestKind)
-        (choice: XProjectionChoice)
         : AttemptExecutionProfile =
         { Authority = authority
           PhysicalUserMessageId = physicalUserMessageId
@@ -89,9 +78,5 @@ module InteractionAttempt =
           Origin = origin
           SystemPromptId = PromptAuthority.systemPromptIdFor authority.CanonicalRole
           ToolCapabilitySet = PromptAuthority.toolCapabilitiesFor authority.CanonicalRole requestKind
-          RequestKind = requestKind
-          ProjectionChoice =
-            if ProviderRequestKind.mayCarryProbe requestKind then
-                choice
-            else
-                XProjectionChoice.UseCommittedEpoch }
+          RequestKind = requestKind }
+

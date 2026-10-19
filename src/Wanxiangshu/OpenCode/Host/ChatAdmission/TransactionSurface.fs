@@ -67,7 +67,6 @@ module TransactionSurface =
             (ProviderRunIdentity.create (requiredText "providerRun" value?providerRun))
             (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
             ProviderRequestKind.WorkMain
-            XProjectionChoice.UseCommittedEpoch
 
     let private initialState
         (stateLabel: string)
@@ -76,8 +75,7 @@ module TransactionSurface =
         let started =
             { Accepted = evidence
               ProviderRun = ProviderRunIdentity.create "provider-transaction"
-              RequestKind = ProviderRequestKind.WorkMain
-              ProjectionChoice = XProjectionChoice.UseCommittedEpoch }
+              RequestKind = ProviderRequestKind.WorkMain }
 
         match stateLabel with
         | "None" -> None

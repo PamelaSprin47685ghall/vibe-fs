@@ -52,10 +52,9 @@ module Surface =
     let private requestKindOf value =
         match requiredText "requestKind" value with
         | "work-main" -> ProviderRequestKind.WorkMain
-        | "blogger-main" -> ProviderRequestKind.BloggerMain
-        | "interaction-repair" -> ProviderRequestKind.InteractionRepair
-        | "strength-replica" -> ProviderRequestKind.StrengthReplica
+                | "interaction-repair" -> ProviderRequestKind.InteractionRepair
         | kind -> invalidArg "requestKind" $"unknown provider request kind '{kind}'"
+
 
     let private participantIdentityOf (value: obj) =
         let roleLabel =
@@ -108,39 +107,6 @@ module Surface =
         PromptIdentitySeed.rehydrate input
         |> Result.defaultWith (fun error -> invalidArg "identitySeed" $"{error}")
 
-    let private projectionChoiceOf (value: obj) =
-        match requiredText "projectionChoice.kind" value?kind with
-        | "UseCommittedEpoch" -> XProjectionChoice.UseCommittedEpoch
-        | "UsePrefixProbe" ->
-            let probe = value?probe
-            let candidate = probe?candidate
-
-            XProjectionChoice.UsePrefixProbe
-                { ProbeId = requiredText "projectionChoice.probe.probeId" probe?probeId
-                  BasedOnEpochId = PrefixEpochId.create (unbox<int64> probe?basedOnEpochId)
-                  Candidate =
-                    { FrozenRecordPrefixRef =
-                        BlobRef.create (
-                            requiredText
-                                "projectionChoice.probe.candidate.frozenRecordPrefixRef"
-                                candidate?frozenRecordPrefixRef
-                        )
-                      FrozenRecordPrefixDigest =
-                        BlobDigest.create (
-                            requiredText
-                                "projectionChoice.probe.candidate.frozenRecordPrefixDigest"
-                                candidate?frozenRecordPrefixDigest
-                        )
-                      CutoffExclusive = unbox<int> candidate?cutoffExclusive
-                      CoveredPrefixDigest =
-                        requiredText
-                            "projectionChoice.probe.candidate.coveredPrefixDigest"
-                            candidate?coveredPrefixDigest
-                      SealRoot = requiredText "projectionChoice.probe.candidate.sealRoot" candidate?sealRoot
-                      SyntheticMessageId =
-                        requiredText "projectionChoice.probe.candidate.syntheticMessageId" candidate?syntheticMessageId } }
-        | kind -> invalidArg "projectionChoice.kind" $"unknown projection choice '{kind}'"
-
     let private acceptedEvidenceOf (value: obj) : AcceptedChatExecutionEvidence =
         { SessionId = SessionId.create (requiredText "sessionId" value?sessionId)
           LogicalRunId = LogicalRunId.create (requiredText "logicalRunId" value?logicalRunId)
@@ -184,26 +150,6 @@ module Surface =
                    ownerLogicalRun = LogicalRunId.value ownerLogicalRun
                    ownerAuthorityRoot = AuthorityRootUserMessageId.value ownerAuthorityRoot
                    participantIdentity = participantIdentity |}
-
-    let private prefixSnapshotToJs (snapshot: PrefixSnapshot) : obj =
-        box
-            {| frozenRecordPrefixRef = BlobRef.value snapshot.FrozenRecordPrefixRef
-               frozenRecordPrefixDigest = BlobDigest.value snapshot.FrozenRecordPrefixDigest
-               cutoffExclusive = snapshot.CutoffExclusive
-               coveredPrefixDigest = snapshot.CoveredPrefixDigest
-               sealRoot = snapshot.SealRoot
-               syntheticMessageId = snapshot.SyntheticMessageId |}
-
-    let private projectionChoiceToJs (choice: XProjectionChoice) : obj =
-        match choice with
-        | XProjectionChoice.UseCommittedEpoch -> box {| kind = "UseCommittedEpoch" |}
-        | XProjectionChoice.UsePrefixProbe probe ->
-            box
-                {| kind = "UsePrefixProbe"
-                   probe =
-                    {| probeId = probe.ProbeId
-                       basedOnEpochId = PrefixEpochId.value probe.BasedOnEpochId
-                       candidate = prefixSnapshotToJs probe.Candidate |} |}
 
     let private authorityKindLabel =
         function
@@ -259,10 +205,6 @@ module Surface =
                    requestKind =
                     state.startedEvidence
                     |> Option.map (fun evidence -> ProviderRequestKind.label evidence.RequestKind)
-                    |> Option.toObj
-                   projectionChoice =
-                    state.startedEvidence
-                    |> Option.map (fun evidence -> projectionChoiceToJs evidence.ProjectionChoice)
                     |> Option.toObj |} |}
 
     let private keyToJs (key: ChatExecutionKey) : obj =
@@ -924,7 +866,6 @@ module Surface =
                                 ProviderRunIdentity.create (requiredText "providerRun" evidenceValue?providerRun)
 
                             let requestKind = requestKindOf evidenceValue?requestKind
-                            let projectionChoice = projectionChoiceOf evidenceValue?projectionChoice
 
                             match!
                                 ManagedChatProviderLifecycle.startWith
@@ -933,7 +874,6 @@ module Surface =
                                     attemptedEvidence
                                     providerRun
                                     requestKind
-                                    projectionChoice
                             with
                             | Ok _ ->
                                 providerAdmitted <- true
@@ -946,8 +886,7 @@ module Surface =
                                 { Accepted = attemptedEvidence
                                   ProviderRun =
                                     ProviderRunIdentity.create (requiredText "providerRun" evidenceValue?providerRun)
-                                  RequestKind = requestKindOf evidenceValue?requestKind
-                                  ProjectionChoice = projectionChoiceOf evidenceValue?projectionChoice }
+                                  RequestKind = requestKindOf evidenceValue?requestKind }
 
                             match!
                                 ManagedChatProviderLifecycle.terminalWith

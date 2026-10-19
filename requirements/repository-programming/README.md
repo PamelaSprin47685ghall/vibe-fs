@@ -35,7 +35,7 @@ Exec capability 投影出 `run` 成员与全局 `js.Runnable`。模型写 `await
 **所有 js.* 成员返回数据，绝不返回渲染后的 prose**（宿主在工具结果与 parked 边界统一渲染）。委托成员统一信封：`{ ok: true, ... }` / `{ ok: false, code }`。
 
 - `fork(payload)`：字符串或 `{ charge, name?, calling?, keywords? }`（缺名由 charge 派生），返回 `{ ok, name, agentId, outcome }`。
-- `join()`：按成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, workRecord }], byName }`。
+- `join()`：按成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, view }], byName }`。
 - `fission({ charge, lanes })`：同身份多 lane，返回 `{ ok, groupId, lanes: [{ index, sessionId }] }`；owner 的 `join()` 收拢本组。
 - `dag({ nodes: [{ id, charge, deps? }] })`：基类编译成波次 `fork` + 一次 `join`，下游 prompt 带依赖记录；返回 `{ ok, results, skipped }`；**节点失败即 park**（`where` 同通道），注入 `"retry"`/`"skip"`/任意值/`{ abort }` 决定。
 

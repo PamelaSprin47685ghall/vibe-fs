@@ -65,7 +65,7 @@ module FissionWorkBundle =
 
     val add:
         laneIndex: int ->
-        workRecordRef: string ->
+        viewRef: string ->
         bundle: FissionWorkBundle ->
             Result<FissionWorkBundle, FissionBundleError>
 

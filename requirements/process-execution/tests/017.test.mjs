@@ -28,6 +28,8 @@ test('WHAT[process-execution-017] js.run accepts multi-minute maxDuration withou
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "printf 'ok'" : null; }
       check() { return true; }
+      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
+      sanity() { return { nextDone: () => [{ root: '/', step: 1 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
     });`,
     )
     assert.equal(caseName(outcome), 'Succeeded')

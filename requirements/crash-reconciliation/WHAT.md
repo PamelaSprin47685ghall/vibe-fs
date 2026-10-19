@@ -75,7 +75,7 @@ HandleController 的 `recordCompletion` 是提交完成态的唯一入口，采�
 - 复用仍由 manager 显式发起；复用门禁、placement、await 一律以 durable handle 为存在性依据。
 
 被中断的工具调用保持失败并原样留在可见历史中，不得推断其完成、隐藏它或伪造终态。
-本进程完成加载归位后，会在下一次真实用户指令之前 prepend 一次只读的状态指导，向模型说明万象术已被重启及其含义。状态指导只出现一次；它不改写用户原文、不创建或延续 Interaction Authority、不改变角色、权限或主体，并按 guidance-delivery-011 冻结已交付的 provider wire 字节。除此之外，不存在独立的续传材料通道，也没有 disclosure-only 的 provider 轮次。
+本进程完成加载归位后，会在下一次真实用户指令之前 prepend 一次只读的状态指导，向模型说明万象术已被重启及其含义。状态指导只出现一次；它不改写用户原文、不创建或延续 Interaction Authority、不改变角色、权限或主体，并冻结已交付的 provider wire 字节。除此之外，不存在独立的续传材料通道，也没有 disclosure-only 的 provider 轮次。
 
 ## [019] 外部 effect 必须逐项闭合 crash reconciliation 合同
 
@@ -87,6 +87,7 @@ HandleController 的 `recordCompletion` 是提交完成态的唯一入口，采�
 崩溃前未决的物理命令（`run`、PTY 输入）一律按中断处理，系统严禁在重启后自动重放、补写或隐式续发命令，杜绝物理副作用重复发生。
 恢复流程必须严格沿用道路初始化时持久化的绑定模型（ModelTarget）与 Persona，严禁在恢复或 resume 时切换模型；新会话与恢复只接纳合法新角色集合，历史旧状态不隐式跨边界恢复。
 Load Phase 必须一次性结算上一 runtime 遗留、本进程无法继续持有的 durable 未决工作（仍活跃的子工作 run）。
+该结算是加载归位的首个持久动作：作废事实必须先于下一次交接的身份判定落定，否则新交接会读到仍然活跃的旧根，把已经退休的子会话判成身份冲突。
 
 ## [021] 进程本地表是缓存，durable 投影是存在性真源
 

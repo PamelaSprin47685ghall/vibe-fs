@@ -4,7 +4,6 @@ open Wanxiangshu.Persistence.Journal.JournalOutcome
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Execution.Delegation
@@ -18,7 +17,6 @@ open Wanxiangshu.Context.Prefix
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
-open Wanxiangshu.Context.Companion.Blogger
 
 module AgentJournalPortAdapter =
     let forDelegatedToolEstimate (journal: AgentJournal) : DelegatedToolEstimatePort =
@@ -52,14 +50,7 @@ module AgentJournalPortAdapter =
         let projections () =
             (AgentJournal.snapshot journal).AgentProjections
 
-        { TryBloggerReceiptKind =
-            fun sessionId providerRun ->
-                (projections ()).Sessions
-                |> Map.tryFind sessionId
-                |> Option.bind (fun session -> session.BloggerCycles)
-                |> Option.bind (BloggerCycleProjection.tryReceipt providerRun)
-                |> Option.map (fun receipt -> receipt.Kind)
-          TryContinuationKind =
+        { TryContinuationKind =
             fun sessionId physicalUserMessageId ->
                 (projections ()).Sessions
                 |> Map.tryFind sessionId
@@ -145,7 +136,6 @@ module AgentJournalPortAdapter =
                     sessionProj
                     |> Option.map (fun s ->
                         { XTrace = s.XTrace
-                          Blog = s.Blog
                           PrefixEpoch = s.PrefixEpoch
                           ViewCheckpoints =
                             projections.ViewCheckpoints
@@ -178,32 +168,7 @@ module AgentJournalPortAdapter =
                               BlobDigest = r.BlobDigest })
                 }
           CurrentProjection = fun xTrace -> XTraceMaterialization.currentProjection journal xTrace
-          RecordConfirmedSuccess = ProviderFailureLedger.recordConfirmedSuccess failurePort
-          CommitPrefixRebase =
-            fun sessionId providerRun rebase ->
-                task {
-                    let fact =
-                        ContextFact.PrefixRebaseCommitted
-                            {| SessionId = sessionId
-                               PreviousEpochId = rebase.PreviousEpochId
-                               NextEpochId = rebase.NextEpochId
-                               FrozenRecordPrefixRef = rebase.FrozenRecordPrefixRef
-                               FrozenRecordPrefixDigest = rebase.FrozenRecordPrefixDigest
-                               CutoffExclusive = rebase.CutoffExclusive
-                               CoveredPrefixDigest = rebase.CoveredPrefixDigest
-                               SealRoot = rebase.SealRoot
-                               SyntheticMessageId = rebase.SyntheticMessageId
-                               ProbeId = rebase.ProbeId
-                               SolvingProviderRun = providerRun |}
-
-                    let! appended =
-                        AgentJournal.appendAgent (StreamId.Session sessionId) (Some providerRun) fact journal
-
-                    return
-                        appended
-                        |> Result.map (fun _ -> ())
-                        |> Result.mapError JournalAppendFailure.describe
-                } }
+          RecordConfirmedSuccess = ProviderFailureLedger.recordConfirmedSuccess failurePort }
 
     /// delegation-029: durable composition is the only place that wraps delegation fact
     /// cases into the outer routing union and adapts the journal handle.

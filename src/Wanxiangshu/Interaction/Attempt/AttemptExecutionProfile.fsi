@@ -14,8 +14,7 @@ type AttemptExecutionProfile =
       Origin: PromptAuthority.PromptOrigin
       SystemPromptId: SystemPromptId
       ToolCapabilitySet: Set<ToolPermission>
-      RequestKind: ProviderRequestKind
-      ProjectionChoice: XProjectionChoice }
+      RequestKind: ProviderRequestKind }
 
     member SessionId: SessionId
     member LogicalRunId: LogicalRunId
@@ -31,5 +30,4 @@ module InteractionAttempt =
         providerRun: ProviderRunIdentity ->
         origin: PromptAuthority.PromptOrigin ->
         requestKind: ProviderRequestKind ->
-        choice: XProjectionChoice ->
             AttemptExecutionProfile

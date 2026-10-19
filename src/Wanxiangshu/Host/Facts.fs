@@ -20,11 +20,6 @@ type HostFactCases =
            CallGap: TranscriptGap
            ResultGap: TranscriptGap
            ConcernPlacement: ConcernPlacementBatch option |}
-    | TipGuidanceDelivered of
-        {| SessionId: SessionId
-           TipName: string
-           OccurrenceId: string option
-           Presentation: TipPresentation |}
     | SessionStartedAtBound of
         {| SessionId: SessionId
            StartedAt: System.DateTimeOffset |}

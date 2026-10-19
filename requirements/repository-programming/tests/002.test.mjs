@@ -1,8 +1,5 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
 
@@ -26,19 +23,9 @@ test('WHAT[repository-programming-002] registered_js_tools_match_js_tool_generat
 }
 import {
   generate,
-  isGeneratedToolName,
   memberBinding,
 } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 import { permissions as rolePermissions } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
-import {
-  execute,
-  caseName,
-  render,
-} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
-import {
-  installDelegationHost,
-  clearDelegationHost,
-} from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 const caps = (...permissions) => permissions
 
@@ -52,8 +39,7 @@ const isSome = (value) => value !== null
 
 const PERMISSION_NAMES = [
   'Fork', 'Join', 'Horizon', 'Advisor', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
-  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment', 'Chronicle',
-  'Finality', 'BashHoneypot',
+  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment',
 ]
 
 const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, n]))
@@ -222,7 +208,6 @@ test('WHAT[repository-programming-002] JS004_member_gate_binds_present_members_o
   assert.equal(memberBinding('Engineer', perms, 'edit'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'rewrite'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'write'), undefined)
-  assert.equal(memberBinding('Blogger', caps(ToolPermission.Chronicle), 'cat'), undefined)
 })
 
 test('WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_rejected', () => {
@@ -327,82 +312,15 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
   assert.deepEqual(expectedMembers([ToolPermission.Advisor]), ['advisor'])
 
   // Absence: a role without the permission never projects the member — the
-  // advisor seat itself holds no permission at all, and blogger/plan keep
-  // their surfaces advisor-free.
+  // advisor seat itself holds no permission at all, and plan keeps its
+  // surface advisor-free.
   const without = allRoleLabels.filter((role) => !rolePermissions(role.toLowerCase()).includes('Advisor'))
-  assert.deepEqual(without, ['advisor', 'blogger', 'plan'], 'the roles without ToolPermission.Advisor')
+  assert.deepEqual(without, ['advisor', 'plan'], 'the roles without ToolPermission.Advisor')
   for (const role of without) {
     assert.equal(
       memberBinding(role, rolePermissions(role.toLowerCase()), 'advisor'),
       undefined,
       `${role} never resolves js.advisor`,
     )
-  }
-})
-
-const jsProgram = (body) => `class Js extends JsProgram {
-  async run() {
-${body}
-  }
-}`
-
-const managerRun = (dir, body, sessionId) =>
-  execute(
-    dir,
-    'Manager',
-    'en',
-    sessionId,
-    { program: jsProgram(body) },
-    3000,
-    Date.now() + 60_000,
-    1 << 20,
-    null,
-  )
-
-test('WHAT[repository-programming-056] js.horizon serves the installed host roster and refuses with DELEGATION_UNAVAILABLE without one', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'wxs-horizon-member-'))
-  const sessionId = `sess-horizon-${Math.random().toString(36).slice(2, 8)}`
-  const roster = {
-    ok: true,
-    agents: [
-      {
-        label: 'Ada',
-        status: 'still-away',
-        workState: 'none',
-        record: 'stub-horizon-roster',
-        turnsUsed: 0,
-        turnsLeft: 0,
-        timeUsedMs: 0,
-        timeLeftMs: 0,
-      },
-    ],
-    ptys: [],
-  }
-  const notExercised = async () => {
-    throw new Error('the horizon member must not reach fork/join/fission')
-  }
-  try {
-    installDelegationHost(
-      sessionId,
-      notExercised,
-      notExercised,
-      notExercised,
-      async () => roster,
-      notExercised,
-    )
-    const wired = await managerRun(dir, `    return await this.horizon();`, sessionId)
-    assert.equal(caseName(wired), 'Succeeded')
-    const wiredDoc = render(wired)
-    assert.match(wiredDoc, /status = "still-away"/, 'the host roster reaches the program as data')
-    assert.match(wiredDoc, /record = "stub-horizon-roster"/, 'the member returns the host envelope untouched')
-    assert.match(wiredDoc, /ptys = \[\]/)
-
-    clearDelegationHost(sessionId)
-    const unwired = await managerRun(dir, `    return await this.horizon();`, sessionId)
-    assert.equal(caseName(unwired), 'Succeeded')
-    assert.match(render(unwired), /code = "DELEGATION_UNAVAILABLE"/)
-  } finally {
-    clearDelegationHost(sessionId)
-    rmSync(dir, { recursive: true, force: true })
   }
 })

@@ -15,13 +15,6 @@ module HostFact =
                ConcernPlacement: ConcernPlacementBatch option |} ->
             AgentFact
 
-    val inline TipGuidanceDelivered:
-        payload:
-            {| SessionId: SessionId
-               TipName: string
-               OccurrenceId: string option
-               Presentation: TipPresentation |} ->
-            AgentFact
 
     val inline SessionStartedAtBound:
         payload:

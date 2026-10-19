@@ -385,7 +385,7 @@ module JsFragmentRegistry =
           Signature = "async join()"
           Description =
             "join() — wait for this session's children and return "
-            + "{ ok, records: [{ name, agentId, role, status, workRecord }], byName } "
+            + "{ ok, records: [{ name, agentId, role, status, view }], byName } "
             + "(status: completed | undelivered | failed | abandoned) or { ok: false, code }. Membership-scoped: "
             + "it collects the children this caller created, not an explicit handle list."
           CanonicalExample =
@@ -448,7 +448,7 @@ module JsFragmentRegistry =
             + "answer back as data, never as a rendering: { ok, advice } carrying the "
             + "advisor's prose, or { ok: false, reason, code } — code advisor-unavailable — "
             + "when the seat cannot answer. The advisor reads its own law, the view rendered "
-            + "in the Chronicle shape (a comment header plus [[new_work_to_record]] data "
+            + "in TOML shape (a comment header plus [[new_work_to_record]] data "
             + "tables), and the intent as separate prompts, never merged. view is an ANCHOR "
             + "view declaration ({ prefixUntil, thenRemove }) choosing the material to hand "
             + "over; a follow-up call delivers only the view delta since the part already "

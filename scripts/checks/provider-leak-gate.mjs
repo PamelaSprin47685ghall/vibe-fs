@@ -62,7 +62,7 @@ export const FORBIDDEN_DTO_PATTERNS = Object.freeze([
 ])
 
 /** fast-/deep- execution binding must not appear in provider-facing prose. */
-export const FAST_DEEP_BINDING_RE = /\b(?:fast|deep)-(?:student|teacher|inspector|coder|manager|orchestrator|blogger|devops|browser|inquiry|bookkeeper|reviewer)\b/
+export const FAST_DEEP_BINDING_RE = /\b(?:fast|deep)-(?:student|teacher|inspector|coder|manager|orchestrator|devops|browser|inquiry|bookkeeper|reviewer)\b/
 
 /**
  * @typedef {{ id: string, file: string, line: number, text: string }} Violation

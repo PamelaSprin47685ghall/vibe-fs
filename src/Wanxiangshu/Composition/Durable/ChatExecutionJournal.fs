@@ -140,7 +140,6 @@ module ManagedChatProviderLifecycle =
         (acceptedEvidence: AcceptedChatExecutionEvidence)
         (providerRun: ProviderRunIdentity)
         (requestKind: ProviderRequestKind)
-        (projectionChoice: XProjectionChoice)
         =
         ManagedChatExecutionFlight'.run (AgentJournal.runtimeId journal) key (fun () ->
             ManagedChatProviderLifecycle.startWith
@@ -148,8 +147,7 @@ module ManagedChatProviderLifecycle =
                 key
                 acceptedEvidence
                 providerRun
-                requestKind
-                projectionChoice)
+                requestKind)
 
     let terminal
         (journal: AgentJournal)

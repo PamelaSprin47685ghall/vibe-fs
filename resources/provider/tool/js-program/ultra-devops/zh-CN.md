@@ -85,8 +85,8 @@ class Js extends JsProgram {
         this.stalled = grew <= 0 ? this.stalled + 1 : 0;
         this.slow = grew > 0 && grew < this.minBytesPerSlice ? this.slow + 1 : 0;
 
-        if (this.stalled >= 6) return { abort: `${this.current.name}: 连续 6 片无新字节` };
-        if (this.slow >= 12) return { abort: `${this.current.name}: 连续 12 片低于 ${this.minBytesPerSlice} 字节/片` };
+        if (this.stalled >= 6) return { abort: `${this.current.name}: no new bytes for 6 slices` };
+        if (this.slow >= 12) return { abort: `${this.current.name}: under ${this.minBytesPerSlice} bytes per slice for 12 slices` };
         return null; // 观察过了，没有异常——继续
       }
 

@@ -1,25 +1,18 @@
 namespace Wanxiangshu.Resources
 
 open System
-open Wanxiangshu.Enforcer
 open Wanxiangshu.Participant.Provider
 
 /// Bundle of package runtime data loaded once at plugin init.
 type RuntimeResources =
-    {
-        Prompts: PromptCatalog
-        /// Rulebook selected for this RuntimeResources view (legacy/internal callers).
-        EnforcerRules: EnforcerRule list
-        EnglishEnforcerRules: EnforcerRule list
-        SimplifiedChineseEnforcerRules: EnforcerRule list
-        /// Phase 2: bilingual provider tree roots present (`resources/provider/{en,zh-CN}`).
-        ProviderLanguageRootsReady: bool
-        /// Per-language catalogs. The installed `Prompts` view stays the English
-        /// seed the system transform repairs; Host-config projection reads the
-        /// bound language from these.
-        EnglishPrompts: PromptCatalog
-        SimplifiedChinesePrompts: PromptCatalog
-    }
+    { Prompts: PromptCatalog
+      /// Phase 2: bilingual provider tree roots present (`resources/provider/{en,zh-CN}`).
+      ProviderLanguageRootsReady: bool
+      /// Per-language catalogs. The installed `Prompts` view stays the English
+      /// seed the system transform repairs; Host-config projection reads the
+      /// bound language from these.
+      EnglishPrompts: PromptCatalog
+      SimplifiedChinesePrompts: PromptCatalog }
 
 module RuntimeResources =
 
@@ -38,13 +31,6 @@ module RuntimeResources =
                     "RuntimeResources not installed; call RuntimeResources.install (RuntimeResources.load ()) at plugin init"
                 )
             )
-
-    let enforcerRulesFor (lang: ProviderLanguage) : EnforcerRule list =
-        let resources = current ()
-
-        match lang with
-        | ProviderLanguage.English -> resources.EnglishEnforcerRules
-        | ProviderLanguage.SimplifiedChinese -> resources.SimplifiedChineseEnforcerRules
 
     /// The prompt catalog for a session-bound language, resolved from the
     /// installed bundle. Never reads the global preference: a bound session

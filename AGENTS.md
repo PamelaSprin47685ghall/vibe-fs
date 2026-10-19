@@ -57,7 +57,7 @@
 
 # Blogger / Chronicle / WorkRecord / Replica 废弃方案（clean-break）
 
-> 状态：**已裁决，待施工**。本文档由 2026-10-19 的依赖面调查与所有者终局裁决产出，记录彻底废弃 blogger、chronicle、Y 轴、WorkRecord 与 Replica（StrengthReplica / speculative-investigation）的完整施工路径。所有数据来自源码检索与 `compile-order.txt` 核查，工作树含未提交的 advisor 开发改动（`src/Wanxiangshu/Execution/Delegation/Advisor/`、`resources/provider/lifecycle/advisor/`）。
+> 状态：**已执行**。本文档由 2026-10-19 的依赖面调查与所有者终局裁决产出，记录彻底废弃 blogger、chronicle、Y 轴、WorkRecord 与 Replica（StrengthReplica / speculative-investigation）的完整施工路径。所有数据来自源码检索与 `compile-order.txt` 核查，工作树含未提交的 advisor 开发改动（`src/Wanxiangshu/Execution/Delegation/Advisor/`、`resources/provider/lifecycle/advisor/`）。各阶段已按下列顺序落地，残余的施工痕迹以本节「四、已执行结果」为准。
 
 ## 一、现状结论
 
@@ -156,3 +156,12 @@
 2. 跑通受影响 requirement 测试套件；
 3. 清空 `.Herdchestra/` 本机运行状态；
 4. 检查 `git status` 确认无残骸，提交并推送到 `master`。
+
+## 五、已执行结果
+
+- **阶段 1**：四个规范包整包删除；`advisor`/`context-compression`/`prefix-stability`/`provider-attempt-recovery`/`execution-failure-policy`/`delegation`/`repository-programming`/`participant-horizon` 全部改写为 `view` 契约与「原样重试 + 拉黑 Provider」；Common Law 收掉 Blogger/WorkRecord/门外探路章节，保留 tip 与诊断里有价值的经验。
+- **阶段 2**：`wanxiangli` 剥离 `Role.Blogger`、Chronicler persona 与 Predictor 槽位，宿主更新 gitlink。
+- **阶段 3**：`js.deliver(value, view)` 与已交付游标去重落地；S1–S4 接力不再主动清上下文；`Mission/WorkRecord` 与 Delegation/Join/Horizon 的 WorkRecord 管道删除（join 记录字段改为 `view`）；Strength/Replica/Predictor 全链路删除；Prefix 的 Y 轴、prefix probe、snapshot/rebase 与 `FrozenRecordPrefix` 一并拆除；`requirements/requirement-grounding/` 按所有者指令根除。
+- **阶段 4**：废弃资源目录删除；`wanxiangshu.mjs` 改为三参数 `route(role, running, previous)` 协议 2；Common Law 双语文本收束。
+- **阶段 5**：Blogger/WorkRecord/Replica/Tip 专属测试套件删除；角色集合测试改写；`view` 去重渲染、接力保留上下文、「原样重试 + 拉黑 Provider」补齐锚定测试。
+- **阶段 6**：`node scripts/build.mjs` 编译与模块图链接全绿；`node scripts/check.mjs` 门禁全绿；`node requirements/verification-system/tests/run.mjs` 全量单元测试全绿；`.Herdchestra/` 本机运行状态整体清空；提交并推送到 `master`。

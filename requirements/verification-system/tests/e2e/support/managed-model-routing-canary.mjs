@@ -80,7 +80,7 @@ try {
 export const hasTheoreticalCapacity = (role, purpose) => true;
 export default function route(role, running, previous, purpose) {
 
-  if (new Set(['manager', 'orchestrator', 'engineer', 'devops', 'blogger', 'bookkeeper', 'predictor']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
+  if (new Set(['manager', 'orchestrator', 'engineer', 'devops', 'bookkeeper', 'plan']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
   throw new Error('unexpected managed role: ' + role)
 }
 

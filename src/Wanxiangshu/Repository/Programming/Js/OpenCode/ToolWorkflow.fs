@@ -283,17 +283,40 @@ module JsToolWorkflow =
         else
             None
 
+    let private decodeViewDeclaration (raw: obj) : Result<obj option, JsFailure> =
+        if isNull raw then
+            Ok None
+        else
+            Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse raw
+            |> Result.map Some
+
+    let private parseRawView (json: string) : Result<obj, JsFailure> =
+        try
+            Ok((JS.JSON.parse json)?view)
+        with _ ->
+            Error(JsFailure.ViewDeclarationInvalid "delivered view did not parse")
+
+    let private deliveredView (json: string) : Result<obj option, JsFailure> =
+        if not (JsToolsData.isDelivered json) then
+            Ok None
+        else
+            parseRawView json
+            |> Result.bind decodeViewDeclaration
+
     let private recordDeliveredValueIfNeeded sessionId (json: string) (parsed: Result<obj, JsFailure>) =
-        if JsToolsData.isDelivered json && Result.isOk parsed then
-            JsDeliveredValues.record sessionId (JsToolsData.parseDeliveredValue json)
+        match parsed, deliveredView json with
+        | Ok _, Ok view when JsToolsData.isDelivered json ->
+            JsDeliveredValues.recordView sessionId (JsToolsData.parseDeliveredValue json) view
+            parsed
+        | _, Error failure when JsToolsData.isDelivered json -> Error failure
+        | _ -> parsed
 
     let private decodeRunResult (sessionId: string) (decoded: Result<string, JsFailure>) =
         match decoded with
         | Error failure -> Error failure
         | Ok json ->
-            let parsed = JsToolsData.parseOutcome json
-            recordDeliveredValueIfNeeded sessionId json parsed
-            parsed
+            JsToolsData.parseOutcome json
+            |> fun parsed -> recordDeliveredValueIfNeeded sessionId json parsed
 
     let private settleExecutionOutcome
         (observation: Result<unit, JsFailure>)
@@ -590,7 +613,6 @@ module JsToolWorkflow =
                         |> Result.bind JsToolsData.parseOutcome
 
                     recordDeliveredValueIfNeeded sessionId json parsed
-                    parsed
                 | Choice2Of2 _ ->
                     // Park won: the program suspended at `await js.park`.
                     Ok(box "{\"__jsParked\":true}")

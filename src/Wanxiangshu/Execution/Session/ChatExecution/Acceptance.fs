@@ -381,7 +381,6 @@ module ManagedChatProviderLifecycle =
         (acceptedEvidence: AcceptedChatExecutionEvidence)
         (providerRun: ProviderRunIdentity)
         (requestKind: ProviderRequestKind)
-        (projectionChoice: XProjectionChoice)
         : Task<Result<ManagedChatProviderStartedWitness, ManagedChatProviderLifecycleError>> =
         taskResult {
             let! current = established key acceptedEvidence persistence
@@ -389,8 +388,7 @@ module ManagedChatProviderLifecycle =
             let startedEvidence =
                 { Accepted = acceptedEvidence
                   ProviderRun = providerRun
-                  RequestKind = requestKind
-                  ProjectionChoice = projectionChoice }
+                  RequestKind = requestKind }
 
             do!
                 ProviderStartedEvidence.validate startedEvidence

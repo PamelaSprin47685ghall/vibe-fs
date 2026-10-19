@@ -19,8 +19,7 @@ const isSome = (value) => value !== null
 
 const PERMISSION_NAMES = [
   'Fork', 'Join', 'Horizon', 'Advisor', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
-  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment', 'Chronicle',
-  'Finality', 'BashHoneypot',
+  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment',
 ]
 
 const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, n]))
@@ -98,7 +97,7 @@ const layersOf = (s) =>
   )
 
 test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_capability', () => {
-  for (const role of ['Inquiry', 'Distiller', 'Blogger']) {
+  for (const role of ['Inquiry', 'Distiller']) {
     const perms = caps(...permsOf(rolePermissions(role.toLowerCase())))
     assert.equal(isNone(surface(role, rolePermissions(role.toLowerCase()))), true, `${role} must get no js-* surface`)
     assert.equal(isGeneratedToolName(role, perms, `todowrite-for-${role.toLowerCase()}`), false)
@@ -115,7 +114,7 @@ test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_ca
 })
 
 test('WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
-  for (const role of ['Manager', 'Orchestrator', 'Engineer', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'DevOps', 'Distiller', 'Blogger']) {
+  for (const role of ['Manager', 'Orchestrator', 'Engineer', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'DevOps', 'Distiller']) {
     const fsPerms = fsPermissionsOf(role)
     const result = surface(role, rolePermissions(role.toLowerCase()))
     if (fsPerms.length === 0) {

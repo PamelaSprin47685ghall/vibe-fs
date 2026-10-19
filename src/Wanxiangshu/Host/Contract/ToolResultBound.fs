@@ -56,6 +56,7 @@ module ToolResultBound =
     // the `config` hook. Defaults mirror the Host transport; a Host that raises
     // or lowers `tool_output` is followed exactly, never widened by us.
     let mutable private hostMaxLines = DefaultHostMaxLines
+    // DSL-MUTABLE: resource — host-declared tool_output ceiling
     let mutable private hostMaxBytes = DefaultHostMaxBytes
 
     /// The live Host ceiling a bound result must not exceed.

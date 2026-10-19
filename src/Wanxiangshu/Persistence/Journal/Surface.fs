@@ -16,10 +16,6 @@ open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Participant.Persona
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.OpenCode.Host.PairProgramming
@@ -57,7 +53,7 @@ type JournalHandle private (journal: AgentJournal, release: unit -> unit, store:
 module JournalSurface =
 
     /// 解析并初始化主工作树的本机状态根，不改 Git 配置。
-    let initializeStateRoot (workspace: string) : string =
+    let initializeStateRoot (workspace: string) : Task<string> =
         RuntimePath.initializeStateRoot workspace
 
     let private str (value: obj) : string =
@@ -124,13 +120,6 @@ module JournalSurface =
         let payload = unbox<obj> (value?payload)
 
         match family, case with
-        | "Companion", "CompanionBloggerLinked" ->
-            CompanionFact.CompanionBloggerLinked
-                {| SessionId = sessionIdOf (payload?SessionId)
-                   BloggerSessionId = sessionIdOf (payload?BloggerSessionId)
-                   BloggerAgent = str payload?BloggerAgent |}
-        | "Companion", "CompanionBloggerClosed" ->
-            CompanionFact.CompanionBloggerClosed {| SessionId = sessionIdOf (payload?SessionId) |}
         | "Companion", "TerminalOutputCaptured" ->
             let runId =
                 let r = str payload?ProviderRun
@@ -172,7 +161,7 @@ module JournalSurface =
     // .startedAt); no private representation is destructured outside its owner.
 
     let private companionSliceToJs (state: CompanionProjection) : obj =
-        box {| bloggerSessionId = state.BloggerSessionId |> Option.map SessionId.value |> Option.toObj |}
+        box {| sessionPresent = true |}
 
     let private xTraceSliceToJs (state: XTraceProjectionState) : obj =
         box
@@ -180,16 +169,9 @@ module JournalSurface =
                partCount = XTraceProjection.orderedSemanticParts state |> List.length
                latestTerminalPresent = XTraceProjection.latestTerminalEvidence state |> Option.isSome |}
 
-    let private blogSliceToJs (state: BlogProjectionState) : obj =
-        box
-            {| frameEpochId = FrameEpochId.value state.FrameEpochId
-               frameCount = BlogProjection.frameCount state
-               ingestedThroughSequence = state.Coverage.IngestedThroughSequence |}
-
     let private prefixEpochSliceToJs (epoch: ActivePrefixEpoch) : obj =
         box
-            {| epochId = PrefixEpochId.value epoch.EpochId
-               snapshotPresent = epoch.Snapshot |> Option.isSome |}
+            {| epochId = PrefixEpochId.value epoch.EpochId |}
 
     let private handleIdText (handleId: HandleId) =
         match handleId with
@@ -243,40 +225,6 @@ module JournalSurface =
                acceptedContinuationCount = Map.count state.AcceptedContinuationIds
                claimSequenceKeys = state.ClaimSequences |> Map.toList |> List.map fst |> List.toArray |}
 
-    let private enforcementToJs (state: EnforcementProjectionState) : obj =
-        box
-            {| cycleCount = Map.count state.ByProviderRun
-               cycles =
-                state.ByProviderRun
-                |> Map.toList
-                |> List.map (fun (providerRun, record) ->
-                    box
-                        {| providerRun = ProviderRunIdentity.value providerRun
-                           mainSessionId = SessionId.value record.MainSessionId
-                           bloggerSessionId = SessionId.value record.BloggerSessionId
-                           tipName = record.TipName
-                           toolCallCount = List.length record.ToolCallIds |})
-                |> List.toArray
-               recentTips =
-                state.RecentTips
-                |> List.map (fun tip ->
-                    box
-                        {| tipName = tip.TipName
-                           cycleId = tip.CycleId |})
-                |> List.toArray |}
-
-    let private bloggerCyclesToJs (state: BloggerCycleProjectionState) : obj =
-        box
-            {| receiptCount = Map.count state.ByProviderRun
-               receiptRuns =
-                state.ByProviderRun
-                |> Map.toList
-                |> List.map (fst >> ProviderRunIdentity.value)
-                |> List.toArray
-               openRequestCount = Map.count state.OpenByRequestId
-               openByBloggerCount = Map.count state.OpenByBlogger
-               providerRunByRequestIdCount = Map.count state.ProviderRunByRequestId |}
-
     let private guidelinesToJs (state: GuidelineProjectionState) : obj =
         box
             {| pairCount = List.length state.Pairs
@@ -291,10 +239,6 @@ module JournalSurface =
                            callId = ToolCallId.value pair.CallId
                            markerText = pair.MarkerText |})
                 |> List.toArray |}
-    let private tipDeliveryToJs (state: TipDeliveryProjectionState) : obj =
-        box
-            {| deliveredOccurrences = state.DeliveredOccurrences |> Set.toList |> List.toArray
-               coveredTipNames = state.CoveredTipNames |> Set.toList |> List.toArray |}
 
     let private sessionStartedAtToJs (state: SessionStartedAtProjectionState) : obj =
         box {| startedAt = (SessionStartedAtProjection.startedAt state).ToString("o") |}
@@ -308,15 +252,11 @@ module JournalSurface =
         box
             {| companion = session.Companion |> Option.map companionSliceToJs |> Option.toObj
                xTrace = session.XTrace |> Option.map xTraceSliceToJs |> Option.toObj
-               blog = session.Blog |> Option.map blogSliceToJs |> Option.toObj
                prefixEpoch = session.PrefixEpoch |> Option.map prefixEpochSliceToJs |> Option.toObj
                handles = session.Handles |> Option.map handlesToJs |> Option.toObj
                providerFailures = session.ProviderFailures |> Option.map providerFailuresToJs |> Option.toObj
                promptAuthority = session.PromptAuthority |> Option.map promptAuthorityToJs |> Option.toObj
-               enforcement = session.Enforcement |> Option.map enforcementToJs |> Option.toObj
-               bloggerCycles = session.BloggerCycles |> Option.map bloggerCyclesToJs |> Option.toObj
                guidelines = session.Guidelines |> Option.map guidelinesToJs |> Option.toObj
-               tipDelivery = session.TipDelivery |> Option.map tipDeliveryToJs |> Option.toObj
                sessionStartedAt = session.SessionStartedAt |> Option.map sessionStartedAtToJs |> Option.toObj
                delegatedToolEstimate =
                 session.DelegatedToolEstimate
@@ -387,8 +327,8 @@ module JournalSurface =
     /// cross this boundary.
     let acquireSharedForWorkspace (workspace: string) (processId: int) (startedAt: string) : Task<obj> =
         task {
-            let commonDirectory = RuntimePath.initializeStateRoot workspace
-            let runtimeDirectory = RuntimePath.forWorkspace workspace
+            let! commonDirectory = RuntimePath.initializeStateRoot workspace
+            let! runtimeDirectory = RuntimePath.forWorkspace workspace
 
             // DSL-MUTABLE: resource — the store the callback just created, so the
             // returned handle can expose the lifecycle append surface.

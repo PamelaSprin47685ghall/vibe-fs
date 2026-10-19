@@ -46,7 +46,6 @@ module StaticTools =
         // work-021: Plan's review shares the `review` verb with Manager's
         // ReviewAssessment. The reverse lookup decides by role, not by this order.
         | ToolPermission.Review -> [ "review" ]
-        | ToolPermission.Chronicle -> []
 
     /// Primary name for permissions with a single verb (tests / simple maps).
     let toolName (p: ToolPermission) =
@@ -117,16 +116,15 @@ module StaticTools =
     /// Shared office boundary for lightweight cognitive utilities (`assume`) so
     /// schema visibility and execution admission cannot drift.
     let cognitiveUtilityRoleAllowed (role: Role) : bool =
-        role <> Role.Blogger && role <> Role.Distiller
+        role <> Role.Distiller
 
     /// capability-enforcement-006/007: a Host-declared external (MCP) tool
     /// namespace is not an office capability, so it never enters
     /// `Roles.permissions` (capability-enforcement-006) and no per-source
     /// permission table is kept for it (capability-enforcement-007). It follows
     /// the Host utility surface (`skill`) instead: every projected office role
-    /// keeps it except the internal companion, whose tool face is exactly
-    /// { chronicle }.
-    let hostExternalNamespaceAllowedForRole (role: Role) : bool = role <> Role.Blogger
+    /// keeps it.
+    let hostExternalNamespaceAllowedForRole (role: Role) : bool = true
 
     /// JS-001: a role whose capability set includes any programming-surface
     /// permission gets its todowrite-for-* tool allowed in the permission
@@ -173,7 +171,6 @@ module StaticTools =
           "todowrite-for-manager"
           "todowrite-for-orchestrator"
           "todowrite-for-devops"
-          "todowrite-for-blogger"
           "todowrite-for-bookkeeper"
           "todowrite-for-plan"
           "ask"
@@ -226,7 +223,6 @@ module StaticTools =
         | true, "fork", Role.DevOps -> "deny"
         | true, "resume", Role.DevOps -> "deny"
 
-        | true, "skill", Role.Blogger -> "deny"
         | true, "skill", _ -> "allow"
         | true, "assume", role when not (cognitiveUtilityRoleAllowed role) -> "deny"
         | true, "assume", _ -> "allow"
@@ -282,9 +278,7 @@ module StaticTools =
 
     let engineerAgentConfig (prompt: string option) : obj = primaryAgent Role.Engineer prompt
 
-    /// Companion Session Y: tool set is exactly { chronicle } (ENFORCER-010).
-    /// System prompt for B-record distillation with chronicle tool protocol.
-    let bloggerAgentConfig (prompt: string) : obj = hiddenAgent Role.Blogger prompt
+
 
     /// InternalLeaf Bookkeeper Host stub (AGENT-002): hidden; ToolRegistry gates todowrite-for-bookkeeper by attachment.
     let bookkeeperAgentConfig (prompt: string) : obj =

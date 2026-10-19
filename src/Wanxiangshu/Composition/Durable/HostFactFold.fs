@@ -3,7 +3,6 @@ namespace Wanxiangshu.Composition.Durable
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.OpenCode.Host.PairProgramming
-open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
 
@@ -42,27 +41,6 @@ module HostFactFold =
                             Guidelines = Some updated }))
                 projection
             |> Result.mapError guidelineRejection
-
-        | HostFactCases.TipGuidanceDelivered payload ->
-            // Idempotent: Full records the occurrence frontier (when the fact
-            // carries one) and covers the TipName; IdentityOnly is a no-op.
-            Ok(
-                AgentProjection.update
-                    payload.SessionId
-                    (fun session ->
-                        let prior = session.TipDelivery |> Option.defaultValue TipDeliveryProjection.empty
-
-                        { session with
-                            TipDelivery =
-                                Some(
-                                    TipDeliveryProjection.apply
-                                        payload.TipName
-                                        payload.OccurrenceId
-                                        payload.Presentation
-                                        prior
-                                ) })
-                    projection
-            )
 
         | HostFactCases.SessionStartedAtBound payload ->
             Ok(

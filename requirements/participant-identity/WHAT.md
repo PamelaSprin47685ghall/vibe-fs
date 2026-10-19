@@ -6,7 +6,7 @@
 
 ## [002] ParticipantIdentity ≠ ExecutionBinding
 
-`ParticipantIdentity` 表达由 `IdentitySeed` 派生并在 logical participant run 内不可变的参与者身份：`Role`、`Persona` 与 `SelectedAgent` 是 canonical identity evidence。系统中不存在 `PeerAgent`，亦无游标选择的 `EffectiveAgent` 轮换。`ExecutionBinding` 表达某次具体物理执行的动态分配：每个 fresh physical execution 将固定的 Role 经 MJS scheduler 路由至 model target，并签发租约与容量栅栏（capacity exact identity 严格绑定为 `session + physical + Role + Participant + target + fence`）。重试、Strength 或显式执行调度只能按固定 Role 申请新物理执行的 model target/lease binding，不得把物理目标或租约回写为 identity，亦不得轮换或变更角色身份。
+`ParticipantIdentity` 表达由 `IdentitySeed` 派生并在 logical participant run 内不可变的参与者身份：`Role`、`Persona` 与 `SelectedAgent` 是 canonical identity evidence。系统中不存在 `PeerAgent`，亦无游标选择的 `EffectiveAgent` 轮换。`ExecutionBinding` 表达某次具体物理执行的动态分配：每个 fresh physical execution 将固定的 Role 经 MJS scheduler 路由至 model target，并签发租约与容量栅栏（capacity exact identity 严格绑定为 `session + physical + Role + Participant + target + fence`）。重试或显式执行调度只能按固定 Role 申请新物理执行的 model target/lease binding，不得把物理目标或租约回写为 identity，亦不得轮换或变更角色身份。StrengthReplica、只读副本与 Predictor 不是执行形态。
 
 ## [003] Persona 由 Role × versioned provenance resolve-once
 

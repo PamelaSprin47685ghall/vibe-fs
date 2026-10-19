@@ -12,7 +12,6 @@ type ModelRoutingTarget = { Model: string; Reasoning: string }
 [<RequireQualifiedAccess>]
 type ModelExecutionPurpose =
     | Normal
-    | ReadonlyDelegate
 
 [<Struct; StructuralEquality; StructuralComparison>]
 type internal CapacityCreditId = private CapacityCreditId of int64

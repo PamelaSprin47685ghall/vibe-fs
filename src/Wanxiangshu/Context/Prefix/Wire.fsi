@@ -6,14 +6,8 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Attempt
 
-[<RequireQualifiedAccess>]
-type PrefixPresentationHorizon =
-    | Current
-    | TentativeCold
-
 type XWireReconciliationDecision =
-    { Promoted: bool
-      Cleared: bool
+    { Cleared: bool
       KeptPlan: bool }
 
 type AttemptPlanCapability =
@@ -25,46 +19,20 @@ type AttemptPlanCapability =
 
 module XWire =
 
-    val internal candidate:
-        port: WireJournalPort ->
-        window: ProbeBound ->
-        sessionId: SessionId ->
-        snapshot: Wanxiangshu.Participant.Provider.Projection.ProjectionSnapshot ->
-        committed: PrefixSnapshot option ->
-        state: WireSessionState ->
-        requestCutoff: int ->
-            Task<Result<PrefixProbe, NoCandidateReason>>
-
-    val mayProbe: budget: ProviderFailureBudget.FailureBudget -> bool
-
-    val presentationHorizonForProbe: hasProbe: bool -> PrefixPresentationHorizon
-
     val reconciliationDecision:
         hasPlan: bool ->
         outcome: AttemptOutcome option ->
-        hasPromotableProbe: bool ->
-        probeEpochMatches: bool ->
             XWireReconciliationDecision
-
-    val retryTransportRetirement: horizon: PrefixPresentationHorizon -> rawMessages: obj list -> Set<string>
-
-    val replacePrefixByHostIds:
-        rawMessages: obj list ->
-        coveredHostMessageIds: string list ->
-        openingHostMessageId: string option ->
-        syntheticMessageId: string ->
-        memory: string ->
-            obj list
 
     val suppressHostMessagesByIds: rawMessages: obj list -> hostMessageIds: Set<string> -> obj list
 
-    val applyTransform:
-        isReplicaSession: (SessionId -> bool) ->
+        val applyTransform:
         snapshot: ISessionSnapshotPort option ->
+
         port: WireJournalPort option ->
         attempts: AttemptPlanCapability ->
         output: obj ->
-            Task<PrefixPresentationHorizon>
+            Task
 
     val reconcileAttempt:
         port: WireJournalPort option -> attempts: AttemptPlanCapability -> turn: ReconciledTurn -> Task

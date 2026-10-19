@@ -33,8 +33,7 @@ module RecoverySurface =
         : ProviderStartedEvidence =
         { Accepted = accepted
           ProviderRun = ProviderRunIdentity.create providerRun
-          RequestKind = ProviderRequestKind.WorkMain
-          ProjectionChoice = XProjectionChoice.UseCommittedEpoch }
+          RequestKind = ProviderRequestKind.WorkMain }
 
     let private acceptedState (accepted: AcceptedChatExecutionEvidence) : ChatExecutionState =
         ChatExecutionState.Accepted accepted

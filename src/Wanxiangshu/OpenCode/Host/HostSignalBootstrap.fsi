@@ -40,25 +40,16 @@ module HostSignalBootstrap =
           ObserveEvent: obj -> Task<unit>
           EnsureVisibleInputAdmission: obj -> Task<unit> }
 
-    /// Neutral Strength ports built by plugin composition (`PluginStrengthPorts`)
-    /// from the already-held `PluginStrengthScope` and durability handle.
-    /// The Host boundary never names Strength types; it only invokes these.
-    /// `None` means that Strength aspect is absent (same as before: no scope,
-    /// no durability, or no replica runtime attached at wire time).
-    type StrengthHostPorts =
-        { HandlePreTurn: (ReconciledTurn -> Task<bool>) option
-          ObservePrimaryTurn: (ReconciledTurn -> Task<unit>) option
-          CancelStrengthOwner: (SessionId -> unit) option
-          OnSessionDeleted: (SessionId -> unit) option }
+    
 
     val wire:
         observeTurnWorkflow: (AbortCause -> ReconciledTurnContext -> Task) ->
         sessionPort: ISessionHostPort ->
         eventPort: IEventObservationPort ->
         snapshotOpt: ISessionSnapshotPort option ->
-        journal: AgentJournal option ->
-        strengthPorts: StrengthHostPorts ->
+                journal: AgentJournal option ->
         scope: PluginRuntimeScope ->
+
         rootWorkspace: IRootWorkspaceReader ->
         input: obj ->
         tryConsumeHostInternalPrompt: (SessionId -> string option -> string option -> bool) ->

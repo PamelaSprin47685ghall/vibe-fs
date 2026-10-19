@@ -207,13 +207,15 @@ module ReviewBackendManager =
     let private lifecycleWorkOf
         (directory: string)
         (sessionId: string)
-        : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
-        let commonDir = RuntimePath.stateRoot directory
+        : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+        task {
+            let! commonDir = RuntimePath.stateRoot directory
 
-        if String.IsNullOrWhiteSpace commonDir then
-            None
-        else
-            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
+            if String.IsNullOrWhiteSpace commonDir then
+                return None
+            else
+                return Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
+        }
 
     type private BoundReviewInvocation =
         { Findings: ReviewFindings
@@ -259,8 +261,11 @@ module ReviewBackendManager =
         (sessionId: SessionId)
         (directorySessionId: string)
         (bound: BoundReviewInvocation)
-        : Result<PreparedAssessment, ReviewFailure> =
-        lifecycleWorkOf bound.Directory directorySessionId
+        : Task<Result<PreparedAssessment, ReviewFailure>> =
+        task {
+            let! workOpt = lifecycleWorkOf bound.Directory directorySessionId
+            return
+                workOpt
         |> requireSome BindingUnavailable
         |> Result.bind (fun work ->
             match work.ActiveId, work.Reviewed with
@@ -275,14 +280,17 @@ module ReviewBackendManager =
                       SessionId = sessionId
                       RootAuthorityUserMessageId = rootAuthorityUserMessageId
                       IncumbencyId = activeId }))
+        }
 
-    let private prepareAssessment (scope: ToolRuntimeScope) (context: HostToolContext) (bound: BoundReviewInvocation) =
+    let private prepareAssessment (scope: ToolRuntimeScope) (context: HostToolContext) (bound: BoundReviewInvocation) : Task<Result<PreparedAssessment, ReviewFailure>> =
+        task {
         let sessionId = SessionId.create context.SessionId
 
         try
-            resolveAssessment scope sessionId context.SessionId bound
+            return! resolveAssessment scope sessionId context.SessionId bound
         with _ ->
-            Error BindingUnavailable
+            return Error BindingUnavailable
+        }
 
     let private acceptedResult (findings: ReviewFindings) =
         let instructionPath =
@@ -320,10 +328,10 @@ module ReviewBackendManager =
         (prepared: PreparedAssessment)
         : Task<Result<string, ReviewFailure>> =
         task {
-            match lifecycleWorkOf prepared.Bound.Directory context.SessionId with
+            match! lifecycleWorkOf prepared.Bound.Directory context.SessionId with
             | None -> return Error RecordFailed
             | Some _ ->
-                let gitCommonDir =
+                let! gitCommonDir =
                     Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot prepared.Bound.Directory
 
                 let requestId = prepared.IncumbencyId + ":review"

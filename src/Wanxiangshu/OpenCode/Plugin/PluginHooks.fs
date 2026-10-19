@@ -36,8 +36,6 @@ open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Host
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
-open Wanxiangshu.Context.Companion.Blogger.OpenCode
-open Wanxiangshu.Enforcer
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Delegation.Handle.OpenCode
 open Wanxiangshu.Execution.Delegation.OpenCode
@@ -56,10 +54,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Process
 open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
-open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Delegation.Handle
@@ -126,15 +120,12 @@ module PluginHooks =
 
             let planStageFor (sessionId: SessionId) : Task<string option> =
                 task {
-                    match roleFor sessionId with
-                    | Some Role.Plan ->
-                        match workspaceDirectory with
-                        | Some workspace ->
-                            let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
-                            return
-                                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId)
-                                |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)
-                        | None -> return None
+                    match roleFor sessionId, workspaceDirectory with
+                    | Some Role.Plan, Some workspace ->
+                        let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+                        return
+                            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId)
+                            |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)
                     | _ -> return None
                 }
 
@@ -239,15 +230,13 @@ module PluginHooks =
                     let onRunStarted =
                         Some(fun sessionId role directory -> wired.BindActiveRun sessionId role directory)
 
-                    // Child return is the deliver view, not a materialized WorkRecord.
+                    // A participant's return is the js.deliver view.
                     let deliveredView =
                         Some(fun sessionId ->
                             Task.FromResult(
                                 Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered sessionId))
 
-                    let parentWorkRecordFor, childWorkRecordFor = deliveredView, deliveredView
-
-                    let childRecordForRun = fun _ _ -> Task.FromResult None
+                    let childViewForRun = fun _ _ -> Task.FromResult None
 
                     let! casebookToolSpecs =
                         match workspaceDirectory with
@@ -262,14 +251,12 @@ module PluginHooks =
                             host.CausalWaitObserver
                             host.RootWorkspace
                             journal
-                                                        (workspaceDirectory)
+                            workspaceDirectory
                             scope
-
                             wired.CurrentPhysicalUserMessage
                             onRunStarted
-                            parentWorkRecordFor
-                            childWorkRecordFor
-                            childRecordForRun
+                            deliveredView
+                            childViewForRun
                             snapshotOpt
                             (Some wired.CancelSignals)
                             (Some eventPort)
@@ -318,37 +305,10 @@ module PluginHooks =
                         return Some registration
                     }
 
-            let getManagerCapabilityFacts (sessionId: string) =
+            let getManagerCapabilityFacts (sessionId: string) : Task<ManagerCapabilityFacts> =
                 match toolRegistration with
                 | Some registration -> registration.Runtime.ManagerCapabilityFactsFor sessionId
-                | None -> ToolRuntimeScope.emptyManagerFacts
-
-            // the only enablement condition for explicit
-            // read-only delegation is that a Predictor model is configured.
-            // The read-only configuration existence query is owned by
-            // ModelRouting (ModelRouting.sharedPredictorConfiguration, loaded
-            // once together with the sole MJS model configuration during the
-            // PluginBoot Load Phase, before any tool definition is registered
-            // or presented) and is shared by tool decoration and delegation
-            // admission, so this hook consumes the query instead of holding a
-            // second enabled truth. Configured decorates the schema and
-            // appends the collaboration prose; NotConfigured decorates nothing.
-            // ConfigurationInvalid is a malformed model configuration: it fails
-            // closed here rather than silently degrading to "not configured",
-            // the same choice as ModelRouting.requireRoutingProtocol; the
-            // hook's registered disposition (HookPolicy ToolDefinition:
-            // Invariant / TypedPolicyFailClosed, diagnostic operation
-            // plugin-hook-tool-definition-failed) already carries the report.
-            let readonlyDelegationPredictorConfigured () : bool =
-                match ModelRouting.sharedPredictorConfiguration () with
-                | ModelRouting.PredictorConfiguration.Configured -> true
-                | ModelRouting.PredictorConfiguration.NotConfigured -> false
-                | ModelRouting.PredictorConfiguration.ConfigurationInvalid reason ->
-                    raise (
-                        InvalidOperationException(
-                            sprintf "execution-model-routing: Predictor model configuration is invalid: %s" reason
-                        )
-                    )
+                | None -> Task.FromResult ToolRuntimeScope.emptyManagerFacts
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
                                 ManagerReviewContract.decorateDefinition toolInput toolOutput
@@ -368,14 +328,16 @@ module PluginHooks =
                     reviewToolPermitted toolName facts
 
             let assertReviewPermitted toolName sessionId =
-                let facts = getManagerCapabilityFacts sessionId
+                task {
+                    let! facts = getManagerCapabilityFacts sessionId
 
-                if not (isReviewPermitted toolName facts) then
-                    invalidOp (
-                        sprintf
-                            "Manager review tool '%s' is not permitted under current manager capability facts"
-                            toolName
-                    )
+                    if not (isReviewPermitted toolName facts) then
+                        invalidOp (
+                            sprintf
+                                "Manager review tool '%s' is not permitted under current manager capability facts"
+                                toolName
+                        )
+                }
 
             let toolField (toolInput: obj) (name: string) =
                 if isNull toolInput || isNull toolInput?(name) then
@@ -607,110 +569,28 @@ module PluginHooks =
                 |> Option.defaultValue (Task.FromResult(()))
 
             let checkManagerReviewPermissions toolName toolInput =
-                let sessionId = toolField toolInput "sessionID"
+                task {
+                    let sessionId = toolField toolInput "sessionID"
 
-                let blockedNative =
-                    toolName = "todowrite-for-engineer" || toolName = "todowrite-for-devops"
+                    let blockedNative =
+                        toolName = "todowrite-for-engineer" || toolName = "todowrite-for-devops"
 
-                if roleFor (SessionId.create sessionId) = Some Role.Manager && blockedNative then
-                    invalidOp (sprintf "Manager tool '%s' is refused on the review gate" toolName)
-                elif ManagerReviewTools.isReviewTool toolName then
-                    assertReviewPermitted toolName sessionId
-
-            // host-boundary-032: snapshot the protocol
-            // fields the model actually produced, before either contract family
-            // hides them. The Host persists the stripped arguments, so the
-            // provider transform restores the fields into the request from this
-            // vault. contract only for review tools (the only place review hide
-            // runs); delegation fields only for participating tools (classifyTool = EstimateAfterCall).
-            //
-            // The call id is read from the hook input itself: WHAT[009]'s
-            // both-halves pairing lives in decodeContext, and this hook input
-            // carries no messageID, so decodeContext would always answer None.
-            let protocolFieldOwnership (toolName: string) : ProtocolArgumentVault.FieldOwnership =
-                { ReviewContract = ManagerReviewTools.isReviewTool toolName
-                  InvestigationEstimate =
-                    readonlyDelegationPredictorConfigured ()
-                    && InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall }
-
-            let recordSnapshotIfPresent
-                (vault: ProtocolArgumentVault.Vault)
-                (sessionId: string)
-                (toolCallId: ToolCallId)
-                (toolName: string)
-                (args: obj)
-                =
-                match ProtocolArgumentVault.snapshotOfArguments (protocolFieldOwnership toolName) args with
-                | Some snapshot -> ProtocolArgumentVault.record vault sessionId (ToolCallId.value toolCallId) snapshot
-                | None -> ()
-
-            let tryRecordVaultEntry
-                (vault: ProtocolArgumentVault.Vault)
-                (toolInput: obj)
-                (toolOutput: obj)
-                (toolCallId: ToolCallId)
-                =
-                let context = ToolHostCodec.decodeContext toolInput
-
-                if not (String.IsNullOrWhiteSpace context.SessionId) then
-                    let toolName = toolField toolInput "tool"
-                    recordSnapshotIfPresent vault context.SessionId toolCallId toolName toolOutput?args
-
-            let tryRecordCall
-                (vault: ProtocolArgumentVault.Vault)
-                (toolInput: obj)
-                (toolOutput: obj)
-                (callIdOpt: ToolCallId option)
-                =
-                match callIdOpt with
-                | Some toolCallId -> tryRecordVaultEntry vault toolInput toolOutput toolCallId
-                | None -> ()
-
-            let recordProtocolArgumentVault (toolInput: obj) (toolOutput: obj) =
-                if not (isNull toolOutput) && not (isNull toolOutput?args) then
-                    tryRecordCall boot.ProtocolArgumentVault toolInput toolOutput (ToolHostCodec.hookCallId toolInput)
-
-            let estimateSessionText (toolInput: obj) =
-                if not (isNull toolInput) && not (isNull toolInput?sessionID) then
-                    string toolInput?sessionID
-                else
-                    (ToolHostCodec.decodeContext toolInput).SessionId
-
-            let rejectInvalidEstimateArguments (toolInput: obj) (args: obj) =
-                match InvestigationEstimateContract.parseParticipatingArguments args with
-                | Ok _ -> ()
-                | Error err ->
-                    let language =
-                        ProviderLanguageBinding.forSessionText (estimateSessionText toolInput)
-
-                    let explanation = InvestigationEstimateContract.formatArgumentError language err
-                    invalidOp (sprintf "Invalid investigation estimate arguments: %s" explanation)
-
-            let restoreParticipatingArguments (isParticipatingTool: bool) (args: obj) =
-                if isParticipatingTool then
-                    ReadonlyDelegationContract.restore args
-
-                ManagerReviewContract.restore args
+                    if roleFor (SessionId.create sessionId) = Some Role.Manager && blockedNative then
+                        invalidOp (sprintf "Manager tool '%s' is refused on the review gate" toolName)
+                    elif ManagerReviewTools.isReviewTool toolName then
+                        do! assertReviewPermitted toolName sessionId
+                }
 
             let hideReviewArguments owner toolName args =
                 if ManagerReviewTools.isReviewTool toolName then
                     ManagerReviewContract.hideForCall owner args
 
-            let hideDelegationArguments owner isDelegationActive args =
-                if isDelegationActive then
-                    ReadonlyDelegationContract.hideForCall owner args
-
-            let hideProtocolArguments owner toolName isDelegationActive args =
+            let hideProtocolArguments owner toolName args =
                 try
                     hideReviewArguments owner toolName args
-                    hideDelegationArguments owner isDelegationActive args
                 with error ->
-                    restoreParticipatingArguments isDelegationActive args
+                    ManagerReviewContract.restore args
                     raise error
-
-            let requireDelegationEstimateArguments (toolInput: obj) (toolOutput: obj) =
-                if not (isNull toolOutput) && not (isNull toolOutput?args) then
-                    rejectInvalidEstimateArguments toolInput toolOutput?args
 
             let argumentCallOwner toolName toolInput : ProtocolArgumentCall option =
                 let context = ToolHostCodec.decodeContext toolInput
@@ -740,39 +620,20 @@ module PluginHooks =
                 else
                     HiddenProtocolArguments.SameCall
 
-            let hiddenDelegationState owner isDelegationActive args =
-                if isDelegationActive then
-                    ReadonlyDelegationContract.classifyHiddenArguments owner args
-                else
-                    HiddenProtocolArguments.SameCall
-
-            // 隐藏状态合并规则是合同：任一 Different → Different；都 Same → Same；
-            // 否则 NotHidden。并发与重放下同一参数对象只有一个隐藏归属
-            //（host-boundary-032）。
-            let combineHiddenStates review delegation =
-                match review, delegation with
-                | HiddenProtocolArguments.DifferentCallOrChangedArguments, _
-                | _, HiddenProtocolArguments.DifferentCallOrChangedArguments ->
-                    HiddenProtocolArguments.DifferentCallOrChangedArguments
-                | HiddenProtocolArguments.SameCall, HiddenProtocolArguments.SameCall -> HiddenProtocolArguments.SameCall
-                | _ -> HiddenProtocolArguments.NotHidden
-
-            let hiddenArgumentState owner toolName isDelegationActive (toolOutput: obj) =
+            let hiddenArgumentState owner toolName (toolOutput: obj) =
                 let isReview = ManagerReviewTools.isReviewTool toolName
 
                 if
-                    (not isReview && not isDelegationActive)
+                    not isReview
                     || isNull toolOutput
                     || isNull toolOutput?args
                 then
                     HiddenProtocolArguments.NotHidden
                 else
-                    combineHiddenStates
-                        (hiddenReviewState owner isReview toolOutput?args)
-                        (hiddenDelegationState owner isDelegationActive toolOutput?args)
+                    hiddenReviewState owner isReview toolOutput?args
 
-            let protocolArgumentsAreHidden owner toolName isDelegationActive toolOutput =
-                match hiddenArgumentState owner toolName isDelegationActive toolOutput with
+            let protocolArgumentsAreHidden owner toolName toolOutput =
+                match hiddenArgumentState owner toolName toolOutput with
                 | HiddenProtocolArguments.SameCall -> true
                 | HiddenProtocolArguments.DifferentCallOrChangedArguments ->
                     invalidOp
@@ -780,50 +641,27 @@ module PluginHooks =
                 | HiddenProtocolArguments.NotHidden -> false
 
             // 隐藏前再核一次：本调用尚未隐藏且 args 可读才执行 hide。
-            // hideProtocolArguments 半途失败时补偿性全量 restore 再重抛，是 before
-            // 失败的唯一回滚点（宿主不会在 before 失败后再调 after）。
-            let hideProtocolArgumentsIfShown owner toolName isDelegationActive (toolOutput: obj) =
+            let hideProtocolArgumentsIfShown owner toolName (toolOutput: obj) =
                 if
-                    not (protocolArgumentsAreHidden owner toolName isDelegationActive toolOutput)
+                    not (protocolArgumentsAreHidden owner toolName toolOutput)
                     && not (isNull toolOutput)
                     && not (isNull toolOutput?args)
                 then
-                    hideProtocolArguments owner toolName isDelegationActive toolOutput?args
+                    hideProtocolArguments owner toolName toolOutput?args
 
-            // 新参数准备链的具名步骤，按序：非法估计拒绝 → wire vault 记录 →
-            // 委托估计观察 → 隐藏协议字段。
-            let prepareNewProtocolArguments owner toolName isDelegationActive toolInput toolOutput =
+            let prepareNewProtocolArguments owner toolName toolInput toolOutput =
                 task {
-                    if isDelegationActive then
-                        requireDelegationEstimateArguments toolInput toolOutput
-
-                    recordProtocolArgumentVault toolInput toolOutput
                     do! observeDelegatedToolEstimate toolInput
-                    hideProtocolArgumentsIfShown owner toolName isDelegationActive toolOutput
+                    hideProtocolArgumentsIfShown owner toolName toolOutput
                 }
 
-            // 已隐藏同调用 → 短路：不重复记录、不重复隐藏。不同调用或参数已变
-            // 由 protocolArgumentsAreHidden 报错。
-            let beforeStagePrepareProtocolArguments toolName isDelegationActive toolInput toolOutput =
+            let beforeStagePrepareProtocolArguments toolName toolInput toolOutput =
                 task {
                     let owner = argumentCallOwner toolName toolInput
 
-                    if not (protocolArgumentsAreHidden owner toolName isDelegationActive toolOutput) then
-                        do! prepareNewProtocolArguments owner toolName isDelegationActive toolInput toolOutput
+                    if not (protocolArgumentsAreHidden owner toolName toolOutput) then
+                        do! prepareNewProtocolArguments owner toolName toolInput toolOutput
                 }
-
-            // tool.execute.before 的既有 stage 序列。work-049 的显式用户等待在这些
-            // 工作步骤之前拒绝新动作；未等待时仍先 grounding，再评审和参数准备。
-            // 第 2 步只对评审工具生效；第 3/4 步
-            // 服务参与工具的估计协议。任何一步抛错即中断本次 before。
-            let beforeStageReviewPermission (toolName: string) (toolInput: obj) =
-                checkManagerReviewPermissions toolName toolInput
-
-            let beforeStageDelegationActive toolName =
-                let isParticipatingTool =
-                    InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
-
-                readonlyDelegationPredictorConfigured () && isParticipatingTool
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
@@ -847,41 +685,27 @@ module PluginHooks =
                         )
                     | _ -> ()
 
-                    beforeStageReviewPermission toolName toolInput
+                    do! checkManagerReviewPermissions toolName toolInput
 
                     do!
                         beforeStagePrepareProtocolArguments
                             toolName
-                            (beforeStageDelegationActive toolName)
                             toolInput
                             toolOutput
                 }
 
-            // 先 Delegation（仅参与工具）后 Manager，两个字段族互不覆盖。
-            let restoreOwnedArguments owner isParticipatingTool args =
-                if isParticipatingTool then
-                    ReadonlyDelegationContract.restoreForCall owner args
-
-                ManagerReviewContract.restoreForCall owner args
-
-            let restoreArgumentsForTarget owner isParticipatingTool (target: obj) =
+            let restoreArgumentsForTarget owner (target: obj) =
                 if not (isNull target) && not (isNull target?args) then
-                    restoreOwnedArguments owner isParticipatingTool target?args
+                    ManagerReviewContract.restoreForCall owner target?args
 
-            // after stage 1: 按 exact 调用身份重算 classify/owner，对 toolInput 与
-            // toolOutput 各恢复一次协议字段。restore 抛错则后续 stage 不执行（现状）。
             let afterStageRestoreProtocolArguments (toolInput: obj) (toolOutput: obj) =
                 let toolName = toolField toolInput "tool"
                 let owner = argumentCallOwner toolName toolInput
 
-                let isParticipatingTool =
-                    InvestigationEstimateContract.classifyTool toolName = InvestigationEstimateContract.InvestigationToolPolicy.EstimateAfterCall
+                restoreArgumentsForTarget owner toolInput
+                restoreArgumentsForTarget owner toolOutput
 
-                restoreArgumentsForTarget owner isParticipatingTool toolInput
-                restoreArgumentsForTarget owner isParticipatingTool toolOutput
-
-            // after stage 2: requirement grounding 读结果补规范。
-            // after stage 3: 可选 casebook 观察。失败只发诊断，不改关键结果
+            // after stage 2: 可选 casebook 观察。失败只发诊断，不改关键结果
             //（host-boundary-024）。
             let afterStageCasebookObservation (toolInput: obj) (toolOutput: obj) =
                 if casebookEnabled then
@@ -915,15 +739,21 @@ module PluginHooks =
                     ProviderLanguageBinding.setHostConfigPreference (string lang)
                     ProviderLanguageBinding.refreshGlobalLanguage ()
 
+            let syncHostToolLimits (config: obj) =
+                let toolOutput = config?tool_output
+
+                if not (isNull toolOutput) then
+                    Wanxiangshu.Host.Contract.ToolResultBound.setHostLimits
+                        toolOutput?max_lines
+                        toolOutput?max_bytes
+
             let configurePluginHost (config: obj) =
                 if not (isNull config) then
                     config?snapshot <- box false
                     syncHostLanguagePreference config
                     ManagerConfig.configureManager config |> ignore
                     scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
-                    Wanxiangshu.Host.Contract.ToolResultBound.setHostLimits
-                        config?tool_output?max_lines
-                        config?tool_output?max_bytes
+                    syncHostToolLimits config
 
             let config = registeredHook HookKey.Config (unaryHook (box configurePluginHost))
 

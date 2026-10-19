@@ -657,7 +657,6 @@ module ProviderFailureSurface =
                         accepted
                         (ProviderRunIdentity.create providerRun)
                         ProviderRequestKind.WorkMain
-                        XProjectionChoice.UseCommittedEpoch
 
                 return box {| ok = Result.isOk started |}
         }
@@ -707,18 +706,18 @@ module ProviderFailureSurface =
         |> Option.map ProviderRequestKind.label
         |> Option.defaultValue ""
 
-    /// provider-attempt-recovery-021: the durable dispatch fact behind one confirmed failure's target
-    /// settlement — true only when that exact physical request was accepted as
-    /// a `ProviderRetryAttempt` continuation AND the failed provider run is the
-    /// exact run that established the request's durable `ProviderStarted`.
-    /// Never derived from a failure ordinal.
-    let wasLwrRetryAttempt
+    /// Confirmed fact consumed by the only recovery step: this failure is itself
+    /// the verbatim retry of the same provider. True only when that exact physical
+    /// request was accepted as a ProviderRetryAttempt continuation AND the failed
+    /// provider run established the request's durable ProviderStarted.
+    /// Never derived from a failure ordinal or a clock.
+    let wasSameProviderRetryAttempt
         (handle: Wanxiangshu.Persistence.Journal.JournalHandle)
         (session: string)
         (physicalMessage: string)
         (providerRun: string)
         : bool =
-        ProviderRecoveryWorkflow.failedAttemptWasLwrRetry
+        ProviderRecoveryWorkflow.failureIsSameProviderRetry
             handle.Journal
             (SessionId.create session)
             (PhysicalUserMessageId.create physicalMessage)

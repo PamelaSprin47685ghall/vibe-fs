@@ -1,10 +1,10 @@
 # Blogger / Chronicle 废弃方案（clean-break）
 
-> 状态：**研究方案，未执行**。本文档由 2026-10-19 的依赖面调查产出，记录彻底废弃 blogger 与 chronicle 的完整施工路径。所有数据来自 `git grep` 与 `compile-order.txt` 的实际检索结果，检索时工作树含未提交的 advisor 开发改动（`src/Wanxiangshu/Execution/Delegation/Advisor/`、`resources/provider/lifecycle/advisor/`，均未跟踪）。
+> 状态：**已执行**。本文档是 2026-10-19 依赖面调查的历史快照，保留当时的检索结论与施工路径，作为本次 clean-break 的施工依据；现行规范以 `AGENTS.md` 的同名章节与 `requirements/` 各包为准。调查时的结论「blogger 与 chronicle 未被废弃」描述的是施工前的仓库状态，现已不成立：`blogger`、`chronicle`、`Y 轴`、`WorkRecord`、`Strength`/`Replica`/`Predictor` 均已从源码、需求树与资源中移除。
 
-## 一、现状结论
+## 一、调查时点的现状结论（施工前，已失效）
 
-blogger 与 chronicle **未被废弃**，是活跃系统组件：
+blogger 与 chronicle 在调查时点**未被废弃**，是活跃系统组件：
 
 - 48 个内部定义文件在 `compile-order.txt` 中参与每次构建；
 - `ToolRegistry.fs` 第 355 行活跃注册 `"chronicle", ChronicleTool.admission bloggerHost`；

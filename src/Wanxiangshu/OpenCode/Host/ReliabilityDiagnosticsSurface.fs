@@ -62,10 +62,9 @@ module ReliabilityDiagnosticsSurface =
     let private requestKindOf value =
         match requiredText "providerRequestKind" value with
         | "work-main" -> ProviderRequestKind.WorkMain
-        | "blogger-main" -> ProviderRequestKind.BloggerMain
-        | "interaction-repair" -> ProviderRequestKind.InteractionRepair
-        | "strength-replica" -> ProviderRequestKind.StrengthReplica
+                | "interaction-repair" -> ProviderRequestKind.InteractionRepair
         | kind -> invalidArg "providerRequestKind" $"unknown provider request kind '{kind}'"
+
 
     let private failureOf commitment value =
         match requiredText "failureClass" value with

@@ -143,7 +143,7 @@ module JsSandbox =
         + "    return JSON.stringify({ __jsAbandoned: true });\n"
         + "  }\n"
         + "  if (__e && __e.__jsDelivered) {\n"
-        + "    return JSON.stringify({ __jsDelivered: true, value: __e.__jsDelivered.value });\n"
+        + "    return JSON.stringify({ __jsDelivered: true, value: __e.__jsDelivered.value, view: __e.__jsDelivered.view });\n"
         + "  }\n"
         + "  return JSON.stringify({ __jsProgramFailed: true, message: String((__e && __e.message) || __e) });\n"
         + "}\n"

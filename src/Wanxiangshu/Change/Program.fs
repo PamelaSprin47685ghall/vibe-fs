@@ -34,16 +34,19 @@ module OrchestratorProgram =
         (rebasedReady:
             {| RebasedCommit: CommitHash
                TargetHeadSnapshot: CommitHash |})
-        : Result<PublicationEvidence, OrchestratorVerdict> =
-        match deps.Relay.LifecycleReviewed job.ManagerSessionId job.Worktree.Path with
-        | None -> Error(failed job "publish refused: no durable Reviewed Promoted or Stayed")
-        | Some(_, authority) ->
-            Ok
-                { ManagerJobId = job.JobId
-                  TargetRef = job.TargetRef
-                  ExpectedHead = rebasedReady.TargetHeadSnapshot
-                  CandidateCommit = rebasedReady.RebasedCommit
-                  AuthorityRevision = AuthorityRevision.create authority }
+        : Task<Result<PublicationEvidence, OrchestratorVerdict>> =
+        task {
+            match! deps.Relay.LifecycleReviewed job.ManagerSessionId job.Worktree.Path with
+            | None -> return Error(failed job "publish refused: no durable Reviewed Promoted or Stayed")
+            | Some(_, authority) ->
+                return
+                    Ok
+                        { ManagerJobId = job.JobId
+                          TargetRef = job.TargetRef
+                          ExpectedHead = rebasedReady.TargetHeadSnapshot
+                          CandidateCommit = rebasedReady.RebasedCommit
+                          AuthorityRevision = AuthorityRevision.create authority }
+        }
 
     let private buildClaimPublicationEvidence
         (job: ManagerJob)
@@ -538,9 +541,10 @@ module OrchestratorProgram =
             (rebasedReady:
                 {| RebasedCommit: CommitHash
                    TargetHeadSnapshot: CommitHash |})
-            : Result<PublicationEvidence, OrchestratorVerdict> =
+            : Task<Result<PublicationEvidence, OrchestratorVerdict>> =
+            task {
             if candidate <> rebasedReady.RebasedCommit then
-                Error(
+                return Error(
                     failed
                         job
                         (sprintf
@@ -549,7 +553,7 @@ module OrchestratorProgram =
                             (CommitHash.value rebasedReady.RebasedCommit))
                 )
             elif expectedHead <> rebasedReady.TargetHeadSnapshot then
-                Error(
+                return Error(
                     failed
                         job
                         (sprintf
@@ -558,7 +562,8 @@ module OrchestratorProgram =
                             (CommitHash.value rebasedReady.TargetHeadSnapshot))
                 )
             else
-                buildPublicationEvidence deps job rebasedReady
+                return! buildPublicationEvidence deps job rebasedReady
+            }
 
         let continueCertifiedWithRebased
             (rebasedReady:
@@ -566,7 +571,7 @@ module OrchestratorProgram =
                    TargetHeadSnapshot: CommitHash |})
             =
             task {
-                match certifiedEvidence rebasedReady with
+                match! certifiedEvidence rebasedReady with
                 | Error verdict -> return verdict
                 | Ok evidence -> return! publishValidated evidence
             }

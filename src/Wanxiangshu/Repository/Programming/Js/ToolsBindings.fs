@@ -30,8 +30,8 @@ module JsToolsBindings =
     [<Import("realpathSync", "node:fs")>]
     let private realpathSync (path: string) : string = jsNative
 
-    [<Import("spawnSync", "node:child_process")>]
-    let private spawnSync (file: string) (args: string array) (options: obj) : obj = jsNative
+    [<Import("spawn", "node:child_process")>]
+    let private spawnProcess (file: string) (args: string array) (options: obj) : obj = jsNative
 
     [<Emit("$0 === undefined || $0 === null")>]
     let private isUndefined (value: obj) : bool = jsNative
@@ -352,69 +352,83 @@ module JsToolsBindings =
         else
             Some token
 
+    let private recordPatternFileOption (token: string) (value: string) (found: ResizeArray<string>) =
+        if token = "-f" || token = "--file" then
+            found.Add value
+
+    let private consumePatternOption (args: string array) (index: int) (token: string) (patterns: int ref) (found: ResizeArray<string>) =
+        match optionValue args index with
+        | Some value ->
+            recordPatternFileOption token value found
+            patterns.Value <- patterns.Value + 1
+            index + 2
+        | None -> index + 1
+
+    let private consumePositional (filesOnly: bool) (patterns: int ref) (token: string) (found: ResizeArray<string>) =
+        if not filesOnly && patterns.Value = 0 then
+            patterns.Value <- 1
+        else
+            found.Add token
+
+    let private consumeArgument
+        (args: string array)
+        (index: int)
+        (patterns: int ref)
+        (filesOnly: bool ref)
+        (found: ResizeArray<string>)
+        : int =
+        let token = args[index]
+
+        if token = "--" then
+            args[(index + 1) ..]
+            |> Array.choose pathOperand
+            |> found.AddRange
+            args.Length
+        elif token = "--files" then
+            filesOnly.Value <- true
+            index + 1
+        elif token = "-e" || token = "--regexp" || token = "-f" || token = "--file" then
+            consumePatternOption args index token patterns found
+        elif token.StartsWith "--file=" then
+            found.Add(token.Substring("--file=".Length))
+            patterns.Value <- patterns.Value + 1
+            index + 1
+        elif token.StartsWith "--glob=" || token.StartsWith "--iglob=" || token.StartsWith "-g=" then
+            index + 1
+        elif token = "--glob" || token = "--iglob" || token = "-g" then
+            index + 2
+        elif token.StartsWith "--regexp=" then
+            patterns.Value <- patterns.Value + 1
+            index + 1
+        elif token.StartsWith "--ignore-file=" then
+            found.Add(token.Substring("--ignore-file=".Length))
+            index + 1
+        elif token = "--ignore-file" then
+            optionValue args index |> Option.iter found.Add
+            index + 2
+        elif token.StartsWith "--pre=" || token.StartsWith "--hostname-bin=" || token.StartsWith "--hyperlink-format=" then
+            index + 1
+        elif token = "--pre" || token = "--hostname-bin" || token = "--hyperlink-format" then
+            index + 2
+        elif token.StartsWith "-" then
+            index + 1
+        else
+            consumePositional filesOnly.Value patterns token found
+            index + 1
+
     /// Positional paths plus path-bearing options. Pattern files and search
     /// roots must stay inside the workspace; nothing else is interpreted.
     let private pathArguments (args: string array) =
         let found = ResizeArray<string>()
+        // DSL-MUTABLE: algorithm-scratch — loop index cursor
         let mutable index = 0
-        let mutable patterns = 0
-        let mutable filesOnly = false
+        // DSL-MUTABLE: algorithm-scratch — pattern argument counter
+        let patterns = ref 0
+        // DSL-MUTABLE: algorithm-scratch — files-only flag
+        let filesOnly = ref false
 
         while index < args.Length do
-            let token = args[index]
-
-            if token = "--" then
-                for rest in args[(index + 1) ..] do
-                    match pathOperand rest with
-                    | Some path -> found.Add path
-                    | None -> ()
-
-                index <- args.Length
-            elif token = "--files" then
-                filesOnly <- true
-                index <- index + 1
-            elif token = "-e" || token = "--regexp" || token = "-f" || token = "--file" then
-                match optionValue args index with
-                | Some value ->
-                    if token = "-f" || token = "--file" then
-                        found.Add value
-
-                    patterns <- patterns + 1
-                    index <- index + 2
-                | None -> index <- index + 1
-            elif token.StartsWith "--file=" then
-                found.Add(token.Substring("--file=".Length))
-                patterns <- patterns + 1
-                index <- index + 1
-            elif token.StartsWith "--glob=" || token.StartsWith "--iglob=" || token.StartsWith "-g=" then
-                index <- index + 1
-            elif token = "--glob" || token = "--iglob" || token = "-g" then
-                index <- index + 2
-            elif token.StartsWith "--regexp=" then
-                patterns <- patterns + 1
-                index <- index + 1
-            elif token.StartsWith "--ignore-file=" then
-                found.Add(token.Substring("--ignore-file=".Length))
-                index <- index + 1
-            elif token = "--ignore-file" then
-                match optionValue args index with
-                | Some value -> found.Add value
-                | None -> ()
-
-                index <- index + 2
-            elif token.StartsWith "--pre=" || token.StartsWith "--hostname-bin=" || token.StartsWith "--hyperlink-format=" then
-                index <- index + 1
-            elif token = "--pre" || token = "--hostname-bin" || token = "--hyperlink-format" then
-                index <- index + 2
-            elif token.StartsWith "-" then
-                index <- index + 1
-            else
-                if not filesOnly && patterns = 0 then
-                    patterns <- 1
-                else
-                    found.Add token
-
-                index <- index + 1
+            index <- consumeArgument args index patterns filesOnly found
 
         if found.Count = 0 then
             found.Add "."
@@ -430,81 +444,144 @@ module JsToolsBindings =
 
     /// `rg(argv)` is `rg --json <argv>` with the argv passed through. The
     /// program receives one JSON object, never the JSONL text.
+    [<Emit("""
+(function (spawn, file, args, cwd, maxBuffer) {
+  return new Promise(function (resolve, reject) {
+    let settled = false;
+    const finish = (value) => { if (!settled) { settled = true; resolve(value); } };
+    const fail = (error) => { if (!settled) { settled = true; reject(error); } };
+    let child;
+    try {
+      child = spawn(file, args, { cwd: cwd, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (error) {
+      finish({ status: null, stdout: "", stderr: "", error: { message: String((error && error.message) || error) } });
+      return;
+    }
+    const outChunks = [];
+    const errChunks = [];
+    let outBytes = 0;
+    let errBytes = 0;
+    let overflow = false;
+    const take = (chunks, which) => (chunk) => {
+      const size = chunk && typeof chunk.length === "number" ? chunk.length : 0;
+      if (which === "out") outBytes += size; else errBytes += size;
+      chunks.push(chunk);
+      if (!overflow && (outBytes > maxBuffer || errBytes > maxBuffer)) {
+        overflow = true;
+        child.kill();
+      }
+    };
+    if (child.stdout) child.stdout.on("data", take(outChunks, "out"));
+    if (child.stderr) child.stderr.on("data", take(errChunks, "err"));
+    const text = (chunks) => (chunks.length === 0 ? "" : Buffer.concat(chunks).toString("utf8"));
+    child.on("error", (error) => {
+      if (overflow) {
+        fail(Object.assign(new Error("rg output exceeded " + maxBuffer + " bytes"), { code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" }));
+        return;
+      }
+      finish({ status: null, stdout: "", stderr: "", error: { message: String((error && error.message) || error) } });
+    });
+    child.on("close", (code) => {
+      if (overflow) {
+        fail(Object.assign(new Error("rg output exceeded " + maxBuffer + " bytes"), { code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" }));
+        return;
+      }
+      finish({ status: code, stdout: text(outChunks), stderr: text(errChunks), error: null });
+    });
+  });
+})($0, $1, $2, $3, $4)
+    """)>]
+    let private spawnRgAsync
+        (spawn: obj)
+        (file: string)
+        (args: string array)
+        (cwd: string)
+        (maxBuffer: int)
+        : Task<obj> =
+        jsNative
+
+    let private rgMissingStatusDetail (outcome: obj) : string =
+        if isNull (outcome?error) then
+            "rg produced no exit code"
+        else
+            string (outcome?error?message)
+
+    let private rgExitFailureDetail (stdout: string) (stderr: string) =
+        if System.String.IsNullOrWhiteSpace stderr then stdout else stderr
+
+    let private splitRgPaths (args: string array) (stdout: string) : string array =
+        if Array.exists (fun token -> token = "-0" || token = "--null") args then
+            stdout.Split('\000', System.StringSplitOptions.RemoveEmptyEntries)
+        else
+            stdout.Split('\n', System.StringSplitOptions.RemoveEmptyEntries)
+
+    let private tryParseJsonLine (line: string) : Result<obj, string> =
+        try
+            Ok(parseJson line)
+        with error ->
+            Error(string error?message)
+
+    let private renderRgJsonOutcome (exitCode: int) (stdout: string) : obj =
+        let parsed =
+            stdout.Split('\n', System.StringSplitOptions.RemoveEmptyEntries)
+            |> Array.map tryParseJsonLine
+
+        match parsed |> Array.tryFind _.IsError with
+        | Some(Error detail) -> failureObj (JsFailure.RgFailed detail)
+        | _ ->
+            let messages = parsed |> Array.map (fun item -> item |> Result.defaultValue null)
+            createObj [ "ok" ==> true; "exitCode" ==> exitCode; "messages" ==> messages ]
+
+    let private renderRgOutcome (summary: bool) (args: string array) (outcome: obj) : obj =
+        if isNull (outcome?status) then
+            failureObj (JsFailure.RgFailed (rgMissingStatusDetail outcome))
+        elif int outcome?status <> 0 && int outcome?status <> 1 then
+            let stdout = string outcome?stdout
+            let stderr = string outcome?stderr
+            failureObj (JsFailure.RgFailed (rgExitFailureDetail stdout stderr))
+        elif summary then
+            let exitCode = int outcome?status
+            let stdout = string outcome?stdout
+            createObj [ "ok" ==> true; "exitCode" ==> exitCode; "paths" ==> splitRgPaths args stdout ]
+        else
+            let exitCode = int outcome?status
+            let stdout = string outcome?stdout
+            renderRgJsonOutcome exitCode stdout
+
+    let private isRgSummary (args: string array) : bool =
+        args
+        |> Array.exists (fun token ->
+            token = "--files"
+            || token = "--files-with-matches"
+            || token = "-l"
+            || token = "--files-without-match"
+            || token = "--count"
+            || token = "-c"
+            || token = "--count-matches"
+            || token = "--quiet"
+            || token = "-q"
+            || token = "--vimgrep"
+            || token = "--type-list")
+
+    let private executeRg (root: string) (args: string array) : Task<obj> =
+        task {
+            match pathArguments args |> List.traverseResultM (boundedPath root) with
+            | Error failure -> return failureObj failure
+            | Ok _ ->
+                let summary = isRgSummary args
+                let invocation = if summary then args else Array.append [| "--json" |] args
+                let! outcome = spawnRgAsync spawnProcess "rg" invocation root 16777216
+                return renderRgOutcome summary args outcome
+        }
+
     let private makeRgMember (root: string) =
         "rg"
         ==> fun (argv: obj) ->
             if not (isStringArray argv) then
-                failureObj (JsFailure.InvalidArgument "rg requires one string array argv")
+                Task.FromResult(failureObj (JsFailure.InvalidArgument "rg requires one string array argv"))
             else
                 let args = Array.init (jsLength argv) (fun index -> string (jsItem argv index))
-
-                match pathArguments args |> List.traverseResultM (boundedPath root) with
-                | Error failure -> failureObj failure
-                | Ok _ ->
-                    let summary =
-                        args
-                        |> Array.exists (fun token ->
-                            token = "--files"
-                            || token = "--files-with-matches"
-                            || token = "-l"
-                            || token = "--files-without-match"
-                            || token = "--count"
-                            || token = "-c"
-                            || token = "--count-matches"
-                            || token = "--quiet"
-                            || token = "-q"
-                            || token = "--vimgrep"
-                            || token = "--type-list")
-
-                    let invocation = if summary then args else Array.append [| "--json" |] args
-
-                    let outcome =
-                        spawnSync
-                            "rg"
-                            invocation
-                            (createObj
-                                [ "cwd" ==> root
-                                  "encoding" ==> "utf8"
-                                  "maxBuffer" ==> 16777216 ])
-
-                    if isNull (outcome?status) then
-                        let detail =
-                            if isNull (outcome?error) then
-                                "rg produced no exit code"
-                            else
-                                string (outcome?error?message)
-
-                        failureObj (JsFailure.RgFailed detail)
-                    else
-                        let stdout = string outcome?stdout
-                        let exitCode = int outcome?status
-
-                        if exitCode <> 0 && exitCode <> 1 then
-                            let stderr = string outcome?stderr
-                            let detail = if System.String.IsNullOrWhiteSpace stderr then stdout else stderr
-                            failureObj (JsFailure.RgFailed detail)
-                        elif summary then
-                            let paths =
-                                if Array.exists (fun token -> token = "-0" || token = "--null") args then
-                                    stdout.Split('\000', System.StringSplitOptions.RemoveEmptyEntries)
-                                else
-                                    stdout.Split('\n', System.StringSplitOptions.RemoveEmptyEntries)
-
-                            createObj [ "ok" ==> true; "exitCode" ==> exitCode; "paths" ==> paths ]
-                        else
-                            let parsed =
-                                stdout.Split('\n', System.StringSplitOptions.RemoveEmptyEntries)
-                                |> Array.map (fun line ->
-                                    try
-                                        Ok(parseJson line)
-                                    with error ->
-                                        Error(string error?message))
-
-                            match parsed |> Array.tryFind _.IsError with
-                            | Some(Error detail) -> failureObj (JsFailure.RgFailed detail)
-                            | _ ->
-                                let messages = parsed |> Array.map (fun item -> item |> Result.defaultValue null)
-                                createObj [ "ok" ==> true; "exitCode" ==> exitCode; "messages" ==> messages ]
+                executeRg root args
 
     /// stat(path): metadata; a missing path is a normal `exists = false`.
     let private makeStatMember (root: string) =

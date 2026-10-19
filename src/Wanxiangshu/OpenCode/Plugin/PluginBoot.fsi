@@ -7,7 +7,6 @@ open Wanxiangshu.Git
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Knowledge.Casebook
-open Wanxiangshu.Strength.OpenCode
 
 module PluginBoot =
 
@@ -19,16 +18,11 @@ module PluginBoot =
             PortOpt: IOpenCodePort option
             Journal: AgentJournal option
             Scope: PluginRuntimeScope
-            StrengthScope: PluginStrengthScope
             Clock: IClockPort
             Timer: ITimerPort
-            StrengthFailFuse: string -> unit
             CasebookSettlements: CasebookSettlementOwner
             WorkspaceDirectory: string option
             FamilyParent: SessionId -> SessionId option
-            /// host-boundary-032 / process-local protocol argument
-            /// snapshot store, keyed by (sessionId, callId). Never persisted.
-            ProtocolArgumentVault: ProtocolArgumentVault.Vault
         }
 
     val create: input: obj -> Task<Boot>

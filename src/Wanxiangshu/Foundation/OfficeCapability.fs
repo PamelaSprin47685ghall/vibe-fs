@@ -20,7 +20,6 @@ type ToolPermission =
     | Exec
     | Pty
     | ReviewAssessment
-    | Chronicle
     /// CASE-009: conditional Casebook read surface for Engineer.
     | Fetch
     /// GLORY-036: the Manager's own end-of-life tool (`deliver`).
@@ -132,7 +131,6 @@ module OfficeCapability =
                   ToolPermission.DevOpsConsultation
                   ToolPermission.Review
                   ToolPermission.Deliver ]
-        | Role.Blogger -> Set.empty
 
     let isAllowed (role: Role) (permission: ToolPermission) : bool =
         if Roles.all |> List.contains role then
@@ -191,7 +189,6 @@ module OfficeCapability =
         | ToolPermission.Review -> "Review"
         | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
         | ToolPermission.Advisor -> "Advisor"
-        | ToolPermission.Chronicle -> "Chronicle"
 
     /// Unknown labels are not a permission.
     let permissionOfLabel (label: string) : ToolPermission option =

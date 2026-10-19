@@ -334,11 +334,10 @@ module JsRunLoop =
     let private verdictOf (raw: obj) : Verdict =
         if isNullish raw then
             Continue
+        elif typeOf raw = "boolean" && unbox<bool> raw then
+            Continue
         elif typeOf raw = "boolean" then
-            if unbox<bool> raw then
-                Continue
-            else
-                Abort "watch returned false"
+            Abort "watch returned false"
         elif hasProperty raw "abort" && not (isNullish (getProperty raw "abort")) then
             Abort(string (getProperty raw "abort"))
         elif hasProperty raw "park" then
@@ -416,6 +415,24 @@ module JsRunLoop =
         else
             int (unbox<float> value)
 
+    /// Parse the `{ send }` step: the flat spelling `{ send: input, name }`
+    /// and the nested spelling `{ send: { input, name } }` both spell one
+    /// signal-free write to a running child.
+    let private parseSendChildCommand (raw: obj) : StepCommand =
+        let send = getProperty raw "send"
+        let topName = string (getProperty raw "name")
+
+        if isString send then
+            // Flat spelling { send: input, name }: the tool description once
+            // promised it, so it stays a legal alias of the nested form.
+            SendChild(topName, string send)
+        else
+            let inputValue = getProperty send "input"
+            let input = if isNullish inputValue then "" else string inputValue
+            let nameValue = getProperty send "name"
+            let targetName = if isNullish nameValue then topName else string nameValue
+            SendChild(targetName, input)
+
     let private parseStepCommand (raw: obj) : StepCommand =
         if isNullish raw then
             EndOfRun
@@ -426,23 +443,7 @@ module JsRunLoop =
         elif hasProperty raw "signal" then
             SignalChild(string (getProperty raw "name"), parseSignalName raw)
         elif hasProperty raw "send" then
-            let send = getProperty raw "send"
-
-            if isString send then
-                // Flat spelling { send: input, name }: the tool description once
-                // promised it, so it stays a legal alias of the nested form.
-                SendChild(string (getProperty raw "name"), string send)
-            else
-                let inputValue = getProperty send "input"
-                let input = if isNullish inputValue then "" else string inputValue
-                let nameValue = getProperty send "name"
-
-                if isNullish nameValue then
-                    // Nested payload without its own name falls back to the
-                    // top-level name: { send: { input }, name }.
-                    SendChild(string (getProperty raw "name"), input)
-                else
-                    SendChild(string nameValue, input)
+            parseSendChildCommand raw
         elif hasProperty raw "waitFor" then
             let waitFor = getProperty raw "waitFor"
             WaitForPort(int (unbox<float> (getProperty waitFor "port")), parseWaitForTimeout waitFor)
@@ -592,7 +593,7 @@ module JsRunLoop =
             let deadlineMs = startedMs + maxDurationMs
             let children = Dictionary<string, ManagedChild>()
             let output = OutputBuffer()
-            // // DSL-MUTABLE: algorithm-scratch — loop step counter shared with
+            // DSL-MUTABLE: algorithm-scratch — loop step counter shared with
             // checkContext (a ref cell: a closure cannot capture a mutable let)
             let stepCell = ref 0
             // DSL-MUTABLE: algorithm-scratch — overall loop state
@@ -904,6 +905,100 @@ module JsRunLoop =
                         outcomeReason
         }
 
+    let private sanityPayload (message: string) (returned: obj) : obj =
+        createObj [ "sanity" ==> createObj [ "failure" ==> message; "returned" ==> returned ] ]
+
+    let private isVeto (verdict: obj) : bool =
+        (typeOf verdict = "boolean" && not (unbox<bool> verdict))
+        || (hasProperty verdict "abort" && not (isNullish (getProperty verdict "abort")))
+
+    type private SanityThunks = { NextDone: obj; WatchVeto: obj }
+
+    type private SanityFailure =
+        | SpecIncomplete of error: obj
+        | SanityFault of payload: obj
+
+    let private extractSanityThunks (sanity: obj) : Result<SanityThunks, SanityFailure> =
+        let nextDone = getProperty sanity "nextDone"
+        let watchVeto = getProperty sanity "watchVeto"
+
+        if not (isFunction nextDone) || not (isFunction watchVeto) then
+            Error(
+                SpecIncomplete(
+                    failure
+                        "RUNNABLE_SPEC_INCOMPLETE"
+                        "sanity() must return { nextDone, watchVeto } — two thunks, each returning the argument array the host applies"
+                )
+            )
+        else
+            Ok { NextDone = nextDone; WatchVeto = watchVeto }
+
+    let private validateSanityNext (spec: RunnableValidated) (nextDone: obj) : Task<Result<unit, SanityFailure>> =
+        task {
+            let! nextArgs = awaitJs (invokeThunk nextDone)
+            let! nextResult = awaitJs (applyArgumentArray (getProperty spec.Instance "next") spec.Instance nextArgs)
+
+            if not (isArray nextArgs) || not (isNullish nextResult) then
+                let message =
+                    sanityMessage
+                        (isArray nextArgs)
+                        "next has no null path — the termination condition does not exist yet"
+                        "nextDone must return the argument array for next — the program does not call next"
+
+                return Error(SanityFault(sanityPayload message nextResult))
+            else
+                return Ok ()
+        }
+
+    let private validateSanityWatch (spec: RunnableValidated) (watchVeto: obj) : Task<Result<unit, SanityFailure>> =
+        task {
+            let! watchArgs = awaitJs (invokeThunk watchVeto)
+            let! watchVerdict = awaitJs (applyArgumentArray (getProperty spec.Instance "watch") spec.Instance watchArgs)
+
+            if not (isArray watchArgs) || not (isVeto watchVerdict) then
+                let message =
+                    sanityMessage
+                        (isArray watchArgs)
+                        "watch has no veto path — the watchdog cannot say no"
+                        "watchVeto must return the argument array for watch — the program does not call watch"
+
+                return Error(SanityFault(sanityPayload message watchVerdict))
+            else
+                return Ok ()
+        }
+
+    let private executeSanityProof
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        (root: string)
+        (stack: string)
+        (spec: RunnableValidated)
+        : Task<obj> =
+        task {
+            let verifiedThunks: Task<Result<unit, SanityFailure>> =
+                taskResult {
+                    let! sanityRaw = awaitJs (callSanity spec.Instance) |> TaskResultCE.ofTask
+                    let! thunks = extractSanityThunks sanityRaw
+                    do! validateSanityNext spec thunks.NextDone
+                    do! validateSanityWatch spec thunks.WatchVeto
+                    return ()
+                }
+
+            let! outcome =
+                task {
+                    try
+                        return! verifiedThunks
+                    with ex ->
+                        return Error(SanityFault(sanityPayload (string ex.Message) null))
+                }
+
+            match outcome with
+            | Error(SpecIncomplete fail) -> return fail
+            | Error(SanityFault payload) -> return! parkOrFailProof parkState stack payload
+            | Ok () ->
+                let fresh = construct spec.Class
+                return! executeValidated parkState root stack { spec with Instance = fresh }
+        }
+
     /// Execute one Runnable class. `root` is the shell working directory;
     /// `stack` is the model stack captured at the `js.run(...)` call site so a
     /// check-park carries the same execution marker as a direct park.
@@ -916,60 +1011,4 @@ module JsRunLoop =
         match validateRunnableSpec runnableClass with
         | Error fail -> Task.FromResult fail
         | Ok spec ->
-            task {
-                // The proof runs on its own construction so its mocked state
-                // never leaks into the real run; Runnable constructors must
-                // stay pure. A failed proof parks with its diagnosis; the
-                // injected unpark value becomes the js.run outcome.
-                // Sanity runs before anything else, on its own instance; the real
-                // run uses a fresh construction, so the thunks' mocked state never
-                // leaks. The host drives the two thunks and calls next and watch
-                // with the argument arrays they return. The program never calls
-                // those methods; a missing exit parks with its diagnosis.
-                let sanityPayload (message: string) (returned: obj) =
-                    createObj [ "sanity" ==> createObj [ "failure" ==> message; "returned" ==> returned ] ]
-
-                let isVeto (verdict: obj) =
-                    (typeOf verdict = "boolean" && not (unbox<bool> verdict))
-                    || (hasProperty verdict "abort" && not (isNullish (getProperty verdict "abort")))
-
-                try
-                    let! sanity = awaitJs (callSanity spec.Instance)
-                    let nextDone = getProperty sanity "nextDone"
-                    let watchVeto = getProperty sanity "watchVeto"
-
-                    if not (isFunction nextDone) || not (isFunction watchVeto) then
-                        return
-                            failure
-                                "RUNNABLE_SPEC_INCOMPLETE"
-                                "sanity() must return { nextDone, watchVeto } — two thunks, each returning the argument array the host applies"
-                    else
-                        let! nextArgs = awaitJs (invokeThunk nextDone)
-                        let! nextResult = awaitJs (applyArgumentArray (getProperty spec.Instance "next") spec.Instance nextArgs)
-
-                        if not (isArray nextArgs) || not (isNullish nextResult) then
-                            let message = sanityMessage (isArray nextArgs) "next has no null path — the termination condition does not exist yet" "nextDone must return the argument array for next — the program does not call next"
-
-                            return!
-                                parkOrFailProof
-                                    parkState
-                                    stack
-                                    (sanityPayload message nextResult)
-                        else
-                            let! watchArgs = awaitJs (invokeThunk watchVeto)
-                            let! watchVerdict = awaitJs (applyArgumentArray (getProperty spec.Instance "watch") spec.Instance watchArgs)
-
-                            if not (isArray watchArgs) || not (isVeto watchVerdict) then
-                                let message = sanityMessage (isArray watchArgs) "watch has no veto path — the watchdog cannot say no" "watchVeto must return the argument array for watch — the program does not call watch"
-
-                                return!
-                                    parkOrFailProof
-                                        parkState
-                                        stack
-                                        (sanityPayload message watchVerdict)
-                            else
-                                let fresh = construct spec.Class
-                                return! executeValidated parkState root stack { spec with Instance = fresh }
-                with ex ->
-                    return! parkOrFailProof parkState stack (sanityPayload (string ex.Message) null)
-            }
+            executeSanityProof parkState root stack spec

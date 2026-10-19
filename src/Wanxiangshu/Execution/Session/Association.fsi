@@ -13,7 +13,6 @@ type ManagedSessionKind =
 type SessionAssociation =
     { SessionId: SessionId
       Kind: ManagedSessionKind
-      BloggerSessionId: SessionId option
       ParentSessionId: SessionId option }
 
 [<RequireQualifiedAccess>]
@@ -29,11 +28,10 @@ module SessionAssociationProjection =
     val tryFind: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionAssociation option
     val isCompanion: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> bool
     val isSatellite: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> bool
+    val tryCompanionOf: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionId option
     val executionClassOf: kind: ManagedSessionKind -> SessionExecutionClass
     val tryMainSessionOf: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionId option
     val tryOwnerOf: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionId option
-    val tryBloggerOf: sessionId: SessionId -> current: Map<SessionId, SessionAssociation> -> SessionId option
-
     val linkSatellite:
         kind: SatelliteKind ->
         mainSessionId: SessionId ->
@@ -44,7 +42,7 @@ module SessionAssociationProjection =
 
     val link:
         mainSessionId: SessionId ->
-        bloggerSessionId: SessionId ->
+        companionSessionId: SessionId ->
         parentOfMain: SessionId option ->
         current: Map<SessionId, SessionAssociation> ->
             Result<Map<SessionId, SessionAssociation>, AssociationRejection>
@@ -67,7 +65,5 @@ module SyncDelegateAssociationHints =
     val dedicatedExecutionClass: SessionExecutionClass
     val dedicatedOwnership: owner: SessionId -> role: SyncDelegateRole -> SessionOwnership
 
-module StrengthReplicaAssociationHints =
-    val executionClass: SessionExecutionClass
-    val ownership: owner: SessionId -> SessionOwnership
-    val isStrengthReplicaAttachment: (AttachmentKind -> bool)
+
+

@@ -53,7 +53,3 @@ Plan tenure 交接通过 `TenureReanchored` 收容：epoch 加一、清除旧快
 ## [014] 标记后缀正文不进入业务 trace
 
 标记后缀正文只参与 provider 呈现，不进入业务消息快照、TOML 视图渲染或 compaction 输入。仅其 durable occurrence 投影参与恢复。
-
-## [015] synthetic identity 确定性
-
-Synthetic ID 由持久化身份材料或原消息 ID（如 `#summary`）确定性派生，不用 GUID、随机数、时间戳或临时运行时 ID。

@@ -49,8 +49,10 @@ test('WHAT[process-execution-011] js.run rejects unsupported command descriptors
       dir,
       `    return await js.run(class extends js.Runnable {
       maxDuration = 2000;
-      next() { return { unsupported: true }; }
+      next(ctx) { return ctx.step === 0 ? { unsupported: true } : null; }
       check() { return true; }
+      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
+      sanity() { return { nextDone: () => [{ root: '/', step: 1 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
     });`,
     )
     assert.equal(caseName(outcome), 'Failed')
@@ -71,6 +73,8 @@ test('WHAT[process-execution-011] js.run maxDuration overrun terminates the fore
       interval = 30;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late-marker" : null; }
       check() { return true; }
+      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
+      sanity() { return { nextDone: () => [{ root: '/', step: 1 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
     });`,
     )
     assert.equal(caseName(outcome), 'Succeeded')

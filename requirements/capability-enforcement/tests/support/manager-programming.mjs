@@ -181,14 +181,6 @@ test('WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_n
   assert.equal(rolePredicate('todowrite-for-engineer', 'manager'), false, 'Manager must deny todowrite-for-engineer')
   assert.equal(rolePredicate('todowrite-for-devops', 'manager'), false, 'Manager must deny todowrite-for-devops')
   assert.equal(generateRole('bookkeeper', 'en'), null, 'Bookkeeper generates no public surface')
-
-  // StrengthReplica 投机只读通道不包含 todowrite-for-manager
-  const replicaTools = capabilityToolNames('manager', 'strength-replica')
-  assert.equal(
-    replicaTools.includes('todowrite-for-manager'),
-    false,
-    'StrengthReplica must not include todowrite-for-manager',
-  )
 })
 
 test('WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data', async () => {

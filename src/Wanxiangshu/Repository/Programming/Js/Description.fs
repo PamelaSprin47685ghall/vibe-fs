@@ -570,7 +570,7 @@ module JsCanonicalDescription =
 
     let private deliverStub (prose: Prose) =
         fill
-            """  async deliver(value) {
+            """  async deliver(value, view) {
     // {{comment_host_capability}}
   }"""
             [ "comment_host_capability", prose.CommentHostCapability ]
@@ -1387,7 +1387,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
       const lines = [node.charge];
       for (const dep of node.deps || []) {
         const record = results[dep];
-        if (record) lines.push("--- " + dep + " ---\\n" + (record.workRecord || ""));
+        if (record) lines.push("--- " + dep + " ---\\n" + (record.view || ""));
       }
       return lines.join("\\n");
     };
@@ -1489,9 +1489,9 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
   }"""
                   []
               fill
-                  """  async deliver(value) {
+                  """  async deliver(value, view) {
     const err = new Error("delivered");
-    err.__jsDelivered = { value: value };
+    err.__jsDelivered = { value: value, view: view };
     throw err;
   }"""
                   []

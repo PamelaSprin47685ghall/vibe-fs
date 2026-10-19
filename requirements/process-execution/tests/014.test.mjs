@@ -26,6 +26,8 @@ test('WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction'
       interval = 50;
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
       check() { return true; }
+      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0 && ctx.exitCode !== 7) return { abort: "command failed" }; return true; }
+      sanity() { return { nextDone: () => [{ root: '/', step: 1 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
     });`,
     )
     assert.equal(caseName(outcome), 'Succeeded')
@@ -79,6 +81,8 @@ test('WHAT[process-execution-014] truncated_output_preserves_program_facts_witho
         return null;
       }
       check() { return true; }
+      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0 && ctx.exitCode !== 7) return { abort: "command failed" }; return true; }
+      sanity() { return { nextDone: () => [{ root: '/', step: 2 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
       onExit(res) { exited = { exitCode: res.exitCode, stdout: res.stdout, stderr: res.stderr }; }
     });
     return { exitCode: r.exitCode, exitedCode: exited.exitCode, truncated: r.truncated, bytes: r.bytes, endsWithExitCodeZeroText: exited.stdout.endsWith("EXIT-CODE=0") };`,

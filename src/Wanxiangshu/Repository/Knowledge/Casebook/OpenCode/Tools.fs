@@ -1,5 +1,6 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
 
+open System.Threading.Tasks
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Knowledge.Casebook
@@ -18,20 +19,26 @@ module CasebookTools =
         (factory: HostToolFactory)
         (workspaceRoot: string)
         (owner: CasebookSettlementOwner)
-        : ToolSpec list =
+        : Task<ToolSpec list> =
+        task {
         try
-            let store = WorkspaceEventStore.acquire (RuntimePath.stateRoot workspaceRoot)
+            let! commonDir = RuntimePath.stateRoot workspaceRoot
+            let store = WorkspaceEventStore.acquire commonDir
 
-            [ FetchTool.spec factory workspaceRoot store owner
-              JsBookkeeperTool.spec factory ]
+            return
+                [ FetchTool.spec factory workspaceRoot store owner
+                  JsBookkeeperTool.spec factory ]
         with _ ->
-            []
+            return []
+        }
 
-    let buildSpecs (factory: HostToolFactory) (workspaceRoot: string) (owner: CasebookSettlementOwner) : ToolSpec list =
+    let buildSpecs (factory: HostToolFactory) (workspaceRoot: string) (owner: CasebookSettlementOwner) : Task<ToolSpec list> =
+        task {
         if isNull (box owner) then
             nullArg "owner"
 
         if not (CasebookFeature.isEnabled workspaceRoot) then
-            []
+            return []
         else
-            tryBuildSpecs factory workspaceRoot owner
+            return! tryBuildSpecs factory workspaceRoot owner
+        }

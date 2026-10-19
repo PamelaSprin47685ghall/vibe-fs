@@ -167,15 +167,7 @@ const handleProvider = async (request, response) => {
     return
   }
   if (!names.includes('todowrite-for-manager')) {
-    const chronicle = body.tools?.find(tool => tool.function?.name === 'chronicle')
-    if (chronicle) {
-      sendSSE(response, buildToolCallChunks('chronicle', 'chronicle', JSON.stringify({
-        charge: 'Preserve the user input evidence.', occurrence: 'A fresh user input arrived.',
-        settlement: 'The current output was not interrupted.', consequence: 'The next request received the input.',
-        tipName: 'user-input-evidence', opinion: 'User input must not interrupt running work.',
-        advice: 'Carry the user input into the next step.',
-      }), 1))
-    } else sendSSE(response, buildTextChunks('auxiliary', 'Auxiliary response.', 1))
+    sendSSE(response, buildTextChunks('auxiliary', 'Auxiliary response.', 1))
     return
   }
   if (guidanceMode && messageID === rootID) {
@@ -281,7 +273,6 @@ try {
     extraEnv: { WXS_USER_INPUT_PLUGIN: path.join(root, 'dist/OpenCode/Plugin/Plugin.js'), WXS_USER_INPUT_COLLECTOR: collectorUrl },
     ...(capacityOne ? { routingSource: `export const routingProtocol = 2
 export const hasTheoreticalCapacity = () => true
-export const predictorConfiguration = () => ({ state: 'unconfigured', reason: null })
 export default function route(role, running) {
   if (role !== 'manager') return { model: 'test/test-model-b', reasoning: 'none' }
   return running.filter(target => target.model === 'test/test-model').length < 1

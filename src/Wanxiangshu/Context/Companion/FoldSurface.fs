@@ -5,15 +5,11 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact
-open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Guidance
-open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Interaction.Authority
@@ -38,9 +34,6 @@ module ContextFoldSurface =
 
     let private prefixEpoch (value: obj) =
         PrefixEpochId.create (Int64.Parse(text value))
-
-    let private bloggerRequest (value: obj) = BloggerRequestId.create (text value)
-    let private promptKey (value: obj) = PromptKey.create (text value)
 
     let private optionalText (value: obj) =
         if isNull value then None else Some(text value)
@@ -83,17 +76,6 @@ module ContextFoldSurface =
 
     let private companionFact (caseName: string) (payload: obj) : AgentFact =
         match caseName with
-        | "CompanionBloggerLinked" ->
-            AgentFact.Companion(
-                CompanionFactCases.CompanionBloggerLinked
-                    {| SessionId = sessionId (payload?SessionId)
-                       BloggerSessionId = sessionId (payload?BloggerSessionId)
-                       BloggerAgent = text (payload?BloggerAgent) |}
-            )
-        | "CompanionBloggerClosed" ->
-            AgentFact.Companion(
-                CompanionFactCases.CompanionBloggerClosed {| SessionId = sessionId (payload?SessionId) |}
-            )
         | "OpeningPromptCaptured" ->
             AgentFact.Companion(
                 CompanionFactCases.OpeningPromptCaptured
@@ -131,43 +113,6 @@ module ContextFoldSurface =
 
     let private contextFact (caseName: string) (payload: obj) : AgentFact =
         match caseName with
-        | "BlogObservationCommitted" ->
-            AgentFact.Context(
-                ContextFactCases.BlogObservationCommitted
-                    {| SessionId = sessionId (payload?SessionId)
-                       BloggerSessionId = sessionId (payload?BloggerSessionId)
-                       RequestId = bloggerRequest (payload?RequestId)
-                       FrameEpochId = frameEpoch (payload?FrameEpochId)
-                       PreviousIngestedThroughSequence = int64Value (payload?PreviousIngestedThroughSequence)
-                       NextIngestedThroughSequence = int64Value (payload?NextIngestedThroughSequence)
-                       PreviousCoverableTurnCutoffExclusive = intValue (payload?PreviousCoverableTurnCutoffExclusive)
-                       NextCoverableTurnCutoffExclusive = intValue (payload?NextCoverableTurnCutoffExclusive)
-                       NextCoveredPrefixDigest = text (payload?NextCoveredPrefixDigest)
-                       TextRef = blobRef (payload?TextRef)
-                       TextDigest = blobDigest (payload?TextDigest)
-                       ProviderRun = providerRun (payload?ProviderRun)
-                       ToolCallIds = toolCallList (payload?ToolCallIds)
-                       TipName = text (payload?TipName)
-                       TipTextRef = optionalBlobRef (payload?TipTextRef)
-                       TipTextDigest = optionalBlobDigest (payload?TipTextDigest)
-                       EvidenceRef = optionalBlobRef (payload?EvidenceRef)
-                       ObservedPrefixEpochId = prefixEpoch (payload?ObservedPrefixEpochId) |}
-            )
-        | "PrefixRebaseCommitted" ->
-            AgentFact.Context(
-                ContextFactCases.PrefixRebaseCommitted
-                    {| SessionId = sessionId (payload?SessionId)
-                       PreviousEpochId = prefixEpoch (payload?PreviousEpochId)
-                       NextEpochId = prefixEpoch (payload?NextEpochId)
-                       FrozenRecordPrefixRef = blobRef (payload?FrozenRecordPrefixRef)
-                       FrozenRecordPrefixDigest = blobDigest (payload?FrozenRecordPrefixDigest)
-                       CutoffExclusive = intValue (payload?CutoffExclusive)
-                       CoveredPrefixDigest = text (payload?CoveredPrefixDigest)
-                       SealRoot = text (payload?SealRoot)
-                       SyntheticMessageId = text (payload?SyntheticMessageId)
-                       ProbeId = text (payload?ProbeId)
-                       SolvingProviderRun = providerRun (payload?SolvingProviderRun) |}
-            )
         | "ContextReanchored" ->
             AgentFact.Context(
                 ContextFactCases.ContextReanchored
@@ -217,48 +162,11 @@ module ContextFoldSurface =
           ProviderRun = optionalProviderRun (value?run)
           Fact = fact }
 
-    let private prefixSnapshotToJs snapshot =
-        match snapshot with
-        | None -> null
-        | Some value ->
-            box
-                {| FrozenRecordPrefixRef = BlobRef.value value.FrozenRecordPrefixRef
-                   FrozenRecordPrefixDigest = BlobDigest.value value.FrozenRecordPrefixDigest
-                   CutoffExclusive = value.CutoffExclusive
-                   CoveredPrefixDigest = value.CoveredPrefixDigest
-                   SealRoot = value.SealRoot
-                   SyntheticMessageId = value.SyntheticMessageId |}
-
-    // Explicit annotation: `open ...Blogger.Runtime` also brings OpenBloggerRequest
-    // (same FrameEpochId field) into scope, and unannotated record-field inference
-    // would resolve `state` to the wrong type.
-    let private blogToJs (blog: BlogProjectionState option) =
-        match blog with
-        | None -> null
-        | Some state ->
-            box
-                {| FrameEpochId = FrameEpochId.value state.FrameEpochId
-                   FrameKinds =
-                    state
-                    |> BlogProjection.frames
-                    |> List.map (fun frame -> string frame.Kind)
-                    |> List.toArray
-                   FrameCount = BlogProjection.frameCount state
-                   Coverage =
-                    box
-                        {| IngestedThroughSequence = state.Coverage.IngestedThroughSequence
-                           CoverableTurnCutoffExclusive = state.Coverage.CoverableTurnCutoffExclusive
-                           CoveredPrefixDigest = state.Coverage.CoveredPrefixDigest |} |}
-
     let private companionToJs (companion: CompanionProjection option) =
         match companion with
         | None -> null
-        | Some state ->
-            box
-                {| BloggerSessionId =
-                    match state.BloggerSessionId with
-                    | None -> null
-                    | Some blogger -> box (SessionId.value blogger) |}
+        | Some _ ->
+            box {| sessionPresent = true |}
 
     let private xTraceToJs (xTrace: XTraceProjectionState option) =
         match xTrace with
@@ -353,43 +261,7 @@ module ContextFoldSurface =
                lastAuthorityProfile = state.LastAuthorityProfile |> Option.map authorityProfileToJs |> Option.toObj
                pendingClaimCount = Map.count state.PendingClaims
                acceptedDispatchCount = Map.count state.AcceptedDispatches
-               physicalLandingCount = Map.count state.PhysicalLandings
-               acceptedContinuationCount = Map.count state.AcceptedContinuationIds
-               claimSequenceKeys = state.ClaimSequences |> Map.toList |> List.map fst |> List.toArray |}
-
-    let private enforcementToJs (state: EnforcementProjectionState) : obj =
-        box
-            {| cycleCount = Map.count state.ByProviderRun
-               cycles =
-                state.ByProviderRun
-                |> Map.toList
-                |> List.map (fun (providerRun, record) ->
-                    box
-                        {| providerRun = ProviderRunIdentity.value providerRun
-                           mainSessionId = SessionId.value record.MainSessionId
-                           bloggerSessionId = SessionId.value record.BloggerSessionId
-                           tipName = record.TipName
-                           toolCallCount = List.length record.ToolCallIds |})
-                |> List.toArray
-               recentTips =
-                state.RecentTips
-                |> List.map (fun tip ->
-                    box
-                        {| tipName = tip.TipName
-                           cycleId = tip.CycleId |})
-                |> List.toArray |}
-
-    let private bloggerCyclesToJs (state: BloggerCycleProjectionState) : obj =
-        box
-            {| receiptCount = Map.count state.ByProviderRun
-               receiptRuns =
-                state.ByProviderRun
-                |> Map.toList
-                |> List.map (fst >> ProviderRunIdentity.value)
-                |> List.toArray
-               openRequestCount = Map.count state.OpenByRequestId
-               openByBloggerCount = Map.count state.OpenByBlogger
-               providerRunByRequestIdCount = Map.count state.ProviderRunByRequestId |}
+               acceptedContinuationCount = Map.count state.AcceptedContinuationIds |}
 
     let private guidelinesToJs (state: GuidelineProjectionState) : obj =
         box
@@ -405,10 +277,6 @@ module ContextFoldSurface =
                            callId = ToolCallId.value pair.CallId
                            markerText = pair.MarkerText |})
                 |> List.toArray |}
-    let private tipDeliveryToJs (state: TipDeliveryProjectionState) : obj =
-        box
-            {| deliveredOccurrences = state.DeliveredOccurrences |> Set.toList |> List.toArray
-               coveredTipNames = state.CoveredTipNames |> Set.toList |> List.toArray |}
 
     let private sessionStartedAtToJs (state: SessionStartedAtProjectionState) : obj =
         box {| startedAt = (SessionStartedAtProjection.startedAt state).ToString("o") |}
@@ -422,21 +290,15 @@ module ContextFoldSurface =
         box
             {| Companion = companionToJs session.Companion
                XTrace = xTraceToJs session.XTrace
-               Blog = blogToJs session.Blog
                PrefixEpoch =
                 match session.PrefixEpoch with
                 | None -> null
                 | Some epoch ->
-                    box
-                        {| EpochId = PrefixEpochId.value epoch.EpochId
-                           Snapshot = prefixSnapshotToJs epoch.Snapshot |}
+                    box {| EpochId = PrefixEpochId.value epoch.EpochId |}
                Handles = session.Handles |> Option.map handlesToJs |> Option.toObj
                ProviderFailures = session.ProviderFailures |> Option.map providerFailuresToJs |> Option.toObj
                PromptAuthority = session.PromptAuthority |> Option.map promptAuthorityToJs |> Option.toObj
-               Enforcement = session.Enforcement |> Option.map enforcementToJs |> Option.toObj
-               BloggerCycles = session.BloggerCycles |> Option.map bloggerCyclesToJs |> Option.toObj
                Guidelines = session.Guidelines |> Option.map guidelinesToJs |> Option.toObj
-               TipDelivery = session.TipDelivery |> Option.map tipDeliveryToJs |> Option.toObj
                SessionStartedAt = session.SessionStartedAt |> Option.map sessionStartedAtToJs |> Option.toObj
                DelegatedToolEstimate =
                 session.DelegatedToolEstimate

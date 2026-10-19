@@ -16,7 +16,6 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Repository.Programming.Js.OpenCode
@@ -338,9 +337,6 @@ module PairProgrammingThoughtTransform =
     /// 组内排序唯一合法：`Ordinal` 升序。
     ///
     /// Anchor 不在当前真实消息里的 historical pair **不重放、不报错**。
-    /// XWire prefix probe 用 FrozenRecordPrefix 替换已覆盖前缀时会 drop 那些
-    /// 消息（CTX-010 canonical `CutoffExclusive`）；被覆盖区里的 pair 属于被替换的前缀，
-    /// 不应再注入 rewritten view，更不能因此 AbortSession 杀死当前物理 retry。
     /// Durable fact 仍保留；完整 transcript 回来时 anchor 在场即可再 replay。
     let cursorGuidanceSeparator = "\u0000\uFEFF"
 
@@ -1306,11 +1302,7 @@ module PairProgrammingThoughtTransform =
         (restartGuidance: string option)
         : Task<LlmFacing.Document> =
         task {
-            let! guidance =
-                match journal, projectionSessionIdOpt with
-                | Some durable, Some sessionId ->
-                    EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
-                | _ -> Task.FromResult None
+            let guidance : string option = None
 
             // Algorithm G2: every round that carries a PairHint also lists the
             // unresolved parked handles, so the AI is pressed to take a

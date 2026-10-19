@@ -34,7 +34,6 @@ module ManagedChatProviderLifecycle =
         acceptedEvidence: AcceptedChatExecutionEvidence ->
         providerRun: ProviderRunIdentity ->
         requestKind: ProviderRequestKind ->
-        projectionChoice: XProjectionChoice ->
             Task<Result<ManagedChatProviderStartedWitness, ManagedChatProviderLifecycleError>>
 
     val terminal:
