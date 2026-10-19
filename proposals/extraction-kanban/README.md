@@ -178,7 +178,7 @@ A—H 是完整迁移的工作范围，可以由拆分方、修复方和集成�
 
 ## 8. 两仓发布与主仓集成，统一串行
 
-本节保留本地当前 vendor 交付流程，不作为上游源码接入的要求。上游已改用 submodule/`file:wanxiangli`，临时发行包不得入 Git；其旧施工说明与 distribution 条款仍待维护者统一，见[原要求对照](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#original-requirements-alignment)。
+主仓本批已按[语义整合计划](UPSTREAM-SEMANTIC-MERGE-2026-10-19.md)接入固定源码子模块与`file:wanxiangli`，当前构建和实际安装以该计划、`.gitmodules`及distribution条款为准。以下vendor步骤仅保留此前交付记录，不作为当前主仓接入命令；历史取证归档按固定路径和摘要保留，临时运行依赖包不得入Git。原要求及尚未完成的上游协作见[原要求对照](LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md#original-requirements-alignment)。
 
 库发布负责人从已审的精确提交建立干净发布工作树，集中处理 package version、exports、files、锁与产物。以下流程没有 `npm publish`；公共 registry 发布不是本计划的默认动作。
 
