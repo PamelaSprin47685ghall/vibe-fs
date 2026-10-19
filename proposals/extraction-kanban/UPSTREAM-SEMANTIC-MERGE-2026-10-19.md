@@ -27,8 +27,8 @@
 
 | 包 | 范围 | 依赖 | 状态 | 验收记录 |
 |---|---|---|---|---|
-| SM-01 | 固定版本、语义处置、条款与测试锚点冲突、基线证据 | — | DOING | 本文与处置表已建立；以下关键裁决待核对 |
-| SM-02A | 库历史整合、Journal/Process/Supervision/Trace 本地保证与上游 Work 规则并存 | SM-01 | READY | 未运行 |
+| SM-01 | 固定版本、语义处置、条款与测试锚点冲突、基线证据 | — | DONE | 68a6785f1 已落盘；20项职责和5项冲突均有目标、责任包与反例 |
+| SM-02A | 库历史整合、Journal/Process/Supervision/Trace 本地保证与上游 Work 规则并存 | SM-01 | LIB_READY | 核心 Node315/0/6skip，Bun273/0，独立编译及真实包外组合43/0；库提交待记录，未非作者复审 |
 | SM-02B | 新增模块接收：resources、time/wait、grounding、identity/events/fs 的实际边界 | SM-02A | BACKLOG | 未运行 |
 | SM-02C | 库构建、声明、隔离安装、可获取提交；正式测试监督器保留 | SM-02B | BACKLOG | 未运行 |
 | SM-03 | 主仓依赖、源码 submodule、状态根、生命周期、退役 Git 状态同步 | SM-02C | BACKLOG | 未运行 |
@@ -98,6 +98,14 @@ SM-04 与 SM-05 的独立调查和测试可交错推进，公共接线串行。�
 - 调查：固定上游源码、WHAT、库历史和临时三方预演；未运行产品测试。
 - 当前交付：计划、处置表和现行入口链接。
 - 剩余：契约冲突的正式去向、库候选及所有生产接线。既有看板中的 REVIEW/DOING/READY 不改变。
+
+### SM-01 交付与 SM-02A 核心候选
+
+- 计划与语义处置表提交 `68a6785f1`。origin/master 的并行方法文档提交 `522e942bc` 已包含它；独立整合分支正常快进保留对方改动，未强推。
+- 两仓整合工作树已隔离。库从 8bb1021 合并固定 71c155f；五个文本冲突手工处理，候选版本0.8.1保留 supervision 导出、声明、说明和测试。原核心生产代码只有上游 lifecycle 规则发生变化。
+- `node scripts/build.mjs` 十四入口通过；Node核心321项315pass/0fail/6skip/0TODO；Bun正确核心范围273pass/0fail；独立编译、可拆监管增强和真实Node/Bun安装包组合43pass/0fail/0skip/0TODO。
+- 首轮Bun误纳入静态node:sqlite专用测试的6个加载错误保留，不改成通过。Journal的Bun实际消费由包外测试证明。库长期原始证据在 `evidence/semantic-merge-sm02a/README.md` 及同目录日志。
+- 边界：这只证明已接入核心的限定范围，尚未完成新模块接收、最终依赖交付、主仓接线或非作者复审；原卡不销项。
 
 ## 本次保留的未完成边界
 
