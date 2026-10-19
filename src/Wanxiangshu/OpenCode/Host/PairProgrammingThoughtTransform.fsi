@@ -12,8 +12,7 @@ open Wanxiangshu.Persistence.Journal
 module PairProgrammingThoughtTransform =
 
     [<RequireQualifiedAccess>]
-    type CursorPresentationOwner =
-        | PairGuidance
+    type CursorPresentationOwner = | PairGuidance
 
     /// Durable/memory pair with both halves' transcript gap anchors.
     type PairProgrammingGuidelineWire =

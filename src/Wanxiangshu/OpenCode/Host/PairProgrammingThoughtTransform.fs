@@ -34,8 +34,7 @@ open Wanxiangshu.Participant.Provider.Projection
 module PairProgrammingThoughtTransform =
 
     [<RequireQualifiedAccess>]
-    type CursorPresentationOwner =
-        | PairGuidance
+    type CursorPresentationOwner = | PairGuidance
 
     [<Literal>]
     let private PairProgrammingGuidelinePath = "host/pair-programming-guideline"
