@@ -1046,9 +1046,8 @@ type ToolRuntimeScope
                 question.ToolCallId = callId
                 && question.ProviderRunId = providerRun
                 && currentPhysicalUserMessage (SessionId.value sessionId) = Some(
-                                                                                PhysicalUserMessageId.value
-                                                                                    question.PhysicalUserMessageId
-                                                                            )
+                    PhysicalUserMessageId.value question.PhysicalUserMessageId
+                )
                 && questionInterrupts.Add(sessionId, question.ProviderRunId, callId)
                 ->
                 return! this.RunQuestionInterrupt(sessionId, (sessionId, question.ProviderRunId, callId))
@@ -1258,7 +1257,7 @@ type ToolRuntimeScope
                         let tenureScope = sprintf "tenure:%s:%s:%d" sessionId frozen gen
 
                         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipScopePhaseInMemory scopeOwnership tenureScope = Some
-                                                                                                                               "Draining")
+                            "Draining")
         }
 
     member _.RetirementBlockersFor(sessionId: string) =

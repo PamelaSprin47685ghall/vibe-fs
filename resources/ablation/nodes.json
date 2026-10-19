@@ -135,6 +135,13 @@
       "borrowed_surface": []
     },
     {
+      "id": "advisor",
+      "package": "advisor",
+      "station": 20,
+      "kind": "package",
+      "borrowed_surface": []
+    },
+    {
       "id": "causal-wait",
       "package": "causal-wait",
       "station": 21,

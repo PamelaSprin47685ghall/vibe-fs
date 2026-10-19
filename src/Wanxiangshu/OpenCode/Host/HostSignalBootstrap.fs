@@ -1127,9 +1127,8 @@ module HostSignalBootstrap =
                 |> Option.filter (fun _ ->
                     ProviderWireDecode.firstString info [ "role" ] = Some "user"
                     && ProviderWireDecode.firstString info [ "sessionID"; "sessionId" ] = Some(
-                                                                                              SessionId.value
-                                                                                                  selected.SessionId
-                                                                                          ))
+                        SessionId.value selected.SessionId
+                    ))
                 |> Option.map (fun physical ->
                     { SessionId = selected.SessionId
                       PhysicalUserMessageId = PhysicalUserMessageId.create physical })
