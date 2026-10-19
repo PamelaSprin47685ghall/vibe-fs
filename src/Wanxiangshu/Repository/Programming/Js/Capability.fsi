@@ -8,6 +8,7 @@ type JsCapability =
     | Write
     | Edit
     | Glob
+    | Grep
     | Move
     | Remove
     | Exec
@@ -36,6 +37,7 @@ module JsFragmentRegistry =
     val mv: JsCapabilityFragment
     val cat: JsCapabilityFragment
     val ls: JsCapabilityFragment
+    val rg: JsCapabilityFragment
     val stat: JsCapabilityFragment
     val mkdir: JsCapabilityFragment
     val whereAll: JsCapabilityFragment

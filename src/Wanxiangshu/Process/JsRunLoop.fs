@@ -105,6 +105,22 @@ module JsRunLoop =
     [<Emit("$0()")>]
     let private invokeThunk (fn: obj) : obj = jsNative
 
+    [<Emit("Array.isArray($0)")>]
+    let private isArray (value: obj) : bool = jsNative
+
+    /// The thunk returns the argument array; the host applies it. The program
+    /// never calls next or watch itself.
+    [<Emit("$0.apply($1, $2)")>]
+    let private applyMethod (method: obj) (instance: obj) (args: obj) : obj = jsNative
+
+    /// Non-arrays stay as the returned value so the existing if can reject
+    /// them; the program never calls the method itself.
+    [<Emit("Array.isArray($2) ? $0.apply($1, $2) : $2")>]
+    let private applyArgumentArray (method: obj) (instance: obj) (args: obj) : obj = jsNative
+
+    [<Emit("$0 ? $1 : $2")>]
+    let private sanityMessage (argsAreArray: bool) (heldFault: string) (arrayFault: string) : string = jsNative
+
     [<Emit("Buffer.byteLength($0, 'utf8')")>]
     let private utf8Bytes (text: string) : int = jsNative
 
@@ -907,9 +923,9 @@ module JsRunLoop =
                 // injected unpark value becomes the js.run outcome.
                 // Sanity runs before anything else, on its own instance; the real
                 // run uses a fresh construction, so the thunks' mocked state never
-                // leaks. The host drives the two thunks and mechanically checks
-                // the results — a thunk that fails to show the exit parks with
-                // its diagnosis.
+                // leaks. The host drives the two thunks and calls next and watch
+                // with the argument arrays they return. The program never calls
+                // those methods; a missing exit parks with its diagnosis.
                 let sanityPayload (message: string) (returned: obj) =
                     createObj [ "sanity" ==> createObj [ "failure" ==> message; "returned" ==> returned ] ]
 
@@ -926,29 +942,31 @@ module JsRunLoop =
                         return
                             failure
                                 "RUNNABLE_SPEC_INCOMPLETE"
-                                "sanity() must return { nextDone, watchVeto } — two thunks: one drives next to null, one drives watch to a veto"
+                                "sanity() must return { nextDone, watchVeto } — two thunks, each returning the argument array the host applies"
                     else
-                        let! nextResult = awaitJs (invokeThunk nextDone)
+                        let! nextArgs = awaitJs (invokeThunk nextDone)
+                        let! nextResult = awaitJs (applyArgumentArray (getProperty spec.Instance "next") spec.Instance nextArgs)
 
-                        if not (isNullish nextResult) then
+                        if not (isArray nextArgs) || not (isNullish nextResult) then
+                            let message = sanityMessage (isArray nextArgs) "next has no null path — the termination condition does not exist yet" "nextDone must return the argument array for next — the program does not call next"
+
                             return!
                                 parkOrFailProof
                                     parkState
                                     stack
-                                    (sanityPayload
-                                        "next has no null path — the termination condition does not exist yet"
-                                        nextResult)
+                                    (sanityPayload message nextResult)
                         else
-                            let! watchVerdict = awaitJs (invokeThunk watchVeto)
+                            let! watchArgs = awaitJs (invokeThunk watchVeto)
+                            let! watchVerdict = awaitJs (applyArgumentArray (getProperty spec.Instance "watch") spec.Instance watchArgs)
 
-                            if not (isVeto watchVerdict) then
+                            if not (isArray watchArgs) || not (isVeto watchVerdict) then
+                                let message = sanityMessage (isArray watchArgs) "watch has no veto path — the watchdog cannot say no" "watchVeto must return the argument array for watch — the program does not call watch"
+
                                 return!
                                     parkOrFailProof
                                         parkState
                                         stack
-                                        (sanityPayload
-                                            "watch has no veto path — the watchdog cannot say no"
-                                            watchVerdict)
+                                        (sanityPayload message watchVerdict)
                             else
                                 let fresh = construct spec.Class
                                 return! executeValidated parkState root stack { spec with Instance = fresh }

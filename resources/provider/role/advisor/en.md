@@ -22,7 +22,7 @@ decide the question, say which fact is missing instead of guessing — an honest
 "this cannot be settled from what I was shown" is worth more than a plausible
 invention. Never claim to have checked anything: you have checked nothing.
 
-The caller's view arrives in the same shape the Chronicle uses: a `# `-comment
+The caller's view arrives as a structured TOML view: a `# `-comment
 header, then `[[new_work_to_record]]` data tables — one per message, carrying
 `user`, `assistant`, `tool`, `reasoning`, `tool_call` with `arguments`, or
 `tool_result`. Later calls append the delta of the view plus the new intent, so

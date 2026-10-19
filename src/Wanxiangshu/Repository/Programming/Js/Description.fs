@@ -512,6 +512,13 @@ module JsCanonicalDescription =
   }"""
             [ "comment_host_capability", prose.CommentHostCapability ]
 
+    let private rgStub (prose: Prose) =
+        fill
+            """  async rg(argv) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
     let private statStub (prose: Prose) =
         fill
             """  async stat(path) {
@@ -652,6 +659,8 @@ class JsProgram {"""
                   whereStub prose
               if has capabilities JsCapability.Glob then
                   lsStub prose
+              if has capabilities JsCapability.Grep then
+                  rgStub prose
               if has capabilities JsCapability.Write then
                   writeStub prose
                   mkdirStub prose
@@ -1287,6 +1296,16 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     return result.entries;
   }"""
                       [ "rethrow_host", rethrowHost ]
+              if has capabilities JsCapability.Grep then
+                  fill
+                      """  async rg(argv) {
+    const result = await this._api.js.rg(argv);
+    {{rethrow_host}}
+    return result.paths !== undefined
+      ? { exitCode: result.exitCode, paths: result.paths }
+      : { exitCode: result.exitCode, messages: result.messages };
+  }"""
+                      [ "rethrow_host", rethrowHost ]
               if has capabilities JsCapability.Write then
                   fill
                       """  write(path, content) {
@@ -1564,6 +1583,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                     (set
                         [ JsCapability.Read
                           JsCapability.Glob
+                          JsCapability.Grep
                           JsCapability.Fork
                           JsCapability.Join
                           JsCapability.Horizon

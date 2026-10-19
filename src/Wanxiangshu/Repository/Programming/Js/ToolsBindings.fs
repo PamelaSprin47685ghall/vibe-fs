@@ -30,6 +30,9 @@ module JsToolsBindings =
     [<Import("realpathSync", "node:fs")>]
     let private realpathSync (path: string) : string = jsNative
 
+    [<Import("spawnSync", "node:child_process")>]
+    let private spawnSync (file: string) (args: string array) (options: obj) : obj = jsNative
+
     [<Emit("$0 === undefined || $0 === null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
@@ -324,6 +327,184 @@ module JsToolsBindings =
                 return createObj [ "ok" ==> true; "entries" ==> names ]
             }
             |> renderOutcome
+
+    [<Emit("Array.isArray($0)")>]
+    let private isStringArray (value: obj) : bool = jsNative
+
+    [<Emit("$0.length")>]
+    let private jsLength (value: obj) : int = jsNative
+
+    [<Emit("$0[$1]")>]
+    let private jsItem (value: obj) (index: int) : obj = jsNative
+
+    [<Emit("JSON.parse($0)")>]
+    let private parseJson (text: string) : obj = jsNative
+
+    let private optionValue (args: string array) (index: int) =
+        if index + 1 < args.Length && not (args[index + 1].StartsWith "-") then
+            Some args[index + 1]
+        else
+            None
+
+    let private pathOperand (token: string) =
+        if System.String.IsNullOrEmpty token || token = "-" || token.StartsWith "-" then
+            None
+        else
+            Some token
+
+    /// Positional paths plus path-bearing options. Pattern files and search
+    /// roots must stay inside the workspace; nothing else is interpreted.
+    let private pathArguments (args: string array) =
+        let found = ResizeArray<string>()
+        let mutable index = 0
+        let mutable patterns = 0
+        let mutable filesOnly = false
+
+        while index < args.Length do
+            let token = args[index]
+
+            if token = "--" then
+                for rest in args[(index + 1) ..] do
+                    match pathOperand rest with
+                    | Some path -> found.Add path
+                    | None -> ()
+
+                index <- args.Length
+            elif token = "--files" then
+                filesOnly <- true
+                index <- index + 1
+            elif token = "-e" || token = "--regexp" || token = "-f" || token = "--file" then
+                match optionValue args index with
+                | Some value ->
+                    if token = "-f" || token = "--file" then
+                        found.Add value
+
+                    patterns <- patterns + 1
+                    index <- index + 2
+                | None -> index <- index + 1
+            elif token.StartsWith "--file=" then
+                found.Add(token.Substring("--file=".Length))
+                patterns <- patterns + 1
+                index <- index + 1
+            elif token.StartsWith "--glob=" || token.StartsWith "--iglob=" || token.StartsWith "-g=" then
+                index <- index + 1
+            elif token = "--glob" || token = "--iglob" || token = "-g" then
+                index <- index + 2
+            elif token.StartsWith "--regexp=" then
+                patterns <- patterns + 1
+                index <- index + 1
+            elif token.StartsWith "--ignore-file=" then
+                found.Add(token.Substring("--ignore-file=".Length))
+                index <- index + 1
+            elif token = "--ignore-file" then
+                match optionValue args index with
+                | Some value -> found.Add value
+                | None -> ()
+
+                index <- index + 2
+            elif token.StartsWith "--pre=" || token.StartsWith "--hostname-bin=" || token.StartsWith "--hyperlink-format=" then
+                index <- index + 1
+            elif token = "--pre" || token = "--hostname-bin" || token = "--hyperlink-format" then
+                index <- index + 2
+            elif token.StartsWith "-" then
+                index <- index + 1
+            else
+                if not filesOnly && patterns = 0 then
+                    patterns <- 1
+                else
+                    found.Add token
+
+                index <- index + 1
+
+        if found.Count = 0 then
+            found.Add "."
+
+        List.ofSeq found
+
+    let private boundedPath (root: string) (path: string) =
+        result {
+            let! full = resolveInside root path
+            do! ensureRealPathInside root path full
+            return ()
+        }
+
+    /// `rg(argv)` is `rg --json <argv>` with the argv passed through. The
+    /// program receives one JSON object, never the JSONL text.
+    let private makeRgMember (root: string) =
+        "rg"
+        ==> fun (argv: obj) ->
+            if not (isStringArray argv) then
+                failureObj (JsFailure.InvalidArgument "rg requires one string array argv")
+            else
+                let args = Array.init (jsLength argv) (fun index -> string (jsItem argv index))
+
+                match pathArguments args |> List.traverseResultM (boundedPath root) with
+                | Error failure -> failureObj failure
+                | Ok _ ->
+                    let summary =
+                        args
+                        |> Array.exists (fun token ->
+                            token = "--files"
+                            || token = "--files-with-matches"
+                            || token = "-l"
+                            || token = "--files-without-match"
+                            || token = "--count"
+                            || token = "-c"
+                            || token = "--count-matches"
+                            || token = "--quiet"
+                            || token = "-q"
+                            || token = "--vimgrep"
+                            || token = "--type-list")
+
+                    let invocation = if summary then args else Array.append [| "--json" |] args
+
+                    let outcome =
+                        spawnSync
+                            "rg"
+                            invocation
+                            (createObj
+                                [ "cwd" ==> root
+                                  "encoding" ==> "utf8"
+                                  "maxBuffer" ==> 16777216 ])
+
+                    if isNull (outcome?status) then
+                        let detail =
+                            if isNull (outcome?error) then
+                                "rg produced no exit code"
+                            else
+                                string (outcome?error?message)
+
+                        failureObj (JsFailure.RgFailed detail)
+                    else
+                        let stdout = string outcome?stdout
+                        let exitCode = int outcome?status
+
+                        if exitCode <> 0 && exitCode <> 1 then
+                            let stderr = string outcome?stderr
+                            let detail = if System.String.IsNullOrWhiteSpace stderr then stdout else stderr
+                            failureObj (JsFailure.RgFailed detail)
+                        elif summary then
+                            let paths =
+                                if Array.exists (fun token -> token = "-0" || token = "--null") args then
+                                    stdout.Split('\000', System.StringSplitOptions.RemoveEmptyEntries)
+                                else
+                                    stdout.Split('\n', System.StringSplitOptions.RemoveEmptyEntries)
+
+                            createObj [ "ok" ==> true; "exitCode" ==> exitCode; "paths" ==> paths ]
+                        else
+                            let parsed =
+                                stdout.Split('\n', System.StringSplitOptions.RemoveEmptyEntries)
+                                |> Array.map (fun line ->
+                                    try
+                                        Ok(parseJson line)
+                                    with error ->
+                                        Error(string error?message))
+
+                            match parsed |> Array.tryFind _.IsError with
+                            | Some(Error detail) -> failureObj (JsFailure.RgFailed detail)
+                            | _ ->
+                                let messages = parsed |> Array.map (fun item -> item |> Result.defaultValue null)
+                                createObj [ "ok" ==> true; "exitCode" ==> exitCode; "messages" ==> messages ]
 
     /// stat(path): metadata; a missing path is a normal `exists = false`.
     let private makeStatMember (root: string) =
@@ -775,6 +956,9 @@ module JsToolsBindings =
 
               if Set.contains JsCapability.Glob capabilities then
                   makeLsMember root
+
+              if Set.contains JsCapability.Grep capabilities then
+                  makeRgMember root
 
               if Set.contains JsCapability.Write capabilities then
                   makeWriteMember root staging readSnapshots ledger

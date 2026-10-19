@@ -32,17 +32,16 @@ class Js extends JsProgram {
         this.failureReason = `build_failed:exit_${result.exitCode}${firstError ? ": " + firstError.trim() : ""}`;
       }
 
-      // Self-test thunks, run first on their own instance: "all done" (past
+      // Self-test thunks, run first on their own instance. They only set state
+      // and return argument arrays; the Host calls next/watch. "all done" (past
       // the build step) → next returns null; "something is wrong" (a recorded
       // failure) → watch vetoes. Writing them is designing the exits.
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
+          nextDone: () => [{ root: "/", step: 1 }],
           watchVeto: async () => {
             this.failureReason = "prove: simulated build failure";
-            const veto = await this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [], elapsedMs: 0, remainingMs: 60000 });
-            this.failureReason = null;
-            return veto;
+            return [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }];
           },
         };
       }
@@ -81,12 +80,13 @@ class Js extends JsProgram {
         testExitCode = result.exitCode;
       }
 
-      // Self-test: past the last step next returns null; a crashed srv in the
-      // observation window makes watch veto.
+      // Self-test: past the last step, the Host calls next and gets null; a crashed
+      // srv in the observation window makes the watch call veto. Thunks return
+      // argument arrays only.
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 4 }),
-          watchVeto: () => this.watch({ root: "/", step: 2, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 4 }],
+          watchVeto: () => [{ root: "/", step: 2, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });
@@ -135,11 +135,9 @@ class Js extends JsProgram {
         return {
           nextDone: () => {
             this.reaped = true;
-            const result = this.next({ root: "/", step: 9 });
-            this.reaped = false;
-            return result;
+            return [{ root: "/", step: 9 }];
           },
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "py", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 30000 }),
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "py", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 30000 }],
         };
       }
     });

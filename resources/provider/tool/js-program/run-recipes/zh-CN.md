@@ -31,16 +31,15 @@ class Js extends JsProgram {
         this.failureReason = `build_failed:exit_${result.exitCode}${firstError ? ": " + firstError.trim() : ""}`;
       }
 
-      // 自证 thunk，先跑在独立实例上：「全部完成」（越过构建步）→ next 返回
-      // null；「出了问题」（有失败记录）→ watch 否决。写它们就是在设计出口。
+      // 自证 thunk，先跑在独立实例上。只拨状态、返回参数数组；宿主调用
+      // next/watch。「全部完成」（越过构建步）→ next 返回 null；「出了问题」
+      // （有失败记录）→ watch 否决。写它们就是在设计出口。
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
+          nextDone: () => [{ root: "/", step: 1 }],
           watchVeto: async () => {
             this.failureReason = "prove: 模拟构建失败";
-            const veto = await this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [], elapsedMs: 0, remainingMs: 60000 });
-            this.failureReason = null;
-            return veto;
+            return [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }];
           },
         };
       }
@@ -79,11 +78,12 @@ class Js extends JsProgram {
         testExitCode = result.exitCode;
       }
 
-      // 自证：越过最后一步 next 返回 null；观察窗里 srv 崩溃让 watch 否决。
+      // 自证：越过最后一步，宿主调用 next 得到 null；观察窗里 srv 崩溃，
+      // 宿主调用 watch 得到否决。thunk 只返回参数数组。
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 4 }),
-          watchVeto: () => this.watch({ root: "/", step: 2, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 4 }],
+          watchVeto: () => [{ root: "/", step: 2, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });
@@ -131,11 +131,9 @@ class Js extends JsProgram {
         return {
           nextDone: () => {
             this.reaped = true;
-            const result = this.next({ root: "/", step: 9 });
-            this.reaped = false;
-            return result;
+            return [{ root: "/", step: 9 }];
           },
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "py", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 30000 }),
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "py", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 30000 }],
         };
       }
     });

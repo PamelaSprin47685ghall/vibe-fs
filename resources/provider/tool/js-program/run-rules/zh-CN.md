@@ -26,20 +26,21 @@ await js.run(class extends js.Runnable { ... }) —— 工程成员。
 - `onTimeout` —— `maxDuration` 到期时的处理；默认即 abort。
 
 `sanity()`：证明你没有糊弄。Host 在一切开始之前先跑它一次。它返回两个 thunk——
-宿主驱动它们并机械地检查结果，断言代码不用你写：
+thunk 只把实例拨到目标状态，并返回参数数组；宿主用这个数组调用 `next` 或 `watch`，
+再机械地检查结果。程序绝不自己调用这两者，断言代码不用你写：
 ```
 sanity() {
   return {
-    nextDone: () => { this.index = this.files.length; return this.next({ root: "/", step: 99 }); },
-    watchVeto: () => { this.stalled = 6; this.current = this.files[0]; return this.watch({ ...ctx }); },
+    nextDone: () => { this.index = this.files.length; return [{ root: "/", step: 99 }]; },
+    watchVeto: () => { this.stalled = 6; this.current = this.files[0]; return [{ ...ctx }]; },
   };
 }
 ```
-`nextDone` 把实例拨到「全部完成」状态并驱动 `next`——宿主要求返回 `null`。
-`watchVeto` 把实例拨到「出了问题」状态并驱动 `watch`——宿主要求一次否决
-（`false` 或 `{ abort }`）。thunk 没展示出出口，整个 `js.run` 就在调用点 park，携带
+`nextDone` 把实例拨到「全部完成」状态，返回 `[ctx]`——宿主调用 `next`，并要求返回 `null`。
+`watchVeto` 把实例拨到「出了问题」状态，返回 `[ctx]`——宿主调用 `watch`，并要求一次否决
+（`false` 或 `{ abort }`）。返回值不是数组，或调出的方法没展示出出口，整个 `js.run` 就在调用点 park，携带
 诊断载荷——在新调用里修好类，或 unpark 注入一个由你的程序当作 js.run 结局消费的值。
-写 thunk 就是在设计终止条件：如果你 mock 不出一个 next 返回 null 的状态，出口还不存在。
+写 thunk 就是在设计终止条件：如果你 mock 不出一个让 next 返回 null 的状态，出口还不存在。
 
 驱动 `next` 的两种形态：轮次驱动（`ctx.step === 0 ? cmd : null`）适合固定剧本——
 spawn、waitFor、测试、收割；事件驱动适合一切需要随机应变的场景——`onExit` 把退出码
@@ -75,7 +76,7 @@ hold 一片、推进，或 `null`。完整示例两种都有：`run-recipes` 是
   即中止；注入其他任何值都继续。
 
 先观察，再裁决。`watch` 应当读 ctx 增量、把要紧的状态记在实例字段
-（`this.lastSize`、`this.stalled`）上，然后再决定。一个什么都不看就 `return true` 的
+（`this.lastSize`、`this.stalled`）上，然后再决定。一个什么都不看就返回 `true` 的
 watch 是没有在监督的 watchdog——Host 不会拦你，但也没有任何东西在被监督。
 `next` 或 `watch` 抛异常会让整个程序失败。
 
@@ -91,8 +92,8 @@ await 交回的结局是
 循环轮数。
 
 失败模式，一次说清：
-- `sanity()` 携带 `sanity.failure` 载荷 park：某个 thunk 没展示出自己的出口——
-  `next` 没返回过 `null`，或 `watch` 没否决过。载荷携带失败原因与 thunk 的返回值；
+- `sanity()` 携带 `sanity.failure` 载荷 park：thunk 没返回参数数组，或宿主调出的方法没展示出口——
+  `next` 没返回 `null`，或 `watch` 没否决。载荷携带失败原因与当时的返回值；
   在新调用里修好类。
 - `status: 'timeout'` 且命令输出每轮重复一份，意味着 `next` 从未返回 `null`——Host
   每轮忠实重跑它返回的东西直到 `maxDuration`。看 `steps`：轮数很多而命令很短，

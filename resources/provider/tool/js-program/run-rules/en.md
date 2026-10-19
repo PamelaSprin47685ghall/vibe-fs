@@ -29,24 +29,27 @@ Optional:
 - `onTimeout` — handler for `maxDuration` expiry; default: abort.
 
 `sanity()`: prove you are not bluffing. The Host runs it once, before anything
-else. It returns two thunks — the host drives them and mechanically checks the
-results, so no assertion code is yours to write:
+else. It returns two thunks — each thunk only puts the instance into the target
+state and returns an argument array. The Host calls `next` or `watch` with that
+array and mechanically checks the result. The program never calls either method;
+no assertion code is yours to write:
 ```
 sanity() {
   return {
-    nextDone: () => { this.index = this.files.length; return this.next({ root: "/", step: 99 }); },
-    watchVeto: () => { this.stalled = 6; this.current = this.files[0]; return this.watch({ ...ctx }); },
+    nextDone: () => { this.index = this.files.length; return [{ root: "/", step: 99 }]; },
+    watchVeto: () => { this.stalled = 6; this.current = this.files[0]; return [{ ...ctx }]; },
   };
 }
 ```
-`nextDone` puts the instance into the "all done" state and drives `next` — the
-host requires `null` back. `watchVeto` puts the instance into the
-"something is wrong" state and drives `watch` — the host requires a veto
-(`false` or `{ abort }`). A thunk that fails parks the whole `js.run` at the
-call site with the diagnosis payload — fix the class in a new call, or unpark
-with a value your program consumes as the js.run outcome. Writing the thunks is
-designing the termination condition: if you cannot mock a state where next
-returns null, the exit does not exist yet.
+`nextDone` puts the instance into the "all done" state and returns `[ctx]` —
+the Host calls `next` and requires `null`. `watchVeto` puts the instance into the
+"something is wrong" state and returns `[ctx]` — the Host calls `watch` and requires
+a veto (`false` or `{ abort }`). A return that is not an array, or a called method
+that fails to show its exit, parks the whole `js.run` at the call site with the
+diagnosis payload — fix the class in a new call, or unpark with a value your
+program consumes as the js.run outcome. Writing the thunks is designing the
+termination condition: if you cannot mock a state where next returns null, the
+exit does not exist yet.
 
 Two ways to drive `next`: round-driven (`ctx.step === 0 ? cmd : null`) for a
 fixed script — spawn, waitFor, test, reap; and event-driven for everything that
@@ -106,9 +109,10 @@ The outcome the await hands back is
 `steps` counts the loop rounds the Host executed.
 
 Failure modes, stated once:
-- `sanity()` parked with a `sanity.failure` payload: a thunk failed to show its
-  exit — `next` never returned `null`, or `watch` never vetoed. The payload
-  carries the failure and what the thunk returned; fix the class in a new call.
+- `sanity()` parked with a `sanity.failure` payload: a thunk did not return an
+  argument array, or the method the Host called failed to show its exit — `next`
+  never returned `null`, or `watch` never vetoed. The payload carries the failure
+  and what was returned; fix the class in a new call.
 - `status: 'timeout'` with the command output repeated once per round means `next`
   never returned `null` — the Host re-ran what it returned every round until
   `maxDuration`. Check `steps`: many rounds around one short command is the signature.

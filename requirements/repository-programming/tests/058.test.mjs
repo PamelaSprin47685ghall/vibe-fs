@@ -21,8 +21,8 @@ const runProgram = (dir, body, sessionId = 'sess-058') =>
 
 const sanity = (nextStep) => `sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: ${nextStep} }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [{ name: "echoer", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: ${nextStep} }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [{ name: "echoer", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }],
         };
       }`
 

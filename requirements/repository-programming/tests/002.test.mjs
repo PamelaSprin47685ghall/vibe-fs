@@ -68,6 +68,7 @@ const fsPermissionsOf = (role) =>
 const MEMBERS_BY_PERMISSION = {
   Read: ['cat', 'stat', 'whereAll', 'where'],
   Glob: ['ls'],
+  Grep: ['rg'],
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
@@ -85,6 +86,7 @@ const BINDING_BY_MEMBER = {
   mv: 'js.mv',
   cat: 'js.cat',
   ls: 'js.ls',
+  rg: 'js.rg',
   stat: 'js.stat',
   mkdir: 'js.mkdir',
   whereAll: 'js.whereAll',
@@ -100,7 +102,7 @@ const BINDING_BY_MEMBER = {
 
 const MEMBER_ORDER = [
   'write', 'rm', 'mv',
-  'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
+  'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where',
   'run',
   'fork', 'dag', 'join', 'fission', 'horizon', 'advisor',
 ]
@@ -136,7 +138,7 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
   const layers = layersOf(result)
   assert.deepEqual(
     Object.keys(layers).sort(),
-    ['cat', 'ls', 'mkdir', 'stat', 'where', 'whereAll', 'write'],
+    ['cat', 'ls', 'mkdir', 'rg', 'stat', 'where', 'whereAll', 'write'],
   )
   for (const [member, layer] of Object.entries(layers)) {
     assert.equal(layer.inBaseClass, true, `${member} in base class`)
@@ -154,13 +156,14 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
   assert.equal(result.description.includes('_api'), false)
   assert.equal(result.description.includes('__jsFailure'), false)
   assert.equal(result.examples.length, 1, 'one responsibility-shaped Ultra Example')
-  assert.match(result.examples[0], /RetryPolicy/)
+  assert.match(result.examples[0], /this\.rg\(/)
+  assert.match(result.examples[0], /oldApi/)
 })
 
 test('WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers', () => {
   const result = surface('Engineer', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
-  assert.deepEqual(memberNames(result), ['cat', 'ls', 'stat', 'whereAll', 'where'])
+  assert.deepEqual(memberNames(result), ['cat', 'ls', 'rg', 'stat', 'whereAll', 'where'])
   assert.equal(result.description.includes('edit(path'), false)
   assert.equal(result.description.includes('rewrite(path'), false)
   assert.equal(result.description.includes('write(path, content)'), false)

@@ -330,23 +330,9 @@ test('WHAT[requirement-grounding-006] registered program grep keeps scan freshne
     await openIncumbency(runtime, sessionID)
     const args = {
       program: `class Js extends JsProgram {
-        async walk(dir = ".") {
-          const found = [];
-          for (const entry of await this.ls(dir)) {
-            const full = dir === "." ? entry : dir + "/" + entry;
-            if (entry.endsWith("/")) found.push(...(await this.walk(full.slice(0, -1))));
-            else found.push(full);
-          }
-          return found;
-        }
         async run() {
-          const hits = [];
-          for (const path of await this.walk("src")) {
-            for (const [begin, end] of this.whereAll(path, "GREPPED")) {
-              hits.push({ path, text: path.slice(begin, end) });
-            }
-          }
-          return hits;
+          const found = await this.rg(["--files", "-g", "*GREPPED*", "src"]);
+          return found.paths.map((path) => ({ path, text: "GREPPED" }));
         }
       }`,
     }
@@ -365,24 +351,11 @@ test('WHAT[requirement-grounding-006] registered program grep keeps scan freshne
 
     const composeArgs = {
       program: `class Js extends JsProgram {
-        async walk(dir = ".") {
-          const found = [];
-          for (const entry of await this.ls(dir)) {
-            const full = dir === "." ? entry : dir + "/" + entry;
-            if (entry.endsWith("/")) found.push(...(await this.walk(full.slice(0, -1))));
-            else found.push(full);
-          }
-          return found;
-        }
         async run() {
-          const hits = [];
-          for (const path of (await this.walk("requirements/alpha")).filter((p) => p.endsWith("WHAT.md"))) {
-            const text = await this.cat(path);
-            for (const [begin, end] of this.whereAll(text, "GREPPED")) {
-              hits.push({ path, text: text.slice(begin, end) });
-            }
-          }
-          return hits;
+          const found = await this.rg(["GREPPED", "requirements/alpha", "-g", "WHAT.md"]);
+          const path = found.messages.find((message) => message.type === "match").data.path.text;
+          const text = await this.cat(path);
+          return this.whereAll(text, "GREPPED").map(([begin, end]) => ({ path, text: text.slice(begin, end) }));
         }
       }`,
     }

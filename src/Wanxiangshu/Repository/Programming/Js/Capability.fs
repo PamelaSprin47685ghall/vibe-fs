@@ -14,6 +14,8 @@ type JsCapability =
     /// description gates its artifact-write teaching blocks on it.
     | Edit
     | Glob
+    /// `rg(argv)`: one ripgrep argv, always invoked as `rg --json`.
+    | Grep
     | Move
     | Remove
     /// Host-owned long-running command engineering (`js.run`).
@@ -36,13 +38,14 @@ type JsCapability =
 module JsCapability =
 
     /// The only ToolPermission → JsCapability mapping. A permission without a
-    /// js-* projection (edit, grep, pty, ask, review, …) produces no member
+    /// js-* projection (edit, pty, ask, review, …) produces no member
     /// (JS-004 four-layer exactness).
     let ofToolPermission (permission: ToolPermission) : JsCapability option =
         match permission with
         | ToolPermission.Read -> Some JsCapability.Read
         | ToolPermission.Write -> Some JsCapability.Write
         | ToolPermission.Glob -> Some JsCapability.Glob
+        | ToolPermission.Grep -> Some JsCapability.Grep
         | ToolPermission.Move -> Some JsCapability.Move
         | ToolPermission.Remove -> Some JsCapability.Remove
         | ToolPermission.Exec -> Some JsCapability.Exec
@@ -163,6 +166,34 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.ls" }
 
+    let rg: JsCapabilityFragment =
+        { Capability = JsCapability.Grep
+          MemberName = "rg"
+          Signature = "async rg(argv)"
+          Description =
+            "rg(argv) — one argv. A content search is `rg --json` plus that argv. "
+            + "--files, --files-with-matches, -l, --files-without-match, --count, -c, "
+            + "--count-matches, --quiet, -q, --vimgrep and --type-list are passed through "
+            + "because rg refuses them with --json. argv is a string array, unchanged; "
+            + "do not shell-quote it and do not pass --json yourself. A search with no path "
+            + "does not search the workspace: pass the path. This member does not add "
+            + "--no-ignore; put it in argv when ignored paths must be searched. "
+            + "Returns one JSON object, never text. Content search: { exitCode, messages }, "
+            + "messages the parsed JSON Lines (begin, match, context, end, summary). "
+            + "The modes above: { exitCode, paths }. "
+            + "exitCode 0 means a hit or a listed path; exitCode 1 means a successful search "
+            + "or listing with nothing, and is not a failure. A non-array argv is "
+            + "INVALID_ARGUMENT. A path outside the workspace is PATH_DENIED. Any other rg "
+            + "failure is RG_FAILED."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const found = await this.rg([\"RetryPolicy\", \"src\", \"-g\", \"*.fs\"]);\n"
+            + "    return found.messages.filter((message) => message.type === \"match\");\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.rg" }
+
     let stat: JsCapabilityFragment =
         { Capability = JsCapability.Read
           MemberName = "stat"
@@ -243,13 +274,16 @@ module JsFragmentRegistry =
             + "called on the global js object. this.run is YOUR program entry, never this "
             + "member: the names collide on purpose, so the engineering run never lands on "
             + "the base class. The class must declare a positive maxDuration, next(ctx), "
-            + "watch(ctx) and sanity(); the host runs the sanity thunks first, then each "
-            + "command, calls watch once per interval slice, dispatches onExit and enforces "
-            + "maxDuration. sanity() returns { nextDone, watchVeto } thunks: nextDone puts "
-            + "the instance into the all-done state and drives next (the host requires null "
-            + "back), watchVeto puts it into the something-is-wrong state and drives watch "
-            + "(the host requires a veto) — writing the thunks is designing the termination "
-            + "condition, and a thunk that fails to show its exit parks the whole js.run "
+            + "watch(ctx) and sanity(); the host runs the sanity thunks first and calls "
+            + "next and watch with the argument arrays they return, then each command, "
+            + "calls watch once per interval slice, dispatches onExit and enforces "
+            + "maxDuration. sanity() returns { nextDone, watchVeto } thunks that return "
+            + "argument arrays and never call next or watch themselves: nextDone puts the "
+            + "instance into the all-done state and returns [ctx] (the host calls next and "
+            + "requires null), watchVeto puts it into the something-is-wrong state and "
+            + "returns [ctx] (the host calls watch and requires a veto) — writing the thunks "
+            + "is designing the termination condition, and a thunk that fails to show its "
+            + "exit parks the whole js.run "
             + "with the diagnosis payload; fix the class in a new call, or unpark with a "
             + "value the program consumes as the outcome. next is a LOOP callback, not a "
             + "one-shot declaration: after every command exits the host calls next again, "
@@ -294,8 +328,8 @@ module JsFragmentRegistry =
             + "      }\n"
             + "      sanity() {\n"
             + "        return {\n"
-            + "          nextDone: () => this.next({ root: \"/\", step: 1 }),\n"
-            + "          watchVeto: () => this.watch({ root: \"/\", step: 0, stdout: \"\", stderr: \"\", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),\n"
+            + "          nextDone: () => [{ root: \"/\", step: 1 }],\n"
+            + "          watchVeto: () => [{ root: \"/\", step: 0, stdout: \"\", stderr: \"\", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],\n"
             + "        };\n"
             + "      }\n"
             + "    });\n"
@@ -466,6 +500,7 @@ module JsFragmentRegistry =
           mv
           cat
           ls
+          rg
           stat
           mkdir
           whereAll

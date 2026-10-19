@@ -95,8 +95,8 @@ test('WHAT[repository-programming-052] wget -c resumes a partial download after 
       }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 3 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 3 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });`,
@@ -137,8 +137,8 @@ test('WHAT[repository-programming-052] wget -c resumes a partial download after 
       }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 5 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 5 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });`,
@@ -208,8 +208,8 @@ test('WHAT[repository-programming-052] wget exit 8 is dispatched to onExit inste
       onExit(r) { dispatched.push(r.exitCode); }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 3 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 3 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });

@@ -1,5 +1,13 @@
 # Changelog — 版本历史
 
+## Unreleased — js.run sanity 只交参数数组
+
+- `sanity()` 仍返回 `{ nextDone, watchVeto }` 两个 thunk，但 thunk 只拨实例状态并返回参数数组，不再自己调用 `next`/`watch`。宿主用该数组调用对应方法：`next` 必须返回 `null`，`watch` 必须一次否决。返回值不是数组，或调出的方法没有出口，整次 `js.run` 在调用点 park，什么都不执行。空操作 `() => null` / `() => false` 因此过不了自证。
+
+## Unreleased — js.rg(argv)
+
+- 编程面 Grep 投影为 `rg(argv)`：一个字符串数组。内容搜索固定加上 `--json`；`--files`、`--files-with-matches`、`-l`、`--count` 等与 `--json` 互斥的模式原样执行，结果收成 `paths`。返回 JSON 对象，不是文本。不追加 `--no-ignore`。
+
 ## Unreleased — PLAN.md 合规审计：生命周期统一实现的决策与工程修正
 
 以 `PLAN.md`（Manager/Plan 统一重组，cutover 分支 `feat/lifecycle-cutover` 已并入）为规范，对现行实现逐算法（A–Q）逐条 35 个「能证伪」条件做合规审计，修正下列真实分歧；被后续决策取代的条目（LWR_prev 交接、Reopen 语义、back-to-back 无评审接力、工作计数→durable authority 身份输入、spawn 标记）逐条记录为 SUPERSEDED，未回退。

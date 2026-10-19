@@ -79,6 +79,7 @@ module JsGeneratorSurface =
         | JsCapability.Write -> "Write"
         | JsCapability.Edit -> "Edit"
         | JsCapability.Glob -> "Glob"
+        | JsCapability.Grep -> "Grep"
         | JsCapability.Move -> "Move"
         | JsCapability.Remove -> "Remove"
         | JsCapability.Exec -> "Exec"

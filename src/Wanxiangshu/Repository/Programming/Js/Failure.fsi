@@ -32,6 +32,7 @@ type JsFailure =
     | FileNotFound of string
     | FileAlreadyExists of string
     | FileReadFailed of string
+    | RgFailed of string
     | DirectoryNotEmpty of string
     | DirectoryExists of string
     | ParentDirectoryMissing of string

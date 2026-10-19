@@ -24,6 +24,7 @@ const fsPermissionsOf = (role) =>
 const MEMBERS_BY_PERMISSION = {
   Read: ['cat', 'stat', 'whereAll', 'where'],
   Glob: ['ls'],
+  Grep: ['rg'],
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
@@ -34,12 +35,13 @@ const BINDING_BY_MEMBER = {
   mv: 'js.mv',
   cat: 'js.cat',
   ls: 'js.ls',
+  rg: 'js.rg',
   stat: 'js.stat',
   mkdir: 'js.mkdir',
   whereAll: 'js.whereAll',
   where: 'js.where',
 }
-const MEMBER_ORDER = ['write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where']
+const MEMBER_ORDER = ['write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where']
 const layersOf = (s) =>
   Object.fromEntries(
     s.members.map((fragment) => [

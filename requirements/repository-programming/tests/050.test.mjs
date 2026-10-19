@@ -76,8 +76,8 @@ test('WHAT[repository-programming-050] the host loop runs one foreground command
       }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });`,
@@ -108,8 +108,8 @@ test('WHAT[repository-programming-050] onExit dispatches every exited command wi
       onExit(result) { dispatched.push(result.exitCode); }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });
@@ -134,8 +134,8 @@ test('WHAT[repository-programming-050] a watch abort kills the foreground comman
       watch() { return { abort: "stalled" }; }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });
@@ -159,7 +159,7 @@ test('WHAT[repository-programming-050] watch returning false is a real veto, not
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch veto.marker" : null; }
       watch() { return false; }
       sanity() {
-        return { nextDone: () => this.next({ root: "/", step: 1 }), watchVeto: () => this.watch({}) };
+        return { nextDone: () => [{ root: "/", step: 1 }], watchVeto: () => [{}] };
       }
     });
     return outcome;`,
@@ -187,10 +187,10 @@ test('WHAT[repository-programming-050] a watch park suspends the run and resumes
       }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
+          nextDone: () => [{ root: "/", step: 1 }],
           watchVeto: () => {
             this.parked = true;
-            return this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 });
+            return [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }];
           },
         };
       }
@@ -229,8 +229,8 @@ test('WHAT[repository-programming-050] a sanity thunk that fails to show its exi
       watch() { return true; }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });
@@ -257,6 +257,39 @@ test('WHAT[repository-programming-050] a sanity thunk that fails to show its exi
     assert.equal(caseName(resumed), 'Succeeded')
     const doc = render(resumed)
     assert.match(doc, /sanity failed: next has no null path/)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-050] a no-op sanity that returns the exits itself is refused before anything runs', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const parked = await runProgram(
+      dir,
+      `    const outcome = await js.run(class extends js.Runnable {
+      maxDuration = 300000;
+      interval = 5000;
+      sanity() {
+        return {
+          nextDone: () => null,
+          watchVeto: () => false,
+        };
+      }
+      next(ctx) {
+        return ctx.step === 0 ? "node scripts/build.mjs" : null;
+      }
+      watch(ctx) {
+        return true;
+      }
+    });
+    return outcome;`,
+    )
+    assert.equal(caseName(parked), 'Parked')
+    const payload = parkedPayload(parked)
+    assert.ok(payload.sanity)
+    assert.match(payload.sanity.failure, /argument array/)
+    assert.equal(existsSync(join(dir, 'scripts')), false, 'the stub must not reach the command')
   } finally {
     cleanup()
   }
@@ -298,8 +331,8 @@ test('WHAT[repository-programming-050] maxDuration expiry kills the command and 
       }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });`,

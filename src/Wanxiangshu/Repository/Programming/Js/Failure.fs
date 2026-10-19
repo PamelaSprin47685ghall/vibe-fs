@@ -37,6 +37,7 @@ type JsFailure =
     | FileNotFound of string
     | FileAlreadyExists of string
     | FileReadFailed of string
+    | RgFailed of string
     | DirectoryNotEmpty of string
     | DirectoryExists of string
     | ParentDirectoryMissing of string
@@ -106,6 +107,7 @@ module JsFailure =
         | JsFailure.FileNotFound _ -> "FILE_NOT_FOUND"
         | JsFailure.FileAlreadyExists _ -> "FILE_ALREADY_EXISTS"
         | JsFailure.FileReadFailed _ -> "FILE_READ_FAILED"
+        | JsFailure.RgFailed _ -> "RG_FAILED"
         | JsFailure.DirectoryNotEmpty _ -> "DIRECTORY_NOT_EMPTY"
         | JsFailure.DirectoryExists _ -> "DIRECTORY_EXISTS"
         | JsFailure.ParentDirectoryMissing _ -> "PARENT_DIRECTORY_MISSING"
@@ -166,6 +168,7 @@ module JsFailure =
         | JsFailure.FileNotFound path -> "target file does not exist: " + path
         | JsFailure.FileAlreadyExists path -> "target file already exists: " + path
         | JsFailure.FileReadFailed path -> "file read failed: " + path
+        | JsFailure.RgFailed detail -> reasonWithMessage "rg failed" "rg failed: " detail
         | JsFailure.DirectoryNotEmpty path -> "directory is not empty: " + path
         | JsFailure.DirectoryExists path -> "directory already exists: " + path
         | JsFailure.ParentDirectoryMissing path -> "parent directory does not exist: " + path
@@ -243,6 +246,7 @@ module JsFailure =
         | "FILE_NOT_FOUND" -> JsFailure.FileNotFound(after "target file does not exist: ")
         | "FILE_ALREADY_EXISTS" -> JsFailure.FileAlreadyExists(after "target file already exists: ")
         | "FILE_READ_FAILED" -> JsFailure.FileReadFailed(after "file read failed: ")
+        | "RG_FAILED" -> JsFailure.RgFailed(after "rg failed: ")
         | "DIRECTORY_NOT_EMPTY" -> JsFailure.DirectoryNotEmpty(after "directory is not empty: ")
         | "DIRECTORY_EXISTS" -> JsFailure.DirectoryExists(after "directory already exists: ")
         | "PARENT_DIRECTORY_MISSING" -> JsFailure.ParentDirectoryMissing(after "parent directory does not exist: ")

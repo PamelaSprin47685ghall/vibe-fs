@@ -27,6 +27,7 @@ module JsRuntimeSurface =
                 [ JsCapability.Read
                   JsCapability.Write
                   JsCapability.Glob
+                  JsCapability.Grep
                   JsCapability.Move
                   JsCapability.Remove
                   JsCapability.Exec
@@ -56,6 +57,7 @@ module JsRuntimeSurface =
         | "Write" -> Some JsCapability.Write
         | "Edit" -> Some JsCapability.Edit
         | "Glob" -> Some JsCapability.Glob
+        | "Grep" -> Some JsCapability.Grep
         | "Move" -> Some JsCapability.Move
         | "Remove" -> Some JsCapability.Remove
         | "Exec" -> Some JsCapability.Exec

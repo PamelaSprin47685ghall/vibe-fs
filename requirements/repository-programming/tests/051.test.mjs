@@ -31,8 +31,8 @@ const runProgram = (dir, body, sessionId = 'sess-051') =>
 
 const sanity = (nextStep) => `sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: ${nextStep} }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: ${nextStep} }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }`
 
@@ -140,8 +140,8 @@ test('WHAT[repository-programming-051] a crashed background is visible to watch 
       }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 2 }),
-          watchVeto: () => this.watch({ root: "/", step: 1, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "die", exited: true, exitCode: 3 }], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 2 }],
+          watchVeto: () => [{ root: "/", step: 1, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "die", exited: true, exitCode: 3 }], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });`,
