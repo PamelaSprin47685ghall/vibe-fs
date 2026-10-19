@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Participant.Provider.Attempt
 
 open Wanxiangshu.Execution.Session.ChatExecution
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Interaction.Attempt
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Foundation

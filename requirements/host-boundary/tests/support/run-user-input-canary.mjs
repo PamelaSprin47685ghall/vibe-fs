@@ -252,7 +252,15 @@ const waitForManagerJoin = () => new Promise((resolve, reject) => {
   const snapshot = path.join(workspace, '.Herdchestra/diagnostics/causal-waits.json')
   const observe = () => {
     if (!fs.existsSync(snapshot)) return
-    const waits = JSON.parse(fs.readFileSync(snapshot, 'utf8'))
+    // The plugin rewrites this snapshot in place, so a watch event can fire
+    // while the file holds a half-written document. A partial read is not an
+    // answer: wait for the next event instead of killing the canary.
+    let waits
+    try {
+      waits = JSON.parse(fs.readFileSync(snapshot, 'utf8'))
+    } catch {
+      return
+    }
     if (waits.active?.some(wait => wait.waitKind === 'agent-join' && JSON.stringify(wait.owner).includes(sessionID))) {
       clearTimeout(timer)
       watcher.close()

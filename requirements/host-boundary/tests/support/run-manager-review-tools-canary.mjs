@@ -150,18 +150,6 @@ const isManagerRequest = (request, body) => {
     return false;
   }
 
-  // Reject blogger requests that might slip through
-  const messages = Array.isArray(body?.messages) ? body.messages : [];
-  const hasBloggerPrompt = messages.some(
-    (m) =>
-      m?.role === 'system' &&
-      typeof m?.content === 'string' &&
-      (m.content.includes('role/blogger') || m.content.includes('BloggerSystemPrompt')),
-  );
-  if (hasBloggerPrompt) {
-    return false;
-  }
-
   return true;
 };
 

@@ -49,7 +49,7 @@ module HostSessionNudge =
     /// truncating the system prompt and breaking the ARCH-004 seal. Using the
     /// root workspace gives a stable, deterministic set of root instructions,
     /// which differs from the previous worktree version by design; the
-    /// scenario's prefix-probe boundary carries that transition.
+    /// scenario's declared boundary carries that transition.
     let private liveDirectory (rootWorkspace: IRootWorkspaceReader) (directory: string option) =
         RootWorkspaceDirectory.select System.IO.Directory.Exists rootWorkspace directory
 

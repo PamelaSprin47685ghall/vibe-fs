@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Execution.Session.ChatExecution
 
 open Fable.Core.JsInterop
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Execution.Failure
 open Wanxiangshu.Foundation.Identity

@@ -9,9 +9,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.durable-events.composition-durable-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-composition.host-fact-cases.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
-    <Compile Include="Host/Facts.fsi"/>
-    <Compile Include="Host/Facts.fs"/>
     <Compile Include="Host/Fact.fsi"/>
     <Compile Include="Host/Fact.fs"/>
   </ItemGroup>

@@ -1,6 +1,5 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode.Host

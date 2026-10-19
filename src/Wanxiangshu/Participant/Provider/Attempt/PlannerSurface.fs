@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Participant.Provider.Attempt
 
 open Fable.Core.JsInterop
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority

@@ -54,7 +54,7 @@ const REQUEST_KIND_SWITCHED = body(
 // successor projection STRIP the predecessor's assistant/tool traffic and keep the user
 // 原文 plus its own tenure's interactions, so the next iteration sends the authority
 // root, whatever its own tenure observed, and its own fresh-head resource. Only the
-// retired guidance occurrence and the companion frame are additionally normalized away
+// retired guidance occurrence is additionally normalized away
 // (context-compression-019 / GAP-022). Structural only: typed authority-revision
 // retention is proved by the unit projection tests and the long-stroke root-only oracle.
 const GUIDANCE_SUFFIX = '\0\uFEFF<system>\n# # Wait-cost calibration: priced interval.\n</system>';
@@ -75,15 +75,6 @@ const MANAGER_NEXT = body('test-model', [
   user('Round 2'),
 ]);
 const MANAGER_RETIRED_WITH_NUDGE = body('test-model', [SYSTEM, ...MANAGER_TRAFFIC, user('work nudge')]);
-// Companion frame (synthetic ack + preamble user) may disappear across iterations.
-const MANAGER_RETIRED_WITH_COMPANION = body('test-model', [
-  SYSTEM,
-  user('Round 1'),
-  assistant('.'),
-  user(`${COMPANION_PREAMBLE}\n# prior record`),
-  assistant('assessment evidence'),
-  { role: 'tool', tool_call_id: 'review-call', content: 'scores' },
-]);
 
 const decide = (previous, next, boundary = null, stripAdmitted = false) =>
   sealDecision({
@@ -355,11 +346,6 @@ export const coldBoundaryCases = [
     name: 'MANAGER-LOOP a new iteration reseals after the successor projection strips the predecessor traffic',
     fn: () => {
       assertEq(decide(MANAGER_RETIRED, MANAGER_NEXT, at('manager-loop')).resealed, 'manager-loop');
-      assertEq(
-        decide(MANAGER_RETIRED_WITH_COMPANION, MANAGER_NEXT, at('manager-loop')).resealed,
-        'manager-loop',
-        'production companion frames may disappear across iterations',
-      );
       assertEq(
         decide(MANAGER_RETIRED_WITH_NUDGE, MANAGER_NEXT, at('manager-loop')).broken,
         'manager-loop-rewrote-fixed',

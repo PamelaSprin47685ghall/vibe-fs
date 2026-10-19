@@ -5,7 +5,6 @@ open Wanxiangshu.Persistence.EventStore
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity

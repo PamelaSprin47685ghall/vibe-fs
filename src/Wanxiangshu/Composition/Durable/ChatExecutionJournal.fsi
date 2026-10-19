@@ -3,7 +3,6 @@ namespace Wanxiangshu.Composition.Durable
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome

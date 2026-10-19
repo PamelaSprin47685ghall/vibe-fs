@@ -1,5 +1,16 @@
 # Changelog — 版本历史
 
+## Unreleased — 验收层收口：集成层恢复全绿，退役概念清零
+
+- **集成层（integration tier）恢复全绿**。cutover 之后无人跑过这一层，它当时是红的，本轮把三处根因修掉：
+  - 36 个文件残留着 `open Wanxiangshu.Context.Prefix`（`XProjectionChoice` 随 prefix probe 一起退役后留下的死引用）。这些 open 指向的命名空间不在各自 shard 的编译闭包里，shard 独立编译因此报 `The namespace 'Prefix' is not defined`；死引用全部删除。
+  - shard 图缺三条边：`repository-programming-js-capability` 缺 `foundation-taskresult`（`JsRunLoop` 用 `taskResult`），`execution-fission-opencode-host` 缺 `host-tool-adapter`（fission 工具用 `ToolHostCodec`），`composition-durable-fact` 缺 Host 事实词汇。前两条补上引用；第三条不能补——`Host/Fact.fs`（投影）依赖持久事实词汇，而持久事实词汇又依赖 `HostFactCases`（`Host/Facts.fs`），补引用会成环。改为把词汇与投影拆成两个 shard：`durable-composition.host-fact-cases` 持 `Host/Facts.*`，`durable-composition.host-fact` 持 `Host/Fact.*` 并引用它，持久事实 shard 引用前者。环消失，闭包自足。
+  - 验收夹具 `arch010-cases.mjs` 有一处 cutover 留下的半截 `assertTrue(`（删 Blogger 断言时切断），整个 integration harness 因此无法加载；同时两条 CTX-010 prefix-probe 用例与一条 companion frame 断言仍在验证已退役的机制，一并删除。
+- **测试层清零退役概念**。退役概念（Blogger / Predictor / Chronicle / StrengthReplica）在 `src`、`resources`、`scripts` 已无残留；测试层里仍在*提供*这些概念的死代码一并清掉：e2e 隔离宿主配置不再注册 blogger / predictor agent，默认路由源不再导出 `predictorConfiguration`，strict mock provider 不再对 blogger turn 特判，`WANXIANGSHU_BLOGGER_CONTEXT_LIMIT`（产品早已不读）不再下发；dispatch-protocol 与 interaction-authority 的 root selection 不再用 `predictor` → `inspector` 的映射冒充角色。规范与说明文字同步：context-compression / feature-ablation / capability-enforcement 里的退役条款保留（负向断言的锚点），过期注释与 README 段落改写为当前事实；`office-capability-015` 那条以退役概念为对象的待证 TODO 删除。
+- **canary 文件观察不再读半截 JSON**。`run-user-input-canary.mjs` 监听插件原地重写的诊断快照，watch 事件可能在写完前触发，`JSON.parse` 于是抛 `Unexpected end of JSON input` 并杀死 canary；现在半截读取不视为答案，等下一个事件。
+- **未闭合**：release 层的 e2e（Long Stroke 场景）仍红——编排器第三轮之后停住，manager / engineer 的 lane 期望一条未发出。本轮已排除本次清理（回退清理后同样停在同一处），停点属于 cutover 之前的既有欠账：pre-cutover 基线连 shard 覆盖都不闭合，Long Stroke 场景与新的接力/工作记录语义尚未对齐。
+- 验收：`node scripts/build.mjs` 与 `node scripts/check.mjs` 全绿；全量单元测试 3972 通过 / 0 失败（105 跳过、293 待证）；集成层 suites 622 通过 / 0 失败、harness 288 通过 / 0 失败、package 通过。
+
 ## Unreleased — 重启后交还子会话不再被判身份冲突
 
 - 加载归位的作废结算（`ChildWorkRecovery.settleOrphanedChildRuns`）改回激活任务的第一件持久动作。它原先排在由 git 子进程支撑的交付恢复之后：重启后 manager 把工作交还给上一 runtime 留下的子会话时，新根的登记会抢在作废落定之前读投影，读到的仍是活跃旧根，于是子会话被判 `ActiveRunIdentityConflict`，交还回执退化成「派发回执不确定」。

@@ -173,13 +173,13 @@ delivery = "provider-error"
   },
 
   {
-    name: 'COMPANION-002 a Companion turn declares no lane',
+    name: 'COMPANION-002 a companion turn declares no lane',
     fn: () => {
       const offenders = walk(SCENARIO_ROOT, ['.toml']).flatMap((file) =>
         readFileSync(file, 'utf8')
           .split('\n')
           .map((line, index) => ({ file, line: index + 1, text: line.trim() }))
-          .filter(({ text }) => /^lane = ".*blogger.*"$/.test(text)),
+          .filter(({ text }) => /^lane = ".*companion.*"$/.test(text)),
       );
 
       assertEq(

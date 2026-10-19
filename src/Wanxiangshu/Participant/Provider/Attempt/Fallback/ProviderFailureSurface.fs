@@ -4,7 +4,6 @@ open System
 open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Durable.Fact

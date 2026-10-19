@@ -7,7 +7,6 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.AsyncSupport
 open Wanxiangshu.Foundation.Identity
 
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Outcome

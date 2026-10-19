@@ -114,9 +114,8 @@ export const arch010Cases = [
   {
     name: 'ARCH-010 every payload production renders conforms to the clause',
     fn: () => {
-      // The positive half. Thirteen renderings covering all four fork shapes, both Blogger shapes, all
-      // three document shapes, multi-line bodies, and the injection payload in every position a
-      // producer can put it.
+      // The positive half. Eleven renderings covering all four fork shapes, all three document
+      // shapes, multi-line bodies, and the injection payload in every position a producer can put it.
       for (const [label, document] of Object.entries(productionPayloads())) {
         const violations = auditPayload(document, { origin: label });
         assertEq(violations.length, 0, `${label} violates ARCH-010: ${violations.join(' | ')}\n${document}`);
@@ -160,6 +159,7 @@ export const arch010Cases = [
         payloads['fork: multi-line assignment'].startsWith('# Fix this:') &&
           payloads['fork: multi-line assignment'].includes('# in C:\\Users\\dev'),
         'the multi-line fixture must actually carry its assignment lines in the instruction header',
+      );
 
       assertTrue(
         payloads['glory: work activation'].startsWith('# Now complete it yourself'),
@@ -311,11 +311,10 @@ export const arch010Cases = [
       // multi-line form. Every rule in the checker reads `syntax` and ignores `content`, so if this
       // split were wrong the rules would fire on values — and the tempting fix would be to weaken the
       // rules rather than the classifier.
-      // The body deliberately avoids `[[item]]`, which the Blogger document uses as a REAL header.
-      // The first draft used it and failed: the line is legitimately both content (inside this value)
-      // and syntax (the item's own header), so "must not be classified as syntax" was false about the
-      // document rather than about the classifier. A token that appears only inside the value is what
-      // actually tests the split.
+      // The body deliberately avoids `[[item]]`, a table header that is legitimately both content
+      // (inside this value) and syntax (the item's own header). A draft that used it failed: the
+      // "must not be classified as syntax" claim was then false about the document rather than about
+      // the classifier. A token that appears only inside the value is what actually tests the split.
       const body = ['# not an instruction', 'status = "not a field"', '[[injected_table]]', ''].join('\n');
       const documentLiteral = `tool_result = '''\n${body}\n'''`;
       const { syntax, content, misplaced, unterminated } = splitDocument(documentLiteral);
