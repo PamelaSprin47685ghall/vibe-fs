@@ -56,6 +56,8 @@ Manager 的 system prompt、continuation、Schema、错误、工具描述及结�
 
 已 durable 建立的可见 child，在最终后果交付前不得消失。`Abandoned` 仍按 Byname 显示“未返回”，直至 Join 消费后果并将 handle 置为 `Retired`；仅 `Retired` 可移出名册。
 
+名册中的每个子智能体，在其委任者 estimate 与自身会话起点两者都可读时另附四个数：已用/预计还剩的工具调用回合数，与已用/按它已显示出的节奏按比例估计还剩的 wall-clock 时间（剩余时间 = 已用回合的平均代价 × 剩余回合数，已用为 0 时以 1 计）。缺任一来源即不呈现这四个数，不以旧值或猜测顶替。
+
 ## [012] warm-start hints 只向有 repository 证据 authority 的角色准入
 
 WarmStart hints 仅向有仓库证据权限的 Engineer、DevOps 提供；其他角色只能沿调用链传递关键词，不接收代码片段。

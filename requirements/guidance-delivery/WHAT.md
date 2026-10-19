@@ -42,4 +42,4 @@ guidance 随结对指引，以 NUL+BOM 分隔后附在真实终端工具结果�
 
 ## [012] 新 occurrence 的动态材料
 
-新 occurrence 合成 latest tip guidance、session elapsed、remaining expected tool calls、模型自身状态的两个 datum——上一轮请求的 token 经济（provider 实际计费的缓存命中 token 数与重新计算 token 数，取自宿主 `message.updated` 事件里 assistant 的 `tokens`）与 provider 声明的 context limit（取自 chat.params 处解析出的模型 `limit.context`，见 context-compression [001]）——以及待交付的 concern 订阅公告或邮箱消息。各动态材料只从所属 O(1) 投影读取一次；最终 MarkerText 原子持久化后冻结，重放不重新渲染或消费动态材料。
+新 occurrence 合成 latest tip guidance、运行校准（四个数：已用/预计还剩的工具调用回合数，与已用/按已显示节奏按比例估计还剩的 wall-clock 时间；无委任者 estimate 时退化为单条 elapsed datum）、模型自身状态的两个 datum——上一轮请求的 token 经济（provider 实际计费的缓存命中 token 数与重新计算 token 数，取自宿主 `message.updated` 事件里 assistant 的 `tokens`）与 provider 声明的 context limit（取自 chat.params 处解析出的模型 `limit.context`，见 context-compression [001]）——以及待交付的 concern 订阅公告或邮箱消息。剩余时间按比例估算：已用回合的平均代价 × 剩余回合数（已用为 0 时以 1 计），因此它随实际节奏变化而非固定值。各动态材料只从所属 O(1) 投影读取一次；最终 MarkerText 原子持久化后冻结，重放不重新渲染或消费动态材料。

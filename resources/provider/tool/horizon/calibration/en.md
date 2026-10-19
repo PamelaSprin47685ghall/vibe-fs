@@ -1,0 +1,1 @@
+# {{label}}: {{turns_used}} tool calls spent and about {{turns_left}} left on the delegator's estimate; {{time_used}} of wall-clock spent and about {{time_left}} left at the pace this participant has shown.

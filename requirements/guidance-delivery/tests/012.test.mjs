@@ -17,10 +17,22 @@ test('WHAT[guidance-delivery-012] actual composition preserves all provided dyna
 })
 
 for (const [locale, resource] of [['English', 'en'], ['SimplifiedChinese', 'zh-CN']]) {
-  test(`WHAT[guidance-delivery-012] ${locale} estimate uses complete authored calibration with the current value`, () => {
-    const template = readResource('pair-programming-tool-estimate', resource)
-    for (const remaining of [0, 4, 17]) {
-      assert.equal(calibration.renderToolEstimate(locale, remaining), template.replaceAll('{{remaining}}', String(remaining)))
+  test(`WHAT[guidance-delivery-012] ${locale} calibration states the four numbers from the authored resource`, () => {
+    const template = readResource('pair-programming-budget', resource)
+    const cases = [
+      [4, 6, 125000, '2 minutes 5 seconds', '3 minutes 7 seconds', '2 分钟 5 秒', '3 分钟 7 秒'],
+      [0, 2, 90000, '1 minute 30 seconds', '3 minutes 0 seconds', '1 分钟 30 秒', '3 分钟 0 秒'],
+    ]
+
+    for (const [turnsUsed, turnsLeft, elapsedMs, enUsed, enLeft, zhUsed, zhLeft] of cases) {
+      const used = locale === 'English' ? enUsed : zhUsed
+      const left = locale === 'English' ? enLeft : zhLeft
+      const expected = template
+        .replaceAll('{{turns_used}}', String(turnsUsed))
+        .replaceAll('{{turns_left}}', String(turnsLeft))
+        .replaceAll('{{time_used}}', used)
+        .replaceAll('{{time_left}}', left)
+      assert.equal(calibration.renderBudget(locale, turnsUsed, turnsLeft, elapsedMs), expected)
     }
   })
 

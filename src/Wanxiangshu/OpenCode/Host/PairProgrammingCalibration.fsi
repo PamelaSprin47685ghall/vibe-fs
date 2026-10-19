@@ -6,7 +6,7 @@ open Wanxiangshu.Participant.Provider
 [<RequireQualifiedAccess>]
 module PairProgrammingCalibration =
     [<Literal>]
-    val ToolEstimatePath: string = "host/pair-programming-tool-estimate"
+    val BudgetPath: string = "host/pair-programming-budget"
 
     [<Literal>]
     val ElapsedPath: string = "host/pair-programming-elapsed"
@@ -32,7 +32,7 @@ module PairProgrammingCalibration =
         tip: string option ->
         elapsed: string option ->
         state: string option list ->
-        toolEstimate: string option ->
+        calibration: string option ->
         guideline: string ->
             LlmFacing.Document
 
@@ -41,7 +41,10 @@ module PairProgrammingCalibration =
     val composeWithElapsed:
         tip: string option -> elapsed: string option -> toolEstimate: string option -> guideline: string -> string
 
-    val renderToolEstimate: language: ProviderLanguage -> remaining: int -> string
     val renderElapsed: language: ProviderLanguage -> elapsedMilliseconds: float -> string
+
+    val renderBudget:
+        language: ProviderLanguage -> turnsUsed: int -> turnsRemaining: int -> elapsedMilliseconds: float -> string
+
     val renderTokenEconomy: language: ProviderLanguage -> cached: int -> uncached: int -> string
     val renderContextLimit: language: ProviderLanguage -> limit: int -> string

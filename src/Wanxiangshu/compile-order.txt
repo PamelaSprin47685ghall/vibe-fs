@@ -632,6 +632,8 @@ Execution/Agent/Program.fsi
 Execution/Agent/Program.fs
 Participant/Provider/SessionLanguage.fsi
 Participant/Provider/SessionLanguage.fs
+Participant/Provider/DurationLabel.fsi
+Participant/Provider/DurationLabel.fs
 Execution/Delegation/Fork/Model.fsi
 Execution/Delegation/Fork/Model.fs
 Execution/Session/AgentCompletion.fsi
@@ -1181,6 +1183,8 @@ OpenCode/JoinResultRendererSurface.fs
 Mission/Work/OpenCode/NarrativeTransform.fsi
 Mission/Work/OpenCode/NarrativeTransform.fs
 
+Execution/Session/OpenCode/HorizonCalibration.fsi
+Execution/Session/OpenCode/HorizonCalibration.fs
 Execution/Session/OpenCode/HorizonTool.fsi
 Execution/Session/OpenCode/HorizonTool.fs
 Execution/Session/OpenCode/HorizonSurface.fsi

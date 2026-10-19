@@ -1,12 +1,37 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+import * as horizonCalibration from '../../../dist/Execution/Session/OpenCode/HorizonCalibration.js'
 import { placeEngineer, withForkRuntime } from './support/fork-runtime.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+
+test('WHAT[participant-horizon-011] a participant calibration states the four numbers from the authored resource', () => {
+  const cases = [
+    ['English', 'en.md', 'Ada', 4, 6, 125000, '2 minutes 5 seconds', '3 minutes 7 seconds'],
+    ['SimplifiedChinese', 'zh-CN.md', 'Ada', 4, 6, 125000, '2 分钟 5 秒', '3 分钟 7 秒'],
+    ['English', 'en.md', 'Ada', 0, 2, 90000, '1 minute 30 seconds', '3 minutes 0 seconds'],
+  ]
+
+  for (const [language, file, label, used, left, elapsedMs, timeUsed, timeLeft] of cases) {
+    const rendered = horizonCalibration.render(language, label, used, left, elapsedMs)
+    const resource = readFileSync(
+      new URL(`../../../resources/provider/tool/horizon/calibration/${file}`, import.meta.url),
+      'utf8',
+    )
+    const expected = resource
+      .trim()
+      .replaceAll('{{label}}', label)
+      .replaceAll('{{turns_used}}', String(used))
+      .replaceAll('{{turns_left}}', String(left))
+      .replaceAll('{{time_used}}', timeUsed)
+      .replaceAll('{{time_left}}', timeLeft)
+    assert.equal(rendered, expected, `${language}: ${used}/${left} turns at ${elapsedMs}ms`)
+  }
+})
 
 test('WHAT[participant-horizon-011] real cancellation keeps an accepted child and its undelivered consequence visible', async (context) => {
   await withForkRuntime(async ({ runtime, owner }) => {

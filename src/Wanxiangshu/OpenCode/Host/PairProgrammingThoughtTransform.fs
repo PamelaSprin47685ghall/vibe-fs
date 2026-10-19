@@ -1290,17 +1290,26 @@ module PairProgrammingThoughtTransform =
             || isInternalRole (sessionRole journal sid)
         | _ -> false
 
-    let private toolEstimateText
+    /// The four calibration numbers, when the delegator's estimate and the
+    /// session start are both known; otherwise the round falls back to the
+    /// elapsed-time datum alone.
+    let private budgetText
         (journal: AgentJournal option)
         (projectionSessionIdOpt: string option)
+        (elapsedMilliseconds: float option)
         (language: ProviderLanguage)
         : string option =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId ->
+        match journal, projectionSessionIdOpt, elapsedMilliseconds with
+        | Some durable, Some sessionId, Some elapsed ->
             let port = AgentJournalPortAdapter.forDelegatedToolEstimate durable
 
-            DelegatedToolEstimateLedger.tryRemaining port (SessionId.create sessionId)
-            |> Option.map (PairProgrammingCalibration.renderToolEstimate language)
+            DelegatedToolEstimateLedger.tryState port (SessionId.create sessionId)
+            |> Option.map (fun state ->
+                PairProgrammingCalibration.renderBudget
+                    language
+                    (DelegatedToolEstimateProjection.countedCallCount state)
+                    (DelegatedToolEstimateProjection.remaining state)
+                    elapsed)
         | _ -> None
 
     /// crash-reconciliation-018: the restart status guidance is one more
@@ -1318,7 +1327,7 @@ module PairProgrammingThoughtTransform =
         (projectionSessionIdOpt: string option)
         (elapsed: string option)
         (state: string option list)
-        (toolEstimate: string option)
+        (calibration: string option)
         (guideline: string)
         (restartGuidance: string option)
         : Task<LlmFacing.Document> =
@@ -1351,7 +1360,7 @@ module PairProgrammingThoughtTransform =
                     [ ProviderProse.render language ParkedHintPath (Map [ "handles", String.Join(", ", parkedHandles) ]) ]
 
             let document =
-                PairProgrammingCalibration.documentWithState guidance elapsed state toolEstimate guideline
+                PairProgrammingCalibration.documentWithState guidance elapsed state calibration guideline
                 |> LlmFacing.withInstructions parkedHint
                 |> withRestartGuidance restartGuidance
 
@@ -1561,13 +1570,21 @@ module PairProgrammingThoughtTransform =
 
             let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
 
-            let elapsed =
+            let elapsedMilliseconds =
                 sessionStartedAt
-                |> Option.map (fun startedAt ->
-                    let elapsedMilliseconds = (clock.UtcNow() - startedAt).TotalMilliseconds
-                    PairProgrammingCalibration.renderElapsed language elapsedMilliseconds)
+                |> Option.map (fun startedAt -> (clock.UtcNow() - startedAt).TotalMilliseconds)
 
-            let toolEstimate = toolEstimateText journal projectionSessionIdOpt language
+            let budget = budgetText journal projectionSessionIdOpt elapsedMilliseconds language
+
+            // Four calibration numbers when the estimate exists, the elapsed
+            // datum alone when it does not: the hint never states the same
+            // number twice.
+            let elapsed =
+                match budget with
+                | Some _ -> None
+                | None ->
+                    elapsedMilliseconds
+                    |> Option.map (PairProgrammingCalibration.renderElapsed language)
 
             let! markerDocument =
                 composeMarkerDocument
@@ -1575,7 +1592,7 @@ module PairProgrammingThoughtTransform =
                     projectionSessionIdOpt
                     elapsed
                     [ tokenEconomy; contextLimit ]
-                    toolEstimate
+                    budget
                     guideline
                     restartGuidance
 

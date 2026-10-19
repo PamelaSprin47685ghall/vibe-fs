@@ -50,6 +50,9 @@ module HorizonTool =
         [<Literal>]
         val LatestWorkUnavailable: string = "tool/horizon/latest-work-unavailable"
 
+        [<Literal>]
+        val Calibration: string = "tool/horizon/calibration"
+
     type HorizonRuntimeContext =
         { RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
           LogicalOwnerFor: SessionId -> SessionId

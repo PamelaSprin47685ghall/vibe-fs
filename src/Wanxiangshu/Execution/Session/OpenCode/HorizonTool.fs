@@ -58,6 +58,9 @@ module HorizonTool =
         [<Literal>]
         let LatestWorkUnavailable = "tool/horizon/latest-work-unavailable"
 
+        [<Literal>]
+        let Calibration = "tool/horizon/calibration"
+
     type HorizonRuntimeContext =
         { RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
           LogicalOwnerFor: SessionId -> SessionId
@@ -131,6 +134,32 @@ module HorizonTool =
     let private unavailable language path =
         ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render language path Map.empty ] []
 
+    /// The four calibration numbers for one participant, when both the
+    /// delegator's estimate and the participant's own start are known: turns
+    /// spent and left, and the wall-clock spent beside the time that remains at
+    /// the pace this participant has shown.
+    let private calibrationLine language (journal: AgentJournal) (handle: HandleRecord) : string option =
+        let estimateState =
+            AgentJournalPortAdapter.forDelegatedToolEstimate journal
+            |> fun port -> DelegatedToolEstimateLedger.tryState port handle.ChildSessionId
+
+        let startedAt =
+            (AgentJournalPortAdapter.forSessionStartedAt journal).TryStartedAt handle.ChildSessionId
+
+        match estimateState, startedAt with
+        | Some state, Some bound ->
+            let elapsed = (DateTimeOffset.UtcNow - bound).TotalMilliseconds
+
+            Some(
+                HorizonCalibration.render
+                    (ProviderLanguage.externalName language)
+                    (labelForHandle language handle)
+                    (DelegatedToolEstimateProjection.countedCallCount state)
+                    (DelegatedToolEstimateProjection.remaining state)
+                    elapsed
+            )
+        | _ -> None
+
     let private appendHandleLines language journal snapshot runtimeByAgentId (agentLines: ResizeArray<string>) handle =
         task {
             match HandleId.tryAgent handle.Handle with
@@ -142,6 +171,8 @@ module HorizonTool =
 
                 let! workRecord = workRecordForHandle language journal snapshot handle
                 agentLines.Add workRecord
+
+                calibrationLine language journal handle |> Option.iter agentLines.Add
         }
 
     let private rosterInstructions language (lines: string list) =

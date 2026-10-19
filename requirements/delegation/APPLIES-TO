@@ -18,7 +18,7 @@
 /resources/provider/tool/resume/**
 /resources/provider/tool/commission/**
 /resources/provider/tool/join/**
-/resources/provider/host/pair-programming-tool-estimate/**
+/resources/provider/host/pair-programming-budget/**
 /scripts/checks/tool-referential-integrity.mjs
 /scripts/lib/owner-compile.mjs
 /scripts/lib/compile-shards.mjs
