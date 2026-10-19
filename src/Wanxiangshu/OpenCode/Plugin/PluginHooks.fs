@@ -11,11 +11,8 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Cycle
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission
@@ -28,7 +25,6 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Mission.Manager
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Mission.Work.OpenCode
-open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt
@@ -36,9 +32,7 @@ open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Repository.Investigation.WarmStart
-open Wanxiangshu.Strength
-open Wanxiangshu.Strength.Projection
-open Wanxiangshu.Strength.Replica
+
 open Wanxiangshu.Host
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
@@ -56,8 +50,7 @@ open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
 open Wanxiangshu.Repository.Investigation.WarmStart
 open Wanxiangshu.Resources
-open Wanxiangshu.Strength.OpenCode
-open Wanxiangshu.Strength.Persistence
+
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -80,7 +73,7 @@ open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Strength
+
 open Wanxiangshu.Repository.Knowledge.Casebook
 open Wanxiangshu.Repository.Knowledge.Casebook.OpenCode
 open Wanxiangshu.OpenCode.Host
@@ -118,8 +111,7 @@ module PluginHooks =
                         PromptAuthorityProjectionQueries.lastAuthorityProfile sessionId projections))
                 |> Option.map (fun profile -> profile.CanonicalRole)
 
-            let isReplica (sessionId: SessionId) =
-                boot.StrengthScope.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome
+            
 
             // work-031: resolve the stage-method semantic path for the
             // session's active plan incumbency. Non-plan sessions, missing
@@ -132,19 +124,23 @@ module PluginHooks =
                 | "S3", Some _ -> Some "planning/s3"
                 | _ -> None
 
-            let planStageFor (sessionId: SessionId) : string option =
-                match roleFor sessionId with
-                | Some Role.Plan ->
-                    workspaceDirectory
-                    |> Option.bind (fun workspace ->
-                        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
-
-                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId))
-                    |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)
-                | _ -> None
+            let planStageFor (sessionId: SessionId) : Task<string option> =
+                task {
+                    match roleFor sessionId with
+                    | Some Role.Plan ->
+                        match workspaceDirectory with
+                        | Some workspace ->
+                            let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+                            return
+                                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId)
+                                |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)
+                        | None -> return None
+                    | _ -> return None
+                }
 
             let systemTransform =
-                ProviderSystemTransform.createWith roleFor isReplica planStageFor
+                                ProviderSystemTransform.createWith roleFor planStageFor
+
 
             // CASE-003: typed capture at the tool boundary — shared
             // CasebookLifecycle.collector; marker flag gates the after-hook.
@@ -243,34 +239,32 @@ module PluginHooks =
                     let onRunStarted =
                         Some(fun sessionId role directory -> wired.BindActiveRun sessionId role directory)
 
-                    // EXEC-006/008: LWR; parent→child Opening on, join off.
-                    let workRecord includeOpening =
+                    // Child return is the deliver view, not a materialized WorkRecord.
+                    let deliveredView =
                         Some(fun sessionId ->
-                            LifecycleWorkRecordProjection.lifecycleWorkRecord
-                                journal
-                                (SessionId.create sessionId)
-                                includeOpening)
+                            Task.FromResult(
+                                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.tryPeekRendered sessionId))
 
-                    let parentWorkRecordFor, childWorkRecordFor = workRecord true, workRecord false
+                    let parentWorkRecordFor, childWorkRecordFor = deliveredView, deliveredView
 
                     let childRecordForRun = fun _ _ -> Task.FromResult None
 
-                    let casebookToolSpecs: ToolSpec list =
+                    let! casebookToolSpecs =
                         match workspaceDirectory with
                         | Some ws ->
                             CasebookTools.buildSpecs (ToolHostCodec.factory toolModule) ws boot.CasebookSettlements
-                        | None -> []
+                        | None -> Task.FromResult []
 
-                    let toolRegistration =
+                    let! toolRegistration =
                         toolHooks
                             toolModule
                             sessionPort
                             host.CausalWaitObserver
                             host.RootWorkspace
                             journal
-                            (workspaceDirectory)
-                            (Some boot.StrengthScope)
+                                                        (workspaceDirectory)
                             scope
+
                             wired.CurrentPhysicalUserMessage
                             onRunStarted
                             parentWorkRecordFor
@@ -357,10 +351,8 @@ module PluginHooks =
                     )
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
-                ManagerReviewContract.decorateDefinition toolInput toolOutput
+                                ManagerReviewContract.decorateDefinition toolInput toolOutput
 
-                if readonlyDelegationPredictorConfigured () then
-                    ReadonlyDelegationContract.decorateDefinition toolInput toolOutput
 
             let reviewToolPermitted toolName (facts: ManagerCapabilityFacts) =
                 match ManagerReviewTools.requiredPermissions toolName with

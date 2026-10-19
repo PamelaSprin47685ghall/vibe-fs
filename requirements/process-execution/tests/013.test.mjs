@@ -21,6 +21,8 @@ test('WHAT[process-execution-013] js.run bounds large output deterministically t
         return null;
       }
       check() { return true; }
+      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
+      sanity() { return { nextDone: () => [{ root: '/', step: 2 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
     });
     return {
       exitCode: r.exitCode,
@@ -57,6 +59,8 @@ test('WHAT[process-execution-013] small output preserves separate stdout and std
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
       check() { return true; }
       onExit(res) { exited = { stdout: res.stdout, stderr: res.stderr }; }
+      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
+      sanity() { return { nextDone: () => [{ root: '/', step: 2 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
     });
     return { exitCode: r.exitCode, truncated: r.truncated, stdout: exited.stdout, stderr: exited.stderr };`,
     )

@@ -33,6 +33,8 @@ test('WHAT[process-execution-015] the complete visible result bounded by ToolRes
       interval = 50;
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
       check() { return true; }
+      watch(ctx) { if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" }; return true; }
+      sanity() { return { nextDone: () => [{ root: '/', step: 1 }], watchVeto: () => [{ root: '/', step: 0, stdout: '', stderr: '', exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }] }; }
     });`,
     )
     assert.equal(caseName(outcome), 'Succeeded')
