@@ -2,11 +2,8 @@
 
 ## 工具调用纪律
 
-- 只要动作彼此独立，就尽量并行读取、调查与验证。并发是为了提高效率、理清因果，不是为了盲目追求工具数量。
-- 在同一文件上有重叠的编辑、存在先后依赖的修改，或者依赖上一条命令结果的执行，必须串行完成。
-- 跨文件修改先判断依赖关系：修改公共类型或接口时，先定好契约边界，再调整调用方，最后清理旧路径。
+- 只要动作彼此独立，就尽量并行。
 - 精准修改局部代码，拒绝无谓的全量重写。
-- 把大诉求拆成细小、明确的独立步骤，避免长时停滞。
 
 ## 架构与编码风格
 
@@ -58,3 +55,104 @@
 
 
 
+# Blogger / Chronicle / WorkRecord / Replica 废弃方案（clean-break）
+
+> 状态：**已裁决，待施工**。本文档由 2026-10-19 的依赖面调查与所有者终局裁决产出，记录彻底废弃 blogger、chronicle、Y 轴、WorkRecord 与 Replica（StrengthReplica / speculative-investigation）的完整施工路径。所有数据来自源码检索与 `compile-order.txt` 核查，工作树含未提交的 advisor 开发改动（`src/Wanxiangshu/Execution/Delegation/Advisor/`、`resources/provider/lifecycle/advisor/`）。
+
+## 一、现状结论
+
+1. **Blogger / Chronicle（Y 轴）**：48 个内部定义文件在 `compile-order.txt` 中参与每次构建；`ToolRegistry.fs` 注册 `"chronicle", ChronicleTool.admission bloggerHost`；`OfficeCapability.fs` 定义 `Role.Blogger -> set [ ToolPermission.Chronicle ]`；约 180 个外部消费文件横跨十层；40 份 requirement 文档及 209 个测试文件（1347 处引用）涉及；`wanxiangli` submodule 定义 `Role.Blogger` 与 Chronicler persona。
+2. **WorkRecord**：源码约 86 个文件（含生成物共 107 处）横跨 Execution（46）、Mission（12，含 3 个 owner fsproj）、OpenCode（10）、Context（9）、Change（4）、Persistence（1），作为三段式结构（Opening + Chronicle + Recent work）承担跨 horizon 返回、join 交付与 attachment 背景。
+3. **Replica（`StrengthReplica`）**：`speculative-investigation`（「门外探路的，只是候选」）的执行载体，分布在 `Context/Prefix/Wire`（`isReplicaSession` 分支）、`Context/Companion/CompressionSurface`、`Context/Prefix/Surface`、`Execution/Session/Association` 与 `Ownership`（`AttachmentKind.StrengthReplica`）、`Interaction/Authority/Model`（只读权限矩阵）、`Execution/Failure/Policy`（预算豁免）、`OpenCode/Host`（`ProviderSystemTransform` 约束行、`HostTurnObserver` leaf-local 观察、`PluginHostInterop`）及 14 份规范文档。
+
+## 二、所有者终局裁决（阶段 0 已闭环）
+
+### 裁决 1：advisor 立即改锚，不等落地后置
+- **事实核查**：`requirements/advisor/WHAT.md` 仅有 [001]–[006]，原草案所称「仿 `CompanionBloggerLinked`」「仿 `EnsureBloggerAsync`」仅存在于施工分期计划文本中；实际已落地的 `AdvisorSeat` 采用进程内 seat 表、无 durable link、不写 journal。真实代码耦合集中在 `src/Wanxiangshu/Execution/Delegation/Advisor/View.fs`（引用 `BloggerDeltaItem`、`BloggerDeltaPart`、`CompanionPrompt.newWorkMessage` 共 8 处）。
+- **结论**：趁 advisor 尚未提交，立即改锚。将 TOML 视图渲染词汇（`SyntheticToml` 及表结构组装）收归通用或 advisor 自有，剥离 `Companion.Blogger` 依赖，同步清理 `advisor/WHAT.md`、`WHY.md`、`README.md` 及 `resources/provider/role/advisor/` 中关于 Blogger/Chronicle 的锚定表述。
+
+### 裁决 2：彻底取消 Y 轴，WorkRecord 整体退出，返回与上下文清理全权交由 view 机制
+- **彻底没有 Y**：不再有 Y 轴、Blogger、Chronicle、`MemoryPreamble`（4 文件）与 `FrozenRecordPrefix` 的 Y 覆盖概念（24 文件）。
+- **完整 turn 的覆盖证明不证自明**：历史截断与保留完全由模型在编程面显式提交的 `view` 声明（`prefixUntil` / `thenRemove`）决定，不另设独立的 Y 物化覆盖证明。
+- **attempt 失败恢复策略简化**：废除 Y 恢复材料与复杂的 prefix probe 候选机制。provider attempt 失败后的恢复策略统一为：**第一次原样重试，第二次把该 Provider 拉黑后重试，以此类推**。
+- **WorkRecord 趁机彻底退出**：删除 `Mission/WorkRecord` 整包及全仓 WorkRecord 三段式物化/投影体系。
+- **委托返回合同重定义为 `js.deliver` 的 view**：
+  - 子工作返回给调用方的内容，就是 `js.deliver` 交回的 `view`（`js.deliver` 带 `view` 参数决定如何交回），渲染成 TOML。
+  - 最后的 assistant 散文要不要交回，由 LLM 自己说了算——`view` 里面有就有，没有就没有。
+  - **去重规则**：本次工作之前已经返回过的内容，即使本次 `view` 里面包含，也不再返回（上次 `deliver` 已经给过返回机会，绝不重复交付）。
+  - **接力上下文管理**：`js.deliver` 在 S1/S2/S3/S4 的接力机制不再主动清除上下文，上下文的保留与裁剪全部依靠 `view` 机制。
+- **tip 与诊断语料废弃**：`guidance-delivery`（Enforcer Tip）与 `behavior-diagnosis` 的运行时提交与注入功能彻底废弃；其中有价值的规则与经验重整后直接融入 Common Law（`resources/provider/world/common-law/`）。
+
+### 裁决 3：durable 历史清空（clean-break）
+- **结论**：授权整体退役本机 `.Herdchestra/` 运行状态，不读取、不迁移、不为旧 Blogger/WorkRecord/Replica 事件保留兼容解码。在阶段 6 构建与测试验证全绿后一次性清空。
+
+### 裁决 4：Replica 机制彻底废弃
+- **结论**：整包废除 `speculative-investigation` 及 `ProviderRequestKind.StrengthReplica` / `AttachmentKind.StrengthReplica`。删除 Common Law 中「门外探路的，只是候选」章节及 Predictor 槽位相关表述，删除 `Prefix/Wire` 中的 `isReplicaSession` 分支、只读权限特例与 Host 观察分支，14 份牵连规范同步收缩。
+
+## 三、依赖面地图
+
+### 内部定义整树删除
+
+- **Blogger / Companion（48+ 文件）**：
+  - `src/Wanxiangshu/Context/Companion/Blogger/` 全目录（Toml、TomlSurface、ItemWire、Delta、DeltaSurface、Request、Projection、FrameSurface、ContextFactFold、MainContext、OpenCode/PluginScope、Runtime/*）
+  - `src/Wanxiangshu/Context/Companion/`（HostBlogger、Builder、Facts、Fold、Host、Identity、Model、Projection、Prompt、Runtime、Transform、CompanionFactFold、CompressionSurface 等围绕 Blogger/Replica 构建的模块）
+  - `src/Wanxiangshu/Enforcer/`（BlogSurface、ChronicleExecution、Cycle/BloggerProbe、Guidance/Tip*、Observation* 等）
+  - `src/Wanxiangshu/OpenCode/Host/`（BloggerChronicleSurface、BloggerChronicleText）
+  - `src/Wanxiangshu/OpenCode/Tools/ChronicleTool.fs`
+- **WorkRecord（12 核心文件 + 3 owner fsproj）**：
+  - `src/Wanxiangshu/Mission/WorkRecord/`（Materialize、Model、Surface）及对应 `.fsproj`
+- **Replica / Strength（相关模块与分支）**：
+  - `StrengthReplicaAssociationHints`、`AttachmentKind.StrengthReplica`、`ProviderRequestKind.StrengthReplica`、`ProviderSystemTransform` 中的 replica 约束逻辑、`Strength` 子系统中服务于 speculative-investigation replica 的运行时组件。
+
+### 外部消费剥离与改写（按子系统）
+
+| 子系统 | 代表文件 | 施工动作 |
+|---|---|---|
+| Foundation | Roles、OfficeCapability、Identity、Outcome、RolesSurface、SyntheticToml | 删 `Role.Blogger` 与 `ToolPermission.Chronicle`；保留/整理 `SyntheticToml` 供 advisor 与 `js.deliver` 的 TOML view 渲染复用 |
+| Participant | Persona/Catalog、ManagedCatalog、Provider/Attempt/*（RequestKind、RetryPolicy、PlannerSurface、Fallback） | 删 `BloggerMain`、`StrengthReplica`、`BloggerRetryPolicy`；将 attempt 恢复落实为「首次原样重试、二次拉黑 Provider 重试」 |
+| Context/Prefix & Trace | Wire、WirePort、Surface、XWireSurface、Trace/* | 删 `FrozenRecordPrefix` 的 Y 覆盖逻辑、`MemoryPreamble`、`isReplicaSession` 分支；上下文裁剪仅依从 `view` 声明 |
+| Composition | Durable/（CompanionFact、Fold、Projection、AgentJournalPortAdapter）、Turn/* | 删 `CompanionBloggerLinked`、`BloggerCycles`、`BloggerCoordinator` |
+| Execution | Delegation/（Advisor/View、Fork/Host/*、Handle、SyncDelegate）、Session/（Association、Attachment、Ownership、Recovery、HorizonTool）、Failure/Policy | Advisor 改锚；Delegation/Join/Horizon 退出 WorkRecord，切换为 `js.deliver(value, view)` 的增量去重 TOML 视图返回；S1–S4 接力移除主动清上下文逻辑；删 `StrengthReplica` |
+| Interaction | Authority/Model、Dispatch/、Repair/ | 删 Blogger 准入与 `StrengthReplica` 只读权限矩阵 |
+| OpenCode | Host/（约 25 文件）、Plugin/*、Tools/（StaticTools、ToolRegistry） | 剥离 Blogger 生命周期、Chronicle 工具注册与 Replica 钩子 |
+| Persistence | Journal/（CodecSurface、Envelope、EventStoreJournalWriter、Surface） | 移除 Blogger / Companion / WorkRecord / Replica 相关 durable 事件类型 |
+| Repository/Programming/Js | Capability、GeneratorSurface、ToolsBindings、RuntimeSurface | 删 `todowrite-for-blogger`；更新 `js.deliver` 签名与实现以支持 `view` 参数、TOML 渲染与跨次去重 |
+| Resources & Scripts | `resources/provider/**`、`resources/wanxiangshu.mjs`、`scripts/**` | 删 blogger/chronicle/companion 资源目录；将 tip 与行为诊断精华并入 `common-law`，同时删去 `common-law` 中 Blogger、WorkRecord、门外探路（Replica/Predictor）表述；更新 build 与 gate 脚本 |
+
+### submodule `wanxiangli`
+
+- `src/identity/Roles.fs`：删 `Role.Blogger` 分支、allRoles、canonicalName、parse
+- `src/identity/PersonaCatalog.fs`：删 Chronicler persona
+- `src/identity/index.d.ts`、`src/identity/AGENTS.md`、`src/identity/tests/001.test.mjs`、`src/compression/AGENTS.md` 同步更新并记录 gitlink。
+
+## 四、分阶段施工顺序
+
+### 阶段 1 —— 规范与 Common Law 先行
+1. **整包删除**：`requirements/work-record/`、`requirements/speculative-investigation/`、`requirements/guidance-delivery/`、`requirements/behavior-diagnosis/`（提取有价值原则并入 Common Law 后删除）。
+2. **核心机制改写**：
+   - `requirements/advisor/`：去锚 Blogger/Chronicle，确立自有 TOML view 契约。
+   - `requirements/context-compression/` 与 `requirements/prefix-stability/`：移除 Y 轴、200 KiB Blogger delta 合同与 Y 覆盖证明；确立 `view` 声明为唯一截断机制，完整 turn 覆盖不证自明。
+   - `requirements/provider-attempt-recovery/` 与 `requirements/execution-failure-policy/`：重写为「首次原样重试，第二次拉黑 Provider 后重试」，移除 `BloggerRetryPolicy`、prefix probe 及 `StrengthReplica` 分支。
+   - `requirements/delegation/`、`requirements/repository-programming/`、`requirements/participant-horizon/`：全面退出 `WorkRecord`；确立 `js.deliver` 携带 `view` 参数、TOML 渲染、按已交付游标去重（不重复返回前次已给过机会的内容）、LLM 自主决定是否纳入末尾散文，以及 S1/S2/S3/S4 接力不再主动清除上下文。
+3. **角色与集合收缩**：清理其余约 35 份规范中对 `Blogger`、`chronicle`、`WorkRecord`、`StrengthReplica` 的枚举与引用。
+
+### 阶段 2 —— submodule（`wanxiangli`）
+剥离 `Role.Blogger` 与 Chronicler，跑通 submodule 自身验证并提交，宿主更新 gitlink。
+
+### 阶段 3 —— 宿主源码（自内向外，手工步步为营）
+1. **Advisor 改锚与通用 TOML 视图沉淀**：将 `View.fs` 切换到不依赖 Blogger 的 TOML 渲染函数。
+2. **`js.deliver` 视图化与 S1–S4 接力改造**：实现带 `view` 参数的 `deliver`、已返回内容游标去重、TOML 渲染，移除 S1–S4 主动清上下文逻辑，替换 Delegation / Join / Horizon 中的 `WorkRecord` 管道，删除 `Mission/WorkRecord`。
+3. **移除 Replica 与重构 Attempt 恢复**：删除 `StrengthReplica` 全链路，简化 attempt retry 为原样重试 + 拉黑 Provider。
+4. **整树拆除 Y 轴 / Blogger / Chronicle / Enforcer Tip & 诊断**：删除 Companion/Blogger、ChronicleTool、Enforcer 提示与诊断注入、Prefix/Wire 的 Y 逻辑及 Persistence 事件，同步更新 `compile-order.txt` 与各 owner `.fsproj`。
+
+### 阶段 4 —— resources / scripts
+删除废弃资源目录，完成 Common Law 双语文本重整（融合 tip/诊断经验，移除 Blogger/WorkRecord/门外探路章节），更新 `wanxiangshu.mjs`、`tool-map.json`、`build.mjs` 及全部门禁脚本。
+
+### 阶段 5 —— 测试清理与补齐
+删除 Blogger / WorkRecord / Replica / Tip 专属测试套件；改写角色集合测试；为 `js.deliver` 的 `view` 去重渲染、S1–S4 接力保留上下文及「首次原样重试、二次拉黑 Provider」补充锚定测试。
+
+### 阶段 6 —— 验证收束与状态退役
+1. `node scripts/build.mjs` 编译与模块图链接验证全绿（严禁 `dotnet build`）；
+2. 跑通受影响 requirement 测试套件；
+3. 清空 `.Herdchestra/` 本机运行状态；
+4. 检查 `git status` 确认无残骸，提交并推送到 `master`。
