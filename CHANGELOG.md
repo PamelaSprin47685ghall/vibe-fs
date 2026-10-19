@@ -1,5 +1,13 @@
 # Changelog — 版本历史
 
+## Unreleased — 宿主工程循环改名：js.run → js.call
+
+- **宿主工程循环成员改名，混淆随之解除**。`js.run` 与模型程序入口 `this.run` 同名，模型在两处都看见 `run`，分不清「执行一次工程」和「运行我的程序」。宿主面成员改为 `js.call(class extends js.Callable { ... })`，只在全局 `js` 对象上调用；基类不提供 `this.call(...)`。模型程序入口仍是基类的 `async run()`——两个不同的名字，两件不同的事。
+- **基类随之改名**：`js.Runnable` → `js.Callable`（宿主在全局 `js` 上绑定的空基类）。旧名「Runnable」描述的是被宿主驱动的循环，新名描述的是「可被调用」的类，与成员名同源。
+- **失败码族整体改名**：`RUNNABLE_SPEC_INCOMPLETE` / `RUN_COMMAND_UNSUPPORTED` / `RUN_WAIT_TIMEOUT` / `RUN_CHILD_UNKNOWN` / `RUN_PARK_UNSUPPORTED` / `RUN_HOST_UNAVAILABLE` → `CALLABLE_SPEC_INCOMPLETE` / `CALL_COMMAND_UNSUPPORTED` / `CALL_WAIT_TIMEOUT` / `CALL_CHILD_UNKNOWN` / `CALL_PARK_UNSUPPORTED` / `CALL_HOST_UNAVAILABLE`。clean-break：不留旧码别名，旧码不再被发出。
+- **宿主实现标识符同步**：`JsRunLoop` 模块 → `JsCallLoop`（`Process/JsRunLoop.fs` → `Process/JsCallLoop.fs`，fsproj 与 compile-order 一并更新）、`JsRunHost` → `JsCallHost`、`makeRunMember` → `makeCallMember`、`RunnableValidated` → `CallableValidated`、`validateRunnableSpec` → `validateCallableSpec`、`RunnableSpecIncomplete` 等 union case → `CallableSpecIncomplete` 等。
+- **规范与教学同步**：`requirements/repository-programming` [050]/[051]/[052]/[058] 与 `requirements/process-execution` 的条款改写为新面；双语 `run-rules` / `run-recipes` / `ultra-devops` 改写为 `js.call(class extends js.Callable { ... })`，并删去「两者同名是有意为之的碰撞」那段已经失效的解释——改名后不再有碰撞需要解释。
+
 ## Unreleased — 验收层收口：集成层恢复全绿，退役概念清零
 
 - **集成层（integration tier）恢复全绿**。cutover 之后无人跑过这一层，它当时是红的，本轮把三处根因修掉：

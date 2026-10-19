@@ -171,7 +171,7 @@
 | 48 | institutional-learning（已退役） | 0 | 随 WP-036 整包退役，目录与条款已删除 |
 | 49 | `repository-investigation` | 9 | repository-investigation-001 ~ 009 |
 | 50 | `knowledge-reuse` | 16 | knowledge-reuse-001 ~ 016 |
-| 51 | `repository-programming` | 60 | 原 001 ~ 027 不变；028 起 programPromise/deadline 可重置、029 起 As-Is 逐笔落盘与失败清单形态、030 ~ 036 park/unpark/abandon 全周期、037 ~ 039 Parked 渲染/投影/现场表、040 ~ 044 rm/mv POSIX 与双语四层接线、045 ~ 047 九个文件原语、where 歧义即 park 与组合教学、048 ~ 049 parked source 与 unpark 自由值、050 ~ 052 js.run 宿主循环/多进程代数/wget 断点续传剧本、053 view 声明捕获、054 deliver 显式终值、055 vm 并行边界、056 委托原语 fork/join/fission/dag（全部返回数据信封，dag 节点失败 park）、057 ls 的 ignore 语义与 glob/grep 退役、058 js.run 的交互形态与唯一执行面、059 js.deliver 的终值记录、060 "js" 机器词汇的终局裁决 |
+| 51 | `repository-programming` | 60 | 原 001 ~ 027 不变；028 起 programPromise/deadline 可重置、029 起 As-Is 逐笔落盘与失败清单形态、030 ~ 036 park/unpark/abandon 全周期、037 ~ 039 Parked 渲染/投影/现场表、040 ~ 044 rm/mv POSIX 与双语四层接线、045 ~ 047 九个文件原语、where 歧义即 park 与组合教学、048 ~ 049 parked source 与 unpark 自由值、050 ~ 052 js.call 宿主循环/多进程代数/wget 断点续传剧本、053 view 声明捕获、054 deliver 显式终值、055 vm 并行边界、056 委托原语 fork/join/fission/dag（全部返回数据信封，dag 节点失败 park）、057 ls 的 ignore 语义与 glob/grep 退役、058 js.call 的交互形态与唯一执行面、059 js.deliver 的终值记录、060 "js" 机器词汇的终局裁决 |
 
 | 54 | `epistemic-reasoning` | 0 | 旧001 ~ 036仅保留历史，现行替代关系见 sphinx-v2/SUPERSEDES.md |
 | 55 | `sphinx-v2` | 36 | sphinx-v2-001 ~ 036（取代 epistemic-reasoning 旧内核条款，关系见 SUPERSEDES.md） |

@@ -631,12 +631,12 @@ module JsCanonicalDescription =
 class JsProgram {"""
             .TrimStart()
 
-    /// `js.Runnable` exists exactly when the Exec capability is projected; the
+    /// `js.Callable` exists exactly when the Exec capability is projected; the
     /// wrapper binds the class onto the global `js` namespace before the model
     /// source runs.
-    let private runnableOpen (capabilities: Set<JsCapability>) =
+    let private callableOpen (capabilities: Set<JsCapability>) =
         if has capabilities JsCapability.Exec then
-            "class JsRunnable {}\n\n"
+            "class JsCallable {}\n\n"
         else
             ""
 
@@ -687,7 +687,7 @@ class JsProgram {"""
               deliverStub prose
               runStub prose ]
 
-        String.concat "\n\n" ((runnableOpen capabilities + classOpen) :: methods @ [ "}" ])
+        String.concat "\n\n" ((callableOpen capabilities + classOpen) :: methods @ [ "}" ])
 
     let private rethrowHost =
         """if (result && result.ok === false) {
@@ -1497,7 +1497,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                   []
               runStub prose ]
 
-        String.concat "\n\n" ((runnableOpen capabilities + classOpen) :: methods @ [ "}" ])
+        String.concat "\n\n" ((callableOpen capabilities + classOpen) :: methods @ [ "}" ])
 
     let private contractFor
         (prose: Prose)
@@ -1520,7 +1520,10 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                       [ prose.VerbCreate; "mkdir" ]
                   else
                       []
-                  if has capabilities JsCapability.Exec then [ "run" ] else [] ]
+                  if has capabilities JsCapability.Exec then
+                      [ "call" ]
+                  else
+                      [] ]
             |> String.concat ", "
 
         let parallelTemplate =

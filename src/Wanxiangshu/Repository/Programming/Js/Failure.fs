@@ -69,12 +69,12 @@ type JsFailure =
     | HandleUnknown of string
     | CannotParkWhileAbandoning
     | Abandoned
-    | RunnableSpecIncomplete of string
-    | RunCommandUnsupported of string
-    | RunWaitTimeout
-    | RunChildUnknown of string
-    | RunParkUnsupported
-    | RunHostUnavailable
+    | CallableSpecIncomplete of string
+    | CallCommandUnsupported of string
+    | CallWaitTimeout
+    | CallChildUnknown of string
+    | CallParkUnsupported
+    | CallHostUnavailable
     | AskRefused of string
     | DelegationUnavailable
     | ViewDeclarationInvalid of string
@@ -140,12 +140,12 @@ module JsFailure =
         | JsFailure.HandleUnknown _ -> "HANDLE_UNKNOWN"
         | JsFailure.CannotParkWhileAbandoning -> "CANNOT_PARK_WHILE_ABANDONING"
         | JsFailure.Abandoned -> "ABANDONED"
-        | JsFailure.RunnableSpecIncomplete _ -> "RUNNABLE_SPEC_INCOMPLETE"
-        | JsFailure.RunCommandUnsupported _ -> "RUN_COMMAND_UNSUPPORTED"
-        | JsFailure.RunWaitTimeout -> "RUN_WAIT_TIMEOUT"
-        | JsFailure.RunChildUnknown _ -> "RUN_CHILD_UNKNOWN"
-        | JsFailure.RunParkUnsupported -> "RUN_PARK_UNSUPPORTED"
-        | JsFailure.RunHostUnavailable -> "RUN_HOST_UNAVAILABLE"
+        | JsFailure.CallableSpecIncomplete _ -> "CALLABLE_SPEC_INCOMPLETE"
+        | JsFailure.CallCommandUnsupported _ -> "CALL_COMMAND_UNSUPPORTED"
+        | JsFailure.CallWaitTimeout -> "CALL_WAIT_TIMEOUT"
+        | JsFailure.CallChildUnknown _ -> "CALL_CHILD_UNKNOWN"
+        | JsFailure.CallParkUnsupported -> "CALL_PARK_UNSUPPORTED"
+        | JsFailure.CallHostUnavailable -> "CALL_HOST_UNAVAILABLE"
         | JsFailure.AskRefused _ -> "ASK_REFUSED"
         | JsFailure.DelegationUnavailable -> "DELEGATION_UNAVAILABLE"
         | JsFailure.ViewDeclarationInvalid _ -> "VIEW_DECLARATION_INVALID"
@@ -206,12 +206,13 @@ module JsFailure =
         | JsFailure.HandleUnknown handle -> "no parked site with this handle: " + handle
         | JsFailure.CannotParkWhileAbandoning -> "park is refused while the site is in its abandon cleanup window"
         | JsFailure.Abandoned -> "the parked program was abandoned; its finalizer has run"
-        | JsFailure.RunnableSpecIncomplete detail -> reasonWithMessage "Runnable spec is incomplete" "" detail
-        | JsFailure.RunCommandUnsupported detail -> reasonWithMessage "next() returned an unsupported command" "" detail
-        | JsFailure.RunWaitTimeout -> "waitFor condition was not met before its timeout"
-        | JsFailure.RunChildUnknown name -> "no background process with this name: " + name
-        | JsFailure.RunParkUnsupported -> "park verdict requires the orchestrated execution path"
-        | JsFailure.RunHostUnavailable -> "js.run has no host loop in this execution path"
+        | JsFailure.CallableSpecIncomplete detail -> reasonWithMessage "Runnable spec is incomplete" "" detail
+        | JsFailure.CallCommandUnsupported detail ->
+            reasonWithMessage "next() returned an unsupported command" "" detail
+        | JsFailure.CallWaitTimeout -> "waitFor condition was not met before its timeout"
+        | JsFailure.CallChildUnknown name -> "no background process with this name: " + name
+        | JsFailure.CallParkUnsupported -> "park verdict requires the orchestrated execution path"
+        | JsFailure.CallHostUnavailable -> "js.call has no host loop in this execution path"
         | JsFailure.AskRefused detail -> reasonWithMessage "ask was refused" "" detail
         | JsFailure.DelegationUnavailable -> "fork/join is not wired in this execution path"
         | JsFailure.ViewDeclarationInvalid detail ->
@@ -278,12 +279,12 @@ module JsFailure =
         | "HANDLE_UNKNOWN" -> JsFailure.HandleUnknown(after "no parked site with this handle: ")
         | "CANNOT_PARK_WHILE_ABANDONING" -> JsFailure.CannotParkWhileAbandoning
         | "ABANDONED" -> JsFailure.Abandoned
-        | "RUNNABLE_SPEC_INCOMPLETE" -> JsFailure.RunnableSpecIncomplete text
-        | "RUN_COMMAND_UNSUPPORTED" -> JsFailure.RunCommandUnsupported text
-        | "RUN_WAIT_TIMEOUT" -> JsFailure.RunWaitTimeout
-        | "RUN_CHILD_UNKNOWN" -> JsFailure.RunChildUnknown(after "no background process with this name: ")
-        | "RUN_PARK_UNSUPPORTED" -> JsFailure.RunParkUnsupported
-        | "RUN_HOST_UNAVAILABLE" -> JsFailure.RunHostUnavailable
+        | "CALLABLE_SPEC_INCOMPLETE" -> JsFailure.CallableSpecIncomplete text
+        | "CALL_COMMAND_UNSUPPORTED" -> JsFailure.CallCommandUnsupported text
+        | "CALL_WAIT_TIMEOUT" -> JsFailure.CallWaitTimeout
+        | "CALL_CHILD_UNKNOWN" -> JsFailure.CallChildUnknown(after "no background process with this name: ")
+        | "CALL_PARK_UNSUPPORTED" -> JsFailure.CallParkUnsupported
+        | "CALL_HOST_UNAVAILABLE" -> JsFailure.CallHostUnavailable
         | "ASK_REFUSED" -> JsFailure.AskRefused text
         | "DELEGATION_UNAVAILABLE" -> JsFailure.DelegationUnavailable
         | "VIEW_DECLARATION_INVALID" -> JsFailure.ViewDeclarationInvalid text

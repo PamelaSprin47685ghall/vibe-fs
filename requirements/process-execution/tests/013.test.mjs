@@ -3,16 +3,16 @@ import test from 'node:test'
 import { sandbox, runProgram, caseName, parseData, nodeCommand } from './support/executor.mjs'
 import * as toolResultBound from '../../../dist/Host/Contract/ToolResultBound.js'
 
-// Host-native `run` tool is retired; `js.run` supersedes it (repository-programming [050]-[052]).
+// Host-native `run` tool is retired; `js.call` supersedes it (repository-programming [050]-[052]).
 
-test('WHAT[process-execution-013] js.run bounds large output deterministically to head+tail without model distillation', async () => {
+test('WHAT[process-execution-013] js.call bounds large output deterministically to head+tail without model distillation', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-013a-')
   try {
     const cmd1 = nodeCommand(`process.stdout.write('HEAD-MARK-' + 'a'.repeat(200000))`)
     const cmd2 = nodeCommand(`process.stdout.write('b'.repeat(200000) + '-TAIL-MARK')`)
     const outcome = await runProgram(
       dir,
-      `    const r = await js.run(class extends js.Runnable {
+      `    const r = await js.call(class extends js.Callable {
       maxDuration = 10000;
       interval = 100;
       next(ctx) {
@@ -53,7 +53,7 @@ test('WHAT[process-execution-013] small output preserves separate stdout and std
     const outcome = await runProgram(
       dir,
       `    let exited = null;
-    const r = await js.run(class extends js.Runnable {
+    const r = await js.call(class extends js.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }

@@ -27,11 +27,11 @@ module StaticTools =
         | ToolPermission.Move -> []
         | ToolPermission.Remove -> []
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
-        // Exec grants the programming surface's `js.run` loop; the Host-native
+        // Exec grants the programming surface's `js.call` loop; the Host-native
         // `run` tool is retired (repository-programming [050]-[052] supersede it).
         | ToolPermission.Exec -> []
         // Pty is retired: interactive execution is the programming surface's
-        // `js.run` ({ spawn, name } + { send, name, input } + { signal, name }).
+        // `js.call` ({ spawn, name } + { send, name, input } + { signal, name }).
         | ToolPermission.Pty -> []
         | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Fetch -> [ "fetch" ]
@@ -115,8 +115,7 @@ module StaticTools =
 
     /// Shared office boundary for lightweight cognitive utilities (`assume`) so
     /// schema visibility and execution admission cannot drift.
-    let cognitiveUtilityRoleAllowed (role: Role) : bool =
-        role <> Role.Distiller
+    let cognitiveUtilityRoleAllowed (role: Role) : bool = role <> Role.Distiller
 
     /// capability-enforcement-006/007: a Host-declared external (MCP) tool
     /// namespace is not an office capability, so it never enters

@@ -7,13 +7,13 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Repository.Programming.Js
 
-/// Host-owned execution loop for `js.run` (PLAN phase 2). The model writes one
-/// Runnable class; this module owns the loop: it instantiates the class,
-/// validates the Runnable spec, runs shell commands, calls `check` once per
+/// Host-owned execution loop for `js.call` (PLAN phase 2). The model writes one
+/// Callable class; this module owns the loop: it instantiates the class,
+/// validates the Callable spec, runs shell commands, calls `watch` once per
 /// time slice, dispatches `onExit`, enforces `maxDuration`, and returns one
 /// structured outcome. A `check` verdict of `{ park: payload }` suspends
 /// through the same park channel as `js.park`.
-module JsRunLoop =
+module JsCallLoop =
 
     [<Import("spawn", "node:child_process")>]
     let private spawnProcess (command: string) (options: obj) : obj = jsNative
@@ -476,7 +476,7 @@ module JsRunLoop =
         | SlicePark _ when decision = "unsupported" -> PortUnsupported
         | _ -> PortPending
 
-    type private RunnableValidated =
+    type private CallableValidated =
         { Class: obj
           Instance: obj
           MaxDurationMs: int64
@@ -489,11 +489,11 @@ module JsRunLoop =
         else
             max minimumIntervalMs (int (unbox<float> intervalValue))
 
-    let private validateRunnableSpec (runnableClass: obj) : Result<RunnableValidated, obj> =
-        if not (isFunction runnableClass) then
-            Error(failure "RUNNABLE_SPEC_INCOMPLETE" "js.run expects a class extending js.Runnable")
+    let private validateCallableSpec (callableClass: obj) : Result<CallableValidated, obj> =
+        if not (isFunction callableClass) then
+            Error(failure "CALLABLE_SPEC_INCOMPLETE" "js.call expects a class extending js.Callable")
         else
-            let instance = construct runnableClass
+            let instance = construct callableClass
             let maxDurationValue = getProperty instance "maxDuration"
             let hasNext = isFunction (getProperty instance "next")
             let hasCheck = isFunction (getProperty instance "watch")
@@ -505,23 +505,23 @@ module JsRunLoop =
                 || not (isFiniteNumber maxDurationValue)
                 || unbox<float> maxDurationValue <= 0.0
             then
-                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must declare a positive maxDuration")
+                Error(failure "CALLABLE_SPEC_INCOMPLETE" "Callable must declare a positive maxDuration")
             elif not hasNext then
-                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement next(ctx)")
+                Error(failure "CALLABLE_SPEC_INCOMPLETE" "Callable must implement next(ctx)")
             elif not hasCheck then
-                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement watch(ctx)")
+                Error(failure "CALLABLE_SPEC_INCOMPLETE" "Callable must implement watch(ctx)")
             elif not (isFunction (getProperty instance "sanity")) then
                 Error(
                     failure
-                        "RUNNABLE_SPEC_INCOMPLETE"
-                        "Runnable must implement sanity() — a control-flow self-test returning { nextDone, watchVeto } thunks"
+                        "CALLABLE_SPEC_INCOMPLETE"
+                        "Callable must implement sanity() — a control-flow self-test returning { nextDone, watchVeto } thunks"
                 )
             else
                 let maxDurationMs = int64 (unbox<float> maxDurationValue)
                 let hasOnExit = isFunction (getProperty instance "onExit")
 
                 Ok
-                    { Class = runnableClass
+                    { Class = callableClass
                       Instance = instance
                       MaxDurationMs = maxDurationMs
                       IntervalMs = intervalMs
@@ -553,7 +553,7 @@ module JsRunLoop =
 
     /// A failed prove() is a semantic fork, not a terminal failure: suspend
     /// through the shared park channel with the diagnosis payload, and let the
-    /// injected unpark value become the js.run outcome by this park point's
+    /// injected unpark value become the js.call outcome by this park point's
     /// contract. Without a park channel the diagnosis cannot be presented, so
     /// the run refuses instead of silently degrading.
     let private parkOrFailProof
@@ -564,7 +564,7 @@ module JsRunLoop =
         match parkState with
         | None ->
             Task.FromResult(
-                failure "RUN_PARK_UNSUPPORTED" "prove failure requires the park channel to present its diagnosis"
+                failure "CALL_PARK_UNSUPPORTED" "prove failure requires the park channel to present its diagnosis"
             )
         | Some state ->
             task {
@@ -582,7 +582,7 @@ module JsRunLoop =
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         (root: string)
         (stack: string)
-        (spec: RunnableValidated)
+        (spec: CallableValidated)
         : Task<obj> =
         task {
             let instance = spec.Instance
@@ -640,7 +640,7 @@ module JsRunLoop =
 
             let interpretParkDecision (decision: string) : string =
                 if decision = "unsupported" then
-                    result <- failure "RUN_PARK_UNSUPPORTED" "park verdict requires the orchestrated execution path"
+                    result <- failure "CALL_PARK_UNSUPPORTED" "park verdict requires the orchestrated execution path"
 
                     "unsupported"
                 else
@@ -768,7 +768,7 @@ module JsRunLoop =
             let signalChildProcess (name: string) (signalName: string) : Task<unit> =
                 task {
                     match children.TryGetValue name with
-                    | false, _ -> result <- failure "RUN_CHILD_UNKNOWN" ("signal names an unknown background: " + name)
+                    | false, _ -> result <- failure "CALL_CHILD_UNKNOWN" ("signal names an unknown background: " + name)
                     | true, managed ->
                         killManaged managed signalName
                         let! _ = awaitExit managed signalGraceMs
@@ -784,7 +784,7 @@ module JsRunLoop =
 
             let sendChildInput (name: string) (input: string) : unit =
                 match children.TryGetValue name with
-                | false, _ -> result <- failure "RUN_CHILD_UNKNOWN" ("send names an unknown background: " + name)
+                | false, _ -> result <- failure "CALL_CHILD_UNKNOWN" ("send names an unknown background: " + name)
                 | true, managed ->
                     let payload = normalizeChildInput input
 
@@ -842,7 +842,7 @@ module JsRunLoop =
                         applyPortOutcome outcome
 
                     if failureReason = Some "timeout" && isNull result then
-                        result <- failure "RUN_WAIT_TIMEOUT" "waitFor condition was not met before its timeout"
+                        result <- failure "CALL_WAIT_TIMEOUT" "waitFor condition was not met before its timeout"
                     elif failureReason = Some "abort" then
                         status <- "aborted"
                         outcomeReason <- "check aborted while waiting for the port"
@@ -863,7 +863,7 @@ module JsRunLoop =
                     | InvalidCommand ->
                         result <-
                             failure
-                                "RUN_COMMAND_UNSUPPORTED"
+                                "CALL_COMMAND_UNSUPPORTED"
                                 "next() must return a command string, null, { spawn, name }, { send: { name, input } }, { signal, name } or { waitFor: { port, timeoutMs } }"
                 }
 
@@ -926,14 +926,16 @@ module JsRunLoop =
             Error(
                 SpecIncomplete(
                     failure
-                        "RUNNABLE_SPEC_INCOMPLETE"
+                        "CALLABLE_SPEC_INCOMPLETE"
                         "sanity() must return { nextDone, watchVeto } — two thunks, each returning the argument array the host applies"
                 )
             )
         else
-            Ok { NextDone = nextDone; WatchVeto = watchVeto }
+            Ok
+                { NextDone = nextDone
+                  WatchVeto = watchVeto }
 
-    let private validateSanityNext (spec: RunnableValidated) (nextDone: obj) : Task<Result<unit, SanityFailure>> =
+    let private validateSanityNext (spec: CallableValidated) (nextDone: obj) : Task<Result<unit, SanityFailure>> =
         task {
             let! nextArgs = awaitJs (invokeThunk nextDone)
             let! nextResult = awaitJs (applyArgumentArray (getProperty spec.Instance "next") spec.Instance nextArgs)
@@ -947,10 +949,10 @@ module JsRunLoop =
 
                 return Error(SanityFault(sanityPayload message nextResult))
             else
-                return Ok ()
+                return Ok()
         }
 
-    let private validateSanityWatch (spec: RunnableValidated) (watchVeto: obj) : Task<Result<unit, SanityFailure>> =
+    let private validateSanityWatch (spec: CallableValidated) (watchVeto: obj) : Task<Result<unit, SanityFailure>> =
         task {
             let! watchArgs = awaitJs (invokeThunk watchVeto)
             let! watchVerdict = awaitJs (applyArgumentArray (getProperty spec.Instance "watch") spec.Instance watchArgs)
@@ -964,14 +966,14 @@ module JsRunLoop =
 
                 return Error(SanityFault(sanityPayload message watchVerdict))
             else
-                return Ok ()
+                return Ok()
         }
 
     let private executeSanityProof
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         (root: string)
         (stack: string)
-        (spec: RunnableValidated)
+        (spec: CallableValidated)
         : Task<obj> =
         task {
             let verifiedThunks: Task<Result<unit, SanityFailure>> =
@@ -994,21 +996,20 @@ module JsRunLoop =
             match outcome with
             | Error(SpecIncomplete fail) -> return fail
             | Error(SanityFault payload) -> return! parkOrFailProof parkState stack payload
-            | Ok () ->
+            | Ok() ->
                 let fresh = construct spec.Class
                 return! executeValidated parkState root stack { spec with Instance = fresh }
         }
 
-    /// Execute one Runnable class. `root` is the shell working directory;
-    /// `stack` is the model stack captured at the `js.run(...)` call site so a
+    /// Execute one Callable class. `root` is the shell working directory;
+    /// `stack` is the model stack captured at the `js.call(...)` call site so a
     /// check-park carries the same execution marker as a direct park.
     let execute
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         (root: string)
-        (runnableClass: obj)
+        (callableClass: obj)
         (stack: string)
         : Task<obj> =
-        match validateRunnableSpec runnableClass with
+        match validateCallableSpec callableClass with
         | Error fail -> Task.FromResult fail
-        | Ok spec ->
-            executeSanityProof parkState root stack spec
+        | Ok spec -> executeSanityProof parkState root stack spec

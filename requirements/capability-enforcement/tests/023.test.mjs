@@ -133,7 +133,7 @@ test('WHAT[capability-enforcement-023] devops_host_schema_contains_direct_mutati
     ['Advisor', 'Exec', 'Glob', 'Grep', 'Horizon', 'Join', 'Move', 'Read', 'Remove', 'Write'],
   )
   const memberNames = surface.members.map((m) => m.memberName)
-  for (const member of ['cat', 'ls', 'rg', 'stat', 'where', 'whereAll', 'mkdir', 'write', 'mv', 'rm', 'run', 'join']) {
+  for (const member of ['cat', 'ls', 'rg', 'stat', 'where', 'whereAll', 'mkdir', 'write', 'mv', 'rm', 'call', 'join']) {
     assert.ok(memberNames.includes(member), `todowrite-for-devops must expose ${member}`)
   }
   assert.deepEqual(

@@ -42,7 +42,7 @@ module JsFragmentRegistry =
     val mkdir: JsCapabilityFragment
     val whereAll: JsCapabilityFragment
     val where: JsCapabilityFragment
-    val run: JsCapabilityFragment
+    val call: JsCapabilityFragment
     val fork: JsCapabilityFragment
     val join: JsCapabilityFragment
     val dag: JsCapabilityFragment

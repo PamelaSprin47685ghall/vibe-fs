@@ -58,7 +58,7 @@ const MEMBERS_BY_PERMISSION = {
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
-  Exec: ['run'],
+  Exec: ['call'],
   Fork: ['fork', 'dag'],
   Join: ['join'],
   Fission: ['fission'],
@@ -77,7 +77,7 @@ const BINDING_BY_MEMBER = {
   mkdir: 'js.mkdir',
   whereAll: 'js.whereAll',
   where: 'js.where',
-  run: 'js.run',
+  call: 'js.call',
   fork: 'js.fork',
   dag: 'js.dag',
   join: 'js.join',
@@ -89,7 +89,7 @@ const BINDING_BY_MEMBER = {
 const MEMBER_ORDER = [
   'write', 'rm', 'mv',
   'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where',
-  'run',
+  'call',
   'fork', 'dag', 'join', 'fission', 'horizon', 'advisor',
 ]
 
@@ -99,9 +99,16 @@ const expectedMembers = (permissionNames) =>
     .sort((left, right) => MEMBER_ORDER.indexOf(left) - MEMBER_ORDER.indexOf(right))
 
 // Sugar members are compiled inside the base class itself instead of
-// delegating to `_api` (dag builds fork waves plus one join; run is the Exec
-// Runnable gate), so their base-class layer is the public method they declare.
-const SUGAR_MEMBERS = ['dag', 'run']
+// Sugar members are compiled inside the base class itself instead of
+// delegating to `_api` (dag builds fork waves plus one join), so their base-class
+// layer is the public method they declare.
+const SUGAR_MEMBERS = ['dag']
+
+// The Exec member is NOT on the base class: it is a member of the global `js`
+// namespace only (`js.call(...)`), because the base class already owns `run()`
+// as the model's program entry. Its binding still resolves, its description and
+// example still name it, and the base class must not shadow it.
+const GLOBAL_MEMBERS = ['call']
 
 const layersOf = (s) =>
   Object.fromEntries(
@@ -253,14 +260,22 @@ test('WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_ev
     assert.equal(layers.horizon.binding, 'js.horizon', `${role}: horizon binding key`)
     assert.equal(layers.horizon.example.includes('horizon'), true, `${role}: horizon canonical example`)
     for (const [member, layer] of Object.entries(layers)) {
-      const baseClassMarker = SUGAR_MEMBERS.includes(member)
-        ? `async ${member}(`
-        : `this._api.${layer.binding}`
-      assert.equal(
-        result.baseClassSource.includes(baseClassMarker),
-        true,
-        `${role}: ${member} in base class`,
-      )
+      if (GLOBAL_MEMBERS.includes(member)) {
+        assert.equal(
+          result.baseClassSource.includes(`this._api.${layer.binding}`),
+          false,
+          `${role}: ${member} must not land on the base class`,
+        )
+      } else {
+        const baseClassMarker = SUGAR_MEMBERS.includes(member)
+          ? `async ${member}(`
+          : `this._api.${layer.binding}`
+        assert.equal(
+          result.baseClassSource.includes(baseClassMarker),
+          true,
+          `${role}: ${member} in base class`,
+        )
+      }
       assert.equal(layer.inDescription, true, `${role}: ${member} in description`)
       assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${role}: ${member} binding`)
     }
@@ -291,14 +306,22 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
     assert.equal(layers.advisor.binding, 'js.advisor', `${role}: advisor binding key`)
     assert.equal(layers.advisor.example.includes('advisor'), true, `${role}: advisor canonical example`)
     for (const [member, layer] of Object.entries(layers)) {
-      const baseClassMarker = SUGAR_MEMBERS.includes(member)
-        ? `async ${member}(`
-        : `this._api.${layer.binding}`
-      assert.equal(
-        result.baseClassSource.includes(baseClassMarker),
-        true,
-        `${role}: ${member} in base class`,
-      )
+      if (GLOBAL_MEMBERS.includes(member)) {
+        assert.equal(
+          result.baseClassSource.includes(`this._api.${layer.binding}`),
+          false,
+          `${role}: ${member} must not land on the base class`,
+        )
+      } else {
+        const baseClassMarker = SUGAR_MEMBERS.includes(member)
+          ? `async ${member}(`
+          : `this._api.${layer.binding}`
+        assert.equal(
+          result.baseClassSource.includes(baseClassMarker),
+          true,
+          `${role}: ${member} in base class`,
+        )
+      }
       assert.equal(layer.inDescription, true, `${role}: ${member} in description`)
       assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${role}: ${member} binding`)
     }

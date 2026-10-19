@@ -1,7 +1,8 @@
-await js.run(class extends js.Runnable { ... }) — the engineering member.
+await js.call(class extends js.Callable { ... }) — the engineering member.
 
-Call it on the global `js` object: `this.run` is YOUR program entry, never this
-member — the names collide on purpose, so the engineering run never lands on the
+Call it on the global `js` object, never on the base class: `js.call(...)` is the
+only spelling and `this.call(...)` does not exist. Your program entry is
+`async run()` — a different name for a different thing.
 base class.
 
 The Host owns the loop. You write only the semantic callbacks. On each round the
@@ -9,14 +10,14 @@ Host calls `next(ctx)`, runs what you returned, supervises it once per interval
 slice with `watch(ctx)`, dispatches the exit with `onExit(result)`, then calls
 `next(ctx)` again — until it returns `null` or `maxDuration` expires. Your code
 never runs between slices, and the slice clock, the child kill, and the outcome
-stay Host-owned: a Runnable cannot skip, stretch, or reorder a slice.
+stay Host-owned: a Callable cannot skip, stretch, or reorder a slice.
 
 `next` is a loop callback, not a one-shot declaration. After every command exits
 the Host calls `next` again; when the work is done it must return `null`, typically
 `ctx.step === 0 ? "command" : null` for a fixed script, or a state read for
 everything that reacts to what happened.
 
-Required members; a missing or malformed one is `RUNNABLE_SPEC_INCOMPLETE`:
+Required members; a missing or malformed one is `CALLABLE_SPEC_INCOMPLETE`:
 - `maxDuration` — milliseconds, positive. The engineering bound for the whole run.
 - `next(ctx)` — the next step, called once per loop round.
 - `watch(ctx)` — the watchdog. Mandatory, and it runs once per slice.
@@ -45,9 +46,9 @@ sanity() {
 the Host calls `next` and requires `null`. `watchVeto` puts the instance into the
 "something is wrong" state and returns `[ctx]` — the Host calls `watch` and requires
 a veto (`false` or `{ abort }`). A return that is not an array, or a called method
-that fails to show its exit, parks the whole `js.run` at the call site with the
+that fails to show its exit, parks the whole `js.call` at the call site with the
 diagnosis payload — fix the class in a new call, or unpark with a value your
-program consumes as the js.run outcome. Writing the thunks is designing the
+program consumes as the js.call outcome. Writing the thunks is designing the
 termination condition: if you cannot mock a state where next returns null, the
 exit does not exist yet.
 
@@ -118,8 +119,8 @@ Failure modes, stated once:
   `maxDuration`. Check `steps`: many rounds around one short command is the signature.
 - A flat `{ send, name, input }` object does not name a child: the nested
   `{ send: { name, input } }` is canonical (the flat `{ send: input, name }` spelling
-  is accepted; a `send` value that resolves to no name fails with `RUN_CHILD_UNKNOWN`).
-- `this.run` is your program entry. The engineering loop is `js.run` only.
+  is accepted; a `send` value that resolves to no name fails with `CALL_CHILD_UNKNOWN`).
+- `async run()` is your program entry. The engineering loop is `js.call` only.
 
 Consequences, stated once:
 - Abort SIGKILLs the foreground process; `maxDuration` expiry does the same and
@@ -130,8 +131,8 @@ Consequences, stated once:
 - Each stream keeps at most 256 KiB — the first 128 KiB plus the last 128 KiB — sets
   `truncated: true`, and still reports the true total as `bytes`.
 
-Stable failure codes: `RUNNABLE_SPEC_INCOMPLETE`, `RUN_COMMAND_UNSUPPORTED`,
-`RUN_WAIT_TIMEOUT`, `RUN_CHILD_UNKNOWN`, `RUN_PARK_UNSUPPORTED`.
+Stable failure codes: `CALLABLE_SPEC_INCOMPLETE`, `CALL_COMMAND_UNSUPPORTED`,
+`CALL_WAIT_TIMEOUT`, `CALL_CHILD_UNKNOWN`, `CALL_PARK_UNSUPPORTED`.
 
 Mechanical rules belong in the callbacks; semantic forks — including a rejected
 sanity thunk — belong in parked payloads.

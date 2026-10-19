@@ -1,19 +1,19 @@
-await js.run(class extends js.Runnable { ... }) —— 工程成员。
+await js.call(class extends js.Callable { ... }) —— 工程成员。
 
-在全局 `js` 对象上调用它：`this.run` 是你的程序入口，绝不是这个成员——两者同名是
-有意为之的碰撞，所以工程 run 从不落在基类上。
+在全局 `js` 对象上调用它，不在基类上：`js.call(...)` 是唯一用法，`this.call(...)`
+不存在。你的程序入口是 `async run()`——两个不同的名字，两件不同的事。
 
 控制流归 Host，你只写语义回调。每轮 Host 调用 `next(ctx)`，执行你返回的东西，
 每个 interval 时间片用 `watch(ctx)` 守望一次，进程退出交给 `onExit(result)` 处置，
 然后再次调用 `next(ctx)`——直到它返回 `null` 或 `maxDuration` 到期。你的代码不会在
-时间片之间运行，切片时钟、子进程收割与结局都归 Host 所有：Runnable 无法跳过、
+时间片之间运行，切片时钟、子进程收割与结局都归 Host 所有：Callable 无法跳过、
 拉长或重排一个时间片。
 
 `next` 是循环回调，不是一次性声明。每轮命令退出后 Host 都会再次调用它；工作做完时
 必须返回 `null`——固定剧本写 `ctx.step === 0 ? "command" : null`，随机应变的场景
 则读状态决定。
 
-必选成员；缺失或形态不合法即 `RUNNABLE_SPEC_INCOMPLETE`：
+必选成员；缺失或形态不合法即 `CALLABLE_SPEC_INCOMPLETE`：
 - `maxDuration` —— 毫秒，正数。整个工程的执行上界。
 - `next(ctx)` —— 下一步，每轮循环调用一次。
 - `watch(ctx)` —— watchdog。必选，每个时间片运行一次。
@@ -38,8 +38,8 @@ sanity() {
 ```
 `nextDone` 把实例拨到「全部完成」状态，返回 `[ctx]`——宿主调用 `next`，并要求返回 `null`。
 `watchVeto` 把实例拨到「出了问题」状态，返回 `[ctx]`——宿主调用 `watch`，并要求一次否决
-（`false` 或 `{ abort }`）。返回值不是数组，或调出的方法没展示出出口，整个 `js.run` 就在调用点 park，携带
-诊断载荷——在新调用里修好类，或 unpark 注入一个由你的程序当作 js.run 结局消费的值。
+（`false` 或 `{ abort }`）。返回值不是数组，或调出的方法没展示出出口，整个 `js.call` 就在调用点 park，携带
+诊断载荷——在新调用里修好类，或 unpark 注入一个由你的程序当作 js.call 结局消费的值。
 写 thunk 就是在设计终止条件：如果你 mock 不出一个让 next 返回 null 的状态，出口还不存在。
 
 驱动 `next` 的两种形态：轮次驱动（`ctx.step === 0 ? cmd : null`）适合固定剧本——
@@ -100,8 +100,8 @@ await 交回的结局是
   就是这个病的签名。
 - 平铺的 `{ send, name, input }` 对象点不出子进程：嵌套 `{ send: { name, input } }`
   才是 canonical（平铺 `{ send: input, name }` 拼写被接受；`send` 载荷解析不出目标名
-  时以 `RUN_CHILD_UNKNOWN` 失败）。
-- `this.run` 是你的程序入口。工程循环只有 `js.run` 一个入口。
+  时以 `CALL_CHILD_UNKNOWN` 失败）。
+- `async run()` 是你的程序入口。工程循环只有 `js.call` 一个入口。
 
 后果，一次说清：
 - 中止用 SIGKILL 杀前台进程；`maxDuration` 到期时同样处理，并回报 status 'timeout'。
@@ -111,8 +111,8 @@ await 交回的结局是
 - 每条流最多保留 256 KiB——开头 128 KiB 加结尾 128 KiB——并置 `truncated: true`，
   仍以 `bytes` 报真实总量。
 
-稳定失败码：`RUNNABLE_SPEC_INCOMPLETE`、`RUN_COMMAND_UNSUPPORTED`、
-`RUN_WAIT_TIMEOUT`、`RUN_CHILD_UNKNOWN`、`RUN_PARK_UNSUPPORTED`。
+稳定失败码：`CALLABLE_SPEC_INCOMPLETE`、`CALL_COMMAND_UNSUPPORTED`、
+`CALL_WAIT_TIMEOUT`、`CALL_CHILD_UNKNOWN`、`CALL_PARK_UNSUPPORTED`。
 
 机械规则写进回调；语义分叉——包括被否决的 sanity thunk——交给 parked 载荷。
 

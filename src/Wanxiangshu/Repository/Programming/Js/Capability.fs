@@ -18,7 +18,7 @@ type JsCapability =
     | Grep
     | Move
     | Remove
-    /// Host-owned long-running command engineering (`js.run`).
+    /// Host-owned long-running command engineering (`js.call`).
     | Exec
     /// Delegation primitives: create a child work (`fork`) and wait for the
     /// caller's children (`join`).
@@ -265,15 +265,16 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.where" }
 
-    let run: JsCapabilityFragment =
+    let call: JsCapabilityFragment =
         { Capability = JsCapability.Exec
-          MemberName = "run"
-          Signature = "js.run(class extends js.Runnable { ... })"
+          MemberName = "call"
+          Signature = "js.call(class extends js.Callable { ... })"
           Description =
-            "js.run(class extends js.Runnable { ... }) — the host-owned engineering loop, "
-            + "called on the global js object. this.run is YOUR program entry, never this "
-            + "member: the names collide on purpose, so the engineering run never lands on "
-            + "the base class. The class must declare a positive maxDuration, next(ctx), "
+            "js.call(class extends js.Callable { ... }) — the host-owned engineering loop, "
+            + "called on the global js object, never on the base class: the call is "
+            + "js.call(...), and this.call(...) does not exist. Your program entry is "
+            + "async run() — a different name for a different thing. The class must "
+            + "declare a positive maxDuration, next(ctx), "
             + "watch(ctx) and sanity(); the host runs the sanity thunks first and calls "
             + "next and watch with the argument arrays they return, then each command, "
             + "calls watch once per interval slice, dispatches onExit and enforces "
@@ -283,7 +284,7 @@ module JsFragmentRegistry =
             + "requires null), watchVeto puts it into the something-is-wrong state and "
             + "returns [ctx] (the host calls watch and requires a veto) — writing the thunks "
             + "is designing the termination condition, and a thunk that fails to show its "
-            + "exit parks the whole js.run "
+            + "exit parks the whole js.call "
             + "with the diagnosis payload; fix the class in a new call, or unpark with a "
             + "value the program consumes as the outcome. next is a LOOP callback, not a "
             + "one-shot declaration: after every command exits the host calls next again, "
@@ -310,13 +311,13 @@ module JsFragmentRegistry =
             + "onExit(result) receives { root, exitCode, stdout, stderr, elapsedMs } with "
             + "that child's full transcript. Returns { ok, status, reason, exitCode, "
             + "stdout, stderr, truncated, bytes, durationMs, steps } — steps counts loop "
-            + "rounds — or { ok: false, code } with RUNNABLE_SPEC_INCOMPLETE / "
-            + "RUN_COMMAND_UNSUPPORTED / RUN_WAIT_TIMEOUT / RUN_CHILD_UNKNOWN / "
-            + "RUN_PARK_UNSUPPORTED."
+            + "rounds — or { ok: false, code } with CALLABLE_SPEC_INCOMPLETE / "
+            + "CALL_COMMAND_UNSUPPORTED / CALL_WAIT_TIMEOUT / CALL_CHILD_UNKNOWN / "
+            + "CALL_PARK_UNSUPPORTED."
           CanonicalExample =
             "class Js extends JsProgram {\n"
             + "  async run() {\n"
-            + "    const outcome = await js.run(class extends js.Runnable {\n"
+            + "    const outcome = await js.call(class extends js.Callable {\n"
             + "      maxDuration = 60000;\n"
             + "      async next(ctx) {\n"
             + "        return ctx.step === 0 ? \"git log --oneline\" : null;\n"
@@ -337,7 +338,7 @@ module JsFragmentRegistry =
             + "    return outcome.ok ? outcome.stdout.split(\"\\n\").slice(0, 10) : outcome;\n"
             + "  }\n"
             + "}"
-          RuntimeBindingKey = "js.run" }
+          RuntimeBindingKey = "js.call" }
 
     let fork: JsCapabilityFragment =
         { Capability = JsCapability.Fork
@@ -505,7 +506,7 @@ module JsFragmentRegistry =
           mkdir
           whereAll
           where
-          run
+          call
           fork
           dag
           join

@@ -256,7 +256,7 @@ test('WHAT[capability-enforcement-002] TOOLSPEC_engineer_and_devops_tools_have_o
   assert.equal(rolePredicate('todowrite-for-engineer', 'devops'), false)
   assert.equal(rolePredicate('todowrite-for-engineer', 'manager'), false)
 
-  // todowrite-for-devops: DevOps only (carries cat/ls/stat/where/whereAll/mkdir/write/mv/rm + js.run via Exec; direct file/exec/pty tools are retired)
+  // todowrite-for-devops: DevOps only (carries cat/ls/stat/where/whereAll/mkdir/write/mv/rm + js.call via Exec; direct file/exec/pty tools are retired)
   assert.equal(rolePredicate('todowrite-for-devops', 'devops'), true)
   assert.equal(rolePredicate('todowrite-for-devops', 'engineer'), false)
   assert.equal(rolePredicate('todowrite-for-devops', 'manager'), false)

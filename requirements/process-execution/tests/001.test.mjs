@@ -628,20 +628,20 @@ test('WHAT[process-execution-001] PTY_TYPES_read_plans_cover_unknown_in_progress
 
 {
   // The four PTY host tools (`open-terminal`, `send-terminal`, `read-terminal`,
-  // `signal-terminal`) are retired; interactive execution is superseded by `js.run`
+  // `signal-terminal`) are retired; interactive execution is superseded by `js.call`
   // (`{ spawn, name }`, `check(ctx)`, `{ send: { name, input } }`, `{ signal, name }`,
   // repository-programming [050]-[052]).
   const { default: assert } = await import('node:assert/strict')
   const { default: test } = await import('node:test')
   const { sandbox, runProgram, caseName, render } = await import('./support/executor.mjs')
 
-  test('WHAT[process-execution-001] js.run interactive actions spawn, send, observe incremental output in check, and signal background child', async () => {
+  test('WHAT[process-execution-001] js.call interactive actions spawn, send, observe incremental output in check, and signal background child', async () => {
     const { dir, cleanup } = sandbox('wxs-proc-001-')
     try {
       const outcome = await runProgram(
         dir,
         `    const chunks = [];
-    const result = await js.run(class extends js.Runnable {
+    const result = await js.call(class extends js.Callable {
       maxDuration = 8000;
       interval = 30;
       next(ctx) {

@@ -45,11 +45,11 @@ module JsToolsBindings =
     [<Emit("new Error().stack")>]
     let private currentStack () : string = jsNative
 
-    /// `js.run` returns a structured outcome; a host failure must surface as a
+    /// `js.call` returns a structured outcome; a host failure must surface as a
     /// decoded js failure, so reject the promise with the `__jsFailure`
     /// sentinel the wrapper classifies instead of returning ok:false as data.
     [<Emit("Promise.resolve($0).then(function(value) { if (value && value.ok === false) { const err = new Error(value.reason || value.code); err.__jsFailure = { code: value.code, reason: value.reason || value.code }; throw err; } return value; })")>]
-    let private rejectRunFailure (promise: obj) : obj = jsNative
+    let private rejectCallFailure (promise: obj) : obj = jsNative
 
     /// A span must cross the vm boundary as a plain JS array, not a typed
     /// array: the parked payload is JSON round-tripped, and a typed array
@@ -356,7 +356,13 @@ module JsToolsBindings =
         if token = "-f" || token = "--file" then
             found.Add value
 
-    let private consumePatternOption (args: string array) (index: int) (token: string) (patterns: int ref) (found: ResizeArray<string>) =
+    let private consumePatternOption
+        (args: string array)
+        (index: int)
+        (token: string)
+        (patterns: int ref)
+        (found: ResizeArray<string>)
+        =
         match optionValue args index with
         | Some value ->
             recordPatternFileOption token value found
@@ -380,9 +386,7 @@ module JsToolsBindings =
         let token = args[index]
 
         if token = "--" then
-            args[(index + 1) ..]
-            |> Array.choose pathOperand
-            |> found.AddRange
+            args[(index + 1) ..] |> Array.choose pathOperand |> found.AddRange
             args.Length
         elif token = "--files" then
             filesOnly.Value <- true
@@ -393,7 +397,11 @@ module JsToolsBindings =
             found.Add(token.Substring("--file=".Length))
             patterns.Value <- patterns.Value + 1
             index + 1
-        elif token.StartsWith "--glob=" || token.StartsWith "--iglob=" || token.StartsWith "-g=" then
+        elif
+            token.StartsWith "--glob="
+            || token.StartsWith "--iglob="
+            || token.StartsWith "-g="
+        then
             index + 1
         elif token = "--glob" || token = "--iglob" || token = "-g" then
             index + 2
@@ -406,7 +414,11 @@ module JsToolsBindings =
         elif token = "--ignore-file" then
             optionValue args index |> Option.iter found.Add
             index + 2
-        elif token.StartsWith "--pre=" || token.StartsWith "--hostname-bin=" || token.StartsWith "--hyperlink-format=" then
+        elif
+            token.StartsWith "--pre="
+            || token.StartsWith "--hostname-bin="
+            || token.StartsWith "--hyperlink-format="
+        then
             index + 1
         elif token = "--pre" || token = "--hostname-bin" || token = "--hyperlink-format" then
             index + 2
@@ -507,7 +519,10 @@ module JsToolsBindings =
             string (outcome?error?message)
 
     let private rgExitFailureDetail (stdout: string) (stderr: string) =
-        if System.String.IsNullOrWhiteSpace stderr then stdout else stderr
+        if System.String.IsNullOrWhiteSpace stderr then
+            stdout
+        else
+            stderr
 
     let private splitRgPaths (args: string array) (stdout: string) : string array =
         if Array.exists (fun token -> token = "-0" || token = "--null") args then
@@ -534,11 +549,11 @@ module JsToolsBindings =
 
     let private renderRgOutcome (summary: bool) (args: string array) (outcome: obj) : obj =
         if isNull (outcome?status) then
-            failureObj (JsFailure.RgFailed (rgMissingStatusDetail outcome))
+            failureObj (JsFailure.RgFailed(rgMissingStatusDetail outcome))
         elif int outcome?status <> 0 && int outcome?status <> 1 then
             let stdout = string outcome?stdout
             let stderr = string outcome?stderr
-            failureObj (JsFailure.RgFailed (rgExitFailureDetail stdout stderr))
+            failureObj (JsFailure.RgFailed(rgExitFailureDetail stdout stderr))
         elif summary then
             let exitCode = int outcome?status
             let stdout = string outcome?stdout
@@ -948,22 +963,22 @@ module JsToolsBindings =
     let private makeParkMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
         "park" ==> fun (payload: obj) -> suspend parkState payload
 
-    /// The host loop behind `js.run`. The closure is injected by the workflow
-    /// (Process.JsRunLoop) so this module stays free of process interop.
-    type JsRunHost =
+    /// The host loop behind `js.call`. The closure is injected by the workflow
+    /// (Process.JsCallLoop) so this module stays free of process interop.
+    type JsCallHost =
         { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }
 
-    /// `js.run(class extends js.Runnable { ... })`: hand the class to the host
+    /// `js.call(class extends js.Callable { ... })`: hand the class to the host
     /// loop and await its structured outcome. Without an injected host loop
-    /// the member refuses with RUN_HOST_UNAVAILABLE instead of pretending.
-    let private makeRunMember (host: JsRunHost option) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
+    /// the member refuses with CALL_HOST_UNAVAILABLE instead of pretending.
+    let private makeCallMember (host: JsCallHost option) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
         let settled =
-            fun (runnableClass: obj) ->
+            fun (callableClass: obj) ->
                 match host with
-                | Some injected -> box (injected.Loop parkState runnableClass (currentStack ()))
-                | None -> box (task { return failureObj JsFailure.RunHostUnavailable })
+                | Some injected -> box (injected.Loop parkState callableClass (currentStack ()))
+                | None -> box (task { return failureObj JsFailure.CallHostUnavailable })
 
-        "run" ==> fun (runnableClass: obj) -> rejectRunFailure (settled runnableClass)
+        "call" ==> fun (callableClass: obj) -> rejectCallFailure (settled callableClass)
 
     /// `js.fork(payload)` hands the payload to the wiring-owned fork spec and
     /// returns its receipt text; `js.join()` waits for this session's children.
@@ -1021,7 +1036,7 @@ module JsToolsBindings =
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
-        (runHost: JsRunHost option)
+        (callHost: JsCallHost option)
         (delegationHost: JsDelegationHost option)
         : obj =
         let members =
@@ -1048,7 +1063,7 @@ module JsToolsBindings =
                   makeMvMember root staging readSnapshots ledger
 
               if Set.contains JsCapability.Exec capabilities then
-                  makeRunMember runHost parkState
+                  makeCallMember callHost parkState
 
               if Set.contains JsCapability.Fork capabilities then
                   makeForkMember delegationHost
@@ -1083,10 +1098,10 @@ module JsToolsBindings =
         (readSnapshots: ResizeArray<JsReadSnapshot>)
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
-        (runHost: JsRunHost option)
+        (callHost: JsCallHost option)
         (delegationHost: JsDelegationHost option)
         : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads ledger None runHost delegationHost
+        createApiCore capabilities root staging readSnapshots explicitReads ledger None callHost delegationHost
 
     /// Build the api object for one sandbox run that carries a park lifecycle
     /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
@@ -1099,7 +1114,7 @@ module JsToolsBindings =
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
-        (runHost: JsRunHost option)
+        (callHost: JsCallHost option)
         (delegationHost: JsDelegationHost option)
         : obj =
         createApiCore
@@ -1110,5 +1125,5 @@ module JsToolsBindings =
             explicitReads
             ledger
             (Some parkState)
-            runHost
+            callHost
             delegationHost

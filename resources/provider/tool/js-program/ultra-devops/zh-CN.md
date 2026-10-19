@@ -12,7 +12,7 @@ class Js extends JsProgram {
     const section = manifest.slice(heading);
     const url = section.slice(section.indexOf("https://")).split(/\s/)[0];
 
-    return await js.run(class extends js.Runnable {
+    return await js.call(class extends js.Callable {
       maxDuration = 3600000; // 整个工程：60 分钟
       interval = 10000;      // watch() 每 10 秒时间片跑一次
 

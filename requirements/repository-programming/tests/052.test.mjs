@@ -79,7 +79,7 @@ test('WHAT[repository-programming-052] wget -c resumes a partial download after 
     const aborted = await runProgram(
       dir,
       `    const host = this;
-    return await js.run(class extends js.Runnable {
+    return await js.call(class extends js.Callable {
       maxDuration = 20000;
       interval = 20;
       next(ctx) {
@@ -110,7 +110,7 @@ test('WHAT[repository-programming-052] wget -c resumes a partial download after 
     const resumed = await runProgram(
       dir,
       `    const host = this;
-    return await js.run(class extends js.Runnable {
+    return await js.call(class extends js.Callable {
       maxDuration = 30000;
       interval = 20;
       next(ctx) {
@@ -191,7 +191,7 @@ test('WHAT[repository-programming-052] wget exit 8 is dispatched to onExit inste
     const outcome = await runProgram(
       dir,
       `    const dispatched = [];
-    const result = await js.run(class extends js.Runnable {
+    const result = await js.call(class extends js.Callable {
       maxDuration = 15000;
       interval = 50;
       next(ctx) {

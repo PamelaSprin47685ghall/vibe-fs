@@ -300,8 +300,7 @@ module JsToolWorkflow =
         if not (JsToolsData.isDelivered json) then
             Ok None
         else
-            parseRawView json
-            |> Result.bind decodeViewDeclaration
+            parseRawView json |> Result.bind decodeViewDeclaration
 
     let private recordDeliveredValueIfNeeded sessionId (json: string) (parsed: Result<obj, JsFailure>) =
         match parsed, deliveredView json with
@@ -424,9 +423,9 @@ module JsToolWorkflow =
 
             let! outcome =
                 taskResult {
-                    let runHost: JsToolsBindings.JsRunHost =
+                    let callHost: JsToolsBindings.JsCallHost =
                         { Loop =
-                            fun parkState runnableClass stack -> JsRunLoop.execute parkState root runnableClass stack }
+                            fun parkState callableClass stack -> JsCallLoop.execute parkState root callableClass stack }
 
                     let api =
                         JsToolsBindings.createApi
@@ -436,7 +435,7 @@ module JsToolWorkflow =
                             readSnapshots
                             explicitReads
                             ledger
-                            (Some runHost)
+                            (Some callHost)
                             None
 
                     let! resultJson =
@@ -677,8 +676,8 @@ module JsToolWorkflow =
         (buffers: RunBuffers)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
         : obj =
-        let runHost: JsToolsBindings.JsRunHost =
-            { Loop = fun parkState runnableClass stack -> JsRunLoop.execute parkState root runnableClass stack }
+        let callHost: JsToolsBindings.JsCallHost =
+            { Loop = fun parkState callableClass stack -> JsCallLoop.execute parkState root callableClass stack }
 
         JsToolsBindings.createApiWithPark
             capabilities
@@ -688,7 +687,7 @@ module JsToolWorkflow =
             buffers.ExplicitReads
             buffers.Ledger
             parkState
-            (Some runHost)
+            (Some callHost)
             (JsDelegationBridge.hostFor sessionId)
 
     let private runProgramWithPark

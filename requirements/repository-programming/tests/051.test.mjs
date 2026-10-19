@@ -47,7 +47,7 @@ test('WHAT[repository-programming-051] spawn, waitFor and signal drive one backg
     )
     const outcome = await runProgram(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class extends js.Callable {
       maxDuration = 15000;
       interval = 100;
       next(ctx) {
@@ -73,13 +73,13 @@ test('WHAT[repository-programming-051] spawn, waitFor and signal drive one backg
   }
 })
 
-test('WHAT[repository-programming-051] waitFor on a closed port fails with RUN_WAIT_TIMEOUT', async () => {
+test('WHAT[repository-programming-051] waitFor on a closed port fails with CALL_WAIT_TIMEOUT', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const port = await freePort()
     const outcome = await runProgram(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class extends js.Callable {
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? { waitFor: { port: ${port}, timeoutMs: 300 } } : null; }
@@ -91,18 +91,18 @@ test('WHAT[repository-programming-051] waitFor on a closed port fails with RUN_W
     });`,
     )
     assert.equal(caseName(outcome), 'Failed')
-    assert.match(render(outcome), /RUN_WAIT_TIMEOUT/)
+    assert.match(render(outcome), /CALL_WAIT_TIMEOUT/)
   } finally {
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-051] signal on an unknown name fails with RUN_CHILD_UNKNOWN', async () => {
+test('WHAT[repository-programming-051] signal on an unknown name fails with CALL_CHILD_UNKNOWN', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const outcome = await runProgram(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class extends js.Callable {
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? { signal: "SIGTERM", name: "nope" } : null; }
@@ -114,7 +114,7 @@ test('WHAT[repository-programming-051] signal on an unknown name fails with RUN_
     });`,
     )
     assert.equal(caseName(outcome), 'Failed')
-    assert.match(render(outcome), /RUN_CHILD_UNKNOWN/)
+    assert.match(render(outcome), /CALL_CHILD_UNKNOWN/)
   } finally {
     cleanup()
   }
@@ -126,7 +126,7 @@ test('WHAT[repository-programming-051] a crashed background is visible to watch 
     const port = await freePort()
     const outcome = await runProgram(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class extends js.Callable {
       maxDuration = 10000;
       interval = 100;
       next(ctx) {
