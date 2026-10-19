@@ -1,0 +1,50 @@
+--- generation19
+
++++ generation22
+
+@@ -1,3 +1,3 @@
+
+-// .build/process-90125/native-process/BunProcess.js
++// .build/process-23218/native-process/BunProcess.js
+ import { Readable, Writable } from "node:stream";
+ import * as node$003Afs from "node:fs";
+@@ -212,5 +212,5 @@
+
+ }
+ 
+-// .build/process-90125/Native.js
++// .build/process-23218/Native.js
+ import { spawn as spawn_1 } from "node:child_process";
+ 
+@@ -1057,5 +1057,5 @@
+
+ }
+ 
+-// .build/process-90125/Native.js
++// .build/process-23218/Native.js
+ import { isAbsolute } from "node:path";
+ import * as node$003Aprocess from "node:process";
+@@ -1150,5 +1150,5 @@
+
+ }
+ 
+-// .build/process-90125/OutputTail.js
++// .build/process-23218/OutputTail.js
+ var OutputTail = class {
+   constructor(capacity) {
+@@ -1238,5 +1238,5 @@
+
+ }
+ 
+-// .build/process-90125/ProcessSession.js
++// .build/process-23218/ProcessSession.js
+ import * as node$003Aprocess2 from "node:process";
+ 
+@@ -1249,5 +1249,5 @@
+
+ }
+ 
+-// .build/process-90125/ProcessSession.js
++// .build/process-23218/ProcessSession.js
+ function ProcessSession(input, outputMode) {
+   Native_require(outputMode == null ? true : equals(outputMode, "Capture"), "Output mode must be Capture or omitted");

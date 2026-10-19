@@ -1,0 +1,7 @@
+Merge made by the 'ort' strategy.
+ .../EXTRACTION-CONSTRAINT-REVIEW-PROMPT.md         | 68 ++++++----------------
+ .../LOCAL-FIRST-FOUR-MODULES-REPORT-2026-10-18.md  |  4 +-
+ proposals/extraction-kanban/README.md              | 24 +++++++-
+ proposals/extraction-kanban/TEMPLATES.md           | 16 ++++-
+ .../UPSTREAM-DELIVERY-CHECKLIST.md                 |  2 +-
+ 5 files changed, 57 insertions(+), 57 deletions(-)

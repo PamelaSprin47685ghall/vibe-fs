@@ -1,0 +1,32 @@
+runner: scoped 使用 TESTS_MJS_FILES=1 files
+runner: build is current (1790 sources, 881 artifacts)
+runner: discovery OVERRIDDEN by TESTS_MJS_FILES (1 file(s))
+runner: 1 test file(s), 5000ms verdict-silence window
+runner: file lifecycle {"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","runId":"ad3dd08bf79b67de70726f45ce46ad5d","pid":38790,"parentPid":38782,"type":"runner:file-start","elapsedMs":50.84233400000005}
+[verification-worker-cost] {"version":1,"phase":"pre-import","sequence":0,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","pid":38791,"parentPid":38790,"monotonicMs":22.350084,"cpuUserMicros":30523,"cpuSystemMicros":12343}
+[verification-test-start] {"pid":38791,"parentPid":38790,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","name":"WHAT[delegation-024] pre-join resume preserves both public join WorkRecords","fullName":"WHAT[delegation-024] pre-join resume preserves both public join WorkRecords"}
+fatal: not a git repository (or any of the parent directories): .git
+[verification-test-start] {"pid":38791,"parentPid":38790,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","name":"WHAT[delegation-024] child completion record comes from delivered value and an undelivered child reports status undelivered","fullName":"WHAT[delegation-024] child completion record comes from delivered value and an undelivered child reports status undelivered"}
+fatal: not a git repository (or any of the parent directories): .git
+[verification-test-start] {"pid":38791,"parentPid":38790,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","name":"WHAT[delegation-024] synchronous observed completion refuses undelivered prose and returns only the explicit delivered value","fullName":"WHAT[delegation-024] synchronous observed completion refuses undelivered prose and returns only the explicit delivered value"}
+fatal: not a git repository (or any of the parent directories): .git
+[verification-test-start] {"pid":38791,"parentPid":38790,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","name":"WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join","fullName":"WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join"}
+fatal: not a git repository (or any of the parent directories): .git
+[verification-test-start] {"pid":38791,"parentPid":38790,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","name":"WHAT[delegation-024] Engineer reuse sends parent delta waits for its own root and returns its own child delta","fullName":"WHAT[delegation-024] Engineer reuse sends parent delta waits for its own root and returns its own child delta"}
+fatal: not a git repository (or any of the parent directories): .git
+[verification-test-start] {"pid":38791,"parentPid":38790,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","name":"WHAT[delegation-024] DevOps completion is claimed by HandleTurn and its LWR returns to the caller","fullName":"WHAT[delegation-024] DevOps completion is claimed by HandleTurn and its LWR returns to the caller"}
+fatal: not a git repository (or any of the parent directories): .git
+[verification-worker-cost] {"version":1,"phase":"exit","sequence":1,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","pid":38791,"parentPid":38790,"monotonicMs":1706.9505,"cpuUserMicros":1147637,"cpuSystemMicros":220290,"exitCode":0}
+runner: file lifecycle {"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","type":"runner:file-drained","elapsedMs":1795.6367089999999}
+runner: worker cost {"version":1,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","enabled":true,"pid":38791,"status":"complete","reason":null,"preImport":{"version":1,"phase":"pre-import","sequence":0,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","pid":38791,"parentPid":38790,"monotonicMs":22.350084,"cpuUserMicros":30523,"cpuSystemMicros":12343},"exit":{"version":1,"phase":"exit","sequence":1,"entryFile":"/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/024.test.mjs","pid":38791,"parentPid":38790,"monotonicMs":1706.9505,"cpuUserMicros":1147637,"cpuSystemMicros":220290,"exitCode":0},"interval":{"clockPid":38791,"wallMs":1684.600416,"cpuUserMicros":1117114,"cpuSystemMicros":207947}}
+
+[test-summary] 1 file(s), 6 passed, 0 failed (1.75s wall, 1.30s test time)
+runner: post-exit group verification/reclamation: pid=38790; elapsedMs=246.198; accepted=true
+runner: 6 test(s), 1.3s of test time; max 626ms, p90 626ms, median 116ms
+runner:     626ms  WHAT[delegation-024] pre-join resume preserves both public join WorkRecords
+runner:     196ms  WHAT[delegation-024] child completion record comes from delivered value and an undelivered child reports status undelivered
+runner:     160ms  WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join
+runner:     116ms  WHAT[delegation-024] synchronous observed completion refuses undelivered prose and returns only the explicit delivered value
+runner:     101ms  WHAT[delegation-024] Engineer reuse sends parent delta waits for its own root and returns its own child delta
+
+runner: 6 passed, 0 failed; 1/1 planned file(s) completed
