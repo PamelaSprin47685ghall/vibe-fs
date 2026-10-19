@@ -189,10 +189,10 @@ const { nameOf: managedAgentName } = await import('../../../dist/Participant/Per
 
 test('WHAT[capability-enforcement-002] P7_SURFACE_role_labels_are_js_native_strings', () => {
   assertJsData(allRoleLabels, 'allRoleLabels')
-  assert.equal(allRoleLabels.length, 6, 'exactly six canonical roles')
+  assert.equal(allRoleLabels.length, 7, 'exactly seven canonical roles')
   assert.deepEqual(
     allRoleLabels,
-    ['blogger', 'devops', 'engineer', 'manager', 'orchestrator', 'plan']
+    ['advisor', 'blogger', 'devops', 'engineer', 'manager', 'orchestrator', 'plan']
       .sort(),
   )
 })
@@ -200,7 +200,7 @@ test('WHAT[capability-enforcement-002] P7_SURFACE_public_internal_partition_and_
   assertJsData(allPublicRoleLabels, 'allPublicRoleLabels')
   assertJsData(allInternalRoleLabels, 'allInternalRoleLabels')
   assert.deepEqual(allPublicRoleLabels, ['devops', 'engineer', 'manager', 'orchestrator', 'plan'])
-  assert.deepEqual(allInternalRoleLabels, ['blogger'])
+  assert.deepEqual(allInternalRoleLabels, ['advisor', 'blogger'])
   assert.equal(allPublicRoleLabels.length + allInternalRoleLabels.length, allRoleLabels.length)
   assert.equal(managedAgentName('deep', 'blogger'), 'blogger')
   assert.equal(managedAgentName('engineer', 'engineer'), 'engineer')

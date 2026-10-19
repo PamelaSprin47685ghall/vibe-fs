@@ -79,6 +79,7 @@ module PersonaCatalog =
         | Role.Browser -> Persona.Researcher
         | Role.Inquiry -> Persona.Analyst
         | Role.Distiller -> Persona.Distiller
+        | Role.Advisor -> Persona.Auditor
 
     let bookkeeperPersona () : Persona = Persona.Curator
 

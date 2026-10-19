@@ -92,6 +92,7 @@ module ProviderSystemTransform =
         | Role.DevOps -> Some catalog.DevopsSystemPrompt
         | Role.Blogger -> Some catalog.BloggerSystemPrompt
         | Role.Plan -> Some catalog.PlanSystemPrompt
+        | Role.Advisor -> Some catalog.AdvisorSystemPrompt
         | Role.Coder
         | Role.Inspector
         | Role.Browser

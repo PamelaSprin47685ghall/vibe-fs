@@ -603,6 +603,7 @@ module StrengthSurface =
             | Role.DevOps -> prompts.DevopsSystemPrompt
             | Role.Orchestrator -> prompts.OrchestratorSystemPrompt
             | Role.Blogger -> prompts.BloggerSystemPrompt
+            | Role.Advisor -> prompts.AdvisorSystemPrompt
             | Role.Coder
             | Role.Inspector
             | Role.Browser

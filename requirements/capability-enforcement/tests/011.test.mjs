@@ -162,6 +162,7 @@ const NAMES = [
   'devops',
   'blogger',
   'plan',
+  'advisor',
   'bookkeeper',
   'predictor',
 ]
@@ -172,7 +173,7 @@ function fullConfig() {
 test('WHAT[capability-enforcement-011] MACFG_validate_accepts_empty_agent_map_and_projects_full_catalog', () => {
   const empty = okOf(validate({}))
   assert.equal(empty.ok, true, empty.ok ? '' : empty.error)
-  assert.equal(empty.bindingNames.length, 6)
+  assert.equal(empty.bindingNames.length, 7)
   const blankMap = okOf(validate({ agent: {} }))
   assert.equal(blankMap.ok, true, blankMap.ok ? '' : blankMap.error)
 })
@@ -184,7 +185,7 @@ test('WHAT[capability-enforcement-011] MACFG_validate_accepts_missing_equal_and_
 
   const result = okOf(validate(cfg))
   assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.equal(result.bindingNames.length, 6, 'bookkeeper and predictor have no active Role binding')
+  assert.equal(result.bindingNames.length, 7, 'bookkeeper and predictor have no active Role binding')
 })
 test('WHAT[capability-enforcement-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
   const cfg = fullConfig()
@@ -233,7 +234,7 @@ test('WHAT[capability-enforcement-011] MACFG_configureFromHostConfig_projects_mi
   const cfg = {}
   const result = configure(cfg)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.equal(result.bindingNames.length, 6)
+  assert.equal(result.bindingNames.length, 7)
   for (const name of NAMES) {
     const entry = cfg.agent[name]
     assert.ok(entry.mode !== undefined, `${name} must be projected`)

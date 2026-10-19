@@ -13,6 +13,7 @@ module PromptResources =
         | Role.DevOps -> "role/devops"
         | Role.Blogger -> "role/blogger"
         | Role.Plan -> "role/plan"
+        | Role.Advisor -> "role/advisor"
         | Role.Coder
         | Role.Inspector
         | Role.Browser
@@ -33,6 +34,7 @@ module PromptResources =
           "role/blogger"
           "role/bookkeeper"
           "role/plan"
+          "role/advisor"
           "planning/s1"
           "planning/s2"
           "planning/s3" ]
@@ -93,7 +95,8 @@ module PromptResources =
           DevopsSystemPrompt = systemForRole lang Role.DevOps
           OrchestratorSystemPrompt = systemForRole lang Role.Orchestrator
           BloggerSystemPrompt = systemForRole lang Role.Blogger
-          PlanSystemPrompt = systemForRole lang Role.Plan }
+          PlanSystemPrompt = systemForRole lang Role.Plan
+          AdvisorSystemPrompt = systemForRole lang Role.Advisor }
 
     let load () : PromptCatalog =
         loadForLanguage ProviderLanguage.English

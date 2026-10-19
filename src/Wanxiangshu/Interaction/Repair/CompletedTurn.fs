@@ -64,6 +64,7 @@ module CompletedTurnClassifier =
         | Some Role.Plan -> true
         | Some Role.Distiller
         | Some Role.Blogger
+        | Some Role.Advisor
         | None -> false
 
     /// Formal visible assistant text only (no reasoning/thinking).

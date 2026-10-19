@@ -303,3 +303,6 @@ module StaticTools =
     let devopsAgentConfig (prompt: string option) : obj = primaryAgent Role.DevOps prompt
 
     let planAgentConfig (prompt: string option) : obj = primaryAgent Role.Plan prompt
+
+    /// The advisor is an internal reviewer runtime: hidden, no tools, prose out.
+    let advisorAgentConfig (prompt: string) : obj = hiddenAgent Role.Advisor prompt

@@ -68,6 +68,9 @@ module OfficeCapability =
 
     let permissions (role: Role) : ToolPermission Set =
         match role with
+        // The advisor is a reviewer, not an actor: it reads the supplied view and
+        // answers in prose, so its office carries no tool at all.
+        | Role.Advisor -> Set.empty
         | Role.Manager ->
             set
                 [ ToolPermission.Fork
