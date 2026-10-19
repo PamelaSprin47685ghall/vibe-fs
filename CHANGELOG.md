@@ -1,5 +1,9 @@
 # Changelog — 版本历史
 
+## Unreleased — ToolResultBound 上限改读宿主 tool_output
+
+- `ToolResultBound` 不再把宿主截断层的缺省值（2000 行 / 51200 字节）当作自身上限：插件 `config` hook 读取宿主公开的 `config.tool_output.max_lines` / `max_bytes`（`@opencode-ai/sdk` Config 类型），写入 `setHostLimits`；内容预算（`ContentMaxLines()` / `ContentMaxBytes()`）在绑定时从当前宿主上限即时减去标记自身的成本（2 行 / 34 字节），使 `Marker + tail` 恰好贴满而不超过宿主窗口——宿主抬高或压低上限，下一次绑定即跟随。宿主未声明 `tool_output` 时退回与传输层一致的缺省；非数字、非正数或低于标记成本的声明一律忽略，配置残缺不会放宽界限。`host-boundary-015` 新增抬高、压低与非法声明三组正反例。
+
 ## Unreleased — js.run sanity 只交参数数组
 
 - `sanity()` 仍返回 `{ nextDone, watchVeto }` 两个 thunk，但 thunk 只拨实例状态并返回参数数组，不再自己调用 `next`/`watch`。宿主用该数组调用对应方法：`next` 必须返回 `null`，`watch` 必须一次否决。返回值不是数组，或调出的方法没有出口，整次 `js.run` 在调用点 park，什么都不执行。空操作 `() => null` / `() => false` 因此过不了自证。

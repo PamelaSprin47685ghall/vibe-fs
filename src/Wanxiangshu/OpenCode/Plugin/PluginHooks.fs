@@ -929,6 +929,9 @@ module PluginHooks =
                     syncHostLanguagePreference config
                     ManagerConfig.configureManager config |> ignore
                     scope.RecordCompactionSettingGap(HostCompactionGate.enforceSettings config)
+                    Wanxiangshu.Host.Contract.ToolResultBound.setHostLimits
+                        config?tool_output?max_lines
+                        config?tool_output?max_bytes
 
             let config = registeredHook HookKey.Config (unaryHook (box configurePluginHost))
 
