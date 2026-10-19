@@ -43,6 +43,7 @@ module AttemptPlannerSurface =
         | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
+        | ToolPermission.Advisor -> "Advisor"
 
     let private requestKindOf (label: string) : ProviderRequestKind option =
         match label.ToLowerInvariant() with

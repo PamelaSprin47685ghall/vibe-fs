@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
-import * as horizonCalibration from '../../../dist/Execution/Session/OpenCode/HorizonCalibration.js'
+import * as horizonCalibration from '../../../dist/Execution/Session/OpenCode/HorizonCalibrationSurface.js'
 import { placeEngineer, withForkRuntime } from './support/fork-runtime.mjs'
 
 process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
@@ -75,3 +75,31 @@ test('WHAT[participant-horizon-011] a restarted process does not present the pre
 
 test.todo('WHAT[participant-horizon-011] Join delivers the abandoned consequence and retires the handle; real scenario stalls at Join after successful cancellation, root cause still under investigation (GAP-080)')
 test.todo('WHAT[participant-horizon-011] latest durable record selection and corrupt-latest rejection must exercise journal/blob reads; a separately implemented HorizonSurface renderer is insufficient (GAP-079)')
+
+test('WHAT[participant-horizon-011] the same roster reaches a program as js.horizon data with the four numbers withheld when no delegated estimate exists', async () => {
+  await withForkRuntime(async ({ runtime, owner }) => {
+    await placeEngineer(runtime, owner, 'Ada')
+    const receipt = await forkTool.executeHorizonReceipt(runtime, owner)
+
+    assert.equal(receipt.ok, true, 'the roster crosses as a data envelope')
+    assert.ok(Array.isArray(receipt.agents), 'the envelope carries the agents roster array')
+    assert.ok(Array.isArray(receipt.ptys), 'the envelope carries the ptys roster array')
+
+    // The runtime-bound fixed DevOps may share this roster (participant-horizon-010),
+    // so the accepted child is located by her own Byname instead of by position.
+    const participant = receipt.agents.find((row) => row.label === 'Ada')
+    assert.ok(participant, 'the accepted child carries a row under her Byname')
+    assert.equal(participant.status, 'still-away')
+    assert.ok(
+      ['latest', 'none', 'unavailable'].includes(participant.workState),
+      `unexpected workState ${participant.workState}`,
+    )
+    assert.equal(typeof participant.record, 'string')
+    // No delegated-tool estimate exists for this child, so the four calibration
+    // numbers are 0 rather than guessed from a neighbouring participant.
+    assert.equal(participant.turnsUsed, 0)
+    assert.equal(participant.turnsLeft, 0)
+    assert.equal(participant.timeUsedMs, 0)
+    assert.equal(participant.timeLeftMs, 0)
+  })
+})

@@ -9,7 +9,9 @@ open System.Threading.Tasks
 type JsDelegationHost =
     { Fork: obj -> Task<obj>
       Join: unit -> Task<obj>
-      Fission: obj -> Task<obj> }
+      Fission: obj -> Task<obj>
+      Horizon: unit -> Task<obj>
+      Advisor: obj -> obj -> Task<obj> } // (intent, view)
 
 module JsDelegationBridge =
     val install: sessionId: string -> host: JsDelegationHost -> unit

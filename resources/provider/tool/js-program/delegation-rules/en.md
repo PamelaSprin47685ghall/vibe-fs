@@ -54,3 +54,25 @@ const outcome = await js.dag({ nodes: [
   - `"skip"` — mark it skipped (dependents see `null` for it);
   - any other value — use it as that node's result and continue;
   - `{ abort: reason }` — fail the program with that reason.
+
+## horizon
+
+```js
+const { agents, ptys } = await js.horizon();
+```
+
+- Who remains at your horizon, as data: `{ ok: true, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`.
+- `status` is `returned` | `still-away` | `did-not-return`; `workState` is `latest` | `none` | `unavailable`, and `record` carries the latest work text when it is `latest`.
+- The four calibration numbers say what this participant has spent and what it will likely need: turns used and left on its delegator's estimate, wall-clock used, and the time still to come at the pace it has shown. All four are `0` whenever either source is missing.
+- Refusal: `{ ok: false, code: "horizon-unavailable" }`.
+
+## advisor
+
+```js
+const advice = await js.advisor("Is the caching layer's eviction policy sound?", { prefixUntil: 12 });
+```
+
+- Consult this session's **dedicated advisor** — a reviewer holding no tools that answers in prose — before committing to an approach or declaring work done. The same session always reaches the same advisor, and later calls append only the view delta plus the new intent, so it keeps the thread.
+- `intent` is the question, sent as its own prompt. `view` declares what the advisor may read, in the same shape as the round view declaration (`{ prefixUntil, thenRemove? }`); the host renders those records in the Chronicle shape and sends them as one prompt, then the intent as another. They are never merged.
+- Result: `{ ok: true, advice }` (prose as data) or `{ ok: false, code: "advisor-unavailable", reason }`; a malformed view declaration refuses with `VIEW_DECLARATION_INVALID`.
+- Treat the answer as guidance: a plan, a correction, or a stop signal. The consult itself writes nothing into your transcript.

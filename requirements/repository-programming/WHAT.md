@@ -8,7 +8,7 @@
 
 每项文件系统 capability 在公开基类、工具描述、canonical examples 与运行时门禁中一致投影；缺失能力在四层均不可用，伪造调用也须拒绝。一项能力可生成固定顺序的同权成员族，不产生第二份授权。
 
-主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`，Exec → `run`，Fork → `fork`/`dag`，Join → `join`，Fission → `fission`；canonical 成员序为 `write, rm, mv, cat, ls, stat, mkdir, whereAll, where, run, fork, dag, join, fission`（生命周期成员 `park` 在基类与运行时绑定中携带，不进入 `members` 列表）。`ToolPermission.Edit` 不再投影任何 `JsCapability`；旧成员 `glob`/`grep`（[057]）与 `file`/`edit`/`rewrite` 均已从仓库生成编程面彻底退役（Plan 任期专用工具 `todowrite-for-plan` 仍独立保有其无路径 `file`/`edit`/`rewrite` 接口）。
+主原语族按能力投影为：Read → `cat`/`stat`/`whereAll`/`where`，Glob → `ls`，Write → `write`/`mkdir`，Move → `mv`，Remove → `rm`，Exec → `run`，Fork → `fork`/`dag`，Join → `join`，Fission → `fission`，Horizon → `horizon`，Advisor → `advisor`；canonical 成员序为 `write, rm, mv, cat, ls, stat, mkdir, whereAll, where, run, fork, dag, join, fission, horizon, advisor`（生命周期成员 `park` 在基类与运行时绑定中携带，不进入 `members` 列表）。`ToolPermission.Edit` 不再投影任何 `JsCapability`；旧成员 `glob`/`grep`（[057]）与 `file`/`edit`/`rewrite` 均已从仓库生成编程面彻底退役（Plan 任期专用工具 `todowrite-for-plan` 仍独立保有其无路径 `file`/`edit`/`rewrite` 接口）。
 
 ## [003] 确定性生成
 
@@ -298,6 +298,8 @@ ctx：`next` 收到 `{ root, step }`；`watch` 收到 `{ root, step, stdout, std
 - `join()`：按本会话成员归属收拢，返回 `{ ok, records: [{ name, agentId, role, status, workRecord }], byName }`；`status ∈ completed | undelivered | failed | abandoned`。拒绝码：`context-unavailable`/`not-ready`/`nothing-to-join`/`join-in-progress`/`interrupted`/`abandoned`。
 - `fission({ charge, lanes })`：同身份多 lane 的任务分片执行（宿主负责 lane 绑定与收拢），返回 `{ ok, groupId, lanes: [{ index, sessionId }] }`；owner 的 `join()` 收拢本组 lane。拒绝码：`fission-unavailable`/`lane-start-failed`/`not-ready`/`context-unavailable`/`invalid-prompt`。
 - `dag({ nodes: [{ id, charge, deps?, lanes? }] })`：纯声明糖，由基类编译成波次 `fork` + 一次 `join`；下游节点的 prompt 带上依赖记录。成功返回 `{ ok, results: { [id]: record }, skipped: [id...] }`。**节点失败 → `park`**（与 `where` 同一条恢复通道），payload 为 `{ dag, node, code, deps, done, pending }`；注入值语义：`"retry"` 重跑、`"skip"` 跳过（下游看到 null）、其他值直接作为该节点结果、`{ abort: reason }` 使程序失败。
+- `horizon()`：返回在场名册的数据信封 `{ ok, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`；`status ∈ returned | still-away | did-not-return`，`workState ∈ latest | none | unavailable`，`record` 是最新帧正文原文（无则为 `""`）；四个校准数 `turnsUsed`/`turnsLeft`/`timeUsedMs`/`timeLeftMs` 只在委任者 estimate 与子会话起点两者都可读时给出，否则全为 `0`，不猜测。拒绝码：`horizon-unavailable`。
+- `advisor(intent, view)`：请求本调用 session 自己的顾问专席——`view` 是 Anchor view 声明 `{ prefixUntil, thenRemove }`，返回的数据信封是 `{ ok, advice }` 或 `{ ok: false, code: "advisor-unavailable", reason }`。顾问读到的请求是彼此独立的 prompt，绝不拼成一段：顾问自己的 law、按 Chronicle 形状渲染的 view（`# ` 注释表头 + `[[new_work_to_record]]` 数据表），以及自成一条 user prompt 的 `intent`；follow-up 只交付相对已交付部分的 view 增量，其后追加新的 intent。拒绝码：`advisor-unavailable`。
 
 实现边界：delegation shard 提供结构化入口（`ForkTool.executeReceipt`/`JoinTool.executeReceipt`/`FissionTool.executeReceipt`，返回数据与上述稳定码；宿主 `fork`/`join`/`fission` 工具的 prose 输出保持不变）；接线层在每次编程调用期间安装进程内委托宿主驱动这些入口，调用结束清除；未安装宿主时成员以 `{ ok:false, code:"DELEGATION_UNAVAILABLE" }` 拒绝，不静默降级。
 

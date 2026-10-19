@@ -18,7 +18,7 @@ const isNone = (value) => value === null
 const isSome = (value) => value !== null
 
 const PERMISSION_NAMES = [
-  'Fork', 'Join', 'Horizon', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
+  'Fork', 'Join', 'Horizon', 'Advisor', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
   'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment', 'Chronicle',
   'Finality', 'BashHoneypot',
 ]
@@ -29,10 +29,11 @@ const ToolPermission = toolPermissionByName
 
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 
+// The member expectation map is the JS-side encoding of the code's
+// ToolPermission -> JsCapability mapping: the expected set is rolePermissions
+// crossed with it, never a hand list of projections per role.
 const fsPermissionsOf = (role) =>
-  rolePermissions(role.toLowerCase()).filter((n) =>
-    ['Read', 'Write', 'Glob', 'Move', 'Remove', 'Exec', 'Fork', 'Join', 'Fission'].includes(n),
-  )
+  rolePermissions(role.toLowerCase()).filter((name) => MEMBERS_BY_PERMISSION[name] !== undefined)
 
 const MEMBERS_BY_PERMISSION = {
   Read: ['cat', 'stat', 'whereAll', 'where'],
@@ -44,6 +45,8 @@ const MEMBERS_BY_PERMISSION = {
   Fork: ['fork', 'dag'],
   Join: ['join'],
   Fission: ['fission'],
+  Horizon: ['horizon'],
+  Advisor: ['advisor'],
 }
 
 const BINDING_BY_MEMBER = {
@@ -61,6 +64,8 @@ const BINDING_BY_MEMBER = {
   dag: 'js.dag',
   join: 'js.join',
   fission: 'js.fission',
+  horizon: 'js.horizon',
+  advisor: 'js.advisor',
 }
 
 const MEMBER_ORDER = [
@@ -71,6 +76,8 @@ const MEMBER_ORDER = [
   'dag',
   'join',
   'fission',
+  'horizon',
+  'advisor',
 ]
 
 const layersOf = (s) =>
@@ -101,7 +108,7 @@ test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_ca
   assert.equal(isNone(orchestrator), false, 'Orchestrator gets the delegation-only surface')
   assert.deepEqual(
     orchestrator.members.map((fragment) => fragment.memberName),
-    ['fork', 'dag', 'join'],
+    ['fork', 'dag', 'join', 'horizon', 'advisor'],
   )
 })
 
@@ -122,9 +129,7 @@ test('WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_pe
 })
 
 test('WHAT[repository-programming-001] JS001_non_fs_permissions_never_produce_members', () => {
-  for (const name of PERMISSION_NAMES.filter(
-    (n) => !['Read', 'Write', 'Glob', 'Move', 'Remove', 'Exec', 'Fork', 'Join', 'Fission'].includes(n),
-  )) {
+  for (const name of PERMISSION_NAMES.filter((n) => MEMBERS_BY_PERMISSION[n] === undefined)) {
     const result = generate('Engineer', caps(toolPermissionByName[name]), 'en')
     assert.equal(isNone(result), true, `${name} alone must not generate a surface`)
   }

@@ -23,6 +23,7 @@ module JsGeneratorSurface =
         | "Join" -> Some ToolPermission.Join
         | "Horizon" -> Some ToolPermission.Horizon
         | "Fission" -> Some ToolPermission.Fission
+        | "Advisor" -> Some ToolPermission.Advisor
         | "Read" -> Some ToolPermission.Read
         | "Write" -> Some ToolPermission.Write
         | "Edit" -> Some ToolPermission.Edit
@@ -51,6 +52,7 @@ module JsGeneratorSurface =
         | ToolPermission.Join -> "Join"
         | ToolPermission.Horizon -> "Horizon"
         | ToolPermission.Fission -> "Fission"
+        | ToolPermission.Advisor -> "Advisor"
         | ToolPermission.Read -> "Read"
         | ToolPermission.Write -> "Write"
         | ToolPermission.Edit -> "Edit"
@@ -83,6 +85,8 @@ module JsGeneratorSurface =
         | JsCapability.Fork -> "Fork"
         | JsCapability.Join -> "Join"
         | JsCapability.Fission -> "Fission"
+        | JsCapability.Horizon -> "Horizon"
+        | JsCapability.Advisor -> "Advisor"
         | JsCapability.Park -> "Park"
 
     let private languageOf (value: string) = ProviderLanguage.parse value

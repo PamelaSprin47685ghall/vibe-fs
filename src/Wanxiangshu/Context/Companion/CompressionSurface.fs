@@ -180,6 +180,7 @@ module CompressionSurface =
         | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
+        | ToolPermission.Advisor -> "Advisor"
 
     let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
         box

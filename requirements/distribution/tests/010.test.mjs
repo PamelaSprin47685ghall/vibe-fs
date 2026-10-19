@@ -15,6 +15,7 @@ test('WHAT[distribution-010] repository resources and emitted role/tool declarat
     .sort()
 
   const expectedActiveRoles = [
+    'advisor',
     'blogger',
     'bookkeeper',
     'devops',
@@ -27,7 +28,7 @@ test('WHAT[distribution-010] repository resources and emitted role/tool declarat
   assert.deepEqual(
     actualRoles,
     expectedActiveRoles,
-    'resources/provider/role must strictly equal the 7 active roles with zero legacy residue',
+    'resources/provider/role must strictly equal the 8 active roles with zero legacy residue',
   )
 
   // 2. RolesSurface 必须包含 6 个公开活跃角色，且严格排除全部 5 个已废止角色

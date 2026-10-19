@@ -40,6 +40,9 @@ module StaticTools =
         | ToolPermission.JsPlan -> [ "todowrite-for-plan" ]
         | ToolPermission.Ask -> [ "ask" ]
         | ToolPermission.DevOpsConsultation -> [ "devops" ]
+        // advisor gates the programming surface's `js.advisor` member: a
+        // consult seat that returns an envelope, never a host tool of its own.
+        | ToolPermission.Advisor -> []
         | ToolPermission.Deliver -> [ "deliver" ]
         // work-021: Plan's review shares the `review` verb with Manager's
         // ReviewAssessment. The reverse lookup decides by role, not by this order.
@@ -77,6 +80,7 @@ module StaticTools =
           ToolPermission.JsPlan
           ToolPermission.Ask
           ToolPermission.DevOpsConsultation
+          ToolPermission.Advisor
           ToolPermission.Deliver
           ToolPermission.Review ]
 

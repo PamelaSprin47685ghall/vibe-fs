@@ -60,6 +60,7 @@
 | Package | 一句话 WHY |
 |---|---|
 | `delegation` | 一项语义工作交给另一 participant 时，authority、charge、owner 与返回后果必须明确；Manager 派发 Engineer 与续做固定 DevOps，禁止跨角色向后差遣；Sphinx 程序内部同步调用标准 Engineer，并压平为同级子会话。 |
+| `advisor` | 同一调用 session 的 advisor 请求永远路由到同一个按需建立的顾问专席，父级是家族根而不产生 sub-subagent；请求由顾问 law、blogger 形状 view 与独立 intent 三条不合并的 prompt 组成，follow-up 只追加 view 增量与新的 intent；顾问无任何工具、只回散文，`js.advisor` 以数据信封返回且不介入调用者授权。 |
 | `intra-participant-parallelism` | 同一个 participant（仅限 Engineer）可拥有多个 coequal execution presents，而 identity/authority/responsibility 与最终 completion 仍保持一个。 |
 | `process-execution` | participant 控制真实进程/PTY 时必须得到有界、可终止、物理完成可信的 execution semantics，承接大输出零 Distiller 留尾截断与 Large Gate 门禁。 |
 | `change-integration` | 独立 Git 工作道路进入共享 ref 时必须在短原子门内发布，长 review/repair 不应被全局串行化；DevOps 自修推进快照触发证书失效与独立重评。 |
@@ -156,6 +157,7 @@
 | 26 | `effect-accounting` | 10 | effect-accounting-001 ~ 008、010、012 |
 | 27 | `durable-convergence` | 11 | durable-convergence-001 ~ 011 |
 | 28 | `delegation` | 30 | delegation-001 ~ 015、017、019 ~ 032 |
+| 58 | `advisor` | 6 | advisor-001 ~ 006（专席归属与家族根父级、law/view/intent 三材料独立 prompt、view 增量与已交付游标、无工具散文、无授权副作用、`js.advisor` 编程面成员） |
 | 29 | `intra-participant-parallelism` | 16 | intra-participant-parallelism-001 ~ 015、017 |
 | 30 | `process-execution` | 17 | process-execution-001 ~ 017；通用工具结果边界归 host-boundary |
 | 31 | `change-integration` | 14 | change-integration-001 ~ 009、011、013 ~ 015、017 |
@@ -215,6 +217,7 @@ effect-accounting        → durable-events
 durable-events           → 无
 durable-convergence      → durable-events
 delegation               → office-capability, session-ontology, managed-session-lifecycle, participant-horizon
+advisor                  → office-capability, capability-enforcement, participant-identity, provider-projection, repository-programming, host-boundary, managed-session-lifecycle
 intra-participant-parallelism → participant-identity, session-ontology, managed-session-lifecycle, office-capability, capability-enforcement, participant-horizon, work-record, process-execution, durable-events, crash-reconciliation
 process-execution        → time-capability, host-boundary, participant-horizon
 change-integration       → effect-accounting, durable-events, crash-reconciliation

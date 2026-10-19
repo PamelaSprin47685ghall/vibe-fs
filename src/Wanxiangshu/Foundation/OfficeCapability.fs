@@ -34,6 +34,10 @@ type ToolPermission =
     /// with Manager's ReviewAssessment; the label stays distinct.
     | Review
     | DevOpsConsultation
+    /// advisor: the caller session's second-opinion seat (`js.advisor`).
+    /// A consult, not an actor: the caller hands over a view plus an intent
+    /// and reads prose back, so the office holding it gains no acting surface.
+    | Advisor
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =
@@ -77,12 +81,18 @@ module OfficeCapability =
                   ToolPermission.Resume
                   ToolPermission.Join
                   ToolPermission.Horizon
+                  ToolPermission.Advisor
                   ToolPermission.ReviewAssessment
                   ToolPermission.Finality
                   ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep ]
-        | Role.Orchestrator -> set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.Horizon ]
+        | Role.Orchestrator ->
+            set
+                [ ToolPermission.Fork
+                  ToolPermission.Join
+                  ToolPermission.Horizon
+                  ToolPermission.Advisor ]
         | Role.Engineer ->
             set
                 [ ToolPermission.Read
@@ -94,7 +104,8 @@ module OfficeCapability =
                   ToolPermission.Remove
                   ToolPermission.BashHoneypot
                   ToolPermission.Fetch
-                  ToolPermission.Fission ]
+                  ToolPermission.Fission
+                  ToolPermission.Advisor ]
         | Role.Coder -> Set.empty
         | Role.Inspector -> Set.empty
         | Role.Browser -> Set.empty
@@ -110,7 +121,8 @@ module OfficeCapability =
                   ToolPermission.Remove
                   ToolPermission.Exec
                   ToolPermission.Join
-                  ToolPermission.Horizon ]
+                  ToolPermission.Horizon
+                  ToolPermission.Advisor ]
         | Role.Distiller -> Set.empty
         | Role.Plan ->
             // devops 委派调查，ask 只提问用户；两者不是同一项能力。
@@ -180,6 +192,7 @@ module OfficeCapability =
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
         | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
+        | ToolPermission.Advisor -> "Advisor"
 
     /// Unknown labels are not a permission.
     let permissionOfLabel (label: string) : ToolPermission option =
@@ -208,4 +221,5 @@ module OfficeCapability =
         | "Deliver" -> Some ToolPermission.Deliver
         | "Review" -> Some ToolPermission.Review
         | "DevOpsConsultation" -> Some ToolPermission.DevOpsConsultation
+        | "Advisor" -> Some ToolPermission.Advisor
         | _ -> None

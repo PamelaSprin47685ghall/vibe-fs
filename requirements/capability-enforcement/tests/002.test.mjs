@@ -158,11 +158,15 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
     // 评审专用工具经 owner 目录（ToolSurface.reviewToolPermissions）映射为领域权限，
     // 无评审契约的工具名称没有权限映射。
     const reviewPermissions = reviewToolPermissions(toolName)
+    // The generated surface's members are part of what the Host schema allows
+    // for that tool, so a member whose only carrier is the surface (e.g.
+    // `advisor`) must be counted beside any review-contract permissions.
+    const generated = toolName.startsWith('todowrite-for-')
+      ? generateRole(toolName.slice('todowrite-for-'.length), 'en')
+      : null
+
+    if (generated) return [...new Set([...reviewPermissions, ...generated.capabilities])]
     if (reviewPermissions.length > 0) return reviewPermissions
-    if (toolName.startsWith('todowrite-for-')) {
-      const generated = generateRole(toolName.slice('todowrite-for-'.length), 'en')
-      return generated ? generated.capabilities : []
-    }
     const single = permissionOf(toolName)
     return single ? [single] : []
   }

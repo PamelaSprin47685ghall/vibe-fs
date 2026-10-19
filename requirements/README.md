@@ -80,6 +80,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | Package | 一句话 WHY |
 |---|---|
 | [delegation](delegation/WHAT.md) | 语义工作转交时 authority、charge、owner 与返回后果明确。 |
+| [advisor](advisor/WHAT.md) | 同一调用 session 的请求永远落到同一个无工具顾问专席；law、view 与独立 intent 三条 prompt 不合并，follow-up 只追加 view 增量，`js.advisor` 以数据信封返回散文。 |
 | [intra-participant-parallelism](intra-participant-parallelism/WHAT.md) | 同一 participant 可展开多个 coequal execution presents，而 identity/authority/responsibility 与最终 completion 仍保持一个。 |
 | [process-execution](process-execution/WHAT.md) | 真实进程/PTY 有 bounded、可终止、物理完成可信的 execution semantics。 |
 | [change-integration](change-integration/WHAT.md) | 独立 Git road 只在短原子门内发布，长 review/repair 不全局串行化。 |

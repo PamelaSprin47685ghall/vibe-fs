@@ -1002,6 +1002,12 @@ Execution/Delegation/Handle/JoinDrain.fsi
 Execution/Delegation/Handle/JoinDrain.fs
 Execution/Delegation/ChildRecoveryWorkflow.fsi
 Execution/Delegation/ChildRecoveryWorkflow.fs
+Execution/Delegation/Advisor/Cursor.fsi
+Execution/Delegation/Advisor/Cursor.fs
+Execution/Delegation/Advisor/View.fsi
+Execution/Delegation/Advisor/View.fs
+Execution/Delegation/Advisor/Surface.fsi
+Execution/Delegation/Advisor/Surface.fs
 Execution/Delegation/Fork/Host/RunLifecycle.fsi
 Execution/Delegation/Fork/Host/RunLifecycle.fs
 Execution/Delegation/Fork/Host/ChildDispatch.fsi
@@ -1132,6 +1138,8 @@ Mission/WorkRecord/Materialize.fsi
 Mission/WorkRecord/Materialize.fs
 Mission/WorkRecord/OpeningSemanticSurface.fsi
 Mission/WorkRecord/OpeningSemanticSurface.fs
+Execution/Delegation/Advisor/Seat.fsi
+Execution/Delegation/Advisor/Seat.fs
 OpenCode/Host/HostCompactionGate.fsi
 OpenCode/Host/HostCompactionGate.fs
 Context/Prefix/Wire.fsi
@@ -1189,6 +1197,8 @@ Execution/Session/OpenCode/HorizonTool.fsi
 Execution/Session/OpenCode/HorizonTool.fs
 Execution/Session/OpenCode/HorizonSurface.fsi
 Execution/Session/OpenCode/HorizonSurface.fs
+Execution/Session/OpenCode/HorizonCalibrationSurface.fsi
+Execution/Session/OpenCode/HorizonCalibrationSurface.fs
 Execution/Delegation/SyncDelegate/OpenCode/Batching.fsi
 Execution/Delegation/SyncDelegate/OpenCode/Batching.fs
 OpenCode/Tools/ChronicleTool.fsi

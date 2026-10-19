@@ -33,6 +33,8 @@ module JsRuntimeSurface =
                   JsCapability.Fork
                   JsCapability.Join
                   JsCapability.Fission
+                  JsCapability.Horizon
+                  JsCapability.Advisor
                   JsCapability.Park ]
 
         let api =
@@ -60,6 +62,8 @@ module JsRuntimeSurface =
         | "Fork" -> Some JsCapability.Fork
         | "Join" -> Some JsCapability.Join
         | "Fission" -> Some JsCapability.Fission
+        | "Horizon" -> Some JsCapability.Horizon
+        | "Advisor" -> Some JsCapability.Advisor
         | "Park" -> Some JsCapability.Park
         | _ -> None
 
@@ -85,12 +89,21 @@ module JsRuntimeSurface =
     let api (handle: obj) : obj = (unbox<JsBindingsHandle> handle).Api
 
     /// Test hook: install a process-live delegation host for one session.
-    let installDelegationHost (sessionId: string) (fork: obj) (join: obj) (fission: obj) : unit =
+    let installDelegationHost
+        (sessionId: string)
+        (fork: obj)
+        (join: obj)
+        (fission: obj)
+        (horizon: obj)
+        (advisor: obj)
+        : unit =
         JsDelegationBridge.install
             sessionId
             { Fork = fun payload -> unbox<Task<obj>> (emitJsExpr (fork, payload) "$0($1)")
               Join = fun () -> unbox<Task<obj>> (emitJsExpr join "$0()")
-              Fission = fun payload -> unbox<Task<obj>> (emitJsExpr (fission, payload) "$0($1)") }
+              Fission = fun payload -> unbox<Task<obj>> (emitJsExpr (fission, payload) "$0($1)")
+              Horizon = fun () -> unbox<Task<obj>> (emitJsExpr horizon "$0()")
+              Advisor = fun intent view -> unbox<Task<obj>> (emitJsExpr (advisor, intent, view) "$0($1,$2)") }
 
     let clearDelegationHost (sessionId: string) : unit = JsDelegationBridge.clear sessionId
 

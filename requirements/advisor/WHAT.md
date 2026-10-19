@@ -4,7 +4,7 @@
 
 ## [001] 专席归属与「孙子变儿子」
 
-同一个调用 session 的 advisor 请求**永远路由到同一个 advisor**：该专席按调用 session 按需生成（首次调用时建立），此后逐次复用，历史随调用累积。顾问由 `Sessions.createChildSession` 建立，因此物理父级是**家族根**（HOST-015：儿子生的儿子仍是儿子）——subagent 请顾问不会产生 sub-subagent。
+同一个调用 session 的 advisor 请求**永远路由到同一个 advisor**：该专席按调用 session 按需生成（首次调用时建立），此后逐次复用，历史随调用累积。顾问由 `Sessions.createChildSession` 建立，因此物理父级是**家族根**（delegation-007：儿子生的儿子仍是儿子）——subagent 请顾问不会产生 sub-subagent。
 
 ## [002] 请求由三样独立材料组成，不合并
 

@@ -24,12 +24,20 @@ type JsCapability =
     | Join
     /// Same-identity multi-lane execution (`js.fission`).
     | Fission
+    /// Who remains at the horizon (`js.horizon`): a data-only roster of the
+    /// session's horizon-visible participants — never a prose rendering.
+    | Horizon
+    /// Consultation with this session's own advisor seat (`js.advisor`): the
+    /// seat answers in prose and the member hands that prose back as data —
+    /// never as a rendering.
+    | Advisor
     | Park
 
 module JsCapability =
 
-    /// The only ToolPermission → JsCapability mapping. Non-filesystem
-    /// permissions produce no js-* member (JS-004 four-layer exactness).
+    /// The only ToolPermission → JsCapability mapping. A permission without a
+    /// js-* projection (edit, grep, pty, ask, review, …) produces no member
+    /// (JS-004 four-layer exactness).
     let ofToolPermission (permission: ToolPermission) : JsCapability option =
         match permission with
         | ToolPermission.Read -> Some JsCapability.Read
@@ -41,6 +49,8 @@ module JsCapability =
         | ToolPermission.Fork -> Some JsCapability.Fork
         | ToolPermission.Join -> Some JsCapability.Join
         | ToolPermission.Fission -> Some JsCapability.Fission
+        | ToolPermission.Horizon -> Some JsCapability.Horizon
+        | ToolPermission.Advisor -> Some JsCapability.Advisor
         | _ -> None
 
     let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
@@ -371,6 +381,61 @@ module JsFragmentRegistry =
             + "}"
           RuntimeBindingKey = "js.fission" }
 
+    let horizon: JsCapabilityFragment =
+        { Capability = JsCapability.Horizon
+          MemberName = "horizon"
+          Signature = "async horizon()"
+          Description =
+            "horizon() — the horizon roster as data: who remains at the horizon and what "
+            + "each participant carries. Returns { ok, agents: [{ label, status, workState, "
+            + "record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] } "
+            + "or { ok: false, code } with code horizon-unavailable. status is returned | "
+            + "still-away | did-not-return; workState is latest | none | unavailable, and "
+            + "record is that latest frame body as raw text (\"\" when there is none). "
+            + "turnsUsed, turnsLeft, timeUsedMs and timeLeftMs are the calibration numbers: "
+            + "all four appear only when both the participant's delegated-tool estimate and "
+            + "its session start resolve, and are 0 otherwise."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const atHorizon = await this.horizon();\n"
+            + "    if (!atHorizon.ok) return atHorizon;\n"
+            + "    return atHorizon.agents.filter((a) => a.status !== \"returned\");\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.horizon" }
+
+    let advisor: JsCapabilityFragment =
+        { Capability = JsCapability.Advisor
+          MemberName = "advisor"
+          Signature = "async advisor(intent, view)"
+          Description =
+            "advisor(intent, view) — consult this session's own advisor seat and take its "
+            + "answer back as data, never as a rendering: { ok, advice } carrying the "
+            + "advisor's prose, or { ok: false, reason, code } — code advisor-unavailable — "
+            + "when the seat cannot answer. The advisor reads its own law, the view rendered "
+            + "in the Chronicle shape (a comment header plus [[new_work_to_record]] data "
+            + "tables), and the intent as separate prompts, never merged. view is an ANCHOR "
+            + "view declaration ({ prefixUntil, thenRemove }) choosing the material to hand "
+            + "over; a follow-up call delivers only the view delta since the part already "
+            + "delivered, plus the new intent."
+          CanonicalExample =
+            "class Js extends JsProgram {\n"
+            + "  async run() {\n"
+            + "    const first = await this.advisor(\n"
+            + "      \"is the retry path sound?\",\n"
+            + "      { prefixUntil: 7 }\n"
+            + "    );\n"
+            + "    if (!first.ok) return first;\n"
+            + "    const followUp = await this.advisor(\n"
+            + "      \"and the second failure?\",\n"
+            + "      { prefixUntil: 7, thenRemove: { \"4\": \"the retry experiment\" } }\n"
+            + "    );\n"
+            + "    return { first: first.advice, followUp: followUp.advice };\n"
+            + "  }\n"
+            + "}"
+          RuntimeBindingKey = "js.advisor" }
+
     /// park fragment — the pause/resume mechanism (PLAN S1 B.7/B.17). Unlike
     /// the filesystem members this is not a ToolPermission projection: it is a
     /// lifecycle capability every js-* surface carries. The runtime binding is
@@ -410,6 +475,8 @@ module JsFragmentRegistry =
           dag
           join
           fission
+          horizon
+          advisor
           park ]
 
     let byCapability: Map<JsCapability, JsCapabilityFragment list> =

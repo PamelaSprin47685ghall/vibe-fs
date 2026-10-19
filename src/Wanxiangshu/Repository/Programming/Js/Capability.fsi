@@ -14,6 +14,8 @@ type JsCapability =
     | Fork
     | Join
     | Fission
+    | Horizon
+    | Advisor
     | Park
 
 module JsCapability =
@@ -43,6 +45,8 @@ module JsFragmentRegistry =
     val join: JsCapabilityFragment
     val dag: JsCapabilityFragment
     val fission: JsCapabilityFragment
+    val horizon: JsCapabilityFragment
+    val advisor: JsCapabilityFragment
     val park: JsCapabilityFragment
     val all: JsCapabilityFragment list
     val byCapability: Map<JsCapability, JsCapabilityFragment list>

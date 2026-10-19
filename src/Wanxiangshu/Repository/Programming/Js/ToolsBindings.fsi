@@ -15,6 +15,15 @@ module JsToolsBindings =
 
     val createLedger: persistence: IJsTransactionPersistence option -> JsAsIsLedger
 
+    /// `js.horizon()`: the `(memberName, member)` pair for the horizon roster
+    /// envelope; refuses with DELEGATION_UNAVAILABLE when no host is installed.
+    val makeHorizonMember: host: JsDelegationHost option -> (string * obj)
+
+    /// `js.advisor(intent, view)`: the `(memberName, member)` pair for the
+    /// advisor consult; refuses with DELEGATION_UNAVAILABLE when no host is
+    /// installed and returns the host closure's envelope verbatim otherwise.
+    val makeAdvisorMember: host: JsDelegationHost option -> (string * obj)
+
     val createApi:
         capabilities: Set<JsCapability> ->
         root: string ->

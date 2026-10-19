@@ -7,6 +7,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Execution.Delegation.Advisor
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission.OpenCode
@@ -23,6 +24,7 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Ablation
@@ -574,6 +576,200 @@ module ToolRegistry =
     let runPlanProgram prose gitCommonDir root sessionId program =
         runPlanProgramCore prose (Some gitCommonDir) (Some root) sessionId (Some program)
 
+    [<Emit("$0 === undefined || $0 === null")>]
+    let private isNullishValue (value: obj) : bool = jsNative
+
+    [<Emit("typeof $0 === 'number'")>]
+    let private isNumberValue (value: obj) : bool = jsNative
+
+    [<Emit("typeof $0 === 'object'")>]
+    let private isObjectValue (value: obj) : bool = jsNative
+
+    [<Emit("Array.isArray($0)")>]
+    let private isArrayValue (value: obj) : bool = jsNative
+
+    [<Emit("$0[$1]")>]
+    let private propertyOf (value: obj) (name: string) : obj = jsNative
+
+    [<Emit("Object.keys($0)")>]
+    let private objectKeys (value: obj) : string[] = jsNative
+
+    let private advisorInvalid (detail: string) : Result<'a, JsFailure> =
+        Error(JsFailure.ViewDeclarationInvalid detail)
+
+    let private advisorAnchorOfKey (key: string) : int option =
+        match System.Int32.TryParse key with
+        | true, anchor when string anchor = key -> Some anchor
+        | _ -> None
+
+    let private advisorPrefixUntilOf (raw: obj) : Result<int, JsFailure> =
+        if isNumberValue raw then
+            Ok(int (unbox<float> raw))
+        else
+            advisorInvalid
+                "prefixUntil must be an anchor number; pass one above every anchor you have seen to keep everything"
+
+    /// `thenRemove` is an anchor→summary map: the summary is what stands in for
+    /// that anchor from here on, so a missing or blank summary is a declaration
+    /// that would silently drop knowledge.
+    let private advisorReplacePair (source: obj) (key: string) : Result<int * string, JsFailure> =
+        let summary = propertyOf source key
+
+        let isSummary =
+            isStringValue summary && not (String.IsNullOrWhiteSpace(unbox<string> summary))
+
+        match advisorAnchorOfKey key, isSummary with
+        | None, _ -> advisorInvalid (sprintf "thenRemove keys must be anchor numbers; \"%s\" is not one" key)
+        | Some _, false ->
+            advisorInvalid (
+                sprintf
+                    "thenRemove[%s] must be a non-blank summary string (the summary replaces that anchor's segments, not deletes them)"
+                    key
+            )
+        | Some anchor, true -> Ok(anchor, string summary)
+
+    let private advisorAppendPair
+        (accumulated: Result<(int * string) list, JsFailure>)
+        (pair: Result<int * string, JsFailure>)
+        : Result<(int * string) list, JsFailure> =
+        match accumulated, pair with
+        | Ok pairs, Ok entry -> Ok(pairs @ [ entry ])
+        | Error failure, _ -> Error failure
+        | _, Error failure -> Error failure
+
+    /// `prefixUntil` is a required anchor number (never "all"); `thenRemove` is
+    /// an optional anchor→summary map naming what stands in for which anchor.
+    /// The parse is the same one `AnchorSurface.setView` applies to a tool-level
+    /// declaration, but a consult never writes it back into the ANCHOR ledger:
+    /// the ledger's pending declaration belongs to the caller's own next
+    /// request, and consulting the advisor must not rewrite it (advisor-[005]).
+    let private advisorParseDeclaration (view: obj) : Result<AdvisorViewDeclaration, JsFailure> =
+        let thenRemoveOf (raw: obj) : Result<(int * string) list, JsFailure> =
+            if isNullishValue raw then
+                Ok []
+            elif isArrayValue raw || not (isObjectValue raw) then
+                advisorInvalid
+                    "thenRemove must be an object mapping anchor numbers to summaries, e.g. { \"3\": \"what segment 3 held\" }"
+            else
+                objectKeys raw
+                |> Array.toList
+                |> List.map (advisorReplacePair raw)
+                |> List.fold advisorAppendPair (Ok [])
+                |> Result.map (List.sortBy fst)
+
+        let prefixUntil = advisorPrefixUntilOf (propertyOf view "prefixUntil")
+        let thenRemove = thenRemoveOf (propertyOf view "thenRemove")
+
+        match prefixUntil, thenRemove with
+        | Ok prefixUntil, Ok thenRemove ->
+            Ok
+                { PrefixUntil = prefixUntil
+                  ThenRemove = thenRemove }
+        | Error failure, _
+        | _, Error failure -> Error failure
+
+    /// A missing declaration hands over no material (`PrefixUntil = 0`), the
+    /// same default the transform applies when a request carries no view.
+    let private advisorDeclarationOf (view: obj) : Result<AdvisorViewDeclaration, JsFailure> =
+        if isNullishValue view then
+            Ok { PrefixUntil = 0; ThenRemove = [] }
+        else
+            advisorParseDeclaration view
+
+    /// The transform's own wire text over a decoded snapshot part: the advisor
+    /// reads exactly what the caller's request carried, tool calls included.
+    let private advisorPartText (part: MessagePart) : string =
+        match part with
+        | MessagePart.Text text
+        | MessagePart.Reasoning text -> text
+        | MessagePart.ToolCall(_, name, args) -> name + " " + args
+        | MessagePart.ToolResult(_, result) -> result
+        | MessagePart.Activity _ -> ""
+
+    let private advisorMessageText (parts: MessagePart array) : string =
+        if isNull parts then
+            ""
+        else
+            parts |> Array.map advisorPartText |> String.concat "\n"
+
+    /// Numbering each snapshot message is what keeps the anchors in a consult
+    /// identical to the ones the caller's own request used.
+    let private advisorViewMessage (sessionId: string) (message: SessionMessage) : AdvisorViewMessage =
+        { Anchor = AnchorLedger.numberMessage sessionId message.Id
+          Text = advisorMessageText message.Parts }
+
+    let private advisorIntentText (intent: obj) : string =
+        if isStringValue intent then unbox<string> intent else ""
+
+    /// advisor-[006]: the member's refusals are data — `{ ok = false, code,
+    /// reason }` — never a throw the program would have to catch.
+    let private advisorRefusal (code: string) (reason: string) : obj =
+        createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
+
+    /// advisor-[002]/[003]: one consult — the caller's own delta rendered as the
+    /// seat's first prompt, the intent appended after it, and the seat's answer
+    /// handed back as data. A successful consult advances that caller session's
+    /// delivered-anchor cursor; a refusal changes nothing.
+    let private advisorSeatAnswer
+        (runtime: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (messages: SessionMessage list)
+        (declaration: AdvisorViewDeclaration)
+        (intent: obj)
+        : Task<obj> =
+        task {
+            let sessionId = ctx.SessionId
+
+            let request: AdvisorViewRequest =
+                { Messages = messages |> List.map (advisorViewMessage sessionId)
+                  Declaration = declaration }
+
+            let plan =
+                AdvisorView.plan (ProviderLanguage.label (lang ctx)) (Cursor.delivered sessionId) request
+
+            let deps: AdvisorSeatDeps =
+                { Sessions = runtime.Sessions
+                  Snapshot = runtime.Snapshot
+                  Journal = runtime.Journal
+                  Directory = runtime.WorkspaceDirectory
+                  Participant = ManagedAgent.nameOf Role.Advisor }
+
+            let! answered = AdvisorSeat.consult deps sessionId (advisorIntentText intent) plan.ViewPrompt
+
+            match answered with
+            | Ok advice ->
+                Cursor.record sessionId plan.DeliveredAnchors
+                return createObj [ "ok" ==> true; "advice" ==> advice ]
+            | Error reason -> return advisorRefusal "advisor-unavailable" reason
+        }
+
+    /// advisor-[006]: the `js.advisor` host closure. The caller's context comes
+    /// from its own session snapshot; an unreadable snapshot or an invalid view
+    /// declaration is a refusal, never a silently empty view. `HasNewMaterial`
+    /// does not gate the consult: the intent alone is new material.
+    let private advisorSnapshotMessages
+        (runtime: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        : Task<Result<SessionMessage list, string>> =
+        match runtime.Snapshot with
+        | None -> Task.FromResult(Error "the session snapshot is unavailable")
+        | Some snapshotPort -> snapshotPort.GetMessages(SessionId.create ctx.SessionId)
+
+    let private advisorConsult
+        (runtime: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (intent: obj)
+        (view: obj)
+        : Task<obj> =
+        task {
+            let! loaded = advisorSnapshotMessages runtime ctx
+
+            match loaded, advisorDeclarationOf view with
+            | Error reason, _ -> return advisorRefusal "advisor-unavailable" reason
+            | _, Error failure -> return advisorRefusal (JsFailure.code failure) (JsFailure.reason failure)
+            | Ok messages, Ok declaration -> return! advisorSeatAnswer runtime ctx messages declaration intent
+        }
+
     let create
         (toolModule: obj)
         (sessionPort: ISessionHostPort)
@@ -745,7 +941,27 @@ module ToolRegistry =
                                                                          "sessionId" ==> sessionId ])
                                                                |> Array.ofList) ]
                                                 | Error code -> refusal code
-                                        } }
+                                        }
+                                  // The horizon roster envelope comes from the
+                                  // horizon owner; the test-facing fork receipt
+                                  // entry takes the JS harness, so the
+                                  // generated-surface host builds the context
+                                  // from its own production runtime scope.
+                                  Horizon =
+                                    fun () ->
+                                        let horizonContext: HorizonTool.HorizonRuntimeContext =
+                                            { RuntimeFor = runtime.RuntimeFor
+                                              LogicalOwnerFor = runtime.LogicalOwnerFor
+                                              Journal = runtime.Journal
+                                              EnsureWorkDevOpsBound = runtime.EnsureWorkDevOpsBound }
+
+                                        HorizonTool.rosterReceipt
+                                            (ProviderLanguage.externalName (
+                                                ProviderLanguageBinding.forSessionText ctx.SessionId
+                                            ))
+                                            horizonContext
+                                            ctx
+                                  Advisor = fun intent view -> advisorConsult runtime ctx intent view }
 
                             JsDelegationBridge.install ctx.SessionId host
 

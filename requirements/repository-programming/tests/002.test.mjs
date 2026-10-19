@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
 
@@ -27,6 +30,15 @@ import {
   memberBinding,
 } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 import { permissions as rolePermissions } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
+import {
+  execute,
+  caseName,
+  render,
+} from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import {
+  installDelegationHost,
+  clearDelegationHost,
+} from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 const caps = (...permissions) => permissions
 
@@ -39,7 +51,7 @@ const isNone = (value) => value === null
 const isSome = (value) => value !== null
 
 const PERMISSION_NAMES = [
-  'Fork', 'Join', 'Horizon', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
+  'Fork', 'Join', 'Horizon', 'Advisor', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
   'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment', 'Chronicle',
   'Finality', 'BashHoneypot',
 ]
@@ -60,6 +72,11 @@ const MEMBERS_BY_PERMISSION = {
   Move: ['mv'],
   Remove: ['rm'],
   Exec: ['run'],
+  Fork: ['fork', 'dag'],
+  Join: ['join'],
+  Fission: ['fission'],
+  Horizon: ['horizon'],
+  Advisor: ['advisor'],
 }
 
 const BINDING_BY_MEMBER = {
@@ -73,13 +90,30 @@ const BINDING_BY_MEMBER = {
   whereAll: 'js.whereAll',
   where: 'js.where',
   run: 'js.run',
+  fork: 'js.fork',
+  dag: 'js.dag',
+  join: 'js.join',
+  fission: 'js.fission',
+  horizon: 'js.horizon',
+  advisor: 'js.advisor',
 }
 
 const MEMBER_ORDER = [
   'write', 'rm', 'mv',
   'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
   'run',
+  'fork', 'dag', 'join', 'fission', 'horizon', 'advisor',
 ]
+
+const expectedMembers = (permissionNames) =>
+  permissionNames
+    .flatMap((name) => MEMBERS_BY_PERMISSION[name] ?? [])
+    .sort((left, right) => MEMBER_ORDER.indexOf(left) - MEMBER_ORDER.indexOf(right))
+
+// Sugar members are compiled inside the base class itself instead of
+// delegating to `_api` (dag builds fork waves plus one join; run is the Exec
+// Runnable gate), so their base-class layer is the public method they declare.
+const SUGAR_MEMBERS = ['dag', 'run']
 
 const layersOf = (s) =>
   Object.fromEntries(
@@ -210,4 +244,162 @@ test('WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_r
   }
   assert.equal(names.includes('rewrite'), false)
   assert.equal(names.includes('write'), false)
+})
+
+test('WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_every_holding_role', () => {
+  const holders = allRoleLabels.filter((role) => rolePermissions(role.toLowerCase()).includes('Horizon'))
+  assert.deepEqual(holders, ['devops', 'manager', 'orchestrator'], 'the roles holding ToolPermission.Horizon')
+
+  for (const role of holders) {
+    const permissions = rolePermissions(role.toLowerCase())
+    const result = surface(role, permissions)
+    assert.equal(isSome(result), true, `${role} gets a js-* surface`)
+    assert.deepEqual(memberNames(result), expectedMembers(permissions), `${role} member set`)
+    assert.equal(
+      memberBinding(role, permissions, 'horizon'),
+      'js.horizon',
+      `${role} horizon runtime gate`,
+    )
+
+    const layers = layersOf(result)
+    assert.equal(layers.horizon.binding, 'js.horizon', `${role}: horizon binding key`)
+    assert.equal(layers.horizon.example.includes('horizon'), true, `${role}: horizon canonical example`)
+    for (const [member, layer] of Object.entries(layers)) {
+      const baseClassMarker = SUGAR_MEMBERS.includes(member)
+        ? `async ${member}(`
+        : `this._api.${layer.binding}`
+      assert.equal(
+        result.baseClassSource.includes(baseClassMarker),
+        true,
+        `${role}: ${member} in base class`,
+      )
+      assert.equal(layer.inDescription, true, `${role}: ${member} in description`)
+      assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${role}: ${member} binding`)
+    }
+  }
+
+  // The permission is the sole source of the member: Fork/Join without Horizon
+  // project fork/dag/join but never horizon.
+  assert.equal(memberBinding('Engineer', caps(ToolPermission.Fork, ToolPermission.Join), 'horizon'), undefined)
+  assert.deepEqual(expectedMembers(['Fork', 'Join', 'Horizon']), ['fork', 'dag', 'join', 'horizon'])
+})
+
+test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_every_holding_role', () => {
+  const holders = allRoleLabels.filter((role) => rolePermissions(role.toLowerCase()).includes('Advisor'))
+  assert.deepEqual(holders, ['devops', 'engineer', 'manager', 'orchestrator'], 'the roles holding ToolPermission.Advisor')
+
+  for (const role of holders) {
+    const permissions = rolePermissions(role.toLowerCase())
+    const result = surface(role, permissions)
+    assert.equal(isSome(result), true, `${role} gets a js-* surface`)
+    assert.deepEqual(memberNames(result), expectedMembers(permissions), `${role} member set`)
+    assert.equal(
+      memberBinding(role, permissions, 'advisor'),
+      'js.advisor',
+      `${role} advisor runtime gate`,
+    )
+
+    const layers = layersOf(result)
+    assert.equal(layers.advisor.binding, 'js.advisor', `${role}: advisor binding key`)
+    assert.equal(layers.advisor.example.includes('advisor'), true, `${role}: advisor canonical example`)
+    for (const [member, layer] of Object.entries(layers)) {
+      const baseClassMarker = SUGAR_MEMBERS.includes(member)
+        ? `async ${member}(`
+        : `this._api.${layer.binding}`
+      assert.equal(
+        result.baseClassSource.includes(baseClassMarker),
+        true,
+        `${role}: ${member} in base class`,
+      )
+      assert.equal(layer.inDescription, true, `${role}: ${member} in description`)
+      assert.equal(layer.binding, BINDING_BY_MEMBER[member], `${role}: ${member} binding`)
+    }
+  }
+
+  // The permission is the sole source of the member: Fork/Join without Advisor
+  // project fork/dag/join but never advisor.
+  const delegationOnly = surface('Engineer', caps(ToolPermission.Fork, ToolPermission.Join))
+  assert.deepEqual(memberNames(delegationOnly), expectedMembers(['Fork', 'Join']))
+  assert.equal(memberBinding('Engineer', caps(ToolPermission.Fork, ToolPermission.Join), 'advisor'), undefined)
+  assert.deepEqual(expectedMembers([ToolPermission.Advisor]), ['advisor'])
+
+  // Absence: a role without the permission never projects the member — the
+  // advisor seat itself holds no permission at all, and blogger/plan keep
+  // their surfaces advisor-free.
+  const without = allRoleLabels.filter((role) => !rolePermissions(role.toLowerCase()).includes('Advisor'))
+  assert.deepEqual(without, ['advisor', 'blogger', 'plan'], 'the roles without ToolPermission.Advisor')
+  for (const role of without) {
+    assert.equal(
+      memberBinding(role, rolePermissions(role.toLowerCase()), 'advisor'),
+      undefined,
+      `${role} never resolves js.advisor`,
+    )
+  }
+})
+
+const jsProgram = (body) => `class Js extends JsProgram {
+  async run() {
+${body}
+  }
+}`
+
+const managerRun = (dir, body, sessionId) =>
+  execute(
+    dir,
+    'Manager',
+    'en',
+    sessionId,
+    { program: jsProgram(body) },
+    3000,
+    Date.now() + 60_000,
+    1 << 20,
+    null,
+  )
+
+test('WHAT[repository-programming-056] js.horizon serves the installed host roster and refuses with DELEGATION_UNAVAILABLE without one', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-horizon-member-'))
+  const sessionId = `sess-horizon-${Math.random().toString(36).slice(2, 8)}`
+  const roster = {
+    ok: true,
+    agents: [
+      {
+        label: 'Ada',
+        status: 'still-away',
+        workState: 'none',
+        record: 'stub-horizon-roster',
+        turnsUsed: 0,
+        turnsLeft: 0,
+        timeUsedMs: 0,
+        timeLeftMs: 0,
+      },
+    ],
+    ptys: [],
+  }
+  const notExercised = async () => {
+    throw new Error('the horizon member must not reach fork/join/fission')
+  }
+  try {
+    installDelegationHost(
+      sessionId,
+      notExercised,
+      notExercised,
+      notExercised,
+      async () => roster,
+      notExercised,
+    )
+    const wired = await managerRun(dir, `    return await this.horizon();`, sessionId)
+    assert.equal(caseName(wired), 'Succeeded')
+    const wiredDoc = render(wired)
+    assert.match(wiredDoc, /status = "still-away"/, 'the host roster reaches the program as data')
+    assert.match(wiredDoc, /record = "stub-horizon-roster"/, 'the member returns the host envelope untouched')
+    assert.match(wiredDoc, /ptys = \[\]/)
+
+    clearDelegationHost(sessionId)
+    const unwired = await managerRun(dir, `    return await this.horizon();`, sessionId)
+    assert.equal(caseName(unwired), 'Succeeded')
+    assert.match(render(unwired), /code = "DELEGATION_UNAVAILABLE"/)
+  } finally {
+    clearDelegationHost(sessionId)
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

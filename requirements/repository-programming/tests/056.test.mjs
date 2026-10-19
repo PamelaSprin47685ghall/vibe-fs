@@ -60,10 +60,13 @@ const fakeHost = () => {
       groupId: 'group-1',
       lanes: Array.from({ length: payload.lanes }, (_, index) => ({ index, sessionId: `lane-${index}` })),
     }),
+    horizon: async () => ({ ok: true, agents: [], ptys: [] }),
+    advisor: async () => ({ ok: true, advice: 'stub-advice' }),
   }
 }
 
-const install = (sessionId, host) => installDelegationHost(sessionId, host.fork, host.join, host.fission)
+const install = (sessionId, host) =>
+  installDelegationHost(sessionId, host.fork, host.join, host.fission, host.horizon, host.advisor)
 
 test('WHAT[repository-programming-056] delegation members return data envelopes, never prose', async () => {
   const { dir, cleanup } = sandbox()
@@ -221,7 +224,7 @@ test('WHAT[repository-programming-056] a failed dag node parks and the injected 
         byName: {},
       }
     }
-    installDelegationHost(sessionId, host.fork, failingJoin, host.fission)
+    installDelegationHost(sessionId, host.fork, failingJoin, host.fission, host.horizon, host.advisor)
 
     const parked = await runProgram(
       dir,
@@ -276,7 +279,7 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
         byName: Object.fromEntries(mapped.map((r) => [r.name, r])),
       }
     }
-    installDelegationHost(sessionId, host.fork, undeliveredJoin, host.fission)
+    installDelegationHost(sessionId, host.fork, undeliveredJoin, host.fission, host.horizon, host.advisor)
 
     const joinOutcome = await runProgram(
       dir,

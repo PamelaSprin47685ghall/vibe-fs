@@ -54,3 +54,25 @@ const outcome = await js.dag({ nodes: [
   - `"skip"`——标记跳过（下游看到 `null`）；
   - 其他任意值——直接当作该节点的结果继续；
   - `{ abort: reason }`——以该原因让程序失败。
+
+## horizon
+
+```js
+const { agents, ptys } = await js.horizon();
+```
+
+- 谁还在你的视野里，以数据形式给出：`{ ok: true, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`。
+- `status` 为 `returned` | `still-away` | `did-not-return`；`workState` 为 `latest` | `none` | `unavailable`，为 `latest` 时 `record` 带上最新工作的正文。
+- 四个校准数说的是这个参与者已经花了多少、大概还需要多少：按委任者估算已用与剩余的回合数、已用的 wall-clock、以及按它已经显示出的节奏估计的剩余时间。任一来源缺失时，四个数都是 `0`。
+- 拒绝：`{ ok: false, code: "horizon-unavailable" }`。
+
+## advisor
+
+```js
+const advice = await js.advisor("Is the caching layer's eviction policy sound?", { prefixUntil: 12 });
+```
+
+- 请教这个 session 的**专属顾问**——一位不持有任何工具、只以散文作答的评审者——用在敲定路线之前，或宣布收工之前。同一个 session 永远落到同一个顾问，之后的调用只追加 view 的增量与新 intent，所以这条线是延续的。
+- `intent` 是要问的问题，自成一条 prompt。`view` 声明顾问可以读什么，形状与本轮的视图声明相同（`{ prefixUntil, thenRemove? }`）；宿主把这些记录按 Chronicle 的形状渲染成一条 prompt，再把 intent 作为另一条发出。二者永不合并。
+- 结果：`{ ok: true, advice }`（散文即数据）或 `{ ok: false, code: "advisor-unavailable", reason }`；视图声明非法时以 `VIEW_DECLARATION_INVALID` 拒绝。
+- 把回答当作指引：一个 plan、一个 correction，或一个 stop signal。这次请教本身不会往你的会话里写入任何东西。

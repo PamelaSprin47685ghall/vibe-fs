@@ -1009,6 +1009,26 @@ module ForkToolSurface =
         let spec = HorizonTool.spec horizonContext
         spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)
 
+    /// The same roster the prose `executeHorizon` renders, as raw data: the
+    /// session-bound language only feeds the fallback labels inside
+    /// `rosterReceipt`, which returns the JS envelope for `js.horizon()`.
+    let executeHorizonReceipt (value: obj) (owner: string) : Task<obj> =
+        let harness = unbox<ForkHarness> value
+        let context = managerContext harness owner
+
+        let horizonContext: HorizonTool.HorizonRuntimeContext =
+            { RuntimeFor = harness.Scope.RuntimeFor
+              LogicalOwnerFor = harness.Scope.LogicalOwnerFor
+              Journal = harness.Scope.Journal
+              EnsureWorkDevOpsBound = harness.Scope.EnsureWorkDevOpsBound }
+
+        HorizonTool.rosterReceipt
+            (Wanxiangshu.Participant.Provider.ProviderLanguage.externalName (
+                ProviderLanguageBinding.forSessionText context.SessionId
+            ))
+            horizonContext
+            context
+
     let executeJoin (value: obj) (owner: string) : Task<string> =
         let harness = unbox<ForkHarness> value
         let spec = JoinTool.spec harness.Scope

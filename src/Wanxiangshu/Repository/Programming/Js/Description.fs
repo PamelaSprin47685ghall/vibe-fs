@@ -582,6 +582,20 @@ module JsCanonicalDescription =
   }"""
             [ "comment_host_capability", prose.CommentHostCapability ]
 
+    let private horizonStub (prose: Prose) =
+        fill
+            """  async horizon() {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
+    let private advisorStub (prose: Prose) =
+        fill
+            """  async advisor(intent, view) {
+    // {{comment_host_capability}}
+  }"""
+            [ "comment_host_capability", prose.CommentHostCapability ]
+
     let private fissionStub (prose: Prose) =
         fill
             """  async fission(payload) {
@@ -651,6 +665,10 @@ class JsProgram {"""
                   dagStub prose
               if has capabilities JsCapability.Join then
                   joinStub prose
+              if has capabilities JsCapability.Horizon then
+                  horizonStub prose
+              if has capabilities JsCapability.Advisor then
+                  advisorStub prose
               if has capabilities JsCapability.Fission then
                   fissionStub prose
               // park is a lifecycle capability every js-* surface carries; it
@@ -1317,6 +1335,18 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
     return await this._api.js.join();
   }"""
                       []
+              if has capabilities JsCapability.Horizon then
+                  fill
+                      """  async horizon() {
+    return await this._api.js.horizon();
+  }"""
+                      []
+              if has capabilities JsCapability.Advisor then
+                  fill
+                      """  async advisor(intent, view) {
+    return await this._api.js.advisor(intent, view);
+  }"""
+                      []
               if has capabilities JsCapability.Fission then
                   fill
                       """  async fission(payload) {
@@ -1531,7 +1561,13 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             | "manager" when
                 Set.isSubset
                     capabilities
-                    (set [ JsCapability.Read; JsCapability.Glob; JsCapability.Fork; JsCapability.Join ])
+                    (set
+                        [ JsCapability.Read
+                          JsCapability.Glob
+                          JsCapability.Fork
+                          JsCapability.Join
+                          JsCapability.Horizon
+                          JsCapability.Advisor ])
                 && not (Set.isEmpty capabilities)
                 ->
                 Some(set [ JsCapability.Read; JsCapability.Glob ], prose.UltraManagerInvestigation)

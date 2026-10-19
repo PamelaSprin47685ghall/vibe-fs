@@ -732,6 +732,29 @@ module JsToolsBindings =
             | Some delegation -> box (delegation.Fission payload)
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
+    /// `js.horizon()` returns the horizon roster as a data envelope (who is
+    /// still away, each participant's status/workState/record and the four
+    /// calibration numbers). Without an installed delegation host the member
+    /// refuses with DELEGATION_UNAVAILABLE instead of pretending.
+    let makeHorizonMember (host: JsDelegationHost option) : (string * obj) =
+        "horizon"
+        ==> fun () ->
+            match host with
+            | Some delegation -> box (delegation.Horizon())
+            | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+
+    /// `js.advisor(intent, view)` consults this session's own advisor seat and
+    /// returns its data envelope verbatim: the advice travels as the value the
+    /// host closure produced, never as a rendering. Without an installed
+    /// delegation host the member refuses with DELEGATION_UNAVAILABLE instead
+    /// of pretending.
+    let makeAdvisorMember (host: JsDelegationHost option) : (string * obj) =
+        "advisor"
+        ==> fun (intent: obj) (view: obj) ->
+            match host with
+            | Some delegation -> box (delegation.Advisor intent view)
+            | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
+
     let private createApiCore
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -774,6 +797,12 @@ module JsToolsBindings =
 
               if Set.contains JsCapability.Fission capabilities then
                   makeFissionMember delegationHost
+
+              if Set.contains JsCapability.Horizon capabilities then
+                  makeHorizonMember delegationHost
+
+              if Set.contains JsCapability.Advisor capabilities then
+                  makeAdvisorMember delegationHost
 
               match parkState with
               | Some state -> makeParkMember state
