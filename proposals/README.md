@@ -1,5 +1,9 @@
 # 计划与提案入口
 
+## 上游语义更新整合（2026-10-19）
+
+用户已授权按[整合计划](extraction-kanban/UPSTREAM-SEMANTIC-MERGE-2026-10-19.md)逐包执行，先按[语义处置表](extraction-kanban/UPSTREAM-SEMANTIC-DISPOSITION-2026-10-19.md)保留本地有效保证、接收固定上游新产品模型。每包同步验收证据与剩余边界；Blogger 全退役和历史 GAP 清零不在本批。原拆分卡状态继续由[看板](extraction-kanban/BOARD.md)维护。
+
 ## 多人抽吸的当前入口（2026-10-15）
 
 Lifecycle cutover 已进入 master。下一轮多人切刀从[保姆级施工指南](extraction-kanban/README.md)开始，在[唯一看板](extraction-kanban/BOARD.md)认领，再读[职责卡](extraction-kanban/CARDS.md)、[范围与旧计划对账](extraction-kanban/COVERAGE.md)和[可复制模板](extraction-kanban/TEMPLATES.md)。蓝图覆盖当前职责，分别记录独立库、主仓接线、旧实现退出，以及须先裁决的保留/删除项。

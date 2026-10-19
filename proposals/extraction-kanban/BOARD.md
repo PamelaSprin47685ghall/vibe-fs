@@ -4,6 +4,10 @@
 
 返回 [施工指南](README.md)；具体工作见 [职责卡](CARDS.md)。
 
+## 上游语义整合批次
+
+2026-10-19 用户已授权按[整合计划](UPSTREAM-SEMANTIC-MERGE-2026-10-19.md)推进 SM-01—SM-07，具体处置见[语义处置表](UPSTREAM-SEMANTIC-DISPOSITION-2026-10-19.md)。owner：本 chat 的 root；当前 SM-01 DOING，后续按依赖推进。公共编辑面为两仓 manifest/锁/gitlink、构建图、实际插件接线与本看板，串行集成。原 CUT/GAP 的状态、失败和剩余范围继续保留；本批局部通过不销父项。Blogger 全退役不在范围。
+
 ## 列与流转
 
 ```text
