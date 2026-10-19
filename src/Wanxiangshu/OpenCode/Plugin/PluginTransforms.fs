@@ -41,7 +41,6 @@ open Wanxiangshu.Strength
 open Wanxiangshu.Strength.Replica
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Host
-open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Change
 open Wanxiangshu.Change.Host
 open Wanxiangshu.Context.Companion.Blogger.OpenCode
@@ -145,9 +144,6 @@ module PluginTransforms =
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
           ApplyReadonlyDelegation: string option -> PhysicalUserMessageId option -> obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
-          ProjectRequirementGrounding: string option -> obj -> Task<unit>
-          InjectBloggerChronicle:
-              string option -> Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option -> obj -> unit
           SettleAndReplaceDeferredInspections: string option -> obj -> Task<unit>
           SanitizeMessages: obj -> unit }
 
@@ -191,14 +187,7 @@ module PluginTransforms =
                         rawMessages
                 with
                 | Error error -> return Error error
-                | Ok paired ->
-                    return!
-                        PairProgrammingThoughtTransform.stripCursorSuffixesWithJournal
-                            durable
-                            session
-                            PairProgrammingThoughtTransform.CursorPresentationOwner.RequirementGrounding
-                            []
-                            paired
+                | Ok stripped -> return Ok stripped
             }
 
         journal
@@ -1077,16 +1066,6 @@ module PluginTransforms =
                             scope.MarkRestartGuidanceDelivered
                             outObj
                 }
-          ProjectRequirementGrounding =
-            RequirementGroundingTransform.projectOrTerminate journal workspaceDirectory terminateSession
-          InjectBloggerChronicle =
-            fun projectionSessionIdOpt physicalUserMessageId outObj ->
-                BloggerChronicleText.maybeInject
-                    journal
-                    projectionSessionIdOpt
-                    physicalUserMessageId
-                    (languageFor projectionSessionIdOpt)
-                    outObj
           SettleAndReplaceDeferredInspections =
             fun projectionSessionIdOpt outObj ->
                 task {
@@ -1318,7 +1297,6 @@ module PluginTransforms =
                               return Some frame
                           } }
                   // 13.1 PairProgrammingThoughtTransform.maybeInjectGuideline
-                  // 13.2 RequirementGroundingTransform.projectOrTerminate
                   // 13.3 Capture and start on the final outgoing request so the
                   //      preparation owns the same mirror and provider attempt plan.
                   { Name = "current-horizon-auxiliaries"
@@ -1327,8 +1305,6 @@ module PluginTransforms =
                           task {
                               if frame.Horizon = PrefixPresentationHorizon.Current then
                                   do! caps.InjectPairGuideline frame.SessionId frame.SessionStartedAt frame.OutObj
-                                  do! caps.ProjectRequirementGrounding frame.SessionId frame.OutObj
-
                                   do!
                                       caps.ApplyReadonlyDelegation
                                           frame.SessionId
@@ -1337,12 +1313,6 @@ module PluginTransforms =
 
                               return Some frame
                           } }
-                  // 14. BloggerChronicleText.maybeInject
-                  { Name = "inject-blogger-chronicle"
-                    Run =
-                      fun frame ->
-                          caps.InjectBloggerChronicle frame.SessionId frame.PhysicalUserMessageId frame.OutObj
-                          Task.FromResult(Some frame) }
                   // 15. Re-apply replaced inspection results after any intermediate insertions
                   { Name = "reapply-deferred-inspections"
                     Run =

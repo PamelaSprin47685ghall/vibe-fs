@@ -171,7 +171,6 @@ module CompressionSurface =
         | ToolPermission.Exec -> "Exec"
         | ToolPermission.Pty -> "Pty"
         | ToolPermission.ReviewAssessment -> "ReviewAssessment"
-        | ToolPermission.Chronicle -> "Chronicle"
         | ToolPermission.Fetch -> "Fetch"
         | ToolPermission.Finality -> "Finality"
         | ToolPermission.BashHoneypot -> "BashHoneypot"
@@ -181,6 +180,7 @@ module CompressionSurface =
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
         | ToolPermission.Advisor -> "Advisor"
+        | ToolPermission.Chronicle -> "Chronicle"
 
     let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
         box

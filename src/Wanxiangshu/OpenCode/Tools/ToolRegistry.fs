@@ -19,14 +19,12 @@ open Wanxiangshu.Mission.Planning
 open Wanxiangshu.Mission.Work.OpenCode
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode.Host
-open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Repository.Programming.Js.OpenCode
-open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Ablation
 open Wanxiangshu.Process
 
@@ -354,7 +352,6 @@ module ToolRegistry =
               || OfficeCapability.isAllowed role ToolPermission.Deliver)
           "bash-honeypot", BashHoneypotTool.admission
           "assume", AssumeTool.admission
-          "chronicle", ChronicleTool.admission bloggerHost
           "fetch", ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
           "todowrite-for-bookkeeper", JsBookkeeperTool.admission ]
 
@@ -811,22 +808,6 @@ module ToolRegistry =
         let jsRootOf (sessionId: string) =
             JsToolSpec.rootForSession sessionDirectories (defaultArg workspaceDirectory "") sessionId
 
-        let groundingObservation (ctx: HostToolContext) (reads: JsExplicitFileRead list) effectPaths =
-            match workspaceDirectory with
-            | None -> Task.FromResult(())
-            | Some _ when System.String.IsNullOrWhiteSpace ctx.SessionId -> Task.FromResult(())
-            | Some _ ->
-                let root = jsRootOf ctx.SessionId
-
-                let observed =
-                    reads
-                    |> List.map (fun read ->
-                        { Path = read.Path
-                          ResultBytes = read.ResultBytes
-                          Coverage = GroundingReadCoverage.CompleteFile })
-
-                RequirementGroundingGate.programObservation journal root ctx.SessionId observed effectPaths
-
         let runtime =
             new ToolRuntimeScope(
                 sessionPort,
@@ -857,7 +838,7 @@ module ToolRegistry =
                         (defaultArg workspaceDirectory "")
                         jsTransactionPersistence
                         jsLifecyclePersistence
-                        (Some groundingObservation)
+                        None
                         jsRootOf
 
                 // Delegation seam: the programming surface's delegation members
@@ -991,7 +972,7 @@ module ToolRegistry =
                 (defaultArg workspaceDirectory "")
                 jsTransactionPersistence
                 jsLifecyclePersistence
-                (Some groundingObservation)
+                None
                 jsRootOf
 
         // Lifecycle uses its own wanxiangli journal. The common directory is
@@ -1611,12 +1592,6 @@ module ToolRegistry =
               yield deliverSpec ()
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
-
-              yield
-                  ChronicleTool.spec
-                      factory
-                      (fun (sessionId, reason) -> runtime.TerminateSession(sessionId, reason))
-                      bloggerHost
 
               yield! casebookToolSpecs
               yield predictorJsSpec ()

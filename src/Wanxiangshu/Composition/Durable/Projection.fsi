@@ -15,7 +15,6 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode.Host.PairProgramming
-open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 type SessionAgentProjection =
@@ -29,7 +28,6 @@ type SessionAgentProjection =
       Enforcement: EnforcementProjectionState option
       BloggerCycles: BloggerCycleProjectionState option
       Guidelines: GuidelineProjectionState option
-      RequirementGrounding: RequirementGroundingProjectionState option
       TipDelivery: TipDeliveryProjectionState option
       SessionStartedAt: SessionStartedAtProjectionState option
       DelegatedToolEstimate: DelegatedToolEstimateProjectionState option }

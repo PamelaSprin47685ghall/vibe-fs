@@ -15,7 +15,6 @@ open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode.Host.PairProgramming
-open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 /// Bounded projections one session owns (PERSIST-008).
@@ -54,7 +53,6 @@ type SessionAgentProjection =
         BloggerCycles: BloggerCycleProjectionState option
         /// HOST-013: permanent auto-injected pairs for this transcript.
         Guidelines: GuidelineProjectionState option
-        RequirementGrounding: RequirementGroundingProjectionState option
         /// Rulebook Main tip delivery: occurrence frontier + TipName coverage (TipGuidanceDelivered fold).
         TipDelivery: TipDeliveryProjectionState option
         SessionStartedAt: SessionStartedAtProjectionState option
@@ -109,7 +107,6 @@ module AgentProjection =
           Enforcement = None
           BloggerCycles = None
           Guidelines = None
-          RequirementGrounding = None
           TipDelivery = None
           SessionStartedAt = None
           DelegatedToolEstimate = None }

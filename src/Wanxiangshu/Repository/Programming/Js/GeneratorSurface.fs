@@ -63,7 +63,6 @@ module JsGeneratorSurface =
         | ToolPermission.Exec -> "Exec"
         | ToolPermission.Pty -> "Pty"
         | ToolPermission.ReviewAssessment -> "ReviewAssessment"
-        | ToolPermission.Chronicle -> "Chronicle"
         | ToolPermission.Fetch -> "Fetch"
         | ToolPermission.Finality -> "Finality"
         | ToolPermission.BashHoneypot -> "BashHoneypot"
@@ -72,6 +71,7 @@ module JsGeneratorSurface =
         | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
+        | ToolPermission.Chronicle -> "Chronicle"
 
     let private capabilityLabel capability =
         match capability with

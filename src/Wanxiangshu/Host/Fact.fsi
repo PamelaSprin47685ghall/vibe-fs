@@ -2,7 +2,6 @@ namespace Wanxiangshu.Host
 
 open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Requirement.Grounding
 
 module HostFact =
     val inline PairProgrammingGuidelineAnchored:
@@ -14,30 +13,6 @@ module HostFact =
                CallGap: TranscriptGap
                ResultGap: TranscriptGap
                ConcernPlacement: ConcernPlacementBatch option |} ->
-            AgentFact
-
-    val inline RequirementGroundingRequested:
-        payload:
-            {| SessionId: SessionId
-               Snapshot: GroundingSnapshot |} ->
-            AgentFact
-
-    val inline RequirementGroundingMaterialObserved:
-        payload:
-            {| SessionId: SessionId
-               Observation: RequirementGroundingMaterialObserved |} ->
-            AgentFact
-
-    val inline RequirementGroundingAnchored:
-        payload:
-            {| SessionId: SessionId
-               Occurrence: RequirementGroundingOccurrence |} ->
-            AgentFact
-
-    val inline RequirementGroundingReadObserved:
-        payload:
-            {| SessionId: SessionId
-               Observation: RequirementGroundingReadObserved |} ->
             AgentFact
 
     val inline TipGuidanceDelivered:

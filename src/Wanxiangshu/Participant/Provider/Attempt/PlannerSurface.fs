@@ -34,7 +34,6 @@ module AttemptPlannerSurface =
         | ToolPermission.Exec -> "Exec"
         | ToolPermission.Pty -> "Pty"
         | ToolPermission.ReviewAssessment -> "ReviewAssessment"
-        | ToolPermission.Chronicle -> "Chronicle"
         | ToolPermission.Fetch -> "Fetch"
         | ToolPermission.Finality -> "Finality"
         | ToolPermission.BashHoneypot -> "BashHoneypot"
@@ -44,6 +43,7 @@ module AttemptPlannerSurface =
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
         | ToolPermission.Advisor -> "Advisor"
+        | ToolPermission.Chronicle -> "Chronicle"
 
     let private requestKindOf (label: string) : ProviderRequestKind option =
         match label.ToLowerInvariant() with

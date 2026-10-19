@@ -132,8 +132,7 @@ module OfficeCapability =
                   ToolPermission.DevOpsConsultation
                   ToolPermission.Review
                   ToolPermission.Deliver ]
-        // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
-        | Role.Blogger -> set [ ToolPermission.Chronicle ]
+        | Role.Blogger -> Set.empty
 
     let isAllowed (role: Role) (permission: ToolPermission) : bool =
         if Roles.all |> List.contains role then
@@ -183,7 +182,6 @@ module OfficeCapability =
         | ToolPermission.Exec -> "Exec"
         | ToolPermission.Pty -> "Pty"
         | ToolPermission.ReviewAssessment -> "ReviewAssessment"
-        | ToolPermission.Chronicle -> "Chronicle"
         | ToolPermission.Fetch -> "Fetch"
         | ToolPermission.Finality -> "Finality"
         | ToolPermission.BashHoneypot -> "BashHoneypot"
@@ -193,6 +191,7 @@ module OfficeCapability =
         | ToolPermission.Review -> "Review"
         | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
         | ToolPermission.Advisor -> "Advisor"
+        | ToolPermission.Chronicle -> "Chronicle"
 
     /// Unknown labels are not a permission.
     let permissionOfLabel (label: string) : ToolPermission option =
@@ -212,7 +211,6 @@ module OfficeCapability =
         | "Exec" -> Some ToolPermission.Exec
         | "Pty" -> Some ToolPermission.Pty
         | "ReviewAssessment" -> Some ToolPermission.ReviewAssessment
-        | "Chronicle" -> Some ToolPermission.Chronicle
         | "Fetch" -> Some ToolPermission.Fetch
         | "Finality" -> Some ToolPermission.Finality
         | "BashHoneypot" -> Some ToolPermission.BashHoneypot

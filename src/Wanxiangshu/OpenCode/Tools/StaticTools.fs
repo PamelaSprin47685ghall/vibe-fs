@@ -34,7 +34,6 @@ module StaticTools =
         // `js.run` ({ spawn, name } + { send, name, input } + { signal, name }).
         | ToolPermission.Pty -> []
         | ToolPermission.ReviewAssessment -> [ "review" ]
-        | ToolPermission.Chronicle -> [ "chronicle" ]
         | ToolPermission.Fetch -> [ "fetch" ]
         | ToolPermission.Finality -> [ "deliver" ]
         | ToolPermission.JsPlan -> [ "todowrite-for-plan" ]
@@ -47,6 +46,7 @@ module StaticTools =
         // work-021: Plan's review shares the `review` verb with Manager's
         // ReviewAssessment. The reverse lookup decides by role, not by this order.
         | ToolPermission.Review -> [ "review" ]
+        | ToolPermission.Chronicle -> []
 
     /// Primary name for permissions with a single verb (tests / simple maps).
     let toolName (p: ToolPermission) =
@@ -73,7 +73,6 @@ module StaticTools =
           ToolPermission.Exec
           ToolPermission.Pty
           ToolPermission.ReviewAssessment
-          ToolPermission.Chronicle
           ToolPermission.Fetch
           ToolPermission.Finality
           ToolPermission.BashHoneypot
@@ -168,7 +167,6 @@ module StaticTools =
           "assume"
           "bash-honeypot"
           "review"
-          "chronicle"
           "fetch"
           "deliver"
           "todowrite-for-engineer"

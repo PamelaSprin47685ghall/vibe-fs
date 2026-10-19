@@ -51,8 +51,6 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'OpenCode/Host/BloggerChronicleSurface.fs',
   'OpenCode/Host/PairProgrammingThoughtSurface.fs',
   'OpenCode/Host/PluginHost.fs',
-  'OpenCode/Host/RequirementGroundingRepositorySurface.fs',
-  'OpenCode/Host/RequirementGroundingSurface.fs',
   'OpenCode/Tools/ToolRegistry.fs',
   'Persistence/EventStore/ProcessEventLog.fs',
   'Persistence/EventStore/WriterStreamSync.fs',

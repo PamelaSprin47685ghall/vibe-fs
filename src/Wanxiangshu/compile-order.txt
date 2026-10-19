@@ -198,8 +198,6 @@ Persistence/Journal/Outcome.fsi
 Persistence/Journal/Outcome.fs
 Execution/Delegation/SyncDelegate/Model.fsi
 Execution/Delegation/SyncDelegate/Model.fs
-Requirement/Grounding/Model.fsi
-Requirement/Grounding/Model.fs
 Interaction/Authority/IdentitySeed.fsi
 Interaction/Authority/IdentitySeed.fs
 Interaction/Authority/Origin.fsi
@@ -260,8 +258,6 @@ Enforcer/Catalog.fsi
 Enforcer/Catalog.fs
 Enforcer/Codec.fsi
 Enforcer/Codec.fs
-Enforcer/ChronicleExecution.fsi
-Enforcer/ChronicleExecution.fs
 Enforcer/Cycle/Model.fsi
 Enforcer/Cycle/Model.fs
 Participant/Provider/Attempt/RetryPolicy.fsi
@@ -500,10 +496,6 @@ OpenCode/Host/PairProgramming/GuidelineProjection.fsi
 OpenCode/Host/PairProgramming/GuidelineProjection.fs
 OpenCode/Host/PairProgramming/GuidelineSurface.fsi
 OpenCode/Host/PairProgramming/GuidelineSurface.fs
-OpenCode/Host/RequirementGrounding/Projection.fsi
-OpenCode/Host/RequirementGrounding/Projection.fs
-OpenCode/Host/RequirementGrounding/Port.fsi
-OpenCode/Host/RequirementGrounding/Port.fs
 Enforcer/Guidance/DeliveryProjection.fsi
 Enforcer/Guidance/DeliveryProjection.fs
 Enforcer/Guidance/DeliverySurface.fsi
@@ -618,8 +610,6 @@ Composition/Durable/DelegationJournalAdapter.fsi
 Composition/Durable/DelegationJournalAdapter.fs
 Composition/Durable/SessionStartedAtJournalAdapter.fsi
 Composition/Durable/SessionStartedAtJournalAdapter.fs
-Composition/Durable/RequirementGroundingJournalAdapter.fsi
-Composition/Durable/RequirementGroundingJournalAdapter.fs
 Composition/Durable/AgentJournalPortAdapter.fsi
 Composition/Durable/AgentJournalPortAdapter.fs
 Git/Subject.fsi
@@ -1201,8 +1191,6 @@ Execution/Session/OpenCode/HorizonCalibrationSurface.fsi
 Execution/Session/OpenCode/HorizonCalibrationSurface.fs
 Execution/Delegation/SyncDelegate/OpenCode/Batching.fsi
 Execution/Delegation/SyncDelegate/OpenCode/Batching.fs
-OpenCode/Tools/ChronicleTool.fsi
-OpenCode/Tools/ChronicleTool.fs
 Enforcer/BlogSurface.fsi
 Enforcer/BlogSurface.fs
 OpenCode/Tools/BashHoneypotTool.fsi
@@ -1215,16 +1203,6 @@ Repository/Programming/Js/Utf8Fs.fsi
 Repository/Programming/Js/Utf8Fs.fs
 Repository/Programming/Js/GlobFs.fsi
 Repository/Programming/Js/GlobFs.fs
-Requirement/Grounding/Catalog.fsi
-Requirement/Grounding/Catalog.fs
-Requirement/Grounding/Surface.fsi
-Requirement/Grounding/Surface.fs
-OpenCode/Host/RequirementGrounding/Runtime.fsi
-OpenCode/Host/RequirementGrounding/Runtime.fs
-OpenCode/Host/RequirementGrounding/Gate.fsi
-OpenCode/Host/RequirementGrounding/Gate.fs
-OpenCode/Host/RequirementGrounding/Transform.fsi
-OpenCode/Host/RequirementGrounding/Transform.fs
 Repository/Programming/Js/AnchorFs.fsi
 Repository/Programming/Js/AnchorFs.fs
 Repository/Programming/Js/MutationFs.fsi
@@ -1364,10 +1342,6 @@ OpenCode/Host/SessionRecoveryHostSurface.fsi
 OpenCode/Host/SessionRecoveryHostSurface.fs
 Execution/Session/ChatExecution/StatusSurface.fsi
 Execution/Session/ChatExecution/StatusSurface.fs
-OpenCode/Host/RequirementGroundingRepositorySurface.fsi
-OpenCode/Host/RequirementGroundingRepositorySurface.fs
-OpenCode/Host/RequirementGroundingSurface.fsi
-OpenCode/Host/RequirementGroundingSurface.fs
 Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fsi
 Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs
 OpenCode/Host/PairProgrammingThoughtSurface.fsi
@@ -1452,10 +1426,6 @@ OpenCode/Host/LoadRecoverySurface.fsi
 OpenCode/Host/LoadRecoverySurface.fs
 OpenCode/Plugin/PluginRecoveryWiring.fsi
 OpenCode/Plugin/PluginRecoveryWiring.fs
-OpenCode/Host/BloggerChronicleText.fsi
-OpenCode/Host/BloggerChronicleText.fs
-OpenCode/Host/BloggerChronicleSurface.fsi
-OpenCode/Host/BloggerChronicleSurface.fs
 OpenCode/Plugin/PlanWorkOpenWiring.fsi
 OpenCode/Plugin/PlanWorkOpenWiring.fs
 OpenCode/Plugin/PluginTransforms.fsi

@@ -12,11 +12,9 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
-open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Context.Prefix
-open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
@@ -125,10 +123,6 @@ module AgentJournalPortAdapter =
                                            PromptAuthority.ContinuationKind.JoinGuard
                         && claim.PayloadDigest = payloadDigest))
                 |> Option.defaultValue false }
-
-    let forRequirementGrounding (journal: AgentJournal) : RequirementGroundingPort =
-        RequirementGroundingJournalAdapter.forRequirementGrounding journal
-
     let forWire (journal: AgentJournal) : WireJournalPort =
         let failurePort = forProviderFailure journal
 

@@ -6,12 +6,6 @@ namespace Wanxiangshu.Enforcer
 [<RequireQualifiedAccess>]
 module BlogSurface =
 
-    val emptyTextError: string
-    val noLiveCycleError: string
-
-    /// Chronicle's canonical text gate.
-    val canonicalText: value: obj -> obj
-
     /// Read a real durable blob and use the production recovery decoder.
     val reloadRequest: journal: obj -> value: obj -> System.Threading.Tasks.Task<obj>
 

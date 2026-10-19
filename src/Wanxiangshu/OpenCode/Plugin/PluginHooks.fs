@@ -824,13 +824,6 @@ module PluginHooks =
             // 工作步骤之前拒绝新动作；未等待时仍先 grounding，再评审和参数准备。
             // 第 2 步只对评审工具生效；第 3/4 步
             // 服务参与工具的估计协议。任何一步抛错即中断本次 before。
-            let beforeStageRequirementGrounding (toolInput: obj) (toolOutput: obj) =
-                Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.before
-                    journal
-                    workspaceDirectory
-                    toolInput
-                    toolOutput
-
             let beforeStageReviewPermission (toolName: string) (toolInput: obj) =
                 checkManagerReviewPermissions toolName toolInput
 
@@ -862,7 +855,6 @@ module PluginHooks =
                         )
                     | _ -> ()
 
-                    do! beforeStageRequirementGrounding toolInput toolOutput
                     beforeStageReviewPermission toolName toolInput
 
                     do!
@@ -897,13 +889,6 @@ module PluginHooks =
                 restoreArgumentsForTarget owner isParticipatingTool toolOutput
 
             // after stage 2: requirement grounding 读结果补规范。
-            let afterStageRequirementGrounding (toolInput: obj) (toolOutput: obj) =
-                Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.after
-                    journal
-                    workspaceDirectory
-                    toolInput
-                    toolOutput
-
             // after stage 3: 可选 casebook 观察。失败只发诊断，不改关键结果
             //（host-boundary-024）。
             let afterStageCasebookObservation (toolInput: obj) (toolOutput: obj) =
@@ -916,7 +901,6 @@ module PluginHooks =
             let toolAfter (toolInput: obj) (toolOutput: obj) =
                 task {
                     afterStageRestoreProtocolArguments toolInput toolOutput
-                    do! afterStageRequirementGrounding toolInput toolOutput
                     afterStageCasebookObservation toolInput toolOutput
                 }
 

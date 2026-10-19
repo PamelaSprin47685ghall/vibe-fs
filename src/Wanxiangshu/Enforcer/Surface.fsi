@@ -19,7 +19,6 @@ module EnforcerSurface =
     val tryRules: unit -> obj
     val ruleCount: unit -> int
     val fieldNames: unit -> string array
-    val chronicleExecutionContract: bool -> obj
     val tryFindByField: string -> obj
     val validate: int -> obj array -> obj
     val decodeCall: obj -> obj

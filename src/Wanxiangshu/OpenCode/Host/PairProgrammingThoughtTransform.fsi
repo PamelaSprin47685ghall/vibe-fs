@@ -14,7 +14,6 @@ module PairProgrammingThoughtTransform =
     [<RequireQualifiedAccess>]
     type CursorPresentationOwner =
         | PairGuidance
-        | RequirementGrounding
 
     /// Durable/memory pair with both halves' transcript gap anchors.
     type PairProgrammingGuidelineWire =

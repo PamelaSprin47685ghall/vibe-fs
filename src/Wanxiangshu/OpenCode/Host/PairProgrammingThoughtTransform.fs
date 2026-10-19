@@ -19,11 +19,9 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Requirement.Grounding
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
 ///
@@ -39,7 +37,6 @@ module PairProgrammingThoughtTransform =
     [<RequireQualifiedAccess>]
     type CursorPresentationOwner =
         | PairGuidance
-        | RequirementGrounding
 
     [<Literal>]
     let private PairProgrammingGuidelinePath = "host/pair-programming-guideline"
@@ -581,30 +578,16 @@ module PairProgrammingThoughtTransform =
                   PartId = partId
                   CallId = ToolCallId.create (unbox<string> parts.[index]?callID) }))
 
-    let private cursorPresentationPrefixes
-        (guidance: PairProgrammingGuideline list)
-        (occurrences: RequirementGroundingOccurrence list)
-        =
+    let private cursorPresentationPrefixes (guidance: PairProgrammingGuideline list) =
         let guidanceBytes =
             guidance
             |> List.map (fun pair -> cursorGuidanceSeparator + pair.MarkerText)
             |> String.concat ""
 
-        occurrences
-        |> List.scan
-            (fun prefix occurrence ->
-                let bytes =
-                    occurrence.Reads
-                    |> List.map (fun read -> cursorGuidanceSeparator + read.CursorResultBytes)
-                    |> String.concat ""
-
-                prefix + bytes)
-            ""
-        |> List.collect (fun reads ->
-            [ { GuidanceBytes = guidanceBytes
-                RequirementBytes = reads }
-              { GuidanceBytes = ""
-                RequirementBytes = reads } ])
+        [ { GuidanceBytes = guidanceBytes
+            RequirementBytes = "" }
+          { GuidanceBytes = ""
+            RequirementBytes = "" } ]
 
     let private presentationsAtMessage (session: SessionAgentProjection option) (rawMsg: obj) =
         let atMessage gap =
@@ -619,19 +602,11 @@ module PairProgrammingThoughtTransform =
         | Some state ->
             let guidance = state.Guidelines |> Option.defaultValue GuidelineProjection.empty
 
-            let grounding =
-                state.RequirementGrounding
-                |> Option.defaultValue RequirementGroundingProjection.empty
+            let atAnchor (pairs: PairProgrammingGuideline list) =
+                cursorPresentationPrefixes (pairs |> List.filter (fun pair -> atMessage pair.ResultGap))
 
-            let atAnchor (pairs: PairProgrammingGuideline list) (occurrences: RequirementGroundingOccurrence list) =
-                cursorPresentationPrefixes
-                    (pairs |> List.filter (fun pair -> atMessage pair.ResultGap))
-                    (occurrences |> List.filter (fun occurrence -> atMessage occurrence.ResultGap))
-
-            atAnchor (GuidelineProjection.pairs guidance) (RequirementGroundingProjection.occurrences grounding)
-            @ atAnchor
-                (GuidelineProjection.visiblePairs guidance)
-                (RequirementGroundingProjection.visibleOccurrences grounding)
+            atAnchor (GuidelineProjection.pairs guidance)
+            @ atAnchor (GuidelineProjection.visiblePairs guidance)
             |> List.distinct
 
     let private captureCursorResult journal trace session (rawMsg: obj) =
@@ -705,8 +680,7 @@ module PairProgrammingThoughtTransform =
     let private stripCapturedPresentation owner captured value =
         let retain presentation =
             match owner with
-            | CursorPresentationOwner.PairGuidance -> captured.Body + presentation.RequirementBytes
-            | CursorPresentationOwner.RequirementGrounding -> captured.Body + presentation.GuidanceBytes
+            | CursorPresentationOwner.PairGuidance -> captured.Body
 
         match matchingPresentations captured value |> List.map retain |> List.distinct with
         | [] -> Ok value

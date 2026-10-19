@@ -15,7 +15,6 @@ open Wanxiangshu.Enforcer
 open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.OpenCode.Host.PairProgramming
-open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -406,26 +405,6 @@ module ContextFoldSurface =
                            callId = ToolCallId.value pair.CallId
                            markerText = pair.MarkerText |})
                 |> List.toArray |}
-
-    let private requirementGroundingToJs (state: RequirementGroundingProjectionState) : obj =
-        box
-            {| pendingCount = Map.count state.Pending
-               occurrenceCount = List.length state.OccurrencesRev
-               visibleMaterialCount = Set.count state.VisibleMaterials
-               readObservations =
-                state.ObservedReads
-                |> Set.toArray
-                |> Array.map (fun read ->
-                    box
-                        {| workspace = read.Workspace
-                           path = read.Path
-                           digest = read.Digest
-                           coverage =
-                            match read.Coverage with
-                            | Wanxiangshu.Requirement.Grounding.GroundingReadCoverage.CompleteFile -> "CompleteFile"
-                            | Wanxiangshu.Requirement.Grounding.GroundingReadCoverage.PartialFile -> "PartialFile" |})
-               visibleFromOrdinal = state.VisibleFromOrdinal |}
-
     let private tipDeliveryToJs (state: TipDeliveryProjectionState) : obj =
         box
             {| deliveredOccurrences = state.DeliveredOccurrences |> Set.toList |> List.toArray
@@ -457,10 +436,6 @@ module ContextFoldSurface =
                Enforcement = session.Enforcement |> Option.map enforcementToJs |> Option.toObj
                BloggerCycles = session.BloggerCycles |> Option.map bloggerCyclesToJs |> Option.toObj
                Guidelines = session.Guidelines |> Option.map guidelinesToJs |> Option.toObj
-               RequirementGrounding =
-                session.RequirementGrounding
-                |> Option.map requirementGroundingToJs
-                |> Option.toObj
                TipDelivery = session.TipDelivery |> Option.map tipDeliveryToJs |> Option.toObj
                SessionStartedAt = session.SessionStartedAt |> Option.map sessionStartedAtToJs |> Option.toObj
                DelegatedToolEstimate =

@@ -6,18 +6,6 @@ module HostFact =
     let inline PairProgrammingGuidelineAnchored payload =
         AgentFact.Host(HostFactCases.PairProgrammingGuidelineAnchored payload)
 
-    let inline RequirementGroundingRequested payload =
-        AgentFact.Host(HostFactCases.RequirementGroundingRequested payload)
-
-    let inline RequirementGroundingMaterialObserved payload =
-        AgentFact.Host(HostFactCases.RequirementGroundingMaterialObserved payload)
-
-    let inline RequirementGroundingReadObserved payload =
-        AgentFact.Host(HostFactCases.RequirementGroundingReadObserved payload)
-
-    let inline RequirementGroundingAnchored payload =
-        AgentFact.Host(HostFactCases.RequirementGroundingAnchored payload)
-
     let inline TipGuidanceDelivered payload =
         AgentFact.Host(HostFactCases.TipGuidanceDelivered payload)
 

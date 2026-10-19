@@ -61,14 +61,6 @@ module BlogSurface =
         | Ok value -> box {| ok = true; value = ok value |}
         | Error reason -> box {| ok = false; error = error reason |}
 
-    let emptyTextError = ChronicleExecution.EmptyTextError
-    let noLiveCycleError = ChronicleExecution.NoLiveCycleError
-
-    /// Chronicle's canonical text gate.
-    let canonicalText (value: obj) : obj =
-        ChronicleExecution.tryCanonicalText (if isNullish value then null else string value)
-        |> resultToJs box box
-
     /// Live Blogger host owns the process-local flight/episode rendezvous.
     let private hostOf (value: obj) : IBloggerRuntimeHost = unbox<IBloggerRuntimeHost> value
 

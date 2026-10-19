@@ -21,7 +21,7 @@
     { "id": "provider", "legacy_owners": ["execution-model-routing", "host-provider-failure-ownership", "provider-attempt-recovery", "provider-language", "provider-projection"] },
     { "id": "repository-investigation", "legacy_owners": ["repository-investigation"] },
     { "id": "repository-programming", "legacy_owners": ["repository-programming"] },
-    { "id": "requirements", "legacy_owners": ["requirement-grounding"] },
+    { "id": "requirements", "legacy_owners": [] },
     { "id": "resources", "legacy_owners": ["cognitive-environment", "distribution"] },
     { "id": "runtime-platform", "legacy_owners": [] },
     { "id": "session-lifecycle", "legacy_owners": ["causal-wait", "managed-session-lifecycle", "session-ontology", "time-capability"] },
