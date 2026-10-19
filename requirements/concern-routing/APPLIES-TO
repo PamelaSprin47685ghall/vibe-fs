@@ -1,14 +1,12 @@
 # Positive package-external paths; this package is covered implicitly.
-/src/Wanxiangshu/Interaction/Concern/**
-/src/Wanxiangshu/OpenCode/Tools/ConcernTools.fs
-/src/Wanxiangshu/OpenCode/Tools/ConcernTools.fsi
 /src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+/src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
 /src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
-/src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
-/src/Wanxiangshu/Composition/Durable/AttentionConcernJournalAdapter.fs
+/src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
 /src/Wanxiangshu/Composition/Durable/HostFactFold.fs
 /src/Wanxiangshu/Composition/Durable/ProjectionUpdate.fs
 /src/Wanxiangshu/Composition/Durable/Fact.fs
+/src/Wanxiangshu/Composition/Durable/Fold.fs
 /src/Wanxiangshu/Composition/Durable/Projection.fs
 /src/Wanxiangshu/Persistence/Journal/Envelope.fs
-/resources/provider/concern-routing/**
+/resources/ablation/fact-map.json

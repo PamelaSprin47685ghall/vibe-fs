@@ -8,17 +8,16 @@ const named = (trace, ...names) => (trace.toolCalls ?? []).filter((call) => name
 
 export const evaluateEngineerLocalInvestigationAndMutation = (_c, trace) => {
   if (trace.role !== 'engineer') return { ok: false, reason: 'expected Engineer' }
-  const executes = named(trace, 'run', 'open-terminal', 'send-terminal', 'exec')
+  const executes = named(trace, 'todowrite-for-devops', 'run', 'open-terminal', 'send-terminal', 'exec')
   if (executes.length > 0) return { ok: false, reason: 'Engineer must not execute real commands' }
-  const reads = named(trace, 'read', 'glob', 'grep')
-  const writes = named(trace, 'write', 'edit', 'mv', 'rm')
-  if (reads.length > 0 || writes.length > 0 || trace.mutations === true) return { ok: true }
+  const jsCalls = named(trace, 'todowrite-for-engineer')
+  if (jsCalls.length > 0 || trace.mutations === true) return { ok: true }
   return { ok: false, reason: 'Engineer should read or edit source directly' }
 }
 
 export const evaluateManagerMixedMission = (_c, trace) => {
   if (trace.role !== 'manager') return { ok: false, reason: 'Manager must retain the mission' }
-  if (trace.mutations === true || named(trace, 'read', 'glob', 'grep', 'write', 'edit', 'mv', 'rm', 'run', 'exec', 'open-terminal', 'send-terminal', 'fission').length > 0) {
+  if (trace.mutations === true || named(trace, 'todowrite-for-engineer', 'todowrite-for-devops', 'read', 'glob', 'grep', 'write', 'edit', 'mv', 'rm', 'run', 'exec', 'open-terminal', 'send-terminal', 'fission').length > 0) {
     return { ok: false, reason: 'Manager must delegate repository work and execution' }
   }
   const forks = named(trace, 'fork')
@@ -45,8 +44,11 @@ export const evaluateDevopsInherentRepair = (_c, trace) => {
     return { ok: false, reason: 'DevOps must repair directly without creating or dispatching agents' }
   }
   const calls = trace.toolCalls ?? []
-  const repair = calls.findIndex((call) => ['write', 'edit', 'mv', 'rm'].includes(call.name))
-  const executes = (call) => ['run', 'open-terminal', 'send-terminal'].includes(call.name)
+  const isRepairCall = (call) =>
+    (call.name === 'todowrite-for-devops' && /\b(?:write|mv|rm)\b/.test(call.args?.program ?? ''))
+    || ['write', 'edit', 'mv', 'rm'].includes(call.name)
+  const repair = calls.findIndex(isRepairCall)
+  const executes = (call) => call.name === 'todowrite-for-devops' && !isRepairCall(call)
   if (repair < 0 || !calls.slice(0, repair).some(executes) || !calls.slice(repair + 1).some(executes)) {
     return { ok: false, reason: 'expected observed failure, local repair and later execution' }
   }
@@ -55,10 +57,10 @@ export const evaluateDevopsInherentRepair = (_c, trace) => {
 
 export const evaluateDevopsDoesNotChooseAmongValidBehaviors = (_c, trace) => {
   if (trace.role !== 'devops') return { ok: false, reason: 'expected DevOps' }
-  if (trace.mutations === true && named(trace, 'edit', 'write').length > 0) {
+  if (trace.mutations === true && named(trace, 'todowrite-for-devops', 'edit', 'write').length > 0) {
     return { ok: false, reason: 'DevOps must not unilaterally choose between distinct architectural/product behaviors' }
   }
-  const evidence = named(trace, 'run', 'read-terminal', 'open-terminal')
+  const evidence = named(trace, 'todowrite-for-devops')
   if (evidence.length === 0) return { ok: false, reason: 'expected runtime evidence' }
   return { ok: true }
 }

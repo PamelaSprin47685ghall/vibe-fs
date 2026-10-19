@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>delegation</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>execution-delegation-advisor-view</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>delegation</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>execution-delegation-advisor-view</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-fact.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.language.fsproj"/>
+    <Compile Include="Execution/Delegation/Advisor/Cursor.fsi"/>
+    <Compile Include="Execution/Delegation/Advisor/Cursor.fs"/>
+    <Compile Include="Execution/Delegation/Advisor/View.fsi"/>
+    <Compile Include="Execution/Delegation/Advisor/View.fs"/>
+    <Compile Include="Execution/Delegation/Advisor/Surface.fsi"/>
+    <Compile Include="Execution/Delegation/Advisor/Surface.fs"/>
+  </ItemGroup>
+</Project>

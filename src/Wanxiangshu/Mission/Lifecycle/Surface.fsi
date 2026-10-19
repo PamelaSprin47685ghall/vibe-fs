@@ -3,7 +3,6 @@ namespace Wanxiangshu.Mission.Lifecycle
 open System.Threading.Tasks
 
 module LifecycleSurface =
-    val authorityInitial: workId: string -> string
     val observeDurable: requestId: string -> durableResult: obj -> obj
     val mayStartDelivery: durableResult: obj -> bool
     val journalPath: gitCommonDir: string -> string
@@ -60,7 +59,7 @@ module LifecycleSurface =
     val documentView: text: string -> obj
     /// First DevOps binding wins. A conflicting rebind writes nothing and keeps the stored target.
     val bindDevOps: store: obj -> workId: string -> devopsId: string -> target: obj -> Task<obj>
-    val roadDevOps: store: obj -> workId: string -> obj
+    val workDevOps: store: obj -> workId: string -> obj
 
     val createOwnership: registryId: string -> records: string array -> obj
     val executeOwnershipInMemory: ownership: obj -> requestId: string -> message: obj -> DurableWorkHost.HostReceipt

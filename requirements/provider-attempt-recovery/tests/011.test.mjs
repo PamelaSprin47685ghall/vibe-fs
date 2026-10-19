@@ -429,15 +429,13 @@ test('WHAT[provider-attempt-recovery-011] an_attempt_without_a_probe_cannot_prom
   const withoutProbe = planner.plan({ role: 'engineer', kind: 'work-main', policyAllowsProbe: false })
   assert.equal(planner.promotableProbeId(withoutProbe, 'Completed'), null)
 })
-test('WHAT[provider-attempt-recovery-011] maintenance policy changes with available material', () => {
-  // Same failed kind, only the material flag flips the decision: no transient
-  // channel participates — the two calls are pure functions of their inputs.
-  assert.notEqual(
+test('WHAT[provider-attempt-recovery-011] Blogger retry policy is a pure function returning BloggerMain', () => {
+  assert.equal(
     compression.nextBloggerRequest('blogger-main', true),
     compression.nextBloggerRequest('blogger-main', false),
   )
   // This pure policy result does not establish physical retry binding.
-  assert.match(compression.nextBloggerRequest('blogger-main', true), /blogger-squash/)
+  assert.equal(compression.nextBloggerRequest('blogger-main', true), 'blogger-main')
 })
 }
 

@@ -1,325 +1,68 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open FsToolkit.ErrorHandling
-open Wanxiangshu.Foundation
 
-/// JS-007: the deterministic gitignore-aware glob adapter behind the js-*
-/// runtime bindings. Durable facts never live here; EventStore owns them
-/// (JS-012).
+/// Deterministic gitignore-aware glob, bridged to `wanxiangli/fs` (CUT-24).
+/// The enumeration algorithm lives in the library; this module keeps the
+/// main-repo signature stable.
 module JsGlobFs =
 
-    [<Emit("new Promise((resolve) => setImmediate(resolve))")>]
-    let private yieldEventLoop () : System.Threading.Tasks.Task<unit> = jsNative
+    [<Import("Filesystem", "wanxiangli/fs")>]
+    let private Filesystem: obj = jsNative
 
-    [<Import("readdirSync", "node:fs")>]
-    let private readdirSync (path: string) : string array = jsNative
-
-    [<Import("lstatSync", "node:fs")>]
-    let private lstatSync (path: string) : obj = jsNative
-
-    [<Import("join", "node:path")>]
-    let private pathJoin (a: string) (b: string) : string = jsNative
-
-    [<Emit("$0.isDirectory()")>]
-    let private isDirectory (stat: obj) : bool = jsNative
-
-    [<Emit("$0.isSymbolicLink()")>]
-    let private isSymbolicLink (stat: obj) : bool = jsNative
-
-    [<Emit("$0.isFile()")>]
-    let private isFile (stat: obj) : bool = jsNative
+    [<Emit("$0({ root: $1 })")>]
+    let private createFilesystem (factory: obj) (root: string) : obj = jsNative
 
     type JsGlobListing = { Paths: string list }
 
-    type private IgnoreRule =
-        { Base: string
-          Regex: obj
-          Negated: bool
-          DirectoryOnly: bool }
+    let private ofResult (result: obj) : Result<JsGlobListing, JsFailure> =
+        if unbox<bool> (result?ok) then
+            let value = result?value
+            let paths = unbox<obj array> (value?paths) |> Array.map string |> Array.toList
+            Ok { Paths = paths }
+        else
+            Error(JsFailure.ofWire (string (result?code)) (string (result?reason)))
 
-    let private splitTopCommas (inner: string) : string list =
-        let rec go (chars: char list) (depth: int) (buf: string) (acc: string list) =
-            match chars with
-            | [] -> List.rev (buf :: acc)
-            | '{' :: rest -> go rest (depth + 1) (buf + "{") acc
-            | '}' :: rest -> go rest (max 0 (depth - 1)) (buf + "}") acc
-            | ',' :: rest when depth = 0 -> go rest 0 "" (buf :: acc)
-            | c :: rest -> go rest depth (buf + string c) acc
-
-        go (List.ofSeq inner) 0 "" []
-
-    type private BraceScan =
-        | BraceDone of (string * string list * string) option
-        | BraceContinue of i: int * depth: int * start: int
-
-    let private braceCharStep (s: string) (i: int) (depth: int) (start: int) : BraceScan =
-        match s.[i] with
-        | '{' when depth = 0 -> BraceContinue(i + 1, 1, i)
-        | '{' -> BraceContinue(i + 1, depth + 1, start)
-        | '}' when depth = 1 && start >= 0 ->
-            let inner = s.Substring(start + 1, i - start - 1)
-            BraceDone(Some(s.Substring(0, start), splitTopCommas inner, s.Substring(i + 1)))
-        | '}' when depth > 1 -> BraceContinue(i + 1, depth - 1, start)
-        | _ -> BraceContinue(i + 1, depth, start)
-
-    let private findBraceGroup (s: string) : (string * string list * string) option =
-        let rec scan (i: int) (depth: int) (start: int) =
-            if i >= s.Length then
-                None
-            else
-                continueBraceScan i depth start
-
-        and continueBraceScan (i: int) (depth: int) (start: int) =
-            match braceCharStep s i depth start with
-            | BraceDone result -> result
-            | BraceContinue(i', depth', start') -> scan i' depth' start'
-
-        scan 0 0 -1
-
-    let rec private expandBraces (pattern: string) : string list =
-        match findBraceGroup pattern with
-        | None -> [ pattern ]
-        | Some(before, alts, after) -> alts |> List.collect (fun alt -> expandBraces (before + alt + after))
-
-    let private compilePathPattern (pattern: string) : Result<obj, JsFailure> =
-        GlobMatch.compilePattern pattern
-        |> Result.mapError (fun _ -> JsFailure.AnchorInvalidPattern)
-
+    /// 单模式路径匹配（fsi 既有入口，无生产消费者；保留桥接以稳定签名）。
     let matchesPathPattern (pattern: string) (path: string) : Result<bool, JsFailure> =
-        GlobMatch.matchesPathPattern pattern path
-        |> Result.mapError (fun _ -> JsFailure.AnchorInvalidPattern)
+        let rootlessApi = createFilesystem Filesystem ""
+        let result = rootlessApi?matchesPathPattern (pattern, path)
 
-    let private compileUserPatterns (pattern: string) : Result<obj array, JsFailure> =
-        if System.String.IsNullOrEmpty pattern then
-            Error JsFailure.AnchorInvalidPattern
+        if unbox<bool> (result?ok) then
+            Ok(unbox<bool> (result?value))
         else
-            expandBraces pattern
-            |> List.traverseResultM compilePathPattern
-            |> Result.map Array.ofList
-
-    let private parseIgnoreBody (baseRel: string) (negated: bool) (body: string) : IgnoreRule option =
-        let directoryOnly = body.EndsWith("/")
-
-        let spec =
-            if directoryOnly then
-                body.Substring(0, body.Length - 1)
-            else
-                body
-
-        compilePathPattern spec
-        |> Result.toOption
-        |> Option.map (fun re ->
-            { Base = baseRel
-              Regex = re
-              Negated = negated
-              DirectoryOnly = directoryOnly })
-
-    let private parseIgnoreLine (baseRel: string) (raw: string) : IgnoreRule option =
-        let line =
-            if raw.EndsWith("\r") then
-                raw.Substring(0, raw.Length - 1)
-            else
-                raw
-
-        let trimmed = line.Trim()
-        let negated = trimmed.StartsWith("!")
-        let body = if negated then trimmed.Substring(1) else trimmed
-
-        if trimmed = "" || trimmed.StartsWith("#") || body = "" then
-            None
-        else
-            parseIgnoreBody baseRel negated body
-
-    let private loadIgnoreFile (filePath: string) (baseRel: string) : IgnoreRule list =
-        match JsUtf8Fs.readUtf8 filePath with
-        | Error _ -> []
-        | Ok text -> text.Split([| '\n' |]) |> Array.toList |> List.choose (parseIgnoreLine baseRel)
-
-    let private localIgnorePath (ruleBase: string) (rel: string) : string option =
-        if ruleBase = "" then
-            Some rel
-        elif rel = ruleBase then
-            Some ""
-        elif rel.StartsWith(ruleBase + "/") then
-            Some(rel.Substring(ruleBase.Length + 1))
-        else
-            None
-
-    let private isIgnored (rules: ResizeArray<IgnoreRule>) (rel: string) (isDir: bool) : bool =
-        let rec go i ignored =
-            if i >= rules.Count then ignored else applyRule i ignored
-
-        and applyRule i ignored =
-            let rule = rules.[i]
-
-            match rule.DirectoryOnly && not isDir, localIgnorePath rule.Base rel with
-            | true, _ -> go (i + 1) ignored
-            | _, None
-            | _, Some "" -> go (i + 1) ignored
-            | _, Some path when GlobMatch.testCompiled rule.Regex path -> go (i + 1) (not rule.Negated)
-            | _, Some _ -> go (i + 1) ignored
-
-        go 0 false
-
-    type private VisibleEntry =
-        | SkipEntry
-        | RecurseDirectory of full: string * childRel: string
-        | EmitFile of childRel: string
-
-    let private tryListDirectory (dir: string) : string list =
-        try
-            readdirSync dir |> Array.toList |> List.sort
-        with _ ->
-            []
-
-    let private tryLstat (full: string) : obj option =
-        try
-            Some(lstatSync full)
-        with _ ->
-            None
-
-    let private classifyStatKind
-        (rules: ResizeArray<IgnoreRule>)
-        (childRel: string)
-        (full: string)
-        (st: obj)
-        : VisibleEntry =
-        if isSymbolicLink st then
-            SkipEntry
-        elif isDirectory st && isIgnored rules childRel true then
-            SkipEntry
-        elif isDirectory st then
-            RecurseDirectory(full, childRel)
-        elif isFile st && isIgnored rules childRel false then
-            SkipEntry
-        elif isFile st then
-            EmitFile childRel
-        else
-            SkipEntry
-
-    let private classifyNonGitEntry
-        (rules: ResizeArray<IgnoreRule>)
-        (rel: string)
-        (dir: string)
-        (entry: string)
-        : VisibleEntry =
-        let full = pathJoin dir entry
-        let childRel = if rel = "" then entry else rel + "/" + entry
-
-        match tryLstat full with
-        | None -> SkipEntry
-        | Some st -> classifyStatKind rules childRel full st
-
-    let private classifyVisibleEntry
-        (rules: ResizeArray<IgnoreRule>)
-        (rel: string)
-        (dir: string)
-        (entry: string)
-        : VisibleEntry =
-        if entry = ".git" then
-            SkipEntry
-        else
-            classifyNonGitEntry rules rel dir entry
-
-    let private applyVisibleEntry (files: ResizeArray<string>) (walk: string -> string -> unit) (action: VisibleEntry) =
-        match action with
-        | SkipEntry -> ()
-        | RecurseDirectory(full, childRel) -> walk full childRel
-        | EmitFile childRel -> files.Add(childRel.Replace('\\', '/'))
-
-    let private processDirectoryEntries
-        (rules: ResizeArray<IgnoreRule>)
-        (files: ResizeArray<string>)
-        (walk: string -> string -> unit)
-        (dir: string)
-        (rel: string)
-        (entries: string list)
-        =
-        for entry in entries do
-            classifyVisibleEntry rules rel dir entry |> applyVisibleEntry files walk
-
-    let private collectVisibleFiles (root: string) : System.Threading.Tasks.Task<string list> =
-        // DSL-MUTABLE: algorithm-scratch — visible file accumulator
-        let files = ResizeArray<string>()
-        let rules = ResizeArray<IgnoreRule>()
-
-        let stepEntry
-            (rulesList: ResizeArray<IgnoreRule>)
-            (walkFn: string -> string -> System.Threading.Tasks.Task<unit>)
-            dir
-            rel
-            entry
-            =
-            task {
-                match classifyVisibleEntry rulesList rel dir entry with
-                | SkipEntry -> ()
-                | RecurseDirectory(full, childRel) -> do! walkFn full childRel
-                | EmitFile childRel ->
-                    files.Add(childRel.Replace('\\', '/'))
-                    do! yieldEventLoop ()
-            }
-
-        let rec visitEntries
-            (rulesList: ResizeArray<IgnoreRule>)
-            (walkFn: string -> string -> System.Threading.Tasks.Task<unit>)
-            (dir: string)
-            (rel: string)
-            (entries: string list)
-            =
-            task {
-                for entry in entries do
-                    do! stepEntry rulesList walkFn dir rel entry
-            }
-
-        let rec walk (dir: string) (rel: string) : System.Threading.Tasks.Task<unit> =
-            task {
-                let nested = loadIgnoreFile (pathJoin dir ".gitignore") rel
-                let mark = rules.Count
-
-                let rootExcludes =
-                    if rel = "" then
-                        loadIgnoreFile (pathJoin root ".git/info/exclude") ""
-                    else
-                        []
-
-                for rule in rootExcludes do
-                    rules.Add(rule)
-
-                for rule in nested do
-                    rules.Add(rule)
-
-                do! yieldEventLoop ()
-
-                try
-                    let entries = tryListDirectory dir
-                    do! visitEntries rules walk dir rel entries
-                finally
-                    rules.RemoveRange(mark, rules.Count - mark)
-            }
-
-        task {
-            do! walk root ""
-            return List.ofSeq files
-        }
+            Error(JsFailure.ofWire (string (result?code)) (string (result?reason)))
 
     /// JS-007: gitignore-style glob. Full deterministic enumeration — no
     /// internal bound. An oversized result is tail-kept once, by the Host
     /// tool-result bound at the final boundary.
-    let glob (root: string) (pattern: string) : System.Threading.Tasks.Task<Result<JsGlobListing, JsFailure>> =
+    let glob (root: string) (pattern: string) : Task<Result<JsGlobListing, JsFailure>> =
+        let api = createFilesystem Filesystem root
+
         task {
-            let matchers = compileUserPatterns pattern
-
-            match matchers with
-            | Error failure -> return Error failure
-            | Ok compiledMatchers ->
-                let! visible = collectVisibleFiles root
-
-                let paths =
-                    visible
-                    |> List.filter (fun rel -> Array.exists (fun re -> GlobMatch.testCompiled re rel) compiledMatchers)
-                    |> List.sort
-
-                return Ok { Paths = paths }
+            let! (result: obj) = unbox<Task<obj>> (api?glob (pattern))
+            return ofResult result
         }
+
+    type JsVisibleEntry = { Name: string; IsDir: bool }
+
+    /// JS-007 / [057]: one-directory listing with the library's gitignore
+    /// semantics. The library resolves the path inside the root and refuses
+    /// boundary escapes itself.
+    let visibleEntries (root: string) (path: string) : Result<JsVisibleEntry list, JsFailure> =
+        let api = createFilesystem Filesystem root
+        let result: obj = api?visibleEntries (path)
+
+        if unbox<bool> (result?ok) then
+            let entries = unbox<obj array> (result?entries)
+
+            entries
+            |> Array.map (fun entry ->
+                { Name = string (entry?name)
+                  IsDir = unbox<bool> (entry?isDir) })
+            |> Array.toList
+            |> Ok
+        else
+            Error(JsFailure.ofWire (string (result?code)) (string (result?reason)))

@@ -228,9 +228,9 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_round_budget_max_of_colla
 test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_classifies_each_tool_by_production_policy_and_delegates_by_participating_subset_max", () => {
   // 混合批次包含：
   // 1. fork: 不参与估计的工具（NoEstimate），即使带参数也不应作为参与工具计入预算
-  // 2. read: 参与工具（EstimateAfterCall），估计为 0 轮，按新合同 0 绝不能带 self_note
-  // 3. edit: 参与工具（EstimateAfterCall），估计为 2 轮，正数必须带合法非空 self_note
-  // 4. grep: 参与工具（EstimateAfterCall），估计为 5 轮，正数必须带合法非空 self_note
+  // 2. todowrite-for-manager: 参与工具（EstimateAfterCall），估计为 0 轮，按新合同 0 绝不能带 self_note
+  // 3. todowrite-for-engineer: 参与工具（EstimateAfterCall），估计为 2 轮，正数必须带合法非空 self_note
+  // 4. fetch: 参与工具（EstimateAfterCall），估计为 5 轮，正数必须带合法非空 self_note
   const mixedWireMessages = [
     {
       role: "assistant",
@@ -246,31 +246,30 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_classifies_ea
         },
         {
           kind: "tool-call",
-          callId: "call-read-1",
-          name: "read",
+          callId: "call-manager-1",
+          name: "todowrite-for-manager",
           args: JSON.stringify({
-            path: "src/Wanxiangshu/Strength/Surface.fs",
+            program: "class Js extends JsProgram { async run() { return { inspected: true } } }",
             [EstimatedReadonlyRoundsField]: 0,
             // 0 轮次不提供 self_note
           }),
         },
         {
           kind: "tool-call",
-          callId: "call-edit-1",
-          name: "edit",
+          callId: "call-engineer-1",
+          name: "todowrite-for-engineer",
           args: JSON.stringify({
-            path: "src/Wanxiangshu/Strength/Surface.fs",
-            patch: "...",
+            program: "class Js extends JsProgram { async run() { return await this.cat('src/Wanxiangshu/Strength/Surface.fs') } }",
             [EstimatedReadonlyRoundsField]: 2,
-            self_note: "Checking caller invariants before edit",
+            self_note: "Checking caller invariants before the next round",
           }),
         },
         {
           kind: "tool-call",
-          callId: "call-grep-1",
-          name: "grep",
+          callId: "call-fetch-1",
+          name: "fetch",
           args: JSON.stringify({
-            query: "estimateCalls",
+            url: "repo://src/Wanxiangshu/Strength/OpenCode/Delegate.fs",
             [EstimatedReadonlyRoundsField]: 5,
             self_note: "Locating all occurrences of batch definitions",
           }),
@@ -281,9 +280,9 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_classifies_ea
       role: "tool",
       parts: [
         { kind: "tool-result", callId: "call-fork-1", result: "ok" },
-        { kind: "tool-result", callId: "call-read-1", result: "source-content" },
-        { kind: "tool-result", callId: "call-edit-1", result: "ok" },
-        { kind: "tool-result", callId: "call-grep-1", result: "match-lines" },
+        { kind: "tool-result", callId: "call-manager-1", result: "source-content" },
+        { kind: "tool-result", callId: "call-engineer-1", result: "ok" },
+        { kind: "tool-result", callId: "call-fetch-1", result: "match-lines" },
       ],
     },
   ];
@@ -295,8 +294,8 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_classifies_ea
       role: "tool",
       parts: [
         { kind: "tool-result", callId: "call-fork-1", result: "ok" },
-        { kind: "tool-result", callId: "call-read-1", result: "source-content" },
-        // call-edit-1 与 call-grep-1 尚未返回
+        { kind: "tool-result", callId: "call-manager-1", result: "source-content" },
+        // call-engineer-1 与 call-fetch-1 尚未返回
       ],
     },
   ];
@@ -317,33 +316,42 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_classifies_ea
   );
   assert.deepEqual(
     batch.exchanges.map((e) => e.toolName),
-    ["fork", "read", "edit", "grep"]
+    ["fork", "todowrite-for-manager", "todowrite-for-engineer", "fetch"]
   );
 
   // 2. 逐工具 Policy 分类：消费生产装饰端的真实判定，不在测试内另写工具名表
   assert.equal(
-    productionDecoratesProtocol("read"),
+    productionDecoratesProtocol("todowrite-for-manager"),
     true,
-    "read is EstimateAfterCall: production must decorate it with the protocol fields"
+    "todowrite-for-manager is EstimateAfterCall: production must decorate it with the protocol fields"
   );
   assert.equal(
-    productionDecoratesProtocol("edit"),
+    productionDecoratesProtocol("todowrite-for-engineer"),
     true,
-    "edit is EstimateAfterCall: production must decorate it with the protocol fields"
+    "todowrite-for-engineer is EstimateAfterCall: production must decorate it with the protocol fields"
   );
   assert.equal(
-    productionDecoratesProtocol("grep"),
+    productionDecoratesProtocol("fetch"),
     true,
-    "grep is EstimateAfterCall: production must decorate it with the protocol fields"
+    "fetch is EstimateAfterCall: production must decorate it with the protocol fields"
   );
   assert.equal(
     productionDecoratesProtocol("fork"),
     false,
     "fork is NoEstimate: production must add no protocol increment"
   );
+  // 已退役的直接文件系统工具不再是参与工具：它们连 provider wire 都到不了，
+  // 生产分类器必须让它们落回 Unreviewed 而不是继续装饰。
+  for (const retired of ["read", "edit", "grep"]) {
+    assert.equal(
+      productionDecoratesProtocol(retired),
+      false,
+      retired + " is retired: production must not decorate it with the protocol fields"
+    );
+  }
 
   // 禁止前缀匹配的反例：已知工具的近似变体一律 Unreviewed，公开面上同样不装饰。
-  // 若生产改为按 js- / read 等前缀或子串模糊匹配，这些变体会开始被装饰，此处变红。
+  // 若生产改为按 js- / todowrite-for- 等前缀或子串模糊匹配，这些变体会开始被装饰，此处变红。
   for (const variant of ["readXyz", "fork-extra", "globbing"]) {
     assert.equal(
       productionDecoratesProtocol(variant),
@@ -456,8 +464,8 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_
 
   // 构造同一主响应内的混合批次：
   // 1. fork: 不参与工具（NoEstimate）
-  // 2. read: 参与工具（EstimateAfterCall），携带合法正估计 2 与合法非空 self_note
-  // 3. edit: 参与工具（EstimateAfterCall），携带非法估计 -1（负数非法）
+  // 2. todowrite-for-engineer: 参与工具（EstimateAfterCall），携带合法正估计 2 与合法非空 self_note
+  // 3. fetch: 参与工具（EstimateAfterCall），携带非法估计 -1（负数非法）
   const mixedInvalidWireMessages = [
     {
       role: "assistant",
@@ -472,21 +480,20 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_
         },
         {
           kind: "tool-call",
-          callId: "call-read-valid-1",
-          name: "read",
+          callId: "call-engineer-valid-1",
+          name: "todowrite-for-engineer",
           args: JSON.stringify({
-            path: "src/Wanxiangshu/Strength/Surface.fs",
+            program: "class Js extends JsProgram { async run() { return await this.cat('src/Wanxiangshu/Strength/Surface.fs') } }",
             [EstimatedReadonlyRoundsField]: 2,
-            self_note: "Checking caller invariants before edit",
+            self_note: "Checking caller invariants before the next round",
           }),
         },
         {
           kind: "tool-call",
-          callId: "call-edit-inv-1",
-          name: "edit",
+          callId: "call-fetch-inv-1",
+          name: "fetch",
           args: JSON.stringify({
-            path: "src/Wanxiangshu/Strength/Surface.fs",
-            patch: "...",
+            url: "repo://src/Wanxiangshu/Strength/OpenCode/Delegate.fs",
             [EstimatedReadonlyRoundsField]: -1,
             self_note: "Negative round budget is invalid",
           }),
@@ -497,8 +504,8 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_
       role: "tool",
       parts: [
         { kind: "tool-result", callId: "call-fork-inv-1", result: "ok" },
-        { kind: "tool-result", callId: "call-read-valid-1", result: "source-content" },
-        { kind: "tool-result", callId: "call-edit-inv-1", result: "ok" },
+        { kind: "tool-result", callId: "call-engineer-valid-1", result: "source-content" },
+        { kind: "tool-result", callId: "call-fetch-inv-1", result: "ok" },
       ],
     },
   ];
@@ -510,29 +517,29 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_
   assert.equal(batch.exchanges.length, 3, "Batch retains every tool in order");
   assert.deepEqual(
     batch.exchanges.map((e) => e.toolName),
-    ["fork", "read", "edit"]
+    ["fork", "todowrite-for-engineer", "fetch"]
   );
 
-  // 2. 参与子集筛选：过滤掉 NoEstimate 工具 fork，仅保留 read 与 edit
+  // 2. 参与子集筛选：过滤掉 NoEstimate 工具 fork，仅保留 todowrite-for-engineer 与 fetch
   const participatingExchanges = batch.exchanges.filter((e) =>
     productionDecoratesProtocol(e.toolName)
   );
   assert.equal(participatingExchanges.length, 2, "Participating subset must filter out NoEstimate tools");
 
-  // 3. 逐调用参数解析：read 合法，edit 非法
+  // 3. 逐调用参数解析：todowrite-for-engineer 合法，fetch 非法
   const parsedByTool = new Map();
   for (const exchange of participatingExchanges) {
     const rawArgs = JSON.parse(exchange.canonicalArguments);
     parsedByTool.set(exchange.toolName, PluginHooksSurface.readonlyDelegationSelfNoteOf(rawArgs));
   }
 
-  const readRes = parsedByTool.get("read");
-  assert.equal(readRes.ok, true, "read in isolation must parse successfully as Ok");
-  assert.equal(readRes.note, "Checking caller invariants before edit");
+  const engineerRes = parsedByTool.get("todowrite-for-engineer");
+  assert.equal(engineerRes.ok, true, "todowrite-for-engineer in isolation must parse successfully as Ok");
+  assert.equal(engineerRes.note, "Checking caller invariants before the next round");
 
-  const editRes = parsedByTool.get("edit");
-  assert.equal(editRes.ok, false, "edit with negative rounds must fail argument validation as Result.Error");
-  assert.equal(editRes.error, "InvalidRange", "Error must be InvalidRange");
+  const fetchRes = parsedByTool.get("fetch");
+  assert.equal(fetchRes.ok, false, "fetch with negative rounds must fail argument validation as Result.Error");
+  assert.equal(fetchRes.error, "InvalidRange", "Error must be InvalidRange");
 
   // self_note 不参与批次判定：0 估计携带短记同样解析成功
   const zeroWithNoteRes = PluginHooksSurface.readonlyDelegationSelfNoteOf({
@@ -544,7 +551,7 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_mixed_batch_with_invalid_
 
   // 4. 整批一票否决与禁止“合法子集假装成功”：
   // 按照生产 Delegate.fs 中 aggregateBatchEstimate 的逻辑，批次内只要有任意参与调用解析失败，
-  // firstError 命中后立即返回 BatchAggregation.ArgumentError，绝不取合法子集 [read: 2] 假装成功
+  // firstError 命中后立即返回 BatchAggregation.ArgumentError，绝不取合法子集 [todowrite-for-engineer: 2] 假装成功
   const participatingResults = participatingExchanges.map((e) => {
     const rawArgs = JSON.parse(e.canonicalArguments);
     return PluginHooksSurface.readonlyDelegationSelfNoteOf(rawArgs);
@@ -587,8 +594,8 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_invalid_metadata_batch_ru
 
   const toolExecutionCounts = {
     fork: 0,
-    read: 0,
-    edit: 0,
+    'todowrite-for-engineer': 0,
+    fetch: 0,
   };
 
   const executeToolMock = (toolName) => {
@@ -605,21 +612,20 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_invalid_metadata_batch_ru
     },
     {
       kind: "tool-call",
-      callId: "call-read-b11-1",
-      name: "read",
+      callId: "call-engineer-b11-1",
+      name: "todowrite-for-engineer",
       args: JSON.stringify({
-        path: "src/Wanxiangshu/Strength/Surface.fs",
+        program: "class Js extends JsProgram { async run() { return await this.cat('src/Wanxiangshu/Strength/Surface.fs') } }",
         [EstimatedReadonlyRoundsField]: 2,
         self_note: "Checking caller invariants",
       }),
     },
     {
       kind: "tool-call",
-      callId: "call-edit-b11-1",
-      name: "edit",
+      callId: "call-fetch-b11-1",
+      name: "fetch",
       args: JSON.stringify({
-        path: "src/Wanxiangshu/Strength/Surface.fs",
-        patch: "...",
+        url: "repo://src/Wanxiangshu/Strength/OpenCode/Delegate.fs",
         [EstimatedReadonlyRoundsField]: -1,
         self_note: "Invalid negative estimate",
       }),
@@ -635,8 +641,8 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_invalid_metadata_batch_ru
 
   // 断言 1：每个工具恰执行一次，不发生多次执行
   assert.equal(toolExecutionCounts.fork, 1, "fork must execute exactly once");
-  assert.equal(toolExecutionCounts.read, 1, "read must execute exactly once");
-  assert.equal(toolExecutionCounts.edit, 1, "edit must execute exactly once despite invalid metadata");
+  assert.equal(toolExecutionCounts['todowrite-for-engineer'], 1, "todowrite-for-engineer must execute exactly once");
+  assert.equal(toolExecutionCounts.fetch, 1, "fetch must execute exactly once despite invalid metadata");
 
   const wireMessages = [
     { role: "assistant", parts: assistantToolCalls },
@@ -674,8 +680,12 @@ test("WHAT[speculative-investigation-002] STRENGTH_002_invalid_metadata_batch_ru
   assert.equal(batchesSecondPass.length, 1, "Second pass on same messages must not duplicate batches");
 
   assert.equal(toolExecutionCounts.fork, 1, "fork must NOT be re-executed on repeated processing");
-  assert.equal(toolExecutionCounts.read, 1, "read must NOT be re-executed on repeated processing");
-  assert.equal(toolExecutionCounts.edit, 1, "edit must NOT be re-executed on repeated processing");
+  assert.equal(
+    toolExecutionCounts['todowrite-for-engineer'],
+    1,
+    "todowrite-for-engineer must NOT be re-executed on repeated processing",
+  );
+  assert.equal(toolExecutionCounts.fetch, 1, "fetch must NOT be re-executed on repeated processing");
 
   const participatingSecondPass = batchesSecondPass[0].exchanges.filter((e) =>
     productionDecoratesProtocol(e.toolName)

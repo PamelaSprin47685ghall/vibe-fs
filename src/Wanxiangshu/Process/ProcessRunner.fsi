@@ -19,11 +19,7 @@ module ProcessRunner =
             Task<ProcessResult>
 
     val run:
-        cmd: Command ->
-        estimate: ProcessEstimate ->
-        ctx: ProcessContext ->
-        ct: CancellationToken ->
-            Task<ProcessResult>
+        cmd: Command -> estimate: ProcessEstimate -> ctx: ProcessContext -> ct: CancellationToken -> Task<ProcessResult>
 
     val runWithLauncher:
         launcher: (Command -> CancellationToken -> Task<EndEvidence * byte array * byte array>) ->

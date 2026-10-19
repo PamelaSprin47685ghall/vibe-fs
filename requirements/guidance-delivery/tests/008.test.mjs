@@ -6,39 +6,38 @@ import * as toml from '../../../dist/Context/Companion/Blogger/TomlSurface.js'
 import * as companion from '../../../dist/Context/Companion/ProjectionSurface.js'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
 import { withRulebookPackage } from '../../behavior-diagnosis/tests/support/resource-package.mjs'
-import { guidance, link, observe, withJournal, main, blogger, tip } from './support/journal.mjs'
+import { guidance, link, observe, withJournal, main, blogger, tip, authoredBody } from './support/journal.mjs'
 
 integrationTest('WHAT[guidance-delivery-008] Blogger composer takes detection source regardless of section vocabulary', async () => {
   await withRulebookPackage(async ({ write, surface }) => {
-    write('sample-tip', 'enforcer.md', '## What To Do Now\nDETECTION SOURCE')
-    write('sample-tip', 'main.md', 'REMEDIATION SOURCE')
+    write('sample-tip', 'lesson.md', '## Opinion\nDETECTION SOURCE\n\n## Advice\nREMEDIATION SOURCE')
     const prompt = surface.composeBloggerSystemPrompt('base', 'en')
     assert.ok(prompt.includes('DETECTION SOURCE'))
-    assert.ok(prompt.includes('What To Do Now'))
-    assert.equal(prompt.includes('REMEDIATION SOURCE'), false)
+    assert.ok(prompt.includes('Opinion'))
+    assert.ok(prompt.includes('REMEDIATION SOURCE'))
   })
 })
 
-test('WHAT[guidance-delivery-008] real Main resolver uses remediation body rather than detection body', async () => {
+test('WHAT[guidance-delivery-008] real Main resolver uses the authored remediation body rather than detection body', async () => {
   await withJournal(async ({ journal }) => {
     await link(journal)
     await observe(journal)
     const result = await guidance.resolve(journal, main)
-    const body = (leaf) => readFileSync(new URL(`../../../resources/enforcer/${tip}/${leaf}.md`, import.meta.url), 'utf8').trim()
-    assert.ok(result.text.includes(body('main')))
-    assert.equal(result.text.includes(body('enforcer')), false)
+    const detection = readFileSync(new URL(`../../../resources/enforcer/${tip}/lesson.md`, import.meta.url), 'utf8').trim()
+    assert.ok(result.text.includes(authoredBody))
+    assert.equal(result.text.includes(detection), false)
   })
 })
 
 test('WHAT[guidance-delivery-008] previous tip retains its identity as low-trust data paired before its frame', () => {
-  const field = 'sample-tip'
-  const block = parseToml(toml.renderPreviousEnforcerTip(field, 'cycle-1'))
-  assert.deepEqual(block.do_not_exec, [{ kind: 'previous_enforcer_tip', tip: field, cycle: 'cycle-1' }])
+  const tipName = 'sample-tip'
+  const block = parseToml(toml.renderPreviousEnforcerTip(tipName, 'cycle-1'))
+  assert.deepEqual(block.do_not_exec, [{ kind: 'previous_enforcer_tip', tip: tipName, cycle: 'cycle-1' }])
   const plan = companion.build((s) => s, {
     blogger: 'blogger', epoch: 0, kind: companion.normal,
     frames: [{ digest: 'frame-digest', body: 'frame body' }],
     delta: { messageId: 'delta', toml: '[[new_work_to_record]]\nuser = "work"' },
-    previousTips: [{ field, cycleId: 'cycle-1' }],
+    previousTips: [{ tipName, cycleId: 'cycle-1' }],
   })
   assert.equal(plan.roles[0], 'assistant')
   assert.deepEqual(parseToml(plan.texts[0]).do_not_exec, block.do_not_exec)
@@ -55,9 +54,8 @@ test('WHAT[guidance-delivery-008] Main guidance resolution keeps Blogger detecti
     await observe(journal, 2)
 
     const resolved = await guidance.resolve(journal, main)
-    const detection = readFileSync(new URL(`../../../resources/enforcer/${tip}/enforcer.md`, import.meta.url), 'utf8').trim()
-    const remediation = readFileSync(new URL(`../../../resources/enforcer/${tip}/main.md`, import.meta.url), 'utf8').trim()
-    assert.ok(resolved.text.includes(remediation), 'Main guidance still carries the remediation body')
+    const detection = readFileSync(new URL(`../../../resources/enforcer/${tip}/lesson.md`, import.meta.url), 'utf8').trim()
+    assert.ok(resolved.text.includes(authoredBody), 'Main guidance carries the authored remediation body')
     assert.equal(resolved.text.includes(detection), false, 'Blogger detection history must not be promoted into Main guidance')
 
     // The Blogger-side view keeps its own detection material: the histories

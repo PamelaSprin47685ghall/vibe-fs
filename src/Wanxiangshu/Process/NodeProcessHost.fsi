@@ -11,6 +11,7 @@ module NodeProcessHost =
         { Process: obj
           Observe: unit -> EndEvidence
           Kill: unit -> unit
+          RequestSignal: string -> Result<unit, string>
           Exited: bool ref
           OnExited: ResizeArray<unit -> unit>
           Failure: string option ref
@@ -34,6 +35,18 @@ module NodeProcessHost =
         onStdout: (byte[] -> unit) ->
         onStderr: (byte[] -> unit) ->
             Task<Result<ChildProcess, ProcessResult>>
+
+    val spawnInteractive:
+        cmd: Command ->
+        ctx: ProcessContext ->
+        onStdout: (byte array -> unit) ->
+        onStderr: (byte array -> unit) ->
+        ct: CancellationToken ->
+            Task<Result<ChildProcess, ProcessResult>>
+
+    /// Error means that input delivery was not confirmed. The caller must not resend it.
+    val writeInput: child: ChildProcess -> bytes: byte[] -> ct: CancellationToken -> Task<Result<int, string>>
+    val signal: child: ChildProcess -> name: string -> Result<unit, string>
 
     val tempPath: unit -> string
     val writeFile: path: string -> data: byte array -> unit

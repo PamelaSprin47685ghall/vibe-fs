@@ -20,9 +20,11 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 const pluginHooksSourcePath = path.join(repoRoot, 'src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs');
 const delegateSourcePath = path.join(repoRoot, 'src/Wanxiangshu/Strength/OpenCode/Delegate.fs');
 
+// The live participating set: exactly the names a real provider wire can still
+// carry. The direct filesystem tools are retired and reach neither the schema
+// decoration nor the source-batch aggregation.
 const PARTICIPATING_TOOLS = [
-  'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
-  'edit', 'write', 'mv', 'rm', 'fetch', 'run'
+  'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops', 'fetch'
 ];
 const PARTICIPATING_SET = new Set(PARTICIPATING_TOOLS);
 
@@ -146,10 +148,10 @@ test('WHAT[speculative-investigation-016] the production classifier admits exact
 
   const noEstimate = [
     'fork', 'resume', 'commission', 'join', 'horizon', 'review', 'deliver',
-    'fission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-    'skill', 'todowrite', 'assume', 'defer', 
-    'publish', 'chronicle', 'js-bookkeeper', 'js-predictor',
-    'bash-honeypot', 'invalid', 'js-orchestrator', 'js-blogger'
+    'fission', 'todowrite-for-plan', 'ask', 'devops',
+    'skill', 'assume',
+    'chronicle', 'todowrite-for-bookkeeper', 'todowrite-for-predictor',
+    'bash-honeypot', 'invalid', 'todowrite-for-orchestrator', 'todowrite-for-blogger'
   ];
   for (const name of noEstimate) {
     assert.equal(
@@ -485,7 +487,7 @@ test('WHAT[speculative-investigation-016] tool.execute.before throws descriptive
 
 test('WHAT[speculative-investigation-016] schema, call-boundary and source-batch consumers all classify through the one contract function', () => {
   const representativeCases = [
-    { name: "read", policy: 'EstimateAfterCall' },
+    { name: "todowrite-for-engineer", policy: 'EstimateAfterCall' },
     { name: "chronicle", policy: 'NoEstimate' },
     { name: "js-foo-unknown", policy: 'Unreviewed' },
     { name: "invalid", policy: 'NoEstimate' },
@@ -619,11 +621,11 @@ test('WHAT[speculative-investigation-016] source batch capture rejects participa
 test('WHAT[speculative-investigation-016] every tool on the known tool surface receives the classification the protocol list prescribes', () => {
   // 已知工具名清单来源于公开 ToolSurface 契约
   const knownToolsFromSurface = ToolSurface.toolSpecNames();
-  assert.ok(knownToolsFromSurface.length >= 30, `knownToolNames must cover active tool surface, got ${knownToolsFromSurface.length}`);
-  assert.ok(knownToolsFromSurface.includes("read"), "knownToolNames must include 'read'");
+  assert.ok(knownToolsFromSurface.length >= 20, `knownToolNames must cover active tool surface, got ${knownToolsFromSurface.length}`);
+  assert.ok(knownToolsFromSurface.includes("todowrite-for-engineer"), "knownToolNames must include 'todowrite-for-engineer'");
   assert.ok(knownToolsFromSurface.includes("chronicle"), "knownToolNames must include 'chronicle'");
   assert.ok(knownToolsFromSurface.includes("fork"), "knownToolNames must include 'fork'");
-  assert.ok(knownToolsFromSurface.includes("run"), "knownToolNames must include 'run'");
+  assert.ok(knownToolsFromSurface.includes("todowrite-for-devops"), "knownToolNames must include 'todowrite-for-devops'");
 
   // 差集门禁：工具面里的每个已知工具都必须拿到已判定的策略，任何工具都不得
   // 静默落到 Unreviewed 而逃过协议审阅。
@@ -700,8 +702,8 @@ test('WHAT[speculative-investigation-016] known-bad fixtures prove the gate dete
   // Mutation 3: a new tool enters the tool surface carrying no production verdict
   assert.throws(
     () => {
-      const simulatedKnownTools = ["read", "new-leaked-tool"];
-      const acknowledgedDecorating = ["read"];
+      const simulatedKnownTools = ["todowrite-for-engineer", "new-leaked-tool"];
+      const acknowledgedDecorating = ["todowrite-for-engineer"];
       const undecided = simulatedKnownTools.filter(
         (name) => !acknowledgedDecorating.includes(name) && Strength.classifyTool(name) === 'Unreviewed'
       );

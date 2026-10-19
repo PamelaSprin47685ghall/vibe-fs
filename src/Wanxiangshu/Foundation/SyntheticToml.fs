@@ -154,15 +154,32 @@ module SyntheticToml =
     let private formatPath (segments: string list) =
         segments |> List.map renderKey |> String.concat "."
 
-    let encodeFs (rewritten: string list) (created: string list) : string list =
+    let encodeFs
+        (rewritten: string list)
+        (created: string list)
+        (removed: string list)
+        (moved: (string * string) list)
+        : string list =
         let renderStringArray values =
             "[" + String.concat ", " (List.map renderString values) + "]"
+
+        let renderMovedArray values =
+            "["
+            + String.concat
+                ", "
+                (values
+                 |> List.map (fun (fromPath, toPath) -> renderString (fromPath + " -> " + toPath)))
+            + "]"
 
         let fields =
             [ if rewritten <> [] then
                   field "rewritten" (renderStringArray rewritten)
               if created <> [] then
-                  field "created" (renderStringArray created) ]
+                  field "created" (renderStringArray created)
+              if removed <> [] then
+                  field "removed" (renderStringArray removed)
+              if moved <> [] then
+                  field "moved" (renderMovedArray moved) ]
 
         if fields = [] then [] else [ tableEntry "fs" fields ]
 

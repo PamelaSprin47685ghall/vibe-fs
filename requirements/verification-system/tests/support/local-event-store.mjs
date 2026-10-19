@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto'
 
 const EventStore = await import('../../../../dist/Persistence/EventStore/Surface.js')
 
-/** Test-only production-shape EventStore: temp git common-dir + one WriterId NDJSON.
+/** Test-only production-shape EventStore: temp state root + one WriterId NDJSON.
  * EventStoreSurface owns append locking, payload closure, Current integration, and replay.
  */
 export const createLocalEventStore = ({ commonDir, writerId } = {}) => {
@@ -14,7 +14,7 @@ export const createLocalEventStore = ({ commonDir, writerId } = {}) => {
 
   if (!gitCommonDir) {
     ownedBase = mkdtempSync(join(tmpdir(), 'wxs-local-store-'))
-    gitCommonDir = join(ownedBase, '.git')
+    gitCommonDir = join(ownedBase, '.Herdchestra')
   }
 
   mkdirSync(gitCommonDir, { recursive: true })

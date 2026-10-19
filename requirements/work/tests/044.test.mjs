@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { deliverOnce, relayHandover } from './support/contract.mjs'
 import * as scopeMod from '../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
-import { withAdmittedChildren } from '../../managed-session-lifecycle/tests/support/admitted-child-work.mjs'
+import { withAdmittedChildren, withSharedAdmittedChildren } from '../../managed-session-lifecycle/tests/support/admitted-child-work.mjs'
+import { join } from 'node:path'
 import * as ownershipHost from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as authority from '../../../dist/Interaction/Authority/RuntimeSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
@@ -81,16 +82,16 @@ test('WHAT[work-044] RetirementBlockersFor excludes fixed DevOps agent and PTYs 
 })
 
 test('WHAT[work-044] cold retirement reads durable child parent edges and retains Engineer PTYs while excluding fixed DevOps', async () => {
-  await withAdmittedChildren('work-044-cold-ownership', 'cold-manager', [
+  await withSharedAdmittedChildren('work-044-cold-ownership', 'cold-manager', [
     { agentId: 'devops', sessionId: 'cold-devops', role: 'devops' },
     { agentId: 'engineer', sessionId: 'cold-engineer', role: 'engineer' },
   ], async (journal, _profiles, directory) => {
     for (const child of ['cold-devops', 'cold-engineer']) {
       const registry = `fork-pty:${child}`
-      ownershipHost.executeOwnershipDurable(directory, registry, `open:${child}`, {
+      ownershipHost.executeOwnershipDurable(join(directory, '.Herdchestra'), registry, `open:${child}`, {
         type: 'OpenScope', scopeId: child, parentId: null,
       })
-      ownershipHost.executeOwnershipDurable(directory, registry, `reserve:${child}`, {
+      ownershipHost.executeOwnershipDurable(join(directory, '.Herdchestra'), registry, `reserve:${child}`, {
         type: 'Reserve', resourceId: `pty:${child}`, scopeId: child, kind: 'process',
       })
     }
@@ -101,7 +102,7 @@ test('WHAT[work-044] cold retirement reads durable child parent edges and retain
 })
 
 test('WHAT[work-044] cold ownership matches the child session when two parents use the same handle name', async () => {
-  await withAdmittedChildren('work-044-distinct-parents', 'a-manager', [
+  await withSharedAdmittedChildren('work-044-distinct-parents', 'a-manager', [
     { agentId: 'engineer-1', sessionId: 'a-child', role: 'engineer' },
   ], async (journal, _profiles, directory) => {
     const owner = await acceptOwner(journal, 'z-manager')
@@ -119,10 +120,10 @@ test('WHAT[work-044] cold ownership matches the child session when two parents u
     assert.equal(sent.ok, true, sent.error)
     const accepted = await dispatch.acceptAgentOwnerRoot(journal, 'z-child', sent.key, 'physical-z-child')
     assert.equal(accepted.ok, true, JSON.stringify(accepted.error))
-    ownershipHost.executeOwnershipDurable(directory, 'fork-pty:z-child', 'open:z-child', {
+    ownershipHost.executeOwnershipDurable(join(directory, '.Herdchestra'), 'fork-pty:z-child', 'open:z-child', {
       type: 'OpenScope', scopeId: 'z-child', parentId: null,
     })
-    ownershipHost.executeOwnershipDurable(directory, 'fork-pty:z-child', 'reserve:z-child', {
+    ownershipHost.executeOwnershipDurable(join(directory, '.Herdchestra'), 'fork-pty:z-child', 'reserve:z-child', {
       type: 'Reserve', resourceId: 'pty:z-child', scopeId: 'z-child', kind: 'process',
     })
     assert.deepEqual(await coldBlockers(journal, directory, 'a-manager'), [])

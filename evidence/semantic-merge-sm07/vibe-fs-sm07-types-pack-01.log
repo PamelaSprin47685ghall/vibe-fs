@@ -1,0 +1,226 @@
+[
+  {
+    "id": "wanxiangli@0.8.1",
+    "name": "wanxiangli",
+    "version": "0.8.1",
+    "size": 262766,
+    "unpackedSize": 1285568,
+    "shasum": "4f5e7483b99fd0b23785cc1c3dbf47f9bc63818d",
+    "integrity": "sha512-KfnPG1A+J9S1vAqratNsVWGUbqnwtcjxvPX0GTpn85N8q5+e+T3tKrNYAt4pCYs9J3J4NFeFUbt4KGFBCKwDXQ==",
+    "filename": "wanxiangli-0.8.1.tgz",
+    "files": [
+      {
+        "path": "MIGRATION.md",
+        "size": 15246,
+        "mode": 420
+      },
+      {
+        "path": "OWNERSHIP.md",
+        "size": 9758,
+        "mode": 420
+      },
+      {
+        "path": "PROCESS.md",
+        "size": 12733,
+        "mode": 420
+      },
+      {
+        "path": "README.md",
+        "size": 15872,
+        "mode": 420
+      },
+      {
+        "path": "THIRD_PARTY_NOTICES",
+        "size": 1280,
+        "mode": 420
+      },
+      {
+        "path": "TRACE.md",
+        "size": 12195,
+        "mode": 420
+      },
+      {
+        "path": "dist/assembly/DurableWork.js",
+        "size": 5355,
+        "mode": 420
+      },
+      {
+        "path": "dist/events/CanonicalEventCodec.js",
+        "size": 141072,
+        "mode": 420
+      },
+      {
+        "path": "dist/eventstore/SqliteJournal.js",
+        "size": 8786,
+        "mode": 420
+      },
+      {
+        "path": "dist/fs/Filesystem.js",
+        "size": 147434,
+        "mode": 420
+      },
+      {
+        "path": "dist/grounding/Grounding.js",
+        "size": 83149,
+        "mode": 420
+      },
+      {
+        "path": "dist/identity/Identity.js",
+        "size": 61364,
+        "mode": 420
+      },
+      {
+        "path": "dist/lifecycle/Work.js",
+        "size": 100425,
+        "mode": 420
+      },
+      {
+        "path": "dist/process/ProcessSession.js",
+        "size": 48791,
+        "mode": 420
+      },
+      {
+        "path": "dist/resources/Resources.js",
+        "size": 141319,
+        "mode": 420
+      },
+      {
+        "path": "dist/session/Ownership.js",
+        "size": 66962,
+        "mode": 420
+      },
+      {
+        "path": "dist/supervision/SupervisedProcess.js",
+        "size": 55071,
+        "mode": 420
+      },
+      {
+        "path": "dist/time-node/NodeTime.js",
+        "size": 7889,
+        "mode": 420
+      },
+      {
+        "path": "dist/time-testing/TimeTesting.js",
+        "size": 37152,
+        "mode": 420
+      },
+      {
+        "path": "dist/time/Time.js",
+        "size": 15792,
+        "mode": 420
+      },
+      {
+        "path": "dist/trace/Trace.js",
+        "size": 65824,
+        "mode": 420
+      },
+      {
+        "path": "dist/wait/Wait.js",
+        "size": 189496,
+        "mode": 420
+      },
+      {
+        "path": "package.json",
+        "size": 3559,
+        "mode": 420
+      },
+      {
+        "path": "resources/provider/library/resource-pair/en.md",
+        "size": 232,
+        "mode": 420
+      },
+      {
+        "path": "resources/provider/library/resource-pair/zh-CN.md",
+        "size": 209,
+        "mode": 420
+      },
+      {
+        "path": "src/assembly/index.d.ts",
+        "size": 928,
+        "mode": 420
+      },
+      {
+        "path": "src/events/index.d.ts",
+        "size": 3002,
+        "mode": 420
+      },
+      {
+        "path": "src/eventstore/index.d.ts",
+        "size": 804,
+        "mode": 420
+      },
+      {
+        "path": "src/fs/index.d.ts",
+        "size": 2867,
+        "mode": 420
+      },
+      {
+        "path": "src/grounding/index.d.ts",
+        "size": 1678,
+        "mode": 420
+      },
+      {
+        "path": "src/identity/index.d.ts",
+        "size": 2736,
+        "mode": 420
+      },
+      {
+        "path": "src/lifecycle/index.d.ts",
+        "size": 4203,
+        "mode": 420
+      },
+      {
+        "path": "src/process/index.d.ts",
+        "size": 2319,
+        "mode": 420
+      },
+      {
+        "path": "src/resources/index.d.ts",
+        "size": 1363,
+        "mode": 420
+      },
+      {
+        "path": "src/session/index.d.ts",
+        "size": 2470,
+        "mode": 420
+      },
+      {
+        "path": "src/supervision/index.d.ts",
+        "size": 1333,
+        "mode": 420
+      },
+      {
+        "path": "src/supervision/README.md",
+        "size": 4404,
+        "mode": 420
+      },
+      {
+        "path": "src/time-node/index.d.ts",
+        "size": 279,
+        "mode": 420
+      },
+      {
+        "path": "src/time-testing/index.d.ts",
+        "size": 429,
+        "mode": 420
+      },
+      {
+        "path": "src/time/index.d.ts",
+        "size": 947,
+        "mode": 420
+      },
+      {
+        "path": "src/trace/index.d.ts",
+        "size": 3967,
+        "mode": 420
+      },
+      {
+        "path": "src/wait/index.d.ts",
+        "size": 4874,
+        "mode": 420
+      }
+    ],
+    "entryCount": 42,
+    "bundled": []
+  }
+]

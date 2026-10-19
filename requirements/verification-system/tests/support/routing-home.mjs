@@ -6,7 +6,7 @@ export const writeRoutingHome = home => {
   mkdirSync(directory, { recursive: true })
   writeFileSync(join(directory, 'wanxiangshu.mjs'), `export const routingProtocol = 2
 export default function route(role, running, previous, purpose) {
-  if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor']).has(role)) throw new Error('unexpected managed role: ' + role)
+  if (!new Set(['manager', 'orchestrator', 'engineer', 'coder', 'inspector', 'browser', 'inquiry', 'reviewer', 'devops', 'distiller', 'blogger', 'bookkeeper', 'predictor', 'plan', 'advisor']).has(role)) throw new Error('unexpected managed role: ' + role)
   if (Array.isArray(globalThis.__wanxiangshu_test_routing_seen)) {
     globalThis.__wanxiangshu_test_routing_seen.push({ role, running: running.map(item => ({ ...item })) })
   }

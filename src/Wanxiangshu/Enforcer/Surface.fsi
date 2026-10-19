@@ -23,7 +23,6 @@ module EnforcerSurface =
     val tryFindByField: string -> obj
     val validate: int -> obj array -> obj
     val decodeCall: obj -> obj
-    val missingTipError: string
     val hasValidText: obj -> bool
     val canonicalCycle: obj -> obj
     val maxBlogTextBytes: int
@@ -31,4 +30,3 @@ module EnforcerSurface =
     val composeBloggerSystemPrompt: string -> string -> string
     val loadFor: string -> obj array
     val validateBounds: string -> string option -> obj
-    val resolveField: field: string -> rules: obj array -> obj

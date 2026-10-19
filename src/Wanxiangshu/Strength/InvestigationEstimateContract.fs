@@ -26,20 +26,20 @@ module InvestigationEstimateContract =
         | NoEstimate
         | Unreviewed
 
+    /// The participating list carries exactly the names that can still reach this
+    /// function: the Host hands it a tool definition (or a tool execution) only for a
+    /// tool the session may actually call. The direct filesystem tools
+    /// (read/glob/grep/edit/write/mv/rm) are retired — the plugin registers no name
+    /// for them and every role permission object denies the unregistered rest with
+    /// `*: deny` — and a read-only replica session's whole Host tool face is
+    /// `todowrite-for-predictor` (StrengthReplicaTools.exactReadonlyHostToolMap).
     let classifyTool (toolName: string) : InvestigationToolPolicy =
         match toolName with
-        | "read"
-        | "glob"
-        | "grep"
-        | "js-manager"
-        | "js-engineer"
-        | "js-devops"
-        | "edit"
-        | "write"
-        | "mv"
-        | "rm"
-        | "fetch"
-        | "run" -> InvestigationToolPolicy.EstimateAfterCall
+        | "todowrite-for-manager"
+        | "todowrite-for-engineer"
+        | "todowrite-for-devops"
+        | "fetch" -> InvestigationToolPolicy.EstimateAfterCall
+
         | "fork"
         | "resume"
         | "commission"
@@ -47,26 +47,20 @@ module InvestigationEstimateContract =
         | "horizon"
         | "review"
         | "fission"
-        | "js-plan"
+        | "todowrite-for-plan"
         | "ask"
-        | "handoff"
+        | "devops"
         | "deliver"
-        | "open-terminal"
-        | "send-terminal"
-        | "read-terminal"
-        | "signal-terminal"
+
         | "skill"
-        | "todowrite"
         | "assume"
-        | "defer"
-        | "publish"
         | "chronicle"
-        | "js-bookkeeper"
-        | "js-predictor"
+        | "todowrite-for-bookkeeper"
+        | "todowrite-for-predictor"
         | "bash-honeypot"
         | "invalid"
-        | "js-orchestrator"
-        | "js-blogger" -> InvestigationToolPolicy.NoEstimate
+        | "todowrite-for-orchestrator"
+        | "todowrite-for-blogger" -> InvestigationToolPolicy.NoEstimate
         | _ -> InvestigationToolPolicy.Unreviewed
 
     [<Struct>]

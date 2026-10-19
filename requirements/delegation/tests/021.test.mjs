@@ -5,7 +5,7 @@ import { render } from '../../../dist/Execution/Delegation/Fork/Surface.js'
 
 const assignment = 'Investigate the failing integration test.'
 const input = attachment => ({
-  Assignment: assignment, Attachment: attachment, CommissionerRecord: undefined,
+  Assignment: assignment, Attachment: attachment,
   RootRequirements: [], Payload: undefined,
 })
 

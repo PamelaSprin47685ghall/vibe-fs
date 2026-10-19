@@ -3,14 +3,19 @@ import test from 'node:test'
 import { generateSurfaceForRole } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 
 test('WHAT[repository-programming-027] both working roles receive the same generated members for equal capabilities', () => {
-  const capabilities = ['Read', 'Write', 'Edit', 'Glob', 'Grep']
+  const capabilities = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove']
   const engineer = generateSurfaceForRole('Engineer', capabilities)
   const devops = generateSurfaceForRole('DevOps', capabilities)
-  assert.equal(engineer.toolName, 'js-engineer')
-  assert.equal(devops.toolName, 'js-devops')
+  assert.equal(engineer.toolName, 'todowrite-for-engineer')
+  assert.equal(devops.toolName, 'todowrite-for-devops')
   assert.equal(engineer.baseClassSource, devops.baseClassSource)
-  assert.deepEqual(engineer.members.map(m => m.memberName), ['file', 'glob', 'grep', 'edit', 'rewrite', 'write'])
+  assert.deepEqual(
+    engineer.members.map(m => m.memberName),
+    ['write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where'],
+  )
   assert.deepEqual(devops.members, engineer.members)
 })
 
-test.todo('WHAT[repository-programming-027] registered direct tools and programming tools enforce the same path, encoding, symlink and transaction boundaries')
+// Superseded note: direct Host filesystem tools (`read`/`write`/`edit`/`glob`/`grep`/`patch`)
+// and plugin `mv`/`rm` ToolSpecs are retired; Engineer and DevOps share the unified js
+// programming surface (`cat`/`where`/`write`/`ls`/`mv`/`rm`).

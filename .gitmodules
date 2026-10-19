@@ -1,0 +1,4 @@
+[submodule "wanxiangli"]
+	path = wanxiangli
+	url = https://github.com/dyx13/wanxiangli.git
+	branch = main

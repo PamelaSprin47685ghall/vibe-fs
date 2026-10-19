@@ -21,7 +21,6 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
-open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.Persistence.EventStore
@@ -452,9 +451,6 @@ module PluginHostInterop =
         (onRunStarted: (SessionId -> Role -> string option -> unit) option)
         (parentWorkRecordFor: (string -> Task<string option>) option)
         (childWorkRecordFor: (string -> Task<string option>) option)
-        (childWorkRecordForRun:
-            SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>)
-        (workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability)
         (snapshot: ISessionSnapshotPort option)
         (cancelSignals: (SessionId seq -> unit) option)
         (eventPort: IEventObservationPort option)
@@ -464,8 +460,13 @@ module PluginHostInterop =
         : ToolRegistration =
         let jsTransactionPersistence =
             workspaceDirectory
-            |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace))
+            |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.stateRoot workspace))
             |> Option.map JsToolsTransactionStore.createPersistence
+
+        let jsLifecyclePersistence =
+            workspaceDirectory
+            |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.stateRoot workspace))
+            |> Option.map JsToolsTransactionStore.createLifecyclePersistence
 
         let quiescence = scope.Sessions.Quiescence :> ISessionQuiescenceGate
 
@@ -494,9 +495,8 @@ module PluginHostInterop =
                  |> Option.map (fun s -> fun sid -> s.StrengthRuntime.TryFindByReplica sid |> Option.isSome))
                 casebookToolSpecs
                 jsTransactionPersistence
+                jsLifecyclePersistence
                 continueManagerLoop
-                (Some childWorkRecordForRun)
-                (Some workRecordCapability)
                 userNotify
 
         // Process-local join admission: JoinTool RequireCurrentProcessJoin → PluginRuntimeScope.

@@ -34,9 +34,14 @@ open Wanxiangshu.Composition.Durable.Fact
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Repository.Programming.Js
+open Fable.Core
 
 /// Per-run terminal lifecycle for HostForkRuntime: install, complete, fail.
 module HostForkRunLifecycle =
+
+    [<Emit("console.error($0, $1)")>]
+    let private logError (prefix: string) (message: string) : unit = jsNative
 
     [<RequireQualifiedAccess>]
     type AgentOwnerDispatchOutcome =
@@ -226,21 +231,11 @@ module HostForkRunLifecycle =
             return interpretDispatchResult durable childId identitySeed prompt onAccepted sent
         }
 
-    let workRecordForOutcome
-        (childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>)
-        (completedFrontier: SessionId -> ProviderRunIdentity -> XTraceCursor option)
-        (run: PendingHostRun)
-        (outcome: TerminalOutcome)
-        =
+    let workRecordForOutcome (run: PendingHostRun) (outcome: TerminalOutcome) =
         match outcome with
-        | TerminalOutcome.Completed result ->
-            completedFrontier run.ChildId result.ProviderRun
-            |> Option.map (fun frontier ->
-                childWorkRecordForRun
-                    run.ChildId
-                    (DelegationHandoff.childRange run.StartCursor frontier)
-                    result.ProviderRun)
-            |> Option.defaultValue (Task.FromResult None)
+        | TerminalOutcome.Completed _ ->
+            JsDeliveredValues.tryTakeRendered (SessionId.value run.ChildId)
+            |> Task.FromResult
         | _ -> Task.FromResult None
 
     /// Idle existing child / first prompt for an AgentOwnerRoot work unit.
@@ -293,72 +288,18 @@ module HostForkRunLifecycle =
         stop.AuthorityRootUserMessageId.IsNone
         || TerminalStop.belongsTo run.AuthorityRoot stop
 
-    /// delegation-031: the handoff port travels with the prepared handoff as one slot
-    /// (`Some slot` proves the capability was present at PrepareHandoff time).
-    /// A run whose `Handoff` slot is `None` has no completion checkpoint to
-    /// write — capability absence is therefore decided here structurally, not by
-    /// a late fatal, and `complete` never re-checks a construction-time fact.
-    /// Prepared-handoff capability arbitration: `Some port`/`Some handoff`
-    /// pair married, capability-absent prepared handoff → structural
-    /// invariant violation. Kept at module level so `checkpointSlot` stays
-    /// single-level — the nested match is delegated here, not inlined.
-    let private checkpointSlotFor
-        (handoffPort: ReusableHandoffPort option)
-        (handoff: PreparedDelegationHandoff)
-        : (ReusableHandoffPort * PreparedDelegationHandoff) option =
-        match handoffPort with
-        | Some port -> Some(port, handoff)
-        | None ->
-            raise (
-                InvalidOperationException
-                    "reusable fork run has no handoff capability: prepared handoff without a handoff port"
-            )
-
-    let private checkpointSlot (handoffPort: ReusableHandoffPort option) (run: PendingHostRun) =
-        match run.Handoff with
-        | None -> None
-        | Some handoff -> checkpointSlotFor handoffPort handoff
-
-    /// Commitment switchboard for a CheckpointCompleted settlement. Non-conflict
-    /// outcomes are sunk to unit; PhaseConflict is the retained inventor's
-    /// authority — it trips the process because no settlement path exists at
-    /// that level.
-    let private checkpointOutcomePort (settled: HandoffCheckpointSettlement) : Task =
-        task {
-            match settled.Commitment with
-            | HandoffCheckpointCommitment.Committed
-            | HandoffCheckpointCommitment.NotCommitted _
-            | HandoffCheckpointCommitment.PersistenceFailed _
-            | HandoffCheckpointCommitment.Unknown _ -> ()
-            | HandoffCheckpointCommitment.PhaseConflict reason ->
-                let detail =
-                    sprintf
-                        "delegation completed-handoff invariant cut at route %s: %s"
-                        (DelegationHandoffRoute.value settled.Identity.Route)
-                        reason
-
-                FatalProcess.trip "HostForkRunLifecycle.checkpointCompletedHandoff" detail
-        }
-        :> Task
-
-    let private settleCompletedHandoff
-        (handoffPort: ReusableHandoffPort option)
-        (parentId: SessionId)
-        (run: PendingHostRun)
-        : Task =
-        match checkpointSlot handoffPort run with
-        | None -> Task.FromResult(()) :> Task
-        | Some(port, handoff) ->
-            task {
-                // delegation-031: the checkpoint returns its own settlement — a pending
-                // completion is delivered whatever the commitment says. The child
-                // already finished; NotCommitted/Unknown preserve pending-evidence
-                // for the next invocation's durable re-read and never re-execute
-                // the child. Only the PhaseConflict invariant cut escalates.
-                let! settled = port.CheckpointCompleted parentId handoff
-                return! checkpointOutcomePort settled
-            }
-            :> Task
+    /// The synchronous sticky replay at install time must never settle a brand-new
+    /// run with a predecessor's stored terminal. A replayed terminal is accepted
+    /// only when it addresses this run: Completed needs the same child and
+    /// authority root, Failed needs the exact authority root (no authority-less
+    /// allowance — the live path keeps that allowance, the replay does not), and
+    /// Aborted is observation only. Live delivery (after the run is armed) keeps
+    /// the existing guards untouched.
+    let private replayedTerminalAddressesRun (run: PendingHostRun) (outcome: TerminalOutcome) : bool =
+        match outcome with
+        | TerminalOutcome.Completed result -> completionBelongsToRun run result
+        | TerminalOutcome.Failed stop -> TerminalStop.belongsTo run.AuthorityRoot stop
+        | TerminalOutcome.Aborted _ -> false
 
     /// P0-RECOVERY-JOIN-001: only proven terminals may claim the cell.
     /// Aborted is observation — never recordCompletion / SetResult / mailbox.
@@ -406,6 +347,61 @@ module HostForkRunLifecycle =
                 pendingRuns.Remove run.AgentId |> ignore
             | _ -> ())
 
+    let private resolveFinalCommittedOutcome
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (proof: JoinableCompletion)
+        (run: PendingHostRun)
+        (agentOutcome: AgentCompletionOutcome)
+        : Task<AgentCompletionOutcome> =
+        match journal with
+        | None -> Task.FromResult agentOutcome
+        | Some j -> committedOutcome (Some j) parentId proof run agentOutcome
+
+    let private isWorkCommittedOrRetired (work: HandleWorkRecord) =
+        match work.Lifecycle with
+        | CompletedAwaitingJoin _
+        | Retired -> true
+        | _ -> false
+
+    let private isCompletionCommitted
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        : bool =
+        journal
+        |> Option.exists (fun durable ->
+            run.Work
+            |> Option.exists (fun admitted ->
+                HandleProjection.tryWork (AdmittedWork.id admitted) (AgentJournal.handleProjection durable parentId)
+                |> Option.exists isWorkCommittedOrRetired))
+
+    let private releaseClaimedRunIfCommitted
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        =
+        if journal.IsNone || isCompletionCommitted journal parentId run then
+            removeClaimedRun gate pendingRuns run
+
+    let private deliverClaimSettlementFault (run: PendingHostRun) (error: exn) =
+        // The claim consumed this run's only completion promise. An
+        // unsettled Source strands the Fork await and the join ledger
+        // forever — settle an explicit failure even when settlement
+        // itself faulted.
+        let failedOutcome =
+            AgentCompletion.failed
+                run.AgentId
+                ("run-" + run.AgentId)
+                (Some run.Role)
+                (Some run.ChildId)
+                "PERSIST"
+                (sprintf "completion settlement faulted: %s" error.Message)
+
+        AsyncSupport.trySetResult run.Source failedOutcome |> ignore
+
     let private startClaimDelivery
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -416,32 +412,20 @@ module HostForkRunLifecycle =
         (agentOutcome: AgentCompletionOutcome)
         : Task =
         task {
-            let! finalOutcome =
-                match journal with
-                | None -> Task.FromResult agentOutcome
-                | Some j -> committedOutcome (Some j) parentId proof run agentOutcome
-
-            // Do not release the road while the exact completion commit is unknown.
-            let committed =
-                journal
-                |> Option.exists (fun durable ->
-                    run.Work
-                    |> Option.exists (fun admitted ->
-                        HandleProjection.tryWork
-                            (AdmittedWork.id admitted)
-                            (AgentJournal.handleProjection durable parentId)
-                        |> Option.exists (fun work ->
-                            match work.Lifecycle with
-                            | CompletedAwaitingJoin _
-                            | Retired -> true
-                            | _ -> false)))
-
-            if journal.IsNone || committed then
-                removeClaimedRun gate pendingRuns run
-
-            run.Source.SetResult finalOutcome
+            try
+                let! finalOutcome = resolveFinalCommittedOutcome journal parentId proof run agentOutcome
+                releaseClaimedRunIfCommitted gate pendingRuns journal parentId run
+                run.Source.SetResult finalOutcome
+            with error ->
+                deliverClaimSettlementFault run error
         }
         :> Task
+
+    let private disposeSubscriptionSafely (subscription: IDisposable option) =
+        try
+            subscription |> Option.iter (fun s -> s.Dispose())
+        with _ ->
+            ()
 
     let private deliverClaimedCompletion
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -455,10 +439,16 @@ module HostForkRunLifecycle =
         let claimed, subscriptionToDispose = claimPendingRun gate pendingRuns run
 
         if claimed then
-            subscriptionToDispose
-            |> Option.iter (fun subscription -> subscription.Dispose())
-
-            startClaimDelivery gate pendingRuns journal parentId run proof agentOutcome
+            task {
+                // The claim consumed this run's only completion promise. A faulting
+                // subscription Dispose must not strand the Source: the delivery (and
+                // its PERSIST failure settlement) always runs, even when cleanup
+                // itself faults. The `do!` stays after the fault boundary, not in
+                // a `finally` (a `finally` in `task { }` cannot await).
+                disposeSubscriptionSafely subscriptionToDispose
+                do! startClaimDelivery gate pendingRuns journal parentId run proof agentOutcome
+            }
+            :> Task
         else
             Task.FromResult(())
 
@@ -550,16 +540,10 @@ module HostForkRunLifecycle =
         (pendingRuns: Dictionary<string, PendingHostRun>)
         (journal: AgentJournal option)
         (parentId: SessionId)
-        (handoffPort: ReusableHandoffPort option)
         (prepareCompletion: PendingHostRun -> TerminalOutcome -> Task<string option>)
         (run: PendingHostRun)
         (outcome: TerminalOutcome)
         : Task =
-        // EXEC-006 / COMPANION-003: the completion's work record is the child's
-        // final LifecycleWorkRecord only — Opening + frames + gap + terminal,
-        // materialised by the same port as parent background. No TerminalText
-        // or session-A fallback: a missing LWR is an empty work_record, not a
-        // second channel.
         let runId = "run-" + run.AgentId
         let childId = run.ChildId
         let handle = HandleController.agentHandle run.AgentId
@@ -579,13 +563,6 @@ module HostForkRunLifecycle =
         | Completed result ->
             prepareCurrentCompletion gate pendingRuns run (fun () -> prepareCompletion run outcome) (fun workRecord ->
                 task {
-                    // delegation-031: settlement is attempted before delivery, but the
-                    // proven completion is delivered whatever the commitment says —
-                    // neither announced early (this await precedes the SetResult
-                    // below) nor forgotten. Only PhaseConflict escalates, after
-                    // which no delivery can follow.
-                    do! settleCompletedHandoff handoffPort parentId run
-
                     let agentOutcome =
                         AgentCompletion.completed
                             run.AgentId
@@ -626,6 +603,45 @@ module HostForkRunLifecycle =
             prepareCurrentCompletion gate pendingRuns run (fun () -> prepareCompletion run outcome) (fun _ ->
                 deliverFailedCompletion gate pendingRuns journal parentId run stop.Reason)
 
+    let private recoverFailedSettlement
+        (gate: obj)
+        (pendingRuns: Dictionary<string, PendingHostRun>)
+        (journal: AgentJournal option)
+        (parentId: SessionId)
+        (run: PendingHostRun)
+        (error: exn)
+        : Task =
+        task {
+            logError "FORK-SETTLEMENT" (sprintf "run %s completion settlement faulted: %s" run.AgentId error.Message)
+
+            try
+                do!
+                    deliverFailedCompletion
+                        gate
+                        pendingRuns
+                        journal
+                        parentId
+                        run
+                        (sprintf "completion settlement faulted: %s" error.Message)
+            with recovery ->
+                logError "FORK-SETTLEMENT" (sprintf "run %s failure delivery faulted: %s" run.AgentId recovery.Message)
+
+                AsyncSupport.trySetResult
+                    run.Source
+                    (AgentCompletion.failed
+                        run.AgentId
+                        ("run-" + run.AgentId)
+                        (Some run.Role)
+                        (Some run.ChildId)
+                        "PERSIST"
+                        (sprintf "completion settlement faulted: %s" error.Message))
+                |> ignore
+        }
+
+    let private requireCompletionClaim gate (run: PendingHostRun) (error: exn) =
+        if not (lock gate (fun () -> run.Finished)) then
+            raise error
+
     let installRun
         (gate: obj)
         (pendingRuns: Dictionary<string, PendingHostRun>)
@@ -633,15 +649,14 @@ module HostForkRunLifecycle =
         (parentId: SessionId)
         (sessions: ISessionHostPort)
         (prepareCompletion: PendingHostRun -> TerminalOutcome -> Task<string option>)
-        (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
-        (handoffPort: ReusableHandoffPort option)
-        (handoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
         (authorityRoot: AuthorityRootUserMessageId)
         =
+        JsDeliveredValues.clear (SessionId.value childId)
+
         let work =
             match journal with
             | None -> invalidOp "a pending agent work requires a canonical journal"
@@ -654,8 +669,6 @@ module HostForkRunLifecycle =
               AgentId = agentId
               ChildId = childId
               Role = role
-              StartCursor = xTraceHead childId
-              Handoff = handoff
               AuthorityRoot = authorityRoot
               Work = Some work
               Source = HostPendingRun.completionSource ()
@@ -665,17 +678,48 @@ module HostForkRunLifecycle =
 
         lock gate (fun () -> pendingRuns.[agentId] <- run)
 
+        // DSL-MUTABLE: algorithm-scratch — install-time replay window flag
+        let mutable armed = false
+
+        let deliverTerminal (outcome: TerminalOutcome) =
+            trackOwnedWork (fun () ->
+                task {
+                    try
+                        do! complete gate pendingRuns journal parentId prepareCompletion run outcome
+                    with error ->
+                        // Preparation can fail while physical resources still block
+                        // completion. Only an already claimed result may recover.
+                        requireCompletionClaim gate run error
+
+                        // A terminal the child proved must still resolve
+                        // this run's only completion promise even when
+                        // settlement faulted: settle an explicit joinable
+                        // failure (never silence, never a stranded Source).
+                        do! recoverFailedSettlement gate pendingRuns journal parentId run error
+                }
+                :> Task)
+
         let subscription =
-            sessions.SubscribeFutureTerminal(
+            // Sticky subscription: a terminal that fired between prompt acceptance
+            // and run installation (e.g. a pre-provider admission failure settling
+            // synchronously inside chat.message) must be replayed here, or the run
+            // is stranded and the parent's join never settles. Until the run is
+            // armed, every delivery is a replay (or a same-tick race) and must
+            // address this run — a predecessor's stored terminal must not settle a
+            // brand-new run. Once armed, the existing guards own the live path.
+            sessions.SubscribeTerminal(
                 childId,
                 (fun _ outcome ->
-                    trackOwnedWork (fun () ->
-                        complete gate pendingRuns journal parentId handoffPort prepareCompletion run outcome))
+                    if not armed && not (replayedTerminalAddressesRun run outcome) then
+                        ()
+                    else
+                        deliverTerminal outcome)
             )
 
         let disposeImmediately =
             lock gate (fun () ->
                 run.Subscription <- Some subscription
+                armed <- true
                 run.Finished)
 
         if disposeImmediately then
@@ -709,7 +753,6 @@ module HostForkRunLifecycle =
         (journal: AgentJournal option)
         (parentId: SessionId)
         (sessions: ISessionHostPort)
-        (handoffPort: ReusableHandoffPort option)
         (run: PendingHostRun)
         (error: string)
         =

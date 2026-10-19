@@ -50,6 +50,9 @@ module HorizonTool =
         [<Literal>]
         val LatestWorkUnavailable: string = "tool/horizon/latest-work-unavailable"
 
+        [<Literal>]
+        val Calibration: string = "tool/horizon/calibration"
+
     type HorizonRuntimeContext =
         { RuntimeFor: HostToolContext -> Result<HostForkRuntime, string>
           LogicalOwnerFor: SessionId -> SessionId
@@ -58,3 +61,9 @@ module HorizonTool =
 
     val admission: ToolAdmission
     val spec: runtimeCtx: HorizonRuntimeContext -> ToolSpec
+
+    /// The same roster as data for `js.horizon()`: every horizon-visible
+    /// participant with the status the prose line reports, its work state, its
+    /// latest record body, and the four calibration numbers, plus the terminals
+    /// still open. Provider prose is never rendered.
+    val rosterReceipt: language: string -> runtimeCtx: HorizonRuntimeContext -> context: HostToolContext -> Task<obj>

@@ -9,6 +9,6 @@
 
 正例路径（active exact）由 `sendAgentOwnerRootAwait` → `acceptAgentOwnerRoot` → `sendContinuation` 的真实 journal 流程覆盖；反例矩阵（never-active、wrong run、wrong root）断言 Host send 次数为零、`observation` 为 null、投影中 `pendingClaims`/`claimSequences` 为零。
 
-Closed-target 反例（run 已 durable 关闭、归档 profile 仍可读）需要真实的 Relay `RetirementCommitted` closure fact，归 018/GAP-123 的 lifecycle closure 工作承载，本包保留对应 todo 锚点。
+Closed-target 反例（run 已 durable 关闭、归档 profile 仍可读）需要真实的统一 `IncumbencyRetired` closure fact，归 018/GAP-123 的 lifecycle closure 工作承载，本包保留对应 todo 锚点。
 
 生产侧 `SendContinuationWithDigestAttempt` 的 claim 前验证由 `HostSessionNudge.sendContinuationResult`（`tryActiveProfile` + Fission 检查）与 DispatchSurface 的上述两层共同承担；两者共享同一 durable 投影，不引入平行状态机。

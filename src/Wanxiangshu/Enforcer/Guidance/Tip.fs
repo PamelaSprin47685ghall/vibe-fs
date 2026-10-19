@@ -9,7 +9,6 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
 open Wanxiangshu.Enforcer
-open Wanxiangshu.Resources
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.OpenCode
 
@@ -19,7 +18,7 @@ type TipGuidance =
     {
         TipName: string
         Presentation: TipPresentation
-        /// Marker tip half only (Full = name header + main.md; Identity = tip: name).
+        /// Marker tip half only (Full = name header + authored tip body; Identity = tip: name).
         Text: string
     }
 
@@ -34,8 +33,8 @@ module EnforcerTipGuidance =
         | ProviderLanguage.English -> "# Enforcer Tip"
         | ProviderLanguage.SimplifiedChinese -> "# Enforcer Tip（规则提示）"
 
-    let private tipFullText (lang: ProviderLanguage) (tipName: string) (mainText: string) : string =
-        let body = if isNull mainText then "" else mainText.Trim()
+    let private tipFullText (lang: ProviderLanguage) (tipName: string) (body: string) : string =
+        let body = if isNull body then "" else body.Trim()
 
         if body.Length = 0 then
             tipIdentityText tipName
@@ -49,18 +48,6 @@ module EnforcerTipGuidance =
         | Some { Kind = ManagedSessionKind.WorkSession } -> Some mainOrBloggerSession
         | Some { Kind = ManagedSessionKind.SatelliteSession(owner, SatelliteKind.Companion) } -> Some owner
         | None -> None
-
-    let private latestOwnerTip (journal: AgentJournal) (mainSessionId: SessionId) : RecentTip option =
-        match
-            (AgentJournal.snapshot journal).AgentProjections.Sessions
-            |> Map.tryFind mainSessionId
-        with
-        | None -> None
-        | Some session ->
-            session.Enforcement
-            |> Option.map EnforcementProjection.recentTips
-            |> Option.defaultValue []
-            |> List.tryLast
 
     let private isTipIdentityOnly
         (journal: AgentJournal)
@@ -108,73 +95,118 @@ module EnforcerTipGuidance =
                       "result", JournalAppendFailure.describe failure ]
         }
 
-    let private tipNameOf (field: string) (rule: EnforcerRule) =
-        if not (isNull rule.Name) && rule.Name.Trim().Length > 0 then
-            rule.Name.Trim()
-        else
-            field.Trim()
+    /// Read the authored tip body for one committed cycle and verify its digest
+    /// (Algorithm R2). None when the record is missing, carries no tip-text ref,
+    /// or the read fails / digest mismatches — never a guessed body.
+    let private verifyTipBlobDigest
+        (record: EnforcementCycleRecord)
+        (expectedDigest: BlobDigest)
+        (readResult: Result<string, string>)
+        : string option =
+        match readResult with
+        | Ok text when HostDigest.sha256Hex text = BlobDigest.value expectedDigest -> Some text
+        | Ok _ ->
+            Diagnostic.emit
+                "tip-guidance-digest-mismatch"
+                [ "tip", record.TipName; "cycle", ProviderRunIdentity.value record.ProviderRun ]
 
-    let private guidanceForRule
+            None
+        | Error error ->
+            Diagnostic.emit
+                "tip-guidance-blob-read-failed"
+                [ "tip", record.TipName
+                  "cycle", ProviderRunIdentity.value record.ProviderRun
+                  "result", error ]
+
+            None
+
+    let private tryReadTipBody (journal: AgentJournal) (record: EnforcementCycleRecord) : Task<string option> =
+        task {
+            match record.TipTextRef, record.TipTextDigest with
+            | Some tipRef, Some tipDigest ->
+                let! readResult = journal.Writer.BlobWriter.Read tipRef
+                return verifyTipBlobDigest record tipDigest readResult
+            | _ -> return None
+        }
+
+    let private presentTipGuidance (tipName: string) (presentation: TipPresentation) (text: string) : TipGuidance =
+        { TipName = tipName
+          Presentation = presentation
+          Text = text }
+
+    let private presentResolvedTipBody
         (journal: AgentJournal)
         (mainSessionId: SessionId)
         (lang: ProviderLanguage)
         (occurrence: string)
-        (field: string)
-        (rule: EnforcerRule)
+        (tipName: string)
+        (body: string option)
         : Task<TipGuidance option> =
         task {
-            let tipName = tipNameOf field rule
-
-            if tipName.Length = 0 then
-                return None
-            elif isTipIdentityOnly journal mainSessionId occurrence tipName then
-                let guidance: TipGuidance =
-                    { TipName = tipName
-                      Presentation = TipPresentation.IdentityOnly
-                      Text = tipIdentityText tipName }
-
-                return Some guidance
-            else
-                let text = tipFullText lang tipName rule.MainText
+            match body with
+            | None ->
+                // G5: an occurrence without a recoverable authored body is
+                // identity-only; the frontier is never advanced by a fake Full.
+                return Some(presentTipGuidance tipName TipPresentation.IdentityOnly (tipIdentityText tipName))
+            | Some text ->
+                let fullText = tipFullText lang tipName text
                 do! recordFullTipDelivered journal mainSessionId tipName occurrence
-
-                let guidance: TipGuidance =
-                    { TipName = tipName
-                      Presentation = TipPresentation.Full
-                      Text = text }
-
-                return Some guidance
+                return Some(presentTipGuidance tipName TipPresentation.Full fullText)
         }
 
-    let private guidanceForField
+    let private guidanceForRecord
         (journal: AgentJournal)
         (mainSessionId: SessionId)
+        (lang: ProviderLanguage)
         (occurrence: string)
-        (field: string)
+        (record: EnforcementCycleRecord)
         : Task<TipGuidance option> =
         task {
-            let lang = SessionProviderLanguage.languageOf mainSessionId
+            let tipName = record.TipName
 
-            match EnforcerCatalog.tryFindByField field (RuntimeResources.enforcerRulesFor lang) with
-            | None -> return None
-            | Some rule -> return! guidanceForRule journal mainSessionId lang occurrence field rule
+            if isNull tipName || tipName.Trim().Length = 0 then
+                return None
+            elif isTipIdentityOnly journal mainSessionId occurrence tipName then
+                return Some(presentTipGuidance tipName TipPresentation.IdentityOnly (tipIdentityText tipName))
+            else
+                let! body = tryReadTipBody journal record
+                return! presentResolvedTipBody journal mainSessionId lang occurrence tipName body
         }
+
+    let private tryFindLatestTipRecord
+        (journal: AgentJournal)
+        (mainSessionId: SessionId)
+        : (string * EnforcementCycleRecord) option =
+        (AgentJournal.snapshot journal).AgentProjections.Sessions
+        |> Map.tryFind mainSessionId
+        |> Option.bind (fun session -> session.Enforcement)
+        |> Option.bind (fun enforcement ->
+            EnforcementProjection.recentTips enforcement
+            |> List.tryLast
+            |> Option.bind (fun tip ->
+                let run = ProviderRunIdentity.create tip.CycleId
+
+                EnforcementProjection.tryFindByProviderRun run enforcement
+                |> Option.map (fun record -> tip.CycleId, record)))
 
     let private guidanceForOwner (journal: AgentJournal) (mainSessionId: SessionId) : Task<TipGuidance option> =
         task {
-            match latestOwnerTip journal mainSessionId with
+            match tryFindLatestTipRecord journal mainSessionId with
             | None -> return None
-            | Some tip -> return! guidanceForField journal mainSessionId tip.CycleId tip.FieldName
+            | Some(occurrence, record) ->
+                let lang = SessionProviderLanguage.languageOf mainSessionId
+                return! guidanceForRecord journal mainSessionId lang occurrence record
         }
 
     /// Resolve Main tip guidance for the auto-injected marker tip half.
     ///
-    /// First Full delivery of a tip occurrence in this Main session → main.md body
-    /// (+ name header). A new occurrence of the same TipName gets its own first
-    /// Full; a replayed occurrence → compact `tip: <name>` identity only. After
-    /// ContextReanchored the full text is restored once without a new first
-    /// delivery. Decision is TipDeliveryProjection (TipGuidanceDelivered fold),
-    /// not process-local memory.
+    /// First Full delivery of a tip occurrence in this Main session → authored
+    /// tip body read back from its blob (+ name header). A new occurrence of the
+    /// same TipName gets its own first Full; a replayed occurrence → compact
+    /// `tip: <name>` identity only. After ContextReanchored the full text is
+    /// restored once without a new first delivery. Decision is
+    /// TipDeliveryProjection (TipGuidanceDelivered fold), not process-local memory.
+    /// An occurrence without a recoverable authored body is identity-only (G5).
     ///
     /// `mainOrBloggerSession` may be the Main session id (SpikePlugin) or the Blogger
     /// satellite id; owner is resolved through SessionAssociation.

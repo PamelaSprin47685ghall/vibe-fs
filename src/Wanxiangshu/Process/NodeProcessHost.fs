@@ -8,8 +8,11 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
 module ProcessResultWire =
-    let private field (source: obj) name: obj = if isNull source then null else source?(name)
+    let private field (source: obj) name : obj =
+        if isNull source then null else source?(name)
+
     let private text source name = string (field source name)
+
     let private optionalText source name =
         let value = field source name
         if isNull value then None else Some(string value)
@@ -23,8 +26,11 @@ module ProcessResultWire =
 
     let private readExitCode ending =
         let code = field ending "exitCode"
-        if emitJsExpr code "Number.isInteger($0) && $0 >= 0 && $0 <= 2147483647" then unbox<int> code
-        else failwith "Invalid exit code"
+
+        if emitJsExpr code "Number.isInteger($0) && $0 >= 0 && $0 <= 2147483647" then
+            unbox<int> code
+        else
+            failwith "Invalid exit code"
 
     let private readEnd ending =
         match text ending "kind" with
@@ -36,7 +42,8 @@ module ProcessResultWire =
     let private readStopRequest stop =
         match text stop "kind" with
         | "CancellationRequested" -> StopRequest.CancellationRequested
-        | "DeadlineStopRequested" -> StopRequest.DeadlineStopRequested(TimeSpan.FromMilliseconds(unbox<float> (field stop "durationMs")))
+        | "DeadlineStopRequested" ->
+            StopRequest.DeadlineStopRequested(TimeSpan.FromMilliseconds(unbox<float> (field stop "durationMs")))
         | _ -> failwith "Invalid stop request"
 
     let private readStop stop =
@@ -48,16 +55,19 @@ module ProcessResultWire =
         | _ -> failwith "Expected in-memory text output"
 
     let private readOutput output =
-        if isNull output then None else Some(readCapturedOutput output)
+        if isNull output then
+            None
+        else
+            Some(readCapturedOutput output)
 
     let private readReceipt raw =
         match text raw "kind" with
-        | "NotStarted" -> ProcessResult.NotStarted(readNoExecution(field raw "reason"))
+        | "NotStarted" -> ProcessResult.NotStarted(readNoExecution (field raw "reason"))
         | "Observed" ->
             ProcessResult.Observed
-                { End = readEnd(field raw "ending")
-                  StopRequested = readStop(field raw "stopRequested")
-                  Output = readOutput(field raw "output")
+                { End = readEnd (field raw "ending")
+                  StopRequested = readStop (field raw "stopRequested")
+                  Output = readOutput (field raw "output")
                   Fault = optionalText raw "fault" }
         | _ -> failwith "Invalid process receipt"
 
@@ -65,7 +75,11 @@ module ProcessResultWire =
         try
             readReceipt raw
         with error ->
-            ProcessResult.Observed { End = EndEvidence.Unconfirmed; StopRequested = None; Output = None; Fault = Some error.Message }
+            ProcessResult.Observed
+                { End = EndEvidence.Unconfirmed
+                  StopRequested = None
+                  Output = None
+                  Fault = Some error.Message }
 
 /// JS-host process adapter. Non-PTY child-process execution delegates to
 /// wanxiangli/supervision (SupervisedProcess); spool-file I/O stays here so the rest
@@ -203,9 +217,11 @@ module NodeProcessHost =
         jsNative
 
     [<Emit("""
-        (function(SupervisedProcess, executable, args, cwd, env, stdinBytes, onStdout, onStderr, onClose, onFailure, onRejected) {
+        (function(SupervisedProcess, executable, args, cwd, env, stdinBytes, onStdout, onStderr, onClose, onFailure, onRejected, keepInputOpen) {
             let session;
             let killRequested = false;
+            let targetReady = false;
+            const pendingSignals = [];
             const input = stdinBytes == null ? null : Uint8Array.from(stdinBytes);
             try {
                 session = new SupervisedProcess({
@@ -219,10 +235,24 @@ module NodeProcessHost =
             } catch (err) {
                 return { ok: false, error: (err && err.message) ? String(err.message) : 'Failed to create SupervisedProcess' };
             }
+            const requestSignal = name => {
+                if (!['SIGTERM', 'SIGKILL', 'SIGINT', 'SIGHUP'].includes(name)) {
+                    return { kind: 'Failed', error: { message: 'Unsupported signal' } };
+                }
+                if (name === 'SIGKILL') {
+                    killRequested = true;
+                    return session.signal(name);
+                }
+                if (!targetReady) {
+                    pendingSignals.push(name);
+                    return { kind: 'Requested' };
+                }
+                return session.signal(name);
+            };
             const requestKill = () => {
                 killRequested = true;
                 try {
-                    const result = session.signal('SIGKILL');
+                    const result = requestSignal('SIGKILL');
                     if (result.kind === 'Failed') onFailure(String(result.error.message));
                 } catch (error) {
                     onFailure(error && error.message ? String(error.message) : String(error));
@@ -254,7 +284,16 @@ module NodeProcessHost =
                         await awaitClose();
                         return;
                     }
-                    if (killRequested) requestKill();
+                    targetReady = true;
+                    if (killRequested) {
+                        requestKill();
+                        pendingSignals.length = 0;
+                    } else {
+                        for (const name of pendingSignals.splice(0)) {
+                            const requested = requestSignal(name);
+                            if (requested.kind === 'Failed') onFailure(String(requested.error.message));
+                        }
+                    }
                     if (input !== null) {
                         for (let pos = 0; pos < input.byteLength; pos += 16777216) {
                             if (killRequested) break;
@@ -267,7 +306,7 @@ module NodeProcessHost =
                             }
                         }
                     }
-                    session.endInput();
+                    if (!keepInputOpen) session.endInput();
                 } catch (error) {
                     onFailure(String(error && error.message || error));
                     requestKill();
@@ -294,8 +333,8 @@ module NodeProcessHost =
                     await awaitClose();
                 }
             })();
-            return { ok: true, session, kill: requestKill };
-        })($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            return { ok: true, session, kill: requestKill, signal: requestSignal };
+        })($0, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     """)>]
     let private startProcessSession
         (ctor: obj)
@@ -309,6 +348,7 @@ module NodeProcessHost =
         (onClose: unit -> unit)
         (onFailure: string -> unit)
         (onRejected: string -> unit)
+        (keepInputOpen: bool)
         : obj =
         jsNative
 
@@ -317,6 +357,7 @@ module NodeProcessHost =
         { Process: obj
           Observe: unit -> EndEvidence
           Kill: unit -> unit
+          RequestSignal: string -> Result<unit, string>
           Exited: bool ref
           OnExited: (unit -> unit) ResizeArray
           Failure: string option ref
@@ -358,37 +399,61 @@ module NodeProcessHost =
         with _ ->
             ()
 
-    let private markProcessClosed
-        (exitedRef: bool ref)
-        (onExited: (unit -> unit) ResizeArray)
-        ()
-        =
+    let private markProcessClosed (exitedRef: bool ref) (onExited: (unit -> unit) ResizeArray) () =
         if not exitedRef.Value then
             exitedRef.Value <- true
             notifyExitedList onExited
 
     let private rememberFailure (failure: string option ref) message =
-        if failure.Value.IsNone then failure.Value <- Some message
+        if failure.Value.IsNone then
+            failure.Value <- Some message
 
     let private unknownEnd native failure =
-        if not (isNull native) then rememberFailure failure "Invalid target end receipt"
+        if not (isNull native) then
+            rememberFailure failure "Invalid target end receipt"
+
         EndEvidence.Unconfirmed
 
     let private readNativeEnd native failure =
-        let validCode: bool = emitJsExpr native "Boolean($0 && Number.isInteger($0.code) && $0.code >= 0 && $0.code <= 2147483647 && $0.signal == null)"
-        let validSignal: bool = emitJsExpr (native, osConstants) "Boolean($0 && $0.code == null && typeof $0.signal === 'string' && Object.hasOwn($1.signals, $0.signal) && $0.signal !== 'SIGSTOP' && $0.signal !== 'SIGCONT')"
-        if validCode then EndEvidence.Confirmed(ProgramEnd.Exited(unbox<int> (native?code)))
-        elif validSignal then EndEvidence.Confirmed(ProgramEnd.Signaled(unbox<string> (native?signal)))
-        else unknownEnd native failure
+        let validCode: bool =
+            emitJsExpr
+                native
+                "Boolean($0 && Number.isInteger($0.code) && $0.code >= 0 && $0.code <= 2147483647 && $0.signal == null)"
+
+        let validSignal: bool =
+            emitJsExpr
+                (native, osConstants)
+                "Boolean($0 && $0.code == null && typeof $0.signal === 'string' && Object.hasOwn($1.signals, $0.signal) && $0.signal !== 'SIGSTOP' && $0.signal !== 'SIGCONT')"
+
+        if validCode then
+            EndEvidence.Confirmed(ProgramEnd.Exited(unbox<int> (native?code)))
+        elif validSignal then
+            EndEvidence.Confirmed(ProgramEnd.Signaled(unbox<string> (native?signal)))
+        else
+            unknownEnd native failure
 
     let private rememberInspectionFailure (state: obj) failure =
         let nativeFailure: obj = state?failure
-        if not (isNull nativeFailure) then rememberFailure failure (string (nativeFailure?message))
+
+        if not (isNull nativeFailure) then
+            rememberFailure failure (string (nativeFailure?message))
 
     let private observeTarget session failure =
         let state: obj = emitJsExpr session "$0.inspect()"
         rememberInspectionFailure state failure
         readNativeEnd (state?exit) failure
+
+    let private signalReceipt (result: obj) =
+        if string (result?kind) = "Failed" then
+            Error(string (result?error?message))
+        else
+            Ok()
+
+    let private requestSessionSignal (started: obj) name =
+        try
+            signalReceipt (started?signal (name))
+        with error ->
+            Error error.Message
 
     let private finalizeStartedSession
         (started: obj)
@@ -403,7 +468,13 @@ module NodeProcessHost =
             let errText: string =
                 emitJsExpr started "String(($0 && $0.error) || 'Failed to spawn process')"
 
-            Error(ProcessResult.Observed { End = EndEvidence.Unconfirmed; StopRequested = None; Output = None; Fault = Some errText })
+            Error(
+                ProcessResult.Observed
+                    { End = EndEvidence.Unconfirmed
+                      StopRequested = None
+                      Output = None
+                      Fault = Some errText }
+            )
         else
             let sessionObj: obj = emitJsExpr started "$0.session"
             let killObj: obj = emitJsExpr started "$0.kill"
@@ -412,6 +483,7 @@ module NodeProcessHost =
                 { Process = sessionObj
                   Observe = fun () -> observeTarget sessionObj failure
                   Kill = (fun () -> invokeKill killObj)
+                  RequestSignal = requestSessionSignal started
                   Exited = exitedRef
                   OnExited = onExited
                   Failure = failure
@@ -425,6 +497,7 @@ module NodeProcessHost =
         (stdin: byte[] option)
         (onStdout: byte[] -> unit)
         (onStderr: byte[] -> unit)
+        (keepInputOpen: bool)
         : Task<Result<ChildProcess, ProcessResult>> =
         task {
             // DSL-MUTABLE: algorithm-scratch — exit callback list accumulator
@@ -450,11 +523,13 @@ module NodeProcessHost =
                         if failure.Value.IsNone then
                             failure.Value <- Some message)
                     (fun reason -> rejection.Value <- Some(NoExecution.StartRejected reason))
+                    keepInputOpen
 
             return finalizeStartedSession started exitedRef onExited failure rejection
         }
 
     let private spawnOrReject
+        (keepInputOpen: bool)
         (cmd: Command)
         (ctx: ProcessContext)
         (onStdout: byte[] -> unit)
@@ -471,7 +546,9 @@ module NodeProcessHost =
                 return Error(ProcessResult.NotStarted(NoExecution.InvalidRequest "Invalid executable name"))
             else
                 let stdin = cmd.Stdin |> Option.map System.Text.Encoding.UTF8.GetBytes
-                return! launchExecutableSession executable cwd envObj cmd.Arguments stdin onStdout onStderr
+
+                return!
+                    launchExecutableSession executable cwd envObj cmd.Arguments stdin onStdout onStderr keepInputOpen
         }
 
     let spawn
@@ -485,8 +562,58 @@ module NodeProcessHost =
             if ct.IsCancellationRequested then
                 return Error(ProcessResult.NotStarted NoExecution.CancelledBeforeStart)
             else
-                return! spawnOrReject cmd ctx onStdout onStderr
+                return! spawnOrReject false cmd ctx onStdout onStderr
         }
+
+    let spawnInteractive cmd ctx onStdout onStderr (ct: CancellationToken) =
+        task {
+            if ct.IsCancellationRequested then
+                return Error(ProcessResult.NotStarted NoExecution.CancelledBeforeStart)
+            elif cmd.Stdin.IsSome then
+                return
+                    Error(ProcessResult.NotStarted(NoExecution.InvalidRequest "Interactive input must use writeInput"))
+            else
+                return! spawnOrReject true cmd ctx onStdout onStderr
+        }
+
+    let private inputReceipt (bytes: byte[]) (result: obj) =
+        let confirmed: bool =
+            emitJsExpr (result, bytes.Length) "Boolean($0 && $0.kind === 'Written' && $0.bytes === $1)"
+
+        if confirmed then
+            Ok bytes.Length
+        else
+            Error "Input delivery was not confirmed; do not resend"
+
+    let private writeStartedInput (child: ChildProcess) (bytes: byte[]) (ct: CancellationToken) (started: obj) =
+        task {
+            if ct.IsCancellationRequested then
+                return Error "Input was cancelled before write"
+            elif string (started?kind) <> "Started" then
+                return Error "Target start was not confirmed"
+            else
+                let! result = unbox<Task<obj>> (child.Process?write(bytes))
+                return inputReceipt bytes result
+        }
+
+    let private awaitInputStart (child: ChildProcess) bytes (ct: CancellationToken) =
+        task {
+            if ct.IsCancellationRequested then
+                return Error "Input was cancelled before write"
+            else
+                let! started = unbox<Task<obj>> (child.Process?started())
+                return! writeStartedInput child bytes ct started
+        }
+
+    let writeInput (child: ChildProcess) (bytes: byte[]) (ct: CancellationToken) : Task<Result<int, string>> =
+        task {
+            try
+                return! awaitInputStart child bytes ct
+            with error ->
+                return Error error.Message
+        }
+
+    let signal (child: ChildProcess) (name: string) : Result<unit, string> = child.RequestSignal name
 
     let spawnBinary fileName arguments (workingDirectory: string) stdin onStdout onStderr =
         task {
@@ -499,7 +626,7 @@ module NodeProcessHost =
             if isNull executable then
                 return Error(ProcessResult.NotStarted(NoExecution.InvalidRequest "Invalid executable name"))
             else
-                return! launchExecutableSession executable cwd envObj arguments stdin onStdout onStderr
+                return! launchExecutableSession executable cwd envObj arguments stdin onStdout onStderr false
         }
 
     let tempPath () : string =

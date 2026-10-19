@@ -5,12 +5,17 @@ import * as blog from '../../../dist/Enforcer/BlogSurface.js'
 import { bindManagedChild, withExecutablePlugin, withPlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const field = enforcer.fieldNames()[0]
+const sections = () => ({
+  tipName: field,
+  opinion: '  The boundary decides later work.  ',
+  advice: '  Take the smallest complete step.  ',
+})
 const structured = (overrides = {}) => ({
   charge: '  Resolve the exact boundary.  ',
   occurrence: '  A decisive state transition happened.  ',
   settlement: '  The boundary is now established.  ',
   consequence: '  Later work can rely on that boundary.  ',
-  tip: field,
+  ...sections(),
   ...overrides,
 })
 
@@ -21,7 +26,7 @@ test('WHAT[behavior-diagnosis-006] canonical field text trims whitespace and ref
   }
 })
 
-test('WHAT[behavior-diagnosis-006] codec requires all four structured fields and one tip', () => {
+test('WHAT[behavior-diagnosis-006] codec requires all four structured fields and one tipName', () => {
   const decoded = enforcer.decodeCall(structured())
   assert.equal(decoded.ok, true)
   assert.deepEqual(
@@ -30,14 +35,14 @@ test('WHAT[behavior-diagnosis-006] codec requires all four structured fields and
       occurrence: decoded.value.occurrence,
       settlement: decoded.value.settlement,
       consequence: decoded.value.consequence,
-      tip: decoded.value.tip.fieldName,
+      tipName: decoded.value.tipName,
     },
     {
       charge: 'Resolve the exact boundary.',
       occurrence: 'A decisive state transition happened.',
       settlement: 'The boundary is now established.',
       consequence: 'Later work can rely on that boundary.',
-      tip: field,
+      tipName: field,
     },
   )
 
@@ -69,21 +74,28 @@ test('WHAT[behavior-diagnosis-006] optional evidence preserves the excerpt and r
   assert.match(oversized.error, /1024/)
 })
 
-test('WHAT[behavior-diagnosis-006] codec rejects missing blank and nonstring tip with the same error', () => {
-  for (const tip of [undefined, null, '', '  ', 1, false, {}, []]) {
-    const result = enforcer.decodeCall(structured({ tip }))
+test('WHAT[behavior-diagnosis-006] codec groups missing blank and nonstring tipName with stable internal errors', () => {
+  for (const tipName of [undefined, '', '  ']) {
+    const result = enforcer.decodeCall(structured({ tipName }))
     assert.equal(result.ok, false)
-    assert.equal(result.error, 'missing required argument: tip')
+    assert.equal(result.error, 'missing-tip-name')
+  }
+
+  for (const tipName of [null, 1, false, {}, []]) {
+    const result = enforcer.decodeCall(structured({ tipName }))
+    assert.equal(result.ok, false)
+    assert.equal(result.error, 'tip-field-not-a-string')
   }
 })
 
 test('WHAT[behavior-diagnosis-006] legacy entry is recovery-only and cannot mix with structured fields', () => {
-  const legacy = enforcer.decodeCall({ entry: '  old work  ', evidence: '  old proof  ', tip: field })
+  const legacy = enforcer.decodeCall({ entry: '  old work  ', evidence: '  old proof  ', ...sections() })
   assert.equal(legacy.ok, true)
   assert.equal(legacy.value.text, 'old work')
   assert.equal(legacy.value.evidence, 'old proof')
+  assert.equal(legacy.value.tipName, field)
 
-  const legacyCycle = enforcer.canonicalCycle({ entry: 'old work', evidence: 'old proof', tip: field })
+  const legacyCycle = enforcer.canonicalCycle({ entry: 'old work', evidence: 'old proof', ...sections() })
   assert.equal(legacyCycle.mergedText, 'old work')
   assert.equal(legacyCycle.mergedEvidence, '', 'legacy recovery must not create a new evidence blob')
 
@@ -128,7 +140,10 @@ test('WHAT[behavior-diagnosis-006] evidence is a single-line bracketed exhibit i
 test('WHAT[behavior-diagnosis-006] real chronicle provider schema exposes optional evidence and no legacy entry', async () => {
   await withPlugin(async (hooks) => {
     const args = hooks.tool.chronicle.args
-    assert.deepEqual(Object.keys(args), ['charge', 'occurrence', 'settlement', 'consequence', 'evidence', 'tip'])
+    assert.deepEqual(Object.keys(args), [
+      'charge', 'occurrence', 'settlement', 'consequence', 'tipName',
+      'opinion', 'advice', 'evidence',
+    ])
     for (const name of Object.keys(args)) {
       assert.ok(args[name].description?.trim().length > 0, `${name} must explain its distinct semantic role`)
     }

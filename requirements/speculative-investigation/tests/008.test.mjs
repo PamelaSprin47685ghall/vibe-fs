@@ -9,8 +9,8 @@ const Strength = await import("../../../dist/Strength/Surface.js");
 
 const H = (text) => createHash('sha256').update(text).digest('hex')
 const frame = () => Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-  { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
-  { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
+  { toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+  { toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
 ] }]).value
 const request = (decisionId = 'd1', target = 'run-1') => Strength.eventRequested({
   decisionId, ownerSessionId: 'owner',
@@ -193,7 +193,7 @@ for (const completed of [false, true]) {
       const local = createLocalEventStore()
       try {
         const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-          { toolName: 'js-predictor', canonicalArguments: '{}', canonicalResult: 'actual readonly material' },
+          { toolName: 'todowrite-for-predictor', canonicalArguments: '{}', canonicalResult: 'actual readonly material' },
         ] }]).value
         assert.equal((await append(local.store, Strength.eventRequested({
           decisionId: 'd1', ownerSessionId: 'owner',
@@ -247,8 +247,8 @@ const { createLocalEventStore } = await import('../../verification-system/tests/
 const H = (text) => createHash('sha256').update(text).digest('hex')
 
 const frame = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-  { toolName: 'read', canonicalArguments: '{"filePath":"src/a.fs"}', canonicalResult: 'let a = 1' },
-  { toolName: 'grep', canonicalArguments: '{"pattern":"a"}', canonicalResult: 'src/a.fs:1:let a = 1' },
+  { toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"src/a.fs"}', canonicalResult: 'let a = 1' },
+  { toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"a"}', canonicalResult: 'src/a.fs:1:let a = 1' },
 ] }]).value
 // A persisted frame payload is the Store wire contract (encodeFrameBundlePayload):
 // version + digest + byte_length + batches[request_ordinal/exchanges[tool_name/arguments/result]].
@@ -278,10 +278,10 @@ test('WHAT[speculative-investigation-008] demoted predictor text survives durabl
   const { tmpdir } = await import('node:os')
   const { join } = await import('node:path')
   const directory = mkdtempSync(join(tmpdir(), 'predictor-text-'))
-  let local = createLocalEventStore({ commonDir: join(directory, '.git'), writerId: 'before' })
+  let local = createLocalEventStore({ commonDir: join(directory, '.Herdchestra'), writerId: 'before' })
   const value = Strength.frameTryBuild(H, [
     { requestOrdinal: 1, assistantText: ['核对结果𠀀'], exchanges: [
-      { toolName: 'js-predictor', canonicalArguments: '{}', canonicalResult: 'actual result' },
+      { toolName: 'todowrite-for-predictor', canonicalArguments: '{}', canonicalResult: 'actual result' },
     ] },
     { requestOrdinal: 2, assistantText: ['conclusion'], exchanges: [] },
   ]).value
@@ -305,7 +305,7 @@ test('WHAT[speculative-investigation-008] demoted predictor text survives durabl
     })
     await append(durability, promotion.event)
     local.close()
-    local = createLocalEventStore({ commonDir: join(directory, '.git'), writerId: 'after' })
+    local = createLocalEventStore({ commonDir: join(directory, '.Herdchestra'), writerId: 'after' })
     durability = Strength.durabilityCreate(local.store)
     projection = (await Strength.durabilityLoadProjection(durability)).value
     const loaded = await Strength.durabilityLoadBundleForDecision(durability, projection, 'text-decision')
@@ -438,7 +438,7 @@ test('WHAT[speculative-investigation-008] H03_replica_identity_flag_yields_Ineli
     // 1. 构造包含正数 estimated_readonly_rounds 与合法 self_note 的 Replica 帧
     const replicaExchanges = [
       {
-        toolName: 'read',
+        toolName: 'todowrite-for-predictor',
         canonicalArguments: JSON.stringify({
           filePath: 'src/Wanxiangshu/Strength/Runtime.fs',
           estimated_readonly_rounds: 3,
@@ -447,7 +447,7 @@ test('WHAT[speculative-investigation-008] H03_replica_identity_flag_yields_Ineli
         canonicalResult: 'let isExactReadonly capabilities = ...'
       },
       {
-        toolName: 'grep',
+        toolName: 'todowrite-for-predictor',
         canonicalArguments: JSON.stringify({
           pattern: 'exactReadonlyHostToolMap',
           estimated_readonly_rounds: 2,

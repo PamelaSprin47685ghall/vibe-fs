@@ -1,5 +1,137 @@
 import test from 'node:test'
 
+for (const callback of ['sanity', 'next', 'watch']) {
+  test(`WHAT[process-execution-004] a synchronous infinite ${callback} callback cannot block the run deadline or strand its physical group`, { timeout: 6000 }, async () => {
+    const assert = (await import('node:assert/strict')).default
+    const { spawnSync } = await import('node:child_process')
+    const { mkdtempSync, existsSync, readFileSync, rmSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const directory = mkdtempSync(join(tmpdir(), 'wxs-callback-deadline-'))
+    try {
+      const result = spawnSync(process.execPath, [join(import.meta.dirname, 'support/callback-deadline.fixture.mjs'), callback, directory], {
+        timeout: 3000, encoding: 'utf8',
+      })
+      assert.equal(result.error, undefined, `${callback} blocked outside the vm deadline: ${result.stderr}`)
+      assert.equal(result.status, 0, result.stderr)
+      const observed = JSON.parse(result.stdout)
+      if (callback === 'sanity') {
+        assert.equal(observed.kind, 'Failed')
+        assert.match(observed.wire, /RUN_SANITY_TIMEOUT/)
+      } else {
+        assert.equal(observed.kind, 'Succeeded', observed.wire)
+        assert.equal(observed.data.entered, true)
+        assert.equal(observed.data.result.status, 'timeout')
+        assert.equal(observed.data.result.stopRequested, 'deadline')
+        if (callback === 'watch') {
+          assert.equal(observed.data.result.exitCode ?? null, null)
+          if (observed.data.result.signal !== undefined) {
+            assert.ok(['SIGTERM', 'SIGKILL'].includes(observed.data.result.signal))
+          } else {
+            assert.equal(observed.data.result.endUnconfirmed, true)
+          }
+          assert.equal(observed.data.result.scopeClosed, true)
+          assert.equal(observed.data.result.outputComplete, false)
+        }
+      }
+    } finally {
+      const witness = join(directory, 'target.json')
+      if (existsSync(witness)) {
+        const { group } = JSON.parse(readFileSync(witness, 'utf8'))
+        assert.ok(Number.isInteger(group) && group > 0)
+        try { process.kill(-group, 'SIGKILL') } catch (error) {
+          if (error.code !== 'ESRCH') throw error
+        }
+      }
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+}
+
+test('WHAT[process-execution-004] the real registered loop applies the administrator ceiling to a longer Runnable estimate', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { withExecutablePlugin, acceptAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const { oneCommand } = await import('./support/runnable.mjs')
+  const { program, nodeCommand } = await import('./support/executor.mjs')
+  const { existsSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { parse } = await import('smol-toml')
+  const previous = process.env.WANXIANGSHU_PROCESS_HARD_LIMIT_SECS
+  process.env.WANXIANGSHU_PROCESS_HARD_LIMIT_SECS = '0.5'
+  try {
+    await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+      const sessionID = 'registered-hard-limit'
+      await acceptAuthorityRoot(runtime, sessionID, 'devops', 'hard-limit-user')
+      await hooks['chat.message']({ sessionID, messageID: 'hard-limit-user', agent: 'devops' }, {
+        message: { id: 'hard-limit-user', role: 'user', agent: 'devops' },
+        parts: [{ type: 'text', text: 'Check the administrator process ceiling.' }],
+      })
+      const ready = join(directory, 'target-started')
+      const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(ready)}, 'ready'); setInterval(() => {}, 1000)`)
+      const wire = await hooks.tool['todowrite-for-devops'].execute({
+        program: program(`return await js.run(${oneCommand(command, { maxDuration: 60000 })});`),
+      }, { sessionID, agent: 'devops', messageID: 'hard-limit-assistant', callID: 'hard-limit-run' })
+      const result = parse(wire).data
+      assert.equal(existsSync(ready), true)
+      assert.equal(result.status, 'timeout')
+      assert.equal(result.stopRequested, 'deadline')
+      assert.equal(result.outputComplete, false)
+      assert.ok(result.durationMs >= 500 && result.durationMs < 4000)
+    })
+  } finally {
+    if (previous === undefined) delete process.env.WANXIANGSHU_PROCESS_HARD_LIMIT_SECS
+    else process.env.WANXIANGSHU_PROCESS_HARD_LIMIT_SECS = previous
+  }
+})
+
+for (const exhaustAfterRun of [false, true]) {
+  test(`WHAT[process-execution-004] concurrent explicit runs borrow the script deadline and ${exhaustAfterRun ? 'return its original remaining budget' : 'keep later watch and result reads alive'}`, async () => {
+    const assert = (await import('node:assert/strict')).default
+    const { sandbox, program, nodeCommand, caseName, parseData, render } = await import('./support/executor.mjs')
+    const { execute } = await import('../../../dist/Repository/Programming/Js/WorkflowSurface.js')
+    const { writeFileSync, readFileSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const { dir, cleanup } = sandbox('wxs-run-deadline-lease-')
+    try {
+      writeFileSync(join(dir, 'probe'), 'data')
+      const command = nodeCommand('setTimeout(() => {}, 350)')
+      const outcome = await execute(dir, 'DevOps', 'en', 'deadline-lease', { program: program(`
+        const host = this;
+        let observedLate = false;
+        function runnable(command) {
+          return class extends js.Runnable {
+            maxDuration = 1500;
+            interval = 25;
+            next(ctx) { return ctx.step === 0 ? command : null; }
+            async watch(ctx) {
+              if (ctx.remainingMs === 0) return false;
+              const observed = await host.stat('probe');
+              if (ctx.elapsedMs > 200 && observed.exists) observedLate = true;
+              return true;
+            }
+            sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+          };
+        }
+        const results = await Promise.all([js.run(runnable('sleep 0.1')), js.run(runnable(${JSON.stringify(command)}))]);
+        await host.write('runs-finished', JSON.stringify({ observedLate, statuses: results.map(result => result.status) }));
+        ${exhaustAfterRun ? 'const until = Date.now() + 250; while (Date.now() < until) {}' : ''}
+        const after = await host.stat('probe');
+        return { observedLate, afterExists: after.exists, statuses: results.map(result => result.status) };
+      `) }, 1000, Date.now() + 150, 4096, null)
+      assert.deepEqual(JSON.parse(readFileSync(join(dir, 'runs-finished'), 'utf8')), { observedLate: true, statuses: ['completed', 'completed'] })
+      if (exhaustAfterRun) {
+        assert.equal(caseName(outcome), 'Failed')
+        assert.match(render(outcome), /PROGRAM_TIMEOUT/)
+      } else {
+        assert.equal(caseName(outcome), 'Succeeded', render(outcome))
+        assert.deepEqual(parseData(outcome), { observedLate: true, afterExists: true, statuses: ['completed', 'completed'] })
+      }
+    } finally {
+      cleanup()
+    }
+  })
+}
+
 test('WHAT[process-execution-004] normal high exit codes stay normal target exits', async () => {
   const assert = (await import('node:assert/strict')).default
   const runtime = await import('../../../dist/Process/Surface.js')
@@ -12,6 +144,56 @@ test('WHAT[process-execution-004] normal high exit codes stay normal target exit
     assert.deepEqual(result.output, { kind: 'InMemory', stdout: '', stderr: '' })
     assert.equal(result.stopRequested, null)
     assert.equal(result.fault, null)
+  }
+})
+
+test('WHAT[process-execution-004] a parked run still stops at its deadline and releases the large-output permit only after physical closure', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const { sandbox, runProgram, caseName, parseData, nodeCommand } = await import('./support/executor.mjs')
+  const { execute, parkedHandle } = await import('../../../dist/Repository/Programming/Js/WorkflowSurface.js')
+  const gate = await import('../../../dist/Process/LargeGateSurface.js')
+  const { readFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { setTimeout: delay } = await import('node:timers/promises')
+  const { dir, cleanup } = sandbox('wxs-park-deadline-')
+  let handle
+  try {
+    assert.equal(gate.getCount(), 1)
+    const witness = join(dir, 'target')
+    const command = `exec ${nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(witness)}, String(process.pid)); process.stdout.write('READY'); setInterval(() => {}, 1000)`)}`
+    const parked = await runProgram(dir, `return await js.run(class extends js.Runnable {
+      maxDuration = 500;
+      interval = 25;
+      worldLock = true;
+      next(ctx) { return ctx.step === 0 ? ${JSON.stringify(command)} : null; }
+      watch(ctx) { if (ctx.stdout) return { park: { ready: true } }; return ctx.remainingMs > 0; }
+      sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+    });`, 'park-deadline')
+    assert.equal(caseName(parked), 'Parked')
+    handle = parkedHandle(parked)
+    const pid = Number(readFileSync(witness, 'utf8'))
+    assert.equal(gate.getCount(), 0)
+    const alive = () => {
+      try { process.kill(pid, 0); return true } catch (error) {
+        if (error.code === 'ESRCH') return false
+        throw error
+      }
+    }
+    const deadline = performance.now() + 2500
+    while ((alive() || gate.getCount() === 0) && performance.now() < deadline) await delay(10)
+    assert.equal(alive(), false, 'park must not suspend the physical deadline')
+    assert.equal(gate.getCount(), 1)
+    const resumed = await execute(dir, 'DevOps', 'en', 'park-deadline', { unpark: { handle, value: 'continue' } }, 2000, Date.now() + 2000, 4096, null)
+    handle = null
+    assert.equal(caseName(resumed), 'Succeeded')
+    const result = parseData(resumed)
+    assert.equal(result.status, 'timeout')
+    assert.equal(result.stopRequested, 'deadline')
+    assert.equal(result.scopeClosed, true)
+    assert.equal(result.outputComplete, false)
+  } finally {
+    if (handle) await execute(dir, 'DevOps', 'en', 'park-deadline', { abandon: { handle } }, 2000, Date.now() + 2000, 4096, null)
+    cleanup()
   }
 })
 

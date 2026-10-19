@@ -17,14 +17,13 @@ export const CASES = Object.freeze([
       role: 'engineer',
       mutations: true,
       toolCalls: Object.freeze([
-        Object.freeze({ name: 'read', args: Object.freeze({ filePath: 'src/ownership.ts' }) }),
-        Object.freeze({ name: 'edit', args: Object.freeze({ filePath: 'src/ownership.ts' }) }),
+        Object.freeze({ name: 'todowrite-for-engineer', args: Object.freeze({ program: "const text = await this.cat('src/ownership.ts'); this.write('src/ownership.ts', text);" }) }),
       ]),
     }),
     fail_example: Object.freeze({
       role: 'engineer',
       toolCalls: Object.freeze([
-        Object.freeze({ name: 'run', args: Object.freeze({ command: 'npm test' }) }),
+        Object.freeze({ name: 'todowrite-for-devops', args: Object.freeze({ program: 'js.run' }) }),
       ]),
     }),
   }),
@@ -77,9 +76,9 @@ export const CASES = Object.freeze([
       role: 'devops',
       mutations: true,
       toolCalls: Object.freeze([
-        Object.freeze({ name: 'run', args: Object.freeze({ command: 'npm test' }) }),
-        Object.freeze({ name: 'edit', args: Object.freeze({ filePath: 'src/bug.ts' }) }),
-        Object.freeze({ name: 'run', args: Object.freeze({ command: 'npm test' }) }),
+        Object.freeze({ name: 'todowrite-for-devops', args: Object.freeze({ program: 'js.run' }) }),
+        Object.freeze({ name: 'todowrite-for-devops', args: Object.freeze({ program: "this.write('src/bug.ts', 'fixed')" }) }),
+        Object.freeze({ name: 'todowrite-for-devops', args: Object.freeze({ program: 'js.run' }) }),
       ]),
     }),
     fail_example: Object.freeze({
@@ -101,8 +100,8 @@ export const CASES = Object.freeze([
       role: 'devops',
       toolCalls: Object.freeze([
         Object.freeze({
-          name: 'run',
-          args: Object.freeze({ command: 'npm test' }),
+          name: 'todowrite-for-devops',
+          args: Object.freeze({ program: 'js.run' }),
         }),
       ]),
     }),
@@ -111,11 +110,9 @@ export const CASES = Object.freeze([
       mutations: true,
       toolCalls: Object.freeze([
         Object.freeze({
-          name: 'edit',
+          name: 'todowrite-for-devops',
           args: Object.freeze({
-            filePath: 'src/api.ts',
-            oldString: 'status 400',
-            newString: 'status 404',
+            program: "this.write('src/api.ts', 'status 404')",
           }),
         }),
       ]),

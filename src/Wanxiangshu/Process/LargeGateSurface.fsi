@@ -9,4 +9,5 @@ module LargeGateSurface =
     val acquire: token: obj -> Task
     val release: unit -> unit
     val getCount: unit -> int
+    val getPendingCount: unit -> int
     val runLargeEstimate: observe: (unit -> unit) -> Task<bool>

@@ -4,6 +4,7 @@ open System
 open Fable.Core.JsInterop
 
 open Wanxiangshu.Foundation
+open Wanxiangshu.Host
 
 module private PatchStatus =
 

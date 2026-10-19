@@ -1,0 +1,18 @@
+export type InstalledLibraries = [
+  typeof import('wanxiangli/durable-work'),
+  typeof import('wanxiangli/events'),
+  typeof import('wanxiangli/eventstore'),
+  typeof import('wanxiangli/fs'),
+  typeof import('wanxiangli/grounding'),
+  typeof import('wanxiangli/identity'),
+  typeof import('wanxiangli/ownership'),
+  typeof import('wanxiangli/process'),
+  typeof import('wanxiangli/resources'),
+  typeof import('wanxiangli/supervision'),
+  typeof import('wanxiangli/time'),
+  typeof import('wanxiangli/time-node'),
+  typeof import('wanxiangli/time-testing'),
+  typeof import('wanxiangli/trace'),
+  typeof import('wanxiangli/wait'),
+  typeof import('wanxiangli/work'),
+]

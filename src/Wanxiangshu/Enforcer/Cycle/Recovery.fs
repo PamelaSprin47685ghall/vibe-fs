@@ -100,7 +100,6 @@ module EnforcerFrameRecovery =
                 CompanionIdentity.newWorkMessageId HostDigest.sha256Hex bloggerSessionId main.DeltaDigest
 
             CompanionRequestKind.Normal, Some(messageId, main.Items)
-        | BloggerRequestContext.Squash squash -> CompanionRequestKind.Squash squash.CoveredFrameCount, None
 
     let private previousTipsOf (projections: ProjectionSet) (owner: SessionId) =
         match projections.AgentProjections.Sessions |> Map.tryFind owner with
@@ -108,7 +107,7 @@ module EnforcerFrameRecovery =
             session.Enforcement
             |> Option.map EnforcementProjection.recentTips
             |> Option.defaultValue []
-            |> List.map (fun tip -> tip.FieldName, tip.CycleId)
+            |> List.map (fun tip -> tip.TipName, tip.CycleId)
         | None -> []
 
     let private hostSourceLabel isPhysical =
@@ -209,14 +208,13 @@ module EnforcerFrameRecovery =
                         delta
                         previousTips
                         (ProviderProse.instructionLines lang CompanionPrompt.Normal Map.empty)
-                        (ProviderProse.instructionLines lang CompanionPrompt.Squash Map.empty)
 
                 return
                     intent
                     |> Option.bind (fun value -> renderPlannedHostMessages snapshot [ value ])
         }
 
-    /// ENFORCER-051 / relay-context-projection-008 step 3b: rebuild via Projection Algebra.
+    /// ENFORCER-051 step 3b: rebuild via Projection Algebra.
     /// Companion-owned rows → Planner → generic renderer → Host messages.
     /// Missing association / frame load → None so the caller keeps rawMessages.
     /// Never return an empty list: that blanks the Host transcript (mock lastUser=null).
@@ -269,9 +267,6 @@ module EnforcerFrameRecovery =
         | BloggerRequestRejection.DeltaDigestMismatch(expected, actual) ->
             $"delta digest mismatch: expected {expected} actual {actual}"
         | BloggerRequestRejection.EpochNotCoherent(field, value) -> $"epoch not coherent: {field} value {value}"
-        | BloggerRequestRejection.EmptySquashCoverage -> "squash covers no frames"
-        | BloggerRequestRejection.SquashCoverageMismatch(declared, carried) ->
-            $"squash coverage mismatch: declared {declared} carried {carried}"
 
     let reloadRejectionLabel (rejection: CycleContextReloadRejection) : string =
         match rejection with
@@ -336,30 +331,8 @@ module EnforcerFrameRecovery =
     /// Decode unverified durable data, validate the §4.2 invariants, then
     /// construct through the same validating constructor as live derivation
     /// (W6). Every rejection is typed; nothing falls back to None or a zero
-    /// default. Squash shape follows the trusted durable coverage; Main
-    /// fields come from the blob with durable defaults only where the blob
-    /// is silent.
-    let private decodeSquashContext
-        (openReq: OpenBloggerRequest)
-        (raw: obj)
-        : Result<BloggerRequestContext, CycleContextReloadRejection> =
-        let covered =
-            asInt raw "covered_frame_count"
-            |> Option.defaultValue (List.length openReq.SelectedFrameDigests)
-
-        let candidate: BloggerSquashRequestInput =
-            { RequestId = openReq.RequestId
-              MainSessionId = openReq.MainSessionId
-              BloggerSessionId = openReq.BloggerSessionId
-              FrameEpochId = openReq.FrameEpochId
-              CoveredFrameCount = covered
-              FrameDigests = openReq.SelectedFrameDigests
-              ObservedPrefixEpochId = openReq.ObservedPrefixEpochId }
-
-        BloggerRequestMaterial.createSquash candidate
-        |> Result.map BloggerRequestContext.Squash
-        |> Result.mapError CycleContextReloadRejection.InvariantViolated
-
+    /// default. Main fields come from the blob with durable defaults only where
+    /// the blob is silent.
     let private decodeMainContext
         (openReq: OpenBloggerRequest)
         (raw: obj)
@@ -403,7 +376,6 @@ module EnforcerFrameRecovery =
         (raw: obj)
         : Result<BloggerRequestContext, CycleContextReloadRejection> =
         match OpenBloggerRequest.providerRequestKind openReq with
-        | Ok ProviderRequestKind.BloggerSquash -> decodeSquashContext openReq raw
         | Ok ProviderRequestKind.BloggerMain -> decodeMainContext openReq raw
         | Ok _ -> Error(CycleContextReloadRejection.UnsupportedRequestKind openReq.RequestKind)
         | Error _ -> Error(CycleContextReloadRejection.UnsupportedRequestKind openReq.RequestKind)

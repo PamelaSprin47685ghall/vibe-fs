@@ -75,11 +75,23 @@ module internal WanxiangliTrace =
     let private getField (_target: obj) (_name: string) : obj = jsNative
 
     type ProjectionBridge =
-        { TraceId: string
-          Records: string list
-          OpeningCutCursor: int
-          PartCuts: (int64 * int) list
-          RecordCount: int }
+        {
+            TraceId: string
+            /// Trace record lines, stored NEWEST-first so each append is an O(1)
+            /// prepend. `recordsOldestFirst` reverses to chronological order for
+            /// the wanxiangli constructor and the `traceRecords` surface.
+            Records: string list
+            OpeningCutCursor: int
+            /// (sequence, cutCursor) pairs, stored newest-first.
+            PartCuts: (int64 * int) list
+            RecordCount: int
+        }
+
+    /// Oldest-first record lines for the trace constructor / inspection.
+    let recordsOldestFirst (bridge: ProjectionBridge) : string list =
+        // `Records` is stored newest-first (see append sites); reverse to the
+        // chronological order the wanxiangli constructor and inspect surface need.
+        List.rev bridge.Records
 
     let private instantiateTrace (traceId: string) (records: string list) : obj =
         if List.isEmpty records then
@@ -93,7 +105,7 @@ module internal WanxiangliTrace =
         if not (isNull cached) then
             cached
         else
-            instantiateTrace bridge.TraceId bridge.Records
+            instantiateTrace bridge.TraceId (recordsOldestFirst bridge)
 
     let private acquireReadableTrace (bridge: ProjectionBridge) : obj =
         let cached = peekCachedTrace traceCache bridge bridge.RecordCount
@@ -101,7 +113,7 @@ module internal WanxiangliTrace =
         if not (isNull cached) then
             cached
         else
-            let created = instantiateTrace bridge.TraceId bridge.Records
+            let created = instantiateTrace bridge.TraceId (recordsOldestFirst bridge)
             attachCachedTrace traceCache bridge created |> ignore
             created
 
@@ -222,7 +234,7 @@ module internal WanxiangliTrace =
 
         let updated =
             { bridge with
-                Records = bridge.Records @ records
+                Records = List.fold (fun prior record -> record :: prior) bridge.Records records
                 OpeningCutCursor =
                     if bridge.RecordCount = 0 then
                         cursor
@@ -286,8 +298,8 @@ module internal WanxiangliTrace =
 
         let updated =
             { bridge with
-                Records = bridge.Records @ addedRecords
-                PartCuts = bridge.PartCuts @ [ cursorSequence, afterCursor ]
+                Records = List.fold (fun records record -> record :: records) bridge.Records addedRecords
+                PartCuts = (cursorSequence, afterCursor) :: bridge.PartCuts
                 RecordCount = afterCursor }
 
         attachCachedTrace traceCache updated trace
@@ -303,8 +315,7 @@ module internal WanxiangliTrace =
 
         let frontierCursor =
             bridge.PartCuts
-            |> List.filter (fun (sequence, _) -> sequence < frontierSequence)
-            |> List.tryLast
+            |> List.tryFind (fun (sequence, _) -> sequence < frontierSequence)
             |> Option.map snd
             |> Option.defaultValue bridge.OpeningCutCursor
 
@@ -327,7 +338,7 @@ module internal WanxiangliTrace =
 
         let updated =
             { bridge with
-                Records = bridge.Records @ addedRecords
+                Records = List.fold (fun records record -> record :: records) bridge.Records addedRecords
                 RecordCount = afterCursor }
 
         attachCachedTrace traceCache updated trace
@@ -356,18 +367,11 @@ module internal WanxiangliTrace =
         let trace = acquireReadableTrace bridge
         cutFromJs (rawHead trace)
 
-    let private cutCursorBeforeIndex (index: int) (bridge: ProjectionBridge) : int =
-        if index <= 0 then
-            bridge.OpeningCutCursor
-        else
-            snd (List.item (index - 1) bridge.PartCuts)
-
     let private anchorCutCursorBeforeSequence (sequence: int64) (bridge: ProjectionBridge) : int =
-        let earlier = bridge.PartCuts |> List.filter (fun (seq, _) -> seq < sequence)
-
-        match List.tryLast earlier with
-        | Some(_, cutCursor) -> cutCursor
-        | None -> bridge.OpeningCutCursor
+        bridge.PartCuts
+        |> List.tryFind (fun (seq, _) -> seq < sequence)
+        |> Option.map snd
+        |> Option.defaultValue bridge.OpeningCutCursor
 
     let cutAtSequenceOfBridge (sequence: int64) (bridge: ProjectionBridge) : XTraceCut =
         let trace = acquireReadableTrace bridge
@@ -377,8 +381,7 @@ module internal WanxiangliTrace =
                 bridge.OpeningCutCursor
             else
                 bridge.PartCuts
-                |> List.filter (fun (seq, _) -> seq <= sequence)
-                |> List.tryLast
+                |> List.tryFind (fun (seq, _) -> seq <= sequence)
                 |> Option.map snd
                 |> Option.defaultValue bridge.OpeningCutCursor
 
@@ -388,19 +391,7 @@ module internal WanxiangliTrace =
         let startSeq = range |> XTraceRange.startInclusive |> XTraceCursor.sequence
         let endSeq = range |> XTraceRange.endExclusive |> XTraceCursor.sequence
 
-        let indexedMatches =
-            bridge.PartCuts
-            |> List.mapi (fun idx (seq, cutCursor) -> idx, seq, cutCursor)
-            |> List.filter (fun (_, seq, _) -> seq >= startSeq && seq < endSeq)
-
-        match indexedMatches with
-        | [] ->
-            let anchor = anchorCutCursorBeforeSequence startSeq bridge
-            anchor, anchor
-        | (firstIdx, _, _) :: _ ->
-            let _, _, lastCutCursor = List.last indexedMatches
-            let afterCursor = cutCursorBeforeIndex firstIdx bridge
-            afterCursor, lastCutCursor
+        anchorCutCursorBeforeSequence startSeq bridge, anchorCutCursorBeforeSequence endSeq bridge
 
     let intervalOfRangeOnBridge (range: XTraceRange) (bridge: ProjectionBridge) : XTraceCut * XTraceCut =
         let trace = acquireReadableTrace bridge
@@ -417,7 +408,7 @@ module internal WanxiangliTrace =
 
         let throughCursor =
             bridge.PartCuts
-            |> List.tryLast
+            |> List.tryHead
             |> Option.map snd
             |> Option.defaultValue bridge.OpeningCutCursor
 
@@ -486,8 +477,8 @@ module XTrace =
     let forWorkRecord (items: XTraceItem list) : XTraceItem list =
         items |> List.filter (fun item -> isWorkRecordPart item.Part)
 
-    /// COMPANION-014 Opening 区间投影：保留 constitutive commitment（含 BlindPlan T1
-    /// call/result）。区间本身已是 OpeningMaterial；不过滤 tool。
+    /// COMPANION-014 / work-record-009 Opening 区间投影：区间本身已是 OpeningMaterial，
+    /// 不过滤 raw tool call/result；Opening 边界不由 planning checkpoint 决定。
     let forOpening (items: XTraceItem list) : XTraceItem list = items
 
     // ── canonical rendering ────────────────────────────────────────────────

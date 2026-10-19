@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict'
+import {mkdtempSync, rmSync} from 'node:fs'
+import {tmpdir} from 'node:os'
+import {join} from 'node:path'
 import test from 'node:test'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
+import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
+import * as workspaceSurface from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as hostSurface from '../../../dist/Change/Host/Surface.js'
+import * as managerWorkflow from '../../../dist/Mission/Manager/WorkflowSurface.js'
 import {withReview, scores} from './support/plugin.mjs'
 import {withSuccessor, messageId} from './support/cut.mjs'
 import { withExecutablePlugin, acceptAuthorityRoot, injectAcceptedAssessment, lifecycleWorkView } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
-test('WHAT[work-011] actual Promoted deliver confirms then retires without abort and dispatches no successor', async () => {
+const life = lifecycle.LifecycleSurface ?? lifecycle
+
+test('WHAT[work-011] Promoted deliver waits for its terminal attempt interrupt before returning and dispatches no successor', async () => {
   await withReview(async ({execute, hooks, runtime, session}) => {
     assert.match(await execute(scores('PERFECT')), /recorded = true/)
     const retirement = {
@@ -19,19 +29,73 @@ test('WHAT[work-011] actual Promoted deliver confirms then retires without abort
     assert.match(confirmation, /confirmation_required = true/)
     assert.match(confirmation, /finished = false/)
     assert.deepEqual(runtime.abortedIds, [])
-    // A different callID retires. Promoted writes Delivered and starts no successor.
-    const result = await hooks.tool.deliver.execute({}, retire)
-    assert.match(result, /Finished\. Do not continue work\./)
-    assert.deepEqual(runtime.abortedIds, [])
+    // 无继任者的终态必须先等 Host 中断回执，不能把成功文字当作停止保证。
+    const interruptStarted = Promise.withResolvers()
+    const interruptAck = Promise.withResolvers()
+    const abort = runtime.client.session.abort
+    runtime.client.session.abort = async args => {
+      await abort(args)
+      interruptStarted.resolve()
+      await interruptAck.promise
+      return {}
+    }
+    let returned = false
+    const delivery = hooks.tool.deliver.execute({}, retire).then(result => {
+      returned = true
+      return result
+    })
+    try {
+      const first = await Promise.race([
+        interruptStarted.promise.then(() => 'interrupt'),
+        delivery.then(() => 'returned'),
+      ])
+      assert.equal(first, 'interrupt', 'deliver must interrupt before returning')
+      assert.equal(returned, false, 'deliver must wait for the Host interrupt acknowledgement')
+      const work = lifecycleWorkView(runtime, session)
+      assert.equal(work.delivered, true, 'interrupt follows durable delivery')
+      assert.equal(work.active, false, 'a final delivery has no successor tenure')
+      assert.deepEqual(runtime.abortedIds, [session])
+    } finally {
+      interruptAck.resolve()
+    }
+    await delivery
     assert.equal(runtime.prompts.length, 0)
     const output = {messages: structuredClone(runtime.messages)}
     await hooks['experimental.chat.messages.transform']({sessionID: session}, output)
-    // Delivered has no successor. The transform must not stop this attempt
-    // and must not abort the session.
-    assert.notEqual(output.messages.length, 0)
-    assert.deepEqual(runtime.abortedIds.filter(id => id === session), [])
+    // 后续 transform 不能再对同一终态发第二次会话中断。
+    assert.deepEqual(runtime.abortedIds.filter(id => id === session), [session])
   })
 })
+
+for (const failure of ['rejected', 'thrown']) {
+  test(`WHAT[work-011] a ${failure} Host interrupt cannot be reported as successful final delivery`, async () => {
+    await withReview(async ({execute, hooks, runtime, session}) => {
+      await execute(scores('PERFECT'))
+      runtime.pushHostMessage(session, {
+        info: {id: 'final-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 3}},
+        parts: [{type: 'tool', tool: 'deliver', callID: 'final-call', state: {status: 'pending', input: {}}}],
+      })
+      await hooks.tool.deliver.execute({}, {
+        sessionID: session, agent: 'manager', messageID: 'confirmation-run', callID: 'confirmation-call',
+      })
+      const reason = `terminal-interrupt-${failure}`
+      runtime.client.session.abort = async () => {
+        if (failure === 'thrown') throw new Error(reason)
+        return {error: reason}
+      }
+      await assert.rejects(
+        hooks.tool.deliver.execute({}, {
+          sessionID: session, agent: 'manager', messageID: 'final-run', callID: 'final-call',
+        }),
+        new RegExp(reason),
+      )
+      const work = lifecycleWorkView(runtime, session)
+      assert.equal(work.delivered, true, 'a failed physical interrupt must not undo committed delivery')
+      assert.equal(work.active, false, 'interrupt failure must not create a successor')
+      assert.equal(runtime.prompts.length, 0)
+    }, {session: `final-interrupt-${failure}`})
+  })
+}
 
 test('WHAT[work-011] actual Stayed deliver starts one same-session successor, the next transform stops the retired attempt, and the successor transform retains the old physical history without another abort', async () => {
   await withSuccessor(async ({hooks, runtime, session, history, gate}) => {
@@ -276,4 +340,105 @@ test('WHAT[work-011] a review whose reviewer identity is the incumbency owner is
     )
     assert.equal(lifecycleWorkView(runtime, session).reviewed, '')
   }, {ownerId: 'manager-reviewer', session: 'review-manager-self-review'})
+})
+
+test('WHAT[work-011] Stayed deliver enqueues the successor manager-assess prompt before returning so no LLM request can slip in between', async () => {
+  await withReview(async ({execute, hooks, runtime, session}) => {
+    assert.match(await execute(scores('REVISE')), /recorded = true/)
+    const retirement = {
+      info: {id: 'retirement-run', role: 'assistant', sessionID: session, parentID: 'user-root', time: {created: 3}},
+      parts: [{type: 'tool', tool: 'deliver', callID: 'deliver-call', state: {status: 'pending', input: {}}}],
+    }
+    runtime.pushHostMessage(session, retirement)
+    const confirm = {sessionID: session, callID: 'deliver-confirm', messageID: 'retirement-confirm', providerRunID: 'run-confirm', agent: 'manager'}
+    const retire = {sessionID: session, callID: 'deliver-call', messageID: 'retirement-run', providerRunID: 'run-retire', agent: 'manager'}
+    assert.match(await hooks.tool.deliver.execute({}, confirm), /confirmation_required = true/)
+    assert.equal(runtime.prompts.length, 0, 'first confirmation does not enqueue successor')
+
+    let promptsAtReturn = -1
+    const deliverPromise = hooks.tool.deliver.execute({}, retire).then((res) => {
+      promptsAtReturn = runtime.prompts.filter(p => p.sessionID === session).length
+      return res
+    })
+    const result = await deliverPromise
+    assert.match(result, /Finished\. Do not continue work\./)
+    assert.equal(promptsAtReturn, 1, 'successor prompt must already be enqueued when deliver resolves')
+    const promptText = runtime.prompts[0]?.body?.parts?.find(p => p?.type === 'text')?.text ?? ''
+    assert.match(promptText, /(你是接手此任务的第 2 个 Manager|You are the 2 Manager taking over this mission)/)
+  }, {session: 'review-manager-atomic-enqueue'})
+})
+
+// ── The successor-prompt occasion, read from the fold alone ────────────────
+// WHAT[work-011]: the occasion is derived from the durable fold — sequence S4,
+// an open tenure, and a committed retirement that the open tenure has not
+// reviewed yet. `successorPromptContextOf` is the read-only probe over the same
+// predicate the dispatch reads; it dispatches nothing.
+
+const withSeededManagerWork = async (outcome, body) => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-successor-context-'))
+  const stateRoot = journalSurface.JournalSurface_initializeStateRoot(root)
+  const store = workspaceSurface.acquire(stateRoot)
+  try {
+    const sessionId = `manager-${outcome ?? 'first'}`
+    const opened = await life.seedOpen(store, 'S4', sessionId, root, 0n)
+    assert.equal(opened.ok, true, opened.error)
+    if (outcome != null) {
+      const reviewed = await life.seedReview(store, sessionId, outcome)
+      assert.equal(reviewed.ok, true, reviewed.error)
+      const confirmed = await life.seedDeliver(store, sessionId, 'run-1', 'call-1', 1n)
+      assert.equal(confirmed.ok, true, confirmed.error)
+      await life.seedDeliver(store, sessionId, 'run-2', 'call-2', 2n)
+    }
+    await body({root, stateRoot, store, sessionId, view: life.inspected(stateRoot, sessionId)})
+  } finally {
+    workspaceSurface.release(stateRoot)
+    rmSync(root, {recursive: true, force: true})
+  }
+}
+
+const successorPromptOf = (root, sessionId) => managerWorkflow.successorPromptContextOf(root, sessionId)
+
+test('WHAT[work-011] a first tenure with no retirement owes no successor prompt', async () => {
+  await withSeededManagerWork(null, async ({root, sessionId}) => {
+    const context = successorPromptOf(root, sessionId)
+    assert.equal(context.present, false, 'the first tenure has no predecessor to hand over')
+    assert.equal(context.retirementId, '')
+    assert.equal(context.providerRunId, '')
+  })
+})
+
+test('WHAT[work-011] a Relayed retirement owes the successor prompt until that successor is reviewed', async () => {
+  await withSeededManagerWork('Stayed', async ({root, store, sessionId, view}) => {
+    const retirement = Array.from(view.Retirements ?? []).at(-1)
+    assert.equal(retirement.Outcome, 'Relayed')
+    assert.equal(view.ActiveId.length > 0, true, 'the relay opened its successor in the same record')
+    assert.equal(view.Reviewed, false, 'the successor starts unreviewed')
+
+    const context = successorPromptOf(root, sessionId)
+    assert.equal(context.present, true, 'the unreviewed successor owes the successor prompt')
+    assert.equal(context.retirementId, retirement.RetirementId, 'the occasion is named by the retirement')
+    assert.equal(context.providerRunId, 'run-2', 'the cut carries the provider run that made the retirement')
+
+    const reviewed = await life.seedReview(store, sessionId, 'Stayed')
+    assert.equal(reviewed.ok, true, reviewed.error)
+    assert.equal(successorPromptOf(root, sessionId).present, false, 'a reviewed successor owes no successor prompt')
+  })
+})
+
+test('WHAT[work-011] the delivered hand-off reopens the occasion on the unreviewed next tenure', async () => {
+  await withSeededManagerWork('Promoted', async ({root, sessionId, view}) => {
+    const delivered = Array.from(view.Retirements ?? []).at(-1)
+    assert.equal(delivered.Outcome, 'Delivered')
+    assert.equal(view.ActiveId ?? null, null, 'a delivery leaves no open tenure')
+    assert.equal(successorPromptOf(root, sessionId).present, false, 'a delivered work owes no successor prompt')
+
+    const receipt = hostSurface.handOffDeliveredTenure(root, sessionId, 'hand-off:successor-context', 3)
+    assert.equal(receipt.ok, true, receipt.error)
+    assert.equal(receipt.kind, 'HandOff')
+
+    const context = successorPromptOf(root, sessionId)
+    assert.equal(context.present, true, 'the reopened tenure owes the successor prompt')
+    assert.equal(context.retirementId, delivered.RetirementId, 'the delivered retirement is the cut')
+    assert.equal(context.providerRunId, 'run-2', 'the cut carries the delivering provider run')
+  })
 })

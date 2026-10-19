@@ -26,17 +26,17 @@ const attach = (replica, rounds, owner = 'owner') => {
   assert.equal(result.ok, true, result.error)
   return { handle, decision, completion: result.value.completion }
 }
-const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')])] })
+const oneBatch = (replica) => ({ messages: [user('u1', replica, [hostText('Continue.')]), assistant('a1', replica, [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')])] })
 const twoBatches = (replica) => ({ messages: [
   user('u1', replica, [hostText('Continue.')]),
-  assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
-  assistant('a2', replica, [hostResult('c2', 'grep', { pattern: 'x' }, 'hit')]),
+  assistant('a1', replica, [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
+  assistant('a2', replica, [hostResult('c2', 'todowrite-for-predictor', { pattern: 'x' }, 'hit')]),
 ] })
 const threeBatches = (replica) => ({ messages: [
   user('u1', replica, [hostText('Continue.')]),
-  assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
-  assistant('a2', replica, [hostResult('c2', 'grep', { pattern: 'x' }, 'hit')]),
-  assistant('a3', replica, [hostResult('c3', 'glob', { pattern: '**/*.fs' }, 'a.fs')]),
+  assistant('a1', replica, [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
+  assistant('a2', replica, [hostResult('c2', 'todowrite-for-predictor', { pattern: 'x' }, 'hit')]),
+  assistant('a3', replica, [hostResult('c3', 'todowrite-for-predictor', { pattern: '**/*.fs' }, 'a.fs')]),
 ] })
 test('WHAT[speculative-investigation-003] STRENGTH_003_repeated_notification_for_one_admitted_request_does_not_add_a_round', async () => {
   const { handle } = attach('replica-idem', 1)
@@ -148,7 +148,7 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_shortened_history_never_r
   // assistant id (or it is the same request re-transformed, not a new round).
   const roundBatch = (round) => ({ messages: [
     user('u1', 'replica-short-view', [hostText('Continue.')]),
-    assistant(`a-round-${round}`, 'replica-short-view', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+    assistant(`a-round-${round}`, 'replica-short-view', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
   ] })
   for (let round = 1; round <= 3; round += 1) {
     assert.equal(await Strength.replicaHandleTransform(handle, roundBatch(round)), true)
@@ -159,7 +159,7 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_shortened_history_never_r
   // compaction. The used round count must not be rebuilt from that shrunken view.
   const shortened = { messages: [
     user('u-short', 'replica-short-view', [hostText('Continue.')]),
-    assistant('a-short', 'replica-short-view', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+    assistant('a-short', 'replica-short-view', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
   ] }
   assert.equal(await Strength.replicaHandleTransform(handle, shortened), true)
   const closed = Strength.replicaPeek(handle, 'replica-short-view')
@@ -194,10 +194,10 @@ test('WHAT[speculative-investigation-003] resident history cannot be republished
   const runtime = registered(replica, 2)
   const transformed = await Strength.transformApply(H, runtime, { messages: [
     user('old-assignment', replica, [hostText('previous readonly assignment')]),
-    assistant('old-read', replica, [hostResult('old-call', 'js-predictor', { code: 'old' }, 'stale-evidence')]),
+    assistant('old-read', replica, [hostResult('old-call', 'todowrite-for-predictor', { code: 'old' }, 'stale-evidence')]),
     assistant('old-final', replica, [hostText('previous decision completed')]),
     user('new-assignment', replica, [hostText('current readonly assignment')]),
-    assistant('new-read', replica, [hostResult('new-call', 'js-predictor', { code: 'new' }, 'current-evidence')]),
+    assistant('new-read', replica, [hostResult('new-call', 'todowrite-for-predictor', { code: 'new' }, 'current-evidence')]),
   ] }, true)
   assert.equal(transformed.kind, 'Ready')
   assert.deepEqual(transformed.batches.map(batch => batch.exchanges.map(exchange => exchange.canonicalResult)), [['current-evidence']])
@@ -207,18 +207,18 @@ test('WHAT[speculative-investigation-003] initial non-readonly batches or interm
   const replica = 'replica-mixed-readonly'
   const runtime = registered(replica, 3)
 
-  // Scenario 1: First batch is non-readonly (e.g. bash/edit), second batch is readonly (read).
+  // Scenario 1: First batch is non-readonly (e.g. bash/edit), second batch is readonly (todowrite-for-predictor).
   // Under the old code, second batch retains requestOrdinal = 2, causing InvalidRequestOrdinal (1, 2).
   // Under contiguous re-indexing, it becomes batch with requestOrdinal = 1.
   const firstNonReadonlySecondReadonly = await Strength.transformApply(H, runtime, { messages: [
     user('u1', replica, [hostText('Continue.')]),
     assistant('a1', replica, [hostResult('c1', 'bash', { command: 'pwd' }, '/app')]),
-    assistant('a2', replica, [hostResult('c2', 'read', { filePath: 'a' }, 'alpha')]),
+    assistant('a2', replica, [hostResult('c2', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
   ] }, true)
   assert.equal(firstNonReadonlySecondReadonly.kind, 'Ready')
   assert.equal(firstNonReadonlySecondReadonly.batches.length, 1)
   assert.equal(firstNonReadonlySecondReadonly.batches[0].requestOrdinal, 1)
-  assert.equal(firstNonReadonlySecondReadonly.batches[0].exchanges[0].toolName, 'read')
+  assert.equal(firstNonReadonlySecondReadonly.batches[0].exchanges[0].toolName, 'todowrite-for-predictor')
   assert.equal(firstNonReadonlySecondReadonly.batches[0].exchanges[0].canonicalResult, 'alpha')
 
   // Frame build on the resulting batches must succeed without InvalidRequestOrdinal
@@ -229,15 +229,15 @@ test('WHAT[speculative-investigation-003] initial non-readonly batches or interm
   // Intermediate batch 2 is filtered out; batches 1 & 3 must have ordinals 1 & 2 contiguously.
   const middleFiltered = await Strength.transformApply(H, runtime, { messages: [
     user('u1', replica, [hostText('Continue.')]),
-    assistant('a1', replica, [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+    assistant('a1', replica, [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
     assistant('a2', replica, [hostResult('c2', 'write', { filePath: 'b', content: 'test' }, 'ok')]),
-    assistant('a3', replica, [hostResult('c3', 'grep', { pattern: 'x' }, 'hit')]),
+    assistant('a3', replica, [hostResult('c3', 'todowrite-for-predictor', { pattern: 'x' }, 'hit')]),
   ] }, true)
   assert.equal(middleFiltered.kind, 'Ready')
   assert.equal(middleFiltered.batches.length, 2)
   assert.deepEqual(middleFiltered.batches.map(b => b.requestOrdinal), [1, 2])
-  assert.equal(middleFiltered.batches[0].exchanges[0].toolName, 'read')
-  assert.equal(middleFiltered.batches[1].exchanges[0].toolName, 'grep')
+  assert.equal(middleFiltered.batches[0].exchanges[0].toolName, 'todowrite-for-predictor')
+  assert.equal(middleFiltered.batches[1].exchanges[0].toolName, 'todowrite-for-predictor')
 
   const frame2 = Strength.frameTryBuild(H, middleFiltered.batches)
   assert.equal(frame2.ok, true, `Frame build failed: ${frame2.error}`)
@@ -247,15 +247,15 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_outbound_gate_is_the_admi
   const runtime = registered('replica-gate', 1)
   const admitted = await Strength.transformApply(H, runtime, { messages: [
     user('u1', 'replica-gate', [hostText('Continue.')]),
-    assistant('a1', 'replica-gate', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+    assistant('a1', 'replica-gate', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
   ] }, true)
   assert.equal(admitted.kind, 'Ready')
   assert.equal(admitted.batches.length, 1)
 
   const refused = await Strength.transformApply(H, runtime, { messages: [
     user('u1', 'replica-gate', [hostText('Continue.')]),
-    assistant('a1', 'replica-gate', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
-    assistant('a2', 'replica-gate', [hostResult('c2', 'grep', { pattern: 'x' }, 'hit')]),
+    assistant('a1', 'replica-gate', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
+    assistant('a2', 'replica-gate', [hostResult('c2', 'todowrite-for-predictor', { pattern: 'x' }, 'hit')]),
   ] }, true)
   assert.equal(refused.kind, 'Retired')
   assert.equal(refused.reason, 'provider-request-budget-reached')
@@ -279,24 +279,24 @@ test('WHAT[speculative-investigation-003] STRENGTH_003_multiple_parallel_tool_ca
   const outcome = await Strength.transformApply(H, runtime, { messages: [
     user('u1', 'replica-multi-tool', [hostText('Continue.')]),
     assistant('a1', 'replica-multi-tool', [
-      hostResult('c1', 'read', { filePath: 'a' }, 'alpha'),
-      hostResult('c2', 'grep', { pattern: 'x' }, 'beta'),
+      hostResult('c1', 'todowrite-for-predictor', { program: 'a' }, 'alpha'),
+      hostResult('c2', 'todowrite-for-predictor', { program: 'x' }, 'beta'),
     ]),
   ] }, true)
   assert.equal(outcome.kind, 'Ready')
   assert.equal(outcome.batches.length, 1)
   assert.equal(outcome.batches[0].exchanges.length, 2)
-  assert.equal(outcome.batches[0].exchanges[0].toolName, 'read')
-  assert.equal(outcome.batches[0].exchanges[1].toolName, 'grep')
+  assert.equal(outcome.batches[0].exchanges[0].toolName, 'todowrite-for-predictor')
+  assert.equal(outcome.batches[0].exchanges[1].toolName, 'todowrite-for-predictor')
 })
 test('WHAT[speculative-investigation-003] STRENGTH_003_completed_host_tool_part_is_one_real_request_with_canonical_material', async () => {
   const runtime = registered('replica-host', 1)
   const outcome = await Strength.transformApply(H, runtime, { messages: [
     user('u1', 'replica-host', [hostText('Continue.')]),
-    assistant('a1', 'replica-host', [hostResult('c1', 'read', { filePath: 'README.md' }, 'alpha')]),
+    assistant('a1', 'replica-host', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'README.md' }, 'alpha')]),
   ] }, true)
   assert.equal(outcome.kind, 'Ready')
-  assert.equal(outcome.batches[0].exchanges[0].toolName, 'read')
+  assert.equal(outcome.batches[0].exchanges[0].toolName, 'todowrite-for-predictor')
   assert.equal(outcome.batches[0].exchanges[0].canonicalArguments, '{"filePath":"README.md"}')
   assert.equal(outcome.batches[0].exchanges[0].canonicalResult, 'alpha')
 })

@@ -53,6 +53,7 @@ try {
   let successor
   let result
   if (lateAcceptance) {
+    sync.recordDeliveredValue(initial.sessionId, 'INITIAL-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, initial.sessionId, initial.physicalUserMessageId,
       initial.authorityRootUserMessageId, 'initial-formal-provider-run', 'INITIAL-FORMAL-ANSWER', ''), true)
     result = await completion
@@ -65,6 +66,7 @@ try {
     assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 1).kind, 'Accepted')
     await observe(true)
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2)
+    sync.recordDeliveredValue(successor.sessionId, 'REPAIR-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, successor.sessionId, successor.physicalUserMessageId,
       successor.authorityRootUserMessageId, 'actual-repair-provider-run', 'REPAIR-FORMAL-ANSWER', ''), true)
     result = await completion
@@ -76,8 +78,6 @@ try {
   }
   assert.equal(sync.childCount(runtime), 1)
   assert.equal(sync.terminalListenerCount(runtime), 0)
-  const firstFrontier = sync.handoffFrontier(runtime, owner, 'Engineer')
-  assert.notEqual(firstFrontier, null)
   if (!scenario.startsWith('own-')) {
     const second = sync.startObserved(runtime, owner, 'SECOND-REPAIR-CHARGE')
     const secondCompletion = sync.observedCompletion(second)
@@ -103,7 +103,6 @@ try {
         successor.authorityRootUserMessageId, 'actual-repair-provider-run', staleText, '')
     assert.equal(staleAccepted, false, 'An actually accepted old repair cannot settle the next same-root invocation')
     assert.equal(await pendingAfterTurn(secondCompletion), 'pending')
-    assert.deepEqual(sync.handoffFrontier(runtime, owner, 'Engineer'), firstFrontier)
     const secondRepair = sync.observeRepairTurn(runtime, secondAccepted.sessionId, secondAccepted.physicalUserMessageId,
       secondAccepted.authorityRootUserMessageId, 'second-incomplete-provider-run', finish, delivery, true)
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 4)
@@ -112,6 +111,7 @@ try {
     const secondSuccessor = await sync.confirmManagedPromptPhysical(runtime, owner, 'Engineer', 3, 'second-repair-physical')
     assert.equal(secondSuccessor.ok, true, JSON.stringify(secondSuccessor))
     assert.equal(secondSuccessor.origin, 'InteractionRepair')
+    sync.recordDeliveredValue(secondSuccessor.sessionId, 'SECOND-REPAIR-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, secondSuccessor.sessionId, secondSuccessor.physicalUserMessageId,
       secondSuccessor.authorityRootUserMessageId, 'second-formal-provider-run', 'SECOND-REPAIR-FORMAL-ANSWER', ''), true)
     const secondResult = await secondCompletion

@@ -683,7 +683,7 @@ const partDescriptor = {
   turn: 0,
   partIndex: 0,
   kind: 'tool_call',
-  toolName: 'read',
+  toolName: 'todowrite-for-engineer',
   textRef: 'blob-1',
   textDigest: 'digest-1',
   body: '{}',
@@ -696,7 +696,7 @@ test('WHAT[semantic-trace-002] copied semantic evidence excludes transport metad
   const projection = unwrap(trace.appendPart(trace.emptyProjection(), partDescriptor))
   const evidence = trace.orderedSemanticParts(projection)[0]
   assert.equal(evidence.providerRun, 'provider-run-1')
-  assert.equal(evidence.toolName, 'read')
+  assert.equal(evidence.toolName, 'todowrite-for-engineer')
   for (const forbidden of ['usage', 'cost', 'timestamp', 'elapsed', 'directory', 'finishReason', 'runtimeId', 'tokens', 'uiDelta']) {
     assert.equal(Object.hasOwn(evidence, forbidden), false, `semantic evidence must not carry ${forbidden}`)
   }
@@ -803,9 +803,9 @@ test('WHAT[semantic-trace-002] capture mapper copies text and reasoning semantic
   assert.deepEqual(trace.mapPart(trace.reasoningPart('considering')), { kind: 'reasoning', text: 'considering' })
 })
 test('WHAT[semantic-trace-002] capture mapper drops transport call identities', () => {
-  assert.deepEqual(trace.mapPart(trace.toolCallPart('call-1', 'read', '{}')), {
+  assert.deepEqual(trace.mapPart(trace.toolCallPart('call-1', 'todowrite-for-engineer', '{}')), {
     kind: 'tool-call',
-    name: 'read',
+    name: 'todowrite-for-engineer',
     args: '{}',
   })
   assert.deepEqual(trace.mapPart(trace.toolResultPart('call-1', 'output')), {
@@ -888,7 +888,7 @@ test('WHAT[semantic-trace-002] later parts and reanchor copies cannot move a ret
       turn: sequence,
       partIndex: 0,
       kind,
-      toolName: kind.startsWith('tool_') ? 'js-plan' : undefined,
+      toolName: kind.startsWith('tool_') ? 'todowrite-for-plan' : undefined,
       textRef: `blob-${sequence}`,
       textDigest: `digest-${sequence}`,
       body: `raw-${sequence}`,
@@ -907,7 +907,7 @@ test('WHAT[semantic-trace-002] later parts and reanchor copies cannot move a ret
   const retired = {
     info: { id: 'retired-exchange', role: 'assistant' },
     parts: [{
-      id: 'retired-tool-part', type: 'tool', callID: 'retired-call', tool: 'js-plan',
+      id: 'retired-tool-part', type: 'tool', callID: 'retired-call', tool: 'todowrite-for-plan',
       state: { status: 'completed', input: { program: 'previous work' }, output: 'retired output' },
     }],
   }
@@ -923,19 +923,18 @@ test('WHAT[semantic-trace-002] later parts and reanchor copies cannot move a ret
     [opening, retired, answer, followup],
     {
       workId: 'trace-tenure', incumbencyId: 'inc-current', stage: 'S2',
-      openingCursor: 4n, previousRange: [0n, 4n], isFreshHandover: false,
+      openingCursor: 4n, isFreshHandover: false,
     },
-    () => 'PREVIOUS_WORK_RECORD',
     trace.hostMessageFirstCursors(projection),
   )
   assert.deepEqual(
     result.messages.map((message) => message.info.id),
-    ['user-opening', 'lwr-prev-inc-current', 'current-answer', 'user-followup'],
+    ['user-opening', 'current-answer', 'user-followup'],
   )
-  assert.equal(result.messages[2], answer)
-  assert.equal(result.messages[3], followup)
+  assert.equal(result.messages[1], answer)
+  assert.equal(result.messages[2], followup)
   assert.deepEqual(result.messages.flatMap((message) => message.parts.map((part) => part.text)), [
-    'Original requirement', 'PREVIOUS_WORK_RECORD', 'CURRENT_ANSWER', 'CURRENT_FOLLOWUP',
+    'Original requirement', 'CURRENT_ANSWER', 'CURRENT_FOLLOWUP',
   ])
 })
 }

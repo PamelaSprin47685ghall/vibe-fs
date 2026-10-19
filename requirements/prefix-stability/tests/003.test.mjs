@@ -41,7 +41,7 @@ test('WHAT[prefix-stability-003] the registered failure proof rejects production
   const child = spawn(process.execPath, [
     join(import.meta.dirname, 'support/promotion-proof-runner.mjs'),
     import.meta.filename, join(import.meta.dirname, 'support/failed-promotion-loader.mjs'),
-  ], { env, stdio: ['ignore', 'pipe', 'pipe'] })
+  ], { env, stdio: ['ignore', 'pipe', 'pipe'], timeout: 30000 })
   let output = ''
   const rejected = Promise.withResolvers()
   let fullyDrained = false
@@ -201,7 +201,7 @@ test('WHAT[prefix-stability-003] the actual admitted retry candidate stays uncom
           globalThis.__wanxiangshu_failed_prefix_promotion = true
         }
         try {
-          await observeFact(directory, 'FailureRecorded', () => failAttempt(hooks, runtime, session, retry, 'Failed'))
+          await observeFact(directory, ['FailureRecorded', 'PrefixRebaseCommitted'], () => failAttempt(hooks, runtime, session, retry, 'Failed'))
           const failures = facts(directory, 'FailureRecorded')
           assert.deepEqual(failures.at(-1).ProviderRun, ['ProviderRunIdentity', retry.run.info.id])
           assert.deepEqual(prefixHistory(directory), history, 'a failed retry must not append a prefix commit or rollback')

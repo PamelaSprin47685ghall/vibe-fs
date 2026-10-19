@@ -15,7 +15,8 @@ type SessionRecoveryHost =
         journal: AgentJournal *
         snapshot: ISessionSnapshotPort *
         scope: PluginRecoveryScope *
-        acceptedMessageRecovery: ExactAcceptedMessageRecoveryPort option ->
+        acceptedMessageRecovery: ExactAcceptedMessageRecoveryPort option *
+        notifyTerminal: (SessionId -> TerminalOutcome -> unit) option ->
             SessionRecoveryHost
 
     member Signal: event: ChatExecutionRecoveryLifecycleEvent -> Task

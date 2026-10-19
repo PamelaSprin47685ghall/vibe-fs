@@ -53,7 +53,6 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
-open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
@@ -142,9 +141,9 @@ module PluginTransforms =
           RefreshCompanionXTrace: string option -> XTraceProjectionState option -> unit
           ApplyCompanion: string option -> obj -> obj -> Task<unit>
           ApplyXWire: obj -> Task<PrefixPresentationHorizon>
-          FreezeProviderAttemptPlan: string option -> obj -> Task<unit>
+          FreezeProviderAttemptPlan: string option -> PhysicalUserMessageId option -> Task<unit>
           ApplyEnforcerContinuation: string option -> obj -> Task<unit>
-          ApplyReadonlyDelegation: string option -> obj -> Task<unit>
+          ApplyReadonlyDelegation: string option -> PhysicalUserMessageId option -> obj -> Task<unit>
           InjectPairGuideline: string option -> DateTimeOffset option -> obj -> Task<unit>
           ProjectRequirementGrounding: string option -> obj -> Task<unit>
           InjectBloggerChronicle:
@@ -210,16 +209,13 @@ module PluginTransforms =
         /// the refusal carries no exact key and is never guessed.
         let exactProviderStartBoundaryKey
             (projectionSessionIdOpt: string option)
-            (outObj: obj)
+            (physicalUserMessageId: PhysicalUserMessageId option)
             : ChatExecutionKey option =
-            match projectionSessionIdOpt with
-            | Some sessionText when not (String.IsNullOrWhiteSpace sessionText) ->
-                outObj
-                |> ProviderWireDecode.messagesFromTransformOutput
-                |> ProviderWireCapture.lastUserMessageId
-                |> Option.map (fun physical ->
+            match projectionSessionIdOpt, physicalUserMessageId with
+            | Some sessionText, Some physical when not (String.IsNullOrWhiteSpace sessionText) ->
+                Some
                     { SessionId = SessionId.create sessionText
-                      PhysicalUserMessageId = physical })
+                      PhysicalUserMessageId = physical }
             | _ -> None
 
         let signalProviderStartBoundaryRejection (key: ChatExecutionKey) (reason: string) () : Task =
@@ -231,12 +227,12 @@ module PluginTransforms =
         /// diagnostic and the caller still raises the hook failure below.
         let reportProviderStartBoundaryRejected
             (projectionSessionIdOpt: string option)
-            (outObj: obj)
+            (physicalUserMessageId: PhysicalUserMessageId option)
             (reason: string)
             : Task =
             task {
                 let report () =
-                    match exactProviderStartBoundaryKey projectionSessionIdOpt outObj with
+                    match exactProviderStartBoundaryKey projectionSessionIdOpt physicalUserMessageId with
                     | Some key -> signalProviderStartBoundaryRejection key reason ()
                     | None -> Task.FromResult(()) :> Task
 
@@ -290,14 +286,9 @@ module PluginTransforms =
                     requireProviderAdmission key
             }
 
-        let confirmProviderStarted projectionSessionIdOpt outObj =
+        let confirmProviderStarted projectionSessionIdOpt physicalUserMessageId =
             task {
-                let physical =
-                    outObj
-                    |> ProviderWireDecode.messagesFromTransformOutput
-                    |> ProviderWireCapture.lastUserMessageId
-
-                match projectionSessionIdOpt, physical with
+                match projectionSessionIdOpt, physicalUserMessageId with
                 | Some sessionText, Some physical ->
                     let key =
                         { SessionId = SessionId.create sessionText
@@ -343,7 +334,7 @@ module PluginTransforms =
                 |> Option.defaultWith (fun () ->
                     Task.FromResult(Error "MANAGED-SESSION-017: current authority root unavailable"))
 
-        let freezeProviderAttemptPlan projectionSessionIdOpt outObj =
+        let freezeProviderAttemptPlan projectionSessionIdOpt physicalUserMessageId =
             task {
                 let conflictingPlan existing attempted =
                     invalidOp (
@@ -388,9 +379,9 @@ module PluginTransforms =
                         journal
                         adaptedFreezeAttemptPlan
                         projectionSessionIdOpt
-                        outObj
+                        physicalUserMessageId
                 with
-                | Ok _ -> do! confirmProviderStarted projectionSessionIdOpt outObj
+                | Ok _ -> do! confirmProviderStarted projectionSessionIdOpt physicalUserMessageId
                 | Error error ->
                     let reason = ProviderLifecycle.providerStartObservationErrorCode error
 
@@ -398,7 +389,7 @@ module PluginTransforms =
                     // reported to the settlement owner for the exact execution. The
                     // report never replaces the original refusal: a failed report is
                     // emitted as a diagnostic and the hook failure is raised below.
-                    do! reportProviderStartBoundaryRejected projectionSessionIdOpt outObj reason
+                    do! reportProviderStartBoundaryRejected projectionSessionIdOpt physicalUserMessageId reason
 
                     return
                         invalidOp (
@@ -565,7 +556,7 @@ module PluginTransforms =
                         (ProviderWireDecode.projectionSessionIdFromMessages outObj)
             }
 
-        let applyReadonlyDelegation projectionSessionIdOpt outObj =
+        let applyReadonlyDelegation projectionSessionIdOpt hostPhysicalUserMessageId outObj =
             StrengthDelegate.tryCaptureAndStart
                 snapshotOpt
                 journal
@@ -575,6 +566,7 @@ module PluginTransforms =
                 scope.SyncDelegateRuntime
                 (predictorConfigured ())
                 projectionSessionIdOpt
+                hostPhysicalUserMessageId
                 (Some boot.Timer)
                 outObj
 
@@ -631,10 +623,21 @@ module PluginTransforms =
             | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Plan -> Some sid
             | _ -> None
 
+        // work-002 / work-046: opening is a closed entry set. A Plan session
+        // opens S1/S2/S3 and a Manager session opens S4 — the same entry covers
+        // the Manager's direct opening, a new commission, and the parentless
+        // Manager execution session an authorized delivery spawns. Every other
+        // role (DevOps, Engineer, Orchestrator, ...) owns no lifecycle work and
+        // must not be handed one here.
+        let managerSessionOf (sidOpt: string option) : string option =
+            match sidOpt with
+            | Some sid when not (String.IsNullOrWhiteSpace sid) && ownerRole sid = Some Role.Manager -> Some sid
+            | _ -> None
+
         let tryReadLifecycleWork (sid: string) =
             workspaceDirectory
             |> Option.bind (fun workspace ->
-                let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+                let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sid)
 
 
@@ -664,10 +667,8 @@ module PluginTransforms =
             }
 
         // COMPANION-003: the Plan session is a top-level main session; nothing
-        // else owns its opening. Without opening evidence the bounded LWR_prev
-        // of a relay successor materializes to nothing and the handover loses
-        // the previous tenure's semantics. The opening is the first physical
-        // user instruction, captured once; a session that already has opening
+        // else owns its opening. The opening is the first physical user
+        // instruction, captured once; a session that already has opening
         // evidence is never rewritten.
         let planOpeningText (rawMessages: obj list) : string option =
             rawMessages
@@ -711,11 +712,85 @@ module PluginTransforms =
                       HasSemanticParts = not (List.isEmpty message.Parts)
                       Raw = raw }))
 
-        // Stopped. inspect has no work sequence. Absence is not a plan tenure.
+        let isPlanSequence (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+            work.Sequence = [ "S1"; "S2"; "S3" ]
+
+        let tenureForActive
+            (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+            (epoch: Wanxiangshu.Context.Prefix.ActivePrefixEpoch)
+            (sid: string)
+            : Wanxiangshu.Mission.Planning.ActiveTenureInfo =
+            let incumbentId = work.ActiveId |> Option.defaultValue ""
+
+            { WorkId = sid
+              IncumbencyId = incumbentId
+              Stage = work.Stage
+              OpeningCursor = work.OpeningCursor |> Option.defaultValue 0. |> int64
+              IsFreshHandover = not (PrefixEpochProjection.isTenureReanchored incumbentId epoch) }
+
+        // The delivered Plan work is post-S3: the tenure is over and the
+        // session waits for the user's execution command. It inherits nothing
+        // from S3 or earlier: every assistant/tool interaction at-or-before the
+        // delivered retirement frontier is stripped.
+        let tenureForPostS3
+            (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+            (sid: string)
+            : Wanxiangshu.Mission.Planning.ActiveTenureInfo =
+            { WorkId = sid
+              IncumbencyId = "post-s3"
+              Stage = "S3"
+              OpeningCursor = work.LastRetirementCursor |> Option.defaultValue -1. |> int64 |> (+) 1L
+              IsFreshHandover = false }
+
+        let isolatePlanTenure (tenure: Wanxiangshu.Mission.Planning.ActiveTenureInfo) (sid: string) (outObj: obj) =
+            task {
+                let durable =
+                    journal
+                    |> Option.defaultWith (fun () -> invalidOp "Plan journal is unavailable")
+
+                let sessionId = SessionId.create sid
+                do! restoreProtocolArguments outObj
+                let rawMessages = ProviderWireDecode.messagesFromTransformOutput outObj
+
+                let! captured =
+                    rawMessages
+                    |> List.filter (ProviderWireCapture.isSyntheticMessage >> not)
+                    |> captureXTraceMessages (Some sid)
+
+                let trace =
+                    captured.Current
+                    |> Option.defaultWith (fun () -> invalidOp "Plan XTrace is unavailable")
+
+                do! capturePlanSessionOpening durable sessionId trace rawMessages
+
+                if tenure.OpeningCursor > XTraceCursor.sequence (XTraceProjection.headCursor trace) then
+                    invalidOp "Plan opening cursor exceeds the captured XTrace frontier"
+
+                let assembled =
+                    Wanxiangshu.Mission.Planning.TenureIsolation.assemble
+                        (tenureMessagesOf rawMessages)
+                        tenure
+                        (XTraceProjection.hostMessageFirstCursors trace)
+
+                if assembled.ReanchorRequested then
+                    do! reanchorTenure durable sessionId tenure (tenureReanchorEpoch durable sessionId)
+
+                HostMessageProjection.replaceMessagesInPlace outObj assembled.Messages
+            }
+
+        let currentEpochOf (sid: string) : Wanxiangshu.Context.Prefix.ActivePrefixEpoch =
+            match journal with
+            | Some durable -> tenureReanchorEpoch durable (SessionId.create sid)
+            | None -> PrefixEpochProjection.empty
+
         let applyResolvedTenure (sid: string) (outObj: obj) =
             task {
-                let _ = sid, outObj
-                return ()
+                match tryReadLifecycleWork sid with
+                | Some work when isPlanSequence work && work.ActiveId.IsSome ->
+                    return! isolatePlanTenure (tenureForActive work (currentEpochOf sid) sid) sid outObj
+                | Some work when isPlanSequence work && work.Delivered ->
+                    return! isolatePlanTenure (tenureForPostS3 work sid) sid outObj
+                | _ -> return ()
             }
 
         let applyTenureIsolation (sidOpt: string option) (outObj: obj) : Task<unit> =
@@ -723,7 +798,7 @@ module PluginTransforms =
                 match planSessionOf sidOpt with
                 | None -> ()
                 | Some sid ->
-                    // planning-020: the entry hook runs before resolveTenure so
+                    // work-036: the entry hook runs before resolveTenure so
                     // the first tenure exists when the isolation is assembled.
                     // The opening cursor is the XTrace head observed in this
                     // transform. The EventStore write lives in
@@ -744,17 +819,47 @@ module PluginTransforms =
                     do! applyResolvedTenure sid outObj
             }
 
+        let acceptedSuccessorRequestFor (sidOpt: string option) (physicalUserMessageId: PhysicalUserMessageId option) =
+            match journal, sidOpt, physicalUserMessageId with
+            | Some durable, Some sessionId, Some physical when not (String.IsNullOrWhiteSpace sessionId) ->
+                let key: ChatExecutionKey =
+                    { SessionId = SessionId.create sessionId
+                      PhysicalUserMessageId = physical }
+
+                (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
+                |> ChatExecutionProjection.byKey key
+                |> Option.isSome
+            | _ -> false
+
         { BeginPhysicalProviderAttempt =
             fun sessionId output ->
                 task {
                     do! wired.EnsureVisibleInputAdmission output
 
-                    do!
-                        SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
-                            journal
-                            scope.Sessions.Quiescence.BeginProviderAttempt
-                            sessionId
-                            output
+                    let physicalUserMessageId =
+                        output
+                        |> ProviderWireDecode.messagesFromTransformOutput
+                        |> ProviderWireCapture.lastUserMessageId
+
+                    let acceptedRequest = acceptedSuccessorRequestFor sessionId physicalUserMessageId
+                    let lifecycle = sessionId |> Option.bind tryReadLifecycleWork
+
+                    if
+                        not (
+                            RelayNarrativeTransform.isStaleRetiredAttempt
+                                journal
+                                acceptedRequest
+                                sessionId
+                                lifecycle
+                                output
+                        )
+                    then
+                        do!
+                            SessionExecutionBinding.beginPhysicalProviderAttemptForTransform
+                                journal
+                                scope.Sessions.Quiescence.BeginProviderAttempt
+                                sessionId
+                                output
                 }
           BindSessionStartedAt =
             let port = journal |> Option.map AgentJournalPortAdapter.forSessionStartedAt
@@ -776,16 +881,7 @@ module PluginTransforms =
                     // External human messages and internal recovery/guard continuations
                     // admitted into ChatExecutions belong to this active iteration.
                     let acceptedSuccessorRequest =
-                        match journal, sidOpt, physicalUserMessageId with
-                        | Some durable, Some sessionId, Some physical when not (String.IsNullOrWhiteSpace sessionId) ->
-                            let key: ChatExecutionKey =
-                                { SessionId = SessionId.create sessionId
-                                  PhysicalUserMessageId = physical }
-
-                            (AgentJournal.snapshot durable).AgentProjections.ChatExecutions
-                            |> ChatExecutionProjection.byKey key
-                            |> Option.isSome
-                        | _ -> false
+                        acceptedSuccessorRequestFor sidOpt physicalUserMessageId
 
                     let handleInterruptionError (error: string) : unit =
                         if error.Contains "MANAGED-SESSION-016" then
@@ -834,7 +930,7 @@ module PluginTransforms =
 
                     match captured.Receipt with
                     | None -> return captured
-                    | Some receipt ->
+                    | Some receipt when managerSessionOf projectionSessionIdOpt |> Option.isSome ->
                         let observedHead = XTraceCursor.sequence receipt.CurrentHead
 
                         do!
@@ -844,6 +940,7 @@ module PluginTransforms =
                                 projectionSessionIdOpt
 
                         return captured
+                    | Some _ -> return captured
                 }
           CommitStrengthTrace =
             fun projectionSessionIdOpt traceState strengthReplayPlans ->
@@ -1075,7 +1172,7 @@ module PluginTransforms =
                   // 3. Relay projection cut + manager-loop opening. This MUST run
                   // before every trace/compaction owner so retired raw history
                   // cannot be reintroduced later in the composition.
-                  { Name = "relay-projection-cut"
+                  { Name = "work-projection-cut"
                     Run =
                       fun frame ->
                           task {
@@ -1168,7 +1265,7 @@ module PluginTransforms =
                     Run =
                       fun frame ->
                           task {
-                              do! caps.FreezeProviderAttemptPlan frame.SessionId frame.OutObj
+                              do! caps.FreezeProviderAttemptPlan frame.SessionId frame.PhysicalUserMessageId
                               return Some frame
                           } }
                   // 12. EnforcerContinuation.applyContinuation
@@ -1190,7 +1287,12 @@ module PluginTransforms =
                               if frame.Horizon = PrefixPresentationHorizon.Current then
                                   do! caps.InjectPairGuideline frame.SessionId frame.SessionStartedAt frame.OutObj
                                   do! caps.ProjectRequirementGrounding frame.SessionId frame.OutObj
-                                  do! caps.ApplyReadonlyDelegation frame.SessionId frame.OutObj
+
+                                  do!
+                                      caps.ApplyReadonlyDelegation
+                                          frame.SessionId
+                                          frame.PhysicalUserMessageId
+                                          frame.OutObj
 
                               return Some frame
                           } }
@@ -1226,6 +1328,7 @@ module PluginTransforms =
                   Horizon = PrefixPresentationHorizon.Current }
 
             do! runOrdinaryStages stages frame
+
         }
 
     let createWithCaps
@@ -1249,11 +1352,17 @@ module PluginTransforms =
                 match determineTransformMode branches projectionSessionIdOpt outObj with
                 | StrengthReplica runtime ->
                     projectionSessionIdOpt |> Option.iter branches.RegisterOwned
+
+                    let physicalUserMessageId =
+                        outObj
+                        |> ProviderWireDecode.messagesFromTransformOutput
+                        |> ProviderWireCapture.lastUserMessageId
+
                     // STRENGTH-004/009: Replica uses exactly one request-plan
                     // writer plus its mirror/K gate. XTrace, Manager narrative,
                     // Companion, Enforcer, Pair and Review are owner-only.
                     do! branches.ReplicaXWire outObj
-                    do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt outObj
+                    do! caps.FreezeProviderAttemptPlan projectionSessionIdOpt physicalUserMessageId
                     // host-boundary-032 / same restore on the
                     // Replica branch, before the runtime reads this request.
                     do! caps.RestoreProtocolArguments outObj

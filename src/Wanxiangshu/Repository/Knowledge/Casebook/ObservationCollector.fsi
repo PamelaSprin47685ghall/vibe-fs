@@ -7,6 +7,9 @@ type CasebookObservationCollector =
     /// Record one tool execution's observation for a session.
     member Collect: sessionId: string * toolName: string * args: obj * output: string -> unit
 
+    /// Record one explicit file read observation for a session.
+    member RecordFileRead: sessionId: string * path: string * output: string -> unit
+
     /// Record substantive access directly.
     member RecordSubstantive: sessionId: string * toolName: string * args: obj * committed: bool -> unit
 

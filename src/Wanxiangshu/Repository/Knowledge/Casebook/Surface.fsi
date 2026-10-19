@@ -6,8 +6,6 @@ module CasebookSurface =
 
     val contentHash: text: string -> string
 
-    val capture: toolName: string -> args: obj -> output: string -> obj
-
     val ofExecCommand: command: string -> obj
 
     val normalize: observations: obj array -> obj array

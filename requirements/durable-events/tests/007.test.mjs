@@ -231,7 +231,7 @@ const invalidUtf8Event = () => {
 
 test('WHAT[durable-events-007] local writer boot rejects invalid UTF-8 without replacement decoding', () => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-invalid-utf8-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   const eventsDir = join(commonDir, 'wanxiangshu', 'events')
   mkdirSync(eventsDir, { recursive: true })
   writeFileSync(join(eventsDir, 'broken.ndjson'), invalidUtf8Event())

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>work</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-work-core</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>work</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-work-core</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Mission/Work/Contract.fsi"/>
+    <Compile Include="Mission/Work/Contract.fs"/>
+  </ItemGroup>
+</Project>

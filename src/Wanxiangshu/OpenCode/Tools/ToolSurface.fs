@@ -7,7 +7,7 @@ open Wanxiangshu.Foundation
 /// owner-defined identity and catalog facts needed by semantic unit laws.
 module ToolSurface =
 
-    /// planning-013: the spec projection of the static catalog. `resume` keeps
+    /// work-030: the spec projection of the static catalog. `resume` keeps
     /// its permission entry for every role (Manager's delegation surface owns
     /// the verb, capability-enforcement-011), but it is not a registered plan
     /// spec; `handoff` left the catalog entirely.
@@ -27,7 +27,15 @@ module ToolSurface =
     let chronicleContract () : obj =
         box
             {| name = "chronicle"
-               argumentNames = [| "charge"; "occurrence"; "settlement"; "consequence"; "evidence"; "tip" |]
+               argumentNames =
+                [| "charge"
+                   "occurrence"
+                   "settlement"
+                   "consequence"
+                   "tipName"
+                   "opinion"
+                   "advice"
+                   "evidence" |]
                tipCount = ChronicleTool.tipFieldNames () |> List.length |}
 
     let reviewToolNames () : string array =

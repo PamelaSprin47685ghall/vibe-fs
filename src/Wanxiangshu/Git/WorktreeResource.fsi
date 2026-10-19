@@ -51,14 +51,7 @@ module WorktreeCommands =
         unit ->
             Task<Result<(WorktreePath * WorktreeIdentity option) list, string>>
 
-    val listBranches:
-        runner: TextProcessRunner ->
-        repo: string ->
-        unit ->
-            Task<Result<WorktreeIdentity list, string>>
+    val listBranches: runner: TextProcessRunner -> repo: string -> unit -> Task<Result<WorktreeIdentity list, string>>
 
     val deleteBranch:
-        runner: TextProcessRunner ->
-        repo: string ->
-        identity: WorktreeIdentity ->
-            Task<Result<unit, string>>
+        runner: TextProcessRunner -> repo: string -> identity: WorktreeIdentity -> Task<Result<unit, string>>

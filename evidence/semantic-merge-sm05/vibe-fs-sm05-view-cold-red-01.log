@@ -1,0 +1,27 @@
+✖ WHAT[work-034] a relaying tenure declaring view: { extra } commits ViewCheckpointCommitted and delivers the declared view to the successor request (1314.673459ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1631.880209
+
+✖ failing tests:
+
+test at requirements/work/tests/034.test.mjs:426:1
+✖ WHAT[work-034] a relaying tenure declaring view: { extra } commits ViewCheckpointCommitted and delivers the declared view to the successor request (1314.673459ms)
+  AssertionError [ERR_ASSERTION]: a durable checkpoint must restore the declared handover summary
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work/tests/034.test.mjs:502:12
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work/tests/034.test.mjs:428:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

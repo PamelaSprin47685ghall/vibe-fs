@@ -63,23 +63,11 @@ module ContextFact =
                TextDigest: BlobDigest
                ProviderRun: ProviderRunIdentity
                ToolCallIds: ToolCallId list
-               TipRuleId: string
-               FieldNameAtCommit: string option
+               TipName: string
+               TipTextRef: BlobRef option
+               TipTextDigest: BlobDigest option
                EvidenceRef: BlobRef option
                ObservedPrefixEpochId: PrefixEpochId |} ->
-            AgentFact
-
-    val inline BlogObservationsSquashed:
-        payload:
-            {| SessionId: SessionId
-               BloggerSessionId: SessionId
-               RequestId: BloggerRequestId
-               PreviousFrameEpochId: FrameEpochId
-               NextFrameEpochId: FrameEpochId
-               CoveredFrameCount: int
-               TextRef: BlobRef
-               TextDigest: BlobDigest
-               ProviderRun: ProviderRunIdentity |} ->
             AgentFact
 
     val inline BloggerRequestMaterialized:
@@ -106,7 +94,7 @@ module ContextFact =
                Reason: string |} ->
             AgentFact
 
-    val inline TodoCheckpointCommitted:
+    val inline ViewCheckpointCommitted:
         payload:
             {| SessionId: SessionId
                ToolCallId: ToolCallId |} ->

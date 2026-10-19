@@ -12,7 +12,6 @@ open Wanxiangshu.Host
 open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode
-open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Persistence.Journal
@@ -53,25 +52,44 @@ module DeliverTool =
     let private text (path: string) =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path Map.empty
 
-    let private pendingDeferred (journal: AgentJournal) (sessionId: SessionId) =
-        AgentProjection.pendingAttentionWorkPairs sessionId (AgentJournal.snapshot journal).AgentProjections
-
     /// The one lifecycle work this session owns. Lifecycle storage is the
     /// wanxiangli journal, independent of the workspace EventStore.
     let private lifecycleWorkOf
         (directory: string)
         (sessionId: string)
         : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
-        let commonDir = RuntimePath.gitCommonDir directory
+        let commonDir = RuntimePath.stateRoot directory
 
         if String.IsNullOrWhiteSpace commonDir then
             None
         else
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
 
-    let private deterministicId prefix payload create =
-        HostDigest.sha256Hex (prefix + "\n" + payload)
-        |> fun digest -> create (prefix + ":" + digest)
+    /// Algorithm E1.1: the fence (ProviderRunId, ToolCallId) is looked up on the
+    /// retirements the fold already committed, before the entry reads an active
+    /// tenure or a review position. A retried call must return the state that
+    /// call recorded: a delivered work has no active tenure left, and a relayed
+    /// one leaves a successor that is not yet reviewed. The recorded outcome
+    /// name is already the closed result vocabulary, so the expected advance the
+    /// entry read is the one field left to compare; a different one is the same
+    /// refusal the second call gets. This path writes nothing.
+    let recordedFenceReplay
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        (providerRunId: string)
+        (toolCallId: string)
+        : Result<string, string> option =
+        let sameFence (retirement: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement) =
+            retirement.ProjectionCut
+            && retirement.Fence.ProviderRunId = providerRunId
+            && retirement.Fence.ToolCallId = toolCallId
+
+        let recordedState (retirement: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement) =
+            if retirement.Expected = work.Authority then
+                Ok(text Path.Retired)
+            else
+                Error "RetirementReplayConflict"
+
+        work.Retirements |> List.tryFind sameFence |> Option.map recordedState
 
     let private blockedResult blockers =
         ToolHostCodec.tomlObjectWithInstructions
@@ -89,9 +107,6 @@ module DeliverTool =
             [ text Path.AssessmentRequired ]
             [ "finished", ToolHostCodec.TBool false
               "assessment_required", ToolHostCodec.TBool true ]
-
-    let private retiredResult () =
-        ToolHostCodec.tomlObjectWithInstructions [ text Path.Retired ] [ "finished", ToolHostCodec.TBool true ]
 
     let private requireSome error =
         function
@@ -149,6 +164,13 @@ module DeliverTool =
           Incumbent: string
           Reviewed: bool }
 
+    /// Algorithm E1.1 and E2: the entry either replays a fence the fold already
+    /// settled, or binds the active tenure. The replay decision belongs to the
+    /// fold, so no earlier layer answers a retried call with a refusal for the
+    /// tenure the retirement removed.
+    type private DeliverEntry =
+        | Replayed of string
+        | Prepared of PreparedRetirement
 
     let private bindInvocation (scope: ToolRuntimeScope) (context: HostToolContext) =
         match
@@ -171,19 +193,32 @@ module DeliverTool =
         | Some _, _, _, _, _, _ -> Error(text Path.NonManagerRole)
         | None, _, _, _, _, _ -> Error(text Path.NoAuthority)
 
-    let private prepareTarget (context: HostToolContext) (bound: BoundRetirement) : Result<PreparedRetirement, string> =
-        let located =
-            lifecycleWorkOf bound.Directory context.SessionId
-            |> Option.bind (fun work -> work.ActiveId |> Option.map (fun active -> work, active))
+    /// Algorithm E1: the caller enters the two-stage sequence only for the
+    /// execution sequence. Algorithm E1.1: an already committed fence replays
+    /// its recorded state before Algorithm E2 reads an active tenure.
+    let private enterDeliver (context: HostToolContext) (bound: BoundRetirement) : Result<DeliverEntry, string> =
+        let fenceReplay (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+            recordedFenceReplay work (ProviderRunIdentity.value bound.ProviderRun) (ToolCallId.value bound.ToolCallId)
+            |> Option.map (Result.map Replayed)
 
-        match located with
-        | None -> Error(text Path.BindingUnavailable)
-        | Some(work, active) ->
-            Ok
-                { Bound = bound
-                  SessionId = SessionId.create context.SessionId
-                  Incumbent = active
-                  Reviewed = work.Reviewed }
+        let activeEntry (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+            work.ActiveId
+            |> Option.map (fun active ->
+                Ok(
+                    Prepared
+                        { Bound = bound
+                          SessionId = SessionId.create context.SessionId
+                          Incumbent = active
+                          Reviewed = work.Reviewed }
+                ))
+            |> Option.defaultValue (Error(text Path.BindingUnavailable))
+
+        let openedEntry (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+            fenceReplay work |> Option.defaultWith (fun () -> activeEntry work)
+
+        match lifecycleWorkOf bound.Directory context.SessionId with
+        | Some work when work.Sequence = [ "S4" ] -> openedEntry work
+        | _ -> Error(text Path.BindingUnavailable)
 
     let private confirmationResult (prepared: PreparedRetirement) pending =
         let deferred =
@@ -224,6 +259,15 @@ module DeliverTool =
             Task.FromResult(Ok(confirmationResult prepared pending))
         else
             confirmFirst ()
+
+    let private enqueueRelayedSuccessor (scope: ToolRuntimeScope) (prepared: PreparedRetirement) (kind: string) =
+        task {
+            if kind = "Relayed" then
+                let! continued = scope.ContinueManagerLoop(prepared.SessionId, prepared.Bound.Directory)
+
+                continued
+                |> Result.defaultWith (fun error -> raise (InvalidOperationException error))
+        }
 
     let private deliverFrozenCursor
         (scope: ToolRuntimeScope)
@@ -272,16 +316,35 @@ module DeliverTool =
         elif receipt.Kind = "ReviewRequired" then
             Task.FromResult(Error "assessment required")
         elif durableOutcome then
-            scope.UnfreezeRetirement context.SessionId
+            task {
+                do! enqueueRelayedSuccessor scope prepared receipt.Kind
+                scope.UnfreezeRetirement context.SessionId
 
-            Task.FromResult(
-                Ok(
-                    if receipt.Kind = "Confirmed" then
-                        confirmationResult prepared pending
-                    else
-                        text Path.Retired
-                )
-            )
+                if receipt.Kind = "Delivered" then
+                    let retirementId =
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "retirementId"
+
+                    do! JournalSurface.appendAuthorityLogicalRunClosed journalDir context.SessionId retirementId
+
+                    let! interrupted = scope.Sessions.InterruptAttempt prepared.SessionId
+
+                    interrupted
+                    |> Result.defaultWith (fun reason ->
+                        invalidOp ("Manager delivery was recorded, but its attempt interrupt failed: " + reason))
+
+                return
+                    Ok(
+                        if receipt.Kind = "Confirmed" then
+                            confirmationResult prepared pending
+                        elif receipt.Kind = "Blocked" then
+                            // Algorithm E8: a committed blocker keeps the tenure
+                            // active. The call reports what to close and may be
+                            // repeated once the resources have settled.
+                            blockedResult blockers
+                        else
+                            text Path.Retired
+                    )
+            }
         else
             Task.FromResult(
                 Error(
@@ -330,12 +393,12 @@ module DeliverTool =
         let toolCallId = ToolCallId.value prepared.Bound.ToolCallId
         let providerRunId = ProviderRunIdentity.value prepared.Bound.ProviderRun
 
-        let pending = pendingDeferred prepared.Bound.Journal prepared.SessionId
+        let pending: (string * string) list = []
 
         let confirmFirst () =
             task {
                 let directory = scope.WorkspaceDirectory
-                let commonDir = directory |> Option.map RuntimePath.gitCommonDir
+                let commonDir = directory |> Option.map RuntimePath.stateRoot
 
                 match commonDir with
                 | None -> return Error "lifecycle journal directory is unavailable"
@@ -364,12 +427,6 @@ module DeliverTool =
             scope.UnfreezeRetirement context.SessionId
             raise (InvalidOperationException error)
 
-    // No session-scoped physical cut here. AbortSession names a session, not the
-    // retired run; the Host applies it after an unobservable delay, so on a reused
-    // session it lands inside the next loop iteration and kills it mid-tool. Retired
-    // output is contained by the durable cut (ProjectionCut.ProviderRunId) plus Retired
-    // tool denial; the retired run's further provider requests are refused in
-    // the transform hook by exact manager-loop gate identity, so the run ends there.
     let private refreshedTarget
         (target: PreparedRetirement)
         (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
@@ -418,8 +475,13 @@ module DeliverTool =
         }
 
     let private execute (scope: ToolRuntimeScope) (_: HostToolArguments) (context: HostToolContext) =
-        match bindInvocation scope context |> Result.bind (prepareTarget context) with
-        | Ok target -> executePrepared scope context target
+        let entered =
+            bindInvocation scope context
+            |> Result.bind (fun bound -> enterDeliver context bound)
+
+        match entered with
+        | Ok(Replayed result) -> task { return result }
+        | Ok(Prepared target) -> executePrepared scope context target
         | Error error -> task { return raise (InvalidOperationException error) }
 
     let description () = text Path.Description

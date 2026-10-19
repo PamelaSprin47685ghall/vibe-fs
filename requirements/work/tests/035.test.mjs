@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -18,7 +19,7 @@ const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-035-'))
   execFileSync('git', ['init', '--quiet', root])
   try {
-    await body(workspace.acquire(realpathSync(join(root, '.git'))), root)
+    await body(workspace.acquire(journalSurface.JournalSurface_initializeStateRoot(root)), root)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
@@ -189,5 +190,82 @@ test('WHAT[work-035] recovery effects keep Done and Review for an open incumbenc
   await withStore(async (store) => {
     const missing = surface.workView(store, '')
     assert.equal(missing.found, false)
+  })
+})
+
+test('WHAT[work-035] S4 recovery reads confirmation, relay and delivery from the fold, and a reopened delivered tenure is active again', async () => {
+  await withStore(async (store, root) => {
+    const commonDir = journalSurface.JournalSurface_initializeStateRoot(root)
+    const workId = 'work-rec-s4-successor'
+    const accepted = ['Committed', 'Replayed', 'Observed']
+    const commit = (requestId, command) => {
+      const receipt = surface.execute(commonDir, workId, requestId, command)
+      assert.ok(accepted.includes(receipt.Status), JSON.stringify(receipt))
+      return receipt
+    }
+    const activeId = () => surface.inspected(commonDir, workId).ActiveId
+    const review = (requestId, promoted) =>
+      commit(requestId, {
+        type: 'Review',
+        incumbencyId: activeId(),
+        reviewerId: 'reviewer',
+        findings: promoted ? [] : ['gap'],
+      })
+    const deliver = (requestId, providerRunId, toolCallId, cursor) =>
+      commit(requestId, {
+        type: 'Deliver',
+        incumbencyId: activeId(),
+        providerRunId,
+        toolCallId,
+        cursor,
+        blockers: [],
+        nextOwnerId: workId,
+      })
+
+    commit('open', {
+      type: 'Open',
+      root,
+      sequence: ['S4'],
+      ownerId: workId,
+      openingCursor: 0,
+    })
+    review('review-1', false)
+    const confirmed = deliver('confirm-1', 'run-1', 'call-1', 1)
+    assert.equal(confirmed.Kind, 'Confirmed')
+    const confirmedWork = surface.inspected(commonDir, workId)
+    assert.equal(confirmedWork.Delivered, false, 'a recorded confirmation is not a retirement')
+    assert.equal(Array.from(confirmedWork.Retirements).length, 0)
+    assert.notEqual(confirmedWork.ActiveId, undefined)
+    const relay = deliver('relay-1', 'run-1', 'call-2', 2)
+    assert.equal(relay.Kind, 'Relayed')
+    const successor = surface.inspected(commonDir, workId)
+    assert.equal(successor.Reviewed, false)
+    assert.equal(Array.from(successor.Retirements).at(-1).Outcome, 'Relayed')
+    assert.notEqual(successor.ActiveId, undefined, 'a relay leaves its successor active')
+
+    review('review-2', true)
+    deliver('confirm-2', 'run-2', 'call-3', 3)
+    const closed = deliver('close-2', 'run-2', 'call-4', 4)
+    assert.equal(closed.Kind, 'Delivered')
+    const delivered = surface.inspected(commonDir, workId)
+    assert.equal(delivered.Delivered, true)
+    assert.equal(Array.from(delivered.Retirements).at(-1).Outcome, 'Delivered')
+
+    const retired = Array.from(delivered.Retirements).at(-1)
+    const reopened = commit('reopen', {
+      type: 'Reopen',
+      retirementId: retired.RetirementId,
+      ownerId: workId,
+      openingCursor: 5,
+      blockers: [],
+    })
+    assert.equal(reopened.Kind, 'Reopened')
+    const rebound = surface.inspected(commonDir, workId)
+    assert.notEqual(rebound.ActiveId, undefined)
+    assert.equal(rebound.Reviewed, false)
+    assert.equal(rebound.Delivered, false, 'reopen clears the delivered read')
+    assert.equal(Array.from(rebound.Retirements).at(-1).Outcome, 'Delivered')
+    assert.notEqual(rebound.ActiveId, retired.IncumbencyId, 'reopen opens a tenure, it revives none')
+    assert.equal(surface.workView(store, workId).active, true)
   })
 })

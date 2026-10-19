@@ -47,7 +47,7 @@ await withSharedAdmittedChildren(`local-evidence-${scenario}`, 'manager-pty', [
     }
     const opened = await host.open(`printf 'launched\\n' >> '${marker}'; printf 'not-observed'; exit 23`)
     assert.equal(opened.ok, true, opened.error)
-    const root = join(workspace, '.git', 'wanxiangshu', 'pty')
+    const root = join(workspace, '.Herdchestra', 'wanxiangshu', 'pty')
     await until(() => fs.existsSync(root) && fs.readdirSync(root).length === 1, 'the exact physical request must exist')
     const directory = join(root, fs.readdirSync(root)[0])
     await until(() => fs.existsSync(join(directory, 'terminal')), 'the real owner must seal its terminal evidence')

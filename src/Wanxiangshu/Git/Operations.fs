@@ -27,6 +27,18 @@ module GitOperations =
     let private failure stdout stderr =
         if String.IsNullOrWhiteSpace stderr then stdout else stderr
 
+    let private commandOutcome (result: TextProcessExit) =
+        if result.ExitCode = 0 then
+            Ok()
+        else
+            Error(failure result.Stdout result.Stderr)
+
+    let private absoluteGitPath (directory: string) (path: string) =
+        if path.StartsWith "/" then
+            path
+        else
+            System.IO.Path.Combine(directory, path)
+
     let private stderrOr (missing: string) (stderr: string) =
         if String.IsNullOrWhiteSpace stderr then
             missing
@@ -129,14 +141,14 @@ module GitOperations =
         : Task<Result<unit, string>> =
         taskResult {
             let! result =
-                execute runner (
-                    command
+                execute
+                    runner
+                    (command
                         repoPath
                         [ "merge-base"
                           "--is-ancestor"
                           CommitHash.value currentHead
-                          CommitHash.value candidate ]
-                )
+                          CommitHash.value candidate ])
 
             if result.ExitCode <> 0 then
                 return! Error(stderrOr "candidate is not a fast-forward of the target branch" result.Stderr)
@@ -217,30 +229,57 @@ module GitOperations =
             else
                 let! result = execute runner (command dir [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
 
-                return! if result.ExitCode = 0 then Ok() else Error(failure result.Stdout result.Stderr)
+                return! commandOutcome result
         }
 
     let stageAll (runner: TextProcessRunner) dir =
         taskResult {
             let! result = execute runner (command dir [ "add"; "-A" ])
-            return! if result.ExitCode = 0 then Ok() else Error(failure result.Stdout result.Stderr)
+
+            return!
+                if result.ExitCode = 0 then
+                    Ok()
+                else
+                    Error(failure result.Stdout result.Stderr)
         }
 
     let candidateCommit (runner: TextProcessRunner) dir (msg: string) =
         taskResult {
             let! deleted = execute runner (command dir [ "update-ref"; "-d"; "REBASE_HEAD" ])
-            do! if deleted.ExitCode = 0 then Ok() else Error(failure deleted.Stdout deleted.Stderr)
+
+            do!
+                if deleted.ExitCode = 0 then
+                    Ok()
+                else
+                    Error(failure deleted.Stdout deleted.Stderr)
+
             let! result = execute runner (command dir [ "commit"; "-m"; msg ])
-            return! if result.ExitCode = 0 then Ok() else Error(failure result.Stdout result.Stderr)
+
+            return!
+                if result.ExitCode = 0 then
+                    Ok()
+                else
+                    Error(failure result.Stdout result.Stderr)
         }
 
     let private freshRebase (runner: TextProcessRunner) dir (target: TargetRef) =
         taskResult {
             // Clear stale REBASE_HEAD so the fresh rebase is not confused.
             let! deleted = execute runner (command dir [ "update-ref"; "-d"; "REBASE_HEAD" ])
-            do! if deleted.ExitCode = 0 then Ok() else Error(failure deleted.Stdout deleted.Stderr)
+
+            do!
+                if deleted.ExitCode = 0 then
+                    Ok()
+                else
+                    Error(failure deleted.Stdout deleted.Stderr)
+
             let! result = execute runner (command dir [ "rebase"; TargetRef.value target ])
-            return! if result.ExitCode = 0 then Ok() else Error(failure result.Stdout result.Stderr)
+
+            return!
+                if result.ExitCode = 0 then
+                    Ok()
+                else
+                    Error(failure result.Stdout result.Stderr)
         }
 
     let private rebaseInProgress (runner: TextProcessRunner) dir =
@@ -248,17 +287,39 @@ module GitOperations =
             // ORCH-003: continue only when rebase-merge/rebase-apply exists.
             // A bare REBASE_HEAD ref can be stale (no rebase in progress).
             let! merge = execute runner (command dir [ "rev-parse"; "--git-path"; "rebase-merge" ])
-            do! if merge.ExitCode = 0 then Ok() else Error(failure merge.Stdout merge.Stderr)
-            do! if String.IsNullOrWhiteSpace merge.Stdout then Error "git rebase-state query returned no path" else Ok()
+
+            do!
+                if merge.ExitCode = 0 then
+                    Ok()
+                else
+                    Error(failure merge.Stdout merge.Stderr)
+
+            do!
+                if String.IsNullOrWhiteSpace merge.Stdout then
+                    Error "git rebase-state query returned no path"
+                else
+                    Ok()
+
             let! apply = execute runner (command dir [ "rev-parse"; "--git-path"; "rebase-apply" ])
-            do! if apply.ExitCode = 0 then Ok() else Error(failure apply.Stdout apply.Stderr)
-            do! if String.IsNullOrWhiteSpace apply.Stdout then Error "git rebase-state query returned no path" else Ok()
+
+            do!
+                if apply.ExitCode = 0 then
+                    Ok()
+                else
+                    Error(failure apply.Stdout apply.Stderr)
+
+            do!
+                if String.IsNullOrWhiteSpace apply.Stdout then
+                    Error "git rebase-state query returned no path"
+                else
+                    Ok()
 
             let exists (path: string) =
-                if String.IsNullOrWhiteSpace path then false
+                if String.IsNullOrWhiteSpace path then
+                    false
                 else
                     let path = path.Trim()
-                    let absolute = if path.StartsWith "/" then path else System.IO.Path.Combine(dir, path)
+                    let absolute = absoluteGitPath dir path
                     System.IO.Directory.Exists absolute
 
             return exists merge.Stdout || exists apply.Stdout
@@ -277,7 +338,12 @@ module GitOperations =
                     let! result = execute runner (command repoPath [ "symbolic-ref"; "--quiet"; "--short"; "HEAD" ])
 
                     if result.ExitCode > 1 then
-                        return! Error(stderrOr (sprintf "cannot freeze target branch: git exited %d" result.ExitCode) result.Stderr)
+                        return!
+                            Error(
+                                stderrOr
+                                    (sprintf "cannot freeze target branch: git exited %d" result.ExitCode)
+                                    result.Stderr
+                            )
                     elif result.ExitCode <> 0 || String.IsNullOrWhiteSpace result.Stdout then
                         return! Error(stderrOr "cannot freeze target branch: repository HEAD is detached" result.Stderr)
                     else
@@ -299,7 +365,10 @@ module GitOperations =
           ConflictedFiles =
             fun worktree ->
                 taskResult {
-                    let! result = execute runner (command (WorktreePath.value worktree) [ "diff"; "--name-only"; "--diff-filter=U" ])
+                    let! result =
+                        execute
+                            runner
+                            (command (WorktreePath.value worktree) [ "diff"; "--name-only"; "--diff-filter=U" ])
 
                     if result.ExitCode <> 0 then
                         return! Error(failure result.Stdout result.Stderr)

@@ -17,7 +17,7 @@ export function runHook(repo, kind = 'pre-push', arg = 'origin', input = '', env
 }
 
 export async function appendFact(repo, writer, value) {
-  const store = eventStore.create(join(repo, '.git'), writer)
+  const store = eventStore.create(join(repo, '.Herdchestra'), writer)
   try {
     const result = await eventStore.append(store, [value])
     assert.equal(result.ok, true, JSON.stringify(result.error))
@@ -27,7 +27,7 @@ export async function appendFact(repo, writer, value) {
 }
 
 export function assertFacts(repo, expected) {
-  const store = eventStore.create(join(repo, '.git'), 'observer')
+  const store = eventStore.create(join(repo, '.Herdchestra'), 'observer')
   try {
     for (const value of expected) assert.deepEqual(eventStore.read(store, value.id), value)
     assert.deepEqual(eventStore.heads(store, expected[0].stream).sort(), expected.map(value => value.id).sort())

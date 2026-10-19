@@ -1,0 +1,28 @@
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-027] root affinity also rejects old Failed without a prepared handoff (201.926791ms)
+✔ WHAT[delegation-027] root affinity also rejects old Aborted without a prepared handoff (120.126042ms)
+✔ WHAT[delegation-027] busy guidance preserves the original work and completion before an idle resume starts new work (215.881458ms)
+✔ WHAT[delegation-027] prepared busy guidance for Ada stays bound to the original active work (217.183625ms)
+✔ WHAT[delegation-027] prepared busy guidance for Ada stays bound to the original finished work (208.033417ms)
+✔ WHAT[delegation-027] prepared busy guidance for Ada stays bound to the original successor work (305.947834ms)
+✔ WHAT[delegation-027] prepared busy guidance for devops stays bound to the original active work (264.169875ms)
+✔ WHAT[delegation-027] prepared busy guidance for devops stays bound to the original finished work (219.382958ms)
+✔ WHAT[delegation-027] prepared busy guidance for devops stays bound to the original successor work (303.701167ms)
+✔ WHAT[delegation-027] installed Host releases Manager Join and appends guidance after the child tool step (8084.165625ms)
+✔ WHAT[delegation-027] installed Host releases Manager Join and appends guidance after the child final output (6272.978209ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16747.139125

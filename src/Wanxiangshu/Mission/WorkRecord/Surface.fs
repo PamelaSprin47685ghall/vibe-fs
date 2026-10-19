@@ -42,8 +42,7 @@ module WorkRecordSurface =
                                previousCutoff = main.PreviousCoverableTurnCutoffExclusive
                                nextCutoff = main.NextCoverableTurnCutoffExclusive
                                nextCoveredPrefixDigest = main.NextCoveredPrefixDigest
-                               observedPrefixEpoch = PrefixEpochId.value main.ObservedPrefixEpochId |}
-                    | BloggerRequestContext.Squash _ -> invalidOp "Expected a Blogger main request")
+                               observedPrefixEpoch = PrefixEpochId.value main.ObservedPrefixEpochId |})
         }
 
     let private journalPrefixState (handle: JournalHandle) (sessionId: string) =
@@ -64,7 +63,7 @@ module WorkRecordSurface =
             XTraceProjection.tryTurnOfToolCallId call trace
 
         let desired =
-            match PhaseWindow.desiredCutoffOf turnOf state.TodoCheckpoints with
+            match PhaseWindow.desiredCutoffOf turnOf state.ViewCheckpoints with
             | PhaseWindowDecision.NoPhases -> null
             | PhaseWindowDecision.KeepFrom cutoff -> box cutoff
 
@@ -252,33 +251,14 @@ module WorkRecordSurface =
                    TextDigest = BlobDigest.create (text (payload?textDigest))
                    ProviderRun = ProviderRunIdentity.create (text providerRun)
                    ToolCallIds = toolCallIds
-                   TipRuleId = text (payload?tipRuleId)
-                   FieldNameAtCommit = optionalText payload?fieldNameAtCommit
+                   TipName = text (payload?tipName)
+                   TipTextRef = optionalText payload?tipTextRef |> Option.map BlobRef.create
+                   TipTextDigest = optionalText payload?tipTextDigest |> Option.map BlobDigest.create
                    EvidenceRef = optionalText payload?evidenceRef |> Option.map BlobRef.create
                    ObservedPrefixEpochId = PrefixEpochId.create (int64 (text (payload?observedPrefixEpoch))) |}
 
         task {
             let! result = AgentJournal.appendAgent (streamOfSession sessionId) (runOf providerRun) fact handle.Journal
-            return appendResult result
-        }
-
-    let appendBlogSquash (handle: JournalHandle) (sessionId: string) (providerRun: string) (payload: obj) : Task<obj> =
-        let fact =
-            ContextFact.BlogObservationsSquashed
-                {| SessionId = SessionId.create sessionId
-                   BloggerSessionId = SessionId.create (text (payload?bloggerSessionId))
-                   RequestId = BloggerRequestId.create (text (payload?requestId))
-                   PreviousFrameEpochId = FrameEpochId.create (int64 (text (payload?previousFrameEpoch)))
-                   NextFrameEpochId = FrameEpochId.create (int64 (text (payload?nextFrameEpoch)))
-                   CoveredFrameCount = int (text (payload?coveredFrameCount))
-                   TextRef = BlobRef.create (text (payload?textRef))
-                   TextDigest = BlobDigest.create (text (payload?textDigest))
-                   ProviderRun = ProviderRunIdentity.create providerRun |}
-
-        task {
-            let! result =
-                AgentJournal.appendAgent (streamOfSession sessionId) (runOf (box providerRun)) fact handle.Journal
-
             return appendResult result
         }
 
@@ -305,8 +285,9 @@ module WorkRecordSurface =
             let! rendered =
                 match optionalText range?ProviderRun with
                 | Some providerRun ->
-                    LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
-                        (Some handle.Journal)
+                    LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedFromSnapshotForRun
+                        handle.Journal
+                        (AgentJournal.snapshot handle.Journal)
                         (SessionId.create sessionId)
                         bounded
                         (ProviderRunIdentity.create providerRun)

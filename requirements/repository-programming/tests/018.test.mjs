@@ -29,10 +29,24 @@ test('WHAT[repository-programming-018] JS019_failure_codes_are_stable_and_unique
     'RESULT_TOO_LARGE',
     'INVALID_RETURN_VALUE',
     'FILE_CHANGED',
+    'FILE_READ_FAILED',
+    'DIRECTORY_NOT_EMPTY',
+    'DIRECTORY_EXISTS',
+    'PARENT_DIRECTORY_MISSING',
+    'CROSS_DEVICE_MOVE',
+    'INVALID_ARGUMENT',
     'TRANSACTION_PREPARE_FAILED',
     'TRANSACTION_COMMIT_FAILED',
     'TRANSACTION_RECOVERY_REQUIRED',
     'UNKNOWN_MEMBER',
+    'RUNNABLE_SPEC_INCOMPLETE',
+    'RUN_COMMAND_UNSUPPORTED',
+    'RUN_WAIT_TIMEOUT',
+    'RUN_CHILD_UNKNOWN',
+    'RUN_PARK_UNSUPPORTED',
+    'RUN_HOST_UNAVAILABLE',
+    'ASK_REFUSED',
+    'DELEGATION_UNAVAILABLE',
   ]
   const cases = failureCatalog()
   assert.equal(cases.length, expectedCodes.length)
@@ -55,7 +69,7 @@ const { run } = await import("../../../dist/Repository/Programming/Js/RuntimeSur
 
 const BASE = `class JsProgram {
   constructor(api) { this._api = api; }
-  file(path) { return this._api.js.read(path); }
+  cat(path) { return this._api.js.cat(path); }
 }`
 const runWrapped = async (
   program,
@@ -65,7 +79,7 @@ const runWrapped = async (
 const failureCode = (result) => result.code
 const PROGRAM = `class Js extends JsProgram {
   async run() {
-    return { sum: 1 + 2, text: (await this.file('a.txt')).text };
+    return { sum: 1 + 2, text: (await this.cat('a.txt')).text };
   }
 }`
 
@@ -94,7 +108,7 @@ const { join } = await import("node:path");
 const { randomUUID } = await import("node:crypto");
 const { parse: parseToml } = await import("smol-toml");
 const { generate } = await import("../../../dist/Repository/Programming/Js/GeneratorSurface.js");
-const { run, runObserved, caseName, rewritten, created, failureCode, render } = await import("../../../dist/Repository/Programming/Js/WorkflowSurface.js");
+const { run, execute, runObserved, caseName, rewritten, created, failureCode, parkedPayload, render } = await import("../../../dist/Repository/Programming/Js/WorkflowSurface.js");
 const { create: createEventStore, dispose: disposeEventStore } = await import("../../../dist/Persistence/EventStore/Surface.js");
 const { pending } = await import("../../../dist/Repository/Programming/Js/TransactionSurface.js");
 
@@ -104,7 +118,7 @@ const sandbox = () => {
 }
 const localStore = () => {
   const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
+  const commonDir = join(owned, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
   return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
@@ -120,7 +134,7 @@ test('WHAT[repository-programming-018] JS085_workflow_file_missing_fails_the_pro
   try {
     const program = `class Js extends JsProgram {
   async run() {
-    await this.file('missing.txt');
+    await this.cat('missing.txt');
     return { ok: true };
   }
 }`
@@ -139,13 +153,16 @@ test('WHAT[repository-programming-018] JS019_missing_anchor_uses_stable_code', a
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    await this.file('a.txt', [['begin', 'end', '## JS-007 FileView.text()']]);
+    const text = await this.cat('a.txt');
+    await this.where(text, '## JS-007 FileView.text()');
     return { ok: true };
   }
 }`
-    const { outcome } = await runWorkflow(dir, program)
-    const failed = parseToml(render(outcome))
-    assert.equal(failed.code, 'ANCHOR_NOT_FOUND')
+    const outcome = await execute(dir, 'Coder', 'en', 'sess-018', { program }, 2000, Date.now() + 60_000, 1 << 20, null)
+    assert.equal(caseName(outcome), 'Parked')
+    const payload = parkedPayload(outcome)
+    assert.equal(payload.needle, '## JS-007 FileView.text()')
+    assert.deepEqual(payload.candidates, [])
   } finally {
     cleanup()
   }

@@ -33,9 +33,9 @@ const provider = await startHttpServer(async (request, response) => {
   if (normal) counts.set(session, number)
   requests.push({ session, number, body })
   if (session === sessionID && number === 1) {
-    sendSSE(response, buildToolCallChunks('guidance_read', 'read', JSON.stringify({ filePath: join(workspace, 'input.txt') }), 1))
+    sendSSE(response, buildToolCallChunks('guidance_read', 'todowrite-for-engineer', JSON.stringify({ program: "class Js extends JsProgram { async run() { return await this.cat('input.txt'); } }" }), 1))
   } else if (number === 1 && body.tools.some(tool => tool.function?.name === 'chronicle')) {
-    sendSSE(response, buildToolCallChunks('guidance_chronicle', 'chronicle', JSON.stringify({ charge: 'Read the file.', occurrence: 'The file was read.', settlement: 'The read completed.', consequence: 'Retain the original result.', tip: enforcer.fieldNames()[0] }), 1))
+    sendSSE(response, buildToolCallChunks('guidance_chronicle', 'chronicle', JSON.stringify({ charge: 'Read the file.', occurrence: 'The file was read.', settlement: 'The read completed.', consequence: 'Retain the original result.', tipName: enforcer.fieldNames()[0], opinion: 'The read result is recorded.', advice: 'Use the recorded result.' }), 1))
   } else {
     sendSSE(response, buildTextChunks('guidance_text_' + requests.length, 'GUIDANCE_DONE', 1))
   }
@@ -100,7 +100,7 @@ try {
     try { process.stdout.write(JSON.stringify({ pid: process.pid, projection: await trace.currentProjection(opened.journal, process.argv[2]) })); }
     finally { journal.JournalSurface_dispose(opened.journal); }
   `
-  const cold = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script, join(workspace, '.git'), sessionID], { encoding: 'utf8', env: { ...process.env, WXS_E2E_QUIET: '1' } }))
+  const cold = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script, join(workspace, '.Herdchestra'), sessionID], { encoding: 'utf8', env: { ...process.env, WXS_E2E_QUIET: '1' } }))
   assert.notEqual(cold.pid, process.pid)
   assert.ok(cold.projection.messages.some(message => message.parts.some(part => part.text === quoted)))
   assert.deepEqual(cold.projection.messages.flatMap(message => message.parts).filter(part => part.kind === 'tool-result'), [{ kind: 'tool-result', result: original }])

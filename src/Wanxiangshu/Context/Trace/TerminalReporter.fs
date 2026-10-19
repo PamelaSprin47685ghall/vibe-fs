@@ -56,7 +56,20 @@ module TerminalReporter =
                 |> ignore
 
                 return XTraceTerminalCompletion.Published runResult
-            | Error error -> return XTraceTerminalCompletion.CaptureFailed error
+            | Error error ->
+                // The provider turn completed but its terminal text could not be
+                // durably captured. The capture failure is an infrastructure fault,
+                // not a proven business success — so report it as the failed
+                // terminal the other capture-error owners already treat it as, and
+                // never leave a parent waiting on a completion that was withheld.
+                eventPort.NotifyTerminal
+                    turn.SessionId
+                    (TerminalOutcome.Failed(
+                        TerminalStop.forAuthority turn.AuthorityRootUserMessageId "terminal trace capture failed"
+                    ))
+                |> ignore
+
+                return XTraceTerminalCompletion.CaptureFailed error
         }
 
     let private reportResolvedRole

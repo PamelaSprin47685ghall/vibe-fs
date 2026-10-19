@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict'
-import * as eventStore from '../../../../dist/Persistence/EventStore/Surface.js'
 import * as casebook from '../../../../dist/Repository/Knowledge/Casebook/Surface.js'
 import * as bookkeeper from '../../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js'
 import * as bookkeeperRefresh from '../../../../dist/Repository/Knowledge/Casebook/BookkeeperRefreshSurface.js'
 import * as lifecycle from '../../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js'
-import { join } from 'node:path'
 
 export const fileRead = (path, contentHash) => ({ kind: 'file-read', path, contentHash })
 export const CANONICAL_Q = 'Canonical maintained question'
@@ -63,4 +61,3 @@ export const installBookkeeperRuntime = (port, ownerSessionIds) => {
 }
 
 export const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
-export const openStore = (dir, writerId) => eventStore.create(join(dir, '.git'), writerId)

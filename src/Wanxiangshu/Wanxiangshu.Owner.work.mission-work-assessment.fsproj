@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>work</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-work-assessment</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>work</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-work-assessment</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>contract</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-core.fsproj"/>
+    <Compile Include="Mission/Work/Review/Model.fsi"/>
+    <Compile Include="Mission/Work/Review/Model.fs"/>
+    <Compile Include="Mission/Work/Review/Surface.fsi"/>
+    <Compile Include="Mission/Work/Review/Surface.fs"/>
+  </ItemGroup>
+</Project>

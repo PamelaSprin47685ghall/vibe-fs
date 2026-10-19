@@ -47,7 +47,7 @@ module PluginHostWiring =
 
     let private acquireFinalizationStore workspaceRoot =
         try
-            let commonDir = RuntimePath.gitCommonDir workspaceRoot
+            let commonDir = RuntimePath.stateRoot workspaceRoot
             Ok(WorkspaceEventStore.acquire commonDir)
         with ex ->
             Error ex
@@ -119,7 +119,7 @@ module PluginHostWiring =
 
                                 member _.SendPrompt(childId, text, agent) =
                                     task {
-                                        let exactTools = Map.ofList [ "*", false; "js-bookkeeper", true ]
+                                        let exactTools = Map.ofList [ "*", false; "todowrite-for-bookkeeper", true ]
 
                                         let opts: Wanxiangshu.OpenCode.SessionPromptOptions =
                                             { Model = None
@@ -168,7 +168,7 @@ module PluginHostWiring =
                     let strengthDurability =
                         match boot.Journal, workspaceDirectory with
                         | Some _, Some workspace ->
-                            WorkspaceEventStore.tryCurrent (RuntimePath.gitCommonDir workspace)
+                            WorkspaceEventStore.tryCurrent (RuntimePath.stateRoot workspace)
                             |> Option.map StrengthDurability.create
                         | _ -> None
 
@@ -243,7 +243,7 @@ module PluginHostWiring =
                 let workOpt =
                     workspaceDirectory
                     |> Option.bind (fun workspace ->
-                        let commonDir = RuntimePath.gitCommonDir workspace
+                        let commonDir = RuntimePath.stateRoot workspace
 
                         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId))
 
@@ -251,10 +251,24 @@ module PluginHostWiring =
                 // active tenure to continue. A missing list is not an empty
                 // list, so an open work is never terminated here.
                 match workOpt with
+                | Some work when work.Delivered && work.Sequence = [ "S1"; "S2"; "S3" ] -> true
                 | Some work -> work.Delivered && activeRoot.IsNone
                 | None -> false
 
-            match PluginHost.createHost input boot.PortOpt (Some boot.FamilyParent) (Some isLifecycleTerminated) with
+            let isUserQuestionWaiting sessionId =
+                boot.Journal
+                |> Option.bind (fun durable ->
+                    Wanxiangshu.Composition.Durable.UserQuestionJournal.pending durable sessionId)
+                |> Option.isSome
+
+            match
+                PluginHost.createHost
+                    input
+                    boot.PortOpt
+                    (Some boot.FamilyParent)
+                    (Some isLifecycleTerminated)
+                    (Some isUserQuestionWaiting)
+            with
             | Error err -> return raise (InvalidOperationException err)
             | Ok(eventPort, sessionPort, snapshotOpt, terminalKey, sharedTerminalPort) ->
                 return! completeHost eventPort sessionPort snapshotOpt terminalKey sharedTerminalPort

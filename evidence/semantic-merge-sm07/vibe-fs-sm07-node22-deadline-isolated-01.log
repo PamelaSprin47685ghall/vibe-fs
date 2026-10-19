@@ -1,0 +1,20 @@
+TAP version 13
+# Subtest: WHAT[process-execution-004] concurrent explicit runs borrow the script deadline and keep later watch and result reads alive
+ok 1 - WHAT[process-execution-004] concurrent explicit runs borrow the script deadline and keep later watch and result reads alive
+  ---
+  duration_ms: 716.559417
+  ...
+# Subtest: WHAT[process-execution-004] concurrent explicit runs borrow the script deadline and return its original remaining budget
+ok 2 - WHAT[process-execution-004] concurrent explicit runs borrow the script deadline and return its original remaining budget
+  ---
+  duration_ms: 718.893542
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1518.398459

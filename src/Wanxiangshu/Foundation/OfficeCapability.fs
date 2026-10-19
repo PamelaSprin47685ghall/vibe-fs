@@ -30,9 +30,14 @@ type ToolPermission =
     | JsPlan
     | Ask
     | Deliver
-    /// planning-002: Plan's review hard gate. Shares the `review` tool name
+    /// work-021: Plan's review hard gate. Shares the `review` tool name
     /// with Manager's ReviewAssessment; the label stays distinct.
     | Review
+    | DevOpsConsultation
+    /// advisor: the caller session's second-opinion seat (`js.advisor`).
+    /// A consult, not an actor: the caller hands over a view plus an intent
+    /// and reads prose back, so the office holding it gains no acting surface.
+    | Advisor
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =
@@ -52,7 +57,7 @@ module OfficeCapability =
     let managerReviewReadOnlyPermissions: ToolPermission Set =
         set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]
 
-    /// capability-enforcement-025 / relay-assessment-005: the final incumbent's
+    /// capability-enforcement-025: the final incumbent's
     /// read/cleanup/close-out surface. It keeps reading, horizon, join and the
     /// deliver finality, and drops every new-work capability (fork, resume,
     /// review).
@@ -67,18 +72,27 @@ module OfficeCapability =
 
     let permissions (role: Role) : ToolPermission Set =
         match role with
+        // The advisor is a reviewer, not an actor: it reads the supplied view and
+        // answers in prose, so its office carries no tool at all.
+        | Role.Advisor -> Set.empty
         | Role.Manager ->
             set
                 [ ToolPermission.Fork
                   ToolPermission.Resume
                   ToolPermission.Join
                   ToolPermission.Horizon
+                  ToolPermission.Advisor
                   ToolPermission.ReviewAssessment
                   ToolPermission.Finality
                   ToolPermission.Read
                   ToolPermission.Glob
                   ToolPermission.Grep ]
-        | Role.Orchestrator -> set [ ToolPermission.Fork; ToolPermission.Join; ToolPermission.Horizon ]
+        | Role.Orchestrator ->
+            set
+                [ ToolPermission.Fork
+                  ToolPermission.Join
+                  ToolPermission.Horizon
+                  ToolPermission.Advisor ]
         | Role.Engineer ->
             set
                 [ ToolPermission.Read
@@ -90,7 +104,8 @@ module OfficeCapability =
                   ToolPermission.Remove
                   ToolPermission.BashHoneypot
                   ToolPermission.Fetch
-                  ToolPermission.Fission ]
+                  ToolPermission.Fission
+                  ToolPermission.Advisor ]
         | Role.Coder -> Set.empty
         | Role.Inspector -> Set.empty
         | Role.Browser -> Set.empty
@@ -105,16 +120,16 @@ module OfficeCapability =
                   ToolPermission.Move
                   ToolPermission.Remove
                   ToolPermission.Exec
-                  ToolPermission.Pty
                   ToolPermission.Join
-                  ToolPermission.Horizon ]
+                  ToolPermission.Horizon
+                  ToolPermission.Advisor ]
         | Role.Distiller -> Set.empty
         | Role.Plan ->
-            // planning-002: the plan toolset is exactly { js-plan, ask,
-            // review, deliver }; resume and handoff are retired.
+            // devops 委派调查，ask 只提问用户；两者不是同一项能力。
             set
                 [ ToolPermission.JsPlan
                   ToolPermission.Ask
+                  ToolPermission.DevOpsConsultation
                   ToolPermission.Review
                   ToolPermission.Deliver ]
         // ENFORCER-010: Blogger's tool set is exactly { chronicle }.
@@ -176,6 +191,8 @@ module OfficeCapability =
         | ToolPermission.Ask -> "Ask"
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
+        | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
+        | ToolPermission.Advisor -> "Advisor"
 
     /// Unknown labels are not a permission.
     let permissionOfLabel (label: string) : ToolPermission option =
@@ -203,4 +220,6 @@ module OfficeCapability =
         | "Ask" -> Some ToolPermission.Ask
         | "Deliver" -> Some ToolPermission.Deliver
         | "Review" -> Some ToolPermission.Review
+        | "DevOpsConsultation" -> Some ToolPermission.DevOpsConsultation
+        | "Advisor" -> Some ToolPermission.Advisor
         | _ -> None

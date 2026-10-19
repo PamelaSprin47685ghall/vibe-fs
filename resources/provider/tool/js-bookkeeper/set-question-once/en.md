@@ -1,1 +1,1 @@
-setQuestion may be called at most once in one js-bookkeeper program
+setQuestion may be called at most once in one todowrite-for-bookkeeper program

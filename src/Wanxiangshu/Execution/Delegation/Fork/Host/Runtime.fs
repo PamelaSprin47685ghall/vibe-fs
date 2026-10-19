@@ -344,7 +344,6 @@ type HostForkRuntime
     (
         parentId: SessionId,
         sessions: ISessionHostPort,
-        childWorkRecordForRun: SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>,
         createMailbox: obj -> ForkCompletionMailbox,
         clock: IClockPort,
         raceExit: Task -> int -> Task<bool>,
@@ -355,9 +354,6 @@ type HostForkRuntime
         ?onChildCreatedDir: string -> SessionId -> string option -> unit,
         ?directoryFor: string -> string option,
         ?onRunStarted: SessionId -> Role -> string option -> unit,
-        ?parentWorkRecordFor: SessionId -> Task<string option>,
-        ?childWorkRecordFor: SessionId -> Task<string option>,
-        ?handoff: ReusableHandoffPort,
         ?sessionSnapshot: ISessionSnapshotPort,
         ?cancelSignals: SessionId seq -> unit,
         /// Ownership of every handle this runtime forks. Host-owned hidden
@@ -593,33 +589,6 @@ type HostForkRuntime
     let childCreatedDir = defaultArg onChildCreatedDir (fun _ _ _ -> ())
     let runStarted = defaultArg onRunStarted (fun _ _ _ -> ())
 
-    let parentWorkRecordOf =
-        defaultArg parentWorkRecordFor (fun _ -> Task.FromResult None)
-
-    let childWorkRecordOf =
-        defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
-
-    let childWorkRecordOfRun = childWorkRecordForRun
-
-    let handoffPort = handoff
-
-    let xTraceOf (sessionId: SessionId) =
-        journal
-        |> Option.bind (fun durable ->
-            AgentJournal.snapshot durable
-            |> fun snapshot -> AgentProjection.tryFind sessionId snapshot.AgentProjections
-            |> Option.bind (fun session -> session.XTrace))
-
-    let xTraceHead (sessionId: SessionId) : XTraceCursor =
-        xTraceOf sessionId
-        |> Option.defaultValue XTraceProjection.empty
-        |> XTraceProjection.headCursor
-
-    let completedFrontier sessionId providerRun =
-        xTraceOf sessionId
-        |> Option.bind (XTraceProjection.terminalEvidenceForProviderRun providerRun)
-        |> Option.map (fun terminal -> terminal.Frontier)
-
     let prepareCompletion (run: PendingHostRun) (outcome: TerminalOutcome) =
         task {
             match run.Role, drainChildPtys with
@@ -632,8 +601,12 @@ type HostForkRuntime
             | Role.DevOps, None -> invalidOp "DevOps PTY round drain is unavailable"
             | _ -> ()
 
-            return! HostForkRunLifecycle.workRecordForOutcome childWorkRecordOfRun completedFrontier run outcome
+            return! HostForkRunLifecycle.workRecordForOutcome run outcome
         }
+
+    let requireCompletionClaim (run: PendingHostRun) (error: exn) =
+        if not (lock gate (fun () -> run.Finished)) then
+            raise error
 
     let cancelSignals = defaultArg cancelSignals (fun _ -> ())
 
@@ -971,21 +944,7 @@ type HostForkRuntime
     member internal _.RunStarted = runStarted
     member internal _.ChildCreated = childCreated
     member internal _.ChildCreatedDir = childCreatedDir
-    member internal _.ParentWorkRecordOf = parentWorkRecordOf
-    member internal _.ChildWorkRecordOf = childWorkRecordOf
     member internal _.PrepareCompletion = prepareCompletion
-    member internal _.XTraceHead = xTraceHead
-    member internal _.HandoffPort = handoffPort
-
-    member internal _.PrepareHandoff(route: DelegationHandoffRoute) : Task<Result<PreparedDelegationHandoff, string>> =
-        match handoffPort with
-        | Some port ->
-            task {
-                let! prepared = port.Prepare parentId route
-                return Ok prepared
-            }
-        | None -> Task.FromResult(Error "reusable delegation handoff capability is unavailable")
-
     member internal _.TrackOwnedWork(work: unit -> Task) = startOwnedWork work |> ignore
     member internal _.SendChildPrompt = sendChildPrompt
     member internal _.SendBusyNudge = sendBusyNudge
@@ -1045,21 +1004,43 @@ type HostForkRuntime
             HandleProjection.isRetired handle projection
             || HandleProjection.isAbandoned handle projection)
 
+    member private this.DrainPtysIfDevOps(run: PendingHostRun) =
+        match run.Role, drainChildPtys with
+        | Role.DevOps, Some drain ->
+            run.Work
+            |> Option.defaultWith (fun () -> invalidOp "DevOps PTY drain requires admitted work")
+            |> drain
+        | _ -> Task.FromResult(())
+
     member this.Complete(run: PendingHostRun, outcome: TerminalOutcome) =
         // Terminal delivery is a synchronous Host callback. The runtime owns the
         // async tail so shutdown can drain it before releasing the Journal.
         startOwnedWork (fun () ->
-            HostForkRunLifecycle.complete gate pendingRuns journal parentId handoffPort prepareCompletion run outcome)
+            task {
+                try
+                    do! HostForkRunLifecycle.complete gate pendingRuns journal parentId prepareCompletion run outcome
+                with error ->
+                    requireCompletionClaim run error
+
+                    // A proven terminal must still resolve this run's only
+                    // completion promise even when settlement faulted: settle an
+                    // explicit joinable failure. deliverFailedCompletion is
+                    // claim-idempotent, so a run already settled is not
+                    // double-delivered.
+                    do!
+                        HostForkRunLifecycle.failRun
+                            gate
+                            pendingRuns
+                            journal
+                            parentId
+                            sessions
+                            run
+                            (sprintf "completion settlement faulted: %s" error.Message)
+            }
+            :> Task)
         |> ignore
 
-    member this.InstallRun
-        (
-            agentId: string,
-            childId: SessionId,
-            role: Role,
-            authorityRoot: AuthorityRootUserMessageId,
-            ?preparedHandoff: PreparedDelegationHandoff
-        ) =
+    member this.InstallRun(agentId: string, childId: SessionId, role: Role, authorityRoot: AuthorityRootUserMessageId) =
         lock gate (fun () ->
             processOwnedAgents.Add agentId |> ignore
             processEstablishedAgents.Add agentId |> ignore)
@@ -1072,10 +1053,7 @@ type HostForkRuntime
                 parentId
                 sessions
                 prepareCompletion
-                xTraceHead
                 (fun work -> startOwnedWork work |> ignore)
-                handoffPort
-                preparedHandoff
                 agentId
                 childId
                 role
@@ -1086,8 +1064,7 @@ type HostForkRuntime
         run
 
     member this.FailRun(run: PendingHostRun, error: string) : Task =
-        startOwnedWork (fun () ->
-            HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions handoffPort run error)
+        startOwnedWork (fun () -> HostForkRunLifecycle.failRun gate pendingRuns journal parentId sessions run error)
 
     member this.MarkReady(run: PendingHostRun) =
         // markReady is intentionally a no-op; do not perform an unnecessary WorkRecord read.
@@ -1096,7 +1073,7 @@ type HostForkRuntime
     member private _.WorkRecordFromCompletion(completion: RunCompletion) : Result<string, string> =
         match completion.Outcome with
         | AgentCompleted payload when not (String.IsNullOrWhiteSpace payload.WorkRecord) -> Ok payload.WorkRecord
-        | AgentCompleted _ -> Error "reusable fork completed without bounded delta WorkRecord"
+        | AgentCompleted _ -> Error "reusable fork completed without js.deliver (undelivered)"
         | AgentFailed payload -> Error payload.Message
         | AgentAbandoned(_, reason) -> Error reason
 
@@ -1321,6 +1298,30 @@ type HostForkRuntime
             | (true, childId), _ -> Some(childId, false)
             | _, (true, childId) -> Some(childId, true)
             | _ -> None)
+
+    /// managed-session-lifecycle settlement-failure seam: settle the pending
+    /// run's Source to a PERSIST failure exactly as the settlement-fault path
+    /// does, while leaving the durable work Active and the run in pendingRuns.
+    /// This is the state a join must wake on and surface as a materialization
+    /// failure instead of waiting forever on a journal revision that never
+    /// advances. Test-only; production settlement uses HostForkRunLifecycle.
+    member _.InjectPendingPersistFailure() : unit =
+        lock gate (fun () ->
+            match pendingRuns.Values |> Seq.tryHead with
+            | None -> ()
+            | Some run ->
+                AsyncSupport.trySetResult
+                    run.Source
+                    (AgentCompletion.failed
+                        run.AgentId
+                        ("run-" + run.AgentId)
+                        (Some run.Role)
+                        (Some run.ChildId)
+                        "PERSIST"
+                        "completion settlement faulted: injected")
+                |> ignore)
+
+        runtime.PulseWake()
 
     member internal _.ActivateDormantChild(agentId: string, childId: SessionId, role: Role) : unit =
         lock gate (fun () ->

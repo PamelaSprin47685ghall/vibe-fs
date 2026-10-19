@@ -8,37 +8,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
 
-/// Coexistence seam between builtin filesystem fallbacks and generated js-*.
-/// GrandRewrite keeps read/edit/write/glob/grep as normal primitive fallback:
-/// their Host descriptions are left untouched. Preference for intent-level
-/// programs is taught inside the generated js-* contract and its Ultra Example.
-module BuiltinToolDescriptionHook =
-
-    [<Emit("$0===undefined||$0===null")>]
-    let private isUndefined (value: obj) : bool = jsNative
-
-    /// The builtin filesystem tools the hook may annotate (凡存在者).
-    let BuiltinFilesystemTools =
-        set [ "read"; "edit"; "write"; "glob"; "grep"; "patch" ]
-
-    let annotate (builtinName: string) (description: string) (jsRoleToolName: string) : string =
-        ignore builtinName
-        ignore jsRoleToolName
-        description
-
-    /// JS-003: the hook must not recommend a tool the provider cannot see.
-    /// `visibleToolNames` is the current Attempt's tool set; a recommendation
-    /// outside it is a lying hook and fails closed.
-    let validateRecommendation (jsRoleToolName: string) (visibleToolNames: Set<string>) : Result<unit, string> =
-        if Set.contains jsRoleToolName visibleToolNames then
-            Ok()
-        else
-            Error(
-                ProviderProse.render
-                    (ProviderLanguageBinding.readGlobalPreference ())
-                    JsCanonicalDescription.Path.HookNotVisible
-                    (Map [ "tool", jsRoleToolName ])
-            )
 
 /// PROMPT-019: load already-localized js-program prose. Domain assembles;
 /// this module binds language.
@@ -66,11 +35,15 @@ module JsDescriptionAssets =
           VerbRewrite = text lang JsCanonicalDescription.Path.VerbRewrite
           VerbCreate = text lang JsCanonicalDescription.Path.VerbCreate
           ReadRules = template lang JsCanonicalDescription.Path.ReadRules
-          GlobRules = text lang JsCanonicalDescription.Path.GlobRules
-          GrepRules = text lang JsCanonicalDescription.Path.GrepRules
+          Recipes = text lang JsCanonicalDescription.Path.Recipes
           EditRules = template lang JsCanonicalDescription.Path.EditRules
           WriteRules = text lang JsCanonicalDescription.Path.WriteRules
           MutationRules = text lang JsCanonicalDescription.Path.MutationRules
+          Rm = text lang JsCanonicalDescription.Path.Rm
+          Mv = text lang JsCanonicalDescription.Path.Mv
+          RunRules = text lang JsCanonicalDescription.Path.RunRules
+          Deliver = text lang JsCanonicalDescription.Path.Deliver
+          DelegationRules = text lang JsCanonicalDescription.Path.DelegationRules
           UltraFraming = text lang JsCanonicalDescription.Path.UltraFraming
           UltraUnavailable = text lang JsCanonicalDescription.Path.UltraUnavailable
           UltraEngineering = text lang JsCanonicalDescription.Path.UltraEngineering
@@ -105,13 +78,18 @@ module JsDescriptionAssets =
           ReasonEditUnknownFields = text lang JsCanonicalDescription.Path.ReasonEditUnknownFields
           ReasonEditCandidate = text lang JsCanonicalDescription.Path.ReasonEditCandidate
           ReasonEditLine = text lang JsCanonicalDescription.Path.ReasonEditLine
-          ReasonEditOverlaps = text lang JsCanonicalDescription.Path.ReasonEditOverlaps }
+          ReasonEditOverlaps = text lang JsCanonicalDescription.Path.ReasonEditOverlaps
+          Park = template lang JsCanonicalDescription.Path.Park
+          ParkedPayload = template lang JsCanonicalDescription.Path.ParkedPayload }
 
     let argProgram (lang: ProviderLanguage) =
         text lang JsCanonicalDescription.Path.ArgProgram
 
     let missingProgram (lang: ProviderLanguage) =
         text lang JsCanonicalDescription.Path.MissingProgram
+
+    let viewDeclarationExtra (lang: ProviderLanguage) =
+        text lang JsCanonicalDescription.Path.ViewDeclarationExtra
 
 /// JS-073/JS-074: a generated js-* tool spec — the dynamic counterpart of the
 /// static baseSpecs. Built from a generated surface (JS-002); execution goes
@@ -126,7 +104,11 @@ module JsToolSpec =
                   ToolPermission.Write
                   ToolPermission.Edit
                   ToolPermission.Glob
-                  ToolPermission.Grep ]
+                  ToolPermission.Grep
+                  ToolPermission.Move
+                  ToolPermission.Remove
+                  ToolPermission.Fork
+                  ToolPermission.Join ]
 
         ToolAdmission.OfficeRole(fun _ r ->
             (string r).ToLowerInvariant() = roleName.ToLowerInvariant()
@@ -134,6 +116,28 @@ module JsToolSpec =
 
     [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative
+
+    /// The directory one session's js-* surface executes in.
+    ///
+    /// The Host creates a Manager and her forked children rooted at the directory
+    /// their owner registered — for a Change road that is the job's own worktree
+    /// (`OrchestratorHost.directoryFor` → `HostForkRuntime.CreateChildSession`).
+    /// The surface must execute where its session lives: resolving the plugin's
+    /// project directory instead writes every road mutation into the target's own
+    /// working tree, leaves the job worktree empty, and turns the candidate into a
+    /// no-op commit whose publish rebase cannot conflict.
+    ///
+    /// A registered path is used as given, never existence-checked into the
+    /// fallback: a worktree released under a live session must fail the write
+    /// closed, not silently redirect it onto the target's checkout.
+    let rootForSession
+        (sessionDirectories: System.Collections.Generic.Dictionary<string, string>)
+        (fallback: string)
+        (sessionId: string)
+        : string =
+        match System.String.IsNullOrWhiteSpace sessionId, sessionDirectories.TryGetValue sessionId with
+        | false, (true, path) when not (System.String.IsNullOrWhiteSpace path) -> path
+        | _ -> fallback
 
     /// Build a ToolSpec for one generated surface.
     ///
@@ -146,35 +150,58 @@ module JsToolSpec =
         (surface: JsSurface)
         (workspaceRoot: string)
         (persistence: IJsTransactionPersistence option)
+        (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
+        (processHost: HostToolContext -> JsToolWorkflow.ProcessHost)
+        (rootOf: string -> string)
         : ToolSpec =
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
 
-        let runProgram ctx programSource =
-            let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
+        /// Build the three-state input object from the Host arguments:
+        /// `{ program } | { unpark: { handle, value } } | { abandon: { handle } }`.
+        let inputOf (args: HostToolArguments) : obj =
+            let program = readProgram args
 
-            match fileAccessObservation with
-            | None ->
-                JsToolWorkflow.run
-                    surface.Capabilities
-                    workspaceRoot
-                    surface.BaseClassSource
-                    programSource
-                    10000
-                    deadlineEpochMs
-                    (1 <<< 20)
-                    persistence
-            | Some observe ->
-                JsToolWorkflow.runWithFileAccessObservation
-                    surface.Capabilities
-                    workspaceRoot
-                    surface.BaseClassSource
-                    programSource
-                    10000
-                    deadlineEpochMs
-                    (1 <<< 20)
-                    persistence
-                    (observe ctx)
+            let unpark = if isNull (args.Raw?unpark) then null else args.Raw?unpark
+
+            let abandon = if isNull (args.Raw?abandon) then null else args.Raw?abandon
+
+            match program, unpark, abandon with
+            | Some source, _, _ -> createObj [ "program" ==> source ]
+            | None, unparkValue, _ when not (isNull unparkValue) ->
+                createObj
+                    [ "unpark"
+                      ==> createObj [ "handle" ==> string (unparkValue?handle); "value" ==> unparkValue?value ] ]
+            | None, _, abandonValue when not (isNull abandonValue) ->
+                createObj [ "abandon" ==> createObj [ "handle" ==> string (abandonValue?handle) ] ]
+            | _ -> createObj []
+
+        // The unpark/abandon arguments are nested objects; the Host schema
+        // describes them as plain objects with string handle fields. The value
+        // field of unpark is free-form (the injected resume value).
+        let unparkSchema =
+            ToolHostCodec.objectSchemaOf
+                [ "handle", ToolHostCodec.stringSchema factory
+                  "value", ToolHostCodec.anySchema factory ]
+                factory
+
+        let abandonSchema =
+            ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
+
+        // ANCHOR view declaration (PLAN phase 3): prefixUntil protects the
+        // cache prefix and thenRemove replaces anchors with the model's own
+        // summaries for good. Optional; consumed once by the next transform.
+        // The bilingual resource states the whole contract.
+        let viewSchema =
+            ToolHostCodec.objectSchemaOf
+                [ "prefixUntil", ToolHostCodec.numberSchema factory
+                  "thenRemove",
+                  ToolHostCodec.recordSchemaOf
+                      (ToolHostCodec.stringSchema factory)
+                      (ToolHostCodec.stringSchema factory)
+                      (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
+                      factory ]
+                factory
 
         { Name = surface.ToolName
           Description = surface.Description
@@ -182,13 +209,31 @@ module JsToolSpec =
             [ "program",
               ToolHostCodec.stringSchemaDescribed
                   (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
-                  factory ]
+                  factory
+              "unpark", unparkSchema
+              "abandon", abandonSchema
+              "view", viewSchema ]
           Admission = admissionFor surface.RoleName
           Execute =
             fun args ctx ->
                 task {
-                    match readProgram args with
-                    | None ->
+                    let input = inputOf args
+
+                    let hasProgram = not (isNull (input?program))
+
+                    let viewFailure =
+                        match
+                            Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView
+                                ctx.SessionId
+                                (args.Raw?view)
+                        with
+                        | Ok() -> None
+                        | Error failure -> Some failure
+
+                    match viewFailure with
+                    | Some failure ->
+                        return JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
+                    | None when not hasProgram && isNull (input?unpark) && isNull (input?abandon) ->
                         return
                             ToolHostCodec.tomlObject
                                 [ "error",
@@ -197,21 +242,54 @@ module JsToolSpec =
                                           ProviderLanguageBinding.readGlobalPreference ()
                                       )
                                   ) ]
-                    | Some programSource ->
+                    | None ->
                         // 10 s sandbox deadline; 1 MiB output bound (JS-054).
-                        let! outcome = runProgram ctx programSource
+                        let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
+
+                        // The session's own directory wins over the plugin workspace:
+                        // a road's deliverable belongs in the worktree that session was
+                        // created in, not in the target's checkout.
+                        let root = rootOf ctx.SessionId
+
+                        let! outcome =
+                            JsToolWorkflow.execute
+                                ctx.SessionId
+                                surface.Capabilities
+                                root
+                                surface.BaseClassSource
+                                input
+                                10000
+                                deadlineEpochMs
+                                (1 <<< 20)
+                                persistence
+                                lifecyclePersistence
+                                (fileAccessObservation |> Option.map (fun observe -> observe ctx))
+                                (Some(processHost ctx))
 
                         return JsToolsResult.render outcome
                 } }
 
-    /// Build a ToolSpec for the dedicated js-predictor surface with PrivateAttachment admission.
+    /// Build a ToolSpec for the dedicated todowrite-for-predictor surface with PrivateAttachment admission.
     let createWithAdmission
         (factory: HostToolFactory)
         (surface: JsSurface)
         (admission: ToolAdmission)
         (workspaceRoot: string)
         (persistence: IJsTransactionPersistence option)
+        (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option)
+        (processHost: HostToolContext -> JsToolWorkflow.ProcessHost)
+        (rootOf: string -> string)
         : ToolSpec =
-        let spec = create factory surface workspaceRoot persistence fileAccessObservation
+        let spec =
+            create
+                factory
+                surface
+                workspaceRoot
+                persistence
+                lifecyclePersistence
+                fileAccessObservation
+                processHost
+                rootOf
+
         { spec with Admission = admission }

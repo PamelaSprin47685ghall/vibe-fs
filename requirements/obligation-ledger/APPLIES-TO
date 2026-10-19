@@ -2,5 +2,11 @@
 # requirements/obligation-ledger/** is covered implicitly and must not be listed here.
 
 /src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+/src/Wanxiangshu/Context/Companion/Facts.*
+/src/Wanxiangshu/Context/Companion/FoldSurface.fs
+/src/Wanxiangshu/Context/Prefix/PhaseWindow.*
+/src/Wanxiangshu/Composition/Durable/CompanionFact.*
+/src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs
+/src/Wanxiangshu/Composition/Durable/Projection.*
 /src/Wanxiangshu/Persistence/Journal/ObligationJournalSurface.*
 /src/Wanxiangshu/Persistence/Journal/ObligationEnvelopeSurface.*

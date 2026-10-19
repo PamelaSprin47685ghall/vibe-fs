@@ -1,0 +1,23 @@
+✔ WHAT[cognitive-workspace-003] legacy Cognition facts decode only into a fold no-op tombstone (1.819334ms)
+✔ WHAT[concern-routing-007] the historical tombstone creates no Concern state, port, or active registration (2.2825ms)
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-023] transient failure follows the injected retry verdict before delivering success or exhaustion (233.344542ms)
+✔ WHAT[delegation-023] actual shared recovery engine exhausts all applicable paths before the parent receives final failure (GAP-153) (0.151542ms) # TODO
+✔ WHAT[delegation-028] Delegation contract excludes workflow Host PTY and recovery sources (7.126208ms)
+✔ WHAT[delegation-028] recovery Snapshot consumer excludes full Host admission capabilities (5.519959ms)
+✔ WHAT[delegation-028] current compile plans meet declared budgets and source-placement audit (143.653542ms)
+✔ WHAT[delegation-028] each bounded locality actually compiles independently with only its declared transitive inputs (GAP-153) (0.0645ms) # TODO
+✔ WHAT[delegation-028] delegation-029 boundary ignores locality kind labels entirely (0.907042ms)
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[dispatch-protocol-003] typed transport receipt accepted-queue-entry remains pending and grants no authority after journal reopen (68.287167ms)
+✔ WHAT[dispatch-protocol-003] typed transport receipt msg-looks-like-physical remains pending and grants no authority after journal reopen (39.482708ms)
+✔ WHAT[dispatch-protocol-003] observed receipt-only send stays unaccepted until true physical ingress while preserving the original receipt carrier (108.829166ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 2
+ℹ duration_ms 633.425083

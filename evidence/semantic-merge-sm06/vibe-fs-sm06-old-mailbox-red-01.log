@@ -1,0 +1,57 @@
+✖ WHAT[participant-identity-009] real old mixed journal preserves the exact failed-event cut and prior-run identity boundary (1310.400875ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1592.740042
+
+✖ failing tests:
+
+test at requirements/participant-identity/tests/009.test.mjs:59:1
+✖ WHAT[participant-identity-009] real old mixed journal preserves the exact failed-event cut and prior-run identity boundary (1310.400875ms)
+  AssertionError [ERR_ASSERTION]: subprocess exited 1
+  
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: []
+  + actual - expected
+  
+    [
+  +   undefined,
+  -   'engineer',
+      'manager'
+    ]
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:52:10
+      at withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:13)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:45:1 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: [ undefined, 'manager' ],
+    expected: [ 'engineer', 'manager' ],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/009.test.mjs:68:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

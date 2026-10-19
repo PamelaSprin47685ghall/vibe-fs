@@ -160,3 +160,100 @@ test('WHAT[change-integration-009] WORKTREE_CMD_identity_of_is_manager_slash_job
   assert.equal(change.worktreeIdentityOf('job-7'), 'manager/job-7')
 })
 }
+
+{
+// The durable loop signal Change derives for one Manager road. The acquisition
+// program blocks on it, so a signal that cannot change would spin the program:
+// `Deliver` commits a Relay together with its successor incumbency in one record,
+// and the hand-off's single physical prompt belongs to ManagerWorkflow's loop gate,
+// not to a second reading of the same retirement.
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const { mkdtempSync, rmSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+
+const hostSurface = await import('../../../dist/Change/Host/Surface.js')
+const journalSurface = await import('../../../dist/Persistence/Journal/Surface.js')
+const lifecycle = await import('../../../dist/Mission/Lifecycle/Surface.js')
+const workspaceSurface = await import('../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js')
+
+const withRoad = async (body) => {
+  const root = mkdtempSync(join(tmpdir(), 'wxs-loop-signal-'))
+  const stateRoot = journalSurface.JournalSurface_initializeStateRoot(root)
+  const store = workspaceSurface.acquire(stateRoot)
+  try {
+    await body({ root, stateRoot, store, signalFor: (workId) => hostSurface.loopSignalOf(root, workId) })
+  } finally {
+    workspaceSurface.release(stateRoot)
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+// A relayed retirement: the reviewed-but-not-promoted work hands the road to the
+// successor incumbency it opened in the same record.
+const relayedRoad = async (store, workId, root) => {
+  const opened = await lifecycle.seedOpen(store, 'S4', workId, root, 0n)
+  assert.equal(opened.ok, true, opened.error)
+  const reviewed = await lifecycle.seedReview(store, workId, 'Stayed')
+  assert.equal(reviewed.ok, true, reviewed.error)
+  const confirmed = await lifecycle.seedDeliver(store, workId, 'run-1', 'call-1', 1n)
+  assert.equal(confirmed.ok, true, confirmed.error)
+  const relay = await lifecycle.seedDeliver(store, workId, 'run-2', 'call-2', 2n)
+  assert.equal(relay.ok, true, relay.error)
+}
+
+test('WHAT[change-integration-009] a relayed retirement whose successor already walks holds no fresh loop signal', async () => {
+  await withRoad(async ({ root, stateRoot, store, signalFor }) => {
+    const workId = 'ses-loop-relayed'
+    await relayedRoad(store, workId, root)
+
+    const view = lifecycle.inspected(stateRoot, workId)
+    assert.equal(typeof view.ActiveId, 'string', 'the relay opened its successor incumbency')
+    assert.notEqual(view.ActiveId.length, 0, 'the successor incumbency has an identity')
+    assert.equal(view.Reviewed, false, 'the successor tenure is not reviewed yet')
+    assert.equal(view.Delivered, false, 'a relay is not a delivered tenure')
+
+    // Reporting the consumed hand-off again would drive the program through
+    // AwaitLoopSignal -> ContinueLoop without ever blocking. The road must wait on
+    // durable change instead: the successor's own retirement is the next occasion.
+    assert.equal(signalFor(workId).kind, 'None')
+    assert.equal(signalFor(workId).detail, '')
+  })
+})
+
+test('WHAT[change-integration-009] a delivered tenure with no successor holds the publication candidate signal once', async () => {
+  await withRoad(async ({ root, stateRoot, store, signalFor }) => {
+    const workId = 'ses-loop-delivered'
+    const opened = await lifecycle.seedOpen(store, 'S4', workId, root, 0n)
+    assert.equal(opened.ok, true, opened.error)
+    const reviewed = await lifecycle.seedReview(store, workId, 'Promoted')
+    assert.equal(reviewed.ok, true, reviewed.error)
+    const confirmed = await lifecycle.seedDeliver(store, workId, 'run-1', 'call-1', 1n)
+    assert.equal(confirmed.ok, true, confirmed.error)
+    // The promoted tenure's closing deliver writes the Delivered retirement. Its
+    // trailing logical-run closure needs a booted shared journal runtime, which this
+    // probe deliberately does not own, so the durable work state is the evidence.
+    await lifecycle.seedDeliver(store, workId, 'run-2', 'call-2', 2n)
+
+    const view = lifecycle.inspected(stateRoot, workId)
+    assert.equal(view.Delivered, true, 'the promoted tenure delivered')
+    assert.equal(view.ActiveId ?? null, null, 'a final delivery leaves no open tenure')
+
+    const delivered = signalFor(workId)
+    assert.equal(delivered.kind, 'Candidate')
+    assert.equal(delivered.detail, '')
+  })
+})
+
+test('WHAT[change-integration-009] no durable work and an unretired tenure both hold no loop signal', async () => {
+  await withRoad(async ({ root, store, signalFor }) => {
+    assert.equal(signalFor('ses-loop-absent').kind, 'NoWork')
+
+    const workId = 'ses-loop-open'
+    const opened = await lifecycle.seedOpen(store, 'S4', workId, root, 0n)
+    assert.equal(opened.ok, true, opened.error)
+    assert.equal(signalFor(workId).kind, 'None')
+  })
+})
+}

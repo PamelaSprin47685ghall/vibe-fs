@@ -13,9 +13,7 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
@@ -46,12 +44,9 @@ type AgentProjectionSet =
         HandleByChildSession: Map<SessionId, HandleRecord>
         Fission: FissionProjectionState
         ChatExecutions: ChatExecutionProjectionState
-        /// Successful native todowrite checkpoints still on the raw side of the
+        /// Successful view declaration checkpoints still on the raw side of the
         /// committed prefix. The retain window (K) is a fixed system parameter.
-        TodoCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
-        DelegationCompletedHandoffs: Map<string, int64>
-        Attention: AttentionProjectionState
-        Concern: ConcernProjectionState
+        ViewCheckpoints: Map<SessionId, PhaseWindow.PhaseCommitWindow>
         RuntimeStartCount: int
     }
 
@@ -63,7 +58,6 @@ module AgentProjection =
     val mainSealedForBlogger: mainSessionId: SessionId -> projection: AgentProjectionSet -> bool
     val hasActiveOrchestratorJobs: projection: AgentProjectionSet -> bool
     val activeOrchestratorJobPairs: projection: AgentProjectionSet -> (ManagerJobId * SessionId) list
-    val pendingAttentionWorkPairs: sessionId: SessionId -> projection: AgentProjectionSet -> (string * string) list
 
     val update:
         sessionId: SessionId ->

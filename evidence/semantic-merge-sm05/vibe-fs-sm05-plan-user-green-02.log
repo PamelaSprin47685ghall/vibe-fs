@@ -1,0 +1,27 @@
+✖ WHAT[work-034] Plan keeps user originals across explicit views and handover; a cold checkpoint restores identity only (1298.707708ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1768.008375
+
+✖ failing tests:
+
+test at requirements/work/tests/034.test.mjs:427:1
+✖ WHAT[work-034] Plan keeps user originals across explicit views and handover; a cold checkpoint restores identity only (1298.707708ms)
+  TypeError [ERR_INVALID_ARG_VALUE]: The argument 'args[4]' must be a string without null bytes. Received '﻿Plan the tenure handover.\r\n保留原文\x00tail\r\n'
+      at validateArgumentNullCheck (node:child_process:1025:11)
+      at validateArgumentsNullCheck (node:child_process:1032:5)
+      at normalizeSpawnArguments (node:child_process:602:3)
+      at spawnSync (node:child_process:887:8)
+      at execFileSync (node:child_process:971:15)
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work/tests/034.test.mjs:498:29
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work/tests/034.test.mjs:429:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    code: 'ERR_INVALID_ARG_VALUE'
+  }

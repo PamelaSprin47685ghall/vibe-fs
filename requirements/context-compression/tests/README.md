@@ -14,14 +14,15 @@ WHAT 拥有输入、提交与生命周期边界；本文只说明现有测试如
 | 018 | 实际 mailbox/flight 的先后等待、取消、隔离、释放，以及普通新消息保真。废止的 ExplicitResume/continue 用例不恢复；跨多个 200 KiB 块追平及 durable producer 的完整续接仍 TODO。 |
 | 019 | 辅助注入的 epoch 退休与 tentative horizon。 |
 | 020 | 原 todowrite 永久保留随阶段窗口迁移；上游 retained 布尔透传不能证明真实选择，已撤下。未覆盖 raw 保留及有新快照载体才退休旧成功结果的实际连线仍 TODO。 |
-| 021、022 | retry 请求种类和失败投影。正常、重试、squash、crash 四条真实入口共用 canonical 重建仍 TODO。 |
+| 021、022 | retry 请求种类和失败投影。正常、重试、crash 真实入口共用 canonical 重建仍 TODO。 |
 | 023 | typed park 返回及取消；事件驱动依赖与 durable producer 判据仍待完整验证。 |
 | 024 | 实际 flight/准入竞争、stale callback 和已有修复场景。 |
 | 025 | 已有停止准入用例；必需注入 fatal 和精确结算仍缺证，不再用测试自建 fatal 模型冒充产品。 |
 | 026 | 实际 repair 注册与关闭真实 writer 后的 coordinator 失败；在途及随后观察者共享同一异常，原 flight 保留，零发送和成功通知。 |
-| 027 | owner 构造性质及真实磁盘 blob 解码验证；冻结身份和 epoch 保留，损坏输入分类。真实 integration Fable consumer 已验证：同一真实声明闭包内，工厂调用、公开成员读取及请求种类匹配编译成功；外部直接构造 Main/Squash 分别在对应 consumer 位置报具体类型的访问拒绝。三项编译用例全部通过，源码与产物均隔离在临时目录；这些证据不替代旧 epoch 实际提交拒绝及全链保留 typed rejection 的缺证。 |
+| 027 | owner 构造性质及真实磁盘 blob 解码验证；冻结身份和 epoch 保留，损坏输入分类。真实 integration Fable consumer 已验证：同一真实声明闭包内，工厂调用、公开成员读取及请求种类匹配编译成功；外部直接构造 Main 在对应 consumer 位置报具体类型的访问拒绝。编译用例全部通过，源码与产物均隔离在临时目录；这些证据不替代旧 epoch 实际提交拒绝及全链保留 typed rejection，相关运行时缺口仍在 GAP-104。 |
 | 028 | 生产 K 窗口公式、同回合多提交及有地址边界；真实 XWire 在只有一条用户消息的工作循环中折叠已覆盖前导历史，同时保留 Opening 与窗口回合。注入材料端口不等于真实磁盘提交。 |
 | 029 | 生产 selector 的窗口、coverage、请求边界、不可回退和 digest 证明；传入无窗口不证明上层只会在真实失败后选择紧急 Probe，仍需调用链证据。 |
+| 031 | ANCHOR 编号稳定、视图声明一次性消费、前缀保留/尾部丢弃/引用重加、无标识消息保守保留、token 经济计数与生成工具的 view 参数捕获。真实 transform 管线内的注入块端到端断言仍待补（当前由 400 例既有 transform 用例证明无回归）。 |
 
 018 原有纯 frame 覆盖集中在 010/011/015/016，flight 竞争在 024，handle 生命周期在 delegation 013/023。删除的源码名字检查、测试自建 Set 去重、空 frame fatal、claim/release 冒充 commit，并不算覆盖迁移；对应缺证留在 GAP-104 与 TODO。effect-accounting 004 的低层重复 receipt 也不能代替完整提交入口，见 GAP-105。
 

@@ -137,7 +137,7 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_host_adapter_encodes_dele
 test('WHAT[speculative-investigation-009] native completed tool output preserves JSON-looking result bytes as text', () => {
   for (const output of ['[]', '{"value": 1}', '"quoted"', 'null', '42']) {
     const applied = Strength.tryApplyRenderedMessages('owner', H, {
-      messages: [msg('assistant', [call('c1', 'js-manager', '{"program":"inspect"}')]),
+      messages: [msg('assistant', [call('c1', 'todowrite-for-manager', '{"program":"inspect"}')]),
         msg('tool', [result('c1', output)])],
       hostMessageIds: ['call', 'result'], hostIsPhysical: [false, false],
     })
@@ -151,14 +151,14 @@ test('WHAT[speculative-investigation-009] final owner encoding preserves physica
     { type: 'file', url: 'file:///fixture.png', mime: 'image/png' },
   ] }
   const native = { info: { id: 'native', sessionID: 'owner', role: 'assistant' }, parts: [
-    { type: 'tool', callID: 'native-call', tool: 'js-manager', state: {
+    { type: 'tool', callID: 'native-call', tool: 'todowrite-for-manager', state: {
       status: 'completed', input: { program: 'original' }, output: 'original result',
     } },
   ] }
   const logical = Wire.tryApplyRenderedMessages('owner', H, {
     messages: [msg('assistant', [
-      call('first', 'js-manager', '{"program":"read first"}'),
-      call('second', 'js-manager', '{"program":"read second"}'),
+      call('first', 'todowrite-for-manager', '{"program":"read first"}'),
+      call('second', 'todowrite-for-manager', '{"program":"read second"}'),
     ]), msg('tool', [result('first', 'first evidence'), result('second', 'second evidence')])],
     hostMessageIds: ['batch-call', 'batch-result'], hostIsPhysical: [false, false],
   })
@@ -171,8 +171,8 @@ test('WHAT[speculative-investigation-009] final owner encoding preserves physica
   assert.deepEqual(encoded.value[1].parts.map(part => [
     part.type, part.callID, part.tool, part.state.status, part.state.input.program, part.state.output,
   ]), [
-    ['tool', 'first', 'js-manager', 'completed', 'read first', 'first evidence'],
-    ['tool', 'second', 'js-manager', 'completed', 'read second', 'second evidence'],
+    ['tool', 'first', 'todowrite-for-manager', 'completed', 'read first', 'first evidence'],
+    ['tool', 'second', 'todowrite-for-manager', 'completed', 'read second', 'second evidence'],
   ])
   const incomplete = Strength.tryEncodeOwnerMessages(H, [physical, logical.value[0]])
   assert.equal(incomplete.ok, false)
@@ -185,8 +185,8 @@ test('WHAT[speculative-investigation-009] final owner encoding preserves physica
 })
 test('WHAT[speculative-investigation-009] STRENGTH_006_009_candidate_wrong_target_and_promoted_replica_reflection_conflict', () => {
   const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-    { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
-    { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
+    { toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+    { toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
   ] }]).value
   const wrongTarget = Strength.candidate(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-a', currentProviderRun: 'target-b', bundle })
   assert.equal(wrongTarget.ok, false)
@@ -202,7 +202,7 @@ test('WHAT[speculative-investigation-009] STRENGTH_006_009_candidate_wrong_targe
   assert.equal(invalidAnchor.error, 'InvalidStrengthAnchor')
 })
 test('WHAT[speculative-investigation-009] STRENGTH_009_012_promoted_frames_leave_later_pair_anchor_messages_in_place', () => {
-  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
+  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
   const base = [msg('user', [text('u1')]), msg('assistant', [text('target-assistant')]), msg('user', [text('pair-anchor-stand-in')])]
   const promoted = Strength.promoted(H, { ownerSessionId: 'owner', decisionId: 'd1', targetProviderRun: 'target-1', beforeIndex: 1, isReplicaRequest: false, bundle }).value
   const renderedOutput = Projection.renderMessagesWithHostIds(snapshot(base), base, [promoted])
@@ -210,7 +210,7 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_012_promoted_frames_leave
   assert.equal(renderedOutput.messages.at(-1).parts[0].text, 'pair-anchor-stand-in')
 })
 test('WHAT[speculative-investigation-009] STRENGTH_009_replica_mirror_replaces_base_then_local_batches_append', () => {
-  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
+  const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
   const mirrorMessages = [msg('user', [text('mirror-base')])]
   const mirror = Strength.projectionMirror({ decisionId: 'd1', targetProviderRun: 'target', semanticDigest: 'sem-a', rows: [{ message: mirrorMessages[0], hostMessageId: 'mirror-host-id', hostIsPhysical: true }] }).value
   const local = Strength.replicaLocal(H, { ownerSessionId: 'owner', decisionId: 'd1', bundle }).value
@@ -253,7 +253,7 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_local_batches_append_afte
   assert.equal(Strength.runtimeRegister(runtime, binding).ok, true)
   const outcome = await Strength.transformApply(H, runtime, { messages: [
     user('u1', 'replica-local', [hostText('Continue.')]),
-    assistant('a1', 'replica-local', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+    assistant('a1', 'replica-local', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
   ] }, true)
   assert.equal(outcome.kind, 'Ready')
   assert.equal(outcome.batches.length, 1)
@@ -272,7 +272,7 @@ test('WHAT[speculative-investigation-009] STRENGTH_009_local_batches_append_afte
   assert.notEqual(localParts[0].callId, 'c1', 'the owner call id must be relocated into this decision')
   // The original arguments and the real result stay on the Host row itself.
   const localPart = outcome.output[1].parts[0]
-  assert.equal(localPart.tool, 'read')
+  assert.equal(localPart.tool, 'todowrite-for-predictor')
   assert.deepEqual(localPart.state.input, { filePath: 'a' })
   assert.equal(localPart.state.output, 'alpha')
 })
@@ -282,7 +282,7 @@ test('WHAT[speculative-investigation-009] replica request never ends on an assis
   assert.equal(Strength.runtimeRegister(runtime, binding).ok, true)
   const input = () => ({ messages: [
     user('u1', 'replica-tail', [hostText('Continue.')]),
-    assistant('a1', 'replica-tail', [hostResult('c1', 'read', { filePath: 'a' }, 'alpha')]),
+    assistant('a1', 'replica-tail', [hostResult('c1', 'todowrite-for-predictor', { filePath: 'a' }, 'alpha')]),
   ] })
   const first = await Strength.transformApply(H, runtime, input(), true)
   const second = await Strength.transformApply(H, runtime, input(), false)
@@ -310,9 +310,9 @@ const { withPreference } = await import('../../provider-language/tests/support/l
 const { readdirSync, readFileSync } = await import('node:fs')
 const { join } = await import('node:path')
 
-const facts = directory => readdirSync(join(directory, '.git', 'wanxiangshu', 'events'))
+const facts = directory => readdirSync(join(directory, '.Herdchestra', 'wanxiangshu', 'events'))
   .filter(name => name.endsWith('.ndjson'))
-  .flatMap(name => readFileSync(join(directory, '.git', 'wanxiangshu', 'events', name), 'utf8').trim().split('\n'))
+  .flatMap(name => readFileSync(join(directory, '.Herdchestra', 'wanxiangshu', 'events', name), 'utf8').trim().split('\n'))
   .filter(Boolean)
   .map(line => JSON.parse(line))
 const user = (sessionID, id, parts) => ({ info: { sessionID, id, role: 'user' }, parts })
@@ -320,8 +320,8 @@ const assistant = (sessionID, parentID, id, created, parts = []) => ({
   info: { sessionID, parentID, id, role: 'assistant', time: { created } }, parts,
 })
 const tool = callID => ({
-  type: 'tool', tool: 'read', callID,
-  state: { status: 'completed', input: { filePath: 'a', estimated_readonly_rounds: 2 }, output: 'alpha' },
+  type: 'tool', tool: 'todowrite-for-engineer', callID,
+  state: { status: 'completed', input: { program: 'class Js extends JsProgram { async run() { return { inspected: true } } }', estimated_readonly_rounds: 2 }, output: 'alpha' },
 })
 
 test('WHAT[speculative-investigation-009] registered Replica hook closes the provider projection without admitting a synthetic physical input', async () => {
@@ -394,7 +394,7 @@ test('WHAT[speculative-investigation-009] registered Replica hook closes the pro
             'the provider-only user row is not durable acceptance or dispatch evidence')
 
           response.parts.push({
-            type: 'tool', tool: 'js-predictor', callID: 'replica-call',
+            type: 'tool', tool: 'todowrite-for-predictor', callID: 'replica-call',
             state: { status: 'completed', input: { code: 'read("a")', estimated_readonly_rounds: 0 }, output: 'alpha' },
           })
           response.info.time.completed = 5

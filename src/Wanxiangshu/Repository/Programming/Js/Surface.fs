@@ -22,13 +22,13 @@ type JsSurface =
 module JsToolGenerator =
 
     let membersFor (capabilities: Set<JsCapability>) : JsCapabilityFragment list =
-        capabilities
-        |> Set.toList
-        |> List.sortBy JsCapability.order
-        |> List.collect (fun capability ->
-            Map.tryFind capability JsFragmentRegistry.byCapability |> Option.defaultValue [])
+        JsFragmentRegistry.all
+        |> List.filter (fun fragment ->
+            fragment.Capability <> JsCapability.Park
+            && Set.contains fragment.Capability capabilities)
 
-    let toolNameFor (roleName: string) : string = "js-" + roleName.ToLowerInvariant()
+    let toolNameFor (roleName: string) : string =
+        "todowrite-for-" + roleName.ToLowerInvariant()
 
     let private tryProject (roleName: string) (capabilities: Set<ToolPermission>) =
         let jsCapabilities = JsCapability.ofToolCapabilities capabilities
@@ -81,10 +81,11 @@ module JsToolGenerator =
                     |> Map.ofList }
 
     /// Dedicated readonly projection for the StrengthReplica JS surface (JS-PREDICTOR).
-    /// Role is not a public office Role; capabilities are exactly {Read, Glob, Grep}.
+    /// Role is not a public office Role; capabilities are exactly {Read, Glob}
+    /// (grep retired in favour of walk + whereAll, [057]).
     let generatePredictor (prose: JsCanonicalDescription.Prose) : JsSurface =
         let roleName = "predictor"
-        let jsCapabilities = set [ JsCapability.Read; JsCapability.Glob; JsCapability.Grep ]
+        let jsCapabilities = set [ JsCapability.Read; JsCapability.Glob ]
         let members = membersFor jsCapabilities
 
         { ToolName = toolNameFor roleName

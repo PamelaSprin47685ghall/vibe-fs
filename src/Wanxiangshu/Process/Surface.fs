@@ -431,9 +431,11 @@ module ProcessSurface =
         match string (property value "kind") with
         | "Exited" ->
             let code: obj = property value "exitCode"
+
             if emitJsExpr code "Number.isInteger($0) && $0 >= 0 && $0 <= 2147483647" then
                 EndEvidence.Confirmed(ProgramEnd.Exited(unbox<int> code))
-            else failwith "Invalid exit code"
+            else
+                failwith "Invalid exit code"
         | "Signaled" -> EndEvidence.Confirmed(ProgramEnd.Signaled(string (property value "signal")))
         | "Unconfirmed" -> EndEvidence.Unconfirmed
         | _ -> failwith "Expected explicit target end evidence"
@@ -480,21 +482,36 @@ module ProcessSurface =
         | ProcessResult.NotStarted reason ->
             let view =
                 match reason with
-                | NoExecution.InvalidRequest reason -> box {| kind = "InvalidRequest"; reason = reason |}
+                | NoExecution.InvalidRequest reason ->
+                    box
+                        {| kind = "InvalidRequest"
+                           reason = reason |}
                 | NoExecution.CancelledBeforeStart -> box {| kind = "CancelledBeforeStart" |}
-                | NoExecution.StartRejected reason -> box {| kind = "StartRejected"; reason = reason |}
+                | NoExecution.StartRejected reason ->
+                    box
+                        {| kind = "StartRejected"
+                           reason = reason |}
+
             box {| kind = "NotStarted"; reason = view |}
         | ProcessResult.Observed observation ->
             let stop =
-                observation.StopRequested |> Option.map (function
+                observation.StopRequested
+                |> Option.map (function
                     | StopRequest.CancellationRequested -> box {| kind = "CancellationRequested" |}
-                    | StopRequest.DeadlineStopRequested duration -> box {| kind = "DeadlineStopRequested"; durationMs = duration.TotalMilliseconds |})
+                    | StopRequest.DeadlineStopRequested duration ->
+                        box
+                            {| kind = "DeadlineStopRequested"
+                               durationMs = duration.TotalMilliseconds |})
                 |> Option.defaultValue null
+
             box
                 {| kind = "Observed"
                    ending = evidenceView observation.End
                    stopRequested = stop
-                   output = observation.Output |> Option.map (box >> outcomeView) |> Option.defaultValue null
+                   output =
+                    observation.Output
+                    |> Option.map (box >> outcomeView)
+                    |> Option.defaultValue null
                    fault = observation.Fault |> Option.defaultValue null |}
 
     let runWithLauncher (launcher: obj) (command: obj) (estimate: obj) (context: obj) (token: obj) : Task<obj> =
@@ -550,6 +567,7 @@ module ProcessSurface =
             { Process = null
               Observe = fun () -> ending.Value
               Kill = kill
+              RequestSignal = fun _ -> Error "The controlled child has no native signal capability"
               Exited = exited
               OnExited = callbacks
               Failure = ref None

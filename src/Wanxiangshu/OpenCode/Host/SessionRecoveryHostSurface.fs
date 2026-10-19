@@ -165,7 +165,7 @@ module SessionRecoveryHostSurface =
                     { new ISessionSnapshotPort with
                         member _.GetMessages _ = Task.FromResult(Ok []) }
 
-                let host = SessionRecoveryHost(journalHandle.Journal, snapshot, scope, port)
+                let host = SessionRecoveryHost(journalHandle.Journal, snapshot, scope, port, None)
 
                 let plainGate =
                     TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
@@ -179,7 +179,7 @@ module SessionRecoveryHostSurface =
                 return
                     { Journal = journalHandle
                       Scope = scope
-                      Sessions = PluginSessionScope(Some journalHandle.Journal, (fun _ -> false))
+                      Sessions = PluginSessionScope(Some journalHandle.Journal, (fun _ -> false), None)
                       Host = host
                       PortOutcome = portOutcome
                       TerminalGate = plainGate
@@ -486,12 +486,12 @@ module SessionRecoveryHostSurface =
                         { new ISessionSnapshotPort with
                             member _.GetMessages _ = Task.FromResult(Ok []) }
 
-                    let host = SessionRecoveryHost(journal, snapshot, scope, port)
+                    let host = SessionRecoveryHost(journal, snapshot, scope, port, None)
 
                     return
                         { Journal = JournalHandle.Create(journal, None)
                           Scope = scope
-                          Sessions = PluginSessionScope(Some journal, (fun _ -> false))
+                          Sessions = PluginSessionScope(Some journal, (fun _ -> false), None)
                           Host = host
                           PortOutcome = portOutcome
                           TerminalGate = gate

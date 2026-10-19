@@ -90,7 +90,13 @@ module PluginBoot =
                 strengthScope.StrengthRuntime.IsResidentSession sessionId
                 || strengthScope.StrengthRuntime.TryFindResident(sessionId).IsSome
 
-            let scope = new PluginRuntimeScope(journal, isSharedModelLease)
+            let jsLifecyclePersistence =
+                workspaceDirectory
+                |> Option.bind (fun workspace -> WorkspaceEventStore.tryCurrent (RuntimePath.stateRoot workspace))
+                |> Option.map Wanxiangshu.Repository.Programming.Js.JsToolsTransactionStore.createLifecyclePersistence
+
+            let scope =
+                new PluginRuntimeScope(journal, isSharedModelLease, jsLifecyclePersistence)
 
             scope.AttachSessionCleanup(fun sid -> strengthScope.ClearSession sid)
             scope.AttachScopeDispose(fun () -> SharedPredictorScope.release strengthScope)

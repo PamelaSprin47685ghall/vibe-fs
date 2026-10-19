@@ -1,14 +1,14 @@
 # attention-regulation — WHY
 
-长会话容易让已经足够的判断反复重开，让放弃的猜想继续占用注意力，也让非阻塞的旁支挤掉当前工作。
+这里记录的是注意力调节工具集的收敛决定：独立的 `enough`、`abandon` 与 `defer` 工具以及专门的 `DeferredWork` 持久队列拆散了注意力表达，并在自然终点与 Manager 退休处引入了额外的续行与待办核对通道。
 
-「信息已足够」与「放下自我承诺」两种注意力动作已经并入 `assume`：它们不改变用户托付，也不需要独立工具。判断“够了”不等于判断一定正确，放弃一个猜想不等于取消真实义务；把这份纪律交给 assume 统一的笃定动作，可以减少并列的微原语，也避免模型在多个近义工具间反复权衡。
+现在这些职责收敛到已有原语：
 
-暂存项需要跨重启保留，却不应成为跨参与者、跨 life 的永久负担。它不再依赖已经退役的学习工具露出，而是在任期收尾、自然终止或编排交接这些真实终点上被消费；消费即消灭，稳定 occurrence 用于避免重放制造新工作。
-
-长期角色规范归 cognitive-environment，真实义务归 obligation-ledger，推理证据归 epistemic-reasoning。本包只提供有限的注意力动作，不接管通用规划。
+- `enough`（信息已足够）与 `abandon`（放下自建计划或推论）由 `assume(assumption)` 统一表达；
+- 非阻塞旁支与跨步备忘由编程面（`todowrite-for-<role>`）程序控制流、ANCHOR 视图声明的 `view.thenRemove` 摘要以及 `assume` 承载，不再维护独立的 `Attention` 持久投影或终点续行呈现。
 
 ## DEPENDS ON
 
 - `participant-identity`
-- `durable-events`
+- `cognitive-environment`
+- `repository-programming`

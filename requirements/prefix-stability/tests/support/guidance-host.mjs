@@ -49,7 +49,7 @@ export async function withGuidanceHost(status, action, identity = status, { role
         try { process.stdout.write(JSON.stringify({ pid: process.pid, projection: await trace.currentProjection(opened.journal, process.argv[2]) })); }
         finally { journal.JournalSurface_dispose(opened.journal); }
       `
-        return JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script, join(directory, '.git'), sessionID], { encoding: 'utf8', env: { ...process.env, WXS_E2E_QUIET: '1' } }))
+        return JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script, join(directory, '.Herdchestra'), sessionID], { encoding: 'utf8', env: { ...process.env, WXS_E2E_QUIET: '1' } }))
       }
       await action({ hooks, runtime, sessionID, raw, first, result, guidance, transform, current, head, cold, textOf,
         quote: async (text, { physicalPart = true, multiple = false } = {}) => {

@@ -738,17 +738,29 @@ module ModelRouting =
                 commit demand target
                 true
 
-        let schedulePendingDemand (demand: ExecutionAdmissionDemand) =
-            routeFreshOrPoison
+        let rejectSaturatedDemand (demand: ExecutionAdmissionDemand) =
+            match admissionQueue.TryTake demand.Node with
+            | Some pending ->
+                AsyncSupport.trySetResult pending.Node.Completion ExecutionAdmissionAcquisition.QueueFull
+                |> ignore
+
                 true
-                demand.SessionId
-                None
-                demand.PhysicalUserMessageId
-                demand.Role
-                demand.LenderSessionId
-                demand.PreviousTarget
-                demand.Purpose
-            |> commitScheduled demand
+            | None -> false
+
+        let schedulePendingDemand (demand: ExecutionAdmissionDemand) =
+            if hasTheoreticalCapacityLocked (Roles.roleLabel demand.Role) demand.Purpose then
+                routeFreshOrPoison
+                    true
+                    demand.SessionId
+                    None
+                    demand.PhysicalUserMessageId
+                    demand.Role
+                    demand.LenderSessionId
+                    demand.PreviousTarget
+                    demand.Purpose
+                |> commitScheduled demand
+            else
+                rejectSaturatedDemand demand
 
         let rec drainDemands () =
             ensureHealthy ()
@@ -1035,6 +1047,8 @@ module ModelRouting =
             =
             match currentExecutionOutcome sessionId physicalUserMessageId role participant purpose with
             | Some current -> current
+            | None when not (hasTheoreticalCapacityLocked (Roles.roleLabel role) purpose) ->
+                ExecutionAdmissionAcquisition.QueueFull
             | None ->
                 let oldPhysicalUserMessageId = currentPhysicalUserMessageId sessionId
 
@@ -1073,11 +1087,7 @@ module ModelRouting =
             =
             lock gate (fun () ->
                 ensureHealthy ()
-
-                if not (hasTheoreticalCapacityLocked (Roles.roleLabel role) purpose) then
-                    ExecutionAdmissionAcquisition.QueueFull
-                else
-                    acquireFreshOrAdopt sessionId physicalUserMessageId role participant purpose lenderSessionId)
+                acquireFreshOrAdopt sessionId physicalUserMessageId role participant purpose lenderSessionId)
 
         let acquireManagedSafe
             sessionId
@@ -1968,6 +1978,7 @@ module ModelRouting =
                 match takeProviderRunWitness (providerRun.Trim()) with
                 | Some(_, target) ->
                     markProviderOfTarget target
+                    drainDemands ()
                     Some target
                 | None -> None)
 

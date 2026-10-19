@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Mission.Lifecycle
 
 module DurableWorkHost =
-    val journalPath: gitCommonDir: string -> string
+    val journalPath: stateRoot: string -> string
 
     type HostReceipt =
         { RequestId: string
@@ -31,6 +31,7 @@ module DurableWorkHost =
         { RetirementId: string
           IncumbencyId: string
           Outcome: string
+          Expected: string
           Fence: HostRunFence
           ProjectionCut: bool }
 
@@ -40,36 +41,47 @@ module DurableWorkHost =
           Next: string }
 
     type InspectedWork =
-        { Opened: bool
-          Sequence: string list
-          Stage: string
-          ActiveId: string option
-          OpeningStage: string option
-          Reviewed: bool
-          ReviewOutcome: string option
-          OpeningCursor: float option
-          PredecessorRange: (float * float) option
-          DeliveryAuthorized: bool
-          Delivered: bool
-          PendingDelivery: bool
-          PendingOperationId: string option
-          PendingExecSessionId: string option
-          PendingDigest: string option
-          PendingPath: string option
-          RoundCount: int
-          RetiredRuns: string list
-          DevOpsId: string option
-          DevOpsTarget: string option
-          Authority: string
-          Confirmed: bool
-          BlockerDigest: string option
-          Root: string option
-          Retirements: HostRetirement list
-          Confirmation: HostRunFence option
-          ProjectionCut: HostRunFence option
-          Advances: HostAdvance list }
+        {
+            Opened: bool
+            Sequence: string list
+            Stage: string
+            ActiveId: string option
+            OpeningStage: string option
+            Reviewed: bool
+            ReviewOutcome: string option
+            /// The review outcome of the most recently retired tenure. `Reviewed`
+            /// and `ReviewOutcome` describe the OPEN tenure; a delivered work has
+            /// none, yet the review that qualified its candidate is still the
+            /// durable fact of the round that delivered it.
+            LastRetiredReview: string option
+            OpeningCursor: float option
+            PredecessorRange: (float * float) option
+            LastRetirementCursor: float option
+            DeliveryAuthorized: bool
+            Delivered: bool
+            PendingDelivery: bool
+            PendingOperationId: string option
+            PendingExecSessionId: string option
+            PendingDigest: string option
+            PendingPath: string option
+            RoundCount: int
+            RetiredRuns: string list
+            DevOpsId: string option
+            DevOpsTarget: string option
+            Authority: string
+            Confirmed: bool
+            BlockerDigest: string option
+            Root: string option
+            Retirements: HostRetirement list
+            Confirmation: HostRunFence option
+            ProjectionCut: HostRunFence option
+            Advances: HostAdvance list
+        }
 
     val inspected: gitCommonDir: string -> workId: string -> InspectedWork option
+
+    val inspectedMany:
+        gitCommonDir: string -> workIds: string array -> (string * Result<InspectedWork option, string>) array
 
     val ensureOpened:
         gitCommonDir: string ->

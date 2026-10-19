@@ -705,7 +705,7 @@ module TemporalSurface =
             let mutable lateBackgroundStarted = false
             // DSL-MUTABLE: algorithm-scratch — scenario rejected-owned-work observation.
             let mutable lateOwnedStarted = false
-            let scope = new PluginRuntimeScope(None, (fun _ -> false))
+            let scope = new PluginRuntimeScope(None, (fun _ -> false), None)
 
             scope.TrackReconcileShutdown(fun () ->
                 task {
@@ -779,7 +779,7 @@ module TemporalSurface =
                 TaskCompletionSource<unit>(TaskCreationOptions.RunContinuationsAsynchronously)
             // DSL-MUTABLE: algorithm-scratch — scenario rejected-background observation.
             let mutable lateBackgroundStarted = false
-            let scope = new PluginRuntimeScope(None, (fun _ -> false))
+            let scope = new PluginRuntimeScope(None, (fun _ -> false), None)
 
             scope.RunBackground(fun () ->
                 task {

@@ -9,10 +9,16 @@ open Wanxiangshu.Resources
 module PairProgrammingCalibration =
 
     [<Literal>]
-    let ToolEstimatePath = "host/pair-programming-tool-estimate"
+    let BudgetPath = "host/pair-programming-budget"
 
     [<Literal>]
     let ElapsedPath = "host/pair-programming-elapsed"
+
+    [<Literal>]
+    let TokenEconomyPath = "host/pair-programming-token-economy"
+
+    [<Literal>]
+    let ContextLimitPath = "host/pair-programming-context-limit"
 
     let private nonBlank (value: string option) =
         value
@@ -28,31 +34,42 @@ module PairProgrammingCalibration =
     let documentWithElapsed tip elapsed toolEstimate guideline =
         LlmFacing.instructions (instructionTexts [ tip; elapsed; toolEstimate; Some guideline ])
 
+    /// The per-round Pair Hint, including the state fragments the model needs
+    /// to price its own view declarations: last round's token economy as the
+    /// provider billed it, and the declared context limit.
+    let documentWithState tip elapsed state calibration guideline =
+        LlmFacing.instructions (instructionTexts (tip :: elapsed :: (state @ [ calibration; Some guideline ])))
+
     let compose tip toolEstimate guideline =
         document tip toolEstimate guideline |> LlmFacing.render
 
     let composeWithElapsed tip elapsed toolEstimate guideline =
         documentWithElapsed tip elapsed toolEstimate guideline |> LlmFacing.render
 
-    let renderToolEstimate language (remaining: int) =
-        ProviderProse.render language ToolEstimatePath (Map [ "remaining", string remaining ])
-
-    let private elapsedLabel language elapsedMilliseconds =
-        let totalSeconds =
-            elapsedMilliseconds
-            |> max 0.0
-            |> fun value -> Math.Floor(value / 1000.0)
-            |> int64
-
-        let minutes = totalSeconds / 60L
-        let seconds = totalSeconds % 60L
-
-        match language with
-        | ProviderLanguage.SimplifiedChinese -> sprintf "%d 分钟 %d 秒" minutes seconds
-        | ProviderLanguage.English ->
-            let minuteUnit = if minutes = 1L then "minute" else "minutes"
-            let secondUnit = if seconds = 1L then "second" else "seconds"
-            sprintf "%d %s %d %s" minutes minuteUnit seconds secondUnit
-
     let renderElapsed language elapsedMilliseconds =
-        ProviderProse.render language ElapsedPath (Map [ "elapsed", elapsedLabel language elapsedMilliseconds ])
+        ProviderProse.render language ElapsedPath (Map [ "elapsed", DurationLabel.format language elapsedMilliseconds ])
+
+    /// The four calibration numbers the model prices its own work with: turns
+    /// spent and estimated to remain, wall-clock spent, and the time that
+    /// remains at the pace actually shown (the average cost of the turns
+    /// already spent, times the turns that remain).
+    let renderBudget language (turnsUsed: int) (turnsRemaining: int) (elapsedMilliseconds: float) =
+        let remainingMilliseconds =
+            elapsedMilliseconds * float turnsRemaining / float (max 1 turnsUsed)
+
+        ProviderProse.render
+            language
+            BudgetPath
+            (Map
+                [ "turns_used", string turnsUsed
+                  "turns_left", string turnsRemaining
+                  "time_used", DurationLabel.format language elapsedMilliseconds
+                  "time_left", DurationLabel.format language remainingMilliseconds ])
+
+    /// Last request's own accounting, as the provider reported it: the tokens
+    /// it served from the cache prefix, and the tokens it recomputed.
+    let renderTokenEconomy language (cached: int) (uncached: int) =
+        ProviderProse.render language TokenEconomyPath (Map [ "cached", string cached; "uncached", string uncached ])
+
+    let renderContextLimit language (limit: int) =
+        ProviderProse.render language ContextLimitPath (Map [ "limit", string limit ])

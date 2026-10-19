@@ -1,11 +1,13 @@
 namespace Wanxiangshu.Enforcer
 
 open System
+open Fable.Core
 
 /// docs/what/enforcer.md ENFORCER-020…026：`blog` tip v2 codec.
 ///
 /// raw JSON object → Result<CanonicalBlogCall, string>.
-/// tip = exact catalog field or deterministic nearest edit-distance match; no score map.
+/// tipName = the blogged free name (trimmed original; no catalog lookup);
+/// the opinion and advice fields decode with the trim-nonempty family. No score map.
 module EnforcerCodec =
 
     type ChronicleRecord =
@@ -20,14 +22,31 @@ module EnforcerCodec =
         | Structured of ChronicleRecord
         | Legacy of text: string * evidence: string option
 
-    /// ENFORCER-004 / 026：领域闭合类型。Tip 必填。
+    /// ENFORCER-004 / 026：领域闭合类型。TipName 与 opinion/advice 必填。
     type CanonicalBlogCall =
         { Content: ChronicleContent
-          Tip: EnforcerTip }
+          TipName: string
+          Opinion: string
+          Advice: string }
 
-    /// ENFORCER-023 错误面。
+    /// ENFORCER-023 / behavior-diagnosis-006：执行期与解码期共用的内部标识。
     [<Literal>]
-    let MissingTipError = "missing required argument: tip"
+    let MissingTipNameError = "missing-tip-name"
+
+    [<Literal>]
+    let TipNameTooLongError = "tip-name-too-long"
+
+    [<Literal>]
+    let TipNameMultilineError = "tip-name-multiline"
+
+    [<Literal>]
+    let TipFieldNotAStringError = "tip-field-not-a-string"
+
+    [<Literal>]
+    let MissingTipFieldPrefix = "missing-tip-field:"
+
+    [<Literal>]
+    let MaxTipNameChars = 200
 
     [<Literal>]
     let MissingChargeError = "missing required argument: charge"
@@ -67,31 +86,59 @@ module EnforcerCodec =
                 if t.Length = 0 then None else Some t
             | _ -> None)
 
-    let private decodeTipString
-        (rules: EnforcerRule list)
-        (content: ChronicleContent)
-        (tipRaw: string)
-        : Result<CanonicalBlogCall, string> =
-        let tipValue = tipRaw.Trim()
+    [<Emit("$0 === undefined")>]
+    let private isUndefined (value: obj) : bool = jsNative
 
-        if tipValue.Length = 0 then
-            Error MissingTipError
+    /// D3：内容字段名。字段顺序即 schema 与解码顺序。
+    let tipSectionNames = [ "opinion"; "advice" ]
+
+    let private missingTipFieldError (fieldName: string) = MissingTipFieldPrefix + fieldName
+
+    let private validateTipNameText (rawText: string) : Result<string, string> =
+        let trimmed = rawText.Trim()
+
+        if trimmed.Length = 0 then
+            Error MissingTipNameError
+        elif trimmed.Contains "\n" || trimmed.Contains "\r" then
+            Error TipNameMultilineError
+        elif trimmed.Length > MaxTipNameChars then
+            Error TipNameTooLongError
         else
-            EnforcerCatalog.resolveByField tipValue rules
-            |> Option.map (fun rule ->
-                Ok
-                    { Content = content
-                      Tip = EnforcerTip.ofRule rule })
-            |> Option.defaultValue (Error MissingTipError)
+            Ok trimmed
 
-    let private decodeTip
-        (rules: EnforcerRule list)
-        (content: ChronicleContent)
-        (value: obj)
-        : Result<CanonicalBlogCall, string> =
-        match value with
-        | :? string as tipRaw -> decodeTipString rules content tipRaw
-        | _ -> Error MissingTipError
+    /// D2：tipName 判定序。缺键或 undefined → missing-tip-name；非 string
+    /// （含 null）→ tip-field-not-a-string；trim 空 → missing-tip-name；
+    /// 含换行或回车 → tip-name-multiline；超 200 字符 → tip-name-too-long。
+    /// 返回 trim 后原串（保留大小写与内部字节）。
+    let private decodeTipName (rawArgs: Map<string, obj>) : Result<string, string> =
+        match Map.tryFind "tipName" rawArgs with
+        | None -> Error MissingTipNameError
+        | Some value when isUndefined value -> Error MissingTipNameError
+        | Some(:? string as rawText) -> validateTipNameText rawText
+        | Some _ -> Error TipFieldNotAStringError
+
+    let private validateTipFieldText (fieldName: string) (rawText: string) : Result<string, string> =
+        let trimmed = rawText.Trim()
+
+        if trimmed.Length = 0 then
+            Error(missingTipFieldError fieldName)
+        else
+            Ok trimmed
+
+    /// D3：单节解码。缺键或空白 → missing-tip-field:<camelCase 字段名>；
+    /// 非 string → tip-field-not-a-string；返回 trim 后文本。
+    let private decodeTipField (fieldName: string) (rawArgs: Map<string, obj>) : Result<string, string> =
+        match Map.tryFind fieldName rawArgs with
+        | None -> Error(missingTipFieldError fieldName)
+        | Some value when isUndefined value -> Error(missingTipFieldError fieldName)
+        | Some(:? string as rawText) -> validateTipFieldText fieldName rawText
+        | Some _ -> Error TipFieldNotAStringError
+
+    let private decodeTipSections (rawArgs: Map<string, obj>) : Result<string * string, string> =
+        match decodeTipField "opinion" rawArgs, decodeTipField "advice" rawArgs with
+        | Ok opinion, Ok advice -> Ok(opinion, advice)
+        | Error error, _ -> Error error
+        | _, Error error -> Error error
 
     let private structuredFieldNames =
         [ "charge"; "occurrence"; "settlement"; "consequence" ]
@@ -151,18 +198,23 @@ module EnforcerCodec =
 
     /// ENFORCER-020/021/023：解析一个 blog 调用。
     ///
-    /// 缺 tip / tip 非 string / 未知 field → Error。
+    /// 先解 tipName 与 opinion/advice（形态无关的顶层必填字段），再解内容形态。
+    /// 缺键/空白/非 string/超长/含换行 → C4.1 内部标识；不映射工具文案。
     /// 新协议必须完整提供 charge/occurrence/settlement/consequence，可选 evidence。
     /// entry/text 仅作为升级前 transcript 的 legacy recovery 身份，且不得与
     /// structured fields 混用；legacy evidence 仍可随旧 entry/text 解码。
     /// 其它 property 忽略（ENFORCER-024）。不默认 tip。
-    let decodeCall (rules: EnforcerRule list) (rawArgs: Map<string, obj>) : Result<CanonicalBlogCall, string> =
-        match Map.tryFind "tip" rawArgs with
-        | None -> Error MissingTipError
-        | Some null -> Error MissingTipError
-        | Some value ->
+    let decodeCall (rawArgs: Map<string, obj>) : Result<CanonicalBlogCall, string> =
+        match decodeTipName rawArgs, decodeTipSections rawArgs with
+        | Ok tipName, Ok(opinion, advice) ->
             decodeContent rawArgs
-            |> Result.bind (fun content -> decodeTip rules content value)
+            |> Result.map (fun content ->
+                { Content = content
+                  TipName = tipName
+                  Opinion = opinion
+                  Advice = advice })
+        | Error error, _ -> Error error
+        | _, Error error -> Error error
 
     /// ENFORCER-022/061：能进入 CanonicalBlogCall 的内容已经完整且非空。
     let hasValidText (_: CanonicalBlogCall) : bool = true

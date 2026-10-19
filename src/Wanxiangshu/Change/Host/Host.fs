@@ -22,6 +22,157 @@ open Wanxiangshu.Mission.Work
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Process
 
+/// The durable loop signal one Manager work holds for Change.
+///
+/// An open tenure owns the road. `Deliver` commits a Relay together with its
+/// successor incumbency in the same record, so a Relayed retirement whose
+/// successor is already walking has no fresh signal to give: ManagerWorkflow owns
+/// that hand-off's one physical prompt through the ManagerLoopGate occasion, and
+/// Change's part is to wait on durable change (`awaitDispatchedWait`). Reporting
+/// the consumed retirement again on every read instead drives the program through
+/// `AwaitLoopSignal` → `ContinueLoop` without ever blocking; in the plugin build
+/// that unbounded promise chain starves the Host's event loop, so the road freezes
+/// exactly at its first relayed retirement.
+///
+/// Only a work with no open tenure can hold a signal: a Delivered retirement owes
+/// the publication candidate, an unnamed confirmation fails closed, and no
+/// retirement at all is not permission to continue.
+[<RequireQualifiedAccess>]
+module DurableLoopSignal =
+    let ofWork (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
+        match work.ActiveId, work.Retirements |> List.tryLast with
+        | Some _, _ -> None
+        | None, Some retirement when retirement.Outcome = "Delivered" -> Some ManagerLoopSignal.Candidate
+        | None, Some retirement when retirement.Outcome = "Relayed" -> Some ManagerLoopSignal.Continue
+        | None, Some retirement ->
+            Some(
+                ManagerLoopSignal.ExceptionalTerminal(
+                    sprintf "Retirement %s has no durable Relayed or Delivered confirmation" retirement.RetirementId
+                )
+            )
+        | None, None -> None
+
+/// change-integration-005/013: the same Work's next tenure after a delivered
+/// manager life.
+///
+/// A delivered tenure has no successor record of its own, so the work's
+/// continuation is the pair `Reopened` + `IncumbencyOpened`: the one lifecycle
+/// fact pair that leaves `Delivered` and opens a fresh, read-only, unreviewed
+/// tenure of the same Work. Change records the machine conflict (or the rebase
+/// that invalidated the old qualification) outside the gate and then hands the
+/// same Work over; the physical Manager session, the worktree and the Work stay
+/// exactly as they were (change-integration-009).
+///
+/// The hand-off is not a retirement attempt: the delivered retirement already
+/// settled the live-resource obligation (work-009) with an empty blocker set,
+/// and nothing can have started a resource since — the delivered attempt was
+/// interrupted and its logical run closed. An open tenure means the hand-off
+/// already happened, so a repeated read never opens a second one.
+[<RequireQualifiedAccess>]
+module DeliveredTenureHandOff =
+    /// The continuation one committed retirement owes its work.
+    ///
+    /// A Relayed retirement already opened the successor tenure it hands to. A
+    /// Delivered retirement has no successor record of its own, so the work's
+    /// continuation is the pair `Reopened` + `IncumbencyOpened`: the one lifecycle
+    /// fact pair that leaves `Delivered` and opens a fresh, read-only, unreviewed
+    /// tenure of the same Work. Change records the machine conflict (or the rebase
+    /// that invalidated the old qualification) outside the gate and then hands the
+    /// same Work over; the physical Manager session, the worktree and the Work stay
+    /// exactly as they were (change-integration-009).
+    ///
+    /// The hand-off is not a retirement attempt, so its blocker set is the durable
+    /// fact the delivered retirement already settled (work-009): that retirement
+    /// was written with no live resource, its attempt was interrupted and its
+    /// logical run closed, and nothing else can have started a resource since. An
+    /// open tenure means the hand-off already happened, so a repeated read never
+    /// opens a second one. A missing observed cursor fails closed: an invented
+    /// cursor would let the successor tenure inherit the predecessor's
+    /// interactions.
+    let continuation
+        (gitCommonDir: string)
+        (workId: string)
+        (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork)
+        (retirement: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement)
+        (observedCursor: int64 option)
+        (requestId: string)
+        : Result<IncumbencyId, string> =
+        let openTenure () =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
+            |> Option.bind (fun seen -> seen.ActiveId)
+
+        let reopenDelivered (cursor: float) =
+            let command =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                    "Reopen"
+                    [ "retirementId", box retirement.RetirementId
+                      "ownerId", box workId
+                      "openingCursor", box cursor
+                      "blockers", box ([||]: string array) ]
+
+            let receipt =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.execute gitCommonDir workId requestId command
+
+            // A concurrent hand-off may have committed the same rotation
+            // (Conflict/Unknown), so only a reread that proves the open tenure
+            // settles the decision.
+            let written () =
+                openTenure () |> Option.map (fun activeId -> Ok(IncumbencyId.create activeId))
+
+            let refusal () =
+                if receipt.Status = "Committed" || receipt.Status = "Replayed" then
+                    Error "hand-off committed without an open tenure"
+                else
+                    Error(
+                        "manager loop hand-off failed: "
+                        + (if receipt.Reason = "" then
+                               receipt.Status
+                           else
+                               receipt.Reason)
+                    )
+
+            written () |> Option.defaultWith refusal
+
+        match retirement.Outcome, work.ActiveId, observedCursor with
+        | "Relayed", Some activeId, _ -> Ok(IncumbencyId.create activeId)
+        | "Relayed", None, _ -> Error "relay continuation has no successor incumbency"
+        | "Delivered", Some activeId, _ -> Ok(IncumbencyId.create activeId)
+        | "Delivered", None, None -> Error "manager loop hand-off has no observed head cursor"
+        | "Delivered", None, Some cursor -> reopenDelivered (float cursor)
+        | _ -> Error(sprintf "retirement %s is neither a relay nor a delivery continuation" retirement.RetirementId)
+
+/// The durable review evidence the publish gate reads for one Manager road.
+///
+/// An open tenure carries its own review. Publishing, however, happens *after*
+/// the qualifying tenure delivered its candidate (change-integration-005/013:
+/// the next tenure re-reviews and then delivers), so the open-tenure review is
+/// absent exactly when the gate needs it. The qualifying review is then the
+/// retired round's own — and only when that round was the delivery, because a
+/// relayed round's review belongs to a tenure that never produced a publishable
+/// candidate. Everything else stays a refusal with zero writes.
+[<RequireQualifiedAccess>]
+module PublishReviewEvidence =
+    let private openTenureReview (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) : string option =
+        match work.Reviewed, work.ReviewOutcome with
+        | true, Some outcome -> Some outcome
+        | _ -> None
+
+    let private deliveringReview (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) : string option =
+        match work.Retirements |> List.tryLast with
+        | Some retirement when retirement.Outcome = "Delivered" -> work.LastRetiredReview
+        | _ -> None
+
+    let ofWork (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) : (string * string) option =
+        // An open tenure is the road's current candidate authority: while it is
+        // unreviewed nothing may publish, even though the predecessor's delivered
+        // review is still in the history.
+        let outcome =
+            match work.ActiveId with
+            | Some _ -> openTenureReview work
+            | None -> deliveringReview work
+
+        outcome |> Option.map (fun value -> value, work.Authority)
+
 /// Host wiring for one Change manager session. One physical Manager session can host many
 /// logical Relay incumbencies; Change never creates a second audit session.
 type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
@@ -49,7 +200,6 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         HostForkRuntime(
             orchestratorId,
             deps.Sessions,
-            deps.ChildWorkRecordForRun,
             CompletionMailboxRuntime.create,
             NodeTiming.nodeClockPort (),
             NodeTiming.raceExit,
@@ -69,9 +219,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
                     | true, path when System.IO.Directory.Exists path -> Some path
                     | _ -> None),
             ?sessionSnapshot = deps.SessionSnapshot,
-            onRunStarted = deps.OnRunStarted,
-            parentWorkRecordFor = deps.ParentWorkRecordFor,
-            childWorkRecordFor = deps.ChildWorkRecordFor
+            onRunStarted = deps.OnRunStarted
         )
 
     let managerAgentId (jobId: ManagerJobId) = ManagerJobId.value jobId
@@ -147,21 +295,10 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
 
     let lifecycleWorkOf (record: ManagerJobProjection) =
         let directory = WorktreePath.value record.WorktreePath
-        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot directory
         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value record.ManagerSessionId)
 
-    /// The loop signal the last committed retirement holds for Change: a
-    /// Delivered tenure has a candidate to publish, a Relayed tenure hands the
-    /// road to its successor. No retirement is not permission to continue, so
-    /// the caller keeps waiting on durable change instead of inventing one.
-    let loopSignalOfWork (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
-        work.Retirements
-        |> List.tryLast
-        |> Option.bind (fun retirement ->
-            match retirement.Outcome with
-            | "Delivered" -> Some ManagerLoopSignal.Candidate
-            | "Relayed" -> Some ManagerLoopSignal.Continue
-            | _ -> None)
+    let loopSignalOfWork = DurableLoopSignal.ofWork
 
     let requireOpenWork (record: ManagerJobProjection) =
         lifecycleWorkOf record |> Result.requireSome "Manager session is not open"
@@ -217,6 +354,19 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | Error error -> Task.FromResult(Error error)
         | Ok(relay, record) -> awaitLoopSignalFromRelay jobId relay record
 
+    /// The continuation the road owes after its last committed retirement.
+    ///
+    /// A Relayed tenure hands the road to the successor incumbency it opened, and
+    /// that successor is the continuation. A Delivered tenure has no successor
+    /// record, so the road's continuation is the same Work's next tenure: every
+    /// continuation after a delivered hand-off means the candidate was rebased or
+    /// lost to a machine conflict, and change-integration-005/013 require the next
+    /// tenure to re-review before anything may publish. An already open tenure is
+    /// that hand-off already made, so a repeated read never opens a second one.
+    ///
+    /// The cursor comes from the observed journal head only. A missing observation
+    /// fails closed: an invented cursor would let the successor tenure inherit the
+    /// predecessor's interactions.
     let continueLoop (jobId: ManagerJobId) : Task<Result<IncumbencyId, string>> =
         taskResult {
             let! relay, record =
@@ -225,10 +375,20 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             let! work = requireOpenWork record
             let! retirement = requireCommittedRetirement work
 
-            match retirement.Outcome, work.ActiveId with
-            | "Relayed", Some activeId -> return IncumbencyId.create activeId
-            | "Relayed", None -> return! Error "relay continuation has no successor incumbency"
-            | _ -> return! Error(sprintf "retirement %s is not a relay continuation" retirement.RetirementId)
+            let commonDir =
+                Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot (WorktreePath.value record.WorktreePath)
+
+            let requestId =
+                "hand-off:" + ManagerJobId.value jobId + ":" + retirement.RetirementId
+
+            return!
+                DeliveredTenureHandOff.continuation
+                    commonDir
+                    (SessionId.value record.ManagerSessionId)
+                    work
+                    retirement
+                    (deps.ObservedHeadCursor record.ManagerSessionId)
+                    requestId
         }
 
     let finalizeRegisteredWorktree (agentId: string) =
@@ -271,13 +431,10 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         let commonDir =
             worktreePath
             |> Wanxiangshu.Foundation.Identity.WorktreePath.value
-            |> Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+            |> Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
 
         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value managerSessionId)
-        |> Option.bind (fun work ->
-            match work.Reviewed, work.ReviewOutcome with
-            | true, Some outcome -> Some(outcome, work.Authority)
-            | _ -> None)
+        |> Option.bind PublishReviewEvidence.ofWork
 
     let relayPort: RelayPort =
         { CreateManagerSession = createManagerSession
@@ -327,7 +484,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             // Canonicalize the repo path via git common-dir so symlinked
             // spellings share one cross-process publish lock.
             let lockRepoPath =
-                Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir deps.RepoPath
+                Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot deps.RepoPath
 
             let sweepLockPath = IntegrationGate.lockPath lockRepoPath (TargetRef.value target)
 
@@ -416,6 +573,9 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         =
         String.concat
             "\n"
+            // Durable identity tag: it feeds the AdvanceCommitted id, so it is a
+            // stable machine vocabulary — renaming it would break replay of
+            // existing records. Not a user-visible term.
             [ "relay-authority-revision-v1"
               SessionId.value record.ManagerSessionId
               ProviderRunIdentity.value callerProviderRun
@@ -506,7 +666,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         (next: string)
         : Result<string, string> =
         let directory = WorktreePath.value record.WorktreePath
-        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir directory
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot directory
 
         if String.IsNullOrWhiteSpace commonDir then
             Error "lifecycle store is unavailable"
@@ -530,6 +690,8 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         : Task<Result<string, string>> =
         taskResult {
             let expectedRevision = AuthorityRevision.create work.Authority
+            // Durable gate identity (the nudge's payload digest binds it), so it
+            // stays stable like the authority-revision tag above.
             let gateKind = "relay-authority-update:" + AuthorityRevision.value nextRevision
 
             let! _physicalAuthorityMessage =
@@ -631,7 +793,7 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
             ?expectedToolCalls: int
         ) : Task<Result<string, string>> =
         if not (tryEnterAuthorityUpdate jobId) then
-            Task.FromResult(Error "Relay authority update is already in flight for this Road")
+            Task.FromResult(Error "Relay authority update is already in flight for this Work")
         else
             runAuthorityUpdate jobId (fun () ->
                 continueManagerJobCore jobId prompt callerProviderRun callerToolCallId expectedToolCalls)

@@ -63,7 +63,7 @@ module ProviderWireDecode =
         elif emitJsExpr value "typeof $0 === 'string'" then
             unbox<string> value
         else
-            Wanxiangshu.Foundation.CanonicalJson.canonicalJson value
+            Wanxiangshu.Host.CanonicalJson.canonicalJson value
 
     let private firstCanonical (partObj: obj) (names: string list) =
         names

@@ -76,8 +76,6 @@ module CompressionSurface =
         | "work-main" -> Some ProviderRequestKind.WorkMain
         | "bloggermain"
         | "blogger-main" -> Some ProviderRequestKind.BloggerMain
-        | "bloggersquash"
-        | "blogger-squash" -> Some ProviderRequestKind.BloggerSquash
         | "interactionrepair"
         | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
         | "strengthreplica"
@@ -179,8 +177,10 @@ module CompressionSurface =
         | ToolPermission.BashHoneypot -> "BashHoneypot"
         | ToolPermission.JsPlan -> "JsPlan"
         | ToolPermission.Ask -> "Ask"
+        | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
+        | ToolPermission.Advisor -> "Advisor"
 
     let private participantIdentityToJs (identity: ParticipantIdentityEvidence) : obj =
         box

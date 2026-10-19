@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFileSync } from 'node:child_process'
+import { buildSourceDependency } from './wanxiangli-source.mjs'
 
 import { run as runSurfaceManifest } from './checks/js-surface-manifest.mjs'
 import { run as runModuleLinkage } from './checks/js-module-linkage.mjs'
@@ -173,10 +174,10 @@ async function verifyArtifacts(targetRoot = root) {
   if (fs.existsSync(catalogJson)) throw new Error(`catalog.json must be removed after folder cutover: ${catalogJson}`)
 
   for (const name of ['primitive-obsession', ruleDirs[0]]) {
-    const enforcerMd = path.join(enforcerRoot, name, 'enforcer.md')
-    const mainMd = path.join(enforcerRoot, name, 'main.md')
-    if (!fs.existsSync(enforcerMd)) throw new Error(`missing rulebook file: ${enforcerMd}`)
-    if (!fs.existsSync(mainMd)) throw new Error(`missing rulebook file: ${mainMd}`)
+    for (const locale of ['lesson.md', 'lesson.zh-CN.md']) {
+      const lessonPath = path.join(enforcerRoot, name, locale)
+      if (!fs.existsSync(lessonPath)) throw new Error(`missing rulebook file: ${lessonPath}`)
+    }
   }
 
   const providerRoles = [
@@ -456,6 +457,7 @@ export async function runBuild({
   targetRoot = root,
   clean = false,
   stdio = 'inherit',
+  skipSourceDependency = path.resolve(targetRoot) !== root,
 } = {}) {
   const resolvedRoot = path.resolve(targetRoot)
   const targetDist = path.join(resolvedRoot, 'dist')
@@ -467,6 +469,10 @@ export async function runBuild({
   let buildCommitted = false
 
   try {
+    // 使用源码依赖的当前产物；不能让旧 node_modules tarball 替新 submodule 报绿。
+    if (!skipSourceDependency) {
+      buildSourceDependency(resolvedRoot)
+    }
     // A previously interrupted full rebuild may have left a staged backup
     // behind; settle it before reading any build state.
     recoverStaleStagedDist(targetDist)

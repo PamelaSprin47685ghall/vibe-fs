@@ -12,13 +12,6 @@ const entryFrame = (n) => blog.frame({
   coveredFrom: n - 1,
   coveredThrough: n,
 })
-const squashFrame = (n) => blog.frame({
-  kind: 'Squash',
-  digest: `sha-entry-${n}`,
-  ref: `blob-squash-${n}`,
-  coveredFrom: 0,
-  coveredThrough: 2,
-})
 const commitEntry = (state, { epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `digest-${cutoffTo}`, n = 1 }) =>
   blog.applyEntry(
     {

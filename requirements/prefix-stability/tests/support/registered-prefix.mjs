@@ -27,7 +27,7 @@ const records = directory => readdirSync(directory, { withFileTypes: true }).fla
   return readFileSync(path, 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line))
 })
 
-export const facts = (directory, name) => records(join(directory, '.git')).map(value => payload(value, name)).filter(Boolean)
+export const facts = (directory, name) => records(join(directory, '.Herdchestra')).map(value => payload(value, name)).filter(Boolean)
 export const state = (runtime, sessionID) => Journal.JournalSurface_snapshot(runtime.journal).sessionProjections[sessionID]
 export const prefixHistory = directory => ({
   rebases: facts(directory, 'PrefixRebaseCommitted'),
@@ -64,21 +64,26 @@ export const commitOfferedFrame = async (runtime, sessionID, label) => {
 
 export const observeFact = async (directory, name, action) => {
   const observed = Promise.withResolvers()
-  const before = facts(directory, name).length
+  const names = Array.isArray(name) ? name : [name]
+  const before = new Map(names.map(key => [key, facts(directory, key).length]))
+  const observeCommitted = () => {
+    for (const key of names) {
+      const committed = facts(directory, key)
+      if (committed.length > before.get(key)) observed.resolve(committed.at(-1))
+    }
+  }
   const append = fs.appendFileSync
-  const eventRoot = realpathSync(join(directory, '.git', 'wanxiangshu', 'events')) + sep
+  const eventRoot = realpathSync(join(directory, '.Herdchestra', 'wanxiangshu', 'events')) + sep
   fs.appendFileSync = (path, content, ...options) => {
     append(path, content, ...options)
-    if (typeof path === 'string' && path.startsWith(eventRoot) && String(content).includes(`"${name}"`)) {
-      const committed = facts(directory, name)
-      if (committed.length > before) observed.resolve(committed.at(-1))
+    if (typeof path === 'string' && path.startsWith(eventRoot) && names.some(key => String(content).includes(`"${key}"`))) {
+      observeCommitted()
     }
   }
   syncBuiltinESMExports()
   try {
     await action()
-    const committed = facts(directory, name)
-    if (committed.length > before) observed.resolve(committed.at(-1))
+    observeCommitted()
     return await observed.promise
   } finally {
     fs.appendFileSync = append
@@ -140,12 +145,12 @@ export const coveredSession = async (hooks, runtime, directory, sessionID, testC
   const running = { info: { id: 'msg-covered-next-run', sessionID, parentID: physical, role: 'assistant', agent: 'manager', providerID: 'provider', modelID: 'manager-model', time: { created: 6 } }, parts: [] }
   await check('actual Chronicle execution and Host transcript commit the covered frame', async () => {
     Object.assign(checkpoint.info, { finish: 'tool-calls', time: { created: 4, completed: 5 } })
-    checkpoint.parts = [{ type: 'tool-call', tool: 'todowrite', callID: 'call-checkpoint', args: { todos: [] } }]
+    checkpoint.parts = [{ type: 'tool-call', tool: 'todowrite-for-manager', callID: 'call-checkpoint', args: { program: 'class Js extends JsProgram { async run() { return {}; } }', view: { prefixUntil: 1 } } }]
     messages.push(structuredClone(checkpoint), { info: { id: 'msg-checkpoint-result', sessionID, role: 'tool', time: { created: 5 } }, parts: [{ type: 'tool-result', callID: 'call-checkpoint', output: 'Todos updated' }] })
     push(structuredClone(messages.at(-1)))
     push(running)
     await transform()
-    const entry = { charge: 'Record the completed read.', occurrence: 'The source was read.', settlement: 'The read is complete.', consequence: 'Later work retains the result.', tip: Enforcer.fieldNames()[0] }
+    const entry = { charge: 'Record the completed read.', occurrence: 'The source was read.', settlement: 'The read is complete.', consequence: 'Later work retains the result.', tipName: Enforcer.fieldNames()[0], opinion: 'The durable frame preserves the outcome for later context.', advice: 'Carry the recorded material into the next step.', }
     const recorded = await hooks.tool.chronicle.execute(entry, { sessionID: blogger, agent: 'blogger', messageID: 'msg-blog-run', callID: 'call-blog' })
     bloggerMessages = [
       { info: { ...bloggerPhysical, sessionID: blogger }, parts: bloggerPhysical.parts },
@@ -159,13 +164,26 @@ export const coveredSession = async (hooks, runtime, directory, sessionID, testC
     assert.equal(facts(directory, 'BlogObservationCommitted')[0].NextCoverableTurnCutoffExclusive, 4)
   })
   await check('native checkpoint tool completion opens the real phase window', async () => {
-    const input = { tool: 'todowrite', sessionID, callID: 'call-checkpoint' }
-    const output = { args: { todos: [] } }
-    await hooks['tool.execute.before'](input, output)
-    await hooks['tool.execute.after']({ ...input, args: output.args }, { title: 'todowrite', output: 'Todos updated', metadata: {} })
-    await hooks.event({ event: { type: 'message.part.updated', properties: { sessionID, part: { type: 'tool', tool: 'todowrite', callID: input.callID, state: { status: 'completed' } } } } })
-    assert.equal(Journal.JournalSurface_snapshot(runtime.journal).todoCheckpoints[0].checkpoints[0].callId, input.callID)
-    assert.deepEqual(checkpointEvidence(runtime, sessionID, input.callID), { checkpointTurn: 4, desiredCutoff: 4 })
+    const callID = 'call-checkpoint'
+    await hooks.event({
+      event: {
+        type: 'message.part.updated',
+        properties: {
+          sessionID,
+          part: {
+            type: 'tool',
+            tool: 'todowrite-for-manager',
+            callID,
+            state: {
+              status: 'completed',
+              input: { program: 'class Js extends JsProgram { async run() { return {}; } }', view: { prefixUntil: 1 } },
+            },
+          },
+        },
+      },
+    })
+    assert.equal(Journal.JournalSurface_snapshot(runtime.journal).viewCheckpoints[0].checkpoints[0].callId, callID)
+    assert.deepEqual(checkpointEvidence(runtime, sessionID, callID), { checkpointTurn: 4, desiredCutoff: 4 })
     assert.equal(facts(directory, 'BlogObservationCommitted')[0].NextCoverableTurnCutoffExclusive, 4)
     assert.deepEqual(await candidateEvidence(runtime, sessionID, 2), { ok: false, reason: 'NoCoverage' }, 'CTX-029: a frame crossing the desired boundary must not advance')
     assert.deepEqual(await candidateEvidence(runtime, sessionID, 4), { ok: true, cutoff: 4 })
@@ -179,7 +197,7 @@ export const commitPendingBlogger = async (hooks, runtime, directory, session) =
   assert.equal(request.PreviousIngestedThroughSequence, previous.NextIngestedThroughSequence)
   assert.equal(request.NextIngestedThroughSequence, '6')
   assert.deepEqual(Trace.semanticCursorAfter(Trace.cursor(6), Trace.snapshot(runtime.journal, session.sessionID)), { turn: 6, partIndex: 0 })
-  const entry = { charge: 'Record the completed checkpoint.', occurrence: 'The checkpoint completed.', settlement: 'The checkpoint is durable.', consequence: 'Later work retains the checkpoint.', tip: Enforcer.fieldNames()[0] }
+  const entry = { charge: 'Record the completed checkpoint.', occurrence: 'The checkpoint completed.', settlement: 'The checkpoint is durable.', consequence: 'Later work retains the checkpoint.', tipName: Enforcer.fieldNames()[0], opinion: 'The durable frame preserves the outcome for later context.', advice: 'Carry the recorded material into the next step.', }
   const recorded = await hooks.tool.chronicle.execute(entry, { sessionID: session.blogger, agent: 'blogger', messageID: session.bloggerNext.info.id, callID: 'call-blog-second' })
   session.bloggerNext.info.finish = 'tool-calls'
   session.bloggerNext.info.time.completed = 5

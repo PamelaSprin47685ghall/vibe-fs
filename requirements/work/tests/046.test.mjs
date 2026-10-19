@@ -57,8 +57,8 @@ test('WHAT[work-046] durable result keeps the caller requestId and only a commit
     }
     assert.equal(surface.mayStartDelivery(requested), true)
     assert.equal(surface.observeDurable('deliver-1', requested).requestId, 'deliver-1')
-    assert.equal(surface.journalPath('/repo/.git').endsWith('/wanxiangshu/work.sqlite'), true)
-    assert.equal(surface.journalPath('/repo/.git').includes('/events/'), false)
+    assert.equal(surface.journalPath('/repo/.Herdchestra').endsWith('/wanxiangshu/work.sqlite'), true)
+    assert.equal(surface.journalPath('/repo/.Herdchestra').includes('/events/'), false)
   } finally {
     journal.close()
   }

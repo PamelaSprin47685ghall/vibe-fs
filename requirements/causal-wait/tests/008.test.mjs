@@ -19,11 +19,10 @@ const mkWait = (waitKind, ownerKind, subject, producer) =>
   })
 const externalProducer = (kind, identity) => causal.externalProducer(kind, identity)
 const readDiagnostic = (workspace) =>
-  JSON.parse(fs.readFileSync(path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json'), 'utf8'))
+  JSON.parse(fs.readFileSync(path.join(workspace, '.Herdchestra', 'diagnostics', 'causal-waits.json'), 'utf8'))
 
 test('WHAT[causal-wait-008] diagnostic bridge writes a non-Journal snapshot file (current behavior pending storage boundary decision)', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-bridge-'))
-  fs.mkdirSync(path.join(workspace, '.git', 'info'), { recursive: true })
   const registry = causal.createRegistry()
   const wait = mkWait(
     'provider-assessment',
@@ -34,10 +33,10 @@ test('WHAT[causal-wait-008] diagnostic bridge writes a non-Journal snapshot file
   const lease = causal.enter(registry, wait)
   try {
     causal.writeSnapshot(workspace, registry)
-    const filePath = path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json')
+    const filePath = path.join(workspace, '.Herdchestra', 'diagnostics', 'causal-waits.json')
     assert.equal(fs.existsSync(filePath), true)
-    const exclude = fs.readFileSync(path.join(workspace, '.git', 'info', 'exclude'), 'utf8')
-    assert.ok(exclude.includes('.wanxiangshu/'), 'diagnostic dir must be git-excluded')
+    const gitignore = fs.readFileSync(path.join(workspace, '.Herdchestra', '.gitignore'), 'utf8')
+    assert.equal(gitignore.trim(), '*', 'runtime data must be git-excluded inside .Herdchestra/.gitignore per durable-events [018]')
     const snap = readDiagnostic(workspace)
     assert.equal(typeof snap.pid, 'number')
     assert.ok(String(snap.sequence).length > 0)

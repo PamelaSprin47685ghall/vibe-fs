@@ -23,7 +23,7 @@ const sandbox = () => {
 
 const terminalRead = (path) => [{
   info: { id: 'r1', role: 'assistant', providerID: 'anthropic' },
-  parts: [{ type: 'tool', tool: 'read', callID: 'source-read', state: { status: 'completed', input: { filePath: path }, output: 'source\n', time: { start: 0, end: 0 } } }],
+  parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'source-read', state: { status: 'completed', input: { program: `class Js extends JsProgram { async run() { return await this.cat(${JSON.stringify(path)}); } }` }, output: 'source\n', time: { start: 0, end: 0 } } }],
 }]
 
 test('WHAT[requirement-grounding-011] grounding appends knowledge without fabricating additional Host messages or changing their roles', async () => {
@@ -50,13 +50,15 @@ const writeProgram = "class Js extends JsProgram { async run() { await this.writ
 
 async function deliverKnowledge(hooks, directory, runtime, sessionID, providerID, established) {
   const path = join(directory, 'src', 'main.fs')
-  const tool = established ? 'js-manager' : 'read'
-  const args = established
-    ? { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
-    : { filePath: path }
+  const tool = established ? 'todowrite-for-manager' : 'todowrite-for-engineer'
+  const args = { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
   const callID = `read-${sessionID}`
   const input = { tool, sessionID, callID }
   const authorityBefore = structuredClone(observeAuthority(runtime, sessionID).activeLogicalRun)
+  if (!established) {
+    const requested = await host.requestPaths({ handle: runtime.journal }, directory, sessionID, [path])
+    assert.equal(requested.ok, true, requested.error)
+  }
   await hooks['tool.execute.before'](input, { args })
   const output = established
     ? await hooks.tool[tool].execute(args, { sessionID, agent: 'manager' })
@@ -94,13 +96,13 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       const writes = join(directory, 'src', 'unauthorized.fs')
       const promptsBefore = runtime.prompts.length
       const childrenBefore = createdIds.length
-      const denied = await hooks.tool['js-engineer'].execute({ program: writeProgram }, { sessionID, agent: 'engineer' })
+      const denied = await hooks.tool['todowrite-for-engineer'].execute({ program: writeProgram }, { sessionID, agent: 'engineer' })
       assert.equal(existsSync(writes), false, 'cross-role program cannot create the unauthorized write effect after knowledge delivery')
       assert.equal(String(denied).includes('UNAUTHORIZED-COMPLETED'), false)
-      const memberDenied = await hooks.tool['js-manager'].execute({ program: writeProgram }, { sessionID, agent: 'manager' })
+      const memberDenied = await hooks.tool['todowrite-for-manager'].execute({ program: writeProgram }, { sessionID, agent: 'manager' })
       assert.equal(existsSync(writes), false, 'the actual Manager programming API remains read-only')
       assert.equal(String(memberDenied).includes('UNAUTHORIZED-COMPLETED'), false)
-      const permitted = await hooks.tool['js-manager'].execute({ program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }, { sessionID, agent: 'manager' })
+      const permitted = await hooks.tool['todowrite-for-manager'].execute({ program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }, { sessionID, agent: 'manager' })
       assert.ok(String(permitted).includes('SOURCE-CONTROL'), 'the same current authority still executes its legitimate read')
       assert.equal(readFileSync(join(directory, 'src', 'main.fs'), 'utf8'), 'SOURCE-CONTROL\n')
       assert.equal(runtime.prompts.length, promptsBefore)
@@ -111,7 +113,7 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       await deliverKnowledge(hooks, directory, runtime, unbound, providerID, false)
       const unboundPromptsBefore = runtime.prompts.length
       const unboundChildrenBefore = createdIds.length
-      const unboundDenied = await hooks.tool['js-engineer'].execute({ program: writeProgram }, { sessionID: unbound, agent: 'engineer' })
+      const unboundDenied = await hooks.tool['todowrite-for-engineer'].execute({ program: writeProgram }, { sessionID: unbound, agent: 'engineer' })
       assert.equal(existsSync(writes), false, 'a knowledge-only session cannot mint execution authority')
       assert.equal(String(unboundDenied).includes('UNAUTHORIZED-COMPLETED'), false)
       assert.equal(observeAuthority(runtime, unbound).activeLogicalRun, null)

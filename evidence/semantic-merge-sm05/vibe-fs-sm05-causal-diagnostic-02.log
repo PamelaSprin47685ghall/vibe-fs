@@ -1,0 +1,5 @@
+{"base":"00000007-0000-0000-0000-000000000000","head":{"heads":[],"event":null}}
+wanxiangshu directory
+wanxiangshu/events directory
+wanxiangshu/events/base-writer-0000.ndjson {"event_id":"00000001-0000-0000-0000-000000000000","event_type":"JournalEnvelope","parents":[],"payload":{"EventId":["EventId","00000001-0000-0000-0000-000000000000"],"Fact":["Runtime",["RuntimeStarted",{"ProcessId":10103,"RuntimeId":["RuntimeId","causal-seed-runtime"],"StartedAt":"2026-10-17T00:00:00.000+00:00"}]],"LocalSeq":["LocalSeq","1"],"ObservedAt":"2026-10-17T00:00:00+00:00","RuntimeId":["RuntimeId","base-writer"],"Stream":"Workspace"},"payload_refs":[],"stream_id":"journal/workspace"}
+{

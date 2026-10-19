@@ -43,11 +43,6 @@ module CasebookSurface =
 
     let contentHash (text: string) : string = CasebookCapture.contentHash text
 
-    let capture (toolName: string) (args: obj) (output: string) : obj =
-        match CasebookCapture.capture toolName args output with
-        | None -> null
-        | Some observation -> observationToJs observation
-
     let ofExecCommand (command: string) : obj =
         match CasebookCapture.ofExecCommand command with
         | None -> null

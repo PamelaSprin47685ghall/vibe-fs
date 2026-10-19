@@ -1,0 +1,10 @@
+✔ WHAT[intra-participant-parallelism-010] load settlement closes orphaned open Fission groups with FissionFailed so a resumed owner turn completes and delivers to join instead of being swallowed as replaced (1643.209708ms)
+✔ WHAT[intra-participant-parallelism-010] actual durable Fission facts reconstruct group membership and replacement after restart, recording interruption without automatically restarting lanes or guessing similar Host sessions (GAP-158) (0.207084ms) # TODO
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 1
+ℹ duration_ms 5876.034125

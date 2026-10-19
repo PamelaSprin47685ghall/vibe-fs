@@ -17,56 +17,57 @@ test('WHAT[process-execution-010] the supervised PTY preserves a real terminal, 
   }))
 
 {
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
+// Host-native `run` tool is retired; `js.run` supersedes it (repository-programming [050]-[052]).
+const { default: assert } = await import('node:assert/strict')
+const { default: test } = await import('node:test')
+const { sandbox, runProgram, caseName, parseData } = await import('./support/executor.mjs')
 
-const {
-  describeRun,
-  run: executeRun,
-  runToolName,
-} = await import('../../../dist/OpenCode/Tools/ExecutorToolSurface.js')
-const { contextDecode, contextView } = await import('../../../dist/OpenCode/Codec/ToolHostSurface.js')
-const chain = (kind, extra = {}) => ({
-  kind,
-  ...extra,
-  describe: () => chain(`${kind}-described`, extra),
-  optional: () => chain(`${kind}-optional`, extra),
+test('WHAT[process-execution-010] js.run completed command reports exit code and streams via onExit and outcome', async () => {
+  const { dir, cleanup } = sandbox('wxs-proc-010a-')
+  try {
+    const outcome = await runProgram(
+      dir,
+      `    let exitedWith = null;
+    const result = await js.run(class extends js.Runnable {
+      maxDuration = 5000;
+      interval = 50;
+      next(ctx) { return ctx.step === 0 ? "printf 'hello-stdout'; printf 'hello-stderr' >&2" : null; }
+      watch(ctx) { return ctx.remainingMs > 0; }
+      sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      onExit(r) { exitedWith = { exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr }; }
+    });
+    return { exitCode: result.exitCode, onExitStdout: exitedWith.stdout, onExitStderr: exitedWith.stderr };`,
+    )
+    assert.equal(caseName(outcome), 'Succeeded')
+    const parsed = parseData(outcome)
+    assert.equal(parsed.exitCode, 0)
+    assert.equal(parsed.onExitStdout, 'hello-stdout')
+    assert.equal(parsed.onExitStderr, 'hello-stderr')
+  } finally {
+    cleanup()
+  }
 })
-const fakeSchema = {
-  string: () => chain('string'),
-  number: () => chain('number'),
-  enum: (values) => chain('enum', { values }),
-  boolean: () => chain('boolean'),
-}
-const toolModule = { tool: { schema: fakeSchema } }
-const context = (sessionID = 'ses-exec') => ({ sessionID })
-const run = (args, ctx = context(), recovery = '') =>
-  executeRun(toolModule, {}, args, ctx, recovery)
-const parseToml = (text) =>
-  Object.fromEntries(
-    text
-      .split('\n')
-      .filter((line) => /^[a-z_0-9]+ = /.test(line))
-      .map((line) => {
-        const [name, ...rest] = line.split(' = ')
-        const raw = rest.join(' = ')
-        return [name, raw.startsWith('"') ? JSON.parse(raw) : raw]
-      }),
-  )
-const SPOOL_COMMAND = "printf 'abcdefghijklmnopqrstuvwxyz0123456789'"
-const SPOOL_BUDGET = { command: SPOOL_COMMAND, output_budget_bytes: 4 }
 
-test('WHAT[process-execution-010] RUN_completed_command_reports_exit_code_and_streams', async () => {
-  const result = parseToml(
-    await run({ command: "printf 'hello-stdout'; printf 'hello-stderr' >&2" }),
-  )
-  assert.equal(result.exit_code, '0')
-  assert.equal(result.stdout, 'hello-stdout')
-  assert.equal(result.stderr, 'hello-stderr')
-})
-test('WHAT[process-execution-010] RUN_nonzero_exit_is_reported_not_thrown', async () => {
-  const result = parseToml(await run({ command: 'exit 3' }))
-  assert.equal(result.exit_code, '3')
+test('WHAT[process-execution-010] js.run nonzero exit is reported as data rather than thrown', async () => {
+  const { dir, cleanup } = sandbox('wxs-proc-010b-')
+  try {
+    const outcome = await runProgram(
+      dir,
+      `    return await js.run(class extends js.Runnable {
+      maxDuration = 5000;
+      interval = 50;
+      next(ctx) { return ctx.step === 0 ? "exit 3" : null; }
+      watch(ctx) { return ctx.remainingMs > 0; }
+      sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+    });`,
+    )
+    assert.equal(caseName(outcome), 'Succeeded')
+    const parsed = parseData(outcome)
+    assert.equal(parsed.status, 'completed')
+    assert.equal(parsed.exitCode, 3)
+  } finally {
+    cleanup()
+  }
 })
 }
 

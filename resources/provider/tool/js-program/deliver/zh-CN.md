@@ -1,0 +1,3 @@
+deliver(value) — 用显式终值立刻结束本程序。调用之后程序不再继续：交付会展开调用栈，把 `value` 记入本会话的交付格，并作为本次调用的结果。subagent 程序必须显式 deliver；普通 `return` 不会写入交付格，子工作会以 `undelivered` 结算（在 `dag` 中触发 `node-undelivered` park）。
+
+该值就是程序自己的数据。捕获内部交付哨兵会让程序继续存活——之后的 return 值才是结果——所以捕获者是在知情地取消这次交付。

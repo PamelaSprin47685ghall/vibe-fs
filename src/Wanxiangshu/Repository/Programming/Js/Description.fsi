@@ -50,10 +50,8 @@ module JsCanonicalDescription =
         val ReadRules: string = "tool/js-program/rules-read"
 
         [<Literal>]
-        val GlobRules: string = "tool/js-program/rules-glob"
+        val Recipes: string = "tool/js-program/recipes"
 
-        [<Literal>]
-        val GrepRules: string = "tool/js-program/rules-grep"
 
         [<Literal>]
         val EditRules: string = "tool/js-program/rules-edit"
@@ -63,6 +61,24 @@ module JsCanonicalDescription =
 
         [<Literal>]
         val MutationRules: string = "tool/js-program/rules-mutation"
+
+        [<Literal>]
+        val Rm: string = "tool/js-program/rm"
+
+        [<Literal>]
+        val Mv: string = "tool/js-program/mv"
+
+        [<Literal>]
+        val RunRules: string = "tool/js-program/run-rules"
+
+        [<Literal>]
+        val ViewDeclarationExtra: string = "tool/js-program/view-declaration-extra"
+
+        [<Literal>]
+        val Deliver: string = "tool/js-program/deliver"
+
+        [<Literal>]
+        val DelegationRules: string = "tool/js-program/delegation-rules"
 
         [<Literal>]
         val UltraFraming: string = "tool/js-program/ultra-framing"
@@ -178,6 +194,12 @@ module JsCanonicalDescription =
         [<Literal>]
         val HookNotVisible: string = "tool/js-program/hook-not-visible"
 
+        [<Literal>]
+        val Park: string = "tool/js-program/park"
+
+        [<Literal>]
+        val ParkedPayload: string = "tool/js-program/parked-payload"
+
     type Prose =
         { Header: string
           EditPrelude: string
@@ -193,11 +215,15 @@ module JsCanonicalDescription =
           VerbRewrite: string
           VerbCreate: string
           ReadRules: string
-          GlobRules: string
-          GrepRules: string
+          Recipes: string
           EditRules: string
           WriteRules: string
           MutationRules: string
+          Rm: string
+          Mv: string
+          RunRules: string
+          Deliver: string
+          DelegationRules: string
           UltraFraming: string
           UltraUnavailable: string
           UltraEngineering: string
@@ -232,9 +258,11 @@ module JsCanonicalDescription =
           ReasonEditUnknownFields: string
           ReasonEditCandidate: string
           ReasonEditLine: string
-          ReasonEditOverlaps: string }
+          ReasonEditOverlaps: string
+          Park: string
+          ParkedPayload: string }
 
-    val fileAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
+
     val planFileAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
     val planEditAlgorithm: prose: Prose -> readSourceLine: string -> raiseFailure: string -> string
     val planRewriteAlgorithm: prose: Prose -> raiseFailure: string -> string

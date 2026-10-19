@@ -18,16 +18,22 @@ module JsToolHostSurface =
     [<Emit("$0.execute($1, $2)")>]
     let private invokeRegistered (registered: obj) (args: obj) (context: obj) : Task<obj> = jsNative
 
-    let builtinTools () : string array =
-        BuiltinToolDescriptionHook.BuiltinFilesystemTools |> Set.toArray
+    [<Emit("$0===undefined||$0===null")>]
+    let private isNullish (value: obj) : bool = jsNative
 
-    let annotate (builtinName: string) (description: string) (jsRoleToolName: string) : string =
-        BuiltinToolDescriptionHook.annotate builtinName description jsRoleToolName
+    [<Emit("Object.entries($0).map(function (entry) { return [String(entry[0]), String(entry[1])] })")>]
+    let private sessionDirectoryEntries (value: obj) : (string * string) array = jsNative
 
-    let validateRecommendation (jsRoleToolName: string) (visibleToolNames: string array) : obj =
-        match BuiltinToolDescriptionHook.validateRecommendation jsRoleToolName (Set.ofArray visibleToolNames) with
-        | Ok() -> box {| ok = true |}
-        | Error message -> box {| ok = false; error = message |}
+    /// The per-session directories this registration resolves against, mirroring
+    /// the plugin's live map (session id → the directory its owner registered).
+    let private sessionDirectoryMap (value: obj) : System.Collections.Generic.Dictionary<string, string> =
+        let map = System.Collections.Generic.Dictionary<string, string>()
+
+        if not (isNullish value) then
+            for key, directory in sessionDirectoryEntries value do
+                map.[key] <- directory
+
+        map
 
     let createRegistered
         (toolModule: obj)
@@ -35,6 +41,7 @@ module JsToolHostSurface =
         (language: string)
         (workspaceRoot: string)
         (store: obj)
+        (sessionDirectories: obj)
         : obj =
         match JsGeneratorSurface.typedRole role language with
         | None -> null
@@ -45,8 +52,31 @@ module JsToolHostSurface =
                 else
                     Some(JsTransactionSurface.persistenceOf store)
 
+            let lifecyclePersistence =
+                if isNull store then
+                    None
+                else
+                    Some(JsTransactionSurface.lifecyclePersistenceOf store)
+
             let factory = ToolHostCodec.factory toolModule
-            let spec = JsToolSpec.create factory surface workspaceRoot persistence None
+
+            let spec =
+                let rootOf =
+                    if isNullish sessionDirectories then
+                        fun _ -> workspaceRoot
+                    else
+                        let map = sessionDirectoryMap sessionDirectories
+                        JsToolSpec.rootForSession map workspaceRoot
+
+                let processHost (ctx: HostToolContext) : JsToolWorkflow.ProcessHost =
+                    { HardLimit = Wanxiangshu.Process.JsRunLoop.standalone.HardLimit
+                      Own = Wanxiangshu.Process.JsRunLoop.standalone.Own
+                      ReadOutput = Wanxiangshu.Process.JsRunLoop.standalone.ReadOutput
+                      AttachLifetimeAbort = fun _ _ -> ignore
+                      AttachAbort = ctx.AttachAbort }
+
+                JsToolSpec.create factory surface workspaceRoot persistence lifecyclePersistence None processHost rootOf
+
             let registered = ToolHostCodec.register factory spec
             box (JsRegisteredToolHandle(spec, registered))
 
@@ -60,6 +90,12 @@ module JsToolHostSurface =
         (unbox<JsRegisteredToolHandle> handle).Spec.Arguments
         |> List.map fst
         |> List.toArray
+
+    let argumentSchema (handle: obj) (name: string) : obj =
+        (unbox<JsRegisteredToolHandle> handle).Spec.Arguments
+        |> List.tryFind (fun (argumentName, _) -> argumentName = name)
+        |> Option.map (fun (_, schema) -> ToolHostCodec.schemaValue schema)
+        |> Option.defaultValue null
 
     let execute (handle: obj) (args: obj) (context: obj) : Task<obj> =
         invokeRegistered (unbox<JsRegisteredToolHandle> handle).Registered args context

@@ -2,8 +2,8 @@ namespace Wanxiangshu.Persistence.Journal
 
 open System.Threading.Tasks
 
-/// Retired obligation-ledger read boundary, plus relay-shaped entry points that
-/// no longer append lifecycle facts.
+/// Retired obligation-ledger read boundary: its entry points refuse and write
+/// nothing (no lifecycle facts are appended here).
 ///
 /// obligation-ledger-007: the magic-todo append is gone. This surface has an
 /// AgentJournal handle, not an event store, an observed head, or a work id, so
@@ -21,7 +21,7 @@ module ObligationJournalSurface =
         box
             {| ok = false
                error =
-                "appendMagicTodo is retired (obligation-ledger-007); Host-native todowrite owns the list and successful calls append TodoCheckpointCommitted only for context compression" |}
+                "appendMagicTodo is retired (obligation-ledger-007); programming-surface view declarations own context compression and successful calls append ViewCheckpointCommitted only for context compression" |}
 
     /// Retired alongside the projection it would have returned.
     let snapshotMagicTodo (handle: JournalHandle) : obj =

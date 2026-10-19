@@ -12,6 +12,7 @@ open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Context.Trace
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Mission.Lifecycle
 open Wanxiangshu.Mission.Planning
 open Wanxiangshu.Mission.WorkRecord
@@ -20,7 +21,7 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 type RelayProjectionDisposition =
     | Unchanged
-    | CurrentIteration
+    | CurrentTenure
     | RetiredAttemptStopped
 
 module RelayNarrativeTransform =
@@ -59,7 +60,7 @@ module RelayNarrativeTransform =
     /// a previous tenure and not permission to continue.
     let private dispositionAfterProjection (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option) =
         match work with
-        | Some current when current.ActiveId.IsSome -> RelayProjectionDisposition.CurrentIteration
+        | Some current when current.ActiveId.IsSome -> RelayProjectionDisposition.CurrentTenure
         | _ -> RelayProjectionDisposition.Unchanged
 
     let private requestBelongsToSuccessor (physical: string option) afterCut freshRoot acceptedRequest gatePhysical =
@@ -133,10 +134,65 @@ module RelayNarrativeTransform =
                         authority)
                 |> Option.map PhysicalUserMessageId.value
 
-            requestBelongsToSuccessor physical physicalAfterCut freshRoot acceptedRequest gatePhysical
+            let successorIdentity =
+                requestBelongsToSuccessor physical physicalAfterCut freshRoot acceptedRequest gatePhysical
+
+            // A request whose own last user message carries a durable
+            // ChatExecution acceptance under the session's CURRENT logical run is
+            // a legitimate current-tenure request — but only when the retired
+            // attempt's cut tool call is no longer present in the wire (the
+            // tenure projection strips the predecessor's interactions). If the
+            // wire still carries the cut, the message set demonstrably belongs
+            // to the retired attempt, and its acceptance evidence is that
+            // attempt's own — never a successor's.
+            let cutPresent =
+                work.ProjectionCut
+                |> Option.map (fun cut -> (cutToolIndex cut.ToolCallId messages).IsSome)
+                |> Option.defaultValue false
+
+            let acceptedRunIdentity =
+                (not cutPresent)
+                && (match physical with
+                    | Some physicalId ->
+                        let key =
+                            { ChatExecutionKey.SessionId = sessionId
+                              PhysicalUserMessageId = PhysicalUserMessageId.create physicalId }
+
+                        let accepted =
+                            ChatExecutionProjection.byKey
+                                key
+                                (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
+
+                        let activeRoot =
+                            sessionProjection
+                            |> Option.bind (fun session -> session.PromptAuthority)
+                            |> Option.bind (fun authority -> authority.ActiveLogicalRun)
+                            |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
+
+                        match accepted, activeRoot with
+                        | Some execution, Some active -> execution.acceptedEvidence.AuthorityRootUserMessageId = active
+                        | _ -> false
+                    | None -> false)
+
+            successorIdentity || acceptedRunIdentity
 
         relayedCut
         |> Option.filter (fun retirement -> not (requestIsSuccessor retirement))
+
+    let isStaleRetiredAttempt
+        (journal: AgentJournal option)
+        (acceptedRequest: bool)
+        (sessionId: string option)
+        (lifecycle: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option)
+        (outObj: obj)
+        : bool =
+        match journal, sessionId, lifecycle with
+        | Some durable, Some value, Some work when not (String.IsNullOrWhiteSpace value) ->
+            let messages = ProviderWireDecode.messagesFromTransformOutput outObj
+
+            staleRetirement durable (SessionId.create value) work acceptedRequest messages
+            |> Option.isSome
+        | _ -> false
 
     let private firstCursors (journal: AgentJournal) (sessionId: SessionId) =
         AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
@@ -152,6 +208,19 @@ module RelayNarrativeTransform =
             ->
             true
         | _ -> false
+
+    /// Algorithm G1's identity rule, the same one the Plan tenure assembly applies:
+    /// an interaction whose Host id has not been captured yet stays (its cursor is
+    /// unknown, not absent), while a semantic interaction with no Host id at all
+    /// would have to be guessed into a predecessor's row, so the assembly refuses.
+    let private interactionHasNoStableIdentity (message: obj) =
+        messageRole message
+        |> Option.exists (fun role ->
+            let role = role.ToLowerInvariant()
+
+            (role = "assistant" || role = "tool")
+            && (messageId message).IsNone
+            && not (List.isEmpty (ProviderWireDecode.rawPartsOf message)))
 
     /// Successor visibility. Opening sequence comes from the active lifecycle
     /// tenure. The other side is the first observation of a captured Host
@@ -173,6 +242,9 @@ module RelayNarrativeTransform =
                 | Some current when current.ActiveId.IsSome ->
                     (firstCursors journal sessionId, current.OpeningCursor |> Option.map (fun cursor -> int64 cursor))
                 | _ -> Map.empty, None
+
+            if openingCursor.IsSome && messages |> List.exists interactionHasNoStableIdentity then
+                invalidOp "Manager interaction has no stable XTrace message identity"
 
             let kept =
                 messages

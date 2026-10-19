@@ -50,20 +50,11 @@ type ContextFactCases =
            TextDigest: BlobDigest
            ProviderRun: ProviderRunIdentity
            ToolCallIds: ToolCallId list
-           TipRuleId: string
-           FieldNameAtCommit: string option
+           TipName: string
+           TipTextRef: BlobRef option
+           TipTextDigest: BlobDigest option
            EvidenceRef: BlobRef option
            ObservedPrefixEpochId: PrefixEpochId |}
-    | BlogObservationsSquashed of
-        {| SessionId: SessionId
-           BloggerSessionId: SessionId
-           RequestId: BloggerRequestId
-           PreviousFrameEpochId: FrameEpochId
-           NextFrameEpochId: FrameEpochId
-           CoveredFrameCount: int
-           TextRef: BlobRef
-           TextDigest: BlobDigest
-           ProviderRun: ProviderRunIdentity |}
     | BloggerRequestMaterialized of
         {| RequestId: BloggerRequestId
            MainSessionId: SessionId
@@ -82,7 +73,7 @@ type ContextFactCases =
            MainSessionId: SessionId
            BloggerSessionId: SessionId
            Reason: string |}
-    | TodoCheckpointCommitted of
+    | ViewCheckpointCommitted of
         {| SessionId: SessionId
            ToolCallId: ToolCallId |}
     | PrefixRebaseCommitted of

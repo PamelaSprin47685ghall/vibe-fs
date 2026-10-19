@@ -33,7 +33,7 @@ const ok = (result) => {
   return result.value
 }
 const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main' } = {}) => [
-  ['symbolic-ref --short HEAD', [0, `${branch}\n`, '']],
+  ['symbolic-ref --quiet --short HEAD', [0, `${branch}\n`, '']],
   ['rev-parse HEAD', [0, `${candidate}\n`, '']],
   ['rev-parse refs/heads/main', [0, `${targetHead}\n`, '']],
   ['merge-base --is-ancestor', [0, '', '']],

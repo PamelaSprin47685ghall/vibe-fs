@@ -1,0 +1,411 @@
+✔ WHAT[repository-programming-050] a Runnable missing watch is refused with RUNNABLE_SPEC_INCOMPLETE (26.204959ms)
+✔ WHAT[repository-programming-050] a Runnable missing sanity is refused with RUNNABLE_SPEC_INCOMPLETE (10.691583ms)
+✖ WHAT[repository-programming-050] the host loop runs one foreground command and reports the structured outcome (10.175958ms)
+✖ WHAT[repository-programming-050] onExit dispatches every exited command with its exit code (6.903208ms)
+✖ WHAT[repository-programming-050] a watch abort kills the foreground command and reports aborted (12.058666ms)
+✖ WHAT[repository-programming-050] watch returning false is a real veto, not a synonym for continue (6.751ms)
+✖ WHAT[repository-programming-050] a watch park suspends the run and resumes after unpark (6.477209ms)
+✔ WHAT[repository-programming-050] a sanity thunk that fails to show its exit parks with the diagnosis (10.777291ms)
+✔ WHAT[repository-programming-050] a sanity that returns non-thunks is refused with RUNNABLE_SPEC_INCOMPLETE (6.124625ms)
+✖ WHAT[repository-programming-050] maxDuration expiry kills the command and reports timeout (6.828417ms)
+✖ WHAT[repository-programming-051] spawn, waitFor and signal drive one background server (30.054416ms)
+✖ WHAT[repository-programming-051] waitFor on a closed port fails with RUN_WAIT_TIMEOUT (9.23325ms)
+✖ WHAT[repository-programming-051] signal on an unknown name fails with RUN_CHILD_UNKNOWN (8.275958ms)
+✖ WHAT[repository-programming-051] a crashed background is visible to watch and can abort the run (11.522375ms)
+✖ WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run (20.733542ms)
+✖ WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed (9.802417ms)
+✖ WHAT[repository-programming-058] js.run drives an interactive child through send and observes the deltas (15.970416ms)
+✖ WHAT[repository-programming-058] send to an unknown child fails with RUN_CHILD_UNKNOWN (6.699916ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 4
+ℹ fail 14
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 447.161542
+
+✖ failing tests:
+
+test at requirements/repository-programming/tests/050.test.mjs:63:1
+✖ WHAT[repository-programming-050] the host loop runs one foreground command and reports the structured outcome (10.175958ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /# ok/. Input:
+  
+  '# parked\n' +
+    '\n' +
+    'handle = "park-1"\n' +
+    "source = '''\n" +
+    ' | class Js extends JsProgram {\n' +
+    ' |   async run() {\n' +
+    '>|     return await js.run(class extends js.Runnable {\n' +
+    ' |       maxDuration = 5000;\n' +
+    ' |       interval = 100;\n' +
+    ' |       next(ctx) { return ctx.step === 0 ? "echo hello" : null; }\n' +
+    ' |       watch(ctx) {\n' +
+    ' |         this.lastExit = ctx.exitCode;\n' +
+    ' |         if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };\n' +
+    ' |         return true;\n' +
+    ' |       }\n' +
+    ' |       sanity() {\n' +
+    ' |         return {\n' +
+    ' |           nextDone: () => this.next({ root: "/", step: 1 }),\n' +
+    ' |           watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),\n' +
+    ' |         };\n' +
+    ' |       }\n' +
+    ' |     });\n' +
+    ' |   }\n' +
+    ' | }\n' +
+    "'''\n" +
+    '[sanity]\n' +
+    'failure = "Cannot convert undefined or null to object"\n'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/050.test.mjs:85:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `# parked\n\nhandle = "park-1"\nsource = '''\n | class Js extends JsProgram {\n |   async run() {\n>|     return await js.run(class extends js.Runnable {\n |       maxDuration = 5000;\n |       interval = 100;\n |       next(ctx) { return ctx.step === 0 ? "echo hello" : null; }\n |       watch(ctx) {\n |         this.lastExit = ctx.exitCode;\n |         if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };\n |         return true;\n |       }\n |       sanity() {\n |         return {\n |           nextDone: () => this.next({ root: "/", step: 1 }),\n |           watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),\n |         };\n |       }\n |     });\n |   }\n | }\n'''\n[sanity]\nfailure = "Cannot convert undefined or null to object"\n`,
+    expected: /# ok/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/050.test.mjs:94:1
+✖ WHAT[repository-programming-050] onExit dispatches every exited command with its exit code (6.903208ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /# ok/. Input:
+  
+  '# parked\n' +
+    '\n' +
+    'handle = "park-2"\n' +
+    "source = '''\n" +
+    ' | class Js extends JsProgram {\n' +
+    ' |   async run() {\n' +
+    ' |     const dispatched = [];\n' +
+    '>|     const outcome = await js.run(class extends js.Runnable {\n' +
+    ' |       maxDuration = 5000;\n' +
+    ' |       interval = 100;\n' +
+    ' |       next(ctx) { return ctx.step === 0 ? "exit 4" : null; }\n' +
+    ' |       watch(ctx) {\n' +
+    ' |         if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };\n' +
+    ' |         return true;\n' +
+    ' |       }\n' +
+    ' |       onExit(result) { dispatched.push(result.exitCode); }\n' +
+    ' |       sanity() {\n' +
+    ' |         return {\n' +
+    ' |           nextDone: () => this.next({ root: "/", step: 1 }),\n' +
+    ' |           watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),\n' +
+    ' |         };\n' +
+    ' |       }\n' +
+    ' |     });\n' +
+    ' |     return { outcome, dispatched };\n' +
+    ' |   }\n' +
+    ' | }\n' +
+    "'''\n" +
+    '[sanity]\n' +
+    'failure = "Cannot convert undefined or null to object"\n'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/050.test.mjs:118:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `# parked\n\nhandle = "park-2"\nsource = '''\n | class Js extends JsProgram {\n |   async run() {\n |     const dispatched = [];\n>|     const outcome = await js.run(class extends js.Runnable {\n |       maxDuration = 5000;\n |       interval = 100;\n |       next(ctx) { return ctx.step === 0 ? "exit 4" : null; }\n |       watch(ctx) {\n |         if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };\n |         return true;\n |       }\n |       onExit(result) { dispatched.push(result.exitCode); }\n |       sanity() {\n |         return {\n |           nextDone: () => this.next({ root: "/", step: 1 }),\n |           watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),\n |         };\n |       }\n |     });\n |     return { outcome, dispatched };\n |   }\n | }\n'''\n[sanity]\nfailure = "Cannot convert undefined or null to object"\n`,
+    expected: /# ok/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/050.test.mjs:125:1
+✖ WHAT[repository-programming-050] a watch abort kills the foreground command and reports aborted (12.058666ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /status = "aborted"/. Input:
+  
+  '# parked\n' +
+    '\n' +
+    'handle = "park-3"\n' +
+    "source = '''\n" +
+    ' | class Js extends JsProgram {\n' +
+    ' |   async run() {\n' +
+    '>|     const outcome = await js.run(class extends js.Runnable {\n' +
+    ' |       maxDuration = 8000;\n' +
+    ' |       interval = 200;\n' +
+    ' |       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late.marker" : null; }\n' +
+    ' |       watch() { return { abort: "stalled" }; }\n' +
+    ' |       sanity() {\n' +
+    ' |         return {\n' +
+    ' |           nextDone: () => this.next({ root: "/", step: 1 }),\n' +
+    ' |           watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),\n' +
+    ' |         };\n' +
+    ' |       }\n' +
+    ' |     });\n' +
+    ' |     return outcome;\n' +
+    ' |   }\n' +
+    ' | }\n' +
+    "'''\n" +
+    '[sanity]\n' +
+    'failure = "Cannot convert undefined or null to object"\n'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/050.test.mjs:144:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `# parked\n\nhandle = "park-3"\nsource = '''\n | class Js extends JsProgram {\n |   async run() {\n>|     const outcome = await js.run(class extends js.Runnable {\n |       maxDuration = 8000;\n |       interval = 200;\n |       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late.marker" : null; }\n |       watch() { return { abort: "stalled" }; }\n |       sanity() {\n |         return {\n |           nextDone: () => this.next({ root: "/", step: 1 }),\n |           watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),\n |         };\n |       }\n |     });\n |     return outcome;\n |   }\n | }\n'''\n[sanity]\nfailure = "Cannot convert undefined or null to object"\n`,
+    expected: /status = "aborted"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/050.test.mjs:151:1
+✖ WHAT[repository-programming-050] watch returning false is a real veto, not a synonym for continue (6.751ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /status = "aborted"/. Input:
+  
+  '# parked\n' +
+    '\n' +
+    'handle = "park-4"\n' +
+    "source = '''\n" +
+    ' | class Js extends JsProgram {\n' +
+    ' |   async run() {\n' +
+    '>|     const outcome = await js.run(class extends js.Runnable {\n' +
+    ' |       maxDuration = 8000;\n' +
+    ' |       interval = 100;\n' +
+    ' |       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch veto.marker" : null; }\n' +
+    ' |       watch() { return false; }\n' +
+    ' |       sanity() {\n' +
+    ' |         return { nextDone: () => this.next({ root: "/", step: 1 }), watchVeto: () => this.watch({}) };\n' +
+    ' |       }\n' +
+    ' |     });\n' +
+    ' |     return outcome;\n' +
+    ' |   }\n' +
+    ' | }\n' +
+    "'''\n" +
+    '[sanity]\n' +
+    'failure = "Cannot convert undefined or null to object"\n'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/050.test.mjs:167:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `# parked\n\nhandle = "park-4"\nsource = '''\n | class Js extends JsProgram {\n |   async run() {\n>|     const outcome = await js.run(class extends js.Runnable {\n |       maxDuration = 8000;\n |       interval = 100;\n |       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch veto.marker" : null; }\n |       watch() { return false; }\n |       sanity() {\n |         return { nextDone: () => this.next({ root: "/", step: 1 }), watchVeto: () => this.watch({}) };\n |       }\n |     });\n |     return outcome;\n |   }\n | }\n'''\n[sanity]\nfailure = "Cannot convert undefined or null to object"\n`,
+    expected: /status = "aborted"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/050.test.mjs:174:1
+✖ WHAT[repository-programming-050] a watch park suspends the run and resumes after unpark (6.477209ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   sanity: {
+  +     failure: 'Cannot convert undefined or null to object',
+  +     returned: null
+  +   }
+  -   reason: 'review'
+    }
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/050.test.mjs:201:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { sanity: { failure: 'Cannot convert undefined or null to object', returned: null } },
+    expected: { reason: 'review' },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/050.test.mjs:285:1
+✖ WHAT[repository-programming-050] maxDuration expiry kills the command and reports timeout (6.828417ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /status = "timeout"/. Input:
+  
+  '# parked\n' +
+    '\n' +
+    'handle = "park-7"\n' +
+    "source = '''\n" +
+    ' | class Js extends JsProgram {\n' +
+    ' |   async run() {\n' +
+    '>|     return await js.run(class extends js.Runnable {\n' +
+    ' |       maxDuration = 400;\n' +
+    ' |       interval = 100;\n' +
+    ' |       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch too-late.marker" : null; }\n' +
+    ' |       watch(ctx) {\n' +
+    ' |         if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };\n' +
+    ' |         return true;\n' +
+    ' |       }\n' +
+    ' |       sanity() {\n' +
+    ' |         return {\n' +
+    ' |           nextDone: () => this.next({ root: "/", step: 1 }),\n' +
+    ' |           watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),\n' +
+    ' |         };\n' +
+    ' |       }\n' +
+    ' |     });\n' +
+    ' |   }\n' +
+    ' | }\n' +
+    "'''\n" +
+    '[sanity]\n' +
+    'failure = "Cannot convert undefined or null to object"\n'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/050.test.mjs:307:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `# parked\n\nhandle = "park-7"\nsource = '''\n | class Js extends JsProgram {\n |   async run() {\n>|     return await js.run(class extends js.Runnable {\n |       maxDuration = 400;\n |       interval = 100;\n |       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch too-late.marker" : null; }\n |       watch(ctx) {\n |         if (ctx.exited && ctx.exitCode !== 0) return { abort: "command failed" };\n |         return true;\n |       }\n |       sanity() {\n |         return {\n |           nextDone: () => this.next({ root: "/", step: 1 }),\n |           watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),\n |         };\n |       }\n |     });\n |   }\n | }\n'''\n[sanity]\nfailure = "Cannot convert undefined or null to object"\n`,
+    expected: /status = "timeout"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/051.test.mjs:39:1
+✖ WHAT[repository-programming-051] spawn, waitFor and signal drive one background server (30.054416ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/051.test.mjs:67:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/051.test.mjs:76:1
+✖ WHAT[repository-programming-051] waitFor on a closed port fails with RUN_WAIT_TIMEOUT (9.23325ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'Parked' !== 'Failed'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/051.test.mjs:93:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/051.test.mjs:100:1
+✖ WHAT[repository-programming-051] signal on an unknown name fails with RUN_CHILD_UNKNOWN (8.275958ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'Parked' !== 'Failed'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/051.test.mjs:116:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/051.test.mjs:123:1
+✖ WHAT[repository-programming-051] a crashed background is visible to watch and can abort the run (11.522375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/051.test.mjs:149:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/052.test.mjs:69:1
+✖ WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run (20.733542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/052.test.mjs:105:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/052.test.mjs:184:1
+✖ WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed (9.802417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/052.test.mjs:219:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/058.test.mjs:29:1
+✖ WHAT[repository-programming-058] js.run drives an interactive child through send and observes the deltas (15.970416ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/058.test.mjs:57:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/058.test.mjs:66:1
+✖ WHAT[repository-programming-058] send to an unknown child fails with RUN_CHILD_UNKNOWN (6.699916ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  'Parked' !== 'Failed'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/058.test.mjs:82:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Failed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

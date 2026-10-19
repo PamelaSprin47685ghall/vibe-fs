@@ -26,6 +26,9 @@ module StrengthDelegate =
     /// Phase one: freeze one authorization from the owner's completed source
     /// batch and persist DelegationRequested. The predictor configuration is a
     /// caller-provided existence input, independent of capacity and health.
+    /// `hostPhysicalUserMessageId` is the identity the Host stamped on this
+    /// request; it is authoritative over any re-read of the outgoing wire, which
+    /// projection owners may have addressed with their own rows.
     val tryCapture:
         snapshotPort: ISessionSnapshotPort option ->
         journal: AgentJournal option ->
@@ -35,6 +38,7 @@ module StrengthDelegate =
         syncDelegateRuntime: SyncDelegateRuntime option ->
         predictorConfigured: bool ->
         projectionSessionIdOpt: string option ->
+        hostPhysicalUserMessageId: PhysicalUserMessageId option ->
         timerPort: Wanxiangshu.Foundation.ITimerPort option ->
         output: obj ->
             Task<CaptureOutcome>
@@ -50,6 +54,7 @@ module StrengthDelegate =
         syncDelegateRuntime: SyncDelegateRuntime option ->
         predictorConfigured: bool ->
         projectionSessionIdOpt: string option ->
+        hostPhysicalUserMessageId: PhysicalUserMessageId option ->
         timerPort: Wanxiangshu.Foundation.ITimerPort option ->
         output: obj ->
             Task<unit>

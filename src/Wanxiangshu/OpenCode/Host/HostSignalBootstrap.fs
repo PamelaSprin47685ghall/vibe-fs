@@ -15,10 +15,8 @@ open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Git.Hook
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Participant.Provider
@@ -120,7 +118,15 @@ module HostSignalBootstrap =
 
             journal
             |> Option.iter (fun durable ->
-                let recovery = SessionRecoveryHost(durable, snapshot, scope.Recovery, None)
+                let recovery =
+                    SessionRecoveryHost(
+                        durable,
+                        snapshot,
+                        scope.Recovery,
+                        None,
+                        Some(fun sessionId outcome -> eventPort.NotifyTerminal sessionId outcome |> ignore)
+                    )
+
                 scope.AttachChatRecoveryRuntime recovery
 
                 scope.AttachDurabilityActivation(fun () ->
@@ -543,19 +549,63 @@ module HostSignalBootstrap =
                 |> Option.map (fun durable ->
                     let runtime = PromptDispatcher.forPrompts (PromptJournalAdapter.create durable)
 
-                    ChatAdmissionTransaction.production durable (fun managed ->
-                        runtime.AcceptManagedChatIntent(ChatAdmissionIntent.ofManaged managed)))
+                    let accept managed =
+                        runtime.AcceptManagedChatIntent(ChatAdmissionIntent.ofManaged managed)
 
-            let durabilityActivation =
-                lazy
-                    (match workspaceDirectory with
-                     | None -> Ok()
-                     | Some workspace -> HookDispatcher.ensure workspace)
+                    // provider-attempt-recovery-023 / managed-chat-execution-015: a
+                    // pre-provider admission settlement writes a durable Terminal but
+                    // the parent Fork / SyncDelegate completion subscription is fed
+                    // only by NotifyTerminal on the shared event port. Without a
+                    // publish the parent join waits forever on a fact that already
+                    // happened.
+                    //
+                    // The publish is deliberately narrow: only a freshly terminalized
+                    // Failed / Rejected disposition is a confirmed-uncontinuable end
+                    // of THIS physical attempt, and only when the exact key was
+                    // Accepted (not yet terminal) immediately before settlement.
+                    // Cancelled / Superseded are physical-attempt observations — a
+                    // newer physical attempt may share the same authority root and
+                    // still be alive, so publishing Failed for them would let
+                    // RunLifecycle.stopBelongsToRun (which matches by authority root)
+                    // prematurely settle live work. An AlreadyTerminal replay is a
+                    // no-op and never republishes.
+                    fun projectHostModel ->
+                        let productionPorts =
+                            ChatAdmissionTransaction.production durable accept projectHostModel
 
-            let requireDurabilityActivation () =
-                match durabilityActivation.Value with
-                | Ok() -> scope.ActivateDurability()
-                | Error error -> Diagnostic.fatal "durability-activation-failed" [ "result", error ]
+                        { productionPorts with
+                            SettlePreProvider =
+                                fun key evidence disposition ->
+                                    task {
+                                        let wasAccepted =
+                                            match productionPorts.ReadExact key with
+                                            | Some(ChatExecutionState.Accepted _) -> true
+                                            | _ -> false
+
+                                        let! settled = productionPorts.SettlePreProvider key evidence disposition
+
+                                        match settled with
+                                        | Ok _ when
+                                            wasAccepted
+                                            && (disposition = ChatExecutionTerminalDisposition.Failed
+                                                || disposition = ChatExecutionTerminalDisposition.Rejected)
+                                            ->
+                                            eventPort.NotifyTerminal
+                                                key.SessionId
+                                                (TerminalOutcome.Failed(
+                                                    TerminalStop.forAuthority
+                                                        evidence.AuthorityRootUserMessageId
+                                                        "provider never started"
+                                                ))
+                                            |> ignore
+                                        | Ok _
+                                        | Error _ -> ()
+
+                                        return settled
+                                    } })
+
+            // 本机持久化不安装 Git hooks，不改 SSH 配置，不发布运行状态 refs。
+            let requireDurabilityActivation () = scope.ActivateDurability()
 
             let observePhysicalAdmission output sessionId physicalId =
                 scope.Sessions.Quiescence.ObservePhysicalUserMessage(sessionId, physicalId)
@@ -626,6 +676,11 @@ module HostSignalBootstrap =
 
             let continueUnmanagedChatMessage () = requireDurabilityActivation ()
 
+            let requireQuestionSettled (resumed: Result<unit, string>) =
+                match resumed with
+                | Ok() -> ()
+                | Error reason -> invalidOp ("Could not settle the user question: " + reason)
+
 
             let continueManagedChatMessage intent output =
                 match intent with
@@ -660,7 +715,27 @@ module HostSignalBootstrap =
                 | _ -> ()
 
                 FissionHostRequestProjection.projectPendingManaged hasPhysicalParent intent output
-                requireDurabilityActivation ()
+
+                task {
+                    let humanInput =
+                        match intent with
+                        | ChatAdmissionIntent.Decision.ExternalRootIntent evidence -> Some evidence.Key
+                        | ChatAdmissionIntent.Decision.ActiveHumanContinuationIntent evidence -> Some evidence.Key
+                        | _ -> None
+
+                    let maybePair =
+                        match journal, humanInput with
+                        | Some durable, Some key -> Some(durable, key)
+                        | _ -> None
+
+                    for durable, key in Option.toList maybePair do
+                        let! resumed =
+                            UserQuestionJournal.observeHumanInput durable key.SessionId key.PhysicalUserMessageId
+
+                        resumed |> requireQuestionSettled
+
+                    requireDurabilityActivation ()
+                }
 
             let observeVisibleChatMessage raw =
                 match HostEventEnvelope.tryVisibleUserMessage raw with
@@ -819,7 +894,7 @@ module HostSignalBootstrap =
                 result
                 =
                 try
-                    completeAdmission intent output result
+                    completeAdmission intent output result |> ignore
 
                     outputs
                     |> Seq.filter (fun requestOutput -> not (obj.ReferenceEquals(requestOutput, output)))
@@ -893,10 +968,10 @@ module HostSignalBootstrap =
                     return acquired
                 }
 
-            let finishUnsettledAdmission intent output =
-                function
+            let finishUnsettledAdmission intent output result =
+                match result with
                 | Ok(ChatAdmissionTransactionOutcome.Settled _) -> ()
-                | result -> completeAdmission intent output result
+                | _ -> completeAdmission intent output result |> ignore
 
             let startAdmissionFlight
                 durable
@@ -1166,50 +1241,6 @@ module HostSignalBootstrap =
                     | _ -> ()
                 }
 
-            // concern-routing-001: a session owns a mailbox named by its
-            // stable Byname (or the reserved `root` when it has none). The
-            // reserved `user` address belongs to the human and is never a
-            // session's own name. The subscription is idempotent, so a repeated
-            // physical admission is a no-op once the live mailbox exists; a
-            // name already owned by another session is silently skipped.
-            let selfMailboxName (sessionId: SessionId) projections =
-                let raw =
-                    Map.tryFind sessionId projections.HandleByChildSession
-                    |> Option.map (fun record -> record.Byname)
-                    |> Option.defaultValue ""
-
-                let candidate = if isNull raw then "" else raw.Trim()
-
-                if candidate.Length = 0 || candidate = ReservedAddress.User then
-                    ReservedAddress.Root
-                else
-                    candidate
-
-            let subscribeSelfMailbox (durable: AgentJournal) (sessionId: SessionId) name state =
-                task {
-                    match ConcernProjection.subscribe sessionId (SessionId.value sessionId) name name state with
-                    | Ok(Some fact) ->
-                        let port = AgentJournalPortAdapter.forConcern durable
-                        let! _ = port.Append sessionId None fact
-                        return ()
-                    | _ -> return ()
-                }
-
-            let ensureSelfMailboxFor (durable: AgentJournal) (sessionId: SessionId) =
-                task {
-                    let projections = (AgentJournal.snapshot durable).AgentProjections
-                    let name = selfMailboxName sessionId projections
-                    let state = projections.Concern
-
-                    if (ConcernProjection.activeMailbox name state).IsNone then
-                        do! subscribeSelfMailbox durable sessionId name state
-                }
-
-            let ensureSelfMailbox (sessionId: SessionId) =
-                match journal with
-                | None -> Task.FromResult(())
-                | Some durable -> ensureSelfMailboxFor durable sessionId
-
             let chatMessageHook =
                 fun (input: obj) (output: obj) ->
                     task {
@@ -1232,10 +1263,6 @@ module HostSignalBootstrap =
 
                         match decoded.SessionId with
                         | Some sessionId -> do! ensurePhysicalParentDiscovered sessionId
-                        | None -> ()
-
-                        match decoded.SessionId with
-                        | Some sessionId -> do! ensureSelfMailbox sessionId
                         | None -> ()
 
                         // intra-participant-parallelism-013: request-local origin

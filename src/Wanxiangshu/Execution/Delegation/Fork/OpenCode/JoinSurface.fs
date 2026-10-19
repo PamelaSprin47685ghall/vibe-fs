@@ -351,7 +351,6 @@ module JoinSurface =
             HostForkRuntime(
                 parentId,
                 sessions,
-                (fun _ _ _ -> Task.FromResult None),
                 CompletionMailboxRuntime.create,
                 NodeTiming.nodeClockPort (),
                 NodeTiming.raceExit,

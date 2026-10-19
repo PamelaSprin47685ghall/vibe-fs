@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -8,6 +8,8 @@ import { join } from 'node:path'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
 import { injectAcceptedAssessment } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import { withFinitePhysicalWait } from '../../verification-system/tests/support/finite-physical-wait.mjs'
+import { runVerificationToolProbe } from '../../../scripts/lib/verification-tool-probe.mjs'
 
 for (const kind of ['Failed', 'Aborted']) {
   test('WHAT[delegation-027] root affinity also rejects old ' + kind + ' without a prepared handoff', async () => {
@@ -74,8 +76,12 @@ for (const replacement of ['active', 'finished', 'successor']) {
     const preparing = Promise.withResolvers()
     const release = Promise.withResolvers()
     let attachmentSession
+    // The same work-record read port is exercised by settle and by the
+    // attachment preparation; only the latter may block here, otherwise the
+    // fixture deadlocks before guidance even starts.
+    let armAttachmentBlock = false
     const runtime = await forkTool.createRuntimeWithWorkRecordRead(directory, [{ sessionId: owner, agent: 'manager' }], async session => {
-      if (session === attachmentSession) {
+      if (armAttachmentBlock && session === attachmentSession) {
         preparing.resolve()
         await release.promise
       }
@@ -95,10 +101,9 @@ for (const replacement of ['active', 'finished', 'successor']) {
         assert.match(await forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', byname, 'ORIGINAL-WORK'), /carries this charge now/)
       }
       const original = forkTool.workSnapshot(runtime, owner)
-      const originalHandoff = forkTool.handoffSnapshot(runtime)
-      assert.ok(originalHandoff.length > 0, 'the completed attachment source established a real handoff frontier')
       const listeners = forkTool.terminalListenerCount(runtime)
       const completeOriginal = await forkTool.prepareTerminalDelivery(runtime, owner, 'ORIGINAL-DONE', 'original-provider')
+      armAttachmentBlock = true
       const guidance = forkTool.executeManagerResumeWithAttachment(runtime, toolModule, owner, byname, 'ORIGINAL-GUIDANCE', 'Source')
       await preparing.promise
       assert.equal(forkTool.promptCount(runtime), 1, 'attachment preparation has not sent guidance')
@@ -111,7 +116,6 @@ for (const replacement of ['active', 'finished', 'successor']) {
         await forkTool.executeManagerResume(runtime, toolModule, owner, '', byname, 'SUCCESSOR-WORK')
       }
       const beforeRelease = forkTool.workSnapshot(runtime, owner)
-      const handoffBeforeRelease = forkTool.handoffSnapshot(runtime)
       const countBeforeRelease = forkTool.promptCount(runtime)
       forkTool.acceptNextPrompt(runtime)
       release.resolve()
@@ -121,7 +125,6 @@ for (const replacement of ['active', 'finished', 'successor']) {
         assert.equal(forkTool.promptCount(runtime), countBeforeRelease + 1)
         assert.match(forkTool.prompt(runtime, countBeforeRelease), /ORIGINAL-GUIDANCE/)
         assert.deepEqual(forkTool.workSnapshot(runtime, owner), original)
-        assert.deepEqual(forkTool.handoffSnapshot(runtime), originalHandoff)
         assert.equal(forkTool.terminalListenerCount(runtime), listeners)
         forkTool.acceptNextPrompt(runtime)
         await forkTool.executeManagerResumeWithAttachment(runtime, toolModule, owner, byname, 'ORIGINAL-GUIDANCE', 'Source')
@@ -129,13 +132,11 @@ for (const replacement of ['active', 'finished', 'successor']) {
         assert.equal(forkTool.prompt(runtime, countBeforeRelease + 1), forkTool.prompt(runtime, countBeforeRelease))
         assert.notEqual(forkTool.promptEvidence(runtime, countBeforeRelease + 1).promptKey, forkTool.promptEvidence(runtime, countBeforeRelease).promptKey)
         assert.deepEqual(forkTool.workSnapshot(runtime, owner), original)
-        assert.deepEqual(forkTool.handoffSnapshot(runtime), originalHandoff)
         await completeOriginal()
       } else {
         assert.equal(result, '# The charge could not be placed.\n')
         assert.equal(forkTool.promptCount(runtime), countBeforeRelease, 'stale guidance never reaches Host')
         assert.deepEqual(forkTool.workSnapshot(runtime, owner), beforeRelease)
-        assert.deepEqual(forkTool.handoffSnapshot(runtime), handoffBeforeRelease)
         if (replacement === 'successor') {
           assert.doesNotMatch(forkTool.prompt(runtime, countBeforeRelease - 1), /ORIGINAL-GUIDANCE/)
           const completeSuccessor = await forkTool.prepareTerminalDelivery(runtime, owner, 'SUCCESSOR-DONE', 'successor-provider')
@@ -157,12 +158,21 @@ for (const replacement of ['active', 'finished', 'successor']) {
 }
 
 for (const phase of ['GUIDANCE', 'GUIDANCE_STOP']) {
-integrationTest(`WHAT[delegation-027] installed Host releases Manager Join and appends guidance after the child ${phase === 'GUIDANCE_STOP' ? 'final output' : 'tool step'}`, () => {
+integrationTest(`WHAT[delegation-027] installed Host releases Manager Join and appends guidance after the child ${phase === 'GUIDANCE_STOP' ? 'final output' : 'tool step'}`, async t => {
   const runner = fileURLToPath(new URL('../../host-boundary/tests/support/run-user-input-canary.mjs', import.meta.url))
-  const launched = spawnSync(process.execPath, [runner, '--phase', phase], {
-    encoding: 'utf8', timeout: 120000,
+  const env = { ...process.env }
+  delete env.NODE_TEST_CONTEXT
+  delete env.NODE_OPTIONS
+  await withFinitePhysicalWait(t, { operation: `actual Host child guidance ${phase}`, limitMs: 30000 }, async () => {
+    try {
+      const output = await runVerificationToolProbe(process.execPath, [runner, '--phase', phase], {
+        cwd: process.cwd(), env, signal: AbortSignal.any([t.signal, AbortSignal.timeout(25000)]),
+      })
+      assert.equal(JSON.parse(output).physicalCleanup, true)
+    } catch (error) {
+      if (typeof error.stderr === 'string') t.diagnostic(error.stderr)
+      throw error
+    }
   })
-  assert.equal(launched.status, 0, `${launched.error ?? ''}\n${launched.stdout}\n${launched.stderr}`)
-  assert.equal(JSON.parse(launched.stdout.trim()).physicalCleanup, true)
 })
 }

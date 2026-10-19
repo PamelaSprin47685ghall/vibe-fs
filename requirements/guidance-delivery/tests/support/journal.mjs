@@ -11,18 +11,28 @@ export const main = 'guidance-main'
 export const blogger = 'guidance-blogger'
 export const tip = 'primitive-obsession'
 
+/// Authored tip body fixture: opinion and advice sections joined with `## ` headings, the
+/// shape the delivery chain now reads back from its blob (Algorithm R2/G1).
+export const authoredBody = [
+  '## Opinion', 'AUTHORED OPINION',
+  '## Advice', 'AUTHORED ADVICE',
+].join('\n')
+
 export async function link(journal, owner = main, companion = blogger) {
   const result = await guidance.appendCompanionLink(journal, { session: owner, bloggerSession: companion, bloggerAgent: 'blogger' })
   assert.equal(result.ok, true, result.error)
 }
 
 export async function observe(journal, ordinal = 1, field = tip, owner = main, companion = blogger) {
+  const written = await guidance.writeTipBody(journal, authoredBody)
+  assert.equal(written.ok, true, written.error)
   const result = await guidance.appendObservation(journal, {
     session: owner, bloggerSession: companion, requestId: `request-${owner}-${ordinal}`, frameEpoch: 0,
     previousIngestedThrough: ordinal - 1, nextIngestedThrough: ordinal,
     previousCutoff: ordinal - 1, nextCutoff: ordinal, nextCoveredPrefixDigest: `digest-${ordinal}`,
     textRef: `blob-${ordinal}`, textDigest: `sha-${ordinal}`, providerRun: `run-${owner}-${ordinal}`,
-    toolCallIds: [`call-${ordinal}`], tipRuleId: field, fieldNameAtCommit: field, observedPrefixEpoch: 0,
+    toolCallIds: [`call-${ordinal}`], tipName: field,
+    tipTextRef: written.blobRef, tipTextDigest: written.blobDigest, observedPrefixEpoch: 0,
   })
   assert.equal(result.ok, true, result.error)
 }

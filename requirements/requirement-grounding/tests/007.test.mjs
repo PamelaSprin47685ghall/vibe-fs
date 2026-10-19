@@ -27,8 +27,8 @@ const sandbox = () => {
 }
 
 const toolBatch = (providerID, path) => [
-  { info: { id: 'c1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'pending', input: { filePath: path }, time: { start: 0 } } }] },
-  { info: { id: 'r1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'completed', input: { filePath: path }, output: 'before\n', time: { start: 0, end: 0 } } }] },
+  { info: { id: 'c1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'source', state: { status: 'pending', input: { program: `class Js extends JsProgram { async run() { return await this.cat(${JSON.stringify(path)}); } }` }, time: { start: 0 } } }] },
+  { info: { id: 'r1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'source', state: { status: 'completed', input: { program: `class Js extends JsProgram { async run() { return await this.cat(${JSON.stringify(path)}); } }` }, output: 'before\n', time: { start: 0, end: 0 } } }] },
 ]
 
 test('WHAT[requirement-grounding-007] actual pair and grounding transforms append result-only bytes for each tested provider without synthetic calls', async () => {
@@ -117,7 +117,7 @@ const originalMaterials = [
 const originalMaterialCarrier = body => `${body}\n\nrequirement_source_path = "requirements/alpha/WHAT.md"\n`
 
 const sessionHostFacts = (directory, sessionID) => {
-  const events = join(directory, '.git', 'wanxiangshu', 'events')
+  const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
   return readdirSync(events).flatMap(name => readFileSync(join(events, name), 'utf8').split('\n').filter(Boolean).map(JSON.parse))
     .flatMap(event => {
       const fact = event.payload?.Fact
@@ -143,17 +143,15 @@ test('WHAT[requirement-grounding-007] registered reads reject illegal self scope
         assert.throws(() => catalog.discoverPackages(directory), /must not declare package self coverage/)
         assert.throws(() => catalog.materializePackage(directory, 'alpha'), /must not declare package self coverage/)
       }
-      for (const tool of ['read', 'js-manager']) {
+      for (const tool of ['todowrite-for-manager']) {
         await t.test(`WHAT[requirement-grounding-007] ${scope} scope with registered ${tool}`, async () => {
           const sessionID = `scope-${scope}-${tool}`
-          if (tool === 'js-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')
+          await acceptAuthorityRoot(runtime, sessionID, 'manager')
           await openIncumbency(runtime, sessionID)
-          const args = tool === 'read' ? { filePath: sourcePath }
-            : { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
+          const args = { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
           const input = { tool, sessionID, callID: `call-${sessionID}` }
           await hooks['tool.execute.before'](input, { args })
-          const output = tool === 'read' ? readFileSync(sourcePath, 'utf8')
-            : await hooks.tool[tool].execute(args, { sessionID, agent: 'manager' })
+          const output = await hooks.tool[tool].execute(args, { sessionID, agent: 'manager' })
           assert.ok(output.includes('ACTUAL-SOURCE'), 'the actual file read succeeds despite invalid grounding')
           await hooks['tool.execute.after']({ ...input, args }, { title: tool, output, metadata: {} })
           const raw = [{ info: { id: `result-${sessionID}`, role: 'assistant', sessionID, providerID: 'anthropic' },
@@ -176,9 +174,9 @@ test('WHAT[requirement-grounding-007] registered reads reject illegal self scope
 })
 
 const withPresentationJournals = async (directory, body) => {
-  const pairJournal = await pair.createJournal(join(directory, '.git'))
+  const pairJournal = await pair.createJournal(join(directory, '.Herdchestra'))
   assert.equal(pairJournal.ok, true)
-  const groundingJournal = await grounding.createJournal(join(directory, '.git'))
+  const groundingJournal = await grounding.createJournal(join(directory, '.Herdchestra'))
   assert.equal(groundingJournal.ok, true)
   try { return await body(pairJournal.journal, groundingJournal.journal) }
   finally {
@@ -206,17 +204,18 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
       writeFileSync(materialPath, 'seed material\n')
       const sessionID = `literal-presentation-${providerID}`
+      await acceptAuthorityRoot(runtime, sessionID, 'manager')
       await openIncumbency(runtime, sessionID)
       const produce = async (ordinal, output) => {
-        writeFileSync(sourcePath, output)
-        const args = { filePath: sourcePath }
-        const input = { tool: 'read', sessionID, callID: `call-${ordinal}` }
+        writeFileSync(sourcePath, `covered-${ordinal}\n`)
+        const args = { program: "class Js extends JsProgram { async run() { await this.cat('src/main.fs'); return { ok: true }; } }" }
+        const input = { tool: 'todowrite-for-manager', sessionID, callID: `call-${ordinal}` }
         await hooks['tool.execute.before'](input, { args })
-        const actual = readFileSync(sourcePath, 'utf8')
-        await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output: actual, metadata: {} })
+        await hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
+        await hooks['tool.execute.after']({ ...input, args }, { title: 'todowrite-for-manager', output, metadata: {} })
         return { info: { id: `result-${ordinal}`, role: 'assistant', sessionID, providerID },
-          parts: [{ id: `part-${ordinal}`, type: 'tool', tool: 'read', callID: input.callID,
-            state: { status: 'completed', input: args, output: actual, time: { start: 0, end: 1 } } }] }
+          parts: [{ id: `part-${ordinal}`, type: 'tool', tool: 'todowrite-for-manager', callID: input.callID,
+            state: { status: 'completed', input: args, output, time: { start: 0, end: 1 } } }] }
       }
       const seed = await produce('seed', 'seed source\n')
       await hooks['experimental.chat.messages.transform']({}, { messages: [structuredClone(seed)] })
@@ -277,15 +276,17 @@ test('WHAT[requirement-grounding-007] missing physical part IDs bind only to exa
     const sessionID = 'captured-missing-part'
     writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
     writeFileSync(materialPath, 'first material\r\n')
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
     const produce = async (ordinal, body) => {
-      writeFileSync(sourcePath, body)
-      const args = { filePath: sourcePath }
-      const input = { tool: 'read', sessionID, callID: `missing-part-call-${ordinal}` }
+      writeFileSync(sourcePath, `covered-${ordinal}\n`)
+      const args = { program: "class Js extends JsProgram { async run() { await this.cat('src/main.fs'); return { ok: true }; } }" }
+      const input = { tool: 'todowrite-for-manager', sessionID, callID: `missing-part-call-${ordinal}` }
       await hooks['tool.execute.before'](input, { args })
-      await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output: body, metadata: {} })
+      await hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
+      await hooks['tool.execute.after']({ ...input, args }, { title: 'todowrite-for-manager', output: body, metadata: {} })
       return { info: { id: `missing-part-result-${ordinal}`, role: 'assistant', sessionID, providerID: 'anthropic' },
-        parts: [{ type: 'tool', tool: 'read', callID: input.callID,
+        parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: input.callID,
           state: { status: 'completed', input: args, output: body, time: { start: 0, end: 1 } } }] }
     }
     const first = await produce('first', 'first physical result\r\n')
@@ -338,8 +339,8 @@ test('WHAT[requirement-grounding-007] new ambiguous missing-part material is ref
   await withExecutablePlugin(async (_hooks, directory, _createdIds, runtime) => {
     const sessionID = 'ambiguous-missing-part'
     const raw = [{ info: { id: 'ambiguous-missing-part-result', role: 'assistant', sessionID, providerID: 'anthropic' },
-      parts: ['first original', 'second original'].map(output => ({ type: 'tool', tool: 'read', callID: 'ambiguous-call',
-        state: { status: 'completed', input: { filePath: 'README.md' }, output, time: { start: 0, end: 1 } } })) }]
+      parts: ['first original', 'second original'].map(output => ({ type: 'tool', tool: 'todowrite-for-manager', callID: 'ambiguous-call',
+        state: { status: 'completed', input: { program: "class Js extends JsProgram { async run() { return await this.cat('README.md'); } }" }, output, time: { start: 0, end: 1 } } })) }]
     const captured = await trace.captureObservedMessages(runtime.journal, sessionID,
       raw.map(message => ({ hostMessageId: message.info.id, message })))
     assert.equal(captured.ok, false)
@@ -385,13 +386,15 @@ test('WHAT[requirement-grounding-007] same-anchor versions cannot turn a complet
     writeFileSync(sourcePath, output)
     writeFileSync(materialPath, firstBody)
     writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
+    await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
-    const args = { filePath: sourcePath }
-    const input = { tool: 'read', sessionID, callID: 'same-anchor-call' }
+    const args = { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
+    const input = { tool: 'todowrite-for-manager', sessionID, callID: 'same-anchor-call' }
     await hooks['tool.execute.before'](input, { args })
-    await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output, metadata: {} })
+    await hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
+    await hooks['tool.execute.after']({ ...input, args }, { title: 'todowrite-for-manager', output, metadata: {} })
     const raw = [{ info: { id: 'same-anchor-result', role: 'assistant', sessionID, providerID: 'anthropic' },
-      parts: [{ id: 'same-anchor-part', type: 'tool', tool: 'read', callID: input.callID,
+      parts: [{ id: 'same-anchor-part', type: 'tool', tool: 'todowrite-for-manager', callID: input.callID,
         state: { status: 'completed', input: args, output, time: { start: 0, end: 1 } } }] }]
     const first = { messages: structuredClone(raw) }
     await hooks['experimental.chat.messages.transform']({}, first)
@@ -468,14 +471,16 @@ for (const damage of ['missing', 'changed']) {
       writeFileSync(join(directory, 'requirements', 'alpha', 'WHAT.md'), 'material\r\n')
       writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
       const sessionID = `damaged-original-${damage}`
+      await acceptAuthorityRoot(runtime, sessionID, 'manager')
       await openIncumbency(runtime, sessionID)
-      const args = { filePath: sourcePath }
-      const input = { tool: 'read', sessionID, callID: `call-${damage}` }
+      const args = { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
+      const input = { tool: 'todowrite-for-manager', sessionID, callID: `call-${damage}` }
       const output = readFileSync(sourcePath, 'utf8')
       await hooks['tool.execute.before'](input, { args })
-      await hooks['tool.execute.after']({ ...input, args }, { title: 'read', output, metadata: {} })
+      await hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
+      await hooks['tool.execute.after']({ ...input, args }, { title: 'todowrite-for-manager', output, metadata: {} })
       const raw = [{ info: { id: `result-${damage}`, role: 'assistant', sessionID, providerID: 'anthropic' },
-        parts: [{ id: `part-${damage}`, type: 'tool', tool: 'read', callID: input.callID,
+        parts: [{ id: `part-${damage}`, type: 'tool', tool: 'todowrite-for-manager', callID: input.callID,
           state: { status: 'completed', input: args, output, time: { start: 0, end: 1 } } }] }]
       const projected = { messages: structuredClone(raw) }
       await hooks['experimental.chat.messages.transform']({}, projected)
@@ -483,7 +488,7 @@ for (const damage of ['missing', 'changed']) {
       assert.equal(captured.hostToolPartId, `part-${damage}`)
       // durable-events-012: the ndjson line is the only payload carrier. Damage
       // means: the content address no longer matches the bytes it names.
-      const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
+      const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
       const writerFile = readdirSync(eventsDir).find((name) => name.endsWith('.ndjson'))
       const writerPath = join(eventsDir, writerFile)
       const lines = readFileSync(writerPath, 'utf8').trimEnd().split('\n')
@@ -510,10 +515,10 @@ for (const damage of ['missing', 'changed']) {
       // history. Neither presentation owner can therefore be handed the evidence,
       // and no boot can smuggle the damaged line into a fold.
       const expected =
-        damage === 'missing' ? /missing durable inline payload/ : /durable inline payload digest mismatch/
+        damage === 'missing' ? /MissingPayload/ : /payload digest mismatch/
       for (const [owner, open] of [
-        ['pair', () => pair.createJournal(join(directory, '.git'))],
-        ['grounding', () => grounding.createJournal(join(directory, '.git'))],
+        ['pair', () => pair.createJournal(join(directory, '.Herdchestra'))],
+        ['grounding', () => grounding.createJournal(join(directory, '.Herdchestra'))],
       ]) {
         await assert.rejects(
           open,
@@ -526,7 +531,7 @@ for (const damage of ['missing', 'changed']) {
 }
 
 for (const providerID of ['anthropic', 'cursor', 'openai']) {
-  test(`WHAT[requirement-grounding-007] registered native hook and actual JS read preserve original material bytes for ${providerID}`, async t => {
+  test(`WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for ${providerID}`, async t => {
     await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
       mkdirSync(join(directory, 'requirements', 'alpha'), { recursive: true })
       mkdirSync(join(directory, 'src'), { recursive: true })
@@ -535,13 +540,13 @@ for (const providerID of ['anthropic', 'cursor', 'openai']) {
       writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
       for (const [name, body] of originalMaterials) {
         writeFileSync(join(directory, 'requirements', 'alpha', 'WHAT.md'), body)
-        for (const tool of ['read', 'js-manager']) {
+        for (const tool of ['todowrite-for-manager']) {
           await t.test(`WHAT[requirement-grounding-007] ${providerID} ${tool} ${name} exact content carrier and canonical history`, async () => {
             const sessionID = `original-${providerID}-${tool}-${name}`
-            if (tool === 'js-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')
+            if (tool === 'todowrite-for-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')
             await openIncumbency(runtime, sessionID)
             const args = tool === 'read' ? { filePath: sourcePath }
-              : { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
+              : { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
             const input = { tool, sessionID, callID: `call-${sessionID}` }
             await hooks['tool.execute.before'](input, { args })
             const output = tool === 'read' ? readFileSync(sourcePath, 'utf8')
@@ -600,27 +605,34 @@ const exerciseRegisteredComposition = async (providerID) => {
     writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
     const sourcePath = join(directory, 'src', 'main.fs')
     writeFileSync(sourcePath, 'before\n')
-    for (const tool of ['read', 'write', 'edit', 'patch', 'apply_patch', 'mv', 'rm', 'js-manager', 'js-engineer']) {
-      const sessionID = `composition-${providerID}-${tool}`
-      if (tool === 'js-manager') await acceptAuthorityRoot(runtime, sessionID, 'manager')
-      if (tool === 'js-engineer') await acceptAuthorityRoot(runtime, sessionID, 'engineer')
+    // Direct Host/plugin filesystem tools (`read`, `write`, `edit`, `patch`, `mv`, `rm`) are retired;
+    // registered composition exercises the programming surface's read (`cat`), write (`write`), move (`mv`), and remove (`rm`) members.
+    const cases = [
+      ['manager-cat', 'todowrite-for-manager', 'manager', { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }],
+      ['engineer-write', 'todowrite-for-engineer', 'engineer', { program: "class Js extends JsProgram { async run() { await this.write('src/generated.fs', 'PROGRAM-MUTATION'); return 'PROGRAM-WRITTEN'; } }" }],
+      ['engineer-mv', 'todowrite-for-engineer', 'engineer', { program: "class Js extends JsProgram { async run() { await this.write('src/move-from.fs', 'MOVE-BODY'); await this.mv('src/move-from.fs', 'src/move-to.fs'); return 'PROGRAM-MOVED'; } }" }],
+      ['engineer-rm', 'todowrite-for-engineer', 'engineer', { program: "class Js extends JsProgram { async run() { await this.write('src/remove-me.fs', 'RM-BODY'); await this.rm('src/remove-me.fs'); return 'PROGRAM-REMOVED'; } }" }],
+    ]
+    for (const [label, tool, agent, args] of cases) {
+      const sessionID = `composition-${providerID}-${label}`
+      await acceptAuthorityRoot(runtime, sessionID, agent)
       await openIncumbency(runtime, sessionID)
       const callID = `call-${sessionID}`
-      const args = tool === 'js-manager'
-        ? { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); return file.text(); } }" }
-        : tool === 'js-engineer'
-          ? { program: "class Js extends JsProgram { async run() { await this.write('src/generated.fs', 'PROGRAM-MUTATION'); return 'PROGRAM-WRITTEN'; } }" }
-          : tool === 'mv'
-            ? { source: sourcePath, destination: join(directory, 'src', 'next.fs') }
-            : { filePath: sourcePath, content: 'changed\n' }
       const input = { tool, sessionID, callID }
       await hooks['tool.execute.before'](input, { args })
-      const actualOutput = tool.startsWith('js-')
-        ? await hooks.tool[tool].execute(args, { sessionID, agent: tool.slice(3) })
-        : 'NATIVE-RESULT\r\n'
-      if (tool === 'js-manager') assert.match(actualOutput, /before/, 'registered program actually reads covered source')
-      if (tool === 'js-engineer') assert.match(actualOutput, /PROGRAM-WRITTEN/, 'registered program actually mutates covered source')
-      if (tool === 'js-engineer') assert.equal(readFileSync(join(directory, 'src', 'generated.fs'), 'utf8'), 'PROGRAM-MUTATION')
+      const actualOutput = await hooks.tool[tool].execute(args, { sessionID, agent })
+      if (label === 'manager-cat') assert.match(actualOutput, /before/, 'registered program actually reads covered source')
+      if (label === 'engineer-write') {
+        assert.match(actualOutput, /PROGRAM-WRITTEN/, 'registered program actually mutates covered source')
+        assert.equal(readFileSync(join(directory, 'src', 'generated.fs'), 'utf8'), 'PROGRAM-MUTATION')
+      }
+      if (label === 'engineer-mv') {
+        assert.match(actualOutput, /PROGRAM-MOVED/, 'registered program actually moves covered source')
+        assert.equal(readFileSync(join(directory, 'src', 'move-to.fs'), 'utf8'), 'MOVE-BODY')
+      }
+      if (label === 'engineer-rm') {
+        assert.match(actualOutput, /PROGRAM-REMOVED/, 'registered program actually removes covered source')
+      }
       const rawOutput = `${actualOutput}\0\uFEFFEXISTING-SUFFIX\n`
       await hooks['tool.execute.after']({ ...input, args }, { title: tool, output: rawOutput, metadata: {} })
       const original = [{

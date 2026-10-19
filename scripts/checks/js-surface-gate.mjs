@@ -37,12 +37,12 @@ export const DEPRECATED_ROLE_TOOL_TOKENS = [
 ]
 
 export const REQUIRED_ACTIVE_JS_TOOLS = [
-  'js-engineer',
-  'js-devops',
-  'js-bookkeeper',
-  'js-manager',
-  'js-orchestrator',
-  'js-blogger',
+  'todowrite-for-engineer',
+  'todowrite-for-devops',
+  'todowrite-for-bookkeeper',
+  'todowrite-for-manager',
+  'todowrite-for-orchestrator',
+  'todowrite-for-blogger',
 ]
 
 /** Files where the static enumeration is legitimate (permission matrix only). */

@@ -13,13 +13,7 @@ const read = (path) => readFileSync(path, 'utf8')
 
 const packageNamesFromIndexTables = () => {
   const text = read(INDEX_FILE)
-  const names = []
-  for (const line of text.split('\n')) {
-    if (!line.startsWith('| ')) continue
-    const name = /`([a-z][a-z0-9-]*)`/.exec(line)?.[1]
-    if (name) names.push(name)
-  }
-  return [...new Set(names)]
+  return [...new Set([...text.matchAll(/^\| `([a-z][a-z0-9-]*)` \|/gm)].map((match) => match[1]))]
 }
 
 test('WHAT[requirement-system-001] declared clause IDs have one owner in the indexed packages', () => {

@@ -3,9 +3,11 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion.Blogger.Runtime
+open Wanxiangshu.Execution.Delegation.Advisor
 open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Fission.OpenCode
@@ -23,6 +25,7 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Process
 open Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Ablation
@@ -57,6 +60,10 @@ module ToolRegistry =
         [<Literal>]
         let DeniedTaskState = "tool/registry/denied-task-state"
 
+        /// Algorithm G1: deliver is blocked while any parked site is unresolved.
+        [<Literal>]
+        let DeliverBlockedByParked = "tool/js-program/parked-deliver-blocked"
+
     let private lang (ctx: HostToolContext) =
         let sessionText = ctx.SessionId
 
@@ -80,17 +87,6 @@ module ToolRegistry =
 
         ToolHostCodec.tomlObjectWithInstructions [ ProviderProse.render (lang ctx) path subs ] fields
 
-    /// mv / rm expose their refusals by code; the other tools keep the
-    /// prose-only shape their existing consumers already match on.
-    let private carriesRefusalCode (specName: string) =
-        match specName with
-        | "mv"
-        | "rm" -> true
-        | _ -> false
-
-    let private refusalCodeFor (specName: string) (path: string) =
-        if carriesRefusalCode specName then Some path else None
-
     let private denyRole (ctx: HostToolContext) (specName: string) (role: Role) =
         let path =
             if specName = "fission" then
@@ -98,7 +94,7 @@ module ToolRegistry =
             else
                 Path.DeniedRole
 
-        denied ctx specName path (Map [ "tool", specName; "role", sprintf "%A" role ]) (refusalCodeFor specName path)
+        denied ctx specName path (Map [ "tool", specName; "role", sprintf "%A" role ]) None
 
     /// The current capability decides; the denial stays action-focused and never
     /// echoes internal loop state.
@@ -125,13 +121,20 @@ module ToolRegistry =
     /// gate reads. `create` fills every field from the ToolRuntimeScope or its
     /// own callbacks; a stage never receives the whole scope.
     type private ToolGateFacts =
-        { RoleFor: HostToolContext -> Role option
-          EnsureRoleFor: HostToolContext -> Task<Role option>
-          IsStrengthReplica: HostToolContext -> bool
-          ManagerFactsFor: string -> ManagerCapabilityFacts
-          IsRetirementFrozen: string -> bool
-          BeginToolExecution: string -> unit
-          EndToolExecution: string -> unit }
+        {
+            RoleFor: HostToolContext -> Role option
+            EnsureRoleFor: HostToolContext -> Task<Role option>
+            IsStrengthReplica: HostToolContext -> bool
+            ManagerFactsFor: string -> ManagerCapabilityFacts
+            IsRetirementFrozen: string -> bool
+            IsWaitingForUser: string -> bool
+            BeginToolExecution: string -> unit
+            EndToolExecution: string -> unit
+            /// Algorithm E1.1: the work already recorded a retirement for this
+            /// call's exact fence, so a retried deliver replays its state instead
+            /// of being refused for the tenure that retirement removed.
+            RecordedDeliverReplay: HostToolContext -> bool
+        }
 
     let private accountingStageWithSession
         (gate: ToolGateFacts)
@@ -167,23 +170,41 @@ module ToolRegistry =
                 None
         )
 
-    /// capability-enforcement-005 / STRENGTH-004: Host-native read/glob/grep are
-    /// the entire replica surface. js-predictor is the single plugin tool a live
-    /// replica may execute; every other plugin tool stays denied.
+    /// capability-enforcement-005 / STRENGTH-004: a live replica's whole Host
+    /// tool face is the readonly JS surface `todowrite-for-predictor`
+    /// (StrengthReplicaTools.exactReadonlyHostToolMap: wildcard deny plus that
+    /// single allow; the replica reads through the JS members, never through a
+    /// Host-native read/glob/grep tool). It is the only plugin tool a live
+    /// replica may execute; every other plugin tool stays denied here.
     let private replicaStage (gate: ToolGateFacts) (spec: ToolSpec) (ctx: HostToolContext) : Task<string option> =
         Task.FromResult(
             if not (gate.IsStrengthReplica ctx) then
                 None
-            elif spec.Name = "js-predictor" then
+            elif spec.Name = "todowrite-for-predictor" then
                 None
             else
                 Some(denied ctx spec.Name Path.DeniedStrength Map.empty None)
         )
 
     /// capability-enforcement-025: current Manager facts close the office gate.
-    /// A frozen retirement keeps only Join and Finality; the final incumbent
+    /// A frozen retirement keeps Join, Finality and the explicit human Ask; the final incumbent
     /// keeps the read/cleanup/close-out surface and loses every new-work
     /// capability.
+    /// Algorithm E1.1: a retried deliver whose fence the work already settled is
+    /// not a new capability — it replays the state that call recorded, so the
+    /// missing tenure is not a reason to refuse it. Every other denied call
+    /// keeps the action-focused refusal.
+    let private refusedOrReplayed
+        (gate: ToolGateFacts)
+        (spec: ToolSpec)
+        (args: HostToolArguments)
+        (ctx: HostToolContext)
+        : Task<string> =
+        if spec.Name = "deliver" && gate.RecordedDeliverReplay ctx then
+            spec.Execute args ctx
+        else
+            Task.FromResult(denyTaskState ctx spec.Name)
+
     let private managerFactsStage
         (gate: ToolGateFacts)
         (spec: ToolSpec)
@@ -203,7 +224,7 @@ module ToolRegistry =
                 ->
                 return denyTaskState ctx spec.Name
             | Some permission when not (OfficeCapability.isAllowedForManagerFacts managerFacts permission) ->
-                return denyTaskState ctx spec.Name
+                return! refusedOrReplayed gate spec args ctx
             | _ -> return! spec.Execute args ctx
         }
 
@@ -215,7 +236,11 @@ module ToolRegistry =
         (ctx: HostToolContext)
         (role: Role)
         : Task<string> =
-        if role = Role.Manager then
+        if gate.IsWaitingForUser ctx.SessionId && spec.Name <> "ask" then
+            Task.FromResult(
+                ProviderProse.render (ProviderLanguageBinding.forSessionText ctx.SessionId) "tool/ask-waiting" Map.empty
+            )
+        elif role = Role.Manager then
             managerFactsStage gate spec managerPermission args ctx
         else
             spec.Execute args ctx
@@ -239,14 +264,7 @@ module ToolRegistry =
             | Some role when officeAdmission ctx role ->
                 return! executeAdmittedRole gate spec managerPermission args ctx role
             | Some role -> return denyRole ctx spec.Name role
-            | None ->
-                return
-                    denied
-                        ctx
-                        spec.Name
-                        Path.DeniedUnestablished
-                        Map.empty
-                        (refusalCodeFor spec.Name Path.DeniedUnestablished)
+            | None -> return denied ctx spec.Name Path.DeniedUnestablished Map.empty None
         }
 
     /// capability-enforcement-006: the attachment IS the authority. Resolving a
@@ -323,11 +341,11 @@ module ToolRegistry =
         [ "fork", ForkTool.managerAdmission
           "resume", ForkTool.managerAdmission
           "commission", ForkTool.orchestratorAdmission
-          "open-terminal", PtyTool.admission
-          "send-terminal", PtyTool.admission
-          "read-terminal", PtyTool.admission
-          "signal-terminal", PtyTool.admission
+
           "join", JoinTool.admission
+          "ask", ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Ask)
+          "devops",
+          ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.DevOpsConsultation)
           "horizon", HorizonTool.admission
           "fission", FissionTool.admission
           "review", ReviewShell.admission
@@ -335,23 +353,18 @@ module ToolRegistry =
           ToolAdmission.OfficeRole(fun _ role ->
               OfficeCapability.isAllowed role ToolPermission.Finality
               || OfficeCapability.isAllowed role ToolPermission.Deliver)
-          "run", ExecutorTool.runAdmission
-          "mv", FileMutationTools.mvAdmission
-          "rm", FileMutationTools.rmAdmission
           "bash-honeypot", BashHoneypotTool.admission
           "assume", AssumeTool.admission
-          "defer", AttentionTools.admission
-          "publish", ConcernTools.admission
           "chronicle", ChronicleTool.admission bloggerHost
           "fetch", ToolAdmission.OfficeRole(fun _ r -> OfficeCapability.isAllowed r ToolPermission.Fetch)
-          "js-bookkeeper", JsBookkeeperTool.admission ]
+          "todowrite-for-bookkeeper", JsBookkeeperTool.admission ]
 
     let private tryAdmissionFor (specName: string) (bloggerHost: IBloggerRuntimeHost option) : ToolAdmission option =
         match staticAdmissions bloggerHost |> List.tryFind (fun (name, _) -> name = specName) with
         | Some(_, admission) -> Some admission
-        | None when specName = "js-predictor" -> Some(ToolAdmission.PrivateAttachment(fun _ -> false))
-        | None when specName.StartsWith "js-" && specName <> "js-bookkeeper" ->
-            Some(JsToolSpec.admissionFor (specName.Substring 3))
+        | None when specName = "todowrite-for-predictor" -> Some(ToolAdmission.PrivateAttachment(fun _ -> false))
+        | None when specName.StartsWith "todowrite-for-" && specName <> "todowrite-for-bookkeeper" ->
+            Some(JsToolSpec.admissionFor (specName.Substring 14))
         | None -> None
 
     let private probeContext (sessionId: string) : HostToolContext =
@@ -390,41 +403,112 @@ module ToolRegistry =
         | Some(ToolAdmission.PrivateAttachment _)
         | None -> fun _ -> false
 
-    let private createPlanSandboxApi (currentContent: string) (stagedMutation: string option ref) =
-        createObj
-            [ "js"
-              ==> createObj
-                      [ "read" ==> fun (_: obj) -> currentContent
-                        "edit"
-                        ==> fun (_path: string) (newText: string) ->
-                            stagedMutation.Value <- Some newText
-                            createObj [ "ok" ==> true ] ] ]
+    /// A refused `js.ask` must reject the program's await with the stable
+    /// failure sentinel instead of resolving to a data object.
+    [<Emit("Promise.reject(Object.assign(new Error($1), { __jsFailure: { code: $0, reason: $1 } }))")>]
+    let private rejectedJsFailure (code: string) (reason: string) : obj = jsNative
+
+    [<Emit("typeof $0 === 'string'")>]
+    let private isStringValue (value: obj) : bool = jsNative
+
+    let private recordParkStack (state: Wanxiangshu.Process.JsSandbox.ParkState) (stack: obj) =
+        if not (isNull stack) then
+            state.ParkStack <- string stack
+
+    let private finishPlanAskOutcome
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        (text: string)
+        (stack: obj)
+        (asked: Result<unit, string>)
+        =
+        match asked with
+        | Ok() ->
+            recordParkStack state stack
+            Wanxiangshu.Process.JsSandbox.suspendProgram state (createObj [ "question" ==> text ])
+        | Error reason ->
+            let failure = JsFailure.AskRefused reason
+            rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
+
+    let private performPlanAsk
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        (invoke: string -> Task<Result<unit, string>>)
+        (text: string)
+        (stack: obj)
+        : Task<obj> =
+        task {
+            if System.String.IsNullOrWhiteSpace text then
+                let failure = JsFailure.InvalidArgument "ask requires a question"
+                return rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
+            else
+                let! asked = invoke text
+                return finishPlanAskOutcome state text stack asked
+        }
+
+    let private handlePlanAsk
+        (state: Wanxiangshu.Process.JsSandbox.ParkState)
+        (invoke: string -> Task<Result<unit, string>>)
+        (question: obj)
+        (stack: obj)
+        : obj =
+        if state.AbandonRequested then
+            rejectedJsFailure
+                (JsFailure.code JsFailure.CannotParkWhileAbandoning)
+                (JsFailure.reason JsFailure.CannotParkWhileAbandoning)
+        else
+            performPlanAsk state invoke (string question) stack |> box
+
+    let private createPlanSandboxApi
+        (currentContent: string)
+        (stagedMutation: string option ref)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
+        (askInvoke: (string -> Task<Result<unit, string>>) option)
+        =
+        let members =
+            [ "read" ==> fun (_: obj) -> currentContent
+              "edit"
+              ==> fun (_path: string) (newText: string) ->
+                  stagedMutation.Value <- Some newText
+                  createObj [ "ok" ==> true ] ]
+
+        let askMembers =
+            match parkState, askInvoke with
+            | Some state, Some invoke ->
+                [ "ask"
+                  ==> fun (question: obj) (stack: obj) -> handlePlanAsk state invoke question stack ]
+            | _ -> []
+
+        createObj [ "js" ==> createObj (members @ askMembers) ]
 
     let private writePlanFile root sessionId newText value =
         match PlanPath.rewritePlanAtomic root sessionId newText with
-        | Ok(_path, _digest) -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [ "plan.md" ], []))
+        | Ok(_path, _digest) ->
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [ "plan.md" ], [], [], []))
         | Error err ->
             JsToolsResult.render (
                 JsToolWorkflow.JsToolOutcome.Failed(
-                    JsFailure.ProgramFailed(sprintf "Failed to write plan artifact: %s" err)
+                    JsFailure.ProgramFailed(sprintf "Failed to write plan artifact: %s" err),
+                    [],
+                    [],
+                    [],
+                    []
                 )
             )
 
     let private commitPlanMutation root sessionId hasReviewed newTextOpt value =
         match newTextOpt with
-        | None -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [], []))
+        | None -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [], [], [], []))
         | Some _ when not hasReviewed ->
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed JsFailure.PlanReviewRequired)
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.PlanReviewRequired, [], [], [], []))
         | Some newText -> writePlanFile root sessionId newText value
 
     let private renderPlanParseOutcome root sessionId hasReviewed stagedMutation json =
         match JsToolsData.parse json with
-        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed failure)
+        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
         | Ok value -> commitPlanMutation root sessionId hasReviewed stagedMutation value
 
     let private renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation runOutcome =
         match runOutcome with
-        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed failure)
+        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
         | Ok json -> renderPlanParseOutcome root sessionId hasReviewed stagedMutation json
 
     let private executePlanSandbox prose root sessionId hasReviewed programSource =
@@ -436,14 +520,15 @@ module ToolRegistry =
 
             // DSL-MUTABLE: algorithm-scratch — staged mutation accumulator for Plan sandbox
             let stagedMutation = ref None
-            let api = createPlanSandboxApi currentContent stagedMutation
+            let api = createPlanSandboxApi currentContent stagedMutation None None
             let baseClassSource = JsCanonicalDescription.runtimePlanBaseClass prose
             let deadlineMs = 10000
             let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
             let outputBoundBytes = 1 <<< 20
 
-            let! runOutcome =
-                JsSandbox.runSurface baseClassSource programSource api deadlineMs deadlineEpochMs outputBoundBytes
+            let! handle = JsSandbox.runSurface baseClassSource programSource api deadlineMs deadlineEpochMs
+
+            let! runOutcome = JsSandbox.awaitResult handle outputBoundBytes
 
             return renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation.Value runOutcome
         }
@@ -461,7 +546,7 @@ module ToolRegistry =
     let private executeTenureSandbox prose root gitCommonDir sessionId programSource =
         match resolveActiveTenure gitCommonDir sessionId with
         | Error reason ->
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason))
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason, [], [], [], []))
             |> Task.FromResult
         | Ok hasReviewed -> executePlanSandbox prose root sessionId hasReviewed programSource
 
@@ -473,11 +558,17 @@ module ToolRegistry =
         (programSourceOpt: string option)
         : Task<string> =
         if Option.isNone programSourceOpt then
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed JsFailure.InvalidProgram)
+            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.InvalidProgram, [], [], [], []))
             |> Task.FromResult
         elif Option.isNone rootOpt || Option.isNone gitCommonDirOpt then
             JsToolsResult.render (
-                JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed "The plan workspace is unavailable")
+                JsToolWorkflow.JsToolOutcome.Failed(
+                    JsFailure.ProgramFailed "The plan workspace is unavailable",
+                    [],
+                    [],
+                    [],
+                    []
+                )
             )
             |> Task.FromResult
         else
@@ -485,6 +576,199 @@ module ToolRegistry =
 
     let runPlanProgram prose gitCommonDir root sessionId program =
         runPlanProgramCore prose (Some gitCommonDir) (Some root) sessionId (Some program)
+
+    [<Emit("$0 === undefined || $0 === null")>]
+    let private isNullishValue (value: obj) : bool = jsNative
+
+    [<Emit("typeof $0 === 'number'")>]
+    let private isNumberValue (value: obj) : bool = jsNative
+
+    [<Emit("typeof $0 === 'object'")>]
+    let private isObjectValue (value: obj) : bool = jsNative
+
+    [<Emit("Array.isArray($0)")>]
+    let private isArrayValue (value: obj) : bool = jsNative
+
+    [<Emit("$0[$1]")>]
+    let private propertyOf (value: obj) (name: string) : obj = jsNative
+
+    [<Emit("Object.keys($0)")>]
+    let private objectKeys (value: obj) : string[] = jsNative
+
+    let private advisorInvalid (detail: string) : Result<'a, JsFailure> =
+        Error(JsFailure.ViewDeclarationInvalid detail)
+
+    let private advisorAnchorOfKey (key: string) : int option =
+        match System.Int32.TryParse key with
+        | true, anchor when string anchor = key -> Some anchor
+        | _ -> None
+
+    let private advisorPrefixUntilOf (raw: obj) : Result<int, JsFailure> =
+        if isNumberValue raw then
+            Ok(int (unbox<float> raw))
+        else
+            advisorInvalid
+                "prefixUntil must be an anchor number; pass one above every anchor you have seen to keep everything"
+
+    /// `thenRemove` is an anchor→summary map: the summary is what stands in for
+    /// that anchor from here on, so a missing or blank summary is a declaration
+    /// that would silently drop knowledge.
+    let private advisorReplacePair (source: obj) (key: string) : Result<int * string, JsFailure> =
+        let summary = propertyOf source key
+
+        let isSummary =
+            isStringValue summary && not (String.IsNullOrWhiteSpace(unbox<string> summary))
+
+        match advisorAnchorOfKey key, isSummary with
+        | None, _ -> advisorInvalid (sprintf "thenRemove keys must be anchor numbers; \"%s\" is not one" key)
+        | Some _, false ->
+            advisorInvalid (
+                sprintf
+                    "thenRemove[%s] must be a non-blank summary string (the summary replaces that anchor's segments, not deletes them)"
+                    key
+            )
+        | Some anchor, true -> Ok(anchor, string summary)
+
+    let private advisorAppendPair
+        (accumulated: Result<(int * string) list, JsFailure>)
+        (pair: Result<int * string, JsFailure>)
+        : Result<(int * string) list, JsFailure> =
+        match accumulated, pair with
+        | Ok pairs, Ok entry -> Ok(pairs @ [ entry ])
+        | Error failure, _ -> Error failure
+        | _, Error failure -> Error failure
+
+    /// `prefixUntil` is a required anchor number (never "all"); `thenRemove` is
+    /// an optional anchor→summary map naming what stands in for which anchor.
+    /// The parse is the same one `AnchorSurface.setView` applies to a tool-level
+    /// declaration, but a consult never writes it back into the ANCHOR ledger:
+    /// the ledger's pending declaration belongs to the caller's own next
+    /// request, and consulting the advisor must not rewrite it (advisor-[005]).
+    let private advisorParseDeclaration (view: obj) : Result<AdvisorViewDeclaration, JsFailure> =
+        let thenRemoveOf (raw: obj) : Result<(int * string) list, JsFailure> =
+            if isNullishValue raw then
+                Ok []
+            elif isArrayValue raw || not (isObjectValue raw) then
+                advisorInvalid
+                    "thenRemove must be an object mapping anchor numbers to summaries, e.g. { \"3\": \"what segment 3 held\" }"
+            else
+                objectKeys raw
+                |> Array.toList
+                |> List.map (advisorReplacePair raw)
+                |> List.fold advisorAppendPair (Ok [])
+                |> Result.map (List.sortBy fst)
+
+        let prefixUntil = advisorPrefixUntilOf (propertyOf view "prefixUntil")
+        let thenRemove = thenRemoveOf (propertyOf view "thenRemove")
+
+        match prefixUntil, thenRemove with
+        | Ok prefixUntil, Ok thenRemove ->
+            Ok
+                { PrefixUntil = prefixUntil
+                  ThenRemove = thenRemove }
+        | Error failure, _
+        | _, Error failure -> Error failure
+
+    /// A missing declaration hands over no material (`PrefixUntil = 0`), the
+    /// same default the transform applies when a request carries no view.
+    let private advisorDeclarationOf (view: obj) : Result<AdvisorViewDeclaration, JsFailure> =
+        if isNullishValue view then
+            Ok { PrefixUntil = 0; ThenRemove = [] }
+        else
+            advisorParseDeclaration view
+
+    /// The transform's own wire text over a decoded snapshot part: the advisor
+    /// reads exactly what the caller's request carried, tool calls included.
+    let private advisorPartText (part: MessagePart) : string =
+        match part with
+        | MessagePart.Text text
+        | MessagePart.Reasoning text -> text
+        | MessagePart.ToolCall(_, name, args) -> name + " " + args
+        | MessagePart.ToolResult(_, result) -> result
+        | MessagePart.Activity _ -> ""
+
+    let private advisorMessageText (parts: MessagePart array) : string =
+        if isNull parts then
+            ""
+        else
+            parts |> Array.map advisorPartText |> String.concat "\n"
+
+    /// Numbering each snapshot message is what keeps the anchors in a consult
+    /// identical to the ones the caller's own request used.
+    let private advisorViewMessage (sessionId: string) (message: SessionMessage) : AdvisorViewMessage =
+        { Anchor = AnchorLedger.numberMessage sessionId message.Id
+          Text = advisorMessageText message.Parts }
+
+    let private advisorIntentText (intent: obj) : string =
+        if isStringValue intent then unbox<string> intent else ""
+
+    /// advisor-[006]: the member's refusals are data — `{ ok = false, code,
+    /// reason }` — never a throw the program would have to catch.
+    let private advisorRefusal (code: string) (reason: string) : obj =
+        createObj [ "ok" ==> false; "code" ==> code; "reason" ==> reason ]
+
+    /// advisor-[002]/[003]: one consult — the caller's own delta rendered as the
+    /// seat's first prompt, the intent appended after it, and the seat's answer
+    /// handed back as data. A successful consult advances that caller session's
+    /// delivered-anchor cursor; a refusal changes nothing.
+    let private advisorSeatAnswer
+        (runtime: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (messages: SessionMessage list)
+        (declaration: AdvisorViewDeclaration)
+        (intent: obj)
+        : Task<obj> =
+        task {
+            let sessionId = ctx.SessionId
+
+            let request: AdvisorViewRequest =
+                { Messages = messages |> List.map (advisorViewMessage sessionId)
+                  Declaration = declaration }
+
+            let plan =
+                AdvisorView.plan (ProviderLanguage.label (lang ctx)) (Cursor.delivered sessionId) request
+
+            let deps: AdvisorSeatDeps =
+                { Sessions = runtime.Sessions
+                  Journal = runtime.Journal
+                  Directory = runtime.WorkspaceDirectory
+                  Participant = ManagedAgent.nameOf Role.Advisor }
+
+            let! answered = AdvisorSeat.consult deps sessionId (advisorIntentText intent) plan.ViewPrompt
+
+            match answered with
+            | Ok advice ->
+                Cursor.record sessionId plan.DeliveredAnchors
+                return createObj [ "ok" ==> true; "advice" ==> advice ]
+            | Error reason -> return advisorRefusal "advisor-unavailable" reason
+        }
+
+    /// advisor-[006]: the `js.advisor` host closure. The caller's context comes
+    /// from its own session snapshot; an unreadable snapshot or an invalid view
+    /// declaration is a refusal, never a silently empty view. `HasNewMaterial`
+    /// does not gate the consult: the intent alone is new material.
+    let private advisorSnapshotMessages
+        (runtime: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        : Task<Result<SessionMessage list, string>> =
+        match runtime.Snapshot with
+        | None -> Task.FromResult(Error "the session snapshot is unavailable")
+        | Some snapshotPort -> snapshotPort.GetMessages(SessionId.create ctx.SessionId)
+
+    let private advisorConsult
+        (runtime: ToolRuntimeScope)
+        (ctx: HostToolContext)
+        (intent: obj)
+        (view: obj)
+        : Task<obj> =
+        task {
+            let! loaded = advisorSnapshotMessages runtime ctx
+
+            match loaded, advisorDeclarationOf view with
+            | Error reason, _ -> return advisorRefusal "advisor-unavailable" reason
+            | _, Error failure -> return advisorRefusal (JsFailure.code failure) (JsFailure.reason failure)
+            | Ok messages, Ok declaration -> return! advisorSeatAnswer runtime ctx messages declaration intent
+        }
 
     let create
         (toolModule: obj)
@@ -509,10 +793,8 @@ module ToolRegistry =
         (isReplicaSession: (SessionId -> bool) option)
         (casebookToolSpecs: ToolSpec list)
         (jsTransactionPersistence: IJsTransactionPersistence option)
+        (jsLifecyclePersistence: IJsLifecyclePersistence option)
         (continueManagerLoop: SessionId -> string -> Task<Result<unit, string>>)
-        (childWorkRecordForRun:
-            (SessionId -> Wanxiangshu.Context.Trace.XTraceRange -> ProviderRunIdentity -> Task<string option>) option)
-        (workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability option)
         (userNotify: (string -> string -> unit) option)
         =
         let factory = ToolHostCodec.factory toolModule
@@ -521,11 +803,20 @@ module ToolRegistry =
         let jsProse: JsCanonicalDescription.Prose =
             JsDescriptionAssets.load providerLanguage
 
+        /// Where the programming surface of one session executes. A Manager, child
+        /// or DevOps session is created rooted at the directory its owner
+        /// registered (a Change road's worktree), so the surface follows the
+        /// session instead of the plugin's project directory.
+        let jsRootOf (sessionId: string) =
+            JsToolSpec.rootForSession sessionDirectories (defaultArg workspaceDirectory "") sessionId
+
         let groundingObservation (ctx: HostToolContext) (reads: JsExplicitFileRead list) effectPaths =
             match workspaceDirectory with
             | None -> Task.FromResult(())
             | Some _ when System.String.IsNullOrWhiteSpace ctx.SessionId -> Task.FromResult(())
-            | Some root ->
+            | Some _ ->
+                let root = jsRootOf ctx.SessionId
+
                 let observed =
                     reads
                     |> List.map (fun read ->
@@ -550,21 +841,156 @@ module ToolRegistry =
                 childWorkRecordFor,
                 snapshot,
                 cancelSignals,
-                ?childWorkRecordForRun = childWorkRecordForRun,
-                ?workRecordCapability = workRecordCapability,
                 continueManagerLoop = continueManagerLoop,
                 ?eventPort = eventPort
             )
 
+        let outputAuthority =
+            function
+            | Wanxiangshu.Execution.Session.Recovery.SessionRecovery.FamilyRecovery.FamilyBlocked _ ->
+                Error "Current process recovery blocks large output"
+            | _ -> Ok()
+
+        let jsProcessHost (ctx: HostToolContext) : JsToolWorkflow.ProcessHost =
+            { HardLimit = runtime.ProcessHardLimit
+              Own = fun start -> runtime.RunOwnedProcess(ctx.SessionId, start)
+              ReadOutput =
+                fun () ->
+                    task {
+                        if String.IsNullOrWhiteSpace ctx.SessionId then
+                            return Error "Output authority requires a session"
+                        else
+                            let! recovery = runtime.RequireCurrentProcessJoin(SessionId.create ctx.SessionId)
+                            return outputAuthority recovery
+                    }
+              AttachLifetimeAbort = fun cancel drained -> runtime.AttachProcessAbort(ctx.SessionId, cancel, drained)
+              AttachAbort = ctx.AttachAbort }
+
         let generatedJsSpecFor (role: Role) =
             JsToolGenerator.generate (string role) (OfficeCapability.permissions role) jsProse
             |> Option.map (fun surface ->
-                JsToolSpec.create
-                    factory
-                    surface
-                    (defaultArg workspaceDirectory "")
-                    jsTransactionPersistence
-                    (Some groundingObservation))
+                let spec =
+                    JsToolSpec.create
+                        factory
+                        surface
+                        (defaultArg workspaceDirectory "")
+                        jsTransactionPersistence
+                        jsLifecyclePersistence
+                        (Some groundingObservation)
+                        jsProcessHost
+                        jsRootOf
+
+                // Delegation seam: the programming surface's delegation members
+                // return data envelopes built from the delegation shard's
+                // structured entries. The host tool prose (fork/join/fission)
+                // is untouched; the host is process-live for one programming
+                // call and capability gating stays on the surface.
+                { spec with
+                    Execute =
+                        fun args ctx ->
+                            let envelopeOk (fields: (string * obj) list) : obj = createObj (("ok" ==> true) :: fields)
+
+                            let refusal (code: string) : obj =
+                                createObj [ "ok" ==> false; "code" ==> code ]
+
+                            let host: JsDelegationHost =
+                                { Fork =
+                                    fun payload ->
+                                        task {
+                                            let raw =
+                                                if isStringValue payload then
+                                                    createObj [ "charge" ==> payload ]
+                                                else
+                                                    payload
+
+                                            let! receipt =
+                                                ForkTool.executeReceipt runtime ctx (ToolHostCodec.argumentsOfRaw raw)
+
+                                            return
+                                                match receipt with
+                                                | Ok placed ->
+                                                    envelopeOk
+                                                        [ "name" ==> placed.Name
+                                                          "agentId" ==> placed.AgentId
+                                                          "outcome" ==> placed.Outcome ]
+                                                | Error code -> refusal code
+                                        }
+                                  Join =
+                                    fun () ->
+                                        task {
+                                            let! receipt = JoinTool.executeReceipt runtime ctx
+
+                                            return
+                                                match receipt with
+                                                | Ok records ->
+                                                    let toObj (record: JoinTool.JoinRecord) =
+                                                        createObj
+                                                            [ "name" ==> record.Name
+                                                              "agentId" ==> record.AgentId
+                                                              "role" ==> record.Role
+                                                              "status" ==> record.Status
+                                                              "workRecord" ==> record.WorkRecord ]
+
+                                                    envelopeOk
+                                                        [ "records" ==> (records |> List.map toObj |> Array.ofList)
+                                                          "byName"
+                                                          ==> createObj
+                                                                  [ for record in records ->
+                                                                        record.Name ==> box (toObj record) ] ]
+                                                | Error code -> refusal code
+                                        }
+                                  Fission =
+                                    fun payload ->
+                                        task {
+                                            let! receipt =
+                                                FissionTool.executeReceipt
+                                                    runtime
+                                                    ctx
+                                                    (ToolHostCodec.argumentsOfRaw payload)
+
+                                            return
+                                                match receipt with
+                                                | Ok group ->
+                                                    envelopeOk
+                                                        [ "groupId" ==> group.GroupId
+                                                          "lanes"
+                                                          ==> (group.Lanes
+                                                               |> List.map (fun (index, sessionId) ->
+                                                                   createObj
+                                                                       [ "index" ==> index
+                                                                         "sessionId" ==> sessionId ])
+                                                               |> Array.ofList) ]
+                                                | Error code -> refusal code
+                                        }
+                                  // The horizon roster envelope comes from the
+                                  // horizon owner; the test-facing fork receipt
+                                  // entry takes the JS harness, so the
+                                  // generated-surface host builds the context
+                                  // from its own production runtime scope.
+                                  Horizon =
+                                    fun () ->
+                                        let horizonContext: HorizonTool.HorizonRuntimeContext =
+                                            { RuntimeFor = runtime.RuntimeFor
+                                              LogicalOwnerFor = runtime.LogicalOwnerFor
+                                              Journal = runtime.Journal
+                                              EnsureWorkDevOpsBound = runtime.EnsureWorkDevOpsBound }
+
+                                        HorizonTool.rosterReceipt
+                                            (ProviderLanguage.externalName (
+                                                ProviderLanguageBinding.forSessionText ctx.SessionId
+                                            ))
+                                            horizonContext
+                                            ctx
+                                  Advisor = fun intent view -> advisorConsult runtime ctx intent view }
+
+                            JsDelegationBridge.install ctx.SessionId host
+
+                            task {
+                                try
+                                    return! spec.Execute args ctx
+                                finally
+                                    JsDelegationBridge.clear ctx.SessionId
+                            } })
 
         let generatedJsSpecs () =
             [ for role in Roles.all do
@@ -584,23 +1010,142 @@ module ToolRegistry =
                 admission
                 (defaultArg workspaceDirectory "")
                 jsTransactionPersistence
+                jsLifecyclePersistence
                 (Some groundingObservation)
+                jsProcessHost
+                jsRootOf
 
         // Lifecycle uses its own wanxiangli journal. The common directory is
         // data passed to that owner, not a borrowed workspace EventStore.
-        let planGitCommonDir = workspaceDirectory |> Option.map RuntimePath.gitCommonDir
+        let planGitCommonDir = workspaceDirectory |> Option.map RuntimePath.stateRoot
 
         let planRoot =
             workspaceDirectory
-            |> Option.map (fun workspace -> RuntimePath.gitCommonDir workspace + "/wanxiangshu")
+            |> Option.map (fun workspace -> RuntimePath.stateRoot workspace + "/wanxiangshu")
 
         let planningAdmission: ToolAdmission =
             ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
 
-        let executeJsPlanTool (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
-            runPlanProgramCore jsProse planGitCommonDir planRoot ctx.SessionId (args.OptionalText "program")
+        // 只有 S1 阶段的 Plan 可以提问；阶段门禁由 AskUser 与 durable work 共同兜底。
+        let planDeadlineMs = 10000
+        let planOutputBoundBytes = 1 <<< 20
 
-        // planning-010: the real delegation capability — the SyncDelegate
+        let planBaseClassSource () =
+            JsCanonicalDescription.runtimePlanBaseClass jsProse
+
+        let resolveHasReviewed (planGitCommonDir: string option) (sessionId: string) : bool =
+            planGitCommonDir
+            |> Option.bind (fun gitCommonDir -> resolveActiveTenure gitCommonDir sessionId |> Result.toOption)
+            |> Option.defaultValue false
+
+        let commitOrRenderPlanOutcome root sessionId hasReviewed stagedMutation value outcome =
+            match stagedMutation with
+            | None -> JsToolsResult.render outcome
+            | Some _ -> commitPlanMutation root sessionId hasReviewed stagedMutation value
+
+        let finishPlanOutcome root sessionId hasReviewed stagedMutation outcome =
+            match outcome with
+            | JsToolWorkflow.JsToolOutcome.Succeeded(value, _, _, _, _) ->
+                commitOrRenderPlanOutcome root sessionId hasReviewed stagedMutation value outcome
+            | _ -> JsToolsResult.render outcome
+
+        let executePlanProgramWithPark (root: string) (ctx: HostToolContext) (programSource: string) : Task<string> =
+            task {
+                let currentContent =
+                    match PlanPath.readPlan root ctx.SessionId with
+                    | Ok c -> c
+                    | Error _ -> ""
+
+                // DSL-MUTABLE: algorithm-scratch — staged plan mutation
+                let stagedMutation = ref None
+
+                let makeApi (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
+                    createPlanSandboxApi
+                        currentContent
+                        stagedMutation
+                        (Some parkState)
+                        (Some(fun question -> runtime.AskUser(ctx, question)))
+
+                let now = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+
+                let! outcome =
+                    JsToolWorkflow.runWithParkApi
+                        ctx.SessionId
+                        (planBaseClassSource ())
+                        programSource
+                        makeApi
+                        planDeadlineMs
+                        (now + int64 planDeadlineMs)
+                        planOutputBoundBytes
+
+                let hasReviewed = resolveHasReviewed planGitCommonDir ctx.SessionId
+                return finishPlanOutcome root ctx.SessionId hasReviewed stagedMutation.Value outcome
+            }
+
+        let executePlanProgramRoute (root: string option) (ctx: HostToolContext) (source: string) : Task<string> =
+            match root with
+            | Some rootDir -> executePlanProgramWithPark rootDir ctx source
+            | None ->
+                Task.FromResult(
+                    JsToolsResult.render (
+                        JsToolWorkflow.JsToolOutcome.Failed(
+                            JsFailure.ProgramFailed "The plan workspace is unavailable",
+                            [],
+                            [],
+                            [],
+                            []
+                        )
+                    )
+                )
+
+        let executeJsPlanTool (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+            task {
+                let viewFailure =
+                    match
+                        Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId (args.Raw?view)
+                    with
+                    | Ok() -> None
+                    | Error failure -> Some failure
+
+                let program = args.OptionalText "program"
+
+                let unpark = if isNull (args.Raw?unpark) then null else args.Raw?unpark
+
+                let abandon = if isNull (args.Raw?abandon) then null else args.Raw?abandon
+
+                match viewFailure, program, unpark, abandon with
+                | Some failure, _, _, _ ->
+                    return JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
+                | None, Some source, _, _ -> return! executePlanProgramRoute planRoot ctx source
+                | None, None, unparkValue, _ when not (isNull unparkValue) ->
+                    let! outcome =
+                        JsToolWorkflow.resumeParked
+                            (string (unparkValue?handle))
+                            (unparkValue?value)
+                            (planBaseClassSource ())
+                            planDeadlineMs
+                            planOutputBoundBytes
+
+                    return JsToolsResult.render outcome
+                | None, None, _, abandonValue when not (isNull abandonValue) ->
+                    let! outcome =
+                        JsToolWorkflow.abandonParked (string (abandonValue?handle)) planDeadlineMs planOutputBoundBytes
+
+                    return JsToolsResult.render outcome
+                | _ ->
+                    return
+                        JsToolsResult.render (
+                            JsToolWorkflow.JsToolOutcome.Failed(
+                                JsFailure.InvalidArgument "no program, unpark, or abandon input",
+                                [],
+                                [],
+                                [],
+                                []
+                            )
+                        )
+            }
+
+        // work-028: the real delegation capability — the SyncDelegate
         // runtime runs the bound fixed DevOps for this work synchronously and
         // hands back its complete work record. A missing runtime fails closed.
         let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
@@ -625,11 +1170,11 @@ module ToolRegistry =
         let renderAskOutcome (outcome: Result<AskResult, string>) : string =
             match outcome with
             | Ok res -> res.WorkRecord
-            | Error err -> sprintf "ask failed: %s" err
+            | Error err -> sprintf "devops failed: %s" err
 
         let askGitCommonDir (directory: string option) =
             match directory with
-            | Some workspace -> Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+            | Some workspace -> Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
             | None -> ""
 
         let askWithLifecycle
@@ -641,7 +1186,7 @@ module ToolRegistry =
                 let gitCommonDir = askGitCommonDir workspaceDirectory
 
                 if String.IsNullOrWhiteSpace gitCommonDir then
-                    return "ask failed: git common directory is missing"
+                    return "devops failed: git common directory is missing"
                 else
                     let delegateTo = devopsDelegateOf syncRuntime ctx
 
@@ -665,24 +1210,29 @@ module ToolRegistry =
         let lifecycleWorkOf (runtime: ToolRuntimeScope) (sessionId: string) =
             runtime.WorkspaceDirectory
             |> Option.bind (fun workspace ->
-                let commonDir = RuntimePath.gitCommonDir workspace
+                let commonDir = RuntimePath.stateRoot workspace
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId)
 
         let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : string option =
             lifecycleWorkOf runtime sessionId |> Option.bind (fun work -> work.ActiveId)
 
-        // planning-008: the receipt names the artifact path and the fact that
+        // work-026: the receipt names the artifact path and the fact that
         // an execution session started; the spawned session id stays out of
         // the provider-visible text.
         let renderDeliverReceipt (res: DeliverResult) : string =
             if res.Relayed then
                 res.Message
+            elif res.RetirementOutcome = "PostS3" then
+                sprintf
+                    "%s The plan artifact is ready at %s; nudges are permanently disabled and this session is now in post-S3 state."
+                    res.Message
+                    res.Path
             elif res.Delivered then
                 sprintf "%s The plan artifact is at %s; an execution session has been started." res.Message res.Path
             else
                 res.Message
 
-        // planning-007/008: the retirement cursor is the exact consumed-through
+        // work-025/026: the retirement cursor is the exact consumed-through
         // XTrace frontier of the physical exchange that owns this deliver call.
         // The snapshot may already contain a newer user/provider message appended
         // while this deliver tool runs; retirement is fenced to the exact
@@ -803,6 +1353,16 @@ module ToolRegistry =
             | Ok res -> renderDeliverReceipt res
             | Error err -> sprintf "deliver failed: %s" err
 
+        let registerPostS3IfEntered
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (outcome: Result<DeliverResult, string>)
+            =
+            match outcome, ctx.ProviderRunId, ctx.ToolCallId with
+            | Ok res, Some runId, Some callId when res.RetirementOutcome = "PostS3" ->
+                runtime.RegisterPostS3Interrupt(SessionId.create ctx.SessionId, runId, callId)
+            | _ -> ()
+
         let deliverCursor
             (root: string)
             (runtime: ToolRuntimeScope)
@@ -826,11 +1386,47 @@ module ToolRegistry =
                 | Error err -> return sprintf "deliver failed: %s" err
                 | Ok retirementCursor ->
                     let! outcome =
-                        PlanTools.executeDeliver
+                        PlanTools.enterPostS3OrRelay
                             gitCommonDir
                             root
                             ctx.SessionId
                             incumbencyId
+                            providerRunId
+                            toolCallId
+                            retirementBlockers
+                            retirementCursor
+
+                    registerPostS3IfEntered runtime ctx outcome
+
+                    return renderDeliverOutcome outcome
+            }
+
+        let deliverPostS3
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (gitCommonDir: string)
+            : Task<string> =
+            task {
+                let providerRunId =
+                    ctx.ProviderRunId
+                    |> Option.map ProviderRunIdentity.value
+                    |> Option.defaultValue ""
+
+                let toolCallId =
+                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
+
+                let retirementBlockers () =
+                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
+
+                match! resolveDeliverRetirementCursor runtime ctx with
+                | Error err -> return sprintf "deliver failed: %s" err
+                | Ok retirementCursor ->
+                    let! outcome =
+                        PlanTools.startPostS3Execution
+                            gitCommonDir
+                            root
+                            ctx.SessionId
                             providerRunId
                             toolCallId
                             retirementBlockers
@@ -851,7 +1447,7 @@ module ToolRegistry =
             task {
                 let gitCommonDir =
                     runtime.WorkspaceDirectory
-                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
                     |> Option.defaultValue ""
 
                 if String.IsNullOrWhiteSpace gitCommonDir then
@@ -862,9 +1458,23 @@ module ToolRegistry =
 
         let runDeliver (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
             task {
-                match lifecycleActiveIncumbencyOf runtime ctx.SessionId with
-                | None -> return "deliver failed: no active incumbency found for this work"
-                | Some incumbencyId -> return! deliverForIncumbency root runtime ctx incumbencyId
+                let gitCommonDir =
+                    runtime.WorkspaceDirectory
+                    |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
+                    |> Option.defaultValue ""
+
+                match lifecycleWorkOf runtime ctx.SessionId with
+                | Some work when work.ActiveId.IsSome ->
+                    return! deliverForIncumbency root runtime ctx work.ActiveId.Value
+                | Some work when
+                    work.Delivered
+                    && work.Sequence = [ "S1"; "S2"; "S3" ]
+                    && String.IsNullOrWhiteSpace gitCommonDir
+                    ->
+                    return "deliver failed: git common directory is missing"
+                | Some work when work.Delivered && work.Sequence = [ "S1"; "S2"; "S3" ] ->
+                    return! deliverPostS3 root runtime ctx gitCommonDir
+                | _ -> return "deliver failed: no active incumbency found for this work"
             }
 
         let executeDeliverTool
@@ -879,7 +1489,32 @@ module ToolRegistry =
             }
 
         let planningSpecs () =
-            [ { Name = "js-plan"
+            let planUnparkSchema =
+                ToolHostCodec.objectSchemaOf
+                    [ "handle", ToolHostCodec.stringSchema factory
+                      "value", ToolHostCodec.anySchema factory ]
+                    factory
+
+            let planAbandonSchema =
+                ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
+
+            // ANCHOR handover view (context-compression [031]): a retiring
+            // tenure declares what the successor request must keep. Same
+            // contract as the generated surfaces: prefixUntil protects the
+            // cache prefix, thenRemove replaces anchors with the tenure's own
+            // summaries for good.
+            let planViewSchema =
+                ToolHostCodec.objectSchemaOf
+                    [ "prefixUntil", ToolHostCodec.numberSchema factory
+                      "thenRemove",
+                      ToolHostCodec.recordSchemaOf
+                          (ToolHostCodec.stringSchema factory)
+                          (ToolHostCodec.stringSchema factory)
+                          (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
+                          factory ]
+                    factory
+
+            [ { Name = "todowrite-for-plan"
                 Description =
                   JsCanonicalDescription.renderPlan
                       jsProse
@@ -888,16 +1523,40 @@ module ToolRegistry =
                   [ "program",
                     ToolHostCodec.stringSchemaDescribed
                         (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
-                        factory ]
+                        factory
+                    "unpark", planUnparkSchema
+                    "abandon", planAbandonSchema
+                    "view", planViewSchema ]
                 Admission = planningAdmission
                 Execute = fun args ctx -> executeJsPlanTool args ctx }
-              { Name = "ask"
-                Description = ProviderProse.render providerLanguage "tool/ask" Map.empty
+              { Name = "devops"
+                Description = ProviderProse.render providerLanguage "tool/devops" Map.empty
                 Arguments =
                   [ "intent",
                     ToolHostCodec.stringSchemaDescribed "Investigation intent handed to the bound fixed DevOps" factory ]
                 Admission = planningAdmission
                 Execute = fun args ctx -> executeAskTool syncDelegateRuntime args ctx } ]
+
+        let askSpec: ToolSpec =
+            { Name = "ask"
+              Description = ProviderProse.render providerLanguage "tool/ask" Map.empty
+              Arguments =
+                [ "question",
+                  ToolHostCodec.stringSchemaDescribed
+                      (ProviderProse.render providerLanguage "tool/ask-question" Map.empty)
+                      factory ]
+              Admission = ToolAdmission.OfficeRole(fun _ role -> OfficeCapability.isAllowed role ToolPermission.Ask)
+              Execute =
+                fun args ctx ->
+                    task {
+                        let! asked = runtime.AskUser(ctx, args.Text "question")
+                        let language = ProviderLanguageBinding.forSessionText ctx.SessionId
+
+                        return
+                            match asked with
+                            | Ok() -> ProviderProse.render language "tool/ask-sent" Map.empty
+                            | Error reason -> ProviderProse.render language "tool/ask-failed" (Map [ "reason", reason ])
+                    } }
 
         /// Algorithm D/E: one `deliver` tool. The work's sequence decides the
         /// path — S4 is the two-stage Manager deliver, S1–S3 the one-shot Plan
@@ -915,6 +1574,11 @@ module ToolRegistry =
             let sequenceOf (ctx: HostToolContext) : string list option =
                 lifecycleWorkOf runtime ctx.SessionId |> Option.map (fun work -> work.Sequence)
 
+            let executeDeliverRoute (ctx: HostToolContext) (args: HostToolArguments) : Task<string> =
+                match sequenceOf ctx with
+                | Some [ "S1"; "S2"; "S3" ] -> planSpec.Execute args ctx
+                | _ -> managerSpec.Execute args ctx
+
             { managerSpec with
                 Admission =
                     ToolAdmission.OfficeRole(fun _ role ->
@@ -922,23 +1586,37 @@ module ToolRegistry =
                         || OfficeCapability.isAllowed role ToolPermission.Deliver)
                 Execute =
                     fun args ctx ->
-                        match sequenceOf ctx with
-                        | Some [ "S1"; "S2"; "S3" ] -> planSpec.Execute args ctx
-                        | _ -> managerSpec.Execute args ctx }
+                        task {
+                            // Algorithm G1: the deliver hard gate. While any
+                            // parked site is unresolved (state=Parked and no
+                            // unpark/abandon has been taken), delivery is
+                            // refused and every handle is listed. The parked
+                            // site table and its read-only query are owned by
+                            // lane-a-core (JsParkedSites.parkedHandles).
+                            let parkedHandles = JsParkedSites.parkedHandles ()
+
+                            if not (List.isEmpty parkedHandles) then
+                                let handles = String.Join(", ", parkedHandles)
+
+                                return
+                                    ToolHostCodec.tomlObjectWithInstructions
+                                        [ ProviderProse.render
+                                              (lang ctx)
+                                              Path.DeliverBlockedByParked
+                                              (Map [ "handles", handles ]) ]
+                                        [ "code", ToolHostCodec.TString Path.DeliverBlockedByParked
+                                          "parked_handles", ToolHostCodec.TString handles ]
+                            else
+                                return! executeDeliverRoute ctx args
+                        } }
 
         let baseSpecs =
             [ yield ForkTool.managerSpec factory runtime
               yield ForkTool.resumeSpec factory runtime
-              let ptyContext: PtyTool.PtyRuntimeContext =
-                  { IsDevOps = fun ctx -> runtime.IsRole(ctx, Role.DevOps)
-                    ManagedAgentFor = runtime.ManagedAgentFor
-                    PtyCapabilityFor = runtime.PtyCapabilityFor
-                    DirectoryFor = runtime.DirectoryFor
-                    WorkspaceDirectory = runtime.WorkspaceDirectory }
 
-              yield! PtyTool.specs factory ptyContext
               yield ForkTool.orchestratorSpec factory runtime
               yield JoinTool.spec runtime
+              yield askSpec
 
               let horizonContext: HorizonTool.HorizonRuntimeContext =
                   { RuntimeFor = runtime.RuntimeFor
@@ -948,17 +1626,12 @@ module ToolRegistry =
 
               yield HorizonTool.spec horizonContext
               yield FissionTool.spec factory runtime
-              // relay-assessment-011 / planning-022: the shared review shell.
+              // work-038: the shared review shell.
               // Plan lifecycle reads its own durable owner directly.
               yield ReviewShell.spec factory runtime
               yield deliverSpec ()
-              yield ExecutorTool.runSpec ProcessRunner.run factory runtime
-              yield FileMutationTools.mvSpec factory
-              yield FileMutationTools.rmSpec factory
               yield BashHoneypotTool.spec
               yield AssumeTool.spec factory
-              yield! AttentionTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forAttention)
-              yield! ConcernTools.specs factory (journal |> Option.map AgentJournalPortAdapter.forConcern) userNotify
 
               yield
                   ChronicleTool.spec
@@ -977,14 +1650,26 @@ module ToolRegistry =
                 replicaPred (SessionId.create ctx.SessionId)
             | _ -> false
 
+        let recordedDeliverReplay (ctx: HostToolContext) =
+            match ctx.ProviderRunId, ctx.ToolCallId with
+            | Some run, Some call ->
+                let settled work =
+                    DeliverTool.recordedFenceReplay work (ProviderRunIdentity.value run) (ToolCallId.value call)
+                    |> Option.isSome
+
+                lifecycleWorkOf runtime ctx.SessionId |> Option.exists settled
+            | _ -> false
+
         let gateFacts: ToolGateFacts =
             { RoleFor = (fun ctx -> runtime.RoleFor ctx)
               EnsureRoleFor = (fun ctx -> runtime.EnsureRoleFor ctx)
               IsStrengthReplica = isStrengthReplica
               ManagerFactsFor = (fun sessionId -> runtime.ManagerCapabilityFactsFor sessionId)
               IsRetirementFrozen = (fun sessionId -> runtime.IsRetirementFrozen sessionId)
+              IsWaitingForUser = runtime.IsWaitingForUser
               BeginToolExecution = beginToolExecution
-              EndToolExecution = endToolExecution }
+              EndToolExecution = endToolExecution
+              RecordedDeliverReplay = recordedDeliverReplay }
 
         // Generic execute gate: every tool declares the authority it is admitted
         // under, and the registry never invents one the session does not hold.

@@ -30,26 +30,29 @@ const ToolPermission = toolPermissionByName
 const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 
 const fsPermissionsOf = (role) =>
-  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Edit', 'Glob', 'Grep'].includes(n))
+  rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Glob', 'Move', 'Remove'].includes(n))
 
 const MEMBERS_BY_PERMISSION = {
-  Read: ['file'],
-  Glob: ['glob'],
-  Grep: ['grep'],
-  Edit: ['edit', 'rewrite'],
-  Write: ['write'],
+  Read: ['cat', 'stat', 'whereAll', 'where'],
+  Glob: ['ls'],
+  Write: ['write', 'mkdir'],
+  Move: ['mv'],
+  Remove: ['rm'],
 }
 
 const BINDING_BY_MEMBER = {
-  file: 'js.read',
-  glob: 'js.glob',
-  grep: 'js.grep',
-  edit: 'js.edit',
-  rewrite: 'js.edit',
   write: 'js.write',
+  rm: 'js.rm',
+  mv: 'js.mv',
+  cat: 'js.cat',
+  ls: 'js.ls',
+  stat: 'js.stat',
+  mkdir: 'js.mkdir',
+  whereAll: 'js.whereAll',
+  where: 'js.where',
 }
 
-const MEMBER_ORDER = ['file', 'glob', 'grep', 'edit', 'rewrite', 'write']
+const MEMBER_ORDER = ['write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where']
 
 const layersOf = (s) =>
   Object.fromEntries(
@@ -68,9 +71,9 @@ const layersOf = (s) =>
 
 test('WHAT[repository-programming-004] JS001_generated_name_gate_rejects_forged_names', () => {
   const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
-  assert.equal(isGeneratedToolName('Engineer', perms, 'js-engineer'), true)
-  assert.equal(isGeneratedToolName('Engineer', perms, 'js-devops'), false)
+  assert.equal(isGeneratedToolName('Engineer', perms, 'todowrite-for-engineer'), true)
+  assert.equal(isGeneratedToolName('Engineer', perms, 'todowrite-for-devops'), false)
   assert.equal(isGeneratedToolName('Engineer', perms, 'read'), false)
   // a role without the capability set never admits its own name
-  assert.equal(isGeneratedToolName('Engineer', caps(ToolPermission.Fork), 'js-engineer'), false)
+  assert.equal(isGeneratedToolName('Engineer', caps(ToolPermission.Ask), 'todowrite-for-engineer'), false)
 })

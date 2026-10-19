@@ -141,6 +141,7 @@ try {
     extraEnv: {
       WXS_GROUNDING_CANARY_COLLECTOR: `${provider.url}/collector`, WXS_GROUNDING_CANARY_WORKSPACE: workspace,
       WXS_GROUNDING_CANARY_SOURCE: sourcePath, WXS_GROUNDING_CANARY_DIST: path.join(root, 'dist'),
+        WANXIANGSHU_PROVIDER_LANGUAGE: 'zh-CN',
     },
   })
   assert.equal((await api('/global/health')).version, version)
@@ -183,7 +184,7 @@ try {
     const delivered = toolResults(requests[index + 1].body).find(message => message.tool_call_id === callIDs[index])
     assert.equal(delivered.content, projected.state.output)
   }
-  const eventsDirectory = path.join(workspace, '.git/wanxiangshu/events')
+  const eventsDirectory = path.join(workspace, '.Herdchestra/wanxiangshu/events')
   journalEvents = fs.readdirSync(eventsDirectory).flatMap(name => fs.readFileSync(path.join(eventsDirectory, name), 'utf8').split('\n').filter(Boolean).map(JSON.parse))
   const hostFacts = journalEvents.flatMap(event => {
     const fact = event.payload?.Fact
@@ -213,7 +214,7 @@ try {
     try { transcript = valueOf(await api(`/session/${sessionID}/message`)) } catch (error) { cleanupErrors.push(error) }
   }
   if (workspace && journalEvents === undefined) {
-    const eventsDirectory = path.join(workspace, '.git/wanxiangshu/events')
+    const eventsDirectory = path.join(workspace, '.Herdchestra/wanxiangshu/events')
     if (fs.existsSync(eventsDirectory)) {
       try {
         journalEvents = fs.readdirSync(eventsDirectory).flatMap(name => fs.readFileSync(path.join(eventsDirectory, name), 'utf8').split('\n').filter(Boolean).map(JSON.parse))

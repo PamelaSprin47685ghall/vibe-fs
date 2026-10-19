@@ -10,8 +10,8 @@
  *   CTX-010        prefix probe — attempt-local head, fixed tool set
  *   ENFORCER-030   frame commit — Blogger frame list grows, fixed system/tools
  *   SyncDelegate   request-kind switch — per-request tool map swap, same transcript
- *   MANAGER-LOOP   manager iteration — same system/plan, root authority kept while
- *                  retired-iteration traffic and the wake are removed
+ *   MANAGER-LOOP   manager tenure — same system/plan, root authority kept while
+ *                  retired-tenure traffic and the wake are removed
  *
  * Sniffing is forbidden, and package K1 measured why. The deleted `epochCold`
  * exemption read "tools and the leading system message unchanged" and then admitted
@@ -34,6 +34,14 @@
 import { readFileSync } from 'node:fs';
 import { isDeepStrictEqual } from 'node:util';
 import { isAppendOnlyPrefix, wireOf } from './provider-wire.js';
+// The injected Blogger/Enforcer row shapes come from their registered JS surface, so a
+// reworded table or member name fails here instead of silently making every row-shaped
+// assistant count as ordinary history (the HOST-013 rule `runtime-key.js` follows).
+import {
+  renderHistoricFrame,
+  renderPreviousEnforcerTip,
+} from '../../../../../dist/Context/Companion/Blogger/TomlSurface.js';
+import { hostDotAckText } from './runtime-key.js';
 
 export const BOUNDARY_KINDS = [
   'epoch-switch',
@@ -128,27 +136,34 @@ const probeKeepsFixedParts = (previousWire, nextWire) => isDeepStrictEqual(previ
 
 // ── pure manager loop ───────────────────────────────────────────────────────
 //
-// Every manager iteration keeps the same workspace, tools and authority plan: a
-// Continue retirement is followed by another ordinary iteration, and the successor
-// keeps the predecessor's provider history instead of restarting from a trimmed
-// transcript (work-008: raw messages, tool calls, results, nudge,
-// late parts and the internal loop wake are all retained). A preceding provider
-// fallback may change only OpenCode's exact model banner. This layer checks structure
-// only — the normalized system is equal, the previous message list is an ordered
-// PREFIX of the next one, and the only admitted difference inside that prefix is a
-// retired auxiliary injection (context-compression-019 / GAP-022: an old horizon's
-// guidance occurrence or companion frame must not replay). So a rewritten or dropped
-// historical message, a novel wake or a synthetic user cannot smuggle in, while the
-// successor's own appended turns and its fresh-head prompt are exactly what the
-// retained-history contract expects. Full typed authority-revision retention is proved
-// by the unit projection tests and the long-stroke root-only oracle, not here.
+// Every manager tenure keeps the same workspace, tools and authority plan: a
+// Relayed retirement is followed by another ordinary tenure. The successor does
+// NOT keep the predecessor's physical history — work-008 makes stripping the
+// predecessor's assistant/tool traffic the obligation (`RelayNarrativeTransform.
+// projectActive` keeps only interactions whose first XTrace observation is at or after
+// the active tenure's opening, and always keeps user input; the retired attempt's own
+// continuation is stopped outright). A preceding provider fallback may change only
+// OpenCode's exact model banner.
+//
+// So the claims that survive at this layer are the ones the projection may not move:
+//
+//   tools       the provider plan is fixed
+//   system      the normalized system prompt is fixed
+//   users       every previous user message is still present, in order and byte-equal
+//               (the authority root is never rewritten and user input is never dropped)
+//
+// Dropping assistant/tool traffic is the projection's own admitted behavior and is
+// therefore NOT a break; a rewritten or dropped user, a changed tool set or system
+// prompt is, and stays fail-closed. What a rewritten-but-retained interaction would look
+// like is indistinguishable from a dropped one plus a new one, so that claim is not
+// asserted here — the long-stroke oracle reads the successor's own structure instead.
 
 const sameProviderPlan = (previousWire, nextWire) => isDeepStrictEqual(previousWire.tools, nextWire.tools);
 
 // The Host appends each guidance occurrence — a `<system>` block or an
 // Enforcer tip — as a `\0\uFEFF`-separated suffix to the request's terminal part (a user
 // message or the last completed tool result; `cursorGuidanceSeparator` in
-// PairProgrammingThoughtTransform.fs). A successor iteration retires such an occurrence
+// PairProgrammingThoughtTransform.fs). A successor tenure retires such an occurrence
 // without rewriting the message it was attached to.
 const GUIDANCE_MARKER = '\0\uFEFF';
 
@@ -168,6 +183,80 @@ const withoutGuidancePart = (part) => {
 // System messages are never stripped: their content is compared separately.
 const withoutGuidanceMessage = (message) =>
   message?.role === 'system' ? message : { ...message, parts: (message.parts ?? []).map(withoutGuidancePart) };
+
+/**
+ * Every seal comparison reads the injected-drift-normalized wires.
+ *
+ * Retiring a guidance occurrence is plugin-injected INTENDED drift, not wire drift
+ * (context-compression-019 / GAP-022): the Host appends each occurrence as a
+ * `\0\uFEFF`-separated suffix to the request's terminal part — a user message or the last
+ * completed tool result — and a later delivery retires that occurrence without rewriting
+ * the message it was attached to. Declaring a boundary per entry would multiply
+ * declarations for one phenomenon (the Manager's reusable nudge ladder alone spans
+ * bounded cursors), so the normalization lives at the seal itself.
+ *
+ * The Blogger/Enforcer auxiliary rows are the same class: production renders the historic
+ * frame and the previous enforcer tip as an assistant message whose body is one
+ * `[[do_not_exec]]` TOML table (`Context/Companion/Blogger/Toml.fs`), and a later
+ * delivery re-renders or retires that row — the frame list grows, the tip rotates. Their
+ * exact prefixes are derived from the production renderer, never re-typed here.
+ *
+ * Fail-closed is kept exactly: only the known occurrence shape is normalized. Everything
+ * before the separator must still match byte for byte, so a rewritten, dropped, inserted
+ * or reordered message still surfaces as a break — declared or undeclared.
+ */
+const PROBE = '\u0000probe';
+const auxiliaryRowPrefixes = [renderHistoricFrame(PROBE), renderPreviousEnforcerTip(PROBE, PROBE)].map(
+  (rendered) => rendered.slice(0, rendered.indexOf(PROBE)),
+);
+
+const isAuxiliaryRow = (message) =>
+  message?.role === 'assistant'
+  && message.parts?.length === 1
+  && message.parts[0]?.kind === 'text'
+  && typeof message.parts[0].text === 'string'
+  && auxiliaryRowPrefixes.some((prefix) => message.parts[0].text.startsWith(prefix));
+
+/**
+ * A retired owner-facing readonly-replay block: one projected companion exchange —
+ * `assistant(tool-call)` closed by its own `tool(result)`, followed by the Host's dot ack.
+ * Production re-renders or retires that replay when the horizon advances, so the block may
+ * disappear between two deliveries of the same entry (the Manager's reusable nudge ladder
+ * does exactly that). Structural only: the call must be closed by the result that names
+ * its own id, and the ack must be the production dot text.
+ */
+const isReadonlyReplayBlock = (call, result, ack) =>
+  call?.role === 'assistant'
+  && call.parts?.length === 1
+  && call.parts[0]?.kind === 'tool-call'
+  && result?.role === 'tool'
+  && result.parts?.length === 1
+  && result.parts[0]?.kind === 'tool-result'
+  && result.parts[0].callId === call.parts[0].callId
+  && ack?.role === 'assistant'
+  && ack.parts?.length === 1
+  && ack.parts[0]?.kind === 'text'
+  && hostDotAckText !== null
+  && ack.parts[0].text === hostDotAckText;
+
+const withoutReadonlyReplayBlocks = (messages) => {
+  const kept = [];
+  for (let index = 0; index < messages.length; index += 1) {
+    if (isReadonlyReplayBlock(messages[index], messages[index + 1], messages[index + 2])) {
+      index += 2;
+      continue;
+    }
+    kept.push(messages[index]);
+  }
+  return kept;
+};
+
+const withoutGuidanceOccurrences = (wire) => ({
+  ...wire,
+  messages: withoutReadonlyReplayBlocks(
+    (wire.messages ?? []).map(withoutGuidanceMessage).filter((message) => !isAuxiliaryRow(message)),
+  ),
+});
 
 // The companion frame is the other retired auxiliary injection: the Host renders it as
 // a synthetic assistant ack row plus a user row carrying the memory preamble and the
@@ -212,12 +301,33 @@ const managerLoopKeepsAuthority = (previousWire, nextWire) => {
   const normalizedNext = withoutHostModelBanner(nextWire);
   if (!isDeepStrictEqual(systemOf(normalizedPrevious), systemOf(normalizedNext))) return false;
 
-  const messagesOf = (wire) => withoutCompanionFrames((wire.messages ?? []).map(withoutGuidanceMessage));
+  // Guidance occurrences are already retired by `sealDecision`; the companion frame is
+  // this kind's own retired auxiliary injection.
+  const messagesOf = (wire) => withoutCompanionFrames(wire.messages ?? []);
   const previousMessages = messagesOf(normalizedPrevious);
   const nextMessages = messagesOf(normalizedNext);
-  if (previousMessages.length === 0 || nextMessages.length < previousMessages.length) return false;
+  if (previousMessages.length === 0 || nextMessages.length === 0) return false;
 
-  return previousMessages.every((message, index) => isDeepStrictEqual(message, nextMessages[index]));
+  const usersOf = (messages) => messages.filter((message) => message?.role === 'user');
+  const previousUsers = usersOf(previousMessages);
+  const nextUsers = usersOf(nextMessages);
+  if (previousUsers.length === 0) return false;
+
+  // The authority root is the handover's fixed point: the first user the successor
+  // sends is the predecessor's first user, unchanged.
+  if (!isDeepStrictEqual(nextUsers[0], previousUsers[0])) return false;
+
+  // User input stays: every previous user is still there, in order and unchanged.
+  let cursor = 0;
+  for (const previousUser of previousUsers) {
+    const found = nextUsers.findIndex(
+      (candidate, index) => index >= cursor && isDeepStrictEqual(candidate, previousUser),
+    );
+    if (found < 0) return false;
+    cursor = found + 1;
+  }
+
+  return true;
 };
 
 /**
@@ -234,7 +344,7 @@ const managerLoopKeepsAuthority = (previousWire, nextWire) => {
  * one: the author believes a cold boundary is covered, and the scenario silently
  * stopped exercising it. Same reasoning as an empty `attempts` list in a fault.
  */
-export function sealDecision({ previousWire, body, boundary }) {
+export function sealDecision({ previousWire, body, boundary, stripAdmitted = false }) {
   if (previousWire === null || previousWire === undefined) {
     // `prefix-probe`, `frame-commit`, and `manager-loop` share the multi-delivery
     // shape: the first request establishes the seal (nothing to break), later ones
@@ -249,11 +359,24 @@ export function sealDecision({ previousWire, body, boundary }) {
       : { broken: 'boundary-not-reached', kind: boundary.kind };
   }
 
-  const nextWire = wireOf(body);
-  const held = isAppendOnlyPrefix(previousWire, nextWire);
+  // Both sides of every comparison below are the occurrence-normalized wires: retiring a
+  // guidance occurrence is intended plugin drift (see `withoutGuidanceOccurrences`), while
+  // every other byte of the prefix still has to match.
+  const previous = withoutGuidanceOccurrences(previousWire);
+  const nextWire = withoutGuidanceOccurrences(wireOf(body));
+  const held = isAppendOnlyPrefix(previous, nextWire);
 
   if (boundary === null || boundary === undefined) {
-    return held ? { held: true } : { broken: 'undeclared' };
+    if (held) return { held: true };
+    // work-008: when the session crossed a tenure boundary between the two deliveries,
+    // production's successor projection legitimately strips the predecessor's
+    // assistant/tool traffic (it keeps user input and whatever the new tenure observed).
+    // The caller establishes that boundary from the durable journal, so this admission is
+    // never taken from the wire alone — and even then the strip has to satisfy the same
+    // structural claims the `manager-loop` boundary makes.
+    return stripAdmitted && managerLoopKeepsAuthority(withoutGuidanceOccurrences(previousWire), nextWire)
+      ? { resealed: 'successor-strip' }
+      : { broken: 'undeclared' };
   }
 
   if (held) {
@@ -265,7 +388,7 @@ export function sealDecision({ previousWire, body, boundary }) {
     // `frame-commit` shares this shape: the Blogger session's first request
     // establishes the seal (nothing to break), later requests break it as frames
     // accumulate. `manager-loop` shares it too: a reusable step-0 entry may see
-    // append-only retries that stay held, with only the next iteration's restart
+    // append-only retries that stay held, with only the next tenure's restart
     // breaking the seal.
     return boundary.kind === 'prefix-probe' || boundary.kind === 'frame-commit' || boundary.kind === 'manager-loop' || boundary.kind === 'epoch-switch'
       ? { held: true }
@@ -282,7 +405,7 @@ export function sealDecision({ previousWire, body, boundary }) {
     // FALLBACK-004: only the model may move. Messages must still be append-only, so a
     // declared side switch cannot excuse a rewritten transcript.
     case 'fallback-side':
-      return messagesStillAppendOnly(previousWire, nextWire)
+      return messagesStillAppendOnly(previous, nextWire)
         ? { resealed: 'fallback-side' }
         : { broken: 'fallback-side-rewrote-messages' };
 
@@ -310,17 +433,17 @@ export function sealDecision({ previousWire, body, boundary }) {
     // SyncDelegate: a dedicated Inspector/Coder CE may swap the per-request
     // tool map (Returned → Completion) without replacing its transcript.
     case 'request-kind-switch':
-      return requestKindKeepsPrefix(previousWire, nextWire)
+      return requestKindKeepsPrefix(previous, nextWire)
         ? { resealed: 'request-kind-switch' }
         : { broken: 'request-kind-switch-rewrote-prefix' };
 
-    // MANAGER-LOOP: a Continue retirement is followed by another ordinary
-    // iteration under the same system/provider plan. The root user is kept and
-    // every next user is a subsequence of the previous users; retired-iteration
+    // MANAGER-LOOP: a Relayed retirement is followed by another ordinary
+    // tenure under the same system/provider plan. The root user is kept and
+    // every next user is a subsequence of the previous users; retired-tenure
     // assistant/tool traffic and a novel wake are absent. Anything else is a
     // rewrite of the fixed parts.
     case 'manager-loop':
-      return managerLoopKeepsAuthority(previousWire, nextWire)
+      return managerLoopKeepsAuthority(previous, nextWire)
         ? { resealed: 'manager-loop' }
         : { broken: 'manager-loop-rewrote-fixed' };
 

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as enforcer from '../../../dist/Enforcer/Surface.js'
 import { inspectEnforcerBoundsSources } from '../../../scripts/lib/enforcer-bounds-owner.mjs'
+import { call, decode } from './support/cycle.mjs'
 
 const MAX_BLOG_TEXT_BYTES = 512 * 1024
 
@@ -70,4 +71,51 @@ test('WHAT[behavior-diagnosis-011] current text and legacy evidence compatibilit
     const invalid = field === 'text' ? enforcer.validateBounds(content + 'x', '') : enforcer.validateBounds('work', content + 'x')
     assert.equal(invalid.ok, false)
   }
+})
+
+const cycleCall = (overrides = {}) =>
+  call({
+    state: {
+      status: 'completed',
+      input: {
+        charge: 'resolve the current question',
+        occurrence: 'work',
+        settlement: 'result settled',
+        consequence: 'continue on the settled path',
+        tipName: 'primitive-obsession',
+        opinion: 'the boundary decides later work',
+        advice: 'smallest complete repair first',
+        ...overrides,
+      },
+    },
+  })
+
+test('WHAT[behavior-diagnosis-011] production decode chain rejects tip sections text over 512KiB with its own message', () => {
+  const result = decode([cycleCall({ opinion: 'a'.repeat(MAX_BLOG_TEXT_BYTES + 1) })])
+  assert.equal(result.decodedCalls, 1, 'the codec puts no byte cap on a single section; the bounds gate rejects this call')
+  assert.equal(result.decision.ok, false)
+  assert.equal(
+    result.decision.error,
+    `blog cycle tip sections exceed MaxBlogTextBytes=${MAX_BLOG_TEXT_BYTES}`
+  )
+})
+
+test('WHAT[behavior-diagnosis-011] production decode chain rejects merged text over 512KiB before the tip sections axis', () => {
+  const result = decode([cycleCall({ charge: 'a'.repeat(MAX_BLOG_TEXT_BYTES + 1) })])
+  assert.equal(result.decodedCalls, 1)
+  assert.equal(result.decision.ok, false)
+  assert.equal(
+    result.decision.error,
+    `blog cycle text exceeds MaxBlogTextBytes=${MAX_BLOG_TEXT_BYTES}`
+  )
+})
+
+test('WHAT[behavior-diagnosis-011] production decode chain accepts both sections whose rendered text stays inside 512KiB', () => {
+  const boundedSection = 'a'.repeat(Math.floor((MAX_BLOG_TEXT_BYTES - 1024) / 2))
+  const result = decode([cycleCall({
+    opinion: boundedSection,
+    advice: boundedSection,
+  })])
+  assert.equal(result.decodedCalls, 1)
+  assert.equal(result.decision.ok, true)
 })

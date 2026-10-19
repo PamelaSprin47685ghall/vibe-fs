@@ -15,6 +15,6 @@ if (mode === 'write') {
   }))
   causal.writeSnapshot(workspace, registry)
 }
-const previous = JSON.parse(readFileSync(join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json'), 'utf8'))
+const previous = JSON.parse(readFileSync(join(workspace, '.Herdchestra', 'diagnostics', 'causal-waits.json'), 'utf8'))
 const current = causal.snapshot(registry)
 process.stdout.write(JSON.stringify({ pid: process.pid, previousPid: previous.pid, previousActive: previous.active.length, active: current.active.length, history: current.history.length }))

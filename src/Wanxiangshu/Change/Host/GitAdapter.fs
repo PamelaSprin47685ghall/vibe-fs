@@ -10,6 +10,12 @@ open Wanxiangshu.Foundation
 /// Git command plumbing for the production Orchestrator host.
 module OrchestratorGit =
 
+    let private absoluteGitPath (directory: string) (path: string) =
+        if path.StartsWith "/" then
+            path
+        else
+            System.IO.Path.Combine(directory, path)
+
     let private estimate =
         { EstimatedRuntime = RuntimeSeconds 30.0
           EstimatedOutput = OutputBytes 65536L
@@ -26,6 +32,7 @@ module OrchestratorGit =
             match res with
             | ProcessResult.Observed { Output = Some(CapturedOutput.Spooled(path, _, _)) } -> Spool.delete path
             | _ -> ()
+
             return ProcessResult.requireText res
         }
 
@@ -50,13 +57,16 @@ module OrchestratorGit =
         let pathFor name =
             taskResult {
                 let! result = execute runner (command worktree [ "rev-parse"; "--git-path"; name ])
+
                 if result.ExitCode <> 0 || String.IsNullOrWhiteSpace result.Stdout then
                     return! Error(sprintf "git rebase-state query failed: %s" result.Stderr)
                 else
                     let path = result.Stdout.Trim()
-                    let absolute = if path.StartsWith "/" then path else System.IO.Path.Combine(worktree, path)
+                    let absolute = absoluteGitPath worktree path
+
                     return System.IO.Directory.Exists absolute
             }
+
         taskResult {
             let! merge = pathFor "rebase-merge"
             let! apply = pathFor "rebase-apply"
@@ -70,10 +80,7 @@ module OrchestratorGit =
     /// markers. Checking unmerged *before* add rejected a resolved file that was
     /// still unstaged (ORCH-003 conflict resume: Coder rewrote the file; Manager
     /// joined; finalize must stage then continue).
-    let private continueRebase
-        (runner: TextProcessRunner)
-        (worktree: string)
-        : Task<Result<unit, string>> =
+    let private continueRebase (runner: TextProcessRunner) (worktree: string) : Task<Result<unit, string>> =
         taskResult {
             let! result = execute runner (command worktree [ "-c"; "core.editor=true"; "rebase"; "--continue" ])
 
@@ -98,7 +105,12 @@ module OrchestratorGit =
         : Task<Result<unit, string>> =
         taskResult {
             let! deleted = execute runner (command worktree [ "update-ref"; "-d"; "REBASE_HEAD" ])
-            do! if deleted.ExitCode = 0 then Ok() else Error(sprintf "git stale-ref cleanup failed: %s" deleted.Stderr)
+
+            do!
+                if deleted.ExitCode = 0 then
+                    Ok()
+                else
+                    Error(sprintf "git stale-ref cleanup failed: %s" deleted.Stderr)
 
             let! result = execute runner (command worktree [ "commit"; "-m"; sprintf "candidate: %s" managerId ])
 
@@ -130,7 +142,8 @@ module OrchestratorGit =
         (worktree: string)
         : Task<Result<unit, string>> =
         taskResult {
-            let! result = execute runner (command worktree [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ])
+            let! result =
+                execute runner (command worktree [ "grep"; "-I"; "-n"; "-E"; "^<<<<<<< |^>>>>>>> "; "--"; "." ])
 
             // git grep exit 0 = matches, 1 = no match, >1 = error
             if result.ExitCode = 0 && not (String.IsNullOrWhiteSpace result.Stdout) then

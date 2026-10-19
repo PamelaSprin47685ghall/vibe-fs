@@ -52,50 +52,6 @@ module internal CompanionHostBlogger =
           Journal: AgentJournal option
           Participant: string }
 
-    /// CTX-012: covered frame count = ceil(m / 2).
-    let coveredFrameCount (frameCount: int) : int =
-        if frameCount <= 0 then 0 else (frameCount + 1) / 2
-
-    /// Build typed Squash context from durable frames (exact digests, fail closed if short).
-    /// Freezes RequestId + ObservedPrefixEpochId at materialization (C5).
-    let tryBuildSquashContext
-        (mainSessionId: SessionId)
-        (bloggerSessionId: SessionId)
-        (observedEpoch: PrefixEpochId)
-        (blog: BlogProjectionState)
-        : BloggerRequestContext option =
-        let m = List.length blog.Frames
-        let k = coveredFrameCount m
-
-        let selected =
-            if k < 1 then
-                None
-            else
-                let frames = List.truncate k (BlogProjection.frames blog)
-                Some frames |> Option.filter (fun selected -> List.length selected = k)
-
-        selected
-        |> Option.map (fun selected ->
-            let digests = selected |> List.map (fun f -> f.Digest)
-
-            let requestId =
-                BloggerRequestContext.squashRequestId mainSessionId bloggerSessionId blog.FrameEpochId k digests
-
-            let candidate: BloggerSquashRequestInput =
-                { RequestId = requestId
-                  MainSessionId = mainSessionId
-                  BloggerSessionId = bloggerSessionId
-                  FrameEpochId = blog.FrameEpochId
-                  CoveredFrameCount = k
-                  FrameDigests = digests
-                  ObservedPrefixEpochId = observedEpoch }
-
-            match BloggerRequestMaterial.createSquash candidate with
-            | Ok verified -> BloggerRequestContext.Squash verified
-            | Error rejection ->
-                invalidOp (sprintf "tryBuildSquashContext staged an unverifiable context: %A" rejection))
-
-
     let private sendClaimedBloggerPrompt
         (deps: BloggerDeps)
         (childId: SessionId)
@@ -125,7 +81,7 @@ module internal CompanionHostBlogger =
         | None -> Task.FromResult(Error "No journal: a Blogger prompt cannot be claimed")
         | Some journal -> sendClaimedBloggerPrompt deps childId prompt journal
 
-    /// Physical send from frozen typed context (Main or Squash). No terminal wait.
+    /// Physical send from frozen typed context. No terminal wait.
     /// Transform rebuilds the provider view from durable frames + this context.
     let startFromContext (deps: BloggerDeps) (ctx: BloggerRequestContext) : Task<Result<PromptKey, string>> =
         task {
@@ -141,17 +97,6 @@ module internal CompanionHostBlogger =
                     ProviderProse.instructionLines
                         (ProviderProse.languageOf deps.PrimaryId)
                         CompanionPrompt.Normal
-                        Map.empty
-                    |> CompanionPrompt.asCommentedInstruction
-
-                return! sendBloggerPrompt deps childId prompt
-            | BloggerRequestContext.Squash _ ->
-                // Physical claim body is the stable squash instruction only.
-                // Frames arrive via rebuildFromContext on the transform (no raw transcript).
-                let prompt =
-                    ProviderProse.instructionLines
-                        (ProviderProse.languageOf deps.PrimaryId)
-                        CompanionPrompt.Squash
                         Map.empty
                     |> CompanionPrompt.asCommentedInstruction
 

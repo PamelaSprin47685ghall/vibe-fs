@@ -23,8 +23,8 @@ type PrefixRendered =
 ///
 /// Pure and index-based. The Host message objects live at the adapter boundary; what
 /// is decided here is the intent: whether the companion memory replaces the physical
-/// prefix, and what that synthetic message contains (relay-context-projection-001 — the caller declares
-/// the intent, the renderer applies it).
+/// prefix, and what that synthetic message contains (the caller declares the
+/// intent, the renderer applies it).
 [<RequireQualifiedAccess>]
 module XPrefixProjection =
 

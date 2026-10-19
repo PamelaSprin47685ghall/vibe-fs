@@ -1,143 +1,238 @@
 namespace Wanxiangshu.Execution.Session.Wait
 
 open System
-open System.Collections.Generic
-open Wanxiangshu.Foundation
+open Fable.Core
+open Fable.Core.JsInterop
 
-/// DSL-MUTABLE: resource — process-local diagnostic wait registry.
-/// It is not a business truth source, recovery input, dedupe key,
-/// workflow branch input, or Journal projection.
-type CausalWaitRegistry(?historyCapacity: int) =
-    let capacity =
-        match historyCapacity with
-        | Some n when n > 0 -> n
-        | _ -> 256
+/// 实现唯一来源：wanxiangli/wait 的注册表与诊断运行时（CUT-21）。
+/// 此文件是类型桥：主仓 CausalWaitRuntime / IWaitObserver / IWaitSnapshotReader /
+/// IWaitDiagnosticSink 契约不变，调用方零改动；F# 词汇与库 JS 描述符在此双向转换。
+module private WaitCodec =
 
-    let gate = obj ()
-    // DSL-MUTABLE: resource — active diagnostic wait leases by local id
-    let active = Dictionary<int64, DiagnosticWait>()
-    // DSL-MUTABLE: resource — bounded diagnostic transition ring buffer
-    let history = Queue<WaitTransition>()
-    // DSL-MUTABLE: resource — monotonic local lease / transition sequence
-    let mutable nextId = 0L
-    // DSL-MUTABLE: resource — snapshot sequence observed by diagnostics
-    let mutable snapshotSequence = 0L
+    let private property (value: obj) (name: string) : obj = emitJsExpr (value, name) "$0[$1]"
 
-    let pushHistory (transition: WaitTransition) =
-        history.Enqueue transition
+    [<Emit("$0==null")>]
+    let private isNullish (value: obj) : bool = jsNative
 
-        while history.Count > capacity do
-            history.Dequeue() |> ignore
+    let private stringOf (value: obj) =
+        if isNullish value then "" else string value
 
-    let leave (leaseId: int64) (exit: DiagnosticWaitExit) =
-        lock gate (fun () ->
-            match active.TryGetValue leaseId with
-            | false, _ -> ()
-            | true, wait ->
-                active.Remove leaseId |> ignore
-                nextId <- nextId + 1L
-                snapshotSequence <- snapshotSequence + 1L
+    let private pairsOf (value: obj) : (string * string) list =
+        if isNullish value then
+            []
+        else
+            let keys: string array = emitJsExpr value "Object.keys($0)"
+            keys |> Array.toList |> List.map (fun key -> key, stringOf (property value key))
 
-                pushHistory
-                    { Sequence = nextId
-                      Kind = WaitTransitionKind.Left
-                      Wait = wait
-                      Exit = Some exit })
+    let private objectOfPairs (pairs: (string * string) list) : obj =
+        createObj (pairs |> List.map (fun (key, value) -> key, box value))
 
-    member _.HistoryCapacity = capacity
+    let private ownerOf (value: obj) : CausalOwnerRef =
+        { Kind = stringOf (property value "kind")
+          Identity = pairsOf (property value "identity") }
+
+    let private ownerObject (owner: CausalOwnerRef) : obj =
+        createObj [ "kind", box owner.Kind; "identity", box (objectOfPairs owner.Identity) ]
+
+    let private producerOf (value: obj) : CausalProducerRef =
+        let kind = stringOf (property value "kind")
+
+        if kind = "workflow" then
+            WorkflowProducer(ownerOf (property value "owner"))
+        else
+            ExternalProducer(stringOf (property value "producerKind"), pairsOf (property value "identity"))
+
+    let private producerObject (producer: CausalProducerRef) : obj =
+        match producer with
+        | WorkflowProducer owner -> createObj [ "kind", box "workflow"; "owner", box (ownerObject owner) ]
+        | ExternalProducer(kind, identity) ->
+            createObj
+                [ "kind", box "external"
+                  "producerKind", box kind
+                  "identity", box (objectOfPairs identity) ]
+
+    let private escapeOf (value: obj) : WaitEscape =
+        match stringOf (property value "kind") with
+        | "deadlineAt" -> WaitEscape.DeadlineAt(DateTimeOffset.Parse(stringOf (property value "at")))
+        | "cancelledBy" -> WaitEscape.CancelledBy(ownerOf (property value "owner"))
+        | "processLifetime" -> WaitEscape.ProcessLifetime
+        | "sessionLifetime" -> WaitEscape.SessionLifetime
+        | _ -> WaitEscape.OpenEndedExternal
+
+    let private escapeObject (escape: WaitEscape) : obj =
+        match escape with
+        | DeadlineAt at -> createObj [ "kind", box "deadlineAt"; "at", box (at.ToString("O")) ]
+        | CancelledBy owner -> createObj [ "kind", box "cancelledBy"; "owner", box (ownerObject owner) ]
+        | ProcessLifetime -> createObj [ "kind", box "processLifetime" ]
+        | SessionLifetime -> createObj [ "kind", box "sessionLifetime" ]
+        | OpenEndedExternal -> createObj [ "kind", box "openEndedExternal" ]
+
+    let waitOf (value: obj) : DiagnosticWait =
+        { WaitKind = stringOf (property value "waitKind")
+          Owner = ownerOf (property value "owner")
+          Subject = pairsOf (property value "subject")
+          Producer = producerOf (property value "producer")
+          Escapes =
+            (unbox<obj array> (property value "escapes"))
+            |> Array.toList
+            |> List.map escapeOf
+          Source = stringOf (property value "source") }
+
+    let waitObject (wait: DiagnosticWait) : obj =
+        createObj
+            [ "waitKind", box wait.WaitKind
+              "owner", box (ownerObject wait.Owner)
+              "subject", box (objectOfPairs wait.Subject)
+              "producer", box (producerObject wait.Producer)
+              "escapes", box (wait.Escapes |> List.map escapeObject |> Array.ofList)
+              "source", box wait.Source ]
+
+    let exitOf (name: string) =
+        match name with
+        | "WaitResolved" -> DiagnosticWaitExit.WaitResolved
+        | "WaitFailed" -> DiagnosticWaitExit.WaitFailed
+        | "WaitCancelled" -> DiagnosticWaitExit.WaitCancelled
+        | "WaitTimedOut" -> DiagnosticWaitExit.WaitTimedOut
+        | "WaitDisposed" -> DiagnosticWaitExit.WaitDisposed
+        | unknown -> invalidArg "exit" ("unknown wait exit: " + unknown)
+
+    let exitName (exit: DiagnosticWaitExit) =
+        match exit with
+        | DiagnosticWaitExit.WaitResolved -> "WaitResolved"
+        | DiagnosticWaitExit.WaitFailed -> "WaitFailed"
+        | DiagnosticWaitExit.WaitCancelled -> "WaitCancelled"
+        | DiagnosticWaitExit.WaitTimedOut -> "WaitTimedOut"
+        | DiagnosticWaitExit.WaitDisposed -> "WaitDisposed"
+
+    let private transitionOf (value: obj) : WaitTransition =
+        { Sequence = unbox<int64> (property value "sequence")
+          Kind =
+            match stringOf (property value "kind") with
+            | "Entered" -> WaitTransitionKind.Entered
+            | _ -> WaitTransitionKind.Left
+          Wait = waitOf (property value "wait")
+          Exit =
+            let exit = property value "exit"
+
+            (if isNullish exit then
+                 None
+             else
+                 Some(exitOf (stringOf exit))) }
+
+    let private transitionObject (transition: WaitTransition) : obj =
+        createObj
+            [ "sequence", box transition.Sequence
+              "kind",
+              box (
+                  match transition.Kind with
+                  | WaitTransitionKind.Entered -> "Entered"
+                  | WaitTransitionKind.Left -> "Left"
+              )
+              "wait", box (waitObject transition.Wait)
+              "exit",
+              box (
+                  match transition.Exit with
+                  | Some exit -> box (exitName exit)
+                  | None -> null
+              ) ]
+
+    let snapshotOf (value: obj) : DiagnosticWaitSnapshot =
+        { Active = (unbox<obj array> (property value "active")) |> Array.toList |> List.map waitOf
+          History =
+            (unbox<obj array> (property value "history"))
+            |> Array.toList
+            |> List.map transitionOf
+          Sequence = int64 (unbox<int> (property value "sequence")) }
+
+    let snapshotObject (snapshot: DiagnosticWaitSnapshot) : obj =
+        createObj
+            [ "active", box (snapshot.Active |> List.map waitObject |> Array.ofList)
+              "history", box (snapshot.History |> List.map transitionObject |> Array.ofList)
+              "sequence", box snapshot.Sequence ]
+
+/// 库容器绑定：wanxiangli/wait 的具名 Wait 导出。
+module private WaitLibrary =
+
+    [<Import("Wait", "wanxiangli/wait")>]
+    let library: obj = jsNative
+
+type CausalWaitRegistry private (libraryRegistry: obj) =
+
+    new(?historyCapacity: int) =
+        let capacity: obj =
+            match historyCapacity with
+            | Some value -> box value
+            | None -> null
+
+        CausalWaitRegistry(WaitLibrary.library?createRegistry (capacity))
+
+    member _.HistoryCapacity: int =
+        unbox<int> (WaitLibrary.library?historyCapacity (libraryRegistry))
 
     interface IWaitObserver with
         member _.Enter(wait: DiagnosticWait) : IWaitLease =
-            let leaseId =
-                lock gate (fun () ->
-                    nextId <- nextId + 1L
-                    snapshotSequence <- snapshotSequence + 1L
-                    let id = nextId
-                    active.[id] <- wait
+            let observer = WaitLibrary.library?observerCapability (libraryRegistry)
 
-                    pushHistory
-                        { Sequence = id
-                          Kind = WaitTransitionKind.Entered
-                          Wait = wait
-                          Exit = None }
-
-                    id)
-
-            // DSL-MUTABLE: resource — one-shot exit marker for the lease
-            let mutable exitMarked: DiagnosticWaitExit option = None
-            // DSL-MUTABLE: resource — dispose latch
-            let mutable disposed = false
+            let lease: obj =
+                WaitLibrary.library?observerEnter (observer, WaitCodec.waitObject wait)
 
             { new IWaitLease with
-                member _.MarkExit(exit: DiagnosticWaitExit) =
-                    if not disposed then
-                        exitMarked <- Some exit
+                member _.MarkExit(exit: DiagnosticWaitExit) : unit =
+                    WaitLibrary.library?markExit (lease, WaitCodec.exitName exit) |> ignore
 
-                member _.Dispose() =
-                    if not disposed then
-                        disposed <- true
-                        leave leaseId (defaultArg exitMarked DiagnosticWaitExit.WaitDisposed) }
+                member _.Dispose() : unit =
+                    WaitLibrary.library?dispose (lease) |> ignore }
 
     interface IWaitSnapshotReader with
         member _.Snapshot() : DiagnosticWaitSnapshot =
-            lock gate (fun () ->
-                { Active = active.Values |> Seq.toList
-                  History = history |> Seq.toList
-                  Sequence = snapshotSequence })
+            WaitCodec.snapshotOf (WaitLibrary.library?snapshot (libraryRegistry))
 
-type private PublishingWaitLease(inner: IWaitLease, publish: unit -> unit) =
-    interface IWaitLease with
-        member _.MarkExit(exit) = inner.MarkExit exit
-
-        member _.Dispose() =
-            inner.Dispose()
-            publish ()
-
-/// One registry plus its write-only business capability. The diagnostic target
-/// is first-bind: a later plugin instance cannot redirect process diagnostics.
 type CausalWaitRuntime(?historyCapacity: int) =
-    let registry = CausalWaitRegistry(?historyCapacity = historyCapacity)
-    let reader = registry :> IWaitSnapshotReader
-    let inner = registry :> IWaitObserver
-    let targetGate = obj ()
-    // DSL-MUTABLE: resource — first-bound process diagnostic target
-    let mutable diagnosticTarget: IWaitDiagnosticSink option = None
+    // 库 registry 只创建一次：Observer / SnapshotReader / BindDiagnosticTarget
+    // 共享同一个库实例（与主仓原单 registry 语义一致）。
+    let capacity: obj =
+        match historyCapacity with
+        | Some value -> box value
+        | None -> null
 
-    let publish () =
-        let target = lock targetGate (fun () -> diagnosticTarget)
+    let libraryRegistry: obj = WaitLibrary.library?createRegistry (capacity)
 
-        target
-        |> Option.iter (fun sink ->
-            try
-                sink.Publish(reader.Snapshot())
-            with _ ->
-                ())
-
-    let observer: IWaitObserver =
+    let observer =
         { new IWaitObserver with
-            member _.Enter(wait) =
-                let lease = inner.Enter wait
-                publish ()
-                new PublishingWaitLease(lease, publish) :> IWaitLease }
+            member _.Enter(wait: DiagnosticWait) : IWaitLease =
+                let observerCapability = WaitLibrary.library?observerCapability (libraryRegistry)
 
-    member _.BindDiagnosticTarget(target: IWaitDiagnosticSink) =
-        let bound =
-            lock targetGate (fun () ->
-                match diagnosticTarget with
-                | Some _ -> false
-                | None ->
-                    diagnosticTarget <- Some target
-                    true)
+                let lease: obj =
+                    WaitLibrary.library?observerEnter (observerCapability, WaitCodec.waitObject wait)
 
-        if bound then
-            publish ()
+                { new IWaitLease with
+                    member _.MarkExit(exit: DiagnosticWaitExit) : unit =
+                        WaitLibrary.library?markExit (lease, WaitCodec.exitName exit) |> ignore
 
-        bound
+                    member _.Dispose() : unit =
+                        WaitLibrary.library?dispose (lease) |> ignore } }
 
-    member _.Observer = observer
-    member _.SnapshotReader = reader
-    member _.HistoryCapacity = registry.HistoryCapacity
+    let reader =
+        { new IWaitSnapshotReader with
+            member _.Snapshot() : DiagnosticWaitSnapshot =
+                WaitCodec.snapshotOf (WaitLibrary.library?snapshot (libraryRegistry)) }
 
+    member _.BindDiagnosticTarget(target: IWaitDiagnosticSink) : bool =
+        let sink: obj =
+            createObj [ "Publish", box (fun (snapshot: obj) -> target.Publish(WaitCodec.snapshotOf snapshot)) ]
+
+        unbox<bool> (WaitLibrary.library?bindDiagnosticTarget (libraryRegistry, sink))
+
+    member _.Observer: IWaitObserver = observer
+
+    member _.SnapshotReader: IWaitSnapshotReader = reader
+
+    member _.HistoryCapacity: int =
+        unbox<int> (WaitLibrary.library?historyCapacity (libraryRegistry))
+
+/// 进程内单例运行时（与主仓原语义一致）。
 module CausalWaitProcess =
-    let private processLocal = CausalWaitRuntime()
-    let local () = processLocal
+
+    let private localRuntime = CausalWaitRuntime()
+
+    let local () : CausalWaitRuntime = localRuntime

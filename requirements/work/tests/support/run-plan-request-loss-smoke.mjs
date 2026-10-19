@@ -9,7 +9,7 @@
  *   2. Assistant asks a natural stop (empty stop, no continuation).
  *   3. User follow-up enters the same incumbency.
  *   4. Tool loop: a real pure JsProgram computes a distinctive value through
- *      js-plan (read-only, no review authorization invented).
+ *      todowrite-for-plan (read-only, no review authorization invented).
  *   5. Deliver relay (unauthorized) opens a successor tenure.
  *   6. Successor work + another user follow-up.
  *
@@ -115,7 +115,7 @@ const providerErrors = []
 // Plan leg requests carry the Plan tool surface; Host title generation and
 // blogger sidecars ride the same mock endpoint and must not shift the script.
 const isPlanRequest = (body) =>
-  (body?.tools ?? []).map((tool) => tool?.function?.name ?? tool?.name).includes('js-plan')
+  (body?.tools ?? []).map((tool) => tool?.function?.name ?? tool?.name).includes('todowrite-for-plan')
 
 const provider = await startHttpServer(async (request, response) => {
   try {
@@ -143,10 +143,10 @@ const provider = await startHttpServer(async (request, response) => {
       sendSSE(response, buildTextChunks(`plan-smoke-${step}`, 'I have reviewed the current draft and need no further input for this leg.', 1))
       return
     }
-    // Step 1: after the user follow-up — a js-plan tool call (real JsProgram).
+    // Step 1: after the user follow-up — a todowrite-for-plan tool call (real JsProgram).
     if (step === 1) {
       const program = `class Js extends JsProgram { async run() { const p = await this.file([]); const value = 'PLAN_SMOKE_TOOL_' + (p.text ? p.text.length : 0); return { computed: value, draftLength: p.text ? p.text.length : 0 }; } }`
-      sendSSE(response, buildToolCallsChunks(`plan-smoke-tool-${step}`, [{ name: 'js-plan', argsStr: JSON.stringify({ program }) }], 1))
+      sendSSE(response, buildToolCallsChunks(`plan-smoke-tool-${step}`, [{ name: 'todowrite-for-plan', argsStr: JSON.stringify({ program }) }], 1))
       return
     }
     // Step 2: tool result processed — deliver relay (unauthorized).
@@ -299,9 +299,9 @@ const run = async () => {
     // incumbency and opens the successor. The Host then emits a continuation
     // request (request 4) whose transform runs under the NEW tenure: it is the
     // relay successor's first assembled request. It must still carry the
-    // original instruction (U is never stripped) and, because the session now
-    // has opening evidence, a materialized LWR_prev — proving the handover is
-    // not lost or blocked. The successor is also re-anchored (fresh prefix epoch).
+    // original instruction (U is never stripped), with prior assistant/tool
+    // stripped and no synthetic lwr-prev-* row injected. The successor is also
+    // re-anchored (fresh prefix epoch).
     await waitForProviderCount(4)
 
     const relayBody = JSON.stringify(providerRequests[3].body)
@@ -341,7 +341,7 @@ const run = async () => {
       successorText.includes('Plan a caching architecture for the repository.'),
       'the successor request must preserve the original instruction',
     )
-    // The u2 turn chain (u2 → js-plan result → deliver relay → stop) settles as
+    // The u2 turn chain (u2 → todowrite-for-plan result → deliver relay → stop) settles as
     // one idle; u3 settles as the third.
     await waitForIdleCount(3)
 

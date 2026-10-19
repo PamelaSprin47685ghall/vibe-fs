@@ -26,7 +26,7 @@ All imports below are compiled, registered `dist` surfaces. Use exact `(sessionI
 Re-observe the installed public Host contract:
 
 ```sh
-node --test requirements/host-boundary/tests/opencode-chat-admission-canary.test.mjs
+node --test requirements/host-boundary/tests/023.test.mjs
 ```
 
 A version mismatch, missing exact assistant `message.updated` start/terminal evidence, or changed hook order is unsupported. Stop recovery action and escalate.

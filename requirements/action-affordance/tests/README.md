@@ -10,7 +10,7 @@
 - 009 先让实际 commission Schema 接受 lead、拒绝 coordinator，再检查中英资源不继续宣传旧的 Coordinator / Lead 选择。此回归已先红；不是所有措辞语义正确的通用判别器。
 - 010 整份文件仅一条 TODO：委派描述须准确说明受托人职责与后果，角色名出现在散文中不构成证明，见 GAP-078。
 - 013 整份文件仅一条 TODO：描述传达可见纪律而不泄露隐藏编排，各语言本地化须保留约束，见 GAP-078。
-- 014 验证 assume 只有 `assumption`、成功不回显输入且不维护 canvas。015 验证 todowrite 的 provider 定义保持宿主原样（`todos` 字段、无注入参数、重复触发 byte-identical），before/after 不改写参数。插件 fixture 使用临时仓库与隔离配置，不调用外部模型。
+- 014 验证 assume 只有 `assumption`、成功不回显输入且不维护 canvas。015 验证宿主原生 todowrite 的 provider 定义保持宿主原样（`todos` 字段、无注入参数、重复触发 byte-identical），before/after 不改写参数；该工具已退役，不再是 checkpoint 来源。插件 fixture 使用临时仓库与隔离配置，不调用外部模型。
 - 原 003—005 的废止工具名称名单和 Role Law 词句不能证明调用描述完整；原 011/012/009 自建 mutant-only 正则也不是实际门禁。这些证明撤下，义务保留为 TODO。双语资源存在性由 provider-language 的实际门禁承担，语义对等仍需审阅。
 
 通过正式构建后，选择本包、requirement-system、迁移来源 capability-enforcement 010 和受影响的 provider-language 检查运行。需启用 integration 才执行真实插件用例；未启用属于跳过。TODO 使正式入口返回非零，不宣称整包已验收。

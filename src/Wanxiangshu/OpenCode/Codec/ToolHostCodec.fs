@@ -293,7 +293,7 @@ type HostSchema = private HostSchema of obj
 
 /// The authority a tool call is admitted under. capability-enforcement-006 keeps the two sources
 /// apart in the type: an office tool is decided by the public Role the Authority
-/// Root established, while an internal leaf tool (Bookkeeper's `js-bookkeeper`)
+/// Root established, while an internal leaf tool (Bookkeeper's `todowrite-for-bookkeeper`)
 /// is decided by owner-held attachment evidence because its session is
 /// HostInternal and holds no public authority profile at all.
 [<RequireQualifiedAccess>]
@@ -313,6 +313,9 @@ module ToolHostCodec =
 
     [<Emit("$0.schema.string()")>]
     let private rawStringSchema (tool: obj) : obj = jsNative
+
+    [<Emit("$0.schema.any().optional()")>]
+    let private rawAnySchema (tool: obj) : obj = jsNative
 
     [<Emit("$0.schema.string().describe($1)")>]
     let private rawStringSchemaDescribed (tool: obj) (description: string) : obj = jsNative
@@ -365,20 +368,14 @@ module ToolHostCodec =
     [<Emit("$0.schema.array($0.schema.string())")>]
     let private rawStringArraySchema (tool: obj) : obj = jsNative
 
-    [<Emit("""$0.schema.array(
-        $0.schema.object({
-            content: $0.schema.string().describe("Todo item content"),
-            status: $0.schema.enum(["pending", "in_progress", "completed", "cancelled"]).describe("Todo status"),
-            priority: $0.schema.enum(["high", "medium", "low"]).optional().describe("Todo priority")
-        })
-    ).describe($1)""")>]
-    let private rawTodoArraySchemaDescribed (tool: obj) (description: string) : obj = jsNative
-
     [<Emit("$0.schema.object($1)")>]
     let private rawObjectSchemaOf (tool: obj) (fields: obj) : obj = jsNative
 
     [<Emit("$0.schema.array($1).describe($2)")>]
     let private rawArraySchemaOf (tool: obj) (item: obj) (description: string) : obj = jsNative
+
+    [<Emit("$0.schema.record($1, $2).describe($3)")>]
+    let private rawRecordSchemaOf (tool: obj) (key: obj) (value: obj) (description: string) : obj = jsNative
 
     [<Emit("$0($1)")>]
     let private applyTool (factory: obj) (definition: obj) : obj = jsNative
@@ -469,9 +466,17 @@ module ToolHostCodec =
 
     let factory (toolModule: obj) = HostToolFactory(toolModule?tool)
 
+    /// Construct host tool arguments from an in-process raw object. The wiring
+    /// layer uses this to drive a registered tool spec directly (for example
+    /// the programming surface's fork/join members feeding the fork tool).
+    let argumentsOfRaw (raw: obj) : HostToolArguments = HostToolArguments raw
+
     let internal schemaValue (HostSchema schema) = schema
 
     let stringSchema (HostToolFactory factory) = HostSchema(rawStringSchema factory)
+
+    /// Free-form JSON value: the caller owns the injected value's shape.
+    let anySchema (HostToolFactory factory) = HostSchema(rawAnySchema factory)
 
     let stringSchemaDescribed description (HostToolFactory factory) =
         HostSchema(rawStringSchemaDescribed factory description)
@@ -526,9 +531,6 @@ module ToolHostCodec =
     let stringArraySchema (HostToolFactory factory) =
         HostSchema(rawStringArraySchema factory)
 
-    let todoArraySchemaDescribed description (HostToolFactory factory) =
-        HostSchema(rawTodoArraySchemaDescribed factory description)
-
     let objectSchemaOf fields (HostToolFactory factory) =
         let fieldsObj =
             fields |> List.map (fun (name, HostSchema schema) -> name, schema) |> createObj
@@ -537,6 +539,10 @@ module ToolHostCodec =
 
     let arraySchemaOf (HostSchema item) description (HostToolFactory factory) =
         HostSchema(rawArraySchemaOf factory item description)
+
+    /// Open key→value map (zod `record`); the description carries the key shape.
+    let recordSchemaOf (HostSchema key) (HostSchema value) description (HostToolFactory factory) =
+        HostSchema(rawRecordSchemaOf factory key value description)
 
     let register (HostToolFactory factory) (spec: ToolSpec) =
         let args =

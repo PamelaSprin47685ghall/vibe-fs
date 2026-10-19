@@ -1,0 +1,45 @@
+✔ WHAT[process-execution-006] a waiter fault without token cancellation keeps its original error (1032.418666ms)
+✖ WHAT[process-execution-006] the registered DevOps tool observes real Host abort during execution without claiming physical completion (6033.270625ms)
+✔ WHAT[process-execution-006] Ctrl-Z stops the direct target while its group supervisor can still apply KILL (1748.559958ms)
+✔ WHAT[process-execution-006] a real PTY keeps job control and drains a separate background group (604.876541ms)
+✔ WHAT[process-execution-006] short job groups can disappear while the live PTY owner drains (294.108083ms)
+✔ WHAT[process-execution-006] cancellation terminates the group after the target exits while a descendant holds stdout (123.179875ms)
+✔ WHAT[process-execution-006] EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs (0.698334ms)
+✔ WHAT[process-execution-006] EXEC_011_throwing_host_under_cancellation_maps_to_process_cancelled (0.116042ms)
+✔ WHAT[process-execution-006] EXEC_011_D_mid_wait_cancellation_kills_once_and_returns_without_hanging_on_exit (32.17675ms)
+✔ WHAT[process-execution-006] PTY_API_abort_parent_invokes_every_registered_callback (0.266333ms)
+✔ WHAT[process-execution-006] PTY_API_abort_parent_with_unknown_id_is_a_noop (0.045792ms)
+✔ WHAT[process-execution-006] PTY_API_unregister_removes_only_the_matching_token (0.090667ms)
+✔ WHAT[process-execution-006] PTY_API_unregister_last_callback_drops_the_parent_entry (0.0375ms)
+✔ WHAT[process-execution-006] PTY_API_unregister_with_unknown_parent_or_token_is_a_noop (0.033875ms)
+✔ WHAT[process-execution-006] PTY_API_tokens_are_monotonic_across_parents (0.057875ms)
+✔ WHAT[process-execution-006] PTY_API_throwing_abort_callback_does_not_block_the_rest (0.074292ms)
+✔ WHAT[process-execution-006] SUPERVISOR_attach_without_port_entry_kills_the_term (1.700334ms)
+✔ WHAT[process-execution-006] SUPERVISOR_cancelAll_kills_live_sessions_and_skips_closed_or_null_backends (0.657084ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 17
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12078.916417
+
+✖ failing tests:
+
+test at requirements/process-execution/tests/006.test.mjs:25:1
+✖ WHAT[process-execution-006] the registered DevOps tool observes real Host abort during execution without claiming physical completion (6033.270625ms)
+  AssertionError [ERR_ASSERTION]: The real process did not reach its expected physical state
+      at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:37:12)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:71:11
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:48:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: undefined,
+    operator: 'fail',
+    diff: 'simple'
+  }

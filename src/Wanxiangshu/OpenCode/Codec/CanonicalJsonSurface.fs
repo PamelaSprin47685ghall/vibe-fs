@@ -5,10 +5,10 @@ namespace Wanxiangshu.OpenCode
 module CanonicalJsonSurface =
 
     let canonicalJson (value: obj) : string =
-        Wanxiangshu.Foundation.CanonicalJson.canonicalJson value
+        Wanxiangshu.Host.CanonicalJson.canonicalJson value
 
     let equal (left: obj) (right: obj) : bool =
-        Wanxiangshu.Foundation.CanonicalJson.equal left right
+        Wanxiangshu.Host.CanonicalJson.equal left right
 
     let withoutKeys (keys: string array) (value: obj) : obj =
-        Wanxiangshu.Foundation.CanonicalJson.withoutKeys keys value
+        Wanxiangshu.Host.CanonicalJson.withoutKeys keys value

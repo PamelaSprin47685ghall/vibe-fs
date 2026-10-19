@@ -97,14 +97,15 @@ module EventsSurface =
         | :? IDisposable as disposable -> disposable.Dispose()
         | _ -> ()
 
-    let notifyCompleted
+    let notifyCompletedForRun
         (port: obj)
         (sessionId: string)
+        (providerRun: string)
         (terminalText: string)
         (formalText: string)
         (roleLabel: string)
         : bool =
-        if String.IsNullOrWhiteSpace roleLabel then
+        if String.IsNullOrWhiteSpace roleLabel || String.IsNullOrWhiteSpace providerRun then
             false
         else
             match Roles.tryParseRole roleLabel with
@@ -113,7 +114,7 @@ module EventsSurface =
                 let result =
                     { SessionId = SessionId.create sessionId
                       AuthorityRootUserMessageId = AuthorityRootUserMessageId.create (sessionId + "-root")
-                      ProviderRun = ProviderRunIdentity.create (sessionId + "-completed")
+                      ProviderRun = ProviderRunIdentity.create providerRun
                       Role = role
                       Directory = None
                       TerminalText = terminalText
@@ -121,6 +122,15 @@ module EventsSurface =
 
                 let typed = port :?> IEventObservationPort
                 typed.NotifyTerminal (SessionId.create sessionId) (TerminalOutcome.Completed result)
+
+    let notifyCompleted
+        (port: obj)
+        (sessionId: string)
+        (terminalText: string)
+        (formalText: string)
+        (roleLabel: string)
+        : bool =
+        notifyCompletedForRun port sessionId (sessionId + "-completed") terminalText formalText roleLabel
 
     let acquireSharedForWorkspace (workspace: string) : obj =
         match SharedTerminalBus.tryAcquireForWorkspace (Some workspace) with

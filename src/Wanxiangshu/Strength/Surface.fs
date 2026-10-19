@@ -95,7 +95,6 @@ module StrengthSurface =
         match textOf value with
         | "work-main" -> Ok ProviderRequestKind.WorkMain
         | "blogger-main" -> Ok ProviderRequestKind.BloggerMain
-        | "blogger-squash" -> Ok ProviderRequestKind.BloggerSquash
         | "interaction-repair" -> Ok ProviderRequestKind.InteractionRepair
         | "strength-replica" -> Ok ProviderRequestKind.StrengthReplica
         | unknown -> Error(sprintf "unknown request kind: %s" unknown)
@@ -125,8 +124,10 @@ module StrengthSurface =
         | ToolPermission.BashHoneypot -> "BashHoneypot"
         | ToolPermission.JsPlan -> "JsPlan"
         | ToolPermission.Ask -> "Ask"
+        | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
+        | ToolPermission.Advisor -> "Advisor"
 
     let private permissionsToJs permissions =
         permissions
@@ -304,13 +305,13 @@ module StrengthSurface =
         |> projectionIntentResultToJs
 
     /// Owner-facing display name for one projected exchange: the replica calls
-    /// `js-predictor`, but the owner must see its own `js-<role>` surface.
+    /// `todowrite-for-predictor`, but the owner must see its own `todowrite-for-<role>` surface.
     let private ownerDisplayNameOf (value: obj) (toolName: string) : string =
         if isNull value || isNull value?ownerRole then
             toolName
         else
             match Roles.tryParseRole (textOf value?ownerRole) with
-            | Some role when toolName = "js-predictor" -> "js-" + Roles.roleLabel role
+            | Some role when toolName = "todowrite-for-predictor" -> "todowrite-for-" + Roles.roleLabel role
             | _ -> toolName
 
     let candidate (sha256: string -> string) (value: obj) : obj =
@@ -603,6 +604,7 @@ module StrengthSurface =
             | Role.DevOps -> prompts.DevopsSystemPrompt
             | Role.Orchestrator -> prompts.OrchestratorSystemPrompt
             | Role.Blogger -> prompts.BloggerSystemPrompt
+            | Role.Advisor -> prompts.AdvisorSystemPrompt
             | Role.Coder
             | Role.Inspector
             | Role.Browser
@@ -1759,8 +1761,8 @@ module StrengthSurface =
             match Roles.tryParseRole ownerRole with
             | Some role ->
                 fun toolName ->
-                    if toolName = "js-predictor" then
-                        "js-" + Roles.roleLabel role
+                    if toolName = "todowrite-for-predictor" then
+                        "todowrite-for-" + Roles.roleLabel role
                     else
                         toolName
             | None -> id

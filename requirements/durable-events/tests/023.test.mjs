@@ -155,7 +155,7 @@ const withJournalDir = async (tag, scenario) => {
   const dir = mkdtempSync(join(tmpdir(), `wxs-portobs-${tag}-`))
   execFileSync('git', ['init', '--quiet', dir])
   try {
-    return await scenario(join(dir, '.git'), tag)
+    return await scenario(join(dir, '.Herdchestra'), tag)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

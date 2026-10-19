@@ -14,13 +14,12 @@
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-managedagent.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-statictools.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.causal-wait.execution-session-wait-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.attention-regulation.interaction-attention-fold.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.durable-composition.durable-adapter-attention-concern.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.cognitive-environment.resources-promptresources.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.opencode-host-sessionexecutionbinding.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.concern-routing.interaction-concern-fold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.context-compression.context-companion-companionfactfold.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.delegation-host-adapter.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-advisor-seat.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-advisor-view.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-identity.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
@@ -37,18 +36,22 @@
     <ProjectReference Include="Wanxiangshu.Owner.office-capability.foundation-officecapability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-horizon.execution-session-opencode-horizontool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.process-execution.opencode-tools-ptytool.fsproj"/>
+
     <ProjectReference Include="Wanxiangshu.Owner.provider-attempt-recovery.participant-provider-attempt-requestkind.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-assessment.mission-relay-reviewtool.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.mission-deliver-tool.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-reviewtool.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-deliver-tool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.opencode-host-requirementgrounding-runtime.fsproj"/>
     
     
-    <ProjectReference Include="Wanxiangshu.Owner.interaction.opencode-tools-filemutationtools.fsproj"/>
+
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.knowledge-reuse.opencode-tools-bookkeepertool.fsproj"/>
+    <Compile Include="OpenCode/Host/ExternalToolNamespace.fsi"/>
+    <Compile Include="OpenCode/Host/ExternalToolNamespace.fs"/>
+    <Compile Include="OpenCode/Host/ExternalToolAdmission.fsi"/>
+    <Compile Include="OpenCode/Host/ExternalToolAdmission.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fsi"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfig.fs"/>
     <Compile Include="OpenCode/Host/ManagedAgentConfigSurface.fsi"/>

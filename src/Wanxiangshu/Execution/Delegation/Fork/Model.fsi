@@ -43,3 +43,8 @@ type AgentRecord =
       TerminalStatusLabel: string option
       CompletionCellSettled: bool
       ChildSessionId: SessionId option }
+
+type ForkReceipt =
+    { Name: string
+      AgentId: string
+      Outcome: string }

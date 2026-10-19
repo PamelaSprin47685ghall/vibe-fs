@@ -15,7 +15,7 @@ import { CANONICAL_Q, CANONICAL_A, installBookkeeperRuntime, scriptedBookkeeperP
 
 const [mode, directory, scenario, requestJson] = process.argv.slice(2)
 const request = JSON.parse(requestJson)
-const commonDir = path.join(directory, '.git')
+const commonDir = path.join(directory, '.Herdchestra')
 const eventsDirectory = path.join(commonDir, 'wanxiangshu', 'events')
 const sourceFile = path.join(eventsDirectory, 'operation-0000.ndjson')
 const encodeCase = value => value === null ? null : { ...value,

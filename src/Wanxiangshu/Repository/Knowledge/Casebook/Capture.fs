@@ -94,60 +94,6 @@ module CasebookCapture =
             let raw = args?(key)
             if isNull raw then None else Some(string raw))
 
-    /// read: args.path + rendered output → FileRead (hash of the observed text).
-    let ofReadExecution (args: obj) (output: string) : Observation option =
-        match pathArg args with
-        | Some path when not (System.String.IsNullOrWhiteSpace output) ->
-            Some(Observation.FileRead(path, contentHash output))
-        | _ -> None
-
-    /// glob: output lines are the matched relative paths (rendered one per
-    /// line); pattern comes from args (pattern / glob / query, best-effort).
-    let ofGlobExecution (args: obj) (output: string) : Observation option =
-        let pattern =
-            [ "pattern"; "glob"; "query" ]
-            |> List.tryPick (fun key ->
-                let raw = args?(key)
-                if isNull raw then None else Some(string raw))
-
-        let paths =
-            output.Split '\n'
-            |> Array.map (fun line -> line.Trim())
-            |> Array.filter (fun line -> line <> "")
-            |> Array.toList
-
-        match pattern with
-        | Some p when not (System.String.IsNullOrWhiteSpace p) -> Some(Observation.GlobResult(p, paths))
-        | _ -> None
-
-    /// grep: pattern from args; matches rendered as "path:line:index:text"
-    /// lines — parse best-effort, keep the raw text for the match payload.
-    let ofGrepExecution (args: obj) (output: string) : Observation option =
-        let pattern =
-            [ "pattern"; "regex"; "query" ]
-            |> List.tryPick (fun key ->
-                let raw = args?(key)
-                if isNull raw then None else Some(string raw))
-
-        let matches =
-            output.Split '\n'
-            |> Array.map (fun line -> line.Trim())
-            |> Array.filter (fun line -> line <> "")
-            |> Array.mapi (fun i line -> "grep-output", i, line)
-            |> Array.toList
-
-        match pattern with
-        | Some p when not (System.String.IsNullOrWhiteSpace p) -> Some(Observation.GrepResult(p, matches))
-        | _ -> None
-
-    /// Dispatch by tool name (CASE-003).
-    let capture (toolName: string) (args: obj) (output: string) : Observation option =
-        match toolName with
-        | "read" -> ofReadExecution args output
-        | "glob" -> ofGlobExecution args output
-        | "grep" -> ofGrepExecution args output
-        | _ -> None
-
     // ---- executor reading tolerance (§63) ---------------------------------
 
     /// Split a command line on whitespace, honoring single quotes (best-effort
@@ -203,11 +149,6 @@ module CasebookCapture =
 
     let isSubstantiveTool (toolName: string) : bool =
         match toolName with
-        | "read"
-        | "write"
-        | "edit"
-        | "mv"
-        | "rm"
         | "create"
         | "rewrite" -> true
         | _ -> false
@@ -230,14 +171,9 @@ module CasebookCapture =
 
     let recordSubstantiveAccess (tracker: AccessTracker) (toolName: string) (args: obj) (committed: bool) : unit =
         match toolName with
-        | "read" -> withPathArg args (fun p -> tracker.RecordRead(p, ""))
-        | "write"
         | "create"
-        | "edit"
         | "rewrite"
-        | "rm"
         | "delete" -> withPathArg args (fun p -> tracker.RecordAttemptedMutation(p, committed))
-        | "mv"
         | "move" -> recordMoveIfCommitted tracker args committed
         | _ -> ()
 

@@ -149,6 +149,36 @@ module InteractionRepairWorkflow =
                 repairKind
                 observer
 
+    /// 合格的收尾散文不等于长程目标完成；每个新的自然停机都重新检查业务门。
+    let repairUnfinishedWork
+        (quiescence: ISessionQuiescenceGate)
+        (context: ReconciledTurnContext)
+        (sessionPort: ISessionHostPort)
+        (rootWorkspace: IRootWorkspaceReader)
+        (eventPort: IEventObservationPort)
+        (journal: AgentJournal option)
+        (observer: ContinuationAcceptanceObserver option)
+        : Task =
+        let path =
+            if context.Turn.Role = Some Role.Manager then
+                "work/manager-continue"
+            else
+                "work/plan-continue"
+
+        let prompt =
+            ProviderProse.render (ProviderProse.languageOf context.Turn.SessionId) path Map.empty
+
+        trySendIdleRepair
+            quiescence
+            context
+            sessionPort
+            rootWorkspace
+            eventPort
+            journal
+            prompt
+            "unfinished-long-work"
+            observer
+
     let private continuationKindOf (journal: AgentJournal option) (turn: ReconciledTurn) =
         journal
         |> Option.bind (fun durable ->
@@ -387,10 +417,7 @@ module InteractionRepairWorkflow =
 
         if fissionReplaced || retryAttemptSuppressesRepair journal observation turn then
             AsyncSupport.completedTask ()
-        elif
-            not (CompletedTurnClassifier.isPlanEmptyStop turn.Role turn.Finish (box turn.Outcome))
-            && CompletedTurnClassifier.needsInteractionRepair turn.Role (box turn.Outcome) turn.Parts
-        then
+        elif CompletedTurnClassifier.needsInteractionRepair turn.Role (box turn.Outcome) turn.Parts then
             repairDefect
                 quiescence
                 context

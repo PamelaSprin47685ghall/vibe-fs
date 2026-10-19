@@ -37,6 +37,11 @@ type JsFailure =
     | FileNotFound of string
     | FileAlreadyExists of string
     | FileReadFailed of string
+    | DirectoryNotEmpty of string
+    | DirectoryExists of string
+    | ParentDirectoryMissing of string
+    | CrossDeviceMove of string
+    | InvalidArgument of string
     | InvalidUtf8 of string
     | AnchorEmptyContent
     | AnchorInvalidPattern
@@ -59,6 +64,21 @@ type JsFailure =
     | TransactionPersistenceFailed of JsTransactionAppendFailure
     | UnknownMember
     | PlanReviewRequired
+    | ConcurrencyLimit
+    | HandleUnknown of string
+    | CannotParkWhileAbandoning
+    | Abandoned
+    | RunnableSpecIncomplete of string
+    | RunCommandUnsupported of string
+    | RunWaitTimeout
+    | RunChildUnknown of string
+    | RunParkUnsupported
+    | RunHostUnavailable
+    | RunOutputBudgetTooSmall of minimumBytes: int64
+    | RunRejected of code: string * detail: string
+    | AskRefused of string
+    | DelegationUnavailable
+    | ViewDeclarationInvalid of string
 
 module JsFailure =
 
@@ -88,6 +108,11 @@ module JsFailure =
         | JsFailure.FileNotFound _ -> "FILE_NOT_FOUND"
         | JsFailure.FileAlreadyExists _ -> "FILE_ALREADY_EXISTS"
         | JsFailure.FileReadFailed _ -> "FILE_READ_FAILED"
+        | JsFailure.DirectoryNotEmpty _ -> "DIRECTORY_NOT_EMPTY"
+        | JsFailure.DirectoryExists _ -> "DIRECTORY_EXISTS"
+        | JsFailure.ParentDirectoryMissing _ -> "PARENT_DIRECTORY_MISSING"
+        | JsFailure.CrossDeviceMove _ -> "CROSS_DEVICE_MOVE"
+        | JsFailure.InvalidArgument _ -> "INVALID_ARGUMENT"
         | JsFailure.InvalidUtf8 _ -> "INVALID_UTF8"
         | JsFailure.AnchorEmptyContent -> "EMPTY_ANCHOR_CONTENT"
         | JsFailure.AnchorInvalidPattern -> "INVALID_ANCHOR_PATTERN"
@@ -111,6 +136,21 @@ module JsFailure =
             transactionPhaseCode failure.Phase + appendFailureCode failure.Error
         | JsFailure.UnknownMember -> "UNKNOWN_MEMBER"
         | JsFailure.PlanReviewRequired -> "PLAN_REVIEW_REQUIRED"
+        | JsFailure.ConcurrencyLimit -> "CONCURRENCY_LIMIT"
+        | JsFailure.HandleUnknown _ -> "HANDLE_UNKNOWN"
+        | JsFailure.CannotParkWhileAbandoning -> "CANNOT_PARK_WHILE_ABANDONING"
+        | JsFailure.Abandoned -> "ABANDONED"
+        | JsFailure.RunnableSpecIncomplete _ -> "RUNNABLE_SPEC_INCOMPLETE"
+        | JsFailure.RunCommandUnsupported _ -> "RUN_COMMAND_UNSUPPORTED"
+        | JsFailure.RunWaitTimeout -> "RUN_WAIT_TIMEOUT"
+        | JsFailure.RunChildUnknown _ -> "RUN_CHILD_UNKNOWN"
+        | JsFailure.RunParkUnsupported -> "RUN_PARK_UNSUPPORTED"
+        | JsFailure.RunHostUnavailable -> "RUN_HOST_UNAVAILABLE"
+        | JsFailure.RunOutputBudgetTooSmall _ -> "RUN_OUTPUT_BUDGET_TOO_SMALL"
+        | JsFailure.RunRejected(code, _) -> code
+        | JsFailure.AskRefused _ -> "ASK_REFUSED"
+        | JsFailure.DelegationUnavailable -> "DELEGATION_UNAVAILABLE"
+        | JsFailure.ViewDeclarationInvalid _ -> "VIEW_DECLARATION_INVALID"
 
     /// LLM-visible stable reason text (proposal §78: readable, stable, no stack noise).
     let private reasonWithMessage fallback prefix message =
@@ -130,6 +170,11 @@ module JsFailure =
         | JsFailure.FileNotFound path -> "target file does not exist: " + path
         | JsFailure.FileAlreadyExists path -> "target file already exists: " + path
         | JsFailure.FileReadFailed path -> "file read failed: " + path
+        | JsFailure.DirectoryNotEmpty path -> "directory is not empty: " + path
+        | JsFailure.DirectoryExists path -> "directory already exists: " + path
+        | JsFailure.ParentDirectoryMissing path -> "parent directory does not exist: " + path
+        | JsFailure.CrossDeviceMove path -> "cross-device move is refused and rolled back: " + path
+        | JsFailure.InvalidArgument detail -> reasonWithMessage "invalid argument" "invalid argument: " detail
         | JsFailure.InvalidUtf8 path -> "file is not strict UTF-8: " + path
         | JsFailure.AnchorEmptyContent -> "anchor content is empty"
         | JsFailure.AnchorInvalidPattern -> "anchor RegExp is invalid"
@@ -158,6 +203,22 @@ module JsFailure =
         | JsFailure.UnknownMember -> "member is not part of this generated surface"
         | JsFailure.PlanReviewRequired ->
             "Review is required before modifying the plan artifact. You must call review first."
+        | JsFailure.ConcurrencyLimit -> "parked-site concurrency limit reached; no queue is formed"
+        | JsFailure.HandleUnknown handle -> "no parked site with this handle: " + handle
+        | JsFailure.CannotParkWhileAbandoning -> "park is refused while the site is in its abandon cleanup window"
+        | JsFailure.Abandoned -> "the parked program was abandoned; its finalizer has run"
+        | JsFailure.RunnableSpecIncomplete detail -> reasonWithMessage "Runnable spec is incomplete" "" detail
+        | JsFailure.RunCommandUnsupported detail -> reasonWithMessage "next() returned an unsupported command" "" detail
+        | JsFailure.RunWaitTimeout -> "waitFor condition was not met before its timeout"
+        | JsFailure.RunChildUnknown name -> "no background process with this name: " + name
+        | JsFailure.RunParkUnsupported -> "park verdict requires the orchestrated execution path"
+        | JsFailure.RunHostUnavailable -> "js.run has no host loop in this execution path"
+        | JsFailure.RunOutputBudgetTooSmall _ -> "outputBudgetBytes cannot encode the required result"
+        | JsFailure.RunRejected(_, detail) -> detail
+        | JsFailure.AskRefused detail -> reasonWithMessage "ask was refused" "" detail
+        | JsFailure.DelegationUnavailable -> "fork/join is not wired in this execution path"
+        | JsFailure.ViewDeclarationInvalid detail ->
+            reasonWithMessage "view declaration is invalid" "view declaration is invalid: " detail
 
     /// JS-078.1 stable result shape for failures: { ok: false, code, reason }.
     let render (failure: JsFailure) : string =
@@ -188,6 +249,11 @@ module JsFailure =
         | "FILE_NOT_FOUND" -> JsFailure.FileNotFound(after "target file does not exist: ")
         | "FILE_ALREADY_EXISTS" -> JsFailure.FileAlreadyExists(after "target file already exists: ")
         | "FILE_READ_FAILED" -> JsFailure.FileReadFailed(after "file read failed: ")
+        | "DIRECTORY_NOT_EMPTY" -> JsFailure.DirectoryNotEmpty(after "directory is not empty: ")
+        | "DIRECTORY_EXISTS" -> JsFailure.DirectoryExists(after "directory already exists: ")
+        | "PARENT_DIRECTORY_MISSING" -> JsFailure.ParentDirectoryMissing(after "parent directory does not exist: ")
+        | "CROSS_DEVICE_MOVE" -> JsFailure.CrossDeviceMove(after "cross-device move is refused and rolled back: ")
+        | "INVALID_ARGUMENT" -> JsFailure.InvalidArgument(after "invalid argument: ")
         | "INVALID_UTF8" -> JsFailure.InvalidUtf8(after "file is not strict UTF-8: ")
         | "EMPTY_ANCHOR_CONTENT" -> JsFailure.AnchorEmptyContent
         | "INVALID_ANCHOR_PATTERN" -> JsFailure.AnchorInvalidPattern
@@ -210,4 +276,25 @@ module JsFailure =
         | "TRANSACTION_RECOVERY_REQUIRED" -> JsFailure.TransactionRecoveryRequired
         | "UNKNOWN_MEMBER" -> JsFailure.UnknownMember
         | "PLAN_REVIEW_REQUIRED" -> JsFailure.PlanReviewRequired
+        | "CONCURRENCY_LIMIT" -> JsFailure.ConcurrencyLimit
+        | "HANDLE_UNKNOWN" -> JsFailure.HandleUnknown(after "no parked site with this handle: ")
+        | "CANNOT_PARK_WHILE_ABANDONING" -> JsFailure.CannotParkWhileAbandoning
+        | "ABANDONED" -> JsFailure.Abandoned
+        | "RUNNABLE_SPEC_INCOMPLETE" -> JsFailure.RunnableSpecIncomplete text
+        | "RUN_COMMAND_UNSUPPORTED" -> JsFailure.RunCommandUnsupported text
+        | "RUN_WAIT_TIMEOUT" -> JsFailure.RunWaitTimeout
+        | "RUN_CHILD_UNKNOWN" -> JsFailure.RunChildUnknown(after "no background process with this name: ")
+        | "RUN_PARK_UNSUPPORTED" -> JsFailure.RunParkUnsupported
+        | "RUN_HOST_UNAVAILABLE" -> JsFailure.RunHostUnavailable
+        | "RUN_OUTPUT_BUDGET_INVALID"
+        | "RUN_WORLD_LOCK_INVALID"
+        | "RUN_HARD_LIMIT_INVALID"
+        | "RUN_CANCELLED_BEFORE_START"
+        | "RUN_DEADLINE_BEFORE_START"
+        | "RUN_SANITY_TIMEOUT"
+        | "RUN_INPUT_UNCONFIRMED"
+        | "RUN_CHILD_NAME_CONFLICT" -> JsFailure.RunRejected(code, text)
+        | "ASK_REFUSED" -> JsFailure.AskRefused text
+        | "DELEGATION_UNAVAILABLE" -> JsFailure.DelegationUnavailable
+        | "VIEW_DECLARATION_INVALID" -> JsFailure.ViewDeclarationInvalid text
         | _ -> JsFailure.ProgramFailed text

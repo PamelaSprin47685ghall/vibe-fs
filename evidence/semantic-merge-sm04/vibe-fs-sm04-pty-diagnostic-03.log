@@ -1,0 +1,23 @@
+open {"error":"","id":"pty-c4468eaadee3a35b98227f519810abeecd9285f48a7af3abdf08c381cec55384","ok":true}
+stop {"finished":true}
+blockers ["pty-c4468eaadee3a35b98227f519810abeecd9285f48a7af3abdf08c381cec55384"]
+file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:58
+        const error = new Error(`PTY worker exited ${code}: ${stderr}`)
+                      ^
+
+Error: PTY worker exited 1: 
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+Exception {
+  message: 'PTY fixture requires canonical authority',
+  innerException: undefined
+}
+
+Node.js v26.6.0
+
+    at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:58:23)
+    at ChildProcess.emit (node:events:514:20)
+    at ChildProcess._handle.onexit (node:internal/child_process:294:12)
+
+Node.js v26.6.0

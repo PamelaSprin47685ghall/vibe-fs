@@ -44,12 +44,13 @@ type WorktreeResource
             try
                 let! removed = git.RemoveWorktree path
                 return! deleteAfterRemove removed
-            with error -> return Error error.Message
+            with error ->
+                return Error error.Message
         }
 
     let settleRelease (receipt: TaskCompletionSource<Result<unit, string>>) =
         task {
-            let! result = releaseOwned()
+            let! result = releaseOwned ()
             receipt.SetResult result
         }
 
@@ -149,15 +150,15 @@ module WorktreeCommands =
             let identity = identityOf jobId
 
             let! result =
-                execute runner (
-                    command
+                execute
+                    runner
+                    (command
                         (Some repo)
                         [ "worktree"
                           "add"
                           WorktreePath.value path
                           "-b"
-                          WorktreeIdentity.value identity ]
-                )
+                          WorktreeIdentity.value identity ])
 
             // Returns the identity rather than unit: it is what recovery locates the
             // worktree by, and a caller that had to re-derive it would be a second
@@ -168,7 +169,8 @@ module WorktreeCommands =
 
     let remove (runner: TextProcessRunner) repo (path: WorktreePath) =
         taskResult {
-            let! result = execute runner (command (Some repo) [ "worktree"; "remove"; "--force"; WorktreePath.value path ])
+            let! result =
+                execute runner (command (Some repo) [ "worktree"; "remove"; "--force"; WorktreePath.value path ])
 
             return! outcome result.ExitCode result.Stdout result.Stderr
         }

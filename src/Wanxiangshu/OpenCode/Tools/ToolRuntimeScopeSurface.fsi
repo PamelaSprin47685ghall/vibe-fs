@@ -22,3 +22,5 @@ type ToolRuntimeScopeSurface =
         journal: JournalHandle * child: string * physical: string * provider: string -> Task<unit>
 
     static member verifyOwnershipRetirementContract: scenario: obj -> Task<obj>
+    static member verifyUnknownProcessDrain: unit -> Task<obj>
+    static member verifyProcessRetirementContract: unit -> Task<obj>

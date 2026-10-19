@@ -494,10 +494,8 @@ test('WHAT[structured-workflow-014] NodeFs physical port and tool contracts have
 
   const staticSignature = readFileSync(join(SRC, 'OpenCode/Tools/StaticTools.fsi'), 'utf8')
   const staticImplementation = readFileSync(join(SRC, 'OpenCode/Tools/StaticTools.fs'), 'utf8')
-  const fileMutationImplementation = readFileSync(join(SRC, 'OpenCode/Tools/FileMutationTools.fs'), 'utf8')
   assert.doesNotMatch(staticSignature, /\bmodule NodeFs\b/)
   assert.doesNotMatch(staticImplementation, /\bmodule NodeFs\b|\[<Import\([^\n]+, "fs"\)>\]/)
-  assert.doesNotMatch(fileMutationImplementation, /\bmodule private NodeFs\b|\[<Import\([^\n]+, "fs"\)>\]/)
 
   const nodeFsSignature = readFileSync(join(SRC, 'OpenCode/Tools/NodeFs.fsi'), 'utf8')
   assert.deepEqual(
@@ -522,22 +520,14 @@ test('WHAT[structured-workflow-014] NodeFs physical port and tool contracts have
   assert.ok(!actionRuntimeRefs.includes(managedProject))
 
   // The mv/rm file-mutation tool face and the JS tool bindings are separate compile shards:
-  // the interaction-side tool shard consumes the narrow NodeFs port, while the JS bindings shard
-  // compiles only Repository/Programming/Js sources and does not inherit the tool-face port.
+  // the standalone interaction-side FileMutationTools shard is retired with the direct mv/rm
+  // ToolSpecs, and the JS bindings shard compiles only Repository/Programming/Js sources without
+  // inheriting the NodeFs port.
   const fileMutationProject = 'Wanxiangshu.Owner.interaction.opencode-tools-filemutationtools.fsproj'
   const jsToolBindingsProject = 'Wanxiangshu.Owner.repository-programming.repository-programming-js-toolbindings.fsproj'
-  // The mv/rm tool face and its registered JS boundary travel together (same OpenCode/Tools
-  // knowledge), while the JS programming surface bundle is a repository-programming shard.
-  assert.deepEqual(compileItems(fileMutationProject), [
-    'OpenCode/Tools/FileMutationTools.fsi',
-    'OpenCode/Tools/FileMutationSurface.fsi',
-    'OpenCode/Tools/FileMutationTools.fs',
-    'OpenCode/Tools/FileMutationSurface.fs',
-  ])
-  assert.ok(
-    !compileItems(fileMutationProject).some((path) => path.startsWith('Repository/Programming/Js/')),
-    'the interaction tool face shard must not compile repository-programming sources',
-  )
+  assert.equal(inventory.projects.has(join(SRC, fileMutationProject)), false)
+  assert.equal(existsSync(join(SRC, 'OpenCode/Tools/FileMutationTools.fs')), false)
+  assert.equal(existsSync(join(SRC, 'OpenCode/Tools/FileMutationSurface.fs')), false)
   const jsRuntimeSurfaceProject = 'Wanxiangshu.Owner.repository-programming.runtime.fsproj'
   // RuntimeSurface composes tool bindings (repository-programming) with TransactionSurface and
   // OpenCode/ToolHostSurface (cross-domain JS/runtime boundary). application-composition
@@ -568,16 +558,10 @@ test('WHAT[structured-workflow-014] NodeFs physical port and tool contracts have
     'Repository/Programming/Js/GeneratorSurface.fs',
   ])
 
-  const fileMutationRefs = references(fileMutationProject)
-  assert.ok(fileMutationRefs.includes(nodeFsProject))
-  assert.ok(!fileMutationRefs.includes(jsToolBindingsProject))
-
   const jsToolBindingsRefs = references(jsToolBindingsProject)
+  assert.ok(!jsToolBindingsRefs.includes(fileMutationProject))
   assert.ok(!jsToolBindingsRefs.includes('Wanxiangshu.Owner.repository-programming.opencode-tools-filemutationtools.fsproj'))
   assert.ok(!jsToolBindingsRefs.includes(nodeFsProject))
-
-  const ptyToolRefs = references('Wanxiangshu.Owner.process-execution.opencode-tools-ptytool.fsproj')
-  assert.ok(ptyToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))
 
   const joinToolRefs = references('Wanxiangshu.Owner.delegation.execution-delegation-hostturnobservedsurface.fsproj')
   assert.ok(joinToolRefs.includes('Wanxiangshu.Owner.delegation.delegation-pty-adapter.fsproj'))

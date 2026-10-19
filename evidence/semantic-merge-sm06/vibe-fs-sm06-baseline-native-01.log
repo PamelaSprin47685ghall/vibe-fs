@@ -1,0 +1,602 @@
+✔ WHAT[advisor-002] the view prompt keeps the prefix under PrefixUntil in the blogger shape (5.814583ms)
+✔ WHAT[advisor-002] a ThenRemove pair substitutes that anchor text with its summary (0.977375ms)
+✔ WHAT[advisor-002] an empty delta reports HasNewMaterial false and emits no record (0.795375ms)
+✔ WHAT[advisor-003] a follow-up plan with the previous DeliveredAnchors emits the delta alone (7.299666ms)
+✔ WHAT[advisor-003] a ThenRemove pair does not re-open an already delivered anchor (0.423667ms)
+✔ WHAT[advisor-003] the delivered cursor accumulates per caller session and only grows (0.353833ms)
+✔ WHAT[advisor-006] todowrite-for-manager carries the advisor member in description, base class and binding (14.38775ms)
+✔ WHAT[advisor-006] js.advisor returns the installed host closure value back verbatim as data (8.24175ms)
+✔ WHAT[advisor-006] an absent delegation host refuses with DELEGATION_UNAVAILABLE (5.932625ms)
+✔ WHAT[office-capability-001] review real delegation contracts against entitled consequences; a sentence mentioning promises does not prove the consequence model (0.409542ms) # TODO
+✔ WHAT[office-capability-003] editing a returned permission projection cannot change the office authority (1.886ms)
+✔ WHAT[office-capability-003] unknown, composite and retired names do not create an office authority (0.277916ms)
+✔ WHAT[office-capability-004] review permission projections against the owning consequence definitions; matching a prompt metaphor cannot prove projection ownership (0.343291ms) # TODO
+✔ WHAT[office-capability-005] compare the actually distributed role, delegation and caller contracts with the same consequence definitions in both languages; keyword hits do not establish semantic identity (0.3655ms) # TODO
+✔ WHAT[office-capability-006] synthetic examples exercise the sample trace checkers, not production agents (0.662333ms)
+✔ WHAT[office-capability-006] synthetic Manager checker rejects personal mutation even when delegation is also present (0.453542ms)
+✔ WHAT[office-capability-006] synthetic Manager checker rejects retired coder delegation (0.065583ms)
+✔ WHAT[office-capability-006] synthetic repair checker requires repair followed by revalidation (0.073042ms)
+✔ WHAT[office-capability-006] evaluate real provider traces and outcomes for office boundaries; synthetic checkers do not prove runtime compliance or distinguish product decisions from engineering choices (0.0515ms) # TODO
+✔ WHAT[office-capability-007] Manager entitlement includes review reading and delegation but excludes mutation execution and fission (1.519792ms)
+✔ WHAT[office-capability-007] an existing DevOps model target accepts the same target and rejects drift (22.565583ms)
+✔ WHAT[office-capability-007] actual Manager review reading and native-tool refusal require the capability-enforcement-025 runtime entry; entitlement alone does not prove the current window (0.061125ms) # TODO
+✔ WHAT[office-capability-011] follow actual Manager incumbency transitions and distinguish stable office entitlement from current review dispatch and retirement admission (0.385375ms) # TODO
+✔ WHAT[office-capability-012] the Orchestrator projection grants orchestration without direct execution or Fission (1.075209ms)
+✔ WHAT[office-capability-012] actual Orchestrator admission must accept only Manager targets; a generic Fork permission does not establish the target boundary (0.077167ms) # TODO
+✔ WHAT[office-capability-015] Predictor has no public office permission projection or Manager fork candidate (0.826ms)
+✔ WHAT[office-capability-015] Predictor confinement to internal Strength must be proved at scheduling and visibility boundaries after resolving 07-D2 (0.069667ms) # TODO
+✔ WHAT[office-capability-016] Engineer owns local source work and exclusive Fission without real execution (1.273417ms)
+✔ WHAT[office-capability-017] DevOps has source repair and real execution permissions without delegation or Fission (1.2195ms)
+✔ WHAT[office-capability-017] real defect repair must retain product boundaries and revalidate the changed source; a permission set or closing an empty PTY port does not prove this workflow (0.058958ms) # TODO
+✔ WHAT[office-capability-018] Sphinx and historical Inquiry have no public office permissions (0.651917ms)
+✔ WHAT[office-capability-018] the standard Engineer entitlement includes source work and fission but no execution or DevOps dispatch (0.358042ms)
+✔ WHAT[office-capability-018] actual Sphinx workflow must bind standard Engineer authority and retain ordinary worktree and Fission admission; a role matrix does not prove workflow wiring (0.047625ms) # TODO
+✔ WHAT[participant-horizon-001] all admitted material passes the six decision questions; a clean source fixture does not establish the filter (GAP-079) (0.462792ms) # TODO
+✔ WHAT[participant-horizon-002] current source leak scanner distinguishes its clean and machine-identity fixtures (1.315666ms)
+✔ WHAT[participant-horizon-002] existing repository source scan has no reported machine leaks in its selected scope (12.118291ms)
+✔ WHAT[participant-horizon-002] fission lane startup carries no internal lane index (4.004292ms)
+✔ WHAT[participant-horizon-002] all actual Provider requests and tool output hide machine topology; source-token scanning is neither full coverage nor semantic classification (GAP-079) (0.190375ms) # TODO
+✔ WHAT[participant-horizon-003] actual Join renderer distinguishes return, failure and abandonment without control DTO fields (7.191916ms)
+✔ WHAT[participant-horizon-003] actual wait and failure outcomes are natural-language consequences (3.6205ms)
+✔ WHAT[participant-horizon-003] mixed results preserve their input order and physical output stays data (1.852959ms)
+✔ WHAT[participant-horizon-003] current source checker accepts prose and rejects its generic-state DTO fixture (0.765459ms)
+✔ WHAT[participant-horizon-004] actual tool returns omit redundant echoes while retaining new consequences; old Join rendering checks belong to 003 (GAP-079) (0.366084ms) # TODO
+✔ WHAT[participant-horizon-005] Join preserves exit measurements without exposing the terminal handle or control codes (6.637167ms)
+✔ WHAT[participant-horizon-006] runtime states are presented as actionable consequences across actual delivery surfaces; description keywords are insufficient (GAP-079) (0.429083ms) # TODO
+✔ WHAT[participant-horizon-007] hidden participants and task slices remain absent from all actual schemas and descriptions; 010 covers fork/commission admission only (GAP-079) (0.363458ms) # TODO
+✔ WHAT[participant-horizon-008] actual Manager requests and outcomes hide review orchestration while carrying quality obligations; keyword absence in selected files is insufficient (GAP-079) (0.475ms) # TODO
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[participant-horizon-009] real Manager fork rejects hidden and unknown callings with the same generic response before child creation (237.229334ms)
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[participant-horizon-010] actual Manager horizon includes the runtime-bound fixed devops byname (133.811708ms)
+﹣ WHAT[participant-horizon-010] actual fork and commission schemas expose only their legal new-participant identities (0.147125ms) # integration tier not enabled
+✔ WHAT[participant-horizon-011] a participant calibration states the four numbers from the authored resource (5.703083ms)
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+▶ WHAT[participant-horizon-011] real cancellation keeps an accepted child and its undelivered consequence visible
+  ✔ accepted child is visible without its physical identity (167.207708ms)
+  ✔ cancellation keeps the undelivered consequence visible (15.832541ms)
+✔ WHAT[participant-horizon-011] real cancellation keeps an accepted child and its undelivered consequence visible (246.103959ms)
+✔ WHAT[participant-horizon-011] a restarted process does not present the previous process abandoned child (149.781416ms)
+✔ WHAT[participant-horizon-011] Join delivers the abandoned consequence and retires the handle; real scenario stalls at Join after successful cancellation, root cause still under investigation (GAP-080) (0.122792ms) # TODO
+✔ WHAT[participant-horizon-011] latest durable record selection and corrupt-latest rejection must exercise journal/blob reads; a separately implemented HorizonSurface renderer is insufficient (GAP-079) (0.117208ms) # TODO
+✔ WHAT[participant-horizon-011] the same roster reaches a program as js.horizon data with the four numbers withheld when no delegated estimate exists (104.021ms)
+✔ WHAT[participant-horizon-012] real warm-start admission permits repository-evidence roles and rejects others before search (6.665792ms)
+▶ WHAT[participant-horizon-013] actual warm-start output contains hint text as data and preserves the localized warning and authoritative charge
+  ✔ English: no trailing LF survives the actual warm-start output unchanged (18.921958ms)
+  ✔ English: trailing LF survives the actual warm-start output unchanged (1.097167ms)
+  ✔ English: multiple trailing LF survives the actual warm-start output unchanged (0.798125ms)
+  ✔ English: CRLF survives the actual warm-start output unchanged (0.689333ms)
+  ✔ English: lone CR survives the actual warm-start output unchanged (0.580458ms)
+  ✔ English: quotes and backslashes survives the actual warm-start output unchanged (0.648791ms)
+  ✔ English: literal quotes and Unicode survives the actual warm-start output unchanged (1.6085ms)
+  ✔ English: control characters survives the actual warm-start output unchanged (1.170291ms)
+  ✔ SimplifiedChinese: no trailing LF survives the actual warm-start output unchanged (0.721166ms)
+  ✔ SimplifiedChinese: trailing LF survives the actual warm-start output unchanged (0.565416ms)
+  ✔ SimplifiedChinese: multiple trailing LF survives the actual warm-start output unchanged (0.444875ms)
+  ✔ SimplifiedChinese: CRLF survives the actual warm-start output unchanged (0.38525ms)
+  ✔ SimplifiedChinese: lone CR survives the actual warm-start output unchanged (0.392542ms)
+  ✔ SimplifiedChinese: quotes and backslashes survives the actual warm-start output unchanged (0.386708ms)
+  ✔ SimplifiedChinese: literal quotes and Unicode survives the actual warm-start output unchanged (0.403125ms)
+  ✔ SimplifiedChinese: control characters survives the actual warm-start output unchanged (0.420375ms)
+✔ WHAT[participant-horizon-013] actual warm-start output contains hint text as data and preserves the localized warning and authoritative charge (31.037625ms)
+✔ WHAT[participant-horizon-014] real visible actions and entity references remain reachable; generic rejection prose alone does not prove existence (GAP-079) (0.369375ms) # TODO
+✔ WHAT[participant-horizon-015] Manager capability projection denies Fission while Engineer retains it (0.989416ms)
+✔ WHAT[participant-horizon-015] actual multiple-Engineer roster preserves each byname without Manager replicas or shared-DevOps fiction; two chooseWork objects do not prove a roster (GAP-079) (0.060792ms) # TODO
+✔ WHAT[participant-identity-001] catalog_has_canonical_roles (1.07825ms)
+✔ WHAT[participant-identity-001] required_names_are_canonical_and_include_managed_agents (0.2375ms)
+✔ WHAT[participant-identity-001] rejects SessionId keyed identity cache (69.230083ms)
+✔ WHAT[participant-identity-001] resolves every canonical participant identity and persona (1.393084ms)
+✔ WHAT[participant-identity-001] rejects legacy, malformed, blank, and unknown participant names (0.171292ms)
+✔ WHAT[participant-identity-001] rejects independently supplied role, persona, and origin (0.157542ms)
+✔ WHAT[participant-identity-002] durable provider failure fold preserves the exact IdentitySeed (5.47975ms)
+✔ WHAT[participant-identity-002] the identity boundary entries are accepted for clean authority shape (1.349458ms)
+✔ WHAT[participant-identity-002] AuthorityRootAcceptedPayload must store the IdentitySeed (0.419791ms)
+✔ WHAT[participant-identity-002] AuthorityRootAcceptedPayload cannot flatten IdentitySeed fields (2.217917ms)
+✔ WHAT[participant-identity-002] AuthorityExecutionProfile must derive identity from its seed (0.373ms)
+✔ WHAT[participant-identity-002] a SessionId-keyed identity collection is forbidden (0.095584ms)
+✔ WHAT[participant-identity-002] a SessionId-keyed identity registry is forbidden (0.071208ms)
+✔ WHAT[participant-identity-002] a second identity fact owner is forbidden (0.161667ms)
+✔ WHAT[participant-identity-002] the production participant identity boundary is clean (227.724375ms)
+✔ WHAT[participant-identity-002] ProviderAttempt carries its ParticipantIdentity as one nested value (0.983625ms)
+✔ WHAT[participant-identity-002] the retired peer slot is ignored and never affects identity (0.133375ms)
+✔ WHAT[participant-identity-003] rejects blank Persona and unsupported catalog version (0.92475ms)
+✔ WHAT[participant-identity-004] terminal dispatch preserves the exact IdentitySeed (3.93825ms)
+✔ WHAT[participant-identity-004] Strength replica inherits owner Persona and version with the same participant (1.212792ms)
+✔ WHAT[participant-identity-004] inherited Engineer seed retains owner Persona version and logical run (0.133791ms)
+✔ WHAT[participant-identity-004] raw legacy PeerAgent/EffectiveAgent/cursor fields are ignored and never re-encoded (0.251333ms)
+✔ WHAT[participant-identity-005] provider planning selects the identity prompt from profile Role (2.141334ms)
+✔ WHAT[participant-identity-007] Bookkeeper has private identity and no public Role (1.198584ms)
+✔ WHAT[participant-identity-007] Predictor has a private identity and never aliases Engineer (0.842084ms)
+✔ WHAT[participant-identity-007] rejects old Predictor evidence that claims Engineer without rewriting it (0.148333ms)
+✔ WHAT[participant-identity-008] inherited identity records the exact durable owner witness (3.127459ms)
+✔ WHAT[participant-identity-008] rejects stale owner identity evidence (0.747ms)
+✔ WHAT[participant-identity-008] closed owner run rejects its inherited identity evidence (20.862875ms)
+✔ WHAT[participant-identity-008] derived identity rejects root-selection evidence (1.018208ms)
+✔ WHAT[participant-identity-008] inherited identity rejects a different owner session (0.267708ms)
+✔ WHAT[participant-identity-008] inherited identity rejects a different authority root (0.13025ms)
+✔ WHAT[participant-identity-008] durable inherited seed round-trips without re-resolution (3.475458ms)
+✔ WHAT[participant-identity-008] raw legacy PeerAgent fields are ignored and never re-encoded (1.455958ms)
+✔ WHAT[participant-identity-008] current v2 durable identity recovers exact participant and owner provenance (7.19725ms)
+✔ WHAT[participant-identity-008] rejects old Predictor authority and mismatched legacy office evidence (3.241292ms)
+✔ WHAT[participant-identity-008] supported legacy HumanRoot deterministically recovers its upgraded identity (10.865709ms)
+✔ WHAT[participant-identity-008] missing active authority rejects even when LastAuthorityProfile is present (0.2175ms)
+✔ WHAT[participant-identity-008] rejects corrupt identity provenance (0.435917ms)
+✔ WHAT[participant-identity-008] closed exact run cannot be recovered as current (0.203125ms)
+✔ WHAT[participant-identity-008] child identity inherits the parent Persona and version across roles (0.310792ms)
+✔ WHAT[participant-identity-008] inherited identity requires the exact current owner Persona and version (0.28425ms)
+✔ WHAT[participant-identity-008] root_dispatch_uses_the_external_participant_and_stays_model_free (845.897083ms)
+✔ WHAT[participant-identity-008] an_inherited_seed_carries_the_owner_participant_whatever_child_name_is_asked (0.348542ms)
+✔ WHAT[participant-identity-008] SyncDelegate identity inherits its exact owner Persona and version (0.114667ms)
+✔ WHAT[participant-identity-008] Strength replica inherits the owner Persona and exact authority lineage (0.095167ms)
+✔ WHAT[participant-identity-008] an Engineer inherited seed validates against its actual owner profile (0.143833ms)
+✔ WHAT[participant-identity-008] derived roots reject blank owner witness fields at construction (0.270333ms)
+✔ WHAT[participant-identity-008] actual Fission lane admission preserves owner-issued lineage without inferring it from a physical parent (GAP-158: real fission admission path pending — the construction-time blank-field rejection above is retained but does not prove the lane admission flow) (0.024833ms) # TODO
+✔ WHAT[participant-identity-009] production plugin replaces identity only after exact durable Manager closure (1540.311292ms)
+✖ WHAT[participant-identity-009] real old mixed journal preserves the exact failed-event cut and prior-run identity boundary (990.817417ms)
+✖ WHAT[participant-identity-009] real old with-cut journal preserves the exact failed-event cut and prior-run identity boundary (1331.5785ms)
+✖ WHAT[participant-identity-009] real old same-event journal preserves the exact failed-event cut and prior-run identity boundary (1125.743583ms)
+✔ WHAT[participant-identity-009] reuses SessionId with a fresh closed-run identity (5.242125ms)
+✔ WHAT[participant-identity-010] role labels retain their catalog spelling for current and historical roles (0.520542ms)
+✔ WHAT[participant-identity-010] active_identity_resolution_accepts_engineer_and_rejects_retired_roles (0.476666ms)
+✔ WHAT[participant-identity-010] new owner-derived identities reject legacy names instead of upgrading them to Engineer (0.555417ms)
+✔ WHAT[participant-identity-010] authority admission rejects a legacy participant carrying Engineer authority (0.69525ms)
+✔ WHAT[participant-identity-010] historical_identity_decoding_does_not_silently_upgrade_inspector_or_devops_to_engineer (0.633042ms)
+✔ WHAT[provider-attempt-recovery-001] an_accepted_authority_root_creates_the_budget (5.370625ms)
+✔ WHAT[provider-attempt-recovery-001] a_record_with_no_accepted_root_stops_the_replay (0.461958ms)
+✔ WHAT[provider-attempt-recovery-001] an_active_authority_root_must_close_before_replacement (1.199541ms)
+✔ WHAT[provider-attempt-recovery-001] no_active_run_records_nothing_and_writes_no_fact (5.114916ms)
+✔ WHAT[provider-attempt-recovery-001] separate authority projections keep independent counts (0.37225ms)
+✔ WHAT[provider-attempt-recovery-002] legacy fallback bytes without a persisted budget are explicitly rejected (8.6495ms)
+✔ WHAT[provider-attempt-recovery-002] a_fresh_budget_starts_at_zero_with_no_budget_spent (1.442083ms)
+✔ WHAT[provider-attempt-recovery-002] fixed_participant_holds_across_failures (0.322834ms)
+✔ WHAT[provider-attempt-recovery-003] duplicate recovery observations in one live Journal share a physical send and settle (726.423291ms)
+ℹ {"physicalPid":18927,"sendDelta":1,"failureFacts":2}
+✔ WHAT[provider-attempt-recovery-003] the_same_attempt_observed_twice_advances_once (1.036667ms)
+✔ WHAT[provider-attempt-recovery-003] success preserves the whole LogicalRun identity set (1.321667ms)
+✔ WHAT[provider-attempt-recovery-003] a_duplicate_line_is_absorbed_because_replay_produces_it (2.4045ms)
+✔ WHAT[provider-attempt-recovery-003] same_failure_observed_twice_advances_once (46.745709ms)
+✔ WHAT[provider-attempt-recovery-003] an_older_failed_run_is_absorbed_after_its_successor_advances (33.500625ms)
+✔ WHAT[provider-attempt-recovery-003] actual writer retains zero-count success and seals a success-ended failure episode (43.817042ms)
+⚠ WHAT[provider-attempt-recovery-003] concurrent identical ledger commands append only one failure fact (25.764208ms) # GAP-140-B: the existing CurrentState-to-Append boundary does not arbitrate concurrent commands
+ℹ CONCURRENT_FAILURE_BUDGET_EVIDENCE: retained /var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-ledger-concurrent-8yTMMs
+✔ WHAT[provider-attempt-recovery-003] a success from a legally closed old root cannot clear a new run budget (71.730625ms)
+✔ WHAT[provider-attempt-recovery-003] ProviderFailure_owner_exposes_budget_and_dedupe_state (0.274083ms)
+✔ WHAT[provider-attempt-recovery-003] each_retry_binds_a_fresh_physical_identity (0.152167ms)
+✔ WHAT[provider-attempt-recovery-004] failure_adds_one_to_the_consecutive_count (1.259209ms)
+✔ WHAT[provider-attempt-recovery-004] success_resets_the_budget (0.277834ms)
+✔ WHAT[provider-attempt-recovery-004] success_is_a_durable_fact_that_zeroes_the_count (28.621583ms)
+✔ WHAT[provider-attempt-recovery-004] recording success keeps previous failure identity sealed (0.736167ms)
+✔ WHAT[provider-attempt-recovery-004] an_accepted_execution_without_a_start_fact_still_names_its_ordinary_kind (63.375333ms)
+✔ WHAT[provider-attempt-recovery-005] finite budget boundaries stop automatic permission at the configured count (1.245292ms)
+✔ WHAT[provider-attempt-recovery-005] durable exhaustion reads only the persisted limit (0.993625ms)
+✔ WHAT[provider-attempt-recovery-005] real retry engine calls neither admission nor redispatch after exhaustion (0.862875ms)
+✔ WHAT[provider-attempt-recovery-005] ledger records exhaustion exactly at its current finite limit and preserves it on reopen (217.461916ms)
+✔ WHAT[provider-attempt-recovery-005] full recovery workflow reaches exhaustion without an extra physical Host send (GAP-139) (0.166291ms) # TODO
+✖ WHAT[provider-attempt-recovery-005] actual recovery closed has no send before durable admission and cold reads the exact committed budget (757.190542ms)
+ℹ FAILURE_BUDGET_EVIDENCE: retained /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/budget-physical-writer-L6SbjQ
+✔ WHAT[provider-attempt-recovery-005] actual recovery before-physical has no send before durable admission and cold reads the exact committed budget (1163.615292ms)
+ℹ {"scenario":"before-physical","physicalPid":19367,"coldPid":19519,"sendDelta":0,"counts":{"targetCalls":1,"targetNativeWrites":0,"targetFsync":0,"releasesAfterTarget":0,"injected":1}}
+✔ WHAT[provider-attempt-recovery-005] actual recovery after-release has no send before durable admission and cold reads the exact committed budget (1005.633167ms)
+ℹ {"scenario":"after-release","physicalPid":19569,"coldPid":19689,"sendDelta":0,"counts":{"targetCalls":1,"targetNativeWrites":1,"targetFsync":1,"releasesAfterTarget":1,"injected":1}}
+✔ WHAT[provider-attempt-recovery-005] actual recovery valid has no send before durable admission and cold reads the exact committed budget (957.257583ms)
+ℹ {"scenario":"valid","physicalPid":19749,"coldPid":19871,"sendDelta":1,"counts":{"targetCalls":1,"targetNativeWrites":1,"targetFsync":3,"releasesAfterTarget":3,"injected":0}}
+✔ WHAT[provider-attempt-recovery-006] request kind changes preserve the selected plan identity and system prompt (3.982375ms)
+✔ WHAT[provider-attempt-recovery-006] actual retry with changed target preserves durable identity and full system prompt through Host submission (GAP-139) (0.075291ms) # TODO
+✔ WHAT[provider-attempt-recovery-007] a_valid_record_moves_the_durable_budget (1.434458ms)
+✔ WHAT[provider-attempt-recovery-007] the_count_must_advance_by_exactly_one_from_the_folded_state (0.085542ms)
+✔ WHAT[provider-attempt-recovery-007] each_rejection_names_a_different_cause (0.28575ms)
+✔ WHAT[provider-attempt-recovery-007] a_replayed_journal_reaches_the_same_budget (5.725333ms)
+✔ WHAT[provider-attempt-recovery-007] ordered facts with intervening success restart the failure streak (0.460625ms)
+✔ WHAT[provider-attempt-recovery-007] a new failure fact after exhaustion stops durable replay (0.580417ms)
+✔ WHAT[provider-attempt-recovery-007] durable replay uses its persisted limit and exhausts without a second marker (1.321333ms)
+✔ WHAT[provider-attempt-recovery-007] conflicting duplicates and a changed limit stop replay (0.329333ms)
+✔ WHAT[provider-attempt-recovery-007] success preserves identities and cannot be replayed to clear newer failures (0.24125ms)
+✔ WHAT[provider-attempt-recovery-007] exhaustion confirmation cannot invent or change the boundary (0.272208ms)
+✔ WHAT[provider-attempt-recovery-007] zero-count success is idempotent after a failure and exhausted success does not reopen (0.357458ms)
+✔ WHAT[provider-attempt-recovery-007] an_advance_naming_another_run_is_absorbed_not_applied (0.29875ms)
+✔ WHAT[provider-attempt-recovery-008] idle arriving before exact empty provider error never dispatches interaction repair (6.234ms)
+✔ WHAT[provider-attempt-recovery-008] errored empty and XML-only terminals wait for provider recovery, never idle repair (1.0915ms)
+✔ WHAT[provider-attempt-recovery-008] terminal validity distinguishes unusable content from an ordinary answer (1.478125ms)
+✔ WHAT[provider-attempt-recovery-008] unusable content alone cannot substitute for a confirmed provider failure (0.981875ms)
+✔ WHAT[provider-attempt-recovery-008] only_a_probe_attempt_with_a_usable_terminal_may_promote (1.732084ms)
+✔ WHAT[provider-attempt-recovery-008] RECON_formal_content_gate_is_shared_with_terminal_validity (0.157667ms)
+✔ WHAT[provider-attempt-recovery-008] actual unfinished Manager and other repairable roles reach one repair without spending provider budget (GAP-139) (0.055375ms) # TODO
+✔ WHAT[provider-attempt-recovery-009] duplicate domain failure identity cannot advance the pure projection again (1.778375ms)
+✔ WHAT[provider-attempt-recovery-009] varying Host transport retry numbers cannot change domain count identity or physical recovery permission (GAP-139) (0.080792ms) # TODO
+✔ WHAT[provider-attempt-recovery-009] the_dedupe_identity_names_the_run_the_root_and_the_attempt (0.158708ms)
+✔ WHAT[provider-attempt-recovery-010] Blogger retry policy selects BloggerMain directly after squash retirement (0.659875ms)
+✔ WHAT[provider-attempt-recovery-010] actual licensed Blogger retry sends Main directly under the failure licence (GAP-139) (0.059167ms) # TODO
+✔ WHAT[provider-attempt-recovery-011] same-key same-plan replays the admitted plan (1.781834ms)
+✔ WHAT[provider-attempt-recovery-011] same-key different authority fails closed (5.646041ms)
+✔ WHAT[provider-attempt-recovery-011] same-key different probe fails closed (0.803833ms)
+✔ WHAT[provider-attempt-recovery-011] same-key different request kind fails closed (0.167708ms)
+✔ WHAT[provider-attempt-recovery-011] same admitted plan drives binding and the frozen candidate is retained (0.796ms)
+✔ WHAT[provider-attempt-recovery-011] bind to the wrong parent or run is refused (0.729375ms)
+✔ WHAT[provider-attempt-recovery-011] terminal consumption is single-shot and never re-promotes (1.207292ms)
+✔ WHAT[provider-attempt-recovery-011] freeze under the wrong session key is an identity mismatch (0.232666ms)
+✔ WHAT[provider-attempt-recovery-011] freeze under the wrong physical key is an identity mismatch (0.14475ms)
+✔ WHAT[provider-attempt-recovery-011] same physical replay after binding returns the admitted plan (0.287ms)
+✔ WHAT[provider-attempt-recovery-011] same run and root with a different participant conflicts (0.3675ms)
+✔ WHAT[provider-attempt-recovery-011] same run and root with a different role conflicts (54.090916ms)
+✔ WHAT[provider-attempt-recovery-011] recordBound rejects a conflicting session, run, or physical parent (1.152833ms)
+✔ WHAT[provider-attempt-recovery-011] same candidate probe id with a different digest conflicts (0.150709ms)
+✔ WHAT[provider-attempt-recovery-011] terminal consume clears both registries so a fresh physical plan may freeze (0.831459ms)
+✔ WHAT[provider-attempt-recovery-011] public plan observation exposes no budget snapshot (0.767916ms)
+✔ WHAT[provider-attempt-recovery-011] an_attempt_without_a_probe_cannot_promote_even_on_success (0.151208ms)
+✔ WHAT[provider-attempt-recovery-011] Blogger retry policy is a pure function returning BloggerMain (0.065584ms)
+✔ WHAT[provider-attempt-recovery-011] actual render observes the admitted immutable plan and cannot consume a transient recovery permission (GAP-139) (0.023667ms) # TODO
+✔ WHAT[provider-attempt-recovery-011] XWIRE_accepted_retry_cannot_be_consumed_by_other_physical_material_in_the_same_session (0.794333ms)
+✔ WHAT[provider-attempt-recovery-011] XWIRE_missing_current_physical_user_cannot_consume_the_accepted_retry (0.1095ms)
+✔ WHAT[provider-attempt-recovery-011] XWIRE_mutation_sensitive_unrelated_physical_user_must_not_consume_accepted_retry (0.091708ms)
+✔ WHAT[provider-attempt-recovery-012] PAR_012_an_interrupted_tool_call_is_not_a_confirmed_failure (0.609792ms)
+✔ WHAT[provider-attempt-recovery-012] ordinary tool error remains distinct from interrupted cleanup residue (0.116584ms)
+✔ WHAT[provider-attempt-recovery-012] actual aborted Host tool residue leaves provider budget unchanged through reconciliation (GAP-139) (0.060125ms) # TODO
+✔ WHAT[provider-attempt-recovery-013] newly constructed plans expose the selected participant evidence instead of a fixed fixture answer (2.230125ms)
+✔ WHAT[provider-attempt-recovery-013] actual retries and restart preserve complete durable Persona provenance language authority and provider horizon (GAP-139) (0.073083ms) # TODO
+✔ WHAT[provider-attempt-recovery-014] ledger replay preserves one licensed failure count (55.393459ms)
+✔ WHAT[provider-attempt-recovery-014] actual continuation waits for exact Host stop after failure admission and never spends budget by sending (GAP-139) (0.148167ms) # TODO
+✔ WHAT[provider-attempt-recovery-015] retry engine never admits or redispatches a StrengthReplica failure (1.384042ms)
+✔ WHAT[provider-attempt-recovery-015] StrengthReplica success is ineligible to clear the owner failure count (1.147333ms)
+✔ WHAT[provider-attempt-recovery-015] actual speculative success and failure leave the owner journal budget unchanged (GAP-139) (0.06225ms) # TODO
+✔ WHAT[provider-attempt-recovery-016] actual RequestKind algebra clears only business-main success (1.92175ms)
+✔ WHAT[provider-attempt-recovery-016] tool-calls finish is a successful provider attempt while the turn continues (0.602584ms)
+✔ WHAT[provider-attempt-recovery-016] real ordinary and Blogger completion use durable kind evidence and write SuccessRecorded only for eligible successes (GAP-139) (0.045459ms) # TODO
+✔ WHAT[provider-attempt-recovery-017] runtime request ownership rejects stale release after explicit replacement (4.061666ms)
+✔ WHAT[provider-attempt-recovery-017] actual Main→Main recovery commits old abandonment before fresh materialization and PromptKey binding (GAP-139) (0.075875ms) # TODO
+✔ WHAT[provider-attempt-recovery-018] actual WorkMain recovery waits on an open Blogger request until committed close or strictly newer coverage; unrelated facts cannot unlock it (GAP-139) (0.337541ms) # TODO
+✔ WHAT[provider-attempt-recovery-018] real recovery proceeds without an open producer and cancellation releases an existing durable-event wait (GAP-139) (0.053416ms) # TODO
+✔ WHAT[provider-attempt-recovery-019] current retry ownership heuristics find no known forbidden source pattern (122.152458ms)
+✔ WHAT[provider-attempt-recovery-019] rejects nested physical retry owner (2.261875ms)
+✔ WHAT[provider-attempt-recovery-019] rejects retry classification from diagnostic text (15.2785ms)
+✔ WHAT[provider-attempt-recovery-019] real retry engine admits only typed provider failures and passes the same exact licence to redispatch (2.214542ms)
+✔ WHAT[provider-attempt-recovery-019] real retry engine waits for admission and never redispatches a refused exhausted or superseded episode (0.322417ms)
+✔ WHAT[provider-attempt-recovery-019] retry licence changes with the exact provider run and request kind (0.198917ms)
+✔ WHAT[provider-attempt-recovery-019] all production callers and wrong-attempt ledger inputs enforce the opaque licence without alternate retry owners (GAP-139) (0.040792ms) # TODO
+✔ WHAT[provider-attempt-recovery-020] budget_replay_exposes_domain_evidence_without_resume_authority (4.465917ms)
+✔ WHAT[provider-attempt-recovery-020] actual plan freeze bind and consume create no manual intervention (2.29225ms)
+✔ WHAT[provider-attempt-recovery-020] real journal replay without exact licence produces no provider retry or resume side effect (GAP-139) (0.070916ms) # TODO
+✔ WHAT[provider-attempt-recovery-021] explicit retain settlement preserves the exact failed target for one fresh admission (5.482583ms)
+✔ WHAT[provider-attempt-recovery-021] retry preference is consumed once and does not pin future admissions (1.322084ms)
+✔ WHAT[provider-attempt-recovery-021] explicit condemnation consumes an exact witness once and rotates to a healthy target (0.934125ms)
+✔ WHAT[provider-attempt-recovery-021] the_settlement_fact_is_the_durable_provider_retry_attempt_acceptance (90.957708ms)
+✔ WHAT[provider-attempt-recovery-021] the_lwr_retry_payload_replaces_the_covered_prefix_with_the_work_record (1.206792ms)
+✔ WHAT[provider-attempt-recovery-021] actual ordinary and sync-delegate recovery combine exact durable LWR evidence and target settlement after licensing and before send (GAP-139) (0.041541ms) # TODO
+✔ WHAT[provider-attempt-recovery-022] await without the exact observation stays pending (1.12325ms)
+✔ WHAT[provider-attempt-recovery-022] another run and another session never satisfy the exact attempt (0.113333ms)
+✔ WHAT[provider-attempt-recovery-022] observation is idempotent and a late waiter resolves immediately (0.075084ms)
+✔ WHAT[provider-attempt-recovery-022] revocation denies the waiting attempt only (0.416333ms)
+✔ WHAT[provider-attempt-recovery-022] actual Host terminal observation alone releases recovery while coarse error and idle cannot; fresh process inherits no stop permission (GAP-139) (0.043375ms) # TODO
+✔ WHAT[provider-attempt-recovery-023] session idle sweep selectively targets only Accepted without ProviderStarted executions of that session (105.75325ms)
+✔ WHAT[provider-attempt-recovery-023] missing resume capability terminalizes the accepted execution instead of leaving it Accepted (27.221542ms)
+✔ WHAT[provider-attempt-recovery-023] real boot sweep after process restart resolves only Accepted-without-start and preserves exact accepted material without replacement send (GAP-139) (0.056792ms) # TODO
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[provider-attempt-recovery-024] the stale-load sweep settles only the same-source accepted execution and returns its exact capacity (669.533084ms)
+✔ WHAT[provider-attempt-recovery-024] the stale-load sweep leaves a provider-started execution untouched (202.452667ms)
+✔ WHAT[provider-attempt-recovery-024] the stale-load sweep fabricates nothing for a session without accepted executions (190.858375ms)
+✔ WHAT[provider-attempt-recovery-024] the real load phase decides the same-source accepted execution of an abandoned stale Blogger request (606.39575ms)
+✔ WHAT[requirement-grounding-001] discovers requirement packages from the current workspace without a Wanxiangshu package list (3.029125ms)
+✔ WHAT[requirement-grounding-002] treats a package own requirements subtree as implicit coverage that APPLIES-TO cannot cancel (5.21475ms)
+✔ WHAT[requirement-grounding-002] rejects every self-subtree declaration before any future descendant exists (10.05275ms)
+✔ WHAT[requirement-grounding-002] keeps disjoint package declarations and external recursive patterns (7.817416ms)
+✔ WHAT[requirement-grounding-002] uses the existing UTF16 glob dialect for package names (1.627ms)
+✔ WHAT[requirement-grounding-002] excludes impossible NUL and backslash-only matches from normalized path scope (9.065625ms)
+✔ WHAT[requirement-grounding-002] preserves recursive-directory separators and the existing line-end dialect (2.6375ms)
+✔ WHAT[requirement-grounding-002] keeps a leading closing bracket inside its glob character class (3.497292ms)
+✔ WHAT[requirement-grounding-002] resolves nonexistent paths through a symlinked workspace without allowing symlink escape (2.887833ms)
+✔ WHAT[requirement-grounding-003] evaluates APPLIES-TO as ordered positive wildmatch includes with bang exclusions (6.829333ms)
+✔ WHAT[requirement-grounding-004] returns every overlapping package in deterministic package-name order (6.731417ms)
+✔ WHAT[requirement-grounding-005] APPLIES-TO external grounding injects only direct Markdown and excludes tests plus the manifest (57.757542ms)
+✔ WHAT[requirement-grounding-006] an unclassified native read wrapper conservatively keeps the complete material eligible (66.31925ms)
+✔ WHAT[requirement-grounding-006] deduplicates material content versions and re-grounds only the changed Markdown sibling (48.755916ms)
+✔ WHAT[requirement-grounding-006] reanchor_resets_horizon_coverage_so_the_same_digest_must_ground_again (43.724333ms)
+✔ WHAT[requirement-grounding-006] a read returning old bytes does not mark the newer disk version visible (33.634291ms)
+✔ WHAT[requirement-grounding-006] a partial returned read does not mark the complete disk material visible (42.531542ms)
+✔ WHAT[requirement-grounding-006] a non-content native observation protocol input does not mint a successful read fact (16.802833ms)
+✔ WHAT[requirement-grounding-006] an actual program file-read failure cannot produce visible read facts (26.820208ms)
+✔ WHAT[requirement-grounding-006] a symlink replaced after the actual read preserves the read-time resolved path at observation (9.938708ms)
+✔ WHAT[requirement-grounding-006] an actual file read through an outside-workspace symlink is denied without an observation (7.799ms)
+﹣ WHAT[requirement-grounding-006] actual pinned native read output cannot honestly establish complete original file bytes (0.110625ms) # integration tier not enabled
+✔ WHAT[requirement-grounding-006] registered program grep keeps scan freshness without claiming explicit visible file contents (779.76725ms)
+✔ WHAT[requirement-grounding-006] registered complete file reads preserve exact versions, deduplicate, replay, and reset after reanchor (406.002ms)
+✔ WHAT[requirement-grounding-006] historical material observations retain their original decode and horizon semantics (34.0425ms)
+﹣ WHAT[requirement-grounding-007] compiled production owners preserve original material through the pinned Host actual provider serialization (0.4005ms) # integration tier not enabled
+✔ WHAT[requirement-grounding-007] actual pair and grounding transforms append result-only bytes for each tested provider without synthetic calls (121.6255ms)
+✔ WHAT[requirement-grounding-007] candidate discovery tools do not ground, while an explicit read does (28.331208ms)
+✔ WHAT[requirement-grounding-007] original Markdown bytes survive the actual result suffix unchanged (21.929583ms)
+▶ WHAT[requirement-grounding-007] registered reads reject illegal self scope without consuming its materials
+  ✖ WHAT[requirement-grounding-007] legal scope with registered read (91.981084ms)
+  ✖ WHAT[requirement-grounding-007] legal scope with registered js-manager (9.236584ms)
+  ✔ WHAT[requirement-grounding-007] positive scope with registered read (53.145875ms)
+  ✖ WHAT[requirement-grounding-007] positive scope with registered js-manager (10.078417ms)
+  ✔ WHAT[requirement-grounding-007] negative scope with registered read (54.382791ms)
+  ✖ WHAT[requirement-grounding-007] negative scope with registered js-manager (12.788083ms)
+✖ WHAT[requirement-grounding-007] registered reads reject illegal self scope without consuming its materials (739.217042ms)
+✔ WHAT[requirement-grounding-007] registered original results retain complete saved presentation text (anthropic) (601.54175ms)
+✔ WHAT[requirement-grounding-007] registered original results retain complete saved presentation text (cursor) (566.711792ms)
+✔ WHAT[requirement-grounding-007] registered original results retain complete saved presentation text (openai) (633.7725ms)
+✔ WHAT[requirement-grounding-007] missing physical part IDs bind only to exact captured missing-part results (489.339833ms)
+✔ WHAT[requirement-grounding-007] new ambiguous missing-part material is refused and legacy ambiguity is rejected by both presentation owners (234.117292ms)
+✔ WHAT[requirement-grounding-007] same-anchor versions cannot turn a complete guidance and read combination into one later material (450.554084ms)
+✔ WHAT[requirement-grounding-007] captured original result missing blob fails both presentation owners (432.266125ms)
+✔ WHAT[requirement-grounding-007] captured original result changed blob fails both presentation owners (414.758125ms)
+▶ WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for anthropic
+  ✔ WHAT[requirement-grounding-007] anthropic todowrite-for-manager crlf-blank-trailing exact content carrier and canonical history (165.498917ms)
+  ✔ WHAT[requirement-grounding-007] anthropic todowrite-for-manager bare-cr exact content carrier and canonical history (159.421917ms)
+  ✔ WHAT[requirement-grounding-007] anthropic todowrite-for-manager empty exact content carrier and canonical history (234.334167ms)
+  ✔ WHAT[requirement-grounding-007] anthropic todowrite-for-manager no-final-lf exact content carrier and canonical history (160.885334ms)
+  ✔ WHAT[requirement-grounding-007] anthropic todowrite-for-manager unicode exact content carrier and canonical history (206.144208ms)
+  ✔ WHAT[requirement-grounding-007] anthropic todowrite-for-manager nul-bom exact content carrier and canonical history (176.81975ms)
+  ✔ WHAT[requirement-grounding-007] anthropic todowrite-for-manager marker-text exact content carrier and canonical history (165.524583ms)
+✔ WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for anthropic (1550.149084ms)
+▶ WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for cursor
+  ✔ WHAT[requirement-grounding-007] cursor todowrite-for-manager crlf-blank-trailing exact content carrier and canonical history (151.54625ms)
+  ✔ WHAT[requirement-grounding-007] cursor todowrite-for-manager bare-cr exact content carrier and canonical history (152.168958ms)
+  ✔ WHAT[requirement-grounding-007] cursor todowrite-for-manager empty exact content carrier and canonical history (187.178459ms)
+  ✔ WHAT[requirement-grounding-007] cursor todowrite-for-manager no-final-lf exact content carrier and canonical history (164.822542ms)
+  ✔ WHAT[requirement-grounding-007] cursor todowrite-for-manager unicode exact content carrier and canonical history (156.959584ms)
+  ✔ WHAT[requirement-grounding-007] cursor todowrite-for-manager nul-bom exact content carrier and canonical history (165.924ms)
+  ✔ WHAT[requirement-grounding-007] cursor todowrite-for-manager marker-text exact content carrier and canonical history (152.196333ms)
+✔ WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for cursor (1357.893916ms)
+▶ WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for openai
+  ✔ WHAT[requirement-grounding-007] openai todowrite-for-manager crlf-blank-trailing exact content carrier and canonical history (171.918042ms)
+  ✔ WHAT[requirement-grounding-007] openai todowrite-for-manager bare-cr exact content carrier and canonical history (152.200667ms)
+  ✔ WHAT[requirement-grounding-007] openai todowrite-for-manager empty exact content carrier and canonical history (161.622875ms)
+  ✔ WHAT[requirement-grounding-007] openai todowrite-for-manager no-final-lf exact content carrier and canonical history (183.281125ms)
+  ✔ WHAT[requirement-grounding-007] openai todowrite-for-manager unicode exact content carrier and canonical history (158.470791ms)
+  ✔ WHAT[requirement-grounding-007] openai todowrite-for-manager nul-bom exact content carrier and canonical history (168.830208ms)
+  ✔ WHAT[requirement-grounding-007] openai todowrite-for-manager marker-text exact content carrier and canonical history (356.311042ms)
+✔ WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for openai (1559.280584ms)
+✔ WHAT[requirement-grounding-007] registered composition preserves result suffixes, orders guidance before grounding and keeps canonical X clean (anthropic) (1311.52225ms)
+✔ WHAT[requirement-grounding-007] registered composition preserves result suffixes, orders guidance before grounding and keeps canonical X clean (cursor) (1062.224125ms)
+✔ WHAT[requirement-grounding-007] registered composition preserves result suffixes, orders guidance before grounding and keeps canonical X clean (openai) (1231.742334ms)
+✔ WHAT[requirement-grounding-007] registered composition keeps canonical suffix order when the production owner calls are reversed (2395.768375ms)
+✔ WHAT[requirement-grounding-007] registered composition proof rejects missing-guidance production wiring (1479.273334ms)
+✔ WHAT[requirement-grounding-007] registered composition proof rejects missing-grounding production wiring (1527.838791ms)
+✔ WHAT[requirement-grounding-007] registered composition proof rejects reversed-delivery production wiring (1541.493334ms)
+✔ WHAT[requirement-grounding-008] mutation grounding is weak observation and never becomes tool admission (52.963125ms)
+✔ WHAT[requirement-grounding-008] registered hooks allow a controlled Host write to an ungrounded covered path (629.310292ms)
+✔ WHAT[requirement-grounding-008] registered hooks allow a controlled Host write despite invalid APPLIES-TO metadata (270.325834ms)
+✔ WHAT[requirement-grounding-008] registered write remains fail-open for an illegal positive self declaration (263.417833ms)
+✖ WHAT[requirement-grounding-008] actual JS mutation commits once with an illegal positive self declaration (242.620375ms)
+✔ WHAT[requirement-grounding-008] registered write remains fail-open for an illegal ! self declaration (257.3075ms)
+✖ WHAT[requirement-grounding-008] actual JS mutation commits once with an illegal ! self declaration (258.21275ms)
+✔ WHAT[requirement-grounding-009] js-* mutations commit normally while grounding observes the full effect set without admission (69.037041ms)
+✔ WHAT[requirement-grounding-010] js-* read is a real read: covered code triggers grounding and already-read Markdown is deduplicated (74.588125ms)
+✔ WHAT[requirement-grounding-011] grounding appends knowledge without fabricating additional Host messages or changing their roles (52.111125ms)
+✔ WHAT[requirement-grounding-011] registered knowledge delivery retains actual role gates and zero unauthorized write effects (anthropic) (863.848542ms)
+✔ WHAT[requirement-grounding-011] registered knowledge delivery retains actual role gates and zero unauthorized write effects (cursor) (533.260917ms)
+✔ WHAT[requirement-grounding-011] registered knowledge delivery retains actual role gates and zero unauthorized write effects (openai) (537.652459ms)
+✔ WHAT[requirement-grounding-011] the knowledge delivery proof rejects a production role gate that incorrectly allows the Engineer surface (1593.533916ms)
+✔ WHAT[requirement-grounding-012] a legacy inline carrier is restored verbatim instead of being rendered with the new representation (36.100917ms)
+✔ WHAT[requirement-grounding-012] reopening the durable journal replays exact messages and appends changed content only to a new terminal result (75.314084ms)
+▶ WHAT[requirement-grounding-012] separate registered producer and restarted processes replay inline occurrence bytes at their original anchors
+  ✔ WHAT[requirement-grounding-012] the registered producer anchors a real covered read and persists its inline occurrence (990.515375ms)
+  ✔ WHAT[requirement-grounding-012] an independent normal boot replays exact prior messages while the original material is absent (1368.703166ms)
+  ✔ WHAT[requirement-grounding-012] a fresh actual read in an independent process appends changed material after the frozen prefix (1016.849625ms)
+  ✔ WHAT[requirement-grounding-012] another normal process replays both saved inline versions with stable anchors and no source package (1240.093958ms)
+  ✔ WHAT[requirement-grounding-012] corruption of the actual persisted occurrence prevents a fresh normal boot from reporting replay success (890.740792ms)
+✔ WHAT[requirement-grounding-012] separate registered producer and restarted processes replay inline occurrence bytes at their original anchors (5541.06975ms)
+ℹ tests 361
+ℹ suites 0
+ℹ pass 306
+ℹ fail 11
+ℹ cancelled 0
+ℹ skipped 3
+ℹ todo 41
+ℹ duration_ms 32138.55275
+
+✖ failing tests:
+
+test at requirements/participant-identity/tests/009.test.mjs:59:1
+✖ WHAT[participant-identity-009] real old mixed journal preserves the exact failed-event cut and prior-run identity boundary (990.817417ms)
+  AssertionError [ERR_ASSERTION]: subprocess exited 1
+  
+  file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:50
+    assert.deepEqual(healthy.map(profile => profile.participantIdentity.role), healthyAgents)
+                                                    ^
+  
+  TypeError: Cannot read properties of null (reading 'participantIdentity')
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:50:51
+      at Array.map (<anonymous>)
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:50:28
+      at withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:13)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:45:1
+  
+  Node.js v26.6.0
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/009.test.mjs:68:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/participant-identity/tests/009.test.mjs:59:1
+✖ WHAT[participant-identity-009] real old with-cut journal preserves the exact failed-event cut and prior-run identity boundary (1331.5785ms)
+  AssertionError [ERR_ASSERTION]: subprocess exited 1
+  
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Missing expected rejection.
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:62:8
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:45:1 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /Journal cut requires a decodable failed event/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/009.test.mjs:68:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/participant-identity/tests/009.test.mjs:59:1
+✖ WHAT[participant-identity-009] real old same-event journal preserves the exact failed-event cut and prior-run identity boundary (1125.743583ms)
+  AssertionError [ERR_ASSERTION]: subprocess exited 1
+  
+  file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:52
+    if (sameEvent) assert.equal(before.participantIdentity.role, 'engineer')
+                                       ^
+  
+  TypeError: Cannot read properties of null (reading 'participantIdentity')
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:52:38
+      at withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:13)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/support/unknown-identity-plugin-scenario.mjs:45:1
+  
+  Node.js v26.6.0
+  
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/participant-identity/tests/009.test.mjs:68:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/provider-attempt-recovery/tests/003.test.mjs:271:1
+⚠ WHAT[provider-attempt-recovery-003] concurrent identical ledger commands append only one failure fact (25.764208ms) # GAP-140-B: the existing CurrentState-to-Append boundary does not arbitrate concurrent commands
+  AssertionError [ERR_ASSERTION]: fold dedupe alone does not prevent a second physical fact
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-attempt-recovery/tests/003.test.mjs:291:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/provider-attempt-recovery/tests/005.test.mjs:74:3
+✖ WHAT[provider-attempt-recovery-005] actual recovery closed has no send before durable admission and cold reads the exact committed budget (757.190542ms)
+  Error: Selected tool identity probe failed
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: 'fatal: not a git repository (or any of the parent directories): .git\n',
+    [cause]: undefined
+  }
+
+test at requirements/requirement-grounding/tests/007.test.mjs:147:17
+✖ WHAT[requirement-grounding-007] legal scope with registered read (91.981084ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:166:18)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:147:9
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:130:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/requirement-grounding/tests/007.test.mjs:147:17
+✖ WHAT[requirement-grounding-007] legal scope with registered js-manager (9.236584ms)
+  TypeError: Cannot read properties of undefined (reading 'execute')
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:156:38)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:147:9
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:130:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at requirements/requirement-grounding/tests/007.test.mjs:147:17
+✖ WHAT[requirement-grounding-007] positive scope with registered js-manager (10.078417ms)
+  TypeError: Cannot read properties of undefined (reading 'execute')
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:156:38)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:147:9
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:130:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at requirements/requirement-grounding/tests/007.test.mjs:147:17
+✖ WHAT[requirement-grounding-007] negative scope with registered js-manager (12.788083ms)
+  TypeError: Cannot read properties of undefined (reading 'execute')
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:156:38)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:147:9
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/007.test.mjs:130:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at requirements/requirement-grounding/tests/008.test.mjs:113:3
+✖ WHAT[requirement-grounding-008] actual JS mutation commits once with an illegal positive self declaration (242.620375ms)
+  TypeError: Cannot read properties of undefined (reading 'execute')
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/008.test.mjs:128:54
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/008.test.mjs:114:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at requirements/requirement-grounding/tests/008.test.mjs:113:3
+✖ WHAT[requirement-grounding-008] actual JS mutation commits once with an illegal ! self declaration (258.21275ms)
+  TypeError: Cannot read properties of undefined (reading 'execute')
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/008.test.mjs:128:54
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/requirement-grounding/tests/008.test.mjs:114:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)

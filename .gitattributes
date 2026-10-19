@@ -6,3 +6,9 @@
 *.gif binary
 *.webp binary
 *.ico binary
+
+evidence/semantic-merge-sm03/**/*.log -text -whitespace
+evidence/semantic-merge-sm04/**/*.log -text -whitespace
+evidence/semantic-merge-sm05/**/*.log -text -whitespace
+evidence/semantic-merge-sm06/**/*.log -text -whitespace
+evidence/semantic-merge-sm07/**/*.log -text -whitespace

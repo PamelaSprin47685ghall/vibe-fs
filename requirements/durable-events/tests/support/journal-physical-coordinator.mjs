@@ -32,7 +32,7 @@ try {
   await close
   if (failure) throw failure
   assert.equal(cleanupRequested, false)
-  assert.deepEqual(terminal, fatal ? { exitCode: null, signal: 'SIGKILL' } : { exitCode: 0, signal: null })
+  assert.deepEqual(terminal, fatal ? { exitCode: null, signal: 'SIGKILL' } : { exitCode: 0, signal: null }, fs.readFileSync(reportFile, 'utf8'))
   const reports = fs.readFileSync(reportFile, 'utf8').split('\n').filter(Boolean).map(JSON.parse)
   assert.equal(reports.length, fatal ? 1 : 0)
   const receipts = fs.readFileSync(path.join(root, 'journal-settlements.ndjson'), 'utf8')

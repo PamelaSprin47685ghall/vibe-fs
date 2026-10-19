@@ -163,11 +163,9 @@ module HostForkChildDispatch =
         (parentId: SessionId)
         (sessions: ISessionHostPort)
         (prepareCompletion: PendingHostRun -> TerminalOutcome -> Task<string option>)
-        (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
         (onRunStarted: SessionId -> Role -> unit)
-        (handoffPort: ReusableHandoffPort option)
         (sendChildPrompt:
             string
                 -> SessionId
@@ -180,7 +178,6 @@ module HostForkChildDispatch =
         (childId: SessionId)
         (role: Role)
         (identitySeed: PromptAuthority.IdentitySeed)
-        (preparedHandoff: PreparedDelegationHandoff option)
         (prompt: string)
         (agent: string)
         (enrichedPrompt: string option)
@@ -202,10 +199,7 @@ module HostForkChildDispatch =
                         parentId
                         sessions
                         prepareCompletion
-                        xTraceHead
                         trackOwnedWork
-                        handoffPort
-                        preparedHandoff
                         agentId
                         childId
                         role
@@ -229,10 +223,8 @@ module HostForkChildDispatch =
         (parentId: SessionId)
         (sessions: ISessionHostPort)
         (prepareCompletion: PendingHostRun -> TerminalOutcome -> Task<string option>)
-        (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
-        (handoffPort: ReusableHandoffPort option)
         (sendChildPrompt:
             string
                 -> SessionId
@@ -242,7 +234,6 @@ module HostForkChildDispatch =
                 -> (PhysicalUserMessageId -> unit)
                 -> Task<HostForkRunLifecycle.AgentOwnerDispatchOutcome>)
         (onRunStarted: SessionId -> Role -> unit)
-        (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
@@ -264,17 +255,14 @@ module HostForkChildDispatch =
                         parentId
                         sessions
                         prepareCompletion
-                        xTraceHead
                         trackOwnedWork
                         runtime
                         onRunStarted
-                        handoffPort
                         sendChildPrompt
                         agentId
                         childId
                         role
                         identitySeed
-                        preparedHandoff
                         prompt
                         agent
                         enrichedPrompt
@@ -294,10 +282,8 @@ module HostForkChildDispatch =
         (parentId: SessionId)
         (sessions: ISessionHostPort)
         (prepareCompletion: PendingHostRun -> TerminalOutcome -> Task<string option>)
-        (xTraceHead: SessionId -> XTraceCursor)
         (trackOwnedWork: (unit -> Task) -> unit)
         (runtime: ForkRuntime)
-        (handoffPort: ReusableHandoffPort option)
         (sendChildPrompt:
             string
                 -> SessionId
@@ -309,7 +295,6 @@ module HostForkChildDispatch =
         (sendBusyNudge:
             string -> SessionId -> PromptAuthority.AuthorityExecutionProfile -> string -> Task<Result<unit, string>>)
         (onRunStarted: SessionId -> Role -> unit)
-        (preparedHandoff: PreparedDelegationHandoff option)
         (agentId: string)
         (childId: SessionId)
         (role: Role)
@@ -326,8 +311,6 @@ module HostForkChildDispatch =
 
             match activeRun, runtime.IsCancelled with
             | Some _, true -> return! Error "Fork runtime is cancelled"
-            | Some _, false when preparedHandoff.IsSome ->
-                return! Error(sprintf "Agent already has an active assignment: %s" agentId)
             | Some run, false ->
                 // Active run: BusyAgentNudge continuation (same LogicalRun).
                 return! nudgeBusyChild sendBusyNudge journal run prompt
@@ -340,13 +323,10 @@ module HostForkChildDispatch =
                         parentId
                         sessions
                         prepareCompletion
-                        xTraceHead
                         trackOwnedWork
                         runtime
-                        handoffPort
                         sendChildPrompt
                         onRunStarted
-                        preparedHandoff
                         agentId
                         childId
                         role

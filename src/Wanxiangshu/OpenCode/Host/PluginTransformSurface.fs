@@ -28,7 +28,7 @@ module PluginTransformSurface =
                   ApplyRelayProjection =
                     fun _ _ ->
                         record "relay"
-                        Task.FromResult RelayProjectionDisposition.CurrentIteration
+                        Task.FromResult RelayProjectionDisposition.CurrentTenure
                   ApplyTenureIsolation = fun _ _ -> complete "tenure-isolation"
                   CaptureXTraceMessages =
                     fun _ _ ->
@@ -53,7 +53,7 @@ module PluginTransformSurface =
                         )
                   FreezeProviderAttemptPlan = fun _ _ -> complete "freeze-plan"
                   ApplyEnforcerContinuation = fun _ _ -> complete "continuation"
-                  ApplyReadonlyDelegation = fun _ _ -> complete "delegation"
+                  ApplyReadonlyDelegation = fun _ _ _ -> complete "delegation"
                   InjectPairGuideline = fun _ _ _ -> complete "pair"
                   ProjectRequirementGrounding = fun _ _ -> complete "grounding"
                   InjectBloggerChronicle = fun _ _ _ -> record "chronicle"

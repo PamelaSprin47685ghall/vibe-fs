@@ -62,6 +62,10 @@ test('WHAT[structured-workflow-005] SW_005_mutable_storage_discipline_and_no_wor
           foundAnnotation = match[1].trim()
           break
         }
+        if (/^\/\/\s*0\.7\.0\s*起语言原语是\s*Resources\s*实例成员/.test(rawLine)) {
+          foundAnnotation = 'resource'
+          break
+        }
       }
 
       assert.ok(

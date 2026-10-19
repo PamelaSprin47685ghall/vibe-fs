@@ -1159,6 +1159,30 @@ module DispatchSurface =
                             |> Option.defaultValue null
                            count = counter.Count |}) |}
 
+    /// 只读真实投影；不为测试另建等待状态。
+    let userQuestionObservation (handle: JournalHandle) (session: string) : obj array =
+        (AgentJournal.snapshot handle.Journal).AgentProjections.Sessions
+        |> Map.tryFind (SessionId.create session)
+        |> Option.bind (fun state -> state.PromptAuthority)
+        |> Option.map (fun authority ->
+            authority.UserQuestions
+            |> Map.toArray
+            |> Array.map (fun (_, question) ->
+                let requested = question.Request
+
+                box
+                    {| logicalRun = LogicalRunId.value requested.LogicalRunId
+                       authorityRoot = AuthorityRootUserMessageId.value requested.AuthorityRootUserMessageId
+                       providerRun = ProviderRunIdentity.value requested.ProviderRunId
+                       sourceInput = PhysicalUserMessageId.value requested.PhysicalUserMessageId
+                       toolCall = ToolCallId.value requested.ToolCallId
+                       question = requested.Question
+                       answer =
+                        question.Answer
+                        |> Option.map PhysicalUserMessageId.value
+                        |> Option.defaultValue null |}))
+        |> Option.defaultValue [||]
+
     let private watermarkText (value: obj) =
         if isNull value then "" else string value
 

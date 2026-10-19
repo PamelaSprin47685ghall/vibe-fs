@@ -15,4 +15,8 @@ module ChronicleExecution =
 
     val tryCanonicalText: rawText: string -> Result<string, string>
 
+    val tryTipName: rawText: string -> Result<string, string>
+
+    val tryTipField: fieldName: string -> rawText: string -> Result<string, string>
+
     val decide: bool -> string -> ChronicleExecution

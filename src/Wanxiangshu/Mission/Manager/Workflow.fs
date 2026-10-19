@@ -30,7 +30,7 @@ module ManagerWorkflow =
     let private lifecycleWork (directory: string option) (sessionId: string) =
         directory
         |> Option.bind (fun workspace ->
-            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId)
 
     /// The iteration ordinal as the provider reads it: "1" for the first
@@ -126,7 +126,9 @@ module ManagerWorkflow =
             sessionPort
             rootWorkspace
             turn.SessionId
-            (ProviderProse.documentFor turn.SessionId resourcePath substitutions)
+            (ProviderProse.documentFor turn.SessionId "work/manager-continue" Map.empty
+             + "\n\n"
+             + ProviderProse.documentFor turn.SessionId resourcePath substitutions)
             PromptAuthority.ContinuationKind.ManagerGuard
             turn.Directory
             (Some journal)
@@ -143,31 +145,58 @@ module ManagerWorkflow =
         (turn: ReconciledTurn)
         =
         task {
-            match activeResourcePath turn.Directory turn.SessionId with
-            | Some resourcePath ->
-                // Durable PromptAuthority gate is the sole dedupe/source of truth:
-                // Sent/AlreadyAdmitted/Retired are settled no-op success, Failed stays nonfatal.
-                let! _ = sendNudge quiescence permit sessionPort rootWorkspace journal turn resourcePath
-                return ()
-            | None -> return ()
+            // 没读到工作不是完成证据；提醒继续核对任务，而不是悄悄放行自然结束。
+            let resourcePath =
+                activeResourcePath turn.Directory turn.SessionId |> Option.defaultValue workPath
+
+            let! outcome = sendNudge quiescence permit sessionPort rootWorkspace journal turn resourcePath
+
+            match outcome with
+            | HostSessionNudge.IdleContinuationOutcome.Failed error
+            | HostSessionNudge.IdleContinuationOutcome.NotSent error ->
+                return invalidOp (sprintf "Manager continuation could not be delivered: %s" error)
+            | _ -> return ()
         }
         :> Task
 
-    /// Algorithm H8 entry two: after a Relayed retirement on an S4 work whose
-    /// successor has not been reviewed yet, the successor prompt is the first
-    /// visible instruction. The retirement id names the cut and the committed
-    /// retirement fence carries the provider run that made it; no run identity
-    /// is invented.
+    /// Algorithm H8 entry two: an S4 work whose open tenure has not been reviewed
+    /// yet starts from the successor prompt, and the last committed retirement is
+    /// the occasion: a Relayed retirement opened the successor itself, a Delivered
+    /// retirement is the cut Change handed the same Work over from after a machine
+    /// conflict or a rebase that invalidated the candidate
+    /// (change-integration-005/013). Either way the retirement id names the cut
+    /// and the committed retirement fence carries the provider run that made it;
+    /// no run identity is invented, and a work with no retirement (the first
+    /// tenure) gets its authority from the job's own prompt, not from here.
     let private successorPromptContext
         (workspaceDirectory: string option)
         (sessionIdText: string)
         : (string * string) option =
         lifecycleWork workspaceDirectory sessionIdText
         |> Option.bind (fun work ->
-            match work.Sequence, List.tryLast work.Retirements with
-            | [ "S4" ], Some retirement when retirement.Outcome = "Relayed" && not work.Reviewed ->
+            match work.Sequence, work.ActiveId, List.tryLast work.Retirements with
+            | [ "S4" ], Some _, Some retirement when not work.Reviewed ->
                 Some(retirement.RetirementId, retirement.Fence.ProviderRunId)
             | _ -> None)
+
+    /// Read-only probe (the `loopSignalOf` / `publishReviewOf` pattern): the
+    /// successor-prompt occasion this Manager session's work currently owes,
+    /// read from the same fold the dispatch reads and dispatching nothing.
+    /// `present = false` is the fail-closed answer for a work that owes no
+    /// successor prompt: a first tenure with no retirement, a work whose open
+    /// tenure is already reviewed, and every non-S4 sequence.
+    let successorPromptContextOf (workspaceDirectory: string) (sessionIdText: string) : obj =
+        match successorPromptContext (Some workspaceDirectory) sessionIdText with
+        | Some(retirementId, providerRunId) ->
+            box
+                {| present = true
+                   retirementId = retirementId
+                   providerRunId = providerRunId |}
+        | None ->
+            box
+                {| present = false
+                   retirementId = ""
+                   providerRunId = "" |}
 
     /// One durable opening at an observed head. DurableWorkHost owns race
     /// reconciliation: a conflicting or unknown append is accepted only when
@@ -182,7 +211,7 @@ module ManagerWorkflow =
         if System.String.IsNullOrWhiteSpace root then
             invalidOp "Manager lifecycle opening failed: Git did not identify a worktree root"
 
-        let gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir root
+        let gitCommonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot root
 
         match
             Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ensureOpened
@@ -318,6 +347,16 @@ module ManagerWorkflow =
         (context: ReconciledTurnContext)
         : Task =
         match journal, context.Failure, context.Turn.Outcome, context.Quiescence with
+        | Some durable, _, _, _ when
+            UserQuestionJournal.suppressesTurn
+                durable
+                context.Turn.SessionId
+                context.Turn.AuthorityRootUserMessageId
+                context.Turn.ProviderRun
+            ->
+            Task.FromResult()
+        | _, _, _, _ when isRetiredObservation context.Turn.Directory context.Turn.SessionId context.Turn.ProviderRun ->
+            Task.FromResult()
         | Some durable, None, ReconcileProgram.TurnCompleted, Some permit ->
             scheduleNudge quiescence permit sessionPort rootWorkspace durable context.Turn
         | _ -> Task.FromResult()

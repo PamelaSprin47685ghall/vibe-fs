@@ -8,7 +8,7 @@ import { toolModule, withForkRuntime } from './support/fork-runtime.mjs'
 test('WHAT[delegation-032] office capability projection denies cross-role dispatch while retaining each role’s own work', () => {
   for (const [role, denied, allowed] of [
     ['engineer', ['Fork', 'Resume', 'Exec', 'Pty', 'Join', 'Horizon'], ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'BashHoneypot', 'Fission']],
-    ['devops', ['Fork', 'Resume', 'Fission'], ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec', 'Pty', 'Join', 'Horizon']],
+    ['devops', ['Fork', 'Resume', 'Pty', 'Fission'], ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec', 'Join', 'Horizon']],
   ]) {
     const actual = permissions(role)
     for (const capability of denied) {

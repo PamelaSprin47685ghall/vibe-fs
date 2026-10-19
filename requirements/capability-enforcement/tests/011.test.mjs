@@ -72,22 +72,9 @@ const allowList = (config, name) => {
     'bash',
     'bash-honeypot',
     'assume',
-    'todowrite',
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
-    'run',
     'fork',
     'resume',
     'commission',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
     'join',
     'horizon',
     'fission',
@@ -96,32 +83,25 @@ const allowList = (config, name) => {
     'fetch',
     'deliver',
     'skill',
+    'todowrite-for-manager',
+    'todowrite-for-orchestrator',
+    'todowrite-for-engineer',
+    'todowrite-for-devops',
   ]
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 const HOST_UTILITY_ALLOW = ['skill']
-const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite']
+const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review'],
-  Orchestrator: ['commission', 'join', 'horizon'],
-  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
+  Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
+  Engineer: ['bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
-    'run',
     'join',
     'horizon',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
+    'todowrite-for-devops',
   ],
   Blogger: ['chronicle'],
 }
@@ -182,6 +162,7 @@ const NAMES = [
   'devops',
   'blogger',
   'plan',
+  'advisor',
   'bookkeeper',
   'predictor',
 ]
@@ -192,7 +173,7 @@ function fullConfig() {
 test('WHAT[capability-enforcement-011] MACFG_validate_accepts_empty_agent_map_and_projects_full_catalog', () => {
   const empty = okOf(validate({}))
   assert.equal(empty.ok, true, empty.ok ? '' : empty.error)
-  assert.equal(empty.bindingNames.length, 6)
+  assert.equal(empty.bindingNames.length, 7)
   const blankMap = okOf(validate({ agent: {} }))
   assert.equal(blankMap.ok, true, blankMap.ok ? '' : blankMap.error)
 })
@@ -204,7 +185,7 @@ test('WHAT[capability-enforcement-011] MACFG_validate_accepts_missing_equal_and_
 
   const result = okOf(validate(cfg))
   assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.equal(result.bindingNames.length, 6, 'bookkeeper and predictor have no active Role binding')
+  assert.equal(result.bindingNames.length, 7, 'bookkeeper and predictor have no active Role binding')
 })
 test('WHAT[capability-enforcement-011] MACFG_applyOwnedFields_writes_owned_keys_and_never_touches_model', () => {
   const cfg = fullConfig()
@@ -253,7 +234,7 @@ test('WHAT[capability-enforcement-011] MACFG_configureFromHostConfig_projects_mi
   const cfg = {}
   const result = configure(cfg)
   assert.equal(result.ok, true, result.ok ? '' : result.error)
-  assert.equal(result.bindingNames.length, 6)
+  assert.equal(result.bindingNames.length, 7)
   for (const name of NAMES) {
     const entry = cfg.agent[name]
     assert.ok(entry.mode !== undefined, `${name} must be projected`)
@@ -272,25 +253,22 @@ const { withPlugin } = await import("../../verification-system/tests/support/plu
 
 const TOOL_NAMES = [
   'fork', 'resume', 'commission', 'join', 'horizon', 'fission',
-  'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
-  'bash-honeypot', 'assume', 'todowrite',
-  'defer',  'publish',
-  'run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
+  'bash-honeypot', 'assume',
   'review', 'chronicle', 'fetch', 'deliver',
+  'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator',
 ]
 
 const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
 
-const COGNITIVE_TOOLS = ['defer',  'publish']
+const COGNITIVE_TOOLS = []
 
 const ALLOWED = {
-  orchestrator: ['commission', 'join', 'horizon', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
+  orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'todowrite-for-manager', 'assume', ...COGNITIVE_TOOLS],
+  engineer: ['fission', 'fetch', 'bash-honeypot', 'todowrite-for-engineer', 'assume', ...COGNITIVE_TOOLS],
   devops: [
-    'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run',
-    'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-    'assume', 'todowrite', ...COGNITIVE_TOOLS,
+    'join', 'horizon', 'todowrite-for-devops',
+    'assume', ...COGNITIVE_TOOLS,
   ],
   blogger: ['chronicle'],
 }

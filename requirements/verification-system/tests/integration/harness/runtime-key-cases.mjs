@@ -17,6 +17,7 @@
 import { assertEq, assertTrue } from './lib.mjs';
 import { kindOf, lanesOf, resolveEntry, runtimeKeyOf, sessionIdOf, stepOf, turnOf } from '../../e2e/support/runtime-key.js';
 import { forkAnchor, forkRelay } from '../../e2e/support/production.js';
+import { createHash } from 'node:crypto';
 import * as providerProjection from '../../../../../dist/Participant/Provider/Projection/Surface.js';
 // HOST-013: production constants read from the build artifact, so the step
 // cases exercise the real marker text and source, not a copy.
@@ -40,6 +41,8 @@ const toolCall = (name, args = '{}') => ({
   tool_calls: [{ id: 'c1', type: 'function', function: { name, arguments: args } }],
 });
 
+// The inserted rows' ids are the production frame digest shape (sha256 hex).
+const replayIdOf = (seed) => createHash('sha256').update(seed).digest('hex');
 const request = (messages) => ({ messages });
 
 const entry = ({ id, turn, step = 0, lane = 'manager' }) => ({ id, lane, turn, step });
@@ -192,6 +195,74 @@ export const runtimeKeyCases = [
   {
     name: 'verification-system-003 step is zero when there is no user message at all',
     fn: () => {
+      // The Host's inserted readonly-replay block (promoted strength frames) is not a model
+      // reply: one `call` + `result` pair per bundle batch, keyed on production's own
+      // generated frame digest id, with the dot ack optional (the Host synthesizes it only
+      // between two consecutive user rows).
+      const replayId = replayIdOf('ins-1');
+      const insertedCall = {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{ id: replayId, type: 'function', function: { name: 'todowrite-for-manager', arguments: '{}' } }],
+      };
+      const insertedResult = { role: 'tool', tool_call_id: replayId, content: '# ok' };
+      const insertedAck = { role: 'assistant', content: '.' };
+      assertEq(
+        stepOf(request([user('go'), assistant('r1'), insertedCall, insertedResult, insertedAck])),
+        1,
+        'an inserted replay pair with its ack does not advance the step cursor',
+      );
+      assertEq(
+        stepOf(request([user('go'), assistant('r1'), insertedCall, insertedResult])),
+        1,
+        'the ack is optional: a block ending before the next user row is still skipped',
+      );
+      assertEq(
+        stepOf(request([user('go'), insertedCall, insertedResult, assistant('r1')])),
+        1,
+        'the block is skipped wherever it sits after the last user message',
+      );
+      // The canary decision carries two bundle batches, so the block is a sequence of pairs.
+      const secondId = replayIdOf('ins-2');
+      const secondCall = {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{ id: secondId, type: 'function', function: { name: 'todowrite-for-manager', arguments: '{}' } }],
+      };
+      assertEq(
+        stepOf(request([
+          user('go'),
+          assistant('r1'),
+          insertedCall,
+          insertedResult,
+          secondCall,
+          { role: 'tool', tool_call_id: secondId, content: '# ok' },
+        ])),
+        1,
+        'a two-batch replay block is skipped as two pairs',
+      );
+      // Fail closed: a Host-issued call id, a non-ack trailing row, or an unclosed call keeps its step.
+      const hostCall = {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'todowrite-for-manager', arguments: '{}' } }],
+      };
+      assertEq(
+        stepOf(request([user('go'), hostCall, { role: 'tool', tool_call_id: 'call_1', content: '# ok' }])),
+        1,
+        'a Host-issued call id is a real step',
+      );
+      assertEq(
+        stepOf(request([user('go'), insertedCall, insertedResult, assistant('not the ack')])),
+        1,
+        'the pair is skipped and a non-ack trailing row is counted as a step',
+      );
+      assertEq(
+        stepOf(request([user('go'), insertedCall, { role: 'tool', tool_call_id: 'other', content: '# ok' }])),
+        1,
+        'an unclosed inserted call is not a pair',
+      );
+
       assertEq(stepOf(request([assistant('r1')])), 0);
       assertEq(stepOf(request([])), 0);
       assertEq(stepOf({}), 0);

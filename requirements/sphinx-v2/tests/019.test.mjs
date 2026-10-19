@@ -525,7 +525,7 @@ const appendCutChild = fileURLToPath(new URL('./support/append-cut-settlement-ch
 for (const scenario of ['valid', 'malformed', 'valid-release', 'malformed-release']) {
   test(`WHAT[sphinx-v2-019] actual store ${scenario} preserves Sphinx settlement and cold replay under explicit bad-payload defense`, async t => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'sphinx-append-cut-')))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     const sourceWriter = randomUUID()
     const eventsDir = join(commonDir, 'wanxiangshu', 'events')
     const resolveSourceFile = () => {

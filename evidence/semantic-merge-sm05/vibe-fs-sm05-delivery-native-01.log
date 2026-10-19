@@ -1,0 +1,1632 @@
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-024] pre-join resume preserves both public join WorkRecords (347.18625ms)
+✔ WHAT[delegation-024] child completion record comes from delivered value and an undelivered child reports status undelivered (232.58775ms)
+✔ WHAT[delegation-024] synchronous observed completion refuses undelivered prose and returns only the explicit delivered value (138.851583ms)
+✔ WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_and_leaves_completion_to_join (228.322291ms)
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-024] Engineer reuse sends parent delta waits for its own root and returns its own child delta (135.135459ms)
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-024] DevOps completion is claimed by HandleTurn and its LWR returns to the caller (116.832875ms)
+✖ WHAT[delegation-025] an invocation completes from its own genuinely accepted production retry successor (1080.031375ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   error: 'EXEC-031: child completed without js.deliver (undelivered)',
++   ok: false
+-   ok: true,
+-   value: {
+-     authorityRootUserMessageId: 'initial-recovery-physical',
+-     formalText: 'RECOVERY-FORMAL-ANSWER',
+-     physicalUserMessageId: 'actual-retry-physical',
+-     providerRun: 'actual-retry-provider-run',
+-     sessionId: 'recovery-owner-own-retry-child-1'
+-   }
+  }
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:78:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    error: 'EXEC-031: child completed without js.deliver (undelivered)',
+    ok: false
+  },
+  expected: {
+    ok: true,
+    value: {
+      sessionId: 'recovery-owner-own-retry-child-1',
+      physicalUserMessageId: 'actual-retry-physical',
+      authorityRootUserMessageId: 'initial-recovery-physical',
+      providerRun: 'actual-retry-provider-run',
+      formalText: 'RECOVERY-FORMAL-ANSWER'
+    }
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] old-retry cannot deliver an earlier genuinely accepted retry to a reused same-root invocation (800.912708ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   error: 'EXEC-031: child completed without js.deliver (undelivered)',
++   ok: false
+-   ok: true,
+-   value: {
+-     authorityRootUserMessageId: 'initial-recovery-physical',
+-     formalText: 'RECOVERY-FORMAL-ANSWER',
+-     physicalUserMessageId: 'actual-retry-physical',
+-     providerRun: 'actual-retry-provider-run',
+-     sessionId: 'recovery-owner-old-retry-child-1'
+-   }
+  }
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:78:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    error: 'EXEC-031: child completed without js.deliver (undelivered)',
+    ok: false
+  },
+  expected: {
+    ok: true,
+    value: {
+      sessionId: 'recovery-owner-old-retry-child-1',
+      physicalUserMessageId: 'actual-retry-physical',
+      authorityRootUserMessageId: 'initial-recovery-physical',
+      providerRun: 'actual-retry-provider-run',
+      formalText: 'RECOVERY-FORMAL-ANSWER'
+    }
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] fallback-old-retry cannot deliver an earlier genuinely accepted retry to a reused same-root invocation (782.388416ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   error: 'EXEC-031: child completed without js.deliver (undelivered)',
++   ok: false
+-   ok: true,
+-   value: {
+-     authorityRootUserMessageId: 'initial-recovery-physical',
+-     formalText: 'RECOVERY-FORMAL-ANSWER',
+-     physicalUserMessageId: 'actual-retry-physical',
+-     providerRun: 'actual-retry-provider-run',
+-     sessionId: 'recovery-owner-fallback-old-retry-child-1'
+-   }
+  }
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:78:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    error: 'EXEC-031: child completed without js.deliver (undelivered)',
+    ok: false
+  },
+  expected: {
+    ok: true,
+    value: {
+      sessionId: 'recovery-owner-fallback-old-retry-child-1',
+      physicalUserMessageId: 'actual-retry-physical',
+      authorityRootUserMessageId: 'initial-recovery-physical',
+      providerRun: 'actual-retry-provider-run',
+      formalText: 'RECOVERY-FORMAL-ANSWER'
+    }
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] late-retry cannot deliver an earlier genuinely accepted retry to a reused same-root invocation (815.444375ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:60:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] fallback-late-retry cannot deliver an earlier genuinely accepted retry to a reused same-root invocation (761.272458ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:60:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production own-guard preserves invocation-owned accepted successors (850.900583ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production old-guard preserves invocation-owned accepted successors (1021.296083ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production fallback-old-guard preserves invocation-owned accepted successors (1182.147584ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production late-guard preserves invocation-owned accepted successors (1388.543209ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production fallback-late-guard preserves invocation-owned accepted successors (902.591792ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production repair own-missing preserves invocation-owned accepted successors (833.557083ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   error: 'EXEC-031: child completed without js.deliver (undelivered)',
++   ok: false
+-   ok: true,
+-   value: {
+-     authorityRootUserMessageId: 'initial-repair-physical',
+-     formalText: 'REPAIR-FORMAL-ANSWER',
+-     physicalUserMessageId: 'actual-repair-physical',
+-     providerRun: 'actual-repair-provider-run',
+-     sessionId: 'repair-owner-own-missing-child-1'
+-   }
+  }
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    error: 'EXEC-031: child completed without js.deliver (undelivered)',
+    ok: false
+  },
+  expected: {
+    ok: true,
+    value: {
+      sessionId: 'repair-owner-own-missing-child-1',
+      physicalUserMessageId: 'actual-repair-physical',
+      authorityRootUserMessageId: 'initial-repair-physical',
+      providerRun: 'actual-repair-provider-run',
+      formalText: 'REPAIR-FORMAL-ANSWER'
+    }
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production repair own-incomplete preserves invocation-owned accepted successors (678.142334ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   error: 'EXEC-031: child completed without js.deliver (undelivered)',
++   ok: false
+-   ok: true,
+-   value: {
+-     authorityRootUserMessageId: 'initial-repair-physical',
+-     formalText: 'REPAIR-FORMAL-ANSWER',
+-     physicalUserMessageId: 'actual-repair-physical',
+-     providerRun: 'actual-repair-provider-run',
+-     sessionId: 'repair-owner-own-incomplete-child-1'
+-   }
+  }
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    error: 'EXEC-031: child completed without js.deliver (undelivered)',
+    ok: false
+  },
+  expected: {
+    ok: true,
+    value: {
+      sessionId: 'repair-owner-own-incomplete-child-1',
+      physicalUserMessageId: 'actual-repair-physical',
+      authorityRootUserMessageId: 'initial-repair-physical',
+      providerRun: 'actual-repair-provider-run',
+      formalText: 'REPAIR-FORMAL-ANSWER'
+    }
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production repair old-missing preserves invocation-owned accepted successors (785.232167ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   error: 'EXEC-031: child completed without js.deliver (undelivered)',
++   ok: false
+-   ok: true,
+-   value: {
+-     authorityRootUserMessageId: 'initial-repair-physical',
+-     formalText: 'REPAIR-FORMAL-ANSWER',
+-     physicalUserMessageId: 'actual-repair-physical',
+-     providerRun: 'actual-repair-provider-run',
+-     sessionId: 'repair-owner-old-missing-child-1'
+-   }
+  }
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    error: 'EXEC-031: child completed without js.deliver (undelivered)',
+    ok: false
+  },
+  expected: {
+    ok: true,
+    value: {
+      sessionId: 'repair-owner-old-missing-child-1',
+      physicalUserMessageId: 'actual-repair-physical',
+      authorityRootUserMessageId: 'initial-repair-physical',
+      providerRun: 'actual-repair-provider-run',
+      formalText: 'REPAIR-FORMAL-ANSWER'
+    }
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production repair old-incomplete preserves invocation-owned accepted successors (853.107ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   error: 'EXEC-031: child completed without js.deliver (undelivered)',
++   ok: false
+-   ok: true,
+-   value: {
+-     authorityRootUserMessageId: 'initial-repair-physical',
+-     formalText: 'REPAIR-FORMAL-ANSWER',
+-     physicalUserMessageId: 'actual-repair-physical',
+-     providerRun: 'actual-repair-provider-run',
+-     sessionId: 'repair-owner-old-incomplete-child-1'
+-   }
+  }
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    error: 'EXEC-031: child completed without js.deliver (undelivered)',
+    ok: false
+  },
+  expected: {
+    ok: true,
+    value: {
+      sessionId: 'repair-owner-old-incomplete-child-1',
+      physicalUserMessageId: 'actual-repair-physical',
+      authorityRootUserMessageId: 'initial-repair-physical',
+      providerRun: 'actual-repair-provider-run',
+      formalText: 'REPAIR-FORMAL-ANSWER'
+    }
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production repair late-missing preserves invocation-owned accepted successors (831.99375ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59
+    assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)
+                              ^
+
+TypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production repair late-incomplete preserves invocation-owned accepted successors (771.710208ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59
+    assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)
+                              ^
+
+TypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production repair fallback-old-missing preserves invocation-owned accepted successors (890.666792ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   error: 'EXEC-031: child completed without js.deliver (undelivered)',
++   ok: false
+-   ok: true,
+-   value: {
+-     authorityRootUserMessageId: 'initial-repair-physical',
+-     formalText: 'REPAIR-FORMAL-ANSWER',
+-     physicalUserMessageId: 'actual-repair-physical',
+-     providerRun: 'actual-repair-provider-run',
+-     sessionId: 'repair-owner-fallback-old-missing-child-1'
+-   }
+  }
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    error: 'EXEC-031: child completed without js.deliver (undelivered)',
+    ok: false
+  },
+  expected: {
+    ok: true,
+    value: {
+      sessionId: 'repair-owner-fallback-old-missing-child-1',
+      physicalUserMessageId: 'actual-repair-physical',
+      authorityRootUserMessageId: 'initial-repair-physical',
+      providerRun: 'actual-repair-provider-run',
+      formalText: 'REPAIR-FORMAL-ANSWER'
+    }
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production repair fallback-old-incomplete preserves invocation-owned accepted successors (1081.175625ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
++ actual - expected
+
+  {
++   error: 'EXEC-031: child completed without js.deliver (undelivered)',
++   ok: false
+-   ok: true,
+-   value: {
+-     authorityRootUserMessageId: 'initial-repair-physical',
+-     formalText: 'REPAIR-FORMAL-ANSWER',
+-     physicalUserMessageId: 'actual-repair-physical',
+-     providerRun: 'actual-repair-provider-run',
+-     sessionId: 'repair-owner-fallback-old-incomplete-child-1'
+-   }
+  }
+
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: {
+    error: 'EXEC-031: child completed without js.deliver (undelivered)',
+    ok: false
+  },
+  expected: {
+    ok: true,
+    value: {
+      sessionId: 'repair-owner-fallback-old-incomplete-child-1',
+      physicalUserMessageId: 'actual-repair-physical',
+      authorityRootUserMessageId: 'initial-repair-physical',
+      providerRun: 'actual-repair-provider-run',
+      formalText: 'REPAIR-FORMAL-ANSWER'
+    }
+  },
+  operator: 'deepStrictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production repair fallback-late-missing preserves invocation-owned accepted successors (902.324167ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59
+    assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)
+                              ^
+
+TypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31
+
+Node.js v26.6.0
+
+✖ WHAT[delegation-025] production repair fallback-late-incomplete preserves invocation-owned accepted successors (938.695084ms)
+ℹ fatal: not a git repository (or any of the parent directories): .git
+file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59
+    assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)
+                              ^
+
+TypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')
+    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31
+
+Node.js v26.6.0
+
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-025] late failure from a previous root cannot settle a reused sync call (235.886ms)
+✔ WHAT[delegation-025] future Host subscriber excludes old terminal and retains new execution identity (0.746041ms)
+✔ WHAT[delegation-025] actual fork execution rejects late run-scoped success failure and abort while preserving legitimate session-wide failures (GAP-153) (0.245792ms) # TODO
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✖ WHAT[delegation-025] observed Engineer execution publishes the exact admitted prompt and causal formal terminal after the existing workflow (269.615709ms)
+✖ WHAT[delegation-025] observed invocations reuse a child while preserving distinct prompt and terminal identities and rejecting previous terminals (145.991542ms)
+✖ WHAT[delegation-025] rejection before dispatch settles both observed tasks without another Host prompt (92.208375ms)
+✔ WHAT[delegation-025] owner disposal after proven admission fails the existing observed completion without inventing physical abort (105.036875ms)
+✖ WHAT[delegation-025] production completed-turn fallback rejects wrong-root instead of settling the reused observed invocation (121.163792ms)
+✖ WHAT[delegation-025] production completed-turn fallback rejects previous-physical instead of settling the reused observed invocation (117.785458ms)
+✖ WHAT[delegation-025] production completed-turn fallback settles its invocation once and preserves the first causal response (103.094459ms)
+✔ WHAT[delegation-025] a real preparation exception settles observed admission and completion without a Host send (43.5595ms)
+✔ WHAT[delegation-025] a real Host send promise exception preserves its actual key without fabricating an outcome (98.834625ms)
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-027] root affinity also rejects old Failed without a prepared handoff (255.59225ms)
+✔ WHAT[delegation-027] root affinity also rejects old Aborted without a prepared handoff (151.135417ms)
+✔ WHAT[delegation-027] busy guidance preserves the original work and completion before an idle resume starts new work (251.412458ms)
+✔ WHAT[delegation-027] prepared busy guidance for Ada stays bound to the original active work (304.686541ms)
+✔ WHAT[delegation-027] prepared busy guidance for Ada stays bound to the original finished work (261.810958ms)
+✔ WHAT[delegation-027] prepared busy guidance for Ada stays bound to the original successor work (340.76025ms)
+✔ WHAT[delegation-027] prepared busy guidance for devops stays bound to the original active work (351.135291ms)
+✔ WHAT[delegation-027] prepared busy guidance for devops stays bound to the original finished work (277.078416ms)
+✔ WHAT[delegation-027] prepared busy guidance for devops stays bound to the original successor work (445.861ms)
+✔ WHAT[delegation-027] installed Host releases Manager Join and appends guidance after the child tool step (10418.58325ms)
+✔ WHAT[delegation-027] installed Host releases Manager Join and appends guidance after the child final output (12597.380792ms)
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-031] successive completed work reuses the child and delivers each bounded WorkRecord (557.310875ms)
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-031] DELEG_031_stale_authority_completion_cannot_claim_a_new_call (182.595833ms)
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-031] DELEG_031_parent_supersede_leaves_no_orphan_completion_claim (91.786708ms)
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[delegation-031] DELEG_031_completed_and_delete_in_both_orders_settle_exactly_once (190.909208ms)
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[managed-session-lifecycle-028] child completion uses its delivery without reading a historical WorkRecord (381.210625ms)
+✔ WHAT[managed-session-lifecycle-028] a proven terminal that faults during settlement resolves the run with an explicit failure instead of stranding the join (344.181875ms)
+✔ WHAT[managed-session-lifecycle-028] a PERSIST-settled Source with durable work still Active wakes the join instead of hanging on the journal revision (183.551834ms)
+ℹ tests 56
+ℹ suites 0
+ℹ pass 29
+ℹ fail 26
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 1
+ℹ duration_ms 28004.752
+
+✖ failing tests:
+
+test at requirements/delegation/tests/025.test.mjs:11:1
+✖ WHAT[delegation-025] an invocation completes from its own genuinely accepted production retry successor (1080.031375ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   error: 'EXEC-031: child completed without js.deliver (undelivered)',
+  +   ok: false
+  -   ok: true,
+  -   value: {
+  -     authorityRootUserMessageId: 'initial-recovery-physical',
+  -     formalText: 'RECOVERY-FORMAL-ANSWER',
+  -     physicalUserMessageId: 'actual-retry-physical',
+  -     providerRun: 'actual-retry-provider-run',
+  -     sessionId: 'recovery-owner-own-retry-child-1'
+  -   }
+    }
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:78:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {
+      error: 'EXEC-031: child completed without js.deliver (undelivered)',
+      ok: false
+    },
+    expected: {
+      ok: true,
+      value: {
+        sessionId: 'recovery-owner-own-retry-child-1',
+        physicalUserMessageId: 'actual-retry-physical',
+        authorityRootUserMessageId: 'initial-recovery-physical',
+        providerRun: 'actual-retry-provider-run',
+        formalText: 'RECOVERY-FORMAL-ANSWER'
+      }
+    },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   error: 'EXEC-031: child completed without js.deliver (undelivered)',\n+   ok: false\n-   ok: true,\n-   value: {\n-     authorityRootUserMessageId: 'initial-recovery-physical',\n-     formalText: 'RECOVERY-FORMAL-ANSWER',\n-     physicalUserMessageId: 'actual-retry-physical',\n-     providerRun: 'actual-retry-provider-run',\n-     sessionId: 'recovery-owner-own-retry-child-1'\n-   }\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:78:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: {\n    error: 'EXEC-031: child completed without js.deliver (undelivered)',\n    ok: false\n  },\n  expected: {\n    ok: true,\n    value: {\n      sessionId: 'recovery-owner-own-retry-child-1',\n      physicalUserMessageId: 'actual-retry-physical',\n      authorityRootUserMessageId: 'initial-recovery-physical',\n      providerRun: 'actual-retry-provider-run',\n      formalText: 'RECOVERY-FORMAL-ANSWER'\n    }\n  },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:23:3
+✖ WHAT[delegation-025] old-retry cannot deliver an earlier genuinely accepted retry to a reused same-root invocation (800.912708ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   error: 'EXEC-031: child completed without js.deliver (undelivered)',
+  +   ok: false
+  -   ok: true,
+  -   value: {
+  -     authorityRootUserMessageId: 'initial-recovery-physical',
+  -     formalText: 'RECOVERY-FORMAL-ANSWER',
+  -     physicalUserMessageId: 'actual-retry-physical',
+  -     providerRun: 'actual-retry-provider-run',
+  -     sessionId: 'recovery-owner-old-retry-child-1'
+  -   }
+    }
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:78:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {
+      error: 'EXEC-031: child completed without js.deliver (undelivered)',
+      ok: false
+    },
+    expected: {
+      ok: true,
+      value: {
+        sessionId: 'recovery-owner-old-retry-child-1',
+        physicalUserMessageId: 'actual-retry-physical',
+        authorityRootUserMessageId: 'initial-recovery-physical',
+        providerRun: 'actual-retry-provider-run',
+        formalText: 'RECOVERY-FORMAL-ANSWER'
+      }
+    },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   error: 'EXEC-031: child completed without js.deliver (undelivered)',\n+   ok: false\n-   ok: true,\n-   value: {\n-     authorityRootUserMessageId: 'initial-recovery-physical',\n-     formalText: 'RECOVERY-FORMAL-ANSWER',\n-     physicalUserMessageId: 'actual-retry-physical',\n-     providerRun: 'actual-retry-provider-run',\n-     sessionId: 'recovery-owner-old-retry-child-1'\n-   }\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:78:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: {\n    error: 'EXEC-031: child completed without js.deliver (undelivered)',\n    ok: false\n  },\n  expected: {\n    ok: true,\n    value: {\n      sessionId: 'recovery-owner-old-retry-child-1',\n      physicalUserMessageId: 'actual-retry-physical',\n      authorityRootUserMessageId: 'initial-recovery-physical',\n      providerRun: 'actual-retry-provider-run',\n      formalText: 'RECOVERY-FORMAL-ANSWER'\n    }\n  },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:23:3
+✖ WHAT[delegation-025] fallback-old-retry cannot deliver an earlier genuinely accepted retry to a reused same-root invocation (782.388416ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   error: 'EXEC-031: child completed without js.deliver (undelivered)',
+  +   ok: false
+  -   ok: true,
+  -   value: {
+  -     authorityRootUserMessageId: 'initial-recovery-physical',
+  -     formalText: 'RECOVERY-FORMAL-ANSWER',
+  -     physicalUserMessageId: 'actual-retry-physical',
+  -     providerRun: 'actual-retry-provider-run',
+  -     sessionId: 'recovery-owner-fallback-old-retry-child-1'
+  -   }
+    }
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:78:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {
+      error: 'EXEC-031: child completed without js.deliver (undelivered)',
+      ok: false
+    },
+    expected: {
+      ok: true,
+      value: {
+        sessionId: 'recovery-owner-fallback-old-retry-child-1',
+        physicalUserMessageId: 'actual-retry-physical',
+        authorityRootUserMessageId: 'initial-recovery-physical',
+        providerRun: 'actual-retry-provider-run',
+        formalText: 'RECOVERY-FORMAL-ANSWER'
+      }
+    },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   error: 'EXEC-031: child completed without js.deliver (undelivered)',\n+   ok: false\n-   ok: true,\n-   value: {\n-     authorityRootUserMessageId: 'initial-recovery-physical',\n-     formalText: 'RECOVERY-FORMAL-ANSWER',\n-     physicalUserMessageId: 'actual-retry-physical',\n-     providerRun: 'actual-retry-provider-run',\n-     sessionId: 'recovery-owner-fallback-old-retry-child-1'\n-   }\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:78:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: {\n    error: 'EXEC-031: child completed without js.deliver (undelivered)',\n    ok: false\n  },\n  expected: {\n    ok: true,\n    value: {\n      sessionId: 'recovery-owner-fallback-old-retry-child-1',\n      physicalUserMessageId: 'actual-retry-physical',\n      authorityRootUserMessageId: 'initial-recovery-physical',\n      providerRun: 'actual-retry-provider-run',\n      formalText: 'RECOVERY-FORMAL-ANSWER'\n    }\n  },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:23:3
+✖ WHAT[delegation-025] late-retry cannot deliver an earlier genuinely accepted retry to a reused same-root invocation (815.444375ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:60:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:60:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:23:3
+✖ WHAT[delegation-025] fallback-late-retry cannot deliver an earlier genuinely accepted retry to a reused same-root invocation (761.272458ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:60:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/recovery-process.fixture.mjs:60:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:29:3
+✖ WHAT[delegation-025] production own-guard preserves invocation-owned accepted successors (850.900583ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:29:3
+✖ WHAT[delegation-025] production old-guard preserves invocation-owned accepted successors (1021.296083ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:29:3
+✖ WHAT[delegation-025] production fallback-old-guard preserves invocation-owned accepted successors (1182.147584ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:29:3
+✖ WHAT[delegation-025] production late-guard preserves invocation-owned accepted successors (1388.543209ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:29:3
+✖ WHAT[delegation-025] production fallback-late-guard preserves invocation-owned accepted successors (902.591792ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\nfalse !== true\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/guard-recovery-process.fixture.mjs:70:10 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:35:3
+✖ WHAT[delegation-025] production repair own-missing preserves invocation-owned accepted successors (833.557083ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   error: 'EXEC-031: child completed without js.deliver (undelivered)',
+  +   ok: false
+  -   ok: true,
+  -   value: {
+  -     authorityRootUserMessageId: 'initial-repair-physical',
+  -     formalText: 'REPAIR-FORMAL-ANSWER',
+  -     physicalUserMessageId: 'actual-repair-physical',
+  -     providerRun: 'actual-repair-provider-run',
+  -     sessionId: 'repair-owner-own-missing-child-1'
+  -   }
+    }
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {
+      error: 'EXEC-031: child completed without js.deliver (undelivered)',
+      ok: false
+    },
+    expected: {
+      ok: true,
+      value: {
+        sessionId: 'repair-owner-own-missing-child-1',
+        physicalUserMessageId: 'actual-repair-physical',
+        authorityRootUserMessageId: 'initial-repair-physical',
+        providerRun: 'actual-repair-provider-run',
+        formalText: 'REPAIR-FORMAL-ANSWER'
+      }
+    },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   error: 'EXEC-031: child completed without js.deliver (undelivered)',\n+   ok: false\n-   ok: true,\n-   value: {\n-     authorityRootUserMessageId: 'initial-repair-physical',\n-     formalText: 'REPAIR-FORMAL-ANSWER',\n-     physicalUserMessageId: 'actual-repair-physical',\n-     providerRun: 'actual-repair-provider-run',\n-     sessionId: 'repair-owner-own-missing-child-1'\n-   }\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: {\n    error: 'EXEC-031: child completed without js.deliver (undelivered)',\n    ok: false\n  },\n  expected: {\n    ok: true,\n    value: {\n      sessionId: 'repair-owner-own-missing-child-1',\n      physicalUserMessageId: 'actual-repair-physical',\n      authorityRootUserMessageId: 'initial-repair-physical',\n      providerRun: 'actual-repair-provider-run',\n      formalText: 'REPAIR-FORMAL-ANSWER'\n    }\n  },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:35:3
+✖ WHAT[delegation-025] production repair own-incomplete preserves invocation-owned accepted successors (678.142334ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   error: 'EXEC-031: child completed without js.deliver (undelivered)',
+  +   ok: false
+  -   ok: true,
+  -   value: {
+  -     authorityRootUserMessageId: 'initial-repair-physical',
+  -     formalText: 'REPAIR-FORMAL-ANSWER',
+  -     physicalUserMessageId: 'actual-repair-physical',
+  -     providerRun: 'actual-repair-provider-run',
+  -     sessionId: 'repair-owner-own-incomplete-child-1'
+  -   }
+    }
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {
+      error: 'EXEC-031: child completed without js.deliver (undelivered)',
+      ok: false
+    },
+    expected: {
+      ok: true,
+      value: {
+        sessionId: 'repair-owner-own-incomplete-child-1',
+        physicalUserMessageId: 'actual-repair-physical',
+        authorityRootUserMessageId: 'initial-repair-physical',
+        providerRun: 'actual-repair-provider-run',
+        formalText: 'REPAIR-FORMAL-ANSWER'
+      }
+    },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   error: 'EXEC-031: child completed without js.deliver (undelivered)',\n+   ok: false\n-   ok: true,\n-   value: {\n-     authorityRootUserMessageId: 'initial-repair-physical',\n-     formalText: 'REPAIR-FORMAL-ANSWER',\n-     physicalUserMessageId: 'actual-repair-physical',\n-     providerRun: 'actual-repair-provider-run',\n-     sessionId: 'repair-owner-own-incomplete-child-1'\n-   }\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: {\n    error: 'EXEC-031: child completed without js.deliver (undelivered)',\n    ok: false\n  },\n  expected: {\n    ok: true,\n    value: {\n      sessionId: 'repair-owner-own-incomplete-child-1',\n      physicalUserMessageId: 'actual-repair-physical',\n      authorityRootUserMessageId: 'initial-repair-physical',\n      providerRun: 'actual-repair-provider-run',\n      formalText: 'REPAIR-FORMAL-ANSWER'\n    }\n  },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:35:3
+✖ WHAT[delegation-025] production repair old-missing preserves invocation-owned accepted successors (785.232167ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   error: 'EXEC-031: child completed without js.deliver (undelivered)',
+  +   ok: false
+  -   ok: true,
+  -   value: {
+  -     authorityRootUserMessageId: 'initial-repair-physical',
+  -     formalText: 'REPAIR-FORMAL-ANSWER',
+  -     physicalUserMessageId: 'actual-repair-physical',
+  -     providerRun: 'actual-repair-provider-run',
+  -     sessionId: 'repair-owner-old-missing-child-1'
+  -   }
+    }
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {
+      error: 'EXEC-031: child completed without js.deliver (undelivered)',
+      ok: false
+    },
+    expected: {
+      ok: true,
+      value: {
+        sessionId: 'repair-owner-old-missing-child-1',
+        physicalUserMessageId: 'actual-repair-physical',
+        authorityRootUserMessageId: 'initial-repair-physical',
+        providerRun: 'actual-repair-provider-run',
+        formalText: 'REPAIR-FORMAL-ANSWER'
+      }
+    },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   error: 'EXEC-031: child completed without js.deliver (undelivered)',\n+   ok: false\n-   ok: true,\n-   value: {\n-     authorityRootUserMessageId: 'initial-repair-physical',\n-     formalText: 'REPAIR-FORMAL-ANSWER',\n-     physicalUserMessageId: 'actual-repair-physical',\n-     providerRun: 'actual-repair-provider-run',\n-     sessionId: 'repair-owner-old-missing-child-1'\n-   }\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: {\n    error: 'EXEC-031: child completed without js.deliver (undelivered)',\n    ok: false\n  },\n  expected: {\n    ok: true,\n    value: {\n      sessionId: 'repair-owner-old-missing-child-1',\n      physicalUserMessageId: 'actual-repair-physical',\n      authorityRootUserMessageId: 'initial-repair-physical',\n      providerRun: 'actual-repair-provider-run',\n      formalText: 'REPAIR-FORMAL-ANSWER'\n    }\n  },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:35:3
+✖ WHAT[delegation-025] production repair old-incomplete preserves invocation-owned accepted successors (853.107ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   error: 'EXEC-031: child completed without js.deliver (undelivered)',
+  +   ok: false
+  -   ok: true,
+  -   value: {
+  -     authorityRootUserMessageId: 'initial-repair-physical',
+  -     formalText: 'REPAIR-FORMAL-ANSWER',
+  -     physicalUserMessageId: 'actual-repair-physical',
+  -     providerRun: 'actual-repair-provider-run',
+  -     sessionId: 'repair-owner-old-incomplete-child-1'
+  -   }
+    }
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {
+      error: 'EXEC-031: child completed without js.deliver (undelivered)',
+      ok: false
+    },
+    expected: {
+      ok: true,
+      value: {
+        sessionId: 'repair-owner-old-incomplete-child-1',
+        physicalUserMessageId: 'actual-repair-physical',
+        authorityRootUserMessageId: 'initial-repair-physical',
+        providerRun: 'actual-repair-provider-run',
+        formalText: 'REPAIR-FORMAL-ANSWER'
+      }
+    },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   error: 'EXEC-031: child completed without js.deliver (undelivered)',\n+   ok: false\n-   ok: true,\n-   value: {\n-     authorityRootUserMessageId: 'initial-repair-physical',\n-     formalText: 'REPAIR-FORMAL-ANSWER',\n-     physicalUserMessageId: 'actual-repair-physical',\n-     providerRun: 'actual-repair-provider-run',\n-     sessionId: 'repair-owner-old-incomplete-child-1'\n-   }\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: {\n    error: 'EXEC-031: child completed without js.deliver (undelivered)',\n    ok: false\n  },\n  expected: {\n    ok: true,\n    value: {\n      sessionId: 'repair-owner-old-incomplete-child-1',\n      physicalUserMessageId: 'actual-repair-physical',\n      authorityRootUserMessageId: 'initial-repair-physical',\n      providerRun: 'actual-repair-provider-run',\n      formalText: 'REPAIR-FORMAL-ANSWER'\n    }\n  },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:35:3
+✖ WHAT[delegation-025] production repair late-missing preserves invocation-owned accepted successors (831.99375ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59
+      assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)
+                                ^
+  
+  TypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nfile:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59\n    assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)\n                              ^\n\nTypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:35:3
+✖ WHAT[delegation-025] production repair late-incomplete preserves invocation-owned accepted successors (771.710208ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59
+      assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)
+                                ^
+  
+  TypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nfile:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59\n    assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)\n                              ^\n\nTypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:35:3
+✖ WHAT[delegation-025] production repair fallback-old-missing preserves invocation-owned accepted successors (890.666792ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   error: 'EXEC-031: child completed without js.deliver (undelivered)',
+  +   ok: false
+  -   ok: true,
+  -   value: {
+  -     authorityRootUserMessageId: 'initial-repair-physical',
+  -     formalText: 'REPAIR-FORMAL-ANSWER',
+  -     physicalUserMessageId: 'actual-repair-physical',
+  -     providerRun: 'actual-repair-provider-run',
+  -     sessionId: 'repair-owner-fallback-old-missing-child-1'
+  -   }
+    }
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {
+      error: 'EXEC-031: child completed without js.deliver (undelivered)',
+      ok: false
+    },
+    expected: {
+      ok: true,
+      value: {
+        sessionId: 'repair-owner-fallback-old-missing-child-1',
+        physicalUserMessageId: 'actual-repair-physical',
+        authorityRootUserMessageId: 'initial-repair-physical',
+        providerRun: 'actual-repair-provider-run',
+        formalText: 'REPAIR-FORMAL-ANSWER'
+      }
+    },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   error: 'EXEC-031: child completed without js.deliver (undelivered)',\n+   ok: false\n-   ok: true,\n-   value: {\n-     authorityRootUserMessageId: 'initial-repair-physical',\n-     formalText: 'REPAIR-FORMAL-ANSWER',\n-     physicalUserMessageId: 'actual-repair-physical',\n-     providerRun: 'actual-repair-provider-run',\n-     sessionId: 'repair-owner-fallback-old-missing-child-1'\n-   }\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: {\n    error: 'EXEC-031: child completed without js.deliver (undelivered)',\n    ok: false\n  },\n  expected: {\n    ok: true,\n    value: {\n      sessionId: 'repair-owner-fallback-old-missing-child-1',\n      physicalUserMessageId: 'actual-repair-physical',\n      authorityRootUserMessageId: 'initial-repair-physical',\n      providerRun: 'actual-repair-provider-run',\n      formalText: 'REPAIR-FORMAL-ANSWER'\n    }\n  },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:35:3
+✖ WHAT[delegation-025] production repair fallback-old-incomplete preserves invocation-owned accepted successors (1081.175625ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   error: 'EXEC-031: child completed without js.deliver (undelivered)',
+  +   ok: false
+  -   ok: true,
+  -   value: {
+  -     authorityRootUserMessageId: 'initial-repair-physical',
+  -     formalText: 'REPAIR-FORMAL-ANSWER',
+  -     physicalUserMessageId: 'actual-repair-physical',
+  -     providerRun: 'actual-repair-provider-run',
+  -     sessionId: 'repair-owner-fallback-old-incomplete-child-1'
+  -   }
+    }
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: {
+      error: 'EXEC-031: child completed without js.deliver (undelivered)',
+      ok: false
+    },
+    expected: {
+      ok: true,
+      value: {
+        sessionId: 'repair-owner-fallback-old-incomplete-child-1',
+        physicalUserMessageId: 'actual-repair-physical',
+        authorityRootUserMessageId: 'initial-repair-physical',
+        providerRun: 'actual-repair-provider-run',
+        formalText: 'REPAIR-FORMAL-ANSWER'
+      }
+    },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:\n+ actual - expected\n\n  {\n+   error: 'EXEC-031: child completed without js.deliver (undelivered)',\n+   ok: false\n-   ok: true,\n-   value: {\n-     authorityRootUserMessageId: 'initial-repair-physical',\n-     formalText: 'REPAIR-FORMAL-ANSWER',\n-     physicalUserMessageId: 'actual-repair-physical',\n-     providerRun: 'actual-repair-provider-run',\n-     sessionId: 'repair-owner-fallback-old-incomplete-child-1'\n-   }\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:71:12 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: {\n    error: 'EXEC-031: child completed without js.deliver (undelivered)',\n    ok: false\n  },\n  expected: {\n    ok: true,\n    value: {\n      sessionId: 'repair-owner-fallback-old-incomplete-child-1',\n      physicalUserMessageId: 'actual-repair-physical',\n      authorityRootUserMessageId: 'initial-repair-physical',\n      providerRun: 'actual-repair-provider-run',\n      formalText: 'REPAIR-FORMAL-ANSWER'\n    }\n  },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:35:3
+✖ WHAT[delegation-025] production repair fallback-late-missing preserves invocation-owned accepted successors (902.324167ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59
+      assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)
+                                ^
+  
+  TypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nfile:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59\n    assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)\n                              ^\n\nTypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:35:3
+✖ WHAT[delegation-025] production repair fallback-late-incomplete preserves invocation-owned accepted successors (938.695084ms)
+  Error: Selected tool identity probe failed
+  fatal: not a git repository (or any of the parent directories): .git
+  file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59
+      assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)
+                                ^
+  
+  TypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31
+  
+  Node.js v26.6.0
+  
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: "fatal: not a git repository (or any of the parent directories): .git\nfile:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59\n    assert.equal(result.value.physicalUserMessageId, initial.physicalUserMessageId)\n                              ^\n\nTypeError: Cannot read properties of undefined (reading 'physicalUserMessageId')\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/repair-recovery-process.fixture.mjs:59:31\n\nNode.js v26.6.0\n",
+    [cause]: undefined
+  }
+
+test at requirements/delegation/tests/025.test.mjs:96:1
+✖ WHAT[delegation-025] observed Engineer execution publishes the exact admitted prompt and causal formal terminal after the existing workflow (269.615709ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   error: 'EXEC-031: child completed without js.deliver (undelivered)',
+  +   ok: false
+  -   ok: true,
+  -   value: {
+  -     authorityRootUserMessageId: 'actual-observed-physical-1',
+  -     formalText: 'FORMAL-ONLY',
+  -     physicalUserMessageId: 'actual-observed-physical-1',
+  -     providerRun: 'actual-observed-provider-run-1',
+  -     sessionId: 'observed-engineer-exact-child-1'
+  -   }
+    }
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:125:12
+      at async withSyncRuntime (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/sync-runtime.mjs:10:12)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:99:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { error: 'EXEC-031: child completed without js.deliver (undelivered)', ok: false },
+    expected: { ok: true, value: { sessionId: 'observed-engineer-exact-child-1', physicalUserMessageId: 'actual-observed-physical-1', authorityRootUserMessageId: 'actual-observed-physical-1', providerRun: 'actual-observed-provider-run-1', formalText: 'FORMAL-ONLY' } },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/delegation/tests/025.test.mjs:139:1
+✖ WHAT[delegation-025] observed invocations reuse a child while preserving distinct prompt and terminal identities and rejecting previous terminals (145.991542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:150:12
+      at async withSyncRuntime (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/sync-runtime.mjs:10:12)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:142:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/delegation/tests/025.test.mjs:176:1
+✖ WHAT[delegation-025] rejection before dispatch settles both observed tasks without another Host prompt (92.208375ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:191:12
+      at async withSyncRuntime (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/sync-runtime.mjs:10:12)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:179:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/delegation/tests/025.test.mjs:214:3
+✖ WHAT[delegation-025] production completed-turn fallback rejects wrong-root instead of settling the reused observed invocation (121.163792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:223:14
+      at async withSyncRuntime (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/sync-runtime.mjs:10:12)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:217:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/delegation/tests/025.test.mjs:214:3
+✖ WHAT[delegation-025] production completed-turn fallback rejects previous-physical instead of settling the reused observed invocation (117.785458ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:223:14
+      at async withSyncRuntime (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/sync-runtime.mjs:10:12)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:217:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/delegation/tests/025.test.mjs:245:1
+✖ WHAT[delegation-025] production completed-turn fallback settles its invocation once and preserves the first causal response (103.094459ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:257:12
+      at async withSyncRuntime (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/support/sync-runtime.mjs:10:12)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/delegation/tests/025.test.mjs:248:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

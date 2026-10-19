@@ -1,0 +1,676 @@
+✔ WHAT[context-compression-017] same-session memory rendering does not introduce delegation fields (0.525083ms)
+✔ WHAT[context-compression-017] every covered physical user message survives LWR replacement as the exact Host object (0.979167ms)
+✔ WHAT[context-compression-017] synthetic companion-memory user-role messages do not acquire the physical-user exemption (0.147ms)
+✔ WHAT[context-compression-017] real compaction and recovery preserve every exact physical user message while same-session FrozenRecordPrefix excludes them; pure XWire replacement does not prove the full lifecycle (GAP-104) (0.042042ms) # TODO
+✔ WHAT[context-compression-017] the actual Blogger start uses max of coverage and true Opening floor independently of phase commits; a test-defined cursor-plus-one function proves nothing (GAP-104) (0.04625ms) # TODO
+✔ WHAT[context-compression-031] anchor numbers are stable per session and message id (2.341042ms)
+✔ WHAT[context-compression-031] a view declaration is consumed exactly once (0.682917ms)
+✔ WHAT[context-compression-031] a malformed view declaration is refused and changes nothing (3.21875ms)
+✔ WHAT[context-compression-031] without a declaration applyView leaves the message list unchanged (0.173667ms)
+✔ WHAT[context-compression-031] prefixUntil protects a prefix without replacing anything (0.225125ms)
+✔ WHAT[context-compression-031] a summary stands in for its anchor for the rest of the session (0.449792ms)
+✔ WHAT[context-compression-031] separate replacements each stand in place (0.24825ms)
+✔ WHAT[context-compression-031] replacing an earlier anchor folds the replacements inside its span (0.224209ms)
+✔ WHAT[context-compression-031] messages without an id are never silently dropped (0.377417ms)
+✔ WHAT[context-compression-031] countTokens reports the o200k_base token count (0.091333ms)
+✔ WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one (71.059708ms)
+✔ WHAT[prefix-stability-011] actual history drift fails without minting an epoch, and replayed markers keep their original elapsed-time bytes; missing export names do not establish either property; GAP-106 (0.369958ms) # TODO
+✔ WHAT[semantic-trace-001] terminal capture returns explicit completion evidence (46.217042ms)
+✔ WHAT[semantic-trace-001] opening evidence is copied verbatim and idempotent (0.86025ms)
+✔ WHAT[semantic-trace-001] semantic parts append in strict cursor order (0.962167ms)
+✔ WHAT[semantic-trace-001] terminal evidence is idempotent per provider run (0.345333ms)
+✔ WHAT[semantic-trace-001] distinct provider runs retain distinct terminal evidence (0.462292ms)
+✔ WHAT[semantic-trace-001] one provider run cannot publish conflicting terminal evidence (0.22325ms)
+✔ WHAT[semantic-trace-002] separate captures preserve complete Host message identities (physical, slash) (161.0335ms)
+✔ WHAT[semantic-trace-002] separate captures preserve complete Host message identities (physical, raw delimiters and UTF-16) (29.125458ms)
+✔ WHAT[semantic-trace-002] separate captures preserve complete Host message identities (call, slash) (60.277958ms)
+✔ WHAT[semantic-trace-002] separate captures preserve complete Host message identities (call, raw delimiters and UTF-16) (28.909291ms)
+✔ WHAT[semantic-trace-002] separate captures preserve complete Host message identities (position, slash) (29.072292ms)
+✔ WHAT[semantic-trace-002] separate captures preserve complete Host message identities (position, raw delimiters and UTF-16) (29.973542ms)
+✔ WHAT[semantic-trace-002] raw message and part delimiters cannot collapse two physical tuples (real) (29.539625ms)
+✔ WHAT[semantic-trace-002] raw message and part delimiters cannot collapse two physical tuples (real/msg:literal) (25.083833ms)
+✔ WHAT[semantic-trace-002] explicit call evidence retains opaque identities across physical replay (physical first) (17.610375ms)
+✔ WHAT[semantic-trace-002] explicit call evidence retains opaque identities across physical replay (missing first) (20.119917ms)
+✔ WHAT[semantic-trace-002] structured identities preserve proven tool wrapper aliases without broadening absent run evidence (33.415625ms)
+✔ WHAT[semantic-trace-002] missing physical evidence and two proven wrappers share one call occurrence (physical first) (13.970333ms)
+✔ WHAT[semantic-trace-002] missing physical evidence and two proven wrappers share one call occurrence (missing first) (16.719791ms)
+✔ WHAT[semantic-trace-002] snapshot and transform preserve typed retry exclusion (info, observed first) (25.988042ms)
+✔ WHAT[semantic-trace-002] snapshot and transform preserve typed retry exclusion (info, snapshot first) (22.41775ms)
+✔ WHAT[semantic-trace-002] snapshot and transform preserve typed retry exclusion (message, observed first) (20.483875ms)
+✔ WHAT[semantic-trace-002] snapshot and transform preserve typed retry exclusion (message, snapshot first) (21.86525ms)
+✔ WHAT[semantic-trace-002] snapshot and transform preserve typed retry exclusion (part, observed first) (20.326584ms)
+✔ WHAT[semantic-trace-002] snapshot and transform preserve typed retry exclusion (part, snapshot first) (19.857083ms)
+✔ WHAT[semantic-trace-002] a missing physical tool part ID stays missing across capture sources (observed first) (28.674084ms)
+✔ WHAT[semantic-trace-002] a missing physical tool part ID stays missing across capture sources (snapshot first) (28.966417ms)
+✔ WHAT[semantic-trace-002] one call with mixed physical evidence is captured once (missing first) (14.879458ms)
+✔ WHAT[semantic-trace-002] one call with mixed physical evidence is captured once (known first) (15.058416ms)
+✔ WHAT[semantic-trace-002] concurrent call-only and physically addressed captures share one confirmed material (15.430916ms)
+✔ WHAT[semantic-trace-002] uncertain call evidence is refused before its first append (bytes) (0.907584ms)
+✔ WHAT[semantic-trace-002] uncertain call evidence is refused before its first append (multiple-addresses) (0.558833ms)
+✔ WHAT[semantic-trace-002] uncertain call evidence is refused before its first append (existing-address) (17.508792ms)
+✔ WHAT[semantic-trace-002] a call-only observation cannot choose between two confirmed physical parts (19.802667ms)
+✔ WHAT[semantic-trace-002] missing tool part IDs retain tool state but cannot become physical locations (1.39525ms)
+✔ WHAT[semantic-trace-002] exact durable retry evidence precedes diagnostic Host origin (pending-claim, UnknownOrigin) (101.523875ms)
+✔ WHAT[semantic-trace-002] exact durable retry evidence precedes diagnostic Host origin (pending-claim, HostInternal) (67.255875ms)
+✔ WHAT[semantic-trace-002] exact durable retry evidence precedes diagnostic Host origin (pending-claim, BusyAgentNudge) (58.967ms)
+✔ WHAT[semantic-trace-002] exact durable retry evidence precedes diagnostic Host origin (accepted-physical, UnknownOrigin) (83.419417ms)
+✔ WHAT[semantic-trace-002] exact durable retry evidence precedes diagnostic Host origin (accepted-physical, HostInternal) (84.091833ms)
+✔ WHAT[semantic-trace-002] exact durable retry evidence precedes diagnostic Host origin (accepted-physical, BusyAgentNudge) (82.848917ms)
+✔ WHAT[semantic-trace-002] durable ordinary origin is preserved under a Host retry label (pending-claim) (83.83825ms)
+✔ WHAT[semantic-trace-002] durable ordinary origin is preserved under a Host retry label (accepted-physical) (98.83375ms)
+✔ WHAT[semantic-trace-002] accepted physical origin precedes a different exact pending PromptKey (141.439667ms)
+✔ WHAT[semantic-trace-002] exact PromptKey resolution works without a physical message identity and ignores unrelated evidence (357.337708ms)
+✔ WHAT[semantic-trace-002] snapshot retry exclusion can use exact durable claim and landing evidence after metadata loss (187.074666ms)
+✔ WHAT[semantic-trace-002] a legacy snapshot address fabricated from callID is read without copying it into new evidence (24.506125ms)
+✔ WHAT[semantic-trace-002] the published 0.6.3 tool-call suffix replays without backfilling missing physical evidence (55.485334ms)
+✔ WHAT[semantic-trace-002] the published 0.6.3 tool-result suffix replays without backfilling missing physical evidence (30.982625ms)
+✔ WHAT[semantic-trace-002] a verified legacy raw-id-suffix preserves the actual physical address (tool-call) (44.502708ms)
+✔ WHAT[semantic-trace-002] a verified legacy facet-suffix preserves the actual physical address (tool-call) (26.834166ms)
+✔ WHAT[semantic-trace-002] a verified legacy raw-id-suffix preserves the actual physical address (tool-result) (23.879166ms)
+✔ WHAT[semantic-trace-002] a verified legacy facet-suffix preserves the actual physical address (tool-result) (29.319333ms)
+✔ WHAT[semantic-trace-002] one batch can confirm both facets of the same physical tool (25.714542ms)
+✔ WHAT[semantic-trace-002] raw physical IDs cannot collide with the tool-call facet (25.888041ms)
+✔ WHAT[semantic-trace-002] raw physical IDs cannot collide with the tool-result facet (22.336125ms)
+✔ WHAT[semantic-trace-002] a real Host tool part keeps its confirmed call and completed result as distinct material (26.612708ms)
+✔ WHAT[semantic-trace-002] copied semantic evidence excludes transport metadata (0.292917ms)
+✔ WHAT[semantic-trace-002] typed retry observation retains stable identity but appends no semantics (14.102584ms)
+✔ WHAT[semantic-trace-002] retry-like ordinary text is preserved and metadata does not become semantic material (12.093542ms)
+✔ WHAT[semantic-trace-002] missing, blank or duplicate Host ids cannot receive stable capture identity (62.398709ms)
+✔ WHAT[semantic-trace-002] capture mapper copies text and reasoning semantics (0.155292ms)
+✔ WHAT[semantic-trace-002] capture mapper drops transport call identities (0.067583ms)
+✔ WHAT[semantic-trace-002] activity bookkeeping has no semantic part (0.031708ms)
+✔ WHAT[semantic-trace-002] provider-run query returns copied semantic evidence (0.371666ms)
+✔ WHAT[semantic-trace-002] exact provider tool and Host identities are queryable (0.216084ms)
+✔ WHAT[semantic-trace-002] later parts and reanchor copies cannot move a retired physical exchange into the current tenure (0.711417ms)
+✔ WHAT[semantic-trace-003] only canonical structured tuples provide Host identity evidence (127.142541ms)
+✔ WHAT[semantic-trace-003] old physical tool provenance replays without adding a cursor or backfilling missing evidence (69.058458ms)
+✔ WHAT[semantic-trace-003] conflicting tool aliases in one capture batch are refused before its first append (1.327708ms)
+✔ WHAT[semantic-trace-003] duplicate Host parts in one batch consume one semantic cursor (17.024125ms)
+✔ WHAT[semantic-trace-003] one physical material cannot change from text to tool-call (18.914583ms)
+✔ WHAT[semantic-trace-003] one physical material cannot change from reasoning to tool-result (19.624ms)
+✔ WHAT[semantic-trace-003] one physical material cannot change from tool-call to text (20.73825ms)
+✔ WHAT[semantic-trace-003] one physical material cannot change from tool-result to reasoning (23.668875ms)
+✔ WHAT[semantic-trace-003] a legacy physical content identity cannot evade kind checks through the new namespace (16.212542ms)
+✔ WHAT[semantic-trace-003] tool facets retain their shared ownership (current, call) (24.935541ms)
+✔ WHAT[semantic-trace-003] tool facets retain their shared ownership (current, run) (16.899209ms)
+✔ WHAT[semantic-trace-003] tool facets retain their shared ownership (current, role) (25.994667ms)
+✔ WHAT[semantic-trace-003] tool facets retain their shared ownership (physical, call) (20.794416ms)
+✔ WHAT[semantic-trace-003] tool facets retain their shared ownership (physical, run) (22.056ms)
+✔ WHAT[semantic-trace-003] tool facets retain their shared ownership (physical, role) (20.086708ms)
+✔ WHAT[semantic-trace-003] tool facets retain their shared ownership (suffix, call) (19.91525ms)
+✔ WHAT[semantic-trace-003] tool facets retain their shared ownership (suffix, run) (18.426166ms)
+✔ WHAT[semantic-trace-003] tool facets retain their shared ownership (suffix, role) (14.308291ms)
+✔ WHAT[semantic-trace-003] physical facet conflicts in one batch are refused before the first append (kind) (0.859875ms)
+✔ WHAT[semantic-trace-003] physical facet conflicts in one batch are refused before the first append (call) (0.53625ms)
+✔ WHAT[semantic-trace-003] conflicting confirmed Host material is refused without advancing its prefix (bytes) (14.194875ms)
+✔ WHAT[semantic-trace-003] conflicting confirmed Host material is refused without advancing its prefix (role) (15.000959ms)
+✔ WHAT[semantic-trace-003] conflicting confirmed Host material is refused without advancing its prefix (kind) (15.826167ms)
+✔ WHAT[semantic-trace-003] concurrent same-session captures serialize before allocating durable cursors (24.878416ms)
+✔ WHAT[semantic-trace-003] missing ProviderRun preserves exact Host replay without merging different physical messages (20.874666ms)
+✔ WHAT[semantic-trace-003] duplicate and retreating cursors are rejected (0.303208ms)
+✔ WHAT[semantic-trace-003] new cursors cannot replay one physical material or corrupt the accepted owner prefix (1.900042ms)
+✔ WHAT[semantic-trace-003] owner cursor operations are monotonic (0.345875ms)
+✔ WHAT[semantic-trace-004] stable Host message identity resolves at a durable cursor (5.287ms)
+✔ WHAT[semantic-trace-004] provider runs segment the ordered semantic projection (0.660542ms)
+✔ WHAT[semantic-trace-004] a new provenance generation changes only the current-generation query (0.434792ms)
+✔ WHAT[semantic-trace-005] canonical render is deterministic and omits provenance (1.363083ms)
+✔ WHAT[semantic-trace-005] composition bridge maps XTraceRange [start, end) to wanxiangli/trace (after, through] cuts and preserves digest chain (6.907958ms)
+✔ WHAT[semantic-trace-005] durable originals preserve reasoning, tool results and raw bytes without temporary recapture (119.726792ms)
+✔ WHAT[semantic-trace-005] opaque projection and wanxiangli/trace reject state mutation, reentrancy and conflicting replay (0.664334ms)
+✔ WHAT[semantic-trace-005] long append sequences preserve authenticated chronological records and range boundaries (20.600459ms)
+✔ WHAT[semantic-trace-005] appending two branches preserves the old projection and both authenticated histories (0.680375ms)
+✔ WHAT[semantic-trace-005] independently compile a consumer and reject access to opaque trace state, cursor and append refs (29894.044041ms)
+✔ WHAT[semantic-trace-006] Blogger coverage consumes only the durable prefix it received (single tool) (540.882208ms)
+✔ WHAT[semantic-trace-006] Blogger coverage consumes only the durable prefix it received (late result after text) (337.063667ms)
+✔ WHAT[semantic-trace-006] Blogger coverage consumes only the durable prefix it received (late result after another message) (356.422792ms)
+✔ WHAT[semantic-trace-006] actual Blogger request evidence preserves a durable cursor beyond Int32 (21.906625ms)
+✔ WHAT[semantic-trace-006] a physical prefix cannot cut across repeated canonical segments of one Host message (74.113875ms)
+✔ WHAT[semantic-trace-006] Host message set resolves only to its exact contiguous range (1.575584ms)
+✔ WHAT[semantic-trace-006] a cursor gap or intervening unrequested identity cannot be a contiguous range (0.969334ms)
+✔ WHAT[semantic-trace-006] range and frontier queries preserve half-open boundaries (0.825833ms)
+✔ WHAT[semantic-trace-006] range vocabulary is half-open (0.138ms)
+✔ WHAT[semantic-trace-007] opaque Host identities survive durable capture and cold replay (237.573208ms)
+✔ WHAT[semantic-trace-007] old opaque provenance is replayed without narrowing its accepted domain (73.821833ms)
+✔ WHAT[semantic-trace-007] a payload cannot manufacture terminal evidence without an actual ProviderRun (1.335125ms)
+✔ WHAT[semantic-trace-007] an invalid durable terminal cannot advance the original owner (digest mismatch) (260.574625ms)
+✔ WHAT[semantic-trace-007] an invalid durable terminal cannot advance the original owner (missing payload) (217.399125ms)
+✔ WHAT[semantic-trace-007] real terminal evidence keeps its exact run and frozen original frontier after later capture (54.69175ms)
+✔ WHAT[semantic-trace-007] real Host bytes and missing run evidence survive in the single original owner (61.041875ms)
+✔ WHAT[semantic-trace-007] durable materialization survives reopening with exact user and tool text (32.506625ms)
+✔ WHAT[semantic-trace-007] projection capture is idempotent and reports owner receipts (36.385917ms)
+✔ WHAT[semantic-trace-007] materialization reads canonical durable semantics (33.238458ms)
+✔ WHAT[semantic-trace-007] canonical flatten preserves semantic part and role order (0.253ms)
+✔ WHAT[semantic-trace-007] actual Y, prefix, WorkRecord and Casebook consumers share the same bounded durable history and exclude request presentation; GAP-101 (0.035458ms) # TODO
+✔ WHAT[semantic-trace-008] actual speculative candidate rejection and failed prefix probe leave durable XTrace unchanged; GAP-101 (0.326709ms) # TODO
+✔ WHAT[semantic-trace-009] appending a part labelled with a new generation preserves earlier projection facts (4.30125ms)
+✔ WHAT[semantic-trace-009] actual Host compaction and durable reanchor preserve opening, all parts and WorkRecord cursor while resetting prefix coverage; GAP-101 (0.065625ms) # TODO
+✔ WHAT[semantic-trace-009] cursor sequence remains global across Host generations (1.830666ms)
+✔ WHAT[semantic-trace-010] legacy journal order restores parts and terminal before a complete late Opening (157.996833ms)
+✔ WHAT[semantic-trace-010] opening capture reports idempotent evidence (24.968375ms)
+✔ WHAT[semantic-trace-010] durable capture refuses conflicting text and requirements without changing opening (24.321583ms)
+✔ WHAT[semantic-trace-010] conflicting opening is rejected (0.3165ms)
+✔ WHAT[semantic-trace-010] large Opening preserves the complete bytes and distinguishes equal-length tails (13.020708ms)
+✔ WHAT[semantic-trace-010] late Opening appends without changing old cuts or old semantic ranges (3.079917ms)
+✔ WHAT[semantic-trace-010] small first Opening retains the original record protocol (0.652541ms)
+✔ WHAT[semantic-trace-011] actual Fission lanes converge independently of arrival order with causal ownership and one consumable terminal frontier; GAP-101 (0.770583ms) # TODO
+✔ WHAT[semantic-trace-012] actual repeated Resume on one physical session yields isolated invocation ranges used by WorkRecord and Casebook; GAP-101 (0.334625ms) # TODO
+✔ WHAT[work-record-001] LWR_same_record_projected_two_ways_shares_work_facts (1.822083ms)
+✔ WHAT[work-record-001] corruption after a frame commit cannot become a silently incomplete canonical record (106.731333ms)
+✔ WHAT[work-record-002] COMPANION_015_bounded_chronicle_excludes_prior_invocation_y_frames (141.547125ms)
+✔ WHAT[work-record-003] LWR_y_frames_cover_prefix_and_x_supplies_only_suffix (1.61325ms)
+✔ WHAT[work-record-003] LWR_no_y_frames_means_opening_plus_raw_gap_not_alternate_A_path (0.1695ms)
+✔ WHAT[work-record-004] COMPANION_015_bounded_chronicle_heading_omitted_when_invocation_has_no_y (130.1485ms)
+✔ WHAT[work-record-004] same terminal text in a reused child is a fresh occurrence when ProviderRun changes (118.082667ms)
+✔ WHAT[work-record-004] rematerializing an older bounded range never substitutes a later terminal (102.436083ms)
+✔ WHAT[work-record-004] a frame spanning two invocations cannot leak the earlier work into the later bounded record (73.596834ms)
+✔ WHAT[work-record-004] bounded originals and coverage stay complete when a frame no frames (106.623417ms)
+✔ WHAT[work-record-004] bounded originals and coverage stay complete when a frame contained prefix (162.998083ms)
+✔ WHAT[work-record-004] bounded originals and coverage stay complete when a frame contained through final text (146.330125ms)
+✔ WHAT[work-record-004] bounded originals and coverage stay complete when a frame crosses start (111.417041ms)
+✔ WHAT[work-record-004] bounded originals and coverage stay complete when a frame crosses end (125.795042ms)
+✔ WHAT[work-record-004] bounded originals and coverage stay complete when a frame crosses both (126.606625ms)
+✔ WHAT[work-record-004] bounded originals and coverage stay complete when a frame contained then crossing (125.889625ms)
+✔ WHAT[work-record-004] bounded originals and coverage stay complete when a frame crossing then contained (110.116375ms)
+✔ WHAT[work-record-004] bounded originals and coverage stay complete when a frame inclusive end at range start (99.355875ms)
+✔ WHAT[work-record-004] a later crossing frame cannot expand an earlier bounded range or hide its original suffix (145.840583ms)
+✔ WHAT[work-record-004] empty and terminal-only bounded records do not borrow a crossing summary (151.527875ms)
+✔ WHAT[work-record-004] bounded formal statement survives a fully covered trailing tool with terminal=false (106.329541ms)
+✔ WHAT[work-record-004] bounded formal statement survives a fully covered trailing tool with terminal=true (138.479083ms)
+✔ WHAT[work-record-004] partial reasoning coverage keeps one formal statement with turn terminal and trailingTool=false (165.636958ms)
+✔ WHAT[work-record-004] partial reasoning coverage keeps one formal statement with suffix terminal and trailingTool=false (133.650792ms)
+✔ WHAT[work-record-004] partial reasoning coverage keeps one formal statement with distinct terminal and trailingTool=false (148.728791ms)
+✔ WHAT[work-record-004] partial reasoning coverage keeps one formal statement with turn terminal and trailingTool=true (182.433459ms)
+✔ WHAT[work-record-004] partial reasoning coverage keeps one formal statement with suffix terminal and trailingTool=true (137.237417ms)
+✔ WHAT[work-record-004] partial reasoning coverage keeps one formal statement with distinct terminal and trailingTool=true (152.06675ms)
+✔ WHAT[work-record-004] partial text coverage keeps one formal statement with turn terminal and trailingTool=false (119.520875ms)
+✔ WHAT[work-record-004] partial text coverage keeps one formal statement with suffix terminal and trailingTool=false (132.498208ms)
+✔ WHAT[work-record-004] partial text coverage keeps one formal statement with distinct terminal and trailingTool=false (129.566959ms)
+✔ WHAT[work-record-004] partial text coverage keeps one formal statement with turn terminal and trailingTool=true (133.814042ms)
+✔ WHAT[work-record-004] partial text coverage keeps one formal statement with suffix terminal and trailingTool=true (131.498083ms)
+✔ WHAT[work-record-004] partial text coverage keeps one formal statement with distinct terminal and trailingTool=true (139.262375ms)
+✔ WHAT[work-record-004] empty reasoning suffix "" preserves terminal evidence with formalVisible=false (96.357458ms)
+✔ WHAT[work-record-004] empty reasoning suffix "" preserves terminal evidence with formalVisible=true (147.855917ms)
+✔ WHAT[work-record-004] empty reasoning suffix " " preserves terminal evidence with formalVisible=false (194.680083ms)
+✔ WHAT[work-record-004] empty reasoning suffix " " preserves terminal evidence with formalVisible=true (257.414875ms)
+✔ WHAT[work-record-004] empty reasoning suffix "\n" preserves terminal evidence with formalVisible=false (119.64625ms)
+✔ WHAT[work-record-004] empty reasoning suffix "\n" preserves terminal evidence with formalVisible=true (150.04125ms)
+✔ WHAT[work-record-004] complete raw reasoning work with crossingFrame=false uses latest formal evidence for formal terminal (75.878625ms)
+✔ WHAT[work-record-004] complete raw reasoning work with crossingFrame=false uses latest formal evidence for earlier terminal (64.656291ms)
+✔ WHAT[work-record-004] complete raw reasoning work with crossingFrame=true uses latest formal evidence for formal terminal (79.249458ms)
+✔ WHAT[work-record-004] complete raw reasoning work with crossingFrame=true uses latest formal evidence for earlier terminal (85.579958ms)
+✔ WHAT[work-record-004] complete raw text work with crossingFrame=false uses latest formal evidence for formal terminal (115.454792ms)
+✔ WHAT[work-record-004] complete raw text work with crossingFrame=false uses latest formal evidence for earlier terminal (80.419959ms)
+✔ WHAT[work-record-004] complete raw text work with crossingFrame=true uses latest formal evidence for formal terminal (96.605834ms)
+✔ WHAT[work-record-004] complete raw text work with crossingFrame=true uses latest formal evidence for earlier terminal (93.001209ms)
+✔ WHAT[work-record-004] completed representation survives later entry, readBefore=false, providerRun=undefined (114.244084ms)
+✔ WHAT[work-record-004] completed representation survives later original, readBefore=false, providerRun=undefined (186.868ms)
+✔ WHAT[work-record-004] completed representation survives later entry, readBefore=true, providerRun=undefined (106.490708ms)
+✔ WHAT[work-record-004] completed representation survives later original, readBefore=true, providerRun=undefined (191.191084ms)
+✔ WHAT[work-record-004] completed representation survives later entry, readBefore=false, providerRun=current-run (126.067541ms)
+✔ WHAT[work-record-004] completed representation survives later original, readBefore=false, providerRun=current-run (138.223625ms)
+✔ WHAT[work-record-004] completed representation survives later entry, readBefore=true, providerRun=current-run (124.253125ms)
+✔ WHAT[work-record-004] completed representation survives later original, readBefore=true, providerRun=current-run (154.051667ms)
+✔ WHAT[work-record-004] empty completion frames, duplicate terminals and same-frontier runs retain distinct historical choices (661.983375ms)
+✔ WHAT[work-record-004] a completed representation survives reanchor and a fresh invocation in another process (575.071875ms)
+✔ WHAT[work-record-004] a corrupt frozen frame fails closed after later valid frames arrive (156.030792ms)
+✔ WHAT[work-record-004] selected frame corruption obeys the bounded evidence boundary (110.422833ms)
+✔ WHAT[work-record-004] crossing frame corruption obeys the bounded evidence boundary (97.609917ms)
+✖ WHAT[work-record-004] a completed Chronicle excludes a later concurrent writer entry after cold replay (149.211166ms)
+✖ WHAT[work-record-004] a completed frontier excludes later concurrent writer originals after cold replay (163.857417ms)
+✖ WHAT[work-record-004] a new Terminal sees all merged heads and retains them across later concurrent originals (153.063958ms)
+✖ WHAT[work-record-004] an ordered duplicate terminal keeps its first representation after a later Entry (161.092292ms)
+✖ WHAT[work-record-004] concurrent same-run terminals fail closed when their frontier evidence differs (162.912541ms)
+✖ WHAT[work-record-004] concurrent same-run terminals fail closed when their Chronicle evidence differs (154.484709ms)
+✖ WHAT[work-record-004] concurrent same-frontier runs require a run identity when their Chronicle choices differ (138.240833ms)
+✖ WHAT[work-record-004] concurrent identical same-run terminals retain their shared completion evidence (158.247958ms)
+✖ WHAT[work-record-004] concurrent same-frontier runs share a generic view when their Chronicle evidence agrees (163.508333ms)
+✖ WHAT[work-record-004] a refreshed Journal writer includes every session head in its new Terminal parents (142.56675ms)
+✖ WHAT[work-record-004] a Terminal with Opening ancestry missing fails closed without borrowing the current view (148.335458ms)
+✖ WHAT[work-record-004] a Terminal with an original below the frontier missing fails closed without borrowing the current view (133.13025ms)
+✖ WHAT[work-record-004] a Terminal that knows only a second identical Opening has valid zero-frontier evidence (130.586708ms)
+✖ WHAT[work-record-004] a formal-only completion without semantic parts retains its zero frontier after cold replay (120.235083ms)
+✖ WHAT[work-record-004] a causally selected later frame cannot skip originals represented only by an unseen frame (95.83125ms)
+✖ WHAT[work-record-004] an old unproven Terminal does not block a later unfinished generic range (166.5205ms)
+✖ WHAT[work-record-004] a concurrent completion can prove its material without knowing another Terminal shortcut (158.578667ms)
+✖ WHAT[work-record-004] a standalone Trace Terminal keeps its zero frontier when a concurrent Opening arrives later (328.542875ms)
+✖ WHAT[work-record-004] concurrent identical completions keep current views for a later mismatched endpoint (134.545209ms)
+✔ WHAT[work-record-005] actual Recent work advances by RecordCoverage within a turn while PrefixCoverage remains zero (192.103916ms)
+✔ WHAT[work-record-006] omitting Opening never erases the canonical fact, including after journal reopen (64.654375ms)
+✔ WHAT[work-record-007] child_to_parent_run_bounded_LWR_omits_caller_charge (118.6835ms)
+✔ WHAT[work-record-007] LWR_parent_to_child_includes_opening (0.410584ms)
+✔ WHAT[work-record-007] LWR_child_to_parent_omits_opening (0.259292ms)
+✔ WHAT[work-record-008] actual Opening rendering preserves assignment bytes and existing requirement numbers (76.729625ms)
+✔ WHAT[work-record-008] actual committed Opening renders the original XTrace interval, not only the inline fields (96.245667ms)
+✔ WHAT[work-record-008] includeOpening=false omits the interval material instead of renaming it into the work body (53.178292ms)
+✔ WHAT[work-record-009] renderer retains tool call and result when explicitly supplied as constitutive Opening (1.493625ms)
+✔ WHAT[work-record-009] actual materializer ends Opening at the first semantic part, not at a planning commitment (123.092333ms)
+✔ WHAT[work-record-009] actual materializer keeps the Opening interval raw call/result inside Opening only (47.308459ms)
+✔ WHAT[work-record-010] repeated bounded materialization of the same durable facts is deterministic (117.592125ms)
+✔ WHAT[work-record-010] actual inspect and fork/join return the same bounded record for the same invocation facts; materializer determinism alone does not prove both consumers; GAP-109 (0.521125ms) # TODO
+✔ WHAT[work-record-010] actual sync returns the delivered value while scoped history stays bounded across cold replay (328.824ms)
+✔ WHAT[work-record-010] actual fork-join returns the delivered value while scoped history stays bounded across cold replay (374.202209ms)
+✔ WHAT[work-record-010] actual Fork delivery and bounded history survive later originals and frames through join (538.202334ms)
+✔ WHAT[work-record-010] actual Fork delivery and bounded history survive later originals and frames through cold-consume (429.50075ms)
+✔ WHAT[work-record-010] actual sync keeps delivery and the historical terminal frontier separate from later trace (805.293875ms)
+✔ WHAT[work-record-010] actual fork-join keeps delivery and the historical terminal frontier separate from later trace (963.771333ms)
+✔ WHAT[work-record-011] bounded terminal-only completion still yields Recent work after Chronicle covered every durable part (235.159ms)
+✔ WHAT[work-record-011] LWR_last_assistant_text_is_in_recent_work_not_a_closing_report (1.156292ms)
+✔ WHAT[work-record-011] LWR_empty_sections_are_omitted (0.349291ms)
+✔ WHAT[work-record-011] LWR_statement_is_the_last_assistant_text_in_recent_work (0.978917ms)
+✔ WHAT[work-record-011] actual renderer uses the three canonical sections and omits empty sections (0.388708ms)
+✔ WHAT[work-record-012] record accepts prose without required report fields and preserves voluntarily chosen headings (0.937084ms)
+✔ WHAT[work-record-013] LWR_gap_excludes_raw_tool_call_and_result_but_keeps_text_and_reasoning (4.236ms)
+✔ WHAT[work-record-013] LWR_recent_work_excludes_raw_tool_parts_and_keeps_last_assistant_text (0.86ms)
+✔ WHAT[work-record-014] LWR_gap_never_uses_prefix_cutoff (2.79875ms)
+✔ WHAT[work-record-014] LWR_recent_work_can_start_mid_turn_at_record_coverage (0.25ms)
+✔ WHAT[work-record-015] actual materializer retains work after Opening while later tool turns and trace head advance (196.058042ms)
+✔ WHAT[work-record-016] COMPANION_015_bounded_review_consumes_request_range_not_session_head (535.153042ms)
+✔ WHAT[work-record-017] actual Engineer Fission converges lane facts into one invocation record and does not expose unfinished fragments; removed Surface merely printed takeover text and ignored lanes; GAP-109 (0.393166ms) # TODO
+✔ WHAT[work-034] initial tenure (S1) assembles U + current messages with no synthetic record and requests reanchor on first turn (15.057791ms)
+✔ WHAT[work-034] non-initial tenure strips prior assistant/tool messages, injects no lwr-prev-* row, and preserves the current user reply in chronological order (0.796708ms)
+✔ WHAT[work-034] user messages U preserve original bytes and order verbatim without modification (1.153625ms)
+✔ WHAT[work-034] the first part immediately after the opening cursor survives tenure assembly (1.922375ms)
+✔ WHAT[work-034] a current assistant row with a Host id but no first-observation entry stays (0.805625ms)
+✔ WHAT[work-034] a semantic assistant row with no Host info.id rejects assembly (1.776667ms)
+✔ WHAT[work-034] synthetic rows are stripped and no synthetic record is ever injected (1.778916ms)
+✔ WHAT[work-034] durable Plan active state assembles U + current interactions in place (0.724333ms)
+✔ WHAT[work-034] the lifecycle document view is reachable as a pure function (43.579584ms)
+✔ WHAT[work-034] reanchorRequested is returned by assemble and is true only on a fresh handover (0.946667ms)
+✔ WHAT[work-034] S1 with no retirement carries no previous range (6.101583ms)
+✔ WHAT[work-034] S1 retirement preserves its opening range for the next tenure (15.392792ms)
+✔ WHAT[work-034] tenure assembly strips prior interactions by openingCursor without materializing a previous record (0.304083ms)
+✔ WHAT[work-034] tenure reanchor event shape carries session, epochs, work and incumbency (0.053666ms)
+✔ WHAT[work-034] duplicate incumbencyId is rejected on second tenure reanchor (2.306625ms)
+✔ WHAT[work-034] reanchorRequested is true on fresh handover and deduplicated via isTenureReanchored (0.397875ms)
+✔ WHAT[work-034] successor projection strips earlier assistant and tool messages and never inserts LWR_prev (0.589625ms)
+✔ WHAT[work-034] post-S3 projection strips all S3-and-earlier context and injects no synthetic record (0.48475ms)
+✔ WHAT[work-034] Plan keeps user originals across explicit views and handover; a cold checkpoint restores identity only (2716.842792ms)
+ℹ tests 287
+ℹ suites 0
+ℹ pass 258
+ℹ fail 19
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 10
+ℹ duration_ms 31363.170625
+
+✖ failing tests:
+
+test at requirements/work-record/tests/004.test.mjs:590:1
+✖ WHAT[work-record-004] a completed Chronicle excludes a later concurrent writer entry after cold replay (149.211166ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:592:5
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:591:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:605:1
+✖ WHAT[work-record-004] a completed frontier excludes later concurrent writer originals after cold replay (163.857417ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:607:5
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:606:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:619:1
+✖ WHAT[work-record-004] a new Terminal sees all merged heads and retains them across later concurrent originals (153.063958ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:621:22
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:620:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:640:1
+✖ WHAT[work-record-004] an ordered duplicate terminal keeps its first representation after a later Entry (161.092292ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:642:22
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:641:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:654:3
+✖ WHAT[work-record-004] concurrent same-run terminals fail closed when their frontier evidence differs (162.912541ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:656:7
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:655:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:654:3
+✖ WHAT[work-record-004] concurrent same-run terminals fail closed when their Chronicle evidence differs (154.484709ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:656:7
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:655:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:667:1
+✖ WHAT[work-record-004] concurrent same-frontier runs require a run identity when their Chronicle choices differ (138.240833ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:669:5
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:668:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:684:1
+✖ WHAT[work-record-004] concurrent identical same-run terminals retain their shared completion evidence (158.247958ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:686:5
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:685:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:695:1
+✖ WHAT[work-record-004] concurrent same-frontier runs share a generic view when their Chronicle evidence agrees (163.508333ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:697:5
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:696:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:708:1
+✖ WHAT[work-record-004] a refreshed Journal writer includes every session head in its new Terminal parents (142.56675ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:710:22
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:709:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:732:3
+✖ WHAT[work-record-004] a Terminal with Opening ancestry missing fails closed without borrowing the current view (148.335458ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async withCausalHistory.parentCursors.parentCursors (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:734:7)
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:733:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:732:3
+✖ WHAT[work-record-004] a Terminal with an original below the frontier missing fails closed without borrowing the current view (133.13025ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async withCausalHistory.parentCursors.parentCursors (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:734:7)
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:733:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:744:1
+✖ WHAT[work-record-004] a Terminal that knows only a second identical Opening has valid zero-frontier evidence (130.586708ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"10000000-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:747:5
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:745:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:757:1
+✖ WHAT[work-record-004] a formal-only completion without semantic parts retains its zero frontier after cold replay (120.235083ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000002-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async withCausalHistory.openingOnly (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:759:5)
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:758:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:769:1
+✖ WHAT[work-record-004] a causally selected later frame cannot skip originals represented only by an unseen frame (95.83125ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000005-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async withCausalHistory.rawOnly (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:771:5)
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:770:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:783:1
+✖ WHAT[work-record-004] an old unproven Terminal does not block a later unfinished generic range (166.5205ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async withCausalHistory.parentCursors.1 (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:785:22)
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:784:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:798:1
+✖ WHAT[work-record-004] a concurrent completion can prove its material without knowing another Terminal shortcut (158.578667ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:800:5
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:799:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:812:1
+✖ WHAT[work-record-004] a standalone Trace Terminal keeps its zero frontier when a concurrent Opening arrives later (328.542875ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  undefined !== 0
+  
+      at withCausalHistory.emptyBase (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:817:12)
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:813:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/work-record/tests/004.test.mjs:827:1
+✖ WHAT[work-record-004] concurrent identical completions keep current views for a later mismatched endpoint (134.545209ms)
+  AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+  
+  false !== true
+  
+      at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:829:22
+      at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/004.test.mjs:828:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

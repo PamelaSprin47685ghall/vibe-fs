@@ -47,7 +47,8 @@ module Fold =
             |> Result.map (fun updated ->
                 { projection with
                     ChatExecutions = updated })
-        | AgentFact.Cognition _ -> Ok projection
+        | AgentFact.Cognition _
+        | AgentFact.Concern _ -> Ok projection
         | AgentFact.Orchestrator orchestrator ->
             // The Change family fold consumes the journal-owned `ProjectionSet`,
             // so its assembly stays with the dispatcher, downstream of that edge.
@@ -63,8 +64,6 @@ module Fold =
         | AgentFact.Host host -> HostFactFold.fold projection host
         | AgentFact.Fission fission -> ProjectionUpdate.applyFission projection fission
         | AgentFact.Delegation delegation -> DelegationProjectionBridge.foldDelegation projection delegation
-        | AgentFact.Attention attention -> ProjectionUpdate.applyAttention projection attention
-        | AgentFact.Concern concern -> ProjectionUpdate.applyConcern projection concern
 
     let foldAgentFact projection fact =
         foldAgentFactWithMaterial None None projection fact

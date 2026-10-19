@@ -7,6 +7,16 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Persistence.Journal
 
 module InteractionRepairWorkflow =
+    val repairUnfinishedWork:
+        quiescence: ISessionQuiescenceGate ->
+        context: ReconciledTurnContext ->
+        sessionPort: ISessionHostPort ->
+        rootWorkspace: IRootWorkspaceReader ->
+        eventPort: IEventObservationPort ->
+        journal: AgentJournal option ->
+        observer: ContinuationAcceptanceObserver option ->
+            Task
+
     val repairBloggerProtocol:
         host: IBloggerRuntimeHost ->
         quiescence: ISessionQuiescenceGate ->

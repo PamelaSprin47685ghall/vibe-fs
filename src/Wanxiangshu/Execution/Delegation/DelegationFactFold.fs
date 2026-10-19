@@ -5,24 +5,6 @@ open Wanxiangshu.Foundation
 
 module DelegationFactFold =
 
-    let private completeHandoff
-        (handoffFrontier: string -> int64 option)
-        (payload:
-            {| ParentSessionId: SessionId
-               Route: DelegationHandoffRoute
-               ParentEndExclusive: int64 |})
-        : Result<DelegationProjectionChange list, DelegationFoldRejection> =
-        let key = DelegationHandoff.key payload.ParentSessionId payload.Route
-
-        let previous = handoffFrontier key |> Option.defaultValue 0L
-
-        if payload.ParentEndExclusive < previous then
-            Error(HandoffFrontierCannotRetreat(previous, payload.ParentEndExclusive))
-        elif payload.ParentEndExclusive < 0L then
-            Error(HandoffFrontierNegative payload.ParentEndExclusive)
-        else
-            Ok [ MoveHandoffFrontier(key, payload.ParentEndExclusive) ]
-
     let private replaceEstimate
         (sessionState: SessionId -> DelegationSessionState option)
         (payload:
@@ -63,10 +45,8 @@ module DelegationFactFold =
 
     let fold
         (sessionState: SessionId -> DelegationSessionState option)
-        (handoffFrontier: string -> int64 option)
         (fact: DelegationFactCases)
         : Result<DelegationProjectionChange list, DelegationFoldRejection> =
         match fact with
         | DelegationFactCases.DelegatedToolEstimateReplaced payload -> replaceEstimate sessionState payload
         | DelegationFactCases.DelegatedToolCallObserved payload -> observeEstimate sessionState payload
-        | DelegationFactCases.DelegationHandoffCompleted payload -> completeHandoff handoffFrontier payload

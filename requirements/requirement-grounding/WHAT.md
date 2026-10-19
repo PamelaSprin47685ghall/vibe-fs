@@ -30,7 +30,7 @@
 
 明确文件读取将代码交给执行者时，补入尚未看见的适用规范。所有 Provider 均在真实终端工具结果后以 `NUL+BOM` 分隔追加，每份材料带 `requirement_source_path = "requirements/<package>/<file>"`，正文保持原始读取字节。
 
-不得生成 synthetic read 调用/结果对、私有 bundle 或特殊 system 文本。同轮顺序固定为 guidance → requirement reads；grep、glob、list 等候选发现不触发注入。原生与可编程文件读取均适用。
+不得生成 synthetic read 调用/结果对、私有 bundle 或特殊 system 文本。同轮顺序固定为 guidance → requirement reads；候选发现与模式检索不触发注入。显式文件读取与可编程文件读取均适用。
 
 ## [008] Mutation 不受 Grounding 阻断
 

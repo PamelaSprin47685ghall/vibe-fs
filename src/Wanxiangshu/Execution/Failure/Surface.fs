@@ -66,7 +66,6 @@ module Surface =
         match requiredText "provider.requestKind" value with
         | "WorkMain" -> ProviderRequestKind.WorkMain
         | "BloggerMain" -> ProviderRequestKind.BloggerMain
-        | "BloggerSquash" -> ProviderRequestKind.BloggerSquash
         | "InteractionRepair" -> ProviderRequestKind.InteractionRepair
         | "StrengthReplica" -> ProviderRequestKind.StrengthReplica
         | requestKind -> invalidArg "provider.requestKind" $"unknown provider request kind '{requestKind}'"
@@ -129,7 +128,6 @@ module Surface =
         function
         | ProviderRequestKind.WorkMain -> "WorkMain"
         | ProviderRequestKind.BloggerMain -> "BloggerMain"
-        | ProviderRequestKind.BloggerSquash -> "BloggerSquash"
         | ProviderRequestKind.InteractionRepair -> "InteractionRepair"
         | ProviderRequestKind.StrengthReplica -> "StrengthReplica"
 

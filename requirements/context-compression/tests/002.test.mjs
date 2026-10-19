@@ -90,13 +90,6 @@ const entryFrame = (n) => blog.frame({
   coveredFrom: n - 1,
   coveredThrough: n,
 })
-const squashFrame = (n) => blog.frame({
-  kind: 'Squash',
-  digest: `sha-entry-${n}`,
-  ref: `blob-squash-${n}`,
-  coveredFrom: 0,
-  coveredThrough: 2,
-})
 const commitEntry = (state, { epoch = 0, from, to, cutoffFrom, cutoffTo, digest = `digest-${cutoffTo}`, n = 1 }) =>
   blog.applyEntry(
     {
@@ -147,18 +140,6 @@ test('WHAT[context-compression-002] HOST_006_reanchor_zeroes_prefix_coverage_and
   })
   assert.equal(blog.hasCoverage(reanchored), false)
   assert.deepEqual(blog.coverableFrameKinds(reanchored), [], 'no probe may be built until prefix coverage rebuilds')
-})
-test('WHAT[context-compression-002] HOST_006_reanchor_does_not_advance_the_frame_epoch', () => {
-  // No frame changed, so a squash already written against the current epoch is
-  // still valid after a reanchor. Advancing here would reject it.
-  const state = threeEntries()
-  const before = blog.frameEpochOf(state)
-  const reanchored = blog.applyReanchor(state)
-
-  assert.equal(blog.frameEpochOf(reanchored), before)
-
-  const squash = blog.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 1, frame: squashFrame(1) }, reanchored)
-  assert.equal(squash.ok, true, squash.ok ? '' : squash.error)
 })
 test('WHAT[context-compression-002] HOST_006_prefix_coverage_rebuilds_after_a_reanchor_without_rewinding_ingest', () => {
   // Probe capability recovers on its own once a new complete-turn boundary is
@@ -322,9 +303,8 @@ const requestKind = prefix.requestKind
 const budget = failureOwner.budget
 
 test('WHAT[context-compression-002] retry dispatch reacts only to confirmed failure material', () => {
-  // Without squash material the next request stays the ordinary main: squash
-  // is never pre-selected before a confirmed failure produces material.
+  // BloggerMain retry stays on the ordinary main request.
   assert.equal(compression.nextBloggerRequest('blogger-main', false), 'blogger-main')
-  assert.equal(compression.nextBloggerRequest('blogger-squash', false), 'blogger-main')
+  assert.equal(compression.nextBloggerRequest('blogger-main', true), 'blogger-main')
 })
 }

@@ -40,8 +40,10 @@ module AttemptPlannerSurface =
         | ToolPermission.BashHoneypot -> "BashHoneypot"
         | ToolPermission.JsPlan -> "JsPlan"
         | ToolPermission.Ask -> "Ask"
+        | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
         | ToolPermission.Deliver -> "Deliver"
         | ToolPermission.Review -> "Review"
+        | ToolPermission.Advisor -> "Advisor"
 
     let private requestKindOf (label: string) : ProviderRequestKind option =
         match label.ToLowerInvariant() with
@@ -49,8 +51,6 @@ module AttemptPlannerSurface =
         | "work-main" -> Some ProviderRequestKind.WorkMain
         | "bloggermain"
         | "blogger-main" -> Some ProviderRequestKind.BloggerMain
-        | "bloggersquash"
-        | "blogger-squash" -> Some ProviderRequestKind.BloggerSquash
         | "interactionrepair"
         | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
         | "strengthreplica"
@@ -67,7 +67,6 @@ module AttemptPlannerSurface =
         let requestKind =
             match bloggerPurpose with
             | "main" -> ProviderRequestKind.BloggerMain
-            | "squash" -> ProviderRequestKind.BloggerSquash
             | _ -> AttemptPlanner.ordinaryRequestKind promptOrigin
 
         ProviderRequestKind.label requestKind

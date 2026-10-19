@@ -1,0 +1,52 @@
+✔ WHAT[durable-events-024] actual Sphinx Commands.start valid preserves its original settlement capability and guard (420.674958ms)
+ℹ {"scenario":"valid","measuredPid":4309,"coldPid":4318,"physicalAndCold":true,"counts":{"append":1,"fsync":1,"close":1,"release":1,"injected":0},"cutIds":[]}
+✔ WHAT[durable-events-024] actual Sphinx Commands.start malformed-release preserves its original settlement capability and guard (424.119125ms)
+ℹ {"scenario":"malformed-release","measuredPid":4321,"coldPid":4324,"physicalAndCold":true,"counts":{"append":1,"fsync":1,"close":1,"release":1,"injected":1},"cutIds":["52cc6f28327942fe82803a75de3c7d1d"]}
+✔ WHAT[durable-events-024] actual Sphinx Commands.start valid-release preserves its original settlement capability and guard (463.849084ms)
+ℹ {"scenario":"valid-release","measuredPid":4336,"coldPid":4341,"physicalAndCold":true,"counts":{"append":1,"fsync":1,"close":1,"release":1,"injected":1},"cutIds":[]}
+✔ WHAT[durable-events-024] actual Sphinx Commands.start not-attempted-controlled preserves its original settlement capability and guard (387.930833ms)
+ℹ {"scenario":"not-attempted-controlled","measuredPid":4344,"coldPid":4347,"physicalAndCold":true,"counts":{"append":0,"fsync":0,"close":0,"release":0,"injected":0},"cutIds":[]}
+✔ WHAT[durable-events-024] actual Sphinx Commands.start no-new-write-controlled preserves its original settlement capability and guard (475.7065ms)
+ℹ {"scenario":"no-new-write-controlled","measuredPid":4350,"coldPid":4353,"physicalAndCold":true,"counts":{"append":0,"fsync":0,"close":0,"release":0,"injected":0},"cutIds":[]}
+✔ WHAT[durable-events-024] original Sphinx wire binding valid settles before its physical terminal and independent cold replay (548.636334ms)
+ℹ {"binding":"wire","scenario":"valid","nativePid":4357,"coldPid":4360,"terminal":0,"physicalAndCold":true}
+✔ WHAT[durable-events-024] original Sphinx wire binding valid-release settles before its physical terminal and independent cold replay (547.755959ms)
+ℹ {"binding":"wire","scenario":"valid-release","nativePid":4364,"coldPid":4368,"terminal":0,"physicalAndCold":true}
+✔ WHAT[durable-events-024] original Sphinx wire binding malformed-release settles before its physical terminal and independent cold replay (460.849458ms)
+ℹ {"binding":"wire","scenario":"malformed-release","nativePid":4378,"coldPid":4381,"terminal":"SIGKILL","physicalAndCold":true}
+✔ WHAT[durable-events-024] original Sphinx mcp binding valid settles before its physical terminal and independent cold replay (787.345959ms)
+ℹ {"binding":"mcp","scenario":"valid","nativePid":4388,"coldPid":4391,"terminal":0,"physicalAndCold":true}
+✔ WHAT[durable-events-024] original Sphinx mcp binding valid-release settles before its physical terminal and independent cold replay (780.029375ms)
+ℹ {"binding":"mcp","scenario":"valid-release","nativePid":4398,"coldPid":4401,"terminal":0,"physicalAndCold":true}
+✔ WHAT[durable-events-024] original Sphinx mcp binding malformed-release settles before its physical terminal and independent cold replay (829.978ms)
+ℹ {"binding":"mcp","scenario":"malformed-release","nativePid":4408,"coldPid":4411,"terminal":"SIGKILL","physicalAndCold":true}
+✔ WHAT[durable-events-024] undecodable Journal malformed refuses a cut without inventing append or fatal evidence (492.793458ms)
+ℹ {"scenario":"malformed","pid":4420,"coldPid":4425,"counts":{"append":0,"fsync":0,"close":0,"release":1,"injected":0},"rejection":{"code":"AppendFailed","causeSame":false,"reason":"integration preparation failed: cut-tail inference failed before and after the one full replay: Journal cut requires a decodable failed event: Error at: `$.Fact.[0]`\nExpecting an array but instead got: undefined; Journal cut requires a decodable failed event: Error at: `$.Fact.[0]`\nExpecting an array but instead got: undefined"}}
+✔ WHAT[durable-events-024] undecodable Journal malformed-release refuses a cut without inventing append or fatal evidence (563.962875ms)
+ℹ {"scenario":"malformed-release","pid":4429,"coldPid":4432,"counts":{"append":0,"fsync":0,"close":0,"release":1,"injected":1},"rejection":{"code":"AppendNotAttempted","phase":"StoreRelease","causeSame":true,"requested":[{"id":"15272172961442e28bb5156b78c9a619","parents":[],"payload":{},"payloadRefs":[],"stream":"journal/workspace","type":"JournalEnvelope"}],"prepared":null,"cleanupFailures":[],"priorRejection":{"code":"AppendFailed","reason":"integration preparation failed: cut-tail inference failed before and after the one full replay: Journal cut requires a decodable failed event: Error at: `$.Fact.[0]`\nExpecting an array but instead got: undefined; Journal cut requires a decodable failed event: Error at: `$.Fact.[0]`\nExpecting an array but instead got: undefined"}}}
+✔ WHAT[durable-events-024] undecodable Journal business-malformed refuses a cut without inventing append or fatal evidence (612.956917ms)
+ℹ {"scenario":"business-malformed","pid":4436,"coldPid":4441,"counts":{"append":1,"fsync":1,"close":1,"release":2,"injected":0},"rejection":{"code":"AppendFailed","causeSame":false,"reason":"integration preparation failed: cut-tail inference failed before and after the one full replay: Journal cut requires a decodable failed event: Error at: `$.Fact.[0]`\nExpecting an array but instead got: undefined; Journal cut requires a decodable failed event: Error at: `$.Fact.[0]`\nExpecting an array but instead got: undefined"}}
+✔ WHAT[durable-events-024] undecodable Journal business-malformed-release refuses a cut without inventing append or fatal evidence (475.436166ms)
+ℹ {"scenario":"business-malformed-release","pid":4445,"coldPid":4448,"counts":{"append":1,"fsync":1,"close":1,"release":2,"injected":1},"rejection":{"code":"AppendNotAttempted","phase":"StoreRelease","causeSame":true,"requested":[{"id":"532914977dca43a8bccbe8ae97a69063","parents":[],"payload":{},"payloadRefs":[],"stream":"journal/session/native-settlement","type":"JournalEnvelope"}],"prepared":null,"cleanupFailures":[],"priorRejection":{"code":"AppendFailed","reason":"integration preparation failed: cut-tail inference failed before and after the one full replay: Journal cut requires a decodable failed event: Error at: `$.Fact.[0]`\nExpecting an array but instead got: undefined; Journal cut requires a decodable failed event: Error at: `$.Fact.[0]`\nExpecting an array but instead got: undefined"}}}
+✔ WHAT[durable-events-024] decodable Journal semantic settles bad fact and cut before actual fatal and cold replay (482.725917ms)
+ℹ {"scenario":"semantic","pid":4452,"coldPid":4455,"counts":{"append":3,"fsync":3,"close":3,"release":3,"injected":0},"cutId":"92d3fd7a49504a798f7a645eb1b1f71c"}
+✔ WHAT[durable-events-024] decodable Journal semantic-release settles bad fact and cut before actual fatal and cold replay (488.389667ms)
+ℹ {"scenario":"semantic-release","pid":4459,"coldPid":4462,"counts":{"append":3,"fsync":3,"close":3,"release":3,"injected":1},"cutId":"198307192516477aa5a05c227d4bc977"}
+✔ WHAT[durable-events-024] original Journal RuntimeStarted valid settles before its physical terminal and independent cold replay (490.139458ms)
+ℹ {"scenario":"valid","measuredPid":4473,"coldPid":4476,"physicalAndCold":true,"counts":{"append":2,"fsync":2,"close":2,"release":2,"injected":0},"cutIds":[]}
+✔ WHAT[durable-events-024] original Journal RuntimeStarted valid-release settles before its physical terminal and independent cold replay (477.513167ms)
+ℹ {"scenario":"valid-release","measuredPid":4480,"coldPid":4483,"physicalAndCold":true,"counts":{"append":1,"fsync":1,"close":1,"release":1,"injected":1},"cutIds":[]}
+✔ WHAT[durable-events-024] original AgentJournal business valid preserves legal initialization before its physical terminal and cold replay (500.190875ms)
+ℹ {"scenario":"business-valid","measuredPid":4487,"coldPid":4490,"physicalAndCold":true,"initId":"6af8b46b049a4b759d1182431f0c4f7a","businessId":"290b497ae26d4c0b95bb79b9ad2ebf29","counts":{"append":2,"fsync":2,"close":2,"release":2,"injected":0},"cutIds":[]}
+✔ WHAT[durable-events-024] original AgentJournal business valid-release preserves legal initialization before its physical terminal and cold replay (471.428417ms)
+ℹ {"scenario":"business-valid-release","measuredPid":4494,"coldPid":4497,"physicalAndCold":true,"initId":"5b420b8f2149461fbd3bcb983ceae221","businessId":"388dad97dd694859b869de70b6a995bc","counts":{"append":2,"fsync":2,"close":2,"release":2,"injected":1},"cutIds":[]}
+✔ WHAT[durable-events-024] actual semantic-cut caller requires injected fatal capability and refuses fatal before committed or unknown settlement (0.09975ms) # TODO
+✔ WHAT[durable-events-024] actual physical child persists bad fact and cut then reports and exits once; duplicate incident cannot execute again (0.02475ms) # TODO
+ℹ tests 23
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 2
+ℹ duration_ms 11528.363666

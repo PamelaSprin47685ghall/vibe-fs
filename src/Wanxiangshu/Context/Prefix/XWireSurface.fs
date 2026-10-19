@@ -830,11 +830,7 @@ module XWireSurface =
 
                             rawFrames
                             |> Array.map (fun f ->
-                                { Kind =
-                                    if string f?kind = "Squash" then
-                                        BlogFrameKind.Squash
-                                    else
-                                        BlogFrameKind.Entry
+                                { Kind = BlogFrameKind.Entry
                                   Digest = BlobDigest.create (if isNullish f?digest then "" else string f?digest)
                                   TextRef = BlobRef.create (if isNullish f?ref then "" else string f?ref)
                                   CoveredFromSequence = if isNullish f?coveredFrom then 0L else int64 f?coveredFrom
@@ -888,11 +884,13 @@ module XWireSurface =
                                 | Ok st -> Some st
                                 | Error _ -> None)
                           Blog = Some blogState
-                          TodoCheckpoints =
-                            (if isNullish input?todoCheckpoints then
-                                 [||]
+                          ViewCheckpoints =
+                            (if not (isNullish input?viewCheckpoints) then
+                                 unbox<obj array> input?viewCheckpoints
+                             elif not (isNullish input?todoCheckpoints) then
+                                 unbox<obj array> input?todoCheckpoints
                              else
-                                 unbox<obj array> input?todoCheckpoints)
+                                 [||])
                             |> Array.fold
                                 (fun window checkpoint ->
                                     let callId = ToolCallId.create (string checkpoint?callId)

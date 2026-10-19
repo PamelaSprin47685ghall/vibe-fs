@@ -268,9 +268,9 @@ module JsBookkeeperTool =
     let private failed language (reason: string) =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.Unchanged; reason ] []
 
-    let private succeeded language (value: LlmFacing.Data.Value) =
+    let private succeeded language (value: obj) =
         LlmFacing.instruction (prose language Path.Accepted)
-        |> LlmFacing.withData (LlmFacing.Data.structuredValue value)
+        |> LlmFacing.withData (LlmFacing.Data.structuredValue (LlmFacing.Data.ofJs value))
         |> LlmFacing.render
 
     let execute (args: HostToolArguments) (context: HostToolContext) =
@@ -298,13 +298,17 @@ module JsBookkeeperTool =
                     let api = createApi language question answer staged
 
                     let! json =
-                        JsSandbox.runSurface
-                            runtimeBaseClass
-                            program
-                            api
-                            10000
-                            (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L)
-                            (1 <<< 20)
+                        task {
+                            let! handle =
+                                JsSandbox.runSurface
+                                    runtimeBaseClass
+                                    program
+                                    api
+                                    10000
+                                    (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L)
+
+                            return! JsSandbox.awaitResult handle (1 <<< 20)
+                        }
                         |> TaskResult.mapError JsFailure.reason
 
                     let! value = JsToolsData.parse json |> Result.mapError JsFailure.reason
@@ -328,7 +332,7 @@ module JsBookkeeperTool =
     let spec (factory: HostToolFactory) : ToolSpec =
         let language = ProviderLanguageBinding.readGlobalPreference ()
 
-        { Name = "js-bookkeeper"
+        { Name = "todowrite-for-bookkeeper"
           Description = assembleDescription language
           Arguments = [ "program", ToolHostCodec.stringSchemaDescribed (prose language Path.ArgProgram) factory ]
           Admission = admission

@@ -33,12 +33,14 @@ test('WHAT[behavior-diagnosis-008] ENFORCER_024_extra_numeric_properties_are_ign
     occurrence: 'The decisive fact was established.',
     settlement: 'The uncertainty is now settled.',
     consequence: 'The future path now rests on that fact.',
-    tip: field,
+    tipName: field,
+    opinion: 'The boundary decides later work.',
+    advice: 'Repair the boundary first.',
     'primitive-obsession': 7,
     some_other_number: 3,
   })
   assert.equal(result.ok, true)
-  assert.equal(result.value.tip.fieldName, field)
+  assert.equal(result.value.tipName, field)
   assert.equal(result.value.evidence, null)
 })
 }
@@ -63,8 +65,9 @@ const observationFact = () => ({
   textDigest: 'sha-obs',
   run: 'run-obs',
   toolCallIds: [],
-  tipRuleId: 'rule-obs',
-  fieldNameAtCommit: 'field-obs',
+  tipName: 'rule-obs',
+  tipTextRef: 'blobs/tip-obs',
+  tipTextDigest: 'tip-obs-digest',
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })
@@ -153,23 +156,12 @@ const observation = (overrides = {}) => ({
   textDigest: 'sha-obs',
   run: 'run-obs',
   toolCallIds: [],
-  tipRuleId: 'rule-obs',
-  fieldNameAtCommit: 'field-obs',
+  tipName: 'rule-obs',
+  tipTextRef: 'blobs/tip-obs',
+  tipTextDigest: 'tip-obs-digest',
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
   ...overrides,
-})
-const squashed = () => ({
-  case: 'BlogObservationsSquashed',
-  sessionId: 'ses_obs',
-  bloggerSessionId: 'ses_blogger',
-  requestId: 'req-squash',
-  previousFrameEpoch: 0,
-  nextFrameEpoch: 1,
-  coveredFrameCount: 1,
-  textRef: 'blobs/blob-squash',
-  textDigest: 'sha-squash',
-  run: 'run-squash',
 })
 
 test('WHAT[behavior-diagnosis-008] ENFORCER_072_score_vector_entry_refuses_with_tip_v2_message', () => {
@@ -212,8 +204,9 @@ const cycleRecord = (n, field) => ({
   toolCallIds: [`call-${n}`],
   textRef: `blob-t${n}`,
   textDigest: `sha-t${n}`,
-  tipRuleId: field,
-  fieldNameAtCommit: field,
+  tipName: field,
+  tipTextRef: `blobs/tip-${n}`,
+  tipTextDigest: `sha-tip-${n}`,
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })
@@ -224,11 +217,13 @@ test('WHAT[behavior-diagnosis-008] ENFORCER_TIP_03_04_facade_surface_has_tip_not
     occurrence: 'A meaningful transition happened.',
     settlement: 'The resulting state is established.',
     consequence: 'The continuing road changed.',
-    tip: fields[0],
+    tipName: fields[0],
+    opinion: 'The boundary decides later work.',
+    advice: 'Repair the boundary first.',
   })
   assert.equal(sample.ok, true)
-  assert.equal(typeof sample.value.tip.ruleId, 'string')
-  assert.equal(sample.value.tip.fieldName in Object.fromEntries(fields.map((f) => [f, true])), true)
+  assert.equal(typeof sample.value.tipName, 'string')
+  assert.equal(typeof sample.value.advice, 'string')
   assert.equal(sample.value.Scores, undefined)
 })
 }

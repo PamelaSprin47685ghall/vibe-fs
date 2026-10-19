@@ -2,19 +2,20 @@ namespace Wanxiangshu.Mission.Planning
 
 open System.Threading.Tasks
 
-/// planning-022: one plan review either promotes the incumbency or keeps it
+/// work-038: one plan review either promotes the incumbency or keeps it
 /// in place.
 [<RequireQualifiedAccess>]
 type PlanReviewOutcome =
     | Promoted
     | Stayed
 
-/// planning-022: the outcome of one review gate on a plan incumbency.
+/// work-038: the outcome of one review gate on a plan incumbency.
 type PlanReviewResult =
     { Outcome: PlanReviewOutcome
+      Target: string
       Gaps: (string * string) list }
 
-/// planning-022: typed rejections for the plan review gate. The hard
+/// work-038: typed rejections for the plan review gate. The hard
 /// once-per-incumbency gate and the fold's own conflict rules stay distinct
 /// from plain record failures.
 [<RequireQualifiedAccess>]
@@ -29,7 +30,7 @@ module PlanReviewError =
 
 module ReviewPlanBackend =
 
-    /// planning-022: the review target is the next milestone derived from the
+    /// work-038: the review target is the next milestone derived from the
     /// current stage. S1 reviews toward S2, S2 toward S3, S3 toward becoming
     /// the final tenure (delivery authorization).
     val reviewTargetFor: stage: string -> string

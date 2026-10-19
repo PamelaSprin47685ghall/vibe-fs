@@ -167,7 +167,7 @@ module RequirementGroundingTransform =
             replayOrdinary realMessages occurrences
 
     let private argsJson path =
-        Wanxiangshu.Foundation.CanonicalJson.canonicalJson (createObj [ "filePath", box path ])
+        Wanxiangshu.Host.CanonicalJson.canonicalJson (createObj [ "filePath", box path ])
 
     let private anchoredReads sessionId ordinal (snapshot: GroundingSnapshot) : RequirementGroundingAnchoredRead list =
         snapshot.Materials

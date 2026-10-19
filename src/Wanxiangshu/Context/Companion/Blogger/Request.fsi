@@ -7,8 +7,6 @@ type BloggerRequestRejection =
     | CoverageDidNotAdvance of previous: int64 * next: int64
     | DeltaDigestMismatch of expected: string * actual: string
     | EpochNotCoherent of field: string * value: int64
-    | EmptySquashCoverage
-    | SquashCoverageMismatch of declared: int * carried: int
 
 type BloggerMainRequestInput =
     { RequestId: BloggerRequestId
@@ -23,15 +21,6 @@ type BloggerMainRequestInput =
       NextCoveredPrefixDigest: string
       FrameEpochId: FrameEpochId
       DeltaDigest: BlobDigest
-      ObservedPrefixEpochId: PrefixEpochId }
-
-type BloggerSquashRequestInput =
-    { RequestId: BloggerRequestId
-      MainSessionId: SessionId
-      BloggerSessionId: SessionId
-      FrameEpochId: FrameEpochId
-      CoveredFrameCount: int
-      FrameDigests: BlobDigest list
       ObservedPrefixEpochId: PrefixEpochId }
 
 type BloggerMainRequestContext =
@@ -64,28 +53,8 @@ type BloggerMainRequestContext =
     member DeltaDigest: BlobDigest
     member ObservedPrefixEpochId: PrefixEpochId
 
-type BloggerSquashRequestContext =
-    private
-        { StoredRequestId: BloggerRequestId
-          StoredMainSessionId: SessionId
-          StoredBloggerSessionId: SessionId
-          StoredFrameEpochId: FrameEpochId
-          StoredCoveredFrameCount: int
-          StoredFrameDigests: BlobDigest list
-          StoredObservedPrefixEpochId: PrefixEpochId }
-
-    member RequestId: BloggerRequestId
-    member MainSessionId: SessionId
-    member BloggerSessionId: SessionId
-    member FrameEpochId: FrameEpochId
-    member CoveredFrameCount: int
-    member FrameDigests: BlobDigest list
-    member ObservedPrefixEpochId: PrefixEpochId
-
 [<RequireQualifiedAccess>]
-type BloggerRequestContext =
-    | Main of BloggerMainRequestContext
-    | Squash of BloggerSquashRequestContext
+type BloggerRequestContext = Main of BloggerMainRequestContext
 
 [<RequireQualifiedAccess>]
 type BloggerTerminalRequestOwnership =
@@ -116,14 +85,6 @@ module BloggerRequestContext =
         nextSeq: int64 ->
             BloggerRequestId
 
-    val squashRequestId:
-        mainSessionId: SessionId ->
-        bloggerSessionId: SessionId ->
-        frameEpoch: FrameEpochId ->
-        coveredFrameCount: int ->
-        frameDigests: BlobDigest list ->
-            BloggerRequestId
-
     val toml: ctx: BloggerRequestContext -> string option
     val isMain: ctx: BloggerRequestContext -> bool
     val requestId: ctx: BloggerRequestContext -> BloggerRequestId
@@ -135,5 +96,3 @@ module BloggerRequestContext =
 [<RequireQualifiedAccess>]
 module BloggerRequestMaterial =
     val createMain: input: BloggerMainRequestInput -> Result<BloggerMainRequestContext, BloggerRequestRejection>
-
-    val createSquash: input: BloggerSquashRequestInput -> Result<BloggerSquashRequestContext, BloggerRequestRejection>

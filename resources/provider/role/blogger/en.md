@@ -48,11 +48,16 @@ possible, impossible, unnecessary, invalid, still blocked, or newly required by
 reality. It is not a todo list and does not command another office.
 
 tip names the one reusable lesson this occurrence teaches the participant.
-Choose exactly one Rulebook TipName. The tip is the abstraction; the other four
-fields describe this concrete turn.
+Name the tip freely in tipName: invent a short name for a new lesson, and reuse
+the same name when the same lesson recurs. Write opinion and advice in your own
+words: opinion judges frankly what this concrete transition did well or badly,
+and why; advice states concretely what to do differently next time. The Rulebook
+entries in your context are bootstrap and format samples, not a closed set to
+pick from. The tip is the abstraction; opinion and advice spell the lesson out,
+and charge, occurrence, settlement, and consequence describe this concrete turn.
 
-Each field must earn its place. Do not write four paraphrases of the same
-sentence. Write one complete sentence per content field; the four sentences are
+Each causal field must earn its place. Do not write four paraphrases of the same
+sentence. Write one complete sentence per causal field; the four sentences are
 persisted without their field labels as one natural Chronicle paragraph. A strong
 record lets a later reader recover why the work mattered,
 what actually happened, what can now be treated as true, and why the future
@@ -123,11 +128,6 @@ Fission lanes belong to one Engineer. Preserve supplied lane attribution and
 convergence without inventing multiple owners or multiple final completions.
 Manager relay changes control, not history. Compression changes representation,
 not what happened.
-
-When old Chronicle frames are squashed, rewrite their semantic content into the
-same causal spine. Do not record compression itself as a new occurrence. Keep
-the underlying charge, occurrence, settlement, and consequence that still
-matter after detail is removed.
 
 One record describes one meaningful turn. One turn carries one reusable lesson.
 Repetition is allowed when reality teaches the same lesson again. Variety is not

@@ -127,12 +127,18 @@ module LifecycleWorkRecordProjection =
             |> XTraceCursor.create
             |> RecordCoverage.create)
 
-    let private immediateOpeningEnd (xTrace: XTraceProjectionState) =
-        xTrace
-        |> XTraceProjection.orderedSemanticParts
-        |> List.tryHead
-        |> Option.map XTraceProjection.frontierAfter
-        |> Option.defaultValue XTraceCursor.originCursor
+    /// work-record-008/009: the Opening interval is the trace's own leading
+    /// material, [record start, OpeningBoundary). It begins at the first
+    /// semantic part's cursor and ends at that part's frontier, so
+    /// `XTraceRange.endExclusive` is WorkRecordStart (work-record-015) and the
+    /// part itself stays inside the Opening instead of being consumed as work.
+    /// Rendering stays owned by XTrace (`renderRange`): no second authority, and
+    /// raw tool call/result is preserved here — Chronicle/Recent work filter it.
+    /// An empty trace has an empty interval, never a synthesized one.
+    let private openingInterval (xTrace: XTraceProjectionState) : XTraceRange =
+        match xTrace |> XTraceProjection.orderedSemanticParts |> List.tryHead with
+        | Some first -> XTraceRange.create first.Cursor (XTraceProjection.frontierAfter first)
+        | None -> XTraceRange.create XTraceCursor.originCursor XTraceCursor.originCursor
 
     type private RenderedRecordEvidence =
         { ConstitutiveBody: string
@@ -160,16 +166,8 @@ module LifecycleWorkRecordProjection =
         task {
             let blog = session.Blog |> Option.defaultValue BlogProjection.empty
             let! frames = BlogProjection.frames blog |> resolveFrames durable
-            let openingEnd = immediateOpeningEnd xTrace
-
-            let constitutiveStart =
-                xTrace
-                |> XTraceProjection.orderedSemanticParts
-                |> List.tryHead
-                |> Option.map XTraceProjection.frontierAfter
-                |> Option.defaultValue openingEnd
-
-            let constitutiveRange = XTraceRange.create constitutiveStart openingEnd
+            let constitutiveRange = openingInterval xTrace
+            let openingEnd = XTraceRange.endExclusive constitutiveRange
             let coverage = coverageOrDefault coverageOverride blog
             let gapStart = laterCursor (RecordCoverage.ingestedThrough coverage) openingEnd
             let gapRange = XTraceProjection.rangeFrom gapStart xTrace
@@ -430,19 +428,3 @@ module LifecycleWorkRecordProjection =
         match journal with
         | None -> Task.FromResult None
         | Some durable -> lifecycleWorkRecordBoundedFromSnapshot durable (AgentJournal.snapshot durable) sessionId range
-
-    let lifecycleWorkRecordBoundedForRun
-        (journal: AgentJournal option)
-        (sessionId: SessionId)
-        (range: XTraceRange)
-        (providerRun: ProviderRunIdentity)
-        : Task<string option> =
-        match journal with
-        | None -> Task.FromResult None
-        | Some durable ->
-            lifecycleWorkRecordBoundedFromSnapshotForRun
-                durable
-                (AgentJournal.snapshot durable)
-                sessionId
-                range
-                providerRun

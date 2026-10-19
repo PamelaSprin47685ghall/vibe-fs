@@ -1,4 +1,4 @@
-Keep the mission's living obligations truthful with todowrite. Truth keeps the account from lying; only accomplished outcomes discharge the debt.
+Keep the mission's living obligations truthful with `todowrite-for-manager` and declare `view` as the compression checkpoint. Truth keeps the account from lying; only accomplished outcomes discharge the debt.
 
 Change the account when the work, facts, or genuine decomposition has changed.
 

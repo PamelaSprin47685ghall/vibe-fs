@@ -57,4 +57,10 @@ module LlmFacing =
         val rootStructuredValue: value: Value -> DataBlock list
         val ofJs: value: obj -> Value
         val ofJson: jsonText: string -> Value
-        val fileEffects: rewritten: string list -> created: string list -> DataBlock list
+
+        val fileEffects:
+            rewritten: string list ->
+            created: string list ->
+            removed: string list ->
+            moved: (string * string) list ->
+                DataBlock list

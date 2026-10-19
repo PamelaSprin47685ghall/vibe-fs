@@ -25,7 +25,7 @@ const sandbox = () => {
 
 const localStore = () => {
   const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
+  const commonDir = join(owned, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
   return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
@@ -38,18 +38,19 @@ const runWorkflow = async (dir, program, { deadlineMs = 2000, store = null } = {
   surface: coderSurface(),
 })
 
-test('WHAT[repository-programming-019] JS085_workflow_preflight_blocks_stale_rewrite_without_touching_disk', async () => {
+test('WHAT[repository-programming-019] JS085_workflow_blocks_a_rewrite_of_a_missing_target', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'current text', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    this.rewrite('missing.txt', 'x');
+    this.write('missing-dir/missing.txt', 'x');
     return { ok: true };
   }
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
+    assert.equal(failureCode(outcome), 'TRANSACTION_COMMIT_FAILED')
     assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'current text')
   } finally {
     cleanup()
@@ -72,19 +73,21 @@ test('WHAT[repository-programming-019] JS085_workflow_program_error_fails_withou
   }
 })
 
-test('WHAT[repository-programming-019] JS019_invalid_return_value_commits_nothing', async () => {
+test('WHAT[repository-programming-019] JS019_invalid_return_value_keeps_the_already_applied_rewrite', async () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    this.rewrite('a.txt', 'new')
+    this.write('a.txt', 'new')
     return [null]
   }
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
-    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old')
+    // Under as-is semantics the rewrite already landed before the invalid
+    // return value was detected; the write stays on disk.
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'new')
   } finally {
     cleanup()
   }

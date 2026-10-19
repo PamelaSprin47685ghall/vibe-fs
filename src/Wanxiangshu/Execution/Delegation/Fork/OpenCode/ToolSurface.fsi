@@ -73,14 +73,19 @@ module ForkToolSurface =
     val detachToolRuntime: value: obj -> Task
     val durableLifecycleByname: value: obj -> owner: string -> byname: string -> obj
     val executeJoin: value: obj -> owner: string -> Task<string>
+    val executeJoinReceipt: value: obj -> owner: string -> Task<obj>
     val executeHorizon: value: obj -> owner: string -> Task<string>
+    val executeHorizonReceipt: value: obj -> owner: string -> Task<obj>
+    val recordDeliveredValue: sessionId: string -> deliveredValue: obj -> unit
     val settle: value: obj -> owner: string -> answer: string -> providerRun: string -> Task<bool>
+    val settleUndelivered: value: obj -> owner: string -> terminalText: string -> providerRun: string -> Task<bool>
 
     val prepareTerminalDelivery:
         value: obj -> owner: string -> answer: string -> providerRun: string -> Task<(unit -> Task)>
 
     val injectAcceptedAssessment: value: obj -> owner: string -> Task
     val injectAuditPendingIncumbency: value: obj -> owner: string -> Task
+    val injectPendingPersistFailure: value: obj -> owner: string -> Task<obj>
     val startUnprepared: obj -> string -> string -> Task<obj>
     val emitStopForRoot: obj -> string -> string -> string -> Task
 
@@ -91,7 +96,6 @@ module ForkToolSurface =
     val emitStopWithReason: obj -> string -> string -> string -> string -> Task
     val replayWorkCompletion: obj -> string -> string -> Task<obj>
     val workSnapshot: obj -> string -> obj array
-    val handoffSnapshot: obj -> obj array
     val coldWorkSnapshot: string -> string -> Task<obj array>
     val replayBinding: obj -> string -> string -> Task<obj>
     val emitTerminalForRoot: obj -> string -> string -> string -> string -> Task

@@ -40,8 +40,6 @@ type ToolRuntimeScope =
         childWorkRecordFor: (string -> Task<string option>) option *
         snapshot: ISessionSnapshotPort option *
         cancelSignals: (SessionId seq -> unit) option *
-        ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
-        ?workRecordCapability: DelegationWorkRecordCapability *
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>) *
         ?eventPort: IEventObservationPort *
         ?ptyPortFactory: (unit -> Wanxiangshu.Process.PtyPort) ->
@@ -58,8 +56,22 @@ type ToolRuntimeScope =
     member EventPort: IEventObservationPort option
     member WorkspaceDirectory: string option
     member ActiveProfileFor: sessionId: SessionId -> PromptAuthority.AuthorityExecutionProfile option
+    member AttachQuestionNotifier: notify: (string -> Task<Result<unit, string>>) -> unit
+    member IsWaitingForUser: sessionId: string -> bool
+    member AskUser: ctx: HostToolContext * question: string -> Task<Result<unit, string>>
+
+    member InterruptForUserQuestion:
+        sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> Task<Result<unit, string>>
+
+    member RegisterPostS3Interrupt: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> unit
+    member HasPendingPostS3Interrupt: sessionId: string -> bool
+
+    member InterruptForPostS3Deliver:
+        sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> Task<Result<unit, string>>
+
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member RunStarted: (SessionId -> Role -> string option -> unit)
+    member ContinueManagerLoop: sessionId: SessionId * workspace: string -> Task<Result<unit, string>>
 
     /// EXEC-011: the administrator's ceiling on any single process.
     ///
@@ -118,7 +130,7 @@ type ToolRuntimeScope =
 
     member EnsureWorkDevOpsBound: parentSessionId: SessionId -> Task<unit>
 
-    /// planning-023: create a parentless execution container. The caller must
+    /// work-039: create a parentless execution container. The caller must
     /// durably bind the returned SessionId before sending its first prompt.
     member CreateExecutionSession: operationId: string * agent: string -> Task<Result<string, string>>
 
@@ -138,6 +150,8 @@ type ToolRuntimeScope =
     member OrchestratorHostFor: sessionId: string -> OrchestratorHost
 
     member RunOwnedWork: start: (unit -> Task) -> bool
+    member RunOwnedProcess: sessionId: string * start: (unit -> Task) -> bool
+    member AttachProcessAbort: sessionId: string * cancel: (unit -> unit) * drained: Task -> (unit -> unit)
 
     member DisposeExecutorRuntime: sessionId: string -> Task
 

@@ -72,22 +72,9 @@ const allowList = (config, name) => {
     'bash',
     'bash-honeypot',
     'assume',
-    'todowrite',
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
-    'run',
     'fork',
     'resume',
     'commission',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
     'join',
     'horizon',
     'fission',
@@ -96,32 +83,25 @@ const allowList = (config, name) => {
     'fetch',
     'deliver',
     'skill',
+    'todowrite-for-manager',
+    'todowrite-for-orchestrator',
+    'todowrite-for-engineer',
+    'todowrite-for-devops',
   ]
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 const HOST_UTILITY_ALLOW = ['skill']
-const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite']
+const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review'],
-  Orchestrator: ['commission', 'join', 'horizon'],
-  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
+  Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
+  Engineer: ['bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
-    'run',
     'join',
     'horizon',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
+    'todowrite-for-devops',
   ],
   Blogger: ['chronicle'],
 }
@@ -150,14 +130,13 @@ test('WHAT[capability-enforcement-006] ASSUME_is_a_non_authority_utility_for_int
     )
   }
 })
-test('WHAT[capability-enforcement-006] TODOWRITE_has_the_same_non_authority_role_boundary_as_assume', () => {
+test('WHAT[capability-enforcement-006] TODOWRITE_is_retired_and_denied_for_all_roles', () => {
   const config = buildConfig()
   assert.equal(configureManagedAgents(config).ok, true)
   for (const role of ROLES) {
-    const expected = role === 'Blogger' ? 'deny' : 'allow'
     assert.equal(
       evaluate(mergedRules(config, agentName(role)), 'todowrite', '*').action,
-      expected,
+      'deny',
       `${agentName(role)} todowrite permission`,
     )
   }
@@ -304,14 +283,15 @@ const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { installDefaultResources } = await import("../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js");
 const { chronicleContract } = await import("../../../dist/OpenCode/Tools/ToolSurface.js");
+const enforcer = await import("../../../dist/Enforcer/Surface.js");
 
 installDefaultResources()
 
 test('WHAT[capability-enforcement-006] CHRONICLE_spec_exposes_identity_and_argument_surface', () => {
   const contract = chronicleContract()
   assert.equal(contract.name, 'chronicle')
-  assert.deepEqual(contract.argumentNames, ['charge', 'occurrence', 'settlement', 'consequence', 'evidence', 'tip'])
-  assert.equal(contract.tipCount, 120)
+  assert.deepEqual(contract.argumentNames, ['charge', 'occurrence', 'settlement', 'consequence', 'tipName', 'opinion', 'advice', 'evidence'])
+  assert.equal(contract.tipCount, enforcer.fieldNames().length)
 })
 }
 
@@ -341,10 +321,10 @@ const { default: test } = await import("node:test");
 const { admissionAuthority, privateAttachmentAdmits, rolePredicate } = await import("../../../dist/OpenCode/Tools/ToolRegistrySurface.js");
 const { allRoleLabels } = await import("../../../dist/Foundation/RolesSurface.js");
 
-const OFFICE_TOOLS = ['fetch', 'review', 'join', 'chronicle', 'run', 'fork', 'resume']
+const OFFICE_TOOLS = ['fetch', 'review', 'join', 'chronicle', 'todowrite-for-devops', 'fork', 'resume']
 
 test('WHAT[capability-enforcement-006] internal_leaf_tool_declares_attachment_authority_not_a_public_office', () => {
-  assert.equal(admissionAuthority('js-bookkeeper'), 'private-attachment')
+  assert.equal(admissionAuthority('todowrite-for-bookkeeper'), 'private-attachment')
   for (const tool of OFFICE_TOOLS) {
     assert.equal(admissionAuthority(tool), 'office', `${tool} is an office tool`)
   }
@@ -353,12 +333,12 @@ test('WHAT[capability-enforcement-006] internal_leaf_tool_declares_attachment_au
 test('WHAT[capability-enforcement-006] internal_leaf_tool_is_invisible_to_every_public_office_role', () => {
   assert.ok(allRoleLabels.length > 0)
   for (const role of allRoleLabels) {
-    assert.equal(rolePredicate('js-bookkeeper', role), false, `js-bookkeeper must stay invisible to ${role}`)
+    assert.equal(rolePredicate('todowrite-for-bookkeeper', role), false, `todowrite-for-bookkeeper must stay invisible to ${role}`)
   }
 })
 test('WHAT[capability-enforcement-006] attachment_authority_is_fail_closed_without_an_attached_transaction', () => {
-  assert.equal(privateAttachmentAdmits('js-bookkeeper', 'ses-never-attached'), false)
-  assert.equal(privateAttachmentAdmits('js-bookkeeper', ''), false)
+  assert.equal(privateAttachmentAdmits('todowrite-for-bookkeeper', 'ses-never-attached'), false)
+  assert.equal(privateAttachmentAdmits('todowrite-for-bookkeeper', ''), false)
 })
 test('WHAT[capability-enforcement-006] an_office_tool_can_never_be_admitted_through_the_attachment_path', () => {
   for (const tool of OFFICE_TOOLS) {
@@ -428,30 +408,6 @@ const { markerSource, markerToolName } = await import("../../../dist/OpenCode/Ho
 const { permissions } = await import("../../../dist/Participant/Persona/OfficeCapabilitySurface.js");
 const { acceptAuthorityRoot, grantWorkOwned, withExecutablePlugin, withPlugin } = await import("../../verification-system/tests/support/plugin-fixture.mjs");
 
-const TOOL_NAMES = [
-  'fork', 'resume', 'commission', 'join', 'horizon', 'fission',
-  'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
-  'bash-honeypot', 'assume', 'todowrite',
-  'defer',  'publish',
-  'run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-  'review', 'chronicle', 'fetch', 'deliver',
-]
-
-const HOST_OWNED_TOOL_NAMES = [ 'read', 'write', 'edit', 'glob', 'grep', 'skill', 'todowrite',
-]
-const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
-const COGNITIVE_TOOLS = ['defer',  'publish']
-const ALLOWED = {
-  orchestrator: ['commission', 'join', 'horizon', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  devops: [
-    'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run',
-    'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-    'assume', 'todowrite', ...COGNITIVE_TOOLS,
-  ],
-  blogger: ['chronicle'],
-}
 const withSession = (messages, sessionID = 'ses-capability-manager') =>
   messages.map((message, index) => ({
     ...message,
@@ -462,11 +418,6 @@ const withSession = (messages, sessionID = 'ses-capability-manager') =>
       sessionID,
     },
   }))
-const fullConfig = () => ({
-  agent: Object.fromEntries(
-    ROLE_NAMES.map((role) => [role, {}]),
-  ),
-})
 
 integrationTest('WHAT[capability-enforcement-006] MANAGER_pair_guidance_rides_cursor_suffix_without_synthetic_skill_row', async () => {
   assert.equal(markerToolName, 'skill')

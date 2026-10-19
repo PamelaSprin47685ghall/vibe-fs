@@ -19,14 +19,15 @@ try {
     if (phase === 'produce' || phase === 'append') {
       const path = join(directory, 'src', 'main.fs')
       const callID = phase === 'produce' ? 'read-original' : 'read-changed'
-      const args = { filePath: path }
-      const input = { tool: 'read', sessionID, callID }
+      const args = { program: "class Js extends JsProgram { async run() { return await this.cat('src/main.fs'); } }" }
+      const input = { tool: 'todowrite-for-engineer', sessionID, callID }
       await incarnation.hooks['tool.execute.before'](input, { args })
+      await incarnation.hooks.tool['todowrite-for-engineer'].execute(args, { sessionID, agent: 'engineer' })
       const output = readFileSync(path, 'utf8')
       assert.equal(output, 'source\n')
-      await incarnation.hooks['tool.execute.after']({ ...input, args }, { title: 'read', output, metadata: {} })
+      await incarnation.hooks['tool.execute.after']({ ...input, args }, { title: 'todowrite-for-engineer', output, metadata: {} })
       raw = [...raw, { info: { id: `result-${callID}`, role: 'assistant', sessionID, providerID: 'anthropic' },
-        parts: [{ id: `part-${callID}`, type: 'tool', tool: 'read', callID, state: { status: 'completed', input: args, output, time: { start: 0, end: 1 } } }] }]
+        parts: [{ id: `part-${callID}`, type: 'tool', tool: 'todowrite-for-engineer', callID, state: { status: 'completed', input: args, output, time: { start: 0, end: 1 } } }] }]
     }
     const project = async () => {
       const projection = { messages: structuredClone(raw) }

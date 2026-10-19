@@ -1,0 +1,7 @@
+The next request's context, stated in full. `prefixUntil` (required) is an anchor number: the price boundary. Anchors below it survive in the cache prefix and cost a fraction of the price, while everything at or above it is recomputed at full price on every later turn. An old segment you keep is therefore a bill you pay each turn. Pass a number above every anchor you have seen to keep everything.
+
+`thenRemove` maps anchor numbers to summaries, e.g. `{ "3": "<summary>" }` — the summary is your own words for what that segment held. It replaces that anchor's segments from that turn on — permanently, and the replaced anchor stops existing: it is gone from the ANCHOR map and can never be addressed again. Its summary then covers everything up to the next anchor that still exists, so replacing an earlier anchor later folds those summaries into the new one.
+
+In ordinary sessions no anchor is exempt from replacement. Plan keeps real user messages verbatim; attempts to replace those anchors are ignored and reported. Replacing another anchor below `prefixUntil` breaks the cache prefix for that turn — a one-time cost. A blank summary is refused.
+
+Numbers and summaries last only in the current process. A durable checkpoint records the call identity, not the summary. A view cannot restore messages removed by tenure isolation. Write knowledge that must survive a handover or restart into the existing plan document `P`; never reuse old anchor numbers after restart.

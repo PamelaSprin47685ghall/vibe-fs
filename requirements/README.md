@@ -60,7 +60,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | [participant-horizon](participant-horizon/WHAT.md) | 只有会改变合法行动的最小事实应穿过 horizon。 |
 | [cognitive-environment](cognitive-environment/WHAT.md) | 长期认知层与瞬时 runtime/mission 分开；knowledge 不创造 authority。 |
 | [cognitive-workspace](cognitive-workspace/WHAT.md) | 持久认知画板已经退休；本包只保留负向合同，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
-| [attention-regulation](attention-regulation/WHAT.md) | 显式结束 evidence churn、解除自创心理债、延后非阻塞旁支；defer 不冒充 obligation。 |
+| [attention-regulation](attention-regulation/WHAT.md) | `enough`、`abandon` 与 `defer` 已经退休；注意力动作并入 `assume` 与编程面 ANCHOR `view.thenRemove` 摘要，本包只保留负向边界。 |
 | [action-affordance](action-affordance/WHAT.md) | 决策点必须知道 act 的正负边界、成功后果与参数意义。 |
 | [provider-language](provider-language/WHAT.md) | 一个 life 一个稳定 natural-language world；protocol identifiers 不翻译。 |
 | [provider-projection](provider-projection/WHAT.md) | typed semantic intent 经唯一确定性投影成为 provider representation，表示不反向创造 authority。 |
@@ -68,7 +68,7 @@ grounding 由 `requirement-grounding` package 拥有。
 ### 5. Interaction / effect / durability
 | Package | 一句话 WHY |
 |---|---|
-| [concern-routing](concern-routing/WHAT.md) | concern-addressed mailbox 让发送者不依赖身份拓扑，消息只在下一次 Pair Hint 自然边界交付。 |
+| [concern-routing](concern-routing/WHAT.md) | concern-addressed 邮箱（`subscribe`/`publish`）已经退休；跨参与者与用户交互并入编程面 `js.fork`/`js.join`/`js.deliver`/`js.ask`，本包只保留负向边界。 |
 | [interaction-authority](interaction-authority/WHAT.md) | PhysicalUserMessage ≠ AuthorityTurn；typed provenance 才能创建/继续 logical interaction。 |
 | [managed-chat-execution](managed-chat-execution/WHAT.md) | 物理消息的 durable acceptance、provider start、唯一终态与 exact settlement 由消息级执行 owner 统一管理。 |
 | [dispatch-protocol](dispatch-protocol/WHAT.md) | 已获授权 interaction 穿过 unreliable Host 时避免 unknown outcome 复制逻辑效果。 |
@@ -80,6 +80,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | Package | 一句话 WHY |
 |---|---|
 | [delegation](delegation/WHAT.md) | 语义工作转交时 authority、charge、owner 与返回后果明确。 |
+| [advisor](advisor/WHAT.md) | 同一调用 session 的请求永远落到同一个无工具顾问专席；law、view 与独立 intent 三条 prompt 不合并，follow-up 只追加 view 增量，`js.advisor` 以数据信封返回散文。 |
 | [intra-participant-parallelism](intra-participant-parallelism/WHAT.md) | 同一 participant 可展开多个 coequal execution presents，而 identity/authority/responsibility 与最终 completion 仍保持一个。 |
 | [process-execution](process-execution/WHAT.md) | 真实进程/PTY 有 bounded、可终止、物理完成可信的 execution semantics。 |
 | [change-integration](change-integration/WHAT.md) | 独立 Git road 只在短原子门内发布，长 review/repair 不全局串行化。 |
@@ -101,10 +102,10 @@ grounding 由 `requirement-grounding` package 拥有。
 | [crash-reconciliation](crash-reconciliation/WHAT.md) | 中断后只从 durable facts + 可信物理观察重入普通程序。 |
 | [degeneration-guard](degeneration-guard/WHAT.md) | 未结束 attempt 病态重复时主动止损再交正常 recovery。 |
 
-### 9. Mission / relay
+### 9. Mission / work
 | Package | 一句话 WHY |
 |---|---|
-| [obligation-ledger](obligation-ledger/WHAT.md) | mission 持续维护「仍欠世界什么」，不用 phase/status 伪装进度。 |
+| [obligation-ledger](obligation-ledger/WHAT.md) | 宿主待办与 compression checkpoint 归编程面 `todowrite-for-<role>` 的非空 `view` 声明；插件不维护第二份待办真相。 |
 | [work](work/WHAT.md) | Work 与 Plan 共用一套生命周期：S1–S3 一段 deliver，S4 两段 deliver；review 返回 pairs，后继剥除前任 assistant 与 tool。 |
 
 ### 10. Feedback
@@ -120,7 +121,7 @@ grounding 由 `requirement-grounding` package 拥有。
 |---|---|
 | [repository-investigation](repository-investigation/WHAT.md) | repository claim 由可定位可追溯真实 observation 建立。 |
 | [knowledge-reuse](knowledge-reuse/WHAT.md) | 历史 repository knowledge 是 best-effort cache/hint，不冒充当前证明。 |
-| [repository-programming](repository-programming/WHAT.md) | repository mutation 用 capability-projected、sandboxed、all-or-nothing surface。 |
+| [repository-programming](repository-programming/WHAT.md) | repository mutation 用 capability-projected、sandboxed、As-Is 逐笔落盘 surface。 |
 | [requirement-grounding](requirement-grounding/WHAT.md) | 代码路径触碰时自动把相关 requirement 文档与测试按 read 语义投影进当前开发上下文。 |
 
 ### 12. Optimization / epistemics

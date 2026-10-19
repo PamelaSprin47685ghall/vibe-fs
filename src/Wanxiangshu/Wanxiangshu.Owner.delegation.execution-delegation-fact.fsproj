@@ -14,8 +14,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.semantic-trace.context-trace-cursor.fsproj"/>
-    <Compile Include="Execution/Delegation/Handoff.fsi"/>
-    <Compile Include="Execution/Delegation/Handoff.fs"/>
     <Compile Include="Execution/Delegation/Fork/Model.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Model.fs"/>
   </ItemGroup>

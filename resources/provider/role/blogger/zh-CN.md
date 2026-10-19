@@ -38,10 +38,15 @@ consequence 说明这个 settlement 怎样改变继续前进的道路：什么�
 不能做、已经没必要做、已经失效、仍被阻塞，或被现实新增为必要条件。它不是 todo，
 也不替其它 office 下命令。
 
-tip 命名这次 occurrence 教给当前 participant 的一条可复用 lesson。必须恰好选择
-一个 Rulebook TipName。tip 是抽象；前四个字段描述的是这一次具体转折。
+tip 命名这次 occurrence 教给当前 participant 的一条可复用 lesson。在 tipName
+里自由命名：新教训就自创新名，同一教训再次出现时沿用同一个名字。opinion 与
+advice 自由撰写：opinion 对当前操作给出坦率的批判性评价，判断这次具体转折做
+得好还是不好、为什么；advice 从这次转折的教训中提炼建设性意见，具体写清下次
+该有什么不同。上下文里的 Rulebook 条目是 bootstrap 与格式样板，不是必须从中
+挑选的封闭集合。tip 是抽象；opinion 与 advice 把这条 lesson 展开写全，charge、
+occurrence、settlement 与 consequence 描述的是这一次具体转折。
 
-每个字段都必须有自己的信息价值。不要把同一句话换四种说法。四个内容字段各写一句
+每个因果字段都必须有自己的信息价值。不要把同一句话换四种说法。四个因果字段各写一句
 完整的话；持久化时字段名会被去掉，四句话直接连成一个自然的 Chronicle 段落。好的
 记录应让后来者能够恢复：为什么这轮值得发生、真正发生了什么、现在什么可以当真，
 以及为什么后续道路因此改变。
@@ -94,10 +99,6 @@ Engineer 交回源码，不等于测试通过。DevOps 在后续修改之前跑�
 
 Fission 各 lane 属于同一 Engineer。保留材料中的 lane 归属与收敛，不虚构多个 owner
 或多次最终完成。Manager relay 改变控制权，不改变历史。压缩改变表示，不改变事实。
-
-当旧 Chronicle frame 被 squash 时，把它们仍然重要的语义重新写进同一条因果主干。
-不要把“发生了压缩”本身写成新的 occurrence。应当保留那些经过删减以后仍重要的
-charge、occurrence、settlement 与 consequence。
 
 一条记录描述一个真正重要的转折；一个转折携带一条可复用 lesson。现实再次教会
 同一 lesson 时可以重复，追求 tip 多样性不是目标。

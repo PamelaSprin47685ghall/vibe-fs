@@ -36,21 +36,13 @@ module CompanionProjectionSurface =
     let private normalLines =
         ProviderProse.instructionLines language CompanionPrompt.Normal Map.empty
 
-    let private squashLines =
-        ProviderProse.instructionLines language CompanionPrompt.Squash Map.empty
-
     let private memoryPreambleValue =
         ProviderProse.render language CompanionPrompt.MemoryPreamble Map.empty
 
     let normalInstructionLines: string array = normalLines |> List.toArray
-    let squashInstructionLines: string array = squashLines |> List.toArray
     let normalInstruction: string = CompanionPrompt.asCommentedInstruction normalLines
-    let squashInstruction: string = CompanionPrompt.asCommentedInstruction squashLines
     let memoryPreamble: string = memoryPreambleValue
     let normal: string = "normal"
-
-    let squash (count: int) : obj =
-        box {| kind = "squash"; count = count |}
 
     let workingRecord (body: string) : string =
         CompanionPrompt.workingRecordMessage body
@@ -103,30 +95,7 @@ module CompanionProjectionSurface =
                text = message.Text
                physical = message.IsPhysical |}
 
-    let private planKind (value: obj) : CompanionRequestKind =
-        let kindValue = value?kind
-
-        let kind =
-            if isNullish kindValue?kind then
-                text kindValue
-            else
-                text kindValue?kind
-
-        let count =
-            if kind = "squash" then
-                let countValue =
-                    if isNullish kindValue?count then
-                        value?count
-                    else
-                        kindValue?count
-
-                if isNullish countValue then 0 else intValue countValue
-            else
-                0
-
-        match kind with
-        | "squash" -> CompanionRequestKind.Squash count
-        | _ -> CompanionRequestKind.Normal
+    let private planKind (_value: obj) : CompanionRequestKind = CompanionRequestKind.Normal
 
     type private ProjectionInput =
         { BloggerSessionId: SessionId
@@ -166,10 +135,9 @@ module CompanionProjectionSurface =
           PreviousTips =
             tipValues
             |> Array.toList
-            |> List.map (fun tip -> text tip?field, text tip?cycleId) }
+            |> List.map (fun tip -> text tip?tipName, text tip?cycleId) }
 
-    /// Build one normal or squash request from durable frame bodies and the
-    /// physical delta. Squash intentionally ignores `delta` in production.
+    /// Build one normal request from durable frame bodies and the physical delta.
     let build (sha256: obj) (value: obj) : obj =
         let input = projectionInput value
 
@@ -183,7 +151,6 @@ module CompanionProjectionSurface =
                 input.PhysicalDelta
                 input.PreviousTips
                 normalLines
-                squashLines
 
         let messages = plan.Messages |> List.map outputMessage |> List.toArray
 
@@ -246,6 +213,5 @@ module CompanionProjectionSurface =
             input.PhysicalDelta
             input.PreviousTips
             normalLines
-            squashLines
         |> Option.map projectionIntentValue
         |> Option.defaultValue null

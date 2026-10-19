@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Foundation
@@ -21,10 +20,8 @@ module HostForkChildDispatch =
         parentId: SessionId ->
         sessions: ISessionHostPort ->
         prepareCompletion: (PendingHostRun -> TerminalOutcome -> Task<string option>) ->
-        xTraceHead: (SessionId -> XTraceCursor) ->
         trackOwnedWork: ((unit -> Task) -> unit) ->
         runtime: ForkRuntime ->
-        handoffPort: ReusableHandoffPort option ->
         sendChildPrompt:
             (string
                 -> SessionId
@@ -36,7 +33,6 @@ module HostForkChildDispatch =
         sendBusyNudge:
             (string -> SessionId -> PromptAuthority.AuthorityExecutionProfile -> string -> Task<Result<unit, string>>) ->
         onRunStarted: (SessionId -> Role -> unit) ->
-        preparedHandoff: PreparedDelegationHandoff option ->
         agentId: string ->
         childId: SessionId ->
         role: Role ->

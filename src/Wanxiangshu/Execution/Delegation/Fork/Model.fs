@@ -56,3 +56,8 @@ type AgentRecord =
         CompletionCellSettled: bool
         ChildSessionId: SessionId option
     }
+
+type ForkReceipt =
+    { Name: string
+      AgentId: string // "" when the child is a commissioned manager job with no agent id
+      Outcome: string } // "created" | "nudged" | "commissioned"

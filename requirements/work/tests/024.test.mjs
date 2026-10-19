@@ -9,6 +9,7 @@ import * as planning from '../../../dist/Mission/Planning/Surface.js'
 import { runJsPlan } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import { rolePermissionRules } from '../../../dist/OpenCode/Tools/ToolSurface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 const surface = lifecycle.LifecycleSurface ?? lifecycle
 
@@ -20,15 +21,15 @@ const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-work-024-'))
   execFileSync('git', ['init', '--quiet', root])
   try {
-    await body(workspace.acquire(realpathSync(join(root, '.git'))), root)
+    await body(workspace.acquire(journalSurface.JournalSurface_initializeStateRoot(root)), root)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
 }
 
-test('WHAT[work-024] Plan admits the four tools on every stage; handoff and resume stay denied', () => {
+test('WHAT[work-024] Plan admits its five role tools on every stage; handoff and resume stay denied', () => {
   const rules = rolePermissionRules('plan')
-  for (const tool of ['js-plan', 'ask', 'review', 'deliver']) {
+  for (const tool of ['todowrite-for-plan', 'devops', 'ask', 'review', 'deliver']) {
     assert.equal(rules[tool], 'allow', `plan must admit ${tool}`)
     assert.notEqual(rolePermissionRules('engineer')[tool], 'allow', `engineer must not admit ${tool}`)
   }

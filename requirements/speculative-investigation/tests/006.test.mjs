@@ -22,9 +22,9 @@ const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 
 const H = (text) => createHash('sha256').update(text).digest('hex')
-const bundleFor = (toolName = 'read') => Strength.frameTryBuild(H, [{
+const bundleFor = (toolName = 'todowrite-for-predictor') => Strength.frameTryBuild(H, [{
   requestOrdinal: 1,
-  exchanges: [{ toolName, canonicalArguments: toolName === 'read' ? '{"filePath":"a"}' : '{"pattern":"x"}', canonicalResult: toolName === 'read' ? 'alpha' : 'a:1:x' }],
+  exchanges: [{ toolName, canonicalArguments: toolName === 'todowrite-for-predictor' ? '{"filePath":"a"}' : '{"pattern":"x"}', canonicalResult: toolName === 'todowrite-for-predictor' ? 'alpha' : 'a:1:x' }],
 }]).value
 const request = (decisionId, rounds = 2) => Strength.eventRequested({
   decisionId,
@@ -149,7 +149,7 @@ const request = (decision) => Strength.eventRequested({
   sourcePhysicalUserMessageId: 'user-1', sourceProviderRun: 'run-1',
   sourceToolCallIds: ['call-1'], requestedRounds: 2, contractRevision: 1,
 })
-const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
+const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }] }]).value
 // A persisted frame payload is the Store wire contract (encodeFrameBundlePayload):
 // version + digest + byte_length + batches[request_ordinal/exchanges[tool_name/arguments/result]].
 // The JS frame shape is the Surface shape, not the payload shape; serializing it
@@ -201,7 +201,7 @@ test('WHAT[speculative-investigation-006] STRENGTH_006_durability_port_rejects_c
     const durability = Strength.durabilityCreate(local.store)
     const first = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(bundle))))
     assert.equal(first.ok, true)
-    const other = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' }] }]).value
+    const other = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' }] }]).value
     const otherRef = await Strength.storeWritePayload(local.store, new TextEncoder().encode(JSON.stringify(storeWirePayload(other))))
     assert.equal((await Strength.durabilityAppend(durability, request('d1'))).ok, true)
     assert.equal((await Strength.durabilityAppend(durability, Strength.eventBound('d1', 'run-1', 'replica-d1', 'anchor-a'))).ok, true)
@@ -213,7 +213,7 @@ test('WHAT[speculative-investigation-006] STRENGTH_006_durability_port_rejects_c
 })
 test('WHAT[speculative-investigation-006] prepared_cut_reopen_observes_only_durable_receipts', async () => {
   const base = makeDir('wxs-strength-cut-reopen-')
-  const commonDir = join(base, '.git')
+  const commonDir = join(base, '.Herdchestra')
   const local = createLocalEventStore({ commonDir })
   try {
     const durability = Strength.durabilityCreate(local.store)
@@ -360,7 +360,7 @@ const child = fileURLToPath(new URL('./support/append-settlement-child.mjs', imp
 for (const scenario of ['store', 'append', 'prepared', 'duplicate']) {
   test(`WHAT[speculative-investigation-006] actual_${scenario}_release_failure_keeps_strength_settlement_evidence`, async t => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'strength-settlement-')))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     const sourceWriter = randomUUID()
     const env = {...process.env}
     delete env.NODE_TEST_CONTEXT

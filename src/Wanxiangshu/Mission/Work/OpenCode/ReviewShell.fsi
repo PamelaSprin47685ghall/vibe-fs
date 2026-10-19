@@ -2,7 +2,7 @@ namespace Wanxiangshu.Mission.Work.OpenCode
 
 open Wanxiangshu.OpenCode
 
-/// relay-assessment-011: the shared `review` shell. Owns the one ToolSpec
+/// work-038: the shared `review` shell. Owns the one ToolSpec
 /// (name, description, findings schema, admission) and dispatches by caller
 /// role: Plan goes to the plan backend (ReviewPlanBackend), every other
 /// admitted caller goes to the Manager backend (ReviewBackendManager). The

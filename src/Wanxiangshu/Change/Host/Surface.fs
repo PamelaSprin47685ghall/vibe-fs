@@ -7,6 +7,7 @@ open Wanxiangshu.Change
 open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Mission.Work
 open Wanxiangshu.OpenCode
 open Wanxiangshu.OpenCode.Host
 open Wanxiangshu.Persistence.Journal
@@ -345,6 +346,10 @@ module OrchestratorHostSurface =
                     member _.TryRead() = None }
               WaitObserver = CausalWaitRuntime().Observer
               Journal = journal
+              // The harness drives the loop continuation through the probe below,
+              // where the caller states the cursor it observed; the Host never
+              // guesses one.
+              ObservedHeadCursor = fun _ -> None
               SessionSnapshot = None
               OnChildCreated = fun _ _ _ -> ()
               RegisterChildDirectory = fun _ _ -> ()
@@ -353,10 +358,7 @@ module OrchestratorHostSurface =
                 fun _ _ _ _ _ _ _ -> Task.FromResult(Error "SendGateContinuation unavailable on harness surface")
               ContinueManagerLoop = fun _ _ -> Task.FromResult(Ok())
               RepoPath = stringOf (field options "repoPath")
-              TargetBranch = stringOf (field options "targetBranch")
-              ParentWorkRecordFor = fun _ -> Task.FromResult None
-              ChildWorkRecordFor = fun _ -> Task.FromResult None
-              ChildWorkRecordForRun = fun _ _ _ -> Task.FromResult None }
+              TargetBranch = stringOf (field options "targetBranch") }
 
         let host =
             OrchestratorHost(deps, SessionId.create (stringOf (field options "orchestratorId")))
@@ -370,6 +372,109 @@ module OrchestratorHostSurface =
 
     let detachAndDrain (handle: obj) : Task =
         (handle :?> HostHandle).Host.DetachAndDrain()
+
+    /// Read-only probe for the durable loop signal this owner derives for one
+    /// Manager session's work, from the same fold the program reads before it
+    /// waits. Nothing is dispatched and nothing is written, so the decision itself
+    /// is observable without running the acquisition program — which matters
+    /// because the program's whole job in this state is to *not* re-report a
+    /// consumed hand-off.
+    let loopSignalOf (workspace: string) (managerSessionId: string) : obj =
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+
+        let derived =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir managerSessionId
+            |> Option.map DurableLoopSignal.ofWork
+
+        match derived with
+        | None -> box {| kind = "NoWork"; detail = "" |}
+        | Some None -> box {| kind = "None"; detail = "" |}
+        | Some(Some ManagerLoopSignal.Continue) -> box {| kind = "Continue"; detail = "" |}
+        | Some(Some ManagerLoopSignal.Candidate) -> box {| kind = "Candidate"; detail = "" |}
+        | Some(Some(ManagerLoopSignal.ExceptionalTerminal reason)) ->
+            box
+                {| kind = "Exceptional"
+                   detail = reason |}
+
+    /// change-integration-005/013: invoke the exact hand-off the Host applies when
+    /// it continues a delivered Manager loop, against durable work the caller
+    /// seeded. `observedCursor` is the head cursor the caller observed for that
+    /// session — `null`/`undefined` means the caller observed none, which the rule
+    /// must refuse rather than guess. The hand-off is the only durable effect;
+    /// nothing is dispatched.
+    let handOffDeliveredTenure
+        (workspace: string)
+        (managerSessionId: string)
+        (requestId: string)
+        (observedCursor: obj)
+        : obj =
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+
+        let cursor =
+            if isNullish observedCursor then
+                None
+            else
+                Some(int64 (unbox<float> observedCursor))
+
+        match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir managerSessionId with
+        | None ->
+            box
+                {| ok = false
+                   kind = "NoWork"
+                   incumbencyId = ""
+                   error = "lifecycle work is missing" |}
+        | Some work ->
+            match work.ActiveId, work.Retirements |> List.tryLast with
+            | Some activeId, _ ->
+                box
+                    {| ok = true
+                       kind = "AlreadyWalking"
+                       incumbencyId = activeId
+                       error = "" |}
+            | None, None ->
+                box
+                    {| ok = false
+                       kind = "NoRetirement"
+                       incumbencyId = ""
+                       error = "no committed retirement to continue" |}
+            | None, Some retirement ->
+                match
+                    DeliveredTenureHandOff.continuation commonDir managerSessionId work retirement cursor requestId
+                with
+                | Ok incumbencyId ->
+                    box
+                        {| ok = true
+                           kind = "HandOff"
+                           incumbencyId = IncumbencyId.value incumbencyId
+                           error = "" |}
+                | Error error ->
+                    box
+                        {| ok = false
+                           kind = "Refused"
+                           incumbencyId = ""
+                           error = error |}
+
+    /// change-integration-005/013: the durable review evidence the publish gate
+    /// reads for one Manager road. `Refused` means the gate refuses publishing with
+    /// zero writes.
+    let publishReviewOf (workspace: string) (managerSessionId: string) : obj =
+        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+
+        let evidence =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir managerSessionId
+            |> Option.bind PublishReviewEvidence.ofWork
+
+        match evidence with
+        | Some(outcome, authority) ->
+            box
+                {| kind = "Reviewed"
+                   outcome = outcome
+                   authority = authority |}
+        | None ->
+            box
+                {| kind = "Refused"
+                   outcome = ""
+                   authority = "" |}
 
     let hasChild (handle: obj) (agentId: string) : bool =
         (handle :?> HostHandle).Host.HasChild agentId

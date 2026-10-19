@@ -3,8 +3,6 @@ namespace Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation.Identity
-open Wanxiangshu.Interaction.Attention
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Foundation
 
 module ProjectionUpdate =
@@ -30,9 +28,3 @@ module ProjectionUpdate =
 
     val applyFission:
         projection: AgentProjectionSet -> fact: FissionFactCases -> Result<AgentProjectionSet, FoldRejection>
-
-    val applyConcern:
-        projection: AgentProjectionSet -> fact: ConcernFactCases -> Result<AgentProjectionSet, FoldRejection>
-
-    val applyAttention:
-        projection: AgentProjectionSet -> fact: AttentionFactCases -> Result<AgentProjectionSet, FoldRejection>

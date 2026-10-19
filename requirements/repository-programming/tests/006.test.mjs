@@ -23,17 +23,18 @@ test('WHAT[repository-programming-006] JS011_sandbox_program_uses_bindings_end_t
     const surface = coderSurface()
     const program = `class Js extends JsProgram {
   async run() {
-    const view = await this.file('a.txt', [['begin', 'end', 'hello']]);
-    this.rewrite('a.txt', view.text('^', 'begin') + 'goodbye' + view.text('end', '$'));
-    return { before: view.text() };
+    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'hello');
+    this.write('a.txt', text.slice(0, begin) + 'goodbye' + text.slice(end));
+    return { before: text };
   }
 }`
     const result = await run(surface.baseClassSource, program, apiOf(binding), 2000, Date.now() + 60_000, 1 << 20)
     assert.equal(result.ok, true)
     assert.deepEqual(JSON.parse(result.value), { before: 'hello world' })
-    assert.equal(stagedCount(binding), 1, 'rewrite staged through the binding')
-    const disk = apiOf(binding).js.read('a.txt')
-    assert.equal(disk.text, 'hello world')
+    assert.equal(stagedCount(binding), 1, 'rewrite recorded in the as-is ledger')
+    const disk = apiOf(binding).js.cat('a.txt')
+    assert.equal(disk.text, 'goodbye world')
   } finally {
     cleanup()
   }
@@ -47,7 +48,7 @@ const { run } = await import("../../../dist/Repository/Programming/Js/RuntimeSur
 
 const BASE = `class JsProgram {
   constructor(api) { this._api = api; }
-  file(path) { return this._api.js.read(path); }
+  cat(path) { return this._api.js.cat(path); }
 }`
 const runWrapped = async (
   program,
@@ -57,12 +58,12 @@ const runWrapped = async (
 const failureCode = (result) => result.code
 const PROGRAM = `class Js extends JsProgram {
   async run() {
-    return { sum: 1 + 2, text: (await this.file('a.txt')).text };
+    return { sum: 1 + 2, text: (await this.cat('a.txt')).text };
   }
 }`
 
 test('WHAT[repository-programming-006] JS011_program_runs_and_returns_json', async () => {
-  const api = { js: { read: async (path) => ({ path, text: 'hello' }) } }
+  const api = { js: { cat: async (path) => ({ path, text: 'hello' }) } }
   const result = await runWrapped(PROGRAM, api)
   assert.equal(result.ok, true)
   assert.deepEqual(JSON.parse(result.value), { sum: 3, text: 'hello' })
@@ -100,9 +101,9 @@ test('WHAT[repository-programming-006] JS054_1_async_deadline_proxy_aborts_api_c
   // deadline in the past → first api call throws __PROGRAM_TIMEOUT__ → wrapper
   // classifies it as a program failure carrying the timeout marker.
   const program = `class Js extends JsProgram {
-  async run() { await this.file('a.txt'); return { ok: true }; }
+  async run() { await this.cat('a.txt'); return { ok: true }; }
 }`
-  const api = { js: { read: async () => ({ text: 'x' }) } }
+  const api = { js: { cat: async () => ({ text: 'x' }) } }
   const result = await runWrapped(program, api, { deadlineEpochMs: Date.now() - 1000 })
   assert.equal(result.ok, false)
   assert.equal(failureCode(result), 'PROGRAM_TIMEOUT')

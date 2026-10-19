@@ -1,0 +1,58 @@
+✔ WHAT[process-execution-013] js.run bounds large output deterministically to head+tail without model distillation (223.389167ms)
+✔ WHAT[process-execution-013] small output preserves separate stdout and stderr in onExit without truncation (92.9605ms)
+✔ WHAT[process-execution-013] ToolResultBound keeps deterministic raw tail when output exceeds host window (2.739375ms)
+✔ WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction (102.091667ms)
+▶ WHAT[process-execution-014] actual process output round-trips every raw text value
+  ✔ empty (84.103875ms)
+  ✔ no trailing LF (95.200584ms)
+  ✔ trailing LF (84.730125ms)
+  ✔ multiple trailing LF (85.426417ms)
+  ✔ CRLF (87.617084ms)
+  ✔ lone CR (87.230083ms)
+  ✔ quotes and backslashes (85.060709ms)
+  ✔ literal quotes and Unicode (85.579917ms)
+  ✔ control characters (85.305625ms)
+  ✔ BOM and CRLF (84.963916ms)
+✔ WHAT[process-execution-014] actual process output round-trips every raw text value (866.378292ms)
+✖ WHAT[process-execution-014] truncated_output_preserves_program_facts_without_log_inference_and_declares_truncation (209.325917ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 0 fits HostMaxBytes without splitting a code point (5.008458ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 1 fits HostMaxBytes without splitting a code point (2.534709ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 2 fits HostMaxBytes without splitting a code point (2.243084ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 3 fits HostMaxBytes without splitting a code point (2.233708ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 4 fits HostMaxBytes without splitting a code point (1.99225ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 7 fits HostMaxBytes without splitting a code point (1.744083ms)
+✔ WHAT[process-execution-015] the complete visible result fits the Host window before any outer truncation (122.121583ms)
+✔ WHAT[process-execution-015] the encoded minimum rejects before execution and admits actual normal, signal and deadline facts (860.638041ms)
+✔ WHAT[process-execution-015] a small explicit budget counts escaped Unicode, both streams, metadata and bilingual truncation data (175.061666ms)
+✔ WHAT[process-execution-018] js.run keeps split UTF-8 bytes, BOM and trailing CRLF in both native streams (378.338542ms)
+✔ WHAT[process-execution-018] native SIGTERM and an ordinary exit 143 remain different facts (157.327417ms)
+✔ WHAT[process-execution-018] a foreground command receives EOF after its input and completes normally (52.6795ms)
+✔ WHAT[process-execution-018] a physical spool failure remains a fault with incomplete output and never becomes a successful empty transcript (140.185542ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 28
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2207.341208
+
+✖ failing tests:
+
+test at requirements/process-execution/tests/014.test.mjs:64:1
+✖ WHAT[process-execution-014] truncated_output_preserves_program_facts_without_log_inference_and_declares_truncation (209.325917ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:94:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

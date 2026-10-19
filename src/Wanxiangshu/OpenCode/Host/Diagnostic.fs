@@ -39,6 +39,11 @@ module Diagnostic =
               "persistence_commitment"
               "hook"
               "policy_class"
+              // speculative-investigation: the durable Strength decision a
+              // `strength-delegation-requested` line belongs to. Without this
+              // entry every such record was dropped by `validate` (and the
+              // dropped line read as "capture never ran").
+              "decision_id"
               // speculative-investigation-013: the read-only delegation Replica child
               // session id is visible for observation only; it is never a business fact.
               "replica_session_id"

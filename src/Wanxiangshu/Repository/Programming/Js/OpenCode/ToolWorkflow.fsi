@@ -6,23 +6,46 @@ open Wanxiangshu.Repository.Programming.Js
 
 /// Parse the sandbox JSON string into LlmFacing reference data and enforce JS-010.
 module JsToolsData =
-    val parse: json: string -> Result<LlmFacing.Data.Value, JsFailure>
+    val parse: json: string -> Result<obj, JsFailure>
+    val isDelivered: json: string -> bool
+    val parseOutcome: json: string -> Result<obj, JsFailure>
+    val parseDeliveredValue: json: string -> obj
+    val parseParkedPayload: json: string -> obj
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
-/// sandbox execution, staging, preflight, durable prepare, commit and the
+/// sandbox execution, as-is per-write persistence, durable accounting and the
 /// commit fact (JS-012/JS-013/JS-015). With `store = None` the workflow is
-/// ephemeral (no durable facts — tests); with a store, the transaction is
-/// Prepared BEFORE any filesystem effect and Committed AFTER, so crash
-/// recovery can undo only what was provably written.
+/// ephemeral (no durable facts — tests); with a store, the written mutations
+/// are accounted as Prepared/Committed after the effects already landed.
 module JsToolWorkflow =
     type FileAccessObservation = JsExplicitFileRead list -> string list -> Task<unit>
 
+    type ProcessHost =
+        { HardLimit: System.TimeSpan
+          Own: (unit -> Task) -> bool
+          ReadOutput: unit -> Task<Result<unit, string>>
+          AttachLifetimeAbort: (unit -> unit) -> Task -> (unit -> unit)
+          AttachAbort: (unit -> unit) -> (unit -> unit) }
+
     /// Outcome of one invocation: the program's structured value plus the
-    /// commit report — or a stable JsFailure.
+    /// commit report — or a stable JsFailure. `Parked` is the top-level parked
+    /// payload: the program suspended at `await js.park(payload)` and the site
+    /// is registered under `handle` (PLAN S2 step 4).
     [<RequireQualifiedAccess>]
     type JsToolOutcome =
-        | Succeeded of value: LlmFacing.Data.Value * rewritten: string list * created: string list
-        | Failed of JsFailure
+        | Succeeded of
+            value: obj *
+            rewritten: string list *
+            created: string list *
+            removed: string list *
+            moved: (string * string) list
+        | Failed of
+            failure: JsFailure *
+            rewritten: string list *
+            created: string list *
+            removed: string list *
+            moved: (string * string) list
+        | Parked of handle: string * payload: obj * source: string
 
     val run:
         capabilities: Set<JsCapability> ->
@@ -47,8 +70,53 @@ module JsToolWorkflow =
         fileAccessObservation: FileAccessObservation ->
             Task<JsToolOutcome>
 
+    /// Execute one js-* tool invocation under the three-state input protocol
+    /// (PLAN S2 step 5): `{ program }` runs a new program, `{ unpark: {
+    /// handle, value } }` resumes a parked site, `{ abandon: { handle } }`
+    /// enters the ABANDONED protocol (algorithm F). `sessionId` tags the
+    /// parked site so session close can reap it.
+    val execute:
+        sessionId: string ->
+        capabilities: Set<JsCapability> ->
+        root: string ->
+        baseClassSource: string ->
+        input: obj ->
+        deadlineMs: int ->
+        deadlineEpochMs: int64 ->
+        outputBoundBytes: int ->
+        persistence: IJsTransactionPersistence option ->
+        lifecyclePersistence: IJsLifecyclePersistence option ->
+        fileAccessObservation: FileAccessObservation option ->
+        processHost: ProcessHost option ->
+            Task<JsToolOutcome>
+
+    /// Run a program whose api is caller-supplied while the park lifecycle,
+    /// race and outcome stay workflow-owned (the plan tenure sandbox).
+    val runWithParkApi:
+        sessionId: string ->
+        baseClassSource: string ->
+        modelSource: string ->
+        makeApi: (Wanxiangshu.Process.JsSandbox.ParkState -> obj) ->
+        deadlineMs: int ->
+        deadlineEpochMs: int64 ->
+        outputBoundBytes: int ->
+            Task<JsToolOutcome>
+
+    /// Resume a parked site from any owning surface.
+    val resumeParked:
+        handle: string ->
+        value: obj ->
+        baseClassSource: string ->
+        deadlineMs: int ->
+        outputBoundBytes: int ->
+            Task<JsToolOutcome>
+
+    /// Abandon a parked site from any owning surface.
+    val abandonParked: handle: string -> deadlineMs: int -> outputBoundBytes: int -> Task<JsToolOutcome>
+
 /// JS-016: stable LLM-visible result shapes, rendered as Synthetic TOML
 /// (the only rendering owner; ARCH-010). Success is `# ok` plus data/fs;
-/// failure is `# failed` plus code/reason.
+/// failure is `# failed` plus code/reason; a parked payload renders as a
+/// top-level `parked` table (PLAN S2 step 4).
 module JsToolsResult =
     val render: outcome: JsToolWorkflow.JsToolOutcome -> string

@@ -2,7 +2,6 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -23,12 +22,7 @@ module HostForkRunLifecycle =
         childAgent: string ->
             Result<PromptAuthority.IdentitySeed, string>
 
-    val workRecordForOutcome:
-        childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) ->
-        completedFrontier: (SessionId -> ProviderRunIdentity -> XTraceCursor option) ->
-        run: PendingHostRun ->
-        outcome: TerminalOutcome ->
-            Task<string option>
+    val workRecordForOutcome: run: PendingHostRun -> outcome: TerminalOutcome -> Task<string option>
 
     val sendAgentOwnerRootObserved:
         sessions: ISessionHostPort ->
@@ -69,7 +63,6 @@ module HostForkRunLifecycle =
         pendingRuns: Dictionary<string, PendingHostRun> ->
         journal: AgentJournal option ->
         parentId: SessionId ->
-        handoffPort: ReusableHandoffPort option ->
         prepareCompletion: (PendingHostRun -> TerminalOutcome -> Task<string option>) ->
         run: PendingHostRun ->
         outcome: TerminalOutcome ->
@@ -82,10 +75,7 @@ module HostForkRunLifecycle =
         parentId: SessionId ->
         sessions: ISessionHostPort ->
         prepareCompletion: (PendingHostRun -> TerminalOutcome -> Task<string option>) ->
-        xTraceHead: (SessionId -> XTraceCursor) ->
         trackOwnedWork: ((unit -> Task) -> unit) ->
-        handoffPort: ReusableHandoffPort option ->
-        handoff: PreparedDelegationHandoff option ->
         agentId: string ->
         childId: SessionId ->
         role: Role ->
@@ -101,7 +91,6 @@ module HostForkRunLifecycle =
         journal: AgentJournal option ->
         parentId: SessionId ->
         sessions: ISessionHostPort ->
-        handoffPort: ReusableHandoffPort option ->
         run: PendingHostRun ->
         error: string ->
             Task

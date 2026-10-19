@@ -36,24 +36,8 @@ function declaredProductionLibraries(manifest) {
   return libraries
 }
 
-function validateDeclaredNpmLibraries(candidate) {
-  const npmRoot = path.join(candidate.root, 'toolchain/npm')
-  const entries = new Map(candidate.entries.map(entry => [entry.path, entry]))
+function walkDeclaredNpmLibraries({ npmRoot, readPackageManifest, onMissingLibrary }) {
   const inspected = new Set()
-
-  function packageManifest(packageRoot) {
-    const manifestPath = path.join(packageRoot, 'package.json')
-    const relative = path.relative(candidate.root, manifestPath).split(path.sep).join('/')
-    if (entries.get(relative)?.type !== 'File') throw invalidEntry(`Declared npm library requires its selected package manifest: ${relative}`)
-    let manifest
-    try {
-      manifest = JSON.parse(fs.readFileSync(manifestPath))
-    } catch (cause) {
-      throw Object.assign(invalidEntry(`Declared npm library manifest must be JSON: ${relative}`), { cause })
-    }
-    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) throw invalidEntry(`Declared npm library manifest must be an object: ${relative}`)
-    return manifest
-  }
 
   function resolveLibrary(packageRoot, name) {
     if (!/^(?:@[A-Za-z0-9_.-]+\/)?[A-Za-z0-9_.-]+$/.test(name) || name.split('/').some(segment => segment === '.' || segment === '..')) throw invalidEntry(`Npm library requires an ordinary package name: ${name}`)
@@ -80,13 +64,81 @@ function validateDeclaredNpmLibraries(candidate) {
   function inspect(packageRoot) {
     if (inspected.has(packageRoot)) return
     inspected.add(packageRoot)
-    for (const [name, optional] of declaredProductionLibraries(packageManifest(packageRoot))) {
+    for (const [name, optional] of declaredProductionLibraries(readPackageManifest(packageRoot))) {
       const library = resolveLibrary(packageRoot, name)
-      if (!library && !optional) throw invalidEntry(`Missing selected npm production library ${name} required by ${path.relative(npmRoot, packageRoot) || 'npm'}`)
-      if (library) inspect(library)
+      if (!library && !optional) {
+        const requiredBy = path.relative(npmRoot, packageRoot) || 'npm'
+        const stop = onMissingLibrary({ name, requiredBy, packageRoot })
+        if (stop) return stop
+      }
+      if (library) {
+        const stopped = inspect(library)
+        if (stopped) return stopped
+      }
     }
   }
-  inspect(npmRoot)
+  return inspect(npmRoot)
+}
+
+export function firstMissingNpmProductionLibrary(root) {
+  const npmRoot = path.resolve(root)
+  function readPackageManifest(packageRoot) {
+    const manifestPath = path.join(packageRoot, 'package.json')
+    let manifest
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+    } catch (cause) {
+      throw Object.assign(invalidEntry(`Declared npm library manifest must be JSON: ${path.relative(npmRoot, manifestPath).split(path.sep).join('/')}`), { cause })
+    }
+    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+      throw invalidEntry(`Declared npm library manifest must be an object: ${path.relative(npmRoot, manifestPath).split(path.sep).join('/')}`)
+    }
+    return manifest
+  }
+  let missing
+  walkDeclaredNpmLibraries({
+    npmRoot,
+    readPackageManifest,
+    onMissingLibrary({ name, requiredBy }) {
+      missing = { name, requiredBy, message: `Missing selected npm production library ${name} required by ${requiredBy}` }
+      return true
+    },
+  })
+  return missing
+}
+
+export function assertSelfContainedNpmRoot(root) {
+  const missing = firstMissingNpmProductionLibrary(root)
+  if (missing) {
+    throw invalidEntry(missing.message)
+  }
+}
+
+function validateDeclaredNpmLibraries(candidate) {
+  const npmRoot = path.join(candidate.root, 'toolchain/npm')
+  const entries = new Map(candidate.entries.map(entry => [entry.path, entry]))
+
+  function packageManifest(packageRoot) {
+    const manifestPath = path.join(packageRoot, 'package.json')
+    const relative = path.relative(candidate.root, manifestPath).split(path.sep).join('/')
+    if (entries.get(relative)?.type !== 'File') throw invalidEntry(`Declared npm library requires its selected package manifest: ${relative}`)
+    let manifest
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath))
+    } catch (cause) {
+      throw Object.assign(invalidEntry(`Declared npm library manifest must be JSON: ${relative}`), { cause })
+    }
+    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) throw invalidEntry(`Declared npm library manifest must be an object: ${relative}`)
+    return manifest
+  }
+
+  walkDeclaredNpmLibraries({
+    npmRoot,
+    readPackageManifest: packageManifest,
+    onMissingLibrary({ name, requiredBy }) {
+      throw invalidEntry(`Missing selected npm production library ${name} required by ${requiredBy}`)
+    },
+  })
 }
 
 function privateEnvironment(root) {

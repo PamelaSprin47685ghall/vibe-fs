@@ -36,6 +36,41 @@ module DurableWorkHost =
     [<Import("mkdirSync", "node:fs")>]
     let private mkdirSync (path: string) (options: obj) : unit = jsNative
 
+    [<Import("resolve", "node:path")>]
+    let private resolvePath (path: string) : string = jsNative
+
+    [<Import("existsSync", "node:fs")>]
+    let private pathExists (path: string) : bool = jsNative
+
+    [<Import("realpathSync", "node:fs")>]
+    let private physicalPath (path: string) : string = jsNative
+
+    [<Import("dirname", "node:path")>]
+    let private directoryOf (path: string) : string = jsNative
+
+    let private rejectGitPath (path: string) =
+        let isGit (value: string) =
+            value.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
+            |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase))
+
+        if isGit path then
+            invalidArg "stateRoot" "Lifecycle persistence cannot read or write inside .git"
+
+        let assertNotGitLink (candidate: string) =
+            if physicalPath candidate |> isGit then
+                invalidArg "stateRoot" "Lifecycle persistence cannot follow a link into .git"
+
+        // 文件尚未存在时也核对已有父目录，防止通过链接回到旧 .git。
+        let rec checkExisting candidate =
+            if pathExists candidate then
+                assertNotGitLink candidate
+            elif directoryOf candidate <> candidate then
+                checkExisting (directoryOf candidate)
+            else
+                ()
+
+        checkExisting path
+
     let private ensureDir (path: string) =
         mkdirSync path (createObj [ "recursive" ==> true ])
 
@@ -58,10 +93,16 @@ module DurableWorkHost =
     [<Emit("Array.isArray($0) ? $0 : []")>]
     let private asArray (_value: obj) : obj array = jsNative
 
-    /// Sibling of `.git/wanxiangshu/events/`, not inside it. The library takes a
+    /// Sibling of `.Herdchestra/wanxiangshu/events/`, not inside it. The library takes a
     /// connection, not a path; this file is the host-owned journal for new work.
-    let journalPath (gitCommonDir: string) : string =
-        gitCommonDir.TrimEnd('/') + "/wanxiangshu/work.sqlite"
+    let journalPath (stateRoot: string) : string =
+        if String.IsNullOrWhiteSpace stateRoot then
+            invalidArg "stateRoot" "A local state root is required"
+
+        rejectGitPath stateRoot
+        let path = resolvePath (stateRoot.TrimEnd('/', '\\') + "/wanxiangshu/work.sqlite")
+        rejectGitPath path
+        path
 
     type HostReceipt =
         { RequestId: string
@@ -140,16 +181,19 @@ module DurableWorkHost =
             closeUnreturnedConnection connection
             raise error
 
-    let useWork (gitCommonDir: string) (workId: string) (body: obj -> 'a) : 'a =
+    /// 一个操作持有一个连接，构造失败时也关闭连接。
+    let private useJournal (gitCommonDir: string) (body: obj -> 'a) : 'a =
         let path = journalPath gitCommonDir
         ensureDir (parentOf path)
         let opened = openJournal path
 
         try
-            let work: obj = createNew DurableWork (workId, opened)
-            body work
+            body opened
         finally
             opened?close ()
+
+    let useWork (gitCommonDir: string) (workId: string) (body: obj -> 'a) : 'a =
+        useJournal gitCommonDir (fun journal -> body (createNew DurableWork (workId, journal)))
 
     let private appendSeed (journal: obj) (workId: string) (revision: float) (record: string) : float =
         let frame: obj = emitJsExpr record "JSON.parse($0)"
@@ -191,10 +235,12 @@ module DurableWorkHost =
 
     /// One committed IncumbencyRetired fact. ProjectionCut is true when the
     /// retirement came from the execution sequence and carries no cursor.
+    /// Expected is the authority the retiring tenure expected to advance from.
     type HostRetirement =
         { RetirementId: string
           IncumbencyId: string
           Outcome: string
+          Expected: string
           Fence: HostRunFence
           ProjectionCut: bool }
 
@@ -209,34 +255,42 @@ module DurableWorkHost =
     /// confirmation identity, projection cut, and advance history the
     /// recovery points need.
     type InspectedWork =
-        { Opened: bool
-          Sequence: string list
-          Stage: string
-          ActiveId: string option
-          OpeningStage: string option
-          Reviewed: bool
-          ReviewOutcome: string option
-          OpeningCursor: float option
-          PredecessorRange: (float * float) option
-          DeliveryAuthorized: bool
-          Delivered: bool
-          PendingDelivery: bool
-          PendingOperationId: string option
-          PendingExecSessionId: string option
-          PendingDigest: string option
-          PendingPath: string option
-          RoundCount: int
-          RetiredRuns: string list
-          DevOpsId: string option
-          DevOpsTarget: string option
-          Authority: string
-          Confirmed: bool
-          BlockerDigest: string option
-          Root: string option
-          Retirements: HostRetirement list
-          Confirmation: HostRunFence option
-          ProjectionCut: HostRunFence option
-          Advances: HostAdvance list }
+        {
+            Opened: bool
+            Sequence: string list
+            Stage: string
+            ActiveId: string option
+            OpeningStage: string option
+            Reviewed: bool
+            ReviewOutcome: string option
+            /// The review outcome of the most recently retired tenure. `Reviewed`
+            /// and `ReviewOutcome` describe the OPEN tenure; a delivered work has
+            /// none, yet the review that qualified its candidate is still the
+            /// durable fact of the round that delivered it.
+            LastRetiredReview: string option
+            OpeningCursor: float option
+            PredecessorRange: (float * float) option
+            LastRetirementCursor: float option
+            DeliveryAuthorized: bool
+            Delivered: bool
+            PendingDelivery: bool
+            PendingOperationId: string option
+            PendingExecSessionId: string option
+            PendingDigest: string option
+            PendingPath: string option
+            RoundCount: int
+            RetiredRuns: string list
+            DevOpsId: string option
+            DevOpsTarget: string option
+            Authority: string
+            Confirmed: bool
+            BlockerDigest: string option
+            Root: string option
+            Retirements: HostRetirement list
+            Confirmation: HostRunFence option
+            ProjectionCut: HostRunFence option
+            Advances: HostAdvance list
+        }
 
     let private optionalText (value: string) : string option = if value = "" then None else Some value
 
@@ -298,6 +352,7 @@ module DurableWorkHost =
         { RetirementId = textOf event?retirementId
           IncumbencyId = textOf event?incumbencyId
           Outcome = textOf event?outcome
+          Expected = textOf event?expectedAdvance
           Fence = hostRunFenceOf event
           ProjectionCut = isRecord cut }
 
@@ -348,6 +403,17 @@ module DurableWorkHost =
         |> Array.tryLast
         |> Option.map hostRunFenceOf
 
+    let private lastRetirementCursorOf (rounds: obj array) : float option =
+        match rounds with
+        | [||] -> None
+        | _ when isNull (rounds.[rounds.Length - 1]?retirementCursor) -> None
+        | _ -> Some(unbox<float> (rounds.[rounds.Length - 1]?retirementCursor))
+
+    let private lastRetiredReviewOf (rounds: obj array) : string option =
+        match rounds with
+        | [||] -> None
+        | _ -> optionalText (textOf rounds.[rounds.Length - 1]?reviewOutcome)
+
     let private projectedWork (snapshot: obj) (work: obj) : InspectedWork =
         let active: obj = snapshot?active
         let pending: obj = snapshot?pendingDelivery
@@ -369,8 +435,10 @@ module DurableWorkHost =
           OpeningStage = openingStageOf active
           Reviewed = outcome.IsSome
           ReviewOutcome = outcome
+          LastRetiredReview = lastRetiredReviewOf rounds
           OpeningCursor = openingCursorOf active
           PredecessorRange = predecessorRangeOf activeId rounds
+          LastRetirementCursor = lastRetirementCursorOf rounds
           DeliveryAuthorized = unbox<bool> snapshot?deliveryAuthorized
           Delivered = isNull active && not (isNull snapshot?opened)
           PendingDelivery = not (isNull pending)
@@ -397,24 +465,44 @@ module DurableWorkHost =
             |> Array.map hostAdvanceOf
             |> Array.toList }
 
-    let private inspectedJournal (gitCommonDir: string) (workId: string) : InspectedWork option =
-        // Read once. Snapshot and history must describe the same revision.
-        useWork gitCommonDir workId (fun durable ->
-            let records: string array = durable?records ()
-            let work: obj = createNew Work (workId, records)
-            let snapshot: obj = work?inspect ()
+    let private inspectedFromJournal (journal: obj) (workId: string) : InspectedWork option =
+        // 同一份已校验记录只折叠一次，快照与历史属于同一修订。
+        let records: string array = journal?read (workId)
+        let work: obj = createNew Work (workId, records)
+        let snapshot: obj = work?inspect ()
 
-            if unbox<bool> snapshot?opened then
-                Some(projectedWork snapshot work)
-            else
-                None)
+        if unbox<bool> snapshot?opened then
+            Some(projectedWork snapshot work)
+        else
+            None
 
     let inspected (gitCommonDir: string) (workId: string) : InspectedWork option =
         // An empty id names no work; it never reaches the journal as a query.
         if String.IsNullOrEmpty workId then
             None
         else
-            inspectedJournal gitCommonDir workId
+            useJournal gitCommonDir (fun journal -> inspectedFromJournal journal workId)
+
+    let private tryInspectWorkFromJournal (journal: obj) (workId: string) : Result<InspectedWork option, string> =
+        try
+            Ok(inspectedFromJournal journal workId)
+        with error ->
+            Error error.Message
+
+    let private safeInspectFromJournal (journal: obj) (workId: string) : Result<InspectedWork option, string> =
+        if String.IsNullOrEmpty workId then
+            Ok None
+        else
+            tryInspectWorkFromJournal journal workId
+
+    /// 启动枚举共用一次连接和全库完整性检查，各工作流仍分别校验并报告错误。
+    let inspectedMany (gitCommonDir: string) (workIds: string array) =
+        if Array.isEmpty workIds then
+            [||]
+        else
+            useJournal gitCommonDir (fun journal ->
+                workIds
+                |> Array.map (fun workId -> workId, safeInspectFromJournal journal workId))
 
     let private openingFailure (receipt: HostReceipt) =
         if receipt.Reason = "" then

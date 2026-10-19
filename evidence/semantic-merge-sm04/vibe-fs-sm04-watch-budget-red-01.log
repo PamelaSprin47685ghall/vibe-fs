@@ -1,0 +1,29 @@
+✖ WHAT[process-execution-015] returning one watch observation cannot bypass the run byte budget (123.268667ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 306.825458
+
+✖ failing tests:
+
+test at requirements/process-execution/tests/015.test.mjs:147:1
+✖ WHAT[process-execution-015] returning one watch observation cannot bypass the run byte budget (123.268667ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(Buffer.byteLength(wire) <= 2048)
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/015.test.mjs:166:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

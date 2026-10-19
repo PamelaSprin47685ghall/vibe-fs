@@ -131,7 +131,11 @@ try {
     })
     const transactionId = 'boundary-transaction'
     const result = phase === 'Prepared'
-      ? await transaction.appendPrepared(observed, { transactionId, workspaceRoot: 'owned-workspace', mutations: [] })
+      ? await transaction.appendPrepared(observed, {
+          transactionId,
+          workspaceRoot: 'owned-workspace',
+          mutation: { path: 'boundary.txt', originalText: null, newText: '', kind: 'create' },
+        })
       : await transaction.appendCommitted(observed, transactionId)
     fs.writeSync(1, JSON.stringify({ stage: 'returned', ok: result.ok, code: result.code }) + '\n')
   }

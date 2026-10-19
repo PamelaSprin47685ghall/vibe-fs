@@ -7,7 +7,7 @@ const { run } = await import("../../../dist/Repository/Programming/Js/RuntimeSur
 
 const BASE = `class JsProgram {
   constructor(api) { this._api = api; }
-  file(path) { return this._api.js.read(path); }
+  cat(path) { return this._api.js.cat(path); }
 }`
 const runWrapped = async (
   program,
@@ -17,7 +17,7 @@ const runWrapped = async (
 const failureCode = (result) => result.code
 const PROGRAM = `class Js extends JsProgram {
   async run() {
-    return { sum: 1 + 2, text: (await this.file('a.txt')).text };
+    return { sum: 1 + 2, text: (await this.cat('a.txt')).text };
   }
 }`
 
@@ -63,7 +63,7 @@ const sandbox = () => {
 }
 const localStore = () => {
   const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
+  const commonDir = join(owned, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
   return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
@@ -80,14 +80,16 @@ test('WHAT[repository-programming-011] JS010_array_null_is_invalid_return_value'
     writeFileSync(join(dir, 'a.txt'), 'old', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    this.rewrite('a.txt', 'new')
+    this.write('a.txt', 'new')
     return [null]
   }
 }`
     const { outcome } = await runWorkflow(dir, program)
     assert.equal(caseName(outcome), 'Failed')
     assert.equal(parseToml(render(outcome)).code, 'INVALID_RETURN_VALUE')
-    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old')
+    // Under as-is semantics the rewrite already landed before the return-value
+    // validation failed; the write is a fact that stays on disk.
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'new')
   } finally {
     cleanup()
   }

@@ -63,7 +63,7 @@ test('WHAT[provider-language-013] companion instruction exports contain Chinese 
   await withPreference('zh-CN', async () => {
     refreshGlobalLanguage()
     const companion = await import('../../../dist/Context/Companion/ProjectionSurface.js')
-    for (const text of [companion.normalInstruction, companion.squashInstruction, companion.memoryPreamble]) {
+    for (const text of [companion.normalInstruction, companion.memoryPreamble]) {
       assert.match(text, /[\u4e00-\u9fff]/)
     }
   })

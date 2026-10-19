@@ -286,7 +286,7 @@ const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurfac
 const { withJournal, acceptOwner, hostPort } = await import('./support/authority.mjs')
 
 for (const [participant, tools] of [
-  ['manager', [['*', false], ['js-predictor', true]]],
+  ['manager', [['*', false], ['todowrite-for-predictor', true]]],
   ['blogger', undefined],
 ]) {
   test(`WHAT[dispatch-protocol-010] managed ${participant} assignments retain the accepted run and tool boundary across journal reopen`, async () => {

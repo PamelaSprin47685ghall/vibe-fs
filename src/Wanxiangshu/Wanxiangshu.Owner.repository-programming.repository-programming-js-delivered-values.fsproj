@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>repository-programming</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>repository-programming-js-delivered-values</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>repository-programming</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>repository-programming-js-delivered-values</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>runtime</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-llm-facing.fsproj"/>
+    <Compile Include="Repository/Programming/Js/DeliveredValues.fsi"/>
+    <Compile Include="Repository/Programming/Js/DeliveredValues.fs"/>
+  </ItemGroup>
+</Project>

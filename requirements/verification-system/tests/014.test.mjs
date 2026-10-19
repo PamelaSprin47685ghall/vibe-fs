@@ -178,7 +178,7 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
     "# act on either assumption. The predecessor's work is the object you must assess; the shared workspace is the actual state it left behind: check it directly\n" +
     '# rather than trusting any inherited claim.\n' +
     '#\n' +
-    "# During assessment, you may directly use the review-only read tool js-manager, or entrust read-only work to Engineer to establish facts about the predecessor's work"
+    "# During assessment, you may directly use the review-only read tool todowrite-for-manager, or entrust read-only work to Engineer to establish facts about the predecessor's work"
   for (const [step, tool] of [[0, 'review'], [1, 'deliver']]) {
     const id = `manager-reopened-loop.${step}`
     const entry = byId.get(id)
@@ -195,7 +195,9 @@ test('WHAT[verification-system-014] the compiled Long Stroke scenario preserves 
   }
   assert.ok(!result.scenario.entries.some((entry) => entry.id.startsWith('manager-resume.')))
   const currentActions = result.scenario.entries.filter((entry) => entry.turnId === 'manager-current-action')
-  assert.deepEqual(currentActions.map((entry) => entry.step), Array.from({ length: 11 }, (_, index) => index))
+  // The Manager idle-nudge cursor is bounded only by the run (work/manager-continue),
+  // so the reusable ladder keeps one declared close attempt per bounded cursor.
+  assert.deepEqual(currentActions.map((entry) => entry.step), Array.from({ length: 24 }, (_, index) => index))
   assert.ok(currentActions.every((entry) => entry.optional === true))
   assert.ok(!result.scenario.must.some((id) => id.startsWith('manager-current-action.')))
   assert.ok(!result.scenario.entries.some((entry) => entry.id.startsWith('manager-repair-resume.')))

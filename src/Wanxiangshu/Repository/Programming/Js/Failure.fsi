@@ -32,6 +32,11 @@ type JsFailure =
     | FileNotFound of string
     | FileAlreadyExists of string
     | FileReadFailed of string
+    | DirectoryNotEmpty of string
+    | DirectoryExists of string
+    | ParentDirectoryMissing of string
+    | CrossDeviceMove of string
+    | InvalidArgument of string
     | InvalidUtf8 of string
     | AnchorEmptyContent
     | AnchorInvalidPattern
@@ -54,6 +59,21 @@ type JsFailure =
     | TransactionPersistenceFailed of JsTransactionAppendFailure
     | UnknownMember
     | PlanReviewRequired
+    | ConcurrencyLimit
+    | HandleUnknown of string
+    | CannotParkWhileAbandoning
+    | Abandoned
+    | RunnableSpecIncomplete of string
+    | RunCommandUnsupported of string
+    | RunWaitTimeout
+    | RunChildUnknown of string
+    | RunParkUnsupported
+    | RunHostUnavailable
+    | RunOutputBudgetTooSmall of minimumBytes: int64
+    | RunRejected of code: string * detail: string
+    | AskRefused of string
+    | DelegationUnavailable
+    | ViewDeclarationInvalid of string
 
 module JsFailure =
     val code: failure: JsFailure -> string

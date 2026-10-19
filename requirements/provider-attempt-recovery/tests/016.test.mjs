@@ -6,7 +6,7 @@ import * as turns from '../../../dist/Interaction/Repair/CompletedTurnSurface.js
 test('WHAT[provider-attempt-recovery-016] actual RequestKind algebra clears only business-main success', () => {
   for (const [role, kind, clears] of [
     ['engineer', 'work-main', true], ['blogger', 'blogger-main', true],
-    ['blogger', 'blogger-squash', false], ['engineer', 'interaction-repair', false],
+    ['engineer', 'interaction-repair', false],
     ['engineer', 'strength-replica', false],
   ]) {
     const plan = planner.plan({ role, kind })

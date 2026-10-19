@@ -7,7 +7,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Host
 open Wanxiangshu.Foundation.Identity
 
-/// Entry point for the first prompt of a plan session (planning-020): opens
+/// Entry point for the first prompt of a plan session (work-036): opens
 /// the work and starts the first incumbency at S1. DevOps is bound by the
 /// first successful ask, not by opening.
 module PlanWorkOpen =
@@ -16,7 +16,7 @@ module PlanWorkOpen =
     let private existsSync (path: string) : bool = jsNative
 
     // Shared with PlanTools.executeAsk's single-flight binding so the entry
-    // and the first ask resolve the identical DevOps identity (planning-010).
+    // and the first ask resolve the identical DevOps identity (work-028).
     let internal deriveDevOpsId (workId: string) : string =
         "devops-" + (HostDigest.sha256Hex ("plan-devops:" + workId)).[..15]
 

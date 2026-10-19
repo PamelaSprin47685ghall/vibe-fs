@@ -135,8 +135,8 @@ const notStrength = { id: 'evt-job-1', stream: 'jobs/other', type: 'JobRequested
 
 // WHAT[015]: the entry check refuses the legacy fact on the integration
 // path: the fact is committed with a ProjectionCutTail carrying the migration
-// guidance, and nothing is silently skipped mid-read.
-test('WHAT[speculative-investigation-015] STRENGTH_015_unmigrated_store_is_refused_with_migration_guidance', async () => {
+// retirement refusal, and nothing is silently skipped mid-read.
+test('WHAT[speculative-investigation-015] STRENGTH_015_unmigrated_store_is_refused_with_retirement_guidance', async () => {
   const local = createLocalEventStore()
   try {
     const refused = await EventStore.append(local.store, [legacyPrepared])
@@ -145,10 +145,9 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_unmigrated_store_is_refus
     assert.equal(refused.cuts[0].rule, 'Strength')
     const detail = JSON.stringify(refused.cuts[0].reason)
     assert.match(detail, /predates the readonly delegation protocol/)
-    assert.match(detail, /run the offline migration first/)
-    assert.match(detail, /migrate-delegation-history\.mjs/)
-    assert.match(detail, /--contract-revision/)
-    assert.match(detail, /the runtime never migrates data/)
+    assert.match(detail, /refuse this history/)
+    assert.match(detail, /Old \.git runtime data is retired/)
+    assert.match(detail, /must not be imported into \.Herdchestra/)
     // The refusal folds nothing: the lifecycle views stay empty and the legacy
     // fact itself is on disk, unchanged.
     const projection = Strength.storeCurrent(local.store)
@@ -515,7 +514,7 @@ const canonicalLine = (envelope) => JSON.stringify(sortValue(envelope)) + '\n'
 
 const copyBackupWithLegacyDecision = () => {
   const base = mkdtempSync(join(tmpdir(), 'wxs-migrate-backup-'))
-  const commonDir = join(base, '.git')
+  const commonDir = join(base, '.Herdchestra')
   mkdirSync(join(commonDir, 'wanxiangshu', 'events'), { recursive: true })
   const envelopes = [
     { event_id: 'evt-prepared-1', stream_id: STREAM, parents: [], event_type: 'StrengthCandidatePrepared', payload: { decision_id: 'decision-1', budget: 'K1', target_provider_run: 'run-old-1', frame_digest: 'frame-digest-old-1', byte_length: 123 }, payload_refs: [] },
@@ -610,9 +609,10 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_the_registered_version_pa
 test('WHAT[speculative-investigation-015] invalid version refusal precedes a missing dist runtime', () => {
   const { base, commonDir } = copyBackupWithLegacyDecision()
   const scripts = join(base, 'without-dist', 'scripts')
-  mkdirSync(scripts, { recursive: true })
+  mkdirSync(join(scripts, 'lib'), { recursive: true })
   const entry = join(scripts, 'migrate-delegation-history.mjs')
   copyFileSync(resolve(repoRoot, 'scripts/migrate-delegation-history.mjs'), entry)
+  copyFileSync(resolve(repoRoot, 'scripts/lib/state-root.mjs'), join(scripts, 'lib', 'state-root.mjs'))
   const report = join(base, 'report.json')
   try {
     const run = runMigration(commonDir, report, ['--input-version', 'pre-delegation-v0', '--contract-revision', '1'], entry)
@@ -624,11 +624,10 @@ test('WHAT[speculative-investigation-015] invalid version refusal precedes a mis
 })
 
 test('WHAT[speculative-investigation-015] STRENGTH_015_the_migration_registry_matches_the_runtime_contract', async () => {
-  // WHAT[015]: the tool's registered input version and contract revision govern
-  // offline historical migration, while the runtime contract revision is governed
-  // by the code-level ProtocolRevision constant.
-  // The guidance emitted by the runtime classifier directs operators to the
-  // script's registered offline migration targets.
+  // WHAT[015]: the offline tool keeps a single registered input version and
+  // contract revision. The runtime no longer points operators at the script —
+  // old .git runtime data is retired and must not be imported — so this test
+  // pins the registry and the retirement refusal instead of a guidance match.
   const script = readFileSync(resolve(repoRoot, 'scripts/migrate-delegation-history.mjs'), 'utf8')
   const registryInputVersions = script.match(/const INPUT_VERSIONS = \[([^\]]*)\]/)
   const registryRevisions = script.match(/const CONTRACT_REVISIONS = \[([^\]]*)\]/)
@@ -643,11 +642,13 @@ test('WHAT[speculative-investigation-015] STRENGTH_015_the_migration_registry_ma
     .map((token) => Number(token.trim()))
 
   const classifierSource = readFileSync(resolve(repoRoot, 'src/Wanxiangshu/Strength/Migration/LegacyProtocolClassifier.fs'), 'utf8')
-  const guidanceInputVersion = classifierSource.match(/--input-version ([\w.-]+)/)
-  const guidanceRevision = classifierSource.match(/--contract-revision (\d+)/)
-  assert.notEqual(guidanceInputVersion, null, '运行时拒绝指引必须写明 --input-version 取值')
-  assert.notEqual(guidanceRevision, null, '运行时拒绝指引必须写明 --contract-revision 取值')
-  assert.deepEqual(inputVersions, [guidanceInputVersion[1]], '迁移登记的输入版本必须等于运行时指引写给操作者的取值')
-  assert.deepEqual(contractRevisions, [Number(guidanceRevision[1])], '迁移登记的契约修订必须等于运行时指引写给操作者的取值')
+  assert.equal(classifierSource.includes('refuse this history'), true, '运行时必须拒绝旧协议历史')
+  assert.equal(
+    classifierSource.includes('must not be imported into .Herdchestra'),
+    true,
+    '运行时必须声明旧 .git 运行数据不迁移',
+  )
+  assert.deepEqual(inputVersions, ['pre-delegation'], '登记表只认一种旧协议')
+  assert.deepEqual(contractRevisions, [1], '登记表只认当前契约修订')
 })
 }

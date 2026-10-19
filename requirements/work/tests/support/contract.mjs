@@ -127,11 +127,11 @@ export function projectSuccessor(messages, openingCursor, first) {
   const kept = messages.filter((message) => message.role === 'user' || message.firstSeen > openingCursor)
   const stripped = messages.filter((message) => (message.role === 'assistant' || message.role === 'tool') && message.firstSeen <= openingCursor)
   if (stripped.some((message) => kept.includes(message))) return { ok: false }
-  const projected = first ? kept : [{ role: 'lwr_prev', once: true }, ...kept]
-  const injections = projected.filter((message) => message.role === 'lwr_prev')
-  if (!first && injections.length !== 1) return { ok: false }
-  if (first && injections.length !== 0) return { ok: false }
-  return { ok: true, projected, retainedPriorAssistant: false }
+  const projected = kept.filter((message) => !message.synthetic)
+  if (projected.some((message) => message.role === 'lwr_prev' || String(message.id ?? '').startsWith('lwr-prev-'))) {
+    return { ok: false }
+  }
+  return { ok: true, projected, first: Boolean(first), retainedPriorAssistant: false }
 }
 
 export function admitOldBytes(bytes) {

@@ -1,0 +1,151 @@
+✔ WHAT[repository-programming-050] a Runnable missing watch is refused with RUNNABLE_SPEC_INCOMPLETE (19.04925ms)
+✔ WHAT[repository-programming-050] a Runnable missing sanity is refused with RUNNABLE_SPEC_INCOMPLETE (5.481208ms)
+✔ WHAT[repository-programming-050] the host loop runs one foreground command and reports the structured outcome (66.577ms)
+✔ WHAT[repository-programming-050] onExit dispatches every exited command with its exit code (69.653167ms)
+✔ WHAT[repository-programming-050] a watch abort kills the foreground command and reports aborted (214.262667ms)
+✔ WHAT[repository-programming-050] watch returning false is a real veto, not a synonym for continue (113.926833ms)
+✔ WHAT[repository-programming-050] a watch park suspends the run and resumes after unpark (363.28425ms)
+✔ WHAT[repository-programming-050] a sanity thunk that fails to show its exit parks with the diagnosis (8.9455ms)
+✔ WHAT[repository-programming-050] a sanity that returns non-thunks is refused with RUNNABLE_SPEC_INCOMPLETE (4.607334ms)
+✔ WHAT[repository-programming-050] maxDuration expiry kills the command and reports timeout (409.245625ms)
+✔ WHAT[repository-programming-051] spawn, waitFor and signal drive one background server (232.824125ms)
+✔ WHAT[repository-programming-051] waitFor on a closed port fails with RUN_WAIT_TIMEOUT (313.595667ms)
+✔ WHAT[repository-programming-051] signal on an unknown name fails with RUN_CHILD_UNKNOWN (5.952667ms)
+✔ WHAT[repository-programming-051] a crashed background is visible to watch and can abort the run (110.35825ms)
+✖ WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run (180.6445ms)
+✖ WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed (160.164833ms)
+✖ WHAT[repository-programming-058] js.run drives an interactive child through send and observes the deltas (540.2355ms)
+✔ WHAT[repository-programming-058] send to an unknown child fails with RUN_CHILD_UNKNOWN (11.4675ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 15
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2007.219417
+
+✖ failing tests:
+
+test at requirements/repository-programming/tests/052.test.mjs:69:1
+✖ WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run (180.6445ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /status = "aborted"/. Input:
+  
+  '# ok\n' +
+    '\n' +
+    '[data]\n' +
+    'ok = true\n' +
+    'status = "failed"\n' +
+    'reason = "Supervisor ended without a target exit receipt"\n' +
+    'exitCode = 127\n' +
+    'scopeClosed = true\n' +
+    'endUnconfirmed = false\n' +
+    'outputComplete = false\n' +
+    'fault = "Supervisor ended without a target exit receipt"\n' +
+    'stdout = ""\n' +
+    "stderr = '''\n" +
+    '/bin/sh: wget: command not found\n' +
+    "'''\n" +
+    'truncated = false\n' +
+    'bytes = 33\n' +
+    'durationMs = 158\n' +
+    'steps = 4\n' +
+    'notStarted = false\n' +
+    'diagnosticTruncated = false\n' +
+    'outputNotice = ""\n'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/052.test.mjs:106:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `# ok\n\n[data]\nok = true\nstatus = "failed"\nreason = "Supervisor ended without a target exit receipt"\nexitCode = 127\nscopeClosed = true\nendUnconfirmed = false\noutputComplete = false\nfault = "Supervisor ended without a target exit receipt"\nstdout = ""\nstderr = '''\n/bin/sh: wget: command not found\n'''\ntruncated = false\nbytes = 33\ndurationMs = 158\nsteps = 4\nnotStarted = false\ndiagnosticTruncated = false\noutputNotice = ""\n`,
+    expected: /status = "aborted"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/052.test.mjs:184:1
+✖ WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed (160.164833ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /status = "completed"/. Input:
+  
+  '# ok\n' +
+    '\n' +
+    '[data]\n' +
+    'dispatched = [127]\n' +
+    '[data.result]\n' +
+    'ok = true\n' +
+    'status = "failed"\n' +
+    'reason = "Supervisor ended without a target exit receipt"\n' +
+    'exitCode = 127\n' +
+    'scopeClosed = true\n' +
+    'endUnconfirmed = false\n' +
+    'outputComplete = false\n' +
+    'fault = "Supervisor ended without a target exit receipt"\n' +
+    'stdout = ""\n' +
+    "stderr = '''\n" +
+    '/bin/sh: wget: command not found\n' +
+    "'''\n" +
+    'truncated = false\n' +
+    'bytes = 33\n' +
+    'durationMs = 151\n' +
+    'steps = 4\n' +
+    'notStarted = false\n' +
+    'diagnosticTruncated = false\n' +
+    'outputNotice = ""\n'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/052.test.mjs:221:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `# ok\n\n[data]\ndispatched = [127]\n[data.result]\nok = true\nstatus = "failed"\nreason = "Supervisor ended without a target exit receipt"\nexitCode = 127\nscopeClosed = true\nendUnconfirmed = false\noutputComplete = false\nfault = "Supervisor ended without a target exit receipt"\nstdout = ""\nstderr = '''\n/bin/sh: wget: command not found\n'''\ntruncated = false\nbytes = 33\ndurationMs = 151\nsteps = 4\nnotStarted = false\ndiagnosticTruncated = false\noutputNotice = ""\n`,
+    expected: /status = "completed"/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/058.test.mjs:29:1
+✖ WHAT[repository-programming-058] js.run drives an interactive child through send and observes the deltas (540.2355ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /status = "completed"/. Input:
+  
+  '# ok\n' +
+    '\n' +
+    '[data]\n' +
+    "seen = ['''\n" +
+    'echo:ping\n' +
+    "''']\n" +
+    '[data.out]\n' +
+    'ok = true\n' +
+    'status = "failed"\n' +
+    'reason = "Supervisor ended without a target exit receipt"\n' +
+    'exitCode = 0\n' +
+    'scopeClosed = true\n' +
+    'endUnconfirmed = false\n' +
+    'outputComplete = false\n' +
+    'fault = "Supervisor ended without a target exit receipt"\n' +
+    "stdout = '''\n" +
+    'echo:ping\n' +
+    "'''\n" +
+    'stderr = ""\n' +
+    'truncated = false\n' +
+    'bytes = 10\n' +
+    'durationMs = 519\n' +
+    'steps = 5\n' +
+    'notStarted = false\n' +
+    'diagnosticTruncated = false\n' +
+    'outputNotice = ""\n'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/058.test.mjs:60:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: `# ok\n\n[data]\nseen = ['''\necho:ping\n''']\n[data.out]\nok = true\nstatus = "failed"\nreason = "Supervisor ended without a target exit receipt"\nexitCode = 0\nscopeClosed = true\nendUnconfirmed = false\noutputComplete = false\nfault = "Supervisor ended without a target exit receipt"\nstdout = '''\necho:ping\n'''\nstderr = ""\ntruncated = false\nbytes = 10\ndurationMs = 519\nsteps = 5\nnotStarted = false\ndiagnosticTruncated = false\noutputNotice = ""\n`,
+    expected: /status = "completed"/,
+    operator: 'match',
+    diff: 'simple'
+  }

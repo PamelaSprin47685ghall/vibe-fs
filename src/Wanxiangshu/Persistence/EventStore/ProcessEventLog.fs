@@ -9,7 +9,7 @@ open Wanxiangshu.Foundation.Identity
 
 /// durable-events-004/005/010/017.
 /// Runtime truth is deliberately boring: one process owns one append-only NDJSON
-/// file under the repository's git common-dir. Git object plumbing is not a
+/// file under the project's .Herdchestra state root. Git object plumbing is not a
 /// dependency of this module and therefore cannot leak into the local append path.
 type ProcessEventLog =
     private
@@ -189,9 +189,6 @@ module ProcessEventLog =
     [<Emit("$0.update($1)")>]
     let private hashUpdate (hash: obj) (content: byte[]) : obj = jsNative
 
-    [<Emit("$0.update($1, 'utf8')")>]
-    let private hashUpdateText (hash: obj) (content: string) : obj = jsNative
-
     [<Emit("[$0.dev, $0.ino, $0.mode, $0.size, $0.mtimeMs, $0.ctimeMs].join(':')")>]
     let private statIdentity (stat: obj) : string = jsNative
 
@@ -220,10 +217,33 @@ module ProcessEventLog =
     [<Literal>]
     let WanxiangshuRootName = "wanxiangshu"
 
-    let private wanxiangDirectory commonDir = join2 commonDir WanxiangshuRootName
+    // 所有读写入口都经过此处；不能只在 writer 创建时拒绝旧目录。
+    let private localPath (value: string) =
+        let rejectGit (candidate: string) =
+            if
+                candidate.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
+                |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase))
+            then
+                invalidArg "stateRoot" "Runtime persistence cannot read or write inside .git"
+
+        if String.IsNullOrWhiteSpace value then
+            invalidArg "stateRoot" "A local state root is required"
+
+        rejectGit value
+        let resolved: string = nodePath?resolve value
+        rejectGit resolved
+
+        if unbox<bool> (nodeFs?existsSync resolved) then
+            let physical: string = nodeFs?realpathSync resolved
+            rejectGit physical
+
+        resolved
+
+    let private wanxiangDirectory commonDir =
+        join2 (localPath commonDir) WanxiangshuRootName |> localPath
 
     let private eventsDirectory commonDir =
-        join2 (wanxiangDirectory commonDir) "events"
+        join2 (wanxiangDirectory commonDir) "events" |> localPath
 
     let private ensureDirectory path =
         mkdirSync path (createObj [ "recursive" ==> true ])
@@ -296,8 +316,8 @@ module ProcessEventLog =
             | None -> return raise (StoreLockAcquireTimeout(attempts, currentTimeMs () - started))
         }
 
-    /// Cross-process physical serialization shared by runtime append and the
-    /// standalone Git-hook synchronizer. It protects bytes/snapshot boundaries
+    /// Cross-process physical serialization shared by local runtime writers.
+    /// It protects bytes/snapshot boundaries
     /// only; it is not durable/domain state and contains no history meaning.
     let acquireStoreLock (commonDir: string) : Task<StoreFileGate> =
         task {
@@ -323,9 +343,7 @@ module ProcessEventLog =
                 return raise ex
         }
 
-    /// durable-events-005: the single-segment byte ceiling. 64 MiB leaves
-    /// headroom under the GitHub 100 MiB hard limit for an oversized single
-    /// line that occupies its own segment.
+    /// durable-events-005: 本机追加段的字节上限。它不是 Git 传输限制。
     [<Literal>]
     let DefaultSegmentCapBytes = 67108864
 
@@ -399,7 +417,13 @@ module ProcessEventLog =
 
     let createWithSegmentCap (commonDir: string) (writerId: string) (segmentCap: int) : ProcessEventLog =
         if String.IsNullOrWhiteSpace commonDir then
-            invalidArg "commonDir" "git common-dir is required"
+            invalidArg "commonDir" "a local state root is required"
+
+        if
+            commonDir.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
+            |> Array.exists (fun part -> part.Equals(".git", StringComparison.OrdinalIgnoreCase))
+        then
+            invalidArg "commonDir" "runtime persistence cannot be placed inside .git"
 
         if segmentCap <= 0 then
             invalidArg "segmentCap" "segment cap must be positive"
@@ -940,18 +964,6 @@ module ProcessEventLog =
             |> Array.sort
             |> Array.toList
 
-    let private fingerprintFiles hash label directory names =
-        names
-        |> List.iter (fun name ->
-            let identity = statSync (join2 directory name) |> statIdentity
-
-            hashUpdateText hash (label + "\u0000" + name + "\u0000" + identity + "\n")
-            |> ignore)
-
-    let private physicalStats directory names =
-        names
-        |> List.map (fun name -> name, statSync (join2 directory name) |> statIdentity)
-
     /// durable-events-005/014: one writer's physical files grouped by
     /// WriterId. A tail `-dddd` name joins its prefix's segment series only
     /// when the ordinals are contiguous from 0000; otherwise the file is a
@@ -1022,17 +1034,6 @@ module ProcessEventLog =
               FileNames = parts |> List.collect (fun part -> part.FileNames) |> List.sort })
         |> List.sortBy (fun group -> group.WriterId)
 
-    /// Git-index-style physical cache key. It never replaces canonical validation:
-    /// a cache miss falls back to reading bytes, while a hit only reuses a snapshot
-    /// that has already been validated/materialized for the exact same file stats.
-    let physicalFingerprint (commonDir: string) : string =
-        let hash = createHash "sha256"
-        fingerprintFiles hash "writers" (eventsDirectory commonDir) (writerFileNames commonDir)
-        hashHex hash
-
-    let writerPhysicalStats (commonDir: string) : (string * string) list =
-        writerFileNames commonDir |> physicalStats (eventsDirectory commonDir)
-
     let writerPhysicalMetadata (commonDir: string) : WriterPhysicalMetadata list =
         writerFileGroups commonDir
         |> List.map (fun group ->
@@ -1043,48 +1044,9 @@ module ProcessEventLog =
               FileNames = group.FileNames
               LastActivityMs = writerActivityOf paths })
 
-    let readWriterFileBytes (commonDir: string) (name: string) : byte[] =
-        readBytesFileSync (join2 (eventsDirectory commonDir) name)
-
     let private setWriterActivity path activityMs =
         let seconds = activityMs / 1000.0
         utimesSync path seconds seconds
-
-    let private currentWriterActivity path = statSync path |> fileActivityMs
-
-    let private someWhen condition value = if condition then Some value else None
-
-    /// Equal bytes describe the same process output, so activity converges
-    /// monotonically toward the earlier observation. An ordinary snapshot already
-    /// carries the identical value, and rewriting the identical activity would churn
-    /// the file's stat identity and force a needless blob rewrite on the next
-    /// materialization, so only a strictly earlier remote observation is a rewrite.
-    let private earlierRemoteActivity current remote = someWhen (remote < current) remote
-
-    let private reconcileSeriesActivity (paths: string list) incomingActivity =
-        incomingActivity
-        |> Option.iter (fun remote ->
-            paths
-            |> List.iter (fun path ->
-                earlierRemoteActivity (currentWriterActivity path) remote
-                |> Option.iter (fun earlier -> setWriterActivity path earlier)))
-
-    /// The physical files of one WriterId (legacy suffixless file plus the
-    /// contiguous segment series).
-    let private writerFilesOf (commonDir: string) (writerId: string) : string list =
-        writerFileNames commonDir
-        |> List.filter (fun name ->
-            name = legacyFileOf writerId
-            || (isSegmentFileName name
-                && name.StartsWith(writerId + "-", StringComparison.Ordinal)
-                && name.Length = writerId.Length + 12))
-
-    /// The WriterId a writer file name belongs to (segment or legacy form).
-    let writerKeyOfFileName (name: string) : string =
-        if isSegmentFileName name then
-            name.Substring(0, name.Length - 12)
-        else
-            name.Substring(0, name.Length - ".ndjson".Length)
 
     let private prefixMatches (prefix: byte[]) (full: byte[]) : bool =
         // DSL-MUTABLE: algorithm-scratch — early-exit prefix scan.
@@ -1176,20 +1138,6 @@ module ProcessEventLog =
         | [ legacyFile ], _ -> coexistingFormsOf directory group.WriterId legacyFile segments
         | _ -> Error(sprintf "multiple legacy files for one writer: %s" group.WriterId)
 
-    let private localLogicalText (commonDir: string) (group: WriterFileGroup) : Result<string, string> =
-        result {
-            let! files = logicalStreamFiles commonDir group
-
-            let! texts =
-                files
-                |> List.traverseResultM (fun name ->
-                    readBytesFileSync (join2 (eventsDirectory commonDir) name)
-                    |> CanonicalEventCodec.tryDecodeUtf8Text
-                    |> Result.mapError (fun reason -> sprintf "not valid UTF-8: %A" reason))
-
-            return String.concat "" texts
-        }
-
     /// durable-events-005: split canonical text into segment-sized chunks at
     /// line boundaries. A single line larger than the cap occupies its own
     /// segment; empty text produces no segments.
@@ -1279,64 +1227,6 @@ module ProcessEventLog =
             durabilityBarrier path)
 
         names
-
-    let private removeSupersededFiles (commonDir: string) (writerId: string) (keep: string list) =
-        writerFilesOf commonDir writerId
-        |> List.filter (fun name -> not (List.contains name keep))
-        |> List.iter (fun name ->
-            let path = join2 (eventsDirectory commonDir) name
-            someWhen (existsSync path) path |> Option.iter unlinkSync)
-
-    /// Merge one writer's logical stream while preserving the producer's
-    /// activity time from the remote snapshot (durable-events-005). The
-    /// incoming text must extend or equal the local logical stream; the
-    /// write-back re-materializes the writer as a segment series, and a
-    /// fetch/import must never make an old writer look new.
-    let mergeWriterTextWithActivity
-        (commonDir: string)
-        (writerId: string)
-        (incoming: string)
-        (incomingActivityMs: float option)
-        : Result<unit, string> =
-        let writer = safeWriterId writerId
-        let directory = eventsDirectory commonDir
-        ensureDirectory directory
-
-        result {
-            let group =
-                { WriterId = writer
-                  FileNames = writerFilesOf commonDir writer }
-
-            let! existing =
-                localLogicalText commonDir group
-                |> Result.mapError (fun reason -> sprintf "writer history is not valid UTF-8: %s" reason)
-
-            if existing = incoming then
-                reconcileSeriesActivity
-                    (group.FileNames |> List.map (fun name -> join2 directory name))
-                    incomingActivityMs
-            elif incoming.StartsWith(existing, StringComparison.Ordinal) then
-                let names = writeSegmentSeries commonDir writer incoming
-                let highest = List.last names
-                removeSupersededFiles commonDir writer names
-                incomingActivityMs |> Option.iter (setWriterActivity (join2 directory highest))
-            elif not (existing.StartsWith(incoming, StringComparison.Ordinal)) then
-                return! Error(sprintf "writer history diverged: %s" writer)
-        }
-
-    /// Replace/import one writer's logical stream only when the incoming
-    /// bytes extend the local complete-line prefix. Divergence is fail-closed
-    /// physical corruption.
-    let mergeWriterText (commonDir: string) (writerId: string) (incoming: string) : Result<unit, string> =
-        mergeWriterTextWithActivity commonDir writerId incoming None
-
-    /// durable-events-005 / durable-convergence-001/011: retention removes a
-    /// writer as a whole — every segment of the series plus the legacy file.
-    let removeWriter (commonDir: string) (writerId: string) : unit =
-        writerFilesOf commonDir writerId
-        |> List.iter (fun name ->
-            let path = join2 (eventsDirectory commonDir) name
-            someWhen (existsSync path) path |> Option.iter unlinkSync)
 
     let private decodeWriterFiles
         (commonDir: string)

@@ -170,7 +170,6 @@ module PluginHooksSurface =
     let private effectLabel =
         function
         | BloggerCoordinator.DecisionEffect.Started -> "Started"
-        | BloggerCoordinator.DecisionEffect.StartedSquash -> "StartedSquash"
         | BloggerCoordinator.DecisionEffect.OfferedParked -> "OfferedParked"
         | BloggerCoordinator.DecisionEffect.NoMaterial -> "NoMaterial"
         | BloggerCoordinator.DecisionEffect.SkippedInFlight -> "SkippedInFlight"
@@ -189,7 +188,7 @@ module PluginHooksSurface =
         (requestId: string)
         : Task<BloggerAdapterObservation> =
         task {
-            let scope = new PluginRuntimeScope(None, (fun _ -> false))
+            let scope = new PluginRuntimeScope(None, (fun _ -> false), None)
             let durable = AgentJournalCompanionPort handle.Journal :> ICompanionDurablePort
             let sessionPort = DispatchSurface.sessionPort port
             // managed-session-lifecycle-001: one lease registry for this isolated
@@ -207,21 +206,30 @@ module PluginHooksSurface =
                 )
 
             let context =
-                BloggerRequestContext.Squash(
+                let toml = "[[new_work_to_record]]\nuser = \"blogger-effect-frame\"\n"
+                let deltaDigest = BlobDigest.create (Wanxiangshu.Host.HostDigest.sha256Hex toml)
+
+                BloggerRequestContext.Main(
                     match
-                        BloggerRequestMaterial.createSquash
+                        BloggerRequestMaterial.createMain
                             { RequestId =
-                                BloggerRequestContext.squashRequestId
+                                BloggerRequestContext.mainRequestId
                                     (SessionId.create mainSession)
                                     (SessionId.create bloggerSession)
-                                    (FrameEpochId.create 1L)
-                                    1
-                                    [ BlobDigest.create "blogger-effect-frame" ]
+                                    deltaDigest
+                                    0L
+                                    1L
                               MainSessionId = SessionId.create mainSession
                               BloggerSessionId = SessionId.create bloggerSession
+                              Items = []
+                              Toml = toml
+                              PreviousIngestedThroughSequence = 0L
+                              NextIngestedThroughSequence = 1L
+                              PreviousCoverableTurnCutoffExclusive = 0
+                              NextCoverableTurnCutoffExclusive = 1
+                              NextCoveredPrefixDigest = "blogger-effect-prefix"
                               FrameEpochId = FrameEpochId.create 1L
-                              CoveredFrameCount = 1
-                              FrameDigests = [ BlobDigest.create "blogger-effect-frame" ]
+                              DeltaDigest = deltaDigest
                               ObservedPrefixEpochId = PrefixEpochId.create 1L }
                     with
                     | Ok verified -> verified

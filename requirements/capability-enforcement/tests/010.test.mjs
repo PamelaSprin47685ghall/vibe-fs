@@ -72,22 +72,9 @@ const allowList = (config, name) => {
     'bash',
     'bash-honeypot',
     'assume',
-    'todowrite',
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
-    'run',
     'fork',
     'resume',
     'commission',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
     'join',
     'horizon',
     'fission',
@@ -96,32 +83,25 @@ const allowList = (config, name) => {
     'fetch',
     'deliver',
     'skill',
+    'todowrite-for-manager',
+    'todowrite-for-orchestrator',
+    'todowrite-for-engineer',
+    'todowrite-for-devops',
   ]
   return tools.filter((tool) => evaluate(rules, tool, '*').action === 'allow')
 }
 const HOST_UTILITY_ALLOW = ['skill']
-const COGNITIVE_UTILITY_ALLOW = ['assume', 'todowrite']
+const COGNITIVE_UTILITY_ALLOW = ['assume']
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
 const ROLE_ALLOW = {
-  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review'],
-  Orchestrator: ['commission', 'join', 'horizon'],
-  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission'],
+  Manager: ['fork', 'resume', 'join', 'horizon', 'deliver', 'review', 'todowrite-for-manager'],
+  Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
+  Engineer: ['bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
-    'run',
     'join',
     'horizon',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
+    'todowrite-for-devops',
   ],
   Blogger: ['chronicle'],
 }
@@ -328,32 +308,28 @@ const { acceptAuthorityRoot, grantWorkOwned, withExecutablePlugin, withPlugin } 
 
 const TOOL_NAMES = [
   'fork', 'resume', 'commission', 'join', 'horizon', 'fission',
-  'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm',
-  'bash-honeypot', 'assume', 'todowrite',
-  'defer',  'publish',
-  'run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
+  'bash-honeypot', 'assume',
   'review', 'chronicle', 'fetch', 'deliver',
+  'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator',
 ]
 const PLUGIN_TOOL_NAMES = [
-  'ask', 'js-plan',
-  'fork', 'resume', 'commission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-  'join', 'horizon', 'fission', 'review', 'deliver', 'run',
-  'mv', 'rm', 'bash-honeypot', 'assume', 'chronicle',
-  'defer',  'publish',
-  'js-engineer', 'js-devops', 'js-manager', 'js-predictor',
+  'ask', 'devops', 'todowrite-for-plan',
+  'fork', 'resume', 'commission',
+  'join', 'horizon', 'fission', 'review', 'deliver',
+  'bash-honeypot', 'assume', 'chronicle',
+  'todowrite-for-engineer', 'todowrite-for-devops', 'todowrite-for-manager', 'todowrite-for-orchestrator', 'todowrite-for-predictor',
 ]
-const HOST_OWNED_TOOL_NAMES = [ 'read', 'write', 'edit', 'glob', 'grep', 'skill', 'todowrite',
+const HOST_OWNED_TOOL_NAMES = ['skill',
 ]
 const ROLE_NAMES = ['orchestrator', 'manager', 'engineer', 'devops', 'blogger']
-const COGNITIVE_TOOLS = ['defer',  'publish']
+const COGNITIVE_TOOLS = []
 const ALLOWED = {
-  orchestrator: ['commission', 'join', 'horizon', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
-  engineer: ['fission', 'read', 'write', 'edit', 'glob', 'grep', 'fetch', 'mv', 'rm', 'bash-honeypot', 'assume', 'todowrite', ...COGNITIVE_TOOLS],
+  orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator', 'assume', ...COGNITIVE_TOOLS],
+  manager: ['fork', 'resume', 'join', 'horizon', 'review', 'deliver', 'todowrite-for-manager', 'assume', ...COGNITIVE_TOOLS],
+  engineer: ['fission', 'fetch', 'bash-honeypot', 'todowrite-for-engineer', 'assume', ...COGNITIVE_TOOLS],
   devops: [
-    'join', 'horizon', 'read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run',
-    'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-    'assume', 'todowrite', ...COGNITIVE_TOOLS,
+    'join', 'horizon', 'todowrite-for-devops',
+    'assume', ...COGNITIVE_TOOLS,
   ],
   blogger: ['chronicle'],
 }
@@ -375,7 +351,7 @@ const fullConfig = () => ({
 
 integrationTest('WHAT[capability-enforcement-010] MANAGER_plugin_registers_only_plugin_owned_capability_tools', async () => {
   await withPlugin(async (hooks) => {
-    // js-predictor 属于插件注册面：WHAT[005] 要求副本面在 deny 全部工具后精准放行它。
+    // todowrite-for-predictor 属于插件注册面：WHAT[005] 要求副本面在 deny 全部工具后精准放行它。
     // 它经 ToolRegistry.fs:267 的 predictorJsSpec () 与其它 js-* 同源注册；注册存在
     // 只是导出面，其准入为 PrivateAttachment 且仅副本会话放行，不等于能力扩大。
     assert.equal(new Set(PLUGIN_TOOL_NAMES).size, PLUGIN_TOOL_NAMES.length, 'shared tools have one registration')
@@ -386,7 +362,7 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_plugin_registers_only_
     for (const toolName of HOST_OWNED_TOOL_NAMES) {
       assert.equal(hooks.tool[toolName], undefined, `${toolName} stays Host-owned`)
     }
-    const forbidden = ['auto-injected', '-', 'tool', 'bash', 'shell', 'inspect', 'establish-behavior', 'repair-behavior', 'query-shell', 'js-browser', 'js-coder', 'js-inspector']
+    const forbidden = ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'auto-injected', '-', 'tool', 'bash', 'shell', 'inspect', 'establish-behavior', 'repair-behavior', 'query-shell', 'js-browser', 'js-coder', 'js-inspector']
     for (const toolName of forbidden) assert.equal(hooks.tool[toolName], undefined, `${toolName} must not be an export`)
   })
 })
@@ -396,11 +372,9 @@ integrationTest('WHAT[capability-enforcement-010] MANAGER_host_schemas_are_prese
       fork: ['calling', 'name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
       resume: ['name', 'charge', 'keywords', 'attach', 'expected_tool_calls'],
       commission: ['calling', 'name', 'charge', 'expected_tool_calls'],
-      chronicle: ['charge', 'occurrence', 'settlement', 'consequence', 'evidence', 'tip'],
+      chronicle: ['charge', 'occurrence', 'settlement', 'consequence', 'tipName', 'opinion', 'advice', 'evidence'],
       'bash-honeypot': [],
       assume: ['assumption'],
-      defer: ['new_work'],
-      publish: ['id', 'message'],
     }
     for (const toolName in expected) {
       for (const argument of expected[toolName]) {

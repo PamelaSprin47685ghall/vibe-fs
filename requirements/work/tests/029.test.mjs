@@ -8,28 +8,29 @@ import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as registry from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as workspaceEvents from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 // The sandbox resolves the active tenure from the unified lifecycle work, so the
 // store is a real workspace store with one opened plan work.
 const openPlanStore = async (root, workId) => {
   execFileSync('git', ['init', '--quiet', root])
-  const store = workspaceEvents.acquire(fs.realpathSync(path.join(root, '.git')))
+  const store = workspaceEvents.acquire(journalSurface.JournalSurface_initializeStateRoot(root))
   const opened = await lifecycle.seedOpen(store, 'plan', workId, root, 1n)
   assert.equal(opened.ok, true, opened.error)
   return store
 }
 
 test('WHAT[work-029] Plan path derivation resolves deterministically and rejects path traversal', () => {
-  const root = '/workspace/test-repo/.git/wanxiangshu'
+  const root = '/workspace/test-repo/.Herdchestra/wanxiangshu'
 
   // Valid work IDs
   const valid1 = surface.PlanningSurface.resolvePlanPath(root, 'work-alpha')
   assert.equal(valid1.ok, true)
-  assert.equal(valid1.path, '/workspace/test-repo/.git/wanxiangshu/plan/work-alpha/plan.md')
+  assert.equal(valid1.path, '/workspace/test-repo/.Herdchestra/wanxiangshu/plan/work-alpha/plan.md')
 
   const valid2 = surface.PlanningSurface.resolvePlanPath(root, 'task_42-v1')
   assert.equal(valid2.ok, true)
-  assert.equal(valid2.path, '/workspace/test-repo/.git/wanxiangshu/plan/task_42-v1/plan.md')
+  assert.equal(valid2.path, '/workspace/test-repo/.Herdchestra/wanxiangshu/plan/task_42-v1/plan.md')
 
   // Insecure work IDs / path traversal attempts MUST be rejected
   const traversalAttempts = [
@@ -95,7 +96,7 @@ test('WHAT[work-029] P is read, rewritten atomically with exclusive temp file, a
   }
 })
 
-test('WHAT[work-029] js-plan programming surface runs via class Js extends JsProgram and strictly forbids path arguments', async () => {
+test('WHAT[work-029] todowrite-for-plan programming surface runs via class Js extends JsProgram and strictly forbids path arguments', async () => {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-prog-test-'))
   const workId = 'work-jsplan-paths'
 
@@ -141,7 +142,7 @@ test('WHAT[work-029] js-plan programming surface runs via class Js extends JsPro
   }
 })
 
-test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks edits and rewrites until review; review unlocks writes and relay re-locks', async () => {
+test('WHAT[work-029] unreviewed tenure permits todowrite-for-plan file reading but blocks edits and rewrites until review; review unlocks writes and relay re-locks', async () => {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-review-gate-test-'))
   const workId = 'work-jsplan-review-gate'
 
@@ -245,7 +246,7 @@ test('WHAT[work-029] unreviewed tenure permits js-plan file reading but blocks e
   }
 })
 
-test('WHAT[work-029] js-plan tool description reuses the shared anchor tutorial with pathless signatures', () => {
+test('WHAT[work-029] todowrite-for-plan tool description reuses the shared anchor tutorial with pathless signatures', () => {
   for (const language of ['en', 'zh-CN']) {
     const description = registry.jsPlanDescription(language)
     const text = description.replace(/\s+/g, ' ')

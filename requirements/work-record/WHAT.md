@@ -38,9 +38,9 @@ includeOpening 只控制输出；即使省略 Opening 段，底层 record 仍完
 
 Opening 是 XTrace 原始区间 [work start, OpeningBoundary)，在 commitment boundary 确立后永久冻结。不从任务文本或第二事实源重建，不重编号 requirements。
 
-## [009] BlindPlan Opening 截止首次 T1 commitment
+## [009] Opening 在 invocation 起点一次冻结
 
-BlindPlan Opening 包括初始委托、前置调查、用户澄清及 accepted planning checkpoints，直到首次 accepted planComplete=true 的 T1 调用及其 accepted 结果；该 call/result 必须完整保留。
+Opening 由 trace owner 在 invocation 开始时捕获且只捕获一次：首个 prompt 的原始委托文本与权威 requirements 按原字节保存；相同文本重放幂等，不同文本被拒绝，此后任何 turn、coverage 或 terminal 都不改写它。Opening 游标终点（= WorkRecordStart）等于该 record 首个语义 part 的 frontier，纯由 XTrace 与生命周期推导，不取业务 Stage、对话转折或 planning checkpoint；旧 BlindPlan T1 / planComplete 判据已退役，不再是边界来源，首个语义 part 之后的材料一律归 Chronicle 或 Recent work。Opening 段原样渲染该 evidence，并原样接纳 trace owner 供应的 Opening 区间渲染（该通道不过滤 raw tool call/result）；供应的 call/result 必须完整保留，不得降级为 incidental tool。
 
 ## [010] sync 与 async 共用记录协议
 
@@ -56,7 +56,7 @@ WorkRecord 仅由 Opening?、Chronicle、Recent work 构成；正式陈述是 Re
 
 ## [013] 工作正文不携带 raw tool 协议
 
-Chronicle 与 Recent work 不含 raw tool call/result 或其 linkage；BlindPlan T1 的 call/result 作为 Opening material 保留。
+Chronicle 与 Recent work 只渲染 text/reasoning（media 以 omission 占位），不含 raw tool call/result 或其 linkage；同一输入必须产生同一文本。Opening 段是唯一例外通道：trace owner 以 Opening 投影（恒等，不滤除 tool）供应的 call/result 作为 Opening material 保留，不得混入 Chronicle 或 Recent work。
 
 ## [014] 两种 coverage 不互代
 

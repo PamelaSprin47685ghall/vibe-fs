@@ -2,8 +2,8 @@ namespace Wanxiangshu.Persistence.Journal
 
 open System.Threading.Tasks
 
-/// Retired obligation-ledger read boundary, plus relay-shaped entry points that
-/// no longer append lifecycle facts.
+/// Retired obligation-ledger read boundary: its entry points refuse and write
+/// nothing (no lifecycle facts are appended here).
 ///
 /// obligation-ledger-007: the magic-todo append is gone. This surface refuses
 /// lifecycle appends and writes nothing.

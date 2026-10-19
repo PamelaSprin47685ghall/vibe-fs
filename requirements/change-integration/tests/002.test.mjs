@@ -1,5 +1,6 @@
 import test from 'node:test'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import { exited, responseReceipt, absentState } from './support/process.mjs'
 
 {
 const { default: assert } = await import("node:assert/strict");
@@ -17,11 +18,11 @@ const fakeRunner = (answers) => {
       if (!key.startsWith(prefix)) continue
       if (Array.isArray(response) && Array.isArray(response[0])) {
         const triple = response.length > 1 ? response.shift() : response[0]
-        return Promise.resolve(triple)
+        return Promise.resolve(responseReceipt(triple))
       }
-      return Promise.resolve(response)
+      return Promise.resolve(responseReceipt(response))
     }
-    return Promise.resolve([0, '', ''])
+    return Promise.resolve(absentState(command))
   }
   return { runner, calls }
 }
@@ -33,7 +34,7 @@ const ok = (result) => {
   return result.value
 }
 const ffAnswers = ({ candidate = 'cafe01', targetHead = 'beef02', branch = 'main' } = {}) => [
-  ['symbolic-ref --short HEAD', [0, `${branch}\n`, '']],
+  ['symbolic-ref --quiet --short HEAD', [0, `${branch}\n`, '']],
   ['rev-parse HEAD', [0, `${candidate}\n`, '']],
   ['rev-parse refs/heads/main', [0, `${targetHead}\n`, '']],
   ['merge-base --is-ancestor', [0, '', '']],
@@ -71,6 +72,7 @@ test('WHAT[change-integration-002] unreadable target cleanliness cannot authoriz
   const fake = fakeRunner(answers)
   const result = await change.gitFfMerge(git(fake.runner), WORKTREE, 'main', 'beef02', 'cafe01')
   assert.equal(result.ok, false)
+  assert.match(result.error, /cannot inspect worktree/)
   assert.equal(fake.calls.some(call => call.args[0] === 'merge'), false)
 })
 test('WHAT[change-integration-002] GIT_ff_merge_refuses_dirty_target_worktree', async () => {
@@ -98,13 +100,13 @@ const job = (id, path = `/tmp/${id}`) => ({
 })
 
 test('WHAT[change-integration-002] Git adapter reports worktree enumeration failure', async () => {
-  const runner = (command) => command.args[0] === 'worktree' ? Promise.resolve([128, '', 'no .git']) : Promise.resolve([0, '', ''])
+  const runner = (command) => Promise.resolve(command.args[0] === 'worktree' ? exited(128, '', 'no .git') : absentState(command))
   const result = await change.gitListWorktrees(change.createGit('/repo', runner))
   assert.equal(result.ok, false)
   assert.match(result.error, /no \.git/)
 })
 test('WHAT[change-integration-002] Git adapter detects a modified target worktree', async () => {
-  const runner = () => Promise.resolve([0, ' M dirty.fs\n', ''])
+  const runner = () => Promise.resolve(exited(0, ' M dirty.fs\n'))
   assert.deepEqual(await change.gitIsDirty(change.createGit('/repo', runner), '/tmp/hostfw5'), { ok: true, value: true })
 })
 }
@@ -123,9 +125,9 @@ const fakeRunner = (answers = []) => {
     calls.push({ args, cwd: command.workingDirectory })
     const key = args.join(' ')
     for (const [prefix, response] of answers) {
-      if (key.startsWith(prefix)) return Promise.resolve(response)
+      if (key.startsWith(prefix)) return Promise.resolve(responseReceipt(response))
     }
-    return Promise.resolve([0, '', ''])
+    return Promise.resolve(absentState(command))
   }
   return { runner, calls }
 }
@@ -170,7 +172,14 @@ const realRunner = (command) => {
     cwd: command.workingDirectory,
     encoding: 'utf8',
   })
-  return Promise.resolve([result.status ?? 1, result.stdout ?? '', result.stderr ?? ''])
+  if (result.error) throw result.error
+  return Promise.resolve({
+    kind: 'Observed',
+    ending: result.signal ? { kind: 'Signaled', signal: result.signal } : { kind: 'Exited', exitCode: result.status },
+    stopRequested: null,
+    output: { kind: 'InMemory', stdout: result.stdout ?? '', stderr: result.stderr ?? '' },
+    fault: null,
+  })
 }
 
 const fixture = () => {
@@ -203,7 +212,7 @@ const withAdmissionFixture = async (status, body) => {
   let host
   try {
     const opened = await journal.JournalSurface_bootWithWriterId(
-      join(fx.repo, '.git'), 'writer-clean-gate', 'runtime-clean-gate', 4242, '2026-01-01T00:00:00Z',
+      join(fx.repo, '.Herdchestra'), 'writer-clean-gate', 'runtime-clean-gate', 4242, '2026-01-01T00:00:00Z',
     )
     assert.equal(opened.ok, true, opened.error)
     handle = opened.journal
@@ -212,11 +221,11 @@ const withAdmissionFixture = async (status, body) => {
       commands.push(command)
       if (command.args[0] === 'status') {
         if (status instanceof Error) throw status
-        return status
+        return responseReceipt(status)
       }
       assert.equal(command.args[0], 'worktree')
       assert.equal(command.args[1], 'add')
-      return [1, '', 'controlled stop before worktree creation']
+      return exited(1, '', 'controlled stop before worktree creation')
     })
     const sessions = fakeSessions()
     host = hostSurface.create({
@@ -231,7 +240,7 @@ const withAdmissionFixture = async (status, body) => {
       targetBranch: 'main',
       orchestratorId: 'orchestrator-clean-gate',
     })
-    const writerFile = join(fx.repo, '.git', 'wanxiangshu', 'events', 'writer-clean-gate-0000.ndjson')
+    const writerFile = join(fx.repo, '.Herdchestra', 'wanxiangshu', 'events', 'writer-clean-gate-0000.ndjson')
     const readHistory = () => {
       try {
         return readFileSync(writerFile, 'utf8')

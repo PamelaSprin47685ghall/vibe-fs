@@ -6,7 +6,6 @@ module ForkChildPayloadSurface =
     val instructions:
         lang: string ->
             {| Base: string array
-               CommissionerRecord: string
                Attachment: string
                Requirements: string |}
 
@@ -18,13 +17,12 @@ module ForkChildPayloadSurface =
         lang: string ->
         input:
             {| Assignment: string
-               CommissionerRecord: string option
                Attachment: string option
                RootRequirements: string array
                Payload: string option |} ->
             string
 
-    val chooseRoad: calling: string -> byname: string -> charge: string -> obj
+    val chooseWork: calling: string -> byname: string -> charge: string -> obj
 
     val reuseBinding:
         byname: string -> boundAgent: string -> requestedAgent: string -> tier: string -> charge: string -> obj

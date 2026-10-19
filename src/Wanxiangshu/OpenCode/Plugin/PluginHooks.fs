@@ -51,7 +51,6 @@ open Wanxiangshu.Execution.Delegation.SyncDelegate.OpenCode
 open Wanxiangshu.Execution.Fission.OpenCode
 open Wanxiangshu.Execution.Session.OpenCode
 open Wanxiangshu.Git
-open Wanxiangshu.Git.Hook
 open Wanxiangshu.Interaction.Dispatch.OpenCode
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Repository.Investigation.Semble
@@ -92,6 +91,9 @@ module PluginHooks =
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
 
+    [<Emit("$0 !== null && $0 !== undefined && typeof $0 === 'object' && !Array.isArray($0) && Object.keys($0).length > 0")>]
+    let private isNonEmptyObject (value: obj) : bool = jsNative
+
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (transform: obj -> obj -> Task<unit>) : Task<obj> =
@@ -119,7 +121,7 @@ module PluginHooks =
             let isReplica (sessionId: SessionId) =
                 boot.StrengthScope.StrengthRuntime.TryFindByReplica sessionId |> Option.isSome
 
-            // planning-014: resolve the stage-method semantic path for the
+            // work-031: resolve the stage-method semantic path for the
             // session's active plan incumbency. Non-plan sessions, missing
             // stores and delivered works resolve None and append nothing, so
             // the non-plan system prompt path stays byte-identical.
@@ -135,7 +137,7 @@ module PluginHooks =
                 | Some Role.Plan ->
                     workspaceDirectory
                     |> Option.bind (fun workspace ->
-                        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+                        let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
 
                         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value sessionId))
                     |> Option.bind (fun work -> stagePathFor work.Stage work.ActiveId)
@@ -152,14 +154,14 @@ module PluginHooks =
                 | Some ws -> CasebookFeature.isEnabled ws
                 | None -> false
 
-            // The Host-native todowrite remains the physical executor, schema and
-            // description included. The plugin records one durable compression
+            // Programming-surface calls carrying a non-empty `view` argument establish
+            // the compression checkpoint. The plugin records one durable compression
             // checkpoint per successfully completed call, keyed by exact call id.
-            let settledTodoCheckpointCalls = HashSet<SessionId * ToolCallId>()
+            let settledViewCheckpoints = HashSet<SessionId * ToolCallId>()
             // obligation-ledger-005: the in-flight append for each identity, so a
             // concurrent duplicate terminal waits for the same append's final
             // outcome instead of reporting an early success.
-            let pendingTodoCheckpointAppends = Dictionary<SessionId * ToolCallId, Task<unit>>()
+            let pendingViewCheckpointAppends = Dictionary<SessionId * ToolCallId, Task<unit>>()
 
             let collectCasebookObservation (toolInput: obj) (toolOutput: obj) =
                 let toolName = if isNull toolInput then "" else string (toolInput?tool)
@@ -194,6 +196,46 @@ module PluginHooks =
                             "$0?.tui?.showToast?.({ body: { title: $1, message: $2, variant: 'info' } })"
                         |> ignore)
 
+            let isToastAvailable () : bool =
+                emitJsExpr client "typeof $0?.tui?.showToast === 'function'"
+
+            let checkQuestionToastResult (response: obj) : Result<unit, string> =
+                if not (isNull response) && not (isNull response?error) then
+                    Error(string response?error)
+                else
+                    Ok()
+
+            let postQuestionToastUnchecked (question: string) : Task<Result<unit, string>> =
+                task {
+                    let title =
+                        ProviderProse.render
+                            (ProviderLanguageBinding.readGlobalPreference ())
+                            "tool/ask-title"
+                            Map.empty
+
+                    let! response =
+                        emitJsExpr
+                            (client, title, question)
+                            "$0.tui.showToast({ body: { title: $1, message: $2, variant: 'info' } })"
+                        |> unbox<Task<obj>>
+
+                    return checkQuestionToastResult response
+                }
+
+            let runGuardedToast (question: string) : Task<Result<unit, string>> =
+                task {
+                    try
+                        return! postQuestionToastUnchecked question
+                    with ex ->
+                        return Error ex.Message
+                }
+
+            let showQuestionToast (question: string) : Task<Result<unit, string>> =
+                if not (isToastAvailable ()) then
+                    Task.FromResult(Error "the Host cannot present a question to the user")
+                else
+                    runGuardedToast question
+
             let configureClient () : Task<ToolRegistration> =
                 task {
                     let! toolModule = importToolModule ()
@@ -210,16 +252,6 @@ module PluginHooks =
                                 includeOpening)
 
                     let parentWorkRecordFor, childWorkRecordFor = workRecord true, workRecord false
-
-                    let childRecordForRun =
-                        fun sid range run ->
-                            LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun journal sid range run
-
-                    let workRecordCapability: Wanxiangshu.Execution.Delegation.DelegationWorkRecordCapability =
-                        { ParentWorkRecord =
-                            fun sid -> LifecycleWorkRecordProjection.lifecycleWorkRecord journal sid true
-                          ParentWorkRecordBounded =
-                            fun sid range -> LifecycleWorkRecordProjection.lifecycleWorkRecordBounded journal sid range }
 
                     let casebookToolSpecs: ToolSpec list =
                         match workspaceDirectory with
@@ -241,8 +273,6 @@ module PluginHooks =
                             onRunStarted
                             parentWorkRecordFor
                             childWorkRecordFor
-                            childRecordForRun
-                            workRecordCapability
                             snapshotOpt
                             (Some wired.CancelSignals)
                             (Some eventPort)
@@ -263,6 +293,8 @@ module PluginHooks =
                                         return Error ex.Message
                                 })
                             userNotify
+
+                    toolRegistration.Runtime.AttachQuestionNotifier(fun question -> showQuestionToast question)
 
                     scope.AttachToolRuntime(toolRegistration.Runtime :> ISessionRuntimeOwner)
 
@@ -335,7 +367,7 @@ module PluginHooks =
                 | None -> false
 
             let isReviewPermitted toolName (facts: ManagerCapabilityFacts) =
-                if toolName = "js-manager" && facts.HasActiveIncumbency then
+                if toolName = "todowrite-for-manager" && facts.HasActiveIncumbency then
                     OfficeCapability.isAllowedForManagerFacts facts ToolPermission.Read
                 else
                     reviewToolPermitted toolName facts
@@ -356,10 +388,10 @@ module PluginHooks =
                 else
                     string toolInput?(name)
 
-            let appendTodoCheckpoint durable sessionText callId =
+            let appendViewCheckpoint durable sessionText callId =
                 task {
                     let fact =
-                        ContextFact.TodoCheckpointCommitted
+                        ContextFact.ViewCheckpointCommitted
                             {| SessionId = SessionId.create sessionText
                                ToolCallId = callId |}
 
@@ -383,7 +415,7 @@ module PluginHooks =
                 else
                     names |> List.tryPick (fun name -> eventText carrier?(name))
 
-            let todoTerminalObservation rawInput =
+            let toolTerminalObservation expectedTool rawInput =
                 let raw = HostEventEnvelope.unwrap rawInput
                 let properties = if isNull raw then null else raw?properties
                 let part = if isNull properties then null else properties?part
@@ -403,53 +435,148 @@ module PluginHooks =
 
                 match HostEventEnvelope.eventTypeOf raw, sessionId, tool, callId, status with
                 | "message.part.updated", Some sessionId, Some tool, Some callId, Some status when
-                    String.Equals(tool, "todowrite", StringComparison.OrdinalIgnoreCase)
+                    String.Equals(tool, expectedTool, StringComparison.OrdinalIgnoreCase)
                     && (status = "completed" || status = "error")
+                    ->
+                    let providerRun =
+                        firstFieldText part [ "messageID"; "messageId" ]
+                        |> Option.map ProviderRunIdentity.create
+
+                    Some(SessionId.value sessionId, ToolCallId.create callId, status, providerRun)
+                | _ -> None
+
+            let viewTerminalObservation rawInput =
+                let raw = HostEventEnvelope.unwrap rawInput
+                let properties = if isNull raw then null else raw?properties
+                let part = if isNull properties then null else properties?part
+                let state = if isNull part then null else part?state
+                let input = if isNull state then null else state?input
+                let view = if isNull input then null else input?view
+
+                let sessionId =
+                    HostEventEnvelope.trySessionId raw
+                    |> Option.orElseWith (fun () ->
+                        firstFieldText part [ "sessionID"; "sessionId" ] |> Option.map SessionId.create)
+
+                let tool = firstFieldText part [ "tool"; "name" ]
+                let callId = firstFieldText part [ "callID"; "callId"; "toolCallId" ]
+
+                let status =
+                    firstFieldText state [ "status" ]
+                    |> Option.map (fun value -> value.ToLowerInvariant())
+
+                match HostEventEnvelope.eventTypeOf raw, sessionId, tool, callId, status with
+                | "message.part.updated", Some sessionId, Some tool, Some callId, Some status when
+                    tool.StartsWith("todowrite-for-", StringComparison.OrdinalIgnoreCase)
+                    && (status = "completed" || status = "error")
+                    && isNonEmptyObject view
                     ->
                     Some(SessionId.value sessionId, ToolCallId.create callId, status)
                 | _ -> None
 
-            let requiredTodoJournal () =
+            let requireUserQuestionInterrupted (result: Result<unit, string>) =
+                match result with
+                | Ok() -> ()
+                | Error reason -> invalidOp ("ask was sent, but its attempt interrupt failed: " + reason)
+
+            let settleUserQuestion rawInput =
+                task {
+                    // `js.ask` inside a plan program records the same durable
+                    // question under the plan tool's call id, so both the
+                    // native ask tool and the plan programming tool complete
+                    // as the interrupt boundary.
+                    let observation =
+                        toolTerminalObservation "ask" rawInput
+                        |> Option.orElseWith (fun () ->
+                            toolTerminalObservation
+                                (Wanxiangshu.Repository.Programming.Js.JsToolGenerator.toolNameFor "plan")
+                                rawInput)
+
+                    match observation, toolRegistration with
+                    | Some(sessionId, callId, "completed", Some providerRun), Some registration ->
+                        // completed 工具部件是占位回执已被 Host 接受的因果边界；不靠定时器猜。
+                        let! result =
+                            registration.Runtime.InterruptForUserQuestion(
+                                SessionId.create sessionId,
+                                providerRun,
+                                callId
+                            )
+
+                        requireUserQuestionInterrupted result
+                    | Some(sessionId, _, "completed", None), Some registration when
+                        registration.Runtime.IsWaitingForUser sessionId
+                        ->
+                        invalidOp
+                            "ask result is missing the exact provider message identity; no attempt was interrupted"
+                    | _ -> ()
+                }
+
+            let requirePostS3Interrupted (result: Result<unit, string>) =
+                match result with
+                | Ok() -> ()
+                | Error reason ->
+                    invalidOp ("post-S3 deliver was recorded, but its attempt interrupt failed: " + reason)
+
+            let settlePostS3Deliver rawInput =
+                task {
+                    match toolTerminalObservation "deliver" rawInput, toolRegistration with
+                    | Some(sessionId, callId, "completed", Some providerRun), Some registration ->
+                        let! result =
+                            registration.Runtime.InterruptForPostS3Deliver(
+                                SessionId.create sessionId,
+                                providerRun,
+                                callId
+                            )
+
+                        requirePostS3Interrupted result
+                    | Some(sessionId, _, "completed", None), Some registration when
+                        registration.Runtime.HasPendingPostS3Interrupt sessionId
+                        ->
+                        invalidOp
+                            "post-S3 deliver result is missing the exact provider message identity; no attempt was interrupted"
+                    | _ -> ()
+                }
+
+            let requiredViewJournal () =
                 journal
-                |> Option.defaultWith (fun () ->
-                    invalidOp "todowrite compression checkpoint requires a durable journal")
+                |> Option.defaultWith (fun () -> invalidOp "view compression checkpoint requires a durable journal")
 
-            let removePendingCheckpoint key =
-                lock pendingTodoCheckpointAppends (fun () -> pendingTodoCheckpointAppends.Remove(key) |> ignore)
+            let removePendingViewCheckpoint key =
+                lock pendingViewCheckpointAppends (fun () -> pendingViewCheckpointAppends.Remove(key) |> ignore)
 
-            let releaseUnattemptedCheckpoint key failure =
+            let releaseUnattemptedViewCheckpoint key failure =
                 match failure with
                 | JournalAppendFailure.WriterUnavailable _ ->
-                    removePendingCheckpoint key
-                    settledTodoCheckpointCalls.Remove(key) |> ignore
+                    removePendingViewCheckpoint key
+                    settledViewCheckpoints.Remove(key) |> ignore
                 | JournalAppendFailure.WriteUnknown _
                 | JournalAppendFailure.NoNewWriteReleaseFailed _
                 | JournalAppendFailure.FactRejected _ -> ()
 
-            let appendTerminalCheckpoint key sessionText callId =
+            let appendTerminalViewCheckpoint key sessionText callId =
                 task {
                     try
-                        do! appendTodoCheckpoint (requiredTodoJournal ()) sessionText callId
-                        removePendingCheckpoint key
+                        do! appendViewCheckpoint (requiredViewJournal ()) sessionText callId
+                        removePendingViewCheckpoint key
                     with :? JournalAppendException as appendFailure ->
-                        releaseUnattemptedCheckpoint key appendFailure.Failure
+                        releaseUnattemptedViewCheckpoint key appendFailure.Failure
                         return raise appendFailure
                 }
 
-            let startTerminalCheckpoint key sessionText callId =
-                lock pendingTodoCheckpointAppends (fun () ->
-                    match pendingTodoCheckpointAppends.TryGetValue(key) with
+            let startTerminalViewCheckpoint key sessionText callId =
+                lock pendingViewCheckpointAppends (fun () ->
+                    match pendingViewCheckpointAppends.TryGetValue(key) with
                     | true, pending -> pending
                     | false, _ ->
-                        let append = appendTerminalCheckpoint key sessionText callId
-                        pendingTodoCheckpointAppends[key] <- append
+                        let append = appendTerminalViewCheckpoint key sessionText callId
+                        pendingViewCheckpointAppends[key] <- append
                         append)
 
-            let settleNewTodoTerminal key sessionText callId status =
-                if not (settledTodoCheckpointCalls.Add(key)) then
+            let settleNewViewCheckpointTerminal key sessionText callId status =
+                if not (settledViewCheckpoints.Add(key)) then
                     Task.FromResult(())
                 elif status = "completed" then
-                    startTerminalCheckpoint key sessionText callId
+                    startTerminalViewCheckpoint key sessionText callId
                 else
                     Task.FromResult(())
 
@@ -463,30 +590,32 @@ module PluginHooks =
             /// semantically refused — repeating it is unsafe), while
             /// WriterUnavailable (NotAttempted) releases the mark so the Host's
             /// retry gets a real second attempt.
-            let settleTodoTerminal (sessionText, callId, status) =
+            let settleViewCheckpointTerminal (sessionText, callId, status) =
                 let key = SessionId.create sessionText, callId
 
                 // A concurrent duplicate first joins the in-flight append (it
                 // must observe the same final outcome); only a terminal with no
                 // pending append consults the settled mark.
                 let joinPending () =
-                    lock pendingTodoCheckpointAppends (fun () ->
-                        match pendingTodoCheckpointAppends.TryGetValue(key) with
+                    lock pendingViewCheckpointAppends (fun () ->
+                        match pendingViewCheckpointAppends.TryGetValue(key) with
                         | true, pending -> Some(pending)
                         | false, _ -> None)
 
                 match joinPending () with
                 | Some pending -> pending
-                | None -> settleNewTodoTerminal key sessionText callId status
+                | None -> settleNewViewCheckpointTerminal key sessionText callId status
 
-            let settleTodoEvent rawInput =
-                todoTerminalObservation rawInput
-                |> Option.map settleTodoTerminal
+            let settleViewCheckpointEvent rawInput =
+                viewTerminalObservation rawInput
+                |> Option.map settleViewCheckpointTerminal
                 |> Option.defaultValue (Task.FromResult(()))
 
             let checkManagerReviewPermissions toolName toolInput =
                 let sessionId = toolField toolInput "sessionID"
-                let blockedNative = toolName = "js-engineer" || toolName = "js-devops"
+
+                let blockedNative =
+                    toolName = "todowrite-for-engineer" || toolName = "todowrite-for-devops"
 
                 if roleFor (SessionId.create sessionId) = Some Role.Manager && blockedNative then
                     invalidOp (sprintf "Manager tool '%s' is refused on the review gate" toolName)
@@ -688,8 +817,9 @@ module PluginHooks =
                         do! prepareNewProtocolArguments owner toolName isDelegationActive toolInput toolOutput
                 }
 
-            // tool.execute.before 的具名 stage 序列。次序即合同（host-boundary-019），
-            // 不得重排。第 1 步无条件最先；第 2 步只对评审工具生效；第 3/4 步
+            // tool.execute.before 的既有 stage 序列。work-049 的显式用户等待在这些
+            // 工作步骤之前拒绝新动作；未等待时仍先 grounding，再评审和参数准备。
+            // 第 2 步只对评审工具生效；第 3/4 步
             // 服务参与工具的估计协议。任何一步抛错即中断本次 before。
             let beforeStageRequirementGrounding (toolInput: obj) (toolOutput: obj) =
                 Wanxiangshu.OpenCode.Host.RequirementGrounding.RequirementGroundingGate.before
@@ -709,8 +839,27 @@ module PluginHooks =
 
             let toolBefore (toolInput: obj) (toolOutput: obj) =
                 task {
-                    do! beforeStageRequirementGrounding toolInput toolOutput
+                    let sessionId = toolField toolInput "sessionID"
                     let toolName = toolField toolInput "tool"
+
+                    // capability-enforcement-002/007: a Host-declared external
+                    // (MCP) tool holds no office capability, so it is advertised
+                    // but fails closed here, before any stage.
+                    match toolRegistration with
+                    | Some registration -> do! ExternalToolAdmission.before registration.Runtime sessionId toolName
+                    | None -> ()
+
+                    match toolRegistration with
+                    | Some registration when toolName <> "ask" && registration.Runtime.IsWaitingForUser sessionId ->
+                        invalidOp (
+                            ProviderProse.render
+                                (ProviderLanguageBinding.forSessionText sessionId)
+                                "tool/ask-waiting"
+                                Map.empty
+                        )
+                    | _ -> ()
+
+                    do! beforeStageRequirementGrounding toolInput toolOutput
                     beforeStageReviewPermission toolName toolInput
 
                     do!
@@ -813,9 +962,47 @@ module PluginHooks =
             let toolAfterRegistration =
                 registeredHook HookKey.ToolAfter (pairedHook (box toolAfter))
 
+            /// context-compression [001]: the provider's own billing for the
+            /// session's latest assistant turn, read off the host's message
+            /// events. It is a datum about the model's own state, never a
+            /// capacity derivation on our side.
+            let tokenUse (raw: obj) : (int * int) option =
+                let info = if isNull raw?properties then null else raw?properties?info
+                let tokens = if isNull info then null else info?tokens
+                let cached = if isNull tokens then null else tokens?cache?read
+                let uncached = if isNull tokens then null else tokens?input
+
+                if
+                    emitJsExpr
+                        (cached, uncached)
+                        "typeof $0 === 'number' && typeof $1 === 'number' && $0 >= 0 && $1 >= 0"
+                then
+                    Some(int (unbox<float> cached), int (unbox<float> uncached))
+                else
+                    None
+
+            let recordProviderTokenUse (rawInput: obj) =
+                let raw = HostEventEnvelope.unwrap rawInput
+
+                let observation =
+                    if HostEventEnvelope.eventTypeOf raw = "message.updated" then
+                        tokenUse raw
+                        |> Option.bind (fun usage ->
+                            HostEventEnvelope.tryMessageSessionId rawInput
+                            |> Option.map (fun sessionId -> sessionId, usage))
+                    else
+                        None
+
+                observation
+                |> Option.iter (fun (sessionId, (cached, uncached)) ->
+                    ProviderTokenUse.record (SessionId.value sessionId) cached uncached)
+
             let observeEvent raw =
                 task {
-                    do! settleTodoEvent raw
+                    recordProviderTokenUse raw
+                    do! settleViewCheckpointEvent raw
+                    do! settleUserQuestion raw
+                    do! settlePostS3Deliver raw
                     do! wired.ObserveEvent raw
                 }
 

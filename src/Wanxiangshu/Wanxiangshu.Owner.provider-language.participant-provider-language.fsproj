@@ -13,6 +13,8 @@
     <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.language.fsproj"/>
     <Compile Include="Participant/Provider/SessionLanguage.fsi"/>
     <Compile Include="Participant/Provider/SessionLanguage.fs"/>
+    <Compile Include="Participant/Provider/DurationLabel.fsi"/>
+    <Compile Include="Participant/Provider/DurationLabel.fs"/>
     <Compile Include="Participant/Provider/Prose.fsi"/>
     <Compile Include="Participant/Provider/Prose.fs"/>
     <Compile Include="OpenCode/Host/ProviderLanguageBinding.fsi"/>

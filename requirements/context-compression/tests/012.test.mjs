@@ -333,14 +333,9 @@ const isPreviousTip = (text) => text.includes('previous_enforcer_tip')
 test('WHAT[context-compression-012] COMPANION_004_request_instructions_require_exactly_one_blog_call', () => {
   assert.match(prompt.normalInstruction, /# Call the chronicle tool exactly once now/)
   assert.match(prompt.normalInstruction, /exactly once/)
-  assert.match(prompt.squashInstruction, /# Call the chronicle tool exactly once now to rewrite/)
-  assert.match(prompt.squashInstruction, /exactly once/)
   assert.equal(prompt.system, undefined, 'System is owned by PromptResources Blogger Role Law, not CompanionPrompt')
 })
-test('WHAT[context-compression-012] ENFORCER_030_squash_and_normal_require_tip_not_omit_scores', () => {
-  assert.match(prompt.squashInstruction, /tip/)
-  assert.match(prompt.squashInstruction, /output no ordinary assistant prose/i)
-  assert.doesNotMatch(prompt.squashInstruction, /omit all scores/)
+test('WHAT[context-compression-012] ENFORCER_030_normal_requires_tip_not_omit_scores', () => {
   assert.match(prompt.normalInstruction, /tip/)
   assert.doesNotMatch(prompt.normalInstruction, /omit.*scores/i)
 })
@@ -477,8 +472,8 @@ test('WHAT[context-compression-012] ENFORCER_071_normal_interleaves_tips_with_fr
     frames: frames(2),
     delta: { messageId: 'msg_delta', items: dataItems },
     previousTips: [
-      { field: 'primitive-obsession', cycleId: 'msg_c1' },
-      { field: 'ignored-tdd', cycleId: 'msg_c2' },
+      { tipName: 'primitive-obsession', cycleId: 'msg_c1' },
+      { tipName: 'ignored-tdd', cycleId: 'msg_c2' },
     ],
   })
 
@@ -505,8 +500,8 @@ test('WHAT[context-compression-012] ENFORCER_071_unpaired_tips_or_frames_append_
     frames: frames(1),
     delta: { messageId: 'msg_d', items: dataItems },
     previousTips: [
-      { field: 'primitive-obsession', cycleId: 'c1' },
-      { field: 'ignored-tdd', cycleId: 'c2' },
+      { tipName: 'primitive-obsession', cycleId: 'c1' },
+      { tipName: 'ignored-tdd', cycleId: 'c2' },
     ],
   })
   assert.deepEqual(
@@ -520,7 +515,7 @@ test('WHAT[context-compression-012] ENFORCER_071_unpaired_tips_or_frames_append_
     kind: proj.normal,
     frames: frames(2),
     delta: { messageId: 'msg_d', items: dataItems },
-    previousTips: [{ field: 'primitive-obsession', cycleId: 'c1' }],
+    previousTips: [{ tipName: 'primitive-obsession', cycleId: 'c1' }],
   })
   assert.deepEqual(
     extraFrame.texts.map((t) => (isPreviousTip(t) ? 'tip' : isHistoricFrame(t) ? 'frame' : 'delta')),
@@ -582,7 +577,7 @@ test('WHAT[context-compression-012] PROJ_008_Companion_owner_normal_rows_render_
     { digest: 'sha-f0', body: 'frame body 0' },
     { digest: 'sha-f1', body: 'frame body 1' },
   ]
-  const previousTips = [{ field: 'progress', cycleId: 'cycle-1' }]
+  const previousTips = [{ tipName: 'progress', cycleId: 'cycle-1' }]
   const delta = { messageId: 'msg_delta', toml: '[[new_work_to_record]]\nuser = "work"' }
   const input = { blogger: 'ses_y', epoch: 0, kind: 'normal', frames, delta, previousTips }
 

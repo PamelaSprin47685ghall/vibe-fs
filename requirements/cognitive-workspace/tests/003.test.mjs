@@ -13,5 +13,5 @@ test('WHAT[cognitive-workspace-003] legacy Cognition facts decode only into a fo
 
   assert.match(fact, /type LegacyCognitionFact/)
   assert.match(envelope, /LegacyCognitionFact/)
-  assert.match(fold, /AgentFact\.Cognition _ -> Ok projection/)
+  assert.match(fold, /AgentFact\.Cognition _\s*\| AgentFact\.Concern _ -> Ok projection/)
 })

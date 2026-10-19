@@ -70,7 +70,8 @@ type InjectedSessionPort
         underlyingPort: IOpenCodePort option,
         eventPort: IEventObservationPort,
         ?familyParent: SessionId -> SessionId option,
-        ?isLifecycleTerminated: SessionId -> bool
+        ?isLifecycleTerminated: SessionId -> bool,
+        ?isUserQuestionWaiting: SessionId -> bool
     ) =
     // DSL-MUTABLE: resource — active terminal listener registry per session
     let activeListeners = Dictionary<SessionId, HashSet<Guid>>()
@@ -390,6 +391,15 @@ type InjectedSessionPort
             | None -> return Error "No Host transport: cannot interrupt attempt"
         }
 
+    let interruptUserQuestion (sessionId: SessionId) =
+        task {
+            Diagnostic.emit "session-user-question-interrupt" [ "session_id", SessionId.value sessionId ]
+            // 只停止提问者的输出；不能取消已入队的人类回复，也不能排空子资源。
+            match underlyingPort with
+            | Some port -> return! port.AbortSession sessionId
+            | None -> return Error "No Host transport: cannot pause for the user question"
+        }
+
     let abortManagedSession (sessionId: SessionId) =
         task {
             Diagnostic.emit "session-abort" [ "session_id", SessionId.value sessionId ]
@@ -476,10 +486,15 @@ type InjectedSessionPort
                 sendRoutedPrompt sessionId text opts
 
         member _.InterruptAttempt sessionId =
+            let waitingForUser =
+                isUserQuestionWaiting |> Option.exists (fun check -> check sessionId)
+
             let terminated =
                 isLifecycleTerminated |> Option.exists (fun check -> check sessionId)
 
-            if not (managedChild sessionId) && not terminated then
+            if waitingForUser then
+                interruptUserQuestion sessionId
+            elif not (managedChild sessionId) && not terminated then
                 Task.FromResult(
                     Error "MANAGED-SESSION-016: user-facing/root session may only be interrupted by the external user"
                 )

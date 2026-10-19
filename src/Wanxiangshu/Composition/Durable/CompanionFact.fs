@@ -27,17 +27,14 @@ module ContextFact =
     let inline BlogObservationCommitted payload =
         AgentFact.Context(ContextFactCases.BlogObservationCommitted payload)
 
-    let inline BlogObservationsSquashed payload =
-        AgentFact.Context(ContextFactCases.BlogObservationsSquashed payload)
-
     let inline BloggerRequestMaterialized payload =
         AgentFact.Context(ContextFactCases.BloggerRequestMaterialized payload)
 
     let inline BloggerRequestAbandoned payload =
         AgentFact.Context(ContextFactCases.BloggerRequestAbandoned payload)
 
-    let inline TodoCheckpointCommitted payload =
-        AgentFact.Context(ContextFactCases.TodoCheckpointCommitted payload)
+    let inline ViewCheckpointCommitted payload =
+        AgentFact.Context(ContextFactCases.ViewCheckpointCommitted payload)
 
     let inline PrefixRebaseCommitted payload =
         AgentFact.Context(ContextFactCases.PrefixRebaseCommitted payload)

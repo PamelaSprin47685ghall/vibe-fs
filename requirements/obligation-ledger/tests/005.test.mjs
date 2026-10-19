@@ -10,16 +10,16 @@ const { acceptAuthorityRoot, withExecutablePlugin } = await import("../../verifi
 const { integrationTest } = await import("../../verification-system/tests/support/tier-gate.mjs");
 const { countFactCase } = await import("../../verification-system/tests/e2e/support/journal-observer.js");
 
-// Count the durable TodoCheckpointCommitted facts in the plugin workspace's
+// Count the durable ViewCheckpointCommitted facts in the plugin workspace's
 // event log — the projection deduping alone cannot prove append idempotence.
 const countCheckpointFacts = (directory) => {
-  const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
+  const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
   let count = 0
   for (const file of readdirSync(eventsDir).filter((file) => file.endsWith('.ndjson'))) {
     const content = readFileSync(join(eventsDir, file), 'utf8')
     assert.ok(content === '' || content.endsWith('\n'), 'durable facts must be complete NDJSON lines')
     const events = content.split('\n').filter(Boolean).map((line) => JSON.parse(line))
-    count += countFactCase(events, 'TodoCheckpointCommitted')
+    count += countFactCase(events, 'ViewCheckpointCommitted')
   }
   return count
 }
@@ -29,14 +29,30 @@ const terminalEvent = (sessionID, callID, status) => ({
     type: 'message.part.updated',
     properties: {
       sessionID,
-      part: { type: 'tool', tool: 'todowrite', callID, state: { status } },
+      part: {
+        type: 'tool',
+        tool: 'todowrite-for-engineer',
+        callID,
+        state: {
+          status,
+          input: {
+            program: 'class Js extends JsProgram { async run() { return {}; } }',
+            view: { prefixUntil: 1 },
+          },
+        },
+      },
     },
   },
 })
 
 const todoCall = (hooks, sessionID, callID) => {
-  const output = { args: { todos: [{ content: 'native todo work', status: 'in_progress', priority: 'high' }] } }
-  return hooks['tool.execute.before']({ tool: 'todowrite', sessionID, callID }, output).then(() => output)
+  const output = {
+    args: {
+      program: 'class Js extends JsProgram { async run() { return {}; } }',
+      view: { prefixUntil: 1 },
+    },
+  }
+  return hooks['tool.execute.before']({ tool: 'todowrite-for-engineer', sessionID, callID }, output).then(() => output)
 }
 
 integrationTest('WHAT[obligation-ledger-005] no checkpoint before the exact completed terminal evidence', async () => {
@@ -47,18 +63,18 @@ integrationTest('WHAT[obligation-ledger-005] no checkpoint before the exact comp
 
     // before: admission alone commits nothing.
     await todoCall(hooks, sessionID, callID)
-    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints, [], 'before admission commits no checkpoint')
+    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints, [], 'before admission commits no checkpoint')
 
     // after: the Host tool part is still running, so no checkpoint either.
     await hooks['tool.execute.after'](
-      { tool: 'todowrite', sessionID, callID, args: { todos: [] } },
-      { title: 'todowrite', output: 'Todos updated', metadata: {} },
+      { tool: 'todowrite-for-engineer', sessionID, callID, args: { program: 'class Js extends JsProgram { async run() { return {}; } }', view: { prefixUntil: 1 } } },
+      { title: 'todowrite-for-engineer', output: 'ok', metadata: {} },
     )
-    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints, [], 'after with the part still running commits no checkpoint')
+    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints, [], 'after with the part still running commits no checkpoint')
 
     // A non-terminal part update (running status) is not terminal evidence.
     await hooks.event(terminalEvent(sessionID, callID, 'running'))
-    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints, [], 'a running part update commits no checkpoint')
+    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints, [], 'a running part update commits no checkpoint')
 
     // A part update for a different tool is not terminal evidence either.
     await hooks.event({
@@ -67,13 +83,13 @@ integrationTest('WHAT[obligation-ledger-005] no checkpoint before the exact comp
         properties: { sessionID, part: { type: 'tool', tool: 'read', callID, state: { status: 'completed' } } },
       },
     })
-    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints, [], 'a completed part for another tool commits no checkpoint')
+    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints, [], 'a completed part for another tool commits no checkpoint')
   })
 })
 
 integrationTest('WHAT[obligation-ledger-005] the exact completed terminal commits exactly one durable checkpoint', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
-    const sessionID = 'ol005-TodoCheckpointCommitted-complete'
+    const sessionID = 'ol005-ViewCheckpointCommitted-complete'
     const callID = 'ol005-call-complete'
     await acceptAuthorityRoot(runtime, sessionID, 'engineer')
     await todoCall(hooks, sessionID, callID)
@@ -82,7 +98,7 @@ integrationTest('WHAT[obligation-ledger-005] the exact completed terminal commit
     await hooks.event(terminalEvent(sessionID, callID, 'completed'))
 
     const snapshot = journalSurface.JournalSurface_snapshot(runtime.journal)
-    assert.deepEqual(snapshot.todoCheckpoints, [
+    assert.deepEqual(snapshot.viewCheckpoints, [
       { sessionId: sessionID, checkpoints: [{ callId: callID }] },
     ], 'the exact completed terminal commits the checkpoint')
 
@@ -92,8 +108,8 @@ integrationTest('WHAT[obligation-ledger-005] the exact completed terminal commit
     await hooks.event(terminalEvent(sessionID, callID, 'completed'))
     assert.equal(countCheckpointFacts(directory), 1, 'the durable log carries exactly one checkpoint fact for the call')
     assert.deepEqual(
-      journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints,
-      snapshot.todoCheckpoints,
+      journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
+      snapshot.viewCheckpoints,
       'the projection is unchanged by the replays',
     )
   })
@@ -108,7 +124,7 @@ integrationTest('WHAT[obligation-ledger-005] an error terminal closes the candid
 
     await todoCall(hooks, sessionID, failedCall)
     await hooks.event(terminalEvent(sessionID, failedCall, 'error'))
-    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints, [], 'an error terminal commits no checkpoint')
+    assert.deepEqual(journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints, [], 'an error terminal commits no checkpoint')
     assert.equal(countCheckpointFacts(directory), 0, 'the durable log carries no checkpoint fact for the error call')
 
     // A repeated error terminal for the same call stays deduplicated.
@@ -119,7 +135,7 @@ integrationTest('WHAT[obligation-ledger-005] an error terminal closes the candid
     await todoCall(hooks, sessionID, goodCall)
     await hooks.event(terminalEvent(sessionID, goodCall, 'completed'))
     assert.deepEqual(
-      journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints,
+      journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
       [{ sessionId: sessionID, checkpoints: [{ callId: goodCall }] }],
       'a later legal call completes normally',
     )
@@ -154,8 +170,8 @@ integrationTest('WHAT[obligation-ledger-005] distinct sessions and calls never c
     await hooks.event(terminalEvent(collideB, 'bc', 'completed'))
 
     const snapshot = journalSurface.JournalSurface_snapshot(runtime.journal)
-    const windowA = snapshot.todoCheckpoints.find((entry) => entry.sessionId === collideA)
-    const windowB = snapshot.todoCheckpoints.find((entry) => entry.sessionId === collideB)
+    const windowA = snapshot.viewCheckpoints.find((entry) => entry.sessionId === collideA)
+    const windowB = snapshot.viewCheckpoints.find((entry) => entry.sessionId === collideB)
     assert.ok(windowA, 'the colliding first session keeps its checkpoint')
     assert.ok(windowB, 'the colliding second session keeps its checkpoint')
     assert.deepEqual(windowA.checkpoints, [{ callId: 'c' }])
@@ -170,7 +186,7 @@ integrationTest('WHAT[obligation-ledger-005] distinct sessions and calls never c
     await todoCall(hooks, colonB, 'a:b')
     await hooks.event(terminalEvent(colonA, 'b', 'completed'))
     await hooks.event(terminalEvent(colonB, 'a:b', 'completed'))
-    const colonWindows = journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints
+    const colonWindows = journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints
     assert.deepEqual(colonWindows.find((entry) => entry.sessionId === colonA)?.checkpoints, [{ callId: 'b' }])
     assert.deepEqual(colonWindows.find((entry) => entry.sessionId === colonB)?.checkpoints, [{ callId: 'a:b' }])
     assert.equal(countCheckpointFacts(directory), 6, 'identities containing the old separator remain independent')
@@ -181,7 +197,7 @@ const { renameSync, writeFileSync } = await import("node:fs");
 // Refuse physical appends in the fixture workspace, restoring its events
 // directory even when the tested operation fails.
 const withBlockedEvents = async (directory, action) => {
-  const eventsDir = join(directory, '.git', 'wanxiangshu', 'events')
+  const eventsDir = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
   const { mkdtempSync: mkStash, mkdirSync, readdirSync, rmSync: rmStash } = await import("node:fs")
   const osModule = await import('node:os')
   const stash = mkStash(join(osModule.tmpdir(), 'wxs-005-stash-'))
@@ -248,7 +264,7 @@ integrationTest('WHAT[obligation-ledger-005] concurrent duplicates of a successf
 
     assert.equal(countCheckpointFacts(directory), 1, 'the shared append commits exactly one durable fact')
     assert.deepEqual(
-      journalSurface.JournalSurface_snapshot(runtime.journal).todoCheckpoints,
+      journalSurface.JournalSurface_snapshot(runtime.journal).viewCheckpoints,
       [{ sessionId: sessionID, checkpoints: [{ callId: callID }] }],
       'the projection carries the single checkpoint',
     )

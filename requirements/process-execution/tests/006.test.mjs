@@ -2,6 +2,120 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { verifyPtyScope } from './support/pty-scope.mjs'
 import { nodeCommand } from './support/executor.mjs'
+import { program } from './support/executor.mjs'
+import { oneCommand } from './support/runnable.mjs'
+import { parse } from 'smol-toml'
+
+const withRegisteredDevOps = async (suffix, action) => {
+  const { withExecutablePlugin, acceptAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+    const sessionID = `registered-${suffix}-devops`
+    const messageID = `${suffix}-user`
+    await acceptAuthorityRoot(runtime, sessionID, 'devops', messageID)
+    await hooks['chat.message']({ sessionID, messageID, agent: 'devops' }, {
+      message: { id: messageID, role: 'user', agent: 'devops' },
+      parts: [{ type: 'text', text: 'Check physical process cancellation.' }],
+    })
+    await action(hooks.tool['todowrite-for-devops'], directory, {
+      sessionID, agent: 'devops', messageID: `${suffix}-assistant`, callID: `${suffix}-run`,
+    }, hooks)
+  })
+}
+
+test('WHAT[process-execution-006] registered pre-cancellation has zero command effects', async () => {
+  const { existsSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  await withRegisteredDevOps('pre-cancel', async (tool, directory, context) => {
+    const marker = join(directory, 'must-not-start')
+    const controller = new AbortController()
+    controller.abort()
+    const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`)
+    const wire = await tool.execute({ program: program(`return await js.run(${oneCommand(command)});`) }, {
+      ...context, abort: controller.signal,
+    })
+    assert.equal(parse(wire).code, 'RUN_CANCELLED_BEFORE_START')
+    assert.equal(existsSync(marker), false)
+  })
+})
+
+test('WHAT[process-execution-006] registered cancellation while queued neither starts the target nor releases another run permit', async () => {
+  const gate = await import('../../../dist/Process/LargeGateSurface.js')
+  const { existsSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { setTimeout: delay } = await import('node:timers/promises')
+  await withRegisteredDevOps('queued-cancel', async (tool, directory, context) => {
+    const marker = join(directory, 'queued-target')
+    const controller = new AbortController()
+    await gate.acquire(gate.createToken(false))
+    let held = true
+    const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`)
+    const pending = tool.execute({ program: program(`return await js.run(${oneCommand(command, { fields: 'worldLock = true;' })});`) }, {
+      ...context, abort: controller.signal,
+    })
+    try {
+      const deadline = performance.now() + 4000
+      while (gate.getPendingCount() !== 1 && performance.now() < deadline) await delay(10)
+      assert.equal(gate.getPendingCount(), 1, 'cancellation must occur after actual queue admission')
+      controller.abort()
+      assert.equal(parse(await pending).code, 'RUN_CANCELLED_BEFORE_START')
+      assert.equal(existsSync(marker), false)
+      assert.equal(gate.getCount(), 0)
+      gate.release()
+      held = false
+      const completed = await tool.execute({ program: program(`return await js.run(${oneCommand(command, { fields: 'worldLock = true;' })});`) }, context)
+      assert.equal(parse(completed).data.exitCode, 0)
+      assert.equal(existsSync(marker), true)
+      assert.equal(gate.getCount(), 1)
+    } finally {
+      controller.abort()
+      if (held) gate.release()
+      await pending.catch(() => {})
+    }
+  })
+})
+
+test('WHAT[process-execution-006] cancellation during a lost startup acknowledgement does not misreport a target that really started as NotStarted', async () => {
+  const { default: files } = await import('node:fs')
+  const { syncBuiltinESMExports } = await import('node:module')
+  const { join } = await import('node:path')
+  const { setTimeout: delay } = await import('node:timers/promises')
+  await withRegisteredDevOps('lost-start-ack', async (tool, directory, context) => {
+    const ready = join(directory, 'really-started')
+    const originalExists = files.existsSync
+    let hiddenReceipts = 0
+    files.existsSync = function (path) {
+      if (/wanxiangli-supervision-[^/]+\/started$/.test(String(path)) && originalExists(path)) {
+        hiddenReceipts += 1
+        return false
+      }
+      return originalExists(path)
+    }
+    syncBuiltinESMExports()
+    const controller = new AbortController()
+    const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(ready)}, 'started'); setInterval(() => {}, 1000)`)
+    const pending = tool.execute({ program: program(`return await js.run(${oneCommand(command)});`) }, {
+      ...context, abort: controller.signal,
+    })
+    try {
+      const deadline = performance.now() + 4000
+      while ((!originalExists(ready) || hiddenReceipts === 0) && performance.now() < deadline) await delay(10)
+      assert.equal(originalExists(ready), true)
+      assert.ok(hiddenReceipts > 0)
+      controller.abort()
+      const observed = parse(await pending).data
+      assert.equal(observed.status, 'aborted')
+      assert.equal(observed.stopRequested, 'cancellation')
+      assert.equal(observed.notStarted, false)
+      assert.equal(observed.endUnconfirmed, true)
+      assert.equal(observed.outputComplete, false)
+    } finally {
+      controller.abort()
+      files.existsSync = originalExists
+      syncBuiltinESMExports()
+      await pending.catch(() => {})
+    }
+  })
+})
 
 test('WHAT[process-execution-006] a waiter fault without token cancellation keeps its original error', async () => {
   const runtime = await import('../../../dist/Process/Surface.js')
@@ -59,9 +173,9 @@ test('WHAT[process-execution-006] the registered DevOps tool observes real Host 
         const controller = new AbortController()
         const modelsBefore = created.length
         const promptsBefore = runtime.prompts.length
-        const pending = hooks.tool.run.execute({
-          command: nodeCommand(`const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${ready}.pending`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${ready}.pending`)}, ${JSON.stringify(ready)}); setInterval(() => {}, 1000)`),
-          output_budget_bytes: 512,
+        const command = nodeCommand(`const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${ready}.pending`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${ready}.pending`)}, ${JSON.stringify(ready)}); setInterval(() => {}, 1000)`)
+        const pending = hooks.tool['todowrite-for-devops'].execute({
+          program: program(`return await js.run(${oneCommand(command, { maxDuration: 60000, fields: 'outputBudgetBytes = 1024;' })});`),
         }, { sessionID, agent: 'devops', messageID: 'registered-abort-assistant', callID: `abort-${language}`, abort: controller.signal })
         let pid
         try {
@@ -71,9 +185,13 @@ test('WHAT[process-execution-006] the registered DevOps tool observes real Host 
           assert.equal(alive(pid), true)
           controller.abort()
           const wire = await pending
-          assert.match(wire, /stop_requested = "cancellation"/)
-          assert.doesNotMatch(wire, /exit_code|SpawnFailed|ExecutionFailed/)
-          assert.ok(Buffer.byteLength(wire) <= 512)
+          const observed = parse(wire).data
+          assert.equal(observed.status, 'aborted')
+          assert.equal(observed.stopRequested, 'cancellation')
+          assert.equal(observed.outputComplete, false)
+          assert.equal(typeof observed.scopeClosed, 'boolean')
+          if (observed.signal) assert.equal(observed.signal, 'SIGKILL')
+          assert.ok(Buffer.byteLength(wire) <= 1024)
           assert.equal(created.length, modelsBefore)
           assert.equal(runtime.prompts.length, promptsBefore)
           await until(() => !alive(pid))
@@ -98,6 +216,93 @@ test('WHAT[process-execution-006] Ctrl-Z stops the direct target while its group
     assert.equal(evidence.anchorRunnable, true)
     assert.equal(evidence.killed, true)
   }))
+
+test('WHAT[process-execution-006] runtime disposal cancels a real registered pipe run before releasing its process owner', { timeout: 15000 }, async () => {
+  const { withExecutablePlugin, acceptAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const { existsSync, readFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { setTimeout: delay } = await import('node:timers/promises')
+  await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+    const sessionID = 'registered-dispose-devops'
+    await acceptAuthorityRoot(runtime, sessionID, 'devops', 'dispose-user')
+    await hooks['chat.message']({ sessionID, messageID: 'dispose-user', agent: 'devops' }, {
+      message: { id: 'dispose-user', role: 'user', agent: 'devops' },
+      parts: [{ type: 'text', text: 'Check process owner disposal.' }],
+    })
+    const ready = join(directory, 'dispose-ready')
+    const controller = new AbortController()
+    const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(ready)}, String(process.pid)); setInterval(() => {}, 1000)`)
+    const pending = hooks.tool['todowrite-for-devops'].execute({
+      program: program(`return await js.run(${oneCommand(command, { maxDuration: 60000 })});`),
+    }, { sessionID, agent: 'devops', messageID: 'dispose-assistant', callID: 'dispose-run', abort: controller.signal })
+    let disposing
+    try {
+      const deadline = performance.now() + 4000
+      while (!existsSync(ready) && performance.now() < deadline) await delay(10)
+      assert.equal(existsSync(ready), true)
+      const pid = Number(readFileSync(ready, 'utf8'))
+      disposing = hooks.dispose()
+      const closed = await Promise.race([disposing.then(() => true), delay(1500).then(() => false)])
+      assert.equal(closed, true, 'disposal must cancel the live process without waiting for its 60-second budget')
+      await pending
+      assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' })
+    } finally {
+      controller.abort()
+      await pending.catch(() => {})
+      await disposing?.catch(() => {})
+    }
+  })
+})
+
+test('WHAT[process-execution-006] an unknown physical close returns a bounded drain failure and retains the exact ownership blocker until close arrives', { timeout: 10000 }, async () => {
+  const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
+  const result = await ToolRuntimeScopeSurface.verifyUnknownProcessDrain()
+  assert.equal(result.admitted, true)
+  assert.equal(result.cancelled, true)
+  assert.match(result.failure, /Process scope closure was not confirmed/)
+  assert.ok(result.before.length > 0)
+  assert.deepEqual(result.afterUnknown, result.before)
+  assert.deepEqual(result.afterClose, [])
+  assert.equal(result.lateAdmitted, false)
+  assert.equal(result.lateStarts, 0)
+})
+
+test('WHAT[process-execution-006] a parked registered run keeps its owner until disposal unwinds its finalizer and clears the stale handle', async () => {
+  const { existsSync, readFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { execute } = await import('../../../dist/Repository/Programming/Js/WorkflowSurface.js')
+  await withRegisteredDevOps('parked-owner', async (tool, directory, context, hooks) => {
+    const marker = join(directory, 'finally.txt')
+    const pidFile = join(directory, 'parked-target')
+    const command = `exec ${nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); process.stdout.write('READY'); setInterval(() => {}, 1000)`)}`
+    const wire = await tool.execute({ program: program(`const host = this;
+      try {
+        await js.run(class extends js.Runnable {
+          maxDuration = 60000;
+          interval = 25;
+          next(ctx) { return ctx.step === 0 ? ${JSON.stringify(command)} : null; }
+          watch(ctx) { if (ctx.stdout) return { park: { ready: true } }; return ctx.remainingMs > 0; }
+          sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+        });
+        await host.write('continued.txt', 'must not run after abandon');
+      } finally {
+        await host.write('finally.txt', 'cleanup completed');
+      }
+      return {};`) }, context)
+    const parked = parse(wire)
+    assert.ok(parked.handle)
+    assert.equal(existsSync(pidFile), true)
+    const pid = Number(readFileSync(pidFile, 'utf8'))
+    assert.equal(existsSync(marker), false)
+    await hooks.dispose()
+    assert.equal(readFileSync(marker, 'utf8'), 'cleanup completed')
+    assert.equal(existsSync(join(directory, 'continued.txt')), false)
+    assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' })
+    const resumed = await execute(directory, 'DevOps', 'en', context.sessionID, { unpark: { handle: parked.handle, value: 'continue' } }, 1000, Date.now() + 1000, 2048, null)
+    const { render } = await import('../../../dist/Repository/Programming/Js/WorkflowSurface.js')
+    assert.match(render(resumed), /HANDLE_UNKNOWN/)
+  })
+})
 
 test('WHAT[process-execution-006] a real PTY keeps job control and drains a separate background group', t =>
   verifyPtyScope(t, 'job-control', evidence => {

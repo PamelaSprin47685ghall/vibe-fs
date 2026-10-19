@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
 import { DatabaseSync } from 'node:sqlite'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -9,13 +10,14 @@ import { SqliteJournal } from 'wanxiangli/eventstore'
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as surface from '../../../dist/Mission/Planning/Surface.js'
 import * as workspace from '../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js'
-import { withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import { ensurePlanWorkOpenedForSession } from '../../../dist/OpenCode/Plugin/PlanWorkOpenWiring.js'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const life = lifecycle.LifecycleSurface ?? lifecycle
 
 const withStore = async (body) => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-planning-020-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   try {
     await body(workspace.acquire(commonDir), root, commonDir)
@@ -96,7 +98,7 @@ test('WHAT[work-036] the first prompt of a plan session opens the work and start
 
 test('WHAT[work-036] the entry needs only the lifecycle journal directory, not an acquired workspace EventStore', async () => {
   const root = mkdtempSync(join(tmpdir(), 'wxs-planning-no-event-store-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir, { recursive: true })
   try {
     const legacyEvents = join(commonDir, 'wanxiangshu', 'events')
@@ -151,7 +153,7 @@ test('WHAT[work-036] subsequent manager transform passes on an already-open work
 
     await hooks['experimental.chat.messages.transform']({ sessionID: managerSession }, { messages: [user1] })
 
-    const commonDir = join(directory, '.git')
+    const commonDir = join(directory, '.Herdchestra')
     const store = workspace.acquire(commonDir)
     const openingEvents = () => {
       const path = life.journalPath(store.gitCommonDir)
@@ -193,7 +195,7 @@ test('WHAT[work-036] subsequent manager transform passes on an already-open work
 test('WHAT[work-036] manager opening fails closed when the same session id already names a Plan work', async () => {
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const managerSession = 'ses-manager-sequence-collision'
-    const commonDir = join(directory, '.git')
+    const commonDir = join(directory, '.Herdchestra')
     const store = workspace.acquire(commonDir)
     const seeded = await life.seedOpen(store, 'plan', managerSession, directory, 1n)
     assert.equal(seeded.ok, true, seeded.error)
@@ -216,5 +218,82 @@ test('WHAT[work-036] manager opening fails closed when the same session id alrea
       /Manager lifecycle opening failed: existing lifecycle work has a different sequence/,
     )
     assert.deepEqual(life.workView(store, managerSession).sequence, 'S1,S2,S3')
+  })
+})
+
+test('WHAT[work-036] the first plan prompt opens work at the git worktree root, not the state directory', async () => {
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), 'wxs-plan-open-root-')))
+  try {
+    execFileSync('git', ['init', '--quiet', directory])
+    const planSession = 'ses-plan-first-prompt-root'
+    await ensurePlanWorkOpenedForSession(directory, planSession, 3n)
+
+    const path = life.journalPath(join(directory, '.Herdchestra'))
+    const database = new DatabaseSync(path)
+    const journal = new SqliteJournal(database)
+    let opened
+    try {
+      const events = journal.read(planSession).flatMap((line) => JSON.parse(line).events ?? [])
+      opened = events.find((event) => event.type === 'WorkOpened')
+    } finally {
+      journal.close()
+    }
+    assert.equal(opened.root, directory)
+    assert.deepEqual(opened.sequence, ['S1', 'S2', 'S3'])
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+test('WHAT[work-036] only a Manager session opens execution work; another managed role opens nothing', async () => {
+  await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
+    const drive = async (agent) => {
+      const sessionId = `ses-entry-closed-${agent}`
+      const physical = `root-${sessionId}`
+      await acceptAuthorityRoot(runtime, sessionId, agent, physical)
+      const user = {
+        info: { id: physical, sessionID: sessionId, role: 'user', agent, time: { created: 1 } },
+        parts: [{ id: `prt-${agent}`, type: 'text', text: 'first instruction' }],
+      }
+      await hooks['chat.message']({ sessionID: sessionId, agent }, { message: user.info, parts: user.parts })
+      runtime.pushHostMessage(sessionId, user)
+      runtime.pushHostMessage(sessionId, {
+        info: {
+          id: `asst-${agent}`,
+          sessionID: sessionId,
+          parentID: physical,
+          role: 'assistant',
+          agent,
+          providerID: 'provider',
+          modelID: `${agent}-model`,
+          time: { created: 2 },
+        },
+        parts: [],
+      })
+      await hooks['experimental.chat.messages.transform']({ sessionID: sessionId }, { messages: [user] })
+      return sessionId
+    }
+
+    const store = workspace.acquire(join(directory, '.Herdchestra'))
+    const eventsOf = (sessionId) => {
+      const path = life.journalPath(store.gitCommonDir)
+      if (!existsSync(path)) return []
+      const database = new DatabaseSync(path)
+      const journal = new SqliteJournal(database)
+      try {
+        return journal.read(sessionId).flatMap((line) => JSON.parse(line).events ?? [])
+      } finally {
+        journal.close()
+      }
+    }
+
+    const engineer = await drive('engineer')
+    const devops = await drive('devops')
+    assert.deepEqual(eventsOf(engineer), [], 'an Engineer session owns no lifecycle work')
+    assert.deepEqual(eventsOf(devops), [], 'a DevOps session owns no lifecycle work')
+
+    const manager = await drive('manager')
+    assert.deepEqual(eventsOf(manager).map((event) => event.type), ['WorkOpened', 'IncumbencyOpened'])
+    assert.deepEqual(eventsOf(manager)[0].sequence, ['S4'])
   })
 })

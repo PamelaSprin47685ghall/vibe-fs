@@ -192,14 +192,14 @@ module XWire =
         }
 
     /// context-compression-028: the boundary selected by the fixed-K window of
-    /// successful todowrite checkpoints.
+    /// successful view declaration checkpoints.
     let internal checkpointWindowDesire (state: WireSessionState) : int option =
         let xTrace = state.XTrace |> Option.defaultValue XTraceProjection.empty
 
         match
             PhaseWindow.desiredCutoffOf
                 (fun callId -> XTraceProjection.tryTurnOfToolCallId callId xTrace)
-                state.TodoCheckpoints
+                state.ViewCheckpoints
         with
         | PhaseWindowDecision.KeepFrom cutoffExclusive -> Some cutoffExclusive
         | PhaseWindowDecision.NoPhases -> None

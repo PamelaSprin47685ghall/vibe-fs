@@ -42,6 +42,9 @@ module LargeGate =
     let getCount () =
         lock gate (fun () -> if held then 0 else 1)
 
+    let getPendingCount () =
+        lock gate (fun () -> waiters |> Seq.filter (fun waiter -> not waiter.IsCanceled) |> Seq.length)
+
     let private grantWaiter (waiter: Waiter) =
         if waiter.TryGrant() then
             held <- true

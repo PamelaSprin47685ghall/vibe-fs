@@ -39,7 +39,6 @@ test('WHAT[context-compression-008] CTX_010_a_companion_request_never_asks_for_a
   // attempt it repairs already sent.
   for (const kind of [
     requestKind.bloggerMain,
-    requestKind.bloggerSquash,
     requestKind.interactionRepair,
     requestKind.strengthReplica,
   ]) {
@@ -87,7 +86,6 @@ const budget = failureOwner.budget
 test('WHAT[context-compression-008] only work_main requests may carry prefix probe', () => {
   assert.equal(requestKind.mayCarryProbe(requestKind.workMain), true)
   assert.equal(requestKind.mayCarryProbe(requestKind.bloggerMain), false)
-  assert.equal(requestKind.mayCarryProbe(requestKind.bloggerSquash), false)
   assert.equal(requestKind.mayCarryProbe(requestKind.interactionRepair), false)
 })
 }

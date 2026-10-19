@@ -15,6 +15,9 @@ type Role =
     | Distiller
     | Blogger
     | Plan
+    /// On-demand second opinion: a dedicated reviewer participant that reads a
+    /// view of the caller's context and answers in prose, holding no tools.
+    | Advisor
 
 module Roles =
 
@@ -24,7 +27,8 @@ module Roles =
           Role.Engineer
           Role.DevOps
           Role.Blogger
-          Role.Plan ]
+          Role.Plan
+          Role.Advisor ]
 
     /// Canonical wire label for a role (lowercase, AGENT-001 vocabulary).
     let roleLabel (role: Role) : string =
@@ -35,6 +39,7 @@ module Roles =
         | Role.DevOps -> "devops"
         | Role.Blogger -> "blogger"
         | Role.Plan -> "plan"
+        | Role.Advisor -> "advisor"
         | Role.Coder -> "coder"
         | Role.Inspector -> "inspector"
         | Role.Browser -> "browser"
@@ -49,6 +54,7 @@ module Roles =
         | "devops" -> Some Role.DevOps
         | "blogger" -> Some Role.Blogger
         | "plan" -> Some Role.Plan
+        | "advisor" -> Some Role.Advisor
         | "coder" -> Some Role.Coder
         | "inspector" -> Some Role.Inspector
         | "browser" -> Some Role.Browser
@@ -63,5 +69,6 @@ module Roles =
     let isInternal (role: Role) : bool =
         match role with
         | Role.Blogger
+        | Role.Advisor
         | Role.Distiller -> true
         | _ -> false

@@ -3,17 +3,10 @@ namespace Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 
-/// COMPANION-005: what a frame is. Entry and Squash are interchangeable inputs to
-/// a later squash (CTX-012 cascade). There is no Seed: the parent LWR is a child's
+/// COMPANION-005: what a frame is. There is no Seed: the parent LWR is a child's
 /// input context, never a frame of the child's own work log (COMPANION-003).
-///
-/// The kind is recorded rather than derived because a squash of `[Entry; Entry]`
-/// is indistinguishable from a squash of `[Entry; Entry]` once written, and
-/// diagnostics need to say which history a frame came from.
 [<RequireQualifiedAccess>]
-type BlogFrameKind =
-    | Entry
-    | Squash
+type BlogFrameKind = | Entry
 
 type BlogFrame =
     {
@@ -96,8 +89,6 @@ type BlogFoldRejection =
     | IngestCursorMismatch
     /// Coverage moved backwards. CTX-011 forbids retreating within one numbering.
     | CoverageRetreated
-    /// A squash claimed a frame count outside `1 .. current`.
-    | CoveredFrameCountOutOfRange of claimed: int * available: int
 
 // PERSIST-007's "TextDigest = digest(blob content)" is deliberately NOT a case
 // here. This module is pure and holds only a `BlobRef`, so it cannot read the body
@@ -152,14 +143,6 @@ module BlogProjection =
         coverableFrames state
         |> List.takeWhile (fun frame -> frame.CutoffExclusive <= cutoffExclusive)
 
-    /// CTX-012: how many of the oldest frames the next squash takes.
-    ///
-    /// `ceil(m / 2)`, and `m = 1` is not skipped — a single frame can still be
-    /// large and redundant enough for a rewrite to shorten it materially.
-    let squashWidth (state: BlogProjectionState) =
-        let m = frameCount state
-        if m = 0 then 0 else (m + 1) / 2
-
     /// PERSIST-010 `BlogObservationCommitted`. Frame append and coverage advance are one
     /// commit, so one function applies both or neither.
     ///
@@ -209,67 +192,6 @@ module BlogProjection =
                           // let a probe summarise a turn that is also still raw.
                           CoverableFrameCount =
                             coverableFrameCount previousCutoff nextCutoff nextFrames state.Coverage.CoverableFrameCount } }
-
-    /// PERSIST-010 `BlogObservationsSquashed`. Replaces the oldest `count` frames with
-    /// one, advances the frame epoch, and leaves coverage untouched.
-    ///
-    /// `count = frameCount` is allowed: collapsing every frame into one is a
-    /// legitimate cascade step. What is refused is a count larger than what exists,
-    /// or zero.
-    let applySquash
-        (previousEpoch: FrameEpochId)
-        (nextEpoch: FrameEpochId)
-        (count: int)
-        (frame: BlogFrame)
-        (state: BlogProjectionState)
-        : Result<BlogProjectionState, BlogFoldRejection> =
-        let available = frameCount state
-
-        if previousEpoch <> state.FrameEpochId then
-            Error(BlogFoldRejection.StaleFrameEpoch(state.FrameEpochId, previousEpoch))
-        elif nextEpoch <> FrameEpochId.next previousEpoch then
-            Error BlogFoldRejection.NonSequentialFrameEpoch
-        elif count < 1 || count > available then
-            Error(BlogFoldRejection.CoveredFrameCountOutOfRange(count, available))
-        else
-            // The coverable boundary is a frame INDEX, so collapsing frames below it
-            // moves it. The cutoff and the digest do not change — a squash rewrites how
-            // B is represented, not which X turns it covers (CTX-012).
-            //
-            // Three cases, and the middle one is why this is not just a subtraction:
-            //
-            //   count < coverable   the boundary shrinks by `count - 1`
-            //   count >= coverable  the whole covered region became one frame, so the
-            //                       boundary is that frame alone. The frame may also
-            //                       carry material past the cutoff; that is redundancy
-            //                       (those turns are still raw after it), not a false
-            //                       claim, because the cutoff and its digest are
-            //                       statements about X's prefix, not about B's contents.
-            //   coverable = 0       nothing was coverable, and a squash cannot create
-            //                       coverage out of frames the cutoff never claimed.
-            let coverable = state.Coverage.CoverableFrameCount
-
-            let nextCoverable = if coverable = 0 then 0 else max 1 (coverable - count + 1)
-
-            let oldestFirst = frames state
-            let replaced = List.truncate count oldestFirst
-
-            // Squash unions replaced frames' coverage (min from, max through).
-            // A merged interval can span invocations. Bounded readers require
-            // complete containment or use the original interval.
-            let storedFrame =
-                { frame with
-                    CoveredFromSequence = replaced |> List.map (fun item -> item.CoveredFromSequence) |> List.min
-                    CoveredThroughSequence = replaced |> List.map (fun item -> item.CoveredThroughSequence) |> List.max
-                    CutoffExclusive = replaced |> List.map (fun item -> item.CutoffExclusive) |> List.max }
-
-            Ok
-                { state with
-                    FrameEpochId = nextEpoch
-                    Frames = List.rev (storedFrame :: List.skip count oldestFirst)
-                    Coverage =
-                        { state.Coverage with
-                            CoverableFrameCount = nextCoverable } }
 
     /// HOST-006 containment: Host compaction voided the Host turn numbering that
     /// PrefixCoverage indexes. Only the prefix mapping returns to the origin.

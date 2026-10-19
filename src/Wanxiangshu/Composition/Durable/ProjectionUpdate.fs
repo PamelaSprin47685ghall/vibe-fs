@@ -2,8 +2,6 @@ namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Fission
-open Wanxiangshu.Interaction.Attention
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
@@ -60,26 +58,3 @@ module ProjectionUpdate =
         |> Result.mapError (fun reason ->
             { Fact = "Fission"
               Reason = sprintf "%A" reason })
-
-    let applyConcern (projection: AgentProjectionSet) (fact: ConcernFactCases) =
-        ConcernProjection.applyFact fact projection.Concern
-        |> Result.map (fun updated -> { projection with Concern = updated })
-        |> Result.mapError (fun reason -> { Fact = "Concern"; Reason = reason })
-
-    let applyAttention
-        (projection: AgentProjectionSet)
-        (fact: AttentionFactCases)
-        : Result<AgentProjectionSet, FoldRejection> =
-        match fact with
-        | AttentionFactCases.DeferredWorkRecorded payload ->
-            Ok
-                { projection with
-                    Attention =
-                        projection.Attention
-                        |> AttentionProjection.record payload.SessionId payload.OccurrenceId payload.Text }
-        | AttentionFactCases.DeferredWorkConsumed payload ->
-            Ok
-                { projection with
-                    Attention =
-                        projection.Attention
-                        |> AttentionProjection.consume payload.SessionId payload.OccurrenceIds }

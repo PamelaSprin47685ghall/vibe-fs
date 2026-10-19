@@ -9,7 +9,7 @@ open Wanxiangshu.Mission.Planning
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 
-/// relay-assessment-011: the shared `review` shell. Owns the one ToolSpec
+/// work-038: the shared `review` shell. Owns the one ToolSpec
 /// (name, description, findings schema, admission) and dispatches by caller
 /// role: Plan goes to the plan backend (ReviewPlanBackend), every other
 /// admitted caller goes to the Manager backend (ReviewBackendManager). The
@@ -31,8 +31,20 @@ module ReviewShell =
         [<Literal>]
         let PlanStayed = "tool/review/plan-stayed"
 
+        [<Literal>]
+        let PlanS2 = "planning/s2"
+
+        [<Literal>]
+        let PlanS3 = "planning/s3"
+
     let private providerText (path: string) substitutions =
         ProviderProse.render (ProviderLanguageBinding.readGlobalPreference ()) path substitutions
+
+    let private promotedStageInstructions (target: string) =
+        match target with
+        | "S2" -> [ providerText Path.PlanS2 Map.empty ]
+        | "S3" -> [ providerText Path.PlanS3 Map.empty ]
+        | _ -> []
 
     let admission =
         ToolAdmission.OfficeRole(fun _ role ->
@@ -56,16 +68,16 @@ module ReviewShell =
         sprintf "- acceptance_criteria: %s | work_plan: %s" acceptance workPlan
 
     let private planAccepted (review: PlanReviewResult) =
-        // planning-022: the gaps return to the model as repair obligations,
-        // echoed verbatim below the outcome instruction.
-        let instructionPath =
-            if review.Outcome = PlanReviewOutcome.Promoted then
-                Path.PlanPromoted
-            else
-                Path.PlanStayed
-
+        // work-038: the gaps return to the model as repair obligations,
+        // echoed verbatim below the outcome instruction; a promotion to a new
+        // stage returns that stage's method in the same tool response so the
+        // current tenure can begin its stretch immediately.
         let instructions =
-            [ providerText instructionPath Map.empty ] @ (review.Gaps |> List.map gapLine)
+            if review.Outcome = PlanReviewOutcome.Promoted then
+                [ providerText Path.PlanPromoted Map.empty ]
+                @ promotedStageInstructions review.Target
+            else
+                [ providerText Path.PlanStayed Map.empty ] @ (review.Gaps |> List.map gapLine)
 
         ToolHostCodec.tomlObjectWithInstructions instructions [ "recorded", ToolHostCodec.TBool true ]
 
@@ -75,7 +87,7 @@ module ReviewShell =
         | Ok review -> planAccepted review
 
     // Same findings schema and three-question semantics as the Manager
-    // backend (relay-assessment-011 shared shell).
+    // backend (work-038 shared shell).
     let private parseFindings (args: HostToolArguments) : Result<ReviewFindings, string> =
         match Model.tryParse args.Raw with
         | Error _ -> Error ReviewBackendManager.Path.InvalidFindings
@@ -113,7 +125,7 @@ module ReviewShell =
 
     let private executePlan (gitCommonDir: string) (args: HostToolArguments) (context: HostToolContext) : Task<string> =
         task {
-            // planning-022 binding: workId is the caller's session.
+            // work-038 binding: workId is the caller's session.
             match preparePlanReview gitCommonDir args context with
             | Error path -> return planRejected path
             | Ok(incumbencyId, gaps) ->
@@ -137,7 +149,7 @@ module ReviewShell =
         let dispatch args context =
             let gitCommonDir =
                 scope.WorkspaceDirectory
-                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
                 |> Option.defaultValue ""
 
             if scope.IsRole(context, Role.Plan) then

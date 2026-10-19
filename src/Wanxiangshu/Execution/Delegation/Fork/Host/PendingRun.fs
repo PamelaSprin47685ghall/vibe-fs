@@ -20,7 +20,6 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 
@@ -30,8 +29,6 @@ type PendingHostRun =
       AgentId: string
       ChildId: SessionId
       Role: Role
-      StartCursor: XTraceCursor
-      Handoff: PreparedDelegationHandoff option
       AuthorityRoot: AuthorityRootUserMessageId
       Work: AdmittedWork option
       Source: TaskCompletionSource<AgentCompletionOutcome>

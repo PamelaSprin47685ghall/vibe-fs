@@ -1,0 +1,73 @@
+HOOK CHAT MESSAGE FAILED: ChatAdmissionHookException {
+  message: 'Managed chat admission failed: TransactionFailed (AcceptanceFailed (AuthorityRegistrationRejected (ActiveRunIdentityConflict ({ StoredSessionId = SessionId "host-child-1-12a6eea31bd65"\n' +
+    '  StoredLogicalRunId = LogicalRunId "237380aad73d3a3e11c653a1e14b0dc0e2d475454938ea20d883c2df0389e2f7"\n' +
+    '  StoredAuthorityRootUserMessageId = AuthorityRootUserMessageId "msg-host-child-1-12a6eea31bd65-0"\n' +
+    '  StoredAuthorityKind = AgentOwnerRoot\n' +
+    '  StoredIdentitySeed = InheritedFromOwner ({ StoredOwnerSessionId = SessionId "advisor-live-answer-owner"\n' +
+    '  StoredOwnerLogicalRunId = LogicalRunId "eb82437cc7b725114437d911531a1905507fce339b31a509b0e45c15dbc4e0f4"\n' +
+    '  StoredOwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId "advisor-owner-root"\n' +
+    '  StoredParticipantIdentity = { Identity = { SelectedAgent = PersonaName "advisor"\n' +
+    '  Kind = ManagedRole Advisor\n' +
+    '  Persona = "Lead"\n' +
+    '  PersonaCatalogVersion = PersonaCatalogVersion 1\n' +
+    '  Origin = InheritedFromOwner } } }) }, { StoredSessionId = SessionId "host-child-1-12a6eea31bd65"\n' +
+    '  StoredLogicalRunId = LogicalRunId "2cf8a3a2cf69f065303080db1e7fdfd1197fb82b1f1a54bb17eca4600a6db8c4"\n' +
+    '  StoredAuthorityRootUserMessageId = AuthorityRootUserMessageId "msg-host-child-1-12a6eea31bd65-1"\n' +
+    '  StoredAuthorityKind = AgentOwnerRoot\n' +
+    '  StoredIdentitySeed = InheritedFromOwner ({ StoredOwnerSessionId = SessionId "advisor-live-answer-owner"\n' +
+    '  StoredOwnerLogicalRunId = LogicalRunId "eb82437cc7b725114437d911531a1905507fce339b31a509b0e45c15dbc4e0f4"\n' +
+    '  StoredOwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId "advisor-owner-root"\n' +
+    '  StoredParticipantIdentity = { Identity = { SelectedAgent = PersonaName "advisor"\n' +
+    '  Kind = ManagedRole Advisor\n' +
+    '  Persona = "Lead"\n' +
+    '  PersonaCatalogVersion = PersonaCatalogVersion 1\n' +
+    '  Origin = InheritedFromOwner } } }) }))))',
+  innerException: undefined,
+  failure: ChatAdmissionHookFailure {
+    tag: 1,
+    fields: [ [ChatAdmissionTransactionError] ]
+  },
+  executionKey: ChatExecutionKey {
+    SessionId: SessionId { tag: 0, fields: [Array] },
+    PhysicalUserMessageId: PhysicalUserMessageId { tag: 0, fields: [Array] }
+  }
+}
+HOOK CHAT MESSAGE FAILED: ChatAdmissionHookException {
+  message: 'Managed chat admission failed: TransactionFailed (AcceptanceFailed (NotAttempted (EventId "306febb47d3843168a1a96cb9eb2da46", WriterClosing)))',
+  innerException: undefined,
+  failure: ChatAdmissionHookFailure {
+    tag: 1,
+    fields: [ [ChatAdmissionTransactionError] ]
+  },
+  executionKey: ChatExecutionKey {
+    SessionId: SessionId { tag: 0, fields: [Array] },
+    PhysicalUserMessageId: PhysicalUserMessageId { tag: 0, fields: [Array] }
+  }
+}
+✖ WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice (1080.222042ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1357.38525
+
+✖ failing tests:
+
+test at requirements/advisor/tests/004.test.mjs:12:1
+✖ WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice (1080.222042ms)
+  Error: consult ended before its two prompts: # ok
+  
+  [data]
+  ok = true
+  advice = "FIRST_ADVICE"
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:37:65
+      at async consult (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:37:7)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:57:22
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:13:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)

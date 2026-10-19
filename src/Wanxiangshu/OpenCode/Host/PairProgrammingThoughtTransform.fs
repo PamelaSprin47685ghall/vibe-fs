@@ -11,7 +11,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
@@ -21,6 +20,9 @@ open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
+open Wanxiangshu.Repository.Programming.Js.OpenCode
+open Wanxiangshu.Repository.Programming.Js.Anchor
+open Wanxiangshu.Participant.Provider.Projection
 open Wanxiangshu.Requirement.Grounding
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
@@ -41,6 +43,10 @@ module PairProgrammingThoughtTransform =
 
     [<Literal>]
     let private PairProgrammingGuidelinePath = "host/pair-programming-guideline"
+
+    /// Algorithm G2: the parked-site reminder rides the same PairHint channel.
+    [<Literal>]
+    let private ParkedHintPath = "tool/js-program/parked-hint"
 
     /// HOST-013 English canonical used by tests; production loads via session language.
     let text =
@@ -209,8 +215,7 @@ module PairProgrammingThoughtTransform =
           CallId: string
           MarkerText: string
           CallGap: TranscriptGap
-          ResultGap: TranscriptGap
-          ConcernPlacement: ConcernPlacementBatch option }
+          ResultGap: TranscriptGap }
 
     /// Process-local fallback when journal is unavailable (tests / no workspace).
     /// Keyed by transcript identity; append-only within process.
@@ -1073,8 +1078,7 @@ module PairProgrammingThoughtTransform =
                   CallId = ToolCallId.value pair.CallId
                   MarkerText = pair.MarkerText
                   CallGap = pair.CallGap
-                  ResultGap = pair.ResultGap
-                  ConcernPlacement = None })
+                  ResultGap = pair.ResultGap })
 
     let private readDurableVisibleHistory
         (journal: AgentJournal)
@@ -1091,8 +1095,7 @@ module PairProgrammingThoughtTransform =
                   CallId = ToolCallId.value pair.CallId
                   MarkerText = pair.MarkerText
                   CallGap = pair.CallGap
-                  ResultGap = pair.ResultGap
-                  ConcernPlacement = None })
+                  ResultGap = pair.ResultGap })
 
     let private readMemoryHistory (key: string) : PairProgrammingGuidelineWire list =
         match memoryLedger.TryGetValue key with
@@ -1116,12 +1119,6 @@ module PairProgrammingThoughtTransform =
         (pair: PairProgrammingGuidelineWire)
         : Task<Result<unit, string>> =
         task {
-            let hostConcernPlacement =
-                pair.ConcernPlacement
-                |> Option.map (fun batch ->
-                    { Wanxiangshu.Host.ConcernPlacementBatch.AnnouncedGenerations = batch.AnnouncedGenerations
-                      Wanxiangshu.Host.ConcernPlacementBatch.DeliveredMessages = batch.DeliveredMessages })
-
             let fact =
                 HostFact.PairProgrammingGuidelineAnchored
                     {| SessionId = sessionId
@@ -1130,7 +1127,7 @@ module PairProgrammingThoughtTransform =
                        MarkerText = pair.MarkerText
                        CallGap = pair.CallGap
                        ResultGap = pair.ResultGap
-                       ConcernPlacement = hostConcernPlacement |}
+                       ConcernPlacement = None |}
 
             match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
             | Ok _ -> return Ok()
@@ -1158,7 +1155,6 @@ module PairProgrammingThoughtTransform =
         (append: PairProgrammingGuidelineWire -> Task<Result<unit, string>>)
         (sessionId: string option)
         (markerText: string)
-        (concernPlacement: ConcernPlacementBatch option)
         (realMessages: obj list)
         (callGap: TranscriptGap)
         (resultGap: TranscriptGap)
@@ -1177,8 +1173,7 @@ module PairProgrammingThoughtTransform =
                       CallId = stableCallId sessionId ordinal
                       MarkerText = markerText
                       CallGap = callGap
-                      ResultGap = resultGap
-                      ConcernPlacement = concernPlacement }
+                      ResultGap = resultGap }
 
                 let! rendered = replayMessages realMessages (visibleHistory @ [ candidate ])
                 do! append candidate
@@ -1245,7 +1240,6 @@ module PairProgrammingThoughtTransform =
         append
         sessionId
         markerText
-        concernPlacement
         realMessages
         =
         taskResult {
@@ -1265,7 +1259,6 @@ module PairProgrammingThoughtTransform =
                         append
                         sessionId
                         markerText
-                        concernPlacement
                         realMessages
                         callGap
                         resultGap
@@ -1288,7 +1281,6 @@ module PairProgrammingThoughtTransform =
         (journal: AgentJournal option)
         (sessionId: string option)
         (markerText: string)
-        (concernPlacement: ConcernPlacementBatch option)
         (rawMessages: obj list)
         : Task<Result<obj list * bool, string>> =
         taskResult {
@@ -1368,7 +1360,6 @@ module PairProgrammingThoughtTransform =
                         append
                         sessionId
                         markerText
-                        concernPlacement
                         realMessages
         }
 
@@ -1386,17 +1377,26 @@ module PairProgrammingThoughtTransform =
             || isInternalRole (sessionRole journal sid)
         | _ -> false
 
-    let private toolEstimateText
+    /// The four calibration numbers, when the delegator's estimate and the
+    /// session start are both known; otherwise the round falls back to the
+    /// elapsed-time datum alone.
+    let private budgetText
         (journal: AgentJournal option)
         (projectionSessionIdOpt: string option)
+        (elapsedMilliseconds: float option)
         (language: ProviderLanguage)
         : string option =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId ->
+        match journal, projectionSessionIdOpt, elapsedMilliseconds with
+        | Some durable, Some sessionId, Some elapsed ->
             let port = AgentJournalPortAdapter.forDelegatedToolEstimate durable
 
-            DelegatedToolEstimateLedger.tryRemaining port (SessionId.create sessionId)
-            |> Option.map (PairProgrammingCalibration.renderToolEstimate language)
+            DelegatedToolEstimateLedger.tryState port (SessionId.create sessionId)
+            |> Option.map (fun state ->
+                PairProgrammingCalibration.renderBudget
+                    language
+                    (DelegatedToolEstimateProjection.countedCallCount state)
+                    (DelegatedToolEstimateProjection.remaining state)
+                    elapsed)
         | _ -> None
 
     /// crash-reconciliation-018: the restart status guidance is one more
@@ -1413,54 +1413,46 @@ module PairProgrammingThoughtTransform =
         (journal: AgentJournal option)
         (projectionSessionIdOpt: string option)
         (elapsed: string option)
-        (toolEstimate: string option)
+        (state: string option list)
+        (calibration: string option)
         (guideline: string)
         (restartGuidance: string option)
         : Task<LlmFacing.Document> =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId ->
-            task {
-                let! guidance = EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
+        task {
+            let! guidance =
+                match journal, projectionSessionIdOpt with
+                | Some durable, Some sessionId ->
+                    EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
+                | _ -> Task.FromResult None
 
-                return
-                    PairProgrammingCalibration.documentWithElapsed guidance elapsed toolEstimate guideline
-                    |> withRestartGuidance restartGuidance
-            }
-        | _ ->
-            Task.FromResult(
-                PairProgrammingCalibration.documentWithElapsed None elapsed toolEstimate guideline
+            // Algorithm G2: every round that carries a PairHint also lists the
+            // unresolved parked handles, so the AI is pressed to take a
+            // position (unpark/abandon) without being forced to resume. The
+            // parked site table and its read-only query are owned by
+            // lane-a-core (JsParkedSites.parkedHandles). A carrier-less round
+            // never reaches this point (decideCurrentPlacement).
+            let parkedHandles = JsParkedSites.parkedHandles ()
+
+            let resolveLanguage =
+                match journal, projectionSessionIdOpt with
+                | Some _, Some sessionId -> Wanxiangshu.OpenCode.ProviderLanguageBinding.forSessionText sessionId
+                | _ -> ProviderLanguage.SimplifiedChinese
+
+            let parkedHint =
+                if List.isEmpty parkedHandles then
+                    []
+                else
+                    let language = resolveLanguage
+
+                    [ ProviderProse.render language ParkedHintPath (Map [ "handles", String.Join(", ", parkedHandles) ]) ]
+
+            let document =
+                PairProgrammingCalibration.documentWithState guidance elapsed state calibration guideline
+                |> LlmFacing.withInstructions parkedHint
                 |> withRestartGuidance restartGuidance
-            )
 
-    let private concernInstructions language (prepared: ConcernPreparedFragments) =
-        let announcements =
-            prepared.Announcements
-            |> List.map (fun (id, concern) ->
-                ProviderProse.render
-                    language
-                    "concern-routing/subscription-announcement"
-                    (Map [ "id", id; "concern", concern ]))
-
-        let messages =
-            prepared.Messages
-            |> List.map (fun (id, message) ->
-                ProviderProse.render language "concern-routing/message-delivery" (Map [ "id", id; "message", message ]))
-
-        match announcements @ messages with
-        | [] -> []
-        | fragments ->
-            ProviderProse.render language "concern-routing/pair-heading" Map.empty
-            :: fragments
-
-    let private prepareConcernFragments journal projectionSessionIdOpt language =
-        match journal, projectionSessionIdOpt with
-        | Some durable, Some sessionId when not (String.IsNullOrWhiteSpace sessionId) ->
-            let recipient = SessionId.create sessionId
-            let state = (AgentJournal.snapshot durable).AgentProjections.Concern
-            let prepared = ConcernProjection.prepareFragments recipient state
-
-            concernInstructions language prepared, Some prepared.Batch
-        | _ -> [], None
+            return document
+        }
 
     let private terminateSessionIfPresent
         (terminateSession: SessionTermination)
@@ -1474,6 +1466,175 @@ module PairProgrammingThoughtTransform =
                 ()
             }
         | None -> Task.FromResult()
+
+    /// ANCHOR stage (PLAN phase 3): number every identified outgoing message,
+    /// consume one pending view declaration, apply its selection, and build the
+    /// instruction block that carries the anchor map, the declaration echo and
+    /// the token economy. Without a declaration the messages pass through
+    /// untouched and only the bounded anchor map is reported.
+    let private wireTextOf (raw: obj) : string =
+        ProviderWireDecode.rawPartsOf raw
+        |> List.choose ProviderWireDecode.decodePart
+        |> List.map (function
+            | ProviderProjection.WireText text
+            | ProviderProjection.WireReasoning text -> text
+            | ProviderProjection.WireToolCall(_, name, args) -> name + " " + args
+            | ProviderProjection.WireToolResult(_, result) -> result
+            | ProviderProjection.WireMedia _ -> "")
+        |> String.concat "\n"
+
+    let private numberHostMessages (sessionId: string) (messages: obj list) =
+        for raw in messages do
+            ProviderWireDecode.hostMessageId raw
+            |> Option.iter (fun messageId -> AnchorLedger.numberMessage sessionId messageId |> ignore)
+
+    let private hashText (anchors: int list) : string =
+        anchors |> List.map (sprintf "#%d") |> String.concat ", "
+
+    /// A replaced anchor's row stands in the request as the model's summary.
+    /// The replacement is not an anchor: it carries a derived id and is marked
+    /// synthetic, so it can never be addressed by a later declaration — which
+    /// is exactly why a later replacement swallows it.
+    [<Emit("({ info: { ...$0.info, id: (($0.info && $0.info.id) ? $0.info.id : ($0.id || 'anchor')) + '#summary', synthetic: true, source: 'anchor-summary' }, parts: [{ type: 'text', text: $1 }] })")>]
+    let private summarizedMessage (raw: obj) (summary: string) : obj = jsNative
+
+    /// Selection applies on every request: a consumed declaration states this
+    /// turn's statement (protected prefix, new summaries), while the summaries
+    /// already recorded are permanent and outlive the declaration that made them.
+    let private applyDeclaredAnchorView
+        (sessionId: string)
+        (messages: obj list)
+        (mapLines: string list)
+        (declaration: AnchorViewDeclaration option)
+        (replaced: Map<int, string>)
+        : obj list * string option =
+        let effective =
+            declaration |> Option.defaultValue { PrefixUntil = 0; ThenRemove = [] }
+
+        let inputs =
+            messages
+            |> List.map (fun raw ->
+                { AnchorView.AnchorMessage.Id = ProviderWireDecode.hostMessageId raw
+                  AnchorView.AnchorMessage.Text = wireTextOf raw
+                  AnchorView.AnchorMessage.Raw = raw })
+
+        let entries, report =
+            AnchorView.apply (AnchorLedger.numberMessage sessionId) AnchorSurface.countTokens replaced effective inputs
+
+        let projected =
+            entries
+            |> List.map (function
+                | AnchorView.Kept message -> message.Raw
+                | AnchorView.Summarized(message, summary) -> summarizedMessage message.Raw summary)
+
+        let declaredLines =
+            declaration
+            |> Option.map (fun view ->
+                [ sprintf
+                      "ANCHOR view applied: prefixUntil=%d; thenRemove=[%s]"
+                      view.PrefixUntil
+                      (view.ThenRemove |> List.map fst |> hashText)
+                  sprintf
+                      "this request: kept=%d summarized=%d folded=%d tokens total=%d used=%d cached=%d (anchors below prefixUntil survive in the cache prefix at a fraction of the price; everything else is recomputed every turn)"
+                      report.Kept
+                      report.Summarized
+                      report.Folded
+                      report.Total
+                      report.Used
+                      report.Cached ])
+            |> Option.defaultValue []
+
+        let replacedLines =
+            if Map.isEmpty replaced then
+                []
+            else
+                [ sprintf
+                      "summaries stand in for anchors [%s] for the rest of this session and are no longer anchors; replacing an earlier anchor folds them in"
+                      (hashText report.Replaced) ]
+
+        let block =
+            declaredLines
+            @ replacedLines
+            @ (if List.isEmpty mapLines then
+                   []
+               else
+                   "ANCHOR map (reference these numbers in a js- tool's view declaration):"
+                   :: mapLines)
+
+        projected, Some(String.concat "\n" block)
+
+    let private resolveAnchorView
+        (sessionId: string)
+        (messages: obj list)
+        (mapLines: string list)
+        (replaced: Map<int, string>)
+        : obj list * string option =
+        let declaration = AnchorLedger.takeView sessionId
+
+        if declaration.IsNone && Map.isEmpty replaced && List.isEmpty mapLines then
+            messages, None
+        else
+            applyDeclaredAnchorView sessionId messages mapLines declaration replaced
+
+    let private protectedUserAnchors journal sessionId messages =
+        if sessionRole journal (SessionId.create sessionId) = Some Role.Plan then
+            messages
+            |> List.filter (fun message ->
+                messageRole message = "user"
+                && not (ProviderWireCapture.isSyntheticMessage message))
+            |> List.choose ProviderWireDecode.hostMessageId
+            |> List.map (AnchorLedger.numberMessage sessionId)
+            |> Set.ofList
+        else
+            Set.empty
+
+    let private withProtectedAnchorReceipt projected block protectedReplacements =
+        if List.isEmpty protectedReplacements then
+            projected, block
+        else
+            projected,
+            Some(
+                defaultArg block ""
+                + "\nPlan user originals kept raw; thenRemove did not replace anchors ["
+                + hashText protectedReplacements
+                + "]."
+            )
+
+    let private applyAnchorView
+        (journal: AgentJournal option)
+        (projectionSessionIdOpt: string option)
+        (messages: obj list)
+        : obj list * string option =
+        match projectionSessionIdOpt with
+        | None -> messages, None
+        | Some sessionId ->
+            numberHostMessages sessionId messages
+
+            let protectedAnchors = protectedUserAnchors journal sessionId messages
+
+            let declaredReplacements = AnchorLedger.replacements sessionId
+
+            let replaced =
+                declaredReplacements
+                |> Map.filter (fun anchor _ -> not (Set.contains anchor protectedAnchors))
+
+            let mapLines =
+                AnchorLedger.anchors sessionId
+                |> List.filter (fun (anchor, _) -> not (Map.containsKey anchor replaced))
+                |> List.rev
+                |> List.truncate 20
+                |> List.rev
+                |> List.map (fun (anchor, messageId) -> sprintf "[ANCHOR: %d] %s" anchor messageId)
+
+            let projected, block = resolveAnchorView sessionId messages mapLines replaced
+
+            let protectedReplacements =
+                declaredReplacements
+                |> Map.toList
+                |> List.map fst
+                |> List.filter (fun anchor -> Set.contains anchor protectedAnchors)
+
+            withProtectedAnchorReceipt projected block protectedReplacements
 
     let private markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored =
         // crash-reconciliation-018: the restart guidance is delivered
@@ -1520,28 +1681,55 @@ module PairProgrammingThoughtTransform =
         task {
             let messages = unbox<obj array> outObj?messages |> Array.toList
 
+            let tokenEconomy =
+                projectionSessionIdOpt
+                |> Option.bind ProviderTokenUse.tryFind
+                |> Option.map (fun usage ->
+                    PairProgrammingCalibration.renderTokenEconomy language usage.Cached usage.Uncached)
+
+            let contextLimit =
+                projectionSessionIdOpt
+                |> Option.bind DeclaredContextLimit.tryFind
+                |> Option.map (PairProgrammingCalibration.renderContextLimit language)
+
+            let messages, anchorBlock = applyAnchorView journal projectionSessionIdOpt messages
+
             let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
 
-            let elapsed =
+            let elapsedMilliseconds =
                 sessionStartedAt
-                |> Option.map (fun startedAt ->
-                    let elapsedMilliseconds = (clock.UtcNow() - startedAt).TotalMilliseconds
-                    PairProgrammingCalibration.renderElapsed language elapsedMilliseconds)
+                |> Option.map (fun startedAt -> (clock.UtcNow() - startedAt).TotalMilliseconds)
 
-            let toolEstimate = toolEstimateText journal projectionSessionIdOpt language
+            let budget = budgetText journal projectionSessionIdOpt elapsedMilliseconds language
+
+            // Four calibration numbers when the estimate exists, the elapsed
+            // datum alone when it does not: the hint never states the same
+            // number twice.
+            let elapsed =
+                match budget with
+                | Some _ -> None
+                | None ->
+                    elapsedMilliseconds
+                    |> Option.map (PairProgrammingCalibration.renderElapsed language)
 
             let! markerDocument =
-                composeMarkerDocument journal projectionSessionIdOpt elapsed toolEstimate guideline restartGuidance
+                composeMarkerDocument
+                    journal
+                    projectionSessionIdOpt
+                    elapsed
+                    [ tokenEconomy; contextLimit ]
+                    budget
+                    guideline
+                    restartGuidance
 
-            let concernInstructions, concernPlacement =
-                prepareConcernFragments journal projectionSessionIdOpt language
+            let markerDocument =
+                match anchorBlock with
+                | Some text -> LlmFacing.withInstruction text markerDocument
+                | None -> markerDocument
 
-            let markerText =
-                markerDocument
-                |> LlmFacing.withInstructions concernInstructions
-                |> LlmFacing.render
+            let markerText = LlmFacing.render markerDocument
 
-            let! injectResult = tryInjectCore journal projectionSessionIdOpt markerText concernPlacement messages
+            let! injectResult = tryInjectCore journal projectionSessionIdOpt markerText messages
 
             do!
                 applyInjectResult
@@ -1585,6 +1773,6 @@ module PairProgrammingThoughtTransform =
         (rawMessages: obj list)
         : Task<Result<obj list, string>> =
         task {
-            let! result = tryInjectCore journal sessionId markerText None rawMessages
+            let! result = tryInjectCore journal sessionId markerText rawMessages
             return Result.map fst result
         }

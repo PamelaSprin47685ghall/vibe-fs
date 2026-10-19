@@ -1,0 +1,23 @@
+{"base":"00000007-0000-0000-0000-000000000000","head":{"heads":[],"event":null}}
+read { head: { sequence: 0 }, record: null, live: null }
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: {"code":"StorageInvalid","error":{"code":"MissingParent","eventId":"00000007-0000-0000-0000-000000000000"}}
+
+false !== true
+
+    at append (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:121:14)
+    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/[eval1]:11:3
+    at async withCausalHistory (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work-record/tests/support/causal-history.mjs:153:5)
+    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/[eval1]:4:1 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.6.0

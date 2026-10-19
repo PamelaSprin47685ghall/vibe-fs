@@ -39,7 +39,7 @@ module ProjectionSurface =
                     {| disposition =
                         match disposition with
                         | RelayProjectionDisposition.Unchanged -> "unchanged"
-                        | RelayProjectionDisposition.CurrentIteration -> "current-iteration"
+                        | RelayProjectionDisposition.CurrentTenure -> "current-tenure"
                         | RelayProjectionDisposition.RetiredAttemptStopped -> "retired-attempt-stopped"
                        messages = output?messages
                        interrupted = interrupted.ToArray() |}

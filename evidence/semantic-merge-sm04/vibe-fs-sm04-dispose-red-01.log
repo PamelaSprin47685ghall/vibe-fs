@@ -1,0 +1,32 @@
+✖ WHAT[process-execution-006] runtime disposal cancels a real registered pipe run before releasing its process owner (2488.221417ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2670.762
+
+✖ failing tests:
+
+test at requirements/process-execution/tests/006.test.mjs:109:1
+✖ WHAT[process-execution-006] runtime disposal cancels a real registered pipe run before releasing its process owner (2488.221417ms)
+  AssertionError [ERR_ASSERTION]: disposal must cancel the live process without waiting for its 60-second budget
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:135:14
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at process.processTimers (node:internal/timers:615:9)
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:114:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

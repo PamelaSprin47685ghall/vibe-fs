@@ -1,0 +1,30 @@
+✖ WHAT[process-execution-004] a parked run still stops at its deadline and releases the large-output permit only after physical closure (2852.847875ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2911.164584
+
+✖ failing tests:
+
+test at requirements/process-execution/tests/004.test.mjs:96:1
+✖ WHAT[process-execution-004] a parked run still stops at its deadline and releases the large-output permit only after physical closure (2852.847875ms)
+  AssertionError [ERR_ASSERTION]: park must not suspend the physical deadline
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/004.test.mjs:130:12)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at process.processTimers (node:internal/timers:615:9)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

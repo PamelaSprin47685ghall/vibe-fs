@@ -186,13 +186,14 @@ module Surface =
 
     let private createIntegrator () =
         // Historical full program, assembled explicitly in registration order:
-        // Structural, Journal, Strength, Sphinx, SphinxGeneric, Casebook, JsTransaction.
+        // Structural, Journal, Strength, Sphinx, SphinxGeneric, Casebook, JsTransaction, JsLifecycleAudit.
         let program =
             CanonicalIntegrator.baseRules
             @ Wanxiangshu.Strength.StrengthIntegrationRules.rules
             @ Wanxiangshu.Sphinx.V2.Composition.Bind.rules
             @ Wanxiangshu.Repository.Knowledge.Casebook.CasebookIntegrationRules.rules
             @ Wanxiangshu.Repository.Programming.Js.JsTransactionIntegrationRules.rules
+            @ Wanxiangshu.Repository.Programming.Js.JsLifecycleIntegrationRules.rules
 
         CanonicalIntegrator.createWithRules program AuthoritativeEventTypes.isKnown
 

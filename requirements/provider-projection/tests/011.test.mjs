@@ -137,7 +137,7 @@ const productionDigest = async (callId, path) => {
     const entry = {
       charge: 'Record the completed read.', occurrence: 'The source was read.',
       settlement: 'The read is complete.', consequence: 'Later work retains the result.',
-      tip: Enforcer.fieldNames()[0],
+      tipName: Enforcer.fieldNames()[0], opinion: 'The durable frame preserves the outcome for later context.', advice: 'Carry the recorded material into the next step.',
     }
     const recorded = await hooks.tool.chronicle.execute(entry, { sessionID: blogger, agent: 'blogger', messageID: 'msg-blog-prefix-run', callID: 'call-blog-prefix' })
     const bloggerMessages = [
@@ -151,8 +151,8 @@ const productionDigest = async (callId, path) => {
     })
     await hooks['experimental.chat.messages.transform']({ sessionID: blogger }, { messages: structuredClone(bloggerMessages) })
     assert.ok(Journal.JournalSurface_snapshot(runtime.journal).sessionProjections[sessionID].blog, JSON.stringify(Journal.JournalSurface_snapshot(runtime.journal)))
-    const observation = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'BlogObservationCommitted')).filter(Boolean)
-    assert.equal(observation.length, 1, JSON.stringify(journalFacts(join(directory, '.git'))))
+    const observation = journalFacts(join(directory, '.Herdchestra')).map(fact => payloadFor(fact, 'BlogObservationCommitted')).filter(Boolean)
+    assert.equal(observation.length, 1, JSON.stringify(journalFacts(join(directory, '.Herdchestra'))))
     assert.equal(observation[0].NextCoverableTurnCutoffExclusive, 4)
     expectedPrefix = Projection.semanticProjection([
       { role: 'user', parts: [{ kind: 'text', text: 'opening assignment' }] },
@@ -163,13 +163,26 @@ const productionDigest = async (callId, path) => {
     assert.equal(observation[0].NextCoveredPrefixDigest, sha256(Projection.renderSemantic(expectedPrefix)))
     assert.notEqual(observation[0].NextCoveredPrefixDigest, sha256(Projection.renderSemantic({ ...expectedPrefix, messages: expectedPrefix.messages.slice(0, 3) })))
     observationDigest = observation[0].NextCoveredPrefixDigest
-    const checkpointInput = { tool: 'todowrite', sessionID, callID: 'call-prefix-checkpoint' }
-    const checkpointOutput = { args: { todos: [] } }
-    await hooks['tool.execute.before'](checkpointInput, checkpointOutput)
-    await hooks['tool.execute.after']({ ...checkpointInput, args: checkpointOutput.args }, { title: 'todowrite', output: 'Todos updated', metadata: {} })
-    await hooks.event({ event: { type: 'message.part.updated', properties: { sessionID, part: { type: 'tool', tool: 'todowrite', callID: checkpointInput.callID, state: { status: 'completed' } } } } })
-    assert.equal(Journal.JournalSurface_snapshot(runtime.journal).todoCheckpoints[0].checkpoints[0].callId, checkpointInput.callID)
-    assert.deepEqual(checkpointEvidence(runtime, sessionID, checkpointInput.callID), { checkpointTurn: 4, desiredCutoff: 4 })
+    const checkpointCallID = 'call-prefix-checkpoint'
+    await hooks.event({
+      event: {
+        type: 'message.part.updated',
+        properties: {
+          sessionID,
+          part: {
+            type: 'tool',
+            tool: 'todowrite-for-manager',
+            callID: checkpointCallID,
+            state: {
+              status: 'completed',
+              input: { program: 'class Js extends JsProgram { async run() { return {}; } }', view: { prefixUntil: 1 } },
+            },
+          },
+        },
+      },
+    })
+    assert.equal(Journal.JournalSurface_snapshot(runtime.journal).viewCheckpoints[0].checkpoints[0].callId, checkpointCallID)
+    assert.deepEqual(checkpointEvidence(runtime, sessionID, checkpointCallID), { checkpointTurn: 4, desiredCutoff: 4 })
     assert.deepEqual(await candidateEvidence(runtime, sessionID, 2), { ok: false, reason: 'NoCoverage' })
     const nextPhysical = 'msg-prefix-next-user'
     const continuation = await Dispatch.sendContinuation({
@@ -210,7 +223,7 @@ const productionDigest = async (callId, path) => {
       parts: [],
     })
     await hooks['experimental.chat.messages.transform']({ sessionID }, { messages: structuredClone(messages) })
-    const rebases = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
+    const rebases = journalFacts(join(directory, '.Herdchestra')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
     assert.equal(rebases.length, 1)
     assert.equal(rebases[0].CutoffExclusive, 4)
     assert.equal(rebases[0].CoveredPrefixDigest, observationDigest)
@@ -226,11 +239,11 @@ const productionDigest = async (callId, path) => {
     await host.withRuntime(async (runtime) => {
       const state = Journal.JournalSurface_snapshot(runtime.journal).sessionProjections[sessionID]
       assert.deepEqual(state.prefixEpoch, { epochId: 1n, snapshotPresent: true })
-      const rebases = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
+      const rebases = journalFacts(join(directory, '.Herdchestra')).map(fact => payloadFor(fact, 'PrefixRebaseCommitted')).filter(Boolean)
       assert.equal(rebases.length, 1)
       assert.equal(rebases[0].CutoffExclusive, 4)
       assert.equal(rebases[0].CoveredPrefixDigest, observationDigest)
-      const replayed = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'BlogObservationCommitted')).filter(Boolean)
+      const replayed = journalFacts(join(directory, '.Herdchestra')).map(fact => payloadFor(fact, 'BlogObservationCommitted')).filter(Boolean)
       assert.equal(replayed[0].NextCoveredPrefixDigest, observationDigest, 'the durable coverage digest survives reopen unchanged')
     })
   })

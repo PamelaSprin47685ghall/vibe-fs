@@ -101,8 +101,6 @@ type ToolRuntimeScope
         childWorkRecordFor: (string -> Task<string option>) option,
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
-        ?childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>),
-        ?workRecordCapability: DelegationWorkRecordCapability,
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
         ?eventPort: IEventObservationPort,
         ?ptyPortFactory: (unit -> PtyPort)
@@ -113,7 +111,7 @@ type ToolRuntimeScope
 
     let ownershipCommonDir =
         workspaceDirectory
-        |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir
+        |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
 
     let createPtyPort () =
         match ptyPortFactory, ownershipCommonDir with
@@ -154,16 +152,24 @@ type ToolRuntimeScope
     // Workspace-snapshot capture is an injected capability: Relay certificate
     // binding owns the capture vocabulary, the composition root supplies it.
 
-    let childRecordForRun =
-        defaultArg childWorkRecordForRun (fun _ _ _ -> Task.FromResult None)
-
-    let reusableHandoff =
-        workRecordCapability
-        |> Option.bind (fun cap -> journal |> Option.map (DelegationHandoffLedger.port cap))
+    /// change-integration-005/013: the head cursor this process observed for one
+    /// session, read from the same journal projection the Manager deliver used for
+    /// its retirement cursor. A missing projection is not a guessed cursor, so the
+    /// hand-off it feeds fails closed.
+    let observedHeadCursor (sessionId: SessionId) : int64 option =
+        journal
+        |> Option.bind (fun durable ->
+            AgentProjection.tryFind sessionId (AgentJournal.snapshot durable).AgentProjections
+            |> Option.bind (fun session -> session.XTrace)
+            |> Option.map (XTraceProjection.headCursor >> XTraceCursor.sequence))
 
     let terminalPort = eventPort
     // DSL-MUTABLE: resource — tool runtime dispose latch
     let mutable disposed = false
+    // DSL-MUTABLE: resource — process lifetime cancellation and exact physical drain.
+    let processLifetimes = Dictionary<string, string * (unit -> unit) * Task>()
+    let processWork = Dictionary<string, string * TaskCompletionSource<unit>>()
+    let closedProcessSessions = HashSet<string>()
     // DSL-MUTABLE: single-flight — shared waiter for tool-owned callback drain.
     let mutable ownedWorkDrainWaiter: TaskCompletionSource<unit> option = None
     // DSL-MUTABLE: resource — first tool-owned callback failure for shutdown propagation.
@@ -171,6 +177,15 @@ type ToolRuntimeScope
     /// Process-local join admission before join / publish consume.
     // DSL-MUTABLE: resource — current-process join admission callback attachment
     let mutable currentProcessJoin: (SessionId -> Task<FamilyRecovery>) option = None
+    let mutable questionNotifier: (string -> Task<Result<unit, string>>) option = None
+    let questionRequests = HashSet<SessionId>()
+    let questionInterrupts = HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
+
+    let postS3PendingInterrupts =
+        HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
+
+    let postS3SettledInterrupts =
+        HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
 
     /// EXEC-017 attempt-scoped join interrupt registry (PluginRuntimeScope or local default).
     // DSL-MUTABLE: resource — join attempt registry attachment
@@ -193,6 +208,66 @@ type ToolRuntimeScope
 
     let unsettledOwnedWork () =
         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipBlockersInMemory scopeOwnership ownedWorkScopeId
+
+    let unsettledGeneralWork () =
+        unsettledOwnedWork ()
+        |> List.filter (fun blocker -> not (processWork.ContainsKey blocker.Lease.ResourceId))
+
+    let drainProcessWork sessionId =
+        task {
+            let pending =
+                lock ownedWorkGate (fun () ->
+                    processWork
+                    |> Seq.filter (fun entry -> sessionId |> Option.forall (fun owner -> owner = fst entry.Value))
+                    |> Seq.map (fun entry -> entry.Key, snd entry.Value)
+                    |> Seq.toArray)
+
+            let lifetimes =
+                lock gate (fun () ->
+                    processLifetimes
+                    |> Seq.filter (fun entry ->
+                        let owner, _, _ = entry.Value
+                        sessionId |> Option.forall ((=) owner))
+                    |> Seq.map (fun entry ->
+                        let _, _, completion = entry.Value
+                        entry.Key, completion)
+                    |> Seq.toArray)
+
+            let drained =
+                task {
+                    for _, completion in pending do
+                        do! completion.Task
+
+                    for _, completion in lifetimes do
+                        do! completion
+                }
+
+            let! completed =
+                emitJsExpr
+                    drained
+                    "new Promise(resolve => { const timer = setTimeout(() => resolve(false), 3000); Promise.resolve($0).then(() => { clearTimeout(timer); resolve(true); }); })"
+                : Task<bool>
+
+            let remaining =
+                Array.append
+                    (pending
+                     |> Array.map fst
+                     |> Array.filter (fun id -> lock ownedWorkGate (fun () -> processWork.ContainsKey id)))
+                    (lifetimes
+                     |> Array.map fst
+                     |> Array.filter (fun id -> lock gate (fun () -> processLifetimes.ContainsKey id)))
+
+            if completed || Array.isEmpty remaining then
+                return None
+            else
+                return
+                    Some(
+                        InvalidOperationException(
+                            "Process scope closure was not confirmed: " + String.concat ", " remaining
+                        )
+                        :> exn
+                    )
+        }
 
     let startReservedOwnedWork
         (seq: int)
@@ -268,7 +343,7 @@ type ToolRuntimeScope
 
             if
                 (phase = Some "Draining" || phase = Some "Closed")
-                && List.isEmpty (unsettledOwnedWork ())
+                && List.isEmpty (unsettledGeneralWork ())
             then
                 ownedWorkDrainWaiter
                 |> Option.iter (fun waiter -> AsyncSupport.trySetResult waiter () |> ignore))
@@ -302,18 +377,36 @@ type ToolRuntimeScope
                 with _ ->
                     ()
 
-                if List.isEmpty (unsettledOwnedWork ()) then
+                if List.isEmpty (unsettledGeneralWork ()) then
                     Task.FromResult(()) :> Task
                 else
                     ownedWorkDrainTask ())
 
         task {
             do! waiting
-            return lock ownedWorkGate (fun () -> ownedWorkFailure)
+            let! processFailure = drainProcessWork None
+            return lock ownedWorkGate (fun () -> ownedWorkFailure |> Option.orElse processFailure)
         }
 
     let recordOwnedWorkFailure (failure: exn) =
         lock ownedWorkGate (fun () -> ownedWorkFailure <- Option.orElse ownedWorkFailure (Some failure))
+
+    let cancelProcessLifetime (cancel: unit -> unit) =
+        try
+            cancel ()
+        with error ->
+            recordOwnedWorkFailure error
+
+    let cancelProcessLifetimes sessionId =
+        let callbacks =
+            lock gate (fun () ->
+                processLifetimes.Values
+                |> Seq.filter (fun (owner, _, _) -> sessionId |> Option.forall ((=) owner))
+                |> Seq.map (fun (_, cancel, _) -> cancel)
+                |> Seq.toArray)
+
+        for cancel in callbacks do
+            cancelProcessLifetime cancel
 
     let captureOwnedWorkFailure (start: unit -> Task) : Task<exn option> =
         task {
@@ -336,6 +429,30 @@ type ToolRuntimeScope
             finishOwnedWork lease resId inc (if failure.IsSome then "Failed" else "Completed")
         }
         :> Task
+
+    let observeProcessLifetime id (drained: Task) =
+        task {
+            try
+                do! drained
+            finally
+                lock gate (fun () -> processLifetimes.Remove id |> ignore)
+        }
+
+    let startOwnedProcess sessionId (start: unit -> Task) =
+        match reserveOwnedWork () with
+        | None -> false
+        | Some(lease, resId, inc) ->
+            let completion = TaskCompletionSource<unit>()
+            lock ownedWorkGate (fun () -> processWork.Add(resId, (sessionId, completion)))
+
+            task {
+                do! observeOwnedWork lease resId inc start
+                lock ownedWorkGate (fun () -> processWork.Remove resId |> ignore)
+                completion.SetResult()
+            }
+            |> ignore
+
+            true
 
     let addUniqueForkRuntime (owned: ResizeArray<HostForkRuntime>) (runtime: HostForkRuntime) =
         if not (owned |> Seq.exists (fun current -> obj.ReferenceEquals(current, runtime))) then
@@ -380,7 +497,6 @@ type ToolRuntimeScope
         HostForkRuntime(
             SessionId.create sid,
             sessions,
-            childRecordForRun,
             CompletionMailboxRuntime.create,
             NodeTiming.nodeClockPort (),
             NodeTiming.raceExit,
@@ -395,9 +511,6 @@ type ToolRuntimeScope
                     |> Option.iter (fun path -> sessionDirectories.[SessionId.value childId] <- path)),
             directoryFor = (fun _ -> directoryFor sid),
             onRunStarted = onStarted,
-            parentWorkRecordFor = (fun parentId -> parentRecord (SessionId.value parentId)),
-            childWorkRecordFor = (fun childId -> childRecord (SessionId.value childId)),
-            ?handoff = reusableHandoff,
             ?sessionSnapshot = snapshot,
             cancelSignals = onCancelSignals,
             drainChildPtys = drainChildPtysFor
@@ -639,7 +752,7 @@ type ToolRuntimeScope
     let lifecycleWorkOfDirectory (directory: string option) (sessionId: string) =
         directory
         |> Option.bind (fun workspace ->
-            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.gitCommonDir workspace
+            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
 
             if String.IsNullOrWhiteSpace commonDir then
                 None
@@ -895,8 +1008,208 @@ type ToolRuntimeScope
     member _.EventPort = terminalPort
     member _.WorkspaceDirectory = workspaceDirectory
     member _.ActiveProfileFor(sessionId: SessionId) = activeProfileFor sessionId
+
+    member _.AttachQuestionNotifier(notify: string -> Task<Result<unit, string>>) = questionNotifier <- Some notify
+
+    member _.IsWaitingForUser(sessionId: string) =
+        journal
+        |> Option.bind (fun durable -> UserQuestionJournal.pending durable (SessionId.create sessionId))
+        |> Option.isSome
+
+    member private _.ClearQuestionInterrupts(sid: SessionId) =
+        let stale =
+            questionInterrupts
+            |> Seq.filter (fun (owner, _, _) -> owner = sid)
+            |> Seq.toArray
+
+        Array.iter (questionInterrupts.Remove >> ignore) stale
+
+    member private _.RecordShownQuestion
+        (durable: AgentJournal, sid: SessionId, sessionIdText: string, request: UserQuestionAskedPayload)
+        =
+        task {
+            let! recorded = UserQuestionJournal.request durable request
+
+            match recorded, currentPhysicalUserMessage sessionIdText with
+            | Ok(), Some latest ->
+                return! UserQuestionJournal.observeHumanInput durable sid (PhysicalUserMessageId.create latest)
+            | _ -> return recorded
+        }
+
+    member private this.SendFreshQuestion
+        (
+            durable: AgentJournal,
+            sid: SessionId,
+            sessionIdText: string,
+            notify: string -> Task<Result<unit, string>>,
+            request: UserQuestionAskedPayload
+        ) =
+        taskResult {
+            try
+                this.ClearQuestionInterrupts sid
+                let! shown = notify request.Question
+                return! this.RecordShownQuestion(durable, sid, sessionIdText, request)
+            finally
+                questionRequests.Remove sid |> ignore
+        }
+
+    member private this.DispatchValidatedQuestion
+        (
+            durable: AgentJournal,
+            sid: SessionId,
+            sessionIdText: string,
+            notify: string -> Task<Result<unit, string>>,
+            request: UserQuestionAskedPayload
+        ) =
+        let work =
+            lifecycleWorkOfDirectory (directoryFor sessionIdText |> Option.orElse workspaceDirectory) sessionIdText
+
+        if
+            not (
+                work
+                |> Option.exists (fun current -> current.ActiveId.IsSome && not current.Delivered)
+            )
+        then
+            Task.FromResult(Error "ask requires an unfinished work with an active incumbency")
+        elif not (work |> Option.exists (fun current -> current.Stage = "S1")) then
+            // 产品裁决：只有 S1 阶段的 Plan 可以向用户中断提问。
+            Task.FromResult(Error "ask is allowed only in the S1 planning stage")
+        elif not (questionRequests.Add sid) then
+            Task.FromResult(Error "a question is already being sent for this session")
+        else
+            this.SendFreshQuestion(durable, sid, sessionIdText, notify, request)
+
+    member private this.ResolveOrSendQuestion
+        (
+            durable: AgentJournal,
+            sid: SessionId,
+            sessionIdText: string,
+            call: ToolCallId,
+            notify: string -> Task<Result<unit, string>>,
+            request: UserQuestionAskedPayload
+        ) =
+        match UserQuestionJournal.tryFind durable sid call with
+        | Some previous when previous.Request = request -> Task.FromResult(Ok())
+        | Some _ -> Task.FromResult(Error "ask call identity conflicts with its recorded question")
+        | None when UserQuestionJournal.pending durable sid |> Option.isSome ->
+            Task.FromResult(Error "a question is already waiting for the user")
+        | None -> this.DispatchValidatedQuestion(durable, sid, sessionIdText, notify, request)
+
+    /// 先确认提问已经呈现，再登记同一逻辑运行的等待。工具只交回占位回执。
+    member this.AskUser(ctx: HostToolContext, question: string) : Task<Result<unit, string>> =
+        task {
+            let sid = SessionId.create ctx.SessionId
+
+            match
+                journal,
+                activeProfileFor sid,
+                ctx.ProviderRunId,
+                ctx.ToolCallId,
+                currentPhysicalUserMessage ctx.SessionId,
+                questionNotifier
+            with
+            | Some durable, Some profile, Some run, Some call, Some physical, Some notify when
+                profile.CanonicalRole = Role.Plan && not (String.IsNullOrWhiteSpace question)
+                ->
+                let request: UserQuestionAskedPayload =
+                    { SessionId = sid
+                      LogicalRunId = profile.LogicalRunId
+                      AuthorityRootUserMessageId = profile.AuthorityRootUserMessageId
+                      PhysicalUserMessageId = PhysicalUserMessageId.create physical
+                      ProviderRunId = run
+                      ToolCallId = call
+                      Question = question }
+
+                return! this.ResolveOrSendQuestion(durable, sid, ctx.SessionId, call, notify, request)
+            | _ ->
+                return
+                    Error "ask requires active Plan authority, exact call evidence, a question, and user notification"
+        }
+
+    member private _.PruneFailedQuestionInterrupt
+        (key: SessionId * ProviderRunIdentity * ToolCallId, stopped: Result<unit, string>)
+        =
+        if Result.isError stopped then
+            questionInterrupts.Remove key |> ignore
+
+        stopped
+
+    member private this.RunQuestionInterrupt(sessionId: SessionId, key: SessionId * ProviderRunIdentity * ToolCallId) =
+        task {
+            try
+                let! stopped = sessions.InterruptAttempt sessionId
+                return this.PruneFailedQuestionInterrupt(key, stopped)
+            with ex ->
+                questionInterrupts.Remove key |> ignore
+                return Error ex.Message
+        }
+
+    /// 只在宿主确认 ask 的工具结果后中断本次 attempt；不终结逻辑运行或取消子资源。
+    member this.InterruptForUserQuestion
+        (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId)
+        : Task<Result<unit, string>> =
+        task {
+            match
+                journal
+                |> Option.bind (fun durable -> UserQuestionJournal.pending durable sessionId)
+            with
+            | Some question when
+                question.ToolCallId = callId
+                && question.ProviderRunId = providerRun
+                && currentPhysicalUserMessage (SessionId.value sessionId) = Some(
+                    PhysicalUserMessageId.value question.PhysicalUserMessageId
+                )
+                && questionInterrupts.Add(sessionId, question.ProviderRunId, callId)
+                ->
+                return! this.RunQuestionInterrupt(sessionId, (sessionId, question.ProviderRunId, callId))
+            | _ -> return Ok()
+        }
+
+    member private _.RunPostS3InterruptAttempt
+        (sessionId: SessionId, key: SessionId * ProviderRunIdentity * ToolCallId)
+        : Task<Result<unit, string>> =
+        task {
+            try
+                let! stopped = sessions.InterruptAttempt sessionId
+
+                lock gate (fun () ->
+                    let _ =
+                        Result.isError stopped && postS3SettledInterrupts.Remove key
+                        || postS3PendingInterrupts.Remove key
+
+                    ())
+
+                return stopped
+            with ex ->
+                lock gate (fun () -> postS3SettledInterrupts.Remove key |> ignore)
+                return Error ex.Message
+        }
+
+    member _.RegisterPostS3Interrupt(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) =
+        lock gate (fun () -> postS3PendingInterrupts.Add(sessionId, providerRun, callId) |> ignore)
+
+    member _.HasPendingPostS3Interrupt(sessionId: string) =
+        let sid = SessionId.create sessionId
+        lock gate (fun () -> postS3PendingInterrupts |> Seq.exists (fun (owner, _, _) -> owner = sid))
+
+    member this.InterruptForPostS3Deliver
+        (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId)
+        : Task<Result<unit, string>> =
+        let key = sessionId, providerRun, callId
+
+        let shouldInterrupt =
+            lock gate (fun () -> postS3PendingInterrupts.Contains key && postS3SettledInterrupts.Add key)
+
+        if shouldInterrupt then
+            this.RunPostS3InterruptAttempt(sessionId, key)
+        else
+            Task.FromResult(Ok())
+
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member _.RunStarted = onStarted
+
+    member _.ContinueManagerLoop(sessionId: SessionId, workspace: string) : Task<Result<unit, string>> =
+        continueManagerLoop sessionId workspace
 
     /// EXEC-011: the administrator's ceiling on any single process.
     ///
@@ -934,7 +1247,7 @@ type ToolRuntimeScope
 
     member _.EnsureWorkDevOpsBound(parentSessionId: SessionId) = ensureWorkDevOpsBound parentSessionId
 
-    /// planning-023: create the parentless execution container. The returned
+    /// work-039: create the parentless execution container. The returned
     /// SessionId is not permission to send its prompt: PlanTools first commits
     /// DeliverySessionBound for the operation.
     member _.CreateExecutionSession(operationId: string, agent: string) : Task<Result<string, string>> =
@@ -1171,7 +1484,12 @@ type ToolRuntimeScope
 
             let toolOwned =
                 lock ownedWorkGate (fun () ->
-                    unsettledOwnedWork () |> List.map (fun blocker -> blocker.Lease.ResourceId))
+                    unsettledOwnedWork ()
+                    |> List.filter (fun blocker ->
+                        match processWork.TryGetValue blocker.Lease.ResourceId with
+                        | true, (owner, _) -> isRelevantSession owner
+                        | false, _ -> true)
+                    |> List.map (fun blocker -> blocker.Lease.ResourceId))
 
             let durableBlockers =
                 ownershipCommonDir
@@ -1283,7 +1601,6 @@ type ToolRuntimeScope
                     HostForkRuntime(
                         SessionId.create ctx.SessionId,
                         sessions,
-                        childRecordForRun,
                         CompletionMailboxRuntime.create,
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
@@ -1313,6 +1630,7 @@ type ToolRuntimeScope
                       RootWorkspace = rootWorkspace
                       WaitObserver = waitObserver
                       Journal = journal
+                      ObservedHeadCursor = observedHeadCursor
                       SessionSnapshot = snapshot
                       OnChildCreated = fun _ role childId -> registerChild sessionId role childId
                       RegisterChildDirectory = fun childId path -> sessionDirectories.[SessionId.value childId] <- path
@@ -1320,10 +1638,7 @@ type ToolRuntimeScope
                       SendGateContinuation = HostSessionNudge.trySendGateContinuationPhysical sessions rootWorkspace
                       ContinueManagerLoop = continueManagerLoop
                       RepoPath = defaultArg workspaceDirectory "."
-                      TargetBranch = ""
-                      ParentWorkRecordFor = fun sid -> parentRecord (SessionId.value sid)
-                      ChildWorkRecordFor = fun sid -> childRecord (SessionId.value sid)
-                      ChildWorkRecordForRun = childRecordForRun }
+                      TargetBranch = "" }
 
                 let host = OrchestratorHost(deps, SessionId.create sessionId)
                 orchestratorHosts.[sessionId] <- host
@@ -1335,6 +1650,30 @@ type ToolRuntimeScope
         | Some(lease, resId, inc) ->
             observeOwnedWork lease resId inc start |> ignore
             true
+
+    member _.AttachProcessAbort(sessionId: string, cancel: unit -> unit, drained: Task) : unit -> unit =
+        let id = Guid.NewGuid().ToString("N")
+
+        let accepted =
+            lock gate (fun () ->
+                if disposed || closedProcessSessions.Contains sessionId then
+                    false
+                else
+                    processLifetimes.Add(id, (sessionId, cancel, drained))
+                    true)
+
+        if not accepted then
+            cancel ()
+        else
+            observeProcessLifetime id drained |> ignore
+
+        fun () -> lock gate (fun () -> processLifetimes.Remove id |> ignore)
+
+    member _.RunOwnedProcess(sessionId: string, start: unit -> Task) : bool =
+        if disposed || closedProcessSessions.Contains sessionId then
+            false
+        else
+            startOwnedProcess sessionId start
 
     member _.DisposeExecutorRuntime(sessionId: string) : Task =
         let runtime =
@@ -1359,6 +1698,8 @@ type ToolRuntimeScope
             | _ -> false)
 
     member _.CancelSessionChildren(sessionId: string) : Task =
+        cancelProcessLifetimes (Some sessionId)
+
         let forkRuntimes, orchestrator =
             lock gate (fun () ->
                 let owned = ResizeArray<HostForkRuntime>()
@@ -1389,6 +1730,9 @@ type ToolRuntimeScope
             match orchestrator with
             | Some host -> do! host.CancelAndDrain()
             | None -> ()
+
+            let! processFailure = drainProcessWork (Some sessionId)
+            processFailure |> Option.iter raise
         }
         :> Task
 
@@ -1417,6 +1761,29 @@ type ToolRuntimeScope
                 reason
 
     member _.DisposeSession(sessionId: string) : Task =
+        lock gate (fun () -> closedProcessSessions.Add sessionId |> ignore)
+        cancelProcessLifetimes (Some sessionId)
+        let questionOwner = SessionId.create sessionId
+
+        for key in
+            questionInterrupts
+            |> Seq.filter (fun (owner, _, _) -> owner = questionOwner)
+            |> Seq.toArray do
+            questionInterrupts.Remove key |> ignore
+
+        lock gate (fun () ->
+            for key in
+                postS3PendingInterrupts
+                |> Seq.filter (fun (owner, _, _) -> owner = questionOwner)
+                |> Seq.toArray do
+                postS3PendingInterrupts.Remove key |> ignore
+
+            for key in
+                postS3SettledInterrupts
+                |> Seq.filter (fun (owner, _, _) -> owner = questionOwner)
+                |> Seq.toArray do
+                postS3SettledInterrupts.Remove key |> ignore)
+
         let forkRuntimes, orchestrator =
             lock gate (fun () ->
                 // DSL-MUTABLE: algorithm-scratch — owned runtime accumulator for dispose
@@ -1450,6 +1817,9 @@ type ToolRuntimeScope
             match orchestrator with
             | Some host -> do! host.CancelAndDrain()
             | None -> ()
+
+            let! processFailure = drainProcessWork (Some sessionId)
+            processFailure |> Option.iter raise
         }
         :> Task
 
@@ -1614,6 +1984,8 @@ type ToolRuntimeScope
                     orchestratorHosts.Clear()
 
                     ownedForkRuntimes, ownedOrchestrators)
+
+        cancelProcessLifetimes None
 
         task {
             let! ownedFailure = stopOwnedWorkAndDrain ()

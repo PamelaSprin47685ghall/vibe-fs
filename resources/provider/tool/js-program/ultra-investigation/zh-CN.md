@@ -1,14 +1,28 @@
 class Js extends JsProgram {
+  async walk(dir) {
+    const found = [];
+    for (const entry of await this.ls(dir)) {
+      const full = dir === "." ? entry : dir + "/" + entry;
+      if (entry.endsWith("/")) found.push(...await this.walk(full.slice(0, -1)));
+      else found.push(full);
+    }
+    return found;
+  }
   async run() {
-    const declarations = await this.grep(/\b(?:type|module)\s+RetryPolicy\b/, "src/**/*.fs");
-    const paths = [...new Set(declarations.matches.map(x => x.path))];
-    const evidence = await Promise.all(paths.map(async path => {
-      const file = await this.file(path);
-      const text = file.text();
-      const at = text.search(/\b(?:type|module)\s+RetryPolicy\b/);
-      return { path, declarationFound: at >= 0,
-        excerpt: at >= 0 ? text.slice(Math.max(0, at - 220), at + 900) : null };
-    }));
-    return { declarations: declarations.matches, evidence, changedFiles: [], executed: false };
+    const declaration = /\b(?:type|module)\s+RetryPolicy\b/;
+    const hits = [];
+    const evidence = [];
+    for (const path of (await this.walk("src")).filter((path) => path.endsWith(".fs"))) {
+      const text = await this.cat(path);
+      const at = text.search(declaration);
+      if (at < 0) continue;
+      hits.push({ path, at });
+      evidence.push({
+        path,
+        declarationFound: true,
+        excerpt: text.slice(Math.max(0, at - 220), at + 900),
+      });
+    }
+    return { declarations: hits, evidence, changedFiles: [], executed: false };
   }
 }

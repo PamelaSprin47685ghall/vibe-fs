@@ -1,0 +1,23 @@
+✖ WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice (1266.375ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1541.392542
+
+✖ failing tests:
+
+test at requirements/advisor/tests/004.test.mjs:12:1
+✖ WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice (1266.375ms)
+  Error: consult ended before its two prompts: # Tool `todowrite-for-manager` is not available right now. Use the tools available to you.
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:36:65
+      at async consult (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:36:7)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:50:21
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:13:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)

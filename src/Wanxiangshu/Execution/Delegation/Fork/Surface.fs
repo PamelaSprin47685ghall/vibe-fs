@@ -19,21 +19,18 @@ module ForkChildPayloadSurface =
         let l = languageOf lang
 
         { Base = ProviderProse.instructionLines l ForkChildPayload.BasePath Map.empty
-          CommissionerRecord = ProviderProse.render l ForkChildPayload.CommissionerRecordPath Map.empty
           Attachment = ProviderProse.render l ForkChildPayload.AttachmentPath Map.empty
           Requirements = ProviderProse.render l ForkChildPayload.RequirementsPath Map.empty }
 
     let instructions
         (lang: string)
         : {| Base: string array
-             CommissionerRecord: string
              Attachment: string
              Requirements: string |}
         =
         let p = proseOf lang
 
         {| Base = List.toArray p.Base
-           CommissionerRecord = p.CommissionerRecord
            Attachment = p.Attachment
            Requirements = p.Requirements |}
 
@@ -54,7 +51,6 @@ module ForkChildPayloadSurface =
         (lang: string)
         (input:
             {| Assignment: string
-               CommissionerRecord: string option
                Attachment: string option
                RootRequirements: string array
                Payload: string option |})
@@ -76,7 +72,6 @@ module ForkChildPayloadSurface =
         ForkChildPayload.render
             prose
             { Assignment = assignment
-              CommissionerRecord = input.CommissionerRecord
               Attachment = input.Attachment
               RootRequirements = requirements
               Payload = input.Payload }
@@ -87,16 +82,16 @@ module ForkChildPayloadSurface =
         else
             Some(value.Trim())
 
-    let chooseRoad (calling: string) (byname: string) (charge: string) : obj =
-        let road = nonEmpty calling
+    let chooseWork (calling: string) (byname: string) (charge: string) : obj =
+        let work = nonEmpty calling
         let name = nonEmpty byname
         let task = nonEmpty charge
 
-        match road, name, task with
+        match work, name, task with
         | Some callingName, Some logicalName, Some assignment ->
             box
                 {| ok = true
-                   road = "Independent"
+                   work = "Independent"
                    calling = callingName
                    byname = logicalName
                    charge = assignment
@@ -104,7 +99,7 @@ module ForkChildPayloadSurface =
         | None, Some logicalName, Some assignment ->
             box
                 {| ok = true
-                   road = "Continuation"
+                   work = "Continuation"
                    calling = null
                    byname = logicalName
                    charge = assignment
@@ -112,7 +107,7 @@ module ForkChildPayloadSurface =
         | _ ->
             box
                 {| ok = false
-                   error = "charge, byname and calling (for a new road) must be non-empty" |}
+                   error = "charge, byname and calling (for a new work) must be non-empty" |}
 
     let reuseBinding
         (byname: string)
@@ -149,7 +144,7 @@ module ForkChildPayloadSurface =
                 | Some record ->
                     box
                         {| ok = true
-                           road = "Continuation"
+                           work = "Continuation"
                            byname = logicalName
                            managedAgent = record.TargetAgent
                            requestedAgent = requestedAgent

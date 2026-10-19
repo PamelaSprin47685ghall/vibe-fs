@@ -10,7 +10,6 @@ import * as PtySurface from '../../../dist/Execution/Delegation/Fork/Host/HostFo
 import * as lifecycle from '../../../dist/Mission/Lifecycle/Surface.js'
 import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 import * as loadRecovery from '../../../dist/OpenCode/Host/LoadRecoverySurface.js'
-import * as PtyToolSurface from '../../../dist/OpenCode/Tools/PtyToolSurface.js'
 import { DatabaseSync } from 'node:sqlite'
 import { withAdmittedChildren, withSharedAdmittedChildren } from './support/admitted-child-work.mjs'
 import { Ownership } from 'wanxiangli/ownership'
@@ -59,7 +58,7 @@ test('WHAT[managed-session-lifecycle-025] load recovery stops old round admissio
   await withAdmissionWorkers('void-stops-admission', async (producer, _other, workspace) => {
     await withRecoveryJournal(workspace, async (journal, active) => {
       assert.ok(active())
-      await loadRecovery.settleChildRuns(journal, join(workspace, '.git'))
+      await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
       assert.equal(active(), null)
       assert.equal((await producer.call('open', 'late-after-void')).ok, false)
       assert.equal(await producer.call('spawns'), 0)
@@ -73,12 +72,12 @@ test('WHAT[managed-session-lifecycle-025] load recovery preserves canonical work
     assert.equal(opened.ok, true, opened.error)
     await withRecoveryJournal(workspace, async (journal, active) => {
       const before = active()
-      await assert.rejects(() => loadRecovery.settleChildRuns(journal, join(workspace, '.git')), /local process binding/)
+      await assert.rejects(() => loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra')), /local process binding/)
       assert.deepEqual(active(), before)
       assert.deepEqual(await producer.call('blockers'), [opened.id])
       assert.equal((await producer.call('open', 'late-before-ended')).ok, false)
       await producer.call('complete', 'foreign-before-void')
-      await loadRecovery.settleChildRuns(journal, join(workspace, '.git'))
+      await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
       assert.equal(active(), null)
       assert.equal((await producer.call('open', 'late-after-ended')).ok, false)
     })
@@ -91,13 +90,13 @@ for (const afterCommit of [false, true]) {
       await withRecoveryJournal(workspace, async (journal, active) => {
         const before = active()
         await loseOwnershipCommit(DatabaseSync, 'Drain', afterCommit, () => assert.rejects(
-          () => loadRecovery.settleChildRuns(journal, join(workspace, '.git')), /Draining was not acknowledged: Unknown/,
+          () => loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra')), /Draining was not acknowledged: Unknown/,
         ))
         assert.deepEqual(active(), before)
         const late = await producer.call('open', 'after-unknown-void')
         assert.equal(late.ok, !afterCommit)
         if (late.ok) await producer.call('complete', 'after-unknown-void')
-        await loadRecovery.settleChildRuns(journal, join(workspace, '.git'))
+        await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
         assert.equal(active(), null)
         assert.equal((await producer.call('open', 'after-confirmed-void')).ok, false)
       })
@@ -329,7 +328,7 @@ test('WHAT[managed-session-lifecycle-025] failed ownership journal initializatio
     assert.equal(result.ok, false)
     assert.match(result.error, /ownership initialization was locked/)
     assert.equal(closes, 1)
-    assert.equal(failedConnection.isOpen, false)
+    assert.throws(() => failedConnection.exec('SELECT 1'), { code: 'ERR_INVALID_STATE' })
     assert.equal(spawns, 0)
   } finally {
     DatabaseSync.prototype.exec = execute
@@ -395,7 +394,7 @@ for (const runtime of ['node', 'bun']) {
         }
         if (mode === 'cold-load') {
           await withRecoveryJournal(workspace, async (journal, active) => {
-            await loadRecovery.settleChildRuns(journal, join(workspace, '.git'))
+            await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
             assert.equal(active(), null)
           })
         } else {
@@ -501,7 +500,7 @@ for (const runtime of ['node', 'bun']) {
       await withFinitePhysicalWait(t, { operation: `PTY foreign ${corruption} receipt and physical drain ${runtime}`, limitMs: 29000 },
         () => withAdmissionWorkers(`foreign-receipt-${runtime}-${corruption}`, async (producer, other, workspace, start) => {
         const { readdirSync } = await import('node:fs')
-        const root = join(workspace, '.git', 'wanxiangshu', 'pty')
+        const root = join(workspace, '.Herdchestra', 'wanxiangshu', 'pty')
         const locate = marker => readdirSync(root).map(key => join(root, key)).find(directory => JSON.parse(readFileSync(join(directory, 'request'), 'utf8')).command.includes(marker))
         const launches = join(workspace, 'launches')
         const prior = await producer.call('open', `printf 'prior\\n' >> '${launches}'; exit 23`)
@@ -572,7 +571,7 @@ for (const runtime of ['node', 'bun']) {
     if (spawnSync('bun', ['--version'], { encoding: 'utf8' }).status !== 0) return t.skip('Bun is required for the real PTY backend')
     await withAdmissionWorkers(`mixed-recovery-${runtime}`, async (producer, restarted, workspace) => {
       const { readdirSync } = await import('node:fs')
-      const root = join(workspace, '.git', 'wanxiangshu', 'pty')
+      const root = join(workspace, '.Herdchestra', 'wanxiangshu', 'pty')
       const oldMarker = join(workspace, 'old-target')
       const localMarker = join(workspace, 'local-target')
       const launches = join(workspace, 'launches')
@@ -631,7 +630,7 @@ for (const runtime of ['node', 'bun']) {
       const terminal = spawnSync('ps', ['-p', String(pid), '-o', 'tty='], { encoding: 'utf8' }).stdout.trim()
       const members = spawnSync('ps', ['-t', terminal, '-o', 'pid='], { encoding: 'utf8' }).stdout.trim().split(/\s+/).map(Number)
       const { readdirSync } = await import('node:fs')
-      const root = join(workspace, '.git', 'wanxiangshu', 'pty')
+      const root = join(workspace, '.Herdchestra', 'wanxiangshu', 'pty')
       const [entry] = readdirSync(root)
       const available = JSON.parse(readFileSync(join(root, entry, 'available'), 'utf8'))
       try {
@@ -1166,16 +1165,6 @@ test('WHAT[managed-session-lifecycle-025] a run drain rejects new local PTYs unt
   owner.complete(next.id)
 })
 
-test('WHAT[managed-session-lifecycle-025] concurrent terminal-name binding closes the losing PTY and waits for its exit', async () => {
-  const result = await PtyToolSurface.nameRace()
-  assert.equal(result.loserLiveBeforeExit, true)
-  assert.equal(result.loserOwnedBeforeExit, true)
-  assert.equal(result.outstandingBeforeExit, 2)
-  assert.equal(result.bothReturnedBeforeExit, false)
-  assert.equal(result.bindingErrors, 1)
-  assert.equal(result.outstandingAfterExit, 1)
-})
-
 test('WHAT[managed-session-lifecycle-025] DevOps run terminal settlement closes every PTY the DevOps child owns at the port boundary', async () => {
   // Observable boundary: the PTY backend port is where owner-initiated cleanup
   // becomes a physical effect. The DevOps child's own PTY must receive that
@@ -1278,18 +1267,21 @@ for (const terminalKind of ['Aborted', 'Missing', 'Empty', 'ForeignRoot', 'Forei
 
 test('WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget durable PTYs without local physical bindings', async () => {
   const { ToolRuntimeScopeSurface } = await import('../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js')
-  await withAdmittedChildren('cold-terminal-pty', 'manager-road-1', [
+  await withSharedAdmittedChildren('cold-terminal-pty', 'manager-road-1', [
     { agentId: 'devops', sessionId: 'devops-session-1', role: 'devops' },
   ], async (journal, profiles, directory) => {
     const child = 'devops-session-1'
     const registry = `fork-pty:${child}`
-    ownershipHost.executeOwnershipDurable(directory, registry, 'open-cold', { type: 'OpenScope', scopeId: child, parentId: null })
-    ownershipHost.executeOwnershipDurable(directory, registry, 'reserve-cold', { type: 'Reserve', resourceId: 'pty:cold', scopeId: child, kind: 'process' })
+    const stateRoot = join(directory, '.Herdchestra')
+    const round = `${child}:run:${profiles.get('devops').logicalRun}`
+    ownershipHost.executeOwnershipDurable(stateRoot, registry, 'open-cold', { type: 'OpenScope', scopeId: child, parentId: null })
+    ownershipHost.executeOwnershipDurable(stateRoot, registry, 'open-cold-round', { type: 'OpenScope', scopeId: round, parentId: child })
+    ownershipHost.executeOwnershipDurable(stateRoot, registry, 'reserve-cold', { type: 'Reserve', resourceId: 'pty:cold', scopeId: round, kind: 'process' })
     const result = await ToolRuntimeScopeSurface.coldDevOpsReturn(journal, directory)
     assert.match(result.failure, /no local process binding/)
     assert.equal(result.finished, false)
     assert.equal(result.delivered, false)
-    const blockers = Array.from(ownershipHost.ownershipBlockersDurable(directory, registry, child))
+    const blockers = Array.from(ownershipHost.ownershipBlockersDurable(stateRoot, registry, child))
     assert.equal(blockers.length, 1)
     assert.equal(blockers[0].Lease.ResourceId, 'pty:cold')
   })
@@ -1314,7 +1306,7 @@ test('WHAT[managed-session-lifecycle-025] a cold return with zero known PTYs sti
     const result = await ToolRuntimeScopeSurface.coldDevOpsReturn(journal, workspace)
     assert.equal(result.finished, true, result.failure)
     const registry = 'fork-pty:devops-session-1'
-    const database = new DatabaseSync(join(workspace, '.git', 'wanxiangshu', 'work.sqlite'))
+    const database = new DatabaseSync(join(workspace, '.Herdchestra', 'wanxiangshu', 'work.sqlite'))
     try {
       const records = database.prepare('SELECT body FROM journal_entries WHERE stream=? ORDER BY revision').all(`ownership:${registry}`)
         .map(row => new TextDecoder().decode(row.body))
@@ -1323,7 +1315,7 @@ test('WHAT[managed-session-lifecycle-025] a cold return with zero known PTYs sti
       assert.equal(restored.scope(run).phase, 'Draining')
       assert.deepEqual(restored.blockers(run), [])
       assert.equal(restored.scope('devops-session-1').phase, 'Open', 'the reusable session must stay open')
-      assert.throws(() => ownershipHost.executeOwnershipDurable(join(workspace, '.git'), registry, 'late-cold-reserve', {
+      assert.throws(() => ownershipHost.executeOwnershipDurable(join(workspace, '.Herdchestra'), registry, 'late-cold-reserve', {
         type: 'Reserve', scopeId: run, resourceId: 'pty:late-cold', kind: 'process',
       }), error => error.message === 'Scope admission is closed')
     } finally {

@@ -119,6 +119,7 @@ module AgentCompletion =
 
     let status (outcome: AgentCompletionOutcome) =
         match outcome with
+        | AgentCompleted payload when String.IsNullOrWhiteSpace payload.WorkRecord -> "undelivered"
         | AgentCompleted _ -> "completed"
         | AgentFailed _ -> "failed"
         | AgentAbandoned _ -> "abandoned"

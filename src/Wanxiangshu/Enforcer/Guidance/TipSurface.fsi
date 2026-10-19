@@ -10,6 +10,8 @@ module TipSurface =
     val createJournal: directory: string -> Task<obj>
     val disposeJournal: journal: obj -> unit
 
+    val writeTipBody: journal: obj -> content: string -> Task<obj>
+
     val appendCompanionLink: journal: obj -> value: obj -> Task<obj>
 
     val appendObservation: journal: obj -> value: obj -> Task<obj>

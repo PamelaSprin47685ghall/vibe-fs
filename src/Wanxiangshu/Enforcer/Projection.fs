@@ -3,7 +3,7 @@ namespace Wanxiangshu.Enforcer
 open Wanxiangshu.Foundation.Identity
 
 /// ENFORCER-045/154: one committed enforcement cycle, derived from BlogObservationCommitted.
-/// Tip v2: TipRuleId replaces CycleScoreRef (ENFORCER-072).
+/// Tip v2: TipName replaces CycleScoreRef (ENFORCER-072).
 type EnforcementCycleRecord =
     { MainSessionId: SessionId
       BloggerSessionId: SessionId
@@ -11,17 +11,15 @@ type EnforcementCycleRecord =
       ToolCallIds: ToolCallId list
       CycleTextRef: BlobRef
       CycleTextDigest: BlobDigest
-      TipRuleId: string
-      FieldNameAtCommit: string option
+      TipName: string
+      TipTextRef: BlobRef option
+      TipTextDigest: BlobDigest option
       CycleEvidenceRef: BlobRef option
       ObservedPrefixEpochId: PrefixEpochId }
 
 /// ENFORCER-070: one tip in the bounded history (oldest → newest).
 /// CycleId = ProviderRunIdentity of the committed cycle (one cycle per run).
-type RecentTip =
-    { RuleId: string
-      FieldName: string
-      CycleId: string }
+type RecentTip = { TipName: string; CycleId: string }
 
 /// ENFORCER-150 + PERSIST-008: O(1) index by ProviderRun + bounded RecentTips.
 /// No separate fact — fold derives this from BlogObservationCommitted.
@@ -43,11 +41,6 @@ module EnforcementProjection =
 
         if n <= limit then tips else tips |> List.skip (n - limit)
 
-    let private fieldNameAtCommit (record: EnforcementCycleRecord) =
-        match record.FieldNameAtCommit with
-        | Some f when not (isNull f) && f.Trim().Length > 0 -> f
-        | _ -> record.TipRuleId
-
     /// Apply the enforcement half of BlogObservationCommitted.
     /// Duplicate ProviderRun → Error (ENFORCER-154). Caller may absorb as idempotent.
     /// Appends RecentTips and keeps last RecentTipLimit (ENFORCER-070).
@@ -63,42 +56,13 @@ module EnforcementProjection =
                     (ProviderRunIdentity.value record.ProviderRun)
             )
         | None ->
-            let fieldName = fieldNameAtCommit record
-
             let tip =
-                { RuleId = record.TipRuleId
-                  FieldName = fieldName
+                { TipName = record.TipName
                   CycleId = ProviderRunIdentity.value record.ProviderRun }
 
             Ok
                 { ByProviderRun = Map.add record.ProviderRun record state.ByProviderRun
                   RecentTips = keepLast RecentTipLimit (state.RecentTips @ [ tip ]) }
-
-    /// Observation squash half of `BlogObservationsSquashed`.
-    ///
-    /// Co-truncate RecentTips when BlogObservationsSquashed collapses the oldest `count`
-    /// frames. Together with BlogProjection.applySquash this is the Journal substrate
-    /// for rulebook `BlogObservationsSquashed`: work-log frames and tips move as one
-    /// Observation history (see `ObservationProjection.observationsOf`).
-    ///
-    /// Assumption (1:1): each BlogObservationCommitted appends one Entry frame and one tip.
-    /// Squash frames do not add tips. On squash of the oldest `count` frames, drop the
-    /// oldest `min(count, tips.Length)` tips so tip history collapses with the covered
-    /// frame range (ENFORCER observation co-move; imperfect if a prior squash frame is
-    /// among the covered range, but improves residual vs independent tip lifetime).
-    let applySquash (count: int) (state: EnforcementProjectionState) : EnforcementProjectionState =
-        let n = List.length state.RecentTips
-
-        let drop =
-            if count <= 0 then 0
-            elif count < n then count
-            else n
-
-        if drop = 0 then
-            state
-        else
-            { state with
-                RecentTips = List.skip drop state.RecentTips }
 
     let tryFindByProviderRun (run: ProviderRunIdentity) (state: EnforcementProjectionState) =
         Map.tryFind run state.ByProviderRun

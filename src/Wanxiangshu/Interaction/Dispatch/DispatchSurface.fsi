@@ -221,6 +221,7 @@ module DispatchSurface =
         handle: JournalHandle -> session: string -> physicalMessageId: string -> agent: string -> Task<obj>
 
     val projectionObservation: handle: JournalHandle -> session: string -> obj
+    val userQuestionObservation: handle: JournalHandle -> session: string -> obj array
 
     val foldRuntimeStartWatermark: events: obj array -> obj
 

@@ -13,7 +13,6 @@ open Wanxiangshu.Foundation
 module CompanionPrompt =
 
     let Normal = "lifecycle/companion/normal"
-    let Squash = "lifecycle/companion/squash"
     let MemoryPreamble = "lifecycle/companion/memory-preamble"
 
     /// Plain lines → ARCH-010 comment-style instruction claim body.

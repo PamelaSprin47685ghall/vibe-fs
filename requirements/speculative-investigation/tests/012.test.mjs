@@ -70,7 +70,7 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_the_budget_is_the_owner_s
 
 test('WHAT[speculative-investigation-012] STRENGTH_012_candidate_and_promoted_semantic_bytes_have_no_mechanism_provenance', () => {
   const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-    { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+    { toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
   ] }]).value
   const base = [
     { role: 'user', parts: [{ kind: 'text', text: 'inspect the file' }] },
@@ -229,7 +229,7 @@ const { default: test } = await import("node:test");
 const PluginHooksSurface = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
 const languageSurface = await import("../../../dist/Participant/Provider/LanguageSurface.js");
 
-const decorateUnder = (language, toolID = 'read', decorateTwice = false) => {
+const decorateUnder = (language, toolID = 'todowrite-for-engineer', decorateTwice = false) => {
   const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = language
   languageSurface.refreshGlobalLanguage()
@@ -253,7 +253,7 @@ const decorateUnder = (language, toolID = 'read', decorateTwice = false) => {
 
 // WHAT[012]: The model-visible protocol is factual investigation outlook without
 // companion, trust-building, retaining control, price, discount or tier framing.
-// Only the 12 participating tools receive decoration; non-participating tools have zero increment.
+// Only the live participating tools receive decoration; non-participating tools have zero increment.
 test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_factual_and_strips_companion_and_trust_framing', () => {
   const english = decorateUnder('en')
   assert.match(
@@ -313,13 +313,12 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_fa
   }
 
   // Appending the same block twice keeps exactly one prose block.
-  const twice = decorateUnder('en', 'read', true)
+  const twice = decorateUnder('en', 'todowrite-for-engineer', true)
   assert.equal(twice.description.split('Investigation outlook: estimated_readonly_rounds').length - 1, 1)
 
-  // 12 participating tools get decorated
+  // The live participating tools get decorated
   const participating = [
-    'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
-    'edit', 'write', 'mv', 'rm', 'fetch', 'run',
+    'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops', 'fetch',
   ]
   for (const tool of participating) {
     const def = decorateUnder('en', tool)
@@ -331,10 +330,10 @@ test('WHAT[speculative-investigation-012] STRENGTH_012_investigation_prose_is_fa
   // Non-participating tools get zero increment
   const nonParticipating = [
     'fork', 'resume', 'commission', 'join', 'horizon', 'review', 'deliver',
-    'fission', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal',
-    'skill', 'assume', 'defer', 
-    'publish', 'chronicle', 'js-bookkeeper',
-    'bash-honeypot', 'invalid', 'js-orchestrator', 'js-blogger',
+    'fission', 'todowrite-for-plan', 'ask', 'devops',
+    'skill', 'assume',
+    'chronicle', 'todowrite-for-bookkeeper', 'todowrite-for-predictor',
+    'bash-honeypot', 'invalid', 'todowrite-for-orchestrator', 'todowrite-for-blogger',
   ]
   for (const tool of nonParticipating) {
     const def = decorateUnder('en', tool)

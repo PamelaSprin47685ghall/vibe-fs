@@ -40,7 +40,7 @@ const ROLE_PREDICATE_ARM_RE = /\|\s*"([^"]+)"(?:\s+->|\s*\|)/g
 
 /** Registry gate logic compares spec.Name — not a ToolSpec owner site. */
 const TOOL_OWNER_SKIP = new Set(['ToolRegistry.fs'])
-TOOL_OWNER_SKIP.add('ExecutorTool.fs')
+
 
 /**
  * @typedef {{ code: string, path: string, detail?: string }} Violation
@@ -99,7 +99,7 @@ export const extractRolePredicateArms = (text) => {
   if (!match) return arms
   for (const hit of match[0].matchAll(ROLE_PREDICATE_ARM_RE)) {
     const name = hit[1]
-    if (!name.startsWith('js-')) arms.push(name)
+    if (!name.startsWith('todowrite-for-')) arms.push(name)
   }
   return arms
 }

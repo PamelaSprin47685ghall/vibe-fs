@@ -85,10 +85,21 @@ module private AgentJournalInternals =
         | AgentFact.Host _ -> "AgentFact.Host"
         | AgentFact.Fission _ -> "AgentFact.Fission"
         | AgentFact.Delegation _ -> "AgentFact.Delegation"
-        | AgentFact.Attention _ -> "AgentFact.Attention"
-        | AgentFact.Concern _ -> "AgentFact.Concern"
         | AgentFact.ChatExecution _ -> "AgentFact.ChatExecution"
         | AgentFact.Cognition _ -> "AgentFact.Cognition"
+        | AgentFact.Concern _ -> "AgentFact.Concern"
+
+    let isReadOnlyFact =
+        function
+        | AgentFact.Concern _ -> true
+        | _ -> false
+
+    let rejectReadOnlyFact factTag =
+        FactRejected(
+            EventId.create "retired-fact",
+            { Fact = factTag
+              Reason = "Retired mailbox subscriptions are read-only" }
+        )
 
     let rejectAblation (factTag: string) =
         FactRejected(
@@ -200,7 +211,9 @@ type AgentJournal internal (writer: IJournalWriter, initialProjection: Projectio
         task {
             let tag = agentFactTag fact
 
-            if AblationGate.factDenied (AblationGate.registry ()) tag then
+            if isReadOnlyFact fact then
+                return Error(rejectReadOnlyFact tag)
+            elif AblationGate.factDenied (AblationGate.registry ()) tag then
                 return Error(rejectAblation tag)
             else
                 let! appended = this.AppendEnvelope stream providerRun (Fact.Agent fact)

@@ -33,10 +33,10 @@ test('WHAT[effect-accounting-003] a disposed journal handle prevents the physica
 })
 
 // D03 (2026-10-04): the old "provider todo mutation" half of the removed TODO
-// is retired by the Host-owned todowrite ruling — WHAT[008] and the existing
-// effect-accounting-008 tests own the live boundary (checkpoint only after the
-// Host reports the exact completed ToolPart). The worktree half is proven here
-// against the real ForkManagerJob chain.
+// is owned elsewhere — WHAT[008] and the existing effect-accounting-008 tests
+// own the live boundary (view checkpoint only after the Host reports the exact
+// completed ToolPart for a `todowrite-for-*` call; obligation-ledger-001). The
+// worktree half is proven here against the real ForkManagerJob chain.
 {
 const { default: assert } = await import('node:assert/strict')
 const { existsSync, mkdtempSync, readFileSync, rmSync } = await import('node:fs')

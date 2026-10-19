@@ -73,23 +73,14 @@ module HostForkAgent =
         (prompt: string)
         (payload: string option)
         : Task<Result<string list * string, string>> =
-        task {
-            let! parentWorkRecord = runtime.ParentWorkRecordOf runtime.ParentId
+        let requirements = []
 
-            let requirements = []
-
-            return
-                Ok(
-                    requirements,
-                    ForkChildPayload.relay
-                        (forkInstructions runtime.ParentId)
-                        prompt
-                        parentWorkRecord
-                        None
-                        requirements
-                        payload
-                )
-        }
+        Task.FromResult(
+            Ok(
+                requirements,
+                ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt None requirements payload
+            )
+        )
 
     let private enrichFirstPrompt
         (runtime: HostForkRuntime)
@@ -120,7 +111,6 @@ module HostForkAgent =
         (agentName: string)
         (identitySeed: PromptAuthority.IdentitySeed)
         (enrichedPrompt: string)
-        (preparedHandoff: PreparedDelegationHandoff option)
         (childId: SessionId)
         : Task<Result<ForkResult, string>> =
         task {
@@ -141,8 +131,7 @@ module HostForkAgent =
 
             match sent with
             | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
-                let run =
-                    runtime.InstallRun(agentId, childId, role, authorityRoot, ?preparedHandoff = preparedHandoff)
+                let run = runtime.InstallRun(agentId, childId, role, authorityRoot)
 
                 let result =
                     runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
@@ -165,7 +154,6 @@ module HostForkAgent =
         (isFirstPrompt: bool)
         (deferSend: bool)
         (expectedToolCalls: int option)
-        (preparedHandoff: PreparedDelegationHandoff option)
         (childId: SessionId)
         : Task<Result<ForkResult, string>> =
         task {
@@ -194,16 +182,7 @@ module HostForkAgent =
 
                 return Ok(ForkResult.Created agentId)
             else
-                return!
-                    sendFirstPromptAndInstallRun
-                        runtime
-                        agentId
-                        role
-                        agentName
-                        identitySeed
-                        enrichedPrompt
-                        preparedHandoff
-                        childId
+                return! sendFirstPromptAndInstallRun runtime agentId role agentName identitySeed enrichedPrompt childId
         }
 
     let private afterLinkage
@@ -218,7 +197,6 @@ module HostForkAgent =
         (isFirstPrompt: bool)
         (deferSend: bool)
         (expectedToolCalls: int option)
-        (preparedHandoff: PreparedDelegationHandoff option)
         (childId: SessionId)
         (linkageResult: Result<unit, string>)
         : Task<Result<ForkResult, string>> =
@@ -241,7 +219,6 @@ module HostForkAgent =
                 isFirstPrompt
                 deferSend
                 expectedToolCalls
-                preparedHandoff
                 childId
 
     let private forkNewChild
@@ -257,7 +234,6 @@ module HostForkAgent =
         (isFirstPrompt: bool)
         (deferSend: bool)
         (expectedToolCalls: int option)
-        (preparedHandoff: PreparedDelegationHandoff option)
         : Task<Result<ForkResult, string>> =
         let interpretChildResult =
             function
@@ -294,7 +270,6 @@ module HostForkAgent =
                             isFirstPrompt
                             deferSend
                             expectedToolCalls
-                            preparedHandoff
                             childId
                             linkageResult
                 }
@@ -328,7 +303,6 @@ module HostForkAgent =
         (enrichedPrompt: string)
         (isFirstPrompt: bool)
         (expectedToolCalls: int option)
-        (preparedHandoff: PreparedDelegationHandoff option)
         : Task<Result<ForkResult, string>> =
         task {
             match HostForkBinding.managedAgent runtime.Journal childId with
@@ -344,14 +318,11 @@ module HostForkAgent =
                         runtime.ParentId
                         runtime.Sessions
                         runtime.PrepareCompletion
-                        runtime.XTraceHead
                         runtime.TrackOwnedWork
                         runtime.Runtime
-                        runtime.HandoffPort
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
                         (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
-                        preparedHandoff
                         agentId
                         childId
                         role
@@ -371,7 +342,6 @@ module HostForkAgent =
         (isFirstPrompt: bool)
         (deferSend: bool)
         (expectedToolCalls: int option)
-        (preparedHandoff: PreparedDelegationHandoff option)
         (retired: bool option)
         (existing: SessionId option)
         (requirements: string list)
@@ -381,16 +351,7 @@ module HostForkAgent =
         | true, _, _ -> Task.FromResult(Error "Parent cancellation is in progress")
         | false, Some true, _ -> Task.FromResult(Error(sprintf "RetiredHandle: %s" agentId))
         | false, _, Some childId ->
-            forkExistingChild
-                runtime
-                agentId
-                childId
-                role
-                prompt
-                enrichedPrompt
-                isFirstPrompt
-                expectedToolCalls
-                preparedHandoff
+            forkExistingChild runtime agentId childId role prompt enrichedPrompt isFirstPrompt expectedToolCalls
         | false, _, None ->
             forkNewChild
                 runtime
@@ -405,7 +366,6 @@ module HostForkAgent =
                 isFirstPrompt
                 deferSend
                 expectedToolCalls
-                preparedHandoff
 
     let private resolveReuseEnrichedPrompt
         (runtime: HostForkRuntime)
@@ -414,15 +374,7 @@ module HostForkAgent =
         : Task<string option> =
         match renderedPrompt with
         | Some rendered -> Task.FromResult(Some rendered)
-        | None ->
-            task {
-                let! parentWorkRecord = runtime.ParentWorkRecordOf runtime.ParentId
-
-                return
-                    Some(
-                        ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt parentWorkRecord None [] None
-                    )
-            }
+        | None -> Task.FromResult(Some(ForkChildPayload.relay (forkInstructions runtime.ParentId) prompt None [] None))
 
     let private reuseWithManagedAgent
         (runtime: HostForkRuntime)
@@ -433,7 +385,6 @@ module HostForkAgent =
         (prompt: string)
         (renderedPrompt: string option)
         (wasDormant: bool)
-        (preparedHandoff: PreparedDelegationHandoff option)
         : Task<Result<ForkResult, string>> =
         task {
 
@@ -459,14 +410,11 @@ module HostForkAgent =
                         runtime.ParentId
                         runtime.Sessions
                         runtime.PrepareCompletion
-                        runtime.XTraceHead
                         runtime.TrackOwnedWork
                         runtime.Runtime
-                        runtime.HandoffPort
                         runtime.SendChildPrompt
                         runtime.SendBusyNudge
                         (fun child role -> runtime.RunStarted child role (runtime.DirectoryOf agentId))
-                        preparedHandoff
                         agentId
                         childId
                         role
@@ -475,19 +423,10 @@ module HostForkAgent =
                         enriched
         }
 
-    let private interpretDevOpsFirstSent
-        (runtime: HostForkRuntime)
-        agentId
-        childId
-        role
-        agentName
-        preparedHandoff
-        sent
-        =
+    let private interpretDevOpsFirstSent (runtime: HostForkRuntime) agentId childId role agentName sent =
         match sent with
         | HostForkRunLifecycle.AgentOwnerDispatchOutcome.Accepted(_, authorityRoot) ->
-            let run =
-                runtime.InstallRun(agentId, childId, role, authorityRoot, ?preparedHandoff = preparedHandoff)
+            let run = runtime.InstallRun(agentId, childId, role, authorityRoot)
 
             let result =
                 runtime.Runtime.Fork(agentId, role, agentName, runWork = (fun () -> run.Source.Task))
@@ -504,7 +443,6 @@ module HostForkAgent =
         prompt
         renderedPrompt
         expectedToolCalls
-        preparedHandoff
         =
         task {
             do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
@@ -535,7 +473,7 @@ module HostForkAgent =
                                 observer
                     )
 
-                return interpretDevOpsFirstSent runtime agentId childId role agentName preparedHandoff sent
+                return interpretDevOpsFirstSent runtime agentId childId role agentName sent
         }
 
     let private reuseLiveChild
@@ -546,7 +484,6 @@ module HostForkAgent =
         (prompt: string)
         (renderedPrompt: string option)
         (expectedToolCalls: int option)
-        (preparedHandoff: PreparedDelegationHandoff option)
         : Task<Result<ForkResult, string>> =
         task {
             let recordOpt =
@@ -582,40 +519,13 @@ module HostForkAgent =
                 do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
 
                 return!
-                    reuseWithManagedAgent
-                        runtime
-                        agentId
-                        childId
-                        Role.DevOps
-                        agentName
-                        prompt
-                        renderedPrompt
-                        wasDormant
-                        preparedHandoff
+                    reuseWithManagedAgent runtime agentId childId Role.DevOps agentName prompt renderedPrompt wasDormant
             | _, None when isDevOpsHandle ->
-                return!
-                    sendDevOpsFirstPrompt
-                        runtime
-                        agentId
-                        childId
-                        prompt
-                        renderedPrompt
-                        expectedToolCalls
-                        preparedHandoff
+                return! sendDevOpsFirstPrompt runtime agentId childId prompt renderedPrompt expectedToolCalls
             | Some role, Some agentName ->
                 do! maybeReplaceToolEstimate runtime.Journal expectedToolCalls childId
 
-                return!
-                    reuseWithManagedAgent
-                        runtime
-                        agentId
-                        childId
-                        role
-                        agentName
-                        prompt
-                        renderedPrompt
-                        wasDormant
-                        preparedHandoff
+                return! reuseWithManagedAgent runtime agentId childId role agentName prompt renderedPrompt wasDormant
             | None, _ -> return Error(sprintf "Unknown agent id: %s" agentId)
             | _, None -> return Error(sprintf "Agent handle '%s' has no active managed agent identity" agentId)
         }
@@ -660,8 +570,7 @@ module HostForkAgent =
                 ?ownership: HandleOwnership,
                 ?deferSend: bool,
                 ?byname: string,
-                ?expectedToolCalls: int,
-                ?preparedHandoff: PreparedDelegationHandoff
+                ?expectedToolCalls: int
             ) : Task<Result<ForkResult, string>> =
             let agentName = agent.Trim()
 
@@ -714,7 +623,6 @@ module HostForkAgent =
                             isFirstPrompt
                             deferSend
                             expectedToolCalls
-                            preparedHandoff
                             retired
                             existing
                             requirements
@@ -722,13 +630,8 @@ module HostForkAgent =
             }
 
         member this.Reuse
-            (
-                agentId: string,
-                prompt: string,
-                ?renderedPrompt: string,
-                ?expectedToolCalls: int,
-                ?preparedHandoff: PreparedDelegationHandoff
-            ) : Task<Result<ForkResult, string>> =
+            (agentId: string, prompt: string, ?renderedPrompt: string, ?expectedToolCalls: int)
+            : Task<Result<ForkResult, string>> =
             task {
                 // GREEN-4: recovery ownership is SessionRecoveryWorkflow only.
                 // After join retires the prior work unit, reuse of the same
@@ -750,16 +653,7 @@ module HostForkAgent =
                 | false, _, Some true, _ -> return Error(sprintf "RetiredHandle: %s" agentId)
                 | false, _, _, None -> return Error(sprintf "Unknown agent id: %s" agentId)
                 | false, _, _, Some(childId, wasDormant) ->
-                    return!
-                        reuseLiveChild
-                            this
-                            agentId
-                            childId
-                            wasDormant
-                            prompt
-                            renderedPrompt
-                            expectedToolCalls
-                            preparedHandoff
+                    return! reuseLiveChild this agentId childId wasDormant prompt renderedPrompt expectedToolCalls
             }
 
         member this.ActiveGuidanceProfile(agentId: string) =

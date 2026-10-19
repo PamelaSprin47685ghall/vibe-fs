@@ -89,8 +89,8 @@ module BlogSurface =
     val deserializeObservationFact: line: string -> obj
 
     /// Build the complete Blogger projection plan from semantic frame/tip
-    /// inputs. The builder retains pairing, physical-delta ordering and
-    /// squash instruction placement behind the Blog owner boundary.
+    /// inputs. The builder retains pairing and physical-delta ordering
+    /// behind the Blog owner boundary.
     val buildProjectionPlan: value: obj -> obj
 
     /// Coverage birth guard: sequence and cutoff advance together with the

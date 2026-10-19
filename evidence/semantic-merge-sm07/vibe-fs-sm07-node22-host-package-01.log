@@ -1,0 +1,5 @@
+[verify-package] FAILED: resources/provider/role in package must strictly equal active roles: expected blogger,bookkeeper,devops,engineer,manager,orchestrator,plan, got advisor,blogger,bookkeeper,devops,engineer,manager,orchestrator,plan
+Error: resources/provider/role in package must strictly equal active roles: expected blogger,bookkeeper,devops,engineer,manager,orchestrator,plan, got advisor,blogger,bookkeeper,devops,engineer,manager,orchestrator,plan
+    at assertActiveRegistrations (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/verify-package.mjs:797:11)
+    at verifyPackage (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/verify-package.mjs:888:5)
+    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/verify-package.mjs:943:20

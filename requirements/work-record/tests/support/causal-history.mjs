@@ -15,7 +15,7 @@ export const causalRun = 'completed-a'
 export const causalRange = { StartInclusive: { Sequence: 0 }, EndExclusive: { Sequence: 4 }, ProviderRun: causalRun }
 
 async function boot(directory, runtime) {
-  const opened = await journal.JournalSurface_boot(directory, runtime, process.pid, '2026-10-17T00:00:00Z')
+  const opened = await journal.JournalSurface_boot(directory, runtime, process.pid, new Date().toISOString())
   assert.equal(opened.ok, true, JSON.stringify(opened.error))
   return opened.journal
 }
@@ -28,17 +28,7 @@ async function summary(handle, name, from, through, frameEpoch = 0) {
     previousIngestedThroughSequence: from, nextIngestedThroughSequence: through,
     previousCoverableTurnCutoffExclusive: 0, nextCoverableTurnCutoffExclusive: 0,
     nextCoveredPrefixDigest: '', textRef: blob.blobRef, textDigest: blob.blobDigest,
-    toolCallIds: [], tipRuleId: name, fieldNameAtCommit: name, observedPrefixEpoch: 0,
-  })
-  assert.equal(appended.ok, true, JSON.stringify(appended.error))
-}
-
-async function squash(handle, name, epoch, count) {
-  const blob = await journal.JournalSurface_writePayload(handle, name.toUpperCase().replaceAll('-', '_'))
-  assert.equal(blob.ok, true)
-  const appended = await record.appendBlogSquash(handle, causalSession, name, {
-    bloggerSessionId: 'causal-blog', requestId: name, previousFrameEpoch: epoch,
-    nextFrameEpoch: epoch + 1, coveredFrameCount: count, textRef: blob.blobRef, textDigest: blob.blobDigest,
+    toolCallIds: [], tipName: name, observedPrefixEpoch: 0,
   })
   assert.equal(appended.ok, true, JSON.stringify(appended.error))
 }
@@ -62,10 +52,7 @@ async function seedTemplates(directory, gapFrames) {
       await summary(handle, 'original-summary', 1, 2)
       await record.captureTerminalText(handle, causalSession, 'FORMAL_RESULT', causalRun)
       await summary(handle, 'late-entry', 2, 3)
-      await squash(handle, 'partial-squash', 0, 2)
-      await squash(handle, 'full-squash', 1, 2)
-      await summary(handle, 'late-tip', 3, 4, 2)
-      await squash(handle, 'nested-squash', 2, 2)
+      await summary(handle, 'late-tip', 3, 4)
       await record.captureProjection(handle, causalSession, { messages: [
         ...messages, { role: 'assistant', parts: [{ kind: 'text', text: 'LATE_ORIGINAL' }] },
       ] })
@@ -129,7 +116,7 @@ export async function withCausalHistory(run, { parentCursors = {}, openingOnly =
       const sequence = (sequences.get(writer) ?? 0) + 1
       sequences.set(writer, sequence)
       const payload = { ...template.payload, EventId: ['EventId', id], RuntimeId: ['RuntimeId', writer],
-        LocalSeq: ['LocalSeq', String(sequence)], ObservedAt: '2026-10-17T00:00:00+00:00' }
+        LocalSeq: ['LocalSeq', String(sequence)], ObservedAt: new Date().toISOString() }
       const appended = await events.append(store, [{ ...template, id, parents, payload }])
       assert.equal(appended.ok, true, JSON.stringify(appended.error))
       assert.deepEqual(appended.cuts, [])

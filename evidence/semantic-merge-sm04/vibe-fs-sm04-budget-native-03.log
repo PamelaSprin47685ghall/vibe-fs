@@ -1,0 +1,39 @@
+✔ WHAT[process-execution-013] js.run bounds large output deterministically to head+tail without model distillation (248.663125ms)
+✔ WHAT[process-execution-013] small output preserves separate stdout and stderr in onExit without truncation (104.054708ms)
+✔ WHAT[process-execution-013] ToolResultBound keeps deterministic raw tail when output exceeds host window (1.697792ms)
+✔ WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction (123.476458ms)
+▶ WHAT[process-execution-014] actual process output round-trips every raw text value
+  ✔ empty (99.053542ms)
+  ✔ no trailing LF (97.357792ms)
+  ✔ trailing LF (90.624916ms)
+  ✔ multiple trailing LF (86.152791ms)
+  ✔ CRLF (95.325625ms)
+  ✔ lone CR (90.923625ms)
+  ✔ quotes and backslashes (84.965042ms)
+  ✔ literal quotes and Unicode (103.281958ms)
+  ✔ control characters (97.8955ms)
+  ✔ BOM and CRLF (111.521917ms)
+✔ WHAT[process-execution-014] actual process output round-trips every raw text value (958.304625ms)
+✔ WHAT[process-execution-014] truncated_output_preserves_program_facts_without_log_inference_and_declares_truncation (283.399542ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 0 fits HostMaxBytes without splitting a code point (4.920875ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 1 fits HostMaxBytes without splitting a code point (2.575292ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 2 fits HostMaxBytes without splitting a code point (2.009042ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 3 fits HostMaxBytes without splitting a code point (1.958791ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 4 fits HostMaxBytes without splitting a code point (1.914042ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 7 fits HostMaxBytes without splitting a code point (2.031125ms)
+✔ WHAT[process-execution-015] the complete visible result fits the Host window before any outer truncation (142.226208ms)
+✔ WHAT[process-execution-015] the encoded minimum rejects before execution and admits actual normal, signal and deadline facts (894.633709ms)
+✔ WHAT[process-execution-015] a small explicit budget counts escaped Unicode, both streams, metadata and bilingual truncation data (181.282875ms)
+✔ WHAT[process-execution-015] returning onExit observation cannot bypass the run byte budget (91.655833ms)
+✔ WHAT[process-execution-018] js.run keeps split UTF-8 bytes, BOM and trailing CRLF in both native streams (381.05975ms)
+✔ WHAT[process-execution-018] native SIGTERM and an ordinary exit 143 remain different facts (169.941416ms)
+✔ WHAT[process-execution-018] a foreground command receives EOF after its input and completes normally (53.116041ms)
+✔ WHAT[process-execution-018] a physical spool failure remains a fault with incomplete output and never becomes a successful empty transcript (146.694209ms)
+ℹ tests 30
+ℹ suites 0
+ℹ pass 30
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2446.121542

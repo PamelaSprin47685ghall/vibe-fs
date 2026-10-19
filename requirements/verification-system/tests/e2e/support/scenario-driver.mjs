@@ -36,13 +36,28 @@ import { bindLaneSession } from './lane.mjs';
 import { compileScenario } from './scenario-schema.js';
 import { attachEventCeilings, normalizeEventCeilings } from './event-ceiling.js';
 import { ScenarioRuntime } from './scenario-runtime.js';
-import { readJournal, watchJournal, getOrCreateSharedObserver } from './journal-observer.js';
+import {
+  readJournal,
+  watchJournal,
+  getOrCreateSharedObserver,
+  workJournalEvents,
+} from './journal-observer.js';
 import { isIdleEvent } from './session-quiescence.js';
 import { createNodeDelayPort } from './delay-port.mjs';
 import { kindOf } from './runtime-key.js';
 import { parse as parseToml } from 'smol-toml';
 
 const SCENARIO_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scenarios');
+
+/** Tenure boundaries crossed by one session, from the unified work journal. */
+const tenureBoundaryCountOf = (workDir, sessionId) =>
+  typeof sessionId === 'string' && sessionId !== ''
+    ? workJournalEvents(workDir)
+        .filter((event) => event.stream === sessionId)
+        .filter((event) => event.type === 'IncumbencyOpened'
+          || (event.type === 'IncumbencyRetired' && event.payload?.outcome === 'Relayed'))
+        .length
+    : 0;
 
 /** Short wall-clock guard when journal/SSE wake is unavailable; not a success-path sleep. */
 const FACT_WAKE_GUARD_MS = 50;
@@ -244,13 +259,12 @@ export async function awaitFactBarrier(scenario, step, ctx = null) {
   const deadline = Date.now() + (step.timeoutMs || WAIT_FACT_WINDOW_MS);
 
   const readCurrentFactCount = () => {
-    if (targetSession) {
-      const obs = getOrCreateSharedObserver(scenario.host.workDir);
-      obs.refresh?.();
-      const matched = obs.select({ caseName: name, sessionId: targetSession });
-      return { named: matched.length, total: obs.counts().uniqueEvents, renew: 0 };
-    }
-    return readJournal(scenario.host.workDir, name, renewOn);
+    // One reader for both sources: `readJournal` merges the plugin event stream with the
+    // unified work journal (`work.sqlite`), and the file-watching observer only ever sees
+    // the former — a session-scoped waitFact would silently read 0 for a lifecycle fact
+    // that lives in the work journal (measured: the Manager work's `Reviewed`).
+    const counts = readJournal(scenario.host.workDir, name, renewOn, { sessionId: targetSession });
+    return { named: counts.named, total: counts.total, renew: counts.renew };
   };
 
   // verification-system-006: a waitFact with an explicit timeout is a bounded wait step —
@@ -266,7 +280,7 @@ export async function awaitFactBarrier(scenario, step, ctx = null) {
   }
   while (!cmp(observed.named) && Date.now() < deadline) {
     const remaining = Math.max(1, deadline - Date.now());
-    // Journal watch wakes on local .git/wanxiangshu/events writer-file changes; ≤FACT_WAKE_GUARD_MS wall guard is fallback only.
+    // Journal watch wakes on local .Herdchestra/wanxiangshu/events writer-file changes; ≤FACT_WAKE_GUARD_MS wall guard is fallback only.
     await wakeOnJournal(scenario.host.workDir, Math.min(remaining, FACT_WAKE_GUARD_MS));
 
     const next = readCurrentFactCount();
@@ -499,8 +513,40 @@ async function runFlow(scenario, doc, ctx) {
       // a signal/diagnostic and never becomes identity data.
       const agent = step.bindChild.agent;
       const sessions = await awaitSessionsByAgent(scenario, agent, step.timeoutMs);
-      ctx.childId = sessions[0].id;
       const bound = step.bindChild.bind || [agent];
+      // The role's OWN session is the one no other lane already owns: a preflow canary or
+      // a HumanRoot work runs on the same agent, and picking the first snapshot entry
+      // (creation order) would attribute this lane's later waits to that other work's
+      // session — measured: the Manager work's `Reviewed`/`IncumbencyRetired` facts live on
+      // the commissioned session, not on the canary owner's.
+      const bindings = scenario.provider?._scenario?.bindings;
+      const ownedByAnotherLane = (sessionId) => {
+        if (!(bindings instanceof Map)) return false;
+        for (const [alias, sessionsOfAlias] of bindings) {
+          if (bound.includes(alias)) continue;
+          if (sessionsOfAlias instanceof Set ? sessionsOfAlias.has(sessionId) : sessionsOfAlias === sessionId) {
+            return true;
+          }
+        }
+        return false;
+      };
+      // Wait for the lane's OWN session, not merely any session of that agent: the role's
+      // road is created asynchronously (the Orchestrator's commission), while a preflow
+      // canary or a HumanRoot road of the same agent already exists and belongs to another
+      // lane. A timeout still fails closed in `awaitSessionsByAgent`.
+      let own = sessions.find((session) => !ownedByAnotherLane(session.id));
+      const deadline = step.timeoutMs === undefined ? Date.now() + 30000 : Date.now() + step.timeoutMs;
+      while (own === undefined && Date.now() < deadline) {
+        await delayPort.delay(FACT_WAKE_GUARD_MS);
+        const next = await fetchSessionsByAgent(scenario, agent);
+        own = next.find((session) => !ownedByAnotherLane(session.id));
+        if (own !== undefined) {
+          for (const session of next) {
+            if (!scenario.sessionIds.includes(session.id)) scenario.sessionIds.push(session.id);
+          }
+        }
+      }
+      ctx.childId = (own ?? sessions[0]).id;
       for (const session of sessions) {
         if (!scenario.sessionIds.includes(session.id)) scenario.sessionIds.push(session.id);
         bindLaneSession(scenario.provider, session.id, ...bound);
@@ -867,7 +913,14 @@ export async function runCanary(scriptName, { customs, preFlow } = {}) {
     const eventCeilings = normalizeEventCeilings(doc.setup ?? {});
     attachEventCeilings(scenario, eventCeilings);
 
-    scenario.provider.attachScenario(new ScenarioRuntime(doc));
+    scenario.provider.attachScenario(new ScenarioRuntime(doc, {
+      // work-008: the successor projection may strip a predecessor's assistant/tool
+      // traffic only when the session actually crossed a tenure boundary between two
+      // deliveries. The count is durable journal evidence — the same facts the loop
+      // oracles read — scoped to the session by the identity the payload carries, so the
+      // seal never infers a tenure change from the wire.
+      tenureBoundaryCount: (sessionId) => tenureBoundaryCountOf(scenario.host.workDir, sessionId),
+    }));
 
     if (Array.isArray(doc.setup?.preFlowTurns) && doc.setup.preFlowTurns.length > 0 && !preFlow) {
       throw new Error('scenario declares preFlowTurns but no preFlow handler was supplied');

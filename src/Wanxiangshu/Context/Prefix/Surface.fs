@@ -114,8 +114,6 @@ module PrefixSurface =
         | "work-main" -> Some ProviderRequestKind.WorkMain
         | "bloggermain"
         | "blogger-main" -> Some ProviderRequestKind.BloggerMain
-        | "bloggersquash"
-        | "blogger-squash" -> Some ProviderRequestKind.BloggerSquash
         | "interactionrepair"
         | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
         | "strengthreplica"
@@ -125,7 +123,6 @@ module PrefixSurface =
     let requestKindLabels: string array =
         [| ProviderRequestKind.WorkMain
            ProviderRequestKind.BloggerMain
-           ProviderRequestKind.BloggerSquash
            ProviderRequestKind.InteractionRepair
            ProviderRequestKind.StrengthReplica |]
         |> Array.map ProviderRequestKind.label
@@ -144,7 +141,6 @@ module PrefixSurface =
         box
             {| workMain = "work-main"
                bloggerMain = "blogger-main"
-               bloggerSquash = "blogger-squash"
                interactionRepair = "interaction-repair"
                strengthReplica = "strength-replica"
                all = requestKindLabels
@@ -350,7 +346,7 @@ module PrefixSurface =
     let private checkpointToJs (checkpoint: Wanxiangshu.Context.Prefix.PhaseWindow.PhaseCheckpoint) : obj =
         box {| callId = ToolCallId.value checkpoint.ToolCallId |}
 
-    /// Append one successful todowrite checkpoint. The window is not trimmed by K;
+    /// Append one successful view declaration checkpoint. The window is not trimmed by K;
     /// only a committed prefix rebase can make older checkpoints unrecoverable.
     let appendCheckpoint (callId: string) (window: obj array) : obj array =
         let committed =

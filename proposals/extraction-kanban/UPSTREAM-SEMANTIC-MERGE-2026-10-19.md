@@ -27,15 +27,15 @@
 
 | 包 | 范围 | 依赖 | 状态 | 验收记录 |
 |---|---|---|---|---|
-| SM-01 | 固定版本、语义处置、条款与测试锚点冲突、基线证据 | — | DONE | 68a6785f1 已落盘；20项职责和5项冲突均有目标、责任包与反例 |
-| SM-02A | 库历史整合、Journal/Process/Supervision/Trace 本地保证与上游 Work 规则并存 | SM-01 | LIB_READY | 核心 Node315/0/6skip，Bun273/0，独立编译及真实包外组合43/0；库提交待记录，未非作者复审 |
+| SM-01 | 固定版本、语义处置、条款与测试锚点冲突、基线证据 | — | DONE | 68a6785f1 已落盘；20项职责和6项冲突均有目标、责任包与反例 |
+| SM-02A | 库历史整合、Journal/Process/Supervision/Trace 本地保证与上游 Work 规则并存 | SM-01 | LIB_READY | 152719c；核心 Node315/0/6skip，Bun273/0，独立编译及真实包外组合43/0；未非作者复审 |
 | SM-02B | 新增模块接收：resources、time/wait、grounding、identity/events/fs 的实际边界 | SM-02A | LIB_READY | 七模块Node/Bun各191/0；独立编译及包外20/0；静止候选重包3/0，主仓未接线 |
-| SM-02C | 库构建、声明、隔离安装、可获取提交；正式测试监督器保留 | SM-02B | LIB_READY | f65e106：正式563项556pass/7skip/0fail/0TODO，16入口实际安装闭包3/0；未非作者复审 |
-| SM-03 | 主仓依赖、源码 submodule、状态根、生命周期、退役 Git 状态同步 | SM-02C | DOING | 固定库候选已交付，主仓冲突按处置表逐项处理 |
-| SM-04 | 新 js.run 接入物理执行、输出预算、取消、资源归属和真实收尾 | SM-03 | BACKLOG | 未运行 |
-| SM-05 | Trace/ANCHOR/前缀/显式子工作终值与现存历史消费者 | SM-03 | BACKLOG | 未运行 |
-| SM-06 | 身份和双侧门禁、失败预算与发送去重、结构化委派、Advisor/horizon | SM-04、SM-05 | BACKLOG | 未运行 |
-| SM-07 | 同一候选的相关回归、真实 Host、包外消费及切换准备 | SM-06 | BACKLOG | 未运行 |
+| SM-02C | 库构建、声明、隔离安装、可获取提交；正式测试监督器保留 | SM-02B | LIB_READY | 最终05f6b5a：最低Node完整566项559pass/7skip/0fail/0TODO；16入口包外消费及声明编译通过；未非作者复审 |
+| SM-03 | 主仓依赖、源码 submodule、状态根、生命周期、退役 Git 状态同步 | SM-02C | READY | gen2构建与8文件正式32/0/0TODO通过；扩大选集无普通失败，既有TODO、长编译监督及最终发行/真实Host边界保留 |
+| SM-04 | 新 js.run 接入物理执行、输出预算、取消、资源归属和真实收尾 | SM-03 | READY | gen11正式13文件232/0/0TODO；完整PTY集通过，发行/真实Host与格式门禁仍归SM-07 |
+| SM-05 | Trace/ANCHOR/前缀/显式子工作终值与现存历史消费者 | SM-03 | READY | gen15正式委派64/0/0skip/2TODO且排空；原件/前缀原生0普通失败，独立编译与真实Host34/0；旧GAP保留 |
+| SM-06 | 身份和双侧门禁、失败预算与发送去重、结构化委派、Advisor/horizon | SM-04、SM-05 | READY | gen17正式身份/Advisor23/0/0TODO；权限55/0/4TODO、恢复/grounding85/0/3TODO，均排空；真实Host4/0，旧边界保留 |
+| SM-07 | 同一候选的相关回归、真实 Host、包外消费及切换准备 | SM-06 | REVIEW | gen21：Node22/26物理各206/0；启用实际Git的25文件255/0/0skip/10TODO；完整发行未通过，未切换运行 |
 
 SM-04 与 SM-05 的独立调查和测试可交错推进，公共接线串行。每次更新表中状态时同步下面的证据和剩余边界；不另建与 BOARD 竞争的状态表，BOARD 只链接本批工作包。
 
@@ -122,5 +122,64 @@ SM-04 与 SM-05 的独立调查和测试可交错推进，公共接线串行。�
 - 原始长期证据在库`evidence/semantic-merge-sm02c/README.md`。主仓准备引用自有fork可获取的确切SHA；最低Node22.13、真实Host和非作者复审尚未完成，原CUT/GAP状态保留。
 
 ## 本次保留的未完成边界
+
+### SM-04 本批范围 READY
+
+新循环已复用 NodeProcessHost 与库监管能力；完整原始 Capture、原生终结、停止、关闭、呈现分别保留。最低预算、实际 TOML/UTF-8、双语数据说明已接新入口。回调与 park 期限、实际注册取消和插件关闭均先保留反例，再逐处修复；证据见`evidence/semantic-merge-sm04/README.md`。上游 onTimeout 只有说明、没有实现与测试，本批删去该虚假承诺，不引入新回调协议。
+
+generation8 合跑 process 与 managed-session-lifecycle-025 为321pass/64fail/1TODO；64红都在旧PTY集。迁移旧状态根并补齐测试端口 sticky 订阅后，generation9为89/34，揭示通用异常恢复会把资源收尾失败转换成业务完成。generation10只允许已认领完成走该恢复，收尾失败继续保留阻塞；旧PTY全集复验中。generation9正式12文件选集109/0/0TODO且排空、回收accepted=true，不能代证后续修正。格式检查仍有26路径未通过。
+
+generation10 的旧PTY全集122/1，唯一剩余夹具向旧位置及非本轮scope预留；迁到共享状态根与确切AdmittedWork轮次后，冷读、blocker、未完成与未交付断言1/0。最终generation11正式13文件232pass/0fail/0skip/0TODO，13/13排空、进程组回收accepted=true，包含完整managed-session-lifecycle-025及真实插件、取消、完整编码预算、GNU wget和pipe/PTY各自证明。未部署，未提交合并事务。详见`evidence/semantic-merge-sm04/`。
+
+当前绿色只覆盖对应日志范围。通用 JS 异步 CPU 隔离、整个 Long Stroke、旧 PTY 跨 Host 保证、发行与真实 Host 仍分列，不能用 pipe 或纯函数代证。正式发行前还须同一最终候选复验。
+
+### SM-05 本批范围READY，历史缺口保留
+
+generation10原生历史基线291项244pass/37fail/10TODO。37红包含旧squash专属调用及子LWR断言、三个Trace夹具差异；不把退役测试的删除当作冻结保证已保住。SC-02先保护Plan的U原文，SC-03先证明checkpoint身份不等于摘要耐久保存，再按现存owner限定ANCHOR寿命。仍存WorkRecord、inspect/Resume、完成冻结与原件捕获继续逐入口验收，Blogger全退役不在范围。
+
+用户明确批准删除CommissionerRecord公共字段、渲染分支及双语资源，真实Attachment保留。SC-02/03按真实反例收窄：Plan用户原文始终保留；ANCHOR编号、替换与摘要只在当前进程有效，checkpoint只证明调用身份，U/P/持久账本承担交棒。没有新增持久摘要层。
+
+generation13历史全选集276pass/0fail/1skip/10TODO、前缀全选集180pass/0fail/1skip/8TODO；启用被跳过的独立正负编译和真实Host证明后34/0/0skip/0TODO。generation15正式委派集（含实际Host指导）64pass/0fail/0skip/2TODO，7/7排空、回收accepted=true；因旧TODO退出1。物理执行和完整PTY生命周期复验206/0/0skip/0TODO，8/8排空、回收accepted=true。选集有重叠，不相加。原始红灯、新鲜度拒绝、收尾修正和全部日志见[evidence/semantic-merge-sm05](../../evidence/semantic-merge-sm05/README.md)。
+
+剩余：GAP-109/111的全消费者等价性、历史TODO及Blogger全退役均未关闭；本包证据允许依赖包施工，不代表全发行通过。SM-07仍须统一候选、格式、最低Node、包外消费及实际切换核对。
+
+### SM-06 本批范围READY，未扩成耐久Advisor或B2施工
+
+generation17统一Fable构建通过；相关全选集360项316pass/0fail/3skip/41TODO。正式身份/Advisor/schema九文件23/0/0skip/0TODO；实际权限七文件55/0/0skip/4TODO；失败预算/grounding六文件85/0/1skip/3TODO；均完整排空、进程组回收accepted=true。跳过的grounding原生Host/实际provider序列化另启集成层4/0/0skip/0TODO。各组有重叠，不相加；含TODO的正式入口仍退出1。
+
+保住旧身份原件时发现MailboxSubscribed先于非法Predictor截断；只保留该确切标记的只读解码，fold不恢复邮箱状态，AgentJournal拒绝新写入。三份旧NDJSON摘要与cut断言不变，未知case和缺字段仍拒绝。恢复误随旧Handoff退出的writer关闭探针，实际物理append前拒绝、零发送、预算冷读和同live Journal一次发送均复验。Advisor已证实并修复旧回答重放，只读本次future终态中的正式散文；当前进程席位/游标合同已校准。证据见[evidence/semantic-merge-sm06](../../evidence/semantic-merge-sm06/README.md)。
+
+剩余：B2仍实测出现两条物理失败事实；GAP-158完整Fission公式、Sphinx真实调用、旧权限TODO、Advisor并发咨询/晚到终态及耐久席位均不关闭。Blogger全退役和旧GAP清零不进入本批。
+
+### SM-03 本批范围READY，整包边界保留
+
+- 依赖已切到自有 fork 的 `f65e106` 源码子模块，`file:wanxiangli` 实际安装及源码索引检查通过。主仓91份历史证据归档另有精确路径/摘要清单，唯一运行依赖归档退出；不删证据换取绿色。
+- 主仓合并仍未提交。首轮正式Fable编译暴露旧接口与新接口的调用差异，原始日志暂存 `/tmp/vibe-fs-sm03-build-02.log`；在工作包验收前转入长期证据。构建失败不记通过。
+- 持久归属、恢复关闭及DevOps终结前PTY收尾保留；状态定位转 `.Herdchestra`。Trace现存MaterialConfirmed原件、冻结cut和完成投影保留；上游索引优化不能绕过本地身份冲突验证。Blogger只退役本批已批准的squash路径，未执行全退役。
+- 正式Fable构建generation1通过：1510编译项、171语义表面、825 ESM模块真实加载。SM-03六包正式选集触发5秒静默门禁，拆分后的长编译选集仍触发；原始失败保留，不放宽时限。原生84文件排空为474项452pass/11fail/11TODO；其中长编译正负边界实际通过。11红已逐项定位为夹具旧回执/旧状态根、规范化根路径与successor重复声明；后续9文件定向178项168pass/6fail/4TODO，剩余6项Journal旧.git夹具修正后23项21pass/0fail/2TODO。尚待同候选正式定向复验和发行/恢复其余门禁，不能把这些分次证据合成一次全绿。
+- 主仓归档和确切gitlink三项反例通过；清单摘要篡改也必须与baseline Git blob比较。原始日志和范围说明进入 `evidence/semantic-merge-sm03/`。未合并/推送生产代码，未部署。计划文档推送曾遇并行master前移，保留远端提交，最终普通合并后推送。
+- generation2正式构建通过。8文件正式选集32pass/0fail/0skip/0TODO，8/8排空且进程组回收accepted=true；验证范围为状态根/旧数据隔离/linked worktree、真实连接关闭、PTY冷归属、successor稳定身份及确切源码依赖。11文件扩大选集72pass/0fail/5TODO，Change/Git完整14文件202pass/0fail/5TODO，crash-reconciliation完整21文件55pass/0fail/18TODO，均已排空、进程组回收accepted=true；因TODO正式入口返回失败，不使用WXS_ACCEPT_TODO。三组存在重叠，不相加冒充独立用例总数。
+- READY只允许依赖它的实现包继续施工；不代表整个requirement包或所有历史GAP关闭。长编译原生通过不替代5秒正式监督失败；完整发行、安装、最低Node和真实Host仍归SM-07。全量上游merge事务在相关包收束后提交，当前不把含未验收SM-04/05语义的候选提前放入master。
+
+### SM-07 候选进入REVIEW，完整发行和切换未通过
+
+最终库固定05f6b5acf63a29d758e08e3162bba4c547dfda8d，已普通推送且可从HTTPS全新clone干净检出。最低Node22.13完整库559pass/0fail/7skip/0TODO，16入口真实安装闭包及外部TypeScript严格编译通过。主仓手工格式和静态检查通过；gen21同一候选的完整物理/PTY正式集在Node22与Node26各206pass/0fail/0skip/0TODO，8/8排空并回收accepted=true。
+
+启用实际Git集成的25文件正式选集255pass/0fail/0skip/10TODO，25/25排空、回收accepted=true；仍因TODO退出1，未记为完整验收。已修正全集发现的墓碑退休合同、漏显式交付的夹具、延迟Host激活的重启夹具及过宽编译依赖。委派Host闭包由399降至381，未提高392预算，交付值cell仍是同一个进程内owner。重启正控保留显式resume、deliver和join，不据此销GAP-149/158。
+
+Node22和Bun的真实主仓包已分别完成npm pack、隔离安装、离工作区导入和bundled库消费。最终并行master文档合并后的构建、发行入口及包摘要见[evidence/semantic-merge-sm07](../../evidence/semantic-merge-sm07/README.md)和该目录delivery.json；提交与普通推送事实单独登记。运行中的原工作区未切换，未部署。
+
+边界：正式发行02在416/870文件完成后触发5秒静默门禁，没有权威总计；相关修正的定向正式复验不覆盖未完成的全集。后续正式入口结果继续原样记录，不设置WXS_ACCEPT_TODO、不提高静默时限。B2、旧TODO、完整Fission公式、通用异步CPU隔离、Advisor晚到/并发及耐久席位、GAP-109/111、CUT既有边界、非作者复审及旧活动资源收束均保留。Blogger/Chronicle全退役、旧GAP清零和旧状态重播不在本批。
+- 旧ExecutorTool/四动词注册表面与Git状态同步已退出。其测试须迁入新入口；下表未通过前，SM-04/05不得标完成，也不得把上游新测试单独通过当成本地保证已保住。
+
+| 原测试 | 仍须迁入的保证 | 责任与证明边界 |
+|---|---|---|
+| process-execution 011 | 所有非法预算/规格在创建物理进程前拒绝，零副作用、启动握手取消 | SM-04；新Runnable和实际注册入口分别验证 |
+| process-execution 013 | 无模型/会话蒸馏、完整结果预算、真实插件计数 | SM-04；头尾呈现取代旧尾部政策，不能只验工具纯函数 |
+| process-execution 014 | CRLF/BOM/尾换行/控制字符原件、伪指令隔离、真实退出码及双语截断数据 | SM-04；实际js.run结果及注册呈现，不用合成TOML代证 |
+| process-execution 015 | 完整wire字节/行数，minimum-1零启动，minimum正常/signal/停止/故障结果 | SM-04；新增预算形态不得静默丢弃这些边界 |
+| 本地process-execution 017 | 二进制stdin/分路捕获、真实终结、握手期限、EOF排空 | SM-04；通用物理保证迁到仍存Process调用者。Git对象/ref/树读取与未知写入专属测试随已退出的GitRawStore退休，历史证明保留在固定本地输入，不复活状态transport |
+| work-record 004/010的squash及旧子LWR分支 | 完成前沿、晚到原件和晚到摘要不改写冻结完成记录，暖冷一致；scope借用失效 | SM-05；退役的squash与子LWR专属断言移除，仍存WorkRecord/inspect/Resume入口另验，不据此关闭GAP-109/111 |
+| managed-session-lifecycle 025的旧open-terminal命名竞争 | 旧工具专属命名失败后关闭已开的PTY | 该入口整体退役；不另造命名模拟器。其余025的资源归属、真实exit、恢复、run关闭及无法确认时阻止交付继续验收；pipe不代证PTY |
 
 GAP-140 B2、CUT-03-R7/R8/R9、CUT-06-R5、CUT-04-R7/R8、CUT-00-R2/R3、R12-U1 及其它历史 TODO 保留原编号、证据与状态。迁移中发现其旧消费者退出时逐项登记适用性，不据此把父 GAP 改 DONE。Blogger 全退役方案、其状态清空建议和替代架构均不进入本批。

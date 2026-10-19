@@ -20,9 +20,8 @@ open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
 /// Confirmed-failure recovery.
-/// WorkMain retries on the next provider failure budget; BloggerMain may insert one BloggerSquash
-/// maintenance request before retrying main. No future unrelated provider material is a
-/// retry trigger.
+/// WorkMain and BloggerMain retry on the next provider failure budget.
+/// No future unrelated provider material is a retry trigger.
 module ProviderRecoveryWorkflow =
 
     let private sessionHasFreshCoverage (projection: ProjectionSet) (sessionId: SessionId) =
@@ -145,8 +144,7 @@ module ProviderRecoveryWorkflow =
         (requestKind: ProviderRequestKind)
         =
         match requestKind with
-        | ProviderRequestKind.BloggerMain
-        | ProviderRequestKind.BloggerSquash ->
+        | ProviderRequestKind.BloggerMain ->
             SessionAssociationProjection.tryMainSessionOf failedSessionId projection.AgentProjections.Associations
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.InteractionRepair -> Some failedSessionId
@@ -179,27 +177,6 @@ module ProviderRecoveryWorkflow =
             | None when SessionAssociationProjection.isSatellite sessionId projection.AgentProjections.Associations ->
                 None
             | None -> Some(AttemptPlanner.ordinaryRequestKind execution.origin))
-
-    let private recoverySquashContext (durable: AgentJournal) (mainSessionId: SessionId) (bloggerSessionId: SessionId) =
-        let session =
-            AgentProjection.tryFind mainSessionId (AgentJournal.snapshot durable).AgentProjections
-
-        let blog =
-            session
-            |> Option.bind (fun value -> value.Blog)
-            |> Option.defaultValue BlogProjection.empty
-
-        let epoch =
-            session
-            |> Option.bind (fun value -> value.PrefixEpoch)
-            |> Option.map (fun prefix -> prefix.EpochId)
-            |> Option.defaultValue PrefixEpochId.initial
-
-        CompanionHostBlogger.tryBuildSquashContext mainSessionId bloggerSessionId epoch blog
-
-    let private squashPrompt (mainSessionId: SessionId) =
-        ProviderProse.instructionLines (ProviderProse.languageOf mainSessionId) CompanionPrompt.Squash Map.empty
-        |> CompanionPrompt.asCommentedInstruction
 
     let private notifyFailure (eventPort: IEventObservationPort) (turn: ReconciledTurn) (reason: string) =
         eventPort.NotifyTerminal
@@ -369,99 +346,25 @@ module ProviderRecoveryWorkflow =
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
         (authorization: ProviderRecoveryAuthorization)
-        (mainSessionId: SessionId)
-        (continuationPrompt: string)
-        (error: string)
-        (squash: BloggerRequestContext option)
-        (failed: BloggerRequestContext)
-        : Task<RetryVerdict> =
-        match BloggerRetryPolicy.nextRequest ProviderRequestKind.BloggerMain squash.IsSome, squash with
-        | Ok ProviderRequestKind.BloggerSquash, Some squashCtx ->
-            replaceFailedBloggerRequest
-                sessionPort
-                rootWorkspace
-                durable
-                scope
-                turn
-                authorization
-                failed
-                squashCtx
-                (squashPrompt mainSessionId)
-                error
-        | Ok ProviderRequestKind.BloggerMain, _ ->
-            replaceFailedBloggerRequest
-                sessionPort
-                rootWorkspace
-                durable
-                scope
-                turn
-                authorization
-                failed
-                failed
-                continuationPrompt
-                error
-        | Ok _, _
-        | Error _, _ -> Task.FromResult(RetryVerdict.Terminal "Blogger recovery produced an invalid next request kind")
-
-    let private rebuildMainAfterFailedSquash
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (durable: AgentJournal)
-        (scope: IBloggerRuntimeHost)
-        (turn: ReconciledTurn)
-        (authorization: ProviderRecoveryAuthorization)
-        (mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
         (failed: BloggerRequestContext)
         : Task<RetryVerdict> =
-        task {
-            match! BloggerMainContext.fromJournal durable mainSessionId turn.SessionId with
-            | None -> return RetryVerdict.Terminal "Blogger squash failed and no main material can be rebuilt"
-            | Some main ->
-                return!
-                    replaceFailedBloggerRequest
-                        sessionPort
-                        rootWorkspace
-                        durable
-                        scope
-                        turn
-                        authorization
-                        failed
-                        main
-                        continuationPrompt
-                        error
-        }
-
-    let private continueFailedBloggerSquash
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (durable: AgentJournal)
-        (scope: IBloggerRuntimeHost)
-        (turn: ReconciledTurn)
-        (authorization: ProviderRecoveryAuthorization)
-        (mainSessionId: SessionId)
-        (continuationPrompt: string)
-        (error: string)
-        (squash: BloggerRequestContext option)
-        (failed: BloggerRequestContext)
-        : Task<RetryVerdict> =
-        match BloggerRetryPolicy.nextRequest ProviderRequestKind.BloggerSquash squash.IsSome with
-        | Error _ ->
-            Task.FromResult(RetryVerdict.Terminal "Blogger squash recovery produced an invalid next request kind")
+        match BloggerRetryPolicy.nextRequest ProviderRequestKind.BloggerMain false with
         | Ok ProviderRequestKind.BloggerMain ->
-            rebuildMainAfterFailedSquash
+            replaceFailedBloggerRequest
                 sessionPort
                 rootWorkspace
                 durable
                 scope
                 turn
                 authorization
-                mainSessionId
+                failed
+                failed
                 continuationPrompt
                 error
-                failed
-        | Ok _ -> Task.FromResult(RetryVerdict.Terminal "Blogger squash recovery did not return to main")
+        | Ok _
+        | Error _ -> Task.FromResult(RetryVerdict.Terminal "Blogger recovery produced an invalid next request kind")
 
     let private continueBlogger
         (sessionPort: ISessionHostPort)
@@ -470,13 +373,12 @@ module ProviderRecoveryWorkflow =
         (scope: IBloggerRuntimeHost)
         (turn: ReconciledTurn)
         (authorization: ProviderRecoveryAuthorization)
-        (mainSessionId: SessionId)
+        (_mainSessionId: SessionId)
         (continuationPrompt: string)
         (error: string)
         : Task<RetryVerdict> =
         task {
             let current = scope.TryPeekCurrentRequest(SessionId.value turn.SessionId)
-            let squash = recoverySquashContext durable mainSessionId turn.SessionId
 
             match current with
             | None -> return RetryVerdict.Terminal "Blogger recovery has no owned request context"
@@ -489,24 +391,8 @@ module ProviderRecoveryWorkflow =
                         scope
                         turn
                         authorization
-                        mainSessionId
                         continuationPrompt
                         error
-                        squash
-                        failed
-            | Some((BloggerRequestContext.Squash _) as failed) ->
-                return!
-                    continueFailedBloggerSquash
-                        sessionPort
-                        rootWorkspace
-                        durable
-                        scope
-                        turn
-                        authorization
-                        mainSessionId
-                        continuationPrompt
-                        error
-                        squash
                         failed
         }
 
@@ -620,7 +506,7 @@ module ProviderRecoveryWorkflow =
             match admitted, hostStopped, input.RequestKind with
             | true, _, _ -> return RetryVerdict.Superseded
             | false, false, _ -> return RetryVerdict.Superseded
-            | false, true, (ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash) ->
+            | false, true, ProviderRequestKind.BloggerMain ->
                 return!
                     dispatchBloggerAfterFailure
                         sessionPort

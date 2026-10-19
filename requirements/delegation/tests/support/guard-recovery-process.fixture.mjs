@@ -59,9 +59,11 @@ try {
     assert.equal(successor.origin, 'DegenerationGuard')
     assert.notEqual(successor.physicalUserMessageId, initial.physicalUserMessageId)
     assert.equal(successor.authorityRootUserMessageId, initial.authorityRootUserMessageId)
+    sync.recordDeliveredValue(successor.sessionId, 'GUARD-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, successor.sessionId, successor.physicalUserMessageId,
       successor.authorityRootUserMessageId, 'guard-successor-provider-run', 'GUARD-FORMAL-ANSWER', ''), true)
   } else {
+    sync.recordDeliveredValue(initial.sessionId, 'FIRST-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, initial.sessionId, initial.physicalUserMessageId,
       initial.authorityRootUserMessageId, 'guard-initial-completed-run', 'FIRST-FORMAL-ANSWER', ''), true)
     assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 1).kind, 'Pending', 'call completion cannot abandon a pending actual guard send')
@@ -70,7 +72,6 @@ try {
   assert.equal(firstResult.ok, true)
 
   if (scenario !== 'own-guard') {
-    const frontier = sync.handoffFrontier(runtime, owner, 'Engineer')
     const second = sync.startObserved(runtime, owner, 'SECOND-GUARD-CHARGE')
     const secondCompletion = sync.observedCompletion(second)
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 3)
@@ -97,7 +98,6 @@ try {
         successor.authorityRootUserMessageId, 'guard-successor-provider-run', staleText, '')
     assert.equal(staleAccepted, false, 'an old actual guard acceptance cannot settle the new same-root invocation')
     assert.equal(await pendingAfterTurn(secondCompletion), 'pending')
-    assert.deepEqual(sync.handoffFrontier(runtime, owner, 'Engineer'), frontier)
 
     const secondSourceRun = 'guard-second-source-provider-run'
     await sync.observeGuardDelta(runtime, {
@@ -119,6 +119,7 @@ try {
     assert.equal(secondSuccessor.origin, 'DegenerationGuard')
     assert.notEqual(secondSuccessor.physicalUserMessageId, secondAccepted.physicalUserMessageId)
     assert.equal(secondSuccessor.authorityRootUserMessageId, secondAccepted.authorityRootUserMessageId)
+    sync.recordDeliveredValue(secondSuccessor.sessionId, 'SECOND-GUARD-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, secondSuccessor.sessionId, secondSuccessor.physicalUserMessageId,
       secondSuccessor.authorityRootUserMessageId, 'guard-second-provider-run', 'SECOND-GUARD-ANSWER', ''), true)
     const result = await secondCompletion

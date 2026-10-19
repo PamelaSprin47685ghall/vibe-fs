@@ -28,7 +28,7 @@ const sandbox = () => {
 
 const terminalRead = (path) => [{
   info: { id: 'r1', role: 'assistant', providerID: 'anthropic' },
-  parts: [{ type: 'tool', tool: 'read', callID: 'source-read', state: { status: 'completed', input: { filePath: path }, output: 'source\n', time: { start: 0, end: 0 } } }],
+  parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'source-read', state: { status: 'completed', input: { program: `class Js extends JsProgram { async run() { return await this.cat(${JSON.stringify(path)}); } }` }, output: 'source\n', time: { start: 0, end: 0 } } }],
 }]
 
 const readFacts = commonDir => {
@@ -204,7 +204,7 @@ test('WHAT[requirement-grounding-006] an actual program file-read failure cannot
   const { dir, cleanup } = sandbox()
   try {
     const observations = []
-    const outcome = await workflow.runObserved(dir, 'Coder', 'en', "class Js extends JsProgram { async run() { const file = await this.file('requirements/alpha/missing.md'); return file.text(); } }", 2000, Date.now() + 60000, 1 << 20, null,
+    const outcome = await workflow.runObserved(dir, 'Coder', 'en', "class Js extends JsProgram { async run() { return await this.cat('requirements/alpha/missing.md'); } }", 2000, Date.now() + 60000, 1 << 20, null,
       async (reads, effects) => observations.push({ reads, effects }))
     assert.equal(workflow.caseName(outcome), 'Failed')
     assert.equal(workflow.failureCode(outcome), 'FILE_NOT_FOUND')
@@ -240,7 +240,7 @@ test('WHAT[requirement-grounding-006] a symlink replaced after the actual read p
       return result
     }
     syncBuiltinESMExports()
-    const outcome = await workflow.runObserved(root, 'Coder', 'en', "class Js extends JsProgram { async run() { const file = await this.file('src/alias.txt'); return file.text(); } }", 2000, Date.now() + 60000, 1 << 20, null,
+    const outcome = await workflow.runObserved(root, 'Coder', 'en', "class Js extends JsProgram { async run() { return await this.cat('src/alias.txt'); } }", 2000, Date.now() + 60000, 1 << 20, null,
       async (reads, effects) => {
         assert.equal(replaced, true, 'the real disk replacement precedes callback admission')
         assert.equal(realpathSync(alias), newPath)
@@ -266,7 +266,7 @@ test('WHAT[requirement-grounding-006] an actual file read through an outside-wor
   symlinkSync(outside, join(dir, 'src', 'foreign.txt'))
   const observations = []
   try {
-    const outcome = await workflow.runObserved(dir, 'Coder', 'en', "class Js extends JsProgram { async run() { const file = await this.file('src/foreign.txt'); return file.text(); } }", 2000, Date.now() + 60000, 1 << 20, null,
+    const outcome = await workflow.runObserved(dir, 'Coder', 'en', "class Js extends JsProgram { async run() { return await this.cat('src/foreign.txt'); } }", 2000, Date.now() + 60000, 1 << 20, null,
       async (reads, effects) => observations.push({ reads, effects }))
     assert.equal(workflow.caseName(outcome), 'Failed')
     assert.equal(workflow.failureCode(outcome), 'PATH_DENIED')
@@ -323,15 +323,38 @@ test('WHAT[requirement-grounding-006] registered program grep keeps scan freshne
     mkdirSync(join(directory, 'requirements', 'alpha'), { recursive: true })
     writeFileSync(join(directory, 'requirements', 'alpha', 'WHAT.md'), 'GREPPED-MATERIAL\n')
     writeFileSync(join(directory, 'requirements', 'alpha', 'APPLIES-TO'), '/src/**\n')
+    mkdirSync(join(directory, 'src'), { recursive: true })
+    writeFileSync(join(directory, 'src', 'GREPPED-target.fs'), 'source\n')
     const sessionID = 'grounding-discovery-only'
     await acceptAuthorityRoot(runtime, sessionID, 'manager')
     await openIncumbency(runtime, sessionID)
-    const args = { program: "class Js extends JsProgram { async run() { return await this.grep('GREPPED', 'requirements/alpha/WHAT.md'); } }" }
-    const input = { tool: 'js-manager', sessionID, callID: 'grep-only' }
+    const args = {
+      program: `class Js extends JsProgram {
+        async walk(dir = ".") {
+          const found = [];
+          for (const entry of await this.ls(dir)) {
+            const full = dir === "." ? entry : dir + "/" + entry;
+            if (entry.endsWith("/")) found.push(...(await this.walk(full.slice(0, -1))));
+            else found.push(full);
+          }
+          return found;
+        }
+        async run() {
+          const hits = [];
+          for (const path of await this.walk("src")) {
+            for (const [begin, end] of this.whereAll(path, "GREPPED")) {
+              hits.push({ path, text: path.slice(begin, end) });
+            }
+          }
+          return hits;
+        }
+      }`,
+    }
+    const input = { tool: 'todowrite-for-manager', sessionID, callID: 'grep-only' }
     await hooks['tool.execute.before'](input, { args })
-    const output = await hooks.tool['js-manager'].execute(args, { sessionID, agent: 'manager' })
+    const output = await hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
     assert.match(output, /text = "GREPPED"/)
-    const events = join(directory, '.git', 'wanxiangshu', 'events')
+    const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
     const persisted = readdirSync(events).map(name => readFileSync(join(events, name), 'utf8')).join('\n')
     assert.equal(persisted.includes('RequirementGroundingMaterialObserved'), false, 'grep must not mint a complete material observation')
     assert.equal(persisted.includes('RequirementGroundingReadObserved'), false, 'grep must not mint an explicit read observation')
@@ -339,6 +362,36 @@ test('WHAT[requirement-grounding-006] registered program grep keeps scan freshne
     const projected = { messages: [{ info: { id: 'grep-result', sessionID, role: 'assistant' }, parts: [{ type: 'tool', tool: input.tool, callID: input.callID, state: { status: 'completed', input: args, output } }] }] }
     await hooks['experimental.chat.messages.transform']({ sessionID }, projected)
     assert.equal(projected.messages[0].parts[0].state.output.includes('requirement_source_path ='), false, 'candidate discovery must not request grounding')
+
+    const composeArgs = {
+      program: `class Js extends JsProgram {
+        async walk(dir = ".") {
+          const found = [];
+          for (const entry of await this.ls(dir)) {
+            const full = dir === "." ? entry : dir + "/" + entry;
+            if (entry.endsWith("/")) found.push(...(await this.walk(full.slice(0, -1))));
+            else found.push(full);
+          }
+          return found;
+        }
+        async run() {
+          const hits = [];
+          for (const path of (await this.walk("requirements/alpha")).filter((p) => p.endsWith("WHAT.md"))) {
+            const text = await this.cat(path);
+            for (const [begin, end] of this.whereAll(text, "GREPPED")) {
+              hits.push({ path, text: text.slice(begin, end) });
+            }
+          }
+          return hits;
+        }
+      }`,
+    }
+    const composeInput = { tool: 'todowrite-for-manager', sessionID, callID: 'compose-search' }
+    await hooks['tool.execute.before'](composeInput, { args: composeArgs })
+    const composeOutput = await hooks.tool['todowrite-for-manager'].execute(composeArgs, { sessionID, agent: 'manager' })
+    assert.match(composeOutput, /text = "GREPPED"/)
+    const composePersisted = readdirSync(events).map(name => readFileSync(join(events, name), 'utf8')).join('\n')
+    assert.equal(composePersisted.includes('RequirementGroundingReadObserved'), true, 'ls + cat + whereAll composition records the explicit file read')
   })
 })
 
@@ -354,24 +407,24 @@ test('WHAT[requirement-grounding-006] registered complete file reads preserve ex
     await incarnation.withRuntime(async runtime => {
       await acceptAuthorityRoot(runtime, sessionID, 'manager')
       await openIncumbency(runtime, sessionID)
-      const args = { program: "class Js extends JsProgram { async run() { const file = await this.file('requirements/alpha/WHAT.md'); return file.text(); } }" }
+      const args = { program: "class Js extends JsProgram { async run() { return await this.cat('requirements/alpha/WHAT.md'); } }" }
       const execute = async callID => {
-        const input = { tool: 'js-manager', sessionID, callID }
+        const input = { tool: 'todowrite-for-manager', sessionID, callID }
         await incarnation.hooks['tool.execute.before'](input, { args })
-        const output = await incarnation.hooks.tool['js-manager'].execute(args, { sessionID, agent: 'manager' })
+        const output = await incarnation.hooks.tool['todowrite-for-manager'].execute(args, { sessionID, agent: 'manager' })
         await incarnation.hooks['tool.execute.after']({ ...input, args }, { title: 'read', output, metadata: {} })
         return output
       }
       const output = await execute('complete-first')
       assert.ok(output.includes('what-v1'))
-      let observed = readFacts(join(dir, '.git'))
+      let observed = readFacts(join(dir, '.Herdchestra'))
       assert.equal(observed.length, 1)
       assert.deepEqual(observed[0].SessionId, ['SessionId', sessionID])
       assert.equal(observed[0].Observation.Coverage, 'CompleteFile')
       assert.equal(observed[0].Observation.Digest, digest('requirements/alpha/WHAT.md', 'what-v1\n'))
       await execute('complete-repeated')
-      assert.equal(readFacts(join(dir, '.git')).length, 1, 'the same actual returned version is not recorded twice')
-      const projected = { messages: [{ info: { id: 'complete-result', sessionID, role: 'assistant' }, parts: [{ type: 'tool', tool: 'js-manager', callID: 'complete-first', state: { status: 'completed', input: args, output } }] }] }
+      assert.equal(readFacts(join(dir, '.Herdchestra')).length, 1, 'the same actual returned version is not recorded twice')
+      const projected = { messages: [{ info: { id: 'complete-result', sessionID, role: 'assistant' }, parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'complete-first', state: { status: 'completed', input: args, output } }] }] }
       await incarnation.hooks['experimental.chat.messages.transform']({ sessionID }, projected)
       const enriched = projected.messages[0].parts[0].state.output
       assert.ok(enriched.includes('requirement_source_path = "requirements/alpha/HOW.md"'))
@@ -379,13 +432,13 @@ test('WHAT[requirement-grounding-006] registered complete file reads preserve ex
       assert.equal(enriched.includes('requirement_source_path = "requirements/alpha/WHAT.md"'), false)
       writeFileSync(join(dir, 'requirements', 'alpha', 'WHAT.md'), 'what-v2\n')
       assert.ok((await execute('complete-changed')).includes('what-v2'))
-      observed = readFacts(join(dir, '.git'))
+      observed = readFacts(join(dir, '.Herdchestra'))
       assert.equal(observed.length, 2)
       assert.deepEqual(observed.map(fact => fact.Observation.Digest), [digest('requirements/alpha/WHAT.md', 'what-v1\n'), digest('requirements/alpha/WHAT.md', 'what-v2\n')])
     })
     await incarnation.hooks.dispose()
     incarnation = null
-    opened = await host.createJournal(join(dir, '.git'))
+    opened = await host.createJournal(join(dir, '.Herdchestra'))
     assert.equal(opened.ok, true, opened.error)
     const source = join(dir, 'src', 'main.fs')
     assert.equal((await host.requestPaths(opened.journal, dir, sessionID, [source])).needsGrounding, false, 'normal boot decodes the new read facts and restores full visibility')

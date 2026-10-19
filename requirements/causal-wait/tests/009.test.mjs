@@ -89,7 +89,7 @@ const mkWait = (waitKind, ownerKind, subject, producer) =>
   })
 const externalProducer = (kind, identity) => causal.externalProducer(kind, identity)
 const readDiagnostic = (workspace) =>
-  JSON.parse(fs.readFileSync(path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json'), 'utf8'))
+  JSON.parse(fs.readFileSync(path.join(workspace, '.Herdchestra', 'diagnostics', 'causal-waits.json'), 'utf8'))
 
 test('WHAT[causal-wait-009] CAUSAL_BRIDGE_first_binding_is_stable_and_refreshes_on_lifecycle', () => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'causal-runtime-'))
@@ -105,10 +105,10 @@ test('WHAT[causal-wait-009] CAUSAL_BRIDGE_first_binding_is_stable_and_refreshes_
   )
   const lease = causal.enter(registry, wait)
   try {
-    const filePath = path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json')
+    const filePath = path.join(workspace, '.Herdchestra', 'diagnostics', 'causal-waits.json')
     assert.equal(fs.existsSync(filePath), true)
     assert.ok(readDiagnostic(workspace).active.some((value) => value.waitKind === 'manager-job'))
-    assert.equal(fs.existsSync(path.join(redirect, '.wanxiangshu', 'diagnostics', 'causal-waits.json')), false)
+    assert.equal(fs.existsSync(path.join(redirect, '.Herdchestra', 'diagnostics', 'causal-waits.json')), false)
   } finally {
     causal.dispose(lease)
     assert.equal(readDiagnostic(workspace).active.length, 0)
@@ -166,7 +166,10 @@ test('WHAT[causal-wait-009] production inventory separates contract runtime adap
   assert.deepEqual(relSources(proof), ['src/Wanxiangshu/Execution/Session/Wait/Surface.fs'])
 
   assert.deepEqual(refShards(contract, projects), [])
-  assert.deepEqual(refShards(adapter, projects), ['execution-session-wait-contract'])
+  assert.deepEqual(refShards(adapter, projects), [
+    'execution-session-wait-contract',
+    'persistence-runtime-path',
+  ])
   assert.deepEqual(refShards(runtime, projects), [
     'execution-session-wait-contract',
     'foundation-temporal-contract',

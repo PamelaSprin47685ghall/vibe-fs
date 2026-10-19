@@ -11,7 +11,4 @@ module OrchestratorGit =
     val hasRebaseHead: runner: TextProcessRunner -> worktree: string -> Task<Result<bool, string>>
 
     val finalizeWorktree:
-        runner: TextProcessRunner ->
-        managerId: string ->
-        worktree: string ->
-            Task<Result<unit, string>>
+        runner: TextProcessRunner -> managerId: string -> worktree: string -> Task<Result<unit, string>>

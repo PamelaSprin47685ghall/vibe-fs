@@ -4,8 +4,8 @@ import { rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.
 import { allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
 
 test('WHAT[capability-enforcement-012] registered programming tools admit their own role and reject cross-role calls', () => {
-  for (const owner of ['engineer', 'devops']) {
-    const tool = `js-${owner}`
+  for (const owner of ['engineer', 'devops', 'manager', 'orchestrator']) {
+    const tool = `todowrite-for-${owner}`
     assert.equal(rolePredicate(tool, owner), true, `${owner} can use ${tool}`)
     for (const caller of allRoleLabels.filter((role) => role !== owner)) {
       assert.equal(rolePredicate(tool, caller), false, `${caller} cannot use ${tool}`)

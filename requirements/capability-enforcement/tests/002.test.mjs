@@ -6,6 +6,7 @@ const { default: test } = await import("node:test");
 const { permissions } = await import("../../../dist/Participant/Persona/OfficeCapabilitySurface.js");
 const { configure: configureManagedAgents, installDefaultResources, validate: validateManagedAgents } = await import("../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js");
 const { reviewToolPermissions } = await import("../../../dist/OpenCode/Tools/ToolSurface.js");
+const { generateRole } = await import("../../../dist/Repository/Programming/Js/GeneratorSurface.js");
 
 installDefaultResources()
 const ROLES = [
@@ -78,22 +79,9 @@ const allowList = (config, name) => {
     'bash',
     'bash-honeypot',
     'assume',
-    'todowrite',
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
-    'run',
     'fork',
     'resume',
     'commission',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
     'join',
     'horizon',
     'fission',
@@ -109,10 +97,6 @@ const allowList = (config, name) => {
 const HOST_UTILITY_ALLOW = ['skill']
 const COGNITIVE_UTILITY_ALLOW = [
   'assume',
-  'todowrite',
-  'defer',
-  
-  'publish',
 ]
 const hostUtilityAllowFor = (role) => (role === 'Blogger' ? [] : HOST_UTILITY_ALLOW)
 const cognitiveUtilityAllowFor = (role) => (role === 'Blogger' ? [] : COGNITIVE_UTILITY_ALLOW)
@@ -124,26 +108,14 @@ const ROLE_ALLOW = {
     'horizon',
     'deliver',
     'review',
-    'js-manager',
+    'todowrite-for-manager',
   ],
-  Orchestrator: ['commission', 'join', 'horizon'],
-  Engineer: ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'bash-honeypot', 'fetch', 'fission', 'js-engineer'],
+  Orchestrator: ['commission', 'join', 'horizon', 'todowrite-for-orchestrator'],
+  Engineer: ['bash-honeypot', 'fetch', 'fission', 'todowrite-for-engineer'],
   DevOps: [
-    'read',
-    'write',
-    'edit',
-    'glob',
-    'grep',
-    'mv',
-    'rm',
-    'run',
     'join',
     'horizon',
-    'open-terminal',
-    'send-terminal',
-    'read-terminal',
-    'signal-terminal',
-    'js-devops',
+    'todowrite-for-devops',
   ],
   Blogger: ['chronicle'],
 }
@@ -164,27 +136,18 @@ test('WHAT[capability-enforcement-002] AGENT_006_role_tool_matrix_reaches_the_ho
   }
 })
 test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_the_host_schema_matrix', () => {
+  // Edit and Grep remain office permissions but project no separate JS capability
+  // (string replacement uses Read + Write; content search uses Read + Glob).
+  const DIRECT_PERMISSION_ONLY = new Set(['Edit', 'Grep'])
   const permissionOf = (toolName) =>
     ({
       fork: 'Fork',
       resume: 'Resume',
       commission: 'Fork',
-      'open-terminal': 'Pty',
-      'send-terminal': 'Pty',
-      'read-terminal': 'Pty',
-      'signal-terminal': 'Pty',
       join: 'Join',
       horizon: 'Horizon',
       fission: 'Fission',
-      read: 'Read',
-      write: 'Write',
-      edit: 'Edit',
-      glob: 'Glob',
-      grep: 'Grep',
-      mv: 'Move',
-      rm: 'Remove',
       'bash-honeypot': 'BashHoneypot',
-      run: 'Exec',
       review: 'ReviewAssessment',
       chronicle: 'Chronicle',
       fetch: 'Fetch',
@@ -195,13 +158,21 @@ test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_
     // 评审专用工具经 owner 目录（ToolSurface.reviewToolPermissions）映射为领域权限，
     // 无评审契约的工具名称没有权限映射。
     const reviewPermissions = reviewToolPermissions(toolName)
+    // The generated surface's members are part of what the Host schema allows
+    // for that tool, so a member whose only carrier is the surface (e.g.
+    // `advisor`) must be counted beside any review-contract permissions.
+    const generated = toolName.startsWith('todowrite-for-')
+      ? generateRole(toolName.slice('todowrite-for-'.length), 'en')
+      : null
+
+    if (generated) return [...new Set([...reviewPermissions, ...generated.capabilities])]
     if (reviewPermissions.length > 0) return reviewPermissions
     const single = permissionOf(toolName)
     return single ? [single] : []
   }
 
   for (const role of ROLES) {
-    const fromRoles = permissions(role.toLowerCase())
+    const fromRoles = permissions(role.toLowerCase()).filter((p) => (role === 'Manager' ? true : !DIRECT_PERMISSION_ONLY.has(p)))
     const config = buildConfig()
     configureManagedAgents(config)
     const nonDomainUtilities = [...hostUtilityAllowFor(role), ...cognitiveUtilityAllowFor(role)]
@@ -222,10 +193,10 @@ const { nameOf: managedAgentName } = await import('../../../dist/Participant/Per
 
 test('WHAT[capability-enforcement-002] P7_SURFACE_role_labels_are_js_native_strings', () => {
   assertJsData(allRoleLabels, 'allRoleLabels')
-  assert.equal(allRoleLabels.length, 6, 'exactly six canonical roles')
+  assert.equal(allRoleLabels.length, 7, 'exactly seven canonical roles')
   assert.deepEqual(
     allRoleLabels,
-    ['blogger', 'devops', 'engineer', 'manager', 'orchestrator', 'plan']
+    ['advisor', 'blogger', 'devops', 'engineer', 'manager', 'orchestrator', 'plan']
       .sort(),
   )
 })
@@ -233,7 +204,7 @@ test('WHAT[capability-enforcement-002] P7_SURFACE_public_internal_partition_and_
   assertJsData(allPublicRoleLabels, 'allPublicRoleLabels')
   assertJsData(allInternalRoleLabels, 'allInternalRoleLabels')
   assert.deepEqual(allPublicRoleLabels, ['devops', 'engineer', 'manager', 'orchestrator', 'plan'])
-  assert.deepEqual(allInternalRoleLabels, ['blogger'])
+  assert.deepEqual(allInternalRoleLabels, ['advisor', 'blogger'])
   assert.equal(allPublicRoleLabels.length + allInternalRoleLabels.length, allRoleLabels.length)
   assert.equal(managedAgentName('deep', 'blogger'), 'blogger')
   assert.equal(managedAgentName('engineer', 'engineer'), 'engineer')
@@ -281,30 +252,24 @@ test('WHAT[capability-enforcement-002] TOOLSPEC_engineer_and_devops_tools_have_o
   assert.equal(rolePredicate('bash-honeypot', 'devops'), false)
   assert.equal(rolePredicate('bash-honeypot', 'manager'), false)
 
-  // mv & rm: Engineer and DevOps (Move / Remove permission)
-  assert.equal(rolePredicate('mv', 'engineer'), true)
-  assert.equal(rolePredicate('mv', 'devops'), true)
-  assert.equal(rolePredicate('mv', 'manager'), false)
-  assert.equal(rolePredicate('rm', 'engineer'), true)
-  assert.equal(rolePredicate('rm', 'devops'), true)
-  assert.equal(rolePredicate('rm', 'manager'), false)
+  // todowrite-for-engineer: Engineer only (carries cat/ls/stat/where/whereAll/mkdir/write/mv/rm/fission)
+  assert.equal(rolePredicate('todowrite-for-engineer', 'engineer'), true)
+  assert.equal(rolePredicate('todowrite-for-engineer', 'devops'), false)
+  assert.equal(rolePredicate('todowrite-for-engineer', 'manager'), false)
 
-  // pty tools: DevOps only
-  assert.equal(rolePredicate('open-terminal', 'devops'), true)
-  assert.equal(rolePredicate('open-terminal', 'engineer'), false)
-  assert.equal(rolePredicate('send-terminal', 'devops'), true)
-  assert.equal(rolePredicate('read-terminal', 'devops'), true)
-  assert.equal(rolePredicate('signal-terminal', 'devops'), true)
-
-  // run: DevOps only
-  assert.equal(rolePredicate('run', 'devops'), true)
-  assert.equal(rolePredicate('run', 'engineer'), false)
-  assert.equal(rolePredicate('run', 'manager'), false)
+  // todowrite-for-devops: DevOps only (carries cat/ls/stat/where/whereAll/mkdir/write/mv/rm + js.run via Exec; direct file/exec/pty tools are retired)
+  assert.equal(rolePredicate('todowrite-for-devops', 'devops'), true)
+  assert.equal(rolePredicate('todowrite-for-devops', 'engineer'), false)
+  assert.equal(rolePredicate('todowrite-for-devops', 'manager'), false)
+  for (const retired of ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm', 'run', 'open-terminal', 'send-terminal', 'read-terminal', 'signal-terminal']) {
+    assert.equal(rolePredicate(retired, 'engineer'), false, `retired ${retired} must be denied for engineer`)
+    assert.equal(rolePredicate(retired, 'devops'), false, `retired ${retired} must be denied`)
+  }
 })
 test('WHAT[capability-enforcement-002] TOOLSPEC_plugin_owned_cognitive_utility_tools_admission', () => {
   // Native todowrite has no plugin ToolSpec; its role boundary is asserted from
   // the Host permission matrix in capability-enforcement-006.
-  for (const tool of ['assume', 'defer',  'publish']) {
+  for (const tool of ['assume']) {
     assert.equal(rolePredicate(tool, 'engineer'), true, `${tool} should be allowed for engineer`)
     assert.equal(rolePredicate(tool, 'devops'), true, `${tool} should be allowed for devops`)
     assert.equal(rolePredicate(tool, 'manager'), true, `${tool} should be allowed for manager`)

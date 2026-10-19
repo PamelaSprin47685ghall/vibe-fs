@@ -54,6 +54,7 @@ try {
   let successor
   let result
   if (lateAcceptance) {
+    sync.recordDeliveredValue(initial.sessionId, 'INITIAL-COMPLETES')
     assert.equal(await sync.settleExactTerminal(runtime, initial.sessionId, initial.physicalUserMessageId,
       initial.authorityRootUserMessageId, 'initial-completion-provider-run', 'INITIAL-COMPLETES', ''), true)
     result = await completion
@@ -72,6 +73,7 @@ try {
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 2, 'Accepted recovery reentry preserves the original PromptKey')
     assert.deepEqual(sync.promptIdentity(runtime, owner, 'Engineer', 1), retryPrompt)
 
+    sync.recordDeliveredValue(successor.sessionId, 'RECOVERY-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, successor.sessionId, successor.physicalUserMessageId,
       successor.authorityRootUserMessageId, 'actual-retry-provider-run', 'RECOVERY-FORMAL-ANSWER', ''), true)
     result = await completion
@@ -89,9 +91,7 @@ try {
   assert.equal(sync.childCount(runtime), 1)
   assert.equal(sync.terminalListenerCount(runtime), 0)
   assert.equal(sync.recoveryStopSnapshot(runtime).waiting, 0)
-  assert.notEqual(sync.handoffFrontier(runtime, owner, 'Engineer'), null)
   if (scenario !== 'own-retry') {
-    const frontier = sync.handoffFrontier(runtime, owner, 'Engineer')
     const second = sync.startObserved(runtime, owner, 'SECOND-RECOVERY-CHARGE')
     const secondCompletion = sync.observedCompletion(second)
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 3)
@@ -118,7 +118,6 @@ try {
         successor.authorityRootUserMessageId, 'actual-retry-provider-run', staleText, '')
     assert.equal(staleAccepted, false, 'an actually accepted old retry cannot settle the new same-root call')
     assert.equal(await pendingAfterTurn(secondCompletion), 'pending')
-    assert.deepEqual(sync.handoffFrontier(runtime, owner, 'Engineer'), frontier)
     const secondFailedRun = 'second-failed-provider-run'
     assert.equal(sync.observeProviderFailureStop(runtime, secondAccepted.sessionId, secondFailedRun), true)
     const secondFailed = sync.observeExactProviderFailure(runtime, secondAccepted.sessionId,
@@ -130,6 +129,7 @@ try {
     assert.equal(secondSuccessor.ok, true, JSON.stringify(secondSuccessor))
     assert.notEqual(secondSuccessor.physicalUserMessageId, secondAccepted.physicalUserMessageId)
     assert.equal(secondSuccessor.origin, 'ProviderRetryAttempt')
+    sync.recordDeliveredValue(secondSuccessor.sessionId, 'SECOND-FORMAL-ANSWER')
     assert.equal(await sync.settleExactTerminal(runtime, secondSuccessor.sessionId, secondSuccessor.physicalUserMessageId,
       secondSuccessor.authorityRootUserMessageId, 'second-provider-run', 'SECOND-FORMAL-ANSWER', ''), true)
     const secondResult = await secondCompletion

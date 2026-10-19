@@ -13,7 +13,10 @@
 - 018 实际 fork tool detach 后读取 durable Active，断言未 abort；另经真实 Scope.CancelSessionChildren 发起受权取消，在 Host abort 端口受控悬置时读取目标 child 的 durable Abandoned，另一个 owner 的同名 child 仍 Active，取消必须等端口完成才返回。两个隔离违约分别漏写 abandon、丢弃 cleanup 等待，用于独立验证断言。四种非授权终止（TurnAborted、provider retry、Fission external-abort 形态、unknown stop）经真实 run lifecycle 投递后按各自真实语义落账、永不写 Abandoned/Retired，冷重放一致且冷重开进程 re-enlist 复用同一 handle 与 child（见下文 session018 核对段）。这些仍不证明 OS 进程退出、全部 PTY 清理或物理 Host 会话存续。020 使用实际插件重开 journal，加纯 authority 属性测试；它不证明尚未落地的五类 durable exact closure。
 - 019 保留实际 execution interpreter 的局部验证，GAP-126 的 cancel/delete drain 断言已落地（见下文 session019 核对段）。021 的真实 fatal 链仍缺证明。022 运行真实 Casebook：有/无 draft、Bookkeeper 不可用、归档读取与重复拒绝；尚未观察 identity 去留及五类 typed settlement。
 - 023 调用实际身份解析，区分拒绝旧活跃身份与历史恢复。024 只证明 handle 拒绝第二个活动绑定及 road 保留给定模型；不是 crash、模型固定或 PTY 排空证明。
-- 025 保留上游的真实 HostForkRuntime 与 ToolRuntimeScope 场景。DevOps 工作先经真实 dispatcher physical acceptance 建立 scoped work，两处 Surface 显式接收同一 canonical journal，不用临时 Root 或无 journal 的 InstallRun。受控 PTY port 结束后清记账；DevOps run 终态结算时在 PTY 端口边界观察到终止效果，其名下 PTY 计数归零且其他会话的 PTY 存活。端口未启动 OS 进程，**「TERM 后真实退出并按需升级 KILL」这一半仍是未证义务**，现由 `test.todo` 单独保留，不因上面那条已转真而消失。
+- 025 的 scoped work 经真实 dispatcher physical acceptance 建立，同一 canonical journal 参与准入、归属与收尾。本批 generation11 正式验收含完整123项：真实 Node/Bun PTY、TERM/KILL与后代范围关闭、跨进程Reserve/Drain、启动与终结丢回执、发布失败恢复及冷读取。新根为 `.Herdchestra`，冷夹具预留在确切AdmittedWork轮次。物理收尾失败不得转换为业务完成；真实已确认关闭才释放 blocker。pipe 与 PTY 的证明各自保留，不能外推所有旧GAP已闭。
+- 028 本批迁到显式交付：子完成不请求历史WorkRecord，故障历史读取端口不会代替交付。第二例在真实HandleWorkCompleted物理append处注入EIO，要求命中一次、join返回失败且durable work保持Active；第三例单独验证PERSIST-settled Source唤醒join。三例在generation12原生通过，sessionPort仍为内存harness；不把受控Source注入代证真实追加故障，也不把认领前资源收尾失败转换为完成。2026-10-17旧记录保留为历史输入，不代证当前候选。
+- 026 Main 收束级联 linked Attached InternalLeaf execution 结算：2026-10-17 同次真实运行四例全部通过——pre-provider 与 after-provider-start 的 exact 容量丢失、重复 Main 关闭幂等、held exact custody 在 Main 关闭时释放。
+- 027 Session 收束取消作用域保留并完成延后归还：同次真实运行五例全部通过——Main 关闭取消 linked leaf 保留并归还 held exact credit、leaf 自删取消自身保留、重复关闭幂等、拒绝的延后释放以所有权违约暴露、失败的自取消不跳过 linked leaf 义务。
 
 ## GAP-132 的 scoped work 回归
 

@@ -1,4 +1,5 @@
 import test from 'node:test'
+import { responseReceipt, absentState } from './support/process.mjs'
 
 {
 const { default: assert } = await import('node:assert/strict')
@@ -53,7 +54,7 @@ const job = (id, path = `/tmp/${id}`) => ({
   targetBranchFrozen: 'refs/heads/main'})
 
 test('WHAT[change-integration-006] worktree resource preserves its configured path through controlled creation and disposal', async () => {
-  const runner = (command) => command.args[0] === 'worktree' ? Promise.resolve([0, '', '']) : Promise.resolve([0, '', ''])
+  const runner = command => Promise.resolve(absentState(command))
   const resource = await change.worktreeCreate(change.createGit('/repo', runner), 'hostfw10', '/tmp/hostfw10')
   assert.equal(resource.ok, true)
   assert.equal(change.worktreePath(resource.value), '/tmp/hostfw10')
@@ -323,9 +324,9 @@ const fakeRunner = (answers = []) => {
     calls.push({ args, cwd: command.workingDirectory })
     const key = args.join(' ')
     for (const [prefix, response] of answers) {
-      if (key.startsWith(prefix)) return Promise.resolve(response)
+      if (key.startsWith(prefix)) return Promise.resolve(responseReceipt(response))
     }
-    return Promise.resolve([0, '', ''])
+    return Promise.resolve(absentState(command))
   }
   return { runner, calls }
 }

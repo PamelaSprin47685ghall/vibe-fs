@@ -14,5 +14,14 @@ module EventsSurface =
     val notifyCompleted:
         port: obj -> sessionId: string -> terminalText: string -> formalText: string -> roleLabel: string -> bool
 
+    val notifyCompletedForRun:
+        port: obj ->
+        sessionId: string ->
+        providerRun: string ->
+        terminalText: string ->
+        formalText: string ->
+        roleLabel: string ->
+            bool
+
     val acquireSharedForWorkspace: workspace: string -> obj
     val releaseSharedForWorkspace: workspace: string -> port: obj -> unit

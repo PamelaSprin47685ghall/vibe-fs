@@ -24,7 +24,7 @@ for (const scenario of ['valid', 'malformed-release', 'valid-release', 'not-atte
   test(`WHAT[durable-events-024] actual Sphinx Commands.start ${scenario} preserves its original settlement capability and guard`, async t => {
     assert.equal(typeof settlement.create, 'function')
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'sphinx-command-settlement-')))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     const sourceWriter = randomUUID()
     const sourceFile = join(commonDir, 'wanxiangshu', 'events', `${sourceWriter}-0000.ndjson`)
     const command = { commandId: 'settlement-' + scenario, goalText: '实际目标\r\nNUL:\u0000；雪 😀 尾部  ',
@@ -135,7 +135,7 @@ for (const binding of ['wire', 'mcp']) {
     test(`WHAT[durable-events-024] original Sphinx ${binding} binding ${scenario} settles before its physical terminal and independent cold replay`, async t => {
       assert.equal(typeof (binding === 'wire' ? wire.createWithStore : mcp.serveConfigured), 'function')
       const root = realpathSync(mkdtempSync(join(tmpdir(), 'sphinx-physical-binding-')))
-      const commonDir = join(root, '.git')
+      const commonDir = join(root, '.Herdchestra')
       const sourceWriter = randomUUID()
       const fatal = scenario === 'malformed-release'
       const release = scenario.endsWith('-release')
@@ -285,7 +285,7 @@ for (const business of [false, true]) {
     const scenario = (business ? 'business-' : '') + 'malformed' + (release ? '-release' : '')
     test(`WHAT[durable-events-024] undecodable Journal ${scenario} refuses a cut without inventing append or fatal evidence`, async t => {
       const root = realpathSync(mkdtempSync(join(tmpdir(), 'journal-decode-rejection-')))
-      const commonDir = join(root, '.git')
+      const commonDir = join(root, '.Herdchestra')
       const writer = randomUUID()
       const env = { ...process.env }
       delete env.NODE_TEST_CONTEXT
@@ -361,7 +361,7 @@ for (const business of [false, true]) {
 for (const scenario of ['semantic', 'semantic-release']) {
   test(`WHAT[durable-events-024] decodable Journal ${scenario} settles bad fact and cut before actual fatal and cold replay`, async t => {
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'journal-decodable-cut-')))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     const writer = randomUUID()
     const env = { ...process.env }
     delete env.NODE_TEST_CONTEXT
@@ -433,7 +433,7 @@ for (const scenario of ['valid', 'valid-release']) {
     assert.equal(typeof journals.openActualJournalWithStore, 'function')
     assert.equal(typeof journals.observeActualJournalProjection, 'function')
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'journal-physical-settlement-')))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     const sourceWriter = randomUUID()
     const sourceFile = join(commonDir, 'wanxiangshu', 'events', `${sourceWriter}-0000.ndjson`)
     const release = scenario.endsWith('-release')
@@ -545,7 +545,7 @@ for (const variant of ['valid', 'valid-release']) {
   test(`WHAT[durable-events-024] original AgentJournal business ${variant} preserves legal initialization before its physical terminal and cold replay`, async t => {
     assert.equal(typeof eventStore.createAppendPayloadStoreAt, 'function')
     const root = realpathSync(mkdtempSync(join(tmpdir(), 'journal-business-settlement-')))
-    const commonDir = join(root, '.git')
+    const commonDir = join(root, '.Herdchestra')
     const sourceWriter = randomUUID()
     const sourceFile = join(commonDir, 'wanxiangshu', 'events', `${sourceWriter}-0000.ndjson`)
     const release = variant.endsWith('-release')

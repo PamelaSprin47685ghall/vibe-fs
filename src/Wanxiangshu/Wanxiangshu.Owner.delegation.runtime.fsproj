@@ -50,7 +50,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-tools-toolruntimescope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-pluginruntimescope.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.opencode-host-turnruntimepreparation.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.relay-retirement.composition-turn-workflow.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.composition-turn-workflow.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.interaction-repair-completedturn.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-contract.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.managed-session-lifecycle.session-attachment-runtime.fsproj"/>
@@ -78,8 +78,6 @@
     <Compile Include="Execution/Delegation/Fork/LifecycleSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Surface.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Surface.fs"/>
-    <Compile Include="Execution/Delegation/HandoffSurface.fsi"/>
-    <Compile Include="Execution/Delegation/HandoffSurface.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/Restart.fsi"/>
     <Compile Include="Execution/Delegation/Fork/Host/Restart.fs"/>
     <Compile Include="Execution/Delegation/Fork/Host/JoinSurface.fsi"/>

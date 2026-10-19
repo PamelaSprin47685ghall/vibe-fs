@@ -5,9 +5,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Participant.Provider.Projection
 
 [<RequireQualifiedAccess>]
-type CompanionRequestKind =
-    | Normal
-    | Squash of frameCount: int
+type CompanionRequestKind = | Normal
 
 type CompanionProjectedMessage =
     { MessageId: string
@@ -29,7 +27,6 @@ module CompanionProjectionBuilder =
         physicalDelta: (string * BloggerDeltaItem list) option ->
         previousTips: (string * string) list ->
         normalInstructionLines: string list ->
-        squashInstructionLines: string list ->
             CompanionProjectionPlan
 
     val projectionIntent:
@@ -41,7 +38,6 @@ module CompanionProjectionBuilder =
         physicalDelta: (string * BloggerDeltaItem list) option ->
         previousTips: (string * string) list ->
         normalInstructionLines: string list ->
-        squashInstructionLines: string list ->
             ProjectionIntent option
 
     val isFirstTurnShape: plan: CompanionProjectionPlan -> bool

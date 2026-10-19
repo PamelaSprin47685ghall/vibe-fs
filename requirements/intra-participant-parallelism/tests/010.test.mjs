@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { acceptAuthorityRoot, openIncumbency, withRestartablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
+import * as journalSurface from '../../../dist/Persistence/Journal/Surface.js'
 
 test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned open Fission groups with FissionFailed so a resumed owner turn completes and delivers to join instead of being swallowed as replaced', async () => {
   await withRestartablePlugin(async (start, _directory, { stop, withRuntime, createdIds, messages, pushHostMessage }) => {
@@ -28,7 +29,17 @@ test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned op
     // orphaned child runs and orphaned open Fission groups.
     await stop(hooks1)
     const hooks2 = await start()
-    await new Promise(r => setTimeout(r, 50))
+    await hooks2['chat.message'](
+      { sessionID: 'restart-observer', messageID: 'restart-observer-user', agent: 'manager' },
+      { message: { id: 'restart-observer-user', role: 'user' }, parts: [{ type: 'text', text: 'observe the restarted Host' }] },
+    )
+    await withRuntime(async runtime => {
+      const deadline = Date.now() + 4000
+      while (journalSurface.JournalSurface_snapshot(runtime.journal).sessionProjections[engineerSession]?.promptAuthority?.activeLogicalRun) {
+        assert.ok(Date.now() < deadline, 'Host activation must durably settle the interrupted child before resume')
+        await new Promise(resolve => setImmediate(resolve))
+      }
+    })
 
     // Now Manager resumes the same child handle after restart.
     const resumed = await hooks2.tool.resume.execute(
@@ -74,6 +85,12 @@ test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned op
         ],
       },
     )
+
+    const delivered = await hooks2.tool['todowrite-for-engineer'].execute(
+      { program: "class Js extends JsProgram { async run() { await this.deliver('Complete 9-item ruling materials report') } }" },
+      { sessionID: engineerSession, agent: 'engineer' },
+    )
+    assert.match(delivered, /^# ok\b/m)
 
     assistantMsg.info.finish = 'stop'
     assistantMsg.info.time.completed = 11

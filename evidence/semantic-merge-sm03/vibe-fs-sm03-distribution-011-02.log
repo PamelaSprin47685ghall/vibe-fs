@@ -1,0 +1,10 @@
+✔ WHAT[distribution-011] source checkout consumes the exact gitlink through one installed source link (915.088583ms)
+✔ WHAT[distribution-011] retained evidence is exact and cannot admit a dependency archive (378.9435ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1365.60525

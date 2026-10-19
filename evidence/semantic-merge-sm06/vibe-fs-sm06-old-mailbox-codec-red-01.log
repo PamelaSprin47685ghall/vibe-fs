@@ -1,0 +1,5 @@
+{
+  error: 'Error at: `$[1]`\n' +
+    'The following `failure` occurred with the decoder: Cannot find case Concern in Wanxiangshu.Composition.Durable.Fact.AgentFact',
+  ok: false
+}

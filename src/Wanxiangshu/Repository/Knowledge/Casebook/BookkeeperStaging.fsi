@@ -1,7 +1,7 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 /// Process-local staged Case for one Bookkeeper transaction.
-/// The provider sees one atomic question/answer object through js-bookkeeper;
+/// The provider sees one atomic question/answer object through todowrite-for-bookkeeper;
 /// no filesystem-shaped Q.md/A.md surface exists here.
 module BookkeeperStaging =
 

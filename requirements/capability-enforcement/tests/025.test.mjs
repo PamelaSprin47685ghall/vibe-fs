@@ -15,7 +15,7 @@ import {
   withRestartablePlugin,
 } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
-const MANAGER_REVIEW_TOOL = 'js-manager'
+const MANAGER_REVIEW_TOOL = 'todowrite-for-manager'
 const RETIRED_REVIEW_TOOLS = ['read-manager', 'glob-manager', 'grep-manager']
 const managerFacts = (hasActiveIncumbency, hasAssessment, isFinalIncumbent, cleanupBlockerDigest) =>
   office.managerFacts(hasActiveIncumbency, hasAssessment, isFinalIncumbent, cleanupBlockerDigest)
@@ -46,19 +46,23 @@ test('WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_
 })
 
 test('WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny', () => {
+  // Direct read/glob/grep host tools are retired from knownToolNames and covered
+  // by the wildcard "*": "deny" rule; rolePredicate also fails closed on them.
   const managerPerms = rolePermissionRules('manager')
-  assert.equal(managerPerms.read, 'deny', 'Native read must be projected as deny for Manager')
-  assert.equal(managerPerms.glob, 'deny', 'Native glob must be projected as deny for Manager')
-  assert.equal(managerPerms.grep, 'deny', 'Native grep must be projected as deny for Manager')
+  assert.equal(managerPerms['*'], 'deny', 'Manager wildcard default must deny retired native tools')
+  for (const retired of ['read', 'glob', 'grep']) {
+    assert.equal(retired in managerPerms, false, `Retired ${retired} must not appear as an explicit Manager permission key`)
+    assert.equal(rolePredicate(retired, 'manager'), false, `Role predicate must deny retired ${retired} for Manager`)
+  }
 })
 
 test('WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role', () => {
   const managerPerms = rolePermissionRules('manager')
-  assert.equal(managerPerms['js-engineer'], 'deny', 'Manager must deny js-engineer')
-  assert.equal(managerPerms['js-devops'], 'deny', 'Manager must deny js-devops')
-  assert.equal(rolePredicate('js-engineer', 'manager'), false, 'Role predicate must deny js-engineer for Manager')
-  assert.equal(rolePredicate('js-devops', 'manager'), false, 'Role predicate must deny js-devops for Manager')
-  assert.equal(managerPerms[MANAGER_REVIEW_TOOL], 'allow', 'Manager must allow the sole review tool js-manager')
+  assert.equal(managerPerms['todowrite-for-engineer'], 'deny', 'Manager must deny todowrite-for-engineer')
+  assert.equal(managerPerms['todowrite-for-devops'], 'deny', 'Manager must deny todowrite-for-devops')
+  assert.equal(rolePredicate('todowrite-for-engineer', 'manager'), false, 'Role predicate must deny todowrite-for-engineer for Manager')
+  assert.equal(rolePredicate('todowrite-for-devops', 'manager'), false, 'Role predicate must deny todowrite-for-devops for Manager')
+  assert.equal(managerPerms[MANAGER_REVIEW_TOOL], 'allow', 'Manager must allow the sole review tool todowrite-for-manager')
 
   for (const tool of RETIRED_REVIEW_TOOLS) {
     for (const role of ['manager', 'engineer', 'devops']) {
@@ -69,14 +73,14 @@ test('WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_r
 
 test('WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface', () => {
   const managerPerms = rolePermissionRules('manager')
-  assert.equal(managerPerms[MANAGER_REVIEW_TOOL], 'allow', 'Manager request projection must allow the sole review tool js-manager')
+  assert.equal(managerPerms[MANAGER_REVIEW_TOOL], 'allow', 'Manager request projection must allow the sole review tool todowrite-for-manager')
   for (const tool of RETIRED_REVIEW_TOOLS) {
     assert.equal(tool in managerPerms, false, `Retired tool ${tool} must no longer appear in the Manager tool surface`)
   }
 })
 
 test('WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission', () => {
-  // 无 active incumbency：当前事实收口为空集，js-manager 依赖的只读能力全部 fail closed
+  // 无 active incumbency：当前事实收口为空集，todowrite-for-manager 依赖的只读能力全部 fail closed
   const noIncumbency = managerFacts(false, false, false, undefined)
   for (const permission of ['Read', 'Glob', 'Grep']) {
     assert.equal(
@@ -99,7 +103,7 @@ test('WHAT[capability-enforcement-025] P06_unknown_identity_never_authorized_by_
     for (const tool of [...RETIRED_REVIEW_TOOLS, MANAGER_REVIEW_TOOL]) {
       assert.equal(rolePredicate(tool, caller), false, `Unknown caller '${caller}' must not be admitted to ${tool}`)
     }
-    assert.equal(rolePredicate('js-engineer', caller), false, `Unknown caller '${caller}' must not be admitted to js-engineer`)
+    assert.equal(rolePredicate('todowrite-for-engineer', caller), false, `Unknown caller '${caller}' must not be admitted to todowrite-for-engineer`)
   }
 })
 
@@ -118,21 +122,21 @@ test('WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retain
     // 评审未被接纳（返回 recorded = false 或拒绝提示）
     assert.match(String(reviewResult), /false|invalid|missing|有效评分|valid ratings/i)
 
-    // 评审未被接纳前，js-manager 专用只读工具仍准入，不得误封
+    // 评审未被接纳前，todowrite-for-manager 专用只读工具仍准入，不得误封
     const beforeOutput = {
-      args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
+      args: { program: "class Js extends JsProgram { async run() { return await this.cat('src/Model.fs'); } }", contract: 'do-not-use-except-for-review' },
     }
     const originalArgs = beforeOutput.args
     const expectedArgs = { ...originalArgs }
     await hooks['tool.execute.before'](
-      { tool: 'js-manager', sessionID, callID: 'call-p03' },
+      { tool: 'todowrite-for-manager', sessionID, callID: 'call-p03' },
       beforeOutput,
     )
     assert.equal(beforeOutput.args, originalArgs, 'admission must preserve the public argument object')
     assert.deepEqual(originalArgs, { program: expectedArgs.program })
     await hooks['tool.execute.after'](
-      { tool: 'js-manager', sessionID, callID: 'call-p03', args: originalArgs },
-      { title: 'js-manager', output: '', metadata: {} },
+      { tool: 'todowrite-for-manager', sessionID, callID: 'call-p03', args: originalArgs },
+      { title: 'todowrite-for-manager', output: '', metadata: {} },
     )
     assert.deepEqual(originalArgs, expectedArgs, 'after must restore the public contract hint')
     assert.deepEqual(Object.keys(originalArgs), Object.keys(expectedArgs))
@@ -140,7 +144,7 @@ test('WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retain
 })
 
 test('WHAT[capability-enforcement-025] P07_cleanup_blocker_or_inactive_incumbency_denies_review_tool', () => {
-  const REVIEW_TOOLS = ['js-manager']
+  const REVIEW_TOOLS = ['todowrite-for-manager']
 
   // 1. 清理阻塞状态（CleanupBlockerDigest 有值）下：收窄为仅 Join/Finality，评审专用只读工具必须拒绝
   const factsCleanup = managerFacts(true, false, false, 'blocker-digest-xyz')
@@ -227,36 +231,36 @@ test('WHAT[capability-enforcement-025] P11_plugin_reopen_evaluates_durable_incum
     await stop(firstPlugin)
     const restartedPlugin = await start()
 
-    // 重启后验证已接纳评审的 session：js-manager 专用只读工具仍严格拒绝，不重置评审
+    // 重启后验证已接纳评审的 session：todowrite-for-manager 专用只读工具仍严格拒绝，不重置评审
     const acceptedBeforeOutput = {
-      args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
+      args: { program: "class Js extends JsProgram { async run() { return await this.cat('src/Model.fs'); } }", contract: 'do-not-use-except-for-review' },
     }
     await assert.rejects(
       async () => {
         await restartedPlugin['tool.execute.before'](
-          { tool: 'js-manager', sessionID: sessionAccepted, callID: 'call-p11-acc' },
+          { tool: 'todowrite-for-manager', sessionID: sessionAccepted, callID: 'call-p11-acc' },
           acceptedBeforeOutput,
         )
       },
       /not permitted under current manager capability facts/i,
-      'js-manager must remain denied after restart when assessment was already accepted',
+      'todowrite-for-manager must remain denied after restart when assessment was already accepted',
     )
 
     // 重启后未接纳评审的 session 仍准入，after 恢复原始参数。
     const unacceptedBeforeOutput = {
-      args: { program: "class Js extends JsProgram { async run() { const f = await this.file('src/Model.fs'); return f.text('^', '$'); } }", contract: 'do-not-use-except-for-review' },
+      args: { program: "class Js extends JsProgram { async run() { return await this.cat('src/Model.fs'); } }", contract: 'do-not-use-except-for-review' },
     }
     const originalArgs = unacceptedBeforeOutput.args
     const expectedArgs = { ...originalArgs }
     await restartedPlugin['tool.execute.before'](
-      { tool: 'js-manager', sessionID: sessionUnaccepted, callID: 'call-p11-unacc' },
+      { tool: 'todowrite-for-manager', sessionID: sessionUnaccepted, callID: 'call-p11-unacc' },
       unacceptedBeforeOutput,
     )
     assert.equal(unacceptedBeforeOutput.args, originalArgs)
     assert.deepEqual(originalArgs, { program: expectedArgs.program })
     await restartedPlugin['tool.execute.after'](
-      { tool: 'js-manager', sessionID: sessionUnaccepted, callID: 'call-p11-unacc', args: originalArgs },
-      { title: 'js-manager', output: '', metadata: {} },
+      { tool: 'todowrite-for-manager', sessionID: sessionUnaccepted, callID: 'call-p11-unacc', args: originalArgs },
+      { title: 'todowrite-for-manager', output: '', metadata: {} },
     )
     assert.deepEqual(originalArgs, expectedArgs, 'after reopening, after must restore the public contract hint')
     assert.deepEqual(Object.keys(originalArgs), Object.keys(expectedArgs))
@@ -295,7 +299,7 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_is_
 
     const beforeOutput = {
       args: {
-        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return f.text('^', '$'); } }",
+        program: "class Js extends JsProgram { async run() { return await this.cat('src/App.fs'); } }",
         contract: 'do-not-use-except-for-review',
       },
     }
@@ -305,7 +309,7 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_is_
 
     // Step 1: before hook 检查通过并放行，隐藏执行视图的提示字段。
     await hooks['tool.execute.before'](
-      { tool: 'js-manager', sessionID, callID },
+      { tool: 'todowrite-for-manager', sessionID, callID },
       beforeOutput,
     )
     assert.equal(beforeOutput.args, originalArgs)
@@ -315,7 +319,7 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_is_
     await injectAcceptedAssessment(runtime, sessionID)
 
     // Step 3: 真实运行入口重新检查当前事实；文件读取次数还未在此观察。
-    const execResult = await hooks.tool['js-manager'].execute(
+    const execResult = await hooks.tool['todowrite-for-manager'].execute(
       beforeOutput.args,
       { sessionID, agent: 'manager' },
     )
@@ -332,8 +336,8 @@ test('WHAT[capability-enforcement-025] P13_review_accepted_after_before_hook_is_
     assert.equal(beforeOutput.args, originalArgs)
     assert.deepEqual(originalArgs, { program: expectedArgs.program })
     await hooks['tool.execute.after'](
-      { tool: 'js-manager', sessionID, callID, args: originalArgs },
-      { title: 'js-manager', output: execResult, metadata: {} },
+      { tool: 'todowrite-for-manager', sessionID, callID, args: originalArgs },
+      { title: 'todowrite-for-manager', output: execResult, metadata: {} },
     )
     assert.deepEqual(originalArgs, expectedArgs, 'after execution denial, after must restore the original public arguments')
     assert.deepEqual(Object.keys(originalArgs), Object.keys(expectedArgs))
@@ -353,17 +357,17 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
     // Call 1 启动并在 Review 接纳前获得最终准入与执行
     const call1Output = {
       args: {
-        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return { text: f.text('^', '$') }; } }",
+        program: "class Js extends JsProgram { async run() { const text = await this.cat('src/App.fs'); return { text }; } }",
         contract: 'do-not-use-except-for-review',
       },
     }
     const originalArgs = call1Output.args
     const expectedArgs = { ...originalArgs }
     await hooks['tool.execute.before'](
-      { tool: 'js-manager', sessionID, callID: call1ID },
+      { tool: 'todowrite-for-manager', sessionID, callID: call1ID },
       call1Output,
     )
-    const call1ExecResult = await hooks.tool['js-manager'].execute(
+    const call1ExecResult = await hooks.tool['todowrite-for-manager'].execute(
       call1Output.args,
       { sessionID, agent: 'manager', callID: call1ID, messageID: 'msg-p14' },
     )
@@ -379,8 +383,8 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
 
     // Call 1 的后置回调须恢复原始参数，不受稍后的评审接纳影响。
     await hooks['tool.execute.after'](
-      { tool: 'js-manager', sessionID, callID: call1ID, args: call1Output.args },
-      { title: 'js-manager', output: call1ExecResult, metadata: {} },
+      { tool: 'todowrite-for-manager', sessionID, callID: call1ID, args: call1Output.args },
+      { title: 'todowrite-for-manager', output: call1ExecResult, metadata: {} },
     )
     assert.equal(
       call1Output.args.contract,
@@ -394,14 +398,14 @@ test('WHAT[capability-enforcement-025] P14_completed_readonly_call_keeps_after_h
     // 后续新调用（Call 2）发起，在入口即被拒绝
     const call2Output = {
       args: {
-        program: "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return f.text('^', '$'); } }",
+        program: "class Js extends JsProgram { async run() { return await this.cat('src/App.fs'); } }",
         contract: 'do-not-use-except-for-review',
       },
     }
     await assert.rejects(
       async () => {
         await hooks['tool.execute.before'](
-          { tool: 'js-manager', sessionID, callID: call2ID },
+          { tool: 'todowrite-for-manager', sessionID, callID: call2ID },
           call2Output,
         )
       },
@@ -416,6 +420,7 @@ test('WHAT[capability-enforcement-025] an admitted call reads the file and befor
   const { parse: parseToml } = await import('smol-toml')
   const revisionSurface = await import('../../../dist/Persistence/Journal/RevisionSurface.js')
   const workspaceEventStoreSurface = await import('../../../dist/OpenCode/Host/WorkspaceEventStoreSurface.js')
+  const journalSurface = await import('../../../dist/Persistence/Journal/Surface.js')
   const lifecycleSurface = await import('../../../dist/Mission/Lifecycle/Surface.js')
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
     const sessionID = 'ses-p15'
@@ -424,8 +429,8 @@ test('WHAT[capability-enforcement-025] an admitted call reads the file and befor
     mkdirSync(join(directory, 'src'), { recursive: true })
     writeFileSync(join(directory, 'src/App.fs'), 'review evidence', 'utf8')
 
-    const program = "class Js extends JsProgram { async run() { const f = await this.file('src/App.fs'); return { text: f.text('^', '$') }; } }"
-    const tool = hooks.tool['js-manager']
+    const program = "class Js extends JsProgram { async run() { const text = await this.cat('src/App.fs'); return { text }; } }"
+    const tool = hooks.tool['todowrite-for-manager']
 
     // The counter observes this registered tool body. The lifecycle store
     // observes the durable Reviewed fact the capability gate reads, so a
@@ -437,7 +442,7 @@ test('WHAT[capability-enforcement-025] an admitted call reads the file and befor
       return originalExecute(...callArgs)
     }
     const revisionOf = () => revisionSurface.revision(runtime.journal)
-    const lifecycleStore = () => workspaceEventStoreSurface.acquire(realpathSync(join(directory, '.git')))
+    const lifecycleStore = () => workspaceEventStoreSurface.acquire(journalSurface.JournalSurface_initializeStateRoot(directory))
     const reviewOf = () => lifecycleSurface.workView(lifecycleStore(), sessionID).reviewed
 
     // Positive control: before review acceptance the same program drives the
@@ -445,7 +450,7 @@ test('WHAT[capability-enforcement-025] an admitted call reads the file and befor
     // the file's bytes, and the counter must observe this registered body.
     const admittedOutput = { args: { program, contract: 'do-not-use-except-for-review' } }
     await hooks['tool.execute.before'](
-      { tool: 'js-manager', sessionID, callID: 'call-p15-control' },
+      { tool: 'todowrite-for-manager', sessionID, callID: 'call-p15-control' },
       admittedOutput,
     )
     const controlResult = await tool.execute(
@@ -458,8 +463,8 @@ test('WHAT[capability-enforcement-025] an admitted call reads the file and befor
       'positive control: the admitted call really reads the file through the full chain',
     )
     await hooks['tool.execute.after'](
-      { tool: 'js-manager', sessionID, callID: 'call-p15-control', args: admittedOutput.args },
-      { title: 'js-manager', output: controlResult, metadata: {} },
+      { tool: 'todowrite-for-manager', sessionID, callID: 'call-p15-control', args: admittedOutput.args },
+      { title: 'todowrite-for-manager', output: controlResult, metadata: {} },
     )
     assert.equal(executions, 1, 'positive control: exactly one registered tool call was observed')
 
@@ -480,7 +485,7 @@ test('WHAT[capability-enforcement-025] an admitted call reads the file and befor
     await assert.rejects(
       async () => {
         await hooks['tool.execute.before'](
-          { tool: 'js-manager', sessionID, callID: 'call-p15-denied' },
+          { tool: 'todowrite-for-manager', sessionID, callID: 'call-p15-denied' },
           deniedOutput,
         )
       },

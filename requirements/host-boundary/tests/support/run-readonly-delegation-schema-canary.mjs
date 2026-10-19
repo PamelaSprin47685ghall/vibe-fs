@@ -5,15 +5,15 @@
  *  - the production plugin is loaded by a real OpenCode host against a mock
  *    provider, with a Predictor model configured in the isolated
  *    `wanxiangshu.mjs` (the only enablement condition);
- *  - the provider wire is inspected: participating tools must carry the
- *    required `estimated_readonly_rounds` integer budget and the optional
- *    `self_note`, including Host built-ins whose definition carries an Effect
- *    argument schema and no JSON schema (`read`, `glob`, `grep`, …);
- *  - original tool constraints survive decoration (built-in `required` entries
- *    are preserved);
- *  - a built-in tool call that carries the protocol fields still executes: the
- *    arguments are hidden before the Host decodes them with the tool's own
- *    Effect schema, and the provider-wire history keeps the original call.
+ *  - the provider wire is inspected: the engineer session's participating tool
+ *    (`todowrite-for-engineer`) must carry the required
+ *    `estimated_readonly_rounds` integer budget and the optional `self_note`,
+ *    while every non-participating tool on the wire stays untouched;
+ *  - original tool constraints survive decoration (the tool's own `required`
+ *    entries are preserved);
+ *  - a tool call that carries the protocol fields still executes: the arguments
+ *    are hidden before the Host decodes them with the tool's own schema, and the
+ *    provider-wire history keeps the original call.
  *
  * Prints one JSON summary on stdout; the wrapping test asserts on it.
  */
@@ -50,12 +50,15 @@ export default function route(role, running, previous, purpose) {
 const READ_FILE = 'canary-sample.txt'
 const FILE_BODY = 'readonly delegation schema canary\n'
 const CALL_ID = 'call_read_delegated_0'
+const READ_PROGRAM = `class Js extends JsProgram { async run() { return await this.cat('${READ_FILE}'); } }`
 const BUDGET = 2
 const SELF_NOTE = 'checking the canary fixture'
 
+// The live participating set: the retired direct filesystem tools can no longer
+// reach a provider wire, so only the session's own programming surface and the
+// conditional office fetch tool carry the protocol.
 const EXPECTED_PARTICIPATING_NAMES = [
-  'read', 'glob', 'grep', 'js-manager', 'js-engineer', 'js-devops',
-  'edit', 'write', 'mv', 'rm', 'fetch', 'run',
+  'todowrite-for-manager', 'todowrite-for-engineer', 'todowrite-for-devops', 'fetch',
 ]
 
 const known = new Set(toolSpecNames())
@@ -63,12 +66,12 @@ const PARTICIPATING_TOOLS = new Set(EXPECTED_PARTICIPATING_NAMES)
 
 assert.equal(
   PARTICIPATING_TOOLS.size,
-  12,
-  `expected exactly 12 participating tools, got ${PARTICIPATING_TOOLS.size}`,
+  4,
+  `expected exactly 4 participating tools, got ${PARTICIPATING_TOOLS.size}`,
 )
 assert.ok(
   EXPECTED_PARTICIPATING_NAMES.every((name) => known.has(name)),
-  'all participating tools must be known canonical tools from ToolSurface',
+  'every participating tool must be a known canonical tool from ToolSurface',
 )
 
 const isTitleRequest = (body) => {
@@ -85,11 +88,11 @@ const providerRequests = []
 const wireTools = new Map()
 let sessionID = null
 
-// The engineer session is identified on the wire by carrying the built-in
-// `read` tool; unrelated sessions (companion, chronicle) reuse the provider and
-// may arrive first, so neither arrival order nor request counting identifies it.
+// The engineer session is identified on the wire by carrying `todowrite-for-engineer`;
+// unrelated sessions (companion, chronicle) reuse the provider and may arrive first,
+// so neither arrival order nor request counting identifies it.
 const isEngineerRequest = (body) =>
-  (body?.tools ?? []).some((tool) => (tool?.function?.name ?? tool?.name) === 'read')
+  (body?.tools ?? []).some((tool) => (tool?.function?.name ?? tool?.name) === 'todowrite-for-engineer')
 
 const provider = http.createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`)
@@ -127,10 +130,10 @@ const provider = http.createServer(async (request, response) => {
 
       const args = JSON.stringify(
         BUDGET > 0
-          ? { filePath: READ_FILE, estimated_readonly_rounds: BUDGET, self_note: SELF_NOTE }
-          : { filePath: READ_FILE, estimated_readonly_rounds: BUDGET },
+          ? { program: READ_PROGRAM, estimated_readonly_rounds: BUDGET, self_note: SELF_NOTE }
+          : { program: READ_PROGRAM, estimated_readonly_rounds: BUDGET },
       )
-      sendSSE(response, buildToolCallChunks(CALL_ID, 'read', args, 10))
+      sendSSE(response, buildToolCallChunks(CALL_ID, 'todowrite-for-engineer', args, 10))
       return
     }
 
@@ -209,7 +212,7 @@ const summary = () => {
     tools: Object.fromEntries(wireTools),
     participatingTools: participating,
     nonParticipatingTools: nonParticipating,
-    read: wireTools.get('read') ?? null,
+    engineerTool: wireTools.get('todowrite-for-engineer') ?? null,
     followUpObserved: followUp !== undefined,
     historicalArguments,
     toolResultPreview: typeof toolResult?.content === 'string' ? toolResult.content.slice(0, 400) : null,

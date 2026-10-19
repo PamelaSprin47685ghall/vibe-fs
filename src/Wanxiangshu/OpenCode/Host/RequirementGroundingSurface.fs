@@ -10,6 +10,7 @@ open Wanxiangshu.Context.Companion
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Persistence.Journal
+open Wanxiangshu.Requirement.Grounding
 
 open Wanxiangshu.Foundation
 
@@ -23,6 +24,36 @@ module RequirementGroundingSurface =
 
     let private isNullish value =
         isNull value || Fable.Core.JsInterop.emitJsExpr value "$0 === undefined"
+
+    let private tryNonBlankField (args: obj) (name: string) : string option =
+        if isNull args || isNull args?(name) then
+            None
+        else
+            let text = string args?(name)
+            if String.IsNullOrWhiteSpace text then None else Some text
+
+    let private isCandidateDiscoveryTool (toolName: string) : bool =
+        match toolName.Trim().ToLowerInvariant() with
+        | "grep"
+        | "glob"
+        | "list" -> true
+        | _ -> false
+
+    let private tryObservationRead (toolName: string) (args: obj) (output: obj) =
+        let isString = Fable.Core.JsInterop.emitJsExpr output "typeof $0 === 'string'"
+
+        let pathOpt =
+            if isCandidateDiscoveryTool toolName then
+                None
+            else
+                [ "filePath"; "path" ] |> List.tryPick (tryNonBlankField args)
+
+        match isString, pathOpt with
+        | true, Some path ->
+            [ { Path = path
+                ResultBytes = string output
+                Coverage = Wanxiangshu.Requirement.Grounding.GroundingReadCoverage.PartialFile } ]
+        | _ -> []
 
     let createJournal (directory: string) : Task<obj> =
         task {
@@ -89,13 +120,12 @@ module RequirementGroundingSurface =
     let weakMutationObservation (journal: obj) (workspace: string) (sessionId: string) (path: string) : Task<bool> =
         task {
             do!
-                RequirementGroundingGate.before
+                RequirementGroundingGate.programObservation
                     (Some(agentJournalOf journal))
-                    (Some workspace)
-                    (box
-                        {| tool = "write"
-                           sessionID = sessionId |})
-                    (box {| args = box {| filePath = path |} |})
+                    workspace
+                    sessionId
+                    []
+                    [ path ]
 
             return true
         }
@@ -109,7 +139,7 @@ module RequirementGroundingSurface =
         (output: obj)
         : Task<obj> =
         task {
-            let reads = RequirementGroundingGate.nativeReadObservations toolName args output
+            let reads = tryObservationRead toolName args output
 
             let! result = RequirementGroundingGate.decideRead (Some(agentJournalOf journal)) workspace sessionId reads
 

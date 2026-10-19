@@ -1,0 +1,42 @@
+✔ WHAT[prefix-stability-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections (1.128084ms)
+✔ WHAT[prefix-stability-014] PPT_source_is_the_frozen_side_channel_identity (0.171833ms)
+✔ WHAT[prefix-stability-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker (6.736166ms)
+✔ WHAT[prefix-stability-014] bare semantic capture preserves supplied bytes rather than guessing guidance from prose (140.422167ms)
+✔ WHAT[prefix-stability-014] a failed guidance assertion ends its exact mock provider step before another single-slot fixture starts (1582.66275ms)
+✔ WHAT[prefix-stability-014] registered Host completed tool presentation leaves physical snapshot and durable originals unchanged (568.61875ms)
+✔ WHAT[prefix-stability-014] registered Host error tool presentation leaves physical snapshot and durable originals unchanged (521.59725ms)
+✔ WHAT[prefix-stability-014] a real user plain quotation of previous guidance is preserved in the request and cold trace (1351.577875ms)
+✔ WHAT[prefix-stability-014] a real user enclosed quotation of previous guidance is preserved in the request and cold trace (638.9415ms)
+✔ WHAT[prefix-stability-014] a real user embedded quotation of previous guidance is preserved in the request and cold trace (548.760792ms)
+✔ WHAT[prefix-stability-014] a real user position quotation of previous guidance is preserved in the request and cold trace (563.773625ms)
+✔ WHAT[prefix-stability-014] a real user multiple quotation of previous guidance is preserved in the request and cold trace (632.948375ms)
+✔ WHAT[prefix-stability-014] a empty terminal user part with a single part cannot acquire an unprovable guidance suffix (662.431917ms)
+✔ WHAT[prefix-stability-014] a empty terminal user part with multiple parts cannot acquire an unprovable guidance suffix (549.77975ms)
+✔ WHAT[prefix-stability-014] a whitespace terminal user part with a single part cannot acquire an unprovable guidance suffix (576.665459ms)
+✔ WHAT[prefix-stability-014] a whitespace terminal user part with multiple parts cannot acquire an unprovable guidance suffix (572.119042ms)
+✔ WHAT[prefix-stability-014] an old user occurrence without its original text is refused rather than inferred from its presentation (635.793708ms)
+✔ WHAT[prefix-stability-014] a same-generation physical user edit cannot disguise an original conflict as guidance replay (541.536166ms)
+✔ WHAT[prefix-stability-014] a same-generation position user edit cannot disguise an original conflict as guidance replay (678.510041ms)
+✔ WHAT[prefix-stability-014] the first reanchored capture of edited physical user text does not borrow retired original evidence (648.52625ms)
+✔ WHAT[prefix-stability-014] the first reanchored capture of edited position user text does not borrow retired original evidence (629.986375ms)
+✔ WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with same text (753.291208ms)
+✔ WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with changed text (929.897125ms)
+✔ WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with same text (783.597375ms)
+✔ WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with changed text (745.300417ms)
+✔ WHAT[prefix-stability-014] a captured user carrier presentation replays from its proven original without adding trace material (568.64175ms)
+✔ WHAT[prefix-stability-014] actual OpenCode Host provider requests preserve user quotations and keep guidance out of physical tool originals through cold recovery (6661.974583ms)
+✔ WHAT[semantic-trace-005] canonical render is deterministic and omits provenance (1.44375ms)
+✔ WHAT[semantic-trace-005] composition bridge maps XTraceRange [start, end) to wanxiangli/trace (after, through] cuts and preserves digest chain (5.865708ms)
+✔ WHAT[semantic-trace-005] durable originals preserve reasoning, tool results and raw bytes without temporary recapture (130.2025ms)
+✔ WHAT[semantic-trace-005] opaque projection and wanxiangli/trace reject state mutation, reentrancy and conflicting replay (0.625333ms)
+✔ WHAT[semantic-trace-005] long append sequences preserve authenticated chronological records and range boundaries (22.074667ms)
+✔ WHAT[semantic-trace-005] appending two branches preserves the old projection and both authenticated histories (0.76375ms)
+✔ WHAT[semantic-trace-005] independently compile a consumer and reject access to opaque trace state, cursor and append refs (18667.09825ms)
+ℹ tests 34
+ℹ suites 0
+ℹ pass 34
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 41785.78575

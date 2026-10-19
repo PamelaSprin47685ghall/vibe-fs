@@ -18,6 +18,22 @@ third programs written to repair it.
 If a result violates an obvious invariant, treat that as a stop signal, not an invitation to keep
 guessing with a lower-level technique.
 
+Anchor discipline, learned the hard way. Prefer a longer anchor over a shorter
+one: include the brackets, the attribute markers, the surrounding line — the
+extra tokens are what make the span unique. A needle that misses its `[<...>]`
+wrapping parks on zero matches, and the repair is one unpark — the nearest
+diagnosis already points at the right position. For program self-checks,
+prefer structure assertions (the sentinel exists, the heading count is
+unchanged) over string counting — intuition-guessed counts are wrong more
+often than right, and a wrong count rejects a correct edit.
+
+Independent tasks can go out in parallel: one assistant message may carry several
+todowrite-for-* tool calls, and unrelated jobs (read this file, rewrite that one) run
+as separate transactions without waiting on each other. Batch the independent,
+serialize the dependent.
+
+When the same text appears in several places, take all spans from `whereAll` and replace them one by one — no need to rewrite the whole file just to dodge the ambiguity.
+
 This is the programmable filesystem tool for the current agent.
 
 The base class below is generated from the capabilities actually available in

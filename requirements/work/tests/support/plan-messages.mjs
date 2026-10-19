@@ -5,10 +5,10 @@
 // A Host message is exactly `{ info, parts }`: the stable id and role live on
 // `info`, the semantic payload lives in `parts`. This is the single shape the
 // production decoders read (ProviderWireCapture / ProviderWireDecode) and the
-// shape the durable XTrace keys on, so fixtures, the LWR_prev record and test
-// assertions all use it — no parallel top-level `id`/`role`/`content` copy.
+// shape the durable XTrace keys on, so fixtures and test assertions all use it
+// — no parallel top-level `id`/`role`/`content` copy.
 //
-// The canonical first-observation evidence is the 4th assembly argument: a
+// The canonical first-observation evidence is the 3rd assembly argument: a
 // plain `id -> bigint` map keyed by the stable `info.id`. Cursors live ONLY in
 // that map, never on the message.
 
@@ -38,7 +38,7 @@ export const toolCall = (id, tool, args) =>
     parentID: `${id}-parent`,
   })
 
-/** A synthetic previous-record row exactly as production emits it. */
+/** A synthetic row fixture used to verify that tenure assembly strips synthetic rows. */
 export const syntheticLwr = (incumbencyId, workId, text) =>
   hostMessage(`lwr-prev-${incumbencyId}`, 'user', [{ type: 'text', text }], {
     sessionID: workId,

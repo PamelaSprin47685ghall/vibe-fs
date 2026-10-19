@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>work</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>mission-work-projection</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>work</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>mission-work-projection</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-core.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-narrative-transform.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.durable-events.persistence-journal-surface.fsproj"/>
+    <Compile Include="Mission/Work/ProjectionSurface.fsi"/>
+    <Compile Include="Mission/Work/ProjectionSurface.fs"/>
+  </ItemGroup>
+</Project>

@@ -11,15 +11,14 @@ open Wanxiangshu.Context.Trace
 ///        + Recent work（RawGapFromX，经 forWorkRecord；含最后一条助手文本）
 /// ```
 ///
-/// 跨 Session 方向不同（EXEC-006 / EXEC-008）：
-/// - 父 → 子：`includeOpening = true`（子未见父任务全文）
-/// - 子 → 父：`includeOpening = false`（布置者已知任务，勿回传 Opening）
+/// 历史范围查询和附件由调用方决定是否包含 Opening。
+/// 子工作当前终值来自显式 js.deliver，不从本记录补值。
 /// 同 Session prefix replacement 不是第三种 delegation：它用
 /// `includeOpening = false`，原始 Opening 留在 X；Companion memory 作为同一
-/// participant 的既有责任重新注入；不得改写成 `commissioner_record` / `attached_work_record`。
+/// participant 的既有责任重新注入，不是跨参与者附件。
 ///
 /// Opening 仍必须 captured（锚点/gap 起点）；本标志只影响渲染段。
-/// tool call/result 不得作为 raw 进入 Recent；T1 constitutive 属 Opening。
+/// tool call/result 不得作为 raw 进入 Recent；constitutive Opening material 属 Opening。
 type LifecycleWorkRecord =
     { Opening: XTraceOpeningEvidence
       Frames: string list
@@ -84,7 +83,7 @@ module LifecycleWorkRecord =
               Frames = frames
               Gap = gap }
 
-    /// Attach the trace owner's canonical rendering of BlindPlan constitutive evidence.
+    /// Attach the trace owner's canonical rendering of the Opening interval material.
     let withConstitutive (opening: XTraceOpeningEvidence) (constitutiveBody: string) : XTraceOpeningEvidence =
         { opening with
             ConstitutiveBody = constitutiveBody }

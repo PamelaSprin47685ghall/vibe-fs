@@ -7,8 +7,12 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 
 open Wanxiangshu.Foundation
+open Fable.Core
 
 module Events =
+
+    [<Emit("console.error($0, $1)")>]
+    let private logError (prefix: string) (message: string) : unit = jsNative
 
     /// The one event port.
     ///
@@ -46,9 +50,17 @@ module Events =
         let stickyOrder = Queue<string>()
         let stickyCap = 256
 
+        let dispatchRegistration sessionId outcome registration =
+            try
+                registration.Listener sessionId outcome
+            with error ->
+                logError
+                    "EVENT-DISPATCH"
+                    (sprintf "terminal listener faulted for session %s: %s" (SessionId.value sessionId) error.Message)
+
         let notifyRegistration sessionId outcome registration =
             if registration.Live then
-                registration.Listener sessionId outcome
+                dispatchRegistration sessionId outcome registration
 
         let trimSticky () =
             while stickyOrder.Count > stickyCap do

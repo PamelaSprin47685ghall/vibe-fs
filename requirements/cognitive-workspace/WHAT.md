@@ -24,11 +24,11 @@
 
 ## [006] assume 不再形成压缩阶段
 
-`assume` 成功不产生 compression checkpoint。上下文压缩的 checkpoint 只来自成功的原生 `todowrite`，语义遵循 context-compression-028。
+`assume` 成功不产生 compression checkpoint。上下文压缩的 checkpoint 只来自成功声明非空 `view` 的编程面调用（`todowrite-for-<role>`），语义遵循 context-compression-028 与 obligation-ledger-001。
 
-## [007] todowrite 不通过 canvas 兼容桥
+## [007] 待办写入不通过 canvas 兼容桥
 
-宿主待办由 OpenCode 原生 `todowrite` executor 执行。不得恢复 TodoSink、`assume(update,todos)` 或 Magic Todo 作为 UI 写入桥。
+宿主待办写入只经编程面 `todowrite-for-<role>`，插件不维护第二份待办真相。不得恢复 TodoSink、`assume(update,todos)` 或 Magic Todo 作为 UI 写入桥。
 
 ## [008] 不执行 jq
 

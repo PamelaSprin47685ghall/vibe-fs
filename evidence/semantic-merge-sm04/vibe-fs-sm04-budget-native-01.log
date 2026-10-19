@@ -1,0 +1,509 @@
+✖ WHAT[process-execution-013] js.run bounds large output deterministically to head+tail without model distillation (17.7105ms)
+✖ WHAT[process-execution-013] small output preserves separate stdout and stderr in onExit without truncation (10.261458ms)
+✔ WHAT[process-execution-013] ToolResultBound keeps deterministic raw tail when output exceeds host window (3.706084ms)
+✖ WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction (15.94975ms)
+▶ WHAT[process-execution-014] actual process output round-trips every raw text value
+  ✖ empty (10.090083ms)
+  ✖ no trailing LF (9.580708ms)
+  ✖ trailing LF (6.86975ms)
+  ✖ multiple trailing LF (6.8745ms)
+  ✖ CRLF (5.605459ms)
+  ✖ lone CR (5.56225ms)
+  ✖ quotes and backslashes (5.936459ms)
+  ✖ literal quotes and Unicode (5.280833ms)
+  ✖ control characters (5.734291ms)
+  ✖ BOM and CRLF (6.344458ms)
+✖ WHAT[process-execution-014] actual process output round-trips every raw text value (68.834458ms)
+✖ WHAT[process-execution-014] truncated_output_preserves_program_facts_without_log_inference_and_declares_truncation (5.400583ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 0 fits HostMaxBytes without splitting a code point (6.870833ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 1 fits HostMaxBytes without splitting a code point (3.017125ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 2 fits HostMaxBytes without splitting a code point (3.15625ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 3 fits HostMaxBytes without splitting a code point (2.29775ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 4 fits HostMaxBytes without splitting a code point (2.044125ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 7 fits HostMaxBytes without splitting a code point (2.373125ms)
+✖ WHAT[process-execution-015] the complete visible result fits the Host window before any outer truncation (15.251ms)
+✖ WHAT[process-execution-015] the encoded minimum rejects before execution and admits actual normal, signal and deadline facts (32.724916ms)
+✖ WHAT[process-execution-015] a small explicit budget counts escaped Unicode, both streams, metadata and bilingual truncation data (6.021917ms)
+✖ WHAT[process-execution-018] js.run keeps split UTF-8 bytes, BOM and trailing CRLF in both native streams (16.404166ms)
+✖ WHAT[process-execution-018] native SIGTERM and an ordinary exit 143 remain different facts (6.221791ms)
+✖ WHAT[process-execution-018] a foreground command receives EOF after its input and completes normally (6.607959ms)
+✖ WHAT[process-execution-018] a physical spool failure remains a fault with incomplete output and never becomes a successful empty transcript (4014.980833ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 7
+ℹ fail 22
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4524.913042
+
+✖ failing tests:
+
+test at requirements/process-execution/tests/013.test.mjs:8:1
+✖ WHAT[process-execution-013] js.run bounds large output deterministically to head+tail without model distillation (17.7105ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/013.test.mjs:35:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/013.test.mjs:48:1
+✖ WHAT[process-execution-013] small output preserves separate stdout and stderr in onExit without truncation (10.261458ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/013.test.mjs:65:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:8:1
+✖ WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction (15.94975ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:23:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:47:19
+✖ empty (10.090083ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:52:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:47:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:47:19
+✖ no trailing LF (9.580708ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:52:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:47:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:47:19
+✖ trailing LF (6.86975ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:52:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:47:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:47:19
+✖ multiple trailing LF (6.8745ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:52:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:47:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:47:19
+✖ CRLF (5.605459ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:52:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:47:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:47:19
+✖ lone CR (5.56225ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:52:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:47:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:47:19
+✖ quotes and backslashes (5.936459ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:52:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:47:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:47:19
+✖ literal quotes and Unicode (5.280833ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Failed'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:52:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:47:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Failed',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:47:19
+✖ control characters (5.734291ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Failed'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:52:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:47:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Failed',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:47:19
+✖ BOM and CRLF (6.344458ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Failed'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:52:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:47:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Failed',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/014.test.mjs:64:1
+✖ WHAT[process-execution-014] truncated_output_preserves_program_facts_without_log_inference_and_declares_truncation (5.400583ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Failed'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/014.test.mjs:88:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Failed',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/015.test.mjs:30:1
+✖ WHAT[process-execution-015] the complete visible result fits the Host window before any outer truncation (15.251ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/015.test.mjs:44:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/015.test.mjs:54:1
+✖ WHAT[process-execution-015] the encoded minimum rejects before execution and admits actual normal, signal and deadline facts (32.724916ms)
+  AssertionError [ERR_ASSERTION]: # parked
+  
+  handle = "park-2"
+  source = '''
+   | class Js extends JsProgram {
+   |   async run() {
+  >| return await js.run(class extends js.Runnable {
+   |   maxDuration = 5000;
+   |   interval = 25;
+   |   outputBudgetBytes = 466;
+   |   next(ctx) { return ctx.step === 0 ? "'/opt/homebrew/Cellar/node/26.6.0/bin/node' -e 'require('\\''node:fs'\\'').writeFileSync(\"/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-run-minimum-015-gK3WeL/started-en\", '\\''started'\\'')'" : null; }
+   |   watch(ctx) { return ctx.remainingMs > 0; }
+   |   sanity() {
+   |     return {
+   |       nextDone: () => this.next({ step: 1 }),
+   |       watchVeto: () => this.watch({ remainingMs: 0 }),
+   |     };
+   |   }
+   |   
+   | });
+   |   }
+   | }
+  '''
+  [sanity]
+  failure = "Cannot convert undefined or null to object"
+  
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/015.test.mjs:84:16)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/015.test.mjs:100:1
+✖ WHAT[process-execution-015] a small explicit budget counts escaped Unicode, both streams, metadata and bilingual truncation data (6.021917ms)
+  AssertionError [ERR_ASSERTION]: # parked
+  
+  handle = "park-3"
+  source = '''
+   | class Js extends JsProgram {
+   |   async run() {
+  >| return await js.run(class extends js.Runnable {
+   |   maxDuration = 5000;
+   |   interval = 25;
+   |   outputBudgetBytes = 2048;
+   |   next(ctx) { return ctx.step === 0 ? "'/opt/homebrew/Cellar/node/26.6.0/bin/node' -e 'process.stdout.write(\"﻿HEAD中文🔥\\r\\n\" + ('\\''\"\\\\中文🔥\\r\\n'\\'').repeat(2000) + \"\\r\\nTAIL🔥中文\"); process.stderr.write('\\''诊断😀'\\''.repeat(1000)); process.exitCode = 7'" : null; }
+   |   watch(ctx) { return ctx.remainingMs > 0; }
+   |   sanity() {
+   |     return {
+   |       nextDone: () => this.next({ step: 1 }),
+   |       watchVeto: () => this.watch({ remainingMs: 0 }),
+   |     };
+   |   }
+   |   
+   | });
+   |   }
+   | }
+  '''
+  [sanity]
+  failure = "Cannot convert undefined or null to object"
+  
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/015.test.mjs:111:14)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/018.test.mjs:20:1
+✖ WHAT[process-execution-018] js.run keeps split UTF-8 bytes, BOM and trailing CRLF in both native streams (16.404166ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/018.test.mjs:39:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/018.test.mjs:46:1
+✖ WHAT[process-execution-018] native SIGTERM and an ordinary exit 143 remain different facts (6.221791ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at executeOne (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/018.test.mjs:13:12)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/018.test.mjs:47:18)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/018.test.mjs:55:1
+✖ WHAT[process-execution-018] a foreground command receives EOF after its input and completes normally (6.607959ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'Parked'
+  - 'Succeeded'
+  
+      at executeOne (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/018.test.mjs:13:12)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/018.test.mjs:56:18)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'Parked',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/process-execution/tests/018.test.mjs:62:1
+✖ WHAT[process-execution-018] a physical spool failure remains a fault with incomplete output and never becomes a successful empty transcript (4014.980833ms)
+  AssertionError [ERR_ASSERTION]: the target must start before the capture fault is introduced
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/018.test.mjs:73:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

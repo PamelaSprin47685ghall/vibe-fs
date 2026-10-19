@@ -404,5 +404,5 @@ module LlmFacing =
 
         let rootStructuredValue (value: Value) = rootBlocks value
 
-        let fileEffects rewritten created =
-            SyntheticToml.encodeFs rewritten created |> List.map block
+        let fileEffects rewritten created removed moved =
+            SyntheticToml.encodeFs rewritten created removed moved |> List.map block

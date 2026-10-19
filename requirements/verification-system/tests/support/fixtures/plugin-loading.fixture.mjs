@@ -11,7 +11,7 @@ if (mode === 'skip') {
   })
 } else if (mode === 'create') {
   await withPlugin(async (hooks) => {
-    assert.equal(typeof hooks.tool.defer.execute, 'function')
+    assert.equal(typeof hooks.tool.assume.execute, 'function')
     assert.equal(typeof hooks.dispose, 'function')
     process.stdout.write('plugin fixture created\n')
   })

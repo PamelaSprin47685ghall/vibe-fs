@@ -44,7 +44,7 @@ module PromptAuthorityLedger =
         | Ok closed -> closed
         | Error error -> invalidOp error
 
-    /// Road completion closes HumanRoot authority; AgentOwnerRoot closure belongs to its owner.
+    /// Work completion closes HumanRoot authority; AgentOwnerRoot closure belongs to its owner.
     let closeCompletedHumanRootManager
         (projection: PromptAuthority.PromptAuthorityProjection)
         : PromptAuthority.PromptAuthorityProjection =

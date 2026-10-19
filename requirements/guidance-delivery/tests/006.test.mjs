@@ -13,12 +13,14 @@ test('WHAT[guidance-delivery-006] Blogger resolves its linked Main and shares th
   })
 })
 
-test('WHAT[guidance-delivery-006] missing tip or missing rule returns no invented guidance', async () => {
+test('WHAT[guidance-delivery-006] an unlinked or tip-less session resolves to no invented guidance', async () => {
   await withJournal(async ({ journal }) => {
     await link(journal)
     assert.equal(await guidance.resolve(journal, main), null)
-    await observe(journal, 1, 'not-in-rulebook')
-    assert.equal(await guidance.resolve(journal, main), null)
+    await observe(journal, 1, 'freely-authored-tip')
+    const delivered = await guidance.resolve(journal, main)
+    assert.equal(delivered.presentation, 'Full')
+    assert.equal(delivered.tipName, 'freely-authored-tip')
     assert.equal(await guidance.resolve(journal, 'unrelated'), null)
   })
 })

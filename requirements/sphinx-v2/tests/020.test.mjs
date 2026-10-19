@@ -134,7 +134,7 @@ const journalBytes = commonDir => {
 
 async function withRuntime(scenario) {
   const root = mkdtempSync(join(tmpdir(), 'sphinx-native-hashes-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   mkdirSync(commonDir)
   const runtimes = new Set()
   const stores = new Set()

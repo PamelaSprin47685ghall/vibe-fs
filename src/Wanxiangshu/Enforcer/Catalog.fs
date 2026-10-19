@@ -1,36 +1,21 @@
 namespace Wanxiangshu.Enforcer
 
-/// Rulebook folder SSOT: directory basename = TipName = provider field = durable RuleId.
-/// Rule payload is full enforcer.md + main.md texts; LexicalOrder is folder order 1..N.
+/// Rulebook folder SSOT: directory basename = RuleId = FieldName (bd [003]/[005]).
+/// Rule payload is the full lesson.md text; LexicalOrder is folder order 1..N.
 type EnforcerRule =
     {
-        /// Directory basename = TipIdentity = provider enum value.
+        /// Directory basename; library identity (= RuleId = FieldName), not a provider enum.
         Name: string
-        /// Full text of resources/enforcer/<name>/enforcer.md
-        EnforcerText: string
-        /// Full text of resources/enforcer/<name>/main.md
-        MainText: string
+        /// Full text of resources/enforcer/<name>/lesson.md
+        LessonText: string
         /// Durable tip id; clean break = Name (no enforcement-a01).
         RuleId: string
-        /// Provider-facing tip enum value; = Name.
+        /// Library field name; = Name. Blogger tipName is free-form: it may match
+        /// this exactly (tryFindByField) or be a new name absent from the library.
         FieldName: string
         /// Lexical folder order index 1..N (deterministic enum/prompt order only).
         LexicalOrder: int
     }
-
-/// ENFORCER-004 / 021: tip identity after rulebook resolve.
-/// FieldName is provider-facing; RuleId is durable — both equal TipName after folder cutover.
-type EnforcerTip =
-    { RuleId: string
-      FieldName: string
-      LexicalOrder: int }
-
-module EnforcerTip =
-
-    let ofRule (rule: EnforcerRule) : EnforcerTip =
-        { RuleId = rule.RuleId
-          FieldName = rule.FieldName
-          LexicalOrder = rule.LexicalOrder }
 
 module EnforcerCatalog =
 
@@ -74,8 +59,7 @@ module EnforcerCatalog =
                 not (isNonEmpty r.Name)
                 || not (isNonEmpty r.RuleId)
                 || not (isNonEmpty r.FieldName)
-                || not (isNonEmpty r.EnforcerText)
-                || not (isNonEmpty r.MainText)
+                || not (isNonEmpty r.LessonText)
                 || r.Name <> r.RuleId
                 || r.Name <> r.FieldName)
         with
@@ -104,42 +88,8 @@ module EnforcerCatalog =
             let trimmed = field.Trim()
             rules |> List.tryFind (fun r -> r.FieldName = trimmed || r.Name = trimmed)
 
-    let private levenshteinDistance (left: string) (right: string) : int =
-        if left = right then
-            0
-        elif left.Length = 0 then
-            right.Length
-        elif right.Length = 0 then
-            left.Length
-        else
-            let rightChars = right |> Seq.toList
-
-            [ 1 .. left.Length ]
-            |> List.fold
-                (fun previous leftIndex ->
-                    List.zip (List.zip previous (List.tail previous)) rightChars
-                    |> List.scan
-                        (fun leftCost ((diagonalCost, aboveCost), rightChar) ->
-                            let substitutionCost = if left[leftIndex - 1] = rightChar then 0 else 1
-
-                            min (min (leftCost + 1) (aboveCost + 1)) (diagonalCost + substitutionCost))
-                        leftIndex)
-                [ 0 .. right.Length ]
-            |> List.last
-
-    let resolveByField (field: string) (rules: EnforcerRule list) : EnforcerRule option =
-        if isNull field || field.Trim().Length = 0 then
-            None
-        else
-            let trimmed = field.Trim()
-
-            tryFindByField trimmed rules
-            |> Option.orElseWith (fun () ->
-                rules
-                |> List.sortBy (fun rule -> levenshteinDistance trimmed rule.FieldName, rule.LexicalOrder)
-                |> List.tryHead)
-
-    /// Provider enum values: TipName list in lexical (LexicalOrder) order.
+    /// Library TipName list (= field names) in lexical (LexicalOrder) order;
+    /// provider-side tipName is free-form, not an enum domain.
     let fieldNames (rules: EnforcerRule list) : string list =
         rules
         |> List.sortBy (fun r -> r.LexicalOrder)

@@ -31,106 +31,57 @@ module CompanionRuntimeSurface =
     let private hostOf (value: obj) : IBloggerRuntimeHost = unbox<IBloggerRuntimeHost> value
 
     let private contextOfJs (value: obj) : BloggerRequestContext =
-        match text value?kind with
-        | "Squash" ->
-            let mainSessionId = SessionId.create (text value?mainSession)
-            let bloggerSessionId = SessionId.create (text value?bloggerSession)
-            let frameEpoch = FrameEpochId.create (int64Value value?frameEpoch)
-            let coveredFrameCount = intValue value?coveredFrameCount
+        let items =
+            match BloggerDeltaItemWire.tryListOfJs value?items with
+            | Ok parsed -> parsed
+            | Error error -> invalidArg "items" error
 
-            let frameDigests =
-                (if isNullish value?digests then
-                     [||]
-                 else
-                     unbox<string array> value?digests)
-                |> Array.toList
-                |> List.map BlobDigest.create
+        let mainSessionId = SessionId.create (text value?mainSession)
+        let bloggerSessionId = SessionId.create (text value?bloggerSession)
+        let toml = text value?toml
+        let previousIngested = int64Value value?previousIngested
+        let nextIngested = int64Value value?nextIngested
+        let deltaDigest = BlobDigest.create (HostDigest.sha256Hex toml)
 
-            let requestId =
-                // Canonical Squash identity when no requestId is carried. An
-                // explicit requestId is honored: the caller is the exact owner
-                // identity, and epoch refresh under the same requestId must
-                // remain an in-place Refreshed claim rather than Conflict.
-                let rawId =
-                    if isNullish value?requestId then
-                        ""
-                    else
-                        text value?requestId
-
-                if System.String.IsNullOrWhiteSpace rawId then
-                    BloggerRequestContext.squashRequestId
-                        mainSessionId
-                        bloggerSessionId
-                        frameEpoch
-                        coveredFrameCount
-                        frameDigests
+        let requestId =
+            // Canonical Main identity when no requestId is carried. An
+            // explicit requestId is honored: the caller carries exact
+            // request identity, and epoch refresh under the same requestId
+            // must stay an in-place Refreshed claim rather than Conflict.
+            let rawId =
+                if isNullish value?requestId then
+                    ""
                 else
-                    BloggerRequestId.create rawId
+                    text value?requestId
 
-            let candidate: BloggerSquashRequestInput =
-                { RequestId = requestId
-                  MainSessionId = mainSessionId
-                  BloggerSessionId = bloggerSessionId
-                  FrameEpochId = frameEpoch
-                  CoveredFrameCount = coveredFrameCount
-                  FrameDigests = frameDigests
-                  ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
+            if System.String.IsNullOrWhiteSpace rawId then
+                BloggerRequestContext.mainRequestId
+                    mainSessionId
+                    bloggerSessionId
+                    deltaDigest
+                    previousIngested
+                    nextIngested
+            else
+                BloggerRequestId.create rawId
 
-            match BloggerRequestMaterial.createSquash candidate with
-            | Ok verified -> BloggerRequestContext.Squash verified
-            | Error rejection -> invalidArg "context" (sprintf "squash context rejected: %A" rejection)
-        | _ ->
-            let items =
-                match BloggerDeltaItemWire.tryListOfJs value?items with
-                | Ok parsed -> parsed
-                | Error error -> invalidArg "items" error
+        let candidate: BloggerMainRequestInput =
+            { RequestId = requestId
+              MainSessionId = mainSessionId
+              BloggerSessionId = bloggerSessionId
+              Items = items
+              Toml = toml
+              PreviousIngestedThroughSequence = previousIngested
+              NextIngestedThroughSequence = nextIngested
+              PreviousCoverableTurnCutoffExclusive = intValue value?previousCutoff
+              NextCoverableTurnCutoffExclusive = intValue value?nextCutoff
+              NextCoveredPrefixDigest = text value?nextDigest
+              FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
+              DeltaDigest = deltaDigest
+              ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
 
-            let mainSessionId = SessionId.create (text value?mainSession)
-            let bloggerSessionId = SessionId.create (text value?bloggerSession)
-            let toml = text value?toml
-            let previousIngested = int64Value value?previousIngested
-            let nextIngested = int64Value value?nextIngested
-            let deltaDigest = BlobDigest.create (HostDigest.sha256Hex toml)
-
-            let requestId =
-                // Canonical Main identity when no requestId is carried. An
-                // explicit requestId is honored: the caller carries exact
-                // request identity, and epoch refresh under the same requestId
-                // must stay an in-place Refreshed claim rather than Conflict.
-                let rawId =
-                    if isNullish value?requestId then
-                        ""
-                    else
-                        text value?requestId
-
-                if System.String.IsNullOrWhiteSpace rawId then
-                    BloggerRequestContext.mainRequestId
-                        mainSessionId
-                        bloggerSessionId
-                        deltaDigest
-                        previousIngested
-                        nextIngested
-                else
-                    BloggerRequestId.create rawId
-
-            let candidate: BloggerMainRequestInput =
-                { RequestId = requestId
-                  MainSessionId = mainSessionId
-                  BloggerSessionId = bloggerSessionId
-                  Items = items
-                  Toml = toml
-                  PreviousIngestedThroughSequence = previousIngested
-                  NextIngestedThroughSequence = nextIngested
-                  PreviousCoverableTurnCutoffExclusive = intValue value?previousCutoff
-                  NextCoverableTurnCutoffExclusive = intValue value?nextCutoff
-                  NextCoveredPrefixDigest = text value?nextDigest
-                  FrameEpochId = FrameEpochId.create (int64Value value?frameEpoch)
-                  DeltaDigest = deltaDigest
-                  ObservedPrefixEpochId = PrefixEpochId.create (int64Value value?observedEpoch) }
-
-            match BloggerRequestMaterial.createMain candidate with
-            | Ok verified -> BloggerRequestContext.Main verified
-            | Error rejection -> invalidArg "context" (sprintf "main context rejected: %A" rejection)
+        match BloggerRequestMaterial.createMain candidate with
+        | Ok verified -> BloggerRequestContext.Main verified
+        | Error rejection -> invalidArg "context" (sprintf "main context rejected: %A" rejection)
 
     let private contextToJs (value: BloggerRequestContext) : obj =
         match value with
@@ -150,13 +101,6 @@ module CompanionRuntimeSurface =
                    frameEpoch = int (FrameEpochId.value main.FrameEpochId)
                    deltaDigest = BlobDigest.value main.DeltaDigest
                    observedEpoch = int (PrefixEpochId.value main.ObservedPrefixEpochId) |}
-        | BloggerRequestContext.Squash squash ->
-            box
-                {| kind = "Squash"
-                   requestId = BloggerRequestId.value squash.RequestId
-                   mainSession = SessionId.value squash.MainSessionId
-                   bloggerSession = SessionId.value squash.BloggerSessionId
-                   coveredFrameCount = squash.CoveredFrameCount |}
 
     let main (value: obj) : obj =
         box
@@ -234,53 +178,6 @@ module CompanionRuntimeSurface =
                     else
                         text value?observedEpoch
                 ) |}
-
-    let squash (value: obj) : obj =
-        box
-            {| kind = "Squash"
-               requestId =
-                // Same rule as `main`: absent requestId stays null so the
-                // canonical squashRequestId derivation runs inside the ctx.
-                if isNullish value?requestId then
-                    null
-                else
-                    text value?requestId
-               mainSession =
-                if isNullish value?mainSession then
-                    "ses-main"
-                else
-                    text value?mainSession
-               bloggerSession =
-                if isNullish value?bloggerSession then
-                    "ses-blog"
-                else
-                    text value?bloggerSession
-               frameEpoch =
-                int (
-                    if isNullish value?frameEpoch then
-                        "0"
-                    else
-                        text value?frameEpoch
-                )
-               observedEpoch =
-                int (
-                    if isNullish value?observedEpoch then
-                        "0"
-                    else
-                        text value?observedEpoch
-                )
-               coveredFrameCount =
-                int (
-                    if isNullish value?coveredFrameCount then
-                        "0"
-                    else
-                        text value?coveredFrameCount
-                )
-               digests =
-                if isNullish value?digests then
-                    [||]
-                else
-                    unbox<obj array> value?digests |> Array.map text |}
 
     let toml (value: obj) : string = text value?toml
 

@@ -8,7 +8,8 @@ open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Resources
 
 /// docs/what/enforcer.md — the `chronicle` tool (ENFORCER-010/020/040/041/061 tip v2).
-/// Provider schema: required charge/occurrence/settlement/consequence + optional evidence + required tip.
+/// Provider schema: required charge/occurrence/settlement/consequence, a free tipName,
+/// opinion and advice lesson fields, plus optional evidence.
 module ChronicleTool =
 
     [<RequireQualifiedAccess>]
@@ -32,7 +33,13 @@ module ChronicleTool =
         let ArgEvidence = "tool/chronicle/arg-evidence"
 
         [<Literal>]
-        let ArgTip = "tool/chronicle/arg-tip"
+        let ArgTipName = "tool/chronicle/arg-tip-name"
+
+        [<Literal>]
+        let ArgOpinion = "tool/chronicle/arg-opinion"
+
+        [<Literal>]
+        let ArgAdvice = "tool/chronicle/arg-advice"
 
         [<Literal>]
         let Remembered = "tool/chronicle/remembered"
@@ -41,7 +48,7 @@ module ChronicleTool =
         let NothingToRemember = "tool/chronicle/nothing-to-remember"
 
         [<Literal>]
-        let MissingTip = "tool/chronicle/missing-tip"
+        let InvalidTip = "tool/chronicle/invalid-tip"
 
     [<Literal>]
     let EmptyTextError = ChronicleExecution.EmptyTextError
@@ -81,8 +88,8 @@ module ChronicleTool =
     let private nothingToRemember language =
         ToolHostCodec.tomlObjectWithInstructions [ prose language Path.NothingToRemember ] []
 
-    let private missingTip language =
-        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.MissingTip ] []
+    let private invalidTip language =
+        ToolHostCodec.tomlObjectWithInstructions [ prose language Path.InvalidTip ] []
 
     let private terminateSessionIfPresent terminateSession sessionId : System.Threading.Tasks.Task =
         task {
@@ -97,13 +104,20 @@ module ChronicleTool =
             do! terminateSessionIfPresent terminateSession ctx.SessionId
         }
 
-    let private resultForTip language tipRaw =
-        if String.IsNullOrWhiteSpace tipRaw then
-            missingTip language
-        else
-            EnforcerCatalog.resolveByField tipRaw (enforcerRules ())
-            |> Option.map (fun _ -> remembered language)
-            |> Option.defaultValue (missingTip language)
+    let private validateTipSection (args: HostToolArguments) (field: string) : string option =
+        match ChronicleExecution.tryTipField field (args.Text field) with
+        | Error error -> Some error
+        | Ok _ -> None
+
+    let private tipFieldError (args: HostToolArguments) : string option =
+        match ChronicleExecution.tryTipName (args.Text "tipName") with
+        | Error error -> Some error
+        | Ok _ -> EnforcerCodec.tipSectionNames |> List.tryPick (validateTipSection args)
+
+    let private resultForLesson language (args: HostToolArguments) : string =
+        match tipFieldError args with
+        | Some _ -> invalidTip language
+        | None -> remembered language
 
     let private allContentFieldsValid (args: HostToolArguments) =
         [ "charge"; "occurrence"; "settlement"; "consequence" ]
@@ -120,7 +134,7 @@ module ChronicleTool =
 
     let private executeValidChronicle language (args: HostToolArguments) : string =
         if allContentFieldsValid args && evidenceValid args then
-            resultForTip language (args.Text "tip")
+            resultForLesson language args
         else
             nothingToRemember language
 
@@ -179,12 +193,16 @@ module ChronicleTool =
               ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgSettlement Map.empty) factory
               "consequence",
               ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgConsequence Map.empty) factory
+              "tipName",
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgTipName Map.empty) factory
+              "opinion",
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgOpinion Map.empty) factory
+              "advice",
+              ToolHostCodec.stringSchemaDescribed (ProviderProse.render language Path.ArgAdvice Map.empty) factory
               "evidence",
               ToolHostCodec.optionalStringSchemaDescribed
                   (ProviderProse.render language Path.ArgEvidence Map.empty)
-                  factory
-              "tip",
-              ToolHostCodec.enumSchemaDescribed fields (ProviderProse.render language Path.ArgTip Map.empty) factory ]
+                  factory ]
           Admission = admission bloggerHost
           Execute =
             fun args ctx ->

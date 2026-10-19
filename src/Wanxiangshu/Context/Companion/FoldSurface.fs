@@ -49,6 +49,9 @@ module ContextFoldSurface =
     let private optionalBlobRef (value: obj) =
         if isNull value then None else Some(blobRef value)
 
+    let private optionalBlobDigest (value: obj) =
+        if isNull value then None else Some(blobDigest value)
+
     let private optionalProviderRun (value: obj) =
         if isNull value then None else Some(providerRun value)
 
@@ -145,23 +148,11 @@ module ContextFoldSurface =
                        TextDigest = blobDigest (payload?TextDigest)
                        ProviderRun = providerRun (payload?ProviderRun)
                        ToolCallIds = toolCallList (payload?ToolCallIds)
-                       TipRuleId = text (payload?TipRuleId)
-                       FieldNameAtCommit = optionalText (payload?FieldNameAtCommit)
+                       TipName = text (payload?TipName)
+                       TipTextRef = optionalBlobRef (payload?TipTextRef)
+                       TipTextDigest = optionalBlobDigest (payload?TipTextDigest)
                        EvidenceRef = optionalBlobRef (payload?EvidenceRef)
                        ObservedPrefixEpochId = prefixEpoch (payload?ObservedPrefixEpochId) |}
-            )
-        | "BlogObservationsSquashed" ->
-            AgentFact.Context(
-                ContextFactCases.BlogObservationsSquashed
-                    {| SessionId = sessionId (payload?SessionId)
-                       BloggerSessionId = sessionId (payload?BloggerSessionId)
-                       RequestId = bloggerRequest (payload?RequestId)
-                       PreviousFrameEpochId = frameEpoch (payload?PreviousFrameEpochId)
-                       NextFrameEpochId = frameEpoch (payload?NextFrameEpochId)
-                       CoveredFrameCount = intValue (payload?CoveredFrameCount)
-                       TextRef = blobRef (payload?TextRef)
-                       TextDigest = blobDigest (payload?TextDigest)
-                       ProviderRun = providerRun (payload?ProviderRun) |}
             )
         | "PrefixRebaseCommitted" ->
             AgentFact.Context(
@@ -195,9 +186,9 @@ module ContextFoldSurface =
                        WorkId = text (payload?WorkId)
                        IncumbencyId = text (payload?IncumbencyId) |}
             )
-        | "TodoCheckpointCommitted" ->
+        | "ViewCheckpointCommitted" ->
             AgentFact.Context(
-                ContextFactCases.TodoCheckpointCommitted
+                ContextFactCases.ViewCheckpointCommitted
                     {| SessionId = sessionId (payload?SessionId)
                        ToolCallId = ToolCallId.create (text (payload?ToolCallId)) |}
             )
@@ -378,15 +369,14 @@ module ContextFoldSurface =
                         {| providerRun = ProviderRunIdentity.value providerRun
                            mainSessionId = SessionId.value record.MainSessionId
                            bloggerSessionId = SessionId.value record.BloggerSessionId
-                           tipRuleId = record.TipRuleId
+                           tipName = record.TipName
                            toolCallCount = List.length record.ToolCallIds |})
                 |> List.toArray
                recentTips =
                 state.RecentTips
                 |> List.map (fun tip ->
                     box
-                        {| ruleId = tip.RuleId
-                           fieldName = tip.FieldName
+                        {| tipName = tip.TipName
                            cycleId = tip.CycleId |})
                 |> List.toArray |}
 
@@ -487,8 +477,8 @@ module ContextFoldSurface =
     /// obligation-ledger-004: the compression checkpoint windows as plain JS,
     /// so a test can observe what the checkpoint facts actually wrote without
     /// reading the durable projection's internal representation.
-    let private todoCheckpointsToJs (projection: ProjectionSet) : obj =
-        projection.AgentProjections.TodoCheckpoints
+    let private viewCheckpointsToJs (projection: ProjectionSet) : obj =
+        projection.AgentProjections.ViewCheckpoints
         |> Map.toList
         |> List.map (fun (sessionId, window) ->
             SessionId.value sessionId,
@@ -502,7 +492,7 @@ module ContextFoldSurface =
     let private okState projection =
         box
             {| sessions = projectionToJs projection
-               todoCheckpoints = todoCheckpointsToJs projection |}
+               viewCheckpoints = viewCheckpointsToJs projection |}
 
     let private rejectionToJs (rejection: FoldRejection) : obj =
         box

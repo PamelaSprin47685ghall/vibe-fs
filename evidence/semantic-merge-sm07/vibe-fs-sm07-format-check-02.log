@@ -1,0 +1,37 @@
+
+> wanxiangshu@0.9.0 format:check
+> wireit
+
+Analyzing
+  0% [0 / 1] [0 running]
+  0% [0 / 1] [1 running] format:check
+✅ Ran 1 script and skipped 0 in 7.3s.
+❌ [format:check] Internal error! Please file a bug at https://github.com/google/wireit/issues/new, mention this message, that you encountered it in wireit version 0.14.13, and give information about your package.json files.
+    Unknown error thrown: Error: EPERM: operation not permitted, open '/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/.wireit/666f726d61743a636865636b/manifest'
+Error: EPERM: operation not permitted, open '/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/.wireit/666f726d61743a636865636b/manifest'
+    at async open (node:internal/fs/promises:1360:25)
+    at async Module.writeFile (node:internal/fs/promises:2104:14)
+    at async Module.writeFile (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/wireit/lib/util/fs.js:127:16)
+    at async #writeOutputManifest (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/wireit/lib/execution/standard.js:674:9)
+    at async #handleNeedsRun (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/wireit/lib/execution/standard.js:384:13)
+    at async StandardScriptExecution._execute (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/wireit/lib/execution/standard.js:47:20)
+    at async StandardScriptExecution.execute (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/wireit/lib/execution/base.js:34:20)
+    at async Executor.execute (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/wireit/lib/executor.js:121:35)
+    at async run (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/wireit/lib/cli.js:127:52)
+    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/wireit/lib/cli.js:160:16
+node:internal/fs/promises:1360
+  return new FileHandle(await PromisePrototypeThen(
+                        ^
+
+Error: EPERM: operation not permitted, open '/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/.wireit/666f726d61743a636865636b/fingerprint'
+    at async open (node:internal/fs/promises:1360:25)
+    at async Module.writeFile (node:internal/fs/promises:2104:14)
+    at async Module.writeFile (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/wireit/lib/util/fs.js:127:16)
+    at async #writeFingerprintFile (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/wireit/lib/execution/standard.js:558:9) {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'open',
+  path: '/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/.wireit/666f726d61743a636865636b/fingerprint'
+}
+
+Node.js v26.6.0

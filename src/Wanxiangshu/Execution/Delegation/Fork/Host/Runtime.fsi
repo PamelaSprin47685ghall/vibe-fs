@@ -3,7 +3,6 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
-open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Session
@@ -18,7 +17,6 @@ type HostForkRuntime =
     new:
         parentId: SessionId *
         sessions: ISessionHostPort *
-        childWorkRecordForRun: (SessionId -> XTraceRange -> ProviderRunIdentity -> Task<string option>) *
         createMailbox: (obj -> ForkCompletionMailbox) *
         clock: IClockPort *
         raceExit: (Task -> int -> Task<bool>) *
@@ -29,9 +27,6 @@ type HostForkRuntime =
         ?onChildCreatedDir: (string -> SessionId -> string option -> unit) *
         ?directoryFor: (string -> string option) *
         ?onRunStarted: (SessionId -> Role -> string option -> unit) *
-        ?parentWorkRecordFor: (SessionId -> Task<string option>) *
-        ?childWorkRecordFor: (SessionId -> Task<string option>) *
-        ?handoff: ReusableHandoffPort *
         ?sessionSnapshot: ISessionSnapshotPort *
         ?cancelSignals: (SessionId seq -> unit) *
         ?ownership: HandleOwnership *
@@ -84,12 +79,7 @@ type HostForkRuntime =
     member internal RunStarted: (SessionId -> Role -> string option -> unit)
     member internal ChildCreated: (string -> Role -> SessionId -> unit)
     member internal ChildCreatedDir: (string -> SessionId -> string option -> unit)
-    member internal ParentWorkRecordOf: (SessionId -> Task<string option>)
-    member internal ChildWorkRecordOf: (SessionId -> Task<string option>)
     member internal PrepareCompletion: (PendingHostRun -> TerminalOutcome -> Task<string option>)
-    member internal XTraceHead: (SessionId -> XTraceCursor)
-    member internal HandoffPort: ReusableHandoffPort option
-    member internal PrepareHandoff: route: DelegationHandoffRoute -> Task<Result<PreparedDelegationHandoff, string>>
     member internal TrackOwnedWork: work: (unit -> Task) -> unit
 
     member internal SendChildPrompt:
@@ -109,12 +99,7 @@ type HostForkRuntime =
     member Complete: run: PendingHostRun * outcome: TerminalOutcome -> unit
 
     member InstallRun:
-        agentId: string *
-        childId: SessionId *
-        role: Role *
-        authorityRoot: AuthorityRootUserMessageId *
-        ?preparedHandoff: PreparedDelegationHandoff ->
-            PendingHostRun
+        agentId: string * childId: SessionId * role: Role * authorityRoot: AuthorityRootUserMessageId -> PendingHostRun
 
     member FailRun: run: PendingHostRun * error: string -> Task
     member MarkReady: run: PendingHostRun -> unit
@@ -159,6 +144,7 @@ type HostForkRuntime =
     member OwnsPty: id: PtyId -> bool
     member AwaitObservedWork: unit -> Task<unit>
     member DrainOwnedWork: unit -> Task<unit>
+    member internal InjectPendingPersistFailure: unit -> unit
     member CloseOwnedPtys: ?graceMs: int -> Task<unit>
     member internal ClosePtyRun: work: AdmittedWork -> Task<unit>
 

@@ -212,7 +212,7 @@ const { default: test } = await import("node:test");
 const Strength = await import("../../../dist/Strength/Surface.js");
 
 const exactReadonly = ['Glob', 'Grep', 'Read']
-const allowedTools = ['read', 'glob', 'grep', 'js-predictor']
+const allowedTools = ['todowrite-for-predictor']
 
 // WHAT[004]: delegation changes the execution purpose, model target, visible
 // tools and short-term control. It never creates a second persona.
@@ -223,7 +223,7 @@ test('WHAT[speculative-investigation-004] STRENGTH_004_every_role_only_ever_rece
   for (const tool of allowedTools) {
     assert.equal(Strength.isAllowedTool(tool), true)
   }
-  for (const tool of ['Write', 'Edit', 'Bash', 'WebFetch', 'TodoWrite', 'Task', 'read_file', 'js-coder']) {
+  for (const tool of ['read', 'glob', 'grep', 'Write', 'Edit', 'Bash', 'WebFetch', 'TodoWrite', 'Task', 'read_file', 'js-coder']) {
     assert.equal(Strength.isAllowedTool(tool), false, `${tool} is not a readonly delegation tool`)
   }
 })
@@ -231,7 +231,7 @@ test('WHAT[speculative-investigation-004] STRENGTH_004_unknown_role_fails_closed
   assert.deepEqual(Strength.capabilities('Unknown'), [])
   assert.deepEqual(
     Strength.exactReadonlyHostToolMap.map((entry) => `${entry.tool}:${entry.allowed}`).sort(),
-    ['*:false', 'js-predictor:true'],
+    ['*:false', 'todowrite-for-predictor:true'],
     'the host gate denies everything by wildcard and allows exactly the single readonly JS surface',
   )
 })

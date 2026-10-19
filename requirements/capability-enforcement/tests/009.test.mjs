@@ -37,6 +37,8 @@ const { generateRole } = await import("../../../dist/Repository/Programming/Js/G
 const { allRoleLabels } = await import("../../../dist/Foundation/RolesSurface.js");
 const { LEGACY_FORBIDDEN_NAMES, extractKnownToolNames, scanEntries, scanRepo } = await import("../../../scripts/checks/tool-referential-integrity.mjs");
 
+const REPO_ROOT = new URL('../../..', import.meta.url).pathname
+
 const LEGACY_VERDICT = `
 module VerdictTool =
     let spec factory scope =
@@ -91,7 +93,7 @@ test('WHAT[capability-enforcement-009] gate_a_extract_known_tool_names', () => {
   assert.deepEqual(extractKnownToolNames(STATIC_TOOLS_SNIPPET), ['fork', 'resume', 'commission', 'join', 'horizon'])
 })
 test('WHAT[capability-enforcement-009] gate_a_repo_scan_is_green', () => {
-  const result = scanRepo()
+  const result = scanRepo(REPO_ROOT)
   assert.equal(result.ok, true, JSON.stringify(result.violations, null, 2))
 })
 }
@@ -113,8 +115,9 @@ test('WHAT[capability-enforcement-009] TOOLSPEC_review_and_finality_tools_have_o
 })
 test('WHAT[capability-enforcement-009] TOOLSPEC_unknown_tools_and_host_natives_fail_closed', () => {
   assert.equal(rolePredicate('nonexistent-tool', 'engineer'), false)
-  assert.equal(rolePredicate('read', 'engineer'), false)
-  assert.equal(rolePredicate('write', 'engineer'), false)
+  for (const retired of ['read', 'write', 'edit', 'glob', 'grep', 'mv', 'rm']) {
+    assert.equal(rolePredicate(retired, 'engineer'), false, `retired ${retired} must fail closed`)
+  }
   assert.equal(rolePredicate('skill', 'engineer'), false)
 })
 }

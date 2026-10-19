@@ -21,7 +21,7 @@ const mustOk = (result, label) => {
 const withRepo = (writerId, fn) => {
   const repo = mkdtempSync(join(tmpdir(), 'wxs-journal-'))
   execFileSync('git', ['init', '--quiet', repo])
-  const commonDir = join(repo, '.git')
+  const commonDir = join(repo, '.Herdchestra')
   return fn(commonDir)
     .finally(() => rmSync(repo, { recursive: true, force: true }))
 }
@@ -115,7 +115,7 @@ const journal = await import("../../../dist/Persistence/Journal/Surface.js");
 const withJournal = async (writerId, fn) => {
   const repo = mkdtempSync(join(tmpdir(), `wxs-journal-closure-${writerId}-`))
   execFileSync('git', ['init', '--quiet', repo])
-  const commonDir = join(repo, '.git')
+  const commonDir = join(repo, '.Herdchestra')
   const booted = await journal.JournalSurface_bootWithWriterId(commonDir, writerId, `rt-${writerId}`, 4242, '2026-04-01T00:00:00Z')
   assert.equal(booted.ok, true, JSON.stringify(booted.error))
   try {
@@ -243,7 +243,7 @@ test('WHAT[durable-events-012] closure_is_empty_for_a_fact_without_blob_fields',
     test(`WHAT[durable-events-012] actual Journal payload ${scenario} respects the original gate and preserves canonical history`, async t => {
       assert.equal(typeof journal.JournalSurface_writePayload, 'function')
       const root = realpathSync(mkdtempSync(join(tmpdir(), 'payload-lock-acquire-')))
-      const commonDir = join(root, '.git')
+      const commonDir = join(root, '.Herdchestra')
       const sourceWriterId = randomUUID()
       const measureWriter = randomUUID()
       const sourceFile = join(commonDir, 'wanxiangshu', 'events', `${sourceWriterId}-0000.ndjson`)

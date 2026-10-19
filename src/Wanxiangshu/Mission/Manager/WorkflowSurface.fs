@@ -45,3 +45,9 @@ module ManagerWorkflowSurface =
             (DispatchSurface.rootWorkspaceReader (box directory))
             (Some journal.Journal)
             context
+
+    /// Read-only probe over the successor-prompt predicate. It reads the fold the
+    /// dispatch reads and dispatches nothing, so the occasion is observable
+    /// without running the Manager loop.
+    let successorPromptContextOf (workspaceDirectory: string) (sessionId: string) : obj =
+        ManagerWorkflow.successorPromptContextOf workspaceDirectory sessionId

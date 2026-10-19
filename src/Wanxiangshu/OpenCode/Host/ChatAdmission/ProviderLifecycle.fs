@@ -12,8 +12,6 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Persona
-open Wanxiangshu.OpenCode.ProviderWireDecode
-open Wanxiangshu.OpenCode.ProviderWireCapture
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Persistence.Journal
 
@@ -72,8 +70,7 @@ module ProviderLifecycle =
                         OpenBloggerRequest.providerRequestKind request
                         |> Result.map Some
                         |> Result.mapError ProviderStartObservationError.BloggerRequestKindUnsupported
-                | None, Some(ProviderRequestKind.BloggerMain | ProviderRequestKind.BloggerSquash as established) ->
-                    return Some established
+                | None, Some(ProviderRequestKind.BloggerMain as established) -> return Some established
                 | None, None when execution.terminalDisposition.IsSome -> return None
                 | None, _ ->
                     return!
@@ -132,7 +129,7 @@ module ProviderLifecycle =
         (journal: AgentJournal option)
         (freezeAttemptPlan: SessionId -> PhysicalUserMessageId -> PendingAttemptPlan -> Result<unit, 'bindingError>)
         (projectionSessionIdOpt: string option)
-        (outObj: obj)
+        (physicalUserMessageId: PhysicalUserMessageId option)
         : Task<Result<unit, ProviderStartObservationError<'bindingError>>> =
         task {
             match projectionSessionIdOpt, journal with
@@ -140,12 +137,6 @@ module ProviderLifecycle =
             | Some _, None -> return Error ProviderStartObservationError.DurableJournalUnavailable
             | Some sessionText, Some durable ->
                 let sessionId = SessionId.create sessionText
-
-                let rawMessages =
-                    ProviderWireDecode.rawArray (ProviderWireDecode.readField outObj "messages")
-
-                let physicalUserMessageId = ProviderWireCapture.lastUserMessageId rawMessages
-
                 return freezePhysicalPlan durable freezeAttemptPlan sessionId physicalUserMessageId
         }
 

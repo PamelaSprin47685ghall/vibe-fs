@@ -4,16 +4,17 @@ open System
 open System.Threading.Tasks
 open Wanxiangshu.Foundation.Identity
 
-/// planning-022: one plan review either promotes the incumbency or keeps it
+/// work-038: one plan review either promotes the incumbency or keeps it
 /// in place.
 [<RequireQualifiedAccess>]
 type PlanReviewOutcome =
     | Promoted
     | Stayed
 
-/// planning-022: the outcome of one review gate on a plan incumbency.
+/// work-038: the outcome of one review gate on a plan incumbency.
 type PlanReviewResult =
     { Outcome: PlanReviewOutcome
+      Target: string
       Gaps: (string * string) list }
 
 [<RequireQualifiedAccess>]
@@ -50,7 +51,7 @@ module ReviewPlanBackend =
         else
             PlanReviewOutcome.Stayed
 
-    // planning-022: each incumbency reviews exactly once. The kernel refuses a
+    // work-038: each incumbency reviews exactly once. The kernel refuses a
     // second review for the same tenure; that refusal is the already-reviewed
     // error, not a record failure.
     /// The reviewer is never the incumbency owner. A plan work opens with the
@@ -58,34 +59,45 @@ module ReviewPlanBackend =
     [<Literal>]
     let private ReviewerId = "plan-reviewer"
 
-    let private activeIdResult (activeId: string option) (incumbencyId: string) : Result<unit, PlanReviewError> =
-        match activeId with
+    let private activeStageResult
+        (active: (string * string) option)
+        (incumbencyId: string)
+        : Result<string, PlanReviewError> =
+        match active with
         | None -> Error PlanReviewError.NoActiveIncumbency
-        | Some active when active <> incumbencyId -> Error(PlanReviewError.IncumbencyMismatch(active, incumbencyId))
-        | Some _ -> Ok()
+        | Some(activeId, _) when activeId <> incumbencyId ->
+            Error(PlanReviewError.IncumbencyMismatch(activeId, incumbencyId))
+        | Some(_, stage) -> Ok stage
 
     let private prepareReview
         (gitCommonDir: string)
         (workId: string)
         (incumbencyId: string)
-        : Result<unit, PlanReviewError> =
+        : Result<string, PlanReviewError> =
         if String.IsNullOrWhiteSpace gitCommonDir then
             Error(PlanReviewError.RecordFailed "git common directory is missing")
         else
-            let activeId =
+            let active =
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir workId
-                |> Option.bind (fun work -> work.ActiveId)
+                |> Option.bind (fun work -> work.ActiveId |> Option.map (fun id -> id, work.Stage))
 
-            activeIdResult activeId incumbencyId
+            activeStageResult active incumbencyId
 
     let private executePreparedReview
         (gitCommonDir: string)
         (workId: string)
         (incumbencyId: string)
+        (stageBeforeReview: string)
         (gaps: (string * string) list)
         : Task<Result<PlanReviewResult, PlanReviewError>> =
         task {
             let outcome = reviewOutcome gaps
+
+            let target =
+                if outcome = PlanReviewOutcome.Promoted then
+                    reviewTargetFor stageBeforeReview
+                else
+                    stageBeforeReview
 
             let findings =
                 gaps
@@ -114,7 +126,11 @@ module ReviewPlanBackend =
             then
                 return Error(PlanReviewError.AlreadyReviewed incumbencyId)
             elif receipt.Status = "Committed" || receipt.Status = "Replayed" then
-                return Ok { Outcome = outcome; Gaps = gaps }
+                return
+                    Ok
+                        { Outcome = outcome
+                          Target = target
+                          Gaps = gaps }
             else
                 return
                     Error(
@@ -136,5 +152,6 @@ module ReviewPlanBackend =
         task {
             match prepareReview gitCommonDir workId incumbencyId with
             | Error error -> return Error error
-            | Ok() -> return! executePreparedReview gitCommonDir workId incumbencyId gaps
+            | Ok stageBeforeReview ->
+                return! executePreparedReview gitCommonDir workId incumbencyId stageBeforeReview gaps
         }

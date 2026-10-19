@@ -289,31 +289,12 @@ test('WHAT[context-compression-018] C0_first_request_does_not_extract_raw_user_t
     'first request still extracts TOML from raw user messages; must project from typed context only',
   )
 })
-test('WHAT[context-compression-018] C0_squash_path_does_not_SubscribeTerminal', () => {
+test('WHAT[context-compression-018] C0_blogger_path_does_not_SubscribeTerminal', () => {
   const blogger = prodText('src/Wanxiangshu/Context/Companion/HostBlogger.fs')
   assert.equal(
     /SubscribeTerminal/.test(blogger),
     false,
-    'Squash still waits on SubscribeTerminal; must share blog-tool continuation with Normal',
-  )
-})
-test('WHAT[context-compression-018] C0_squash_constructs_typed_BloggerRequestContext_Squash_in_production', () => {
-  // Domain type + match arms exist; production must CONSTRUCT Squash context for send/commit.
-  // W6 cutover: the constructor is `BloggerRequestMaterial.createSquash` piped
-  // into `BloggerRequestContext.Squash` — the squash payload is validated inline,
-  // never built from a positional record. Pattern-match alone doesn't count.
-  const constructors = prodFiles.filter((file) => {
-    const text = readFileSync(file, 'utf8')
-    return (
-      /Result\.map\s+BloggerRequestContext\.Squash/.test(text)
-      || /Ok\s+verified\s*->\s*BloggerRequestContext\.Squash\s+verified/.test(text)
-      || /BloggerRequestContext\.Squash\(.*createSquash/.test(text)
-      || /createSquash[\s\S]{0,200}BloggerRequestContext\.Squash/.test(text)
-    )
-  }).map(rel)
-  assert.ok(
-    constructors.length > 0,
-    'no production construction of BloggerRequestContext.Squash via createSquash — typed squash context is domain-only',
+    'Blogger must not wait on SubscribeTerminal; it uses the blog-tool continuation',
   )
 })
 test('WHAT[context-compression-018] C0_park_only_after_KnownCommitted', () => {
@@ -330,7 +311,7 @@ test('WHAT[context-compression-018] C0_park_only_after_KnownCommitted', () => {
   // is the wrong probe.
   assert.match(
     host,
-    /CycleDisposition\.Committed afterSquashMain -> finishCommitted/,
+    /CycleDisposition\.Committed -> finishCommitted/,
     'Committed arm must enter finishCommitted',
   )
   assert.match(
@@ -338,7 +319,7 @@ test('WHAT[context-compression-018] C0_park_only_after_KnownCommitted', () => {
     /let! refreshed = ctx\.RefreshMainContext[\s\S]{0,180}return! catchUpAfterCommitMaterial/,
     'finishCommitted refreshes durable coverage before park',
   )
-  assert.match(host, /None, None -> return! finishCaughtUpAfterCommit/)
+  assert.match(host, /\| None -> return! finishCaughtUpAfterCommit/)
   assert.match(host, /return! parkAfterCatchUpClear/)
   const parkFn = host.indexOf('let private parkAfterCatchUpClear')
   const park = host.indexOf('ParkTransform', parkFn)
@@ -392,7 +373,7 @@ test('WHAT[context-compression-018] C0_commit_refreshes_durable_coverage_before_
 })
 test('WHAT[context-compression-018] C0_caught_up_is_parked_not_completed_and_wake_rechecks_live_Current', () => {
   const host = prodText('src/Wanxiangshu/Enforcer/Continuation.fs')
-  const quiet = host.indexOf('| None, None -> return! finishCaughtUpAfterCommit')
+  const quiet = host.indexOf('| None -> return! finishCaughtUpAfterCommit')
   const parkFn = host.indexOf('let private parkAfterCatchUpClear')
   const park = host.indexOf('ParkTransform', parkFn)
   const wakeFn = host.indexOf('let private afterParkResumed')
@@ -690,7 +671,7 @@ test('WHAT[context-compression-018] COMPANION_018_first_turn_shape_is_false_when
     kind: proj.normal,
     frames: [],
     delta: { messageId: 'msg_d', items: dataItems },
-    previousTips: [{ field: 'primitive-obsession', cycleId: 'c1' }],
+    previousTips: [{ tipName: 'primitive-obsession', cycleId: 'c1' }],
   })
   assert.equal(withTip.isFirstTurnShape, false)
 })
@@ -722,11 +703,6 @@ const stopReason = (reason) => {
   return reason
 }
 
-test('WHAT[context-compression-018] ENFORCER_same_run_after_squash_rejected_as_known_not_committed', () => {
-  const committedRuns = new Set(['run-squash'])
-  assert.equal(committedRuns.has('run-squash'), true)
-  assert.equal(stopReason('idempotent-receipt-catch-up-complete'), 'idempotent-receipt-catch-up-complete')
-})
 test('WHAT[context-compression-018] ENFORCER_open_without_promptkey_binding_is_unexpected_end', () => {
   const scope = runtime.scope()
   assert.equal(runtime.claimCurrentRequest(scope, 'ses-blog', runtime.main({ toml: 'open' })), 'Claimed')
@@ -974,16 +950,6 @@ const mainJson = (overrides = {}) => ({
   observedEpoch: 0,
   ...overrides,
 })
-const squashJson = (overrides = {}) => ({
-  requestId: 'req-squash',
-  mainSession: 'ses-main',
-  bloggerSession: 'ses-blog',
-  frameEpoch: 0,
-  observedEpoch: 0,
-  coveredFrameCount: 2,
-  digests: ['sha-a', 'sha-b'],
-  ...overrides,
-})
 const oneFrame = () => {
   const result = frames.applyEntry({
     epoch: 0,
@@ -1005,12 +971,6 @@ test('WHAT[context-compression-018] ENFORCER_reload_main_context_from_open_mater
   assert.equal(m.nextIngested, 1)
   assert.equal(m.previousCutoff, 0)
   assert.equal(m.nextCutoff, 1)
-})
-test('WHAT[context-compression-018] ENFORCER_reload_squash_context_from_open_materialization', () => {
-  const s = runtime.squash(squashJson())
-  assert.equal(s.kind, 'Squash')
-  assert.equal(s.coveredFrameCount, 2)
-  assert.deepEqual(s.digests, ['sha-a', 'sha-b'])
 })
 test('WHAT[context-compression-018] ENFORCER_reload_defaults_when_blob_is_sparse', () => {
   const m = runtime.main({ kind: 'Main' })
@@ -1036,38 +996,6 @@ test('WHAT[context-compression-018] ENFORCER_resolve_cycle_prefers_live_request_
   const live = runtime.currentRequest(scope, 'ses-blog')
   assert.equal(live.toml, 'live-toml')
   assert.notEqual(runtime.currentRequest(scope, 'ses-blog'), null)
-  runtime.dispose(scope)
-})
-test('WHAT[context-compression-018] ENFORCER_squash_frame_count_beyond_existing_frames_abandons', () => {
-  const result = frames.applySquash({ previousEpoch: 0, nextEpoch: 1, count: 2, frame: frames.frame({ kind: 'Squash', digest: 'sha-s', ref: 'blob-s' }) }, oneFrame())
-  assert.equal(result.ok, false)
-})
-test('WHAT[context-compression-018] ENFORCER_squash_frame_epoch_mismatch_abandons', () => {
-  const result = frames.applySquash({ previousEpoch: 2, nextEpoch: 3, count: 1, frame: frames.frame({ kind: 'Squash', digest: 'sha-s', ref: 'blob-s' }) }, oneFrame())
-  assert.equal(result.ok, false)
-})
-test('WHAT[context-compression-018] ENFORCER_squash_frame_digests_mismatch_abandons', () => {
-  const source = readFileSync(
-    resolve(import.meta.dirname, '../../../src/Wanxiangshu/Enforcer/Cycle/Commit.fs'),
-    'utf8',
-  )
-  const start = source.indexOf('let private validateSquashFrames')
-  const end = source.indexOf('let private decideSquashLink', start)
-  assert.ok(start >= 0 && end > start, 'production squash admission validator must exist')
-  const validator = source.slice(start, end)
-  assert.match(validator, /let digests = selected \|> List\.map \(fun f -> f\.Digest\)/)
-  assert.match(validator, /elif digests <> squash\.FrameDigests then/)
-  assert.match(validator, /SquashAdmission\.Rejected "BlogObservationsSquashed frame digests mismatch"/)
-  assert.ok(
-    validator.indexOf('digests <> squash.FrameDigests') < validator.indexOf('SquashAdmission.Ready'),
-    'digest-list mismatch must reject before the squash is admitted',
-  )
-})
-test('WHAT[context-compression-018] ENFORCER_squash_other_blogger_session_abandons', () => {
-  const scope = runtime.scope()
-  runtime.claimCurrentRequest(scope, 'ses-other-blog', runtime.squash(squashJson({ bloggerSession: 'ses-other-blog' })))
-  assert.notEqual(runtime.currentRequest(scope, 'ses-other-blog'), null)
-  assert.equal(runtime.currentRequest(scope, 'ses-other-blog').kind, 'Squash')
   runtime.dispose(scope)
 })
 }

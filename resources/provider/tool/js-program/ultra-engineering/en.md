@@ -1,15 +1,30 @@
 class Js extends JsProgram {
-  async run() {
-    const refs = await this.grep(/\boldApi\b/, "{src,tests}/**/*.{js,ts}");
-    const paths = [...new Set(refs.matches.map(x => x.path))];
-    this.edit("src/api.js", [
-      { find: "const oldApi = buildApi();", put: "const newApi = buildApi();" },
-      { find: 'registry.register("oldApi", oldApi);', put: 'registry.register("newApi", newApi);' },
-      { find: "export { oldApi };", put: "export { newApi };" },
-    ]);
-    for (const path of paths.filter(path => path !== "src/api.js")) {
-      this.edit(path, { find: /\boldApi\b/, put: "newApi", all: true });
+  async walk(dir) {
+    const found = [];
+    for (const entry of await this.ls(dir)) {
+      const full = dir === "." ? entry : dir + "/" + entry;
+      if (entry.endsWith("/")) found.push(...await this.walk(full.slice(0, -1)));
+      else found.push(full);
     }
-    return { migrated: `oldApi → newApi`, referencesObserved: refs.matches.length };
+    return found;
+  }
+  async run() {
+    const paths = (await this.walk("src")).concat(await this.walk("tests"))
+      .filter((path) => path.endsWith(".js") || path.endsWith(".ts"));
+    let rewritten = 0;
+    for (const path of paths) {
+      const text = await this.cat(path);
+      const spans = this.whereAll(text, "oldApi");
+      if (spans.length === 0) continue;
+      let next = text;
+      for (const [begin, end] of [...spans].reverse()) {
+        next = next.slice(0, begin) + "newApi" + next.slice(end);
+      }
+      this.write(path, next);
+      rewritten += spans.length;
+    }
+    const api = await this.cat("src/api.js");
+    const [registryAt] = await this.where(api, 'registry.register("oldApi", oldApi);');
+    return { migrated: "oldApi -> newApi", rewritten, registryAt };
   }
 }

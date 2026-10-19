@@ -2,10 +2,13 @@ namespace Wanxiangshu.Repository.Programming.Js.OpenCode
 
 open System.Threading.Tasks
 open Fable.Core
+open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Foundation
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Process
+open Wanxiangshu.Participant.Provider
+open Wanxiangshu.OpenCode
 
 /// Parse the sandbox JSON string into LlmFacing reference data and enforce JS-010.
 module JsToolsData =
@@ -28,102 +31,116 @@ module JsToolsData =
     [<Emit("$0.length")>]
     let private jsLength (value: obj) : int = jsNative
 
-    [<Emit("Number.isInteger($0)")>]
-    let private jsIsInteger (value: obj) : bool = jsNative
-
     [<Emit("Number.isFinite($0)")>]
     let private jsIsFinite (value: obj) : bool = jsNative
 
-    let private maxSafeInteger = 9007199254740991.0
-
-    let rec private isPrimitiveTree (value: LlmFacing.Data.Value) =
-        match value with
-        | LlmFacing.Data.Value.Bool _
-        | LlmFacing.Data.Value.Integer _
-        | LlmFacing.Data.Value.Float _
-        | LlmFacing.Data.Value.String _ -> true
-        | LlmFacing.Data.Value.Array items -> List.forall isPrimitiveTree items
-        | LlmFacing.Data.Value.Null
-        | LlmFacing.Data.Value.Object _ -> false
-
-    let private validateArray (items: LlmFacing.Data.Value list) : Result<unit, JsFailure> =
-        if
-            items
-            |> List.exists (function
-                | LlmFacing.Data.Value.Null -> true
-                | _ -> false)
-        then
-            Error JsFailure.InvalidReturnValue
-        elif List.isEmpty items then
-            Ok()
-        elif
-            items
-            |> List.forall (function
-                | LlmFacing.Data.Value.Object _ -> true
-                | _ -> false)
-        then
-            Ok()
-        elif List.forall isPrimitiveTree items then
-            Ok()
-        else
-            Error JsFailure.InvalidReturnValue
-
-    let private ofJsNumber (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
-        if not (jsIsFinite value) then
-            Error JsFailure.InvalidReturnValue
-        elif not (jsIsInteger value) then
-            Ok(LlmFacing.Data.Value.Float(unbox value))
-        elif abs (unbox<float> value) <= maxSafeInteger then
-            Ok(LlmFacing.Data.Value.Integer(int64 (unbox<float> value)))
-        else
-            Ok(LlmFacing.Data.Value.Float(unbox<float> value))
-
-    let rec private ofJsValue (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
+    /// JS-010: a returned or delivered value is JSON-compatible — null, boolean,
+    /// finite number, string, or an array/object of such values. An array holds
+    /// no null element and is either all objects or one primitive tree.
+    /// Validation stays on the native value; only the rendering boundary
+    /// converts it into `LlmFacing.Data.Value` (that conversion cannot fail,
+    /// so it must not run before the value is accepted).
+    let rec private validateJsValue (value: obj) : Result<unit, JsFailure> =
         let ty = jsType value
 
-        if jsNull value then
-            Ok LlmFacing.Data.Value.Null
-        elif ty = "boolean" then
-            Ok(LlmFacing.Data.Value.Bool(unbox value))
-        elif ty = "string" then
-            Ok(LlmFacing.Data.Value.String(unbox value))
-        elif ty = "number" then
-            ofJsNumber value
-        elif jsIsArray value then
-            ofJsArray value
-        elif ty = "object" then
-            ofJsObject value
+        if jsNull value then Ok()
+        elif ty = "boolean" || ty = "string" then Ok()
+        elif ty = "number" then validateJsNumber value
+        elif jsIsArray value then validateJsArray value
+        elif ty = "object" then validateJsObject value
+        else Error JsFailure.InvalidReturnValue
+
+    and isPlainObject (value: obj) : bool =
+        not (jsNull value) && jsType value = "object" && not (jsIsArray value)
+
+    and validateJsNumber (value: obj) : Result<unit, JsFailure> =
+        if jsIsFinite value then
+            Ok()
         else
             Error JsFailure.InvalidReturnValue
 
-    and ofJsArray (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
-        result {
-            let! items =
-                [ 0 .. jsLength value - 1 ]
-                |> List.traverseResultM (fun index -> ofJsValue (jsGet value index))
+    and isPrimitiveTreeValue (value: obj) : bool =
+        let ty = jsType value
 
-            do! validateArray items
-            return LlmFacing.Data.Value.Array items
-        }
+        if ty = "boolean" || ty = "string" then
+            true
+        elif ty = "number" then
+            jsIsFinite value
+        elif jsIsArray value then
+            [ 0 .. jsLength value - 1 ]
+            |> List.forall (fun index -> isPrimitiveTreeValue (jsGet value index))
+        else
+            false
 
-    and ofJsObject (value: obj) : Result<LlmFacing.Data.Value, JsFailure> =
-        result {
-            let keys = jsKeys value
+    and validateAll (values: obj list) : Result<unit, JsFailure> =
+        match values with
+        | [] -> Ok()
+        | value :: rest -> validateJsValue value |> Result.bind (fun () -> validateAll rest)
 
-            let! fields =
-                [ 0 .. keys.Length - 1 ]
-                |> List.traverseResultM (fun index ->
-                    ofJsValue (jsGet value keys.[index])
-                    |> Result.map (fun item -> keys.[index], item))
+    and validateJsArray (value: obj) : Result<unit, JsFailure> =
+        let items = [ 0 .. jsLength value - 1 ] |> List.map (fun index -> jsGet value index)
 
-            return LlmFacing.Data.Value.Object fields
-        }
+        validateAll items
+        |> Result.bind (fun () ->
+            if List.isEmpty items then
+                Ok()
+            elif List.exists jsNull items then
+                Error JsFailure.InvalidReturnValue
+            elif List.forall isPlainObject items then
+                Ok()
+            elif List.forall isPrimitiveTreeValue items then
+                Ok()
+            else
+                Error JsFailure.InvalidReturnValue)
 
-    let parse (json: string) : Result<LlmFacing.Data.Value, JsFailure> =
+    and validateJsObject (value: obj) : Result<unit, JsFailure> =
+        let keys = jsKeys value
+
+        [ 0 .. keys.Length - 1 ]
+        |> List.map (fun index -> jsGet value keys.[index])
+        |> validateAll
+
+    let private validateParsed (value: obj) : Result<obj, JsFailure> =
+        validateJsValue value |> Result.map (fun () -> value)
+
+    let parse (json: string) : Result<obj, JsFailure> =
         try
-            ofJsValue (JS.JSON.parse json)
+            validateParsed (JS.JSON.parse json)
         with _ ->
             Error JsFailure.InvalidReturnValue
+
+    /// `js.deliver(value)` ends the program with an explicit terminal value;
+    /// the sandbox reports it as this sentinel instead of a return value.
+    let private deliveredPrefix = "{\"__jsDelivered\":"
+
+    let isDelivered (json: string) = json.StartsWith deliveredPrefix
+
+    let private parseDelivered (json: string) : Result<obj, JsFailure> =
+        try
+            validateParsed ((JS.JSON.parse json)?value)
+        with _ ->
+            Error JsFailure.InvalidReturnValue
+
+    /// The raw JS value a program handed over through `js.deliver(value)`.
+    let parseDeliveredValue (json: string) : obj =
+        try
+            (JS.JSON.parse json)?value
+        with _ ->
+            null
+
+    /// One decode for both endings: a delivered value is the program's result.
+    let parseOutcome (json: string) : Result<obj, JsFailure> =
+        if isDelivered json then parseDelivered json else parse json
+
+    /// Extract the payload from a parked sentinel JSON string. The sentinel is
+    /// produced by the park signal path; its payload is the value the program
+    /// passed to `await js.park(payload)`.
+    let parseParkedPayload (json: string) : obj =
+        try
+            let payload = JS.JSON.parse json
+            jsGet payload "payload"
+        with _ ->
+            null
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
 /// sandbox execution, staging, preflight, durable prepare, commit and the
@@ -131,47 +148,89 @@ module JsToolsData =
 /// ephemeral (no durable facts — tests); with a store, the transaction is
 /// Prepared BEFORE any filesystem effect and Committed AFTER, so crash
 /// recovery can undo only what was provably written.
+
 module JsToolWorkflow =
+    type ProcessHost =
+        { HardLimit: System.TimeSpan
+          Own: (unit -> Task) -> bool
+          ReadOutput: unit -> Task<Result<unit, string>>
+          AttachLifetimeAbort: (unit -> unit) -> Task -> (unit -> unit)
+          AttachAbort: (unit -> unit) -> (unit -> unit) }
 
     type FileAccessObservation = JsExplicitFileRead list -> string list -> Task<unit>
 
+    let private outputNotice sessionId () =
+        ProviderProse.render
+            (ProviderLanguageBinding.forSessionText sessionId)
+            "tool/js-program/run-output-truncated"
+            Map.empty
+
     /// Outcome of one invocation: the program's structured value plus the
-    /// commit report — or a stable JsFailure.
+    /// commit report — or a stable JsFailure. `Parked` is the top-level parked
+    /// payload: the program suspended at `await js.park(payload)` and the site
+    /// is registered under `handle` (PLAN S2 step 4).
     type JsToolOutcome =
-        | Succeeded of value: LlmFacing.Data.Value * rewritten: string list * created: string list
-        | Failed of JsFailure
+        | Succeeded of
+            value: obj *
+            rewritten: string list *
+            created: string list *
+            removed: string list *
+            moved: (string * string) list
+        | Failed of
+            failure: JsFailure *
+            rewritten: string list *
+            created: string list *
+            removed: string list *
+            moved: (string * string) list
+        | Parked of handle: string * payload: obj * source: string
+
+    /// The park payload is created inside the sandbox realm; the host reads it
+    /// from ParkState across the vm boundary. A JSON round-trip detaches the
+    /// value from the vm prototypes so host-side consumers and semantic tests
+    /// compare it structurally as a plain host-realm object.
+    [<Emit("JSON.parse(JSON.stringify($0))")>]
+    let private hostRealmPayload (payload: obj) : obj = jsNative
+
+    [<Emit("typeof $0 === 'string'")>]
+    let private isStringValue (value: obj) : bool = jsNative
+
+    /// The park signal wins the race by settling the host-synthesized marker
+    /// string; the workflow reads it back as the parked marker rather than a
+    /// program result.
+    let private isParkedSentinel (value: obj) : bool =
+        isStringValue value && (unbox<string> value).StartsWith "{\"__jsParked\":"
 
     let private rewrittenPaths (mutations: JsStagedMutation list) =
         mutations
         |> List.choose (function
             | JsStagedMutation.Rewrite(path, _, _) -> Some path
-            | JsStagedMutation.Create _ -> None)
+            | JsStagedMutation.Create _
+            | JsStagedMutation.Remove _
+            | JsStagedMutation.Move _ -> None)
 
     let private createdPaths (mutations: JsStagedMutation list) =
         mutations
         |> List.choose (function
             | JsStagedMutation.Create(path, _) -> Some path
-            | JsStagedMutation.Rewrite _ -> None)
+            | JsStagedMutation.Rewrite _
+            | JsStagedMutation.Remove _
+            | JsStagedMutation.Move _ -> None)
 
-    let private readCurrentText (root: string) (path: string) : string option =
-        JsUtf8Fs.readUtf8Classified (JsMutationFs.resolveToolPath root path)
-        |> Result.toOption
+    let private removedPaths (mutations: JsStagedMutation list) =
+        mutations
+        |> List.choose (function
+            | JsStagedMutation.Remove(path) -> Some path
+            | JsStagedMutation.Rewrite _
+            | JsStagedMutation.Create _
+            | JsStagedMutation.Move _ -> None)
 
-    let private preflight root readSnapshots mutations =
-        let exists path =
-            JsMutationFs.existsPath (JsMutationFs.resolveToolPath root path)
-
-        JsTransaction.preflight exists (readCurrentText root) readSnapshots mutations
-
-    let private commitEphemeral
-        (root: string)
-        (mutations: JsStagedMutation list)
-        (value: LlmFacing.Data.Value)
-        : Result<LlmFacing.Data.Value * string list * string list, JsFailure> =
-        result {
-            do! JsMutationFs.commitPlan root (JsTransaction.commitPlan mutations)
-            return value, rewrittenPaths mutations, createdPaths mutations
-        }
+    let private movedPaths (mutations: JsStagedMutation list) =
+        mutations
+        |> List.choose (function
+            | JsStagedMutation.Move(fromPath, toPath) -> Some(fromPath, toPath)
+            | JsStagedMutation.Rewrite _
+            | JsStagedMutation.Create _
+            | JsStagedMutation.Remove _ -> None)
 
     let private mapPersistenceFailure
         (operation: Task<Result<'a, JsTransactionAppendFailure>>)
@@ -179,37 +238,35 @@ module JsToolWorkflow =
         operation
         |> TaskValue.map (Result.mapError JsFailure.TransactionPersistenceFailed)
 
-    let private commitDurable
-        (durable: IJsTransactionPersistence)
-        (root: string)
-        (readSnapshots: JsReadSnapshot list)
-        (mutations: JsStagedMutation list)
-        (value: LlmFacing.Data.Value)
-        (prepared: JsTransactionPrepared)
-        : Task<Result<LlmFacing.Data.Value * string list * string list, JsFailure>> =
-        taskResult {
-            let! _ = durable.AppendPrepared prepared |> mapPersistenceFailure
-            do! preflight root readSnapshots mutations
-            do! JsMutationFs.commitPlan root (JsTransaction.commitPlan mutations)
-            let! _ = durable.AppendCommitted prepared.TransactionId |> mapPersistenceFailure
-            return value, rewrittenPaths mutations, createdPaths mutations
+    /// Settle the H1 ledger the mutation members fired (PLAN algorithm H1):
+    /// await every Prepared/Committed append. The members fire Prepared at
+    /// call time (before the write lands) and Committed right after, at
+    /// per-mutation granularity with no aggregation; the physical EventStore
+    /// append chain settles within the same event-loop turn as the write. A
+    /// failed append fails the tool result with the stable
+    /// TRANSACTION_PREPARE_*/COMMIT_* codes while the landed as-is writes
+    /// stay reported, never rolled back ([013]).
+    let private recordFirstAppendFailure
+        (currentFailure: JsFailure option)
+        (appended: Result<'a, JsTransactionAppendFailure>)
+        =
+        match currentFailure, appended with
+        | None, Error failure -> Some(JsFailure.TransactionPersistenceFailed failure)
+        | _ -> currentFailure
+
+    let private settleLedger (ledger: JsAsIsLedger) : Task<Result<unit, JsFailure>> =
+        task {
+            // DSL-MUTABLE: algorithm-scratch — first append failure for the outcome
+            let mutable appendFailure = None
+
+            for pending in ledger.Appends do
+                let! appended = pending
+                appendFailure <- recordFirstAppendFailure appendFailure appended
+
+            match appendFailure with
+            | Some failure -> return Error failure
+            | None -> return Ok()
         }
-
-    let private commitMutations
-        (root: string)
-        (readSnapshots: JsReadSnapshot list)
-        (mutations: JsStagedMutation list)
-        (value: LlmFacing.Data.Value)
-        (persistence: IJsTransactionPersistence option)
-        : Task<Result<LlmFacing.Data.Value * string list * string list, JsFailure>> =
-        let prepared =
-            { TransactionId = JsTransactionId.generate ()
-              WorkspaceRoot = root
-              Mutations = JsTransactionFacts.ofStaged mutations }
-
-        match persistence with
-        | None -> commitEphemeral root mutations value |> Task.FromResult
-        | Some durable -> commitDurable durable root readSnapshots mutations value prepared
 
     let private invokeObservation observe readPaths effectPaths : Task<Result<unit, JsFailure>> =
         task {
@@ -230,6 +287,111 @@ module JsToolWorkflow =
         | None -> Task.FromResult(Ok())
         | Some observe -> invokeObservation observe readPaths effectPaths
 
+
+    let private checkReadOnlyMutation
+        (hasMutationCapability: bool)
+        (mutations: JsStagedMutation list)
+        : JsFailure option =
+        if not hasMutationCapability && not (List.isEmpty mutations) then
+            Some JsFailure.ReadOnlyMutationRejected
+        else
+            None
+
+    let private recordDeliveredValueIfNeeded sessionId (json: string) (parsed: Result<obj, JsFailure>) =
+        if JsToolsData.isDelivered json && Result.isOk parsed then
+            JsDeliveredValues.record sessionId (JsToolsData.parseDeliveredValue json)
+
+    let private decodeRunResult (sessionId: string) (decoded: Result<string, JsFailure>) =
+        match decoded with
+        | Error failure -> Error failure
+        | Ok json ->
+            let parsed = JsToolsData.parseOutcome json
+            recordDeliveredValueIfNeeded sessionId json parsed
+            parsed
+
+    let private settleExecutionOutcome
+        (observation: Result<unit, JsFailure>)
+        (ledgerOutcome: Result<unit, JsFailure>)
+        (value: obj)
+        (rewritten: string list)
+        (created: string list)
+        (removed: string list)
+        (moved: (string * string) list)
+        : JsToolOutcome =
+        match observation, ledgerOutcome with
+        | Error failure, _ -> Failed(failure, rewritten, created, removed, moved)
+        | _, Error failure -> Failed(failure, rewritten, created, removed, moved)
+        | Ok(), Ok() -> Succeeded(value, rewritten, created, removed, moved)
+
+    /// Best-effort lifecycle audit trace. A failed audit never fails the tool
+    /// call: the parked site is process-live and the audit is only a trace.
+    let private recordLifecycle
+        (lifecyclePersistence: IJsLifecyclePersistence option)
+        (eventType: JsLifecycleEventType)
+        (handle: string)
+        (sessionId: string)
+        : unit =
+        match lifecyclePersistence with
+        | None -> ()
+        | Some durable ->
+            let event: JsLifecycleEvent =
+                { EventType = eventType
+                  Handle = handle
+                  SessionId = sessionId
+                  At = System.DateTimeOffset.UtcNow.ToString("o") }
+
+            task {
+                let! _ = durable.AppendLifecycleEvent event
+                return ()
+            }
+            |> ignore
+
+    let private registerParkedSite
+        (site: JsParkedSites.JsParkedSite)
+        (lifecyclePersistence: IJsLifecyclePersistence option)
+        (baseClassSource: string)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
+        (rewritten: string list)
+        (created: string list)
+        (removed: string list)
+        (moved: (string * string) list)
+        : JsToolOutcome =
+        match JsParkedSites.register site with
+        | Error failure ->
+            site.Cancellation.Cancel()
+            JsSandbox.abandon parkState
+            Failed(failure, rewritten, created, removed, moved)
+        | Ok _ ->
+            recordLifecycle lifecyclePersistence JsLifecycleEventType.Parked site.Handle site.SessionId
+
+            let source =
+                JsSandbox.sourceWithExecutionMarker baseClassSource site.ModelSource parkState.ParkStack
+
+            Parked(site.Handle, hostRealmPayload parkState.ParkPayload, source)
+
+    let private registerResumedParkedSite
+        (newSite: JsParkedSites.JsParkedSite)
+        (baseClassSource: string)
+        : JsToolOutcome =
+        match JsParkedSites.register newSite with
+        | Error failure ->
+            newSite.Cancellation.Cancel()
+            JsSandbox.abandon newSite.RunHandle.ParkState
+            Failed(failure, [], [], [], [])
+        | Ok _ ->
+            let source =
+                JsSandbox.sourceWithExecutionMarker
+                    baseClassSource
+                    newSite.ModelSource
+                    newSite.RunHandle.ParkState.ParkStack
+
+            Parked(newSite.Handle, hostRealmPayload newSite.RunHandle.ParkState.ParkPayload, source)
+
+    let private settleResumedExecutionOutcome (ledgerOutcome: Result<unit, JsFailure>) (value: obj) : JsToolOutcome =
+        match ledgerOutcome with
+        | Error failure -> Failed(failure, [], [], [], [])
+        | Ok() -> Succeeded(value, [], [], [], [])
+
     /// Run a model program against root. `baseClassSource` is the generated
     /// JsProgram (JS-002); `modelSource` is the model's `class Js ... run()`.
     /// deadlineMs bounds the sandbox; outputBoundBytes bounds the result.
@@ -247,47 +409,79 @@ module JsToolWorkflow =
         (fileAccessObservation: FileAccessObservation option)
         : Task<JsToolOutcome> =
         task {
+            // DSL-MUTABLE: algorithm-scratch — JS as-is write ledger. Every
+            // edit/write is persisted atomically at call time; this buffer
+            // records what was actually written, so any termination (throw,
+            // timeout, output bound) keeps the already-applied mutations
+            // observable and on disk.
+            let staging = ResizeArray<JsStagedMutation>()
+            let readSnapshots = ResizeArray<JsReadSnapshot>()
+            let explicitReads = ResizeArray<JsExplicitFileRead>()
+            let ledger = JsToolsBindings.createLedger persistence
+
             let! outcome =
                 taskResult {
-                    // DSL-MUTABLE: algorithm-scratch — JS mutation staging accumulator
-                    let staging = ResizeArray<JsStagedMutation>()
-                    let readSnapshots = ResizeArray<JsReadSnapshot>()
-                    let explicitReads = ResizeArray<JsExplicitFileRead>()
+                    let runHost: JsToolsBindings.JsRunHost =
+                        { Loop =
+                            fun parkState runnableClass stack ->
+                                JsRunLoop.execute
+                                    { JsRunLoop.standalone with
+                                        OutputNotice = outputNotice ""
+                                        SynchronousBudgetMs = deadlineMs }
+                                    parkState
+                                    root
+                                    runnableClass
+                                    stack }
 
                     let api =
-                        JsToolsBindings.createApi capabilities root staging readSnapshots explicitReads
+                        JsToolsBindings.createApi
+                            capabilities
+                            root
+                            staging
+                            readSnapshots
+                            explicitReads
+                            ledger
+                            (Some runHost)
+                            None
 
                     let! resultJson =
-                        JsSandbox.runSurface baseClassSource modelSource api deadlineMs deadlineEpochMs outputBoundBytes
+                        task {
+                            let! handle =
+                                JsSandbox.runSurface baseClassSource modelSource api deadlineMs deadlineEpochMs
 
-                    let! value = JsToolsData.parse resultJson
-                    let mutations = staging |> Seq.toList
-                    let snapshots = readSnapshots |> Seq.toList
-                    let readPaths = explicitReads |> Seq.distinct |> Seq.toList
-                    let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
+                            return! JsSandbox.awaitResult handle outputBoundBytes
+                        }
 
-                    let hasMutationCapability =
-                        Set.contains JsCapability.Edit capabilities
-                        || Set.contains JsCapability.Write capabilities
-
-                    let commitIfNotEmpty () =
-                        if List.isEmpty mutations then
-                            Task.FromResult(Ok(value, [], []))
-                        else
-                            commitMutations root snapshots mutations value persistence
-
-                    if not hasMutationCapability && not (List.isEmpty mutations) then
-                        return! Error JsFailure.ReadOnlyMutationRejected
-                    else
-                        do! preflight root snapshots mutations
-                        do! observeFileAccess fileAccessObservation readPaths effectPaths
-                        do! preflight root snapshots mutations
-                        return! commitIfNotEmpty ()
+                    let! value = JsToolsData.parseOutcome resultJson
+                    return value
                 }
 
+            let mutations = staging |> Seq.toList
+            let rewritten = rewrittenPaths mutations
+            let created = createdPaths mutations
+            let removed = removedPaths mutations
+            let moved = movedPaths mutations
+            let readPaths = explicitReads |> Seq.distinct |> Seq.toList
+            let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
+
+            let hasMutationCapability =
+                Set.contains JsCapability.Edit capabilities
+                || Set.contains JsCapability.Write capabilities
+                || Set.contains JsCapability.Remove capabilities
+                || Set.contains JsCapability.Move capabilities
+
+            let! ledgerOutcome = settleLedger ledger
+
             match outcome with
-            | Ok(value, rewritten, created) -> return Succeeded(value, rewritten, created)
-            | Error failure -> return Failed failure
+            | Error failure ->
+                // Program execution or return-value parsing failed; the writes
+                // that already landed stay on disk and are reported as-is.
+                return Failed(failure, rewritten, created, removed, moved)
+            | Ok _ when (checkReadOnlyMutation hasMutationCapability mutations).IsSome ->
+                return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
+            | Ok value ->
+                let! observation = observeFileAccess fileAccessObservation readPaths effectPaths
+                return settleExecutionOutcome observation ledgerOutcome value rewritten created removed moved
         }
 
     let run
@@ -333,23 +527,572 @@ module JsToolWorkflow =
             persistence
             (Some fileAccessObservation)
 
+    /// Run a new program with park support. `sessionId` tags the site so
+    /// session close can reap it. The park signal is installed before the
+    /// program starts; if the program suspends at `await js.park(payload)` the
+    /// signal wins the race and the workflow registers the site. A successful
+    /// registration records the Parked lifecycle audit trace (best-effort).
+    /// The buffers one run owns; `makeApi` decides which members see them.
+    type private RunBuffers =
+        { Staging: ResizeArray<JsStagedMutation>
+          ReadSnapshots: ResizeArray<JsReadSnapshot>
+          ExplicitReads: ResizeArray<JsExplicitFileRead>
+          Ledger: JsAsIsLedger }
+
+    let private runProgramCore
+        (sessionId: string)
+        (capabilities: Set<JsCapability>)
+        (root: string)
+        (baseClassSource: string)
+        (modelSource: string)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        (persistence: IJsTransactionPersistence option)
+        (lifecyclePersistence: IJsLifecyclePersistence option)
+        (fileAccessObservation: FileAccessObservation option)
+        (processHost: ProcessHost option)
+        (makeApi: RunBuffers -> Wanxiangshu.Process.JsSandbox.ParkState -> JsRunLoop.ExecutionScope -> obj)
+        : Task<JsToolOutcome> =
+        task {
+            let cancellation = new System.Threading.CancellationTokenSource()
+            let runHandleReady = TaskCompletionSource<JsSandbox.JsRunHandle>()
+            let mutable abortHandle: JsSandbox.JsRunHandle option = None
+
+            let detachAbort =
+                processHost
+                |> Option.map (fun host -> host.AttachAbort cancellation.Cancel)
+                |> Option.defaultValue ignore
+
+            let execution: JsRunLoop.ExecutionScope =
+                { Cancellation = cancellation.Token
+                  HardLimit =
+                    processHost
+                    |> Option.map (fun host -> host.HardLimit)
+                    |> Option.defaultValue JsRunLoop.standalone.HardLimit
+                  SynchronousBudgetMs = deadlineMs
+                  OutputNotice = outputNotice sessionId
+                  ReadOutput =
+                    processHost
+                    |> Option.map (fun host -> host.ReadOutput)
+                    |> Option.defaultValue JsRunLoop.standalone.ReadOutput
+                  BorrowDeadline =
+                    fun duration ->
+                        task {
+                            let! handle = runHandleReady.Task
+                            return handle.BorrowDeadline duration
+                        }
+                  Own =
+                    processHost
+                    |> Option.map (fun host -> host.Own)
+                    |> Option.defaultValue JsRunLoop.standalone.Own }
+            // DSL-MUTABLE: algorithm-scratch — JS as-is write ledger. Every
+            // edit/write is persisted atomically at call time; this buffer
+            // records what was actually written, so any termination (throw,
+            // timeout, output bound, park) keeps the already-applied mutations
+            // observable and on disk.
+            let staging = ResizeArray<JsStagedMutation>()
+            let readSnapshots = ResizeArray<JsReadSnapshot>()
+            let explicitReads = ResizeArray<JsExplicitFileRead>()
+            let ledger = JsToolsBindings.createLedger persistence
+
+            let buffers: RunBuffers =
+                { Staging = staging
+                  ReadSnapshots = readSnapshots
+                  ExplicitReads = explicitReads
+                  Ledger = ledger }
+
+            // DSL-MUTABLE: resource — park lifecycle state shared by the api
+            // member and the workflow. Process-live, never durable.
+            let parkState: Wanxiangshu.Process.JsSandbox.ParkState =
+                { ParkRequested = false
+                  ParkPayload = null
+                  ParkSignalResolve = null
+                  ParkDeferredResolve = null
+                  ParkDeferredReject = null
+                  ParkStack = null
+                  AbandonRequested = false }
+
+            let programSettled = TaskCompletionSource<unit>()
+
+            let detachLifetime =
+                processHost
+                |> Option.map (fun host ->
+                    host.AttachLifetimeAbort
+                        (fun () ->
+                            abortHandle
+                            |> Option.iter (fun handle ->
+                                JsSandbox.resetDeadline
+                                    handle
+                                    (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                                     + int64 (max 1000 deadlineMs)))
+
+                            cancellation.Cancel()
+                            JsSandbox.abandon parkState)
+                        (programSettled.Task :> Task))
+                |> Option.defaultValue ignore
+
+            let api = makeApi buffers parkState execution
+
+            // Install the park signal the workflow races against the program
+            // promise before the program starts: the async IIFE body runs
+            // synchronously to its first await, so an immediate
+            // `await js.park(payload)` must already see ParkSignalResolve.
+            // Fable has no Task.WhenAny; Promise.race is the established
+            // pattern (Await.fs / FinalityController).
+            let parkSignal = JsSandbox.installParkSignal parkState
+
+            let! runHandle =
+                JsSandbox.runSurfaceWithPark baseClassSource modelSource api deadlineMs deadlineEpochMs (Some parkState)
+
+            abortHandle <- Some runHandle
+            runHandleReady.SetResult runHandle
+
+            let taggedProgram: Task<obj> =
+                task {
+                    try
+                        let! json = runHandle.ProgramPromise
+                        let! _ = settleLedger ledger
+                        return box (Choice1Of2 json)
+                    finally
+                        JsParkedSites.removeForState parkState
+                        detachLifetime ()
+                        cancellation.Cancel()
+                        cancellation.Dispose()
+                        programSettled.SetResult()
+                }
+
+            let taggedPark: Task<obj> =
+                task {
+                    let! payload = parkSignal
+                    return box (Choice2Of2 payload)
+                }
+
+            let! winnerObj = emitJsExpr (taggedProgram, taggedPark) "Promise.race([$0, $1])": Task<obj>
+            detachAbort ()
+
+            let outcome =
+                match unbox<Choice<string, obj>> winnerObj with
+                | Choice1Of2 json ->
+                    // The program finished first (Done, or a failure/timeout
+                    // sentinel). Decode it like the plain path.
+                    let parsed =
+                        JsSandbox.classifyResult json outputBoundBytes
+                        |> Result.bind JsToolsData.parseOutcome
+
+                    recordDeliveredValueIfNeeded sessionId json parsed
+                    parsed
+                | Choice2Of2 _ ->
+                    // Park won: the program suspended at `await js.park`.
+                    Ok(box "{\"__jsParked\":true}")
+
+            let mutations = staging |> Seq.toList
+            let rewritten = rewrittenPaths mutations
+            let created = createdPaths mutations
+            let removed = removedPaths mutations
+            let moved = movedPaths mutations
+            let readPaths = explicitReads |> Seq.distinct |> Seq.toList
+            let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
+
+            let hasMutationCapability =
+                Set.contains JsCapability.Edit capabilities
+                || Set.contains JsCapability.Write capabilities
+                || Set.contains JsCapability.Remove capabilities
+                || Set.contains JsCapability.Move capabilities
+
+            match outcome with
+            | Error failure ->
+                // The program failed after the race; drain the fired ledger
+                // (H1) so no append task is left unsettled. The program
+                // failure keeps the reported code; landed writes stay as-is.
+                let! _ = settleLedger ledger
+                return Failed(failure, rewritten, created, removed, moved)
+            | Ok parkedValue when isParkedSentinel parkedValue ->
+                // The program parked. Register the site under a fresh handle.
+                let handle = JsParkedSites.allocateHandle ()
+
+                let site: JsParkedSites.JsParkedSite =
+                    { Handle = handle
+                      RunHandle = runHandle
+                      ReadSnapshots = readSnapshots
+                      Ledger = ledger
+                      SessionId = sessionId
+                      Cancellation = cancellation
+                      ModelSource = modelSource }
+
+                return
+                    registerParkedSite
+                        site
+                        lifecyclePersistence
+                        baseClassSource
+                        parkState
+                        rewritten
+                        created
+                        removed
+                        moved
+            | Ok _ when (checkReadOnlyMutation hasMutationCapability mutations).IsSome ->
+                return Failed(JsFailure.ReadOnlyMutationRejected, rewritten, created, removed, moved)
+            | Ok value ->
+                let! observation = observeFileAccess fileAccessObservation readPaths effectPaths
+                let! ledgerOutcome = settleLedger ledger
+                return settleExecutionOutcome observation ledgerOutcome value rewritten created removed moved
+        }
+
+    /// The generated-surface api factory: bindings own the file members and
+    /// the host loop.
+    let private bindingsApiFactory
+        (sessionId: string)
+        (capabilities: Set<JsCapability>)
+        (root: string)
+        (buffers: RunBuffers)
+        (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
+        (execution: JsRunLoop.ExecutionScope)
+        : obj =
+        let runHost: JsToolsBindings.JsRunHost =
+            { Loop = fun parkState runnableClass stack -> JsRunLoop.execute execution parkState root runnableClass stack }
+
+        JsToolsBindings.createApiWithPark
+            capabilities
+            root
+            buffers.Staging
+            buffers.ReadSnapshots
+            buffers.ExplicitReads
+            buffers.Ledger
+            parkState
+            (Some runHost)
+            (JsDelegationBridge.hostFor sessionId)
+
+    let private runProgramWithPark
+        (sessionId: string)
+        (capabilities: Set<JsCapability>)
+        (root: string)
+        (baseClassSource: string)
+        (modelSource: string)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        (persistence: IJsTransactionPersistence option)
+        (lifecyclePersistence: IJsLifecyclePersistence option)
+        (fileAccessObservation: FileAccessObservation option)
+        (processHost: ProcessHost option)
+        : Task<JsToolOutcome> =
+        runProgramCore
+            sessionId
+            capabilities
+            root
+            baseClassSource
+            modelSource
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
+            processHost
+            (fun buffers parkState execution ->
+                bindingsApiFactory sessionId capabilities root buffers parkState execution)
+
+
+    /// Resume a parked site (algorithm E). `handle` must exist; the deferred
+    /// promise is resolved with `value`, the handle is removed (one-shot), and
+    /// the deadline is reset to now+10s. If the program parks again the result
+    /// is a new parked payload with a new handle.
+    let private unparkSite
+        (site: JsParkedSites.JsParkedSite)
+        (value: obj)
+        (baseClassSource: string)
+        (deadlineMs: int)
+        (outputBoundBytes: int)
+        : Task<JsToolOutcome> =
+        task {
+            Wanxiangshu.Process.JsSandbox.unpark site.RunHandle.ParkState value
+            JsParkedSites.remove site.Handle
+
+            // Reset the deadline to now+10s (algorithm E5).
+            let now = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            Wanxiangshu.Process.JsSandbox.resetDeadline site.RunHandle (now + int64 (max 1000 deadlineMs))
+
+            // Install a fresh park signal and race the program promise against
+            // it: the resumed program may park again (algorithm E5).
+            let parkSignal = JsSandbox.installParkSignal site.RunHandle.ParkState
+
+            let taggedProgram: Task<obj> =
+                task {
+                    let! json = site.RunHandle.ProgramPromise
+                    return box (Choice1Of2 json)
+                }
+
+            let taggedPark: Task<obj> =
+                task {
+                    let! payload = parkSignal
+                    return box (Choice2Of2 payload)
+                }
+
+            let! winnerObj = emitJsExpr (taggedProgram, taggedPark) "Promise.race([$0, $1])": Task<obj>
+
+            let outcome =
+                match unbox<Choice<string, obj>> winnerObj with
+                | Choice1Of2 _ ->
+                    task {
+                        let! decoded = JsSandbox.awaitResult site.RunHandle outputBoundBytes
+                        return decodeRunResult site.SessionId decoded
+                    }
+                | Choice2Of2 _ -> task { return Ok(box "{\"__jsParked\":true}") }
+
+            let! outcome = outcome
+
+            match outcome with
+            | Error failure ->
+                let! _ = settleLedger site.Ledger
+                return Failed(failure, [], [], [], [])
+            | Ok parkedValue when isParkedSentinel parkedValue ->
+                // The resumed program parked again: a new handle and a new
+                // parked payload (algorithm E5). The ledger stays with the
+                // site: it is settled when the resumed run finishes.
+                let newHandle = JsParkedSites.allocateHandle ()
+
+                let newSite: JsParkedSites.JsParkedSite =
+                    { Handle = newHandle
+                      RunHandle = site.RunHandle
+                      ReadSnapshots = site.ReadSnapshots
+                      Ledger = site.Ledger
+                      SessionId = site.SessionId
+                      Cancellation = site.Cancellation
+                      ModelSource = site.ModelSource }
+
+                return registerResumedParkedSite newSite baseClassSource
+            | Ok value ->
+                let! ledgerOutcome = settleLedger site.Ledger
+                return settleResumedExecutionOutcome ledgerOutcome value
+        }
+
+    /// Abandon a parked site (algorithm F): reject the deferred promise with
+    /// the `__jsAbandoned` marker so native try/finally runs, reset the
+    /// deadline to the 10s cleanup window, then await the program's settle.
+    /// The outcome is Abandoned (no value); the site is removed.
+    let private abandonSite
+        (site: JsParkedSites.JsParkedSite)
+        (deadlineMs: int)
+        (outputBoundBytes: int)
+        : Task<JsToolOutcome> =
+        task {
+            site.Cancellation.Cancel()
+            Wanxiangshu.Process.JsSandbox.abandon site.RunHandle.ParkState
+
+            // Reset the deadline to the 10s cleanup window (algorithm F2/F5).
+            let now = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            Wanxiangshu.Process.JsSandbox.resetDeadline site.RunHandle (now + int64 (max 1000 deadlineMs))
+
+            // Await the program's settle; the ABANDONED rejection unwinds the
+            // stack so finally blocks run. A timeout force-truncates (F5).
+            let! _ = JsSandbox.awaitResult site.RunHandle outputBoundBytes
+
+            // Drain the ledger the finalizer fired (H1): the Abandoned
+            // outcome is final regardless, so a failed append is only
+            // observed here, never escalated into a different code.
+            let! _ = settleLedger site.Ledger
+
+            JsParkedSites.remove site.Handle
+
+            return Failed(JsFailure.Abandoned, [], [], [], [])
+        }
+
+    /// Run a program whose api is supplied by the caller but whose park
+    /// lifecycle, race and outcome rendering stay workflow-owned. The plan
+    /// tenure sandbox uses this so `js.ask` suspends through the same site
+    /// table as the generated surfaces.
+    let runWithParkApi
+        (sessionId: string)
+        (baseClassSource: string)
+        (modelSource: string)
+        (makeApi: Wanxiangshu.Process.JsSandbox.ParkState -> obj)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        : Task<JsToolOutcome> =
+        runProgramCore
+            sessionId
+            Set.empty
+            ""
+            baseClassSource
+            modelSource
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            None
+            None
+            None
+            None
+            (fun _ parkState _ -> makeApi parkState)
+
+    /// Resume a parked site from any owning surface (generated or plan).
+    let resumeParked
+        (handle: string)
+        (value: obj)
+        (baseClassSource: string)
+        (deadlineMs: int)
+        (outputBoundBytes: int)
+        : Task<JsToolOutcome> =
+        match JsParkedSites.tryFind handle with
+        | None -> Task.FromResult(Failed(JsFailure.HandleUnknown handle, [], [], [], []))
+        | Some site -> unparkSite site value baseClassSource deadlineMs outputBoundBytes
+
+    /// Abandon a parked site from any owning surface.
+    let abandonParked (handle: string) (deadlineMs: int) (outputBoundBytes: int) : Task<JsToolOutcome> =
+        match JsParkedSites.tryFind handle with
+        | None -> Task.FromResult(Failed(JsFailure.HandleUnknown handle, [], [], [], []))
+        | Some site -> abandonSite site deadlineMs outputBoundBytes
+
+    [<RequireQualifiedAccess>]
+    type private ToolWorkflowInvocation =
+        | Program of source: string
+        | Unpark of handle: string * value: obj
+        | Abandon of handle: string
+        | Invalid
+
+    let private parseWorkflowInvocation (input: obj) : ToolWorkflowInvocation =
+        if isNull input then
+            ToolWorkflowInvocation.Invalid
+        elif not (isNull input?program) then
+            ToolWorkflowInvocation.Program(string input?program)
+        elif not (isNull input?unpark) then
+            let unpark = input?unpark
+            ToolWorkflowInvocation.Unpark(string (unpark?handle), unpark?value)
+        elif not (isNull input?abandon) then
+            ToolWorkflowInvocation.Abandon(string ((input?abandon)?handle))
+        else
+            ToolWorkflowInvocation.Invalid
+
+    let private resolveParkedSite (handle: string) : Result<JsParkedSites.JsParkedSite, JsFailure> =
+        match JsParkedSites.tryFind handle with
+        | Some site -> Ok site
+        | None -> Error(JsFailure.HandleUnknown handle)
+
+    let private dispatchResolvedParkedSite
+        (resolved: Result<JsParkedSites.JsParkedSite, JsFailure>)
+        (useSite: JsParkedSites.JsParkedSite -> Task<JsToolOutcome>)
+        : Task<JsToolOutcome> =
+        match resolved with
+        | Error failure -> Task.FromResult(Failed(failure, [], [], [], []))
+        | Ok site -> useSite site
+
+    /// Execute one js-* tool invocation under the three-state input protocol
+    /// (PLAN S2 step 5). The `input` object carries one of:
+    ///   { program: string }
+    ///   { unpark: { handle: string, value: obj } }
+    ///   { abandon: { handle: string } }
+    /// `sessionId` tags newly created parked sites so session close can reap
+    /// them. `lifecyclePersistence` records Parked/Unparked/Abandoned audit
+    /// traces (best-effort; a failed audit never fails the tool call); Reaped
+    /// is recorded by the session-close path (PluginSessionScope).
+    let execute
+        (sessionId: string)
+        (capabilities: Set<JsCapability>)
+        (root: string)
+        (baseClassSource: string)
+        (input: obj)
+        (deadlineMs: int)
+        (deadlineEpochMs: int64)
+        (outputBoundBytes: int)
+        (persistence: IJsTransactionPersistence option)
+        (lifecyclePersistence: IJsLifecyclePersistence option)
+        (fileAccessObservation: FileAccessObservation option)
+        (processHost: ProcessHost option)
+        : Task<JsToolOutcome> =
+        task {
+            let useParked (site: JsParkedSites.JsParkedSite) action =
+                task {
+                    let detach =
+                        processHost
+                        |> Option.map (fun host -> host.AttachAbort site.Cancellation.Cancel)
+                        |> Option.defaultValue ignore
+
+                    try
+                        return! action site
+                    finally
+                        detach ()
+                }
+
+            match parseWorkflowInvocation input with
+            | ToolWorkflowInvocation.Program programSource ->
+                return!
+                    runProgramWithPark
+                        sessionId
+                        capabilities
+                        root
+                        baseClassSource
+                        programSource
+                        deadlineMs
+                        deadlineEpochMs
+                        outputBoundBytes
+                        persistence
+                        lifecyclePersistence
+                        fileAccessObservation
+                        processHost
+            | ToolWorkflowInvocation.Unpark(handle, value) ->
+                return!
+                    dispatchResolvedParkedSite (resolveParkedSite handle) (fun site ->
+                        recordLifecycle lifecyclePersistence JsLifecycleEventType.Unparked handle sessionId
+
+                        useParked site (fun active ->
+                            unparkSite active value baseClassSource deadlineMs outputBoundBytes))
+            | ToolWorkflowInvocation.Abandon handle ->
+                return!
+                    dispatchResolvedParkedSite (resolveParkedSite handle) (fun site ->
+                        recordLifecycle lifecyclePersistence JsLifecycleEventType.Abandoned handle sessionId
+                        useParked site (fun active -> abandonSite active deadlineMs outputBoundBytes))
+            | ToolWorkflowInvocation.Invalid ->
+                return Failed(JsFailure.InvalidArgument "no program, unpark, or abandon input", [], [], [], [])
+        }
+
 /// JS-016: stable LLM-visible result shapes, rendered as Synthetic TOML
 /// (the only rendering owner; ARCH-010). Success is `# ok` plus data/fs;
 /// failure is `# failed` plus code/reason.
 module JsToolsResult =
 
+    let private failureFields =
+        function
+        | JsFailure.RunOutputBudgetTooSmall minimum -> [ LlmFacing.Data.int64Field "minimumOutputBudgetBytes" minimum ]
+        | _ -> []
+
     let render (outcome: JsToolWorkflow.JsToolOutcome) : string =
         match outcome with
-        | JsToolWorkflow.JsToolOutcome.Succeeded(value, rewritten, created) ->
+        | JsToolWorkflow.JsToolOutcome.Succeeded(value, rewritten, created, removed, moved) ->
             LlmFacing.instruction "ok"
             |> LlmFacing.withData (
-                LlmFacing.Data.structuredValue value
-                @ LlmFacing.Data.fileEffects rewritten created
+                LlmFacing.Data.structuredValue (LlmFacing.Data.ofJs value)
+                @ LlmFacing.Data.fileEffects rewritten created removed moved
             )
             |> LlmFacing.render
-        | JsToolWorkflow.JsToolOutcome.Failed failure ->
+        | JsToolWorkflow.JsToolOutcome.Failed(failure, rewritten, created, removed, moved) ->
+            let effects =
+                if
+                    List.isEmpty rewritten
+                    && List.isEmpty created
+                    && List.isEmpty removed
+                    && List.isEmpty moved
+                then
+                    []
+                else
+                    LlmFacing.Data.fileEffects rewritten created removed moved
+
             LlmFacing.instruction "failed"
-            |> LlmFacing.withData
+            |> LlmFacing.withData (
                 [ LlmFacing.Data.stringField "code" (JsFailure.code failure)
                   LlmFacing.Data.stringField "reason" (JsFailure.reason failure) ]
+                @ failureFields failure
+                @ effects
+            )
+            |> LlmFacing.render
+        | JsToolWorkflow.JsToolOutcome.Parked(handle, payload, source) ->
+            // Top-level parked payload (PLAN S2 step 4): the program suspended
+            // at `await js.park(payload)` and the site is registered under
+            // handle. The caller resumes with `{ unpark: { handle, value } }`
+            // or gives up with `{ abandon: { handle } }`.
+            LlmFacing.instruction "parked"
+            |> LlmFacing.withData (
+                [ LlmFacing.Data.stringField "handle" handle
+                  LlmFacing.Data.stringField "source" source ]
+                @ LlmFacing.Data.rootStructuredValue (LlmFacing.Data.ofJs payload)
+            )
             |> LlmFacing.render

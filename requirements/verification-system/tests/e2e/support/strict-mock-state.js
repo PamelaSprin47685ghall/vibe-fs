@@ -10,6 +10,8 @@ export function createState() {
   return {
     sessionBindings: new Map(), // diagnostic / canary routing only
     unexpected: [],
+    /** Requests the plugin stopped before it said anything (see StrictMockProvider). */
+    infrastructure: [],
     requests: [],
     responseCounter: 0,
     idCounter: 0,
@@ -23,6 +25,7 @@ export function createState() {
 export function resetState(state) {
   state.sessionBindings.clear();
   state.unexpected.length = 0;
+  state.infrastructure.length = 0;
   state.requests.length = 0;
   state.responseCounter = 0;
   state.stopped = false;

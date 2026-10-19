@@ -527,20 +527,6 @@ module ForkToolSurface =
             let sessionPort = ForkSessionPort(abortSession, existingChildIds)
             let sessions = sessionPort :> ISessionHostPort
 
-            let childWorkRecordForRun sessionId range providerRun =
-                LifecycleWorkRecordProjection.lifecycleWorkRecordBoundedForRun
-                    (Some journal)
-                    sessionId
-                    range
-                    providerRun
-
-            let workRecordCapability: DelegationWorkRecordCapability =
-                { ParentWorkRecord =
-                    fun sessionId -> LifecycleWorkRecordProjection.lifecycleWorkRecord (Some journal) sessionId true
-                  ParentWorkRecordBounded =
-                    fun sessionId range ->
-                        LifecycleWorkRecordProjection.lifecycleWorkRecordBounded (Some journal) sessionId range }
-
             let parentWorkRecord sessionId =
                 task {
                     match beforeWorkRecord with
@@ -569,9 +555,7 @@ module ForkToolSurface =
                     Some parentWorkRecord,
                     None,
                     None,
-                    cancelSignals,
-                    childWorkRecordForRun = childWorkRecordForRun,
-                    workRecordCapability = workRecordCapability
+                    cancelSignals
                 )
 
             scope.AttachCurrentProcessJoinMode "ready"
@@ -1037,10 +1021,57 @@ module ForkToolSurface =
         let spec = HorizonTool.spec horizonContext
         spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)
 
+    /// The same roster the prose `executeHorizon` renders, as raw data: the
+    /// session-bound language only feeds the fallback labels inside
+    /// `rosterReceipt`, which returns the JS envelope for `js.horizon()`.
+    let executeHorizonReceipt (value: obj) (owner: string) : Task<obj> =
+        let harness = unbox<ForkHarness> value
+        let context = managerContext harness owner
+
+        let horizonContext: HorizonTool.HorizonRuntimeContext =
+            { RuntimeFor = harness.Scope.RuntimeFor
+              LogicalOwnerFor = harness.Scope.LogicalOwnerFor
+              Journal = harness.Scope.Journal
+              EnsureWorkDevOpsBound = harness.Scope.EnsureWorkDevOpsBound }
+
+        HorizonTool.rosterReceipt
+            (Wanxiangshu.Participant.Provider.ProviderLanguage.externalName (
+                ProviderLanguageBinding.forSessionText context.SessionId
+            ))
+            horizonContext
+            context
+
     let executeJoin (value: obj) (owner: string) : Task<string> =
         let harness = unbox<ForkHarness> value
         let spec = JoinTool.spec harness.Scope
         spec.Execute (HostToolArguments(box {| |})) (managerContext harness owner)
+
+    let executeJoinReceipt (value: obj) (owner: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+            let! receipt = JoinTool.executeReceipt harness.Scope (managerContext harness owner)
+
+            return
+                match receipt with
+                | Error code -> box {| ok = false; code = code |}
+                | Ok records ->
+                    let toObj (record: JoinTool.JoinRecord) =
+                        createObj
+                            [ "name" ==> record.Name
+                              "agentId" ==> record.AgentId
+                              "role" ==> record.Role
+                              "status" ==> record.Status
+                              "workRecord" ==> record.WorkRecord ]
+
+                    createObj
+                        [ "ok" ==> true
+                          "records" ==> (records |> List.map toObj |> Array.ofList)
+                          "byName"
+                          ==> createObj [ for record in records -> record.Name ==> box (toObj record) ] ]
+        }
+
+    let recordDeliveredValue (sessionId: string) (deliveredValue: obj) : unit =
+        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record sessionId deliveredValue
 
     let settle (value: obj) (owner: string) (answer: string) (providerRun: string) : Task<bool> =
         task {
@@ -1053,6 +1084,13 @@ module ForkToolSurface =
                 | None -> return false
                 | Some root ->
                     do! captureCompletedTrace harness.Journal childId providerRun answer
+
+                    if
+                        isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value childId))
+                    then
+                        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record
+                            (SessionId.value childId)
+                            (box answer)
 
                     match harness.Scope.RuntimeFor(managerContext harness owner) with
                     | Error _ -> return false
@@ -1093,6 +1131,54 @@ module ForkToolSurface =
                             | Error _ -> return false
         }
 
+    let settleUndelivered (value: obj) (owner: string) (terminalText: string) (providerRun: string) : Task<bool> =
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match harness.Sessions.LatestChild with
+            | None -> return false
+            | Some childId ->
+                match harness.Sessions.LatestAuthorityRoot childId with
+                | None -> return false
+                | Some root ->
+                    do! captureTraceText harness.Journal childId providerRun terminalText
+                    Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.clear (SessionId.value childId)
+
+                    match harness.Scope.RuntimeFor(managerContext harness owner) with
+                    | Error _ -> return false
+                    | Ok runtime ->
+                        let agentRole =
+                            match
+                                runtime.List()
+                                |> fst
+                                |> List.tryFind (fun a ->
+                                    match runtime.TryChildSession a.AgentId with
+                                    | Some sid -> sid = childId
+                                    | None -> false)
+                            with
+                            | Some a -> a.Role
+                            | None ->
+                                if (SessionId.value childId).Contains("devops") then
+                                    Role.DevOps
+                                else
+                                    Role.Engineer
+
+                        harness.Sessions.Notify(
+                            childId,
+                            TerminalOutcome.Completed
+                                { SessionId = childId
+                                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create root
+                                  ProviderRun = ProviderRunIdentity.create providerRun
+                                  Role = agentRole
+                                  Directory = None
+                                  TerminalText = terminalText
+                                  TurnFormalText = terminalText }
+                        )
+
+                        do! runtime.AwaitObservedWork()
+                        return true
+        }
+
     let prepareTerminalDelivery (value: obj) (owner: string) (answer: string) (providerRun: string) =
         task {
             let harness = unbox<ForkHarness> value
@@ -1108,6 +1194,13 @@ module ForkToolSurface =
                 with
                 | Some binding, Some root ->
                     do! captureCompletedTrace harness.Journal childId providerRun answer
+
+                    if
+                        isNull (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek (SessionId.value childId))
+                    then
+                        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record
+                            (SessionId.value childId)
+                            (box answer)
 
                     return
                         fun () ->
@@ -1164,15 +1257,6 @@ module ForkToolSurface =
         |> HandleProjection.workRecords
         |> List.map workView
         |> List.toArray
-
-    let handoffSnapshot (value: obj) : obj array =
-        (AgentJournal.snapshot (unbox<ForkHarness> value).Journal)
-            .AgentProjections.DelegationCompletedHandoffs
-        |> Map.toArray
-        |> Array.map (fun (key, sequence) ->
-            box
-                {| key = key
-                   sequence = string sequence |})
 
     let coldWorkSnapshot (directory: string) (owner: string) : Task<obj array> =
         task {
@@ -1487,4 +1571,19 @@ module ForkToolSurface =
                 return! observe handle
             finally
                 handle.Dispose()
+        }
+
+    let injectPendingPersistFailure (value: obj) (owner: string) : Task<obj> =
+        task {
+            let harness = unbox<ForkHarness> value
+
+            match harness.Scope.RuntimeFor(managerContext harness owner) with
+            | Error error ->
+                return
+                    box
+                        {| ok = false
+                           error = sprintf "%A" error |}
+            | Ok runtime ->
+                runtime.InjectPendingPersistFailure()
+                return box {| ok = true |}
         }

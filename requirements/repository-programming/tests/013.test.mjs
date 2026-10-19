@@ -14,7 +14,7 @@ for (const phase of ['Prepared', 'Committed']) {
   for (const scenario of ['valid', 'malformed', 'malformed-release']) {
     test(`WHAT[repository-programming-013] JS ${phase} actual EventStore port ${scenario} bad-input defense settles bytes before semantic-cut fatal`, async t => {
       const root = mkdtempSync(join(tmpdir(), 'js-cut-boundary-'))
-      const commonDir = join(root, '.git')
+      const commonDir = root
       const writer = randomUUID()
       const env = { ...process.env }
       delete env.NODE_TEST_CONTEXT
@@ -87,7 +87,7 @@ const unwrap = (result) => {
   return result.value
 }
 
-test('WHAT[repository-programming-013] JS013_commitPlan_all_or_nothing', () => {
+test('WHAT[repository-programming-013] JS013_commitPlan_writes_every_planned_file', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
@@ -119,18 +119,19 @@ test('WHAT[repository-programming-013] JS013_commitPlan_aborts_before_write_when
     cleanup()
   }
 })
-test('WHAT[repository-programming-013] JS013_commitPlan_rolls_back_written_files_on_write_failure', () => {
+test('WHAT[repository-programming-013] JS013_commitPlan_restores_earlier_writes_on_write_failure', () => {
   const { dir, cleanup } = sandbox()
   try {
     writeFileSync(join(dir, 'a.txt'), 'oldA', 'utf8')
     // second target's parent directory does not exist → write fails → the
-    // already-written first file must be rolled back (all-or-nothing)
+    // already-written first file is restored by the commit plan (its own
+    // restore semantics, not the workflow's as-is path)
     const plan = [
       { kind: 'rewrite', path: 'a.txt', expectedCurrent: 'oldA', newText: 'newA' },
       { kind: 'create', path: 'x/y.txt', newText: 'nope' },
     ]
     assert.equal(codeOf(commitPlan(dir, plan)), 'TRANSACTION_COMMIT_FAILED')
-    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'oldA', 'first write rolled back')
+    assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'oldA', 'first write restored by the commit plan')
   } finally {
     cleanup()
   }
@@ -187,9 +188,7 @@ const sandbox = () => {
 }
 const localStore = () => {
   const owned = mkdtempSync(join(tmpdir(), 'wxs-workflow-events-'))
-  const commonDir = join(owned, '.git')
-  mkdirSync(commonDir, { recursive: true })
-  const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
+  const handle = createEventStore(owned, randomUUID().replaceAll('-', ''))
   return { handle, close: () => { disposeEventStore(handle); rmSync(owned, { recursive: true, force: true }) } }
 }
 const coderSurface = () => generate('Coder', ['Read', 'Write', 'Edit', 'Glob', 'Grep'], 'en')
@@ -218,18 +217,24 @@ for (const fate of [
         }, (append) => observed.push(append))
         const { outcome } = await runWorkflow(dir, `class Js extends JsProgram {
   async run() {
-    this.rewrite('a.txt', 'new');
-    await this.write('created.txt', 'created');
+    this.write('a.txt', 'new');
+    this.write('created.txt', 'created');
     return { receipt: 'must-not-report-success' };
   }
 }`, { store })
         assert.equal(caseName(outcome), 'Failed')
         const expectedCode = `TRANSACTION_${phase === 'Prepared' ? 'PREPARE' : 'COMMIT'}_${fate.suffix}`
         assert.equal(failureCode(outcome), expectedCode)
-        assert.deepEqual(rewritten(outcome), [])
-        assert.deepEqual(created(outcome), [])
-        assert.equal(observed.length, phase === 'Prepared' ? 1 : 2, 'no append retry or new transaction identity')
-        const failedAppend = observed.at(-1)
+        // Under as-is semantics the filesystem effects already landed at each
+        // edit/write call; a durable-accounting failure reports them as-is.
+        assert.deepEqual(rewritten(outcome), ['a.txt'])
+        assert.deepEqual(created(outcome), ['created.txt'])
+        const requested = observed.flatMap(append => append.requested)
+        assert.equal(new Set(requested.map(event => event.id)).size, requested.length, 'an append is not retried')
+        const preparedPaths = requested.filter(event => event.payload.mutation).map(event => event.payload.mutation.path)
+        assert.deepEqual(preparedPaths.sort(), ['a.txt', 'created.txt'], 'each mutation is prepared once, not retried with a new identity')
+        const failedAppend = observed.find(append => append.originalError !== null)
+        assert.ok(failedAppend, 'the injected append failure must be observed')
         const failure = persistenceFailure(outcome)
         assert.equal(failure.phase, phase)
         assert.equal(failure.kind, fate.kind)
@@ -243,8 +248,11 @@ for (const fate of [
           assert.strictEqual(failure.cleanupFailures[0].cause, cleanupCause)
         }
         if (phase === 'Prepared') {
-          assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'old', 'Prepared failure precedes all file effects')
-          assert.equal(existsSync(join(dir, 'created.txt')), false)
+          // Under as-is semantics the filesystem effects already landed at each
+          // edit/write call before the durable accounting runs; a Prepared
+          // append failure therefore does not roll them back.
+          assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'new', 'as-is write stays despite Prepared failure')
+          assert.equal(readFileSync(join(dir, 'created.txt'), 'utf8'), 'created')
           assert.deepEqual(pending(local.handle), [])
         } else {
           assert.equal(readFileSync(join(dir, 'a.txt'), 'utf8'), 'new', 'Committed failure does not claim rollback of real effects')
@@ -259,7 +267,8 @@ for (const fate of [
         const doc = parseToml(rendered)
         assert.equal(doc.code, expectedCode)
         assert.equal(doc.data, undefined)
-        assert.equal(doc.fs, undefined)
+        assert.deepEqual(doc.fs.rewritten, ['a.txt'], 'failure reports the already-applied writes')
+        assert.deepEqual(doc.fs.created, ['created.txt'])
       } finally { local.close(); cleanup() }
     })
   }
@@ -271,9 +280,10 @@ test('WHAT[repository-programming-013] JS085_workflow_reads_and_commits_rewrite'
     writeFileSync(join(dir, 'a.txt'), 'hello world', 'utf8')
     const program = `class Js extends JsProgram {
   async run() {
-    const view = await this.file('a.txt', [['begin', 'end', 'hello']]);
-    this.rewrite('a.txt', view.text('^', 'begin') + 'goodbye' + view.text('end', '$'));
-    return { before: view.text() };
+    const text = await this.cat('a.txt');
+    const [begin, end] = await this.where(text, 'hello');
+    this.write('a.txt', text.slice(0, begin) + 'goodbye' + text.slice(end));
+    return { before: text };
   }
 }`
     const { outcome } = await runWorkflow(dir, program)

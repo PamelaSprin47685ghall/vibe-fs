@@ -3,8 +3,7 @@ namespace Wanxiangshu.Mission.Planning
 open System.Threading.Tasks
 
 module PlanningSurface =
-    val assembleTenureMessages:
-        messages: obj -> tenureObj: obj -> materializePrev: (obj -> string) -> messageCursors: obj -> obj
+    val assembleTenureMessages: messages: obj -> tenureObj: obj -> messageCursors: obj -> obj
 
     val validateWorkId: workId: string -> obj
     val canonicalWorkKey: workId: string -> obj
@@ -28,6 +27,17 @@ module PlanningSurface =
         retirementCursor: obj ->
             Task<obj>
 
+    val startPostS3Execution:
+        gitCommonDir: string ->
+        root: string ->
+        workId: string ->
+        providerRunId: string ->
+        toolCallId: string ->
+        hasBlocker: obj ->
+        execution: obj ->
+        retirementCursor: obj ->
+            Task<obj>
+
     val reconcileBoundExecution:
         gitCommonDir: string ->
         workId: string ->
@@ -36,7 +46,7 @@ module PlanningSurface =
         blockers: string array ->
             obj
 
-    /// planning-010: `delegateTo` is a plain JavaScript function
+    /// work-028: `delegateTo` is a plain JavaScript function
     /// `(intent) => Promise<string>` returning the DevOps work record.
     val executeAsk: gitCommonDir: string -> workId: string -> intent: string -> delegateTo: obj -> Task<obj>
     val executeJsPlan: root: string -> workId: string -> action: string -> content: obj -> patches: obj -> obj

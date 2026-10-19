@@ -45,7 +45,7 @@ const user = (text) => ({ role: 'user', content: text });
 const assistant = (text) => ({ role: 'assistant', content: text });
 
 /** One request with an explicit session id for its test context. */
-const request = (messages, { tools = ['write'], sessionId = SESSION } = {}) => ({
+const request = (messages, { tools = ['todowrite-for-engineer'], sessionId = SESSION } = {}) => ({
   sessionID: sessionId,
   model: 'test-model',
   tools: tools.map((name) => ({ type: 'function', function: { name } })),

@@ -23,6 +23,21 @@ type PromptAbandonReason =
     | SupersededBeforePhysicalSend
     | UnresolvedAfterRecovery
 
+type UserQuestionAskedPayload =
+    { SessionId: SessionId
+      LogicalRunId: LogicalRunId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      ProviderRunId: ProviderRunIdentity
+      ToolCallId: ToolCallId
+      Question: string }
+
+type UserQuestionAnsweredPayload =
+    { SessionId: SessionId
+      LogicalRunId: LogicalRunId
+      ToolCallId: ToolCallId
+      PhysicalUserMessageId: PhysicalUserMessageId }
+
 type PromptFactCases =
     | PluginPromptClaimed of
         {| PromptKey: PromptKey
@@ -46,3 +61,5 @@ type PromptFactCases =
            Reason: PromptAbandonReason |}
     | AuthorityRootAccepted of AuthorityRootAcceptedPayload
     | AuthorityLogicalRunClosed of AuthorityLogicalRunClosedPayload
+    | UserQuestionAsked of UserQuestionAskedPayload
+    | UserQuestionAnswered of UserQuestionAnsweredPayload

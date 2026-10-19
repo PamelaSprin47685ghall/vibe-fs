@@ -1,5 +1,23 @@
 import test from 'node:test'
 
+test('WHAT[participant-identity-009] the exact retired mailbox marker round trips while unknown Concern cases still fail closed', async () => {
+  const { default: assert } = await import('node:assert/strict')
+  const { readFileSync } = await import('node:fs')
+  const codec = await import('../../../dist/Persistence/Journal/FactCodecSurface.js')
+  const rows = readFileSync(new URL('./support/old667-mixed-journal.ndjson', import.meta.url), 'utf8').trim().split('\n').map(JSON.parse)
+  const marker = rows[1].payload.Fact
+  assert.equal(marker[1][1][0], 'MailboxSubscribed')
+  const decoded = codec.decode(JSON.stringify(marker))
+  assert.equal(decoded.ok, true, decoded.error)
+  assert.deepEqual(JSON.parse(decoded.line), marker)
+  const unknown = structuredClone(marker)
+  unknown[1][1][0] = 'MailboxReopened'
+  assert.equal(codec.decode(JSON.stringify(unknown)).ok, false)
+  const malformed = structuredClone(marker)
+  delete malformed[1][1][1].OwnerSessionId
+  assert.equal(codec.decode(JSON.stringify(malformed)).ok, false)
+})
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { spawnSync } = await import("node:child_process");

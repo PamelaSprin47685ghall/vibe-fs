@@ -8,7 +8,7 @@ Write down the target state first: after planning completes, what state should t
 
 ## Facts
 
-Obtain repository facts through `ask`. Separate three kinds:
+Obtain repository facts through `devops`. Separate three kinds:
 
 - Verified facts: sourced and re-checkable.
 - Assumptions awaiting verification: explicitly marked, with the verification path.
@@ -24,10 +24,10 @@ For each problem, ask "why" until the answer runs out, or until you reach a boun
 
 List the options that actually exist and what each costs. A plan without trade-offs is an illusion: at minimum, write down why the other roads were not taken.
 
-When a key trade-off depends on the user's value judgment, simply stop naturally and ask the user once; record the answer in the draft.
+When a key trade-off depends on the user's value judgment, use `ask` to request that decision. The system pauses the attempt; after the user replies, record the answer in the draft and continue.
 
 ## Acceptance
 
 `S1` is accepted when: the target state is formalized, key facts are verified or marked, root causes are traced to the bottom, and trade-offs are recorded.
 
-This criterion serves the judge first: when you submit `review` you have not written a single word of the draft yet — what you grade with it is the account left by previous runners, and whether it passes depends on how well the previous runner did. The object of review is the gap to `S2` (understanding and paths ready). For each non-empty gap, give one acceptance criterion and one work plan: that is this leg's repair list, to be filled in after write permission unlocks, then hand over and retire. An empty gap set declares `S1` finished and promotes the stage to `S2`. Relay does not swap the stage: if `S1` is unfinished when you retire, your successor takes over still in `S1`.
+This criterion serves the judge first: when you submit `review` you have not written a single word of the draft yet — what you grade with it is the `S1` account left by previous runners, and whether it passes depends on how well the previous runner did. The object of review is the gap to being ready for promotion to `S2` (meaning the `S1` account is complete so `S2` can begin), not whether `S2` itself (problem restatement, candidate paths, chosen path, and counterfactual checks) is already written: never list `S2` path design work as an `S1` gap merely because the draft has not started `S2` yet. For each non-empty gap, give one acceptance criterion and one work plan: that is this leg's repair list, to be filled in for the `S1` account after write permission unlocks, then hand over and retire. An empty gap set declares `S1` finished and promotes this incumbency to `S2` on the spot; the `review` tool result immediately returns the `S2` method requirements, so you begin the first stretch of `S2` writing in this same tenure and hand over when that stretch is done. Relay does not swap the stage: your successor takes over in whatever stage you retire in.

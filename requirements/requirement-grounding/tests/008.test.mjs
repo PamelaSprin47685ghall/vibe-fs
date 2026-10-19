@@ -22,8 +22,8 @@ const sandbox = () => {
 }
 
 const toolBatch = (providerID, path) => [
-  { info: { id: 'c1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'pending', input: { filePath: path }, time: { start: 0 } } }] },
-  { info: { id: 'r1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'read', callID: 'source', state: { status: 'completed', input: { filePath: path }, output: 'before\n', time: { start: 0, end: 0 } } }] },
+  { info: { id: 'c1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'source', state: { status: 'pending', input: { program: `class Js extends JsProgram { async run() { return await this.cat(${JSON.stringify(path)}); } }` }, time: { start: 0 } } }] },
+  { info: { id: 'r1', role: 'assistant', providerID }, parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'source', state: { status: 'completed', input: { program: `class Js extends JsProgram { async run() { return await this.cat(${JSON.stringify(path)}); } }` }, output: 'before\n', time: { start: 0, end: 0 } } }] },
 ]
 
 test('WHAT[requirement-grounding-008] mutation grounding is weak observation and never becomes tool admission', async () => {
@@ -69,9 +69,11 @@ const assertRegisteredMutationContinues = async (mapping = '/src/**\n', expected
     }
 
     const sessionID = expectedError ? 'mutation-broken-mapping' : 'mutation-not-grounded'
+    await acceptAuthorityRoot(runtime, sessionID, 'engineer')
     await openIncumbency(runtime, sessionID)
-    const input = { tool: 'write', sessionID, callID: 'write-once' }
-    const args = { filePath: sourcePath, content: 'changed by controlled Host continuation\n' }
+    const expectedContent = 'changed by controlled Host continuation\n'
+    const input = { tool: 'todowrite-for-engineer', sessionID, callID: 'write-once' }
+    const args = { program: `class Js extends JsProgram { async run() { await this.write('src/main.fs', ${JSON.stringify(expectedContent)}); return 'file written'; } }` }
     const originalInput = structuredClone(input)
     const originalArgs = structuredClone(args)
     const keys = Reflect.ownKeys(args)
@@ -84,13 +86,13 @@ const assertRegisteredMutationContinues = async (mapping = '/src/**\n', expected
     assert.deepEqual(Reflect.ownKeys(args), keys)
     assert.equal(readFileSync(sourcePath, 'utf8'), 'before\n')
 
-    // The Host continuation is controlled here; the registered hooks are real.
-    writeFileSync(output.args.filePath, output.args.content, 'utf8')
+    const execResult = await hooks.tool['todowrite-for-engineer'].execute(output.args, { sessionID, agent: 'engineer' })
+    assert.match(String(execResult), /file written/)
     await hooks['tool.execute.after'](
       { ...input, args },
-      { title: 'write', output: 'file written', metadata: {} },
+      { title: 'todowrite-for-engineer', output: execResult, metadata: {} },
     )
-    assert.equal(readFileSync(sourcePath, 'utf8'), originalArgs.content)
+    assert.equal(readFileSync(sourcePath, 'utf8'), expectedContent)
     assert.equal(output.args, args)
     assert.deepEqual(args, originalArgs)
     assert.deepEqual(Reflect.ownKeys(args), keys)
@@ -117,15 +119,15 @@ for (const prefix of ['', '!']) {
       const sessionID = 'mutation-illegal-self-js'
       await acceptAuthorityRoot(runtime, sessionID, 'engineer')
       await openIncumbency(runtime, sessionID)
-      const input = { tool: 'js-engineer', sessionID, callID: 'js-write-once' }
-      const args = { program: "class Js extends JsProgram { async run() { const file = await this.file('src/main.fs'); await this.rewrite('src/main.fs', file.text() + 'ONCE\\n'); return 'PROGRAM-WRITTEN'; } }" }
+      const input = { tool: 'todowrite-for-engineer', sessionID, callID: 'js-write-once' }
+      const args = { program: "class Js extends JsProgram { async run() { const text = await this.cat('src/main.fs'); await this.write('src/main.fs', text + 'ONCE\\n'); return 'PROGRAM-WRITTEN'; } }" }
       const originalArgs = structuredClone(args)
       const carrier = { args }
       await hooks['tool.execute.before'](input, carrier)
       assert.equal(carrier.args, args)
-      const output = await hooks.tool['js-engineer'].execute(args, { sessionID, agent: 'engineer' })
+      const output = await hooks.tool['todowrite-for-engineer'].execute(args, { sessionID, agent: 'engineer' })
       assert.match(output, /PROGRAM-WRITTEN/)
-      await hooks['tool.execute.after']({ ...input, args }, { title: 'js-engineer', output, metadata: {} })
+      await hooks['tool.execute.after']({ ...input, args }, { title: 'todowrite-for-engineer', output, metadata: {} })
       assert.deepEqual(args, originalArgs)
       assert.equal(readFileSync(join(directory, 'src', 'main.fs'), 'utf8'), 'before\nONCE\n')
     })

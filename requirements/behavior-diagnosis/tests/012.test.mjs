@@ -7,17 +7,13 @@ const observation = {
   frameEpoch: 0, previousIngestedThroughSequence: 0, nextIngestedThroughSequence: 1,
   previousCoverableTurnCutoffExclusive: 0, nextCoverableTurnCutoffExclusive: 1,
   nextCoveredPrefixDigest: 'prefix', textRef: 'blobs/text', textDigest: 'text-digest',
-  run: 'provider-run', toolCallIds: ['tool-call'], tipRuleId: 'sample-rule', fieldNameAtCommit: 'sample-rule',
+  run: 'provider-run', toolCallIds: ['tool-call'], tipName: 'sample-rule',
+  tipTextRef: 'blobs/tip-text', tipTextDigest: 'tip-text-digest',
   evidenceRef: 'blobs/evidence', observedPrefixEpoch: 0,
 }
-const squash = {
-  case: 'BlogObservationsSquashed', sessionId: 'main', bloggerSessionId: 'blogger', requestId: 'squash',
-  previousFrameEpoch: 0, nextFrameEpoch: 1, coveredFrameCount: 1,
-  textRef: 'blobs/squash', textDigest: 'squash-digest', run: 'squash-run',
-}
 
-test('WHAT[behavior-diagnosis-012] actual fact codec preserves complete observation and squash records', () => {
-  for (const fact of [observation, squash]) {
+test('WHAT[behavior-diagnosis-012] actual fact codec preserves complete observation records', () => {
+  for (const fact of [observation]) {
     const line = blog.serializeFact(fact)
     const decoded = blog.deserializeFact(line)
     assert.equal(decoded.ok, true)
@@ -26,7 +22,7 @@ test('WHAT[behavior-diagnosis-012] actual fact codec preserves complete observat
 })
 
 test('WHAT[behavior-diagnosis-012] actual codec refuses retired split observation facts', () => {
-  for (const [fact, retired] of [[observation, 'BlogEntryCommitted'], [squash, 'BlogSquashCommitted']]) {
+  for (const [fact, retired] of [[observation, 'BlogEntryCommitted'], [observation, 'BlogSquashCommitted'], [observation, 'BlogObservationsSquashed']]) {
     const line = blog.serializeFact(fact).replaceAll(fact.case, retired)
     assert.equal(blog.deserializeFact(line).ok, false)
   }

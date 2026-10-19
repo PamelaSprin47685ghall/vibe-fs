@@ -39,7 +39,7 @@ await withAdmissionWorkers(`publication-${mode}`, async (producer, _unused, work
   try {
     const opened = await producer.call('open', `printf 'once\\n' >> '${marker}'; exit 23`)
     assert.equal(opened.ok, true, opened.error)
-    const root = join(workspace, '.git', 'wanxiangshu', 'pty')
+    const root = join(workspace, '.Herdchestra', 'wanxiangshu', 'pty')
     await until(() => fs.existsSync(root) && fs.readdirSync(root).length === 1, 'the exact physical request must exist')
     const keys = fs.readdirSync(root)
     assert.equal(keys.length, 1)

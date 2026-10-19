@@ -1,0 +1,95 @@
+✔ WHAT[change-integration-002] GIT_is_dirty_true_only_on_nonempty_porcelain (1.693083ms)
+✔ WHAT[change-integration-002] failed cleanliness inspection preserves the command failure (0.568208ms)
+✔ WHAT[change-integration-002] rejected cleanliness command preserves its original exception (0.298ms)
+✔ WHAT[change-integration-002] unreadable target cleanliness cannot authorize ff publication (0.964ms)
+✖ WHAT[change-integration-002] GIT_ff_merge_refuses_dirty_target_worktree (3.815125ms)
+✔ WHAT[change-integration-002] Git adapter reports worktree enumeration failure (0.444458ms)
+✔ WHAT[change-integration-002] Git adapter detects a modified target worktree (0.145791ms)
+✔ WHAT[change-integration-002] WORKTREE_CMD_is_dirty_reads_porcelain (0.189417ms)
+✔ WHAT[change-integration-002] failed Git cleanliness blocks a new Host job before its worktree request or Manager creation (386.559791ms)
+✔ WHAT[change-integration-002] rejected Git command leaves a new Host job without its worktree request or Manager creation (286.997208ms)
+✔ WHAT[change-integration-002] dirty Git result still rejects admission while clean permits the worktree request (775.437875ms)
+✔ WHAT[change-integration-002] actual Git status failure returns an inspection error (283.588625ms)
+✔ WHAT[change-integration-002] Adapter_ffMerge_dirty_target_fails_closed_without_advancing_head (336.163042ms)
+✔ WHAT[change-integration-006] projecting candidate and conflict facts preserves the recorded Road worktree identity (2.175833ms)
+✔ WHAT[change-integration-006] worktree resource preserves its configured path through controlled creation and disposal (1.833417ms)
+✔ WHAT[change-integration-006] ORCH_003_fact_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry (0.192292ms)
+✔ WHAT[change-integration-006] ORCH_006_a_terminal_job_stays_in_the_map_so_a_replay_is_recognised (0.216ms)
+✔ WHAT[change-integration-006] ORCH_006_a_terminal_job_accepts_no_further_facts (0.214167ms)
+✔ WHAT[change-integration-006] ORCH_006_all_three_terminal_cases_end_the_job (0.145167ms)
+✔ WHAT[change-integration-006] ORCH_007_projection_keeps_independent_facts_instead_of_latest_stage (0.16525ms)
+✔ WHAT[change-integration-006] ORCH_006_the_journal_replays_independent_facts_and_terminal (0.683166ms)
+✔ WHAT[change-integration-006] ORCH_006_a_fact_before_its_create_is_dropped_not_promoted (0.108958ms)
+✔ WHAT[change-integration-006] ORCH_006_a_replayed_create_does_not_reset_a_job_that_already_made_progress (0.157416ms)
+✔ WHAT[change-integration-006] PERSIST_009_worktree_request_then_created_marks_identity_created (0.24525ms)
+✔ WHAT[change-integration-006] PERSIST_009_duplicate_request_after_created_does_not_regress_to_requested (0.072709ms)
+✔ WHAT[change-integration-006] PERSIST_009_duplicate_created_is_idempotent (0.071417ms)
+✔ WHAT[change-integration-006] PERSIST_009_request_alone_is_not_created (0.049417ms)
+✔ WHAT[change-integration-006] PERSIST_009_direct_request_accept_helpers_match_fold (0.118792ms)
+✔ WHAT[change-integration-006] EXEC_016_active_manager_jobs_are_outstanding_for_orchestrator (0.089458ms)
+✔ WHAT[change-integration-006] THEOREM_independent_facts_survive_and_published_is_terminal (0.452917ms)
+✔ WHAT[change-integration-006] WORKTREE_adopt_never_releases_on_dispose (0.12375ms)
+✔ WHAT[change-integration-006] WORKTREE_mark_durable_disposes_without_release (0.166959ms)
+✔ WHAT[change-integration-006] WORKTREE_CMD_list_parses_porcelain_blocks (0.599708ms)
+✔ WHAT[change-integration-006] WORKTREE_CMD_list_error_propagates (0.120292ms)
+✔ WHAT[change-integration-006] WORKTREE_CMD_list_branches_strips_current_and_worktree_markers (0.282333ms)
+✔ WHAT[change-integration-006] WORKTREE_CMD_delete_branch_uses_force_delete (0.107875ms)
+✔ WHAT[change-integration-006] WORKTREE_CMD_delete_branch_falls_back_to_stdout_when_stderr_blank (0.064458ms)
+✔ WHAT[change-integration-006] PERSIST_009_worktree_requested_created_reentry_is_finite_and_fail_closed (0.385125ms)
+✔ WHAT[change-integration-006] GAP-212: an interrupted publish resumes from its actual durable events and actual Git refs in a fresh process without replacing the Road worktree (0.026208ms) # TODO
+✔ WHAT[crash-reconciliation-020] current role vocabulary includes DevOps and Engineer but excludes legacy Coder (0.506541ms)
+✔ WHAT[crash-reconciliation-020] in-process physical terminals preserve an active child logical run and handle (26.590583ms)
+✔ WHAT[crash-reconciliation-020] production load decision voids active child runs without creating a completion (15.015208ms)
+✔ WHAT[crash-reconciliation-020] an active child work run leaves the horizon projection only after load settlement voids it (1.657166ms)
+✔ WHAT[crash-reconciliation-020] human roots and child runs without a durable handle are not selected for load settlement (0.578708ms)
+✔ WHAT[crash-reconciliation-020] stale Blogger selection respects exact live flight and abandonment clears the same folded open request (3.088375ms)
+✔ WHAT[crash-reconciliation-020] actual child settlement persists voids across journal reopen without a completion (233.069792ms)
+✔ WHAT[crash-reconciliation-020] actual child settlement propagates unknown and unattempted append failures (186.811708ms)
+✔ WHAT[crash-reconciliation-020] actual plugin activation durably settles orphan child and Blogger work before ordinary execution, preserves exact live flights, and refuses append failure (GAP-149) (0.081958ms) # TODO
+✔ WHAT[crash-reconciliation-020] a real interrupted run and PTY input are not replayed after restart while unique DevOps authority and durable model Persona binding are retained (GAP-149; GAP-129; GAP-132) (0.084083ms) # TODO
+✔ WHAT[distribution-011] source checkout consumes the exact gitlink through one installed source link (1031.8695ms)
+✔ WHAT[distribution-011] retained evidence is exact and cannot admit a dependency archive (321.775625ms)
+✔ WHAT[distribution-011] a different checked-out dependency commit is rejected before build (389.60825ms)
+✔ WHAT[durable-events-010] SharedAgentJournal_boots_local_EventStore_and_leaves_retired_RuntimePath_ndjson_unread (91.036291ms)
+✔ WHAT[durable-events-027] a retained line of a retired lifecycle event type fails closed on reload; removing it restores loading (10.102208ms)
+✔ WHAT[durable-events-028] runtime and diagnostics use the primary worktree state without editing Git configuration (203.967167ms)
+✔ WHAT[durable-events-028] non-Git directories and independent repositories keep separate state (127.005584ms)
+✔ WHAT[durable-events-028] bare repositories and direct Git paths are not state roots (98.072ms)
+✔ WHAT[durable-events-028] corrupted retired files cannot influence a fresh local event stream (88.446208ms)
+✔ WHAT[durable-events-028] symlink state and ignore files cannot redirect persistence into Git (98.595334ms)
+✔ WHAT[work-033] failed journal construction reclaims the exact native connection and preserves its error on Node (3.809709ms)
+✔ WHAT[work-033] failed journal construction reclaims the exact native connection and preserves its error on Bun (109.4895ms)
+✔ WHAT[work-033] one projection uses one record snapshot even when another connection commits between reads (52.55175ms)
+✔ WHAT[work-033] the fixed DevOps identity and model target remain separate projection fields (51.847458ms)
+✔ WHAT[work-033] lifecycle payload keys are ordered by Unicode code point (21.268542ms)
+✔ WHAT[work-033] canonical lines round-trip and keep int64 cursor precision (1.409291ms)
+✔ WHAT[work-033] real bytes fold through the codec and the live store (81.150834ms)
+✔ WHAT[work-033] an illegal first stage is rejected by the fold before any live append (43.555625ms)
+✔ WHAT[work-033] a same-request replay is idempotent and a different payload is a structured conflict (50.073167ms)
+ℹ tests 68
+ℹ suites 0
+ℹ pass 64
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 3
+ℹ duration_ms 3437.612083
+
+✖ failing tests:
+
+test at requirements/change-integration/tests/002.test.mjs:77:1
+✖ WHAT[change-integration-002] GIT_ff_merge_refuses_dirty_target_worktree (3.815125ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /target worktree is dirty; refusing ff-only merge/. Input:
+  
+  "publish branch mismatch: target repo is on '' but publish is frozen to 'main'"
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/change-integration/tests/002.test.mjs:81:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "publish branch mismatch: target repo is on '' but publish is frozen to 'main'",
+    expected: /target worktree is dirty; refusing ff-only merge/,
+    operator: 'match',
+    diff: 'simple'
+  }

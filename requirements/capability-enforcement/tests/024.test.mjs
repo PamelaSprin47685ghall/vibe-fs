@@ -73,12 +73,12 @@ test('WHAT[capability-enforcement-024] FORK_manager_fork_engineer_admitted_after
 })
 
 // 静态门禁：fork/resume 在 Manager 角色层固定 allow，Plan 角色 deny；
-// js-devops 对 Manager 的跨角色绕路调用在角色层 deny。
+// todowrite-for-devops 对 Manager 的跨角色绕路调用在角色层 deny。
 test('WHAT[capability-enforcement-024] role_permission_rules_fork_separation', () => {
   const managerRules = rolePermissionRules('manager')
   assert.equal(managerRules.fork, 'allow')
   assert.equal(managerRules.resume, 'allow')
-  assert.equal(managerRules['js-devops'], 'deny')
+  assert.equal(managerRules['todowrite-for-devops'], 'deny')
   const planRules = rolePermissionRules('plan')
   assert.equal(planRules.fork, 'deny')
   assert.equal(planRules.resume, 'deny')

@@ -6,7 +6,7 @@
 
 ## 上游语义整合批次
 
-2026-10-19 用户已授权按[整合计划](UPSTREAM-SEMANTIC-MERGE-2026-10-19.md)推进 SM-01—SM-07，具体处置见[语义处置表](UPSTREAM-SEMANTIC-DISPOSITION-2026-10-19.md)。owner：本 chat 的 root；SM-01已提交，SM-02A/B/C库候选f65e106限定验收LIB_READY，当前SM-03主仓接线。证据与未决范围只在整合计划更新。公共编辑面为两仓 manifest/锁/gitlink、构建图、实际插件接线与本看板，串行集成。原 CUT/GAP 的状态、失败和剩余范围继续保留；本批局部通过不销父项。Blogger 全退役不在范围。
+2026-10-19 用户已授权按[整合计划](UPSTREAM-SEMANTIC-MERGE-2026-10-19.md)推进 SM-01—SM-07，具体处置见[语义处置表](UPSTREAM-SEMANTIC-DISPOSITION-2026-10-19.md)。owner：本 chat 的 root；SM-01已提交，SM-02A/B/C库候选05f6b5a限定验收LIB_READY，SM-03至SM-06限定范围READY，SM-07候选进入REVIEW；完整发行未通过，未切换运行。证据与未决范围只在整合计划更新。公共编辑面为两仓 manifest/锁/gitlink、构建图、实际插件接线与本看板，串行集成。原 CUT/GAP 的状态、失败和剩余范围继续保留；本批局部通过不销父项。Blogger 全退役不在范围。
 
 ## 列与流转
 
@@ -43,9 +43,9 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-02 | 非 PTY 进程执行 | 物理 | DONE | CUT-00 | eng-cut02 | manager |
 | CUT-03 | 原始轨迹与固定区间 | 上下文 | DONE | CUT-00 | eng-cut03 | manager |
 | CUT-04 | 唯一资源归属与关闭 | 执行 | DONE | CUT-00, CUT-01 | eng-cut04 | manager |
-| CUT-05 | 双语资源与包内定位 | 表达 | READY | CUT-00 | — | — |
+| CUT-05 | 双语资源与包内定位 | 表达 | DONE | CUT-00 | — | 2026-10-15 主线提交 2f98049e5：wanxiangli 0.7.0 resources 模块合入，库侧 8 测试 + 主仓 provider-language 25 项回归全绿，证据链见 cards/CUT-05.md §10 |
 | CUT-06 | WorkRecord 取材与视图 | 上下文 | BACKLOG | CUT-03 | — | — |
-| CUT-07 | 参与者身份与执行绑定分离 | 权威 | READY | CUT-00 | — | — |
+| CUT-07 | 参与者身份与执行绑定分离 | 权威 | LIB_READY | CUT-00 | — | 2026-10-15 库侧 identity 模块 24 测试全绿并随 0.7.0 发布；主仓切换按 eng-cut07 报告推迟至后续集成队列（主仓消费面与 Interaction 层进行中改动交叠，避免同窗冲突），证据链见 cards/CUT-07.md §10 |
 | CUT-08 | 能力事实与双侧门禁 | 权威 | BACKLOG | CUT-07 | — | — |
 | CUT-09 | 来源、逻辑根与关闭权威 | 权威 | BACKLOG | CUT-07 | — | — |
 | CUT-10 | 模型路由与精确容量许可 | 执行 | BACKLOG | CUT-07 | — | — |
@@ -56,15 +56,15 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-15 | 前缀世代与候选提交 | 上下文 | BACKLOG | CUT-03 | — | — |
 | CUT-16 | 压缩覆盖与 checkpoint | 上下文 | BACKLOG | CUT-03, CUT-06, CUT-15 | — | — |
 | CUT-17 | 请求投影与信息边界 | 表达 | BACKLOG | CUT-05, CUT-06, CUT-08, CUT-15, CUT-16 | — | — |
-| CUT-18 | 规范事实编码与校验 | 存储 | READY | CUT-00 | — | — |
+| CUT-18 | 规范事实编码与校验 | 存储 | DONE | CUT-00 | eng-cut18 | 2026-10-15 主线提交 2f98049e5：wanxiangli events 模块合入 0.7.0，库侧 34 测试 + durable-events 244 项回归全绿，证据链见 cards/CUT-18.md §10 |
 | CUT-19 | 多 writer 存储与收敛 | 存储 | BACKLOG | CUT-18 | — | — |
 | CUT-20 | PTY 与完整输出外存 | 物理 | BACKLOG | CUT-02, CUT-04 | — | — |
-| CUT-21 | 显式时间与因果等待 | 物理 | READY | CUT-00 | — | — |
+| CUT-21 | 显式时间与因果等待 | 物理 | DONE | CUT-00 | — | 2026-10-15 库侧 time/wait 模块随 0.8.0 发布（库 commit 8422617，全量 460 测试绿）；主仓 NodeTiming/Deadline/VirtualTiming/Wait Registry/CompletionMailbox 桥接切至 0.8.0，干净 HEAD worktree 验证 time-capability 24/0、causal-wait 52/0、subsystems OK；主仓共享工作树全量 build 因他人 Interaction 进行中改动阻断（非本卡引入），证据链见 cards/CUT-21.md §10 |
 | CUT-22 | attention、concern 与邮箱归属 | 权威 | BACKLOG | CUT-09 | — | — |
 | CUT-23 | Git 工作树、委任与集成 | 仓库 | BACKLOG | CUT-12, CUT-13 | — | — |
-| CUT-24 | 文件读取、锚点与原子编辑 | 仓库 | READY | CUT-00 | — | — |
+| CUT-24 | 文件读取、锚点与原子编辑 | 仓库 | DONE | CUT-00 | eng-cut24 | 2026-10-15 主线提交 2f98049e5：wanxiangli fs 模块合入 0.7.0（38 测试绿），repository-programming 158 项回归全绿，证据链见 cards/CUT-24.md §10 |
 | CUT-25 | 受限 JS 编程面与执行组合 | 仓库 | BACKLOG | CUT-02, CUT-08, CUT-24 | — | — |
-| CUT-26 | 需求发现与材料溯源 | 仓库 | READY | CUT-00 | — | — |
+| CUT-26 | 需求发现与材料溯源 | 仓库 | DONE | CUT-00 | eng-cut26 | 2026-10-15 主线提交 2f98049e5：wanxiangli grounding 模块合入 0.7.0（13 测试绿）；主仓 requirement-grounding 残留 002/007 两项为 GAP.md 既有登记缺口（GAP-085，非本卡回归），证据链见 cards/CUT-26.md §10 |
 | CUT-27 | Casebook / 知识复用去向 | 产品裁决 | DECISION | CUT-06, CUT-19, CUT-24 | — | — |
 | CUT-28 | Fission 多 lane 执行 | 执行 | BACKLOG | CUT-03, CUT-10, CUT-12, CUT-13 | — | — |
 | CUT-29 | Strength / 投机调查去向 | 产品裁决 | DECISION | CUT-06, CUT-10, CUT-13, CUT-19 | — | — |
@@ -187,6 +187,8 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | `Mission/WorkRecord/{CompletionProjection,Materialize}.fs(.fsi)`、`Composition/Durable/{Projection,DomainFamilyBridge}.fs(.fsi)`、SyncDelegate/Runtime、Fork/Host/{Runtime,RunLifecycle}、Fork/OpenCode/ToolSurface、Journal/Surface的既有ContextReanchored解码、对应owner编译清单、work-record WHAT/004/010及本包证据文档 | `CUT-06-R2` | root | `2ec1a5400` | 完成表示、确切终点、真实消费者和独立冷恢复、1239项相关回归及精确包非作者验收完成，随本原子提交交付；库0.6.4不变 | `已释放` |
 | EventStore 的因果成员契约/Integrator、各规则签名、Journal writer/接线、Trace/WorkRecord 完成投影及相关规范/门禁/证据 | `CUT-06-R4` | root；r2_consumer_review 仅 work-record/004 末尾与独占测试 helper | `49b64879c` | 正式新增22项、1311项相关需求、三名非作者和229980精确包隔离消费通过，随本原子提交交付；越界白盒测试已撤回，库0.6.4不变 | `已释放` |
 | `OpenCode/Host/PairProgrammingThoughtTransform.fs`、`Context/Trace/Materialization.fs(.fsi)`、prefix-stability/014及独占辅助夹具、旧grounding-007/Host-032与共享Plugin夹具、相关契约与证据 | `CUT-17-R1` | root | `2aaaf6077` | 真实Host网络/原件/引用/冷读、1350项相关回归及f047精确包隔离消费完成；归因与边界同步，随本原子提交交付，库0.6.4未改 | `已释放` |
+| `src/Wanxiangshu/Foundation/CanonicalJson.fs(.fsi), src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs(.fsi)` | `CUT-18` | `eng-cut18` | `62dbebc5d`（认领时未运行 git，base 以 DevOps 核实为准） | `CUT-18 完成 wanxiangli/events 0.6.0 验证、vendor tarball 落位与 durable-events 测试回归`（2026-10-15 随 0.7.0 主线提交 2f98049e5 合入，durable-events 244 项全绿，证据见 cards/CUT-18.md） | `已释放` |
+| `src/Wanxiangshu/Process/{Deadline,NodeTiming,VirtualTiming}.fs(.fsi), src/Wanxiangshu/Execution/Session/Wait/{Registry,CompletionMailbox}.fs(.fsi)` | `CUT-21` | `devops`（受委派集成） | `2f98049e5` | `CUT-21 完成 wanxiangli 0.8.0 time/wait 发布与主仓桥接切换`（2026-10-15 库 commit 8422617，干净 HEAD worktree 验证全绿后主线合入） | `已释放` |
 
 ## 两仓集成队列
 
@@ -197,6 +199,9 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | 1 | CUT-02 | — | 4be1c4105 | manager | GAP-092（仅 015 预声明 todo，无新增门禁） | 已合入 |
 | 2 | CUT-03 | — | 042ae616a | manager | 无新增门禁（GAP-101 均为预声明 todo） | 已合入 |
 | 3 | CUT-04 | — | 6b5b71cc7 | manager | 无新增门禁（GAP-133 均为预声明 todo） | 已合入 |
+| 4 | CUT-05/07/18/24/26 | wanxiangli 8422617 之前的主线形态（0.7.0 tarball） | 2f98049e5 | manager | GAP-085（requirement-grounding 002/007 为 GAP.md 既有登记缺口，非本批回归） | 已合入 |
+| 5 | CUT-07 主仓切换 | 库侧已随 0.7.0 发布（identity 24 测试绿） | 待定（下一集成窗口） | manager | 主仓消费面与 Interaction 层进行中改动交叠，推迟至 Interaction 改动合入后串行执行 | 排队中 |
+| 6 | CUT-21 | wanxiangli 8422617 / 0.8.0 | 2f98049e5 之上的本轮主仓提交 | manager | 主仓共享工作树全量 build 因他人 Interaction 改动中间态阻断；本卡验证已在干净 HEAD worktree 完成（time-capability 24/0、causal-wait 52/0、subsystems OK） | 已验证待合入 |
 
 ## 边界修订与产品裁决登记
 

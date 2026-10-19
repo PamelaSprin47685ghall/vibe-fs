@@ -43,12 +43,7 @@ module ObservationSurface =
                frameDigest = optionalObj item.FrameDigest |}
 
     let private frameOfJs (value: obj) : BlogFrame =
-        let kind =
-            match text value?kind with
-            | "Squash" -> BlogFrameKind.Squash
-            | _ -> BlogFrameKind.Entry
-
-        { Kind = kind
+        { Kind = BlogFrameKind.Entry
           Digest = BlobDigest.create (text value?digest)
           TextRef = BlobRef.create (text value?ref)
           CoveredFromSequence = int64 (text value?coveredFrom)
@@ -64,7 +59,6 @@ module ObservationSurface =
             {| kind =
                 match frame.Kind with
                 | BlogFrameKind.Entry -> "Entry"
-                | BlogFrameKind.Squash -> "Squash"
                digest = BlobDigest.value frame.Digest
                ref = BlobRef.value frame.TextRef
                coveredFrom = frame.CoveredFromSequence
@@ -98,8 +92,7 @@ module ObservationSurface =
 
     let private tipToJs (tip: RecentTip) : obj =
         box
-            {| ruleId = tip.RuleId
-               fieldName = tip.FieldName
+            {| tipName = tip.TipName
                cycleId = tip.CycleId |}
 
     let private cycleToJs (record: EnforcementCycleRecord) : obj =
@@ -110,8 +103,9 @@ module ObservationSurface =
                toolCallIds = record.ToolCallIds |> List.map ToolCallId.value |> List.toArray
                textRef = BlobRef.value record.CycleTextRef
                textDigest = BlobDigest.value record.CycleTextDigest
-               tipRuleId = record.TipRuleId
-               fieldNameAtCommit = optionalObj record.FieldNameAtCommit
+               tipName = record.TipName
+               tipTextRef = record.TipTextRef |> Option.map BlobRef.value |> optionalObj
+               tipTextDigest = record.TipTextDigest |> Option.map BlobDigest.value |> optionalObj
                evidenceRef = record.CycleEvidenceRef |> Option.map BlobRef.value |> optionalObj
                observedPrefixEpoch = int (PrefixEpochId.value record.ObservedPrefixEpochId) |}
 
@@ -141,8 +135,9 @@ module ObservationSurface =
                     |> List.map (fun callId -> ToolCallId.create (text callId))
                   CycleTextRef = BlobRef.create (text item?textRef)
                   CycleTextDigest = BlobDigest.create (text item?textDigest)
-                  TipRuleId = text item?tipRuleId
-                  FieldNameAtCommit = optionalText item?fieldNameAtCommit
+                  TipName = text item?tipName
+                  TipTextRef = optionalText item?tipTextRef |> Option.map BlobRef.create
+                  TipTextDigest = optionalText item?tipTextDigest |> Option.map BlobDigest.create
                   CycleEvidenceRef = optionalText item?evidenceRef |> Option.map BlobRef.create
                   ObservedPrefixEpochId = PrefixEpochId.create (int64 (text item?observedPrefixEpoch)) })
             |> Map.ofList
@@ -151,8 +146,7 @@ module ObservationSurface =
             arrayOf value?recentTips
             |> Array.toList
             |> List.map (fun item ->
-                { RuleId = text item?ruleId
-                  FieldName = text item?fieldName
+                { TipName = text item?tipName
                   CycleId = text item?cycleId })
 
         { ByProviderRun = records
@@ -175,8 +169,9 @@ module ObservationSurface =
             |> List.map (fun callId -> ToolCallId.create (text callId))
           CycleTextRef = BlobRef.create (text value?textRef)
           CycleTextDigest = BlobDigest.create (text value?textDigest)
-          TipRuleId = text value?tipRuleId
-          FieldNameAtCommit = optionalText value?fieldNameAtCommit
+          TipName = text value?tipName
+          TipTextRef = optionalText value?tipTextRef |> Option.map BlobRef.create
+          TipTextDigest = optionalText value?tipTextDigest |> Option.map BlobDigest.create
           CycleEvidenceRef = optionalText value?evidenceRef |> Option.map BlobRef.create
           ObservedPrefixEpochId = PrefixEpochId.create (int64 (text value?observedPrefixEpoch)) }
 
@@ -232,9 +227,6 @@ module ObservationSurface =
         EnforcementProjection.applyFromEntry (stateOfJs state) (cycleRecordOfJs cycle)
         |> resultToJs stateToJs errorText
 
-    let applyEnforcementSquash (count: int) (state: obj) : obj =
-        EnforcementProjection.applySquash count (stateOfJs state) |> stateToJs
-
     let recentTips (state: obj) : obj array =
         stateOfJs state
         |> EnforcementProjection.recentTips
@@ -262,15 +254,6 @@ module ObservationSurface =
             input
         |> resultToJs blogStateToJs errorText
 
-    let applyBlogSquash (request: obj) (frame: obj) (state: obj) : obj =
-        BlogProjection.applySquash
-            (FrameEpochId.create (int64 (text request?previousFrameEpoch)))
-            (FrameEpochId.create (int64 (text request?nextFrameEpoch)))
-            (int (text request?coveredFrameCount))
-            (frameOfJs frame)
-            (blogStateOfJs state)
-        |> resultToJs blogStateToJs errorText
-
     let frameCount (state: obj) : int =
         blogStateOfJs state |> BlogProjection.frameCount
 
@@ -278,8 +261,7 @@ module ObservationSurface =
         BlogProjection.frames (blogStateOfJs state)
         |> List.map (fun frame ->
             match frame.Kind with
-            | BlogFrameKind.Entry -> "Entry"
-            | BlogFrameKind.Squash -> "Squash")
+            | BlogFrameKind.Entry -> "Entry")
         |> List.toArray
 
     let coverage (state: obj) : obj =
@@ -301,10 +283,5 @@ module ObservationSurface =
         let blogState = if isNullish blog then None else Some(blogStateOfJs blog)
 
         ObservationProjection.observationsOf enforcementState blogState
-        |> List.map workLogToJs
-        |> List.toArray
-
-    let observationsAfterSquash (count: int) (enforcement: obj) (blog: obj) : obj array =
-        ObservationProjection.observationsAfterSquash count (stateOfJs enforcement) (blogStateOfJs blog)
         |> List.map workLogToJs
         |> List.toArray

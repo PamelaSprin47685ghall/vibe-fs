@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Execution.Delegation.Fork.OpenCode
 
 open Wanxiangshu.OpenCode
+open System.Threading.Tasks
+open Wanxiangshu.Execution.Delegation.Fork
 
 /// Manager fork & resume / Orchestrator commission. One typed request backs
 /// every public tool; each tool exposes its own schema; PTY is absent.
@@ -74,13 +76,7 @@ module ForkTool =
             val PersonCannotTakeCharge: string = "tool/fork/person-cannot-take-charge"
 
             [<Literal>]
-            val HandoffJournalRequired: string = "tool/fork/handoff-journal-required"
-
-            [<Literal>]
             val PersonSessionUnknown: string = "tool/fork/person-session-unknown"
-
-            [<Literal>]
-            val HandoffAppendFailed: string = "tool/fork/handoff-append-failed"
 
         [<RequireQualifiedAccess>]
         module Commission =
@@ -115,10 +111,10 @@ module ForkTool =
             val ChargeTaken: string = "tool/commission/charge-taken"
 
             [<Literal>]
-            val RoadNotOpened: string = "tool/commission/road-not-opened"
+            val WorkNotOpened: string = "tool/commission/work-not-opened"
 
             [<Literal>]
-            val RoadCannotTakeCharge: string = "tool/commission/road-cannot-take-charge"
+            val WorkCannotTakeCharge: string = "tool/commission/work-cannot-take-charge"
 
         [<RequireQualifiedAccess>]
         module Resume =
@@ -134,6 +130,9 @@ module ForkTool =
             [<Literal>]
             val AssessmentPendingForDevOps: string = "tool/resume/assessment-pending-for-devops"
 
+            [<Literal>]
+            val DispatchClosed: string = "tool/resume/dispatch-closed"
+
     type Request =
         { Calling: string
           Name: string
@@ -148,3 +147,9 @@ module ForkTool =
     val managerSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
     val resumeSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
     val orchestratorSpec: factory: HostToolFactory -> scope: ToolRuntimeScope -> ToolSpec
+
+    val executeReceipt:
+        scope: ToolRuntimeScope ->
+        context: HostToolContext ->
+        args: HostToolArguments ->
+            Task<Result<ForkReceipt, string>>

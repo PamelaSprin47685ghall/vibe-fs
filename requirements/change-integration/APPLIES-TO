@@ -1,8 +1,6 @@
 # Positive package-external path set. Repository-root relative; gitignore wildmatch syntax.
 # requirements/change-integration/** is covered implicitly.
 /src/Wanxiangshu/Change/**
-/src/Wanxiangshu/Git/Gateway.fs
-/src/Wanxiangshu/Git/Gateway.fsi
 /src/Wanxiangshu/Git/IntegrationGate.fs
 /src/Wanxiangshu/Git/IntegrationGate.fsi
 /src/Wanxiangshu/Git/Operations.fs

@@ -6,8 +6,7 @@ open Wanxiangshu.Foundation.Identity
 /// Observation view over Journal Blog + Enforcement substrate.
 ///
 /// Cutover DONE: physical EventStore / journal facts ARE
-/// `BlogObservationCommitted` (frame append + enforcement tip half) and
-/// `BlogObservationsSquashed` (frame collapse + tip co-truncate). This module
+/// `BlogObservationCommitted` (frame append + enforcement tip half). This module
 /// names the paired fold over those facts — it does not own a second store.
 ///
 /// Coverage stays a BlogProjection fold field (not a private coverage file).
@@ -28,7 +27,7 @@ module ObservationProjection =
         | None -> []
         | Some state ->
             EnforcementProjection.recentTips state
-            |> List.map (fun tip -> tip.FieldName, tip.CycleId)
+            |> List.map (fun tip -> tip.TipName, tip.CycleId)
 
     /// Zip Enforcement RecentTips with Blog frames into domain WorkLogObservations.
     ///
@@ -39,14 +38,3 @@ module ObservationProjection =
         (blog: BlogProjectionState option)
         : WorkLogObservation list =
         RulebookObservation.ofTipsAndFrames (tipIdentities enforcement) (frameDigests blog)
-
-    /// After Observation squash (`BlogObservationsSquashed` + `EnforcementProjection.applySquash`),
-    /// re-derive the paired list. Pure convenience over `observationsOf`.
-    let observationsAfterSquash
-        (coveredFrameCount: int)
-        (enforcement: EnforcementProjectionState)
-        (blog: BlogProjectionState)
-        : WorkLogObservation list =
-        let tips = EnforcementProjection.applySquash coveredFrameCount enforcement
-
-        observationsOf (Some tips) (Some blog)

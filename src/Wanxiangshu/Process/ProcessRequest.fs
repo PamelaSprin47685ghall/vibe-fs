@@ -81,18 +81,19 @@ type TextProcessExit =
 
 type TextProcessRunner = Command -> Task<Result<TextProcessExit, ProcessResult>>
 
-type RunProcess =
-    Command -> ProcessEstimate -> ProcessContext -> CancellationToken -> Task<ProcessResult>
+type RunProcess = Command -> ProcessEstimate -> ProcessContext -> CancellationToken -> Task<ProcessResult>
 
 module ProcessResult =
     let requireText result =
         match result with
-        | ProcessResult.Observed
-            { End = EndEvidence.Confirmed(ProgramEnd.Exited code)
-              StopRequested = None
-              Output = Some(CapturedOutput.InMemory(stdout, stderr))
-              Fault = None } ->
-            Ok { ExitCode = code; Stdout = stdout; Stderr = stderr }
+        | ProcessResult.Observed { End = EndEvidence.Confirmed(ProgramEnd.Exited code)
+                                   StopRequested = None
+                                   Output = Some(CapturedOutput.InMemory(stdout, stderr))
+                                   Fault = None } ->
+            Ok
+                { ExitCode = code
+                  Stdout = stdout
+                  Stderr = stderr }
         | other -> Error other
 
     let private outputDescription output =
@@ -105,8 +106,12 @@ module ProcessResult =
         match result with
         | ProcessResult.NotStarted reason -> sprintf "Process not started: %A" reason
         | ProcessResult.Observed observation ->
-            sprintf "Process end: %A; stop: %A; output: %s; fault: %A"
-                observation.End observation.StopRequested (outputDescription observation.Output) observation.Fault
+            sprintf
+                "Process end: %A; stop: %A; output: %s; fault: %A"
+                observation.End
+                observation.StopRequested
+                (outputDescription observation.Output)
+                observation.Fault
 
 module ProcessEstimate =
 

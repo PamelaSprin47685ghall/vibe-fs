@@ -122,7 +122,7 @@ module CasebookBookkeeperSurface =
 
                     member _.SendPrompt(childId, text, agent) =
                         task {
-                            let exactTools = Map.ofList [ "*", false; "js-bookkeeper", true ]
+                            let exactTools = Map.ofList [ "*", false; "todowrite-for-bookkeeper", true ]
 
                             let opts: Wanxiangshu.OpenCode.SessionPromptOptions =
                                 { Model = None

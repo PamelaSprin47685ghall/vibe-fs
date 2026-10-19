@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { performance } from 'node:perf_hooks'
 import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 
 // Keep the original retained journal bytes. Only this child owns the wall clock.
 const NativeDate = Date
@@ -43,11 +43,13 @@ const healthyAgents = fixture.healthy
 let result
 
 await withExecutablePlugin(async (hooks, directory, ids, runtime) => {
-  const source = join(directory, '.git/wanxiangshu/events/6501f2cb85a44e099ae21008cb87f83f-0000.ndjson')
+  const source = join(directory, '.Herdchestra/wanxiangshu/events/6501f2cb85a44e099ae21008cb87f83f-0000.ndjson')
   const healthy = healthyAgents.map(agent =>
     observeAuthority(runtime, 'gap159-cold-mixed-predictor-' + agent).activeLogicalRun,
   )
-  assert.deepEqual(healthy.map(profile => profile.participantIdentity.role), healthyAgents)
+  const cuts = readdirSync(dirname(source)).filter(name => name.endsWith('.ndjson')).flatMap(name =>
+    readFileSync(join(dirname(source), name), 'utf8').split('\n').filter(line => line.includes('failed_event_id')))
+  assert.deepEqual(healthy.map(profile => profile?.participantIdentity.role), healthyAgents, JSON.stringify(cuts))
   const before = observeAuthority(runtime, session).activeLogicalRun
   if (sameEvent) assert.equal(before.participantIdentity.role, 'engineer')
   else assert.equal(before, null)
@@ -73,7 +75,7 @@ await withExecutablePlugin(async (hooks, directory, ids, runtime) => {
   assert.deepEqual(readFileSync(source), original)
   result = { ok: true, originalDigest: digest, healthyRoles: fixture.roles }
 }, {}, async input => {
-  const events = join(input.directory, '.git/wanxiangshu/events')
+  const events = join(input.directory, '.Herdchestra/wanxiangshu/events')
   mkdirSync(events, { recursive: true })
   writeFileSync(join(events, '6501f2cb85a44e099ae21008cb87f83f-0000.ndjson'), original)
   return plugin.server(input)

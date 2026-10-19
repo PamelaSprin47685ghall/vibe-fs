@@ -14,7 +14,7 @@ type AttachmentKind =
     | SyncCoder
     /// EXEC-026: the Engineer role's dedicated attachment identity.
     | SyncEngineer
-    /// planning-010: the plan ask delegation's fixed DevOps attachment identity.
+    /// work-028: the plan ask delegation's fixed DevOps attachment identity.
     | SyncDevOps
     | Bookkeeper of transactionId: string
     | StrengthReplica

@@ -94,5 +94,5 @@ module LegacyProtocolClassifier =
     /// The refusal an unmigrated store produces before any fold runs.
     let refusalMessage (reason: string) : string =
         sprintf
-            "this Strength store predates the readonly delegation protocol (%s); run the offline migration first: node scripts/migrate-delegation-history.mjs --backup <copy-of-.git> --input-version pre-delegation --contract-revision 1 --report <file> --execute; the runtime never migrates data"
+            "this local Strength store predates the readonly delegation protocol (%s); refuse this history. Old .git runtime data is retired and must not be imported into .Herdchestra"
             reason

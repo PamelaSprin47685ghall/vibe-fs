@@ -2,6 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { withForkRuntime, toolModule } from './support/fork-runtime.mjs'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
+import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { withSyncRuntime } from './support/sync-runtime.mjs'
 
 test('WHAT[delegation-024] pre-join resume preserves both public join WorkRecords', async () => {
   const owner = 'prejoin-retained-delivery'
@@ -23,6 +26,67 @@ test('WHAT[delegation-024] pre-join resume preserves both public join WorkRecord
     assert.match(result, /RETAINED-ANSWER-B/)
     assert.equal((result.match(/RETAINED-ANSWER-A/g) ?? []).length, 1)
     assert.equal((result.match(/RETAINED-ANSWER-B/g) ?? []).length, 1)
+  })
+})
+
+test('WHAT[delegation-024] child completion record comes from delivered value and an undelivered child reports status undelivered', async () => {
+  const owner = 'delivered-and-undelivered-join'
+  await withForkRuntime(owner, async runtime => {
+    const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'DELIVER-CHARGE')
+    await forkTool.awaitPromptCount(runtime, 1)
+    assert.equal(forkTool.acceptPrompt(runtime, 0), true)
+    assert.match(await first, /Ada/)
+    const childSession = forkTool.child(runtime)
+    forkTool.recordDeliveredValue(childSession, { summary: 'DELIVERED-RECORD', files: 2 })
+    assert.equal(await forkTool.settle(runtime, owner, 'RAW-PROSE-IGNORED', 'provider-delivered'), true)
+
+    const deliveredReceipt = await forkTool.executeJoinReceipt(runtime, owner)
+    assert.equal(deliveredReceipt.ok, true)
+    assert.equal(deliveredReceipt.records.length, 1)
+    assert.equal(deliveredReceipt.records[0].name, 'Ada')
+    assert.equal(deliveredReceipt.records[0].status, 'completed')
+    assert.match(deliveredReceipt.records[0].workRecord, /summary = "DELIVERED-RECORD"/)
+    assert.match(deliveredReceipt.records[0].workRecord, /files = 2/)
+    assert.doesNotMatch(deliveredReceipt.records[0].workRecord, /RAW-PROSE-IGNORED/)
+
+    const second = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'UNDELIVERED-CHARGE')
+    await forkTool.awaitPromptCount(runtime, 2)
+    assert.equal(forkTool.acceptPrompt(runtime, 1), true)
+    assert.match(await second, /Ada/)
+    assert.equal(await forkTool.settleUndelivered(runtime, owner, 'PLAIN-RETURN-NO-DELIVER', 'provider-undelivered'), true)
+
+    const undeliveredReceipt = await forkTool.executeJoinReceipt(runtime, owner)
+    assert.equal(undeliveredReceipt.ok, true)
+    assert.equal(undeliveredReceipt.records.length, 1)
+    assert.equal(undeliveredReceipt.records[0].name, 'Ada')
+    assert.equal(undeliveredReceipt.records[0].status, 'undelivered')
+    assert.equal(undeliveredReceipt.records[0].workRecord, '')
+  })
+})
+
+test('WHAT[delegation-024] synchronous observed completion refuses undelivered prose and returns only the explicit delivered value', async () => {
+  const owner = 'sync-explicit-delivery'
+  await withSyncRuntime(owner, async runtime => {
+    for (const delivered of [false, true]) {
+      const execution = sync.startObserved(runtime, owner, `EXPLICIT-DELIVERY-${delivered}`)
+      const completion = sync.observedCompletion(execution)
+      const count = delivered ? 2 : 1
+      await sync.awaitPromptCount(runtime, owner, 'Engineer', count)
+      assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', count - 1, dispatch.admittedWithPhysicalMessage(`explicit-physical-${delivered}`)), true)
+      const accepted = await sync.observedAdmission(execution)
+      if (delivered) sync.recordDeliveredValue(accepted.sessionId, { summary: 'EXPLICIT-DELIVERY', files: 2 })
+      assert.equal(await sync.settleExactTerminal(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, `explicit-provider-${delivered}`, 'PROSE-IS-NOT-DELIVERY', 'REASONING-IS-NOT-DELIVERY'), true)
+      const result = await completion
+      assert.equal(result.ok, delivered)
+      if (delivered) {
+        assert.match(result.value.formalText, /summary = "EXPLICIT-DELIVERY"/)
+        assert.match(result.value.formalText, /files = 2/)
+        assert.doesNotMatch(result.value.formalText, /PROSE-IS-NOT-DELIVERY|REASONING-IS-NOT-DELIVERY|TOOL-RESULT-ONLY/)
+        assert.equal(result.value.physicalUserMessageId, accepted.physicalUserMessageId)
+      } else {
+        assert.match(result.error, /undelivered/)
+      }
+    }
   })
 })
 
@@ -62,8 +126,6 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
   const runtime = await forkTool.createRuntime(directory, ownerDescriptor(owner))
 
   try {
-    await forkTool.captureOwnerOpening(runtime, owner, 'ROOT-OPENING-MARKER')
-
     const first = forkTool.executeManagerFork(
       runtime,
       toolModule,
@@ -78,12 +140,9 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
     const child = forkTool.child(runtime)
     assert.notEqual(child, null)
     assert.match(forkTool.prompt(runtime, 0), /FIRST-FORK-CHARGE/)
-    assert.match(forkTool.prompt(runtime, 0), /ROOT-OPENING-MARKER/)
     assert.match(await first, /Ada/)
 
     assert.equal(await forkTool.settle(runtime, owner, 'FIRST-FORK-ANSWER', 'fork-run-1'), true)
-
-    await forkTool.captureOwnerDeltaPart(runtime, owner, 'PARENT-FRESH-DELTA-MARKER', 'parent-run-2')
 
     const second = forkTool.executeManagerResume(
       runtime,
@@ -101,9 +160,6 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
 
     const secondPrompt = forkTool.prompt(runtime, 1)
     assert.match(secondPrompt, /SECOND-FORK-CHARGE/)
-    assert.match(secondPrompt, /commissioner_record\s*=/)
-    assert.match(secondPrompt, /PARENT-FRESH-DELTA-MARKER/)
-    assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
 
     const secondResult = await second
     assert.match(secondResult, /Ada/)
@@ -125,26 +181,6 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
   } finally {
     await forkTool.disposeRuntime(runtime)
   }
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const handoff = await import("../../../dist/Execution/Delegation/HandoffSurface.js");
-
-
-test('WHAT[delegation-024] reusable handoff advances one durable parent delta window at a time', () => {
-  const first = handoff.handoffWindow(null, 10)
-  assert.deepEqual(first, { start: 0, end: 10, isInitial: true })
-
-  const second = handoff.handoffWindow(10, 17)
-  assert.deepEqual(second, { start: 10, end: 17, isInitial: false })
-
-  assert.deepEqual(handoff.handoffWindow(17, 17), { start: 17, end: 17, isInitial: false })
-})
-test('WHAT[delegation-024] bounded child result never widens to an earlier invocation', () => {
-  assert.deepEqual(handoff.childRange(31, 44), { start: 31, end: 44 })
 })
 }
 
@@ -178,12 +214,9 @@ const verifyReusableHandoff = async (role) => {
   const owner = `owner-handoff-${role.toLowerCase()}`
   const h = await live(owner)
   try {
-    await sync.captureOwnerOpening(h, owner, 'ROOT-OPENING-MARKER')
-
     const first = sync.invoke(h, owner, role, 'FIRST-CHARGE')
     await waitForPromptCount(h, owner, role, 1)
-    assert.equal(sync.handoffFrontier(h, owner, role), null)
-    assert.match(sync.prompt(h, owner, role, 0), /ROOT-OPENING-MARKER/)
+    assert.match(sync.prompt(h, owner, role, 0), /FIRST-CHARGE/)
     assert.match(
       sync.prompt(h, owner, role, 0),
       /closing report/,
@@ -194,19 +227,11 @@ const verifyReusableHandoff = async (role) => {
     const firstResult = await first
     assert.equal(firstResult.ok, true)
     assert.match(firstResult.value, /FIRST-ANSWER/)
-    const firstFrontier = sync.handoffFrontier(h, owner, role)
-    assert.notEqual(firstFrontier, null)
-
-    await sync.captureOwnerDeltaPart(h, owner, 'PARENT-DELTA-ONLY-MARKER', 'parent-run-2')
 
     const second = sync.invoke(h, owner, role, 'SECOND-CHARGE')
     await waitForPromptCount(h, owner, role, 2)
     const secondPrompt = sync.prompt(h, owner, role, 1)
     assert.match(secondPrompt, /SECOND-CHARGE/)
-    assert.match(secondPrompt, /commissioner_record\s*=/)
-    assert.match(secondPrompt, /PARENT-DELTA-ONLY-MARKER/)
-    assert.doesNotMatch(secondPrompt, /ROOT-OPENING-MARKER/)
-    assert.equal(sync.handoffFrontier(h, owner, role), firstFrontier)
 
     assert.equal(
       await sync.settleWithAuthorityRoot(h, owner, role, 'STALE-ANSWER', 'run-stale', 'old-authority-root'),
@@ -219,7 +244,6 @@ const verifyReusableHandoff = async (role) => {
     assert.equal(secondResult.ok, true)
     assert.match(secondResult.value, /SECOND-ANSWER/)
     assert.doesNotMatch(secondResult.value, /FIRST-ANSWER/)
-    assert.notEqual(sync.handoffFrontier(h, owner, role), firstFrontier)
     assert.equal(sync.childCount(h), 1)
   } finally { sync.dispose(h) }
 }

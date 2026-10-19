@@ -50,8 +50,7 @@ const commitY = async (handle, { from, to, body, n }) => {
     textRef: written.blobRef,
     textDigest: written.blobDigest,
     toolCallIds: [],
-    tipRuleId: `tip-y${n}`,
-    fieldNameAtCommit: `field-y${n}`,
+    tipName: `tip-y${n}`,
     observedPrefixEpoch: 0,
   })
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))
@@ -435,32 +434,9 @@ for (const prefixKind of ['reasoning', 'text']) {
   }
 }
 
-test('WHAT[work-record-004] an actual durable squash spanning invocations restores only bounded originals after cold replay', async () => {
-  await withReopenableJournal(async (handle, reopen) => {
-    const session = 'record-range-squashed'
-    await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
-    await workRecord.captureProjection(handle, session, { messages: rangeMessages })
-    await commitFrame(handle, session, { from: 0, through: 3, body: 'PRIOR_SUMMARY', id: 'prior' })
-    await commitFrame(handle, session, { from: 3, through: 5, body: 'CURRENT_REASONING_SUMMARY', id: 'current' })
-    await commitFrame(handle, session, { from: 5, through: 9, body: 'CURRENT_BODY NEXT_WORK', id: 'later' })
-    const range = { StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 8 } }
-    const written = await journal.JournalSurface_writePayload(handle, 'PRIOR_WORK CURRENT_BODY NEXT_WORK SQUASHED_SUMMARY')
-    assert.equal(written.ok, true)
-    const committed = await workRecord.appendBlogSquash(handle, session, 'squash-run', {
-      bloggerSessionId: `blog-${session}`, requestId: 'squash-request',
-      previousFrameEpoch: 0, nextFrameEpoch: 1, coveredFrameCount: 3,
-      textRef: written.blobRef, textDigest: written.blobDigest,
-    })
-    assert.equal(committed.ok, true, committed.error)
-    const bounded = await workRecord.lifecycleWorkRecordBounded(handle, session, range)
-    assert.equal(bounded, 'Recent work\nCURRENT_REASONING\nassistant: CURRENT_BODY')
-    assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), bounded)
-  })
-})
-
 for (const providerRun of [undefined, 'current-run']) {
   for (const readBefore of [false, true]) {
-    for (const mutation of ['entry', 'squash']) {
+    for (const mutation of ['entry', 'original']) {
       test(`WHAT[work-record-004] completed representation survives later ${mutation}, readBefore=${readBefore}, providerRun=${providerRun}`, async () => {
         await withReopenableJournal(async (handle, reopen) => {
           const session = `completed-record-${providerRun}-${readBefore}-${mutation}`
@@ -480,18 +456,10 @@ for (const providerRun of [undefined, 'current-run']) {
           } else {
             await workRecord.captureProjection(handle, session, { messages: rangeMessages })
             await commitFrame(handle, session, { from: 5, through: 9, body: 'CURRENT_BODY NEXT_WORK', id: 'future' })
-            const blob = await journal.JournalSurface_writePayload(handle, 'PRIOR_WORK CURRENT_BODY NEXT_WORK SQUASHED_SUMMARY')
-            assert.equal(blob.ok, true)
-            const squashed = await workRecord.appendBlogSquash(handle, session, 'squash-run', {
-              bloggerSessionId: `blog-${session}`, requestId: 'squash-request',
-              previousFrameEpoch: 0, nextFrameEpoch: 1, coveredFrameCount: 3,
-              textRef: blob.blobRef, textDigest: blob.blobDigest,
-            })
-            assert.equal(squashed.ok, true, squashed.error)
             await workRecord.captureTerminalText(handle, session, 'NEXT_FINAL', 'next-run')
           }
           const live = await workRecord.lifecycleWorkRecord(handle, session, false)
-          assert.match(live, mutation === 'entry' ? /LATE_SUMMARY/ : /SQUASHED_SUMMARY/)
+          assert.match(live, mutation === 'entry' ? /LATE_SUMMARY/ : /CURRENT_BODY NEXT_WORK/)
           assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, range), expected)
           const recovered = await reopen()
           assert.equal(await workRecord.lifecycleWorkRecordBounded(recovered, session, range), expected)
@@ -574,7 +542,7 @@ test('WHAT[work-record-004] a completed representation survives reanchor and a f
   })
 })
 
-test('WHAT[work-record-004] a corrupt frozen frame fails closed even after a valid squash replaces the live frames', async () => {
+test('WHAT[work-record-004] a corrupt frozen frame fails closed after later valid frames arrive', async () => {
   await withReopenableJournal(async (handle, reopen) => {
     const session = 'completed-corrupt-frame'
     await workRecord.captureOpening(handle, session, 'ROOT_CHARGE', [])
@@ -586,15 +554,7 @@ test('WHAT[work-record-004] a corrupt frozen frame fails closed even after a val
     await workRecord.captureTerminalText(handle, session, 'CURRENT_BODY', 'current-run')
     await workRecord.captureProjection(handle, session, { messages: rangeMessages })
     await commitFrame(handle, session, { from: 5, through: 9, body: 'FUTURE_SUMMARY', id: 'future' })
-    const blob = await journal.JournalSurface_writePayload(handle, 'VALID_SQUASHED_SUMMARY')
-    assert.equal(blob.ok, true)
-    const squashed = await workRecord.appendBlogSquash(handle, session, 'squash-run', {
-      bloggerSessionId: `blog-${session}`, requestId: 'squash-request',
-      previousFrameEpoch: 0, nextFrameEpoch: 1, coveredFrameCount: 3,
-      textRef: blob.blobRef, textDigest: blob.blobDigest,
-    })
-    assert.equal(squashed.ok, true, squashed.error)
-    assert.match(await workRecord.lifecycleWorkRecord(handle, session, false), /VALID_SQUASHED_SUMMARY/)
+    assert.equal(await workRecord.lifecycleWorkRecord(handle, session, false), null)
     const range = { StartInclusive: { Sequence: 4 }, EndExclusive: { Sequence: 8 }, ProviderRun: 'current-run' }
     assert.equal(await workRecord.lifecycleWorkRecordBounded(handle, session, range), null)
     assert.equal(await workRecord.lifecycleWorkRecordBounded(await reopen(), session, range), null)
@@ -655,31 +615,6 @@ test('WHAT[work-record-004] a completed frontier excludes later concurrent write
     assert.equal(history.read(causalRange).record, completed.record)
   })
 })
-
-for (const [mutation, steps] of [
-  ['partial-squash', ['late-entry', 'partial-squash']],
-  ['full-squash', ['late-entry', 'partial-squash', 'full-squash']],
-  ['nested-squash', ['late-entry', 'partial-squash', 'full-squash', 'late-tip', 'nested-squash']],
-]) {
-  test(`WHAT[work-record-004] completed bytes exclude concurrent writer ${mutation} ancestry after cold replay`, async () => {
-    await withCausalHistory(async history => {
-      await history.append('completed-a', 'terminal-writer', 0xf0000000, [history.base])
-      const completed = history.read()
-      const genericRange = { StartInclusive: causalRange.StartInclusive, EndExclusive: causalRange.EndExclusive }
-      const generic = history.read(genericRange).record
-      let parent = history.base
-      for (let index = 0; index < steps.length; index += 1) {
-        parent = await history.append(steps[index], 'late-writer', 0x10000000 + index, [parent])
-      }
-      const recovered = history.read()
-      assert.match(recovered.live, new RegExp(mutation.toUpperCase().replaceAll('-', '_')))
-      assert.equal(recovered.terminal.frontier.sequence, 4)
-      assert.equal(recovered.record, completed.record)
-      assert.equal(history.read(genericRange).record, generic)
-      assert.equal(history.read().record, completed.record)
-    })
-  })
-}
 
 test('WHAT[work-record-004] a new Terminal sees all merged heads and retains them across later concurrent originals', async () => {
   await withCausalHistory(async history => {

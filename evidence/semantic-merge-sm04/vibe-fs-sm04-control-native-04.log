@@ -1,0 +1,54 @@
+✔ WHAT[repository-programming-006] JS011_sandbox_program_uses_bindings_end_to_end (25.679083ms)
+✔ WHAT[repository-programming-006] JS011_program_runs_and_returns_json (0.79375ms)
+✔ WHAT[repository-programming-006] JS011_api_is_the_only_authority_in_the_context (0.677875ms)
+✔ WHAT[repository-programming-006] JS054_1_sync_infinite_loop_is_killed_by_vm_timeout (202.086458ms)
+✔ WHAT[repository-programming-006] JS054_1_async_deadline_proxy_aborts_api_calls_after_deadline (1.913416ms)
+✔ WHAT[repository-programming-006] JS054_2_output_bound_rejects_oversized_results (0.736583ms)
+✔ WHAT[repository-programming-006] output budget measures UTF-8 bytes and accepts the exact boundary (1.361791ms)
+✔ WHAT[repository-programming-006] pending async work and post-await computation terminate within the execution budget (0.052042ms) # TODO
+✔ WHAT[repository-programming-006] memory exhaustion is contained without exhausting the Host process (0.062334ms) # TODO
+✔ WHAT[repository-programming-031] deliver hard gate is wired at the deliverSpec execute chain (1.388084ms)
+✔ WHAT[repository-programming-031] parked reminder rides the PairHint composeMarkerDocument (0.752375ms)
+✔ WHAT[repository-programming-031] session close force-reaps parked sites owned by the session (0.223291ms)
+✔ WHAT[repository-programming-031] parked reminder and deliver-block resources are paired bilingual files (0.942792ms)
+✔ WHAT[repository-programming-031] the three call sites stay within the owned files and do not define the parked table (0.516958ms)
+✔ WHAT[repository-programming-031] a real parked handle blocks deliver and the refusal names the handle (821.845916ms)
+✔ WHAT[repository-programming-031] a live parked handle is folded into the PairHint marker by the real transform (605.083125ms)
+✔ WHAT[repository-programming-031] reapSession consumes every site of its session from the real table (20.597792ms)
+✔ WHAT[repository-programming-039] parked sites carry a session owner so session close can reap them (0.494ms)
+✔ WHAT[repository-programming-039] the parked-site table is one process-level static module shared by its consumers, not redefined by them (1.34375ms)
+✔ WHAT[repository-programming-039] a parked program is process-live: it survives across calls within the process (24.251958ms)
+✔ WHAT[repository-programming-050] a Runnable missing watch is refused with RUNNABLE_SPEC_INCOMPLETE (16.242625ms)
+✔ WHAT[repository-programming-050] a Runnable missing sanity is refused with RUNNABLE_SPEC_INCOMPLETE (11.179291ms)
+✔ WHAT[repository-programming-050] the host loop runs one foreground command and reports the structured outcome (90.084792ms)
+✔ WHAT[repository-programming-050] onExit dispatches every exited command with its exit code (110.226916ms)
+✔ WHAT[repository-programming-050] a watch abort kills the foreground command and reports aborted (215.019458ms)
+✔ WHAT[repository-programming-050] watch returning false is a real veto, not a synonym for continue (115.441333ms)
+✔ WHAT[repository-programming-050] a watch park suspends the run and resumes after unpark (377.04225ms)
+✔ WHAT[repository-programming-050] a sanity thunk that fails to show its exit parks with the diagnosis (13.146584ms)
+✔ WHAT[repository-programming-050] a sanity that returns non-thunks is refused with RUNNABLE_SPEC_INCOMPLETE (8.350958ms)
+✔ WHAT[repository-programming-050] maxDuration expiry kills the command and reports timeout (422.338083ms)
+✔ WHAT[repository-programming-051] spawn, waitFor and signal drive one background server (338.565792ms)
+✔ WHAT[repository-programming-051] waitFor on a closed port fails with RUN_WAIT_TIMEOUT (426.261042ms)
+✔ WHAT[repository-programming-051] signal on an unknown name fails with RUN_CHILD_UNKNOWN (10.768834ms)
+✔ WHAT[repository-programming-051] a crashed background is visible to watch and can abort the run (114.110875ms)
+✔ WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run (1261.88275ms)
+✔ WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed (334.423584ms)
+✔ WHAT[repository-programming-058] js.run drives an interactive child through send and observes the deltas (602.958083ms)
+✔ WHAT[repository-programming-058] send to an unknown child fails with RUN_CHILD_UNKNOWN (11.585125ms)
+✔ WHAT[work-009] new pipe ownership blocks the current family while fixed DevOps keeps its own scope across retirement (20.880125ms)
+✔ WHAT[work-009] a live owned resource blocks deliver without retiring (0.49225ms)
+✔ WHAT[work-009] the second deliver reports the live blocker instead of reporting an end (1246.479458ms)
+✔ WHAT[work-009] ToolRuntimeScope ownership tracks tool-owned-work and PTY leases, keeps blockers across Cancel/Drain, and clears only on Ended (4.613542ms)
+✔ WHAT[work-009] durable ownership host commits Reserve before granting start permission and retains blockers across Cancel and Drain (14.092542ms)
+✔ WHAT[work-009] a process-local reservation never grants durable launch permission (0.266375ms)
+✔ WHAT[work-009] an unknown ownership scope is an error rather than proof of no resources (0.42425ms)
+✔ WHAT[work-009] durable blocker queries refuse a missing owner and a missing scope (10.81725ms)
+ℹ tests 46
+ℹ suites 0
+ℹ pass 44
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 2
+ℹ duration_ms 5607.031667

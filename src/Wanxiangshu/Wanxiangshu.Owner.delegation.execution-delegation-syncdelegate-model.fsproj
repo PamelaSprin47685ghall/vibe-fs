@@ -14,8 +14,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.session-ontology.execution-session-syncdelegaterole.fsproj"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fsi"/>
     <Compile Include="Execution/Delegation/SyncDelegate/Model.fs"/>
-    <Compile Include="Execution/Delegation/HandoffIdentity.fsi"/>
-    <Compile Include="Execution/Delegation/HandoffIdentity.fs"/>
     <Compile Include="Execution/Delegation/Facts.fsi"/>
     <Compile Include="Execution/Delegation/Facts.fs"/>
     <Compile Include="Execution/Session/AgentCompletion.fsi"/>

@@ -13,7 +13,6 @@ open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
-open Wanxiangshu.Interaction.Attention
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Dispatch.OpenCode
@@ -29,6 +28,72 @@ open Wanxiangshu.Resources
 /// Ordinary turn observation policy (INTERACTION-REPAIR / PROVIDER-RECOVERY / TERMINAL-REPORT).
 module OrdinaryTurnWorkflow =
 
+    type private LongWorkGate =
+        | Ordinary
+        | Wait
+        | Continue
+
+    let private isExplicitWaitOrOldTurn
+        (authority: PromptAuthority.PromptAuthorityProjection option)
+        (turn: ReconciledTurn)
+        : bool =
+        authority
+        |> Option.exists (fun state ->
+            let obsolete =
+                match state.ActiveLogicalRun with
+                | Some active -> active.AuthorityRootUserMessageId <> turn.AuthorityRootUserMessageId
+                | None -> state.LastAuthorityProfile.IsSome
+
+            obsolete
+            || (state.UserQuestions
+                |> Map.exists (fun _ question ->
+                    question.Request.AuthorityRootUserMessageId = turn.AuthorityRootUserMessageId
+                    && (question.Answer.IsNone || question.Request.ProviderRunId = turn.ProviderRun))))
+
+    let private isTurnWorkSettled (turn: ReconciledTurn) : bool =
+        turn.Directory
+        |> Option.bind (fun directory ->
+            let commonDir = RuntimePath.stateRoot directory
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value turn.SessionId))
+        |> Option.exists (fun work ->
+            work.Delivered
+            || List.contains (ProviderRunIdentity.value turn.ProviderRun) work.RetiredRuns)
+
+    let private classifyManagerOrPlanTurn (context: ReconciledTurnContext) : LongWorkGate =
+        let turn = context.Turn
+
+        match context.Failure, turn.Observation, turn.Outcome with
+        | None, None, ReconcileProgram.TurnCompleted -> Continue
+        | None, None, ReconcileProgram.TurnNeedsContinuation _ when
+            turn.Finish
+            |> Option.exists (fun finish ->
+                System.String.Equals(finish, "stop", System.StringComparison.OrdinalIgnoreCase))
+            ->
+            Continue
+        | _ -> Ordinary
+
+    let private longWorkGate (journal: AgentJournal option) (context: ReconciledTurnContext) =
+        let turn = context.Turn
+
+        let isManaged =
+            match turn.Role with
+            | Some(Role.Manager | Role.Plan) -> true
+            | _ -> false
+
+        let authority () =
+            journal
+            |> Option.bind (fun durable ->
+                (AgentJournal.snapshot durable).AgentProjections.Sessions
+                |> Map.tryFind turn.SessionId
+                |> Option.bind (fun session -> session.PromptAuthority))
+
+        if not isManaged then
+            Ordinary
+        elif isExplicitWaitOrOldTurn (authority ()) turn || isTurnWorkSettled turn then
+            Wait
+        else
+            classifyManagerOrPlanTurn context
+
     let private bloggerReceiptKind (port: TurnObservationJournalPort) (turn: ReconciledTurn) =
         port.TryBloggerReceiptKind turn.SessionId turn.ProviderRun
 
@@ -39,14 +104,13 @@ module OrdinaryTurnWorkflow =
         match continuationKind, turn.Role with
         | Some PromptContinuationKind.InteractionRepair, _ -> Some ProviderRequestKind.InteractionRepair
         // A Blogger terminal without a durable cycle receipt did not prove a
-        // business Main or maintenance Squash success. Never clear the failure budget
+        // business Main success. Never clear the failure budget
         // from Role alone.
         | _, Some Role.Blogger -> None
         | _ -> Some ProviderRequestKind.WorkMain
 
     let private requestKindOfCompleted (port: TurnObservationJournalPort) (turn: ReconciledTurn) =
         match bloggerReceiptKind port turn with
-        | Some BlogFrameKind.Squash -> Some ProviderRequestKind.BloggerSquash
         | Some BlogFrameKind.Entry -> Some ProviderRequestKind.BloggerMain
         | None -> requestKindWithoutBloggerReceipt port turn
 
@@ -94,8 +158,24 @@ module OrdinaryTurnWorkflow =
             || (observation
                 |> Option.exists (fun port -> port.IsFissionActive context.Turn.SessionId))
 
+        let workGate =
+            if isFissionReplaced then
+                Wait
+            else
+                longWorkGate journal context
+
         match isFissionReplaced, context.Turn.Observation, context.Turn.Outcome with
         | true, _, _ -> AsyncSupport.completedTask ()
+        | false, _, _ when workGate = Wait -> AsyncSupport.completedTask ()
+        | false, _, _ when workGate = Continue ->
+            InteractionRepairWorkflow.repairUnfinishedWork
+                quiescence
+                context
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
+                observer
         | false, Some ReconcileProgram.TurnUnknown, _ ->
             InteractionRepairWorkflow.repairMissingFinalReport
                 quiescence
@@ -167,12 +247,15 @@ module OrdinaryTurnWorkflow =
         (joinGuardNudges: HashSet<string>)
         (quiescence: ISessionQuiescenceGate)
         (context: ReconciledTurnContext)
-        =
+        : Task<bool> =
         task {
             let turn = context.Turn
 
             match context.Quiescence with
-            | None -> ()
+            // No idle permit: no reminder can be claimed on this occasion, and
+            // the reconcile pass dedupes the published turn — this terminal will
+            // not be re-offered. Only publishing now can still reach the parent.
+            | None -> return false
             | Some permit ->
                 match!
                     HostJoinGuard.nudge
@@ -192,81 +275,23 @@ module OrdinaryTurnWorkflow =
                         turn.SessionId
                         (TerminalOutcome.Failed(TerminalStop.forAuthority turn.AuthorityRootUserMessageId reason))
                     |> ignore
-                | _ -> ()
+                    // The Failed terminal was published: the parent already
+                    // learns this occasion resolved. Do not publish again.
+                    return true
+                | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
+                | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding ->
+                    // A durable continuation claim exists on this session: the
+                    // woken run will report a fresh terminal occasion.
+                    return true
+                | HostJoinGuard.JoinGuardNudgeOutcome.NotSent
+                | HostJoinGuard.JoinGuardNudgeOutcome.Superseded
+                | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected _ ->
+                    // No durable claim exists for the reminder, and the reconcile
+                    // pass already consumed this published turn: nothing will
+                    // re-offer this terminal. Withholding it would strand every
+                    // parent waiting on this run.
+                    return false
         }
-
-    /// ATTENTION-005: after an Engineer, DevOps or Orchestrator run reaches
-    /// its natural terminal, pending deferred work is presented once through a
-    /// same-run continuation and then consumed durably. Presentation and
-    /// receipt are idempotent: a replayed terminal finds nothing pending, and a
-    /// failed send leaves the entries for the next terminal.
-    let private presentPendingDeferredWork
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (journal: AgentJournal)
-        (turn: ReconciledTurn)
-        (items: DeferredWorkItem list)
-        =
-        task {
-            let attention = AttentionConcernJournalAdapter.forAttention journal
-
-            let guidance =
-                ProviderProse.render
-                    (ProviderProse.languageOf turn.SessionId)
-                    "attention-regulation/defer-presentation"
-                    Map.empty
-
-            let entries = items |> List.map (fun item -> "- " + item.Text) |> String.concat "\n"
-
-            let prompt = guidance + "\n\n" + entries
-
-            let! sent =
-                HostSessionNudge.sendContinuation
-                    sessionPort
-                    rootWorkspace
-                    turn.SessionId
-                    prompt
-                    PromptAuthority.ContinuationKind.DeferredWorkPresentation
-                    turn.Directory
-                    (Some journal)
-
-            match sent with
-            | Error _ -> return ()
-            | Ok _ ->
-                let fact =
-                    AttentionFactCases.DeferredWorkConsumed
-                        {| SessionId = turn.SessionId
-                           OccurrenceIds = (items |> List.map (fun item -> item.OccurrenceId)) |}
-
-                let! _ = attention.Append turn.SessionId (Some turn.ProviderRun) fact
-                return ()
-        }
-
-    let private presentDeferredWork
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (journal: AgentJournal)
-        (turn: ReconciledTurn)
-        =
-        task {
-            let attention = AttentionConcernJournalAdapter.forAttention journal
-            let pending = AttentionProjection.pending turn.SessionId (attention.Read())
-
-            match pending with
-            | [] -> return ()
-            | items -> return! presentPendingDeferredWork sessionPort rootWorkspace journal turn items
-        }
-
-    let private presentDeferredWorkForRole
-        (sessionPort: ISessionHostPort)
-        (rootWorkspace: IRootWorkspaceReader)
-        (journal: AgentJournal option)
-        (turn: ReconciledTurn)
-        =
-        match journal, turn.Role with
-        | Some durable, Some(Role.Engineer | Role.DevOps | Role.Orchestrator) ->
-            presentDeferredWork sessionPort rootWorkspace durable turn
-        | _ -> Task.FromResult(())
 
     let private handleCompleted
         (sessionPort: ISessionHostPort)
@@ -289,11 +314,35 @@ module OrdinaryTurnWorkflow =
             let joinOutstanding =
                 TerminalPolicy.outstandingBackground terminalPolicyPort hasLivePty turn.Role turn.SessionId
 
+            // A withheld completion is only safe when a later pass is promised
+            // to re-offer this same terminal. When JoinGuard cannot make that
+            // promise (nudge unsent or superseded), the completed terminal is
+            // published instead — deferring would strand every parent waiting
+            // on a fact that already happened. (managed-session-lifecycle:
+            // terminal admission deferral)
+            let resolveOutstandingJoinCompletion () =
+                task {
+                    let! deferred =
+                        applyJoinGuardNudge
+                            sessionPort
+                            rootWorkspace
+                            eventPort
+                            journal
+                            joinGuardNudges
+                            quiescence
+                            context
+
+                    if deferred then
+                        return XTraceTerminalCompletion.RejectedEmptyOutput
+                    else
+                        return! completeAgent ()
+                }
+
             let! completion =
-                if joinOutstanding then
-                    Task.FromResult XTraceTerminalCompletion.RejectedEmptyOutput
-                else
+                if not joinOutstanding then
                     completeAgent ()
+                else
+                    resolveOutstandingJoinCompletion ()
 
             let terminalValid =
                 match completion with
@@ -305,15 +354,7 @@ module OrdinaryTurnWorkflow =
             if terminalValid then
                 do! recordSuccessIfValid journal observation turn
 
-            if TerminalPolicy.sessionDead terminalPolicyPort turn.SessionId then
-                return ()
-            elif joinOutstanding then
-                return!
-                    applyJoinGuardNudge sessionPort rootWorkspace eventPort journal joinGuardNudges quiescence context
-            elif terminalValid then
-                return! presentDeferredWorkForRole sessionPort rootWorkspace journal turn
-            else
-                return ()
+            return ()
         }
         :> Task
 
@@ -423,8 +464,24 @@ module OrdinaryTurnWorkflow =
             FissionRuntime.isSilentInterrupt turn.SessionId
             || (observation |> Option.exists (fun port -> port.IsFissionActive turn.SessionId))
 
+        let workGate =
+            if isFissionReplaced then
+                Wait
+            else
+                longWorkGate journal context
+
         match isFissionReplaced, turn.Observation with
         | true, _ -> AsyncSupport.completedTask ()
+        | false, _ when workGate = Wait -> AsyncSupport.completedTask ()
+        | false, _ when workGate = Continue ->
+            InteractionRepairWorkflow.repairUnfinishedWork
+                quiescence
+                context
+                sessionPort
+                rootWorkspace
+                eventPort
+                journal
+                observer
         | false, Some ReconcileProgram.TurnUnknown ->
             InteractionRepairWorkflow.repairMissingFinalReport
                 quiescence

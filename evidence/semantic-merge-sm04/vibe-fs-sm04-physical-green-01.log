@@ -1,0 +1,11 @@
+✔ WHAT[process-execution-018] js.run keeps split UTF-8 bytes, BOM and trailing CRLF in both native streams (396.533292ms)
+✔ WHAT[process-execution-018] native SIGTERM and an ordinary exit 143 remain different facts (204.056416ms)
+✔ WHAT[process-execution-018] a foreground command receives EOF after its input and completes normally (60.157458ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 853.305708

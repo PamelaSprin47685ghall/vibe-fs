@@ -10,7 +10,7 @@ type TipGuidance =
     {
         TipName: string
         Presentation: TipPresentation
-        /// Marker tip half only (Full = name header + main.md; Identity = tip: name).
+        /// Marker tip half only (Full = name header + authored tip body; Identity = tip: name).
         Text: string
     }
 

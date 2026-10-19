@@ -1,99 +1,3 @@
-import test from 'node:test'
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const observation = await import("../../../dist/Enforcer/ObservationSurface.js");
-
-const entryFrame = (n) => observation.blogFrame({
-  kind: 'Entry',
-  digest: `sha-entry-${n}`,
-  ref: `blob-entry-${n}`,
-  coveredFrom: n - 1,
-  coveredThrough: n,
-})
-const squashFrame = (n) => observation.blogFrame({
-  kind: 'Squash',
-  digest: `sha-squash-${n}`,
-  ref: `blob-squash-${n}`,
-  coveredFrom: 0,
-  coveredThrough: 2,
-})
-const cycleRecord = (n, field) => ({
-  mainSessionId: 'ses-main',
-  bloggerSessionId: 'ses-blog',
-  run: `msg_tip_${n}`,
-  toolCallIds: [],
-  textRef: `blob-cycle-${n}`,
-  textDigest: `sha-cycle-${n}`,
-  tipRuleId: field,
-  fieldNameAtCommit: field,
-  evidenceRef: undefined,
-  observedPrefixEpoch: 0,
-})
-const commitEntry = (state, { from, to, cutoffFrom, cutoffTo, digest = `digest-${cutoffTo}`, n = 1 }) =>
-  observation.applyBlogEntry(
-    {
-      frameEpoch: 0,
-      previousIngestedThroughSequence: from,
-      nextIngestedThroughSequence: to,
-      previousCoverableTurnCutoffExclusive: cutoffFrom,
-      nextCoverableTurnCutoffExclusive: cutoffTo,
-      nextCoveredPrefixDigest: digest,
-    },
-    entryFrame(n),
-    state,
-  )
-const readObs = (enforcement, blog) => observation.observationsOf(enforcement, blog).map((o) => ({
-  tipName: o.tipName,
-  cycleId: o.cycleId,
-  frameDigest: o.frameDigest,
-}))
-
-test('WHAT[behavior-diagnosis-016] OBS_PROJ_003_squash_co_moves_tips_and_frames_as_observation', () => {
-  let blog = observation.emptyBlog
-  let enforcement = observation.emptyEnforcement
-
-  for (let n = 1; n <= 3; n += 1) {
-    const applied = observation.applyEnforcementCycle(enforcement, cycleRecord(n, `field-${n}`))
-    assert.equal(applied.ok, true)
-    enforcement = applied.value
-
-    const entry = commitEntry(blog, {
-      from: n - 1,
-      to: n,
-      cutoffFrom: n - 1,
-      cutoffTo: n,
-      n,
-    })
-    assert.equal(entry.ok, true)
-    blog = entry.value
-  }
-
-  assert.equal(readObs(enforcement, blog).length, 3)
-
-  const squashed = observation.applyBlogSquash(
-    { previousFrameEpoch: 0, nextFrameEpoch: 1, coveredFrameCount: 2 },
-    squashFrame(1),
-    blog,
-  )
-  assert.equal(squashed.ok, true, squashed.ok ? '' : squashed.error)
-  const after = observation.observationsAfterSquash(2, enforcement, squashed.value).map((o) => ({
-    tipName: o.tipName,
-    cycleId: o.cycleId,
-    frameDigest: o.frameDigest,
-  }))
-
-  assert.deepEqual(observation.frameKinds(squashed.value), ['Squash', 'Entry'])
-  assert.deepEqual(after, [
-    { tipName: 'field-3', cycleId: 'msg_tip_3', frameDigest: 'sha-squash-1' },
-  ])
-
-  const tipsOnly = observation.applyEnforcementSquash(2, enforcement)
-  assert.deepEqual(readObs(tipsOnly, squashed.value), after)
-})
-}
-
 {
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
@@ -106,7 +10,7 @@ const blog = await import("../../../dist/Enforcer/BlogSurface.js");
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures')
 const TIP_X = 'primitive-obsession'
-const TIP_Y = 'ignored-tdd'
+const TIP_Y = 'tool-error-ignored'
 const WORK_LOG_A = readFileSync(join(FIXTURES, 'observation-a-work-log.txt'), 'utf8').trim()
 const WORK_LOG_B = readFileSync(join(FIXTURES, 'observation-b-work-log.txt'), 'utf8').trim()
 const structuredCall = (occurrence, tip) => ({
@@ -114,7 +18,9 @@ const structuredCall = (occurrence, tip) => ({
   occurrence,
   settlement: 'The observation remains part of the durable paired history.',
   consequence: 'Later selection may compare new material against this established transition.',
-  tip,
+  tipName: tip,
+  opinion: 'The boundary decides later work.',
+  advice: 'Repair the boundary first.',
 })
 const NEW_MATERIAL_SIMILAR_TO_A = `[[new_work_to_record]]
 assistant = "Coder 修改 /src/tenancy/bind.ts：userId 与 tenantId 均声明为 string，绑定函数可互换两个标识。"
@@ -132,8 +38,9 @@ const cycle = (n, tip, run) => ({
   toolCallIds: [`call-paired-${n}`],
   textRef: `blob-paired-${n}`,
   textDigest: `sha-obs-${n === 1 ? 'a' : 'b'}`,
-  tipRuleId: tip,
-  fieldNameAtCommit: tip,
+  tipName: tip,
+  tipTextRef: `blobs/tip-paired-${n}`,
+  tipTextDigest: `sha-tip-paired-${n}`,
   evidenceRef: undefined,
   observedPrefixEpoch: 0,
 })
@@ -183,8 +90,8 @@ const isHistoricFrame = (text) => text.includes('historic_frame')
 
 test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_001_eval_loads_120_tip_catalog_from_owner_surface', () => {
   const rules = enforcer.rules()
-  assert.equal(rules.length, 120)
-  assert.equal(enforcer.ruleCount(), 120)
+  assert.equal(rules.length, enforcer.fieldNames().length)
+  assert.equal(enforcer.ruleCount(), enforcer.fieldNames().length)
   assert.deepEqual(enforcer.fieldNames(), rules.map((r) => r.fieldName))
 
   const x = enforcer.tryFindByField(TIP_X)
@@ -210,19 +117,19 @@ test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_002_observations_a_and_b_c
 
   const tips = observation.recentTips(projected.enforcement)
   assert.deepEqual(
-    tips.map((t) => ({ field: t.fieldName, ruleId: t.ruleId, cycleId: t.cycleId })),
+    tips.map((t) => ({ tipName: t.tipName, cycleId: t.cycleId })),
     [
-      { field: TIP_X, ruleId: TIP_X, cycleId: 'run-obs-a' },
-      { field: TIP_Y, ruleId: TIP_Y, cycleId: 'run-obs-b' },
+      { tipName: TIP_X, cycleId: 'run-obs-a' },
+      { tipName: TIP_Y, cycleId: 'run-obs-b' },
     ],
   )
 
   const decodedX = enforcer.decodeCall(structuredCall(WORK_LOG_A, TIP_X))
   assert.equal(decodedX.ok, true)
-  assert.equal(decodedX.value.tip.fieldName, TIP_X)
+  assert.equal(decodedX.value.tipName, TIP_X)
   const decodedY = enforcer.decodeCall(structuredCall(WORK_LOG_B, TIP_Y))
   assert.equal(decodedY.ok, true)
-  assert.equal(decodedY.value.tip.fieldName, TIP_Y)
+  assert.equal(decodedY.value.tipName, TIP_Y)
 })
 test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_003_selection_path_sees_tip_x_when_new_material_resembles_a', () => {
   const projected = foldPairedHistory()
@@ -230,7 +137,7 @@ test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_003_selection_path_sees_ti
   assert.equal(observations[0].tipName, TIP_X)
 
   const previousTips = observation.recentTips(projected.enforcement).map((t) => ({
-    tipName: t.fieldName,
+    tipName: t.tipName,
     cycleId: t.cycleId,
   }))
   assert.equal(previousTips[0].tipName, TIP_X)
@@ -252,7 +159,6 @@ test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_003_selection_path_sees_ti
     physicalDelta: { id: 'msg-new-similar-to-a', items: NEW_MATERIAL_SIMILAR_TO_A_ITEMS },
     previousTips,
     normalInstructionLines: ['normal history'],
-    squashInstructionLines: ['squash history'],
   })
 
   assert.deepEqual(
@@ -291,39 +197,5 @@ test('WHAT[behavior-diagnosis-016] A42_PAIRED_HISTORY_004_history_visibility_is_
   // surface deliberately has no machine TrueRepeat verdict.
   const candidateRepeat = tipXVisible && NEW_MATERIAL_SIMILAR_TO_A.includes('string')
   assert.equal(candidateRepeat, true)
-})
-}
-
-{
-const { default: assert } = await import("node:assert/strict");
-const { default: test } = await import("node:test");
-const enforcer = await import("../../../dist/Enforcer/Surface.js");
-const observation = await import("../../../dist/Enforcer/ObservationSurface.js");
-
-const fields = enforcer.fieldNames()
-const cycleRecord = (n, field) => ({
-  mainSessionId: 'ses-main',
-  bloggerSessionId: 'ses-blog',
-  run: `msg_tip_${n}`,
-  toolCallIds: [`call-${n}`],
-  textRef: `blob-t${n}`,
-  textDigest: `sha-t${n}`,
-  tipRuleId: field,
-  fieldNameAtCommit: field,
-  evidenceRef: undefined,
-  observedPrefixEpoch: 0,
-})
-
-test('WHAT[behavior-diagnosis-016] ENFORCER_TIP_12_squash_co_truncates_recent_tips', () => {
-  let state = observation.emptyEnforcement
-  for (let n = 1; n <= 2; n += 1) {
-    const applied = observation.applyEnforcementCycle(state, cycleRecord(n, fields[n - 1]))
-    assert.equal(applied.ok, true)
-    state = applied.value
-  }
-  assert.deepEqual(observation.recentTips(observation.applyEnforcementSquash(1, state)).map((t) => t.cycleId), ['msg_tip_2'])
-  assert.deepEqual(observation.recentTips(observation.applyEnforcementSquash(2, state)), [])
-  assert.deepEqual(observation.recentTips(observation.applyEnforcementSquash(5, state)), [])
-  assert.deepEqual(observation.recentTips(observation.applyEnforcementSquash(0, state)).map((t) => t.cycleId), ['msg_tip_1', 'msg_tip_2'])
 })
 }

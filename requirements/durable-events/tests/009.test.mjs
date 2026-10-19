@@ -260,7 +260,7 @@ const openRepo = (name) => {
   execFileSync('git', ['init', '--quiet', workspace])
   return {
     workspace,
-    commonDir: join(workspace, '.git'),
+    commonDir: join(workspace, '.Herdchestra'),
     close: () => rmSync(workspace, { recursive: true, force: true }),
   }
 }
@@ -332,7 +332,7 @@ integrationTest('WHAT[durable-events-009] local_EventStore_never_reads_or_rewrit
   const repo = mkdtempSync(join(tmpdir(), 'wxs-leave-unread-'))
   try {
     execFileSync('git', ['init', '--quiet', repo])
-    const commonDir = join(repo, '.git')
+    const commonDir = join(repo, '.Herdchestra')
     const planted = plant(commonDir)
     const local = eventStore.create(commonDir, 'fresh-writer')
     const event = {
@@ -363,8 +363,8 @@ integrationTest('WHAT[durable-events-009] shock_cut_source_has_no_legacy_shape_d
     new URL('../../../src/Wanxiangshu/Persistence/EventStore/Store.fs', import.meta.url),
     'utf8',
   )
-  const sync = await readFile(
-    new URL('../../../src/Wanxiangshu/Persistence/EventStore/WriterStreamSync.fs', import.meta.url),
+  const log = await readFile(
+    new URL('../../../src/Wanxiangshu/Persistence/EventStore/ProcessEventLog.fs', import.meta.url),
     'utf8',
   )
   const legacySources = [
@@ -373,7 +373,7 @@ integrationTest('WHAT[durable-events-009] shock_cut_source_has_no_legacy_shape_d
   ]
 
   assert.doesNotMatch(
-    eventStore + sync,
+    eventStore + log,
     /LegacyEventsDir|isLegacy|migrat|reset.*root|wanxiangshu-next/i,
   )
   for (const legacy of legacySources) {

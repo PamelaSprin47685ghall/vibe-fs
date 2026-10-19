@@ -511,7 +511,7 @@ export const acceptChildAgentOwnerRoot = async (runtime, childSessionId, promptK
 const lifecycleStore = (runtime) => {
   const directory = runtime?.directory
   if (!directory) throw new Error('lifecycle seeding needs an executable plugin runtime (runtime.directory)')
-  return workspaceEventStoreSurface.acquire(realpathSync(join(directory, '.git')))
+  return workspaceEventStoreSurface.acquire(journalSurface.JournalSurface_initializeStateRoot(directory))
 }
 
 export const openIncumbency = async (

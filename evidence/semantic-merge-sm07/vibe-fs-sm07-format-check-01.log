@@ -1,0 +1,44 @@
+
+> wanxiangshu@0.9.0 format:check
+> wireit
+
+Analyzing
+  0% [0 / 1] [0 running]
+  0% [0 / 1] [1 running] format:check
+src/Wanxiangshu/Git/Operations.fsi needs formatting
+src/Wanxiangshu/Git/Operations.fs needs formatting
+src/Wanxiangshu/Git/WorktreeResource.fs needs formatting
+src/Wanxiangshu/Git/WorktreeResource.fsi needs formatting
+src/Wanxiangshu/Process/ProcessOutput.fs needs formatting
+src/Wanxiangshu/Process/Surface.fs needs formatting
+src/Wanxiangshu/Process/ProcessRequest.fs needs formatting
+src/Wanxiangshu/Process/JsRunLoop.fsi needs formatting
+src/Wanxiangshu/Process/JsRunLoop.fs needs formatting
+src/Wanxiangshu/Process/ProcessRequest.fsi needs formatting
+src/Wanxiangshu/Process/NodeProcessWait.fs needs formatting
+src/Wanxiangshu/Process/JsSandbox.fs needs formatting
+src/Wanxiangshu/Process/NodeProcessHost.fs needs formatting
+src/Wanxiangshu/Process/NodeProcessWait.fsi needs formatting
+src/Wanxiangshu/Process/ProcessRunner.fsi needs formatting
+src/Wanxiangshu/Process/ProcessRunner.fs needs formatting
+src/Wanxiangshu/Change/Host/GitAdapter.fs needs formatting
+src/Wanxiangshu/Change/Host/GitAdapter.fsi needs formatting
+src/Wanxiangshu/Persistence/Journal/AgentJournal.fs needs formatting
+src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs needs formatting
+src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs needs formatting
+src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs needs formatting
+src/Wanxiangshu/OpenCode/Host/EventsSurface.fsi needs formatting
+src/Wanxiangshu/OpenCode/Host/EventsSurface.fs needs formatting
+src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs needs formatting
+src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs needs formatting
+src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs needs formatting
+src/Wanxiangshu/Repository/Programming/Js/OpenCode/ParkedSites.fs needs formatting
+src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs needs formatting
+src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs needs formatting
+src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs needs formatting
+src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fsi needs formatting
+src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs needs formatting
+src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs needs formatting
+
+❌ [format:check] exited with exit code 99.
+❌ 1 script failed.

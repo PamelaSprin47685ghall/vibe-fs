@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <WanxiangshuSubsystem>process</WanxiangshuSubsystem>
+    <WanxiangshuCompileShard>process-js-run-loop</WanxiangshuCompileShard>
+    <WanxiangshuSemanticOwner>process-execution</WanxiangshuSemanticOwner>
+    <WanxiangshuOwnerLocality>process-js-run-loop</WanxiangshuOwnerLocality>
+    <WanxiangshuOwnerLocalityKind>adapter</WanxiangshuOwnerLocalityKind>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.process-execution.host-contract-toolresultbound.fsproj"/>
+    <Compile Include="Process/JsRunLoop.fsi"/>
+    <Compile Include="Process/JsRunLoop.fs"/>
+  </ItemGroup>
+</Project>

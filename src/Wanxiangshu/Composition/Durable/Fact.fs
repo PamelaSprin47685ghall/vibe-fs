@@ -9,8 +9,6 @@ open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Interaction.Attention
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Host
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
@@ -36,6 +34,16 @@ module Fact =
     [<RequireQualifiedAccess>]
     type LegacyCognitionFact = AssumePhaseCommitted of LegacyAssumePhaseCommitted
 
+    /// Read-only marker from the retired mailbox. It must not hide later identity evidence.
+    type LegacyMailboxSubscription =
+        { Concern: string
+          Generation: string
+          Id: string
+          OwnerSessionId: SessionId }
+
+    [<RequireQualifiedAccess>]
+    type LegacyConcernFact = MailboxSubscribed of LegacyMailboxSubscription
+
     type RuntimeFact =
         | RuntimeStarted of
             {| RuntimeId: RuntimeId
@@ -55,10 +63,9 @@ module Fact =
         | Host of HostFactCases
         | Fission of FissionFactCases
         | Delegation of DelegationFactCases
-        | Attention of AttentionFactCases
-        | Concern of ConcernFactCases
         | ChatExecution of ChatExecutionFactCases
         | Cognition of LegacyCognitionFact
+        | Concern of LegacyConcernFact
 
     type Fact =
         | Runtime of RuntimeFact

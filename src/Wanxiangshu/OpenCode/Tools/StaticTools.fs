@@ -16,24 +16,35 @@ module StaticTools =
         | ToolPermission.Join -> [ "join" ]
         | ToolPermission.Horizon -> [ "horizon" ]
         | ToolPermission.Fission -> [ "fission" ]
-        | ToolPermission.Read -> [ "read" ]
-        | ToolPermission.Write -> [ "write" ]
-        | ToolPermission.Edit -> [ "edit" ]
-        | ToolPermission.Glob -> [ "glob" ]
-        | ToolPermission.Grep -> [ "grep" ]
-        | ToolPermission.Move -> [ "mv" ]
-        | ToolPermission.Remove -> [ "rm" ]
+        // The direct filesystem tools are retired: Read/Write/Edit/Glob/Grep/
+        // Move/Remove stay as permissions (they gate the programming surface's
+        // cat/write/ls/mv/rm members) but project no host tool name.
+        | ToolPermission.Read -> []
+        | ToolPermission.Write -> []
+        | ToolPermission.Edit -> []
+        | ToolPermission.Glob -> []
+        | ToolPermission.Grep -> []
+        | ToolPermission.Move -> []
+        | ToolPermission.Remove -> []
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
-        | ToolPermission.Exec -> [ "run" ]
-        | ToolPermission.Pty -> [ "open-terminal"; "send-terminal"; "read-terminal"; "signal-terminal" ]
+        // Exec grants the programming surface's `js.run` loop; the Host-native
+        // `run` tool is retired (repository-programming [050]-[052] supersede it).
+        | ToolPermission.Exec -> []
+        // Pty is retired: interactive execution is the programming surface's
+        // `js.run` ({ spawn, name } + { send, name, input } + { signal, name }).
+        | ToolPermission.Pty -> []
         | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Chronicle -> [ "chronicle" ]
         | ToolPermission.Fetch -> [ "fetch" ]
         | ToolPermission.Finality -> [ "deliver" ]
-        | ToolPermission.JsPlan -> [ "js-plan" ]
+        | ToolPermission.JsPlan -> [ "todowrite-for-plan" ]
         | ToolPermission.Ask -> [ "ask" ]
+        | ToolPermission.DevOpsConsultation -> [ "devops" ]
+        // advisor gates the programming surface's `js.advisor` member: a
+        // consult seat that returns an envelope, never a host tool of its own.
+        | ToolPermission.Advisor -> []
         | ToolPermission.Deliver -> [ "deliver" ]
-        // planning-002: Plan's review shares the `review` verb with Manager's
+        // work-021: Plan's review shares the `review` verb with Manager's
         // ReviewAssessment. The reverse lookup decides by role, not by this order.
         | ToolPermission.Review -> [ "review" ]
 
@@ -68,6 +79,8 @@ module StaticTools =
           ToolPermission.BashHoneypot
           ToolPermission.JsPlan
           ToolPermission.Ask
+          ToolPermission.DevOpsConsultation
+          ToolPermission.Advisor
           ToolPermission.Deliver
           ToolPermission.Review ]
 
@@ -98,18 +111,28 @@ module StaticTools =
         |> Option.exists (fun permission -> OfficeCapability.permissions role |> Set.contains permission)
 
 
-    /// JS-001: the generated js-ROLE tool name for a role.
+    /// JS-001: the generated todowrite-for-ROLE tool name for a role.
     let jsToolName (role: Role) : string =
-        "js-" + (string role).ToLowerInvariant()
+        "todowrite-for-" + (string role).ToLowerInvariant()
 
-    /// Shared office boundary for lightweight cognitive utilities. Both the
-    /// custom assume tool and the Host-native todowrite surface consume this
-    /// predicate so schema visibility and execution admission cannot drift.
+    /// Shared office boundary for lightweight cognitive utilities (`assume`) so
+    /// schema visibility and execution admission cannot drift.
     let cognitiveUtilityRoleAllowed (role: Role) : bool =
         role <> Role.Blogger && role <> Role.Distiller
 
-    /// JS-001: a role whose capability set includes any filesystem permission
-    /// gets its js-* tool allowed in the permission matrix.
+    /// capability-enforcement-006/007: a Host-declared external (MCP) tool
+    /// namespace is not an office capability, so it never enters
+    /// `Roles.permissions` (capability-enforcement-006) and no per-source
+    /// permission table is kept for it (capability-enforcement-007). It follows
+    /// the Host utility surface (`skill`) instead: every projected office role
+    /// keeps it except the internal companion, whose tool face is exactly
+    /// { chronicle }.
+    let hostExternalNamespaceAllowedForRole (role: Role) : bool = role <> Role.Blogger
+
+    /// JS-001: a role whose capability set includes any programming-surface
+    /// permission gets its todowrite-for-* tool allowed in the permission
+    /// matrix. Fork/Join count: the Orchestrator's only programming surface is
+    /// delegation (js.fork/js.join).
     let private hasFsCapability (role: Role) : bool =
         let fsPermissions =
             set
@@ -117,7 +140,11 @@ module StaticTools =
                   ToolPermission.Write
                   ToolPermission.Edit
                   ToolPermission.Glob
-                  ToolPermission.Grep ]
+                  ToolPermission.Grep
+                  ToolPermission.Move
+                  ToolPermission.Remove
+                  ToolPermission.Fork
+                  ToolPermission.Join ]
 
         Set.intersect (OfficeCapability.permissions role) fsPermissions
         |> Set.isEmpty
@@ -126,47 +153,33 @@ module StaticTools =
     /// Single source: OfficeCapability.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
     /// filters and contract tests see concrete denies (not only "*").
-    /// planning-013: `handoff` is fully retired — no permission owns it and it
+    /// work-030: `handoff` is fully retired — no permission owns it and it
     /// left this catalog. `resume` stays: Manager's delegation surface owns the
     /// verb, so every role's permission object keeps its explicit entry.
     let knownToolNames =
         [ "fork"
           "resume"
           "commission"
-          "open-terminal"
-          "send-terminal"
-          "read-terminal"
-          "signal-terminal"
+
           "join"
           "horizon"
           "fission"
-          "read"
-          "write"
-          "edit"
-          "glob"
-          "grep"
           "skill"
-          "todowrite"
           "assume"
-          "defer"
-          "publish"
-          "mv"
-          "rm"
           "bash-honeypot"
-          "run"
           "review"
           "chronicle"
           "fetch"
           "deliver"
-          "js-engineer"
-          "js-manager"
-          "js-orchestrator"
-          "js-devops"
-          "js-blogger"
-          "js-bookkeeper"
-          "js-plan"
+          "todowrite-for-engineer"
+          "todowrite-for-manager"
+          "todowrite-for-orchestrator"
+          "todowrite-for-devops"
+          "todowrite-for-blogger"
+          "todowrite-for-bookkeeper"
+          "todowrite-for-plan"
           "ask"
-          "deliver" ]
+          "devops" ]
 
     /// PROMPT-012: an explicit complete allow/deny map for PromptInput.tools.
     /// The office half comes from the one reverse lookup; utility tools keep
@@ -178,10 +191,7 @@ module StaticTools =
         |> List.map (fun name ->
             name,
             (name = "skill"
-             || name = "todowrite"
              || name = "assume"
-             || name = "defer"
-             || name = "publish"
              || (permissionOfToolName role name
                  |> Option.exists (fun permission -> Set.contains permission allowed))))
         |> Map.ofList
@@ -195,9 +205,9 @@ module StaticTools =
         if admitted then "allow" else "deny"
 
     let private jsPermission role name =
-        if name = "js-manager" && role = Role.Manager then
+        if name = "todowrite-for-manager" && role = Role.Manager then
             "allow"
-        elif name = "js-plan" && role = Role.Plan then
+        elif name = "todowrite-for-plan" && role = Role.Plan then
             "allow"
         elif name = jsToolName role && hasFsCapability role then
             "allow"
@@ -207,26 +217,23 @@ module StaticTools =
     let private permissionFor (registry: AblationRegistry) allowed role name =
         match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
-        // planning-002: the plan toolset is { js-plan, ask, review, deliver }.
-        | true, ("ask" | "review" | "deliver" | "js-plan"), Role.Plan -> "allow"
+        // 普通工具准入与可见性使用同一份能力映射。
+        | true, ("ask" | "devops" | "review" | "deliver" | "todowrite-for-plan"), Role.Plan -> "allow"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"
-        | true, ("read" | "grep" | "glob"), Role.Manager -> "deny"
+
         | true, "fork", Role.Orchestrator -> "deny"
         | true, "resume", Role.Orchestrator -> "deny"
         | true, "commission", Role.Orchestrator -> "allow"
-        | true, ("open-terminal" | "send-terminal" | "read-terminal" | "signal-terminal"), Role.DevOps -> "allow"
         | true, "fork", Role.DevOps -> "deny"
         | true, "resume", Role.DevOps -> "deny"
-        | true, "run", Role.DevOps -> "allow"
+
         | true, "skill", Role.Blogger -> "deny"
         | true, "skill", _ -> "allow"
-        | true, ("assume" | "todowrite"), role when not (cognitiveUtilityRoleAllowed role) -> "deny"
-        | true, ("assume" | "todowrite"), _ -> "allow"
-        | true, ("defer" | "publish"), Role.Blogger -> "deny"
-        | true, ("defer" | "publish"), _ -> "allow"
-        | true, "js-bookkeeper", _ -> "deny"
-        | true, name, _ when name.StartsWith "js-" -> jsPermission role name
+        | true, "assume", role when not (cognitiveUtilityRoleAllowed role) -> "deny"
+        | true, "assume", _ -> "allow"
+        | true, "todowrite-for-bookkeeper", _ -> "deny"
+        | true, name, _ when name.StartsWith "todowrite-for-" -> jsPermission role name
         | true, _, _ -> defaultPermission allowed role name
 
     let permissionObj (role: Role) : obj =
@@ -304,3 +311,6 @@ module StaticTools =
     let devopsAgentConfig (prompt: string option) : obj = primaryAgent Role.DevOps prompt
 
     let planAgentConfig (prompt: string option) : obj = primaryAgent Role.Plan prompt
+
+    /// The advisor is an internal reviewer runtime: hidden, no tools, prose out.
+    let advisorAgentConfig (prompt: string) : obj = hiddenAgent Role.Advisor prompt

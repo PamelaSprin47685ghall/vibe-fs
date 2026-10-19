@@ -198,7 +198,6 @@ const installBookkeeperRuntime = (port, ownerSessionIds) => {
   assert.equal(installed.ok, true, installed.error)
 }
 const record = (sessionId, q, a, observations) => ({ sessionId, q, a, observations, lastAccessOrder: 0 })
-const openStore = (dir, writerId) => eventStore.create(join(dir, '.git'), writerId)
 
 test('WHAT[knowledge-reuse-006] CASE006_create_child_once_per_refresh_via_js_bookkeeper', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-bk-session-refresh-'))
@@ -322,7 +321,7 @@ const factory = { tool: { schema: fakeSchema } }
 
 test('WHAT[knowledge-reuse-006] CASE006_bookkeeper_provider_contract_is_one_program', () => {
   const tool = bookkeeper.contract(factory)
-  assert.equal(tool.name, 'js-bookkeeper')
+  assert.equal(tool.name, 'todowrite-for-bookkeeper')
   assert.deepEqual(tool.argumentNames, ['program'])
   assert.match(tool.description, /one atomic JavaScript transformation|用一次原子的 JavaScript transformation/i)
   assert.match(tool.description, /setQuestion\(newText\)/)
@@ -356,7 +355,7 @@ const currentCase = (question, answer) => [question, answer]
 
 test('WHAT[knowledge-reuse-006] js_bookkeeper_surface_is_program_only_and_has_case_sdk', () => {
   const tool = bookkeeper.contract(factory)
-  assert.equal(tool.name, 'js-bookkeeper')
+  assert.equal(tool.name, 'todowrite-for-bookkeeper')
   assert.deepEqual(tool.argumentNames, ['program'])
   assert.match(tool.description, /question\(matches = \[\]\)/)
   assert.match(tool.description, /answer\(matches = \[\]\)/)
@@ -451,7 +450,7 @@ test('WHAT[knowledge-reuse-006] js_bookkeeper_duplicate_set_rolls_back_the_whole
       }`,
     )
 
-    assert.match(String(result), /setQuestion may be called at most once|setQuestion 在同一个 js-bookkeeper program 中最多只能调用一次/i)
+    assert.match(String(result), /setQuestion may be called at most once|setQuestion 在同一个 todowrite-for-bookkeeper program 中最多只能调用一次/i)
     assert.deepEqual(current(tx), ['Q', 'A'])
   } finally {
     bookkeeper.abort(tx)

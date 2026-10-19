@@ -121,6 +121,7 @@ test('WHAT[delegation-025] observed Engineer execution publishes the exact admit
       authorityRootUserMessageId: 'actual-observed-physical-1',
     })
     assert.equal(await stillPendingObserved(completion), 'pending')
+    sync.recordDeliveredValue(sent.sessionId, 'FORMAL-ONLY')
     assert.equal(await sync.settleExactTerminal(runtime, sent.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'actual-observed-provider-run-1', 'FORMAL-ONLY', 'REASONING-ONLY'), true)
     assert.deepEqual(await completion, {
       ok: true,
@@ -132,7 +133,6 @@ test('WHAT[delegation-025] observed Engineer execution publishes the exact admit
         formalText: 'FORMAL-ONLY',
       },
     })
-    assert.notEqual(sync.handoffFrontier(runtime, owner, 'Engineer'), null, 'existing completed handoff checkpoint precedes success delivery')
     assert.equal(sync.terminalListenerCount(runtime), 0)
   })
 })
@@ -146,6 +146,7 @@ test('WHAT[delegation-025] observed invocations reuse a child while preserving d
     assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 0, dispatch.admittedWithPhysicalMessage('observed-reuse-physical-1')), true)
     const firstAdmission = await sync.observedAdmission(first)
     assert.equal(firstAdmission.kind, 'Accepted')
+    sync.recordDeliveredValue(firstAdmission.sessionId, 'FIRST-FORMAL')
     assert.equal(await sync.settleExactTerminal(runtime, firstAdmission.sessionId, firstAdmission.physicalUserMessageId, firstAdmission.authorityRootUserMessageId, 'observed-reuse-run-1', 'FIRST-FORMAL', ''), true)
     const firstResult = await sync.observedCompletion(first)
     assert.equal(firstResult.ok, true)
@@ -162,6 +163,7 @@ test('WHAT[delegation-025] observed invocations reuse a child while preserving d
     assert.equal(await stillPendingObserved(secondCompletion), 'pending')
     assert.equal(await sync.failWithAuthorityRoot(runtime, owner, 'Engineer', 'stale coarse failure', firstAdmission.authorityRootUserMessageId), 'Ignored')
     assert.equal(await stillPendingObserved(secondCompletion), 'pending')
+    sync.recordDeliveredValue(secondAdmission.sessionId, 'SECOND-FORMAL')
     assert.equal(await sync.settleExactTerminal(runtime, secondAdmission.sessionId, secondAdmission.physicalUserMessageId, secondAdmission.authorityRootUserMessageId, 'observed-reuse-run-2', 'SECOND-FORMAL', ''), true)
     const secondResult = await secondCompletion
     assert.equal(secondResult.ok, true)
@@ -188,6 +190,7 @@ test('WHAT[delegation-025] rejection before dispatch settles both observed tasks
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 1)
     assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 0, dispatch.admittedWithPhysicalMessage('observed-active-first-physical')), true)
     const accepted = await sync.observedAdmission(first)
+    sync.recordDeliveredValue(accepted.sessionId, 'FIRST-DONE')
     assert.equal(await sync.settleExactTerminal(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'observed-active-first-run', 'FIRST-DONE', ''), true)
     assert.equal((await sync.observedCompletion(first)).ok, true)
     assert.equal(sync.terminalListenerCount(runtime), 0)
@@ -220,6 +223,7 @@ for (const defect of ['wrong-root', 'previous-physical']) {
       await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
       assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 0, dispatch.admittedWithPhysicalMessage(`fallback-first-${defect}`)), true)
       const firstAdmission = await sync.observedAdmission(first)
+      sync.recordDeliveredValue(firstAdmission.sessionId, 'FIRST-DONE')
       assert.equal(await sync.settleExactTerminal(runtime, firstAdmission.sessionId, firstAdmission.physicalUserMessageId, firstAdmission.authorityRootUserMessageId, `fallback-first-run-${defect}`, 'FIRST-DONE', ''), true)
       assert.equal((await sync.observedCompletion(first)).ok, true)
       const second = sync.startObserved(runtime, owner, 'FALLBACK-SECOND')
@@ -230,6 +234,7 @@ for (const defect of ['wrong-root', 'previous-physical']) {
       assert.equal(accepted.sessionId, firstAdmission.sessionId)
       const physical = defect === 'previous-physical' ? firstAdmission.physicalUserMessageId : accepted.physicalUserMessageId
       const root = defect === 'wrong-root' ? `${accepted.authorityRootUserMessageId}-wrong` : accepted.authorityRootUserMessageId
+      sync.recordDeliveredValue(accepted.sessionId, 'CURRENT-FALLBACK')
       assert.equal(sync.settleExactFallback(runtime, accepted.sessionId, physical, root, `fallback-stale-run-${defect}`, 'STALE-FALLBACK'), false)
       assert.equal(await stillPendingObserved(completion), 'pending')
       assert.equal(sync.settleExactFallback(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, `fallback-current-run-${defect}`, 'CURRENT-FALLBACK'), true)
@@ -252,6 +257,7 @@ test('WHAT[delegation-025] production completed-turn fallback settles its invoca
     await sync.awaitPromptCount(runtime, owner, 'Engineer', 1)
     assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', 0, dispatch.admittedWithPhysicalMessage('fallback-single-physical')), true)
     const accepted = await sync.observedAdmission(execution)
+    sync.recordDeliveredValue(accepted.sessionId, 'FIRST-FALLBACK')
     assert.equal(sync.settleExactFallback(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'fallback-first-provider-run', 'FIRST-FALLBACK'), true)
     assert.equal(sync.settleExactFallback(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'fallback-late-provider-run', 'LATE-FALLBACK'), false)
     const result = await completion

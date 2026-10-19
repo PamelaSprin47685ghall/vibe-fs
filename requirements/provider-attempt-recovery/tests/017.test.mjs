@@ -44,4 +44,4 @@ test('WHAT[provider-attempt-recovery-017] runtime request ownership rejects stal
   )
 })
 
-test.todo('WHAT[provider-attempt-recovery-017] actual Main→Main Main→Squash and Squash→Main recovery commits old abandonment before fresh materialization and PromptKey binding (GAP-139)')
+test.todo('WHAT[provider-attempt-recovery-017] actual Main→Main recovery commits old abandonment before fresh materialization and PromptKey binding (GAP-139)')

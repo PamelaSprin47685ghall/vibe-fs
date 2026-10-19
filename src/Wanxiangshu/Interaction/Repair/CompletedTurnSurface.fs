@@ -101,9 +101,7 @@ module CompletedTurnSurface =
         let classified =
             CompletedTurnClassifier.classifyOutcome completed finishValue None typedParts
 
-        // planning-009: Plan's empty stop is a natural stop, never a repair.
-        not (CompletedTurnClassifier.isPlanEmptyStop roleValue finishValue classified)
-        && CompletedTurnClassifier.needsInteractionRepair roleValue classified typedParts
+        CompletedTurnClassifier.needsInteractionRepair roleValue classified typedParts
 
     let private repairDecisionName =
         function

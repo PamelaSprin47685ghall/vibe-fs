@@ -15,10 +15,10 @@ const openStore = (commonDir) => {
   const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
   return { handle, close: () => disposeEventStore(handle) }
 }
-const prepared = (id, root, mutations) => ({
+const prepared = (id, root, mutation) => ({
   transactionId: id,
   workspaceRoot: root,
-  mutations,
+  mutation,
 })
 const mutation = (path, originalText, newText) => ({ path, originalText, newText })
 const unwrap = (result) => {
@@ -32,10 +32,7 @@ test('WHAT[repository-programming-025] reopening a store with only Prepare keeps
   const common = makeDir('wxs-committed-cut-before-events-')
   const local = openStore(common)
   try {
-    unwrap(await appendPrepared(local.handle, prepared('tx-hold', workspace, [
-      mutation('keep-a.txt', null, 'a'),
-      mutation('keep-b.txt', 'old-b', 'new-b'),
-    ])))
+    unwrap(await appendPrepared(local.handle, prepared('tx-hold', workspace, mutation('keep-a.txt', null, 'a'))))
 
     // Interrupt here: file effects "may already exist" on the interrupted side,
     // but no Committed receipt exists. Recovery must still see the Prepared.
@@ -44,7 +41,7 @@ test('WHAT[repository-programming-025] reopening a store with only Prepare keeps
     try {
       assert.deepEqual(pendingIds(reopened.handle), ['tx-hold'])
       const [fact] = pending(reopened.handle)
-      assert.equal(fact.mutations.length, 2, 'complete write set survives the interrupt')
+      assert.equal(fact.mutation.path, 'keep-a.txt', 'single-mutation Prepared survives the interrupt')
     } finally {
       reopened.close()
     }
@@ -58,7 +55,7 @@ test('WHAT[repository-programming-025] reopening a store with Prepare and Commit
   const common = makeDir('wxs-committed-cut-after-events-')
   const local = openStore(common)
   try {
-    unwrap(await appendPrepared(local.handle, prepared('tx-done', workspace, [mutation('done.txt', null, 'done')])))
+    unwrap(await appendPrepared(local.handle, prepared('tx-done', workspace, mutation('done.txt', null, 'done'))))
     unwrap(await appendCommitted(local.handle, 'tx-done'))
     assert.deepEqual(pendingIds(local.handle), [])
 
@@ -81,7 +78,7 @@ test('WHAT[repository-programming-025] reopening preserves durable Commit despit
   const common = makeDir('wxs-committed-cut-unknown-events-')
   const local = openStore(common)
   try {
-    unwrap(await appendPrepared(local.handle, prepared('tx-amb', workspace, [mutation('amb.txt', null, 'amb')])))
+    unwrap(await appendPrepared(local.handle, prepared('tx-amb', workspace, mutation('amb.txt', null, 'amb'))))
 
     // Simulate an ambiguous outcome: the committer side cannot prove whether
     // its Committed append landed (here: the handle is gone before the receipt
@@ -115,7 +112,7 @@ test('WHAT[repository-programming-025] committed_cut_foreign_commit_never_releas
   const common = makeDir('wxs-committed-cut-foreign-events-')
   const local = openStore(common)
   try {
-    unwrap(await appendPrepared(local.handle, prepared('tx-local', workspace, [mutation('l.txt', null, 'l')])))
+    unwrap(await appendPrepared(local.handle, prepared('tx-local', workspace, mutation('l.txt', null, 'l'))))
     // A stale/foreign Committed for a different transaction id has no release
     // authority over this pending entry (execution-failure-policy-006: stale/foreign callbacks
     // have no release authority).
@@ -141,7 +138,7 @@ test('WHAT[repository-programming-025] committed_cut_file_effects_are_owned_by_w
   const local = openStore(common)
   try {
     writeFileSync(join(workspace, 'pinned.txt'), 'pinned', 'utf8')
-    unwrap(await appendPrepared(local.handle, prepared('tx-facts', workspace, [mutation('pinned.txt', 'pinned', 'changed')])))
+    unwrap(await appendPrepared(local.handle, prepared('tx-facts', workspace, mutation('pinned.txt', 'pinned', 'changed'))))
     unwrap(await appendCommitted(local.handle, 'tx-facts'))
     assert.equal(readFileSync(join(workspace, 'pinned.txt'), 'utf8'), 'pinned')
     assert.deepEqual(
@@ -172,10 +169,10 @@ const openStore = (commonDir) => {
   const handle = createEventStore(commonDir, randomUUID().replaceAll('-', ''))
   return { handle, close: () => disposeEventStore(handle) }
 }
-const prepared = (id, root, mutations) => ({
+const prepared = (id, root, mutation) => ({
   transactionId: id,
   workspaceRoot: root,
-  mutations,
+  mutation,
 })
 const mutation = (path, originalText, newText) => ({ path, originalText, newText })
 const unwrap = (result) => {
@@ -192,8 +189,8 @@ test('WHAT[repository-programming-025] prepared_cut_appends_facts_without_any_fi
   const common = makeDir('wxs-prepared-cut-events-')
   const local = openStore(common)
   try {
-    unwrap(await appendPrepared(local.handle, prepared('tx-cut-1', workspace, [mutation('a.txt', null, 'created-a')])))
-    unwrap(await appendPrepared(local.handle, prepared('tx-cut-2', workspace, [mutation('b.txt', 'old-b', 'new-b')])))
+    unwrap(await appendPrepared(local.handle, prepared('tx-cut-1', workspace, mutation('a.txt', null, 'created-a'))))
+    unwrap(await appendPrepared(local.handle, prepared('tx-cut-2', workspace, mutation('b.txt', 'old-b', 'new-b'))))
 
     const waiting = pending(local.handle)
     assert.equal(waiting.length, 2)
@@ -210,18 +207,14 @@ test('WHAT[repository-programming-025] prepared_cut_appends_facts_without_any_fi
     rmSync(common, { recursive: true, force: true })
   }
 })
-test('WHAT[repository-programming-025] prepared_cut_pending_matches_the_complete_write_set_across_files', async () => {
+test('WHAT[repository-programming-025] prepared_cut_pending_matches_the_single_write_across_files', async () => {
   const workspace = makeDir('wxs-prepared-cut-cross-')
   const common = makeDir('wxs-prepared-cut-cross-events-')
   const local = openStore(common)
   try {
     unwrap(await appendPrepared(
       local.handle,
-      prepared('tx-cross', workspace, [
-        mutation('one.txt', 'one-old', 'one-new'),
-        mutation('two.txt', null, 'two-new'),
-        mutation('three.txt', 'three-old', 'three-new'),
-      ]),
+      prepared('tx-cross', workspace, mutation('one.txt', 'one-old', 'one-new')),
     ))
 
     const waiting = pending(local.handle)
@@ -230,13 +223,9 @@ test('WHAT[repository-programming-025] prepared_cut_pending_matches_the_complete
     assert.equal(fact.transactionId, 'tx-cross')
     assert.equal(fact.workspaceRoot, workspace)
     assert.deepEqual(
-      fact.mutations.map((m) => [m.path, m.originalText, m.newText]),
-      [
-        ['one.txt', 'one-old', 'one-new'],
-        ['two.txt', null, 'two-new'],
-        ['three.txt', 'three-old', 'three-new'],
-      ],
-      'cross-file assertion inspects the complete write set, not one file',
+      [fact.mutation.path, fact.mutation.originalText, fact.mutation.newText],
+      ['one.txt', 'one-old', 'one-new'],
+      'single-mutation Prepared inspects the one write, not a set',
     )
     assert.deepEqual(workspaceFiles(workspace), [], 'no workspace byte may move before the receipt')
   } finally {
@@ -253,13 +242,13 @@ test('WHAT[repository-programming-025] prepared_cut_codec_round_trip_is_fold_acc
     const tricky = 'dir/空格 \"quoted\" \u{1F9ED}.txt'
     unwrap(await appendPrepared(
       local.handle,
-      prepared('tx-uni', workspace, [mutation(tricky, 'héllo\r\nwörld', 'héllo\r\nwörld!')]),
+      prepared('tx-uni', workspace, mutation(tricky, 'héllo\r\nwörld', 'héllo\r\nwörld!')),
     ))
 
     const waiting = pending(local.handle)
     assert.equal(waiting.length, 1)
-    assert.equal(waiting[0].mutations[0].path, tricky)
-    assert.equal(waiting[0].mutations[0].newText, 'héllo\r\nwörld!')
+    assert.equal(waiting[0].mutation.path, tricky)
+    assert.equal(waiting[0].mutation.newText, 'héllo\r\nwörld!')
   } finally {
     local.close()
     rmSync(workspace, { recursive: true, force: true })
@@ -271,7 +260,7 @@ test('WHAT[repository-programming-025] reopening without a second append preserv
   const common = makeDir('wxs-prepared-cut-interrupt-events-')
   const local = openStore(common)
   try {
-    unwrap(await appendPrepared(local.handle, prepared('tx-base', workspace, [mutation('base.txt', null, 'base')])))
+    unwrap(await appendPrepared(local.handle, prepared('tx-base', workspace, mutation('base.txt', null, 'base'))))
     assert.equal(pending(local.handle).length, 1)
 
     const before = pending(local.handle).map((p) => p.transactionId)
@@ -301,7 +290,7 @@ test('WHAT[repository-programming-025] prepared_cut_committed_match_releases_pen
   const common = makeDir('wxs-prepared-cut-commit-events-')
   const local = openStore(common)
   try {
-    unwrap(await appendPrepared(local.handle, prepared('tx-both', workspace, [mutation('x.txt', null, 'x')])))
+    unwrap(await appendPrepared(local.handle, prepared('tx-both', workspace, mutation('x.txt', null, 'x'))))
     assert.equal(pending(local.handle).length, 1)
     unwrap(await appendCommitted(local.handle, 'tx-both'))
     assert.deepEqual(pending(local.handle), [])

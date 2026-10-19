@@ -8,9 +8,14 @@ import { EventProbe } from '../../../verification-system/tests/e2e/support/event
 import { initGitWorkspace } from '../../../verification-system/tests/e2e/support/process-host-utils.js'
 import { buildTextChunks, buildToolCallChunks, sendJSON, sendSSE } from '../../../verification-system/tests/e2e/support/strict-mock-sse.js'
 import { startHttpServer, stopHttpServer } from '../../../verification-system/tests/e2e/support/strict-mock-server.js'
+import { countFactCase } from '../../../verification-system/tests/e2e/support/journal-observer.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(here, '../../../..')
+// The negative leg drives the same hook path with the retired v1 `tip` argument
+// instead of the v2 tip fields, so the canary proves both halves of the contract:
+// v2 is accepted and committed, v1 is rejected as missing-tip-name.
+const legacyTip = process.argv.includes('--legacy-tip')
 const marker = fs.readFileSync(path.join(root, 'resources/provider/cognitive-environment/blogger-chronicle-text/en.md'), 'utf8').trim()
 const bloggerRequests = []
 // 015 diagnostics: every POST body's tool census, independent of the chronicle
@@ -49,18 +54,32 @@ const handleProviderRequest = async (request, response) => {
     assert.equal(hints.length, 1, 'each real Blogger provider request must carry exactly one ephemeral marker')
     assert.equal(body.model, 'step-3.5-flash-canary')
     assert.ok(bytes.includes(Buffer.from(JSON.stringify(marker).slice(1, -1))), 'the actual request bytes must contain the rendered resource')
+    // The chronicle call is the FIRST Blogger response so the second Host
+    // request is the provider step that judges it: the enforcer decodes the
+    // persisted assistant part of the previous step before answering, so only
+    // this ordering observes the wire the enforcer actually reads (v2 fields
+    // must survive Host persistence; a v1 `tip` call is rejected here with
+    // enforcer-blog-call-invalid and never commits a cycle).
     if (bloggerRequests.length === 1) {
-      sendSSE(response, buildTextChunks('blogger-first', 'The current record still needs its chronicle call.', 1))
+      const chronicleArgs = legacyTip ? {
+        charge: 'Preserve the exact provider delivery evidence.',
+        occurrence: 'The installed Host delivered one temporary Blogger prompt per request.',
+        settlement: 'The prompt remains outside durable Host history.',
+        consequence: 'A later Blogger request receives only its own temporary prompt.',
+        tip: 'primitive-obsession',
+      } : {
+        charge: 'Preserve the exact provider delivery evidence.',
+        occurrence: 'The installed Host delivered one temporary Blogger prompt per request.',
+        settlement: 'The prompt remains outside durable Host history.',
+        consequence: 'A later Blogger request receives only its own temporary prompt.',
+        tipName: 'chronicle-provider-evidence',
+        opinion: 'The installed Host should deliver one temporary Blogger prompt per request.',
+        advice: 'Ensure the prompt remains outside durable Host history.',
+      }
+      sendSSE(response, buildToolCallChunks('chronicle-provider-canary', 'chronicle', JSON.stringify(chronicleArgs), 1))
       return
     }
-    const tip = chronicle.function.parameters.properties.tip.enum[0]
-    sendSSE(response, buildToolCallChunks('chronicle-provider-canary', 'chronicle', JSON.stringify({
-      charge: 'Preserve the exact provider delivery evidence.',
-      occurrence: 'The installed Host delivered one temporary Blogger prompt per request.',
-      settlement: 'The prompt remains outside durable Host history.',
-      consequence: 'A later Blogger request receives only its own temporary prompt.',
-      tip,
-    }), 1))
+    sendSSE(response, buildTextChunks('blogger-first', 'The record is complete.', 1))
     finish()
   } catch (error) {
     providerErrors.push(error)
@@ -177,12 +196,26 @@ export default function route(role) { return { model: role === 'blogger' ? 'test
   assert.equal(terminal.properties.part.state.status, 'completed', 'the actual chronicle tool must complete before final history is accepted')
   for (const child of childSessions) {
     const history = valueOf(await api(`/session/${child.id}/message`))
-    assert.ok(history.some(message => message.parts.some(part => part.type === 'tool'
-      && part.callID === 'chronicle-provider-canary' && part.state.status === 'completed')),
-    'the second response chronicle call must actually complete before history is accepted')
+    const chroniclePart = history.flatMap(message => message.parts)
+      .find(part => part.type === 'tool' && part.callID === 'chronicle-provider-canary')
+    assert.ok(chroniclePart, 'the declared chronicle call must complete before history is accepted')
+    assert.equal(chroniclePart.state?.status, 'completed', 'the declared chronicle call must complete before history is accepted')
+    // The enforcer reads the persisted tool part of the previous step, so the
+    // provider-declared arguments must survive Host persistence verbatim. Only
+    // the v2 call carries the fields the codec requires; the v1 leg persists the
+    // retired `tip` alone, which is what the enforcer must reject below.
+    if (legacyTip) {
+      assert.equal(chroniclePart.state?.input?.tipName, undefined,
+        'the v1 call must persist no v2 tipName; the codec has only the retired tip argument')
+    } else {
+      assert.equal(chroniclePart.state?.input?.tipName, 'chronicle-provider-evidence',
+        'the Host must persist the provider-declared v2 tipName, not a stripped argument set')
+      assert.ok(chroniclePart.state?.input?.opinion && chroniclePart.state?.input?.advice,
+        'the Host must persist the provider-declared v2 opinion and advice')
+    }
     assert.equal(JSON.stringify(history).includes(marker), false, 'the real Host persisted history must exclude the injected hint')
   }
-  const events = path.join(host.workDir, '.git/wanxiangshu/events')
+  const events = path.join(host.workDir, '.Herdchestra/wanxiangshu/events')
   const walk = directory => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const filename = path.join(directory, entry.name)
@@ -191,12 +224,27 @@ export default function route(role) { return { model: role === 'blogger' ? 'test
     }
   }
   walk(events)
+  // The second Blogger request transformed the previous step, so the enforcer
+  // judged the chronicle call there: acceptance is one durable cycle, rejection
+  // is the named diagnostic and no cycle (ENFORCER-023/060).
+  const committedCycles = countFactCase(host.workDir, 'BlogObservationCommitted')
+  if (legacyTip) {
+    assert.equal(committedCycles, 0,
+      'the enforcer must reject the retired v1 tip call and commit no cycle')
+    assert.match(host.stderrLog, /enforcer-blog-call-invalid[\s\S]*missing-tip-name/,
+      'the v1 rejection must surface as the enforcer blog-call-invalid diagnostic naming missing-tip-name')
+  } else {
+    assert.equal(committedCycles, 1,
+      'the enforcer must accept the provider-declared v2 chronicle call and commit exactly one cycle')
+  }
   if (process.argv.includes('--late-provider-error')) {
     const response = await fetch(`${provider.url}/v1/chat/completions`, { method: 'POST', body: '{' })
     assert.equal(response.status, 500, 'the real late HTTP request must reach the provider callback error path')
     await response.text()
   }
-  result = { providerRequests: bloggerRequests.length, chronicleCompleted: true, historyClean: true, journalClean: true }
+  result = legacyTip
+    ? { legacyTipRejected: true }
+    : { providerRequests: bloggerRequests.length, chronicleCompleted: true, historyClean: true, journalClean: true }
 } catch (error) {
   console.error(host.stdoutLog)
   await collectFailureDiagnostics()

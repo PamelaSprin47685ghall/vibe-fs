@@ -271,6 +271,38 @@ test('WHAT[semantic-trace-003] concurrent same-session captures serialize before
     assert.deepEqual(parts.map((part) => trace.tryHostMessageIdAt(part.cursor, captured)).sort(), ['concurrent-a', 'concurrent-b'])
   })
 })
+
+test('WHAT[semantic-trace-003] missing ProviderRun preserves exact Host replay without merging different physical messages', async () => {
+  await withJournal(async (handle) => {
+    const observation = (hostMessageId) => ({
+      hostMessageId,
+      message: {
+        info: { id: hostMessageId, role: 'tool' },
+        parts: [{
+          id: 'same-host-tool-part', type: 'tool', tool: 'todowrite-for-engineer', callID: 'same-tool-call',
+          state: { status: 'completed', input: { program: "class Js extends JsProgram { async run() { return await this.cat('sample'); } }" }, output: 'stable tool output' },
+        }],
+      },
+    })
+    const first = await trace.captureObservedMessages(handle, SESSION, [observation('first-host-message')])
+    assert.equal(first.ok, true, first.ok ? '' : first.error)
+    assert.equal(first.receipt.capturedPartCount, 1)
+    const before = trace.orderedSemanticParts(trace.snapshot(handle, SESSION))
+    assert.equal(before[0].providerRun, null)
+
+    const replay = await trace.captureObservedMessages(handle, SESSION, [observation('first-host-message')])
+    assert.equal(replay.ok, true, replay.ok ? '' : replay.error)
+    assert.equal(replay.receipt.capturedPartCount, 0)
+    assert.deepEqual(trace.orderedSemanticParts(trace.snapshot(handle, SESSION)), before)
+    const reanchored = await trace.captureObservedMessages(handle, SESSION, [observation('reanchored-host-message')])
+    assert.equal(reanchored.ok, true, reanchored.ok ? '' : reanchored.error)
+    assert.equal(reanchored.receipt.capturedPartCount, 1, 'without a run witness another Host message is a distinct observation')
+    const repeated = await trace.captureObservedMessages(handle, SESSION, [observation('reanchored-host-message')])
+    assert.equal(repeated.ok, true, repeated.ok ? '' : repeated.error)
+    assert.equal(repeated.receipt.capturedPartCount, 0)
+    assert.equal(trace.orderedSemanticParts(trace.snapshot(handle, SESSION)).length, 2)
+  })
+})
 }
 
 {

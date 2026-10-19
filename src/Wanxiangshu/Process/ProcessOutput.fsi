@@ -13,6 +13,7 @@ module ProcessOutput =
           OutputLimit: int64 }
 
     val create: estimate: ProcessEstimate -> OutputCollector
+    val createWithOutputLimit: outputLimit: int64 -> OutputCollector
     val addStdout: collector: OutputCollector -> bytes: byte array -> unit
     val addStderr: collector: OutputCollector -> bytes: byte array -> unit
     val discard: collector: OutputCollector -> unit

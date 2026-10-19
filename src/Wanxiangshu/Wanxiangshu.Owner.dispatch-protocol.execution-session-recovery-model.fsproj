@@ -11,7 +11,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.dispatch-protocol.foundation-outcome.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.execution-failure-policy.execution-failure-model.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-message-contract.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.host-boundary.host-opencode-types.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.participant-identity.foundation-roles.fsproj"/><ProjectReference Include="Wanxiangshu.Owner.participant-identity.participant-persona.fsproj"/>
     <Compile Include="Execution/Session/Recovery/Model.fsi"/>
     <Compile Include="Execution/Session/Recovery/Model.fs"/>
     <Compile Include="Composition/Turn/Program.fsi"/>

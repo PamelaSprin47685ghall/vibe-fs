@@ -7,14 +7,21 @@ open System.Threading.Tasks
 [<RequireQualifiedAccess>]
 module JsToolHostSurface =
 
-    val builtinTools: unit -> string array
-    val annotate: builtinName: string -> description: string -> jsRoleToolName: string -> string
-    val validateRecommendation: jsRoleToolName: string -> visibleToolNames: string array -> obj
 
+
+    /// `sessionDirectories` mirrors the plugin's live session id → directory map:
+    /// the registered session's own directory wins over `workspaceRoot`.
     val createRegistered:
-        toolModule: obj -> role: string -> language: string -> workspaceRoot: string -> store: obj -> obj
+        toolModule: obj ->
+        role: string ->
+        language: string ->
+        workspaceRoot: string ->
+        store: obj ->
+        sessionDirectories: obj ->
+            obj
 
     val name: handle: obj -> string
     val description: handle: obj -> string
     val argumentNames: handle: obj -> string array
+    val argumentSchema: handle: obj -> name: string -> obj
     val execute: handle: obj -> args: obj -> context: obj -> Task<obj>

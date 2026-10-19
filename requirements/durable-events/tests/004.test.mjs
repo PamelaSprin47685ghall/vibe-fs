@@ -83,7 +83,7 @@ const assertIncompleteTailRejected = (read) => {
 }
 const withWriter = (run) => {
   const root = mkdtempSync(join(tmpdir(), 'wanxiang-writer-tail-property-'))
-  const commonDir = join(root, '.git')
+  const commonDir = join(root, '.Herdchestra')
   const eventsDir = join(commonDir, 'wanxiangshu', 'events')
   const writerPath = join(eventsDir, 'property-writer.ndjson')
   mkdirSync(eventsDir, { recursive: true })

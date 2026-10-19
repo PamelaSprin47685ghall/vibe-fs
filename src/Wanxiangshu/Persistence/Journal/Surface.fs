@@ -59,6 +59,10 @@ type JournalHandle private (journal: AgentJournal, release: unit -> unit, store:
 [<RequireQualifiedAccess>]
 module JournalSurface =
 
+    /// 解析并初始化主工作树的本机状态根，不改 Git 配置。
+    let initializeStateRoot (workspace: string) : string =
+        RuntimePath.initializeStateRoot workspace
+
     let private str (value: obj) : string =
         if isNull value then "" else string value
 
@@ -278,15 +282,14 @@ module JournalSurface =
                         {| providerRun = ProviderRunIdentity.value providerRun
                            mainSessionId = SessionId.value record.MainSessionId
                            bloggerSessionId = SessionId.value record.BloggerSessionId
-                           tipRuleId = record.TipRuleId
+                           tipName = record.TipName
                            toolCallCount = List.length record.ToolCallIds |})
                 |> List.toArray
                recentTips =
                 state.RecentTips
                 |> List.map (fun tip ->
                     box
-                        {| ruleId = tip.RuleId
-                           fieldName = tip.FieldName
+                        {| tipName = tip.TipName
                            cycleId = tip.CycleId |})
                 |> List.toArray |}
 
@@ -379,8 +382,8 @@ module JournalSurface =
             |> List.map (fun (sessionId, _) -> SessionId.value sessionId)
             |> List.toArray
 
-        let todoCheckpoints =
-            projection.AgentProjections.TodoCheckpoints
+        let viewCheckpoints =
+            projection.AgentProjections.ViewCheckpoints
             |> Map.toList
             |> List.map (fun (sessionId, window) ->
                 box
@@ -399,7 +402,7 @@ module JournalSurface =
 
         box
             {| sessions = sessions
-               todoCheckpoints = todoCheckpoints
+               viewCheckpoints = viewCheckpoints
                sessionProjections = sessionProjections |}
 
     let private journalOrError
@@ -436,7 +439,7 @@ module JournalSurface =
     /// cross this boundary.
     let acquireSharedForWorkspace (workspace: string) (processId: int) (startedAt: string) : Task<obj> =
         task {
-            let commonDirectory = RuntimePath.gitCommonDir workspace
+            let commonDirectory = RuntimePath.initializeStateRoot workspace
             let runtimeDirectory = RuntimePath.forWorkspace workspace
 
             // DSL-MUTABLE: resource — the store the callback just created, so the
@@ -504,7 +507,7 @@ module JournalSurface =
 
             let! acquired =
                 SharedAgentJournal.acquire
-                    (RuntimePath.forCommonDir commonDir)
+                    (RuntimePath.forStateRoot commonDir)
                     0
                     (DateTimeOffset.Parse "1970-01-01T00:00:00Z")
                     refuseMissingEntry

@@ -1,64 +1,130 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { sandbox, runProgram, caseName, parseData, nodeCommand } from './support/executor.mjs'
+import * as toolResultBound from '../../../dist/Host/Contract/ToolResultBound.js'
+import { oneCommand } from './support/runnable.mjs'
+import { program } from './support/executor.mjs'
 import { parse } from 'smol-toml'
-import { run, nodeCommand } from './support/executor.mjs'
+import { refreshGlobalLanguage } from '../../../dist/Participant/Provider/LanguageSurface.js'
 
-process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+// Host-native `run` tool is retired; `js.run` supersedes it (repository-programming [050]-[052]).
 
-test('WHAT[process-execution-013] real large output retains the exact raw suffix without calling the injected session capability', async () => {
-  const latest = 'LATEST_RAW_OUTPUT'
-  const original = 'EARLY_ERROR_' + 'x'.repeat(500) + latest
-  const accessed = []
-  const sessions = new Proxy({}, { get(_target, member) {
-    accessed.push(member)
-    throw new Error(`Unexpected session capability use: ${String(member)}`)
-  } })
-  const wire = await run({ command: nodeCommand(`process.stdout.write(${JSON.stringify(original)})`), output_budget_bytes: 512 }, { sessions })
-  const result = parse(wire)
-  assert.equal(result.exit_code, 0)
-  assert.ok(original.endsWith(result.output))
-  assert.ok(result.output.endsWith(latest))
-  assert.ok(Buffer.byteLength(wire) <= 512)
-  assert.equal(result.output_truncated, true)
-  assert.deepEqual(accessed, [])
-})
-
-test('WHAT[process-execution-013] small output preserves separate stdout and stderr exactly', async () => {
-  const result = parse(await run({ command: nodeCommand("process.stdout.write('hello'); process.stderr.write('warning')"), output_budget_bytes: 1024 }))
-  assert.equal(result.exit_code, 0)
-  assert.equal(result.stdout, 'hello')
-  assert.equal(result.stderr, 'warning')
-})
-
-test('WHAT[process-execution-013] the registered plugin preserves budgets and creates no model session for small, large and line-limited output', async () => {
-  const { withExecutablePlugin, acceptAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
-  await withExecutablePlugin(async (hooks, _directory, created, runtime) => {
-    const sessionID = 'budget-registered-devops'
-    const messageID = 'budget-user-root'
-    await acceptAuthorityRoot(runtime, sessionID, 'devops', messageID)
-    await hooks['chat.message']({ sessionID, messageID, agent: 'devops' }, {
-      message: { id: messageID, role: 'user', agent: 'devops' },
-      parts: [{ type: 'text', text: 'Check bounded command output.' }],
-    })
-    const context = { sessionID, agent: 'devops', messageID: 'budget-assistant', callID: 'budget-command' }
-    const modelsBefore = created.length
-    const promptsBefore = runtime.prompts.length
-    for (const [budget, text] of [[0, 'never'], [512, 'ok'], [512, 'x'.repeat(2000)], [65536, '\n'.repeat(2500)]]) {
-      const wire = await hooks.tool.run.execute({ command: nodeCommand(`require('node:fs').writeFileSync(1, ${JSON.stringify(text)})`), output_budget_bytes: budget }, context)
-      const result = parse(wire)
-      if (budget === 0) {
-        assert.equal(result.executed, false)
-        assert.equal(result.rejected, 'output_budget_too_small')
-      } else {
-        assert.equal(result.exit_code, 0)
-        assert.ok(Buffer.byteLength(wire) <= budget)
-        assert.ok(Buffer.byteLength(wire) <= 51200)
-        assert.ok(wire.split('\n').length <= 2000)
-        if (result.output_truncated) assert.ok(text.endsWith(result.output))
-        else assert.equal(result.stdout, text)
+test('WHAT[process-execution-013] js.run bounds large output deterministically to head+tail without model distillation', async () => {
+  const { dir, cleanup } = sandbox('wxs-proc-013a-')
+  try {
+    const cmd1 = nodeCommand(`process.stdout.write('HEAD-MARK-' + 'a'.repeat(200000))`)
+    const cmd2 = nodeCommand(`process.stdout.write('b'.repeat(200000) + '-TAIL-MARK')`)
+    const outcome = await runProgram(
+      dir,
+      `    const r = await js.run(class extends js.Runnable {
+      maxDuration = 10000;
+      interval = 100;
+      next(ctx) {
+        if (ctx.step === 0) return ${JSON.stringify(cmd1)};
+        if (ctx.step === 1) return ${JSON.stringify(cmd2)};
+        return null;
       }
-      assert.equal(created.length, modelsBefore)
-      assert.equal(runtime.prompts.length, promptsBefore)
-    }
-  })
+      watch(ctx) { return ctx.remainingMs > 0; }
+      sanity() { return { nextDone: () => this.next({ step: 2 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+    });
+    return {
+      exitCode: r.exitCode,
+      truncated: r.truncated,
+      bytes: r.bytes,
+      keptLength: r.stdout.length,
+      startsWithHead: r.stdout.startsWith("HEAD-MARK-"),
+      endsWithTail: r.stdout.endsWith("-TAIL-MARK"),
+    };`,
+    )
+    assert.equal(caseName(outcome), 'Succeeded')
+    const parsed = parseData(outcome)
+    assert.equal(parsed.exitCode, 0)
+    assert.equal(parsed.truncated, true)
+    assert.equal(parsed.bytes, 10 + 200000 + 200000 + 10)
+    assert.ok(parsed.keptLength > 0 && parsed.keptLength <= toolResultBound.HostMaxBytes)
+    assert.equal(parsed.startsWithHead, true)
+    assert.equal(parsed.endsWithTail, true)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[process-execution-013] small output preserves separate stdout and stderr in onExit without truncation', async () => {
+  const { dir, cleanup } = sandbox('wxs-proc-013b-')
+  try {
+    const cmd = nodeCommand("process.stdout.write('hello'); process.stderr.write('warning')")
+    const outcome = await runProgram(
+      dir,
+      `    let exited = null;
+    const r = await js.run(class extends js.Runnable {
+      maxDuration = 5000;
+      interval = 50;
+      next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
+      watch(ctx) { return ctx.remainingMs > 0; }
+      sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      onExit(res) { exited = { stdout: res.stdout, stderr: res.stderr }; }
+    });
+    return { exitCode: r.exitCode, truncated: r.truncated, stdout: exited.stdout, stderr: exited.stderr };`,
+    )
+    assert.equal(caseName(outcome), 'Succeeded')
+    const parsed = parseData(outcome)
+    assert.equal(parsed.exitCode, 0)
+    assert.equal(parsed.truncated, false)
+    assert.equal(parsed.stdout, 'hello')
+    assert.equal(parsed.stderr, 'warning')
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[process-execution-013] ToolResultBound keeps deterministic raw tail when output exceeds host window', () => {
+  const original = 'EARLY-ERROR-\n' + 'x'.repeat(60000) + '\nLATEST-RAW-OUTPUT'
+  const bounded = toolResultBound.bound(original)
+  assert.ok(bounded.startsWith(toolResultBound.Marker))
+  assert.ok(bounded.endsWith('\nLATEST-RAW-OUTPUT'))
+  assert.equal(toolResultBound.fitsInWindow(bounded), true)
+})
+
+test('WHAT[process-execution-013] the actual registered tool returns bilingual bounded raw data without a model or Host re-truncation', async () => {
+  const { withExecutablePlugin, acceptAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const previous = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  try {
+    await withExecutablePlugin(async (hooks, directory, created, runtime) => {
+      const sessionID = 'registered-large-output'
+      await acceptAuthorityRoot(runtime, sessionID, 'devops', 'large-output-user')
+      await hooks['chat.message']({ sessionID, messageID: 'large-output-user', agent: 'devops' }, {
+        message: { id: 'large-output-user', role: 'user', agent: 'devops' },
+        parts: [{ type: 'text', text: 'Check raw process output.' }],
+      })
+      for (const language of ['en', 'zh-CN']) {
+        process.env.WANXIANGSHU_PROVIDER_LANGUAGE = language
+        refreshGlobalLanguage()
+        const beforeCreated = created.length
+        const beforePrompts = runtime.prompts.length
+        const command = nodeCommand("process.stdout.write('RAW-HEAD-' + '中文🔥'.repeat(40000) + '-RAW-TAIL'); process.stderr.write('诊断😀'.repeat(30000)); process.exitCode = 7")
+        const wire = await hooks.tool['todowrite-for-devops'].execute({
+          program: program(`return await js.run(${oneCommand(command, { fields: 'outputBudgetBytes = 2048; worldLock = true;' })});`),
+        }, { sessionID, agent: 'devops', messageID: 'large-output-assistant', callID: `large-${language}` })
+        const result = parse(wire).data
+        assert.equal(result.status, 'completed', wire)
+        assert.equal(result.exitCode, 7)
+        assert.equal(result.scopeClosed, true)
+        assert.equal(result.outputComplete, true)
+        assert.equal(result.truncated, true)
+        assert.equal(result.stdout.startsWith('RAW-HEAD-'), true)
+        assert.equal(result.stdout.endsWith('-RAW-TAIL'), true)
+        assert.match(result.outputNotice, language === 'en' ? /head and tail/ : /头部和尾部/)
+        assert.equal(wire.includes('\uFFFD'), false)
+        assert.ok(Buffer.byteLength(wire) <= 2048)
+        assert.equal(toolResultBound.fitsInWindow(wire), true)
+        assert.deepEqual(wire.split('\n').filter(line => line.startsWith('#')), ['# ok'])
+        assert.equal(created.length, beforeCreated)
+        assert.equal(runtime.prompts.length, beforePrompts)
+      }
+    })
+  } finally {
+    if (previous === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+    else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previous
+    refreshGlobalLanguage()
+  }
 })

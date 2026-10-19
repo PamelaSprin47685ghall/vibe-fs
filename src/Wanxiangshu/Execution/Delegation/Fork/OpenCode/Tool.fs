@@ -91,13 +91,7 @@ module ForkTool =
             let PersonCannotTakeCharge = "tool/fork/person-cannot-take-charge"
 
             [<Literal>]
-            let HandoffJournalRequired = "tool/fork/handoff-journal-required"
-
-            [<Literal>]
             let PersonSessionUnknown = "tool/fork/person-session-unknown"
-
-            [<Literal>]
-            let HandoffAppendFailed = "tool/fork/handoff-append-failed"
 
         [<RequireQualifiedAccess>]
         module Commission =
@@ -132,10 +126,10 @@ module ForkTool =
             let ChargeTaken = "tool/commission/charge-taken"
 
             [<Literal>]
-            let RoadNotOpened = "tool/commission/road-not-opened"
+            let WorkNotOpened = "tool/commission/work-not-opened"
 
             [<Literal>]
-            let RoadCannotTakeCharge = "tool/commission/road-cannot-take-charge"
+            let WorkCannotTakeCharge = "tool/commission/work-cannot-take-charge"
 
         [<RequireQualifiedAccess>]
         module Resume =
@@ -150,6 +144,9 @@ module ForkTool =
 
             [<Literal>]
             let AssessmentPendingForDevOps = "tool/resume/assessment-pending-for-devops"
+
+            [<Literal>]
+            let DispatchClosed = "tool/resume/dispatch-closed"
 
     let private lang (ctx: HostToolContext) =
         ProviderLanguageBinding.forSessionText ctx.SessionId
@@ -234,17 +231,10 @@ module ForkTool =
         (runtime: HostForkRuntime)
         (role: Role)
         (request: Request)
-        (commissionerRecord: string option)
         (attachment: string option)
         : Task<string> =
         let baseDocument =
-            ForkChildPayload.relayDocument
-                (forkInstructions runtime.ParentId)
-                request.Charge
-                commissionerRecord
-                attachment
-                []
-                None
+            ForkChildPayload.relayDocument (forkInstructions runtime.ParentId) request.Charge attachment [] None
 
         if hasKeywords request then
             RepositoryWarmStart.appendToBaseDocument
@@ -339,11 +329,8 @@ module ForkTool =
         (managed: ManagedAgent)
         =
         taskResult {
-            let route = DelegationHandoffRoute.forkByname request.Name
-            let! handoff = runtime.PrepareHandoff route
-
             let! rendered =
-                prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
+                prepareForkPromptWithRecord scope runtime role request attachment
                 |> TaskResultCE.ofTask
 
             let! result =
@@ -355,8 +342,7 @@ module ForkTool =
                     None,
                     renderedPrompt = rendered,
                     byname = request.Name,
-                    ?expectedToolCalls = request.ExpectedToolCalls,
-                    preparedHandoff = handoff
+                    ?expectedToolCalls = request.ExpectedToolCalls
                 )
 
             return result
@@ -372,11 +358,8 @@ module ForkTool =
         agentId
         =
         taskResult {
-            let route = DelegationHandoffRoute.forkByname request.Name
-            let! handoff = runtime.PrepareHandoff route
-
             let! rendered =
-                prepareForkPromptWithRecord scope runtime role request handoff.ParentRecord attachment
+                prepareForkPromptWithRecord scope runtime role request attachment
                 |> TaskResultCE.ofTask
 
             return!
@@ -384,8 +367,7 @@ module ForkTool =
                     agentId,
                     request.Charge,
                     renderedPrompt = rendered,
-                    ?expectedToolCalls = request.ExpectedToolCalls,
-                    preparedHandoff = handoff
+                    ?expectedToolCalls = request.ExpectedToolCalls
                 )
         }
 
@@ -473,8 +455,7 @@ module ForkTool =
                 match! resolveAttachment scope handles request with
                 | Error path -> return consequence (prose language path)
                 | Ok attachment ->
-                    let! rendered =
-                        prepareForkPromptWithRecord scope runtime profile.CanonicalRole request None attachment
+                    let! rendered = prepareForkPromptWithRecord scope runtime profile.CanonicalRole request attachment
 
                     return! appendBusyGuidance runtime request language agentId profile rendered
             }
@@ -674,12 +655,25 @@ module ForkTool =
 
             executeManagerExistingPerson scope runtime context request language handles existingByname
 
-    let private boundDevOpsDispatchClosed (scope: ToolRuntimeScope) parentSessionId isDevOps =
-        if isDevOps then
-            let facts = scope.ManagerCapabilityFactsFor(SessionId.value parentSessionId)
-            not facts.HasAssessment
+    /// The one parked cell of the dispatch gate is the repair window: the review
+    /// landed Stayed with no confirmation yet. Before the review lands a new task
+    /// for the bound DevOps is closed, and it closes again once the tenure is
+    /// closing out — a Promoted review opens no new work, and a durable
+    /// confirmation means the tenure's remaining step is the close-out deliver.
+    let private devopsDispatchRefusal (facts: ManagerCapabilityFacts) : string option =
+        if not facts.HasAssessment then
+            Some Path.Resume.AssessmentPendingForDevOps
+        elif facts.IsFinalIncumbent || facts.HasConfirmation then
+            Some Path.Resume.DispatchClosed
         else
-            false
+            None
+
+    let private boundDevOpsDispatchRefusal (scope: ToolRuntimeScope) parentSessionId isDevOps =
+        if isDevOps then
+            scope.ManagerCapabilityFactsFor(SessionId.value parentSessionId)
+            |> devopsDispatchRefusal
+        else
+            None
 
     let private bindWorkDevOpsIfNeeded (scope: ToolRuntimeScope) parentSessionId isDevOps =
         task {
@@ -703,9 +697,9 @@ module ForkTool =
             let isDevOps =
                 String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
 
-            if boundDevOpsDispatchClosed scope parentSessionId isDevOps then
-                return consequence (prose language Path.Resume.AssessmentPendingForDevOps)
-            else
+            match boundDevOpsDispatchRefusal scope parentSessionId isDevOps with
+            | Some refusal -> return consequence (prose language refusal)
+            | None ->
                 do! bindWorkDevOpsIfNeeded scope parentSessionId isDevOps
                 return! resumeOnRuntime scope request context language
         }
@@ -742,10 +736,9 @@ module ForkTool =
             let isDevOps =
                 String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
 
-            if boundDevOpsDispatchClosed scope parentSessionId isDevOps then
-                return consequence (prose language Path.Resume.AssessmentPendingForDevOps)
-            else
-                return! executeManagerAfterGuards scope request context language
+            match boundDevOpsDispatchRefusal scope parentSessionId isDevOps with
+            | Some refusal -> return consequence (prose language refusal)
+            | None -> return! executeManagerAfterGuards scope request context language
         }
 
     let private executeManager (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
@@ -790,7 +783,7 @@ module ForkTool =
                 )
             with
             | Ok _ -> return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
-            | Error _ -> return consequence (prose language Path.Commission.RoadNotOpened)
+            | Error _ -> return consequence (prose language Path.Commission.WorkNotOpened)
         }
 
     /// delegation-004: Orchestrator only commissions a Manager, so a blank
@@ -825,8 +818,8 @@ module ForkTool =
                 with
                 | Ok _ ->
                     return successInstruction (namedProse language Path.Commission.ChargeTaken (request.Name.Trim()))
-                | Error _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
-            | _ -> return consequence (prose language Path.Commission.RoadCannotTakeCharge)
+                | Error _ -> return consequence (prose language Path.Commission.WorkCannotTakeCharge)
+            | _ -> return consequence (prose language Path.Commission.WorkCannotTakeCharge)
         }
 
     let private executeOrchestratorAfterGuards
@@ -945,3 +938,257 @@ module ForkTool =
                     | Error message -> return consequence message
                     | Ok request -> return! executeOrchestrator scope request context
                 } }
+
+    let private commitNewManagerForkReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        (managed: ManagedAgent)
+        role
+        attachment
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let handleId = ToolHostCodec.newHandleId ()
+
+            let! placement =
+                taskResult {
+                    do! recordFissionAffinity scope context handleId
+                    let! result = runManagerFork scope runtime role request language attachment handleId managed
+                    announceChild runtime context handleId
+                    return result
+                }
+
+            return
+                match placement with
+                | Error _ -> Error "placement-failed"
+                | Ok(ForkResult.DispatchUncertain _) -> Error "dispatch-uncertain"
+                | Ok(ForkResult.NotFound _) -> Error "placement-failed"
+                | Ok(ForkResult.Created agentId) ->
+                    Ok
+                        { Name = request.Name.Trim()
+                          AgentId = agentId
+                          Outcome = "created" }
+                | Ok(ForkResult.Nudged agentId) ->
+                    Ok
+                        { Name = request.Name.Trim()
+                          AgentId = agentId
+                          Outcome = "nudged" }
+        }
+
+    let private finishNewManagerForkReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        (managed: ManagedAgent)
+        role
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            match! resolveAttachment scope handles request with
+            | Error _ -> return Error "placement-failed"
+            | Ok attachment ->
+                return! commitNewManagerForkReceipt scope runtime context request language managed role attachment
+        }
+
+    let private placeNewManagerForkReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        (managed: ManagedAgent)
+        : Task<Result<ForkReceipt, string>> =
+        let role = managed.Role
+
+        if hasKeywords request && not (warmStartAllowed role) then
+            Task.FromResult(Error "warm-start-unavailable")
+        else
+            finishNewManagerForkReceipt scope runtime context request language handles managed role
+
+    let private resolveDerivedManagedCalling bindings derived =
+        match tryCalling bindings derived with
+        | None -> Error "unknown-calling"
+        | Some managed -> Ok managed
+
+    let private resolveManagerCalling request derived =
+        if callingConflictsWithDerived request derived then
+            Error "calling-conflict"
+        else
+            resolveDerivedManagedCalling managerCallingBindings derived
+
+    let private createNewManagerForkReceipt
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        : Task<Result<ForkReceipt, string>> =
+        let derived = derivedForkCalling request.Name
+
+        match resolveManagerCalling request derived with
+        | Error err -> Task.FromResult(Error err)
+        | Ok managed -> placeNewManagerForkReceipt scope runtime context request language handles managed
+
+    let private checkExistingByname (existing: HandleRecord option) =
+        match existing with
+        | Some _ -> Error "name-already-belongs"
+        | None -> Ok()
+
+    let private createManagerForkIfNameFree
+        (scope: ToolRuntimeScope)
+        (runtime: HostForkRuntime)
+        (context: HostToolContext)
+        (request: Request)
+        language
+        handles
+        =
+        let existingByname =
+            handles |> Option.bind (HandleProjection.tryFindByByname request.Name)
+
+        match checkExistingByname existingByname with
+        | Error err -> Task.FromResult(Error err)
+        | Ok() -> createNewManagerForkReceipt scope runtime context request language handles
+
+    let private executeManagerReceiptAfterGuards
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        language
+        : Task<Result<ForkReceipt, string>> =
+        match scope.RuntimeFor context with
+        | Error _ -> Task.FromResult(Error "context-unavailable")
+        | Ok runtime ->
+            let handles = agentHandles scope context
+            createManagerForkIfNameFree scope runtime context request language handles
+
+    let private resolveParentSessionId (scope: ToolRuntimeScope) (sessionId: string) =
+        if String.IsNullOrWhiteSpace sessionId then
+            SessionId.create ""
+        else
+            scope.LogicalOwnerFor(SessionId.create sessionId)
+
+    let private validateManagerRequestPrerequisites (scope: ToolRuntimeScope) (request: Request) (sessionId: string) =
+        let parentSessionId = resolveParentSessionId scope sessionId
+
+        let isDevOps =
+            String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
+
+        if String.IsNullOrWhiteSpace request.Name then
+            Error "name-required"
+        elif String.IsNullOrWhiteSpace request.Charge then
+            Error "charge-required"
+        elif isSelfAttachment request then
+            Error "placement-failed"
+        elif (boundDevOpsDispatchRefusal scope parentSessionId isDevOps).IsSome then
+            Error "placement-failed"
+        else
+            Ok()
+
+    let private executeManagerReceipt
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        : Task<Result<ForkReceipt, string>> =
+        match validateManagerRequestPrerequisites scope request context.SessionId with
+        | Error err -> Task.FromResult(Error err)
+        | Ok() ->
+            let language = lang context
+            executeManagerReceiptAfterGuards scope request context language
+
+    let private finishCommissionNewReceipt
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (request: Request)
+        (managed: ManagedAgent)
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let managerId = ManagerJobId.create (ToolHostCodec.newHandleId ())
+            let host = scope.OrchestratorHostFor context.SessionId
+
+            match!
+                host.ForkManagerJob(
+                    managerId,
+                    managed.Name,
+                    request.Charge,
+                    byname = request.Name,
+                    ?expectedToolCalls = request.ExpectedToolCalls
+                )
+            with
+            | Ok _ ->
+                return
+                    Ok
+                        { Name = request.Name.Trim()
+                          AgentId = ""
+                          Outcome = "commissioned" }
+            | Error _ -> return Error "placement-failed"
+        }
+
+    let private validateOrchestratorCalling (request: Request) =
+        let hasCalling = not (String.IsNullOrWhiteSpace request.Calling)
+
+        if
+            hasCalling
+            && not (String.Equals(request.Calling.Trim(), derivedCommissionCalling, StringComparison.OrdinalIgnoreCase))
+        then
+            Error "unknown-calling"
+        else
+            Ok()
+
+    let private validateOrchestratorRequest (scope: ToolRuntimeScope) (request: Request) (context: HostToolContext) =
+        let existingByname = orchestratorExistingByname scope request
+
+        if String.IsNullOrWhiteSpace context.SessionId then
+            Error "context-unavailable"
+        elif String.IsNullOrWhiteSpace request.Name then
+            Error "name-required"
+        elif String.IsNullOrWhiteSpace request.Charge then
+            Error "charge-required"
+        elif (validateOrchestratorCalling request).IsError then
+            Error "unknown-calling"
+        elif existingByname.IsSome then
+            Error "name-already-belongs"
+        else
+            resolveDerivedManagedCalling orchestratorCallingBindings derivedCommissionCalling
+
+    let private executeOrchestratorReceipt
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (context: HostToolContext)
+        : Task<Result<ForkReceipt, string>> =
+        match validateOrchestratorRequest scope request context with
+        | Error err -> Task.FromResult(Error err)
+        | Ok managed -> finishCommissionNewReceipt scope context request managed
+
+    let private dispatchRoleReceipt
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (role: Role)
+        (decoded: Result<Request, string>)
+        : Task<Result<ForkReceipt, string>> =
+        match decoded, role with
+        | Ok request, Role.Manager -> executeManagerReceipt scope request context
+        | Ok request, Role.Orchestrator -> executeOrchestratorReceipt scope request context
+        | Error _, _ -> Task.FromResult(Error "placement-failed")
+        | _ -> Task.FromResult(Error "not-a-delegation-role")
+
+    let executeReceipt
+        (scope: ToolRuntimeScope)
+        (context: HostToolContext)
+        (args: HostToolArguments)
+        : Task<Result<ForkReceipt, string>> =
+        task {
+            let! roleOpt = scope.EnsureRoleFor context
+
+            match roleOpt with
+            | None -> return Error "not-a-delegation-role"
+            | Some role ->
+                let language = lang context
+                let decoded = decode language args
+                return! dispatchRoleReceipt scope context role decoded
+        }

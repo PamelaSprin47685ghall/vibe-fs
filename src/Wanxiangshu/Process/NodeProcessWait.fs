@@ -7,27 +7,42 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.AsyncSupport
 
 module NodeProcessWait =
-    type StopCause = Cancellation | Deadline
+    type StopCause =
+        | Cancellation
+        | Deadline
+
     type WaitOutcome = { StopRequested: StopCause option }
 
-    type private WaitSignal = Closed | TimerElapsed | Cancelled
+    type private WaitSignal =
+        | Closed
+        | TimerElapsed
+        | Cancelled
 
     let KillAckGraceMs = 1_000
 
     let private requestStop (child: NodeProcessHost.ChildProcess) =
-        try child.Kill()
-        with error -> child.Failure.Value <- child.Failure.Value |> Option.orElse (Some error.Message)
+        try
+            child.Kill()
+        with error ->
+            child.Failure.Value <- child.Failure.Value |> Option.orElse (Some error.Message)
 
     let private completeOrAwait (child: NodeProcessHost.ChildProcess) (settled: TaskCompletionSource<WaitSignal>) =
-        if child.Exited.Value then Task.FromResult Closed else settled.Task
+        if child.Exited.Value then
+            Task.FromResult Closed
+        else
+            settled.Task
 
     let private waitForSignal (child: NodeProcessHost.ChildProcess) milliseconds (ct: CancellationToken) =
         task {
             let settled = TaskCompletionSource<WaitSignal>()
             let onClosed () = trySetResult settled Closed |> ignore
             child.OnExited.Add onClosed
-            let timer = emitJsExpr (milliseconds, (fun () -> trySetResult settled TimerElapsed |> ignore)) "setTimeout($1, $0)"
+
+            let timer =
+                emitJsExpr (milliseconds, (fun () -> trySetResult settled TimerElapsed |> ignore)) "setTimeout($1, $0)"
+
             use registration = ct.Register(fun () -> trySetResult settled Cancelled |> ignore)
+
             try
                 return! completeOrAwait child settled
             finally
@@ -38,6 +53,7 @@ module NodeProcessWait =
     let rec private awaitDeadline child deadline ct =
         task {
             let milliseconds = Deadline.nextWaitMs (fun () -> DateTimeOffset.UtcNow) deadline
+
             if milliseconds = 0 then
                 return TimerElapsed
             else
@@ -47,14 +63,15 @@ module NodeProcessWait =
 
     and private afterSegment child deadline ct signal =
         match signal with
-        | TimerElapsed when not (Deadline.isExpired (fun () -> DateTimeOffset.UtcNow) deadline) -> awaitDeadline child deadline ct
+        | TimerElapsed when not (Deadline.isExpired (fun () -> DateTimeOffset.UtcNow) deadline) ->
+            awaitDeadline child deadline ct
         | other -> Task.FromResult other
 
     let private stopAtDeadline child ct =
         task {
             requestStop child
             let! signal = waitForSignal child KillAckGraceMs ct
-            return { StopRequested = Some (if signal = Cancelled then Cancellation else Deadline) }
+            return { StopRequested = Some(if signal = Cancelled then Cancellation else Deadline) }
         }
 
     let private awaitStop child deadline ct =

@@ -178,12 +178,11 @@ module EnforcerCycleDecode =
 
     let private decodeCanonicalCall
         (emitDiagnostic: string -> (string * string) list -> unit)
-        (rules: EnforcerRule list)
         (ordinal: int)
         (callId: ToolCallId)
         (input: obj)
         : (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) option =
-        match EnforcerCodec.decodeCall rules (decodeObject input) with
+        match EnforcerCodec.decodeCall (decodeObject input) with
         | Ok call -> Some(ordinal, callId, call)
         | Error reason ->
             // CTX-014: fold identity into result — no whitelist growth for
@@ -196,11 +195,10 @@ module EnforcerCycleDecode =
 
     let private tryCanonicalCall
         (emitDiagnostic: string -> (string * string) list -> unit)
-        (rules: EnforcerRule list)
         (ordinal: int, part: obj)
         : (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) option =
         blogCallFromPart part
-        |> Option.bind (fun (callId, input) -> decodeCanonicalCall emitDiagnostic rules ordinal callId input)
+        |> Option.bind (fun (callId, input) -> decodeCanonicalCall emitDiagnostic ordinal callId input)
 
     /// ENFORCER-042: (PartOrdinal, ToolCallId, CanonicalBlogCall) for one
     /// provider step, in provider-visible order. The ordinal is the part's
@@ -214,11 +212,9 @@ module EnforcerCycleDecode =
         (emitDiagnostic: string -> (string * string) list -> unit)
         (step: AssistantStep)
         : (int * ToolCallId * EnforcerCodec.CanonicalBlogCall) list =
-        let rules = RuntimeResources.current().EnforcerRules
-
         step.Parts
         |> List.mapi (fun ordinal part -> ordinal, part)
-        |> List.choose (tryCanonicalCall emitDiagnostic rules)
+        |> List.choose (tryCanonicalCall emitDiagnostic)
 
     /// ENFORCER-042 / behavior-diagnosis-009: raw chronicle call cardinality
     /// of one provider step, counted by tool identity alone — before any
@@ -239,7 +235,11 @@ module EnforcerCycleDecode =
         if not (EnforcerCycle.isValidCycle cycle) then
             Error EmptyTextError
         else
-            EnforcerCycle.validateContentBounds LlmFacing.byteCount cycle.MergedText cycle.MergedEvidence
+            EnforcerCycle.validateContentBounds
+                LlmFacing.byteCount
+                cycle.MergedText
+                cycle.TipSectionsText
+                cycle.MergedEvidence
             |> Result.mapError EnforcerCycle.contentBoundsError
             |> Result.map (fun _ -> cycle, [ callId ])
 

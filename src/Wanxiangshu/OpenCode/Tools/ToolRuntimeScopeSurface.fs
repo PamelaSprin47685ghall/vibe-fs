@@ -25,6 +25,16 @@ type private DummySessionHostPort() =
     let terminals =
         Dictionary<SessionId, ResizeArray<SessionId -> TerminalOutcome -> unit>>()
 
+    let subscribe childId listener =
+        if not (terminals.ContainsKey childId) then
+            terminals.[childId] <- ResizeArray()
+
+        terminals.[childId].Add listener
+
+        { new IDisposable with
+            member _.Dispose() =
+                terminals.[childId].Remove listener |> ignore }
+
     member _.CaptureTerminal(childId: SessionId) =
         let listeners = terminals.[childId] |> Seq.toArray
 
@@ -33,19 +43,9 @@ type private DummySessionHostPort() =
                 listener childId outcome
 
     interface ISessionHostPort with
-        member _.SubscribeTerminal(_, _) =
-            { new IDisposable with
-                member _.Dispose() = () }
+        member _.SubscribeTerminal(childId, listener) = subscribe childId listener
 
-        member _.SubscribeFutureTerminal(childId, listener) =
-            if not (terminals.ContainsKey childId) then
-                terminals.[childId] <- ResizeArray()
-
-            terminals.[childId].Add listener
-
-            { new IDisposable with
-                member _.Dispose() =
-                    terminals.[childId].Remove listener |> ignore }
+        member _.SubscribeFutureTerminal(childId, listener) = subscribe childId listener
 
         member _.SendPrompt(_, _, _) =
             Task.FromResult(SendOutcome.Fatal "dummy")
@@ -726,7 +726,6 @@ type ToolRuntimeScopeSurface =
                 HostForkRuntime(
                     parent,
                     sessions,
-                    (fun _ _ _ -> Task.FromResult None),
                     CompletionMailboxRuntime.create,
                     NodeTiming.nodeClockPort (),
                     NodeTiming.raceExit,
@@ -841,6 +840,144 @@ type ToolRuntimeScopeSurface =
                     {| failure = failure
                        finished = finished
                        delivered = deliveredBeforeDispose |}
+        }
+
+    [<CompiledName("verifyUnknownProcessDrain")>]
+    static member verifyUnknownProcessDrain() : Task<obj> =
+        task {
+            let scope =
+                new ToolRuntimeScope(
+                    DummySessionHostPort(),
+                    DummyObserver(),
+                    { new IRootWorkspaceReader with
+                        member _.TryRead() = None },
+                    None,
+                    None,
+                    Dictionary<string, string>(),
+                    (fun _ -> None),
+                    Dictionary<string, string>(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None
+                )
+
+            let physicalClose = TaskCompletionSource<unit>()
+            let programSettled = TaskCompletionSource<unit>()
+            let mutable cancelled = false
+
+            let detach =
+                scope.AttachProcessAbort(
+                    "unknown-pipe",
+                    (fun () ->
+                        cancelled <- true
+                        programSettled.SetResult()),
+                    programSettled.Task :> Task
+                )
+
+            let admitted =
+                scope.RunOwnedProcess("unknown-pipe", (fun () -> physicalClose.Task :> Task))
+
+            let before = scope.RetirementBlockersFor "unknown-pipe" |> List.toArray
+
+            let! failure =
+                task {
+                    try
+                        do! scope.DisposeAsync()
+                        return None
+                    with error ->
+                        return Some error.Message
+                }
+
+            let afterUnknown = scope.RetirementBlockersFor "unknown-pipe" |> List.toArray
+            let mutable lateStarts = 0
+
+            let lateAdmitted =
+                scope.RunOwnedProcess(
+                    "unknown-pipe",
+                    fun () ->
+                        lateStarts <- lateStarts + 1
+                        Task.FromResult() :> Task
+                )
+
+            physicalClose.SetResult()
+            do! emitJsExpr () "new Promise(resolve => setImmediate(resolve))"
+            let afterClose = scope.RetirementBlockersFor "unknown-pipe" |> List.toArray
+            detach ()
+
+            return
+                createObj
+                    [ "admitted" ==> admitted
+                      "cancelled" ==> cancelled
+                      "failure" ==> (failure |> Option.map box |> Option.defaultValue null)
+                      "before" ==> before
+                      "afterUnknown" ==> afterUnknown
+                      "afterClose" ==> afterClose
+                      "lateAdmitted" ==> lateAdmitted
+                      "lateStarts" ==> lateStarts ]
+        }
+
+    [<CompiledName("verifyProcessRetirementContract")>]
+    static member verifyProcessRetirementContract() : Task<obj> =
+        task {
+            let parents = Dictionary<string, string>()
+            parents.Add("process-devops", "process-manager")
+            parents.Add("process-engineer", "process-manager")
+
+            let scope =
+                new ToolRuntimeScope(
+                    DummySessionHostPort(),
+                    DummyObserver(),
+                    { new IRootWorkspaceReader with
+                        member _.TryRead() = None },
+                    None,
+                    None,
+                    parents,
+                    (fun _ -> None),
+                    Dictionary<string, string>(),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None
+                )
+
+            let context: HostToolContext =
+                { SessionId = "process-manager"
+                  Agent = None
+                  ToolCallId = None
+                  ProviderRunId = None
+                  PromptText = None
+                  AttachAbort = fun _ -> ignore }
+
+            let manager = scope.RuntimeFor context |> Result.defaultWith failwith
+            manager.AdoptChild("devops", SessionId.create "process-devops")
+            let engineer = TaskCompletionSource<unit>()
+            let devops = TaskCompletionSource<unit>()
+
+            let admittedEngineer =
+                scope.RunOwnedProcess("process-engineer", (fun () -> engineer.Task :> Task))
+
+            let admittedDevOps =
+                scope.RunOwnedProcess("process-devops", (fun () -> devops.Task :> Task))
+
+            let before = scope.RetirementBlockersFor "process-manager" |> List.toArray
+            engineer.SetResult()
+            do! emitJsExpr () "new Promise(resolve => setImmediate(resolve))"
+            let afterEngineer = scope.RetirementBlockersFor "process-manager" |> List.toArray
+            let devopsOwn = scope.RetirementBlockersFor "process-devops" |> List.toArray
+            devops.SetResult()
+            do! emitJsExpr () "new Promise(resolve => setImmediate(resolve))"
+            do! scope.DisposeAsync()
+
+            return
+                createObj
+                    [ "admittedEngineer" ==> admittedEngineer
+                      "admittedDevOps" ==> admittedDevOps
+                      "before" ==> before
+                      "afterEngineer" ==> afterEngineer
+                      "devopsOwn" ==> devopsOwn ]
         }
 
     [<CompiledName("verifyOwnershipRetirementContract")>]

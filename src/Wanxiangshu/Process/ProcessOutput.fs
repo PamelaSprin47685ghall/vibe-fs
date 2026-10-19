@@ -18,14 +18,17 @@ module ProcessOutput =
           mutable Discarded: bool
           OutputLimit: int64 }
 
-    let create (estimate: ProcessEstimate) : OutputCollector =
+    let createWithOutputLimit (outputLimit: int64) : OutputCollector =
         { Stdout = List<byte[]>()
           Stderr = List<byte[]>()
           Combined = List<byte[]>()
           Spool = None
           BytesObserved = 0L
           Discarded = false
-          OutputLimit = ProcessEstimate.outputThreshold estimate.EstimatedOutput }
+          OutputLimit = outputLimit }
+
+    let create (estimate: ProcessEstimate) : OutputCollector =
+        createWithOutputLimit (ProcessEstimate.outputThreshold estimate.EstimatedOutput)
 
     /// 内存积压封顶：超过该预算即在到达 OutputLimit 之前切到 spool，避免跨过
     /// OutputLimit 那一刻把积压的全部字节一次性同步 dump。与 Spool 分块一致。
@@ -85,8 +88,7 @@ module ProcessOutput =
 
     let buildResult (collector: OutputCollector) : CapturedOutput =
         match collector.Spool with
-        | Some active ->
-            CapturedOutput.Spooled(active.Path, active.BytesWritten, Spool.chunkCount active.BytesWritten)
+        | Some active -> CapturedOutput.Spooled(active.Path, active.BytesWritten, Spool.chunkCount active.BytesWritten)
         | None ->
             let stdoutBytes = concatBytes collector.Stdout
             let stderrBytes = concatBytes collector.Stderr

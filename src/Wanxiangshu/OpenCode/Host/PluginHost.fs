@@ -77,7 +77,7 @@ module PluginHost =
         }
 
     let private createWorkspaceJournal workspace : Task<Result<AgentJournal option, string>> =
-        let commonDir = RuntimePath.gitCommonDir workspace
+        let commonDir = RuntimePath.initializeStateRoot workspace
         let runtimeDir = RuntimePath.forWorkspace workspace
         acquireWorkspaceJournal commonDir runtimeDir
 
@@ -94,6 +94,7 @@ module PluginHost =
         (portOpt: IOpenCodePort option)
         (familyParent: (SessionId -> SessionId option) option)
         (isLifecycleTerminated: (SessionId -> bool) option)
+        (isUserQuestionWaiting: (SessionId -> bool) option)
         : Result<
               IEventObservationPort *
               ISessionHostPort *
@@ -120,7 +121,8 @@ module PluginHost =
                 portOpt,
                 eventPort,
                 ?familyParent = familyParent,
-                ?isLifecycleTerminated = isLifecycleTerminated
+                ?isLifecycleTerminated = isLifecycleTerminated,
+                ?isUserQuestionWaiting = isUserQuestionWaiting
             )
 
         let snapshotPort = SessionSnapshotPort.create input

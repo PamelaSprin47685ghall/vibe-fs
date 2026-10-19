@@ -47,8 +47,11 @@ test('WHAT[dispatch-protocol-003] observed receipt-only send stays unaccepted un
     assert.equal(accepted.physicalUserMessageId, 'actual-ingress-physical')
     assert.notEqual(accepted.physicalUserMessageId, accepted.hostOutcome.value)
     assert.equal(sync.promptClaimState(runtime, owner, 'Engineer', 0).kind, 'Accepted')
+    sync.recordDeliveredValue(accepted.sessionId, 'RECEIPT-DELIVERED')
     assert.equal(await sync.settleExactTerminal(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, 'receipt-provider-run', 'RECEIPT-FORMAL', ''), true)
-    assert.equal((await completion).value.providerRun, 'receipt-provider-run')
+    const completed = await completion
+    assert.equal(completed.value.providerRun, 'receipt-provider-run')
+    assert.equal(completed.value.formalText, 'RECEIPT-DELIVERED')
     assert.equal(sync.promptCount(runtime, owner, 'Engineer'), 1)
     assert.equal(sync.terminalListenerCount(runtime), 0)
   })

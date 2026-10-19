@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Thoth.Json
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
+open Wanxiangshu.Host
 open Wanxiangshu.Persistence.EventStore
 open Wanxiangshu.Sphinx.V2.Core
 

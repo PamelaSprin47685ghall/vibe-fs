@@ -1,0 +1,993 @@
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, rename) (1293.374958ms)
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, directory-sync) (1189.710125ms)
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, owner-lost) (1176.129584ms)
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, rename) (1040.367125ms)
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, directory-sync) (1208.026708ms)
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, owner-lost) (1144.301375ms)
+✔ WHAT[managed-session-lifecycle-025] another process cannot reserve a PTY after the work round stops admission (880.2685ms)
+✔ WHAT[managed-session-lifecycle-025] load recovery stops old round admission before voiding canonical work in another process (683.002083ms)
+✔ WHAT[managed-session-lifecycle-025] load recovery preserves canonical work and an unbound PTY until its producer proves Ended (671.084667ms)
+✔ WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost before COMMIT (612.4795ms)
+✔ WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost after COMMIT (616.71175ms)
+✖ WHAT[managed-session-lifecycle-025] a foreign committed reservation prevents premature terminal settlement (637.096542ms)
+✖ WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with reserve first (599.226084ms)
+✔ WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with drain first (636.711791ms)
+✔ WHAT[managed-session-lifecycle-025] two concurrent process reservations can grant only one first launch at the same revision (618.107708ms)
+✔ WHAT[managed-session-lifecycle-025] duplicate tool calls across processes never grant another launch, including after Ended (749.313042ms)
+✔ WHAT[managed-session-lifecycle-025] detaching one runtime closes only its round subtree and keeps the other process eligible (777.114667ms)
+✔ WHAT[managed-session-lifecycle-025] a later Host-observed assistant run shares the admitted physical execution while an unknown run cannot borrow it (649.023875ms)
+✔ WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost before COMMIT cannot launch in either process (886.137958ms)
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT never reports terminal success (772.329541ms)
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT still closes exact local PTYs and retains foreign blockers (679.214542ms)
+✖ WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost after COMMIT cannot launch in either process (611.711917ms)
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT never reports terminal success (632.877625ms)
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT still closes exact local PTYs and retains foreign blockers (616.626834ms)
+✖ WHAT[managed-session-lifecycle-025] a conflicting round Drain still closes local PTYs without clearing the winning foreign reservation (673.611708ms)
+✔ WHAT[managed-session-lifecycle-025] failed ownership journal initialization preserves its error, closes its native connection and grants no launch (9.624417ms)
+✔ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, running) (1165.484417ms)
+✔ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, exited) (1212.239708ms)
+✔ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, cold-load) (884.284708ms)
+✔ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, running) (1004.909375ms)
+✔ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, exited) (922.438208ms)
+✔ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, cold-load) (751.640417ms)
+✔ WHAT[managed-session-lifecycle-025] SIGKILL before Ended COMMIT recovers the same native exit without replay (node) (1267.881041ms)
+✔ WHAT[managed-session-lifecycle-025] SIGKILL after Ended COMMIT recovers the same native exit without replay (node) (1194.829167ms)
+✔ WHAT[managed-session-lifecycle-025] SIGKILL before Ended COMMIT recovers the same native exit without replay (bun) (1111.970584ms)
+✔ WHAT[managed-session-lifecycle-025] SIGKILL after Ended COMMIT recovers the same native exit without replay (bun) (1063.255042ms)
+✖ WHAT[managed-session-lifecycle-025] SIGKILL after Reserve COMMIT before physical preparation preserves its unknown obligation and never launches on restart (897.492291ms)
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (node) (1327.000167ms)
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (node) (1321.83625ms)
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (bun) (1879.68975ms)
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (bun) (1031.817792ms)
+✖ WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (node) (1636.986875ms)
+✖ WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (node) (1577.141708ms)
+✖ WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (bun) (1515.35925ms)
+✖ WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (bun) (1650.422667ms)
+✔ WHAT[managed-session-lifecycle-025] local late-not-started preserves its exact evidence kind (node) (5512.066541ms)
+✖ WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (node) (1460.078209ms)
+✔ WHAT[managed-session-lifecycle-025] local missing-bun preserves its exact evidence kind (node) (5397.388125ms)
+✖ WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (node) (1347.319584ms)
+✔ WHAT[managed-session-lifecycle-025] local late-not-started preserves its exact evidence kind (bun) (5391.717625ms)
+✖ WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (bun) (1338.399667ms)
+✖ WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (bun) (1215.828ms)
+✖ WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (node) (1170.030458ms)
+✖ WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (bun) (976.251542ms)
+✖ WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost before COMMIT (909.703708ms)
+✖ WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost after COMMIT (812.318208ms)
+✔ WHAT[managed-session-lifecycle-025] two Bun processes enforce stop-first admission with the real PTY backend (601.8715ms)
+✖ WHAT[managed-session-lifecycle-025] two Bun processes enforce reserve-first admission with the real PTY backend (859.734ms)
+✔ WHAT[managed-session-lifecycle-025] controlled PTY port completion clears actual HostForkRuntime ownership and name bookkeeping (2.499292ms)
+✔ WHAT[managed-session-lifecycle-025] an unproven spawn exception retains its ownership blocker (0.311958ms)
+✔ WHAT[managed-session-lifecycle-025] the production backend refuses a PTY without a durable owner before reservation or spawn (0.242375ms)
+✔ WHAT[managed-session-lifecycle-025] synchronous backend exit is observed before Fork returns (0.423959ms)
+✔ WHAT[managed-session-lifecycle-025] close without an exit witness fails and preserves the live blocker (0.8795ms)
+✔ WHAT[managed-session-lifecycle-025] a failed startup observation cannot publish Ended for an unresolved process (0.53425ms)
+✔ WHAT[managed-session-lifecycle-025] closeAll Cancel receipt loss before COMMIT still closes each exact local process (16.489542ms)
+✔ WHAT[managed-session-lifecycle-025] closeAll Cancel receipt loss after COMMIT still closes each exact local process (12.891208ms)
+✔ WHAT[managed-session-lifecycle-025] detach Cancel receipt loss before COMMIT still closes each exact local process (13.270834ms)
+✔ WHAT[managed-session-lifecycle-025] detach Cancel receipt loss after COMMIT still closes each exact local process (13.1585ms)
+✔ WHAT[managed-session-lifecycle-025] cancel Cancel receipt loss before COMMIT still closes each exact local process (15.372541ms)
+✔ WHAT[managed-session-lifecycle-025] cancel Cancel receipt loss after COMMIT still closes each exact local process (13.68975ms)
+✔ WHAT[managed-session-lifecycle-025] close Cancel receipt loss before COMMIT still closes each exact local process (9.718375ms)
+✔ WHAT[managed-session-lifecycle-025] close Cancel receipt loss after COMMIT still closes each exact local process (11.178917ms)
+✔ WHAT[managed-session-lifecycle-025] Reserve receipt loss before COMMIT never authorizes Spawn (10.440541ms)
+✔ WHAT[managed-session-lifecycle-025] Reserve receipt loss after COMMIT never authorizes Spawn (8.70175ms)
+✔ WHAT[managed-session-lifecycle-025] Drain receipt loss before COMMIT cannot reopen a permanently detaching runtime (9.28825ms)
+✔ WHAT[managed-session-lifecycle-025] Drain receipt loss after COMMIT cannot reopen a permanently detaching runtime (10.188125ms)
+✔ WHAT[managed-session-lifecycle-025] detach reconciles Ended receipt loss before COMMIT before reporting success (12.415084ms)
+✔ WHAT[managed-session-lifecycle-025] detach reconciles Ended receipt loss after COMMIT before reporting success (16.894583ms)
+✔ WHAT[managed-session-lifecycle-025] detach with no local PTY preserves another runtime on the same port and durable root (12.314625ms)
+✔ WHAT[managed-session-lifecycle-025] detach with one local PTY preserves another runtime on the same port and durable root (15.714ms)
+✔ WHAT[managed-session-lifecycle-025] cancel with no local PTY preserves another runtime on the same port and durable root (10.551166ms)
+✔ WHAT[managed-session-lifecycle-025] cancel with one local PTY preserves another runtime on the same port and durable root (14.582542ms)
+✔ WHAT[managed-session-lifecycle-025] permanent detach removes its shared port listener while reusable drain keeps its listener (0.858375ms)
+✔ WHAT[managed-session-lifecycle-025] a terminated parent runtime without an initial PTY refuses new reserve or spawn and releases its listener (0.212583ms)
+✔ WHAT[managed-session-lifecycle-025] a terminated parent runtime with an initial PTY refuses new reserve or spawn and releases its listener (0.329166ms)
+✔ WHAT[managed-session-lifecycle-025] cancellation that retains the canonical fixed DevOps keeps PTY reuse and completion delivery (65.668958ms)
+✔ WHAT[managed-session-lifecycle-025] failed terminal cancellation retains observation until exit while keeping new PTY admission closed (0.434792ms)
+✔ WHAT[managed-session-lifecycle-025] failed detach retains its exit listener until a late exit observation settles the last lease (0.325541ms)
+✔ WHAT[managed-session-lifecycle-025] detach rejects when the exact Ended observation still cannot be committed (12.592583ms)
+✔ WHAT[managed-session-lifecycle-025] Ended receipt loss before COMMIT replays the exact exit observation (13.824459ms)
+✔ WHAT[managed-session-lifecycle-025] Ended receipt loss after COMMIT replays the exact exit observation (10.900125ms)
+✔ WHAT[managed-session-lifecycle-025] a durable reservation precedes Spawn and survives runtime reconstruction without replay (11.986792ms)
+✔ WHAT[managed-session-lifecycle-025] ending one runtime scope does not close a successor scope in the same durable registry (12.360208ms)
+fatal: not a git repository (or any of the parent directories): .git
+FORK-SETTLEMENT run devops completion settlement faulted: DevOps PTY round drain is unavailable
+✔ WHAT[managed-session-lifecycle-025] a fresh process sees a prior reservation and refuses to close or replay an unbound instance (543.735583ms)
+✔ WHAT[managed-session-lifecycle-025] a run drain rejects new local PTYs until exit and permits the next DevOps run (1.770333ms)
+✔ WHAT[managed-session-lifecycle-025] DevOps run terminal settlement closes every PTY the DevOps child owns at the port boundary (76.069125ms)
+✔ WHAT[managed-session-lifecycle-025] fixed DevOps work return drains its PTY residue without affecting other runtimes (66.070542ms)
+✔ WHAT[managed-session-lifecycle-025] registered production terminal callback drains DevOps once and ignores a late callback after completion (146.894416ms)
+✔ WHAT[managed-session-lifecycle-025] registered Aborted terminal preserves eligibility and can receive a later valid terminal (110.137125ms)
+✔ WHAT[managed-session-lifecycle-025] registered Missing terminal preserves eligibility and can receive a later valid terminal (99.590291ms)
+✔ WHAT[managed-session-lifecycle-025] registered Empty terminal preserves eligibility and can receive a later valid terminal (109.101833ms)
+✔ WHAT[managed-session-lifecycle-025] registered ForeignRoot terminal preserves eligibility and can receive a later valid terminal (106.666333ms)
+✔ WHAT[managed-session-lifecycle-025] registered ForeignChild terminal preserves eligibility and can receive a later valid terminal (137.455125ms)
+✔ WHAT[managed-session-lifecycle-025] registered Failed terminal preserves eligibility and can receive a later valid terminal (98.385625ms)
+✖ WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget durable PTYs without local physical bindings (100.351834ms)
+✖ WHAT[managed-session-lifecycle-025] a DevOps terminal cannot silently bypass a missing round-drain capability (62.420291ms)
+✔ WHAT[managed-session-lifecycle-025] a cold return with zero known PTYs still durably stops admission for the exact round (117.390292ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty TERM waits for exit and escalates to KILL before releasing ownership (758.158958ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty ended-before preserves ownership until scope exit is known (464.113334ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty ended-after preserves ownership until scope exit is known (475.767125ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty shared-detach preserves ownership until scope exit is known (804.573792ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty shared-cancel preserves ownership until scope exit is known (758.0355ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-close-before preserves ownership until scope exit is known (783.717333ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-close-after preserves ownership until scope exit is known (831.907916ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-closeAll-before preserves ownership until scope exit is known (747.951166ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-closeAll-after preserves ownership until scope exit is known (791.987958ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-detach-before preserves ownership until scope exit is known (772.187375ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-detach-after preserves ownership until scope exit is known (819.337291ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-cancel-before preserves ownership until scope exit is known (764.051791ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-cancel-after preserves ownership until scope exit is known (957.22375ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty leader-exit preserves ownership until scope exit is known (646.008166ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty leader-natural preserves ownership until scope exit is known (558.35825ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty owner-lost preserves ownership until scope exit is known (395.54275ms)
+ℹ tests 123
+ℹ suites 0
+ℹ pass 89
+ℹ fail 34
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 84199.840625
+
+✖ failing tests:
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, rename) (1293.374958ms)
+  Error: Command failed: node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs rename
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs rename',
+    stdout: '',
+    stderr: "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\ntrue !== false\n\n    at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14\n    at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: true,\n  expected: false,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n"
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, directory-sync) (1189.710125ms)
+  Error: Command failed: node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs directory-sync
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs directory-sync',
+    stdout: '',
+    stderr: "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\ntrue !== false\n\n    at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14\n    at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: true,\n  expected: false,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n"
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, owner-lost) (1176.129584ms)
+  Error: Command failed: node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs owner-lost
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs owner-lost',
+    stdout: '',
+    stderr: "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\ntrue !== false\n\n    at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14\n    at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: true,\n  expected: false,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n"
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, rename) (1040.367125ms)
+  Error: Command failed: bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs rename
+  51 |     await until(() => records().some(row => row.kind === 'inner-before-remove'), 'preserve the actual physical scope exit')
+  52 |     const inner = records().find(row => row.kind === 'inner-before-remove').state
+  53 |     assert.deepEqual(inner['scope-ended'].targetExit, { code: 23, signal: null })
+  54 |     await delay(100)
+  55 |     const original = await producer.call('stop')
+  56 |     assert.equal(original.finished, false)
+                  ^
+  AssertionError: Expected values to be strictly equal:
+  
+  true !== false
+  
+   generatedMessage: true,
+       actual: true,
+     expected: false,
+     operator: "strictEqual",
+         code: "ERR_ASSERTION"
+  
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14
+        at processTicksAndRejections (native:7:39)
+  
+  Bun v1.3.14 (macOS arm64)
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs rename',
+    stdout: '',
+    stderr: `51 |     await until(() => records().some(row => row.kind === 'inner-before-remove'), 'preserve the actual physical scope exit')\n52 |     const inner = records().find(row => row.kind === 'inner-before-remove').state\n53 |     assert.deepEqual(inner['scope-ended'].targetExit, { code: 23, signal: null })\n54 |     await delay(100)\n55 |     const original = await producer.call('stop')\n56 |     assert.equal(original.finished, false)\n                ^\nAssertionError: Expected values to be strictly equal:\n\ntrue !== false\n\n generatedMessage: true,\n     actual: true,\n   expected: false,\n   operator: "strictEqual",\n       code: "ERR_ASSERTION"\n\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14\n      at processTicksAndRejections (native:7:39)\n\nBun v1.3.14 (macOS arm64)\n`
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, directory-sync) (1208.026708ms)
+  Error: Command failed: bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs directory-sync
+  51 |     await until(() => records().some(row => row.kind === 'inner-before-remove'), 'preserve the actual physical scope exit')
+  52 |     const inner = records().find(row => row.kind === 'inner-before-remove').state
+  53 |     assert.deepEqual(inner['scope-ended'].targetExit, { code: 23, signal: null })
+  54 |     await delay(100)
+  55 |     const original = await producer.call('stop')
+  56 |     assert.equal(original.finished, false)
+                  ^
+  AssertionError: Expected values to be strictly equal:
+  
+  true !== false
+  
+   generatedMessage: true,
+       actual: true,
+     expected: false,
+     operator: "strictEqual",
+         code: "ERR_ASSERTION"
+  
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14
+        at processTicksAndRejections (native:7:39)
+  
+  Bun v1.3.14 (macOS arm64)
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at Socket.<anonymous> (node:internal/child_process:497:11)
+      at Socket.emit (node:events:514:20)
+      at Pipe.<anonymous> (node:net:363:12) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs directory-sync',
+    stdout: '',
+    stderr: `51 |     await until(() => records().some(row => row.kind === 'inner-before-remove'), 'preserve the actual physical scope exit')\n52 |     const inner = records().find(row => row.kind === 'inner-before-remove').state\n53 |     assert.deepEqual(inner['scope-ended'].targetExit, { code: 23, signal: null })\n54 |     await delay(100)\n55 |     const original = await producer.call('stop')\n56 |     assert.equal(original.finished, false)\n                ^\nAssertionError: Expected values to be strictly equal:\n\ntrue !== false\n\n generatedMessage: true,\n     actual: true,\n   expected: false,\n   operator: "strictEqual",\n       code: "ERR_ASSERTION"\n\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14\n      at processTicksAndRejections (native:7:39)\n\nBun v1.3.14 (macOS arm64)\n`
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, owner-lost) (1144.301375ms)
+  Error: Command failed: bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs owner-lost
+  51 |     await until(() => records().some(row => row.kind === 'inner-before-remove'), 'preserve the actual physical scope exit')
+  52 |     const inner = records().find(row => row.kind === 'inner-before-remove').state
+  53 |     assert.deepEqual(inner['scope-ended'].targetExit, { code: 23, signal: null })
+  54 |     await delay(100)
+  55 |     const original = await producer.call('stop')
+  56 |     assert.equal(original.finished, false)
+                  ^
+  AssertionError: Expected values to be strictly equal:
+  
+  true !== false
+  
+   generatedMessage: true,
+       actual: true,
+     expected: false,
+     operator: "strictEqual",
+         code: "ERR_ASSERTION"
+  
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14
+        at processTicksAndRejections (native:7:39)
+  
+  Bun v1.3.14 (macOS arm64)
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs owner-lost',
+    stdout: '',
+    stderr: `51 |     await until(() => records().some(row => row.kind === 'inner-before-remove'), 'preserve the actual physical scope exit')\n52 |     const inner = records().find(row => row.kind === 'inner-before-remove').state\n53 |     assert.deepEqual(inner['scope-ended'].targetExit, { code: 23, signal: null })\n54 |     await delay(100)\n55 |     const original = await producer.call('stop')\n56 |     assert.equal(original.finished, false)\n                ^\nAssertionError: Expected values to be strictly equal:\n\ntrue !== false\n\n generatedMessage: true,\n     actual: true,\n   expected: false,\n   operator: "strictEqual",\n       code: "ERR_ASSERTION"\n\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:56:12\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14\n      at processTicksAndRejections (native:7:39)\n\nBun v1.3.14 (macOS arm64)\n`
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:107:1
+✖ WHAT[managed-session-lifecycle-025] a foreign committed reservation prevents premature terminal settlement (637.096542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:112:12
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:108:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:133:3
+✖ WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with reserve first (599.226084ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:148:16
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:134:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:250:3
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT never reports terminal success (772.329541ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:253:14
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:251:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:263:3
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT still closes exact local PTYs and retains foreign blockers (679.214542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:270:14
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:264:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:233:3
+✖ WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost after COMMIT cannot launch in either process (611.711917ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:242:16
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:234:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:250:3
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT never reports terminal success (632.877625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:253:14
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:251:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:263:3
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT still closes exact local PTYs and retains foreign blockers (616.626834ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:270:14
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:264:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:280:1
+✖ WHAT[managed-session-lifecycle-025] a conflicting round Drain still closes local PTYs without clearing the winning foreign reservation (673.611708ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:297:12
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:281:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:445:1
+✖ WHAT[managed-session-lifecycle-025] SIGKILL after Reserve COMMIT before physical preparation preserves its unknown obligation and never launches on restart (897.492291ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:453:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:447:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:462:5
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (node) (1327.000167ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:478:18)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:464:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:462:5
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (node) (1321.83625ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:478:18)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:464:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:462:5
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (bun) (1879.68975ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:478:18)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:464:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:462:5
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (bun) (1031.817792ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:478:18)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:464:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:498:5
+✖ WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (node) (1636.986875ms)
+  AssertionError [ERR_ASSERTION]: target must be exited before Ended: S+  
+   
+      at requirePtyTargetReaped (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:361:12)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:553:41)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:500:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:498:5
+✖ WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (node) (1577.141708ms)
+  AssertionError [ERR_ASSERTION]: target must be exited before Ended: S+  
+   
+      at requirePtyTargetReaped (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:361:12)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:553:41)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:500:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:498:5
+✖ WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (bun) (1515.35925ms)
+  AssertionError [ERR_ASSERTION]: target must be exited before Ended: S+  
+   
+      at requirePtyTargetReaped (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:361:12)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:553:41)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:500:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:498:5
+✖ WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (bun) (1650.422667ms)
+  AssertionError [ERR_ASSERTION]: target must be exited before Ended: S+  
+   
+      at requirePtyTargetReaped (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:361:12)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:553:41)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:500:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:562:5
+✖ WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (node) (1460.078209ms)
+  Error: Command failed: node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs stream-loss
+  FORK-SETTLEMENT run devops completion settlement faulted: PTY owner connection was lost
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:66:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:22:1 {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at Socket.<anonymous> (node:internal/child_process:497:11)
+      at Socket.emit (node:events:514:20)
+      at Pipe.<anonymous> (node:net:363:12) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs stream-loss',
+    stdout: '',
+    stderr: "FORK-SETTLEMENT run devops completion settlement faulted: PTY owner connection was lost\nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\ntrue !== false\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:66:14\n    at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:22:1 {\n  generatedMessage: true,\n  code: 'ERR_ASSERTION',\n  actual: true,\n  expected: false,\n  operator: 'strictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n"
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:570:3
+✖ WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (node) (1347.319584ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:599:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:572:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:562:5
+✖ WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (bun) (1338.399667ms)
+  Error: Command failed: bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs stream-loss
+  FORK-SETTLEMENT run devops completion settlement faulted: PTY owner connection was lost
+  61 |     assert.equal(physical.kind, streamLoss ? 'Ended' : 'NotStarted')
+  62 |     assert.equal(streamLoss ? fs.readFileSync(marker, 'utf8') : fs.existsSync(marker), streamLoss ? 'launched\n' : false)
+  63 |     const first = await host.stop()
+  64 |     const second = await host.stop()
+  65 |     if (streamLoss) {
+  66 |       assert.equal(first.finished, false)
+                    ^
+  AssertionError: Expected values to be strictly equal:
+  
+  true !== false
+  
+   generatedMessage: true,
+       actual: true,
+     expected: false,
+     operator: "strictEqual",
+         code: "ERR_ASSERTION"
+  
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:66:14
+        at processTicksAndRejections (native:7:39)
+  
+  Bun v1.3.14 (macOS arm64)
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs stream-loss',
+    stdout: '',
+    stderr: `FORK-SETTLEMENT run devops completion settlement faulted: PTY owner connection was lost\n61 |     assert.equal(physical.kind, streamLoss ? 'Ended' : 'NotStarted')\n62 |     assert.equal(streamLoss ? fs.readFileSync(marker, 'utf8') : fs.existsSync(marker), streamLoss ? 'launched\\n' : false)\n63 |     const first = await host.stop()\n64 |     const second = await host.stop()\n65 |     if (streamLoss) {\n66 |       assert.equal(first.finished, false)\n                  ^\nAssertionError: Expected values to be strictly equal:\n\ntrue !== false\n\n generatedMessage: true,\n     actual: true,\n   expected: false,\n   operator: "strictEqual",\n       code: "ERR_ASSERTION"\n\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:66:14\n      at processTicksAndRejections (native:7:39)\n\nBun v1.3.14 (macOS arm64)\n`
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:570:3
+✖ WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (bun) (1215.828ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:599:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:572:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:622:3
+✖ WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (node) (1170.030458ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:643:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:624:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:622:3
+✖ WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (bun) (976.251542ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:643:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:624:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:660:3
+✖ WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost before COMMIT (909.703708ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:669:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:662:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:660:3
+✖ WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost after COMMIT (812.318208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:669:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:662:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:681:3
+✖ WHAT[managed-session-lifecycle-025] two Bun processes enforce reserve-first admission with the real PTY backend (859.734ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:697:16)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:683:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1268:1
+✖ WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget durable PTYs without local physical bindings (100.351834ms)
+  AssertionError [ERR_ASSERTION]: The "string" argument must be of type string. Received type undefined (undefined)
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1278:12
+      at async withJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:46:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1270:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: /no local process binding/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1287:1
+✖ WHAT[managed-session-lifecycle-025] a DevOps terminal cannot silently bypass a missing round-drain capability (62.420291ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  true !== false
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1293:12
+      at async withJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:46:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1289:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

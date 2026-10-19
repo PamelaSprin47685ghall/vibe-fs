@@ -1,0 +1,43 @@
+✔ WHAT[process-execution-006] the registered DevOps tool observes real Host abort during execution without claiming physical completion (1132.258333ms)
+✖ WHAT[process-execution-006] runtime disposal cancels a real registered pipe run before releasing its process owner (281.863833ms)
+✖ WHAT[process-execution-006] an unknown physical close returns a bounded drain failure and retains the exact ownership blocker until close arrives (3014.813083ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 1
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4645.85525
+
+✖ failing tests:
+
+test at requirements/process-execution/tests/006.test.mjs:109:1
+✖ WHAT[process-execution-006] runtime disposal cancels a real registered pipe run before releasing its process owner (281.863833ms)
+  TypeError: completion_3.get_Task(...).get_IsCompleted is not a function
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/dist/OpenCode/Tools/ToolRuntimeScope.js:1714:49
+      at Array.filter (<anonymous>)
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/dist/OpenCode/Tools/ToolRuntimeScope.js:1712:75
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:134:22
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:114:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7)
+
+test at requirements/process-execution/tests/006.test.mjs:146:1
+✖ WHAT[process-execution-006] an unknown physical close returns a bounded drain failure and retains the exact ownership blocker until close arrives (3014.813083ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Process scope closure was not confirmed/. Input:
+  
+  'completion_3.get_Task(...).get_IsCompleted is not a function'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:151:10)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'completion_3.get_Task(...).get_IsCompleted is not a function',
+    expected: /Process scope closure was not confirmed/,
+    operator: 'match',
+    diff: 'simple'
+  }

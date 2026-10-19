@@ -13,7 +13,7 @@ test('WHAT[durable-events-025] conflicting Prepared identity returns StorageInva
     const H = (text) => `H(${text})`
     const frame = Strength.frameTryBuild(H, [{
       requestOrdinal: 1,
-      exchanges: [{ toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }]
+      exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' }]
     }]).value
 
     const firstReq = {
@@ -50,7 +50,7 @@ test('WHAT[durable-events-025] conflicting Prepared identity returns StorageInva
     // Conflicting request with different replica/parameters for the same decisionId
     const conflictFrame = Strength.frameTryBuild(H, [{
       requestOrdinal: 1,
-      exchanges: [{ toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' }]
+      exchanges: [{ toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' }]
     }]).value
     const conflictReq = {
       ownerSessionId: 'owner-de025',

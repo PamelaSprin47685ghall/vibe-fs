@@ -1,0 +1,30 @@
+✖ WHAT[work-034] Plan keeps user originals across explicit views and handover; a cold checkpoint restores identity only (1306.528833ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1617.650417
+
+✖ failing tests:
+
+test at requirements/work/tests/034.test.mjs:426:1
+✖ WHAT[work-034] Plan keeps user originals across explicit views and handover; a cold checkpoint restores identity only (1306.528833ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(successorOut.messages.some(message => msgId(message) === userRoot.info.id && msgText(message).includes(userRoot.parts[0].text)))
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work/tests/034.test.mjs:554:12
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/work/tests/034.test.mjs:428:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

@@ -8,7 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.runtime-platform-git-subject.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.runtime-platform.digest.fsproj"/>
     <Compile Include="Persistence/Journal/RuntimePath.fsi"/>
     <Compile Include="Persistence/Journal/RuntimePath.fs"/>
   </ItemGroup>

@@ -1,14 +1,29 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { renderToolEstimate } from '../../../dist/OpenCode/Host/PairProgrammingCalibrationSurface.js'
+import { renderBudget } from '../../../dist/OpenCode/Host/PairProgrammingCalibrationSurface.js'
 import * as estimate from '../../../dist/Execution/Delegation/DelegatedToolEstimateSurface.js'
 
-test('WHAT[delegation-022] estimate prose selects the whole advisory resource in each provider language', () => {
-  for (const [language, file] of [['English', 'en.md'], ['SimplifiedChinese', 'zh-CN.md']]) {
-    const rendered = renderToolEstimate(language, 4)
-    const resource = readFileSync(new URL(`../../../resources/provider/host/pair-programming-tool-estimate/${file}`, import.meta.url), 'utf8')
-    assert.equal(rendered, resource.trim().replaceAll('{{remaining}}', '4'))
+test('WHAT[delegation-022] calibration prose states the four numbers from the whole authored resource', () => {
+  const cases = [
+    ['English', 'en.md', 4, 6, 125000, '2 minutes 5 seconds', '3 minutes 7 seconds'],
+    ['SimplifiedChinese', 'zh-CN.md', 4, 6, 125000, '2 分钟 5 秒', '3 分钟 7 秒'],
+    ['English', 'en.md', 0, 3, 60000, '1 minute 0 seconds', '3 minutes 0 seconds'],
+  ]
+
+  for (const [language, file, turnsUsed, turnsLeft, elapsedMs, timeUsed, timeLeft] of cases) {
+    const rendered = renderBudget(language, turnsUsed, turnsLeft, elapsedMs)
+    const resource = readFileSync(
+      new URL(`../../../resources/provider/host/pair-programming-budget/${file}`, import.meta.url),
+      'utf8',
+    )
+    const expected = resource
+      .trim()
+      .replaceAll('{{turns_used}}', String(turnsUsed))
+      .replaceAll('{{turns_left}}', String(turnsLeft))
+      .replaceAll('{{time_used}}', timeUsed)
+      .replaceAll('{{time_left}}', timeLeft)
+    assert.equal(rendered, expected, `${language}: turns ${turnsUsed}/${turnsLeft} at ${elapsedMs}ms`)
   }
 })
 

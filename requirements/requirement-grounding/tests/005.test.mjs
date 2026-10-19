@@ -22,7 +22,7 @@ const sandbox = () => {
 
 const terminalRead = (path) => [{
   info: { id: 'r1', role: 'assistant', providerID: 'anthropic' },
-  parts: [{ type: 'tool', tool: 'read', callID: 'source-read', state: { status: 'completed', input: { filePath: path }, output: 'source\n', time: { start: 0, end: 0 } } }],
+  parts: [{ type: 'tool', tool: 'todowrite-for-manager', callID: 'source-read', state: { status: 'completed', input: { program: `class Js extends JsProgram { async run() { return await this.cat(${JSON.stringify(path)}); } }` }, output: 'source\n', time: { start: 0, end: 0 } } }],
 }]
 
 test('WHAT[requirement-grounding-005] APPLIES-TO external grounding injects only direct Markdown and excludes tests plus the manifest', async () => {

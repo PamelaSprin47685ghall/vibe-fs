@@ -28,8 +28,8 @@ const Strength = await import("../../../dist/Strength/Surface.js");
 
 const H = (text) => createHash('sha256').update(text).digest('hex')
 const bundle = Strength.frameTryBuild(H, [{ requestOrdinal: 1, exchanges: [
-  { toolName: 'read', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
-  { toolName: 'grep', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
+  { toolName: 'todowrite-for-predictor', canonicalArguments: '{"filePath":"a"}', canonicalResult: 'alpha' },
+  { toolName: 'todowrite-for-predictor', canonicalArguments: '{"pattern":"x"}', canonicalResult: 'a:1:x' },
 ] }]).value
 const request = (decisionId = 'd1') => Strength.eventRequested({
   decisionId, ownerSessionId: 'owner',

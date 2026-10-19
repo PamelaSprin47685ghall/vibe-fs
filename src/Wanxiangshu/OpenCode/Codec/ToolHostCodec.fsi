@@ -53,8 +53,11 @@ module ToolHostCodec =
     val decodeContext: raw: obj -> HostToolContext
     val hookCallId: raw: obj -> ToolCallId option
     val factory: toolModule: obj -> HostToolFactory
+    /// Construct host tool arguments from an in-process raw object.
+    val argumentsOfRaw: raw: obj -> HostToolArguments
     val internal schemaValue: schema: HostSchema -> obj
     val stringSchema: factory: HostToolFactory -> HostSchema
+    val anySchema: factory: HostToolFactory -> HostSchema
     val stringSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val numberSchema: factory: HostToolFactory -> HostSchema
     val numberSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
@@ -81,9 +84,12 @@ module ToolHostCodec =
     val optionalNonNegativeIntegerSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val optionalStringArraySchema: factory: HostToolFactory -> HostSchema
     val stringArraySchema: factory: HostToolFactory -> HostSchema
-    val todoArraySchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val objectSchemaOf: fields: (string * HostSchema) list -> factory: HostToolFactory -> HostSchema
     val arraySchemaOf: item: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
+
+    val recordSchemaOf:
+        key: HostSchema -> value: HostSchema -> description: string -> factory: HostToolFactory -> HostSchema
+
     val register: factory: HostToolFactory -> spec: ToolSpec -> obj
     val registry: factory: HostToolFactory -> specs: ToolSpec list -> obj
     val hide: registry: obj -> name: string -> callback: 'callback -> unit

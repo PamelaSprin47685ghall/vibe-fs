@@ -11,8 +11,6 @@ open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
-open Wanxiangshu.Interaction.Attention
-open Wanxiangshu.Interaction.Concern
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Requirement.Grounding
 open Wanxiangshu.Persistence.Journal
@@ -25,12 +23,6 @@ open Wanxiangshu.Execution.Delegation.Fork.OpenCode
 open Wanxiangshu.Context.Companion.Blogger
 
 module AgentJournalPortAdapter =
-    let forAttention (journal: AgentJournal) : AttentionJournalPort =
-        AttentionConcernJournalAdapter.forAttention journal
-
-    let forConcern (journal: AgentJournal) : ConcernJournalPort =
-        AttentionConcernJournalAdapter.forConcern journal
-
     let forDelegatedToolEstimate (journal: AgentJournal) : DelegatedToolEstimatePort =
         SessionStartedAtJournalAdapter.forDelegatedToolEstimate journal
 
@@ -161,8 +153,8 @@ module AgentJournalPortAdapter =
                         { XTrace = s.XTrace
                           Blog = s.Blog
                           PrefixEpoch = s.PrefixEpoch
-                          TodoCheckpoints =
-                            projections.TodoCheckpoints
+                          ViewCheckpoints =
+                            projections.ViewCheckpoints
                             |> Map.tryFind sessionId
                             |> Option.defaultValue PhaseWindow.emptyWindow })
 

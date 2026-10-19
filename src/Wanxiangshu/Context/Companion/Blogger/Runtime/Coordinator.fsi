@@ -30,7 +30,6 @@ module BloggerCoordinator =
     [<RequireQualifiedAccess>]
     type DecisionEffect =
         | Started
-        | StartedSquash
         | SkippedInFlight
         | OfferedParked
         | NoMaterial

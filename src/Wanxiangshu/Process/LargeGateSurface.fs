@@ -33,6 +33,7 @@ module LargeGateSurface =
     let release () = LargeGate.release ()
 
     let getCount () = LargeGate.getCount ()
+    let getPendingCount () = LargeGate.getPendingCount ()
 
     /// Execute one in-memory large estimate through ProcessRunner. The callback
     /// runs at launcher entry, after ProcessRunner has acquired LargeGate.

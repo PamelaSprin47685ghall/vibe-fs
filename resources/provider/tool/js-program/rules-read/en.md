@@ -1,61 +1,22 @@
-{{fileCall}} reads this transaction's immutable UTF-8 snapshot,
-optionally resolves ordered anchors, and returns an immutable FileView.
+Read with `cat(path)`: it returns the file as a string and registers the read snapshot used by the write-before FILE_CHANGED check. A missing path is FILE_NOT_FOUND, invalid encoding is INVALID_UTF8. `stat(path)` returns `{ exists, size, mtime, isDir }` — a missing path is `exists: false`, not an error.
 
-matches is Array<[beginAnchor, endAnchor, pattern]> where pattern is a non-empty
-string or a RegExp. Anchors are position names, not the matched text.
-Every FileView has built-in anchors ^ (file start) and $ (file end). Do not
-declare ^ or $ as custom names.
+Locate with `where` / `whereAll`:
 
-Ordered matching: each pattern is searched from the current cursor; after a match,
-cursor = match.end. Duplicate source text does not need to be globally unique.
-Caller RegExp g/y flags and lastIndex are ignored; matching uses its own forward
-search. Zero-width RegExp is allowed (begin offset may equal end offset); begin
-and end names must still differ.
+- `whereAll(content, needle, from = 0)` returns every normalized match as `[[begin, end], ...]`.
+- `where(content, needle, from = 0)` returns the single span. Zero or many matches suspend the program through the same channel as `park`, with `{ needle, candidates, nearest }`; resume by injecting the chosen span.
 
-Anchor declaration refusals: empty names; reserved ^/$; duplicate names; begin == end
-in one declaration; empty string pattern. Pattern not found in declaration order fails.
+Normalization collapses whitespace runs to one space and trims the needle; offsets always address the original string. `where` never throws a locating error and never silently picks a match: uniqueness is mechanical, ambiguity is yours.
 
-file.text(from, to) — default text(from = "^", to = "$") — returns the exact original
-substring between two resolved anchors. String pattern content must be non-empty.
-Reverse slices fail. FileView is immutable: rewrite() does not change a previously
-returned view.
+Recompose with slices — do not re-search what you already located:
 
-from/to may be a declared name, ^, $, or a temporary shift name+N / name-N
-(example: h1+200, h1-40, $+0). N is a JS string index delta — the same unit as
-String.length / slice — not a line number and not a UTF-8 byte count.
-file_len is source.length. Shifts are not stored. If the full string is a
-declared name, that exact name wins. Otherwise the last [+-]digits is the delta;
-the base name is resolved recursively. The resulting caret is clipped to
-[0, file_len] inclusive, so $+N and ^-N stay at EOF / start.
+```js
+const text = await this.cat(path);
+const [begin, end] = await this.where(text, "old");
+this.write(path, text.slice(0, begin) + "new" + text.slice(end));
+```
 
-Recommended workflow:
-1. Declare the minimal begin/end anchors needed to locate spans (read or edit).
-2. Let Host resolve those positions.
-3. Read with text(from, to). Adjacent headers make a body slice:
-   text("h1end", "h2"). A window around a hit is text("h1", "h1+200")
-   (200 string indices, not 200 lines).
-4. For edits, build the complete resulting file from text(...) slices plus new content.
-5. Use indexOf / replaceAll only when anchor-and-splice is genuinely inconvenient.
+`Promise.all` / `Promise.allSettled` give you parallel IO inside one program; the host adds no lock or queue, and a failed sibling never undoes a write that already landed. Same-file races are yours.
 
-I have already paid for this mistake. I once treated a roughly 8k lines file
-reorganization as manual string surgery: indexOf, substring, then join. One run
-turned it into roughly 31k lines. The ugly part was not one bad output; I then
-spent more calls guessing at the damage, using grep to stare at repeated
-headings and replace to scrape away leftovers. grep was finding candidates, not
-owning structure. The generated API had already given me an immutable snapshot,
-ordered anchors, and exact text() slices; by calculating the boundaries myself I
-threw those guards away and recreated the bugs they exist to prevent.
+I have already paid for this mistake. I once treated a roughly 8k-line reorganization as manual string surgery: `indexOf`, `substring`, then join. One run turned it into roughly 31k lines, and I then spent more calls guessing at the damage — scanning for repeated headings and scraping away leftovers. Raw search was finding candidates, not owning structure. The primitives had already given me an immutable snapshot and exact spans; by computing boundaries by hand I threw those guards away and recreated the bugs they exist to prevent.
 
-So when the job is structural — keep these spans, drop those spans, reorder these
-sections — declare the structure first, then splice only the slices that belong
-in the target file. Do not make "load everything, then keep deleting what looks
-wrong" your default plan. Raw string search is useful inside a known slice; it is
-not a reason to reimplement structural location.
-
-Do not let familiarity impersonate facts. indexOf feels "simple" because you
-have seen it thousands of times; that familiarity says nothing about whether it
-owns this file's structure. The primitive with the stronger contract gets the
-presumption. The lower-level technique carries the burden of proof.
-
-Prefer:
-  f.text("^", "begin") + "newString" + f.text("end", "$")
+So when the job is structural — keep these spans, drop those spans, reorder these sections — locate the structure first, then splice only the slices that belong in the target file. Do not let familiarity impersonate facts: `indexOf` feels simple because you have seen it thousands of times; that familiarity says nothing about whether it owns this file's structure. The primitive with the stronger contract gets the presumption.

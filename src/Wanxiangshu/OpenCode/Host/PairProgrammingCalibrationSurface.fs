@@ -28,8 +28,21 @@ module PairProgrammingCalibrationSurface =
             (optionalText toolEstimate)
             guideline
 
-    let renderToolEstimate (language: string) (remaining: obj) : string =
-        PairProgrammingCalibration.renderToolEstimate (languageOf language) (int (string remaining))
+    let renderBudget (language: string) (turnsUsed: obj) (turnsRemaining: obj) (elapsedMilliseconds: obj) : string =
+        PairProgrammingCalibration.renderBudget
+            (languageOf language)
+            (int (string turnsUsed))
+            (int (string turnsRemaining))
+            (float (string elapsedMilliseconds))
 
     let renderElapsed (language: string) (elapsedMilliseconds: obj) : string =
         PairProgrammingCalibration.renderElapsed (languageOf language) (float (string elapsedMilliseconds))
+
+    let renderTokenEconomy (language: string) (cached: obj) (uncached: obj) : string =
+        PairProgrammingCalibration.renderTokenEconomy
+            (languageOf language)
+            (int (string cached))
+            (int (string uncached))
+
+    let renderContextLimit (language: string) (limit: obj) : string =
+        PairProgrammingCalibration.renderContextLimit (languageOf language) (int (string limit))

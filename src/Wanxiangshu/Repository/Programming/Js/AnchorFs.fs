@@ -1,61 +1,37 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open System.Threading.Tasks
 open Fable.Core
 open Fable.Core.JsInterop
-open FsToolkit.ErrorHandling
 
-/// JS-006/020: the ordered anchor matching and host grep adapter behind the
-/// js-* runtime bindings. Durable facts never live here; EventStore owns them
-/// (JS-012).
+/// Ordered anchor matching and host grep, bridged to `wanxiangli/fs`
+/// (CUT-24). The matching algorithm lives in the library; this module keeps
+/// the main-repo signature (AnchorSpec DU, JsGrepHit/JsGrepListing records)
+/// stable for existing consumers.
 module JsAnchorFs =
 
-    [<Emit("new Promise((resolve) => setImmediate(resolve))")>]
-    let private yieldEventLoop () : System.Threading.Tasks.Task<unit> = jsNative
+    [<Import("Filesystem", "wanxiangli/fs")>]
+    let private Filesystem: obj = jsNative
 
-    [<Import("join", "node:path")>]
-    let private pathJoin (a: string) (b: string) : string = jsNative
+    [<Emit("$0({ root: $1 })")>]
+    let private createFilesystem (factory: obj) (root: string) : obj = jsNative
 
-    [<Emit("new RegExp($0, 'g')")>]
-    let private regexGlobal (pattern: string) : obj = jsNative
+    let private api = createFilesystem Filesystem ""
 
-    [<Emit("""
-        ((text, re, occurrence) => {
-          let index = 0;
-          let m;
-          while ((m = re.exec(text)) !== null) {
-            index += 1;
-            if (index === occurrence) {
-              const matched = m[0] === undefined ? '' : m[0];
-              return { found: true, start: m.index, end: m.index + matched.length };
-            }
-            if (m.index === re.lastIndex) re.lastIndex += 1;
-          }
-          return { found: false };
-        })($0, $1, $2)
-    """)>]
-    let private findRegexOccurrence (text: string) (re: obj) (occurrence: int) : obj = jsNative
+    let private specToJs (spec: AnchorSpec) : obj =
+        match spec with
+        | AnchorSpec.Exact text -> createObj [ "kind" ==> "exact"; "text" ==> text ]
+        | AnchorSpec.Regex text -> createObj [ "kind" ==> "regex"; "text" ==> text ]
 
-    [<Emit("""
-        ((text, re) => {
-          const hits = [];
-          let m;
-          while ((m = re.exec(text)) !== null) {
-            hits.push({ index: m.index, text: m[0] === undefined ? '' : m[0] });
-            if (m.index === re.lastIndex) re.lastIndex += 1;
-          }
-          return hits;
-        })($0, $1)
-    """)>]
-    let private allRegexHits (text: string) (re: obj) : obj array = jsNative
+    let private failureOf (result: obj) : JsFailure =
+        JsFailure.ofWire (string (result?code)) (string (result?reason))
 
-    [<Emit("$0.found === true")>]
-    let private matchFound (m: obj) : bool = jsNative
-
-    [<Emit("$0.start")>]
-    let private matchStart (m: obj) : int = jsNative
-
-    [<Emit("$0.end")>]
-    let private matchEnd (m: obj) : int = jsNative
+    let private spanOf (result: obj) : Result<int * int, JsFailure> =
+        if unbox<bool> (result?ok) then
+            let value = unbox<obj array> (result?value)
+            Ok(unbox<int> (value.[0]), unbox<int> (value.[1]))
+        else
+            Error(failureOf result)
 
     type JsGrepHit =
         { Path: string
@@ -67,191 +43,50 @@ module JsAnchorFs =
         { Matches: JsGrepHit list
           ReadSnapshots: JsReadSnapshot list }
 
-    let private appendLineStartIfNewline (offsets: ResizeArray<int>) (text: string) (i: int) =
-        if text.[i] = '\n' then
-            offsets.Add(i + 1)
-
-    /// 每行起始偏移索引。lineOffsets[0]=0；每个 '\n' 之后紧跟下一行起始。
-    /// 只认 '\n'（不做 CRLF 修正），与历史 lineColumn 计法一致。
-    let private lineOffsets (text: string) : int array =
-        // DSL-MUTABLE: algorithm-scratch — line offset accumulator
-        let offsets = ResizeArray<int>()
-        offsets.Add 0
-
-        for i in 0 .. text.Length - 1 do
-            appendLineStartIfNewline offsets text i
-
-        offsets.ToArray()
-
-    /// (line, column) 均 1-based，从 lineOffsets 二分定位 index 所在行。
-    /// index 落在 '\n' 上时，该换行属于当前行（line 不递增），与旧逐字扫描等价。
-    let private lineColumn (offsets: int array) (index: int) : int * int =
-        // 二分找最后一个 lineStart <= index
-        // DSL-MUTABLE: algorithm-scratch — binary-search lower bound
-        let mutable lo = 0
-        // DSL-MUTABLE: algorithm-scratch — binary-search upper bound
-        let mutable hi = offsets.Length - 1
-
-        while lo < hi do
-            let mid = (lo + hi + 1) / 2
-
-            if offsets.[mid] <= index then lo <- mid else hi <- mid - 1
-
-        lo + 1, index - offsets.[lo] + 1
-
-    let private exactHits (text: string) (needle: string) : (int * string) list =
-        let rec go fromIndex =
-            let idx = text.IndexOf(needle, fromIndex, System.StringComparison.Ordinal)
-
-            if idx < 0 then
-                []
-            else
-                (idx, needle) :: go (idx + max needle.Length 1)
-
-        if needle = "" then [] else go 0
-
-    let private regexHits (text: string) (source: string) : (int * string) list =
-        try
-            allRegexHits text (regexGlobal source)
-            |> Array.toList
-            |> List.map (fun hit -> (int (hit?index), string (hit?text)))
-        with _ ->
-            []
-
-    let private locateHits (text: string) (spec: AnchorSpec) : (int * string) list =
-        match spec with
-        | AnchorSpec.Exact needle -> exactHits text needle
-        | AnchorSpec.Regex source -> regexHits text source
-
-    let private grepHitAt (rel: string) (offsets: int array) (index: int) (matched: string) : JsGrepHit =
-        let line, column = lineColumn offsets index
-
-        { Path = rel
-          Line = line
-          Column = column
-          Text = matched }
-
-    let private grepHitsOnText (rel: string) (text: string) (spec: AnchorSpec) : JsGrepHit list =
-        let offsets = lineOffsets text
-
-        locateHits text spec
-        |> List.map (fun (index, matched) -> grepHitAt rel offsets index matched)
-
-    let private grepPath (root: string) (spec: AnchorSpec) (rel: string) =
-        match JsUtf8Fs.readUtf8Classified (pathJoin root rel) with
-        | Error _ -> None
-        | Ok text -> Some({ Path = rel; Text = text }, grepHitsOnText rel text spec)
-
     /// JS-020: Host grep over gitignore-selected UTF-8 files. Full result —
     /// no internal bound; the Host tool-result bound tail-keeps the tail.
-    let grep
-        (root: string)
-        (spec: AnchorSpec)
-        (pattern: string)
-        : System.Threading.Tasks.Task<Result<JsGrepListing, JsFailure>> =
-        let scanPaths paths =
-            task {
-                let scanned = ResizeArray<JsReadSnapshot * JsGrepHit list>()
+    let grep (root: string) (spec: AnchorSpec) (pattern: string) : Task<Result<JsGrepListing, JsFailure>> =
+        let rootApi = createFilesystem Filesystem root
 
-                for path in paths do
-                    do! yieldEventLoop ()
-                    grepPath root spec path |> Option.iter scanned.Add
+        task {
+            let! (result: obj) = unbox<Task<obj>> (rootApi?grep (specToJs spec, pattern))
+
+            if not (unbox<bool> (result?ok)) then
+                return Error(failureOf result)
+            else
+                let value = result?value
+                let matches = unbox<obj array> (value?matches)
+
+                let hits =
+                    matches
+                    |> Array.map (fun hit ->
+                        { Path = string (hit?path)
+                          Line = int (hit?line)
+                          Column = int (hit?column)
+                          Text = string (hit?text) })
+                    |> Array.toList
+
+                let snapshots = unbox<obj array> (value?readSnapshots)
+
+                let readSnapshots =
+                    snapshots
+                    |> Array.map (fun snapshot ->
+                        { Path = string (snapshot?path)
+                          Text = string (snapshot?text) })
+                    |> Array.toList
 
                 return
                     Ok
-                        { Matches = scanned |> Seq.collect snd |> Seq.toList
-                          ReadSnapshots = scanned |> Seq.map fst |> Seq.toList }
-            }
-
-        let runGrep pat =
-            task {
-                match! JsGlobFs.glob root pat with
-                | Error e -> return Error e
-                | Ok l -> return! scanPaths l.Paths
-            }
-
-        if System.String.IsNullOrEmpty pattern then
-            System.Threading.Tasks.Task.FromResult(Error JsFailure.AnchorInvalidPattern)
-        else
-            runGrep pattern
-
-    /// Index of the nth occurrence of an exact needle, scanning forward
-    /// from fromIndex (ordinal). -1 when absent.
-    let rec private nthIndex (text: string) (needle: string) (fromIndex: int) (n: int) : int =
-        if n <= 0 then
-            -1
-        else
-            let idx = text.IndexOf(needle, fromIndex, System.StringComparison.Ordinal)
-
-            if idx < 0 then -1
-            elif n = 1 then idx
-            else nthIndex text needle (idx + needle.Length) (n - 1)
-
-    let private findExactAnchor (text: string) (needle: string) (occurrence: int) : Result<int * int, JsFailure> =
-        result {
-            do!
-                if System.String.IsNullOrEmpty needle then
-                    Error JsFailure.AnchorEmptyContent
-                else
-                    Ok()
-
-            let start = nthIndex text needle 0 occurrence
-
-            if start < 0 then
-                return! Error(JsFailure.AnchorNotFound("anchor did not match at occurrence " + string occurrence))
-            else
-                return start, start + needle.Length
+                        { Matches = hits
+                          ReadSnapshots = readSnapshots }
         }
-
-    let private regexOccurrenceOrMissing
-        (text: string)
-        (pattern: string)
-        (occurrence: int)
-        : Result<int * int, JsFailure> =
-        let re = regexGlobal pattern
-        let m = findRegexOccurrence text re occurrence
-
-        if matchFound m then
-            Ok(matchStart m, matchEnd m)
-        else
-            Error(JsFailure.AnchorNotFound("anchor did not match at occurrence " + string occurrence))
-
-    let private findRegexAnchor (text: string) (pattern: string) (occurrence: int) : Result<int * int, JsFailure> =
-        result {
-            do!
-                if System.String.IsNullOrEmpty pattern then
-                    Error JsFailure.AnchorEmptyContent
-                else
-                    Ok()
-
-            try
-                return! regexOccurrenceOrMissing text pattern occurrence
-            with _ ->
-                return! Error JsFailure.AnchorInvalidPattern
-        }
-
-    let private findAnchorBySpec (text: string) (spec: AnchorSpec) (occurrence: int) : Result<int * int, JsFailure> =
-        match spec with
-        | AnchorSpec.Exact needle -> findExactAnchor text needle occurrence
-        | AnchorSpec.Regex pattern -> findRegexAnchor text pattern occurrence
 
     /// JS-006: ordered string/RegExp anchor matching. `occurrence` is 1-based.
     /// Returns (start, end); zero-width matches yield start = end.
     let findAnchor (text: string) (spec: AnchorSpec) (occurrence: int) : Result<int * int, JsFailure> =
-        if occurrence < 1 then
-            Error JsFailure.AnchorInvalidPattern
-        else
-            findAnchorBySpec text spec occurrence
-
-    let private uniqueAfterFirst (text: string) (spec: AnchorSpec) (first: int * int) : Result<int * int, JsFailure> =
-        match findAnchor text spec 2 with
-        | Ok _ -> Error JsFailure.AnchorNotUnique
-        | Error _ -> Ok first
+        spanOf (api?findAnchor (text, specToJs spec, float occurrence))
 
     /// JS-006: uniqueness refusal — when no occurrence is declared, the anchor
     /// must match exactly once.
     let requireUnique (text: string) (spec: AnchorSpec) : Result<int * int, JsFailure> =
-        result {
-            let! first = findAnchor text spec 1
-            return! uniqueAfterFirst text spec first
-        }
+        spanOf (api?requireUnique (text, specToJs spec))

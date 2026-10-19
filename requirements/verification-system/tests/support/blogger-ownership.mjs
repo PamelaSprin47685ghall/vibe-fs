@@ -98,7 +98,9 @@ export const chroniclePart = (callID, tip, text) => ({
       occurrence: text,
       settlement: 'The supplied occurrence is now part of the durable work record.',
       consequence: 'Later context may rely on this record after raw history is compressed.',
-      tip,
+      tipName: tip,
+      opinion: 'The durable record keeps the change recoverable.',
+      advice: 'Apply the recorded material in the next action.',
     },
   },
 })

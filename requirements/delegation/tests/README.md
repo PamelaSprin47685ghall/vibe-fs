@@ -25,9 +25,9 @@ e1合并的gen77官方510文件与完整36文件integration均0 fail。003实际
 | 019、021 | 生产 typed renderer 的两种语言、敌意 TOML 样本、指令与数据平面分离、空背景省略 | 真正首提示读取最新 durable parent、指定 peer 的材料来源、权限不克隆 |
 | 022 | 完整语言资源选择、estimate fold 的去重与零饱和 | 归零后仍能真实执行、同一 durable estimate 的替换/重开 |
 | 023 | 同步 workflow 消费注入 retry verdict，恢复成功或耗尽后返回 | 真实恢复 engine 各路径与最终失败组合 |
-| 024—026 | parent delta、own child delta、因果完成/失败、实际 fork 接收与不确定发送后果；Host event port 保留身份 | 所有 terminal 分支、进程 crash cuts、未知接收的后续收敛 |
+| 024—026 | 同名/同角色复用、own child delta、因果完成/失败、实际 fork 接收与不确定发送后果；Host event port 保留身份（父到子 `DelegationHandoff` delta tracking 已随显式 charge 传递与共享 ANCHOR 地址空间退役） | 所有 terminal 分支、进程 crash cuts、未知接收的后续收敛 |
 | 028、029 | 当前编译清单的直接/传递闭包、额度及反向注入检测；部分源码词形审计 | 各 locality 独立真实编译、类型隔离和实际 capability 行为；路径/词形只是当前结构审计 |
-| 031 | 连续完成、独立 checkpoint 的 Committed/NotCommitted 和身份、旧 root/取消、完成与清理 | 真正重复 terminal、在同一次完成中注入 NotCommitted/Unknown 后仍交付、Unknown 重读、PhaseConflict 真正熔断；SyncDelegate 不替 fork 证明 |
+| 031 | 连续完成复用同一 child 并交付 bounded WorkRecord、旧 root 拒绝、parent supersede 取消、完成与删除在两种顺序下各结算一次（`HandoffCheckpointSettlement` 已随父到子 `DelegationHandoff` 退役） | 真正重复 terminal；SyncDelegate 不替 fork 证明 |
 
 `support` 只建立真实 runtime 所需的临时 journal、可控物理端口和清理。tool schema stub 仅支持构造工具，不证明真实 Host schema validation。等待同时考虑 prompt 与 invocation 拒绝，避免将合法拒绝误作挂死。新建角色限制不改变历史解码。
 
@@ -35,7 +35,7 @@ Join 的条数上限、显示窗口和 WorkRecord 本身的有界物化不是同
 
 014/015 保留 PR #42 新增的四项 mailbox 回归。三方合并曾各复制两遍；核实两份逐字相同后只删除重复副本，断言均保留一次。028 保留上游 Host adapter ratchet 312；旧说明中的 307 是此前认知 runtime 引入时的历史值，312 来自后续 prefix shard 显式依赖。
 
-旧 chooseRoad/evidenceBoundary 的固定答案、serializationDecision 的复制判断、reuseBinding 的单次读取及 batchOrder 的过滤器已移除；无用 deferred-result exports 同步删除。实际受控队列与有效渲染证据保留。源码中有方法名、WHAT 自我匹配、手写 descriptor 都不算实现达标。
+旧 chooseWork/evidenceBoundary 的固定答案、serializationDecision 的复制判断、reuseBinding 的单次读取及 batchOrder 的过滤器已移除；无用 deferred-result exports 同步删除。实际受控队列与有效渲染证据保留。源码中有方法名、WHAT 自我匹配、手写 descriptor 都不算实现达标。
 
 旧角色在拒绝前创建 child 的修复及回归保留，待新基线复验（GAP-154）。完整待补范围见 GAP-153；编译额度归属沿用 22-D1，DevOps binding 与 work handle 复用沿用 34/35 待决，不在测试中另设规则。旧发布清单及fatal库存的历史状态不能代替当前真实执行证明。
 

@@ -83,7 +83,7 @@ test('WHAT[work-037] reopening without a delivery is rejected', () => {
   const opened = surface.encodeOpening('plan', 'work-21c', '/root', 0n)
   const active = surface.reopenProbe(opened, incumbencyIdOf(opened))
   assert.equal(active.decision, 'Refuse', 'an active tenure cannot reopen')
-  assert.match(active.detail, /Only an inactive delivered plan can reopen|No retirement to reopen/)
+  assert.match(active.detail, /Only an inactive delivered work can reopen|No retirement to reopen/)
 
   const stayed = surface.reviewProbe(opened, incumbencyIdOf(opened), 'Stayed')
   const relayed = surface.deliverProbe(`${opened}${stayed.bytes}`, 'run-relay', 'call-relay', 10n)
@@ -91,7 +91,7 @@ test('WHAT[work-037] reopening without a delivery is rejected', () => {
   const successorText = `${opened}${stayed.bytes}${relayed.bytes}`
   const relayedReopen = surface.reopenProbe(successorText, incumbencyIdOf(opened))
   assert.equal(relayedReopen.decision, 'Refuse', 'a Relayed retirement is not a delivery')
-  assert.match(relayedReopen.detail, /Only an inactive delivered plan can reopen|No retirement to reopen/)
+  assert.match(relayedReopen.detail, /Only an inactive delivered work can reopen|No retirement to reopen/)
 })
 
 test('WHAT[work-037] reopen keeps the predecessor range and not the tenure own delivery', () => {

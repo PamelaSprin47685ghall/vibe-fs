@@ -109,7 +109,7 @@ test.todo('WHAT[crash-reconciliation-018] a restarted plugin normalizes durable 
 const { default: test } = await import('node:test')
 const { default: assert } = await import('node:assert/strict')
 const { withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
-const { admit, user, transform, hints } = await import('../../concern-routing/tests/support/plugin.mjs')
+const { admit, user, transform, hints } = await import('./support/pair-hint-transform.mjs')
 
 // crash-reconciliation-018: the load-phase normalization owes exactly one
 // restart status guidance to the next real user instruction. It rides the same

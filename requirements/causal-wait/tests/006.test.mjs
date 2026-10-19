@@ -105,7 +105,7 @@ const { default: path } = await import("node:path");
 const causal = await import('../../../dist/Execution/Session/Wait/Surface.js')
 const owner = (id) => causal.owner('flow', { id })
 const readDiagnostic = (workspace) =>
-  JSON.parse(fs.readFileSync(path.join(workspace, '.wanxiangshu', 'diagnostics', 'causal-waits.json'), 'utf8'))
+  JSON.parse(fs.readFileSync(path.join(workspace, '.Herdchestra', 'diagnostics', 'causal-waits.json'), 'utf8'))
 const write = (descriptor) => {
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'escape-taxonomy-'))
   const registry = causal.createRegistry()

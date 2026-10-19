@@ -24,9 +24,14 @@ type ToolPermission =
     | JsPlan
     | Ask
     | Deliver
-    /// planning-002: Plan's review hard gate. Shares the `review` tool name
+    /// work-021: Plan's review hard gate. Shares the `review` tool name
     /// with Manager's ReviewAssessment; the label stays distinct.
     | Review
+    | DevOpsConsultation
+    /// advisor: the caller session's second-opinion seat (`js.advisor`).
+    /// A consult, not an actor: the caller hands over a view plus an intent
+    /// and reads prose back, so the office holding it gains no acting surface.
+    | Advisor
 
 [<RequireQualifiedAccess>]
 type ManagerCapabilityFacts =

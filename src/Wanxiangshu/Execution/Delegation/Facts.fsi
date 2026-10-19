@@ -105,7 +105,3 @@ type DelegationFactCases =
     | DelegatedToolCallObserved of
         {| SessionId: SessionId
            ToolCallId: ToolCallId |}
-    | DelegationHandoffCompleted of
-        {| ParentSessionId: SessionId
-           Route: DelegationHandoffRoute
-           ParentEndExclusive: int64 |}

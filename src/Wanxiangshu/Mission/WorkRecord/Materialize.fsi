@@ -35,10 +35,3 @@ module LifecycleWorkRecordProjection =
 
     val lifecycleWorkRecordBounded:
         journal: AgentJournal option -> sessionId: SessionId -> range: XTraceRange -> Task<string option>
-
-    val lifecycleWorkRecordBoundedForRun:
-        journal: AgentJournal option ->
-        sessionId: SessionId ->
-        range: XTraceRange ->
-        providerRun: ProviderRunIdentity ->
-            Task<string option>

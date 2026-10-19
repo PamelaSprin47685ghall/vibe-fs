@@ -1,0 +1,117 @@
+HOOK CHAT MESSAGE FAILED: ChatAdmissionHookException {
+  message: 'Managed chat admission failed: TransactionFailed (AcceptanceFailed (AuthorityRegistrationRejected (ActiveRunIdentityConflict ({ StoredSessionId = SessionId "host-child-1-6dcb289f05083"\n' +
+    '  StoredLogicalRunId = LogicalRunId "282e74553a14143715b7a236d0694e0943c7222d9245f46d535ddb68953d98ac"\n' +
+    '  StoredAuthorityRootUserMessageId = AuthorityRootUserMessageId "msg-host-child-1-6dcb289f05083-0"\n' +
+    '  StoredAuthorityKind = AgentOwnerRoot\n' +
+    '  StoredIdentitySeed = InheritedFromOwner ({ StoredOwnerSessionId = SessionId "ses-fission-restart-manager"\n' +
+    '  StoredOwnerLogicalRunId = LogicalRunId "0b5930c17cd166ae66a956e77a3a1e60eb600fbedb7ff3c877d328015f9fcb78"\n' +
+    '  StoredOwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId "root-ses-fission-restart-manager"\n' +
+    '  StoredParticipantIdentity = { Identity = { SelectedAgent = PersonaName "engineer"\n' +
+    '  Kind = ManagedRole Engineer\n' +
+    '  Persona = "Lead"\n' +
+    '  PersonaCatalogVersion = PersonaCatalogVersion 1\n' +
+    '  Origin = InheritedFromOwner } } }) }, { StoredSessionId = SessionId "host-child-1-6dcb289f05083"\n' +
+    '  StoredLogicalRunId = LogicalRunId "3d4f9354540579fce3070ba5f5296df633c47c8b201d58ff856f58377c7cb478"\n' +
+    '  StoredAuthorityRootUserMessageId = AuthorityRootUserMessageId "msg-host-child-1-6dcb289f05083-1"\n' +
+    '  StoredAuthorityKind = AgentOwnerRoot\n' +
+    '  StoredIdentitySeed = InheritedFromOwner ({ StoredOwnerSessionId = SessionId "ses-fission-restart-manager"\n' +
+    '  StoredOwnerLogicalRunId = LogicalRunId "0b5930c17cd166ae66a956e77a3a1e60eb600fbedb7ff3c877d328015f9fcb78"\n' +
+    '  StoredOwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId "root-ses-fission-restart-manager"\n' +
+    '  StoredParticipantIdentity = { Identity = { SelectedAgent = PersonaName "engineer"\n' +
+    '  Kind = ManagedRole Engineer\n' +
+    '  Persona = "Lead"\n' +
+    '  PersonaCatalogVersion = PersonaCatalogVersion 1\n' +
+    '  Origin = InheritedFromOwner } } }) }))))',
+  innerException: undefined,
+  failure: ChatAdmissionHookFailure {
+    tag: 1,
+    fields: [ [ChatAdmissionTransactionError] ]
+  },
+  executionKey: ChatExecutionKey {
+    SessionId: SessionId { tag: 0, fields: [Array] },
+    PhysicalUserMessageId: PhysicalUserMessageId { tag: 0, fields: [Array] }
+  }
+}
+✖ WHAT[intra-participant-parallelism-010] load settlement closes orphaned open Fission groups with FissionFailed so a resumed owner turn completes and delivers to join instead of being swallowed as replaced (12650.255375ms)
+✔ WHAT[intra-participant-parallelism-010] actual durable Fission facts reconstruct group membership and replacement after restart, recording interruption without automatically restarting lanes or guessing similar Host sessions (GAP-158) (10.800042ms) # TODO
+js-boundary-gate: OK — 0 debt line(s) across 0 file(s)
+js-boundary-gate: OK — 0 debt line(s) across 0 file(s)
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-ddagZv/requirements/consumer/tests/support/api.mjs:1 [deep-dist-import] import * as api from '../../../../dist/Internal/Unregistered.js'
+js-boundary-gate: OK — 0 debt line(s) across 0 file(s)
+js-boundary-gate: OK — 0 debt line(s) across 0 file(s)
+js-boundary-gate: OK — 0 debt line(s) across 0 file(s)
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-NCLz4U/requirements/consumer/tests/001.test.mjs:3 [du-shape] export const value = api.fields
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-8w1ZfC/requirements/consumer/tests/001.test.mjs:4 [du-shape] export const value = data.fields
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-XVoGZ0/requirements/consumer/tests/001.test.mjs:1 [du-shape] export const read = value => value.fields
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-sfzsyt/requirements/consumer/tests/001.test.mjs:2 [du-shape] export function read(data) { return data.fields }
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-cmDxJ8/requirements/consumer/tests/001.test.mjs:4 [du-shape] for (const scenario of scenarios) console.log(scenario.fields)
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-OU6g8u/requirements/consumer/tests/001.test.mjs:5 [du-shape] for (const scenario of scenarios) console.log(scenario.fields)
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-In1Q1X/requirements/consumer/tests/001.test.mjs:6 [du-shape] for (const scenario of scenarios) console.log(scenario.fields)
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-KIWn4j/requirements/consumer/tests/001.test.mjs:7 [du-shape] for (const scenario of scenarios) console.log(scenario.fields)
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-ddWbyi/requirements/consumer/tests/001.test.mjs:7 [du-shape] for (const scenario of scenarios) console.log(scenario.fields)
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-QGeixl/requirements/consumer/tests/001.test.mjs:5 [du-shape] for (const scenario of scenarios) console.log(scenario.fields)
+js-boundary-gate: 1 violation(s) across 1 file(s)
+  ../../../../../../var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/js-surface-a3Grw6/requirements/consumer/tests/001.test.mjs:4 [du-shape] export const value = data["fields"]
+✔ WHAT[js-semantic-surface-002] the current semantic zone passes the implemented boundary gate (1869.838041ms)
+✔ WHAT[js-semantic-surface-002] the same gate accepts a registered public import and rejects an internal module (2.033583ms)
+✔ WHAT[js-semantic-surface-002] module discovery, generated-name probing and runtime representation access are detected (1.275625ms)
+✔ WHAT[js-semantic-surface-002] a template that chooses an unregistered compiled module is detected (1.290417ms)
+✔ WHAT[js-semantic-surface-002] ordinary data enumeration and standard function binding remain legal (1.532958ms)
+▶ WHAT[js-semantic-surface-002] native fixture fields and standard object spread are not runtime representation access
+  ✔ WHAT[js-semantic-surface-002] accepts plain DTO through the actual gate (1.239167ms)
+  ✔ WHAT[js-semantic-surface-002] accepts object spread through the actual gate (1.180542ms)
+  ✔ WHAT[js-semantic-surface-002] accepts static fixture loop through the actual gate (1.297834ms)
+✔ WHAT[js-semantic-surface-002] native fixture fields and standard object spread are not runtime representation access (4.054458ms)
+▶ WHAT[js-semantic-surface-002] imported runtime and unproved fields receivers remain forbidden
+  ✔ WHAT[js-semantic-surface-002] rejects imported namespace at the representation boundary (1.242792ms)
+  ✔ WHAT[js-semantic-surface-002] rejects imported result at the representation boundary (1.194875ms)
+  ✔ WHAT[js-semantic-surface-002] rejects unknown parameter at the representation boundary (0.922916ms)
+  ✔ WHAT[js-semantic-surface-002] rejects shadowed native name at the representation boundary (1.045791ms)
+  ✔ WHAT[js-semantic-surface-002] rejects mixed fixture array at the representation boundary (1.054208ms)
+  ✔ WHAT[js-semantic-surface-002] rejects mutated fixture array at the representation boundary (1.072833ms)
+  ✔ WHAT[js-semantic-surface-002] rejects aliased runtime insertion at the representation boundary (1.158583ms)
+  ✔ WHAT[js-semantic-surface-002] rejects assigned alias runtime insertion at the representation boundary (1.128292ms)
+  ✔ WHAT[js-semantic-surface-002] rejects implicit return alias runtime insertion at the representation boundary (1.222916ms)
+  ✔ WHAT[js-semantic-surface-002] rejects escaped fixture container at the representation boundary (1.021667ms)
+  ✔ WHAT[js-semantic-surface-002] rejects computed runtime access at the representation boundary (1.15525ms)
+✔ WHAT[js-semantic-surface-002] imported runtime and unproved fields receivers remain forbidden (12.703333ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 21
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 1
+ℹ duration_ms 13195.748416
+
+✖ failing tests:
+
+test at requirements/intra-participant-parallelism/tests/010.test.mjs:5:1
+✖ WHAT[intra-participant-parallelism-010] load settlement closes orphaned open Fission groups with FissionFailed so a resumed owner turn completes and delivers to join instead of being swallowed as replaced (12650.255375ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /现已接下这项托付|carries this charge now/i. Input:
+  
+  '# Dispatch receipt for ruling-materials is uncertain (the charge may already have been accepted). Recovery owns this dispatch anomaly: keep this same participant and do not fork a replacement for the same charge (report to developers if unexpected).\n'
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/intra-participant-parallelism/tests/010.test.mjs:38:12
+      at async withRestartablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:321:5)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/intra-participant-parallelism/tests/010.test.mjs:6:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '# Dispatch receipt for ruling-materials is uncertain (the charge may already have been accepted). Recovery owns this dispatch anomaly: keep this same participant and do not fork a replacement for the same charge (report to developers if unexpected).\n',
+    expected: /现已接下这项托付|carries this charge now/i,
+    operator: 'match',
+    diff: 'simple'
+  }

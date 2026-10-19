@@ -10,11 +10,6 @@ open Wanxiangshu.Persistence.Journal
 
 module LifecycleSurface =
 
-    let private sha256 = HostDigest.sha256Hex
-
-    let authorityInitial (workId: string) =
-        sha256 ("authority-initial-v1\n" + workId)
-
     let observeDurable (requestId: string) (durableResult: obj) =
         let seen = DurableWorkHost.observe requestId durableResult
 
@@ -1382,7 +1377,7 @@ module LifecycleSurface =
                 Some(string target))
         |> Array.tryLast
 
-    let roadDevOps (store: obj) (workId: string) =
+    let workDevOps (store: obj) (workId: string) =
         match stampedDir store with
         | None -> null
         | Some dir ->

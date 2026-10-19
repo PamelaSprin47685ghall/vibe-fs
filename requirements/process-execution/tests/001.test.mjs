@@ -635,3 +635,52 @@ test('WHAT[process-execution-001] PTY_TYPES_read_plans_cover_unknown_in_progress
   assert.deepEqual(await portRead(port, id), { ok: true, value: { output: '', closed: true } })
 })
 }
+
+{
+  // The four PTY host tools (`open-terminal`, `send-terminal`, `read-terminal`,
+  // `signal-terminal`) are retired; interactive execution is superseded by `js.run`
+  // (`{ spawn, name }`, `check(ctx)`, `{ send: { name, input } }`, `{ signal, name }`,
+  // repository-programming [050]-[052]).
+  const { default: assert } = await import('node:assert/strict')
+  const { default: test } = await import('node:test')
+  const { sandbox, runProgram, caseName, render } = await import('./support/executor.mjs')
+
+  test('WHAT[process-execution-001] js.run interactive actions spawn, send, observe incremental output in check, and signal background child', async () => {
+    const { dir, cleanup } = sandbox('wxs-proc-001-')
+    try {
+      const outcome = await runProgram(
+        dir,
+        `    const chunks = [];
+    const result = await js.run(class extends js.Runnable {
+      maxDuration = 8000;
+      interval = 30;
+      next(ctx) {
+        if (ctx.step === 0) {
+          return {
+            spawn: "node -e \\"process.stdin.setEncoding('utf8'); process.stdin.on('data', d => process.stdout.write('ACK:' + d.trim()));\\"",
+            name: "repl",
+          };
+        }
+        if (ctx.step === 1) return { send: { name: "repl", input: "hello-interactive" } };
+        if (ctx.step === 2) return "sleep 0.2";
+        if (ctx.step === 3) return { signal: "SIGTERM", name: "repl" };
+        return null;
+      }
+      sanity() { return { nextDone: () => this.next({ step: 4 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      watch(ctx) {
+        if (ctx.stdout) chunks.push(ctx.stdout);
+        return ctx.remainingMs > 0;
+      }
+    });
+    return { status: result.status, observed: chunks.join("") };`,
+        'ses-001-interactive',
+      )
+      assert.equal(caseName(outcome), 'Succeeded')
+      const doc = render(outcome)
+      assert.match(doc, /status = "completed"/)
+      assert.match(doc, /ACK:hello-interactive/)
+    } finally {
+      cleanup()
+    }
+  })
+}

@@ -1,0 +1,2 @@
+# Token economy of your previous request, as the provider actually billed it: {{cached}} tokens came from the cache prefix (cheap), {{uncached}} tokens were recomputed (full price).
+# The cheap part is the prefix you kept below prefixUntil; everything else was paid for again. Raising prefixUntil moves more of the request into that prefix, and a segment you neither need nor summarized is billed to you every single turn.

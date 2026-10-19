@@ -552,7 +552,7 @@ const { installDefaultResources } = await import("../../../dist/OpenCode/Host/Ma
 
 installDefaultResources()
 
-const REVIEW_TOOLS = ['js-manager']
+const REVIEW_TOOLS = ['todowrite-for-manager']
 const CONTRACT_TOKEN = 'do-not-use-except-for-review'
 
 const createRawManagerTools = () => [
@@ -627,7 +627,7 @@ const createRawManagerTools = () => [
     },
   },
   {
-    name: 'js-manager',
+    name: 'todowrite-for-manager',
     description: 'Run programmatic read-only exploration script using Read/Glob/Grep methods.',
     parameters: {
       type: 'object',
@@ -863,10 +863,10 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
   )
 
   const alteredContractTools = buildDecoratedManagerTools()
-  const readTool = alteredContractTools.find((tool) => tool.name === 'js-manager')
+  const readTool = alteredContractTools.find((tool) => tool.name === 'todowrite-for-manager')
   readTool.parameters.properties.contract.enum = ['altered-contract-enum']
   assert.notEqual(
-    canonicalJson.canonicalJson(toolsBefore.find((tool) => tool.name === 'js-manager')),
+    canonicalJson.canonicalJson(toolsBefore.find((tool) => tool.name === 'todowrite-for-manager')),
     canonicalJson.canonicalJson(readTool),
     'altering contract decoration enum must change canonical JSON',
   )

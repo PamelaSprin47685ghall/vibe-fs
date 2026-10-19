@@ -69,10 +69,10 @@ tools = ["fork", "join", "list"]
 id = "coder-write"
 lane = "coder"
 user = "write x.txt"
-tools = ["write"]
+tools = ["todowrite-for-engineer"]
 
   [[turn.step]]
-  respond = { type = "tool-call", tool = "write", args = { filePath = "x.txt", content = "ok\\n" } }
+  respond = { type = "tool-call", tool = "todowrite-for-engineer", args = { program = "class Js extends JsProgram { async run() { this.write('x.txt', 'ok\\\\n'); return { written: true }; } }" } }
 `, {
     manager: 'forest-manager',
     coder: 'forest-coder',
@@ -80,7 +80,7 @@ tools = ["write"]
   try {
     const coderFirst = await postJson(
       `${provider.url}/v1/chat/completions`,
-      chat('write x.txt', ['write']),
+      chat('write x.txt', ['todowrite-for-engineer']),
       sessionHeaders('forest-coder'),
     );
     assertTrue(coderFirst.ok, 'independent coder path may run before manager');

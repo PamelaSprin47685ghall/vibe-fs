@@ -1,0 +1,67 @@
+HOOK CHAT MESSAGE FAILED: ChatAdmissionHookException {
+  message: 'Managed chat admission failed: TransactionFailed (AcceptanceFailed (AuthorityRegistrationRejected (ActiveRunIdentityConflict ({ StoredSessionId = SessionId "host-child-1-27a98f859bdd38"\n' +
+    '  StoredLogicalRunId = LogicalRunId "1b5575ef2a68ff91f1c2e01a55ab900e9fd4c770d5f1f4658fe611d0f7a8fe73"\n' +
+    '  StoredAuthorityRootUserMessageId = AuthorityRootUserMessageId "msg-host-child-1-27a98f859bdd38-0"\n' +
+    '  StoredAuthorityKind = AgentOwnerRoot\n' +
+    '  StoredIdentitySeed = InheritedFromOwner ({ StoredOwnerSessionId = SessionId "advisor-live-answer-owner"\n' +
+    '  StoredOwnerLogicalRunId = LogicalRunId "08b96ddaa61e6dda89d73f95509bfcca8a8659d0439f45b36b9ea976a46818cf"\n' +
+    '  StoredOwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId "advisor-owner-root"\n' +
+    '  StoredParticipantIdentity = { Identity = { SelectedAgent = PersonaName "advisor"\n' +
+    '  Kind = ManagedRole Advisor\n' +
+    '  Persona = "Lead"\n' +
+    '  PersonaCatalogVersion = PersonaCatalogVersion 1\n' +
+    '  Origin = InheritedFromOwner } } }) }, { StoredSessionId = SessionId "host-child-1-27a98f859bdd38"\n' +
+    '  StoredLogicalRunId = LogicalRunId "e8efb3d15334108733741d67087abaf85ea7dac752bbc94a67a0fc8739dbe481"\n' +
+    '  StoredAuthorityRootUserMessageId = AuthorityRootUserMessageId "msg-host-child-1-27a98f859bdd38-1"\n' +
+    '  StoredAuthorityKind = AgentOwnerRoot\n' +
+    '  StoredIdentitySeed = InheritedFromOwner ({ StoredOwnerSessionId = SessionId "advisor-live-answer-owner"\n' +
+    '  StoredOwnerLogicalRunId = LogicalRunId "08b96ddaa61e6dda89d73f95509bfcca8a8659d0439f45b36b9ea976a46818cf"\n' +
+    '  StoredOwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId "advisor-owner-root"\n' +
+    '  StoredParticipantIdentity = { Identity = { SelectedAgent = PersonaName "advisor"\n' +
+    '  Kind = ManagedRole Advisor\n' +
+    '  Persona = "Lead"\n' +
+    '  PersonaCatalogVersion = PersonaCatalogVersion 1\n' +
+    '  Origin = InheritedFromOwner } } }) }))))',
+  innerException: undefined,
+  failure: ChatAdmissionHookFailure {
+    tag: 1,
+    fields: [ [ChatAdmissionTransactionError] ]
+  },
+  executionKey: ChatExecutionKey {
+    SessionId: SessionId { tag: 0, fields: [Array] },
+    PhysicalUserMessageId: PhysicalUserMessageId { tag: 0, fields: [Array] }
+  }
+}
+✖ WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice (1026.452208ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1286.873167
+
+✖ failing tests:
+
+test at requirements/advisor/tests/004.test.mjs:12:1
+✖ WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice (1026.452208ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + undefined
+  - true
+  
+      at consult (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:44:14)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:51:21
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/advisor/tests/004.test.mjs:13:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

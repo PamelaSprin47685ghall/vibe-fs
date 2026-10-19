@@ -62,9 +62,13 @@ Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle �
 
 ## [016] Attempt Interrupt 与 Logical Cancel
 
-内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。正常生命周期内，自动化机制不得主动中断用户根会话；deliver 在任期退休事实落地后，可凭退休事实终止该 run 的残余尝试。
+内部控制只能中断子会话的当前 attempt，不因此逻辑取消或级联销毁。自动化机制不得任意中断用户根会话；deliver 可凭已落地的退休事实终止残余尝试。work-049 的已登记用户询问是另一项窄例外：同一 ask 的工具结果确认后，只暂停提问者的当前 attempt，不取消已入队的真实用户输入，也不影响子资源或逻辑运行。
+
+work-011 的 S4 Delivered 是完成停止，不是任意取消：无继任者时，在退休与对应 logical run 关闭落盘后、deliver 返回前等待当前 attempt 的中断回执。有继任者的 Relayed 不发此中断；第一次确认也不中断。失败必须如实呈现，不能用成功文字代替停止保证。
 
 真实外部物理用户输入只允许打断 `join` 等待，不得中断当前 LLM 输出或其他工具，也不得调用 Host `AbortSession` / `InterruptAttempt` 排空当前 attempt。新输入作为下一次 LLM 请求的材料，由 Host 在当前输出或工具自然结束后纳入；当前物理 assistant 与工具结果仍须正常保存。
+
+work-049 的 `ask` 是模型主动请求的人类等待，不是“新用户输入到来即中断”。它在自身工具结果得到 Host 确认后中断当前 attempt，保留 logical run 与工作资源。用户随后回复仍走本条的普通人类输入准入，不再发一次 interrupt，也不因此注销任期。
 
 准入 owner 仍以 durable `Accepted` 和 owner-issued 的 `HumanRoot` / `HumanMessage` evidence 精确接纳新输入。已有同一 run 的活跃租约时，`HumanMessage` 与 `BusyAgentNudge` 先持久接纳并投影已有目标，保留旧 exact lease，供当前输出、工具及已经准备中的请求自然完成；Host 的下一次 provider 边界实际选择可见新输入后，才交接 exact lease 和原 capacity credit，不重新派工或抢占第二份容量。容量 owner 的 supersession 不授予物理中断权。
 
@@ -72,7 +76,7 @@ Agent 子会话的 handle 就是其运行时 Agent ID；重启后同一 handle �
 
 ## [017] 中断必须有后继
 
-内部中断发起物理 abort 前，必须已有唯一 successor；没有 successor 则形成明确 Failed 终态并唤醒父等待。Failed 携当前物理用户消息提升所得的 Authority Root；缺失则 fail closed，不退化成 session-scoped/rootless 终态。
+自动恢复的内部中断发起物理 abort 前，必须已有唯一 successor；没有 successor 则形成明确 Failed 终态并唤醒父等待。Failed 携当前物理用户消息提升所得的 Authority Root；缺失则 fail closed，不退化成 session-scoped/rootless 终态。work-049 不属于失败重试：用户等待事实就是当前暂停的依据，下一步来自真实用户回复；不得为它制造 Failed、重试 successor 或逻辑关闭。
 
 ## [018] Abandon 需要不可逆授权
 
@@ -144,3 +148,12 @@ Session 收束（`PluginSessionScope.ClearSession`，覆盖宿主 `SessionDelete
 - 禁止后果：不得使用 `ReleaseExecution`/`ReleaseSession` 等 force 路径；不得 session-wide blind release、计数减一或以时间猜测释放；保留未取消时不得宣称归还完成；取消操作不得取消无关的 pending demand 或触碰其他 session 的保留。
 - 失败后果：取消回放对 `AlreadyApplied` 与 `StaleFence` 按幂等结果接受，视同归还完成并清除挂起记录；对 `Conflict` 不得吞没——以带 exact key 信息文本的 `InvalidOperationException` 显式暴露（风格对齐 [026] 的 `SessionRecoveryHost.release`），且暴露时保留挂起记录，使「取消已完成、归还未完成」的状态不被静默吞掉。重复收束幂等：保留已取消时不产生第二次释放副作用；除真实所有权冲突外不抛错。
 - 失败隔离：收束链的任一步失败只隔离该步自身，不得跳过其余独立义务。`ClearSession` 内，Main 自身的结算、保留取消或释放失败不得跳过 linked Attached InternalLeaf 的结算、保留取消与 exact 释放；任一作用域的失败也不得跳过本次收束的无条件 per-session 清理组（registry 条目、quiescence、join-interrupt、companion 等）。`PluginRuntimeScope.DisposeSession` 承接 `ClearSession` 失败后仍必须执行其后续清理组（recovery scope、attempt plan、Blogger parked/episodes、LoopSensor 等）。失败在完成其余义务后仍显式暴露：首个真实失败被保留并在其余义务完成后重新抛出；上一段的真冲突例外语义不因隔离被吞掉或降级。重复收束继续幂等，已消费的失败源不得在第二次收束中再次产生副作用或吞掉新的失败。
+
+## [028] Child 终态结算必须可观察
+
+child run 已在 journal 中证实的 Terminal 事实必须总能转化为一次可观察的 settlement。结算路径的任何故障都不得让父 join 陷入无界等待，也不得只靠 shutdown 取消收场。
+
+- 允许后果：work-record 读取故障时降级为空记录继续结算，已完成的 child 仍写入可 join 的 `CompletedAwaitingJoin`，owner 的 work record 不因读取失败丢失。结算本身故障时，该 run 的唯一 completion promise 以显式 joinable 失败解决，join 消费到明确 outcome（完成、失败或取消），不静默，不搁浅 Source。
+- PERSIST 形态：Source 结算为 PERSIST 失败而 durable work 仍 Active 时，join 经 pending Source 浮现该失败，不挂等 journal revision 前进；未知 durable commit 不放行新工作，durable work 保持 Active，不得伪装成成功或按完成释放。
+- 禁止后果：不得以 work-record 读取失败为由跳过结算或吞掉完成事实；不得让 join 无界等待；不得把未知 durable commit 当作已交付完成。
+- 失败后果：结算故障必须落为显式可 join 的失败事实并保留原始证据，供恢复与取证；不得用空记录、静默或成功文字代替停止保证。

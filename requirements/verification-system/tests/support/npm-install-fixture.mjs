@@ -8,6 +8,7 @@ import path from 'node:path'
 import { gzipSync } from 'node:zlib'
 import { Header } from 'tar'
 import { fixturePhase } from './fixture-phase.mjs'
+import { firstMissingNpmProductionLibrary } from '../../../../scripts/lib/verification-node-tools.mjs'
 
 const parentName = 'wxs-fixture-parent'
 const leafName = 'wxs-fixture-leaf'
@@ -17,6 +18,7 @@ function selectedNpm() {
   const candidates = process.env.WXS_VERIFICATION_NPM_CLI
     ? [process.env.WXS_VERIFICATION_NPM_CLI]
     : [path.join(path.dirname(process.execPath), 'npm'), ...String(process.env.PATH ?? '').split(path.delimiter).map(directory => path.join(directory, 'npm'))]
+  let lastFailure
   for (const candidate of candidates) {
     let npmCli
     try {
@@ -25,16 +27,28 @@ function selectedNpm() {
       if (error.code === 'ENOENT') continue
       throw error
     }
-    if (path.basename(npmCli) !== 'npm-cli.js') continue
-    const manifest = JSON.parse(fs.readFileSync(path.resolve(npmCli, '../../package.json'), 'utf8'))
-    assert.equal(manifest.name, 'npm')
+    if (path.basename(npmCli) !== 'npm-cli.js') {
+      lastFailure = `Candidate ${candidate} realpath basename is not npm-cli.js: ${npmCli}`
+      continue
+    }
+    const root = path.resolve(npmCli, '../..')
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
+    if (manifest.name !== 'npm') {
+      lastFailure = `Candidate ${candidate} package manifest name is not npm`
+      continue
+    }
+    const missing = firstMissingNpmProductionLibrary(root)
+    if (missing) {
+      lastFailure = missing.message
+      continue
+    }
     fixturePhase('npm:version-enter', { npmCli })
     const version = execFileSync(process.execPath, [npmCli, '--version'], { encoding: 'utf8' }).trim()
     fixturePhase('npm:version-completed', { npmCli, version })
     assert.equal(version, manifest.version)
     return { npmCli, expectedNpmVersion: version, npmCliSha256: sha256(fs.readFileSync(npmCli)) }
   }
-  throw new Error('The real npm installation fixture requires an explicit available npm CLI')
+  throw new Error('The real npm installation fixture requires an explicit available npm CLI' + (lastFailure ? `: ${lastFailure}` : ''))
 }
 
 function packageArchive(manifest, source) {

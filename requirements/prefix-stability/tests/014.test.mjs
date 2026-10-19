@@ -295,7 +295,7 @@ for (const [name, body] of [['empty', ''], ['whitespace', ' \t\r\n']]) {
         assert.deepEqual(host.head(), frontier)
         assert.deepEqual(await host.current(), before)
         assert.deepEqual(host.cold().projection, before)
-        const opened = await pair.createJournal(join(host.runtime.directory, '.git'))
+        const opened = await pair.createJournal(join(host.runtime.directory, '.Herdchestra'))
         assert.equal(opened.ok, true, JSON.stringify(opened))
         try {
           const projected = await pair.tryInjectWithJournal(opened.journal, host.sessionID, 'must not create an occurrence', [...host.raw, quoted.message])
@@ -311,7 +311,7 @@ for (const [name, body] of [['empty', ''], ['whitespace', ' \t\r\n']]) {
 test('WHAT[prefix-stability-014] an old user occurrence without its original text is refused rather than inferred from its presentation', async () => {
   await withGuidanceHost('completed', async host => {
     const message = { info: { id: 'msg-legacy-empty', sessionID: host.sessionID, role: 'user' }, parts: [{ id: 'part-legacy-empty', type: 'text', text: '' }] }
-    const opened = await pair.createJournal(join(host.runtime.directory, '.git'))
+    const opened = await pair.createJournal(join(host.runtime.directory, '.Herdchestra'))
     assert.equal(opened.ok, true, JSON.stringify(opened))
     try {
       const anchored = await pair.appendAnchoredPair(opened.journal, {
@@ -400,7 +400,7 @@ for (const physicalPart of [true, false]) {
         assert.deepEqual(parts.map(part => part.generation), [0, 1])
         const before = host.cold().projection
         assert.equal(before.messages.at(-1).parts.at(-1).text, body)
-        const opened = await pair.createJournal(join(host.runtime.directory, '.git'))
+        const opened = await pair.createJournal(join(host.runtime.directory, '.Herdchestra'))
         assert.equal(opened.ok, true, JSON.stringify(opened))
         let presented
         try {
@@ -409,7 +409,7 @@ for (const physicalPart of [true, false]) {
           presented = replay.value.find(item => item.info.id === message.info.id)
           assert.equal(presented.parts[0].text, `${body}${separator}<system>\nnew horizon guidance\n</system>`)
         } finally { pair.disposeJournal(opened.journal) }
-        const reopened = await pair.createJournal(join(host.runtime.directory, '.git'))
+        const reopened = await pair.createJournal(join(host.runtime.directory, '.Herdchestra'))
         assert.equal(reopened.ok, true, JSON.stringify(reopened))
         try {
           const replay = await pair.tryInjectWithJournal(reopened.journal, host.sessionID, 'must not replace frozen bytes', [...host.raw, presented])
@@ -428,7 +428,7 @@ test('WHAT[prefix-stability-014] a captured user carrier presentation replays fr
     const quoted = await host.quote('continue the work')
     const before = await host.current()
     const frontier = host.head()
-    const reopened = await pair.createJournal(join(host.runtime.directory, '.git'))
+    const reopened = await pair.createJournal(join(host.runtime.directory, '.Herdchestra'))
     assert.equal(reopened.ok, true, JSON.stringify(reopened))
     try {
       const carrier = { ...quoted.message, parts: [{ ...quoted.message.parts[0], text: quoted.presented }] }

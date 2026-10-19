@@ -1,0 +1,1410 @@
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, rename) (5961.4175ms)
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, directory-sync) (5887.536333ms)
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, owner-lost) (6462.560541ms)
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, rename) (5726.951875ms)
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, directory-sync) (5690.727584ms)
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, owner-lost) (5732.741959ms)
+✖ WHAT[managed-session-lifecycle-025] another process cannot reserve a PTY after the work round stops admission (742.235208ms)
+✖ WHAT[managed-session-lifecycle-025] load recovery stops old round admission before voiding canonical work in another process (625.08ms)
+✖ WHAT[managed-session-lifecycle-025] load recovery preserves canonical work and an unbound PTY until its producer proves Ended (619.79875ms)
+✖ WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost before COMMIT (560.363291ms)
+✖ WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost after COMMIT (630.350333ms)
+✖ WHAT[managed-session-lifecycle-025] a foreign committed reservation prevents premature terminal settlement (578.909333ms)
+✖ WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with reserve first (601.920208ms)
+✖ WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with drain first (607.868209ms)
+✔ WHAT[managed-session-lifecycle-025] two concurrent process reservations can grant only one first launch at the same revision (676.045583ms)
+✔ WHAT[managed-session-lifecycle-025] duplicate tool calls across processes never grant another launch, including after Ended (588.211416ms)
+✖ WHAT[managed-session-lifecycle-025] detaching one runtime closes only its round subtree and keeps the other process eligible (596.784791ms)
+✔ WHAT[managed-session-lifecycle-025] a later Host-observed assistant run shares the admitted physical execution while an unknown run cannot borrow it (675.600584ms)
+✖ WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost before COMMIT cannot launch in either process (558.928875ms)
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT never reports terminal success (560.706083ms)
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT still closes exact local PTYs and retains foreign blockers (567.551208ms)
+✖ WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost after COMMIT cannot launch in either process (571.703916ms)
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT never reports terminal success (543.262625ms)
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT still closes exact local PTYs and retains foreign blockers (577.0865ms)
+✖ WHAT[managed-session-lifecycle-025] a conflicting round Drain still closes local PTYs without clearing the winning foreign reservation (663.796875ms)
+✔ WHAT[managed-session-lifecycle-025] failed ownership journal initialization preserves its error, closes its native connection and grants no launch (11.071208ms)
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, running) (1074.499292ms)
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, exited) (1111.416875ms)
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, cold-load) (800.705584ms)
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, running) (882.132791ms)
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, exited) (899.272167ms)
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, cold-load) (636.2375ms)
+✖ WHAT[managed-session-lifecycle-025] SIGKILL before Ended COMMIT recovers the same native exit without replay (node) (1390.066334ms)
+✖ WHAT[managed-session-lifecycle-025] SIGKILL after Ended COMMIT recovers the same native exit without replay (node) (1536.459417ms)
+✖ WHAT[managed-session-lifecycle-025] SIGKILL before Ended COMMIT recovers the same native exit without replay (bun) (1270.26425ms)
+✖ WHAT[managed-session-lifecycle-025] SIGKILL after Ended COMMIT recovers the same native exit without replay (bun) (1063.203541ms)
+✖ WHAT[managed-session-lifecycle-025] SIGKILL after Reserve COMMIT before physical preparation preserves its unknown obligation and never launches on restart (815.018125ms)
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (node) (1047.912709ms)
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (node) (1094.212333ms)
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (bun) (1052.118334ms)
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (bun) (1036.071375ms)
+✖ WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (node) (711.151542ms)
+✖ WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (node) (664.777667ms)
+✖ WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (bun) (548.1165ms)
+✖ WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (bun) (542.59775ms)
+✖ WHAT[managed-session-lifecycle-025] local late-not-started preserves its exact evidence kind (node) (8562.018334ms)
+✖ WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (node) (8563.633333ms)
+✖ WHAT[managed-session-lifecycle-025] local missing-bun preserves its exact evidence kind (node) (8617.273417ms)
+✖ WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (node) (1220.229958ms)
+✖ WHAT[managed-session-lifecycle-025] local late-not-started preserves its exact evidence kind (bun) (8619.00825ms)
+✖ WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (bun) (8378.099833ms)
+✖ WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (bun) (817.063042ms)
+✖ WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (node) (846.955959ms)
+✖ WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (bun) (677.912666ms)
+✖ WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost before COMMIT (849.927625ms)
+✖ WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost after COMMIT (851.373334ms)
+✖ WHAT[managed-session-lifecycle-025] two Bun processes enforce stop-first admission with the real PTY backend (485.401584ms)
+✖ WHAT[managed-session-lifecycle-025] two Bun processes enforce reserve-first admission with the real PTY backend (910.3585ms)
+✔ WHAT[managed-session-lifecycle-025] controlled PTY port completion clears actual HostForkRuntime ownership and name bookkeeping (3.627792ms)
+✔ WHAT[managed-session-lifecycle-025] an unproven spawn exception retains its ownership blocker (0.46725ms)
+✔ WHAT[managed-session-lifecycle-025] the production backend refuses a PTY without a durable owner before reservation or spawn (0.297875ms)
+✔ WHAT[managed-session-lifecycle-025] synchronous backend exit is observed before Fork returns (0.530959ms)
+✔ WHAT[managed-session-lifecycle-025] close without an exit witness fails and preserves the live blocker (1.587417ms)
+✔ WHAT[managed-session-lifecycle-025] a failed startup observation cannot publish Ended for an unresolved process (0.816708ms)
+✔ WHAT[managed-session-lifecycle-025] closeAll Cancel receipt loss before COMMIT still closes each exact local process (18.109708ms)
+✔ WHAT[managed-session-lifecycle-025] closeAll Cancel receipt loss after COMMIT still closes each exact local process (11.704042ms)
+✔ WHAT[managed-session-lifecycle-025] detach Cancel receipt loss before COMMIT still closes each exact local process (12.633458ms)
+✔ WHAT[managed-session-lifecycle-025] detach Cancel receipt loss after COMMIT still closes each exact local process (15.620041ms)
+✔ WHAT[managed-session-lifecycle-025] cancel Cancel receipt loss before COMMIT still closes each exact local process (12.911125ms)
+✔ WHAT[managed-session-lifecycle-025] cancel Cancel receipt loss after COMMIT still closes each exact local process (15.025959ms)
+✔ WHAT[managed-session-lifecycle-025] close Cancel receipt loss before COMMIT still closes each exact local process (11.836458ms)
+✔ WHAT[managed-session-lifecycle-025] close Cancel receipt loss after COMMIT still closes each exact local process (12.45675ms)
+✔ WHAT[managed-session-lifecycle-025] Reserve receipt loss before COMMIT never authorizes Spawn (11.1975ms)
+✔ WHAT[managed-session-lifecycle-025] Reserve receipt loss after COMMIT never authorizes Spawn (9.639084ms)
+✔ WHAT[managed-session-lifecycle-025] Drain receipt loss before COMMIT cannot reopen a permanently detaching runtime (10.715917ms)
+✔ WHAT[managed-session-lifecycle-025] Drain receipt loss after COMMIT cannot reopen a permanently detaching runtime (11.170625ms)
+✔ WHAT[managed-session-lifecycle-025] detach reconciles Ended receipt loss before COMMIT before reporting success (20.164834ms)
+✔ WHAT[managed-session-lifecycle-025] detach reconciles Ended receipt loss after COMMIT before reporting success (16.957042ms)
+✔ WHAT[managed-session-lifecycle-025] detach with no local PTY preserves another runtime on the same port and durable root (13.699917ms)
+✔ WHAT[managed-session-lifecycle-025] detach with one local PTY preserves another runtime on the same port and durable root (16.920792ms)
+✔ WHAT[managed-session-lifecycle-025] cancel with no local PTY preserves another runtime on the same port and durable root (10.48725ms)
+✔ WHAT[managed-session-lifecycle-025] cancel with one local PTY preserves another runtime on the same port and durable root (14.654125ms)
+✔ WHAT[managed-session-lifecycle-025] permanent detach removes its shared port listener while reusable drain keeps its listener (0.889166ms)
+✔ WHAT[managed-session-lifecycle-025] a terminated parent runtime without an initial PTY refuses new reserve or spawn and releases its listener (0.22475ms)
+✔ WHAT[managed-session-lifecycle-025] a terminated parent runtime with an initial PTY refuses new reserve or spawn and releases its listener (0.346417ms)
+✔ WHAT[managed-session-lifecycle-025] cancellation that retains the canonical fixed DevOps keeps PTY reuse and completion delivery (55.230458ms)
+✔ WHAT[managed-session-lifecycle-025] failed terminal cancellation retains observation until exit while keeping new PTY admission closed (0.541583ms)
+✔ WHAT[managed-session-lifecycle-025] failed detach retains its exit listener until a late exit observation settles the last lease (0.353625ms)
+✔ WHAT[managed-session-lifecycle-025] detach rejects when the exact Ended observation still cannot be committed (12.472458ms)
+✔ WHAT[managed-session-lifecycle-025] Ended receipt loss before COMMIT replays the exact exit observation (15.028875ms)
+✔ WHAT[managed-session-lifecycle-025] Ended receipt loss after COMMIT replays the exact exit observation (14.451458ms)
+✔ WHAT[managed-session-lifecycle-025] a durable reservation precedes Spawn and survives runtime reconstruction without replay (12.966333ms)
+✔ WHAT[managed-session-lifecycle-025] ending one runtime scope does not close a successor scope in the same durable registry (13.38325ms)
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[managed-session-lifecycle-025] a fresh process sees a prior reservation and refuses to close or replay an unbound instance (507.369916ms)
+✔ WHAT[managed-session-lifecycle-025] a run drain rejects new local PTYs until exit and permits the next DevOps run (0.929792ms)
+✔ WHAT[managed-session-lifecycle-025] DevOps run terminal settlement closes every PTY the DevOps child owns at the port boundary (65.947083ms)
+✔ WHAT[managed-session-lifecycle-025] fixed DevOps work return drains its PTY residue without affecting other runtimes (62.482875ms)
+✖ WHAT[managed-session-lifecycle-025] registered production terminal callback drains DevOps once and ignores a late callback after completion (92.182375ms)
+✖ WHAT[managed-session-lifecycle-025] registered Aborted terminal preserves eligibility and can receive a later valid terminal (89.202958ms)
+✖ WHAT[managed-session-lifecycle-025] registered Missing terminal preserves eligibility and can receive a later valid terminal (97.362208ms)
+✖ WHAT[managed-session-lifecycle-025] registered Empty terminal preserves eligibility and can receive a later valid terminal (91.382333ms)
+✖ WHAT[managed-session-lifecycle-025] registered ForeignRoot terminal preserves eligibility and can receive a later valid terminal (93.330459ms)
+✖ WHAT[managed-session-lifecycle-025] registered ForeignChild terminal preserves eligibility and can receive a later valid terminal (90.638541ms)
+✖ WHAT[managed-session-lifecycle-025] registered Failed terminal preserves eligibility and can receive a later valid terminal (147.636958ms)
+✖ WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget durable PTYs without local physical bindings (101.371208ms)
+✖ WHAT[managed-session-lifecycle-025] a DevOps terminal cannot silently bypass a missing round-drain capability (54.52125ms)
+✖ WHAT[managed-session-lifecycle-025] a cold return with zero known PTYs still durably stops admission for the exact round (92.651292ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty TERM waits for exit and escalates to KILL before releasing ownership (745.805208ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty ended-before preserves ownership until scope exit is known (518.951333ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty ended-after preserves ownership until scope exit is known (542.281625ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty shared-detach preserves ownership until scope exit is known (887.019541ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty shared-cancel preserves ownership until scope exit is known (838.214458ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-close-before preserves ownership until scope exit is known (805.115333ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-close-after preserves ownership until scope exit is known (795.278417ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-closeAll-before preserves ownership until scope exit is known (836.168ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-closeAll-after preserves ownership until scope exit is known (817.73425ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-detach-before preserves ownership until scope exit is known (824.280708ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-detach-after preserves ownership until scope exit is known (903.763042ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-cancel-before preserves ownership until scope exit is known (793.013458ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty cancel-cancel-after preserves ownership until scope exit is known (792.233583ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty leader-exit preserves ownership until scope exit is known (563.971209ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty leader-natural preserves ownership until scope exit is known (511.828583ms)
+✔ WHAT[managed-session-lifecycle-025] real bun-pty owner-lost preserves ownership until scope exit is known (425.252583ms)
+ℹ Error: Test "WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with reserve first" at requirements/managed-session-lifecycle/tests/025.test.mjs:133:3 generated asynchronous activity after the test ended. This activity created the error "Error: PTY worker exited 1: node:events:505
+    throw er; // Unhandled 'error' event
+    ^
+
+Error: write EPIPE
+    at target._send (node:internal/child_process:901:20)
+    at target.send (node:internal/child_process:776:19)
+    at process.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission-worker.mjs:72:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Emitted 'error' event on process instance at:
+    at process.processEmit [as emit] (/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/signal-exit/index.js:199:34)
+    at node:internal/child_process:905:39
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11) {
+  errno: -32,
+  code: 'EPIPE',
+  syscall: 'write'
+}
+
+Node.js v26.6.0
+" and would have caused the test to fail, but instead triggered an unhandledRejection event.
+ℹ Error: Test "WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with drain first" at requirements/managed-session-lifecycle/tests/025.test.mjs:133:3 generated asynchronous activity after the test ended. This activity created the error "Error: PTY worker exited 1: node:events:505
+    throw er; // Unhandled 'error' event
+    ^
+
+Error: write EPIPE
+    at target._send (node:internal/child_process:901:20)
+    at target.send (node:internal/child_process:776:19)
+    at process.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission-worker.mjs:72:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Emitted 'error' event on process instance at:
+    at process.processEmit [as emit] (/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/signal-exit/index.js:199:34)
+    at node:internal/child_process:905:39
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11) {
+  errno: -32,
+  code: 'EPIPE',
+  syscall: 'write'
+}
+
+Node.js v26.6.0
+" and would have caused the test to fail, but instead triggered an unhandledRejection event.
+ℹ Error: Test "WHAT[managed-session-lifecycle-025] a conflicting round Drain still closes local PTYs without clearing the winning foreign reservation" at requirements/managed-session-lifecycle/tests/025.test.mjs:280:1 generated asynchronous activity after the test ended. This activity created the error "Error: PTY worker exited 1: node:events:505
+    throw er; // Unhandled 'error' event
+    ^
+
+Error: write EPIPE
+    at target._send (node:internal/child_process:901:20)
+    at target.send (node:internal/child_process:776:19)
+    at process.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission-worker.mjs:72:13)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+Emitted 'error' event on process instance at:
+    at process.processEmit [as emit] (/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/node_modules/signal-exit/index.js:199:34)
+    at node:internal/child_process:905:39
+    at process.processTicksAndRejections (node:internal/process/task_queues:85:11) {
+  errno: -32,
+  code: 'EPIPE',
+  syscall: 'write'
+}
+
+Node.js v26.6.0
+" and would have caused the test to fail, but instead triggered an unhandledRejection event.
+✔ WHAT[process-execution-001] the compiled OpenCode Host starts PTY workers and preserves the target environment (unset) (3773.438ms)
+✔ WHAT[process-execution-001] the compiled OpenCode Host starts PTY workers and preserves the target environment (original-value) (288.030125ms)
+✔ WHAT[process-execution-001] PTY_API_bytes_encodes_utf8 (1.220333ms)
+✔ WHAT[process-execution-001] PTY_API_new_id_has_pty_prefix_and_eight_hex_chars (0.844917ms)
+✔ WHAT[process-execution-001] PTY_API_new_id_is_unique_per_call (0.564541ms)
+✔ WHAT[process-execution-001] BACKEND_createPort_returns_a_working_port (0.480625ms)
+✔ WHAT[process-execution-001] BACKEND_failed_fork_leaves_unknown_active_but_known_closed (2.491834ms)
+✔ WHAT[process-execution-001] BACKEND_generated_id_also_fails_cleanly (0.240625ms)
+✔ WHAT[process-execution-001] BACKEND_send_after_failed_fork_reports_closed (0.3755ms)
+✔ WHAT[process-execution-001] BACKEND_send_on_never_forked_id_is_unknown (0.133833ms)
+✔ WHAT[process-execution-001] BACKEND_read_after_failed_fork_returns_empty_closed (0.664667ms)
+✔ WHAT[process-execution-001] BACKEND_read_never_forked_is_an_error (0.134791ms)
+✔ WHAT[process-execution-001] BACKEND_close_all_with_nothing_active_resolves (0.602375ms)
+✔ WHAT[process-execution-001] BACKEND_ports_are_isolated_from_each_other (0.379333ms)
+✔ WHAT[process-execution-001] BACKEND_signal_on_failed_id_is_rejected_as_closed (0.176375ms)
+✔ WHAT[process-execution-001] PORT_ctor_defaults_are_safe_and_functional (0.243958ms)
+✔ WHAT[process-execution-001] PORT_ctor_keeps_supplied_sender_and_handler (0.6425ms)
+✔ WHAT[process-execution-001] PORT_fork_generates_pty_id_and_dispatches_spawn (0.116291ms)
+✔ WHAT[process-execution-001] PORT_fork_honors_explicit_id_and_cwd (0.094208ms)
+✔ WHAT[process-execution-001] PORT_active_id_cannot_replace_its_unfinished_physical_instance (0.300542ms)
+✔ WHAT[process-execution-001] PORT_exists_and_known_track_active_and_closed (0.087875ms)
+✔ WHAT[process-execution-001] PORT_send_unknown_and_closed_ids_fail_with_distinct_reasons (0.107375ms)
+✔ WHAT[process-execution-001] PORT_send_forwards_command_and_propagates_handler_outcomes (0.238292ms)
+✔ WHAT[process-execution-001] PORT_read_unknown_id_is_an_error (0.081666ms)
+✔ WHAT[process-execution-001] PORT_read_after_close_returns_empty_closed_without_handling (0.195791ms)
+✔ WHAT[process-execution-001] PORT_read_parks_waiter_and_read_result_resolves_it (0.244583ms)
+✔ WHAT[process-execution-001] PORT_read_result_can_report_closed_and_reparks_after_resolution (0.100042ms)
+✔ WHAT[process-execution-001] PORT_concurrent_read_fails_fast_without_unparking (0.093459ms)
+✔ WHAT[process-execution-001] PORT_fail_read_resolves_parked_reader_with_error (0.097458ms)
+✔ WHAT[process-execution-001] PORT_read_result_and_fail_read_without_waiter_are_noops (0.044708ms)
+✔ WHAT[process-execution-001] SUPERVISOR_signalName_maps_every_signal_to_a_kill_name (0.060708ms)
+✔ WHAT[process-execution-001] SUPERVISOR_ensureSpawn_reuses_one_loader_and_observes_runtime_availability (0.164209ms)
+✔ WHAT[process-execution-001] SUPERVISOR_spawnSync_fails_fast_when_loader_never_ran (0.043ms)
+✔ WHAT[process-execution-001] SUPERVISOR_spawnSync_invokes_the_scope_factory_with_fixed_options (0.06725ms)
+✔ WHAT[process-execution-001] SUPERVISOR_spawnSync_defaults_cwd_to_process_cwd (0.039916ms)
+✔ WHAT[process-execution-001] SUPERVISOR_applyLive_closed_session_short_circuits_ok (0.455625ms)
+✔ WHAT[process-execution-001] SUPERVISOR_applyLive_write_forwards_utf8_to_backend (0.186875ms)
+✔ WHAT[process-execution-001] SUPERVISOR_applyLive_write_backend_error_becomes_error_result (0.081209ms)
+✔ WHAT[process-execution-001] SUPERVISOR_applyLive_read_drains_buffer_into_port (0.283083ms)
+✔ WHAT[process-execution-001] SUPERVISOR_applyLive_resize_swallows_backend_errors (0.13875ms)
+✔ WHAT[process-execution-001] SUPERVISOR_applyLive_spawn_on_live_backend_is_a_noop (0.069958ms)
+✔ WHAT[process-execution-001] SUPERVISOR_applyLive_write_without_backend_parks_until_resolved (0.236833ms)
+✔ WHAT[process-execution-001] SUPERVISOR_applyLive_parked_write_resolves_with_error (0.066833ms)
+✔ WHAT[process-execution-001] SUPERVISOR_applyLive_non_write_commands_without_backend_return_ok_immediately (0.127417ms)
+✔ WHAT[process-execution-001] PTY_TYPES_tryParse_accepts_every_supported_signal_name (0.091042ms)
+✔ WHAT[process-execution-001] PTY_TYPES_tryParse_rejects_unknown_and_prefixed_names (0.088167ms)
+✔ WHAT[process-execution-001] PTY_TYPES_command_views_carry_their_fields (0.102125ms)
+✔ WHAT[process-execution-001] PTY_TYPES_pty_id_roundtrips_its_value (0.025166ms)
+✔ WHAT[process-execution-001] PTY_TYPES_pty_handle_view_exposes_identity_and_command (0.114917ms)
+✔ WHAT[process-execution-001] PTY_TYPES_pty_read_view_reports_output_and_closed (0.084625ms)
+✔ WHAT[process-execution-001] PTY_TYPES_read_plans_cover_unknown_in_progress_closed_and_park (0.190833ms)
+✔ WHAT[process-execution-001] js.run interactive actions spawn, send, observe incremental output in check, and signal background child (560.0525ms)
+✔ WHAT[process-execution-002] PORT_send_term_kill_int_marks_abort_for_the_next_completion (4.164875ms)
+✔ WHAT[process-execution-002] SUPERVISOR_applyLive_signal_kills_the_real_process_group_or_process (9.561209ms)
+✔ WHAT[process-execution-002] SUPERVISOR_applyLive_signal_unknown_pid_becomes_error (0.402125ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (node, rename) (602.417041ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (node, double-failure) (489.1835ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (node, directory-sync) (513.078542ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (node, directory-sync-read) (481.868708ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (node, stopped) (507.371292ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (node, owner-lost) (508.308291ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (bun, rename) (460.054917ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (bun, double-failure) (491.427459ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (bun, directory-sync) (460.008583ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (bun, directory-sync-read) (458.72925ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (bun, stopped) (487.831875ms)
+✔ WHAT[process-execution-003] a failed terminal publication preserves exact physical evidence (bun, owner-lost) (660.157625ms)
+✔ WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (node, paused-small) (826.831625ms)
+✔ WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (node, paused-large) (730.149334ms)
+✔ WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (node, truncated) (710.897541ms)
+✔ WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (node, not-started-race) (5240.4875ms)
+✔ WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (node, ended-race) (464.275084ms)
+✔ WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (bun, paused-small) (659.014208ms)
+✔ WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (bun, paused-large) (688.706666ms)
+✔ WHAT[process-execution-003] recovery preserves ordered observations and exact terminal evidence (bun, truncated) (677.2855ms)
+✔ WHAT[process-execution-003] a durable PTY owner survives Host SIGKILL, refuses input replay and seals only its exact native outcome (8909.294458ms)
+✔ WHAT[process-execution-003] an incomplete PTY observation cannot claim an empty scope ("") (0.35425ms)
+✔ WHAT[process-execution-003] an incomplete PTY observation cannot claim an empty scope ("222 111 R") (0.200125ms)
+✔ WHAT[process-execution-003] an incomplete PTY observation cannot claim an empty scope ("111 111") (0.027875ms)
+✔ WHAT[process-execution-003] an incomplete PTY observation cannot claim an empty scope ("111 111 Ss\n333 333") (0.024875ms)
+✔ WHAT[process-execution-003] an incomplete PTY observation cannot claim an empty scope ("111 111 Z") (0.025458ms)
+✔ WHAT[process-execution-003] an incomplete PTY observation cannot claim an empty scope ("111 111 Ss\n111 333 S") (0.022917ms)
+✔ WHAT[process-execution-003] a complete PTY observation requires its live owner and keeps other live members (0.09075ms)
+✔ WHAT[process-execution-003] the real PTY scope retains a live descendant after target exit (leader-kill) (580.31075ms)
+✔ WHAT[process-execution-003] the real PTY scope retains a live descendant after target exit (leader-natural) (471.5875ms)
+✔ WHAT[process-execution-003] an unresponsive PTY supervisor bounds drain with Unknown (stalled-owner) (5371.776958ms)
+✔ WHAT[process-execution-003] an unresponsive PTY supervisor bounds drain with Unknown (stalled-anchor) (5474.772958ms)
+✔ WHAT[process-execution-003] NODE_EXIT_registered_callbacks_run_once_in_registration_order_and_fail_fast (1.351125ms)
+✔ WHAT[process-execution-003] EXEC_011_A_natural_exit_before_deadline_returns_code_without_kill (23.289041ms)
+✔ WHAT[process-execution-003] backend load failure publishes a known failure before spawn (3.100125ms)
+✔ WHAT[process-execution-003] BACKEND_concurrent_failed_forks_each_publish_one_completion (0.3485ms)
+✔ WHAT[process-execution-003] PORT_AddMailboxSender_reaches_every_registered_sender (0.21475ms)
+✔ WHAT[process-execution-003] removing an exit listener is idempotent and preserves the other listeners (0.124125ms)
+✔ WHAT[process-execution-003] PORT_send_plain_signal_does_not_abort_the_completion (0.272792ms)
+✔ WHAT[process-execution-003] PORT_complete_default_publishes_pty_exited_closed (0.137541ms)
+✔ WHAT[process-execution-003] PORT_complete_ok_publishes_exited_with_outcome_text (0.09225ms)
+✔ WHAT[process-execution-003] PORT_complete_error_publishes_failed_with_code_and_message (0.134625ms)
+✔ WHAT[process-execution-003] PORT_complete_after_terminate_publishes_aborted (0.181ms)
+✔ WHAT[process-execution-003] PORT_complete_abort_with_error_outcome_carries_the_error_text (0.10875ms)
+✔ WHAT[process-execution-003] PORT_complete_on_inactive_id_publishes_nothing (0.041875ms)
+✔ WHAT[process-execution-003] PORT_complete_isolates_failing_senders (0.122833ms)
+✔ WHAT[process-execution-003] PORT_complete_removes_the_exit_task_entry (0.579416ms)
+✔ WHAT[process-execution-003] a stalled TERM handler cannot block confirmed exit or KILL (kill) (1.978875ms)
+✔ WHAT[process-execution-003] a stalled TERM handler cannot block confirmed exit or KILL (exit) (0.174125ms)
+✔ WHAT[process-execution-003] unresolved startup cannot be overwritten by another spawn with the same PTY id (0.2455ms)
+✔ WHAT[process-execution-003] unknown startup does not prevent TERM and KILL cleanup of another live PTY (0.565667ms)
+✔ WHAT[process-execution-003] PORT_complete_aborted_forces_abort_without_terminate_mark (0.139834ms)
+✔ WHAT[process-execution-003] PORT_complete_aborted_defaults_message_and_clears_active (0.073083ms)
+✔ WHAT[process-execution-003] SUPERVISOR_failPending_resolves_every_tcs_with_the_reason (0.272833ms)
+✔ WHAT[process-execution-003] SUPERVISOR_attach_onExit_completes_exit_publishes_closed_and_drops_session (0.804084ms)
+✔ WHAT[process-execution-003] SUPERVISOR_attach_onExit_publishes_residual_output (0.215041ms)
+✔ WHAT[process-execution-003] SUPERVISOR_attach_onExit_fails_pending_writes_and_parked_read (0.266958ms)
+✔ WHAT[process-execution-003] SUPERVISOR_attach_onExit_is_idempotent_for_already_dropped_session (0.21725ms)
+✔ WHAT[process-execution-003] SUPERVISOR_attach_onExit_noop_when_session_already_closed (0.116375ms)
+✔ WHAT[process-execution-003] a lost scope witness rejects an already waiting drain without publishing completion (0.324625ms)
+✔ WHAT[process-execution-004] a synchronous infinite sanity callback cannot block the run deadline or strand its physical group (449.284125ms)
+✔ WHAT[process-execution-004] a synchronous infinite next callback cannot block the run deadline or strand its physical group (455.350916ms)
+✔ WHAT[process-execution-004] a synchronous infinite watch callback cannot block the run deadline or strand its physical group (1180.626708ms)
+✔ WHAT[process-execution-004] the real registered loop applies the administrator ceiling to a longer Runnable estimate (1624.95125ms)
+✔ WHAT[process-execution-004] concurrent explicit runs borrow the script deadline and keep later watch and result reads alive (471.944958ms)
+✔ WHAT[process-execution-004] concurrent explicit runs borrow the script deadline and return its original remaining budget (719.939334ms)
+✔ WHAT[process-execution-004] normal high exit codes stay normal target exits (500.241459ms)
+✔ WHAT[process-execution-004] a parked run still stops at its deadline and releases the large-output permit only after physical closure (520.089583ms)
+✔ WHAT[process-execution-004] a physical spawn rejection proves no target execution (48.135167ms)
+✔ WHAT[process-execution-004] target signal status does not use the supervisor KILL status (243.644125ms)
+✔ WHAT[process-execution-004] deadline terminates the group after the target exits while a descendant holds stdout (2013.138042ms)
+✔ WHAT[process-execution-004] Process_deadline_uses_explicit_offset_semantics (0.416875ms)
+✔ WHAT[process-execution-004] Process_deadline_is_independent_of_ambient_timezone (2.556667ms)
+✔ WHAT[process-execution-004] EXEC_oneshot_completion_wait_is_bounded_by_management_deadline (0.180875ms)
+✔ WHAT[process-execution-004] EXEC_011_slow_process_is_killed_and_reports_timeout (103.160166ms)
+✔ WHAT[process-execution-004] EXEC_011_untyped_host_rejection_does_not_prove_zero_execution (0.492792ms)
+✔ WHAT[process-execution-004] EXEC_011_throwing_host_maps_to_execution_failed (0.168375ms)
+✔ WHAT[process-execution-004] EXEC_011_B_deadline_kills_once_then_real_exit_is_timed_out (16.947042ms)
+✔ WHAT[process-execution-004] EXEC_011_C_kill_never_acked_preserves_stop_without_fabricating_exit (1001.90675ms)
+✔ WHAT[process-execution-004] effective deadline takes the smaller estimate and hard limit (0.327166ms)
+✔ WHAT[process-execution-004] deadline result describes waiting ending without claiming a return (0.075542ms)
+✔ WHAT[process-execution-005] js.run rejects non-positive or non-finite maxDuration before spawning (74.036542ms)
+✔ WHAT[process-execution-005] EXEC_010_process_request_carries_all_fields (0.939ms)
+✔ WHAT[process-execution-005] estimate validation rejects nonfinite or nonpositive time and negative output (0.134458ms)
+✔ WHAT[process-execution-006] registered pre-cancellation has zero command effects (1053.86925ms)
+✔ WHAT[process-execution-006] registered cancellation while queued neither starts the target nor releases another run permit (396.654417ms)
+✔ WHAT[process-execution-006] cancellation during a lost startup acknowledgement does not misreport a target that really started as NotStarted (644.838583ms)
+✔ WHAT[process-execution-006] a waiter fault without token cancellation keeps its original error (1022.252ms)
+✔ WHAT[process-execution-006] the registered DevOps tool observes real Host abort during execution without claiming physical completion (537.790875ms)
+✔ WHAT[process-execution-006] Ctrl-Z stops the direct target while its group supervisor can still apply KILL (397.735584ms)
+✔ WHAT[process-execution-006] runtime disposal cancels a real registered pipe run before releasing its process owner (330.00625ms)
+✔ WHAT[process-execution-006] an unknown physical close returns a bounded drain failure and retains the exact ownership blocker until close arrives (3012.250333ms)
+✔ WHAT[process-execution-006] a parked registered run keeps its owner until disposal unwinds its finalizer and clears the stale handle (551.117ms)
+✔ WHAT[process-execution-006] a real PTY keeps job control and drains a separate background group (669.511583ms)
+✔ WHAT[process-execution-006] short job groups can disappear while the live PTY owner drains (399.307417ms)
+✔ WHAT[process-execution-006] cancellation terminates the group after the target exits while a descendant holds stdout (159.049917ms)
+✔ WHAT[process-execution-006] EXEC_011_kill_ack_grace_is_finite_not_MaxTimerWaitMs (1.348833ms)
+✔ WHAT[process-execution-006] EXEC_011_throwing_host_under_cancellation_maps_to_process_cancelled (0.676458ms)
+✔ WHAT[process-execution-006] EXEC_011_D_mid_wait_cancellation_kills_once_and_returns_without_hanging_on_exit (31.169417ms)
+✔ WHAT[process-execution-006] PTY_API_abort_parent_invokes_every_registered_callback (0.558084ms)
+✔ WHAT[process-execution-006] PTY_API_abort_parent_with_unknown_id_is_a_noop (0.070167ms)
+✔ WHAT[process-execution-006] PTY_API_unregister_removes_only_the_matching_token (0.138625ms)
+✔ WHAT[process-execution-006] PTY_API_unregister_last_callback_drops_the_parent_entry (0.052792ms)
+✔ WHAT[process-execution-006] PTY_API_unregister_with_unknown_parent_or_token_is_a_noop (0.039083ms)
+✔ WHAT[process-execution-006] PTY_API_tokens_are_monotonic_across_parents (0.035041ms)
+✔ WHAT[process-execution-006] PTY_API_throwing_abort_callback_does_not_block_the_rest (0.065333ms)
+✔ WHAT[process-execution-006] SUPERVISOR_attach_without_port_entry_kills_the_term (3.662667ms)
+✔ WHAT[process-execution-006] SUPERVISOR_cancelAll_kills_live_sessions_and_skips_closed_or_null_backends (2.128ms)
+✔ WHAT[process-execution-007] PORT_close_requests_terminate_but_keeps_the_session_live (5.049084ms)
+✔ WHAT[process-execution-007] PORT_close_all_with_no_sessions_resolves (1.648958ms)
+✔ WHAT[process-execution-007] PORT_close_all_awaits_exit_task_when_it_resolves_in_grace (1.979375ms)
+✔ WHAT[process-execution-007] PORT_close_all_escalates_to_kill_after_grace (3.777875ms)
+✔ WHAT[process-execution-007] PORT_close_all_kill_failure_propagates (3.766458ms)
+✔ WHAT[process-execution-007] PORT_close_all_skips_ids_without_exit_task (0.607667ms)
+✔ WHAT[process-execution-007] PORT_list_reports_active_handles (1.387ms)
+✔ WHAT[process-execution-007] PORT_list_without_provider_returns_empty_agents (0.189416ms)
+✔ WHAT[process-execution-007] SUPERVISOR_add_tryGet_get_roundtrip (0.487125ms)
+✔ WHAT[process-execution-007] SUPERVISOR_tryGet_missing_returns_none_and_get_throws (0.15725ms)
+✔ WHAT[process-execution-007] SUPERVISOR_remove_drops_the_session (0.096833ms)
+✔ WHAT[process-execution-007] SUPERVISOR_list_returns_added_ids_only (0.1145ms)
+✔ WHAT[process-execution-007] SUPERVISOR_takePending_returns_and_clears_the_queue (0.314541ms)
+✔ WHAT[process-execution-007] SUPERVISOR_takePending_unknown_id_is_empty (0.216375ms)
+✔ WHAT[process-execution-007] SUPERVISOR_drop_removes_session_and_returns_pending (0.214708ms)
+✔ WHAT[process-execution-007] SUPERVISOR_attach_registers_live_session_and_forwards_onData_to_buffer (1.045583ms)
+✔ WHAT[process-execution-007] SUPERVISOR_attach_onData_ignored_after_session_closed (0.303959ms)
+✔ WHAT[process-execution-007] SUPERVISOR_attach_replays_pending_writes_onto_the_live_backend (0.497375ms)
+✔ WHAT[process-execution-007] short PTY exit race owns enough physical lifetime to settle (91.517459ms)
+✔ WHAT[process-execution-008] EXEC_018_drain_available_returns_two_completions_in_publish_order (1.211917ms)
+✔ WHAT[process-execution-008] Agent completion publishes only a pulse while physical PTY completion uses its own channel (0.063667ms) # TODO
+✔ WHAT[process-execution-009] EXEC_011_collector_concatenates_stdout_stderr_utf8 (1.260959ms)
+✔ WHAT[process-execution-009] EXEC_011_collector_ignores_empty_chunks (0.153625ms)
+✔ WHAT[process-execution-009] EXEC_011_collector_spools_when_byte_count_crosses_threshold (6.40875ms)
+✔ WHAT[process-execution-009] EXEC_011_collector_spool_accumulates_later_chunks (0.824292ms)
+✔ WHAT[process-execution-009] EXEC_011_collector_spooled_buffers_are_cleared (0.376125ms)
+✔ WHAT[process-execution-009] EXEC_011_spool_chunk_count_rounds_up (0.083375ms)
+✔ WHAT[process-execution-009] EXEC_011_spool_chunk_bytes_splits_at_chunk_size (0.194833ms)
+✔ WHAT[process-execution-009] EXEC_011_spool_round_trips_bytes_through_temp_file (1.018917ms)
+✔ WHAT[process-execution-009] EXEC_011_spool_append_tracks_bytes_written (1.428125ms)
+✔ WHAT[process-execution-009] PTY_SESSION_create_sets_id_and_backend (0.540875ms)
+✔ WHAT[process-execution-009] PTY_SESSION_create_defaults_open_empty_and_pending (0.0755ms)
+✔ WHAT[process-execution-009] PTY_SESSION_exit_completion_starts_unresolved (0.066917ms)
+✔ WHAT[process-execution-009] PTY_SESSION_mutable_state_roundtrips (0.101875ms)
+✔ WHAT[process-execution-009] the output threshold reflects a nonnegative requested budget (0.048708ms)
+✔ WHAT[process-execution-009] CUT_02_capture_spools_every_byte_beyond_the_library_tail_capacity (573.118916ms)
+✔ WHAT[process-execution-009] CUT_02_writeFileSync_failure_removes_output_even_after_the_native_write (92.079958ms)
+✔ WHAT[process-execution-009] CUT_02_appendFileSync_failure_removes_output_even_after_the_native_write (82.334292ms)
+✔ WHAT[process-execution-010] native signal exits remain distinct from normal high exit codes (2941.658917ms)
+✔ WHAT[process-execution-010] the supervised PTY preserves a real terminal, input, resize and target exit code (269.0935ms)
+✔ WHAT[process-execution-010] js.run completed command reports exit code and streams via onExit and outcome (91.885292ms)
+✔ WHAT[process-execution-010] js.run nonzero exit is reported as data rather than thrown (63.694292ms)
+✔ WHAT[process-execution-010] EXEC_004_pty_completion_is_natural_language_plus_exit_code (0.938958ms)
+✔ WHAT[process-execution-010] EXEC_011_successful_run_collects_stdout_and_exit_code (2.8095ms)
+✔ WHAT[process-execution-010] EXEC_011_nonzero_exit_is_still_an_ok_outcome (0.248ms)
+✔ WHAT[process-execution-010] CUT_02_non_pty_host_uses_one_supervised_process_owner_and_retires_direct_child_process_spawn (84.4345ms)
+✔ WHAT[process-execution-011] RUN_host_context_codec_exposes_plain_snapshot (1.04425ms)
+✔ WHAT[process-execution-011] js.run rejects incomplete Runnable specs before spawning (37.203375ms)
+✔ WHAT[process-execution-011] js.run rejects unsupported command descriptors with RUN_COMMAND_UNSUPPORTED (13.826709ms)
+✔ WHAT[process-execution-011] js.run maxDuration overrun terminates the foreground command and reports timeout (164.13825ms)
+✔ WHAT[process-execution-011] malformed command descriptors and output budgets have zero command effects (97.501709ms)
+✔ WHAT[process-execution-012] request vocabulary is compiled separately from process and PTY runtime (69.986042ms)
+✔ WHAT[process-execution-012] an isolated Fable consumer uses request and PTY contracts but cannot reach physical adapters (60305.272458ms)
+✔ WHAT[process-execution-013] js.run bounds large output deterministically to head+tail without model distillation (261.093833ms)
+✔ WHAT[process-execution-013] small output preserves separate stdout and stderr in onExit without truncation (106.825166ms)
+✔ WHAT[process-execution-013] ToolResultBound keeps deterministic raw tail when output exceeds host window (1.651792ms)
+✔ WHAT[process-execution-013] the actual registered tool returns bilingual bounded raw data without a model or Host re-truncation (1278.313792ms)
+✔ WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction (129.012875ms)
+▶ WHAT[process-execution-014] actual process output round-trips every raw text value
+  ✔ empty (99.473083ms)
+  ✔ no trailing LF (96.701042ms)
+  ✔ trailing LF (101.144791ms)
+  ✔ multiple trailing LF (96.64125ms)
+  ✔ CRLF (101.878042ms)
+  ✔ lone CR (98.239625ms)
+  ✔ quotes and backslashes (101.416041ms)
+  ✔ literal quotes and Unicode (104.710875ms)
+  ✔ control characters (129.96425ms)
+  ✔ BOM and CRLF (94.717792ms)
+✔ WHAT[process-execution-014] actual process output round-trips every raw text value (1026.243375ms)
+✔ WHAT[process-execution-014] truncated_output_preserves_program_facts_without_log_inference_and_declares_truncation (374.10325ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 0 fits HostMaxBytes without splitting a code point (5.625667ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 1 fits HostMaxBytes without splitting a code point (2.865291ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 2 fits HostMaxBytes without splitting a code point (2.223625ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 3 fits HostMaxBytes without splitting a code point (2.349791ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 4 fits HostMaxBytes without splitting a code point (2.15625ms)
+✔ WHAT[process-execution-015] UTF-8 tail bound at alignment offset 7 fits HostMaxBytes without splitting a code point (1.995042ms)
+✔ WHAT[process-execution-015] the complete visible result fits the Host window before any outer truncation (148.148666ms)
+✔ WHAT[process-execution-015] the encoded minimum rejects before execution and admits actual normal, signal, deadline and capture fault facts (1249.837292ms)
+✔ WHAT[process-execution-015] a small explicit budget counts escaped Unicode, both streams, metadata and bilingual truncation data (198.171417ms)
+✔ WHAT[process-execution-015] returning onExit observation cannot bypass the run byte budget (104.649959ms)
+✔ WHAT[process-execution-015] returning one watch observation cannot bypass the run byte budget (119.5335ms)
+✔ WHAT[process-execution-016] cancellation while queued returns a typed result without starting or stealing a permit (6.113875ms)
+✔ WHAT[process-execution-016] cancellation at permit handoff returns a typed result without starting or stealing a permit (0.554084ms)
+✔ WHAT[process-execution-016] large_estimate_acquires_and_releases_the_gate (0.22625ms)
+✔ WHAT[process-execution-016] a host spawn failure releases the large-output permit for the next execution (0.499458ms)
+✔ WHAT[process-execution-016] large_gate_first_acquire_succeeds_immediately (0.080583ms)
+✔ WHAT[process-execution-016] large_gate_second_acquire_waits_until_release (0.477792ms)
+✔ WHAT[process-execution-016] large_gate_release_without_holder_is_noop (0.076209ms)
+✔ WHAT[process-execution-016] large_gate_waiters_are_served_fifo (0.271292ms)
+✔ WHAT[process-execution-016] large_gate_cancelled_waiter_is_skipped (0.208291ms)
+✔ WHAT[process-execution-016] large_gate_precancelled_token_is_rejected_immediately (0.092417ms)
+✔ WHAT[process-execution-016] large_gate_cancellation_observed_by_gate (0.057208ms)
+✔ WHAT[process-execution-016] large_gate_acquire_after_release_reenters_cleanly (0.046166ms)
+✔ WHAT[process-execution-017] retired host run and PTY tool resources and ExecutorTool are absent (0.430417ms)
+✔ WHAT[process-execution-017] js.run accepts multi-minute maxDuration without an artificial 10-second cap and completes fast commands (75.803458ms)
+✔ WHAT[process-execution-018] js.run keeps split UTF-8 bytes, BOM and trailing CRLF in both native streams (371.564917ms)
+✔ WHAT[process-execution-018] native SIGTERM and an ordinary exit 143 remain different facts (180.0355ms)
+✔ WHAT[process-execution-018] a foreground command receives EOF after its input and completes normally (62.680666ms)
+✔ WHAT[process-execution-018] a physical spool failure remains a fault with incomplete output and never becomes a successful empty transcript (147.776375ms)
+✔ WHAT[process-execution-018] killing the supervisor group preserves an unknown background end and the already known foreground exit (222.491875ms)
+ℹ tests 386
+ℹ suites 0
+ℹ pass 321
+ℹ fail 64
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 1
+ℹ duration_ms 133585.778917
+
+✖ failing tests:
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, rename) (5961.4175ms)
+  Error: Command failed: node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs rename
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: the exact physical request must exist
+      at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12)
+      at async withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:43:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs rename',
+    stdout: '',
+    stderr: "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: the exact physical request must exist\n    at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12)\n    at async withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:43:5)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14\n    at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n"
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, directory-sync) (5887.536333ms)
+  Error: Command failed: node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs directory-sync
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: the exact physical request must exist
+      at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12)
+      at async withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:43:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at Socket.<anonymous> (node:internal/child_process:497:11)
+      at Socket.emit (node:events:514:20)
+      at Pipe.<anonymous> (node:net:363:12) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs directory-sync',
+    stdout: '',
+    stderr: "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: the exact physical request must exist\n    at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12)\n    at async withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:43:5)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14\n    at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n"
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, owner-lost) (6462.560541ms)
+  Error: Command failed: node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs owner-lost
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: the exact physical request must exist
+      at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12)
+      at async withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:43:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs owner-lost',
+    stdout: '',
+    stderr: "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: the exact physical request must exist\n    at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12)\n    at async withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:43:5)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14\n    at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:35:1 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n"
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, rename) (5726.951875ms)
+  Error: Command failed: bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs rename
+  25 |   }
+  26 | }
+  27 | const until = async (condition, message) => {
+  28 |   const deadline = Date.now() + 5000
+  29 |   while (!condition()) {
+  30 |     assert.ok(Date.now() < deadline, message)
+                  ^
+  AssertionError: the exact physical request must exist
+   generatedMessage: false,
+       actual: false,
+     expected: true,
+     operator: "==",
+         code: "ERR_ASSERTION"
+  
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:44:11
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14
+        at processTicksAndRejections (native:7:39)
+  
+  Bun v1.3.14 (macOS arm64)
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at Socket.<anonymous> (node:internal/child_process:497:11)
+      at Socket.emit (node:events:514:20)
+      at Pipe.<anonymous> (node:net:363:12) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs rename',
+    stdout: '',
+    stderr: '25 |   }\n26 | }\n27 | const until = async (condition, message) => {\n28 |   const deadline = Date.now() + 5000\n29 |   while (!condition()) {\n30 |     assert.ok(Date.now() < deadline, message)\n                ^\nAssertionError: the exact physical request must exist\n generatedMessage: false,\n     actual: false,\n   expected: true,\n   operator: "==",\n       code: "ERR_ASSERTION"\n\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:44:11\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14\n      at processTicksAndRejections (native:7:39)\n\nBun v1.3.14 (macOS arm64)\n'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, directory-sync) (5690.727584ms)
+  Error: Command failed: bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs directory-sync
+  25 |   }
+  26 | }
+  27 | const until = async (condition, message) => {
+  28 |   const deadline = Date.now() + 5000
+  29 |   while (!condition()) {
+  30 |     assert.ok(Date.now() < deadline, message)
+                  ^
+  AssertionError: the exact physical request must exist
+   generatedMessage: false,
+       actual: false,
+     expected: true,
+     operator: "==",
+         code: "ERR_ASSERTION"
+  
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:44:11
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14
+        at processTicksAndRejections (native:7:39)
+  
+  Bun v1.3.14 (macOS arm64)
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs directory-sync',
+    stdout: '',
+    stderr: '25 |   }\n26 | }\n27 | const until = async (condition, message) => {\n28 |   const deadline = Date.now() + 5000\n29 |   while (!condition()) {\n30 |     assert.ok(Date.now() < deadline, message)\n                ^\nAssertionError: the exact physical request must exist\n generatedMessage: false,\n     actual: false,\n   expected: true,\n   operator: "==",\n       code: "ERR_ASSERTION"\n\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:44:11\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14\n      at processTicksAndRejections (native:7:39)\n\nBun v1.3.14 (macOS arm64)\n'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:26:5
+✖ WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, owner-lost) (5732.741959ms)
+  Error: Command failed: bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs owner-lost
+  25 |   }
+  26 | }
+  27 | const until = async (condition, message) => {
+  28 |   const deadline = Date.now() + 5000
+  29 |   while (!condition()) {
+  30 |     assert.ok(Date.now() < deadline, message)
+                  ^
+  AssertionError: the exact physical request must exist
+   generatedMessage: false,
+       actual: false,
+     expected: true,
+     operator: "==",
+         code: "ERR_ASSERTION"
+  
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:44:11
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14
+        at processTicksAndRejections (native:7:39)
+  
+  Bun v1.3.14 (macOS arm64)
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs owner-lost',
+    stdout: '',
+    stderr: '25 |   }\n26 | }\n27 | const until = async (condition, message) => {\n28 |   const deadline = Date.now() + 5000\n29 |   while (!condition()) {\n30 |     assert.ok(Date.now() < deadline, message)\n                ^\nAssertionError: the exact physical request must exist\n generatedMessage: false,\n     actual: false,\n   expected: true,\n   operator: "==",\n       code: "ERR_ASSERTION"\n\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:30:12\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-publication-evidence.mjs:44:11\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:67:14\n      at processTicksAndRejections (native:7:39)\n\nBun v1.3.14 (macOS arm64)\n'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:35:1
+✖ WHAT[managed-session-lifecycle-025] another process cannot reserve a PTY after the work round stops admission (742.235208ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:57:1
+✖ WHAT[managed-session-lifecycle-025] load recovery stops old round admission before voiding canonical work in another process (625.08ms)
+  { message: "Lifecycle persistence cannot read or write inside .git (Parameter 'stateRoot')", innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:69:1
+✖ WHAT[managed-session-lifecycle-025] load recovery preserves canonical work and an unbound PTY until its producer proves Ended (619.79875ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /local process binding/. Input:
+  
+  "Lifecycle persistence cannot read or write inside .git (Parameter 'stateRoot')"
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:75:7
+      at async withRecoveryJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:51:12)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:73:5
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:70:3)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { message: "Lifecycle persistence cannot read or write inside .git (Parameter 'stateRoot')", innerException: undefined },
+    expected: /local process binding/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:88:3
+✖ WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost before COMMIT (560.363291ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Draining was not acknowledged: Unknown/. Input:
+  
+  "Lifecycle persistence cannot read or write inside .git (Parameter 'stateRoot')"
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async loseOwnershipCommit (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/ownership-commit.mjs:27:20)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:92:9
+      at async withRecoveryJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:51:12)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:90:7
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:89:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { message: "Lifecycle persistence cannot read or write inside .git (Parameter 'stateRoot')", innerException: undefined },
+    expected: /Draining was not acknowledged: Unknown/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:88:3
+✖ WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost after COMMIT (630.350333ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Draining was not acknowledged: Unknown/. Input:
+  
+  "Lifecycle persistence cannot read or write inside .git (Parameter 'stateRoot')"
+  
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async loseOwnershipCommit (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/ownership-commit.mjs:27:20)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:92:9
+      at async withRecoveryJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:51:12)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:90:7
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:89:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { message: "Lifecycle persistence cannot read or write inside .git (Parameter 'stateRoot')", innerException: undefined },
+    expected: /Draining was not acknowledged: Unknown/,
+    operator: 'rejects',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:107:1
+✖ WHAT[managed-session-lifecycle-025] a foreign committed reservation prevents premature terminal settlement (578.909333ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:133:3
+✖ WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with reserve first (601.920208ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:133:3
+✖ WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with drain first (607.868209ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:206:1
+✖ WHAT[managed-session-lifecycle-025] detaching one runtime closes only its round subtree and keeps the other process eligible (596.784791ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:233:3
+✖ WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost before COMMIT cannot launch in either process (558.928875ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:250:3
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT never reports terminal success (560.706083ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:263:3
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT still closes exact local PTYs and retains foreign blockers (567.551208ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:233:3
+✖ WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost after COMMIT cannot launch in either process (571.703916ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:250:3
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT never reports terminal success (543.262625ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:263:3
+✖ WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT still closes exact local PTYs and retains foreign blockers (577.0865ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:280:1
+✖ WHAT[managed-session-lifecycle-025] a conflicting round Drain still closes local PTYs without clearing the winning foreign reservation (663.796875ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:369:3
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, running) (1074.499292ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:369:3
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, exited) (1111.416875ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:369:3
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, cold-load) (800.705584ms)
+  { message: "Lifecycle persistence cannot read or write inside .git (Parameter 'stateRoot')", innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:369:3
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, running) (882.132791ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:369:3
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, exited) (899.272167ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:369:3
+✖ WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, cold-load) (636.2375ms)
+  { message: "Lifecycle persistence cannot read or write inside .git (Parameter 'stateRoot')", innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:424:5
+✖ WHAT[managed-session-lifecycle-025] SIGKILL before Ended COMMIT recovers the same native exit without replay (node) (1390.066334ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:424:5
+✖ WHAT[managed-session-lifecycle-025] SIGKILL after Ended COMMIT recovers the same native exit without replay (node) (1536.459417ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:424:5
+✖ WHAT[managed-session-lifecycle-025] SIGKILL before Ended COMMIT recovers the same native exit without replay (bun) (1270.26425ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:424:5
+✖ WHAT[managed-session-lifecycle-025] SIGKILL after Ended COMMIT recovers the same native exit without replay (bun) (1063.203541ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:445:1
+✖ WHAT[managed-session-lifecycle-025] SIGKILL after Reserve COMMIT before physical preparation preserves its unknown obligation and never launches on restart (815.018125ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:462:5
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (node) (1047.912709ms)
+  AssertionError [ERR_ASSERTION]: target must be exited before Ended: S+  
+   
+      at requirePtyTargetReaped (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:361:12)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:489:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:464:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:462:5
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (node) (1094.212333ms)
+  AssertionError [ERR_ASSERTION]: target must be exited before Ended: S+  
+   
+      at requirePtyTargetReaped (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:361:12)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:489:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:464:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:462:5
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (bun) (1052.118334ms)
+  AssertionError [ERR_ASSERTION]: target must be exited before Ended: S+  
+   
+      at requirePtyTargetReaped (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:361:12)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:489:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:464:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:462:5
+✖ WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (bun) (1036.071375ms)
+  AssertionError [ERR_ASSERTION]: target must be exited before Ended: S+  
+   
+      at requirePtyTargetReaped (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:361:12)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:489:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:464:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:498:5
+✖ WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (node) (711.151542ms)
+  Error: ENOENT: no such file or directory, scandir '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-foreign-receipt-node-proof-5c5QgX/.git/wanxiangshu/pty'
+      at readdirSync (node:fs:1884:26)
+      at locate (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:504:34)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:508:32)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:500:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'scandir',
+    path: '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-foreign-receipt-node-proof-5c5QgX/.git/wanxiangshu/pty'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:498:5
+✖ WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (node) (664.777667ms)
+  Error: ENOENT: no such file or directory, scandir '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-foreign-receipt-node-instance-GIssxq/.git/wanxiangshu/pty'
+      at readdirSync (node:fs:1884:26)
+      at locate (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:504:34)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:508:32)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:500:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'scandir',
+    path: '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-foreign-receipt-node-instance-GIssxq/.git/wanxiangshu/pty'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:498:5
+✖ WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (bun) (548.1165ms)
+  Error: ENOENT: no such file or directory, scandir '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-foreign-receipt-bun-proof-vSN4k1/.git/wanxiangshu/pty'
+      at readdirSync (node:fs:1884:26)
+      at locate (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:504:34)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:508:32)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:500:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'scandir',
+    path: '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-foreign-receipt-bun-proof-vSN4k1/.git/wanxiangshu/pty'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:498:5
+✖ WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (bun) (542.59775ms)
+  Error: ENOENT: no such file or directory, scandir '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-foreign-receipt-bun-instance-EFf22K/.git/wanxiangshu/pty'
+      at readdirSync (node:fs:1884:26)
+      at locate (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:504:34)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:508:32)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:500:7)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'scandir',
+    path: '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-foreign-receipt-bun-instance-EFf22K/.git/wanxiangshu/pty'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:562:5
+✖ WHAT[managed-session-lifecycle-025] local late-not-started preserves its exact evidence kind (node) (8562.018334ms)
+  Error: Command failed: node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs late-not-started
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: the exact physical request must exist
+      at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:17:12)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:51:5
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:22:1 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs late-not-started',
+    stdout: '',
+    stderr: "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: the exact physical request must exist\n    at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:17:12)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:51:5\n    at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:22:1 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n"
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:562:5
+✖ WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (node) (8563.633333ms)
+  Error: Command failed: node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs stream-loss
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: the exact physical request must exist
+      at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:17:12)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:51:5
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:22:1 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at Socket.<anonymous> (node:internal/child_process:497:11)
+      at Socket.emit (node:events:514:20)
+      at Pipe.<anonymous> (node:net:363:12) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs stream-loss',
+    stdout: '',
+    stderr: "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: the exact physical request must exist\n    at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:17:12)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:51:5\n    at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:22:1 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n"
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:562:5
+✖ WHAT[managed-session-lifecycle-025] local missing-bun preserves its exact evidence kind (node) (8617.273417ms)
+  Error: Command failed: node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs missing-bun
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: the exact physical request must exist
+      at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:17:12)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:51:5
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:22:1 {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+  
+  Node.js v26.6.0
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'node /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs missing-bun',
+    stdout: '',
+    stderr: "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: the exact physical request must exist\n    at until (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:17:12)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:51:5\n    at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)\n    at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:22:1 {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n"
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:570:3
+✖ WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (node) (1220.229958ms)
+  Error: ENOENT: no such file or directory, scandir '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-mixed-recovery-node-FWpSDG/.git/wanxiangshu/pty'
+      at readdirSync (node:fs:1884:26)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:582:28)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:572:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'scandir',
+    path: '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-mixed-recovery-node-FWpSDG/.git/wanxiangshu/pty'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:562:5
+✖ WHAT[managed-session-lifecycle-025] local late-not-started preserves its exact evidence kind (bun) (8619.00825ms)
+  Error: Command failed: bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs late-not-started
+  12 | const missingBun = scenario === 'missing-bun'
+  13 | const streamLoss = scenario === 'stream-loss'
+  14 | const until = async (condition, message) => {
+  15 |   const deadline = Date.now() + 8000
+  16 |   while (!condition()) {
+  17 |     assert.ok(Date.now() < deadline, message)
+                  ^
+  AssertionError: the exact physical request must exist
+   generatedMessage: false,
+       actual: false,
+     expected: true,
+     operator: "==",
+         code: "ERR_ASSERTION"
+  
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:17:12
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:54:9
+        at processTicksAndRejections (native:7:39)
+  
+  Bun v1.3.14 (macOS arm64)
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs late-not-started',
+    stdout: '',
+    stderr: `12 | const missingBun = scenario === 'missing-bun'\n13 | const streamLoss = scenario === 'stream-loss'\n14 | const until = async (condition, message) => {\n15 |   const deadline = Date.now() + 8000\n16 |   while (!condition()) {\n17 |     assert.ok(Date.now() < deadline, message)\n                ^\nAssertionError: the exact physical request must exist\n generatedMessage: false,\n     actual: false,\n   expected: true,\n   operator: "==",\n       code: "ERR_ASSERTION"\n\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:17:12\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:54:9\n      at processTicksAndRejections (native:7:39)\n\nBun v1.3.14 (macOS arm64)\n`
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:562:5
+✖ WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (bun) (8378.099833ms)
+  Error: Command failed: bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs stream-loss
+  12 | const missingBun = scenario === 'missing-bun'
+  13 | const streamLoss = scenario === 'stream-loss'
+  14 | const until = async (condition, message) => {
+  15 |   const deadline = Date.now() + 8000
+  16 |   while (!condition()) {
+  17 |     assert.ok(Date.now() < deadline, message)
+                  ^
+  AssertionError: the exact physical request must exist
+   generatedMessage: false,
+       actual: false,
+     expected: true,
+     operator: "==",
+         code: "ERR_ASSERTION"
+  
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:17:12
+        at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:54:9
+        at processTicksAndRejections (native:7:39)
+  
+  Bun v1.3.14 (macOS arm64)
+  
+      at genericNodeError (node:internal/errors:999:15)
+      at wrappedFn (node:internal/errors:544:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:20)
+      at maybeClose (node:internal/child_process:1125:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:305:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: 'bun /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs stream-loss',
+    stdout: '',
+    stderr: `12 | const missingBun = scenario === 'missing-bun'\n13 | const streamLoss = scenario === 'stream-loss'\n14 | const until = async (condition, message) => {\n15 |   const deadline = Date.now() + 8000\n16 |   while (!condition()) {\n17 |     assert.ok(Date.now() < deadline, message)\n                ^\nAssertionError: the exact physical request must exist\n generatedMessage: false,\n     actual: false,\n   expected: true,\n   operator: "==",\n       code: "ERR_ASSERTION"\n\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:17:12\n      at /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-local-evidence.mjs:54:9\n      at processTicksAndRejections (native:7:39)\n\nBun v1.3.14 (macOS arm64)\n`
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:570:3
+✖ WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (bun) (817.063042ms)
+  Error: ENOENT: no such file or directory, scandir '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-mixed-recovery-bun-OhY27w/.git/wanxiangshu/pty'
+      at readdirSync (node:fs:1884:26)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:582:28)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:572:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'scandir',
+    path: '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-mixed-recovery-bun-OhY27w/.git/wanxiangshu/pty'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:622:3
+✖ WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (node) (846.955959ms)
+  Error: ENOENT: no such file or directory, scandir '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-both-lost-node-5lyXB3/.git/wanxiangshu/pty'
+      at readdirSync (node:fs:1884:26)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:634:23)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:624:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'scandir',
+    path: '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-both-lost-node-5lyXB3/.git/wanxiangshu/pty'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:622:3
+✖ WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (bun) (677.912666ms)
+  Error: ENOENT: no such file or directory, scandir '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-both-lost-bun-GBhQdK/.git/wanxiangshu/pty'
+      at readdirSync (node:fs:1884:26)
+      at withAdmissionWorkers.realBackend (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:634:23)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:68:14
+      at async withSharedJournal (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/interaction-authority/tests/support/authority.mjs:68:16)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:624:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    errno: -2,
+    code: 'ENOENT',
+    syscall: 'scandir',
+    path: '/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wxs-authority-shared-both-lost-bun-GBhQdK/.git/wanxiangshu/pty'
+  }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:660:3
+✖ WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost before COMMIT (849.927625ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:660:3
+✖ WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost after COMMIT (851.373334ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:681:3
+✖ WHAT[managed-session-lifecycle-025] two Bun processes enforce stop-first admission with the real PTY backend (485.401584ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:681:3
+✖ WHAT[managed-session-lifecycle-025] two Bun processes enforce reserve-first admission with the real PTY backend (910.3585ms)
+  Error: The given key 'SessionId "devops-pty"' was not present in the dictionary.
+      at ChildProcess.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/managed-session-lifecycle/tests/support/pty-admission.mjs:50:25)
+      at ChildProcess.emit (node:events:514:20)
+      at emit (node:internal/child_process:973:14)
+      at process.processTicksAndRejections (node:internal/process/task_queues:91:21)
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1213:1
+✖ WHAT[managed-session-lifecycle-025] registered production terminal callback drains DevOps once and ignores a late callback after completion (92.182375ms)
+  { message: `The given key 'SessionId "devops-session-1"' was not present in the dictionary.`, innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3
+✖ WHAT[managed-session-lifecycle-025] registered Aborted terminal preserves eligibility and can receive a later valid terminal (89.202958ms)
+  { message: `The given key 'SessionId "devops-session-1"' was not present in the dictionary.`, innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3
+✖ WHAT[managed-session-lifecycle-025] registered Missing terminal preserves eligibility and can receive a later valid terminal (97.362208ms)
+  { message: `The given key 'SessionId "devops-session-1"' was not present in the dictionary.`, innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3
+✖ WHAT[managed-session-lifecycle-025] registered Empty terminal preserves eligibility and can receive a later valid terminal (91.382333ms)
+  { message: `The given key 'SessionId "devops-session-1"' was not present in the dictionary.`, innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3
+✖ WHAT[managed-session-lifecycle-025] registered ForeignRoot terminal preserves eligibility and can receive a later valid terminal (93.330459ms)
+  { message: `The given key 'SessionId "devops-session-1"' was not present in the dictionary.`, innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3
+✖ WHAT[managed-session-lifecycle-025] registered ForeignChild terminal preserves eligibility and can receive a later valid terminal (90.638541ms)
+  { message: `The given key 'SessionId "devops-session-1"' was not present in the dictionary.`, innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3
+✖ WHAT[managed-session-lifecycle-025] registered Failed terminal preserves eligibility and can receive a later valid terminal (147.636958ms)
+  { message: `The given key 'SessionId "devops-session-1"' was not present in the dictionary.`, innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1268:1
+✖ WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget durable PTYs without local physical bindings (101.371208ms)
+  { message: `The given key 'SessionId "devops-session-1"' was not present in the dictionary.`, innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1287:1
+✖ WHAT[managed-session-lifecycle-025] a DevOps terminal cannot silently bypass a missing round-drain capability (54.52125ms)
+  { message: `The given key 'SessionId "devops-session-1"' was not present in the dictionary.`, innerException: undefined }
+
+test at requirements/managed-session-lifecycle/tests/025.test.mjs:1298:1
+✖ WHAT[managed-session-lifecycle-025] a cold return with zero known PTYs still durably stops admission for the exact round (92.651292ms)
+  { message: `The given key 'SessionId "devops-session-1"' was not present in the dictionary.`, innerException: undefined }

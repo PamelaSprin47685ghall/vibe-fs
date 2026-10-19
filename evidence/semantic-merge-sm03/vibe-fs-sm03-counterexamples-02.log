@@ -1,0 +1,292 @@
+✔ WHAT[change-integration-002] GIT_is_dirty_true_only_on_nonempty_porcelain (1.612791ms)
+✔ WHAT[change-integration-002] failed cleanliness inspection preserves the command failure (0.819333ms)
+✔ WHAT[change-integration-002] rejected cleanliness command preserves its original exception (0.284291ms)
+✔ WHAT[change-integration-002] unreadable target cleanliness cannot authorize ff publication (4.57475ms)
+✔ WHAT[change-integration-002] GIT_ff_merge_refuses_dirty_target_worktree (0.495791ms)
+✔ WHAT[change-integration-002] Git adapter reports worktree enumeration failure (0.184959ms)
+✔ WHAT[change-integration-002] Git adapter detects a modified target worktree (0.092583ms)
+✔ WHAT[change-integration-002] WORKTREE_CMD_is_dirty_reads_porcelain (0.157625ms)
+✔ WHAT[change-integration-002] failed Git cleanliness blocks a new Host job before its worktree request or Manager creation (279.238458ms)
+✔ WHAT[change-integration-002] rejected Git command leaves a new Host job without its worktree request or Manager creation (211.899875ms)
+✔ WHAT[change-integration-002] dirty Git result still rejects admission while clean permits the worktree request (496.250125ms)
+✔ WHAT[change-integration-002] actual Git status failure returns an inspection error (234.418208ms)
+✔ WHAT[change-integration-002] Adapter_ffMerge_dirty_target_fails_closed_without_advancing_head (294.388541ms)
+✔ WHAT[change-integration-003] signal at add -A stops the real finalization sequence (1.602542ms)
+✔ WHAT[change-integration-003] signal at diff --name-only --diff-filter=U stops the real finalization sequence (0.364583ms)
+✔ WHAT[change-integration-003] signal at grep -I stops the real finalization sequence (0.450709ms)
+✔ WHAT[change-integration-003] signal at rev-parse --git-path rebase-merge stops the real finalization sequence (0.931041ms)
+✔ WHAT[change-integration-003] signal at rev-parse --git-path rebase-apply stops the real finalization sequence (0.273208ms)
+✔ WHAT[change-integration-003] signal at update-ref -d REBASE_HEAD stops the real finalization sequence (0.221875ms)
+✔ WHAT[change-integration-003] signal at rev-parse --git-path rebase-merge stops the real rebase sequence (0.386667ms)
+✔ WHAT[change-integration-003] signal at rev-parse --git-path rebase-apply stops the real rebase sequence (0.148ms)
+✔ WHAT[change-integration-003] signal at update-ref -d REBASE_HEAD stops the real rebase sequence (0.197ms)
+✔ WHAT[change-integration-003] unknown at add -A stops the real finalization sequence (0.119042ms)
+✔ WHAT[change-integration-003] unknown at diff --name-only --diff-filter=U stops the real finalization sequence (0.074ms)
+✔ WHAT[change-integration-003] unknown at grep -I stops the real finalization sequence (0.064167ms)
+✔ WHAT[change-integration-003] unknown at rev-parse --git-path rebase-merge stops the real finalization sequence (0.08375ms)
+✔ WHAT[change-integration-003] unknown at rev-parse --git-path rebase-apply stops the real finalization sequence (0.071959ms)
+✔ WHAT[change-integration-003] unknown at update-ref -d REBASE_HEAD stops the real finalization sequence (0.144042ms)
+✔ WHAT[change-integration-003] unknown at rev-parse --git-path rebase-merge stops the real rebase sequence (0.048459ms)
+✔ WHAT[change-integration-003] unknown at rev-parse --git-path rebase-apply stops the real rebase sequence (0.063ms)
+✔ WHAT[change-integration-003] unknown at update-ref -d REBASE_HEAD stops the real rebase sequence (0.101125ms)
+✔ WHAT[change-integration-003] stopped at add -A stops the real finalization sequence (0.120625ms)
+✔ WHAT[change-integration-003] stopped at diff --name-only --diff-filter=U stops the real finalization sequence (0.055292ms)
+✔ WHAT[change-integration-003] stopped at grep -I stops the real finalization sequence (0.062208ms)
+✔ WHAT[change-integration-003] stopped at rev-parse --git-path rebase-merge stops the real finalization sequence (0.060417ms)
+✔ WHAT[change-integration-003] stopped at rev-parse --git-path rebase-apply stops the real finalization sequence (0.091125ms)
+✔ WHAT[change-integration-003] stopped at update-ref -d REBASE_HEAD stops the real finalization sequence (0.083416ms)
+✔ WHAT[change-integration-003] stopped at rev-parse --git-path rebase-merge stops the real rebase sequence (0.081458ms)
+✔ WHAT[change-integration-003] stopped at rev-parse --git-path rebase-apply stops the real rebase sequence (0.047166ms)
+✔ WHAT[change-integration-003] stopped at update-ref -d REBASE_HEAD stops the real rebase sequence (0.059959ms)
+✔ WHAT[change-integration-003] capture fault at add -A stops the real finalization sequence (0.031ms)
+✔ WHAT[change-integration-003] capture fault at diff --name-only --diff-filter=U stops the real finalization sequence (0.046042ms)
+✔ WHAT[change-integration-003] capture fault at grep -I stops the real finalization sequence (0.047417ms)
+✔ WHAT[change-integration-003] capture fault at rev-parse --git-path rebase-merge stops the real finalization sequence (0.060625ms)
+✔ WHAT[change-integration-003] capture fault at rev-parse --git-path rebase-apply stops the real finalization sequence (0.075458ms)
+✔ WHAT[change-integration-003] capture fault at update-ref -d REBASE_HEAD stops the real finalization sequence (0.077ms)
+✔ WHAT[change-integration-003] capture fault at rev-parse --git-path rebase-merge stops the real rebase sequence (0.04875ms)
+✔ WHAT[change-integration-003] capture fault at rev-parse --git-path rebase-apply stops the real rebase sequence (0.051625ms)
+✔ WHAT[change-integration-003] capture fault at update-ref -d REBASE_HEAD stops the real rebase sequence (0.053834ms)
+✔ WHAT[change-integration-003] not started at add -A stops the real finalization sequence (0.071833ms)
+✔ WHAT[change-integration-003] not started at diff --name-only --diff-filter=U stops the real finalization sequence (0.041417ms)
+✔ WHAT[change-integration-003] not started at grep -I stops the real finalization sequence (0.03925ms)
+✔ WHAT[change-integration-003] not started at rev-parse --git-path rebase-merge stops the real finalization sequence (0.045084ms)
+✔ WHAT[change-integration-003] not started at rev-parse --git-path rebase-apply stops the real finalization sequence (1.050916ms)
+✔ WHAT[change-integration-003] not started at update-ref -d REBASE_HEAD stops the real finalization sequence (0.118958ms)
+✔ WHAT[change-integration-003] not started at rev-parse --git-path rebase-merge stops the real rebase sequence (0.042ms)
+✔ WHAT[change-integration-003] not started at rev-parse --git-path rebase-apply stops the real rebase sequence (0.043291ms)
+✔ WHAT[change-integration-003] not started at update-ref -d REBASE_HEAD stops the real rebase sequence (0.067375ms)
+✔ WHAT[change-integration-003] failed stale-ref deletion stops before commit (0.148792ms)
+✔ WHAT[change-integration-003] empty successful query is not evidence that rebase state is absent (0.100833ms)
+✔ WHAT[change-integration-003] GIT_rebase_ok_on_zero_exit (0.10925ms)
+✔ WHAT[change-integration-003] GIT_rebase_stale_rebase_head_is_cleared_before_fresh_rebase (0.407291ms)
+✔ WHAT[change-integration-003] GIT_rebase_in_progress_stages_and_continues (0.564917ms)
+✔ WHAT[change-integration-003] GIT_rebase_continue_failure_surfaces_stderr (0.283458ms)
+✔ WHAT[change-integration-003] GIT_rebase_stage_failure_is_an_error (0.228458ms)
+✔ WHAT[change-integration-003] GIT_rebase_surfaces_stderr_on_failure (0.089959ms)
+✔ WHAT[change-integration-003] GIT_candidate_commit_deletes_stale_rebase_head_before_commit_and_surfaces_failure (0.457333ms)
+✔ WHAT[change-integration-003] GIT_has_rebase_head_true_only_when_git_path_dir_exists (0.724584ms)
+✔ WHAT[change-integration-003] ORCH_007_each_durable_fact_has_one_projection_slot (1.139209ms)
+✔ WHAT[change-integration-003] ORCH_007_incomplete_publish_claimed_evidence_is_rejected (0.234666ms)
+✔ WHAT[change-integration-003] THEOREM_publish_claimed_without_rebased_candidate_is_rejected (0.191458ms)
+✔ WHAT[change-integration-003] THEOREM_publish_claimed_with_incomplete_evidence_is_rejected (0.086833ms)
+✔ WHAT[change-integration-003] reentry with valid complete claim reenters without CandidateReady and publishes on the pin (2.388958ms)
+✔ WHAT[change-integration-003] reentry missing RebasedCandidateReady evidence sends zero FF (0.109708ms)
+✔ WHAT[change-integration-003] reentry with conflicting claim snapshot sends zero FF (0.220792ms)
+✔ WHAT[change-integration-003] reentry with conflicting claim target sends zero FF (0.057584ms)
+✔ WHAT[change-integration-003] old incomplete claim decode fails closed in fold and recordFact (0.103541ms)
+✔ WHAT[change-integration-003] reentry FF-success with Published-append failure never masquerades as success (0.143ms)
+✔ WHAT[change-integration-003] WORKTREE_create_propagates_port_error (0.232833ms)
+✔ WHAT[change-integration-003] WORKTREE_CMD_create_returns_identity_on_success (0.079292ms)
+✔ WHAT[change-integration-003] WORKTREE_CMD_create_surfaces_stderr_on_failure (0.045666ms)
+✔ WHAT[change-integration-003] publication claim requires every explicit binding field even when candidate facts already exist (0.230834ms)
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[change-integration-005] rebase conflict records machine fact and continues the loop outside the gate (80.234625ms)
+✔ WHAT[change-integration-005] artifact conflict continues the loop outside the gate (1.018125ms)
+✔ WHAT[change-integration-005] GIT_conflicted_files_parses_lines (0.8275ms)
+✔ WHAT[change-integration-005] GIT_conflicted_files_error_propagates (0.366ms)
+✔ WHAT[change-integration-005] ConflictDetected_preserves_machine_conflict_evidence_on_the_same_Road_worktree (0.601375ms)
+✔ WHAT[change-integration-005] THEOREM_conflict_detected_remains_independent_durable_evidence (0.242167ms)
+✔ WHAT[change-integration-005] THEOREM_drop_ephemeral_preserves_conflict_evidence (0.180459ms)
+✔ WHAT[change-integration-005] cleanup failure after landed FF preserves published fact as PublishedPendingCleanup (27.629458ms)
+✔ WHAT[change-integration-005] reentry cleanup failure preserves PublishedPendingCleanup (2.025833ms)
+✔ WHAT[change-integration-005] WORKTREE_create_returns_owned_resource_and_marks_path_identity (0.506708ms)
+✔ WHAT[change-integration-005] WORKTREE_release_removes_worktree_and_branch_once (0.314792ms)
+✔ WHAT[change-integration-005] WORKTREE_release_stops_after_failed_remove_and_reuses_the_failure (0.165291ms)
+✔ WHAT[change-integration-005] WORKTREE_release_reports_single_failure_side (0.249708ms)
+✔ WHAT[change-integration-005] WORKTREE_unreleased_resource_disposes_by_releasing (0.161708ms)
+✔ WHAT[change-integration-005] WORKTREE_CMD_remove_force_flag_and_bound_repo (0.08575ms)
+✔ WHAT[change-integration-005] CHGINT_worktree_create_argv_is_accepted_by_real_git (128.632417ms)
+✔ WHAT[change-integration-005] CHGINT_worktree_create_survives_installed_wanxiang_reference_transaction_hook (3255.416667ms)
+✔ WHAT[change-integration-005] a delivered tenure hands the road on instead of re-preparing the refused candidate (57.196458ms)
+✔ WHAT[change-integration-005] the hand-off refuses to invent the cursor it never observed (31.767667ms)
+✔ WHAT[change-integration-005] a relayed tenure needs no hand-off: its successor already walks (36.269292ms)
+✔ WHAT[change-integration-005] the publish gate reads the review of the tenure that delivered the candidate (40.943625ms)
+✔ WHAT[change-integration-005] a relayed round review never qualifies a publish (26.728209ms)
+✔ WHAT[change-integration-006] projecting candidate and conflict facts preserves the recorded Road worktree identity (2.115083ms)
+✔ WHAT[change-integration-006] worktree resource preserves its configured path through controlled creation and disposal (1.775375ms)
+✔ WHAT[change-integration-006] ORCH_003_fact_for_an_unknown_job_is_a_no_op_rather_than_a_new_entry (0.17875ms)
+✔ WHAT[change-integration-006] ORCH_006_a_terminal_job_stays_in_the_map_so_a_replay_is_recognised (0.223ms)
+✔ WHAT[change-integration-006] ORCH_006_a_terminal_job_accepts_no_further_facts (0.218125ms)
+✔ WHAT[change-integration-006] ORCH_006_all_three_terminal_cases_end_the_job (0.151625ms)
+✔ WHAT[change-integration-006] ORCH_007_projection_keeps_independent_facts_instead_of_latest_stage (0.173083ms)
+✔ WHAT[change-integration-006] ORCH_006_the_journal_replays_independent_facts_and_terminal (0.887875ms)
+✔ WHAT[change-integration-006] ORCH_006_a_fact_before_its_create_is_dropped_not_promoted (0.284625ms)
+✔ WHAT[change-integration-006] ORCH_006_a_replayed_create_does_not_reset_a_job_that_already_made_progress (0.4305ms)
+✔ WHAT[change-integration-006] PERSIST_009_worktree_request_then_created_marks_identity_created (0.320416ms)
+✔ WHAT[change-integration-006] PERSIST_009_duplicate_request_after_created_does_not_regress_to_requested (0.072709ms)
+✔ WHAT[change-integration-006] PERSIST_009_duplicate_created_is_idempotent (0.077625ms)
+✔ WHAT[change-integration-006] PERSIST_009_request_alone_is_not_created (0.060167ms)
+✔ WHAT[change-integration-006] PERSIST_009_direct_request_accept_helpers_match_fold (0.121083ms)
+✔ WHAT[change-integration-006] EXEC_016_active_manager_jobs_are_outstanding_for_orchestrator (2.955667ms)
+✔ WHAT[change-integration-006] THEOREM_independent_facts_survive_and_published_is_terminal (0.553084ms)
+✔ WHAT[change-integration-006] WORKTREE_adopt_never_releases_on_dispose (0.145917ms)
+✔ WHAT[change-integration-006] WORKTREE_mark_durable_disposes_without_release (0.192583ms)
+✔ WHAT[change-integration-006] WORKTREE_CMD_list_parses_porcelain_blocks (0.668542ms)
+✔ WHAT[change-integration-006] WORKTREE_CMD_list_error_propagates (0.276334ms)
+✔ WHAT[change-integration-006] WORKTREE_CMD_list_branches_strips_current_and_worktree_markers (0.263167ms)
+✔ WHAT[change-integration-006] WORKTREE_CMD_delete_branch_uses_force_delete (0.105125ms)
+✔ WHAT[change-integration-006] WORKTREE_CMD_delete_branch_falls_back_to_stdout_when_stderr_blank (0.070292ms)
+✔ WHAT[change-integration-006] PERSIST_009_worktree_requested_created_reentry_is_finite_and_fail_closed (0.548042ms)
+✔ WHAT[change-integration-006] GAP-212: an interrupted publish resumes from its actual durable events and actual Git refs in a fresh process without replacing the Road worktree (0.035292ms) # TODO
+✔ WHAT[durable-events-024] actual Sphinx Commands.start valid preserves its original settlement capability and guard (484.170625ms)
+ℹ {"scenario":"valid","measuredPid":3832,"coldPid":3835,"physicalAndCold":true,"counts":{"append":1,"fsync":1,"close":1,"release":1,"injected":0},"cutIds":[]}
+✔ WHAT[durable-events-024] actual Sphinx Commands.start malformed-release preserves its original settlement capability and guard (510.157833ms)
+ℹ {"scenario":"malformed-release","measuredPid":3838,"coldPid":3841,"physicalAndCold":true,"counts":{"append":1,"fsync":1,"close":1,"release":1,"injected":1},"cutIds":["4538b5b199914efcbf3aa8e246df246b"]}
+✔ WHAT[durable-events-024] actual Sphinx Commands.start valid-release preserves its original settlement capability and guard (451.730416ms)
+ℹ {"scenario":"valid-release","measuredPid":3844,"coldPid":3847,"physicalAndCold":true,"counts":{"append":1,"fsync":1,"close":1,"release":1,"injected":1},"cutIds":[]}
+✔ WHAT[durable-events-024] actual Sphinx Commands.start not-attempted-controlled preserves its original settlement capability and guard (463.935667ms)
+ℹ {"scenario":"not-attempted-controlled","measuredPid":3861,"coldPid":3885,"physicalAndCold":true,"counts":{"append":0,"fsync":0,"close":0,"release":0,"injected":0},"cutIds":[]}
+✔ WHAT[durable-events-024] actual Sphinx Commands.start no-new-write-controlled preserves its original settlement capability and guard (429.4915ms)
+ℹ {"scenario":"no-new-write-controlled","measuredPid":3889,"coldPid":3897,"physicalAndCold":true,"counts":{"append":0,"fsync":0,"close":0,"release":0,"injected":0},"cutIds":[]}
+✔ WHAT[durable-events-024] original Sphinx wire binding valid settles before its physical terminal and independent cold replay (573.49025ms)
+ℹ {"binding":"wire","scenario":"valid","nativePid":3907,"coldPid":3910,"terminal":0,"physicalAndCold":true}
+✔ WHAT[durable-events-024] original Sphinx wire binding valid-release settles before its physical terminal and independent cold replay (529.187333ms)
+ℹ {"binding":"wire","scenario":"valid-release","nativePid":3917,"coldPid":3921,"terminal":0,"physicalAndCold":true}
+✔ WHAT[durable-events-024] original Sphinx wire binding malformed-release settles before its physical terminal and independent cold replay (632.683333ms)
+ℹ {"binding":"wire","scenario":"malformed-release","nativePid":3929,"coldPid":3932,"terminal":"SIGKILL","physicalAndCold":true}
+✔ WHAT[durable-events-024] original Sphinx mcp binding valid settles before its physical terminal and independent cold replay (920.680459ms)
+ℹ {"binding":"mcp","scenario":"valid","nativePid":3949,"coldPid":3959,"terminal":0,"physicalAndCold":true}
+✔ WHAT[durable-events-024] original Sphinx mcp binding valid-release settles before its physical terminal and independent cold replay (910.110292ms)
+ℹ {"binding":"mcp","scenario":"valid-release","nativePid":3983,"coldPid":3990,"terminal":0,"physicalAndCold":true}
+✔ WHAT[durable-events-024] original Sphinx mcp binding malformed-release settles before its physical terminal and independent cold replay (864.003084ms)
+ℹ {"binding":"mcp","scenario":"malformed-release","nativePid":4013,"coldPid":4026,"terminal":"SIGKILL","physicalAndCold":true}
+✖ WHAT[durable-events-024] undecodable Journal malformed refuses a cut without inventing append or fatal evidence (264.293542ms)
+ℹ JOURNAL_DECODE_REJECTION_EVIDENCE: retained /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/journal-decode-rejection-9c1uz3
+✖ WHAT[durable-events-024] undecodable Journal malformed-release refuses a cut without inventing append or fatal evidence (289.937375ms)
+ℹ JOURNAL_DECODE_REJECTION_EVIDENCE: retained /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/journal-decode-rejection-PATx2e
+✖ WHAT[durable-events-024] undecodable Journal business-malformed refuses a cut without inventing append or fatal evidence (266.058667ms)
+ℹ JOURNAL_DECODE_REJECTION_EVIDENCE: retained /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/journal-decode-rejection-yYxR9a
+✖ WHAT[durable-events-024] undecodable Journal business-malformed-release refuses a cut without inventing append or fatal evidence (304.103417ms)
+ℹ JOURNAL_DECODE_REJECTION_EVIDENCE: retained /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/journal-decode-rejection-4g39Je
+✖ WHAT[durable-events-024] decodable Journal semantic settles bad fact and cut before actual fatal and cold replay (273.954917ms)
+ℹ JOURNAL_DECODABLE_CUT_EVIDENCE: retained /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/journal-decodable-cut-Vv0a3S
+✖ WHAT[durable-events-024] decodable Journal semantic-release settles bad fact and cut before actual fatal and cold replay (268.833666ms)
+ℹ JOURNAL_DECODABLE_CUT_EVIDENCE: retained /private/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/journal-decodable-cut-13SE3L
+✔ WHAT[durable-events-024] original Journal RuntimeStarted valid settles before its physical terminal and independent cold replay (521.056ms)
+ℹ {"scenario":"valid","measuredPid":4096,"coldPid":4102,"physicalAndCold":true,"counts":{"append":2,"fsync":2,"close":2,"release":2,"injected":0},"cutIds":[]}
+✔ WHAT[durable-events-024] original Journal RuntimeStarted valid-release settles before its physical terminal and independent cold replay (537.392458ms)
+ℹ {"scenario":"valid-release","measuredPid":4116,"coldPid":4138,"physicalAndCold":true,"counts":{"append":1,"fsync":1,"close":1,"release":1,"injected":1},"cutIds":[]}
+✔ WHAT[durable-events-024] original AgentJournal business valid preserves legal initialization before its physical terminal and cold replay (564.625458ms)
+ℹ {"scenario":"business-valid","measuredPid":4142,"coldPid":4149,"physicalAndCold":true,"initId":"d8100c028660419d956feb016e580a7c","businessId":"5d3af0e8ff8c4368baeb65c02b65377b","counts":{"append":2,"fsync":2,"close":2,"release":2,"injected":0},"cutIds":[]}
+✔ WHAT[durable-events-024] original AgentJournal business valid-release preserves legal initialization before its physical terminal and cold replay (526.355709ms)
+ℹ {"scenario":"business-valid-release","measuredPid":4153,"coldPid":4168,"physicalAndCold":true,"initId":"024fabab3e8b4af68254c77a17188a6e","businessId":"663d006e9fe543c09a22dfad479c4382","counts":{"append":2,"fsync":2,"close":2,"release":2,"injected":1},"cutIds":[]}
+✔ WHAT[durable-events-024] actual semantic-cut caller requires injected fatal capability and refuses fatal before committed or unknown settlement (0.112375ms) # TODO
+✔ WHAT[durable-events-024] actual physical child persists bad fact and cut then reports and exits once; duplicate incident cannot execute again (0.023042ms) # TODO
+✔ WHAT[work-008] a successor strips prior assistant and tool and never injects a synthetic LWR_prev record (0.514417ms)
+✔ WHAT[work-008] a semantic successor row with no stable Host identity refuses the assembly (1193.232ms)
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+✔ WHAT[work-011] Promoted deliver waits for its terminal attempt interrupt before returning and dispatches no successor (996.053041ms)
+✔ WHAT[work-011] a rejected Host interrupt cannot be reported as successful final delivery (382.132291ms)
+✔ WHAT[work-011] a thrown Host interrupt cannot be reported as successful final delivery (372.459416ms)
+✔ WHAT[work-011] actual Stayed deliver starts one same-session successor, the next transform stops the retired attempt, and the successor transform retains the old physical history without another abort (551.15225ms)
+✔ WHAT[work-011] physical prompt after Accepted deliver invalidates certificate and unblocks successor manager tools (667.832209ms)
+✔ WHAT[work-011] a controlled in-flight Host interrupt prevents successor dispatch until exact provider-step release and physical interruption complete (0.06525ms) # TODO
+✔ WHAT[work-011] a post-cut wake after a fresh successor root is cleared without session abort and without MANAGER-LOOP-004 crash (470.582625ms)
+✔ WHAT[work-011] a review whose reviewer identity is the incumbency owner is refused by the kernel self-review gate (271.273792ms)
+✔ WHAT[work-011] Stayed deliver enqueues the successor manager-assess prompt before returning so no LLM request can slip in between (440.287875ms)
+✔ WHAT[work-011] a first tenure with no retirement owes no successor prompt (19.422042ms)
+✔ WHAT[work-011] a Relayed retirement owes the successor prompt until that successor is reviewed (31.071792ms)
+✔ WHAT[work-011] the delivered hand-off reopens the occasion on the unreviewed next tenure (28.451709ms)
+✔ WHAT[work-036] the first prompt of a plan session opens the work and starts the first tenure at S1 (19.164041ms)
+✔ WHAT[work-036] the entry needs only the lifecycle journal directory, not an acquired workspace EventStore (5.411917ms)
+✔ WHAT[work-036] the entry never forges an S1 fallback when the lifecycle directory is unavailable (0.259709ms)
+✔ WHAT[work-036] subsequent manager transform passes on an already-open work do not append duplicate WorkOpened or IncumbencyOpened events (918.334375ms)
+✔ WHAT[work-036] manager opening fails closed when the same session id already names a Plan work (283.104584ms)
+✔ WHAT[work-036] the first plan prompt opens work at the git worktree root, not the state directory (61.588709ms)
+✔ WHAT[work-036] only a Manager session opens execution work; another managed role opens nothing (626.954959ms)
+✔ WHAT[work-044] Relayed keeps the fixed DevOps and its received work for the successor (0.830709ms)
+✔ WHAT[work-044] RetirementBlockersFor excludes fixed DevOps agent and PTYs while blocking on active Engineer work (156.179291ms)
+✔ WHAT[work-044] cold retirement reads durable child parent edges and retains Engineer PTYs while excluding fixed DevOps (158.767125ms)
+✔ WHAT[work-044] cold ownership matches the child session when two parents use the same handle name (133.862167ms)
+ℹ tests 178
+ℹ suites 0
+ℹ pass 168
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 4
+ℹ duration_ms 12974.801417
+
+✖ failing tests:
+
+test at requirements/durable-events/tests/024.test.mjs:286:5
+✖ WHAT[durable-events-024] undecodable Journal malformed refuses a cut without inventing append or fatal evidence (264.293542ms)
+  Error: Selected tool identity probe failed
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: `node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: \nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: "runtime persistence cannot be placed inside .git (Parameter 'commonDir')",\n  innerException: undefined\n}\n\nNode.js v26.6.0\n\n+ actual - expected\n\n  {\n+   exitCode: 1,\n-   exitCode: 0,\n    signal: null\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/durable-events/tests/support/journal-physical-coordinator.mjs:35:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: { exitCode: 1, signal: null },\n  expected: { exitCode: 0, signal: null },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n`,
+    [cause]: undefined
+  }
+
+test at requirements/durable-events/tests/024.test.mjs:286:5
+✖ WHAT[durable-events-024] undecodable Journal malformed-release refuses a cut without inventing append or fatal evidence (289.937375ms)
+  Error: Selected tool identity probe failed
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: `node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: \nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: "runtime persistence cannot be placed inside .git (Parameter 'commonDir')",\n  innerException: undefined\n}\n\nNode.js v26.6.0\n\n+ actual - expected\n\n  {\n+   exitCode: 1,\n-   exitCode: 0,\n    signal: null\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/durable-events/tests/support/journal-physical-coordinator.mjs:35:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: { exitCode: 1, signal: null },\n  expected: { exitCode: 0, signal: null },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n`,
+    [cause]: undefined
+  }
+
+test at requirements/durable-events/tests/024.test.mjs:286:5
+✖ WHAT[durable-events-024] undecodable Journal business-malformed refuses a cut without inventing append or fatal evidence (266.058667ms)
+  Error: Selected tool identity probe failed
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: `node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: \nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: "runtime persistence cannot be placed inside .git (Parameter 'commonDir')",\n  innerException: undefined\n}\n\nNode.js v26.6.0\n\n+ actual - expected\n\n  {\n+   exitCode: 1,\n-   exitCode: 0,\n    signal: null\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/durable-events/tests/support/journal-physical-coordinator.mjs:35:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: { exitCode: 1, signal: null },\n  expected: { exitCode: 0, signal: null },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n`,
+    [cause]: undefined
+  }
+
+test at requirements/durable-events/tests/024.test.mjs:286:5
+✖ WHAT[durable-events-024] undecodable Journal business-malformed-release refuses a cut without inventing append or fatal evidence (304.103417ms)
+  Error: Selected tool identity probe failed
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: `node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: \nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: "runtime persistence cannot be placed inside .git (Parameter 'commonDir')",\n  innerException: undefined\n}\n\nNode.js v26.6.0\n\n+ actual - expected\n\n  {\n+   exitCode: 1,\n-   exitCode: 0,\n    signal: null\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/durable-events/tests/support/journal-physical-coordinator.mjs:35:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: { exitCode: 1, signal: null },\n  expected: { exitCode: 0, signal: null },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n`,
+    [cause]: undefined
+  }
+
+test at requirements/durable-events/tests/024.test.mjs:362:3
+✖ WHAT[durable-events-024] decodable Journal semantic settles bad fact and cut before actual fatal and cold replay (273.954917ms)
+  Error: Selected tool identity probe failed
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: `node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: \nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: "runtime persistence cannot be placed inside .git (Parameter 'commonDir')",\n  innerException: undefined\n}\n\nNode.js v26.6.0\n\n+ actual - expected\n\n  {\n+   exitCode: 1,\n+   signal: null\n-   exitCode: null,\n-   signal: 'SIGKILL'\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/durable-events/tests/support/journal-physical-coordinator.mjs:35:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: { exitCode: 1, signal: null },\n  expected: { exitCode: null, signal: 'SIGKILL' },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n`,
+    [cause]: undefined
+  }
+
+test at requirements/durable-events/tests/024.test.mjs:362:3
+✖ WHAT[durable-events-024] decodable Journal semantic-release settles bad fact and cut before actual fatal and cold replay (268.833666ms)
+  Error: Selected tool identity probe failed
+      at complete (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/scripts/lib/verification-tool-probe.mjs:29:30) {
+    code: 'verification-tool-probe-failed',
+    exitCode: 1,
+    signal: null,
+    stdout: '',
+    stderr: `node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: \nnode:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\nException {\n  message: "runtime persistence cannot be placed inside .git (Parameter 'commonDir')",\n  innerException: undefined\n}\n\nNode.js v26.6.0\n\n+ actual - expected\n\n  {\n+   exitCode: 1,\n+   signal: null\n-   exitCode: null,\n-   signal: 'SIGKILL'\n  }\n\n    at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/durable-events/tests/support/journal-physical-coordinator.mjs:35:10\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: { exitCode: 1, signal: null },\n  expected: { exitCode: null, signal: 'SIGKILL' },\n  operator: 'deepStrictEqual',\n  diff: 'simple'\n}\n\nNode.js v26.6.0\n`,
+    [cause]: undefined
+  }

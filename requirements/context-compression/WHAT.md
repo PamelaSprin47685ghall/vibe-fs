@@ -1,12 +1,16 @@
 # context-compression — WHAT
 
-## [001] 不观察容量
+## [001] 不推导容量，只向模型披露计量与声明常量
 
-严禁读取、查询、推导或缓存任何模型上下文窗口大小。禁止引入任何形式的上下文余量、Token 计数器、模型容量表或字节换算逻辑。唯一允许的字节计量为 200 KiB 输入合同与合法的文件/进程计量。
+严禁从自身观察推导、估算或缓存任何模型上下文窗口大小；禁止上下文余量、模型容量表，或把字节/token 换算成窗口比例的逻辑。唯一允许的字节计量为 200 KiB 输入合同与合法的文件/进程计量。
+
+可以披露的只有两类事实：已经发生的计量，与 provider 自己声明的常量。宿主向模型披露本次请求的计量数字（`total / used / cached`，见 [031]），以及在 chat.params 屏障处读到的 provider 对当前模型声明的 context limit（opencode 模型配置里的值，宿主只读不推）。二者都只是模型判断自身状态的 datum——模型是唯一知道哪些上下文对任务重要的主体，披露把选择权交给它。宿主不得由这些数字推导窗口大小、剩余预算，也不得替模型做出压缩决定。
 
 ## [002] 不主动预测溢出
 
-在请求发送前严禁判断是否接近容量上限，禁止根据投影长度比例、剩余预算或累计 Token 主动选择压缩点。真实的 provider attempt 失败是唯一的恢复触发信号。
+在请求发送前，宿主严禁判断是否接近容量上限，禁止根据投影长度比例、剩余预算或累计 Token 主动选择压缩点。真实的 provider attempt 失败是唯一的恢复触发信号。
+
+向模型披露计量（[001]）不构成溢出预测：披露不改变起点，不产生任何自动压缩动作，压缩点仍只由 attempt 失败触发；模型在视图声明中的选择是显式请求，不是宿主预测。
 
 ## [003] 200 KiB 输入合同
 
@@ -14,7 +18,7 @@
 
 ## [004] 输出预算属 provider
 
-系统不计算 squash 应占用的 Token 数量，亦不检查压缩比例。对压缩输出的唯一内容校验为 `isValidTerminal`（非空且非纯 XML）。
+系统不计算输出应占用的 Token 数量，亦不检查压缩比例。对输出的唯一内容校验为 `isValidTerminal`（非空且非纯 XML）。
 
 ## [005] 失败不分类
 
@@ -22,15 +26,17 @@
 
 ## [006] 重试材料当次决策，失败预算有界
 
-每个物理 retry attempt 拥有全新 physical identity；其是否包含 prefix/squash 恢复材料是由当前 attempt 的 retry-policy 从 journal 已提交事实（是否允许 probe/squash 以及材料是否可用）做出的不可变决策，不依赖历史位置、奇偶或跨回调瞬态状态。X 在 retry policy 允许 probe 时实际执行候选选择，由 `PrefixProbeSelection` 的 `Ok probe | Error NoCandidateReason` 证明材料是否可用；Y 则以当前 typed Blogger request 与 durable frames 判定是否先执行 squash（`BloggerRetryPolicy.nextRequest` 纯函数）。若本次物理 attempt 没有可用材料，则发送普通主请求，严禁将恢复决策留给未来无关请求，也严禁等待未来 X material 再补做 retry。每次确认失败经 `ProviderFailureLedger` 记账并推进连续失败计数；以该 LogicalRun 首次失败持久化的 `BudgetSpec` 限额裁决，达到限额即停止自动重试。仅首次建立预算时选用产品默认值，重放与后续裁决不得重选。业务主请求（`WorkMain | BloggerMain` 的有效成功）清零未耗尽的连续失败计数，保留限额与已观察身份；重复旧成功不清掉新失败，已耗尽状态不重新开放。
+每个物理 retry attempt 拥有全新 physical identity；是否包含 prefix 恢复材料由本次 retry policy 依据已提交事实一次决定，不依赖历史位置、奇偶或跨回调瞬态状态。X 在允许 probe 时以 `PrefixProbeSelection` 的结果证明材料是否可用；Y 通过 `BloggerRetryPolicy.nextRequest` 直接重试 `BloggerMain`，旧 squash 循环退役。材料不可用时发送普通主请求，不等待未来 X material，也不把恢复决策留给无关请求。
+
+每次确认失败经 `ProviderFailureLedger` 记账并推进连续失败计数；以该 LogicalRun 首次失败持久化的 `BudgetSpec` 限额裁决，达到限额即停止自动重试。仅首次建立预算时选用产品默认值，重放与后续裁决不得重选。业务主请求（`WorkMain | BloggerMain` 的有效成功）清零未耗尽的连续失败计数，保留限额与已观察身份；重复旧成功不清掉新失败，已耗尽状态不重新开放。
 
 ## [007] 按 RequestKind 分派结局
 
-每个 attempt 的结局按 `ProviderRequestKind` 进行确定性分派；RequestKind 必须来自 attempt 的 typed context / durable receipt / accepted continuation evidence，而非角色猜测或错误文本。同种 RequestKind 的同种结局必须产生完全一致的后继动作。`BloggerSquash` 与 `InteractionRepair` 成功不得清零连续失败计数；只有 `WorkMain | BloggerMain` 的有效成功可以清零。
+每个 attempt 的结局按 `ProviderRequestKind` 进行确定性分派；RequestKind 必须来自 attempt 的 typed context / durable receipt / accepted continuation evidence，而非角色猜测或错误文本。同种 RequestKind 的同种结局必须产生完全一致的后继动作。`InteractionRepair` 与 `StrengthReplica` 成功不得清零连续失败计数；只有 `WorkMain | BloggerMain` 的有效成功可以清零。
 
 ## [008] X 不发压缩请求
 
-主工作会话（Work Session）严禁向主模型发送请求压缩历史的指令。压缩操作仅在 Y 的 squash 或 X 的 prefix 替换投影中发生。仅 `WorkMain` 请求有资格携带 prefix probe。
+主工作会话（Work Session）严禁向主模型发送请求压缩历史的指令。上下文压缩由模型在 [031] ANCHOR `view` 声明中自主选择，或经 X 的 prefix 替换投影发生。仅 `WorkMain` 请求有资格携带 prefix probe。
 
 ## [009] 候选未提交不是事实
 
@@ -42,7 +48,7 @@
 
 ## [011] 提交语义分型
 
-X probe 的**物理 provider attempt** 一旦产生可用成功（包括 `finish=tool-calls`：Host turn 尚未结束、但该 provider attempt 已成功），必须先原子提交新 epoch 并继承 SealRoot，再允许下一次 provider request 组装；失败或不可用回应则无 rebase 事实。`PrefixRebaseCommitted` 的 durable append 成功是消费 attempt-local probe plan 的前置条件，append 失败必须 fail-closed，严禁“plan 已消费但 epoch 未提交”。一旦 epoch 已提交，后续每一个普通 `WorkMain` 都必须继续投影该 committed prefix；retry-policy 未允许 probe 只表示本次不得构造新 probe，绝不表示退回 raw X 历史。Y squash 成功时提交 squashed observation 并使 FrameEpoch 递增，失败时不修改现有 frames 与 coverage。`m=1` 时仍允许 `k=1` 的真实 rewrite；新的 squash terminal blob 是新的历史表示，其 `TextDigest` 可以且通常应与被替换 Entry 不同，不得把 digest 相等误作单帧 squash 的 PERSIST-010 条件。
+X probe 的**物理 provider attempt** 一旦产生可用成功（包括 `finish=tool-calls`：Host turn 尚未结束、但该 provider attempt 已成功），必须先原子提交新 epoch 并继承 SealRoot，再允许下一次 provider request 组装；失败或不可用回应则无 rebase 事实。`PrefixRebaseCommitted` 的 durable append 成功是消费 attempt-local probe plan 的前置条件，append 失败必须 fail-closed，严禁“plan 已消费但 epoch 未提交”。一旦 epoch 已提交，后续每一个普通 `WorkMain` 都必须继续投影该 committed prefix；retry-policy 未允许 probe 只表示本次不得构造新 probe，绝不表示退回 raw X 历史。
 
 ## [012] Blogger delta TOML 合同
 
@@ -50,11 +56,11 @@ Blogger delta 以 data-only TOML 形式冻结于 blob，指令头部仅在投影
 
 ## [013] 诊断不是控制输入
 
-可观测诊断日志严禁作为控制流输入，不得使用任何诊断字段驱动 retry、probe 或 squash 的分支决策。
+可观测诊断日志严禁作为控制流输入，不得使用任何诊断字段驱动 retry 或 probe 的分支决策。
 
-## [014] squash 只处理本 X 的 frames
+## [014] Blogger squash 压缩循环已退役（由 [031] ANCHOR 视图声明接管）
 
-Squash 仅压缩当前 X 会话自身的 frames，严禁混入父级 LWR 或跨会话上下文。
+旧 Blogger squash 压缩循环（`ProviderRequestKind.BloggerSquash`、`CompanionRequestKind.Squash`、`BlogObservationsSquashed`、`BlogProjection.applySquash`、`resources/provider/lifecycle/companion/squash`）已退役。上下文压缩由模型在 [031] ANCHOR `view` 声明中自主控制；Companion 投影仅构建 `Normal` 请求，将本会话已提交的 Chronicle `Entry` frames、`RecentTips` 与当前 delta 组装为确定性的 provider 视图。
 
 ## [015] busy/失败不推进 coverage
 
@@ -68,6 +74,8 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 任何真实 Host `role=user` 消息都不得被 Y/LWR 改写、删除或重编码；只要 prefix replacement 覆盖到它，就必须把原始 Host message 原封不动保留。该规则适用于整个会话，不只第一条消息。LWR 自己生成的 `synthetic=true` / `source=companion-memory` user-role 消息不是用户输入，不享受该豁免，后续 rebase 可以正常替换。
 
+本条约束 Y/LWR 前缀替换。模型显式声明的进程内 ANCHOR 视图另遵守 [031]；Plan 的 `U` 原文保证同时约束这两个呈现阶段。任何摘要或指导呈现均晚于原件捕获，不得作为新的原始事实回写。
+
 真实 Opening 仍保留自己的生命周期 floor 语义：same-session FrozenRecordPrefix 必须采用 `includeOpening=false`；其 canonical WorkRecord 仍保存 Opening 事实，Blogger 的 effectiveStart 仍取 `max(RecordCoverage, Life.WorkRecordStart)`。但 provider write-back 保留首条 Opening 的根本理由不再是“它排在第一条”，而是：若它是真实用户消息，就由本条用户消息规则永久 raw；若还有其它真实用户消息，它们也同样永久 raw。Manager 是否已到 T1 不得改变该边界；pre-T1 与 post-T1 普通 assistant/tool 历史一视同仁。同 session 的前缀替换使用自身历史替换旧前缀，严禁包装为 delegation 字段。
 
 ## [018] Blogger catch-up 连续追平；禁止 frozen drain frontier；quiet 只等待事件
@@ -80,17 +88,17 @@ Y prefix 物化仅允许使用具有 PrefixCoverage 完整 turn 证明的 Y 产�
 
 候选 probe 尚未成功提交时也不得形成“必须先成功才能变小”的死锁：当当前物理 WorkMain 已选择 `UsePrefixProbe`，XWire 必须把该 attempt 标记为 typed tentative cold horizon，并让同一 `messages.transform` 中位于 XWire 之后的 historical auxiliary projectors（Strength speculation、pair guideline、requirement grounding）跳过本次注入。该状态只能作为当前调用的返回值顺序消费，严禁写入跨 callback 的 process-local marker；只有 probe 成功后，`PrefixRebaseCommitted` 才成为跨请求 durable horizon 事实。
 
-## [020] `todowrite` 是 checkpoint，不享有永久 raw 豁免
+## [020] view 声明是 checkpoint，不享有永久 raw 豁免
 
-成功的原生 `todowrite` 形成 compression checkpoint；它所在的完整 semantic turn 只因固定的 K 窗口而保持 raw，不因工具名获得永久豁免。正常 cutoff 以所选 checkpoint 的 turn 起点为边界，因此窗口内 call/result 自然完整保留；一旦 `PrefixRebaseCommitted` 已越过某个旧 checkpoint，该回合可以与其他 covered 历史一样由 LWR 替换，任何后续 checkpoint 都不得把它恢复出来。所有真实用户消息仍按 [017] 永久 raw。
+成功完成的 `todowrite-for-<role>` 调用在 `state.input.view` 为非空对象时形成 compression checkpoint（判定门禁见 obligation-ledger-001）；它所在的完整 semantic turn 只因固定的 K 窗口而保持 raw，不因工具名获得永久豁免。正常 cutoff 以所选 checkpoint 的 turn 起点为边界，因此窗口内 call/result 自然完整保留；一旦 `PrefixRebaseCommitted` 已越过某个旧 checkpoint，该回合可以与其他 covered 历史一样由 LWR 替换，任何后续 checkpoint 都不得把它恢复出来。所有真实用户消息仍按 [017] 永久 raw。
 
 ## [021] Y retry 由失败会话当场拥有，禁止等待未来 X material
 
-`BloggerMain` 的已确认失败在重试时，若 `BloggerRetryPolicy` 选中 Squash（存在可 squash frames），则该 Blogger 的下一次 continuation 必须先物化 `BloggerRequestContext.Squash` 并发送 `BloggerSquash`；不得先重发失败的 BloggerMain，也不得等待未来主 X transform 再补做 retry。`BloggerSquash` 成功提交后，下一次 provider step 必须从 durable Blog + XTrace 重新派生 BloggerMain；Squash 失败则记账失败并按策略继续后续物理重试。失败 request 的 durable open materialization 必须在任何 retry 前关闭，新物理 retry 必须重新绑定自己的 PromptKey。
+`BloggerMain` 的已确认失败在重试时，由 `BloggerRetryPolicy.nextRequest` 直接选中 `BloggerMain` 当场重发，严禁等待未来主 X transform 再补做 retry（旧 `BloggerSquash` 旁路已随 [014]/[031] 退役）。失败 request 的 durable open materialization 必须在任何 retry 前关闭，新物理 retry 必须重新绑定自己的 PromptKey。
 
 ## [022] BloggerMainContext 是唯一重建公式，canonical XTrace 是唯一输入宇宙
 
-正常 catch-up、squash 成功后的 Main、失败后的 Main retry 与 crash refresh 必须共用同一个 `BloggerMainContext` 推导：同一 Opening floor、同一 XTrace generation、同一 ingest 位置、同一 200 KiB chunk 与同一 coverage digest 规则。所有路径先通过 `XTraceMaterialization.currentProjection` 得到 canonical X，再进入 `BloggerMainContext`；严禁 normal transform 从 request-local provider presentation 计算 digest、而 retry 路径从 XTrace 重建，也严禁在 Coordinator、Enforcer 或 retry workflow 中复制第二套 next-main 算法。
+正常 catch-up、失败后的 Main retry 与 crash refresh 必须共用同一个 `BloggerMainContext` 推导：同一 Opening floor、同一 XTrace generation、同一 ingest 位置、同一 200 KiB chunk 与同一 coverage digest 规则。所有路径先通过 `XTraceMaterialization.currentProjection` 得到 canonical X，再进入 `BloggerMainContext`；严禁 normal transform 从 request-local provider presentation 计算 digest、而 retry 路径从 XTrace 重建，也严禁在 Coordinator、Enforcer 或 retry workflow 中复制第二套 next-main 算法。
 
 ## [023] retry/park 全事件驱动且时间无关
 
@@ -114,13 +122,13 @@ Blogger claim/release conflict、semantic cut与compression invariant必须携�
 
 ## [027] Blogger 请求构造权只属于 owner，恢复先解码再验证
 
-`BloggerMainRequestContext` 与 `BloggerSquashRequestContext` 的 record 字段只读：外部代码可以模式匹配与读取字段，但不能组装任意 `PreviousIngestedThroughSequence`／`NextIngestedThroughSequence`／`DeltaDigest`／`Toml`／epoch 组合。唯一构造入口是 `BloggerRequestMaterial.createMain`／`createSquash`（validating constructor），失败为 typed `BloggerRequestRejection`，永不产生部分 record。构造保证：`nextIngested > prevIngested`；`DeltaDigest = SHA256(Toml)`；epoch 为合法 generation；Squash 的 `CoveredFrameCount ≥ 1` 且与 `FrameDigests` 长度一致。`RequestId` 是 owner 在 materialization 时计算并冻结的 durable 身份（`mainRequestId`／`squashRequestId` canonical hash），构造与恢复只携带、不从 blob 内容重算。live 派生（`mainContextFromChunk`／`tryBuildSquashContext`）与恢复解码走同一构造器；恢复先解码未验证数据再验证，损坏／版本不兼容／I-O 不可用的 durable 输入分别成为 `CycleContextReloadRejection` 的独立分支（`BlobCorrupt`／`UnsupportedRequestKind`／`ItemsUndecodable`／`InvariantViolated`／`BlobUnreadable`），不得坍缩为 `None` 或零默认值。旧 epoch 请求不得借恢复取得当前提交权：恢复沿用 durable open 的 frozen epoch，commit 仍以 staged coverage 与 live projection 的一致性裁决。
+`BloggerMainRequestContext` 的 record 字段只读：外部代码可以模式匹配与读取字段，但不能组装任意 `PreviousIngestedThroughSequence`／`NextIngestedThroughSequence`／`DeltaDigest`／`Toml`／epoch 组合。唯一构造入口是 `BloggerRequestMaterial.createMain`（validating constructor），失败为 typed `BloggerRequestRejection`，永不产生部分 record。构造保证：`nextIngested > prevIngested`；`DeltaDigest = SHA256(Toml)`；epoch 为合法 generation。`RequestId` 是 owner 在 materialization 时计算并冻结的 durable 身份（`mainRequestId` canonical hash），构造与恢复只携带、不从 blob 内容重算。live 派生（`mainContextFromChunk`）与恢复解码走同一构造器；恢复先解码未验证数据再验证，损坏／版本不兼容／I-O 不可用的 durable 输入分别成为 `CycleContextReloadRejection` 的独立分支（`BlobCorrupt`／`UnsupportedRequestKind`／`ItemsUndecodable`／`BlobUnreadable`／`InvariantViolated`），永不静默降级为 `None` 或零值默认。
 
 repair episode 的 durable abandon 失败时，rendezvous 进入终态失败：所有已接收未完成的观察者、入队请求与后续到达的旧/新 observer 都以同一异常拒绝；不发送 terminal 通知，不释放 exact flight，不重新打开预算。episode 以失败态保留注册，防止同一请求以新 budget 重启。
 
-## [028] todowrite checkpoint 的固定 K 窗口
+## [028] view checkpoint 的固定 K 窗口
 
-设成功的原生 `todowrite` checkpoint 按顺序为 `T1..TN`，`Bi` 为包含 `Ti` 的完整 semantic turn 起始边界（canonical XTrace generation + stable Host identity）。K 是系统固定参数 `K = 3`，包含本次 checkpoint；它不是逐次输入，也不由模型提供，因此 checkpoint 事实只记录调用身份，不记录 K。
+设成功声明 `view` 的编程面 checkpoint 按顺序为 `T1..TN`，`Bi` 为包含 `Ti` 的完整 semantic turn 起始边界（canonical XTrace generation + stable Host identity）。K 是系统固定参数 `K = 3`，包含本次 checkpoint；它不是逐次输入，也不由模型提供，因此 checkpoint 事实只记录调用身份，不记录 K。
 
 ```text
 N = 0：不给新 cutoff，沿用当前已提交前缀与原始尾部。
@@ -128,16 +136,32 @@ N > 0：j = max(1, N − K + 1)
 desired cutoff exclusive = Bj
 ```
 
-因此窗口保留最近三次 `todowrite` 所属的完整 semantic turn，从这三次里最早的一次之前开始压缩；不足三次时从最早的 checkpoint 之前开始。
+因此窗口保留最近三次 view checkpoint 所属的完整 semantic turn，从这三次里最早的一次之前开始压缩；不足三次时从最早的 checkpoint 之前开始。
 
 checkpoint projection 不能提前遗忘尚未被 committed prefix 越过的旧 checkpoint；只有真实 `PrefixRebaseCommitted` 才能永久裁掉其 cutoff 之前的 checkpoint。于是尚存 raw 的历史可以不额外压缩，却绝不能把已经替换成 LWR 的内容恢复出来。保留调用所属整回合，绝不在 call/result 中间切断。同一 semantic turn 内多个顺序 checkpoint 可以共享 `Bi`。
 
 ## [029] coverage 落后不丢 raw，frame 不跨界冒用，紧急 Probe 是明示例外
 
-actual cutoff 必须同时满足：当前 generation、完整 semantic turn、连续 PrefixCoverage、有精确截断能力的已冻结 Blogger/LWR 材料、Opening floor、不得越过当前请求正在回答的最新消息所在回合、不得回退已提交 cutoff。该请求边界是 canonical XTrace 当前 generation 的最新语义回合，不是最后一条 `role=user` 消息：一条 user 消息可驱动整段 agent loop，其后每个 provider step 回答的是自身的 assistant/tool 历史；若以那条 user 消息为界，loop 内的 checkpoint 窗口永远不折叠，raw 历史无界增长。Blogger 落后时：新的 `todowrite` checkpoint 仍可成功提交，但未覆盖的普通历史继续原样保留，不把 RawGap 冒充前缀覆盖。一个 Blogger frame 覆盖区间跨过 desired 边界时，必须使用可验证的完整材料子集，否则本次不前移。真实 WorkMain 失败后，既有 Probe 可在完整 coverage 与合法语义边界证明下越过正常 K 窗口，但必须作为 Probe 冷边界明确记录；这是紧急恢复例外，不是常规策略。
+actual cutoff 必须同时满足：当前 generation、完整 semantic turn、连续 PrefixCoverage、有精确截断能力的已冻结 Blogger/LWR 材料、Opening floor、不得越过当前请求正在回答的最新消息所在回合、不得回退已提交 cutoff。该请求边界是 canonical XTrace 当前 generation 的最新语义回合，不是最后一条 `role=user` 消息：一条 user 消息可驱动整段 agent loop，其后每个 provider step 回答的是自身的 assistant/tool 历史；若以那条 user 消息为界，loop 内的 checkpoint 窗口永远不折叠，raw 历史无界增长。Blogger 落后时：新的 view checkpoint 仍可成功提交，但未覆盖的普通历史继续原样保留，不把 RawGap 冒充前缀覆盖。一个 Blogger frame 覆盖区间跨过 desired 边界时，必须使用可验证的完整材料子集，否则本次不前移。真实 WorkMain 失败后，既有 Probe 可在完整 coverage 与合法语义边界证明下越过正常 K 窗口，但必须作为 Probe 冷边界明确记录；这是紧急恢复例外，不是常规策略。
 
 ## [030] assume 调用永久以原始 Host 消息穿透 LWR
 
 `assume` 是短小但高价值的判断承诺点。任何 prefix replacement 若覆盖了 `assume` tool call，都必须从原始 Host 消息中按 exact call id 找到该调用，并把承载该 call id 的调用消息与对应 result 消息原封不动保留；不得把 assumption 文本抽出来重写、不得重新渲染参数、不得用摘要替代固定结果。
 
-这条规则与 todowrite K 窗口独立：todowrite 的固定 K 窗口只决定正常 cutoff 希望推进到哪里；`assume` 不形成 checkpoint、不改变 cutoff，但即使 committed cutoff 已越过它，其原始 call/result 仍穿透 LWR 保留。若同一物理 Host 消息还承载其它 parts，为避免拆改原始消息，该整条物理消息一并保留；这不是其它工具获得永久豁免。
+这条规则与 view checkpoint 的 K 窗口独立：该固定 K 窗口只决定正常 cutoff 希望推进到哪里；`assume` 不形成 checkpoint、不改变 cutoff，但即使 committed cutoff 已越过它，其原始 call/result 仍穿透 LWR 保留。若同一物理 Host 消息还承载其它 parts，为避免拆改原始消息，该整条物理消息一并保留；这不是其它工具获得永久豁免。
+
+## [031] ANCHOR 编址、视图声明与 token 经济
+
+进程内每条带 Host 消息 id 的 user message 与 tool result 在进入下一请求时获得稳定 `[ANCHOR: N]` 编号：N 是进程内全局单调流水，同一 session 内同一消息 id 复用同一编号；重启重置编号、现场与取代集（与 parked 同命）。每回合的注入块列出有界（最近 20 条）锚点映射，使模型能引用编号；已被取代的锚点不再出现在映射里。
+
+生成工具接受可选 `view` 参数 `{ prefixUntil, thenRemove? }`：`prefixUntil` 是必填锚点编号，语义左闭右开——编号小于它的锚点留在缓存前缀里（便宜），编号大于等于它的段每回合按原价重新计算；传一个比见过的都大的编号即全部保留。`thenRemove` 是可选映射 `{ 锚点编号: 摘要 }`：摘要从该回合起永久取代该锚点的内容，被取代的锚点从此不再存在（退出锚点映射、不再可被点名），其摘要覆盖到下一个仍然存在的锚点为止——因此之后取代更靠前的锚点时，区段内已取代的摘要会被折进新的那段。空摘要被拒。声明只被下一请求消费一次，不落 durable；无声明时消息列表不变（已生效的取代集除外）。
+
+普通会话没有锚点豁免取代：`prefixUntil` 是价格边界而非保护围栏。Plan 的真实用户消息遵守 work-034 的 `U` 原文保证，不接受 `thenRemove` 取代，回执列出这些保留的锚点；这条角色边界也适用于累积取代集。取代 `prefixUntil` 之下的其它锚点即破坏该回合的缓存前缀，是一次性代价；留下的旧段则每回合按原价计费。双语资源 `tool/js-program/view-declaration-extra` 向模型讲明这套经济模型。
+
+`ViewCheckpointCommitted` 的耐久调用身份与本条进程内视图是两个合同。该事实不含摘要载荷，也不恢复编号或取代集；重启后只按新进程实际建立的映射编号，禁止用旧锚点猜消息。任期过滤已剥除的消息不因 ANCHOR 声明恢复，摘要需要跨任期保存时由模型写入既有底稿 `P`，系统不补造持久摘要层。
+
+视图应用是纯函数：取代集跨回合累计生效，被取代的行以同槽位合成消息呈现（保留原消息角色，id 派生为 `#summary` 并标 synthetic，故不再进入编号），区段内被折叠的行整行消失。无标识消息保守保留，永不静默丢弃。声明形状非法（缺 `prefixUntil`、`prefixUntil` 不是编号、`thenRemove` 不是映射、键不是锚点编号、摘要为空或非字符串）即整次调用失败（稳定码 `VIEW_DECLARATION_INVALID`）：不执行程序，也不改动任何现场。
+
+应用后注入块回执本次声明、本回合保留/取代/折叠计数、会话累计取代锚点集与 token 经济 `total / used / cached`：`cached` 是 `prefixUntil` 之下存活段的 token 数（命中缓存前缀区，只花零头），`used` 是本次实际发出的 token 数（含摘要文本），`total` 是声明前全部消息的 token 数。计数使用与校验器一致的 `gpt-tokenizer` o200k_base 编码。
+
+每回合的 Pair Hint 另向模型披露上一轮请求的 token 经济（provider 实际计费的缓存命中与未命中 token 数）与 provider 声明的 context limit（见 [001]），使模型对自身状态有数。

@@ -8,13 +8,21 @@
 
 资源路径以模块自身的绝对位置（import.meta.url）上溯包根，再按固定相对路径解析。不依赖 caller CWD，不探测候选路径，不回退到 src 或 dist 内备用资源。
 
-## [003] 生产入口
+## [003] 生产入口与必需根文件
 
-package.json 的 main 与 exports["."] 均指向 artifact 内实际存在的 `./dist/OpenCode/Plugin/Plugin.js`，消费者按 manifest 可正常加载。
+package.json 的 main 与 exports["."] 均指向 artifact 内实际存在的 `./dist/OpenCode/Plugin/Plugin.js`，消费者按 manifest 可正常加载。package.json 本身是本 artifact 的必需根成员：它必须逐字节进入归档，缺失即发布不成立（来源树缺失同样立即失败，不得由校验器的便利放行代为决定）。
 
-## [004] 内容白名单
+## [004] 内容白名单与归档成员边界
 
-package.json 的 files 白名单固定为 `["dist/", "resources/"]`；这是本仓自身内容的唯一生产白名单。显式 `bundleDependencies` 可以把已经作为 npm dependency 安装的独立运行时库带入 artifact，但每个 bundle 必须逐文件进入发布闭包校验，不能借此允许任意 `node_modules`、源码工作树、测试或内部工具混入。当前唯一 bundle 是 `wanxiangli`。
+package.json 的 files 白名单固定为 `["dist/", "resources/"]`；这是本仓自身内容（payload）的唯一生产白名单：payload 即这两个前缀下的全部文件，不额外声明第二处内容清单。显式 `bundleDependencies` 可以把已经作为 npm dependency 安装的独立运行时库带入 artifact，但每个 bundle 必须逐文件进入发布闭包校验，不能借此允许任意 `node_modules`、源码工作树、测试或内部工具混入。当前唯一 bundle 是 `wanxiangli`。
+
+归档成员边界由本条显式规定，恰好三类，此外一律拒绝：
+
+1. payload：files 白名单前缀 `dist/**` 与 `resources/**`。
+2. 包根元数据：必需根文件 `package.json`（见 [003]），以及允许的可选根文件 `README.md` 与 `LICENSE`；可选者仅在来源树存在时携带，缺失不构成违约。它们的价值是消费者可见的许可与用法入口，因此允许与 payload 同级出现在包根。
+3. 显式 bundle：`node_modules/<bundleDependencies 中声明的名字>/**`，当前即 `node_modules/wanxiangli/**`。
+
+清单外的包根成员（例如 `CHANGELOG.md`、`SECURITY.md`、`.npmignore`）以及任何其它前缀（`src/`、`tests/`、`scripts/`、`requirements/`、`.fable-build/`、`.git/`、`.github/`、未声明 bundle 的 `node_modules/`、`*.log`）都不得进入归档，即使 npm 的自动收录策略会把它们放入。此三类清单即合同本身：校验器只实现上述边界，不得自行增设白名单、也不得把便利放行写成新的合同。
 
 ## [005] 同一份 Production Bytes
 
@@ -26,7 +34,7 @@ dist 是唯一编译产物。发布须通过 `scripts/build.mjs --clean` 重建�
 
 ## [007] 发布证明
 
-verify:release 覆盖构建、真实 npm pack、解包和消费者验证。校验归档成员只允许本仓白名单、固定根文件与显式 bundle 的完整字节闭包；在非仓库目录删除另装的顶层 bundle 后，仍须按生产入口导入。dry-run 不构成打包证明。
+verify:release 覆盖构建、真实 npm pack、解包和消费者验证。校验归档成员只允许 [004] 规定的三类成员（payload、包根元数据、显式 bundle）的完整字节闭包：[003] 的必需根文件在来源树或归档中缺失、清单外根成员出现、禁用前缀出现都必须立即失败，逐成员字节与来源树一致。在非仓库目录删除另装的顶层 bundle 后，仍须按生产入口导入。dry-run 不构成打包证明。
 
 ## [008] 资源闭合
 
@@ -38,8 +46,10 @@ verify:release 覆盖构建、真实 npm pack、解包和消费者验证。校�
 
 ## [011] 独立生命周期依赖的可复现交付
 
-`wanxiangshu` 只通过 npm artifact 依赖 `wanxiangli`，不从其源码目录、dist 或 npm link 取生产代码。源码 checkout 使用仓库内跟踪的精确 tgz 完成 `npm ci`；最终 `wanxiangshu` tarball 将同一版本作为 bundled dependency 自包含交付。package-lock 的版本与 integrity 必须对应该 tgz。删除源码侧 `wanxiangli/` 目录后，构建、测试和 pack 不受影响；删除消费者顶层另装的 `wanxiangli` 后，安装产物仍可真实加载 lifecycle。
+`wanxiangshu` 经 `file:wanxiangli` 依赖 Git submodule 提供的源码。构建、测试与 pack 使用索引gitlink固定的确切提交，checkout偏离时构建前拒绝；不能仅因版本号相同就放行。`npm ci` 将 `node_modules/wanxiangli` 链接到该源码，package-lock记录 `resolved: "wanxiangli"` 的link条目。最终tarball把同一产物作为bundled dependency实体化，自包含交付；删除消费者顶层另装的 `wanxiangli` 后仍可真实加载lifecycle。
+
+运行依赖禁止tracked归档，`.gitignore` 声明 `*.tgz`。唯一例外是两仓各自 `evidence/retained-archives.json` 列出的既有取证原件：路径仅限证据目录，清单须等于固定baseline提交中的完整归档集合，每份内容同时符合清单SHA-256和baseline Git blob。改摘要不能放行新内容；清单外归档、缺失原件与依赖归档均拒绝。证据不能成为安装依赖或进入发行包，不删改旧红/绿证据来取得绿色。
 
 ## [010] 活跃注册一致
 
-产物的代码和资源须与现行活跃角色一致，不含废止角色的注册代码、死资源或旧工具映射。js-engineer、js-devops、js-bookkeeper 等现行工具在编译代码、surface manifest 和资源清单中保持完整一致，无孤立注册。
+产物的代码和资源须与现行活跃角色一致，不含废止角色的注册代码、死资源或旧工具映射。todowrite-for-engineer、todowrite-for-devops、todowrite-for-bookkeeper 等现行工具在编译代码、surface manifest 和资源清单中保持完整一致，无孤立注册。

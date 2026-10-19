@@ -42,7 +42,7 @@ module EnforcerContinuation =
     [<RequireQualifiedAccess>]
     type CycleDisposition =
         | Working
-        | Committed of afterSquashMain: BloggerRequestContext option
+        | Committed
         | CommitUnknown
         | AbandonThenCatchUp
 
@@ -392,41 +392,6 @@ module EnforcerContinuation =
             return CycleDisposition.AbandonThenCatchUp
         }
 
-    /// Evidence → Decision: squash commit outcome → disposition.
-    let private dispositionAfterSquashCommit
-        (ctx: Context)
-        (mainSessionId: SessionId)
-        (sessionKey: string)
-        (providerRun: ProviderRunIdentity)
-        (squash: BloggerSquashRequestContext)
-        (mergedText: string)
-        : Task<CycleDisposition> =
-        task {
-            match!
-                EnforcerCycleCommit.commitSquash
-                    ctx.Durable
-                    mainSessionId
-                    ctx.BloggerSessionId
-                    providerRun
-                    squash
-                    mergedText
-            with
-            | EnforcerCycleCommit.CycleCommitOutcome.KnownCommitted ->
-                releaseExact ctx sessionKey ctx.Live
-                return CycleDisposition.Committed None
-            | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
-                return! abandonStaleDisposition ctx mainSessionId sessionKey reason
-            | EnforcerCycleCommit.CycleCommitOutcome.NoNewWriteReleaseFailed failure ->
-                return raise (JournalAppendException failure)
-            | EnforcerCycleCommit.CycleCommitOutcome.CommitUnknown reason ->
-                // The durable commit evidence is indeterminate — keep the exact
-                // request in-flight. The caller keeps the pending marker and
-                // projects again; the write is not lost to a premature process
-                // exit masking durable evidence.
-                Diagnostic.emit "enforcer-cycle-commit-unknown" [ "session_id", sessionKey; "result", reason ]
-                return CycleDisposition.CommitUnknown
-        }
-
     /// Durable seal after commit only cancels the physical parked waiter; the
     /// durable seal fact itself blocks new work. Never reopens durable work.
     let private sealIfMainSealedAfterCommit (ctx: Context) (mainSessionId: SessionId) (sessionKey: string) =
@@ -457,7 +422,7 @@ module EnforcerContinuation =
             | EnforcerCycleCommit.CycleCommitOutcome.KnownCommitted ->
                 sealIfMainSealedAfterCommit ctx mainSessionId sessionKey
                 releaseExact ctx sessionKey ctx.Live
-                return CycleDisposition.Committed None
+                return CycleDisposition.Committed
             | EnforcerCycleCommit.CycleCommitOutcome.KnownNotCommitted reason ->
                 return! abandonStaleDisposition ctx mainSessionId sessionKey reason
             | EnforcerCycleCommit.CycleCommitOutcome.NoNewWriteReleaseFailed failure ->
@@ -492,7 +457,7 @@ module EnforcerContinuation =
         else
             dispositionAfterMainCommit ctx mainSessionId sessionKey providerRun toolCallIds merged main
 
-    /// Evidence → Decision: live request context kind → squash/main commit path.
+    /// Evidence → Decision: live request context kind → main commit path.
     let private dispositionForValidatedCycle
         (ctx: Context)
         (mainSessionId: SessionId)
@@ -502,8 +467,6 @@ module EnforcerContinuation =
         (toolCallIds: ToolCallId list)
         : Task<CycleDisposition> =
         match ctx.Live with
-        | BloggerRequestContext.Squash squash ->
-            dispositionAfterSquashCommit ctx mainSessionId sessionKey providerRun squash merged.MergedText
         | BloggerRequestContext.Main main ->
             dispositionForMainCycle ctx mainSessionId sessionKey providerRun toolCallIds merged main
 
@@ -529,22 +492,20 @@ module EnforcerContinuation =
                 return! parkAfterCatchUpClear ctx mainSessionId sessionKey "park-ended-catch-up-complete"
         }
 
-    /// Evidence → Decision: post-commit refresh × afterSquashMain → resume or catch-up stop.
+    /// Evidence → Decision: post-commit refresh → resume or catch-up stop.
     let private catchUpAfterCommitMaterial
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
         (refreshed: BloggerRequestContext option)
-        (afterSquashMain: BloggerRequestContext option)
         : Task<ContinuationOutcome> =
         task {
-            match refreshed, afterSquashMain with
-            | Some live, _
-            | None, Some live ->
+            match refreshed with
+            | Some live ->
                 let! refreshedAgain = ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId
                 let live = refreshedAgain |> Option.defaultValue live
                 return! resumeCatchUpWithLive ctx sessionKey live
-            | None, None -> return! finishCaughtUpAfterCommit ctx mainSessionId sessionKey
+            | None -> return! finishCaughtUpAfterCommit ctx mainSessionId sessionKey
         }
 
     /// Evidence → Decision: main sealed after commit → cancel waiter and stop; else park next material.
@@ -552,7 +513,6 @@ module EnforcerContinuation =
         (ctx: Context)
         (mainSessionId: SessionId)
         (sessionKey: string)
-        (afterSquashMain: BloggerRequestContext option)
         : Task<ContinuationOutcome> =
         task {
             if durableSealedFor ctx mainSessionId then
@@ -560,7 +520,7 @@ module EnforcerContinuation =
                 return ctx.Stop "main-sealed-after-commit"
             else
                 let! refreshed = ctx.RefreshMainContext mainSessionId ctx.BloggerSessionId
-                return! catchUpAfterCommitMaterial ctx mainSessionId sessionKey refreshed afterSquashMain
+                return! catchUpAfterCommitMaterial ctx mainSessionId sessionKey refreshed
         }
 
     /// Evidence → Decision: commit disposition → catch-up / project / park.
@@ -575,7 +535,7 @@ module EnforcerContinuation =
         | CycleDisposition.AbandonThenCatchUp ->
             resumeCatchUp ctx mainSessionId sessionKey "stale-cycle-catch-up-complete"
         | CycleDisposition.Working -> finishWorking ctx
-        | CycleDisposition.Committed afterSquashMain -> finishCommitted ctx mainSessionId sessionKey afterSquashMain
+        | CycleDisposition.Committed -> finishCommitted ctx mainSessionId sessionKey
 
     /// Evidence → Decision: cycle validation → coordinator repair / fatal / commit.
     let private commitValidated

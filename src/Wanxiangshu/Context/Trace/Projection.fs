@@ -22,7 +22,7 @@ type XTraceProjectionState =
         {
             /// InitialCharge, inline: first task prompt, bounded and
             /// human-sized; fold materialises the LWR Opening section without a
-            /// second read. BlindPlan interval end = WorkRecordStart (COMPANION-014).
+            /// second read. Opening interval end = WorkRecordStart (COMPANION-014).
             Opening: XTraceOpeningEvidence option
             OpeningCapturedBy: EventId list
             OpeningShortcut: EventId option
@@ -569,7 +569,8 @@ module XTraceProjection =
     let traceIntervalAfterCoverage (coverage: RecordCoverage) (state: XTraceProjectionState) : XTraceCut * XTraceCut =
         WanxiangliTrace.intervalAfterCoverageOnBridge coverage state.Bridge
 
-    let traceRecords (state: XTraceProjectionState) : string list = state.Bridge.Records
+    let traceRecords (state: XTraceProjectionState) : string list =
+        WanxiangliTrace.recordsOldestFirst state.Bridge
 
     let partText provenance (state: XTraceProjectionState) =
         try

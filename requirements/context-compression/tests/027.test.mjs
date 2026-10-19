@@ -38,27 +38,12 @@ const honestMain = (pick) => {
   }
 }
 
-const honestSquash = (pick) => ({
-  kind: 'Squash',
-  mainSession: `ses-main-${pick.mark}-${randomUUID()}`,
-  bloggerSession: `ses-blog-${pick.mark}-${randomUUID()}`,
-  frameEpoch: pick.frameEpoch,
-  observedEpoch: pick.observedEpoch,
-  coveredFrameCount: pick.digests.length,
-  digests: [...pick.digests],
-})
-
 const expectedMainContext = (descriptor) => ({
   previousIngested: descriptor.previousIngested,
   nextIngested: descriptor.nextIngested,
   deltaDigest: sha256Hex(descriptor.toml),
   frameEpoch: descriptor.frameEpoch,
   observedEpoch: descriptor.observedEpoch,
-})
-
-const expectedSquashContext = (descriptor) => ({
-  coveredFrameCount: descriptor.coveredFrameCount,
-  carried: descriptor.digests.length,
 })
 
 const arbitraryMark = fc
@@ -78,13 +63,6 @@ const arbitraryMainPick = fc.record({
   cutoffAdvance: fc.integer({ min: 0, max: 3 }),
   frameEpoch: arbitraryEpoch,
   observedEpoch: arbitraryEpoch,
-})
-
-const arbitrarySquashPick = fc.record({
-  mark: arbitraryMark,
-  frameEpoch: arbitraryEpoch,
-  observedEpoch: arbitraryEpoch,
-  digests: fc.array(fc.string({ minLength: 1, maxLength: 12 }), { minLength: 1, maxLength: 4 }),
 })
 
 test('WHAT[context-compression-027] Main construction derives its digest and preserves validated coverage and epochs', () => {
@@ -114,31 +92,6 @@ test('WHAT[context-compression-027] Main construction derives its digest and pre
       }
     }),
     { seed: 0x27062701, numRuns: 120 },
-  )
-})
-
-test('WHAT[context-compression-027] every successful Squash construction binds count and digests', () => {
-  fc.assert(
-    fc.property(arbitrarySquashPick, (pick) => {
-      const descriptor = honestSquash(pick)
-      const expected = expectedSquashContext(descriptor)
-      const scope = runtime.scope()
-      try {
-        const outcome = runtime.claimCurrentRequest(scope, descriptor.bloggerSession, runtime.squash(descriptor))
-        assert.equal(outcome, 'Claimed')
-        const live = runtime.currentRequest(scope, descriptor.bloggerSession)
-        assert.notEqual(live, null)
-        assert.equal(live.kind, 'Squash')
-        assert.equal(live.coveredFrameCount, expected.coveredFrameCount)
-        // contextToJs carries Main requests fully but Squash requests as
-        // kind + covered count only; identity binding for Squash is proved
-        // through the constructor rejection tests below (foreign identity
-        // and count/digest disagreement never construct).
-      } finally {
-        runtime.dispose(scope)
-      }
-    }),
-    { seed: 0x27062702, numRuns: 120 },
   )
 })
 
@@ -225,59 +178,6 @@ test('WHAT[context-compression-027] different content yields different digests; 
   )
 })
 
-test('WHAT[context-compression-027] squash count/digest disagreement is rejected, never constructed', () => {
-  // Count-vs-carried disagreement: the production squash constructor rejects
-  // before any flight state is touched. Proved through the claim boundary
-  // (constructor failure throws out of `squash`, so no flight is claimed).
-  fc.assert(
-    fc.property(
-      arbitrarySquashPick,
-      fc.integer({ min: 0, max: 6 }),
-      (pick, declaredCount) => {
-        fc.pre(declaredCount !== pick.digests.length)
-        const descriptor = { ...honestSquash(pick), coveredFrameCount: declaredCount }
-        const scope = runtime.scope()
-        try {
-          assert.throws(
-            () => runtime.claimCurrentRequest(scope, descriptor.bloggerSession, runtime.squash(descriptor)),
-            /SquashCoverageMismatch|EmptySquashCoverage|squash context rejected/,
-          )
-          assert.equal(runtime.currentRequest(scope, descriptor.bloggerSession), null)
-        } finally {
-          runtime.dispose(scope)
-        }
-      },
-    ),
-    { seed: 0x27062705, numRuns: 100 },
-  )
-
-  // Empty coverage (count 0, no digests) is its own rejection — the
-  // `k < 1` guard from `tryBuildSquashContext` now lives in the constructor.
-  const scope = runtime.scope()
-  try {
-    assert.throws(
-      () =>
-        runtime.claimCurrentRequest(
-          scope,
-          'ses-blog-empty',
-          runtime.squash({
-            kind: 'Squash',
-            mainSession: 'ses-main-empty',
-            bloggerSession: 'ses-blog-empty',
-            frameEpoch: 0,
-            observedEpoch: 0,
-            coveredFrameCount: 0,
-            digests: [],
-          }),
-        ),
-      /EmptySquashCoverage|squash context rejected/,
-    )
-    assert.equal(runtime.currentRequest(scope, 'ses-blog-empty'), null)
-  } finally {
-    runtime.dispose(scope)
-  }
-})
-
 const withJournal = async (run) => {
   const directory = mkdtempSync(join(tmpdir(), 'blogger-reload-'))
   const opened = await journal.JournalSurface_boot(directory, 'reload-runtime', 4242, '9999-01-01T00:00:00Z')
@@ -305,16 +205,12 @@ const reloadBlob = async (handle, raw, overrides = {}) => {
   })
 }
 
-test('WHAT[context-compression-027] actual stored Main and Squash reload preserve frozen identity and epochs', async () => {
+test('WHAT[context-compression-027] actual stored Main reload preserves frozen identity and epochs', async () => {
   await withJournal(async (handle) => {
     assert.deepEqual(await reloadBlob(handle, validStoredMain), {
       ok: true, kind: 'Main', requestId: 'frozen-request-id', toml: 'raw work',
       deltaDigest: sha256Hex('raw work'), previousIngested: 1, nextIngested: 3,
       frameEpoch: 3, observedEpoch: 2,
-    })
-    assert.deepEqual(await reloadBlob(handle, { covered_frame_count: 2 }, { requestKind: 'squash', digests: ['a', 'b'] }), {
-      ok: true, kind: 'Squash', requestId: 'frozen-request-id', coveredFrameCount: 2,
-      digests: ['a', 'b'], frameEpoch: 3, observedEpoch: 2,
     })
   })
 })
@@ -328,7 +224,6 @@ test('WHAT[context-compression-027] actual recovery distinguishes unreadable, ma
       [await reloadBlob(handle, { ...validStoredMain, items: 'not-an-array' }), /undecodable/],
       [await reloadBlob(handle, { ...validStoredMain, delta_digest: 'wrong-digest' }), /delta digest mismatch/],
       [await reloadBlob(handle, { ...validStoredMain, next_ingest: 1 }), /coverage did not advance/],
-      [await reloadBlob(handle, { covered_frame_count: 2 }, { requestKind: 'squash', digests: ['only-one'] }), /squash coverage mismatch/],
     ]
     for (const [outcome, expected] of outcomes) {
       assert.equal(outcome.ok, false)
@@ -418,22 +313,6 @@ test('WHAT[context-compression-027] wire descriptors cannot bypass the validatin
     )
     assert.equal(runtime.currentRequest(scope, 'ses-blog-no-advance'), null)
 
-    // Squash coverage must be non-empty and match the digest list length.
-    const emptySquash = runtime.squash({
-      kind: 'Squash',
-      mainSession: 'ses-main-empty-squash',
-      bloggerSession: 'ses-blog-empty-squash',
-      frameEpoch: 0,
-      observedEpoch: 0,
-      coveredFrameCount: 0,
-      digests: [],
-    })
-    assert.throws(
-      () => runtime.claimCurrentRequest(scope, 'ses-blog-empty-squash', emptySquash),
-      /squash context rejected/,
-    )
-    assert.equal(runtime.currentRequest(scope, 'ses-blog-empty-squash'), null)
-
     // Without a wire requestId the owner identity is the canonical hash of
     // the record contents, frozen and deterministic across claims.
     const honest = runtime.main({
@@ -514,6 +393,3 @@ const assertPrivateConstructionRejected = async (consumer, typeName) => {
 
 integrationTest('WHAT[context-compression-027] Fable rejects external direct construction of the private Main record', () =>
   assertPrivateConstructionRejected('DirectMainConsumer.fs', 'BloggerMainRequestContext'))
-
-integrationTest('WHAT[context-compression-027] Fable rejects external direct construction of the private Squash record', () =>
-  assertPrivateConstructionRejected('DirectSquashConsumer.fs', 'BloggerSquashRequestContext'))

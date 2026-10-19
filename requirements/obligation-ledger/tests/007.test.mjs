@@ -11,5 +11,3 @@ test('WHAT[obligation-ledger-007] the retired decoder currently returns explicit
     })
   }
 })
-
-test.todo('WHAT[obligation-ledger-007] controlled legacy audit reading retains old accepted facts without activating gates prefix switching or Host writes')

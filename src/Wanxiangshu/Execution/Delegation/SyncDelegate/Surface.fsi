@@ -132,6 +132,8 @@ module SyncDelegateSurface =
 
     val settle: value: obj -> owner: string -> role: string -> answer: string -> runId: string -> Task<bool>
 
+    val recordDeliveredValue: sessionId: string -> deliveredValue: obj -> unit
+
     val failWithAuthorityRoot:
         value: obj -> owner: string -> role: string -> reason: string -> authorityRoot: string -> Task<string>
 
@@ -157,7 +159,6 @@ module SyncDelegateSurface =
     val prompt: value: obj -> owner: string -> role: string -> index: int -> obj
     val captureOwnerOpening: value: obj -> owner: string -> text: string -> Task
     val captureOwnerDeltaPart: value: obj -> owner: string -> text: string -> providerRun: string -> Task
-    val handoffFrontier: value: obj -> owner: string -> role: string -> obj
     val batchOrder: roleName: string -> toolNames: string array -> currentCall: string -> obj
 
     val invokeBatch:
@@ -185,16 +186,10 @@ module SyncDelegateSurface =
     val dispose: value: obj -> unit
 
     /// Use the actual writer through a scoped opaque handle; it expires after this callback.
-    val withJournal:
-        value: obj -> observe: (Wanxiangshu.Persistence.Journal.JournalHandle -> Task<'result>) -> Task<'result>
-
-    /// delegation-031 probe: close the journal writer so later appends are known
-    /// NotAttempted; the next invocation must still deliver its WorkRecord.
     val closeJournalWriter: value: obj -> unit
 
-    /// delegation-031 probe: run the production checkpoint for one prepared handoff
-    /// and return the boxed settlement it reports.
-    val checkpointForHarness: value: obj -> owner: string -> role: string -> parentEndExclusive: int -> Task<obj>
+    val withJournal:
+        value: obj -> observe: (Wanxiangshu.Persistence.Journal.JournalHandle -> Task<'result>) -> Task<'result>
 
     /// delegation-031 probe: abandon the pending call for this delegate (parent
     /// supersede guard) so a stale completion afterwards cannot claim it.

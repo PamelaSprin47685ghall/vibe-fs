@@ -8,7 +8,6 @@ namespace Wanxiangshu.Participant.Provider.Attempt
 type ProviderRequestKind =
     | WorkMain
     | BloggerMain
-    | BloggerSquash
     | InteractionRepair
     | StrengthReplica
 
@@ -19,7 +18,6 @@ module ProviderRequestKind =
         match kind with
         | ProviderRequestKind.WorkMain -> "work-main"
         | ProviderRequestKind.BloggerMain -> "blogger-main"
-        | ProviderRequestKind.BloggerSquash -> "blogger-squash"
         | ProviderRequestKind.InteractionRepair -> "interaction-repair"
         | ProviderRequestKind.StrengthReplica -> "strength-replica"
 
@@ -27,7 +25,6 @@ module ProviderRequestKind =
         match kind with
         | ProviderRequestKind.WorkMain
         | ProviderRequestKind.BloggerMain -> true
-        | ProviderRequestKind.BloggerSquash
         | ProviderRequestKind.InteractionRepair
         | ProviderRequestKind.StrengthReplica -> false
 
@@ -35,6 +32,5 @@ module ProviderRequestKind =
         match kind with
         | ProviderRequestKind.WorkMain -> true
         | ProviderRequestKind.BloggerMain
-        | ProviderRequestKind.BloggerSquash
         | ProviderRequestKind.InteractionRepair
         | ProviderRequestKind.StrengthReplica -> false

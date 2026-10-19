@@ -48,9 +48,10 @@ module StrengthReplicaTools =
     /// is required: the replica holds exactly one tool, and a wildcard allow
     /// would leave the owner role's broad agent permissions visible. The wildcard
     /// comes before the single specific allow so Host's last-match permission rule
-    /// lets exactly `js-predictor` through and nothing else -- the replica has no
+    /// lets exactly `todowrite-for-predictor` through and nothing else -- the replica has no
     /// read/glob/grep; all investigation goes through the readonly JS surface.
-    let exactReadonlyHostToolMap = Map.ofList [ "*", false; "js-predictor", true ]
+    let exactReadonlyHostToolMap =
+        Map.ofList [ "*", false; "todowrite-for-predictor", true ]
 
     let isExactReadonly (capabilities: Set<ToolPermission>) =
         capabilities = set [ ToolPermission.Read; ToolPermission.Glob; ToolPermission.Grep ]

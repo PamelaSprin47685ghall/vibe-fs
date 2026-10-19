@@ -1,0 +1,26 @@
+✖ WHAT[process-execution-015] returning onExit observation cannot bypass the run byte budget (115.605792ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 294.062125
+
+✖ failing tests:
+
+test at requirements/process-execution/tests/015.test.mjs:132:1
+✖ WHAT[process-execution-015] returning onExit observation cannot bypass the run byte budget (115.605792ms)
+  AssertionError [ERR_ASSERTION]: callback observations must use the same complete encoding budget
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/015.test.mjs:140:12)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

@@ -82,8 +82,7 @@ const blogEntry = (session, bloggerSession) => ({
     TextDigest: 'sha-entry-004',
     ProviderRun: 'msg-entry-004',
     ToolCallIds: [],
-    TipRuleId: 'tip-004',
-    FieldNameAtCommit: 'field-004',
+    TipName: 'tip-004',
     EvidenceRef: null,
     ObservedPrefixEpochId: 0,
   },
@@ -109,11 +108,11 @@ const prefixRebase = (session) => ({
 
 const checkpoint = (session, toolCallId) => ({
   family: 'Context',
-  case: 'TodoCheckpointCommitted',
+  case: 'ViewCheckpointCommitted',
   payload: { SessionId: session, ToolCallId: toolCallId },
 })
 
-test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable companion, trace, blog, prefix-epoch and terminal state and isolates checkpoint windows', () => {
+test('WHAT[obligation-ledger-004] ViewCheckpointCommitted preserves observable companion, trace, blog, prefix-epoch and terminal state and isolates checkpoint windows', () => {
   // A non-empty, observable pre-state: the session already carries a linked
   // companion, a captured opening, a trace part, a terminal capture, a blog
   // entry and a committed prefix rebase (real state the checkpoint must not
@@ -172,7 +171,7 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable c
   const after = foldSurface.fold([...prefix, envelope(7, 'ses-a', checkpoint('ses-a', 'call-1'))])
   assert.equal(after.ok, true, 'checkpoint fold is Ok')
 
-  const window = after.value.todoCheckpoints['ses-a']
+  const window = after.value.viewCheckpoints['ses-a']
   assert.ok(window, 'the compression window exists for the session')
   assert.deepEqual(window.checkpoints, [{ callId: 'call-1' }], 'the window records only the checkpoint call identity')
 
@@ -192,8 +191,8 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable c
     envelope(8, 'ses-b', checkpoint('ses-b', 'call-b')),
   ])
   assert.equal(crossSession.ok, true)
-  assert.deepEqual(crossSession.value.todoCheckpoints['ses-b'].checkpoints, [{ callId: 'call-b' }])
-  assert.deepEqual(crossSession.value.todoCheckpoints['ses-a'], window, 'another session\'s checkpoint preserves the existing window')
+  assert.deepEqual(crossSession.value.viewCheckpoints['ses-b'].checkpoints, [{ callId: 'call-b' }])
+  assert.deepEqual(crossSession.value.viewCheckpoints['ses-a'], window, 'another session\'s checkpoint preserves the existing window')
   assert.deepEqual(crossSession.value.sessions['ses-a'].Companion, beforeSession.Companion, 'another session\'s checkpoint preserves the companion')
   assert.deepEqual(crossSession.value.sessions['ses-a'].XTrace, beforeSession.XTrace, 'another session\'s checkpoint preserves the trace')
   assert.deepEqual(crossSession.value.sessions['ses-a'].Blog, beforeSession.Blog, 'another session\'s checkpoint preserves the blog')
@@ -207,7 +206,7 @@ test('WHAT[obligation-ledger-004] TodoCheckpointCommitted preserves observable c
     envelope(8, 'ses-a', checkpoint('ses-a', 'call-1')),
   ])
   assert.equal(replayed.ok, true)
-  assert.deepEqual(replayed.value.todoCheckpoints['ses-a'].checkpoints, [{ callId: 'call-1' }], 'replay keeps exactly one checkpoint entry')
+  assert.deepEqual(replayed.value.viewCheckpoints['ses-a'].checkpoints, [{ callId: 'call-1' }], 'replay keeps exactly one checkpoint entry')
   assert.deepEqual(replayed.value.sessions['ses-a'].Companion, beforeSession.Companion, 'replay keeps the protected companion state')
   assert.deepEqual(replayed.value.sessions['ses-a'].XTrace, beforeSession.XTrace, 'replay keeps the protected trace state')
   assert.deepEqual(replayed.value.sessions['ses-a'].Blog, beforeSession.Blog, 'replay keeps the protected blog state')
@@ -226,14 +225,30 @@ const terminalEvent = (sessionID, callID, status) => ({
     type: 'message.part.updated',
     properties: {
       sessionID,
-      part: { type: 'tool', tool: 'todowrite', callID, state: { status } },
+      part: {
+        type: 'tool',
+        tool: 'todowrite-for-engineer',
+        callID,
+        state: {
+          status,
+          input: {
+            program: 'class Js extends JsProgram { async run() { return {}; } }',
+            view: { prefixUntil: 1 },
+          },
+        },
+      },
     },
   },
 })
 
 const todoCall = (hooks, sessionID, callID) => {
-  const output = { args: { todos: [{ content: 'native todo work', status: 'in_progress', priority: 'high' }] } }
-  return hooks['tool.execute.before']({ tool: 'todowrite', sessionID, callID }, output).then(() => output)
+  const output = {
+    args: {
+      program: 'class Js extends JsProgram { async run() { return {}; } }',
+      view: { prefixUntil: 1 },
+    },
+  }
+  return hooks['tool.execute.before']({ tool: 'todowrite-for-engineer', sessionID, callID }, output).then(() => output)
 }
 
 // Real owner entry points build the non-empty pre-states (Manager ruling on
@@ -338,8 +353,8 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
     assert.equal(recovered, completedRecord)
 
     // Only the checkpoint window changed for the session.
-    const beforeWindow = before.todoCheckpoints.find((entry) => entry.sessionId === sessionID)
-    const afterWindow = after.todoCheckpoints.find((entry) => entry.sessionId === sessionID)
+    const beforeWindow = before.viewCheckpoints.find((entry) => entry.sessionId === sessionID)
+    const afterWindow = after.viewCheckpoints.find((entry) => entry.sessionId === sessionID)
     assert.equal(beforeWindow, undefined, 'no checkpoint window existed before the completed terminal')
     assert.deepEqual(afterWindow?.checkpoints, [{ callId: callID }], 'the completed terminal commits the checkpoint')
 

@@ -47,8 +47,7 @@ const commitY = async (handle, { from, to, body, n }) => {
     textRef: written.blobRef,
     textDigest: written.blobDigest,
     toolCallIds: [],
-    tipRuleId: `tip-y${n}`,
-    fieldNameAtCommit: `field-y${n}`,
+    tipName: `tip-y${n}`,
     observedPrefixEpoch: 0,
   })
   assert.equal(result.ok, true, result.ok ? '' : JSON.stringify(result.error))

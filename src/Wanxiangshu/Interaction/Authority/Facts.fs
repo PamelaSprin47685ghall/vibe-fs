@@ -32,6 +32,22 @@ type PromptAbandonReason =
     /// Recovery budget expired without proving physical acceptance.
     | UnresolvedAfterRecovery
 
+/// 提问只暂停当前委托，不结束逻辑运行；回执绑定真实调用，不能用文字声称代替。
+type UserQuestionAskedPayload =
+    { SessionId: SessionId
+      LogicalRunId: LogicalRunId
+      AuthorityRootUserMessageId: AuthorityRootUserMessageId
+      PhysicalUserMessageId: PhysicalUserMessageId
+      ProviderRunId: ProviderRunIdentity
+      ToolCallId: ToolCallId
+      Question: string }
+
+type UserQuestionAnsweredPayload =
+    { SessionId: SessionId
+      LogicalRunId: LogicalRunId
+      ToolCallId: ToolCallId
+      PhysicalUserMessageId: PhysicalUserMessageId }
+
 type PromptFactCases =
     | PluginPromptClaimed of
         {| PromptKey: PromptKey
@@ -55,3 +71,5 @@ type PromptFactCases =
            Reason: PromptAbandonReason |}
     | AuthorityRootAccepted of AuthorityRootAcceptedPayload
     | AuthorityLogicalRunClosed of AuthorityLogicalRunClosedPayload
+    | UserQuestionAsked of UserQuestionAskedPayload
+    | UserQuestionAnswered of UserQuestionAnsweredPayload

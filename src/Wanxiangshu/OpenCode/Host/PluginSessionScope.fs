@@ -40,13 +40,19 @@ open Wanxiangshu.Execution.Session.Wait
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
+open Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Repository.Programming.Js.OpenCode
 
 /// Per-instance session registry state for one plugin instance (HOST-012):
 /// owned sessions, companions, verdicts, nudges,
 /// quiescence permits and join interrupts. Shared cross-worktree state stays
 /// in SharedState; everything here is per-instance and dies with the scope.
 type PluginSessionScope
-    (journal: Wanxiangshu.Persistence.Journal.AgentJournal option, isModelLeaseExternallyOwned: SessionId -> bool) =
+    (
+        journal: Wanxiangshu.Persistence.Journal.AgentJournal option,
+        isModelLeaseExternallyOwned: SessionId -> bool,
+        jsLifecyclePersistence: IJsLifecyclePersistence option
+    ) =
     let releaseInstanceModelLease sessionId =
         let session = SessionId.create sessionId
 
@@ -241,6 +247,50 @@ type PluginSessionScope
                     remember failure
 
             do! attempt (fun () -> this.SettleSessionExecutions sessionId)
+
+            // Algorithm G3/H3: closing a session reaps every parked site owned
+            // by that session (Algorithm F, ABANDONED protocol) so no parked
+            // program survives its owner silently. The reap action is owned by
+            // lane-a-core (JsParkedSites.reapSession); the durable Reaped
+            // audit is recorded here, one event per consumed handle. Both
+            // steps share the close's attempt/remember isolation per
+            // managed-session-lifecycle-027: an audit failure is remembered
+            // and rethrown with the close, never error-silently dropped.
+            let reapedHandles = JsParkedSites.handlesForSession sessionId
+
+            do! attempt (fun () -> JsParkedSites.reapSession sessionId)
+
+            let recordReapedAudit (durable: IJsLifecyclePersistence) (handle: string) =
+                attempt (fun () ->
+                    task {
+                        let event: JsLifecycleEvent =
+                            { EventType = JsLifecycleEventType.Reaped
+                              Handle = handle
+                              SessionId = sessionId
+                              At = System.DateTimeOffset.UtcNow.ToString("o") }
+
+                        match! durable.AppendLifecycleEvent event with
+                        | Ok _ -> ()
+                        | Error failure ->
+                            raise (
+                                InvalidOperationException(
+                                    sprintf
+                                        "session close failed to record the Reaped audit event for handle %s: %A"
+                                        handle
+                                        failure
+                                )
+                            )
+                    })
+
+            let recordAllReapedAudits (durable: IJsLifecyclePersistence) =
+                task {
+                    for handle in reapedHandles do
+                        do! recordReapedAudit durable handle
+                }
+
+            match jsLifecyclePersistence with
+            | None -> ()
+            | Some durable -> do! recordAllReapedAudits durable
 
             // managed-session-lifecycle-027: scope close cancels the retained
             // continuation inputs this session owns; the last cancellation

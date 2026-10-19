@@ -13,10 +13,8 @@ test('WHAT[context-compression-007] same_failed_kind_with_same_material_always_s
   // Same failed kind + same material presence always selects the same next
   // request: the decision carries no cross-attempt waiter state.
   for (const [failedKind, hasMaterial, expected] of [
-    ['blogger-main', true, 'blogger-squash'],
+    ['blogger-main', true, 'blogger-main'],
     ['blogger-main', false, 'blogger-main'],
-    ['blogger-squash', true, 'blogger-main'],
-    ['blogger-squash', false, 'blogger-main'],
   ]) {
     assert.equal(compression.nextBloggerRequest(failedKind, hasMaterial), expected)
     assert.equal(compression.nextBloggerRequest(failedKind, hasMaterial), expected)
