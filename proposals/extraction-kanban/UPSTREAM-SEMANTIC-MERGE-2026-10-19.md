@@ -29,8 +29,8 @@
 |---|---|---|---|---|
 | SM-01 | 固定版本、语义处置、条款与测试锚点冲突、基线证据 | — | DONE | 68a6785f1 已落盘；20项职责和5项冲突均有目标、责任包与反例 |
 | SM-02A | 库历史整合、Journal/Process/Supervision/Trace 本地保证与上游 Work 规则并存 | SM-01 | LIB_READY | 核心 Node315/0/6skip，Bun273/0，独立编译及真实包外组合43/0；库提交待记录，未非作者复审 |
-| SM-02B | 新增模块接收：resources、time/wait、grounding、identity/events/fs 的实际边界 | SM-02A | BACKLOG | 未运行 |
-| SM-02C | 库构建、声明、隔离安装、可获取提交；正式测试监督器保留 | SM-02B | BACKLOG | 未运行 |
+| SM-02B | 新增模块接收：resources、time/wait、grounding、identity/events/fs 的实际边界 | SM-02A | LIB_READY | 七模块Node/Bun各191/0；独立编译及包外20/0；静止候选重包3/0，主仓未接线 |
+| SM-02C | 库构建、声明、隔离安装、可获取提交；正式测试监督器保留 | SM-02B | DOING | 待固定全部候选；运行依赖归档退出与15份历史证据归档的规则冲突已定位 |
 | SM-03 | 主仓依赖、源码 submodule、状态根、生命周期、退役 Git 状态同步 | SM-02C | BACKLOG | 未运行 |
 | SM-04 | 新 js.run 接入物理执行、输出预算、取消、资源归属和真实收尾 | SM-03 | BACKLOG | 未运行 |
 | SM-05 | Trace/ANCHOR/前缀/显式子工作终值与现存历史消费者 | SM-03 | BACKLOG | 未运行 |
@@ -106,6 +106,14 @@ SM-04 与 SM-05 的独立调查和测试可交错推进，公共接线串行。�
 - `node scripts/build.mjs` 十四入口通过；Node核心321项315pass/0fail/6skip/0TODO；Bun正确核心范围273pass/0fail；独立编译、可拆监管增强和真实Node/Bun安装包组合43pass/0fail/0skip/0TODO。
 - 首轮Bun误纳入静态node:sqlite专用测试的6个加载错误保留，不改成通过。Journal的Bun实际消费由包外测试证明。库长期原始证据在 `evidence/semantic-merge-sm02a/README.md` 及同目录日志。
 - 边界：这只证明已接入核心的限定范围，尚未完成新模块接收、最终依赖交付、主仓接线或非作者复审；原卡不销项。
+
+### SM-02B 接收修正
+
+- 库SM-02A提交为`152719c`。SM-02B保留原核心，修资源替换次序、冻结deadline、窄observer、声明与实际对象；时间拆为time/time-node/time-testing三个真实编译/发行单元，生产没有虚拟工厂。
+- GAP-085的完整子树算法进入fs公开能力并由grounding调用；首个右括号和未来路径保证保留。新接收fs还复现并修正macOS逻辑根与realpath别名误拒，增加symlink根正反用例。
+- 七个新增模块Node/Bun各191pass/0fail，独立编译/真实安装消费20pass/0fail；停止构建后重包3pass/0fail。库长期原始证据见`evidence/semantic-merge-sm02b/README.md`。
+- 旧红、错误扫描前提和Bun调用范围错误均保留，不计通过。全库最终候选、所有导出闭包、非作者复审和主仓实际接线仍待。
+- 新发现的源码归档规则冲突进入SM-02C：上游拒绝任何tgz，但本地有15份固定历史红/绿取证归档；必须保留证据身份并禁止它们变成运行依赖，不通过删证据或改名取得绿色。
 
 ## 本次保留的未完成边界
 
