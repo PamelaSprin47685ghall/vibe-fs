@@ -357,13 +357,16 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
       }
 
       lifecycle.notePrompt(delegateId, question)
+      // deliver(reportMapping) 的键必须是非负整数锚点编号字符串，值是该段材料；
+      // 旧形态 { question, answer, turn } 会被当作锚点声明而拒（VIEW_DECLARATION_INVALID）。
+      const deliveredMaterial = `question = ${JSON.stringify(question)}\nanswer = ${JSON.stringify(answer)}\nturn = ${i + 1}`
       const delivered = await jsWorkflow.execute(
         dir,
         'Engineer',
         'en',
         delegateId,
         {
-          program: `class Js extends JsProgram { async run() { await this.deliver({ question: ${JSON.stringify(question)}, answer: ${JSON.stringify(answer)}, turn: ${i + 1} }); } }`,
+          program: `class Js extends JsProgram { async run() { await this.deliver({ "0": ${JSON.stringify(deliveredMaterial)} }); } }`,
         },
         3000,
         Date.now() + 60_000,

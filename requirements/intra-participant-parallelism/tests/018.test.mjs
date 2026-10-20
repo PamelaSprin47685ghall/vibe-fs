@@ -136,11 +136,18 @@ test('WHAT[intra-participant-parallelism-018] a fission lane inherits the curren
       await acceptAuthorityRoot(runtime, managerSession, 'manager')
       await openIncumbency(runtime, managerSession)
 
-      const forked = await hooks.tool.fork.execute(
-        { name: 'fission-context', charge: 'collect the lane materials' },
+      // 派工是编程面成员（宿主 fork 工具已整体退役）：
+      // `this.fork(payload, reportMapping)`。
+      const forked = await hooks.tool['todowrite-for-manager'].execute(
+        {
+          program:
+            'class Js extends JsProgram { async run() { return await this.fork({ name: "fission-context", charge: "collect the lane materials" }, { 1: null }); } }',
+        },
         { sessionID: managerSession, agent: 'manager' },
       )
-      assert.match(forked, /现已接下这项托付|carries this charge now/i)
+      assert.match(forked, /ok = true/)
+      assert.match(forked, /name = "fission-context"/)
+      assert.match(forked, /outcome = "created"/)
       const engineerSession = createdIds[0]
 
       // The owner's current conversation context (the anchor ledger of the
