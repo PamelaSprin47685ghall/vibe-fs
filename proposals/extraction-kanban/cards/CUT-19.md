@@ -187,3 +187,15 @@
 - **回退**：纯计算，不迁移、不改写任何已有文件；`git revert` 主仓提交即回到手写版本（库 0.24.0 可保留）。
 - **未做**：全量 `scripts/verify.mjs` 与 integration tier。
 - **状态**：CUT-19-a `DONE`；剩余 CUT-19-b（READY）、CUT-19-c（BACKLOG）。
+
+## 18. CUT-19-b：Integrator 规则隔离账与 cut-tail 载荷律交给 `wanxiangli/quarantine`（eng-cut27d-goose，2026-10-21）
+
+- **职责**（durable-events-013/019/021）：业务规则在某事件上失败时只隔离 (rule, FaultScope)，隔离期间该键的后续事件跳过、Current 停在最后一次成功；隔离只能由按时间线出现的持久 `ProjectionCutTail` 解除。载荷 `{rule, failed_event_id, reason, reset_json}`（线上键序固定、四者皆字符串）；畸形截尾不是截尾；截尾只在规则仍在程序中且它点名的失败事件已整合时生效，解除键为 (cut.rule, 失败事件自己的 scope)，reset 由规则应用、失败则隔离保留。
+- **库**：`wanxiangli/quarantine` / `RuleQuarantine`（库提交 `f2ab26d`，随 `3d6a83f` 发布 0.38.0）：持久不可变隔离账 `empty/quarantine/release/isQuarantined/fault/size`、`encodeCut/decodeCut`、`cutVerdict`。库测试 `src/quarantine/tests/019.test.mjs` 3 例（账的持久性与键不因拼接撞车、编解码严格性与键序、生效条件）。发布前定向集 123 项 122 pass / 1 fail，失败为既有 `build-001 sandbox`（与 §17 同因，非本刀）。
+- **主仓**（master `c52bff68a`）：`IntegratorEngine` 的 `Faults` 改为库账（不透明），`decideBusinessRule`/`applyBusinessDecision`/`applyCutForRule`/`ensureRuleReset` 经库查询与登记；手写 Thoth `Encode.object`/`Decode.object` 截尾编解码删除，`open Thoth.Json` 移除。留主仓（组合者）：规则本体与 `PlanCut/ApplyCut` 调用、Current 持有、进程级唯一一次全量重放预算、`PrepareLive` 的乐观提交、截尾事件的流名与 parents（`EventVocabulary`/结构 heads）。
+- **反例**：没有找到旧实现上会红的真实失败，不伪造红。收益是隔离与截尾律有了独立 owner 与独立测试。**观察（未修、未证实）**：旧实现与库都不比对“截尾点名的失败事件”与“账上当前记录的失败事件”是否同一个——若并发 writer 的旧截尾在 k-way 归并中排到同键的更新失败之后，可能用旧 reset 解除新隔离。本刀保持逐位一致，未构造出复现；若要改，应先写出在旧实现上红的多 writer 用例，再改 `quarantine` LEMMA 4。
+- **影子双算**（`evidence/CUT-19/shadow-quarantine.mjs`，纯计算，固定种子 1902）：旧主仓截尾编解码（从 base dist 直接调用旧代码所用的同一组 Thoth.Json 函数）对库 3000 组：编码线上字节 3000/3000 相等；解码判定 3000/3000 相等（其中 805 组为有效截尾，其余覆盖畸形字段、非对象、错类型）；隔离账对旧 `Map<RuleFaultKey, RuleFault>` 语义的参考模型 1,804,680 次查询（含每个旧快照的持久性）全部相等，差异 0。
+- **验证**：base（master 981008460 构建）durable-events 006/012/013/019/021/024/027 + durable-convergence 011 + knowledge-reuse 011/013 + sphinx-v2 019 共 11 文件 161 pass / 0 fail；候选同集 161 / 0。候选 durable-events + durable-convergence 35 文件 252 pass / 0 fail（与 §15/§17 相同）。落地时 rebase 到 master 2eab66e14 重建复验：knowledge-reuse 16 + durable 35 文件 388 pass / 7 fail，7 个均为既有 knowledge-reuse-010（与 CUT-27 base 同名同因）。gitlink d2ce694（0.35.0）→ 3d6a83f（0.38.0），lockfile 版本一致，推送前检查通过；fantomas --check 通过；`node scripts/check.mjs` 中本文件的 `type-name 'Field'` 低级条目消失，无新增条目。日志 `/workspace/vfs-cut/wt/logs-cut27d/{19b-base,19b-cand,19b-cand-wide,19b-kr,19b-check,land19b-1}.log`。
+- **回退**：纯计算，不改事件词汇与线上字节；`git revert c52bff68a` 回到手写版本（库 0.38.0 可保留）。
+- **未做**：全量 `scripts/verify.mjs` 与 integration tier。
+- **状态**：CUT-19-b `DONE`；剩余 CUT-19-c（BACKLOG，前置 CUT-11/12/29/31 未完成）。
