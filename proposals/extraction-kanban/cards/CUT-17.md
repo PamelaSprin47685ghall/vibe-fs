@@ -14,6 +14,7 @@
 | Plan 任期过滤（U 保留、前任交换剥离、未捕获保留、合成剥离、无 id 有语义拒绝） | `TenureIsolation.assemble` 内联 `keepMessage`/`keepsInteraction` | **抽出** → `wanxiangli/projection.tenure`（子范围①） |
 | `isCurrentTenurePhysical` | 无调用者的同义规则副本 | 删除 |
 | 意图规划（基底去重与冲突、插入键冲突、锚点/key 规范序） | `ProjectionPlanner.plan` 内联 `reduceBase`/`reduceInsertions`/`insertionSortKey` | **抽出** → `wanxiangli/projection.plan`（子范围②） |
+| 布局（基底替换、锚点拼接、append、宿主 id/物理标记对齐） | `ProjectionRenderer` 内联 `spliceBefore`/`applyInsertions` | **抽出** → `wanxiangli/projection.layout`（子范围③） |
 | 消息解码、XTrace 首次观测游标、重锚事实写入、保留消息写回 | `PlanningSurface`、`PluginTransforms.isolatePlanTenure` | 留主仓（宿主 codec / Trace / journal） |
 
 ## 3. 子范围①：任期过滤（eng-cut17b-goose）
@@ -35,3 +36,12 @@
 - F：`ProjectionPlanner.plan` 签名与调用者（`ProjectionSurface`、`ProjectionRenderer`）不变；宿主把最小负锚点平移到 0 后交库。
 - G：删除 `insertionSortKey`、`reduceBase`、`reduceInsertions`。
 - H：双算 18000 次 0 分歧，负控 A/B 分别 1818/40 次分歧；88 文件相关测试无新增失败。见[证据](../evidence/CUT-17/README.md)。
+
+## 5. 子范围③：布局（eng-cut17d-goose）
+
+- B 契约：`Projection().layout(intents, baseLength)` → `{ ok, order, rows: { intent, row }[] }`；锚点为负或超出（替换后）基底长度时抛错；见库 `index.d.ts`、库测试 003。
+- C 反例：基底替换后锚点空间错位、同锚点 key 序、append 次序、宿主 id 与物理标记错位 → 库 003；主仓 provider-projection 001–014。以两种负控变异体被双算抓到作证。
+- D/E：库已在 0.34.0（`9bb4288`/`e43ef87`），gitlink 不动。
+- F：渲染器先用 `plan` 拒绝冲突，再由 `ProjectionPlanner.layout` 交库布局，按 `{ intent, row }` 取回行。负/越界锚点的拒绝文案改为库的校验文案（无依赖者）。
+- G：删除 `renderedRows`、`emptyRendered`、`spliceBefore`、`applyInsertions`。
+- H：双算 18000 次 0 分歧，负控 C/D 分别 714/1116 次分歧；88 文件 verdict 不变。见[证据](../evidence/CUT-17/README.md)。

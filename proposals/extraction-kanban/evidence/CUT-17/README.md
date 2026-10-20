@@ -26,3 +26,12 @@
 - 负控：在候选 dist 的拷贝上 A）去掉锚点平移 → 1818 次分歧；B）插入意图指纹置空 → 40 次分歧。两者都被抓到。
 - 相关测试（`planner-suite.files`，88 文件：上面 66 文件 + provider-projection、prefix-stability、participant-horizon 全部、interaction-authority 008、host-boundary 020）：candidate 375 pass / 2 fail / 8 cancelled / 1 skipped / 20 todo（`planner-suite.verdicts`）。base 取 `wt/CUT-17-base`（master `0ba124c4a` 的 dist 与测试）：365 pass / 8 fail / 8 cancelled；差异（`planner-suite.base-vs-cand.diff`）全部来自 master 在 `0ba124c4a` 之后对 work 009/019/021/024 测试的迁移（失败转绿与新增用例），**没有 base 通过而 candidate 失败的用例**。prefix-stability-001 的 8 条在两边同样失败（文件级取消），work-011/026 两边同样失败，均为既有问题。
 - 产物：`dist/Participant/Provider/Projection/Planner.js` import `wanxiangli/projection` 的 `Projection` 并调用 `projection.plan`。
+
+## 子范围③：ProjectionRenderer 布局（wanxiangli/projection `layout`，0.34.0 已含，gitlink 不动）
+
+- 宿主改动：`ProjectionRenderer.renderMessagesWithHostIds` 仍先用 `ProjectionPlanner.plan` 拒绝冲突（同一 `invalidOp` 文案），随后由新增的 `ProjectionPlanner.layout` 把原始锚点（不平移）与基底长度交给库 `layout`，按库返回的 `{ intent, row }` 取回行、宿主 id 与物理标记。删除宿主自有的 `renderedRows`/`emptyRendered`/`spliceBefore`/`applyInsertions` 及按降序拼接的规则。
+- 双算（`layout-diff.mjs`，`layout-diff.txt`）：旧实现 `wt/CUT-17-base/dist`，新实现本工作树；锚点集中在基底（或替换基底）范围附近，含 -1、越界、append、同键同值重复、重复基底。经 `renderMessagesWithHostIds` 与 `renderMessages` 两个面，3 种子 × 3000 轮 = 18000 次比较 **0 分歧**：约 7400 次双方逐字节相同地渲染成功，其余双方都拒绝。
+- 行为差异（如实记录）：拒绝时的**异常文案**变了。冲突拒绝仍是宿主自己的 `requires a conflict-free intent set`（双算里逐字核对）；锚点为负或越界时，旧文案来自 `List.splitAt` 内部（`The input must be non-negative` / `insufficient number of elements`），新文案来自库的锚点校验（`intents[i].anchor … past the end of the message base` / `must be null (append) or a nonnegative …`），能指出哪条意图出错。同时有负锚点与越界锚点时，旧实现因按降序拼接先撞到越界，新实现先报负锚点——两边都拒绝。没有调用者或测试依赖旧文案（相关测试 verdict 不变）。因此子范围②的 `plan-diff.mjs` 在本刀后对 render 面报出约 600 次/种子的“分歧”，逐条核对全部是“双方都抛错、文案不同”，plan 面仍 0 分歧。
+- 负控（候选 dist 拷贝）：C）基底行报告为物理行 → 714 次分歧；D）意图内的行倒序 → 1116 次分歧。
+- 相关测试（同 `planner-suite.files` 88 文件，增量构建 generation 31）：375 pass / 2 fail / 8 cancelled / 1 skipped / 20 todo，verdict 与子范围② candidate **逐条相同**（`layout-suite.verdicts`）。
+- 生产调用面核对：`ProjectionIntent`/`ProjectionRenderer.renderMessages*` 在 `src/` 中只被 `ProjectionSurface`（纯 JS 契约面，供 provider-projection 测试与集成 harness 使用）调用；`XWireSurface` 只用 `cutoffDigest`。

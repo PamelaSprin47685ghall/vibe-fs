@@ -12,6 +12,7 @@ module ProjectionPlanner =
     [<AllowNullLiteral>]
     type private ProjectionPlans =
         abstract plan: intents: obj -> obj
+        abstract layout: intents: obj * baseLength: int -> obj
 
     [<Import("Projection", "wanxiangli/projection")>]
     let private createProjection: unit -> ProjectionPlans = jsNative
@@ -92,3 +93,22 @@ module ProjectionPlanner =
             | "ConflictingMessageBase" -> Error ProjectionConflict.ConflictingMessageBase
             | "ConflictingMessageRows" -> Error(ProjectionConflict.ConflictingMessageRows(unbox<string> answer?key))
             | other -> invalidOp ("wanxiangli/projection plan returned an unknown conflict: " + other)
+
+    /// 布局规则的唯一实现：wanxiangli/projection `layout`（CUT-17）。只对无冲突的意图集调用；
+    /// 锚点原样交库，负锚点或超出（替换后）基底长度的锚点由库拒绝。返回每一输出行的来源：
+    /// `None, row` 是原始基底第 row 行，`Some intent, row` 是 `intents[intent]` 的第 row 行。
+    let layout (intents: ProjectionIntent list) (baseLength: int) : (int option * int) list =
+        let answer =
+            projection.layout (box (intents |> List.toArray |> Array.map (layoutIntent 0.0)), baseLength)
+
+        if unbox<bool> answer?ok then
+            unbox<obj array> answer?rows
+            |> Array.map (fun row ->
+                let intent: obj = row?intent
+                (if isNull intent then None else Some(unbox<int> intent)), unbox<int> row?row)
+            |> Array.toList
+        else
+            invalidOp (
+                "ProjectionPlanner.layout requires a conflict-free intent set: "
+                + unbox<string> answer?conflict
+            )

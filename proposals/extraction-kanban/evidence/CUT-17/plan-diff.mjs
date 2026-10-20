@@ -38,7 +38,7 @@ for (let r = 0; r < rounds; r++) {
     cmp++; if (a !== b) { diverge++; if (diverge < 5) console.log('DIVERGE plan', a, b, JSON.stringify(intents)) }
     if (a.includes('"ok":false')) conflicts++
     const c = run(() => oldS.renderMessagesWithHostIds(snap, base, intents)), d = run(() => newS.renderMessagesWithHostIds(snap, base, intents))
-    cmp++; if (c !== d) { diverge++; if (diverge < 5) console.log('DIVERGE render', c, d, JSON.stringify(intents)) }
+    cmp++; if (c !== d) { diverge++; if (diverge < 5 || process.env.ALL) console.log("DIVERGE render", c, d, JSON.stringify(intents)) }
     if (!c.startsWith('THROW')) renders++
   }
 }
