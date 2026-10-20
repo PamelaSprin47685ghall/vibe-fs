@@ -124,6 +124,7 @@ test('WHAT[process-execution-007] PORT_list_without_provider_returns_empty_agent
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { spawn } = await import("node:child_process");
+const { driverHandle, libraryTerminal, settleTerminal } = await import('./support/pty-terminal.mjs');
 
 const {
   supervisorCreate,
@@ -148,7 +149,6 @@ const {
   sessionCreate,
   sessionView,
   sessionSetClosed,
-  sessionAppendOutput,
   sessionPushPending,
   sessionPushPendingTask,
   createPtyPort,
@@ -179,20 +179,6 @@ const waitExit = (value) =>
     new Promise((resolve) => value.once('exit', resolve)),
     new Promise((resolve) => setTimeout(resolve, 2_000)),
   ])
-const fakeTerm = (pid) => {
-  const term = {
-    pid,
-    dataCb: null,
-    exitCb: null,
-    writes: [],
-    resizes: [],
-    onData: (cb) => { term.dataCb = cb },
-    onExit: (cb) => { term.exitCb = cb },
-    write: (text) => term.writes.push(text),
-    resize: (width, height) => term.resizes.push([width, height]),
-  }
-  return term
-}
 const portWith = (value) => {
   const p = port()
   portFork(p, 'echo hi', 'devops', id(value), undefined)
@@ -252,35 +238,35 @@ test('WHAT[process-execution-007] SUPERVISOR_drop_removes_session_and_returns_pe
   assert.equal(supervisorTryGet(supervisor, id('pty-d')), null)
   assert.deepEqual(supervisorPendingEntries(supervisorDropPending(supervisor, id('pty-d'))), [])
 })
-test('WHAT[process-execution-007] SUPERVISOR_attach_registers_live_session_and_forwards_onData_to_buffer', () => {
+test('WHAT[process-execution-007] SUPERVISOR_attach_registers_live_session_and_its_output_reaches_the_terminal_buffer', () => {
   const supervisor = supervisorCreate()
-  const term = fakeTerm(9999)
+  const handle = driverHandle(9999)
+  const term = libraryTerminal(handle)
   supervisorAttach(supervisor, portWith('pty-at'), id('pty-at'), term)
   const session = supervisorGet(supervisor, id('pty-at'))
   assert.equal(sessionView(session).backend, term)
   assert.equal(sessionView(session).closed, false)
-  term.dataCb('hello ')
-  term.dataCb('world')
-  assert.equal(sessionView(session).output, 'hello world')
+  handle.dataCb('hello ')
+  handle.dataCb('world')
+  assert.equal(term.inspect().buffered, 'hello world'.length)
 })
-test('WHAT[process-execution-007] SUPERVISOR_attach_onData_ignored_after_session_closed', () => {
+test('WHAT[process-execution-007] SUPERVISOR_commands_on_a_closed_session_never_reach_the_terminal', async () => {
   const supervisor = supervisorCreate()
-  const term = fakeTerm(9999)
-  supervisorAttach(supervisor, portWith('pty-ic'), id('pty-ic'), term)
-  const session = supervisorGet(supervisor, id('pty-ic'))
-  sessionSetClosed(session, true)
-  term.dataCb('late data')
-  assert.equal(sessionView(session).output, '')
+  const handle = driverHandle(9999)
+  supervisorAttach(supervisor, portWith('pty-ic'), id('pty-ic'), libraryTerminal(handle))
+  sessionSetClosed(supervisorGet(supervisor, id('pty-ic')), true)
+  assert.deepEqual(await supervisorApplyLive(supervisor, port(), id('pty-ic'), ptyCommandWrite(new TextEncoder().encode('late'))), resultOk)
+  assert.deepEqual(handle.writes, [])
 })
 test('WHAT[process-execution-007] SUPERVISOR_attach_replays_pending_writes_onto_the_live_backend', async () => {
   const supervisor = supervisorCreate()
   const session = sessionCreate('pty-rp', null)
   supervisorAdd(supervisor, id('pty-rp'), session)
   const parked = supervisorApplyLive(supervisor, port(), id('pty-rp'), ptyCommandWrite(new TextEncoder().encode('early')))
-  const term = fakeTerm(9999)
-  supervisorAttach(supervisor, portWith('pty-rp'), id('pty-rp'), term)
+  const handle = driverHandle(9999)
+  supervisorAttach(supervisor, portWith('pty-rp'), id('pty-rp'), libraryTerminal(handle))
   assert.deepEqual(await parked, resultOk)
-  assert.deepEqual(term.writes, ['early'])
+  assert.deepEqual(handle.writes, ['early'])
 })
 }
 

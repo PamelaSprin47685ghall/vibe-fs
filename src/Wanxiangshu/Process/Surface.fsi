@@ -132,7 +132,6 @@ module ProcessSurface =
     val sessionView: session: obj -> obj
     val sessionSetClosed: session: obj -> closed: bool -> unit
     val sessionSetBackend: session: obj -> backend: obj -> unit
-    val sessionAppendOutput: session: obj -> text: string -> unit
     val sessionPushPending: session: obj -> command: obj -> unit
     val sessionPushPendingTask: session: obj -> command: obj -> Task<obj>
     val sessionExitPending: session: obj -> bool

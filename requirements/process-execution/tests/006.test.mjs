@@ -184,6 +184,7 @@ test('WHAT[process-execution-006] PTY_API_throwing_abort_callback_does_not_block
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { spawn } = await import("node:child_process");
+const { driverHandle, libraryTerminal, settleTerminal } = await import('./support/pty-terminal.mjs');
 
 const {
   supervisorCreate,
@@ -208,7 +209,6 @@ const {
   sessionCreate,
   sessionView,
   sessionSetClosed,
-  sessionAppendOutput,
   sessionPushPending,
   sessionPushPendingTask,
   createPtyPort,
@@ -239,20 +239,6 @@ const waitExit = (value) =>
     new Promise((resolve) => value.once('exit', resolve)),
     new Promise((resolve) => setTimeout(resolve, 2_000)),
   ])
-const fakeTerm = (pid) => {
-  const term = {
-    pid,
-    dataCb: null,
-    exitCb: null,
-    writes: [],
-    resizes: [],
-    onData: (cb) => { term.dataCb = cb },
-    onExit: (cb) => { term.exitCb = cb },
-    write: (text) => term.writes.push(text),
-    resize: (width, height) => term.resizes.push([width, height]),
-  }
-  return term
-}
 const portWith = (value) => {
   const p = port()
   portFork(p, 'echo hi', 'devops', id(value), undefined)
@@ -263,17 +249,17 @@ test('WHAT[process-execution-006] SUPERVISOR_attach_without_port_entry_kills_the
   const process = child()
   try {
     const supervisor = supervisorCreate()
-    supervisorAttach(supervisor, createPtyPort({}), id('pty-nk'), fakeTerm(process.pid))
+    supervisorAttach(supervisor, createPtyPort({}), id('pty-nk'), libraryTerminal(driverHandle(process.pid)))
     await waitExit(process)
-    assert.ok(died(process), 'unregistered attach SIGKILLs the process tree')
+    assert.ok(died(process), 'unregistered attach closes the terminal process group')
   } finally { killChild(process) }
 })
 test('WHAT[process-execution-006] SUPERVISOR_cancelAll_kills_live_sessions_and_skips_closed_or_null_backends', async () => {
   const process = child()
   try {
     const supervisor = supervisorCreate()
-    const live = sessionCreate('pty-l1', { pid: process.pid })
-    const closed = sessionCreate('pty-l2', { pid: 2_147_483_647 })
+    const live = sessionCreate('pty-l1', libraryTerminal(driverHandle(process.pid)))
+    const closed = sessionCreate('pty-l2', libraryTerminal(driverHandle(2_147_483_647)))
     sessionSetClosed(closed, true)
     supervisorAdd(supervisor, id('pty-l1'), live)
     supervisorAdd(supervisor, id('pty-l2'), closed)

@@ -925,16 +925,11 @@ module ProcessSurface =
             {| ptyId = value.PtyId
                backend = value.Backend
                closed = value.Closed
-               awaitingFirstByte = value.AwaitingFirstByte
-               output = value.OutputBuffer.ToString()
                pendingCount = value.Pending.Count
                exitPending = not value.ExitCompleted |}
 
     let sessionSetClosed (session: obj) (closed: bool) : unit = (sessionOf session).Closed <- closed
     let sessionSetBackend (session: obj) (backend: obj) : unit = (sessionOf session).Backend <- backend
-
-    let sessionAppendOutput (session: obj) (text: string) : unit =
-        (sessionOf session).OutputBuffer.Append(text) |> ignore
 
     let sessionPushPending (session: obj) (command: obj) : unit =
         (sessionOf session).Pending.Add(ptyCommandOf command, None)

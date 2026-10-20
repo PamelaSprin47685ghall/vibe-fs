@@ -52,7 +52,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-17 | 请求投影与信息边界 | 表达 | BACKLOG | CUT-05, CUT-06, CUT-08, CUT-15, CUT-16 | — | — |
 | CUT-18 | 规范事实编码与校验 | 存储 | DONE | CUT-00 | eng-cut18 | 2026-10-15 主线提交 2f98049e5：wanxiangli events 模块合入 0.7.0，库侧 34 测试 + durable-events 244 项回归全绿，证据链见 cards/CUT-18.md §10 |
 | CUT-19 | 多 writer 存储与收敛 | 存储 | DOING | CUT-18 | eng-cut19b-goose | 2026-10-20 交接：eng-cut19-goose 已退出（其工作树 cut/CUT-19 干净、与 master 同步，无运行进程），由 eng-cut19b-goose 接手 §10 后续子范围。子范围①结构 k-way 归并（wanxiangli/convergence 0.14.0，主仓 b7d45b063）与②整条 writer UTC 日保留规则（wanxiangli/retention 0.16.0）已接回真实链，各带一个旧实现上会红的反例；段追加/活动判定/校验收敛仍在主仓，见 cards/CUT-19.md §10 |
-| CUT-20 | PTY 与完整输出外存 | 物理 | DOING | CUT-02, CUT-04 | eng-cut20-goose | 2026-10-20 第一步 spool 已落地：wanxiangli/spool（库 20e0372 / 0.13.0 发布 6bf65d3），主仓 ProcessOutput/Spool 改为组合者、NodeProcessHost spool I/O 删除；修复 GitAdapter 把 Spooled 变成空 stdout（大量冲突标记会被提交）与 spool 文件泄漏；第二步 PTY 进行中，证据见 cards/CUT-20.md |
+| CUT-20 | PTY 与完整输出外存 | 物理 | DONE | CUT-02, CUT-04 | eng-cut20b-goose（接手 eng-cut20-goose） | 2026-10-20 spool：wanxiangli/spool（库 20e0372，0.13.0 发布 6bf65d3），主仓 f7d112dad，修复 Spooled git 输出被吞成空串与 spool 文件泄漏；PTY：wanxiangli/pty（库 e383e93，0.15.0 发布 4f8e316），主仓 PtySupervisor 改为路由、物理终端交给库，修复 bun-pty 在缺失 cwd 时于别处执行命令；PTY 整体去留是产品裁决，不在本卡；证据见 cards/CUT-20.md |
 | CUT-21 | 显式时间与因果等待 | 物理 | DONE | CUT-00 | — | 2026-10-15 库侧 time/wait 模块随 0.8.0 发布（库 commit 8422617，全量 460 测试绿）；主仓 NodeTiming/Deadline/VirtualTiming/Wait Registry/CompletionMailbox 桥接切至 0.8.0，干净 HEAD worktree 验证 time-capability 24/0、causal-wait 52/0、subsystems OK；主仓共享工作树全量 build 因他人 Interaction 进行中改动阻断（非本卡引入），证据链见 cards/CUT-21.md §10 |
 | CUT-22 | attention、concern 与邮箱归属 | 权威 | BACKLOG | CUT-09 | — | — |
 | CUT-23 | Git 工作树、委任与集成 | 仓库 | BACKLOG | CUT-12, CUT-13 | — | — |
@@ -113,7 +113,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | `src/Wanxiangshu/Foundation/CanonicalJson.fs(.fsi), src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs(.fsi)` | `CUT-18` | `eng-cut18` | `62dbebc5d`（认领时未运行 git，base 以 DevOps 核实为准） | `CUT-18 完成 wanxiangli/events 0.6.0 验证、vendor tarball 落位与 durable-events 测试回归`（2026-10-15 随 0.7.0 主线提交 2f98049e5 合入，durable-events 244 项全绿，证据见 cards/CUT-18.md） | `已释放` |
 | `src/Wanxiangshu/Process/{Deadline,NodeTiming,VirtualTiming}.fs(.fsi), src/Wanxiangshu/Execution/Session/Wait/{Registry,CompletionMailbox}.fs(.fsi)` | `CUT-21` | `devops`（受委派集成） | `2f98049e5` | `CUT-21 完成 wanxiangli 0.8.0 time/wait 发布与主仓桥接切换`（2026-10-15 库 commit 8422617，干净 HEAD worktree 验证全绿后主线合入） | `已释放` |
 | `src/Wanxiangshu/Foundation/{Roles,RolesSurface}.fs(.fsi), src/Wanxiangshu/Participant/Persona/{Catalog,Identity,ManagedCatalog,Surface}.fs(.fsi), src/Wanxiangshu/Interaction/Authority/{IdentitySeed,Origin}.fs(.fsi); wanxiangli src/identity/*` | `CUT-07` | `eng-cut07b-goose`（接手 eng-cut07-goose） | `48dff9349` / wxl `a8b89a4` | `CUT-07 主仓切换合入 master 并更新卡片证据`（2026-10-20 wanxiangli 54dcc34 / 0.11.0，主仓切换合入，证据见 cards/CUT-07.md §11） | `已释放` |
-| `src/Wanxiangshu/Process/{Pty,PtyApi,PtyBackend,PtySession,PtySupervisor,PtyTypes,Spool,ProcessOutput}.fs(.fsi)`；wanxiangli `src/pty/`、`src/spool/` | `CUT-20` | `eng-cut20-goose` | `48dff9349` | `CUT-20 完成 PTY/spool 库实现、主仓接线与旧 owner 退出` | `持有` |
+| `src/Wanxiangshu/Process/{Pty,PtyApi,PtyBackend,PtySession,PtySupervisor,PtyTypes,Spool,ProcessOutput}.fs(.fsi)`；wanxiangli `src/pty/`、`src/spool/` | `CUT-20` | `eng-cut20-goose` | `48dff9349` | `CUT-20 完成 PTY/spool 库实现、主仓接线与旧 owner 退出` | `已释放` |
 | `src/Wanxiangshu/Persistence/EventStore/{EventKWayMerge,MergeSurface,IntegratorEngine}.fs(.fsi)`、`Wanxiangshu.Owner.durable-convergence.eventstore-merge-runtime.fsproj`；wanxiangli `src/convergence/` | `CUT-19` | `eng-cut19b-goose`（接手 eng-cut19-goose） | `701e69551` / wxl `c9a943d` | `CUT-19 KWayMerge 子范围合入 master 并更新卡片证据` | `持有` |
 | `src/Wanxiangshu/Repository/Programming/Js/DeliveredValues.fs(.fsi)`；wanxiangli `src/workrecord/`→`src/delivery/` | `CUT-06` | `eng-cut06-goose` | `993e93683` / wxl `a8b89a4` | `CUT-06 交付视图格接线合入 master 并更新卡片证据`（2026-10-20 wanxiangli 2564387 / 0.9.0，主仓接线合入） | `已释放` |
 | `src/Wanxiangshu/Execution/Session/{LoopDetector,LoopDetectorSurface}.fs(.fsi)`；wanxiangli `src/degeneration/` | `CUT-30` | `eng-cut06-goose` | `fa08a6100` / wxl `5edd3c7` | `CUT-30 检测算法接线合入 master 并更新卡片证据` | `已释放` |
@@ -133,6 +133,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | 6 | CUT-21 | wanxiangli 8422617 / 0.8.0 | 2f98049e5 之上的本轮主仓提交 | manager | 主仓共享工作树全量 build 因他人 Interaction 改动中间态阻断；本卡验证已在干净 HEAD worktree 完成（time-capability 24/0、causal-wait 52/0、subsystems OK） | 已验证待合入 |
 | 7 | CUT-06 | wanxiangli 2564387 / 0.9.0 / 无 tarball（submodule + `file:wanxiangli`，仓规禁止跟踪 .tgz） | ef0476046 / 本卡接线提交 | 自治（仓主授权） | 相关回归 9 fail/5 cancelled 为 master 既有（base 同） | 已合入 |
 | 8 | CUT-30 | wanxiangli a0f0de9 / 0.12.0 / 无 tarball（submodule） | 959f05643 / 本卡接线提交 | 自治（仓主授权） | degeneration-guard 10 fail 为 master 既有（base 同，006/007/009 对账 WIP） | 已合入 |
+| 9 | CUT-20 | wanxiangli 20e0372→6bf65d3 / 0.13.0（spool）；e383e93→4f8e316 / 0.15.0（pty）；submodule + `file:wanxiangli`，无 tarball | spool f7d112dad；pty 本卡接线提交 | 自治（仓主授权） | 无新增门禁：check 154 与 base 相同；PTY 相关 36 个文件与 base 逐项一致（既有 7 fail/48 cancelled） | 已合入 |
 
 ## 边界修订与产品裁决登记
 
@@ -142,7 +143,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 |---|---|---|---|---|
 | D-01 | 07、09、11 | 草稿中的未知来源回退 human 与现行权威证据冲突 | 保留现行拒绝/明确未知；开工时裁定精确接口 | 待认领；不得先删权威闭包 |
 | D-02 | 03、06、15、16、28 | 单观察者 Trace 与并发捕获、推理、retry 排除、Fission 合流、Opening 范围不完全等价 | 先做差异表与最小闭合子范围 | 待 CUT-03 |
-| D-03 | 02、20、21 | 基础 pipe 留尾不等于主仓硬期限、完整外存及 PTY | 暂留未覆盖 owner；分别切换 | 待 CUT-02/20 |
+| D-03 | 02、20、21 | 基础 pipe 留尾不等于主仓硬期限、完整外存及 PTY | 暂留未覆盖 owner；分别切换 | CUT-20：完整外存由独立 `wanxiangli/spool` 承接（不用 pipe 留尾冒充），PTY 由独立 `wanxiangli/pty` 承接（真实 tty，非 pipe）；主仓硬期限仍由 CUT-02 的组合者持有。见 cards/CUT-20.md |
 | D-04 | 18、19 | 单流 SQLite CAS 与多 writer 合法分叉不是同一承诺 | 两种协议分开，不用前者替代后者 | 待 CUT-18/19 |
 | D-05 | 27、29、30、31 | 新库草稿“不再建”与仍生效的产品功能冲突 | 默认暂留并维护；抽取/删除需逐卡裁决 | 待认领；不是删除批准 |
 | D-06 | 32、33、38 | 相对主线净改进与完整发布验收 | 合并可用净改进准入，验证结果仍原样报告 | 用户 2026-10-14T23:59:13Z 授权；[比较记录](../lifecycle-cutover-closeout.md) |

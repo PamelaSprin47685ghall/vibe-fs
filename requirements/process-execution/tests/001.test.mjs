@@ -328,6 +328,8 @@ test('WHAT[process-execution-001] PORT_read_result_and_fail_read_without_waiter_
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { spawn } = await import("node:child_process");
+const { tmpdir } = await import("node:os");
+const { driverHandle, libraryTerminal, settleTerminal } = await import('./support/pty-terminal.mjs');
 
 const {
   supervisorCreate,
@@ -352,7 +354,6 @@ const {
   sessionCreate,
   sessionView,
   sessionSetClosed,
-  sessionAppendOutput,
   sessionPushPending,
   sessionPushPendingTask,
   createPtyPort,
@@ -383,20 +384,6 @@ const waitExit = (value) =>
     new Promise((resolve) => value.once('exit', resolve)),
     new Promise((resolve) => setTimeout(resolve, 2_000)),
   ])
-const fakeTerm = (pid) => {
-  const term = {
-    pid,
-    dataCb: null,
-    exitCb: null,
-    writes: [],
-    resizes: [],
-    onData: (cb) => { term.dataCb = cb },
-    onExit: (cb) => { term.exitCb = cb },
-    write: (text) => term.writes.push(text),
-    resize: (width, height) => term.resizes.push([width, height]),
-  }
-  return term
-}
 const portWith = (value) => {
   const p = port()
   portFork(p, 'echo hi', 'devops', id(value), undefined)
@@ -425,23 +412,30 @@ test('WHAT[process-execution-001] SUPERVISOR_spawnSync_invokes_sh_lc_with_fixed_
   let seen
   supervisorSetSpawn(supervisor, (shell, args, options) => {
     seen = [shell, args, options]
-    return { pid: 4242 }
+    return driverHandle(4242)
   })
-  const term = await supervisorSpawn(supervisor, 'echo hi', '/tmp/work')
-  assert.equal(term.pid, 4242)
+  const term = await supervisorSpawn(supervisor, 'echo hi', tmpdir())
+  assert.equal(term.inspect().pid, 4242, 'a wanxiangli/pty Terminal wraps the driver handle')
   assert.equal(seen[0], 'sh')
   assert.deepEqual(seen[1], ['-lc', 'echo hi'])
   assert.equal(seen[2].name, 'xterm-256color')
   assert.equal(seen[2].cols, 80)
   assert.equal(seen[2].rows, 24)
-  assert.equal(seen[2].cwd, '/tmp/work')
+  assert.equal(seen[2].cwd, tmpdir())
+})
+test('WHAT[process-execution-001] SUPERVISOR_spawn_reports_a_missing_cwd_instead_of_running_elsewhere', () => {
+  const supervisor = supervisorCreate()
+  let called = 0
+  supervisorSetSpawn(supervisor, () => { called++; return driverHandle() })
+  assert.throws(() => supervisorSpawn(supervisor, 'echo hi', '/nonexistent/pty-cwd'), /ENOENT/)
+  assert.equal(called, 0)
 })
 test('WHAT[process-execution-001] SUPERVISOR_spawnSync_defaults_cwd_to_process_cwd', async () => {
   const supervisor = supervisorCreate()
   let seenCwd
   supervisorSetSpawn(supervisor, (_shell, _args, options) => {
     seenCwd = options.cwd
-    return {}
+    return driverHandle()
   })
   await supervisorSpawn(supervisor, 'ls', '')
   assert.equal(seenCwd, process.cwd())
@@ -455,37 +449,49 @@ test('WHAT[process-execution-001] SUPERVISOR_applyLive_closed_session_short_circ
 })
 test('WHAT[process-execution-001] SUPERVISOR_applyLive_write_forwards_utf8_to_backend', async () => {
   const supervisor = supervisorCreate()
-  const writes = []
-  const backend = { write: (text) => writes.push(text) }
-  supervisorAdd(supervisor, id('pty-w'), sessionCreate('pty-w', backend))
+  const handle = driverHandle()
+  supervisorAdd(supervisor, id('pty-w'), sessionCreate('pty-w', libraryTerminal(handle)))
   const result = await supervisorApplyLive(supervisor, port(), id('pty-w'), ptyCommandWrite(new TextEncoder().encode('héllo')))
   assert.deepEqual(result, resultOk)
-  assert.deepEqual(writes, ['héllo'])
+  assert.deepEqual(handle.writes, ['héllo'])
 })
 test('WHAT[process-execution-001] SUPERVISOR_applyLive_write_backend_error_becomes_error_result', async () => {
   const supervisor = supervisorCreate()
-  const backend = { write: () => { throw new Error('EPIPE') } }
-  supervisorAdd(supervisor, id('pty-we'), sessionCreate('pty-we', backend))
+  const handle = driverHandle()
+  handle.write = () => { throw new Error('EPIPE') }
+  supervisorAdd(supervisor, id('pty-we'), sessionCreate('pty-we', libraryTerminal(handle)))
   assert.deepEqual(await supervisorApplyLive(supervisor, port(), id('pty-we'), ptyCommandWrite(new Uint8Array(0))), resultError('EPIPE'))
 })
 test('WHAT[process-execution-001] SUPERVISOR_applyLive_read_drains_buffer_into_port', async () => {
   const supervisor = supervisorCreate()
   const p = portWith('pty-re')
-  const session = sessionCreate('pty-re', {})
-  sessionAppendOutput(session, 'partial output')
-  supervisorAdd(supervisor, id('pty-re'), session)
+  const handle = driverHandle()
+  const terminal = libraryTerminal(handle)
+  handle.dataCb('partial output')
+  supervisorAdd(supervisor, id('pty-re'), sessionCreate('pty-re', terminal))
 
-  assert.deepEqual(await supervisorApplyLive(supervisor, p, id('pty-re'), ptyCommandRead()), resultOk)
-  assert.equal(sessionView(session).output, '', 'buffer drained')
   const read = portRead(p, id('pty-re'))
-  portReadResult(p, id('pty-re'), 'after', false)
-  assert.deepEqual(await read, { ok: true, value: { output: 'after', closed: false } })
+  assert.deepEqual(await supervisorApplyLive(supervisor, p, id('pty-re'), ptyCommandRead()), resultOk)
+  assert.deepEqual(await read, { ok: true, value: { output: 'partial output', closed: false } })
+  assert.equal(terminal.inspect().buffered, 0, 'buffer drained')
+})
+test('WHAT[process-execution-001] SUPERVISOR_applyLive_read_on_silent_terminal_is_answered_by_the_first_byte', async () => {
+  const supervisor = supervisorCreate()
+  const p = portWith('pty-fb')
+  const handle = driverHandle()
+  supervisorAdd(supervisor, id('pty-fb'), sessionCreate('pty-fb', libraryTerminal(handle)))
+  const read = portRead(p, id('pty-fb'))
+  assert.deepEqual(await supervisorApplyLive(supervisor, p, id('pty-fb'), ptyCommandRead()), resultOk)
+  await settleTerminal()
+  handle.dataCb('echo')
+  assert.deepEqual(await read, { ok: true, value: { output: 'echo', closed: false } })
 })
 test('WHAT[process-execution-001] SUPERVISOR_applyLive_resize_swallows_backend_errors', async () => {
   const supervisor = supervisorCreate()
   const resizes = []
-  const backend = { resize: (width, height) => { resizes.push([width, height]); throw new Error('nope') } }
-  supervisorAdd(supervisor, id('pty-z'), sessionCreate('pty-z', backend))
+  const handle = driverHandle()
+  handle.resize = (width, height) => { resizes.push([width, height]); throw new Error('nope') }
+  supervisorAdd(supervisor, id('pty-z'), sessionCreate('pty-z', libraryTerminal(handle)))
   assert.deepEqual(await supervisorApplyLive(supervisor, port(), id('pty-z'), ptyCommandResize(120, 40)), resultOk)
   assert.deepEqual(resizes, [[120, 40]])
 })

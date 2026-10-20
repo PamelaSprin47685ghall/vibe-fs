@@ -65,6 +65,7 @@ test('WHAT[process-execution-002] PORT_send_term_kill_int_marks_abort_for_the_ne
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { spawn } = await import("node:child_process");
+const { driverHandle, libraryTerminal } = await import('./support/pty-terminal.mjs');
 
 const {
   supervisorCreate,
@@ -89,7 +90,6 @@ const {
   sessionCreate,
   sessionView,
   sessionSetClosed,
-  sessionAppendOutput,
   sessionPushPending,
   sessionPushPendingTask,
   createPtyPort,
@@ -120,20 +120,6 @@ const waitExit = (value) =>
     new Promise((resolve) => value.once('exit', resolve)),
     new Promise((resolve) => setTimeout(resolve, 2_000)),
   ])
-const fakeTerm = (pid) => {
-  const term = {
-    pid,
-    dataCb: null,
-    exitCb: null,
-    writes: [],
-    resizes: [],
-    onData: (cb) => { term.dataCb = cb },
-    onExit: (cb) => { term.exitCb = cb },
-    write: (text) => term.writes.push(text),
-    resize: (width, height) => term.resizes.push([width, height]),
-  }
-  return term
-}
 const portWith = (value) => {
   const p = port()
   portFork(p, 'echo hi', 'devops', id(value), undefined)
@@ -144,7 +130,7 @@ test('WHAT[process-execution-002] SUPERVISOR_applyLive_signal_kills_the_real_pro
   const process = child()
   try {
     const supervisor = supervisorCreate()
-    supervisorAdd(supervisor, id('pty-k'), sessionCreate('pty-k', { pid: process.pid }))
+    supervisorAdd(supervisor, id('pty-k'), sessionCreate('pty-k', libraryTerminal(driverHandle(process.pid))))
     assert.deepEqual(await supervisorApplyLive(supervisor, port(), id('pty-k'), ptyCommandSignal('KILL')), resultOk)
     await waitExit(process)
     assert.ok(died(process), 'child was killed')
@@ -152,7 +138,7 @@ test('WHAT[process-execution-002] SUPERVISOR_applyLive_signal_kills_the_real_pro
 })
 test('WHAT[process-execution-002] SUPERVISOR_applyLive_signal_unknown_pid_becomes_error', async () => {
   const supervisor = supervisorCreate()
-  supervisorAdd(supervisor, id('pty-ku'), sessionCreate('pty-ku', { pid: 2_147_483_647 }))
+  supervisorAdd(supervisor, id('pty-ku'), sessionCreate('pty-ku', libraryTerminal(driverHandle(2_147_483_647))))
   const result = await supervisorApplyLive(supervisor, port(), id('pty-ku'), ptyCommandSignal('TERM'))
   assert.equal(result.ok, false)
   assert.match(result.error, /ESRCH/)

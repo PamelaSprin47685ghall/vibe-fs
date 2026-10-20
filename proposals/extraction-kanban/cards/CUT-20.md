@@ -61,4 +61,49 @@ base 实测（`evidence/CUT-20/base-red-git-grep-spooled.mjs`，6000 行冲突�
 
 ## 3. 第二步：PTY
 
-见 §4（落地后补写）。
+### A. 范围
+
+一句职责：一个真实伪终端会话的打开、写入、读取、信号、尺寸与关闭（含整个进程组回收），如实报告每个动作结果。
+
+旧 owner：主仓 `Process/PtySupervisor.fs`（bun-pty 句柄、`onData` 字符串缓冲、首字节读、`process.kill(-pid)`、孤儿 KILL）与 `PtySession` 的 `OutputBuffer/AwaitingFirstByte`。
+留在主仓（组合与路由，不是物理）：`PtyPort`（id、parked read、exit 监听、完成邮箱）、`PtySupervisor` 的会话表与 pending 队列、bun-pty 驱动的加载（驱动选择属于组合根）、`HostForkPty`/委派侧适配。
+
+调查结论（如实）：生产路径会构造 `PtyBackend.createPort()` 并在 teardown `CloseAll`，但当前没有生产调用者 `Fork` 一个 PTY（模型面的四个 pty 工具与 devops/run 已按 repository-programming[327] 退役，`js.call` 的 spawn/send/watch/signal 走 `Process/JsCallLoop.fs` 自己的管道）。但 process-execution、delegation、managed-session-lifecycle[025] 仍规定 PTY 合同，看板规则是"不用删功能换接线"，因此本卡抽取而不删除；是否整体退役 PTY 属产品裁决，不在本卡。
+
+### B. 契约（wanxiangli/pty 0.15.0，对象 `Terminal`）
+
+`Terminal.open({ driver, command, cwd, cols, rows })` → `Opened{terminal}` / `Failed{error}`；`write` → `Written|Closed|Failed`；`read(waitMs)` → `Read{output, closed}|Busy`；`signal(name)` → `Sent|Closed|Failed`；`resize` → `Resized|Closed|Failed`；`wait()`；`close(graceMs)` → `Exited{escalated}|AlreadyExited|Unconfirmed{pid}`；`inspect()`。规则与证明见库 `src/pty/AGENTS.md`。驱动（bun-pty `spawn`）由组合者注入，库零运行时依赖。
+
+行为裁决（与旧实现的差异）：
+- 不存在的 `cwd`：旧实现交给 bun-pty，实测 bun-pty 会**在别处照常运行命令**；新实现在调用驱动前返回 `Failed{operation:'cwd', code:'ENOENT'|'ENOTDIR'}`。
+- 退出后写入：bun-pty 静默"成功"；新实现返回 `Closed`，主仓映射为 `Error "PTY exited before command was applied"`。
+- 关闭：旧 `cancelAll`/孤儿路径只对组发一次 KILL；新 `close(0)` 先 TERM，未退出再 KILL，确认退出后再对组补发 KILL，忽略 TERM 的后代也被回收；无法确认时报 `Unconfirmed`。
+- 退出时挂起的库读取：由库在退出时用剩余输出应答（`closed: true`）；主仓仍对端口上挂起的读执行 `FailRead`，残余输出进入完成结果，行为与旧实现一致。
+
+### C. 反例（真实）
+
+在 bun-pty 0.4.10 上实测：`spawn('sh',['-lc','echo hi'],{cwd:'/nonexistent/...'})` 照常输出 `hi`、退出码 0——命令在错误目录执行而无任何报错。新实现拒绝（库 `SPEC[pty-002] a missing cwd fails instead of running the command elsewhere`，主仓 `SUPERVISOR_spawn_reports_a_missing_cwd_instead_of_running_elsewhere`）。另：忽略 TERM 的后代在 `close` 后不存活（库 `SPEC[pty-003]`）。
+
+### D. 独立实现
+
+库 `e383e93`（实现 + 12 项测试，其中 8 项在 Bun 子进程中驱动真实 bun-pty：`test -t 0` 为真、写后读、UTF-8、首字节唤醒、沉默应答、Busy、resize 后 `stty size`、组回收、TERM 升级 KILL、INT），发布 `4f8e316`（0.15.0）。库全量 560 项：559 pass / 1 fail，失败项为 `SPEC[eventstore-001] two real processes cannot both win revision zero`（`database is locked`，共享机满载时的 SQLite 锁竞争），单独重跑 eventstore 15/15 通过，与本模块无关。
+
+### E. 消费
+
+候选验证时主仓 gitlink 为 `4f8e316`（0.15.0）；落地前 master 已由 CUT-19 把 gitlink 推进到 `c9a943d`（0.16.0，包含 `4f8e316`），rebase 后沿用 master 的 gitlink 与锁版本，并在其上重建复验。主仓 `PtySupervisor` 以 `import { Terminal } from 'wanxiangli/pty'` 使用；bun-pty 依赖仍在主仓（驱动由组合根加载并注入）。
+
+### F. 真实链
+
+`PtyBackend.createPort` → `PtySupervisor.spawn` → `Terminal.open(driver=bun-pty spawn)` → `attach` 以 `terminal.wait()` 驱动退出结算，`Read` 走 `terminal.read(250)` 后 `PtyPort.ReadResult`，`Signal/Write/Resize` 直达库。主仓测试在 Node 下运行（bun-pty 只在 Bun 下可加载），因此主仓测试用真实库 `Terminal` 包装一个脚本化的驱动句柄来检验路由；终端物理语义只由库在真实 PTY 上证明。
+
+### G. 旧 owner 退出
+
+删除：`killProcessTree`、`writeBackend/readBackend` 的直接 bun-pty 调用、`armFirstByteWait/resolveSilentRead/drainAwaitingFirstByte/appendLiveData/onSessionData`、`killOrphanTerm/killUnlessClosed`，`PtySession.OutputBuffer/AwaitingFirstByte`，Surface 的 `sessionAppendOutput` 与 `sessionView.output/awaitingFirstByte`。对应白盒测试改写为经库 `Terminal` 的路由测试。
+
+### H. 验收
+
+- 主仓 build OK；`process-execution` 182 项：179 pass / 0 fail / 3 todo。
+- 其余引用 PTY 的 36 个测试文件：结果与同期 base 对照，见 `evidence/CUT-20/README.md`。
+- `scripts/check.mjs`：154 issues，与 base 相同，无 PTY 相关新增。
+- 已知边界：只在 Linux x64 + Bun 1.x 实测；bun-pty 不报告终止信号（`signal` 恒为 null）；`setsid` 脱离进程组的后代不回收；输出为驱动给出的字符串，不做字节级外存。
+- 交接复验（eng-cut20b-goose，2026-10-20）：eng-cut20-goose 中断后接手，PTY 接线提交 rebase 到 master `1c90ecf69`、再 rebase 到 `587cd7b3c`（CUT-07 落地，gitlink 仍为 `c9a943d` / 0.16.0，已含 0.15.0 pty）后两次重新全量 `node scripts/build.mjs`：OK（1310 项，js-surface-manifest 151 / js-module-linkage 725 OK）；`process-execution` 182 项 179 pass / 0 fail / 3 todo（连跑两次一致）；`durable-convergence-011` 2/2；`scripts/check.mjs` 154 issues，与 base 相同。如实记录：加 `--test-force-exit` 跑全目录时 001 文件会被提前结束（122 项、10 cancelled），在未改动的 base 62e07b0c4 上三次复现完全相同，属既有运行器现象，非本卡引入。

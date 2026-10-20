@@ -264,6 +264,7 @@ test('WHAT[process-execution-003] PORT_complete_aborted_defaults_message_and_cle
 const { default: assert } = await import("node:assert/strict");
 const { default: test } = await import("node:test");
 const { spawn } = await import("node:child_process");
+const { driverHandle, libraryTerminal, settleTerminal } = await import('./support/pty-terminal.mjs');
 
 const {
   supervisorCreate,
@@ -288,7 +289,6 @@ const {
   sessionCreate,
   sessionView,
   sessionSetClosed,
-  sessionAppendOutput,
   sessionPushPending,
   sessionPushPendingTask,
   createPtyPort,
@@ -319,20 +319,6 @@ const waitExit = (value) =>
     new Promise((resolve) => value.once('exit', resolve)),
     new Promise((resolve) => setTimeout(resolve, 2_000)),
   ])
-const fakeTerm = (pid) => {
-  const term = {
-    pid,
-    dataCb: null,
-    exitCb: null,
-    writes: [],
-    resizes: [],
-    onData: (cb) => { term.dataCb = cb },
-    onExit: (cb) => { term.exitCb = cb },
-    write: (text) => term.writes.push(text),
-    resize: (width, height) => term.resizes.push([width, height]),
-  }
-  return term
-}
 const portWith = (value) => {
   const p = port()
   portFork(p, 'echo hi', 'devops', id(value), undefined)
@@ -350,13 +336,14 @@ test('WHAT[process-execution-003] SUPERVISOR_failPending_resolves_every_tcs_with
 })
 test('WHAT[process-execution-003] SUPERVISOR_attach_onExit_completes_exit_publishes_closed_and_drops_session', async () => {
   const supervisor = supervisorCreate()
-  const term = fakeTerm(9999)
+  const handle = driverHandle(9999)
+  const term = libraryTerminal(handle)
   const completions = []
   const p = portWith('pty-ex')
   portAddMailboxSender(p, (item) => completions.push(item))
   supervisorAttach(supervisor, p, id('pty-ex'), term)
-  term.exitCb({ exitCode: 0 })
-  await new Promise((resolve) => setImmediate(resolve))
+  handle.exitCb({ exitCode: 0 })
+  await settleTerminal()
   assert.equal(supervisorTryGet(supervisor, id('pty-ex')), null, 'session dropped')
   assert.equal(completions.length, 1)
   assert.equal(completions[0].kind, 'PtyExited')
@@ -366,50 +353,54 @@ test('WHAT[process-execution-003] SUPERVISOR_attach_onExit_completes_exit_publis
 })
 test('WHAT[process-execution-003] SUPERVISOR_attach_onExit_publishes_residual_output', async () => {
   const supervisor = supervisorCreate()
-  const term = fakeTerm(9999)
+  const handle = driverHandle(9999)
+  const term = libraryTerminal(handle)
   const completions = []
   const p = portWith('pty-ro')
   portAddMailboxSender(p, (item) => completions.push(item))
   supervisorAttach(supervisor, p, id('pty-ro'), term)
-  term.dataCb('final words')
-  term.exitCb({ exitCode: 1 })
-  await new Promise((resolve) => setImmediate(resolve))
+  handle.dataCb('final words')
+  handle.exitCb({ exitCode: 1 })
+  await settleTerminal()
   assert.equal(completions[0].kind, 'PtyExited')
   assert.equal(completions[0].outcome, 'final words')
 })
 test('WHAT[process-execution-003] SUPERVISOR_attach_onExit_fails_pending_writes_and_parked_read', async () => {
   const supervisor = supervisorCreate()
-  const term = fakeTerm(9999)
+  const handle = driverHandle(9999)
+  const term = libraryTerminal(handle)
   const p = portWith('pty-fp')
   supervisorAttach(supervisor, p, id('pty-fp'), term)
   const parkedRead = portRead(p, id('pty-fp'))
   const session = supervisorGet(supervisor, id('pty-fp'))
   const parkedWrite = sessionPushPendingTask(session, ptyCommandWrite(new Uint8Array(0)))
-  term.exitCb({ exitCode: 0 })
+  handle.exitCb({ exitCode: 0 })
   assert.deepEqual(await parkedRead, resultError('PTY exited before read completed'))
   assert.deepEqual(await parkedWrite, resultError('PTY exited before command was applied'))
 })
 test('WHAT[process-execution-003] SUPERVISOR_attach_onExit_is_idempotent_for_already_dropped_session', async () => {
   const supervisor = supervisorCreate()
-  const term = fakeTerm(9999)
+  const handle = driverHandle(9999)
+  const term = libraryTerminal(handle)
   const completions = []
   const p = portWith('pty-idem')
   portAddMailboxSender(p, (item) => completions.push(item))
   supervisorAttach(supervisor, p, id('pty-idem'), term)
-  term.exitCb({ exitCode: 0 })
-  await new Promise((resolve) => setImmediate(resolve))
-  term.exitCb({ exitCode: 0 })
+  handle.exitCb({ exitCode: 0 })
+  await settleTerminal()
+  handle.exitCb({ exitCode: 0 })
   assert.equal(completions.length, 1)
 })
 test('WHAT[process-execution-003] SUPERVISOR_attach_onExit_noop_when_session_already_closed', () => {
   const supervisor = supervisorCreate()
-  const term = fakeTerm(9999)
+  const handle = driverHandle(9999)
+  const term = libraryTerminal(handle)
   const completions = []
   const p = portWith('pty-ec')
   portAddMailboxSender(p, (item) => completions.push(item))
   supervisorAttach(supervisor, p, id('pty-ec'), term)
   sessionSetClosed(supervisorGet(supervisor, id('pty-ec')), true)
-  term.exitCb({ exitCode: 0 })
+  handle.exitCb({ exitCode: 0 })
   assert.equal(completions.length, 0)
   assert.notEqual(supervisorTryGet(supervisor, id('pty-ec')), null)
 })

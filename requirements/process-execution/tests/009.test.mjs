@@ -118,7 +118,6 @@ const {
   sessionView,
   sessionSetClosed,
   sessionSetBackend,
-  sessionAppendOutput,
   sessionPushPending,
   sessionResolveExit,
   ptyCommandRead,
@@ -136,7 +135,6 @@ test('WHAT[process-execution-009] PTY_SESSION_create_defaults_open_empty_and_pen
   const view = sessionView(sessionCreate('pty-def', null))
   assert.equal(view.backend, null)
   assert.equal(view.closed, false)
-  assert.equal(view.output, '')
   assert.equal(view.pendingCount, 0)
   assert.equal(view.exitPending, true)
 })
@@ -148,7 +146,6 @@ test('WHAT[process-execution-009] PTY_SESSION_exit_completion_starts_unresolved'
 })
 test('WHAT[process-execution-009] PTY_SESSION_mutable_state_roundtrips', () => {
   const session = sessionCreate('pty-jkl', null)
-  assert.equal(sessionView(session).output, '')
 
   sessionSetClosed(session, true)
   assert.equal(sessionView(session).closed, true)
@@ -159,9 +156,6 @@ test('WHAT[process-execution-009] PTY_SESSION_mutable_state_roundtrips', () => {
 
   sessionPushPending(session, command)
   assert.equal(sessionView(session).pendingCount, 1)
-
-  sessionAppendOutput(session, 'partial')
-  assert.equal(sessionView(session).output, 'partial')
 })
 }
 
