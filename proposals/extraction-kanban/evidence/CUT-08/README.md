@@ -67,3 +67,38 @@ differential.mjs:       compared 3950; differing 0
 | durable-events | 252 / 233 / 0 fail | — |
 
 注：attention-regulation、obligation-ledger、intra-participant-parallelism、work 四个套件是在 rebase 前的 candidate 上跑的（同一段宿主改动，gitlink 为未发布的库 `12a0bee`）。其余套件和两个差分都在最终 candidate 上重跑过。
+
+## 6. 第 4 段（实用工具准入、Fission 冗余守卫）
+
+| 项 | 值 |
+|---|---|
+| 库 | `0aa7b39` 实现，`06e6535` 0.22.0 发布；`npm run build && node --test --test-force-exit <scripts.test 全部文件>` 614/614 pass；capability 11/11 |
+| 主仓 base（差分） | `b40dd6efa` 源码的 dist（gitlink `b6b05e2`），快照于 box `logs-cut08c/base-b40` |
+| 主仓 candidate | `0a186821c` + 本段 + gitlink `06e6535`，`node scripts/build.mjs` exit 0（node 22.23.3） |
+
+```
+differential-utility.mjs: compared 55;   differing 18   （全部为退役角色，27 个字段全是 allow→deny / true→false）
+differential-tools.mjs:   compared 784;  differing 10   （同样 5 个退役角色的 permissionObj / requestToolMap）
+differential.mjs:         compared 3950; differing 0
+```
+
+套件（`node --test --test-concurrency=2`，candidate）：
+
+| 套件 | candidate | 对 base |
+|---|---|---|
+| capability-enforcement | 149 / 133 / 0 fail | 同 |
+| office-capability | 23 / 14 / 0 fail | 同 |
+| action-affordance | 21 / 2 / 0 fail | 同 |
+| attention-regulation | 6 / 6 | 同 |
+| cognitive-workspace | 10 / 10 | — |
+| participant-identity | 52 / 51 | 同 |
+| advisor | 14 / 14 | 同 |
+| feature-ablation | 20 / 19 / 1 skip | — |
+| intra-participant-parallelism | 45 / 27 / 3 fail | 同；`not ok` 名单 diff 为空 |
+| structured-workflow | 116 / 102 / 1 fail | 同；diff 为空 |
+| repository-programming | 335 / 320 / 11 fail | 见下 |
+| host-boundary（rebase 前） | 232 / 225 / 2 fail | 023 是本机 `--ignore-scripts` 未跑 opencode postinstall；026 在 base 源码上同样失败（bookkeepertool 闭包含 HostEventCodec） |
+
+repository-programming 比旧 base 多 5 个用例、多 3 个失败，都是 048（parked payload 的源码标记），来自 master 上 CUT-25 的 `0a186821c` 沙箱修复，不在本段 diff 内。在纯 master `68582b84b`（含 `0a186821c`，未带本段）的独立构建上跑同一套件：335 / 320 / 11 fail，`not ok` 名单与 candidate 的 diff 为空。
+
+`node scripts/check.mjs`：exit 1（既有），去掉路径和行号后发现集合与上一段 candidate 相同，无新增。`fantomas --check`：StaticTools.fs 已格式化；Fission Tool.fs 在 base 上就未格式化，本段只改一行，没有顺带重排。

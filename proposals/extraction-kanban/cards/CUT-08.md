@@ -76,7 +76,31 @@
 - 套件计数与 base 相同，已有失败的用例名 diff 为空（repository-programming 8、structured-workflow 1、intra-participant-parallelism 3、work 9，都是 base 已有）。
 - check.mjs：本卡文件无新增发现。新出现的 2 条 `Ablation/Manifest.fs` match-pyramid 来自 master 上他人的 `3e7f7e302`，不在本卡 diff 内。
 
-## 5. 剩余（CUT-08 未 DONE 的原因）
+## 5. 第 4 段：实用工具准入与 Fission 冗余守卫（2026-10-21，eng-cut08c-goose）
+
+### 5.1 反例（base 上实测）
+
+base 的 `assume` 有两份答案：`StaticTools.permissionObj` 和 `AssumeTool.admission` 读 `cognitiveUtilityRoleAllowed`（`role <> Distiller`），而 `requestToolMap` 自己写死 `name = "skill" || name = "assume"`。结果 Distiller 在请求工具表里 `assume=true`，在权限对象和执行准入里却是 deny/false，属于"看得见但调不了"。差分日志里的 base 值可以直接看到这一点。
+
+### 5.2 库侧
+
+- wanxiangli `0aa7b39`：`ToolSurface.utilityToolNames`（`skill`、`assume`）和 `admitsUtility`，`OfficeMatrix.roles`（现行六个角色），以及 `tests/003.test.mjs`（SPEC[capability-005]）。实用工具不是办公能力，不进矩阵，也不进名字→能力反查。现行角色都持有；矩阵外的角色标签（历史角色、已退役的 distiller、大小写错误、非字符串）一律失败关闭。
+- `06e6535` 发布 **0.22.0**，库全套 614/614 pass。
+
+### 5.3 主仓接线
+
+- `OfficeCapability.fs(.fsi)` 新增 `utilityToolNames` / `admitsUtility` 投影。
+- `StaticTools`：删除 `cognitiveUtilityRoleAllowed`（fs 与 fsi）；`permissionFor` 中 skill/assume 三行合成一行，读库；`requestToolMap` 不再写死名字，读同一个 `admitsUtility`。
+- `AssumeTool.roleAllowed` 改为 `OfficeCapability.admitsUtility role "assume"`。
+- `Execution/Fission/OpenCode/Tool.fs`：准入删掉 `r = Role.Engineer &&`，只读矩阵（矩阵里只有 engineer 持有 Fission，差分证明逐角色相同）。
+- gitlink → `06e6535`（0.22.0，含他人 0.21.0 compression 增量，主仓尚未消费它），lockfile 同步。
+
+### 5.4 行为变化（已核实只收窄，不扩权）
+
+[differential-utility.mjs](../evidence/CUT-08/differential-utility.mjs) 在 11 个角色上双算 `permissionObj`、`requestToolMap`、`AssumeTool.roleAllowed/admission` 和 Fission 准入：`compared 55; differing 18`。18 处全部在已退役角色（coder、inspector、browser、inquiry、distiller），27 个字段全是 allow→deny 或 true→false。六个现行角色 0 差异，Fission 准入 11 个角色 0 差异。
+
+这些退役角色在 base 上本来就跑不起来：`ManagedAgentConfig` 不给它们 agent 配置，`PromptResources` 不给 provider prompt，`ModelRouting.isDeprecatedRole` 拒绝它们的容量预约。所以它们的工具面从"无人使用的 allow"变为 deny，等于把 SPEC[capability-002] 的失败关闭延伸到实用工具，同时消除了 §5.1 的分叉。第 2 段差分（differential-tools.mjs）在新 candidate 上是 `784 / 10`，10 处是同样这 5 个退役角色的 `permissionObj` / `requestToolMap`，原因相同；第 1 段差分仍为 `3950 / 0`。
+
+## 6. 剩余
 
 - 第 3 段（schema、描述、示例与运行门禁一致）：action-affordance 001–013 都是 GAP-078 语义评审 TODO，需要人工审阅描述文本，不是单纯的代码抽取。`StaticTools.jsPermission` / `hasFsCapability` 中 todowrite-for-* 的编程面准入，以及 `ToolRegistry` 的 JS 生成器归 CUT-25（已被他人认领）。
-- 第 4 段余项：`Execution/Fission/OpenCode/Tool.fs:963` 的 `r = Role.Engineer &&` 与矩阵冗余（矩阵里只有 Engineer 持有 Fission），`cognitiveUtilityRoleAllowed` 是另一张手写角色表。这两处都可以收进库，作为下一刀。
