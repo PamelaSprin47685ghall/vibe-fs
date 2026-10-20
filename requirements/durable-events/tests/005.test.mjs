@@ -449,6 +449,103 @@ test('WHAT[durable-events-005] line_continuation_convergence_appends_legacy_line
   })
 })
 
+test('WHAT[durable-events-005] interrupted_line_continuation_resumes_after_each_complete_copied_prefix', async t => {
+  for (const copied of [1, 2, 3]) {
+    await t.test(`${copied} copied legacy lines across segment boundaries`, async () => {
+      await withRepo(async (repo, commonDir) => {
+        const cap = 1024
+        const original = chain(2, cap / 2)
+        const legacyEvents = [
+          lineOf(0x51, cap / 2, [original.at(-1).id]),
+          lineOf(0x52, cap / 2, [hexId(0x51)]),
+          lineOf(0x53, cap / 2, [hexId(0x52)]),
+        ]
+        legacyEvents[1].payload.fill = legacyEvents[1].payload.fill.slice(6) + '万象'
+        const directory = eventsDir(commonDir)
+        mkdirSync(directory, { recursive: true })
+        const first = join(directory, 'resume-law-0000.ndjson')
+        const originalBytes = original.map(canonicalLine).join('')
+        writeFileSync(first, originalBytes)
+        const copiedLines = legacyEvents.slice(0, copied).map(canonicalLine)
+        writeFileSync(join(directory, 'resume-law-0001.ndjson'), copiedLines.slice(0, 2).join(''))
+        if (copied === 3) writeFileSync(join(directory, 'resume-law-0002.ndjson'), copiedLines[2])
+        const legacy = writeLegacy(commonDir, 'resume-law', legacyEvents)
+        const before = new Map(readdirSync(directory).map(name => [name, readFileSync(join(directory, name))]))
+        const expected = [...original, ...legacyEvents]
+        const observe = () => {
+          const output = execFileSync(process.execPath, ['--input-type=module', '-e', `
+            const eventStore = await import(process.argv[1]);
+            const store = eventStore.create(process.argv[2], 'resume-observer');
+            try {
+              console.log(JSON.stringify({
+                events: process.argv.slice(4).map(id => eventStore.read(store, id)),
+                heads: eventStore.heads(store, process.argv[3]),
+              }));
+            } finally { eventStore.dispose(store); }
+          `, new URL('../../../dist/Persistence/EventStore/Surface.js', import.meta.url).href,
+          commonDir, expected.at(-1).stream, ...expected.map(event => event.id)], { encoding: 'utf8' })
+          assert.deepEqual(JSON.parse(output), { events: expected, heads: [expected.at(-1).id] })
+        }
+        observe()
+        assert.deepEqual(readdirSync(directory).sort(), [...before.keys()].sort(), 'read does not reorganize')
+        for (const [name, bytes] of before) assert.deepEqual(readFileSync(join(directory, name)), bytes)
+
+        assert.deepEqual(await retention.reorganizeWithSegmentCap(commonDir, cap), { ok: true })
+        assert.equal(existsSync(legacy), false)
+        assert.equal(readFileSync(first, 'utf8'), originalBytes, 'sealed original segment stays byte-exact')
+        const names = readdirSync(directory).sort()
+        assert.deepEqual(names, ['resume-law-0000.ndjson', 'resume-law-0001.ndjson', 'resume-law-0002.ndjson'])
+        const bytes = names.map(name => readFileSync(join(directory, name), 'utf8')).join('')
+        assert.equal(bytes, expected.map(canonicalLine).join(''), 'only missing lines are appended, exactly once')
+        assert.deepEqual(await retention.reorganizeWithSegmentCap(commonDir, cap), { ok: true })
+        assert.equal(names.map(name => readFileSync(join(directory, name), 'utf8')).join(''), bytes)
+        observe()
+      })
+    })
+  }
+})
+
+test('WHAT[durable-events-005] copied_legacy_identity_with_different_bytes_still_refuses_without_writes', async () => {
+  await withRepo(async (repo, commonDir) => {
+    const original = chain(2, 512)
+    const copied = lineOf(0x61, 512, [original.at(-1).id])
+    const changed = { ...copied, payload: { fill: 'different bytes for the same event' } }
+    const remaining = lineOf(0x62, 512, [copied.id])
+    const directory = eventsDir(commonDir)
+    mkdirSync(directory, { recursive: true })
+    const segment = join(directory, 'collision-resume-law-0000.ndjson')
+    writeFileSync(segment, [...original, changed].map(canonicalLine).join(''))
+    const legacy = writeLegacy(commonDir, 'collision-resume-law', [copied, remaining])
+    const before = new Map(readdirSync(directory).map(name => [name, readFileSync(join(directory, name))]))
+    const result = await retention.reorganizeWithSegmentCap(commonDir, CAP)
+    assert.equal(result.ok, false)
+    assert.match(result.error, /diverged/)
+    assert.throws(() => eventStore.create(commonDir, 'collision-resume-observer'), /diverged/)
+    assert.equal(existsSync(legacy), true)
+    assert.deepEqual(readdirSync(directory).sort(), [...before.keys()].sort())
+    for (const [name, bytes] of before) assert.deepEqual(readFileSync(join(directory, name)), bytes)
+  })
+})
+
+test('WHAT[durable-events-005] a_copied_legacy_prefix_cannot_hide_an_old_series_id_in_its_remaining_suffix', async () => {
+  await withRepo(async (repo, commonDir) => {
+    const original = chain(2, 512)
+    const copied = lineOf(0x71, 512, [original.at(-1).id])
+    const directory = eventsDir(commonDir)
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'overlap-after-copy-law-0000.ndjson'), [...original, copied].map(canonicalLine).join(''))
+    writeLegacy(commonDir, 'overlap-after-copy-law', [copied, original[0]])
+    const before = new Map(readdirSync(directory).map(name => [name, readFileSync(join(directory, name))]))
+
+    assert.throws(() => eventStore.create(commonDir, 'overlap-after-copy-observer'), /diverged/)
+    const result = await retention.reorganizeWithSegmentCap(commonDir, CAP)
+    assert.equal(result.ok, false)
+    assert.match(result.error, /diverged/)
+    assert.deepEqual(readdirSync(directory).sort(), [...before.keys()].sort())
+    for (const [name, bytes] of before) assert.deepEqual(readFileSync(join(directory, name)), bytes)
+  })
+})
+
 test('WHAT[durable-events-005] line_continuation_with_a_half_line_still_fails_closed', async () => {
   await withRepo(async (repo, commonDir) => {
     const aChain = chain(2, CAP / 8)

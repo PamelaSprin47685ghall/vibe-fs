@@ -1065,35 +1065,51 @@ module ProcessEventLog =
         else
             prefixMatches prefix full
 
-    let private eventIdsOfDecoded (text: string) : Set<string> option =
-        match decodeWriterText "coexistence" text with
-        | Error _ -> None
-        | Ok events ->
-            Some(
-                events
-                |> List.map (fun envelope -> EventId.value envelope.EventId)
-                |> Set.ofList
-            )
-
-    /// durable-events-005: the event-id set of one physical form, or None
-    /// when the bytes are not complete canonical NDJSON (invalid UTF-8, a
-    /// half line, or a non-canonical line).
-    let private eventIdsOf (bytes: byte[]) : Set<string> option =
+    let private canonicalLines (bytes: byte[]) : (string[] * string[]) option =
         match CanonicalEventCodec.tryDecodeUtf8Text bytes with
         | Error _ -> None
-        | Ok text -> eventIdsOfDecoded text
+        | Ok text ->
+            match decodeWriterText "coexistence" text with
+            | Error _ -> None
+            | Ok events ->
+                let ids =
+                    events
+                    |> List.map (fun envelope -> EventId.value envelope.EventId)
+                    |> List.toArray
 
-    /// durable-events-005: the line-continuation form of coexistence — an
-    /// old process kept appending canonical lines to the legacy name after
-    /// the segment series landed (a version-transition race). Those lines
-    /// are genuine durable facts: every legacy line is complete canonical
-    /// NDJSON and no legacy event id overlaps the series. Overlapping ids,
-    /// half lines, or non-canonical bytes stay divergent.
-    let private isLineContinuation (legacyBytes: byte[]) (segmentBytes: byte[]) : bool =
-        match eventIdsOf legacyBytes, eventIdsOf segmentBytes with
-        | Some legacyIds, Some segmentIds ->
-            legacyIds |> Set.forall (fun eventId -> not (Set.contains eventId segmentIds))
-        | _ -> false
+                Some(text.Split('\n') |> Array.take ids.Length, ids)
+
+    /// A copied legacy prefix must be the exact canonical suffix of the series.
+    /// Every remaining legacy id must still be absent from the series.
+    let private continuationCopiedLines (legacyBytes: byte[]) (segmentBytes: byte[]) : int option =
+        match canonicalLines legacyBytes, canonicalLines segmentBytes with
+        | Some(legacyLines, legacyIds), Some(segmentLines, segmentIds) ->
+            let existing = Set.ofArray segmentIds
+
+            let copied =
+                legacyIds
+                |> Array.tryHead
+                |> Option.bind (fun first -> segmentIds |> Array.tryFindIndex ((=) first))
+                |> Option.map (fun start -> segmentIds.Length - start)
+                |> Option.defaultValue 0
+
+            let exactSuffix =
+                copied <= legacyLines.Length
+                && Array.forall2
+                    (=)
+                    (segmentLines |> Array.skip (segmentLines.Length - copied))
+                    (legacyLines |> Array.take copied)
+
+            if
+                exactSuffix
+                && (legacyIds
+                    |> Array.skip copied
+                    |> Array.forall (fun id -> not (Set.contains id existing)))
+            then
+                Some copied
+            else
+                None
+        | _ -> None
 
     /// durable-events-005: the authoritative file list of one writer's
     /// logical stream. A coexisting legacy file and segment series is only a
@@ -1107,7 +1123,7 @@ module ProcessEventLog =
         (writerId: string)
         (legacyFile: string)
         (segments: string list)
-        : Result<string list, string> =
+        : Result<(string * int) list, string> =
         let legacyBytes = readBytesFileSync (join2 directory legacyFile)
 
         let segmentBytes =
@@ -1116,15 +1132,15 @@ module ProcessEventLog =
             |> Array.concat
 
         if isPrefixOf legacyBytes segmentBytes then
-            Ok segments
+            Ok(segments |> List.map (fun name -> name, 0))
         elif isPrefixOf segmentBytes legacyBytes then
-            Ok [ legacyFile ]
-        elif isLineContinuation legacyBytes segmentBytes then
-            Ok(segments @ [ legacyFile ])
+            Ok [ legacyFile, 0 ]
         else
-            Error(sprintf "writer files diverged: %s" writerId)
+            match continuationCopiedLines legacyBytes segmentBytes with
+            | Some copied -> Ok((segments |> List.map (fun name -> name, 0)) @ [ legacyFile, copied ])
+            | None -> Error(sprintf "writer files diverged: %s" writerId)
 
-    let private logicalStreamFiles (commonDir: string) (group: WriterFileGroup) : Result<string list, string> =
+    let private logicalStreamFiles (commonDir: string) (group: WriterFileGroup) : Result<(string * int) list, string> =
         let directory = eventsDirectory commonDir
 
         let legacy =
@@ -1133,8 +1149,8 @@ module ProcessEventLog =
         let segments = group.FileNames |> List.filter isSegmentFileName |> List.sort
 
         match legacy, segments with
-        | [], files -> Ok files
-        | [ legacyFile ], [] -> Ok [ legacyFile ]
+        | [], files -> Ok(files |> List.map (fun name -> name, 0))
+        | [ legacyFile ], [] -> Ok [ legacyFile, 0 ]
         | [ legacyFile ], _ -> coexistingFormsOf directory group.WriterId legacyFile segments
         | _ -> Error(sprintf "multiple legacy files for one writer: %s" group.WriterId)
 
@@ -1239,7 +1255,9 @@ module ProcessEventLog =
 
             let! decoded =
                 files
-                |> List.traverseResultM (fun name -> decodeFileCached (join2 (eventsDirectory commonDir) name))
+                |> List.traverseResultM (fun (name, copied) ->
+                    decodeFileCached (join2 (eventsDirectory commonDir) name)
+                    |> Result.map (List.skip copied))
 
             return List.concat decoded
         }
@@ -1321,18 +1339,25 @@ module ProcessEventLog =
         (commonDir: string)
         (writerId: string)
         (legacyFile: string)
+        (copied: int)
         : Result<unit, string> =
         let directory = eventsDirectory commonDir
 
         match CanonicalEventCodec.tryDecodeUtf8Text (readBytesFileSync legacyFile) with
         | Error reason -> Error(sprintf "writer history is not valid UTF-8: %A" reason)
         | Ok text ->
+            let remaining = text.Split('\n') |> Array.skip copied |> String.concat "\n"
             let segments = seriesFilesOf commonDir writerId
             let tailName, headroom = seriesTailOf directory writerId segments
-            let pieces = splitTextIntoSegmentsWithHeadroom text (segmentCapBytes ()) headroom
+
+            let pieces =
+                splitTextIntoSegmentsWithHeadroom remaining (segmentCapBytes ()) headroom
 
             pieces
             |> List.iteri (fun index piece -> appendLegacyPiece directory writerId tailName index piece)
+
+            if copied > 0 then
+                segments |> List.iter (fun name -> durabilityBarrier (join2 directory name))
 
             unlinkSync legacyFile
             Ok()
@@ -1358,10 +1383,10 @@ module ProcessEventLog =
             Ok()
         elif isPrefixOf segmentBytes legacyBytes then
             dropSeriesAndReassign commonDir writerId legacyFile segments
-        elif isLineContinuation legacyBytes segmentBytes then
-            appendLegacyLinesToSeries commonDir writerId legacyFile
         else
-            Error(sprintf "writer files diverged: %s" writerId)
+            match continuationCopiedLines legacyBytes segmentBytes with
+            | Some copied -> appendLegacyLinesToSeries commonDir writerId legacyFile copied
+            | None -> Error(sprintf "writer files diverged: %s" writerId)
 
     let internal convergeWriterFiles (commonDir: string) (writerId: string) : Result<unit, string> =
         let directory = eventsDirectory commonDir
