@@ -38,7 +38,13 @@
 
 ## [009] Grep Capability 投影
 
-`grep(needle, pattern)` 只由 Grep capability 授权；Read+Glob 不代替它。needle 接受字符串或正则，必填 pattern 按 glob 规则选文件；返回行列位置与匹配文本，不可读或非 UTF-8 文件跳过。
+`async rg(argv)` 只由 Grep capability 授权，Read+Glob 不代替它，也不授予 Exec。公开基类、描述、示例与运行时绑定同源。内部旧 grep 消费者保持其原合同，不恢复旧公开 grep/glob。
+
+首批支持内容JSON、`--files`、`-l/--files-with-matches`、`--files-without-match`。内容返回 `{ ok, exitCode, messages }`，文件列表返回 `{ ok, exitCode, paths }`；路径以NUL分隔解析，不以换行切路径。0/1只在确认实际终结、完整采集及有效解析后作为数据返回，其他状态显式失败。整个结果按实际Host窗口验算，超量或损坏不包装为截断成功。
+
+argv必须是字符串数组、显式提供搜索路径，选项及其参数个数按声明检查。支持常用大小写/固定字符串/行号/词边界/隐藏与ignore开关、glob、type、模式及根内模式文件/ignore文件、max-count/max-depth；支持`--`和选项等号形式。未知选项、count/vimgrep/type-list/quiet等未定义模式、外部预处理/命令、递归跟随链接在启动前拒绝。搜索路径与侧文件均须在授权根内，既有符号链接检查实际目标；固定cwd和rg程序，禁继承ripgrep配置，不接受用户指定可执行程序。
+
+搜索复用现有物理进程适配、逐路原字节采集/spool及owner监管，消费当前程序剩余绝对期限与Host硬顶，不另借期或按查询重置。预取消零启动；取消、到期与输出超量请求停止并等待实际范围关闭，未确认关闭时显式失败且owner保留至真实关闭。读取前后复核当前调用授权；输出解码严格UTF-8，采集容量与呈现预算分别受限。rg缺失明确失败，不下载或改用另一套遍历实现。
 
 ## [010] Rewrite、Write 与 Mkdir 的落盘语义
 

@@ -5,6 +5,7 @@
 /src/Wanxiangshu/Repository/Programming/**
 /src/Wanxiangshu/Process/JsSandbox.fs
 /src/Wanxiangshu/Process/JsCallLoop.fs
+/src/Wanxiangshu/Process/JsSearch.fs
 /src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
 /resources/provider/tool/js-program/**
 /resources/provider/tool/js-bookkeeper/**

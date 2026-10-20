@@ -97,6 +97,7 @@ module JsTransactionSurface =
            JsFailure.TransactionRecoveryRequired, "TransactionRecoveryRequired"
            JsFailure.UnknownMember, "UnknownMember"
            JsFailure.RunnableSpecIncomplete "missing check", "RunnableSpecIncomplete"
+           JsFailure.RgFailed "query failed", "RgFailed"
            JsFailure.RunCommandUnsupported "next() returned an object", "RunCommandUnsupported"
            JsFailure.RunWaitTimeout, "RunWaitTimeout"
            JsFailure.RunChildUnknown "srv", "RunChildUnknown"

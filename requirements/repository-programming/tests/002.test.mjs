@@ -68,6 +68,7 @@ const fsPermissionsOf = (role) =>
 const MEMBERS_BY_PERMISSION = {
   Read: ['cat', 'stat', 'whereAll', 'where'],
   Glob: ['ls'],
+  Grep: ['rg'],
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
@@ -89,6 +90,7 @@ const BINDING_BY_MEMBER = {
   mkdir: 'js.mkdir',
   whereAll: 'js.whereAll',
   where: 'js.where',
+  rg: 'js.rg',
   call: 'js.call',
   fork: 'js.fork',
   dag: 'js.dag',
@@ -101,7 +103,7 @@ const BINDING_BY_MEMBER = {
 const MEMBER_ORDER = [
   'write', 'rm', 'mv',
   'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
-  'call',
+  'rg', 'call',
   'fork', 'dag', 'join', 'fission', 'horizon', 'advisor',
 ]
 
@@ -136,7 +138,7 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
   const layers = layersOf(result)
   assert.deepEqual(
     Object.keys(layers).sort(),
-    ['cat', 'ls', 'mkdir', 'stat', 'where', 'whereAll', 'write'],
+    ['cat', 'ls', 'mkdir', 'rg', 'stat', 'where', 'whereAll', 'write'],
   )
   for (const [member, layer] of Object.entries(layers)) {
     assert.equal(layer.inBaseClass, true, `${member} in base class`)
@@ -160,7 +162,7 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
 test('WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers', () => {
   const result = surface('Engineer', ['Read', 'Glob', 'Grep']) // no Edit / Write
   assert.equal(isSome(result), true)
-  assert.deepEqual(memberNames(result), ['cat', 'ls', 'stat', 'whereAll', 'where'])
+  assert.deepEqual(memberNames(result), ['cat', 'ls', 'stat', 'whereAll', 'where', 'rg'])
   assert.equal(result.description.includes('edit(path'), false)
   assert.equal(result.description.includes('rewrite(path'), false)
   assert.equal(result.description.includes('write(path, content)'), false)

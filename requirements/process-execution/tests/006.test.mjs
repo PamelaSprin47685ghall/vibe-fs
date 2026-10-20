@@ -1,10 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { verifyPtyScope } from './support/pty-scope.mjs'
-import { nodeCommand } from './support/executor.mjs'
+import { nodeCommand, shellQuote } from './support/executor.mjs'
 import { program } from './support/executor.mjs'
 import { oneCommand } from './support/runnable.mjs'
 import { parse } from 'smol-toml'
+import { withSearchLauncher } from './support/search-launcher.mjs'
+import { withFinitePhysicalWait } from '../../verification-system/tests/support/finite-physical-wait.mjs'
 
 const withRegisteredDevOps = async (suffix, action) => {
   const { withExecutablePlugin, acceptAuthorityRoot } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
@@ -69,6 +71,61 @@ test('WHAT[process-execution-006] cancellation during a pending sanity proof ref
       await pending.catch(() => {})
     }
   })
+})
+
+test('WHAT[process-execution-006] rg pre-cancellation has zero command effects', async () => {
+  const { existsSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  await withRegisteredDevOps('rg-pre', async (tool, directory, context) => {
+    await withSearchLauncher(directory, `throw new Error('pre-cancelled target started')`, async () => {
+      const cancelled = new AbortController()
+      cancelled.abort()
+      const refused = await tool.execute({ program: program(`return await this.rg(['needle', '.']);`) }, {
+        ...context, abort: cancelled.signal,
+      })
+      assert.match(parse(refused).code, /RG_FAILED|ABANDONED/)
+      assert.equal(existsSync(join(directory, '.search-launcher-entered')), false)
+    })
+  })
+})
+
+test('WHAT[process-execution-006] active cancellation drains an actual TERM-resistant rg query', { timeout: 15000 }, async t => {
+  const { existsSync, readFileSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const { setTimeout: delay } = await import('node:timers/promises')
+  await withFinitePhysicalWait(t, { operation: 'registered rg target startup and actual cancellation drain', limitMs: 12000 }, () => withRegisteredDevOps('rg-cancel', async (tool, directory, context) => {
+    const witness = join(directory, 'query-pid')
+    const source = `process.on('SIGTERM', () => {}); require('node:fs').writeFileSync(${JSON.stringify(witness)}, String(process.pid)); setInterval(() => {}, 50)`
+    await withSearchLauncher(directory, source, async () => {
+      const query = { program: program(`return await this.rg(['needle', '.']);`) }
+      const controller = new AbortController()
+      const pending = tool.execute(query, { ...context, callID: 'rg-active', abort: controller.signal })
+      let settled
+      pending.then(value => { settled = value }, error => { settled = String(error) })
+      let pid
+      const alive = () => {
+        try { process.kill(pid, 0); return true } catch (error) {
+          if (error.code === 'ESRCH') return false
+          throw error
+        }
+      }
+      try {
+        const startDeadline = performance.now() + 8000
+        while (!existsSync(witness) && settled === undefined && performance.now() < startDeadline) await delay(10)
+        assert.equal(existsSync(witness), true, settled ?? 'actual query has not reached its witness')
+        pid = Number(readFileSync(witness, 'utf8'))
+        controller.abort()
+        const observed = await pending
+        assert.match(parse(observed).code, /RG_FAILED|ABANDONED|PROGRAM_TIMEOUT/)
+        const closeDeadline = performance.now() + 2500
+        while (alive() && performance.now() < closeDeadline) await delay(10)
+        assert.equal(alive(), false, 'the actual query must die after TERM/KILL')
+      } finally {
+        controller.abort()
+        await pending.catch(() => {})
+      }
+    })
+  }))
 })
 
 test('WHAT[process-execution-006] registered cancellation while queued neither starts the target nor releases another run permit', async () => {

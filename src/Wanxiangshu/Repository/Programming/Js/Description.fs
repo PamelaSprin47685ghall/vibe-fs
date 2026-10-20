@@ -652,6 +652,10 @@ class JsProgram {"""
                   whereStub prose
               if has capabilities JsCapability.Glob then
                   lsStub prose
+              if has capabilities JsCapability.Grep then
+                  """  async rg(argv) {
+    // Search the workspace with an explicit pattern and path.
+  }"""
               if has capabilities JsCapability.Write then
                   writeStub prose
                   mkdirStub prose
@@ -1246,6 +1250,14 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
             [ """
   constructor(api) { this._api = api; }"""
                   .TrimStart()
+              if has capabilities JsCapability.Grep then
+                  fill
+                      """  async rg(argv) {
+    const result = await this._api.js.rg(argv);
+    {{rethrow_host}}
+    return result;
+  }"""
+                      [ "rethrow_host", rethrowHost ]
               if has capabilities JsCapability.Read then
                   fill
                       """  async cat(path) {
@@ -1493,6 +1505,7 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                   else
                       []
                   if has capabilities JsCapability.Glob then [ "ls" ] else []
+                  if has capabilities JsCapability.Grep then [ "rg" ] else []
                   if has capabilities JsCapability.Edit then
                       [ prose.VerbTransform; prose.VerbRewrite ]
                   else
@@ -1501,7 +1514,10 @@ const err = new Error(reason); err.__jsFailure = { code, reason }; throw err;"""
                       [ prose.VerbCreate; "mkdir" ]
                   else
                       []
-                  if has capabilities JsCapability.Exec then [ "call" ] else [] ]
+                  if has capabilities JsCapability.Exec then
+                      [ "call" ]
+                  else
+                      [] ]
             |> String.concat ", "
 
         let parallelTemplate =

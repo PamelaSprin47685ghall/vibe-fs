@@ -69,6 +69,7 @@ type JsFailure =
     | CannotParkWhileAbandoning
     | Abandoned
     | RunnableSpecIncomplete of string
+    | RgFailed of string
     | RunCommandUnsupported of string
     | RunWaitTimeout
     | RunChildUnknown of string
@@ -141,6 +142,7 @@ module JsFailure =
         | JsFailure.CannotParkWhileAbandoning -> "CANNOT_PARK_WHILE_ABANDONING"
         | JsFailure.Abandoned -> "ABANDONED"
         | JsFailure.RunnableSpecIncomplete _ -> "CALLABLE_SPEC_INCOMPLETE"
+        | JsFailure.RgFailed _ -> "RG_FAILED"
         | JsFailure.RunCommandUnsupported _ -> "CALL_COMMAND_UNSUPPORTED"
         | JsFailure.RunWaitTimeout -> "CALL_WAIT_TIMEOUT"
         | JsFailure.RunChildUnknown _ -> "CALL_CHILD_UNKNOWN"
@@ -208,6 +210,7 @@ module JsFailure =
         | JsFailure.CannotParkWhileAbandoning -> "park is refused while the site is in its abandon cleanup window"
         | JsFailure.Abandoned -> "the parked program was abandoned; its finalizer has run"
         | JsFailure.RunnableSpecIncomplete detail -> reasonWithMessage "Callable spec is incomplete" "" detail
+        | JsFailure.RgFailed detail -> reasonWithMessage "rg failed" "" detail
         | JsFailure.RunCommandUnsupported detail -> reasonWithMessage "next() returned an unsupported command" "" detail
         | JsFailure.RunWaitTimeout -> "waitFor condition was not met before its timeout"
         | JsFailure.RunChildUnknown name -> "no background process with this name: " + name
@@ -281,6 +284,7 @@ module JsFailure =
         | "CANNOT_PARK_WHILE_ABANDONING" -> JsFailure.CannotParkWhileAbandoning
         | "ABANDONED" -> JsFailure.Abandoned
         | "CALLABLE_SPEC_INCOMPLETE" -> JsFailure.RunnableSpecIncomplete text
+        | "RG_FAILED" -> JsFailure.RgFailed text
         | "CALL_COMMAND_UNSUPPORTED" -> JsFailure.RunCommandUnsupported text
         | "CALL_WAIT_TIMEOUT" -> JsFailure.RunWaitTimeout
         | "CALL_CHILD_UNKNOWN" -> JsFailure.RunChildUnknown(after "no background process with this name: ")

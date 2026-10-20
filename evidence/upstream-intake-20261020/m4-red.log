@@ -1,0 +1,79 @@
+✖ WHAT[repository-programming-009] actual rg gives a Grep-only office JSON matches, ignored files and native no-match status (43.491458ms)
+✖ WHAT[repository-programming-009] file lists preserve newline paths and explicit dash patterns, globs and pattern files work (6.82125ms)
+✖ WHAT[repository-programming-009] unsafe argv, missing paths and external side files are refused before search (8.150833ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 251.386416
+
+✖ failing tests:
+
+test at requirements/repository-programming/tests/009.test.mjs:18:1
+✖ WHAT[repository-programming-009] actual rg gives a Grep-only office JSON matches, ignored files and native no-match status (43.491458ms)
+  AssertionError [ERR_ASSERTION]: # failed
+  
+  code = "PROGRAM_FAILED"
+  reason = "program threw: this.rg is not a function"
+  
+  + actual - expected
+  
+  + 'Failed'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/009.test.mjs:27:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'Failed',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/009.test.mjs:45:1
+✖ WHAT[repository-programming-009] file lists preserve newline paths and explicit dash patterns, globs and pattern files work (6.82125ms)
+  AssertionError [ERR_ASSERTION]: # failed
+  
+  code = "PROGRAM_FAILED"
+  reason = "program threw: this.rg is not a function"
+  
+  + actual - expected
+  
+  + 'Failed'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/009.test.mjs:53:14)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'Failed',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/009.test.mjs:66:1
+✖ WHAT[repository-programming-009] unsafe argv, missing paths and external side files are refused before search (8.150833ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /INVALID_ARGUMENT|PATH_DENIED/. Input:
+  
+  '# failed\n' +
+    '\n' +
+    'code = "PROGRAM_FAILED"\n' +
+    'reason = "program threw: this.rg is not a function"\n'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/009.test.mjs:81:14)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '# failed\n\ncode = "PROGRAM_FAILED"\nreason = "program threw: this.rg is not a function"\n',
+    expected: /INVALID_ARGUMENT|PATH_DENIED/,
+    operator: 'match',
+    diff: 'simple'
+  }

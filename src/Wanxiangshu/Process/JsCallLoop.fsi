@@ -15,6 +15,7 @@ module JsCallLoop =
           OutputNotice: unit -> string
           ReadOutput: unit -> Task<Result<unit, string>>
           BorrowDeadline: int64 -> Task<(unit -> unit)>
+          RemainingMs: unit -> Task<int64>
           Own: (unit -> Task) -> bool }
 
     val standalone: ExecutionScope

@@ -14,6 +14,7 @@ type JsCapability =
     /// description gates its artifact-write teaching blocks on it.
     | Edit
     | Glob
+    | Grep
     | Move
     | Remove
     /// Host-owned long-running command engineering (`js.call`).
@@ -36,13 +37,14 @@ type JsCapability =
 module JsCapability =
 
     /// The only ToolPermission → JsCapability mapping. A permission without a
-    /// js-* projection (edit, grep, pty, ask, review, …) produces no member
+    /// js-* projection (edit, pty, ask, review, …) produces no member
     /// (JS-004 four-layer exactness).
     let ofToolPermission (permission: ToolPermission) : JsCapability option =
         match permission with
         | ToolPermission.Read -> Some JsCapability.Read
         | ToolPermission.Write -> Some JsCapability.Write
         | ToolPermission.Glob -> Some JsCapability.Glob
+        | ToolPermission.Grep -> Some JsCapability.Grep
         | ToolPermission.Move -> Some JsCapability.Move
         | ToolPermission.Remove -> Some JsCapability.Remove
         | ToolPermission.Exec -> Some JsCapability.Exec
@@ -233,6 +235,26 @@ module JsFragmentRegistry =
             + "  }\n"
             + "}"
           RuntimeBindingKey = "js.where" }
+
+    let rg: JsCapabilityFragment =
+        { Capability = JsCapability.Grep
+          MemberName = "rg"
+          Signature = "async rg(argv)"
+          Description =
+            "rg(argv) — search with ripgrep inside the workspace. Pass a string array with "
+            + "an explicit search path, for example ['-n', '-g', '*.fs', 'needle', '.']. "
+            + "Content returns { ok, exitCode, messages } with parsed JSON records; --files, "
+            + "-l and --files-without-match return { ok, exitCode, paths }. Exit 1 means no match. "
+            + "Common pattern, glob, type and ignore options are supported; side files stay "
+            + "inside the workspace. Unsupported options, external commands, symlink following "
+            + "and count/vimgrep/type-list/quiet modes refuse before search. No shell or Exec "
+            + "permission is granted. Search shares the current deadline and cancellation; "
+            + "oversized or invalid results fail explicitly. Narrow the query rather than "
+            + "expecting truncated JSON. The Host must provide rg."
+          CanonicalExample =
+            "class Js extends JsProgram {\n  async run() {\n"
+            + "    return await this.rg(['-n', '-g', '*.fs', 'TODO', '.']);\n  }\n}"
+          RuntimeBindingKey = "js.rg" }
 
     let run: JsCapabilityFragment =
         { Capability = JsCapability.Exec
@@ -468,6 +490,7 @@ module JsFragmentRegistry =
           mkdir
           whereAll
           where
+          rg
           run
           fork
           dag

@@ -38,6 +38,7 @@ const fsPermissionsOf = (role) =>
 const MEMBERS_BY_PERMISSION = {
   Read: ['cat', 'stat', 'whereAll', 'where'],
   Glob: ['ls'],
+  Grep: ['rg'],
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
@@ -59,6 +60,7 @@ const BINDING_BY_MEMBER = {
   mkdir: 'js.mkdir',
   whereAll: 'js.whereAll',
   where: 'js.where',
+  rg: 'js.rg',
   call: 'js.call',
   fork: 'js.fork',
   dag: 'js.dag',
@@ -71,7 +73,7 @@ const BINDING_BY_MEMBER = {
 const MEMBER_ORDER = [
   'write', 'rm', 'mv',
   'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
-  'call',
+  'rg', 'call',
   'fork',
   'dag',
   'join',

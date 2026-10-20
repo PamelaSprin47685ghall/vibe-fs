@@ -12,5 +12,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.host-contract-toolresultbound.fsproj"/>
     <Compile Include="Process/JsCallLoop.fsi"/>
     <Compile Include="Process/JsCallLoop.fs"/>
+    <Compile Include="Process/JsSearch.fsi"/>
+    <Compile Include="Process/JsSearch.fs"/>
   </ItemGroup>
 </Project>

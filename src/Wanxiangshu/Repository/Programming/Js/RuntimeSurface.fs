@@ -27,6 +27,7 @@ module JsRuntimeSurface =
                 [ JsCapability.Read
                   JsCapability.Write
                   JsCapability.Glob
+                  JsCapability.Grep
                   JsCapability.Move
                   JsCapability.Remove
                   JsCapability.Exec
@@ -47,6 +48,7 @@ module JsRuntimeSurface =
                 (JsToolsBindings.createLedger None)
                 None
                 None
+                None
 
         box (JsBindingsHandle(api, staging, readSnapshots))
 
@@ -56,6 +58,7 @@ module JsRuntimeSurface =
         | "Write" -> Some JsCapability.Write
         | "Edit" -> Some JsCapability.Edit
         | "Glob" -> Some JsCapability.Glob
+        | "Grep" -> Some JsCapability.Grep
         | "Move" -> Some JsCapability.Move
         | "Remove" -> Some JsCapability.Remove
         | "Exec" -> Some JsCapability.Exec
@@ -81,6 +84,7 @@ module JsRuntimeSurface =
                 readSnapshots
                 (ResizeArray<JsExplicitFileRead>())
                 (JsToolsBindings.createLedger None)
+                None
                 None
                 None
 

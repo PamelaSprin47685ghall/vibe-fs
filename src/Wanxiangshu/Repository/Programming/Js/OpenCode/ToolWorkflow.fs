@@ -421,17 +421,23 @@ module JsToolWorkflow =
 
             let! outcome =
                 taskResult {
+                    let execution =
+                        { JsCallLoop.standalone with
+                            OutputNotice = outputNotice ""
+                            SynchronousBudgetMs = deadlineMs
+                            RemainingMs =
+                                fun () ->
+                                    Task.FromResult(
+                                        max 0L (deadlineEpochMs - System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds())
+                                    ) }
+
                     let runHost: JsToolsBindings.JsCallHost =
                         { Loop =
                             fun parkState runnableClass stack ->
-                                JsCallLoop.execute
-                                    { JsCallLoop.standalone with
-                                        OutputNotice = outputNotice ""
-                                        SynchronousBudgetMs = deadlineMs }
-                                    parkState
-                                    root
-                                    runnableClass
-                                    stack }
+                                JsCallLoop.execute execution parkState root runnableClass stack }
+
+                    let searchHost: JsToolsBindings.JsSearchHost =
+                        { Search = JsSearch.execute execution root }
 
                     let api =
                         JsToolsBindings.createApi
@@ -442,6 +448,7 @@ module JsToolWorkflow =
                             explicitReads
                             ledger
                             (Some runHost)
+                            (Some searchHost)
                             None
 
                     let! resultJson =
@@ -581,6 +588,14 @@ module JsToolWorkflow =
                         task {
                             let! handle = runHandleReady.Task
                             return handle.BorrowDeadline duration
+                        }
+                  RemainingMs =
+                    fun () ->
+                        task {
+                            let! handle = runHandleReady.Task
+
+                            return
+                                emitJsExpr handle.DeadlineRef "BigInt(Math.max(0, Math.floor($0.current - Date.now())))"
                         }
                   Own =
                     processHost
@@ -752,6 +767,9 @@ module JsToolWorkflow =
             { Loop =
                 fun parkState callableClass stack -> JsCallLoop.execute execution parkState root callableClass stack }
 
+        let searchHost: JsToolsBindings.JsSearchHost =
+            { Search = JsSearch.execute execution root }
+
         JsToolsBindings.createApiWithPark
             capabilities
             root
@@ -761,6 +779,7 @@ module JsToolWorkflow =
             buffers.Ledger
             parkState
             (Some runHost)
+            (Some searchHost)
             (JsDelegationBridge.hostFor sessionId)
 
     let private runProgramWithPark

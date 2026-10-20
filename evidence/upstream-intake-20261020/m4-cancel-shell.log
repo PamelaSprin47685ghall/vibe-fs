@@ -1,0 +1,35 @@
+✖ WHAT[process-execution-006] rg pre-cancellation has zero effects and active cancellation drains an actual TERM-resistant query (4163.271875ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4410.545208
+
+✖ failing tests:
+
+test at requirements/process-execution/tests/006.test.mjs:75:1
+✖ WHAT[process-execution-006] rg pre-cancellation has zero effects and active cancellation drains an actual TERM-resistant query (4163.271875ms)
+  AssertionError [ERR_ASSERTION]: actual query has not reached its witness
+  
+  false !== true
+  
+      at file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:104:16
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at process.processTimers (node:internal/timers:615:9)
+      at async withSearchLauncher (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/support/search-launcher.mjs:19:12)
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:82:5
+      at async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:20:5
+      at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+      at async withRegisteredDevOps (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:12:3)
+      at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/process-execution/tests/006.test.mjs:79:3)
+      at async Test.run (node:internal/test_runner/test:1404:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

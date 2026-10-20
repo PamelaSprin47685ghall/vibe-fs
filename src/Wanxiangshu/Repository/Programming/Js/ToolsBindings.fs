@@ -694,6 +694,188 @@ module JsToolsBindings =
     type JsCallHost =
         { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }
 
+    type JsSearchHost =
+        { Search: string array -> bool -> Task<obj> }
+
+    type private RgArguments =
+        { Operands: string list
+          HasPattern: bool
+          FilesOnly: bool
+          PathsOnly: bool }
+
+    let private rgPath root path =
+        if pathIsAbsolute path then
+            ensureRealPathInside root path (pathResolve path)
+        else
+            result {
+                let! full = resolveInside root path
+                return! ensureRealPathInside root path full
+            }
+
+    let private rgFlag key parsed =
+        match key with
+        | "--files" ->
+            Ok
+                { parsed with
+                    FilesOnly = true
+                    PathsOnly = true }
+        | "-l"
+        | "--files-with-matches"
+        | "--files-without-match" -> Ok { parsed with PathsOnly = true }
+        | "-i"
+        | "--ignore-case"
+        | "-s"
+        | "--case-sensitive"
+        | "-S"
+        | "--smart-case"
+        | "-F"
+        | "--fixed-strings"
+        | "-w"
+        | "--word-regexp"
+        | "-x"
+        | "--line-regexp"
+        | "-n"
+        | "--line-number"
+        | "-N"
+        | "--no-line-number"
+        | "--hidden"
+        | "--no-ignore"
+        | "--no-ignore-vcs"
+        | "--json" -> Ok parsed
+        | _ -> Error(JsFailure.InvalidArgument("unsupported rg option: " + key))
+
+    let private rgValue root key value parsed =
+        match key with
+        | "-e"
+        | "--regexp" -> Ok { parsed with HasPattern = true }
+        | "-f"
+        | "--file" -> rgPath root value |> Result.map (fun () -> { parsed with HasPattern = true })
+        | "--ignore-file" -> rgPath root value |> Result.map (fun () -> parsed)
+        | _ -> Ok parsed
+
+    let private rgValueOptions =
+        set
+            [ "-e"
+              "--regexp"
+              "-f"
+              "--file"
+              "-g"
+              "--glob"
+              "--iglob"
+              "-t"
+              "--type"
+              "-T"
+              "--type-not"
+              "-m"
+              "--max-count"
+              "--max-depth"
+              "--encoding"
+              "--ignore-file" ]
+
+    let private rgArguments root (args: string array) =
+        let rec scan index afterOptions parsed =
+            if index >= args.Length then
+                Ok parsed
+            else
+                tokenAt index afterOptions parsed
+
+        and tokenAt index afterOptions parsed =
+            let token = args[index]
+
+            if not afterOptions && token = "--" then
+                scan (index + 1) true parsed
+            elif not afterOptions && token.StartsWith("-") then
+                optionAt index token parsed
+            else
+                scan
+                    (index + 1)
+                    afterOptions
+                    { parsed with
+                        Operands = token :: parsed.Operands }
+
+        and optionAt index (token: string) parsed =
+            let separator = token.IndexOf '='
+
+            let key =
+                if separator < 0 then
+                    token
+                else
+                    token.Substring(0, separator)
+
+            if Set.contains key rgValueOptions then
+                valueAt index separator key token parsed
+            elif separator >= 0 then
+                Error(JsFailure.InvalidArgument("unsupported rg option: " + token))
+            else
+                rgFlag key parsed |> Result.bind (scan (index + 1) false)
+
+        and valueAt index separator key token parsed =
+            if separator >= 0 then
+                rgValue root key (token.Substring(separator + 1)) parsed
+                |> Result.bind (scan (index + 1) false)
+            elif index + 1 < args.Length then
+                rgValue root key args[index + 1] parsed |> Result.bind (scan (index + 2) false)
+            else
+                Error(JsFailure.InvalidArgument("rg option requires a value: " + key))
+
+        result {
+            let! parsed =
+                scan
+                    0
+                    false
+                    { Operands = []
+                      HasPattern = false
+                      FilesOnly = false
+                      PathsOnly = false }
+
+            let operands = List.rev parsed.Operands
+
+            let paths =
+                if parsed.HasPattern || parsed.FilesOnly then
+                    operands
+                else
+                    operands |> List.skip (min 1 operands.Length)
+
+            do!
+                if
+                    List.isEmpty paths
+                    || (not parsed.HasPattern && not parsed.FilesOnly && operands.Length < 2)
+                then
+                    Error(
+                        JsFailure.InvalidArgument
+                            "rg requires a pattern and an explicit search path, or --files with a path"
+                    )
+                else
+                    paths |> List.traverseResultM (rgPath root) |> Result.map ignore
+
+            let framing = if parsed.PathsOnly then "--null" else "--json"
+            return Array.append [| "--no-config"; framing |] args, parsed.PathsOnly
+        }
+
+    [<Emit("Array.isArray($0) && Array.prototype.every.call($0, value => typeof value === 'string' && !value.includes('\\0'))")>]
+    let private isSearchArguments (value: obj) : bool = jsNative
+
+    let private invokeRg root arguments host =
+        match rgArguments root arguments, host with
+        | Error failure, _ -> Task.FromResult(failureObj failure)
+        | Ok(invocation, pathsOnly), Some injected -> injected.Search invocation pathsOnly
+        | Ok _, None -> Task.FromResult(failureObj (JsFailure.RgFailed "search Host is unavailable"))
+
+    let private makeRgMember root (host: JsSearchHost option) =
+        "rg"
+        ==> fun (argv: obj) ->
+            let search =
+                task {
+                    if not (isSearchArguments argv) then
+                        return failureObj (JsFailure.InvalidArgument "rg requires one string array argv without NUL")
+                    else
+                        let arguments: string array = emitJsExpr argv "Array.from($0)"
+
+                        return! invokeRg root arguments host
+                }
+
+            rejectRunFailure (box search)
+
     /// `js.call(class extends js.Callable { ... })`: hand the class to the host
     /// loop and await its structured outcome. Without an injected host loop
     /// the member refuses with CALL_HOST_UNAVAILABLE instead of pretending.
@@ -763,6 +945,7 @@ module JsToolsBindings =
         (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         (runHost: JsCallHost option)
+        (searchHost: JsSearchHost option)
         (delegationHost: JsDelegationHost option)
         : obj =
         let members =
@@ -774,6 +957,9 @@ module JsToolsBindings =
 
               if Set.contains JsCapability.Glob capabilities then
                   makeLsMember root
+
+              if Set.contains JsCapability.Grep capabilities then
+                  makeRgMember root searchHost
 
               if Set.contains JsCapability.Write capabilities then
                   makeWriteMember root staging readSnapshots ledger
@@ -822,9 +1008,20 @@ module JsToolsBindings =
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
         (runHost: JsCallHost option)
+        (searchHost: JsSearchHost option)
         (delegationHost: JsDelegationHost option)
         : obj =
-        createApiCore capabilities root staging readSnapshots explicitReads ledger None runHost delegationHost
+        createApiCore
+            capabilities
+            root
+            staging
+            readSnapshots
+            explicitReads
+            ledger
+            None
+            runHost
+            searchHost
+            delegationHost
 
     /// Build the api object for one sandbox run that carries a park lifecycle
     /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
@@ -838,6 +1035,7 @@ module JsToolsBindings =
         (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
         (runHost: JsCallHost option)
+        (searchHost: JsSearchHost option)
         (delegationHost: JsDelegationHost option)
         : obj =
         createApiCore
@@ -849,4 +1047,5 @@ module JsToolsBindings =
             ledger
             (Some parkState)
             runHost
+            searchHost
             delegationHost

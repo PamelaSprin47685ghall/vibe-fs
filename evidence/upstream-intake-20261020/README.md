@@ -28,3 +28,19 @@
 - `m3-formal-03.log`：gen26正式14文件120pass/0fail/0TODO，14/14排空、回收accepted=true。PATH只补已有 `/tmp/wget-1.25.0/src` 的真实GNU wget；无新下载/系统安装。覆盖公开能力、前后台/wget/send、伪造apply、参数数组、真实next/watch忙循环、未完成Promise、证明期间取消、并发借期、park期限、双路原字节、spool故障与未确认关闭归属。
 - 另有小范围手工格式整理与描述词汇修正，后续统一构建需覆盖这些最终字节；不将gen26证据冒称最终提交字节已验。M6完整物理和历史回归仍待。
 - `m3-build-03.log`：最终手工格式和描述修正后gen27，171表面/825模块加载通过。`m3-formal-04.log`：公开001/002、sanity050、取消006四文件50/0，4/4排空、回收accepted=true。三个格式预览仅写/tmp；依预览手工编辑后check通过，控制嵌套检查0违规。M3限定范围READY，完整发行、真实Host配置与M6统一候选未完成。
+
+## M4 / M5
+
+- `m4-build-06.log`：gen31，171表面/826模块。之前真实rg反例发现绝对路径校验误用文件API的根相对语义，已修；测试启动器遗漏Node参数分隔符会产生假阳性，补实际进入见证后重验。
+- `m4-formal-04.log`：并行58/1，取消启动见证未及时到达，保留失败。`m4-formal-05.log`：串行59/0，5/5排空且回收accepted。实际搜索、根内外/侧文件/符号链接、配置继承、缺rg、JSON/UTF8损坏、NUL文件名、输出超量、同一绝对期限、预取消及TERM抵抗后的PID死亡；另含真实插件Engineer无Exec与Host配置接线。
+- `m4-repository-node22.log`：最低Node全编程首轮289/5，58/58排空回收。五处公开合同旧断言和failureCatalog漏RG_FAILED已手工调整；复验待。日志保留，不计完整通过。
+- 受控shell启动器不稳定，采用实际Node查询；期限测试仍要求第一条完成、第二条实际启动并被同一期限停止，10秒第二工作不能获得新预算。产品期限、5秒监督门与旧TODO均未放宽。早期失败日志保留。
+
+剩余：统一候选物理/历史/包消费与发行入口；E05/E06按处置表留档。Blogger、.Herdchestra、库16入口及旧GAP范围保持。
+
+## M6 进行中
+
+- `m6-build-01.log`：gen32，171注册表面、826模块实际加载；`m6-format-01.log`、`m6-check-01.log`均退出0，report-only低置信度提示不记作销项。
+- `m6-related-node22-01.log`：最低Node串行78文件611pass/1fail/8TODO，78/78排空且回收accepted=true。全编程旧断言修正、原物理集、历史身份009/010、Trace002、Attachment021、冻结前缀008、context-compression010/011、WorkRecord001、只读墓碑及发行入口约束均实际执行。唯一普通失败是rg取消夹具3秒启动窗口；8旧TODO完整保留，不接受为通过。
+- `m4-cancel-independent-node22.log`仍在3秒窗口失败；`m4-cancel-observed-node22.log`使用已有有限物理等待后1/0，4363ms完成，实际进入见证后取消并确认PID死亡。预取消与活动取消分为独立插件实例；正式补验待。并未调整Host期限、5秒默认静默或实际关闭断言。
+- `m6-build-02.log`：gen33。`m6-focused-node22-02.log`：最低Node正式80/0，10/10排空、回收accepted=true，有限物理等待已正式验收；公开合同修正、插件接线与真实搜索可用。各组选集重叠，不累加为完整发行通过。

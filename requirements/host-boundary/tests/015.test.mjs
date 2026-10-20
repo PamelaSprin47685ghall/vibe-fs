@@ -7,6 +7,28 @@ const hostLines = (text) => text.split('\n').length
 
 const hostBytes = (text) => Buffer.byteLength(text)
 
+test('WHAT[host-boundary-015] real plugin config updates the Host budget used by registered tools', async () => {
+  const { withExecutablePlugin } = await import('../../verification-system/tests/support/plugin-fixture.mjs')
+  const { requiredNames } = await import('../../../dist/Participant/Persona/Surface.js')
+  try {
+    await withExecutablePlugin(async hooks => {
+      await hooks.config({
+        agent: Object.fromEntries(Array.from(requiredNames).map(name => [name, { model: `fixture/${name}-model` }])),
+        tool_output: { max_lines: 8, max_bytes: 128 },
+      })
+      assert.equal(toolResultBound.HostMaxLines(), 8)
+      assert.equal(toolResultBound.HostMaxBytes(), 128)
+      const registered = registerBounded({ tool: definition => definition }, 'configured', 'configured', () => Promise.resolve('中'.repeat(1000) + '\nactual tail'))
+      const wire = await registered.execute({}, { sessionID: 'configured' })
+      assert.ok(hostBytes(wire) <= 128)
+      assert.ok(hostLines(wire) <= 8)
+      assert.ok(wire.endsWith('actual tail'))
+    })
+  } finally {
+    toolResultBound.clearHostLimitsForTests()
+  }
+})
+
 test('WHAT[host-boundary-015] declared Host ceilings bound actual registered output and malformed updates keep the limit', async () => {
   try {
     toolResultBound.setHostLimits(8, 128)

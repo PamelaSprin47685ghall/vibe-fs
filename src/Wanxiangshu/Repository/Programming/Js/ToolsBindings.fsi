@@ -13,6 +13,9 @@ module JsToolsBindings =
     type JsCallHost =
         { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }
 
+    type JsSearchHost =
+        { Search: string array -> bool -> Task<obj> }
+
     val createLedger: persistence: IJsTransactionPersistence option -> JsAsIsLedger
 
     /// `js.horizon()`: the `(memberName, member)` pair for the horizon roster
@@ -32,6 +35,7 @@ module JsToolsBindings =
         explicitReads: ResizeArray<JsExplicitFileRead> ->
         ledger: JsAsIsLedger ->
         runHost: JsCallHost option ->
+        searchHost: JsSearchHost option ->
         delegationHost: JsDelegationHost option ->
             obj
 
@@ -47,5 +51,6 @@ module JsToolsBindings =
         ledger: JsAsIsLedger ->
         parkState: Wanxiangshu.Process.JsSandbox.ParkState ->
         runHost: JsCallHost option ->
+        searchHost: JsSearchHost option ->
         delegationHost: JsDelegationHost option ->
             obj

@@ -19,6 +19,7 @@ module JsCallLoop =
           OutputNotice: unit -> string
           ReadOutput: unit -> Task<Result<unit, string>>
           BorrowDeadline: int64 -> Task<(unit -> unit)>
+          RemainingMs: unit -> Task<int64>
           Own: (unit -> Task) -> bool }
 
     let standalone =
@@ -28,6 +29,7 @@ module JsCallLoop =
           OutputNotice = fun () -> ""
           ReadOutput = fun () -> Task.FromResult(Ok())
           BorrowDeadline = fun _ -> Task.FromResult ignore
+          RemainingMs = fun () -> Task.FromResult 2147483647L
           Own =
             fun start ->
                 start () |> ignore
