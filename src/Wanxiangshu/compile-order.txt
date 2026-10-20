@@ -703,8 +703,6 @@ OpenCode/Codec/OpencodeTypes.fsi
 OpenCode/Codec/OpencodeTypes.fs
 OpenCode/Host/ModelCapacity/Model.fsi
 OpenCode/Host/ModelCapacity/Model.fs
-OpenCode/Host/ModelCapacity/Ledger.fsi
-OpenCode/Host/ModelCapacity/Ledger.fs
 OpenCode/Host/ModelCapacity/Queue.fsi
 OpenCode/Host/ModelCapacity/Queue.fs
 OpenCode/Host/ModelCapacity/Borrowing.fsi

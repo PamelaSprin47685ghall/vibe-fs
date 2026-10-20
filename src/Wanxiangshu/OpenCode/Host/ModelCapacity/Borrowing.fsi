@@ -4,9 +4,7 @@ open System
 open System.Threading.Tasks
 
 type internal BorrowingCapacity<'target> =
-    new:
-        ledger: CapacityLedger<'target> * providerOf: ('target -> string) * sameTarget: ('target -> 'target -> bool) ->
-            BorrowingCapacity<'target>
+    new: providerOf: ('target -> string) * sameTarget: ('target -> 'target -> bool) -> BorrowingCapacity<'target>
 
     member RouteFresh:
         sessionId: string *

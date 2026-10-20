@@ -18,7 +18,6 @@
 /src/Wanxiangshu/Strength/OpenCode/**
 /src/Wanxiangshu/Strength/Policy.fs
 /src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs
-/src/Wanxiangshu/OpenCode/Host/ModelCapacity/Ledger.fs
 /src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs
 /src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs
 /src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs

@@ -16,8 +16,7 @@ type ModelExecutionPurpose = | Normal
 type internal CapacityCreditId = private CapacityCreditId of int64
 
 module internal CapacityCreditId =
-    val initial: CapacityCreditId
-    val next: CapacityCreditId -> CapacityCreditId
+    val ofValue: int64 -> CapacityCreditId
     val first: CapacityCreditId
     val value: CapacityCreditId -> int64
 

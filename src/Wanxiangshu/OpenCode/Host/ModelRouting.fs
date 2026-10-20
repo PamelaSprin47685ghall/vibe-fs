@@ -317,7 +317,7 @@ module ModelRouting =
         let transitionCounters = CapacityTransitionCounters()
 
         let capacity =
-            BorrowingCapacity<ModelRoutingTarget>(CapacityLedger<ModelRoutingTarget>(), targetProvider, (=))
+            BorrowingCapacity<ModelRoutingTarget>(targetProvider, (=))
         // DSL-MUTABLE: resource — active execution lease map per session
         let activeBySession = Dictionary<string, ExecutionLease>()
         let activeProviderStepTasks = Dictionary<string, Task>()

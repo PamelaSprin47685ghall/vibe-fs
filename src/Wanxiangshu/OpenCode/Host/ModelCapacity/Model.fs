@@ -16,9 +16,9 @@ type ModelExecutionPurpose = | Normal
 type internal CapacityCreditId = private CapacityCreditId of int64
 
 module internal CapacityCreditId =
-    let initial = CapacityCreditId 0L
-    let next (CapacityCreditId value) = CapacityCreditId(value + 1L)
-    let first = next initial
+    /// Credits are minted by wanxiangli/borrowing (CUT-10); the host only wraps the library's number.
+    let ofValue (value: int64) = CapacityCreditId value
+    let first = ofValue 1L
     let value (CapacityCreditId value) = value
 
 [<Struct; StructuralEquality; StructuralComparison>]

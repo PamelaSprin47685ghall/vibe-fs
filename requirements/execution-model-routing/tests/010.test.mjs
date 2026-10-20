@@ -287,17 +287,32 @@ const EXCLUSIVE_PRIVATE_KNOWLEDGE = Object.freeze([
   'recordReservationCredit',
   'adoptOwnedToken',
 ])
-const CONTROLLED_PUBLIC_TYPES = Object.freeze([
+// CUT-10: the capacity ledger, execution custody and provider-step borrowing law moved to
+// wanxiangli/borrowing (src/borrowing/CapacityBorrowing.fs). These host identifiers of the old
+// in-repo implementation were renamed or folded there; they must not reappear anywhere in the host.
+const RETIRED_HOST_KNOWLEDGE = Object.freeze([
   'CapacityLedger',
+  'CapacityStep',
+  'CapacityCreditState',
+  'CapacityCreditSource',
+  'currentCreditSource',
+  'capacityOrdinaryDecision',
+  'acquireForRoute',
+  'recordRoutedCredit',
+  'applyRoutedToken',
+  'ensureReservationToken',
+  'recordReservationCredit',
+])
+const CONTROLLED_PUBLIC_TYPES = Object.freeze([
   'BorrowingCapacity',
 ])
 const OWNER_FILES = Object.freeze([
   'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs',
-  'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Ledger.fs',
   'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs',
   'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs',
   'src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs',
 ])
+const LIBRARY_OWNER_FILE = 'wanxiangli/src/borrowing/CapacityBorrowing.fs'
 const PERMITTED_CONSUMER_FILES = Object.freeze([
   ...OWNER_FILES,
   'src/Wanxiangshu/OpenCode/Host/ModelRouting.fs',
@@ -305,10 +320,11 @@ const PERMITTED_CONSUMER_FILES = Object.freeze([
 
 test('WHAT[execution-model-routing-010] EMR_010_model_capacity_owner_defines_all_private_borrowing_knowledge', async () => {
   const ownerContent = (
-    await Promise.all(OWNER_FILES.map((file) => readFile(join(repoRoot, file), 'utf8')))
+    await Promise.all([...OWNER_FILES, LIBRARY_OWNER_FILE].map((file) => readFile(join(repoRoot, file), 'utf8')))
   ).join('\n')
 
   for (const identifier of EXCLUSIVE_PRIVATE_KNOWLEDGE) {
+    if (RETIRED_HOST_KNOWLEDGE.includes(identifier)) continue
     const pattern = new RegExp(`\\b${identifier}\\b`)
     assert.match(
       ownerContent,
@@ -334,12 +350,10 @@ test('WHAT[execution-model-routing-010] EMR_010_model_capacity_private_knowledge
 
   for (const fileAbs of allFsFiles) {
     const relPath = toRelative(fileAbs)
-    if (OWNER_FILES.includes(relPath)) {
-      continue
-    }
 
     const content = await readFile(fileAbs, 'utf8')
-    for (const identifier of EXCLUSIVE_PRIVATE_KNOWLEDGE) {
+    for (const identifier of [...EXCLUSIVE_PRIVATE_KNOWLEDGE, ...RETIRED_HOST_KNOWLEDGE]) {
+      if (OWNER_FILES.includes(relPath) && !RETIRED_HOST_KNOWLEDGE.includes(identifier)) continue
       const pattern = new RegExp(`\\b${identifier}\\b`)
       if (pattern.test(content)) {
         violations.push({
@@ -632,12 +646,14 @@ test('WHAT[execution-model-routing-010] EMR_010_borrowing_complexity_is_owned_on
   const capacity = (
     await Promise.all([
       source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Model.fs'),
-      source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Ledger.fs'),
       source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Queue.fs'),
       source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs'),
       source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Surface.fs'),
+      source('wanxiangli/src/borrowing/CapacityBorrowing.fs'),
     ])
   ).join('\n')
+  const adapter = await source('src/Wanxiangshu/OpenCode/Host/ModelCapacity/Borrowing.fs')
+  const library = await source('wanxiangli/src/borrowing/CapacityBorrowing.fs')
   const routing = await source('src/Wanxiangshu/OpenCode/Host/ModelRouting.fs')
   const sessions = await source('src/Wanxiangshu/OpenCode/Host/Sessions.fs')
   const binding = await source('src/Wanxiangshu/OpenCode/Host/SessionExecutionBinding.fs')
@@ -645,10 +661,14 @@ test('WHAT[execution-model-routing-010] EMR_010_borrowing_complexity_is_owned_on
   const host = await source('src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs')
   const scheduler = await source('resources/wanxiangshu.mjs')
 
-  assert.match(capacity, /type internal CapacityLedger<'target>/)
   assert.match(capacity, /type internal BorrowingCapacity<'target>/)
-  assert.match(capacity, /routeDecision/)
-  assert.match(capacity, /CapacityCreditState/)
+  // CUT-10: the ledger, token states and route decision are owned by wanxiangli/borrowing; the host
+  // adapter only imports it and must not re-implement any of it.
+  assert.match(adapter, /Import\("CapacityBorrowing", "wanxiangli\/borrowing"\)/)
+  assert.match(library, /type CapacityBorrowing\(/)
+  assert.match(library, /routeDecision/)
+  assert.match(library, /type internal TokenState/)
+  assert.doesNotMatch(adapter, /routeDecision|recordRoutedCredit|ownedTokenByExecution|creditSourceByExecution|TokenState|CapacityLedger/)
   assert.match(routing, /BorrowingCapacity<ModelRoutingTarget>/)
   assert.doesNotMatch(routing, /routeDecision|recordRoutedCredit|ownedTokenByExecution|creditSourceByExecution/)
 
