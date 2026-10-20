@@ -45,7 +45,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-09-a | 入口准入决策（ChatAdmission/Intent）的纯裁决 | 权威 | DONE | CUT-09 | eng-cut09e-goose（接手 eng-cut09d-goose、eng-cut09c-goose） | 2026-10-21 完成：入口准入固定次序（畸形载体、HumanRoot 重放、缺会话/快照/物理 id、已接受/已落地、pending claim 会话与来源可准入性、Host 内部、未 claim/授根/UnknownOriginWhileActive/省略 participant 续接）只剩 wanxiangli/authority 0.36.0 `admit` 一个 owner；Intent.fs 9 个手写裁决函数已删。差分 1,290,240 次 0 处不同，6 个变异全抓住。见 cards/CUT-09-a.md |
 | CUT-09-b | interaction-authority-018 关闭见证精确匹配 | 权威 | BACKLOG | CUT-09, CUT-11 | — | 2026-10-21 从 CUT-09 拆出：五类 ExpectedClosureKind 与 source witness 精确匹配，宿主需先补齐事实；见 cards/CUT-09.md §6 |
 | CUT-10 | 模型路由与精确容量许可 | 执行 | DOING | CUT-07 | eng-cut10d-goose（接手 eng-cut10c-goose、eng-cut10b-goose、eng-cut10-goose） | 2026-10-21 认领；①②③已合入（f982f8070 routing、9b4b64dad permit 0.33.0、807a3db6a capacity 0.35.0），eng-cut10d-goose 接手收尾：子范围①调度器 ABI（协议版本、导出形状、target 解码、同步调用、理论容量查询）抽入 wanxiangli/routing（0.25.0，主仓接线随本次交接合入）；②精确执行许可（签发/提交/两种互斥释放）抽入 wanxiangli/permit 进行中；③容量账本与 provider-step 借用随后。写集合 `OpenCode/Host/ModelRouting.fs(.fsi)` 的 ABI 段、`OpenCode/Host/ModelCapacity/*`；wanxiangli `src/routing/`、`src/permit/` |
-| CUT-11 | 派发认领与外部效果记账 | 执行 | BACKLOG | CUT-09, CUT-10 | — | — |
+| CUT-11 | 派发认领与外部效果记账 | 执行 | DOING | CUT-09, CUT-10 | eng-cut09e-goose | 2026-10-21 认领：先做库侧契约（wanxiangli/dispatch：认领作用域与 PromptKey 原文、ClaimSequence、四态结算编辑、occasion 准入、恢复核对）；主仓接线 `Interaction/Authority/{Model,Run}.fs` 的认领段与 `Interaction/Dispatch/Recovery.fs`，CUT-10 收尾后接入 |
 | CUT-12 | 会话关联与执行事实 | 执行 | BACKLOG | CUT-04, CUT-11 | — | — |
 | CUT-13 | 委派、复用与结果认领 | 执行 | BACKLOG | CUT-06, CUT-12 | — | — |
 | CUT-14 | 失败预算、恢复决议与结算 | 执行 | BACKLOG | CUT-10, CUT-11, CUT-12 | — | — |
