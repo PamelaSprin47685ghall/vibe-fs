@@ -19,8 +19,6 @@ type TenureAssemblyResult =
       ReanchorRequested: bool }
 
 module TenureIsolation =
-    val isCurrentTenurePhysical: openingCursor: int64 -> cursor: int64 option -> bool
-
     val assemble:
         messages: TenureMessage list ->
         tenure: ActiveTenureInfo ->

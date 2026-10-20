@@ -20,6 +20,34 @@ type TenureAssemblyResult =
 
 module TenureIsolation =
 
+    open Fable.Core
+    open Fable.Core.JsInterop
+
+    /// 任期过滤规则的唯一实现：wanxiangli/projection（CUT-17）。
+    [<AllowNullLiteral>]
+    type private ProjectionMessages =
+        abstract tenure: messages: obj * openingCursor: obj -> obj
+
+    [<Import("Projection", "wanxiangli/projection")>]
+    let private createProjection: unit -> ProjectionMessages = jsNative
+
+    let private projection = createProjection ()
+
+    let private physicalCursor (messageCursors: Map<string, int64>) (message: TenureMessage) =
+        message.Id
+        |> Option.bind (fun messageId -> Map.tryFind messageId messageCursors)
+
+    let private wireMessage (messageCursors: Map<string, int64>) (message: TenureMessage) : obj =
+        createObj
+            [ "id" ==> Option.toObj message.Id
+              "role" ==> message.Role
+              "synthetic" ==> message.IsSynthetic
+              "semantic" ==> message.HasSemanticParts
+              "cursor"
+              ==> (match physicalCursor messageCursors message with
+                   | Some cursor -> box cursor
+                   | None -> null) ]
+
     /// Assembles the physical message set for an active or post-S3 Plan tenure:
     /// verbatim user messages `U` (role user, non-synthetic, in original order)
     /// plus current-tenure physical messages whose first XTrace observation
@@ -27,60 +55,15 @@ module TenureIsolation =
     /// identity). All prior-tenure assistant/tool messages and synthetic rows
     /// are stripped; handover is carried by the predecessor's ANCHOR view
     /// declaration rather than a machine-materialized record.
-    let isCurrentTenurePhysical (openingCursor: int64) (cursor: int64 option) =
-        match cursor with
-        | None -> true
-        | Some sequence -> sequence >= openingCursor
-
-    let private physicalCursor (messageCursors: Map<string, int64>) (message: TenureMessage) =
-        message.Id
-        |> Option.bind (fun messageId -> Map.tryFind messageId messageCursors)
-
-    /// Strip a captured assistant/tool exchange only when its first
-    /// observation is strictly earlier than this opening. A Host id that is
-    /// not in the first-observation map has not been captured yet, so the
-    /// message stays. A semantic exchange with no Host id is still a contract
-    /// violation: do not invent a cursor, and do not keep or drop the whole set.
-    let private keepsInteraction
-        (tenure: ActiveTenureInfo)
-        (identity: string option)
-        (cursor: int64 option)
-        (hasSemanticParts: bool)
-        =
-        match identity, cursor, hasSemanticParts with
-        | _, Some sequence, _ -> sequence >= tenure.OpeningCursor
-        | Some _, None, _ -> true
-        | None, None, false -> false
-        | None, None, true -> invalidOp "Plan interaction has no stable XTrace message identity"
-
-    let private keepMessage (tenure: ActiveTenureInfo) cursor (message: TenureMessage) =
-        match message.IsSynthetic, message.Role with
-        | true, _ -> false
-        | false, "user" -> true
-        | false, "assistant"
-        | false, "tool" -> keepsInteraction tenure message.Id cursor message.HasSemanticParts
-        | false, _ -> false
-
-    let private validateTenure (tenure: ActiveTenureInfo) =
-        if tenure.OpeningCursor < 0L then
-            invalidArg (nameof tenure) "Plan opening cursor cannot be negative"
-
     let assemble
         (messages: TenureMessage list)
         (tenure: ActiveTenureInfo)
         (messageCursors: Map<string, int64>)
         : TenureAssemblyResult =
-        validateTenure tenure
+        let rows = List.toArray messages
 
         let kept =
-            messages
-            |> List.choose (fun message ->
-                let cursor = physicalCursor messageCursors message
+            projection.tenure (rows |> Array.map (wireMessage messageCursors) |> box, box tenure.OpeningCursor)
 
-                if keepMessage tenure cursor message then
-                    Some message.Raw
-                else
-                    None)
-
-        { Messages = kept
+        { Messages = unbox<int array> kept |> Array.map (fun index -> rows.[index].Raw) |> Array.toList
           ReanchorRequested = tenure.IsFreshHandover }
