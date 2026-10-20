@@ -43,11 +43,22 @@
 - G：主仓删除手写形状校验（`isAnchor`/`isRecord`/`keys`/`pairOf`/fold）、`live`/`plan` 内联实现、`AnchorView` 的 `Row`/`replace`/`messageOf` 折叠与三处计数。接手时发现前任未编译过的两处 `obj`→数组类型约束错误（`unbox` 修正）。
 - H：见证据：32 个相关测试文件 base/candidate 逐用例 verdict 完全相同；差分 3×1500 轮共 270000 次比较 0 分歧，变异体（替换边界 `>`→`>=+2`）在 300 轮内被抓到 457 次。
 
-## 6. 余项（本卡仍为 DOING）
+## 6. 子范围③与收卡（eng-cut16d-goose，DONE）
 
-- 子范围②：已完成，见 §7。
-- 子范围③：todo hook（todowrite 失败不落 checkpoint、不重写原生 todo 列表）与压缩候选接受/拒绝、退休/重启从原件恢复。
-- 已知不足：本机 Node 22.21.1 下有 7 个文件中 13 个用例既有失败（base 同样失败，见证据），全量 verify 与集成 run.mjs 未跑。
+按 CARDS 顺序逐项核对现行需求与代码后裁定，无剩余可切的纯职责：
+
+| 顺序项 | 现行规则 / 代码事实 | 处置 |
+|---|---|---|
+| todo hook：todowrite 失败不落 checkpoint | obligation-ledger [005]；error 终态由 `checkpoints().observe` 封口（库 004、主仓 005 集成层） | 子范围②已交库 |
+| 不重写原生 todo、无第二份 desired/applied | obligation-ledger [003]；`PluginHooks` 不持 todo 行，持久投影只有 `ViewCheckpoints` 的 `ToolCallId` | 无可切；obligation-ledger-003 两侧 ok |
+| 终态资格判断（`todowrite-for-*`、completed/error、非空 view 对象） | Host 事件线格式解码 | 留主仓（宿主 codec） |
+| 保留用户原文的材料切分 | context-compression [003] 已废 200 KiB 切块；[017] 原文只能被显式 view 替换，规则在 `compression.project` | 子范围①已交库 |
+| 真实压缩候选接受/拒绝、旧 Blogger 完成覆盖新任 | [003][008] 已废 Blogger/Chronicle/压缩请求；`src` 中 Blogger 引用为 0 | 已退役，无对象可切 |
+| 退休/重启后从原件恢复 | [031]“进程重启重置编号与进程内视图状态”；`ViewCheckpoints` 窗口由持久事实经 `PhaseWindow`（wanxiangli/prefix，CUT-15）折叠 | 无新职责；重启恢复语义归 prefix 投影 |
+| 编号台账、待用声明一次性消费、o200k、渲染 | `AnchorLedger`（进程内会话状态）、`AnchorView` | 留主仓（宿主会话状态与线格式） |
+| 旧 Cognition/canvas | cognitive-workspace 006 两侧 ok | 不重新引入 |
+
+退出核对：沉淀范围（view 覆盖 + checkpoint 准入）只有 wanxiangli/compression 一个 owner；无第二份 desired/applied todo。已知不足：全量 `scripts/verify.mjs` 与集成 `run.mjs` 未跑（共享机），72 文件内 9 个既有失败与集成层 2 个既有失败两侧相同，见证据。
 
 ## 7. 子范围②：view 检查点追加准入（eng-cut16d-goose）
 
