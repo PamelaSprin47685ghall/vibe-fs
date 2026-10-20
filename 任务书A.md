@@ -359,10 +359,10 @@ dotnet tool run fantomas src/Wanxiangshu                 # 格式化（阶段末
 
 ### B. 交付面剩余缺陷（本会话审计已定位、**未修**）
 
-- **B1** `Repository/Programming/Js/Description.fs`：`resume`/`commission` **不派生命名**（`fork` 派生了，`resume`/`commission` 没有）→ 文档里「单参 charge」调用会被 `name-required` 拒。修法照抄 fork 的 slug 派生。验收：`this.resume("继续审计", {1:null})` 不再 `name-required`。
+- **B1** ~~`resume`/`commission` 不派生命名~~ —— **已闭合（2026-10-21 核实，且非本批引入）**：`fork` 与 `commission` 共享 `deriveNameFromCharge`（`Description.fs:429`，`:565-571`、`:575-580`）；`resume` **有意不派生**（`Description.fs:581-585`，无 `name_derivation` 槽），因为现行 WHAT（`repository-programming` [056]）规定 `resume(payload, reportMapping)` 的 `payload` **必带 `name`**，拒绝码含 `name-required`。**旧条目「resume 应照抄 fork 派生」是过时义务，不得恢复。**
 - **B2** 同文件：`dag` 门控仍是 **Fork 即可**，但方法体调用 `this.join()`（Join 才有）→ 生成面可能引用不存在的成员。修法：dag 需要 Fork ∧ Join。
 - **B3** `Repository/Programming/Js/Capability.fs`：成员注册表**缺 deliver 分片** → `deliver` 不在 `surface.members` / `memberBinding`，四层目录描述不到它。
-- **B4** 同文件/同生成面：Manager 运行时基类读 `api.reviewOnly`，而非宿主执行路径没有该字段 → TypeError 而不是数据信封。修法：Manager 面恒挂 ReviewOnly 包装，或 `api.reviewOnly` 缺失时返回 `{ok:false,code:"REVIEW_ONLY"}`。
+- **B4** ~~Manager 运行时基类读 `api.reviewOnly` 导致 TypeError~~ —— **已闭合（2026-10-21 核实，且非本批引入）**：`ReviewOnly` 子对象的成员读 `this._api`（构造器收到的就是 `api.reviewOnly` 命名空间本身），不再误访问 `this._api.reviewOnly`（`Description.fs:771-778`）；缺失成员由 `missingMemberGuard`（`Description.fs:440-448`）以 `{ ok: false, code: "REVIEW_ONLY", reason: ... }` 拒绝；Manager 面在 `Description.fs:402` 挂 `reviewOnly = new ReviewOnly()`。
 - **B5** `Repository/Programming/Js/DeliveredValues.fs`：`tryTakeRenderedFor` 只比 `ProviderRun`，**不比 `ToolCallId`** → 同一 provider run 内的另一笔调用可取走本调用的交付物。修法：加按完整围栏取用的入口，fork/sync 侧改用它。
 - **B6** `Host/Facts.fs`：`tryFindByFenceFields` **不比较 `LogicalRunId` 与 `Task`** → 别的逻辑运行/别的任务的见证可以满足门禁。修法：围栏子集读取补这两个过滤位。
 - **B7** `Mission/Work/OpenCode/DeliverTool.fs`：`receipt.Status = "Observed"` 被当作 durable outcome 接纳（`durableOutcome`）→ 「无新事实的观察」可能走成 Delivered 并触发中断。修法：只认 `Committed`/`Replayed`。
@@ -482,10 +482,27 @@ dotnet tool run fantomas src/Wanxiangshu
 
 `work-021` / `work-024` 的根因是上游把 `devops` **宿主工具**整体退役（`StaticTools.fs:52-54`：devops 离开目录与 ToolSpec，只以编程面成员 `this.devops` 存活），这些用例仍在断言已退役的宿主工具。其余 7 条同属「用例仍在调用已退役宿主工具/旧契约」。
 
+**`work-026` 单列（可能不是「旧契约」，而是真生产缺陷 C2）**：`requirements/work/tests/026.test.mjs:124` 的 `AssertionError: post-S3 deliver must interrupt the conversation`。该红在 pristine `435eac2d9` 上同样存在，所以**不是本批引入**；但它与「用例仍调用已退役宿主工具」的其它 8 条不同类：**post-S3 交付是否登记「已成立」正是 C2 的内容**（`OpenCode/Tools/ToolRuntimeScope.fs:1333` 有 `RegisterPostS3Interrupt`，`PluginHooks.fs:533-544` 的 `settlePostS3Deliver` 只做 `RecordDeliveryPresented`）。build-doctor 正在审计 C2；**在 C2 审计结论出来前，不得把 `work-026` 归为「旧契约」豁免**。
+
+### 十·三·五 `npm run check` 的 167 项去重分类
+
+完整清单见 `/tmp/check-issues.md`（只读分类，未改任何代码）。摘要：
+
+| 门禁 | 规则 | 数量 | A 生产违反 | B 测试旧表示 | C 词法误报 |
+|---|---|---|---|---|---|
+| `fsharp-control-pyramid.mjs` | `match-pyramid` / `branch-pyramid` | 100 | 100 | 0 | 0 |
+| `js-boundary-gate.mjs` | `deep-dist-import` | 37 | 0 | 37 | 0 |
+| `js-boundary-gate.mjs` | `du-shape` | 30 | 0 | 30 | 0 |
+| **合计** | | **167** | **100** | **67** | **0** |
+
+- **A 类 100 项**全部在 `src/`，去重后 24 个文件；其中 **本批净增 4 处**，全在 `PluginHooks.fs`（`:425`、`:442`、`:444`、`:451`、`:454` 的扁平声明判定链），其余 76 处为上游既有欠账。
+- **B 类 67 项**全部在 `requirements/` 的 7 个测试文件里。**37 项 deep-dist-import 全部是不合法内部导入**（逐项比对 151 个公开 `SURFACE_MODULES`，命中数 0），涉及 12 个未注册内部模块；其中 3 个有直接可用的公开 Surface 落点（`Foundation/Roles.js`→`RolesSurface`、`Context/Trace/TerminalReporter.js`→`SemanticTraceSurface`、`Repository/Programming/Js/Failure.js`→两个 Failure 面），其余 9 个需先开/确认公开 Surface 或改走真实 Host 路径。30 项 `du-shape` 与深导入同源，迁移时须一并处理。
+- **C 类 0 项**：本轮没有词法误报——pyramid 门禁按 AST 判定嵌套深度，boundary 门禁命中的都是真实违规写法。
+
 ### 十·四 仍未闭合（需继续核查，非本批范围）
 
-- **B1** `resume`/`commission` 不派生命名 —— 未修。
-- **B4** `api.reviewOnly` 缺失路径 —— `ToolsBindings.fs:1251` 有 `api?reviewOnly <- review`，`Description.fs:280-283` 有 Manager 面改写，**本批未核实现状是否已闭合**。
+- **B1** —— **已闭合**（2026-10-21 按当前代码核实，非本批引入）。`fork` 与 `commission` 共享 `deriveNameFromCharge`（`Description.fs:429`，`:565-571`、`:575-580`）；`resume` **有意不派生**（`Description.fs:581-585`），符合现行 WHAT（`repository-programming` [056]：`resume` 的 `payload` 必带 `name`，拒绝码含 `name-required`）。旧条目的「resume 应派生」是过时义务。
+- **B4** —— **已闭合**（2026-10-21 按当前代码核实，非本批引入）。`ReviewOnly` 子对象的成员读 `this._api`（构造器收到的就是 `api.reviewOnly` 命名空间本身，`Description.fs:771-778`），不再误访问 `this._api.reviewOnly`；缺失成员由 `missingMemberGuard`（`Description.fs:440-448`）以 `{ ok: false, code: "REVIEW_ONLY", reason: ... }` 拒绝。
 - **B5** `tryTakeRenderedFor` 只比 `ProviderRun` 不比 `ToolCallId` —— **仍未修**。本批的处置是**删除**了新增的 `tryTakeRenderedFenced`（它无调用方，且 owner 的 `claim` 只支持 `peek`/`cache`/`run` 三种 mode，`run` 只比 providerRun，见 `wanxiangli/src/delivery/Delivery.fs:154-176`），并把 `tryTakeRenderedFor` 的注释改成实话：它只比 provider run、是 harness/fallback 通道、**不是交付证据**，真正的证据是 durable 见证。按最新 WHAT（`repository-programming` [054]/[059]）核对后，**完整 ToolCallId 围栏消费仍是未闭合项**，保留在本任务书待办。
 - **B8** S4 终态中断未按当前物理输入设围栏 —— 未核。
 - **B9** `PluginTransforms.fs` + `NarrativeTransform.fs` 五项 —— 未核。
