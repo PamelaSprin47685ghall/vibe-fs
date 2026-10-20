@@ -233,7 +233,7 @@ const terminalEvent = (sessionID, callID, status) => ({
           status,
           input: {
             program: 'class Js extends JsProgram { async run() { return {}; } }',
-            view: { prefixUntil: 1 },
+            prefixUntil: 1, thenMap: {},
           },
         },
       },
@@ -245,7 +245,7 @@ const todoCall = (hooks, sessionID, callID) => {
   const output = {
     args: {
       program: 'class Js extends JsProgram { async run() { return {}; } }',
-      view: { prefixUntil: 1 },
+      prefixUntil: 1, thenMap: {},
     },
   }
   return hooks['tool.execute.before']({ tool: 'todowrite-for-engineer', sessionID, callID }, output).then(() => output)
@@ -348,7 +348,7 @@ integrationTest('WHAT[obligation-ledger-004] the completed-terminal checkpoint l
       } finally { journal.JournalSurface_dispose(opened.journal); }
     `
     const recovered = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', coldScript,
-      join(runtime.directory, '.git'), sessionID, JSON.stringify(completedRange),
+      journalSurface.JournalSurface_initializeStateRoot(runtime.directory), sessionID, JSON.stringify(completedRange),
     ], { encoding: 'utf8', env: { ...process.env, WXS_E2E_QUIET: '1' } }))
     assert.equal(recovered, completedRecord)
 

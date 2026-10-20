@@ -1,108 +1,39 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-
 import { plan } from '../../../dist/Execution/Delegation/Advisor/Surface.js'
 
-// advisor-[002]: the view is the caller's own context, rendered with the repository's existing
-// blogger input vocabulary (`BloggerToml`/`SyntheticToml`): the authored `# ` comment header, one
-// blank line, then one `[[new_work_to_record]]` table per record. The declaration says how far the
-// view may reach (`prefixUntil`, exclusive) and which anchors arrive as summaries (`thenRemove`).
-const message = (anchor, text) => ({ anchor, text })
+const messages = [1, 2, 3].map((anchor) => ({ anchor, text: 'material-' + anchor }))
+const request = (prefixUntil, thenMap = {}, history = []) => ({
+  messages, declaration: { prefixUntil, thenMap }, history,
+})
+const count = (prompt) => (prompt.split('\n\n').slice(1).join('\n\n').match(/\[\[new_work_to_record\]\]/g) ?? []).length
 
-const request = (messages, { prefixUntil, thenRemove = [] } = {}) => ({
-  messages,
-  declaration: { prefixUntil, thenRemove },
+test('WHAT[advisor-002] the shared view retains the full context and protects its prefix in blogger tables', () => {
+  const planned = plan('en', [], request(3, { 1: 'ignored', 3: null }))
+  assert.deepEqual(planned.deliveredAnchors, [1, 2, 3])
+  assert.equal(count(planned.viewPrompt), 3)
+  assert.equal(planned.viewPrompt.startsWith('# '), true)
+  assert.equal(planned.viewPrompt.endsWith('\n'), true)
+  assert.match(planned.viewPrompt, /material-1/)
+  assert.match(planned.viewPrompt, /material-2/)
+  assert.match(planned.viewPrompt, /material-3/)
+  assert.doesNotMatch(planned.viewPrompt, /ignored/)
 })
 
-// The authored header prose itself names `[[new_work_to_record]]`, so every table count below is
-// scoped to the data body — the part after the header's blank line.
-const viewBody = (prompt) => {
-  const boundary = prompt.indexOf('\n\n')
-  return boundary === -1 ? '' : prompt.slice(boundary + 2)
-}
-
-const tableCount = (prompt) => (viewBody(prompt).match(/\[\[new_work_to_record\]\]/g) ?? []).length
-
-test('WHAT[advisor-002] the view prompt keeps the prefix under PrefixUntil in the blogger shape', () => {
-  const planned = plan(
-    'en',
-    [],
-    request(
-      [
-        message(1, 'anchor-one-material'),
-        message(2, 'anchor-two-material'),
-        message(3, 'anchor-three-material'),
-      ],
-      { prefixUntil: 3 },
-    ),
-  )
-
-  assert.equal(planned.hasNewMaterial, true)
-  assert.deepEqual(planned.deliveredAnchors, [1, 2])
-
-  const prompt = planned.viewPrompt
-  const boundary = prompt.indexOf('\n\n')
-  assert.equal(prompt.startsWith('# '), true, 'the authored header opens the view as a comment block')
-  assert.equal(
-    prompt.slice(0, boundary).split('\n').every((line) => line.startsWith('#')),
-    true,
-    'every header line is a `# ` comment line',
-  )
-  assert.equal(boundary > 0, true, 'the header block is separated from the tables by one blank line')
-  assert.equal(
-    viewBody(prompt).startsWith('[[new_work_to_record]]'),
-    true,
-    'the data body opens with the first record table',
-  )
-  assert.equal(tableCount(prompt), 2, 'one table per kept record')
-  assert.equal(prompt.includes('record = "anchor-one-material"'), true)
-  assert.equal(prompt.includes('record = "anchor-two-material"'), true)
-  assert.equal(prompt.includes('anchor-three-material'), false, 'an anchor at PrefixUntil is outside the view')
-  assert.equal(
-    prompt.indexOf('anchor-one-material') < prompt.indexOf('anchor-two-material'),
-    true,
-    'records keep the caller anchor order',
-  )
-  assert.equal(prompt.endsWith('\n'), true)
+test('WHAT[advisor-002] interval projection includes prior summaries before emitting the view', () => {
+  const planned = plan('en', [], request(0, { 1: 'one-and-two' }, [
+    { anchor: 2, until: 3, summary: 'old-two-summary' },
+  ]))
+  assert.equal(count(planned.viewPrompt), 2)
+  assert.match(planned.viewPrompt, /one-and-two/)
+  assert.match(planned.viewPrompt, /material-3/)
+  assert.doesNotMatch(planned.viewPrompt, /material-1|material-2|old-two-summary/)
 })
 
-test('WHAT[advisor-002] a ThenRemove pair substitutes that anchor text with its summary', () => {
-  const planned = plan(
-    'en',
-    [],
-    request([message(1, 'anchor-one-material'), message(2, 'anchor-two-material')], {
-      prefixUntil: 3,
-      thenRemove: [[2, 'anchor-two-summary']],
-    }),
-  )
-
-  assert.deepEqual(planned.deliveredAnchors, [1, 2])
-  assert.equal(planned.viewPrompt.includes('record = "anchor-two-summary"'), true)
-  assert.equal(
-    planned.viewPrompt.includes('anchor-two-material'),
-    false,
-    'the removed anchor arrives as its summary, not as its text',
-  )
-  assert.equal(planned.viewPrompt.includes('record = "anchor-one-material"'), true)
-  assert.equal(tableCount(planned.viewPrompt), 2)
-})
-
-test('WHAT[advisor-002] an empty delta reports HasNewMaterial false and emits no record', () => {
-  const delivered = [1, 2]
-  const empty = plan(
-    'en',
-    delivered,
-    request([message(1, 'anchor-one-material'), message(2, 'anchor-two-material')], { prefixUntil: 2 }),
-  )
-
-  assert.equal(empty.hasNewMaterial, false, 'nothing new was handed over')
-  assert.deepEqual(empty.deliveredAnchors, [1, 2], 'a delivered anchor is never dropped')
-  assert.equal(viewBody(empty.viewPrompt), '', 'no record is emitted for an empty delta')
-  assert.equal(tableCount(empty.viewPrompt), 0)
-  assert.equal(empty.viewPrompt.startsWith('# '), true, 'the view prompt keeps its header')
-
-  const noMaterial = plan('en', [], request([], { prefixUntil: 5 }))
-  assert.equal(noMaterial.hasNewMaterial, false)
-  assert.deepEqual(noMaterial.deliveredAnchors, [])
-  assert.equal(tableCount(noMaterial.viewPrompt), 0)
+test('WHAT[advisor-002] an empty context has no new material and keeps the authored header', () => {
+  const planned = plan('en', [], { messages: [], declaration: { prefixUntil: 0, thenMap: {} } })
+  assert.equal(planned.hasNewMaterial, false)
+  assert.deepEqual(planned.deliveredAnchors, [])
+  assert.equal(count(planned.viewPrompt), 0)
+  assert.equal(planned.viewPrompt.startsWith('# '), true)
 })

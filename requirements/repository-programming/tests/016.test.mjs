@@ -20,6 +20,7 @@ const toolModule = () => {
   tool.schema = {
     string: () => ({
       type: 'string',
+      nullable: () => ({ type: 'string', nullable: true }),
       describe: (description) => ({ type: 'string', description }),
     }),
     any: () => ({
@@ -36,7 +37,8 @@ const toolModule = () => {
       type: 'record',
       key,
       value,
-      describe: (description) => ({ type: 'record', key, value, description }),
+      describe: (description) => ({ type: 'record', key, value, description,
+        optional: () => ({ type: 'record', key, value, description, optional: true }) }),
     }),
     object: (shape) => ({ type: 'object', shape }),
   }
@@ -190,7 +192,7 @@ const { createRegistered, execute } = await import("../../../dist/Repository/Pro
 const toolModule = () => {
   const tool = (definition) => definition
   tool.schema = {
-    string: () => ({ type: 'string', describe: (text) => ({ type: 'string', description: text }) }),
+    string: () => ({ type: 'string', nullable: () => ({ type: 'string', nullable: true }), describe: (text) => ({ type: 'string', description: text }) }),
     any: () => ({ type: 'any', optional: () => ({ type: 'any', optional: true }) }),
     number: () => ({ type: 'number', optional: () => ({ type: 'number', optional: true }) }),
     array: (item) => ({ type: 'array', item, describe: (description) => ({ type: 'array', item, description }) }),
@@ -198,7 +200,8 @@ const toolModule = () => {
       type: 'record',
       key,
       value,
-      describe: (description) => ({ type: 'record', key, value, description }),
+      describe: (description) => ({ type: 'record', key, value, description,
+        optional: () => ({ type: 'record', key, value, description, optional: true }) }),
     }),
     object: (shape) => ({ type: 'object', shape }),
   }

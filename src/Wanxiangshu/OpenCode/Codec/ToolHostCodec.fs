@@ -314,6 +314,9 @@ module ToolHostCodec =
     [<Emit("$0.schema.string()")>]
     let private rawStringSchema (tool: obj) : obj = jsNative
 
+    [<Emit("$0.schema.string().nullable()")>]
+    let private rawNullableStringSchema (tool: obj) : obj = jsNative
+
     [<Emit("$0.schema.any().optional()")>]
     let private rawAnySchema (tool: obj) : obj = jsNative
 
@@ -474,6 +477,12 @@ module ToolHostCodec =
     let internal schemaValue (HostSchema schema) = schema
 
     let stringSchema (HostToolFactory factory) = HostSchema(rawStringSchema factory)
+
+    let nullableStringSchema (HostToolFactory factory) =
+        HostSchema(rawNullableStringSchema factory)
+
+    let optionalSchema (HostSchema schema) =
+        HostSchema(emitJsExpr schema "$0.optional()")
 
     /// Free-form JSON value: the caller owns the injected value's shape.
     let anySchema (HostToolFactory factory) = HostSchema(rawAnySchema factory)

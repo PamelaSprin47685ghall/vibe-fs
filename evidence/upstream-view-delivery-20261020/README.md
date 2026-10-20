@@ -26,3 +26,5 @@
 真实 Host 证明包括不注入保证书、历史实际传入的 contract 原样恢复、正常/失败/取消及 executor throw 的实际边界、provider 序列化和 grounding 原件；scope 内的 mock 测试另证明同源键顺序和并发参数隔离。未把历史 executor throw TODO 或 GAP-106 转绿。
 
 UM-1 限定源码接收已具备证据。完整发行、独立安装包、UM-2—UM-4 组合及运行切换留给后续包；distribution-007 的旧发行问题仍由 N1 承接。
+
+UM-2 的中间失败与修正过程保存在 um2-*.log：首轮类型不匹配、静态分支门禁、旧 view checkpoint 入口、旧前缀展示断言，以及 Advisor 完整尝试夹具的 authority 冲突均保留。um2-provider011-baseline.log 是旧工作树同名用例的原始 6 pass / 2 fail，作为本轮同类失败的基线证据，不当作接收证明。最终冻结候选以 um2-delivery.json 为准；相关测试、integration checkpoint、剩余旧失败分别列明。

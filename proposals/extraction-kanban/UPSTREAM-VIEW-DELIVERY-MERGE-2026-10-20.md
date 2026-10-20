@@ -159,3 +159,17 @@ UM-1 最终 gen43 构建、格式和静态检查通过。正式七文件 175pass
 Host canary 的旧 schema 观察断言同步更新；其真实物理执行使用已有 begin/end ACK、最多 30000ms 授权，默认 5000ms 静默门和原子进程超时未改。原始静默、旧断言、夹具及构建期语料变化失败均保留，详见[证据索引](../../evidence/upstream-view-delivery-20261020/README.md)。当前仅满足 UM-1 限定源码接收；未执行完整发行、包消费或部署，旧 GAP/TODO 不关闭。
 
 最终把本计划、看板和证据索引冻结暂存，再构建复验；最终候选结果只写入 [um1-delivery.json](../../evidence/upstream-view-delivery-20261020/um1-delivery.json)，不在验证期间继续修改作为构建输入的 Markdown。
+
+### UM-2 开始
+
+UM-1 已以24462522f普通推送master；提交后构建新鲜度仍为gen44。UM-2从该干净候选接续。先定义thenMap、有序区间、Plan用户原文保护及调用边界，再迁移实际消费者。上游Plan通用化目前只切工作目录并提供PLAN_PATH常量，未落实本地P-only文件约束；这是接收前必须用真实路径/原始API调用反例验证的边界，不按显示问题留到部署后。
+
+### UM-2 接线与中间证据
+
+已接入有序固定区间、null 保留、隐含 0、保护前缀、历史摘要和材料游标；Host 在真实用户与终态工具结果原位投影锚点。顶层 prefixUntil/thenMap、nullable map schema、持久 checkpoint 监听及相关夹具共同迁移。Plan 复用普通文件原语、效果记账和 park 流程，实际 API 限定 P；每次写入重新检查本程序原任期身份与评审，不能借用继任者评审。旧 file/edit/rewrite 算法和独立提交路径已手工移除。
+
+gen45 构建通过；初选 28 项通过，真实 Plan Host 21/22 通过后修正 checkpoint 入口。gen46 正式扩选为 144 pass、28 fail、14 skip、1 旧 TODO，26/26 排空且回收 accepted=true。失败分为旧断言/夹具迁移与 provider-projection-011 的既有两项缺失 ProviderStarted 证据；后者在旧工作树同名测试原样复现为 6 pass、2 fail，日志为 um2-provider011-baseline.log，先记录，不修旧夹具。前缀断言保留原件冲突、冷恢复和原文字节反例，仅将新增内联标记与指导正文分开观察。Advisor 装配的完整模型尝试夹具会触发既有专席第二 prompt 的 authority 冲突，保留失败日志；其成员返回隔离测试使用共享 Anchor 边界准备本轮视图。
+
+上述均为中间结果，不关闭 UM-2。最终源码冻结后同候选重新构建，正式选集及 integration checkpoint 单列；之后结果写入 evidence/upstream-view-delivery-20261020/um2-delivery.json。UM-3、UM-4 尚未实现，本组未进入 master，未部署。
+
+gen47 构建与静态检查通过。核心 21 文件 156 pass、1 新断言失败、1 skip、1 旧 TODO；checkpoint integration 5 文件 22 pass、1 失败，两组均完整排空、回收 accepted=true。已定位并局部修正：新锚点测试遗漏已有指导后缀；provider-projection-011 与 obligation-ledger-004 的夹具读取旧 .git 状态目录。前者改用现有状态根后，与锚点反例原生合跑 24 pass、0 fail；不扩大修其他历史债务。Plan 文件观察器保持启用，改用 P 所在的真实目录，防止把底稿 plan.md 误记成仓库根的同名文件。自动审批曾拒绝移除该观察器的方案；未执行该删除，接收的是保留观察且修正路径归属的实现。

@@ -14,18 +14,36 @@ module AnchorLedger =
     let private numbers = Dictionary<string, Dictionary<string, int>>()
 
     // DSL-MUTABLE: resource — sessionId → pending one-turn declaration
-    let private views = Dictionary<string, AnchorViewDeclaration>()
+    let private views = Dictionary<string, AnchorViewDeclaration * int list>()
 
-    // DSL-MUTABLE: resource — sessionId → (anchor → summary standing in for it)
-    let private summaries = Dictionary<string, Dictionary<int, string>>()
+    // DSL-MUTABLE: resource — session-owned ordered replacement history
+    let private histories = Dictionary<string, AnchorReplacement list>()
 
-    let private sessionTable (store: Dictionary<string, Dictionary<int, string>>) (sessionId: string) =
-        match store.TryGetValue sessionId with
-        | true, existing -> existing
-        | false, _ ->
-            let fresh = Dictionary<int, string>()
-            store.[sessionId] <- fresh
-            fresh
+    // DSL-MUTABLE: resource — session-owned source material
+    let private contexts = Dictionary<string, (string option * string) list>()
+
+    // DSL-MUTABLE: resource — authoritative Plan user anchors
+    let private protectedAnchors = Dictionary<string, Set<int>>()
+
+    let remember sessionId messages = contexts.[sessionId] <- messages
+
+    let context sessionId =
+        match contexts.TryGetValue sessionId with
+        | true, messages -> messages
+        | false, _ -> []
+
+    let replacements sessionId =
+        match histories.TryGetValue sessionId with
+        | true, history -> history
+        | false, _ -> []
+
+    let private overlaps anchors change =
+        anchors
+        |> Set.exists (fun anchor -> anchor >= change.Anchor && anchor < change.Until)
+
+    let protect sessionId anchors =
+        protectedAnchors.[sessionId] <- anchors
+        histories.[sessionId] <- replacements sessionId |> List.filter (overlaps anchors >> not)
 
     let numberMessage (sessionId: string) (messageId: string) : int =
         let session =
@@ -43,7 +61,7 @@ module AnchorLedger =
             session.[messageId] <- nextNumber.Value
             nextNumber.Value
 
-    let anchors (sessionId: string) : (int * string) list =
+    let private numbered (sessionId: string) : (int * string) list =
         match numbers.TryGetValue sessionId with
         | false, _ -> []
         | true, session ->
@@ -52,35 +70,54 @@ module AnchorLedger =
             |> Seq.sortBy fst
             |> Seq.toList
 
-    let setView (sessionId: string) (declaration: AnchorViewDeclaration) : unit = views.[sessionId] <- declaration
+    let knownAnchors sessionId = numbered sessionId |> List.map fst
+
+    let anchors sessionId =
+        let surviving =
+            AnchorViewDeclaration.live (knownAnchors sessionId) (replacements sessionId)
+            |> Set.ofList
+
+        numbered sessionId
+        |> List.filter (fun (anchor, _) -> Set.contains anchor surviving)
+
+    let setView sessionId declaration =
+        let history = replacements sessionId
+
+        let changes =
+            AnchorViewDeclaration.plan (knownAnchors sessionId) history declaration
+
+        let protectedSet =
+            match protectedAnchors.TryGetValue sessionId with
+            | true, anchors -> anchors
+            | false, _ -> Set.empty
+
+        let blocked, accepted = changes |> List.partition (overlaps protectedSet)
+        histories.[sessionId] <- history @ accepted
+        views.[sessionId] <- declaration, (blocked |> List.map _.Anchor)
+
+    let protectedReplacements sessionId =
+        match views.TryGetValue sessionId with
+        | true, (_, blocked) -> blocked
+        | false, _ -> []
 
     let takeView (sessionId: string) : AnchorViewDeclaration option =
         match views.TryGetValue sessionId with
-        | true, declaration ->
+        | true, (declaration, _) ->
             views.Remove sessionId |> ignore
             Some declaration
         | false, _ -> None
 
-    /// A summary is permanent: from here on the anchor's segments are replaced
-    /// by it, whether or not a later declaration names that anchor again.
-    let replaceAnchors (sessionId: string) (pairs: (int * string) list) : unit =
-        if not (List.isEmpty pairs) then
-            let session = sessionTable summaries sessionId
-
-            pairs |> List.iter (fun (anchor, summary) -> session.[anchor] <- summary)
-
-    let replacements (sessionId: string) : Map<int, string> =
-        match summaries.TryGetValue sessionId with
-        | true, existing -> existing |> Seq.map (fun pair -> pair.Key, pair.Value) |> Map.ofSeq
-        | false, _ -> Map.empty
-
     let clearSession (sessionId: string) : unit =
         numbers.Remove sessionId |> ignore
         views.Remove sessionId |> ignore
-        summaries.Remove sessionId |> ignore
+        histories.Remove sessionId |> ignore
+        contexts.Remove sessionId |> ignore
+        protectedAnchors.Remove sessionId |> ignore
 
     let clearAll () : unit =
         numbers.Clear()
         views.Clear()
-        summaries.Clear()
+        histories.Clear()
+        contexts.Clear()
+        protectedAnchors.Clear()
         nextNumber.Value <- 0

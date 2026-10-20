@@ -22,7 +22,9 @@ const rendered = (result) =>
   result.entries.map((entry) => (entry.kind === 'kept' ? entry.message.text : `#${entry.summary}`))
 
 const messagesOf = (id, messages) => {
-  for (const message of messages) numberMessage(id, message.id)
+  for (const message of messages) {
+    if (typeof message.id === 'string') numberMessage(id, message.id)
+  }
   return messages
 }
 
@@ -47,7 +49,7 @@ test('WHAT[context-compression-031] anchor numbers are stable per session and me
 
 test('WHAT[context-compression-031] a view declaration is consumed exactly once', () => {
   const id = session()
-  const declaration = { prefixUntil: 3, thenRemove: { 7: 'segment 7 held the benchmark table' } }
+  const declaration = { prefixUntil: 3, thenMap: { 7: 'segment 7 held the benchmark table' } }
   setView(id, declaration)
   assert.deepEqual(takeView(id), declaration, 'the declaration echoes back as declared')
   assert.equal(takeView(id), null, 'the declaration does not persist')
@@ -63,11 +65,17 @@ test('WHAT[context-compression-031] a malformed view declaration is refused and 
   for (const malformed of [
     {},
     { prefixUntil: 'all' },
-    { thenRemove: { 1: 'summary' } },
-    { prefixUntil: 1, thenRemove: [1] },
-    { prefixUntil: 1, thenRemove: { 2: '' } },
-    { prefixUntil: 1, thenRemove: { two: 'summary' } },
-    { prefixUntil: 1, thenRemove: { 2: 3 } },
+    { thenMap: { 1: 'summary' } },
+    { prefixUntil: 1 },
+    { prefixUntil: -1, thenMap: {} },
+    { prefixUntil: 1.5, thenMap: {} },
+    { prefixUntil: Infinity, thenMap: {} },
+    { prefixUntil: null, thenMap: {} },
+    { prefixUntil: 1, thenMap: [1] },
+    { prefixUntil: 1, thenMap: { 2: '' } },
+    { prefixUntil: 1, thenMap: { two: 'summary' } },
+    { prefixUntil: 1, thenMap: { 2: 3 } },
+    { prefixUntil: 1, thenRemove: {} },
   ]) {
     setView(id, malformed)
     assert.equal(takeView(id), null, `refused declaration must not be captured: ${JSON.stringify(malformed)}`)
@@ -97,7 +105,7 @@ test('WHAT[context-compression-031] prefixUntil protects a prefix without replac
     { id: 'b', text: 'beta' },
     { id: 'c', text: 'gamma' },
   ])
-  setView(id, { prefixUntil: 99 })
+  setView(id, { prefixUntil: 99, thenMap: {} })
   const result = applyView(id, messages)
   assert.deepEqual(rendered(result), ['alpha', 'beta', 'gamma'], 'nothing is dropped by prefixUntil alone')
   assert.equal(
@@ -116,7 +124,7 @@ test('WHAT[context-compression-031] a summary stands in for its anchor for the r
     { id: 'c', text: 'gamma' },
   ])
 
-  setView(id, { prefixUntil: 1, thenRemove: { 2: 'b held the tool dump' } })
+  setView(id, { prefixUntil: 1, thenMap: { 2: 'b held the tool dump' } })
   const first = applyView(id, messages)
   assert.deepEqual(kinds(first), ['kept', 'summarized', 'kept'])
   assert.deepEqual(rendered(first), ['alpha', '#b held the tool dump', 'gamma'])
@@ -139,9 +147,9 @@ test('WHAT[context-compression-031] separate replacements each stand in place', 
     { id: 'c', text: 'gamma' },
   ])
 
-  setView(id, { prefixUntil: 1, thenRemove: { 1: 'a held the brief' } })
+  setView(id, { prefixUntil: 1, thenMap: { 1: 'a held the brief' } })
   applyView(id, messages)
-  setView(id, { prefixUntil: 1, thenRemove: { 3: 'c held the tail' } })
+  setView(id, { prefixUntil: 1, thenMap: { 3: 'c held the tail' } })
   const result = applyView(id, messages)
   assert.deepEqual(rendered(result), ['#a held the brief', 'beta', '#c held the tail'])
   assert.equal(result.report.folded, 0)
@@ -155,10 +163,10 @@ test('WHAT[context-compression-031] replacing an earlier anchor folds the replac
     { id: 'c', text: 'gamma' },
   ])
 
-  setView(id, { prefixUntil: 1, thenRemove: { 2: 'b held the tool dump' } })
+  setView(id, { prefixUntil: 1, thenMap: { 2: 'b held the tool dump' } })
   applyView(id, messages)
 
-  setView(id, { prefixUntil: 1, thenRemove: { 1: 'a and the tool dump, in one paragraph' } })
+  setView(id, { prefixUntil: 1, thenMap: { 1: 'a and the tool dump, in one paragraph' } })
   const result = applyView(id, messages)
   assert.deepEqual(
     rendered(result),
@@ -169,13 +177,13 @@ test('WHAT[context-compression-031] replacing an earlier anchor folds the replac
   assert.deepEqual(result.report.replaced.sort(), [1, 2], 'both anchors are gone: one summarized, one folded')
 })
 
-test('WHAT[context-compression-031] messages without an id are never silently dropped', () => {
+test('WHAT[context-compression-031] unidentified content remains when no interval replaces it', () => {
   const id = session()
   const messages = messagesOf(id, [
     { id: 'a', text: 'alpha' },
     { text: 'unidentified tail' },
   ])
-  setView(id, { prefixUntil: 1, thenRemove: { 9: 'nothing matches anchor 9' } })
+  setView(id, { prefixUntil: 1, thenMap: { 9: 'nothing matches anchor 9' } })
   const result = applyView(id, messages)
   assert.deepEqual(rendered(result), ['alpha', 'unidentified tail'])
 })
@@ -183,6 +191,78 @@ test('WHAT[context-compression-031] messages without an id are never silently dr
 test('WHAT[context-compression-031] countTokens reports the o200k_base token count', () => {
   assert.ok(countTokens('hello world') > 0)
   assert.ok(countTokens('hello world') >= countTokens('hello'))
+})
+
+test('WHAT[context-compression-031] registered Host inline anchors are stable projections and do not alter physical originals', async () => {
+  const { withGuidanceHost } = await import('../../prefix-stability/tests/support/guidance-host.mjs')
+  await withGuidanceHost('completed', async host => {
+    const raw = JSON.stringify(host.raw)
+    const user = host.first.find(message => message.info.id === host.raw[0].info.id)
+    const tool = host.first.find(message => message.info.id === host.result.info.id)
+    const known = anchors(host.sessionID)
+    const markerFor = id => '[ANCHOR: ' + known.find(item => item.messageId === id).anchor + ']\0\uFEFF'
+    assert.ok(user.parts[0].text.startsWith(markerFor(host.raw[0].info.id) + host.raw[0].parts[0].text))
+    assert.ok(tool.parts[0].state.output.startsWith(markerFor(host.result.info.id)))
+    assert.deepEqual(await host.transform(host.raw), host.first)
+    assert.equal(JSON.stringify(host.raw), raw)
+    const original = await host.current()
+    assert.deepEqual(host.cold().projection, original)
+    assert.ok(original.messages.flatMap(message => message.parts)
+      .some(part => part.kind === 'text' && part.text === host.raw[0].parts[0].text))
+    assert.ok(original.messages.flatMap(message => message.parts)
+      .filter(part => part.kind === 'tool-result').every(part => !part.result.includes('[ANCHOR:')))
+  }, 'inline-anchors-031', { role: 'engineer', openWorkBeforeTool: true })
+})
+
+test('WHAT[context-compression-031] protected items and null mappings keep their current material', () => {
+  const id = session()
+  const messages = messagesOf(id, [
+    { id: 'a', text: 'alpha' }, { id: 'b', text: 'beta' }, { id: 'c', text: 'gamma' },
+  ])
+  setView(id, { prefixUntil: 2, thenMap: { 1: 'protected', 2: null, 3: 'summary gamma' } })
+  assert.deepEqual(rendered(applyView(id, messages)), ['alpha', 'beta', '#summary gamma'])
+  setView(id, { prefixUntil: 0, thenMap: { 1: 'summary alpha' } })
+  assert.deepEqual(rendered(applyView(id, messages)), ['#summary alpha', 'beta', '#summary gamma'])
+  setView(id, { prefixUntil: 99, thenMap: {} })
+  const result = applyView(id, messages)
+  assert.deepEqual(rendered(result), ['#summary alpha', 'beta', '#summary gamma'])
+  assert.equal(result.report.cached, result.report.used)
+})
+
+test('WHAT[context-compression-031] same-round adjacent summaries use the input partition', () => {
+  const id = session()
+  const messages = messagesOf(id, [
+    { id: 'a', text: 'alpha' }, { text: 'alpha reasoning' },
+    { id: 'b', text: 'beta' }, { id: 'c', text: 'gamma' },
+  ])
+  setView(id, { prefixUntil: 0, thenMap: { 2: 'summary beta', 1: 'summary alpha' } })
+  assert.deepEqual(rendered(applyView(id, messages)), ['#summary alpha', '#summary beta', 'gamma'])
+})
+
+test('WHAT[context-compression-031] anchor zero persists and earlier replacement includes prior summaries', () => {
+  const id = session()
+  const messages = messagesOf(id, [
+    { text: 'opening' }, { id: 'a', text: 'alpha' },
+    { id: 'b', text: 'beta' }, { id: 'c', text: 'gamma' }, { id: 'd', text: 'delta' },
+  ])
+  setView(id, { prefixUntil: 0, thenMap: { 3: 'summary gamma' } })
+  applyView(id, messages)
+  setView(id, { prefixUntil: 0, thenMap: { 2: 'beta and gamma' } })
+  assert.deepEqual(rendered(applyView(id, messages)), ['opening', 'alpha', '#beta and gamma', 'delta'])
+  setView(id, { prefixUntil: 0, thenMap: { 0: 'summary opening' } })
+  assert.deepEqual(rendered(applyView(id, messages)), ['#summary opening', 'alpha', '#beta and gamma', 'delta'])
+  setView(id, { prefixUntil: 0, thenMap: { 0: 'new opening' } })
+  assert.deepEqual(rendered(applyView(id, messages)), ['#new opening', 'alpha', '#beta and gamma', 'delta'])
+})
+
+test('WHAT[context-compression-031] a captured tail interval cannot swallow a later message', () => {
+  const id = session()
+  const messages = messagesOf(id, [{ id: 'a', text: 'alpha' }, { id: 'b', text: 'beta' }])
+  setView(id, { prefixUntil: 0, thenMap: { 2: 'summary beta' } })
+  applyView(id, messages)
+  const later = [...messages, { id: 'c', text: 'later gamma' }]
+  numberMessage(id, 'c')
+  assert.deepEqual(rendered(applyView(id, later)), ['alpha', '#summary beta', 'later gamma'])
 })
 
 test('WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one', async () => {
@@ -195,7 +275,11 @@ test('WHAT[context-compression-031] a generated tool captures the view argument 
       const tool = (definition) => definition
       const any = () => ({ type: 'any', optional: () => ({ type: 'any', optional: true }) })
       tool.schema = {
-        string: () => ({ type: 'string', describe: (text) => ({ type: 'string', description: text }) }),
+        string: () => ({
+          type: 'string',
+          nullable: () => ({ type: 'string', nullable: true }),
+          describe: (text) => ({ type: 'string', description: text }),
+        }),
         number: () => ({ type: 'number', optional: () => ({ type: 'number', optional: true }) }),
         any,
         array: (item) => ({
@@ -207,7 +291,8 @@ test('WHAT[context-compression-031] a generated tool captures the view argument 
           type: 'record',
           key,
           value,
-          describe: (description) => ({ type: 'record', key, value, description }),
+          describe: (description) => ({ type: 'record', key, value, description,
+            optional: () => ({ type: 'record', key, value, description, optional: true }) }),
         }),
         object: (shape) => ({ type: 'object', shape }),
       }
@@ -220,17 +305,17 @@ test('WHAT[context-compression-031] a generated tool captures the view argument 
       registered,
       {
         program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        view: { prefixUntil: 2, thenRemove: { 1: 'keep this' } },
+        prefixUntil: 2, thenMap: { 1: 'keep this' },
       },
       { sessionID: sessionId },
     )
-    assert.deepEqual(takeView(sessionId), { prefixUntil: 2, thenRemove: { 1: 'keep this' } })
+    assert.deepEqual(takeView(sessionId), { prefixUntil: 2, thenMap: { 1: 'keep this' } })
 
     const refused = await execute(
       registered,
       {
         program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        view: { prefixUntil: 'all' },
+        prefixUntil: 'all', thenMap: {},
       },
       { sessionID: sessionId },
     )

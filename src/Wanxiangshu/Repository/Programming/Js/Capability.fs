@@ -9,10 +9,6 @@ open Wanxiangshu.Foundation
 type JsCapability =
     | Read
     | Write
-    /// Plan-artifact write capability. No fragment projects it — the plan
-    /// tenure surface carries its own file/edit/rewrite API — but the plan
-    /// description gates its artifact-write teaching blocks on it.
-    | Edit
     | Glob
     | Grep
     | Move
@@ -436,7 +432,7 @@ module JsFragmentRegistry =
             + "when the seat cannot answer. The advisor reads its own law, the view rendered "
             + "in the Chronicle shape (a comment header plus [[new_work_to_record]] data "
             + "tables), and the intent as separate prompts, never merged. view is an ANCHOR "
-            + "view declaration ({ prefixUntil, thenRemove }) choosing the material to hand "
+            + "view declaration ({ prefixUntil, thenMap }) choosing the material to hand "
             + "over; a follow-up call delivers only the view delta since the part already "
             + "delivered, plus the new intent."
           CanonicalExample =
@@ -444,12 +440,12 @@ module JsFragmentRegistry =
             + "  async run() {\n"
             + "    const first = await this.advisor(\n"
             + "      \"is the retry path sound?\",\n"
-            + "      { prefixUntil: 7 }\n"
+            + "      { prefixUntil: 7, thenMap: {} }\n"
             + "    );\n"
             + "    if (!first.ok) return first;\n"
             + "    const followUp = await this.advisor(\n"
             + "      \"and the second failure?\",\n"
-            + "      { prefixUntil: 7, thenRemove: { \"4\": \"the retry experiment\" } }\n"
+            + "      { prefixUntil: 0, thenMap: { \"4\": \"the retry experiment\" } }\n"
             + "    );\n"
             + "    return { first: first.advice, followUp: followUp.advice };\n"
             + "  }\n"

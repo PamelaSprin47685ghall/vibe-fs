@@ -1,0 +1,440 @@
+TAP version 13
+# HOOK CHAT MESSAGE FAILED: ChatAdmissionHookException {
+#   message: 'Managed chat admission failed: TransactionFailed (PreProviderSettlementFailed (PersistenceFailed (WriterUnavailable (EventId "dc951789292344c28664c22d957377ed", WriterClosing))))',
+#   innerException: undefined,
+#   failure: ChatAdmissionHookFailure {
+#     tag: 1,
+#     fields: [ [ChatAdmissionTransactionError] ]
+#   },
+#   executionKey: ChatExecutionKey {
+#     SessionId: SessionId { tag: 0, fields: [Array] },
+#     PhysicalUserMessageId: PhysicalUserMessageId { tag: 0, fields: [Array] }
+#   }
+# }
+# Subtest: WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+not ok 1 - WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+  ---
+  duration_ms: 668.131875
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:12:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    HOST-BOUNDARY-008: provider attempt plan freeze failed (accepted-execution-missing): AcceptedExecutionMissing ({ SessionId = SessionId "advisor-live-answer-owner"
+      PhysicalUserMessageId = PhysicalUserMessageId "caller-material" })
+  code: 'ERR_TEST_FAILURE'
+  ...
+# (node:96727) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[prefix-stability-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections
+ok 2 - WHAT[prefix-stability-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections
+  ---
+  duration_ms: 0.847375
+  ...
+# Subtest: WHAT[prefix-stability-014] PPT_source_is_the_frozen_side_channel_identity
+ok 3 - WHAT[prefix-stability-014] PPT_source_is_the_frozen_side_channel_identity
+  ---
+  duration_ms: 0.133167
+  ...
+# Subtest: WHAT[prefix-stability-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker
+ok 4 - WHAT[prefix-stability-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker
+  ---
+  duration_ms: 1.898916
+  ...
+# Subtest: WHAT[prefix-stability-014] bare semantic capture preserves supplied bytes rather than guessing guidance from prose
+ok 5 - WHAT[prefix-stability-014] bare semantic capture preserves supplied bytes rather than guessing guidance from prose
+  ---
+  duration_ms: 53.779292
+  ...
+# (node:96738) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[prefix-stability-014] multiple terminal parts keep their physical originals through guidance replay
+ok 6 - WHAT[prefix-stability-014] multiple terminal parts keep their physical originals through guidance replay
+  ---
+  duration_ms: 725.702833
+  ...
+# Subtest: WHAT[prefix-stability-014] a failed guidance assertion ends its exact mock provider step before another single-slot fixture starts
+ok 7 - WHAT[prefix-stability-014] a failed guidance assertion ends its exact mock provider step before another single-slot fixture starts
+  ---
+  duration_ms: 785.806208
+  ...
+# Subtest: WHAT[prefix-stability-014] registered Host completed tool presentation leaves physical snapshot and durable originals unchanged
+ok 8 - WHAT[prefix-stability-014] registered Host completed tool presentation leaves physical snapshot and durable originals unchanged
+  ---
+  duration_ms: 458.450208
+  ...
+# Subtest: WHAT[prefix-stability-014] registered Host error tool presentation leaves physical snapshot and durable originals unchanged
+ok 9 - WHAT[prefix-stability-014] registered Host error tool presentation leaves physical snapshot and durable originals unchanged
+  ---
+  duration_ms: 442.128667
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user plain quotation of previous guidance is preserved in the request and cold trace
+ok 10 - WHAT[prefix-stability-014] a real user plain quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 491.293833
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user enclosed quotation of previous guidance is preserved in the request and cold trace
+ok 11 - WHAT[prefix-stability-014] a real user enclosed quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 489.552875
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user embedded quotation of previous guidance is preserved in the request and cold trace
+ok 12 - WHAT[prefix-stability-014] a real user embedded quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 483.556833
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user position quotation of previous guidance is preserved in the request and cold trace
+ok 13 - WHAT[prefix-stability-014] a real user position quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 471.493167
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user multiple quotation of previous guidance is preserved in the request and cold trace
+ok 14 - WHAT[prefix-stability-014] a real user multiple quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 477.289917
+  ...
+# Subtest: WHAT[prefix-stability-014] a empty terminal user part with a single part cannot acquire an unprovable guidance suffix
+not ok 15 - WHAT[prefix-stability-014] a empty terminal user part with a single part cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 328.243709
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:307:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    only the existing Host empty-content placeholder may be added
+    + actual - expected
+    
+      [
+        {
+          id: 'part-quote',
+          text: '',
+          type: 'text'
+        },
+    -   {
+    -     text: '#',
+    -     type: 'text'
+    -   }
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0:
+      id: 'part-quote'
+      type: 'text'
+      text: ''
+    1:
+      type: 'text'
+      text: '#'
+  actual:
+    0:
+      id: 'part-quote'
+      type: 'text'
+      text: ''
+  operator: 'deepStrictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:311:16
+    async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:57:7
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async withGuidanceHost (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:14:3)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:308:7)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[prefix-stability-014] a empty terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+not ok 16 - WHAT[prefix-stability-014] a empty terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 354.358291
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:307:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        {
+          id: 'part-prior',
+    +     text: '[ANCHOR: 31]\x00﻿Prior user part',
+    -     text: 'Prior user part',
+          type: 'text'
+        },
+        {
+          id: 'part-quote',
+          text: '',
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0:
+      id: 'part-prior'
+      type: 'text'
+      text: 'Prior user part'
+    1:
+      id: 'part-quote'
+      type: 'text'
+      text: ''
+  actual:
+    0:
+      id: 'part-prior'
+      type: 'text'
+      text: '[ANCHOR: 31]\x00﻿Prior user part'
+    1:
+      id: 'part-quote'
+      type: 'text'
+      text: ''
+  operator: 'deepStrictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:316:16
+    async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:57:7
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async withGuidanceHost (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:14:3)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:308:7)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[prefix-stability-014] a whitespace terminal user part with a single part cannot acquire an unprovable guidance suffix
+not ok 17 - WHAT[prefix-stability-014] a whitespace terminal user part with a single part cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 326.866292
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:307:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    only the existing Host empty-content placeholder may be added
+    + actual - expected
+    
+      [
+        {
+          id: 'part-quote',
+          text: ' \t\r\n',
+          type: 'text'
+        },
+    -   {
+    -     text: '#',
+    -     type: 'text'
+    -   }
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0:
+      id: 'part-quote'
+      type: 'text'
+      text: |-
+         	
+        
+    1:
+      type: 'text'
+      text: '#'
+  actual:
+    0:
+      id: 'part-quote'
+      type: 'text'
+      text: |-
+         	
+        
+  operator: 'deepStrictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:311:16
+    async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:57:7
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async withGuidanceHost (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:14:3)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:308:7)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[prefix-stability-014] a whitespace terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+not ok 18 - WHAT[prefix-stability-014] a whitespace terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 367.124167
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:307:5'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        {
+          id: 'part-prior',
+    +     text: '[ANCHOR: 37]\x00﻿Prior user part',
+    -     text: 'Prior user part',
+          type: 'text'
+        },
+        {
+          id: 'part-quote',
+          text: ' \t\r\n',
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0:
+      id: 'part-prior'
+      type: 'text'
+      text: 'Prior user part'
+    1:
+      id: 'part-quote'
+      type: 'text'
+      text: |-
+         	
+        
+  actual:
+    0:
+      id: 'part-prior'
+      type: 'text'
+      text: '[ANCHOR: 37]\x00﻿Prior user part'
+    1:
+      id: 'part-quote'
+      type: 'text'
+      text: |-
+         	
+        
+  operator: 'deepStrictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:316:16
+    async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:57:7
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async withGuidanceHost (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:14:3)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:308:7)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[prefix-stability-014] an old user occurrence without its original text is refused rather than inferred from its presentation
+ok 19 - WHAT[prefix-stability-014] an old user occurrence without its original text is refused rather than inferred from its presentation
+  ---
+  duration_ms: 560.378416
+  ...
+# Subtest: WHAT[prefix-stability-014] a same-generation physical user edit cannot disguise an original conflict as guidance replay
+ok 20 - WHAT[prefix-stability-014] a same-generation physical user edit cannot disguise an original conflict as guidance replay
+  ---
+  duration_ms: 467.909917
+  ...
+# Subtest: WHAT[prefix-stability-014] a same-generation position user edit cannot disguise an original conflict as guidance replay
+ok 21 - WHAT[prefix-stability-014] a same-generation position user edit cannot disguise an original conflict as guidance replay
+  ---
+  duration_ms: 468.31375
+  ...
+# Subtest: WHAT[prefix-stability-014] the first reanchored capture of edited physical user text does not borrow retired original evidence
+not ok 22 - WHAT[prefix-stability-014] the first reanchored capture of edited physical user text does not borrow retired original evidence
+  ---
+  duration_ms: 392.5495
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:375:3'
+  failureType: 'testCodeFailure'
+  error: 'retired bytes now quoted by a physical user remain business material'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:391:14
+    async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:57:7
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async withGuidanceHost (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:14:3)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:376:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[prefix-stability-014] the first reanchored capture of edited position user text does not borrow retired original evidence
+not ok 23 - WHAT[prefix-stability-014] the first reanchored capture of edited position user text does not borrow retired original evidence
+  ---
+  duration_ms: 397.63475
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:375:3'
+  failureType: 'testCodeFailure'
+  error: 'retired bytes now quoted by a physical user remain business material'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:391:14
+    async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:57:7
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async withGuidanceHost (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:14:3)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:376:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with same text
+ok 24 - WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with same text
+  ---
+  duration_ms: 636.146292
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with changed text
+ok 25 - WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with changed text
+  ---
+  duration_ms: 640.066375
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with same text
+ok 26 - WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with same text
+  ---
+  duration_ms: 643.875416
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with changed text
+ok 27 - WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with changed text
+  ---
+  duration_ms: 635.657125
+  ...
+# Subtest: WHAT[prefix-stability-014] a captured user carrier presentation replays from its proven original without adding trace material
+ok 28 - WHAT[prefix-stability-014] a captured user carrier presentation replays from its proven original without adding trace material
+  ---
+  duration_ms: 479.720125
+  ...
+# Subtest: WHAT[prefix-stability-014] actual OpenCode Host provider requests preserve user quotations and keep guidance out of physical tool originals through cold recovery
+ok 29 - WHAT[prefix-stability-014] actual OpenCode Host provider requests preserve user quotations and keep guidance out of physical tool originals through cold recovery # SKIP integration tier not enabled
+  ---
+  duration_ms: 0.036
+  ...
+# Subtest: WHAT[repository-programming-049] unpark.value is declared as an optional free-form JSON value
+ok 30 - WHAT[repository-programming-049] unpark.value is declared as an optional free-form JSON value
+  ---
+  duration_ms: 18.528083
+  ...
+# Subtest: WHAT[repository-programming-049] the tool description teaches the free-form injection responsibility
+ok 31 - WHAT[repository-programming-049] the tool description teaches the free-form injection responsibility
+  ---
+  duration_ms: 4.457667
+  ...
+# Subtest: WHAT[work-020] U messages are preserved verbatim in original order
+ok 32 - WHAT[work-020] U messages are preserved verbatim in original order
+  ---
+  duration_ms: 1.020042
+  ...
+# Subtest: WHAT[work-020] neither initial nor later tenures ever inject a synthetic lwr-prev-* message
+ok 33 - WHAT[work-020] neither initial nor later tenures ever inject a synthetic lwr-prev-* message
+  ---
+  duration_ms: 0.144917
+  ...
+# Subtest: WHAT[work-020] assembled messages come only from U and current-tenure interactions
+ok 34 - WHAT[work-020] assembled messages come only from U and current-tenure interactions
+  ---
+  duration_ms: 0.209041
+  ...
+# Subtest: WHAT[work-020] the plan runner holds no write capability beyond P
+ok 35 - WHAT[work-020] the plan runner holds no write capability beyond P
+  ---
+  duration_ms: 0.311333
+  ...
+# Subtest: WHAT[work-020] a negative openingCursor rejects assembly fail-closed
+ok 36 - WHAT[work-020] a negative openingCursor rejects assembly fail-closed
+  ---
+  duration_ms: 0.2275
+  ...
+# Subtest: WHAT[work-020] synthetic rows are stripped and never re-injected during assembly
+ok 37 - WHAT[work-020] synthetic rows are stripped and never re-injected during assembly
+  ---
+  duration_ms: 0.105
+  ...
+# (node:97071) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[work-020] a relaying tenure view checkpoints call identity without carrying a replacement for Plan user originals
+ok 38 - WHAT[work-020] a relaying tenure view checkpoints call identity without carrying a replacement for Plan user originals
+  ---
+  duration_ms: 719.180875
+  ...
+1..38
+# tests 38
+# suites 0
+# pass 30
+# fail 7
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 13829.85875

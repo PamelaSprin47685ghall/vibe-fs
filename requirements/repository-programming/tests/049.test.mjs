@@ -20,6 +20,7 @@ const toolModule = () => {
   tool.schema = {
     string: () => ({
       type: 'string',
+      nullable: () => ({ type: 'string', nullable: true }),
       describe: (text) => ({ type: 'string', description: text }),
     }),
     any: () => ({
@@ -36,7 +37,8 @@ const toolModule = () => {
       type: 'record',
       key,
       value,
-      describe: (description) => ({ type: 'record', key, value, description }),
+      describe: (description) => ({ type: 'record', key, value, description,
+        optional: () => ({ type: 'record', key, value, description, optional: true }) }),
     }),
     object: (shape) => ({ type: 'object', shape }),
   }
@@ -47,7 +49,7 @@ test('WHAT[repository-programming-049] unpark.value is declared as an optional f
   const { dir, cleanup } = sandbox()
   try {
     const registered = createRegistered(toolModule(), 'Coder', 'en', dir, null)
-    assert.deepEqual(argumentNames(registered), ['program', 'unpark', 'abandon', 'view'])
+    assert.deepEqual(argumentNames(registered), ['program', 'unpark', 'abandon', 'prefixUntil', 'thenMap'])
     const unpark = argumentSchema(registered, 'unpark')
     assert.equal(unpark.type, 'object')
     assert.equal(unpark.shape.handle.type, 'string')

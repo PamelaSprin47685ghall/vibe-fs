@@ -175,7 +175,7 @@ const productionDigest = async (callId, path) => {
             callID: checkpointCallID,
             state: {
               status: 'completed',
-              input: { program: 'class Js extends JsProgram { async run() { return {}; } }', view: { prefixUntil: 1 } },
+              input: { program: 'class Js extends JsProgram { async run() { return {}; } }', prefixUntil: 1, thenMap: {} },
             },
           },
         },
@@ -207,7 +207,7 @@ const productionDigest = async (callId, path) => {
     const tentative = { messages: structuredClone(messages) }
     await hooks['experimental.chat.messages.transform']({ sessionID }, tentative)
     assert.ok(tentative.messages.some(message => message.info?.source === 'companion-memory'), 'the frame ends exactly at the canonical checkpoint boundary')
-    const started = journalFacts(join(directory, '.git')).map(fact => payloadFor(fact, 'ProviderStarted')).filter(Boolean).find(fact => fact.Key.PhysicalUserMessageId[1] === nextPhysical)
+    const started = journalFacts(Journal.JournalSurface_initializeStateRoot(directory)).map(fact => payloadFor(fact, 'ProviderStarted')).filter(Boolean).find(fact => fact.Key.PhysicalUserMessageId[1] === nextPhysical)
     assert.equal(started.Evidence.ProjectionChoice[0], 'UsePrefixProbe')
     assert.equal(started.Evidence.ProjectionChoice[1].Candidate.CutoffExclusive, 4)
     solvingRun.info.finish = 'tool-calls'

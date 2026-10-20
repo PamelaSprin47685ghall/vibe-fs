@@ -51,7 +51,7 @@ const jsViewCall = (id, view) =>
     'todowrite-for-engineer',
     JSON.stringify({
       program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-      ...(view === undefined ? {} : { view }),
+      ...(view === undefined ? {} : view),
     }),
     1,
   )
@@ -92,11 +92,11 @@ const provider = await startHttpServer(async (request, response) => {
       return
     }
     if (text.includes('OL002_A_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 100, thenRemove: {} }))
+      sendSSE(response, jsViewCall('ol002-a-view', { prefixUntil: 100, thenMap: {} }))
       return
     }
     if (text.includes('OL002_B_VIEW')) {
-      sendSSE(response, jsViewCall('ol002-b-view', { prefixUntil: 100 }))
+      sendSSE(response, jsViewCall('ol002-b-view', { prefixUntil: 100, thenMap: {} }))
       return
     }
     sendJSON(response, 500, { error: `unexpected prompt text: ${text.slice(0, 200)}` })

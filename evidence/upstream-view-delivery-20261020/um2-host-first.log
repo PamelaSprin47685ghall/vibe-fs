@@ -1,0 +1,158 @@
+TAP version 13
+# (node:95230) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[work-034] initial tenure (S1) assembles U + current messages with no synthetic record and requests reanchor on first turn
+ok 1 - WHAT[work-034] initial tenure (S1) assembles U + current messages with no synthetic record and requests reanchor on first turn
+  ---
+  duration_ms: 1.292709
+  ...
+# Subtest: WHAT[work-034] non-initial tenure strips prior assistant/tool messages, injects no lwr-prev-* row, and preserves the current user reply in chronological order
+ok 2 - WHAT[work-034] non-initial tenure strips prior assistant/tool messages, injects no lwr-prev-* row, and preserves the current user reply in chronological order
+  ---
+  duration_ms: 0.245083
+  ...
+# Subtest: WHAT[work-034] user messages U preserve original bytes and order verbatim without modification
+ok 3 - WHAT[work-034] user messages U preserve original bytes and order verbatim without modification
+  ---
+  duration_ms: 0.127958
+  ...
+# Subtest: WHAT[work-034] the first part immediately after the opening cursor survives tenure assembly
+ok 4 - WHAT[work-034] the first part immediately after the opening cursor survives tenure assembly
+  ---
+  duration_ms: 0.092625
+  ...
+# Subtest: WHAT[work-034] a current assistant row with a Host id but no first-observation entry stays
+ok 5 - WHAT[work-034] a current assistant row with a Host id but no first-observation entry stays
+  ---
+  duration_ms: 0.118042
+  ...
+# Subtest: WHAT[work-034] a semantic assistant row with no Host info.id rejects assembly
+ok 6 - WHAT[work-034] a semantic assistant row with no Host info.id rejects assembly
+  ---
+  duration_ms: 0.265875
+  ...
+# Subtest: WHAT[work-034] synthetic rows are stripped and no synthetic record is ever injected
+ok 7 - WHAT[work-034] synthetic rows are stripped and no synthetic record is ever injected
+  ---
+  duration_ms: 0.134875
+  ...
+# Subtest: WHAT[work-034] durable Plan active state assembles U + current interactions in place
+ok 8 - WHAT[work-034] durable Plan active state assembles U + current interactions in place
+  ---
+  duration_ms: 0.09925
+  ...
+# Subtest: WHAT[work-034] the lifecycle document view is reachable as a pure function
+ok 9 - WHAT[work-034] the lifecycle document view is reachable as a pure function
+  ---
+  duration_ms: 5.906708
+  ...
+# Subtest: WHAT[work-034] reanchorRequested is returned by assemble and is true only on a fresh handover
+ok 10 - WHAT[work-034] reanchorRequested is returned by assemble and is true only on a fresh handover
+  ---
+  duration_ms: 0.276208
+  ...
+# Subtest: WHAT[work-034] S1 with no retirement carries no previous range
+ok 11 - WHAT[work-034] S1 with no retirement carries no previous range
+  ---
+  duration_ms: 0.914792
+  ...
+# Subtest: WHAT[work-034] S1 retirement preserves its opening range for the next tenure
+ok 12 - WHAT[work-034] S1 retirement preserves its opening range for the next tenure
+  ---
+  duration_ms: 3.611333
+  ...
+# Subtest: WHAT[work-034] tenure assembly strips prior interactions by openingCursor without materializing a previous record
+ok 13 - WHAT[work-034] tenure assembly strips prior interactions by openingCursor without materializing a previous record
+  ---
+  duration_ms: 0.132417
+  ...
+# Subtest: WHAT[work-034] tenure reanchor event shape carries session, epochs, work and incumbency
+ok 14 - WHAT[work-034] tenure reanchor event shape carries session, epochs, work and incumbency
+  ---
+  duration_ms: 0.032959
+  ...
+# Subtest: WHAT[work-034] duplicate incumbencyId is rejected on second tenure reanchor
+ok 15 - WHAT[work-034] duplicate incumbencyId is rejected on second tenure reanchor
+  ---
+  duration_ms: 0.379333
+  ...
+# Subtest: WHAT[work-034] reanchorRequested is true on fresh handover and deduplicated via isTenureReanchored
+ok 16 - WHAT[work-034] reanchorRequested is true on fresh handover and deduplicated via isTenureReanchored
+  ---
+  duration_ms: 0.051583
+  ...
+# Subtest: WHAT[work-034] successor projection strips earlier assistant and tool messages and never inserts LWR_prev
+ok 17 - WHAT[work-034] successor projection strips earlier assistant and tool messages and never inserts LWR_prev
+  ---
+  duration_ms: 0.079959
+  ...
+# Subtest: WHAT[work-034] post-S3 projection strips all S3-and-earlier context and injects no synthetic record
+ok 18 - WHAT[work-034] post-S3 projection strips all S3-and-earlier context and injects no synthetic record
+  ---
+  duration_ms: 0.098125
+  ...
+# Subtest: WHAT[work-034] Plan keeps user originals across explicit views and handover; a cold checkpoint restores identity only
+not ok 19 - WHAT[work-034] Plan keeps user originals across explicit views and handover; a cold checkpoint restores identity only
+  ---
+  duration_ms: 862.028792
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/034.test.mjs:427:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    relaying tenure view declaration commits a durable ViewCheckpointCommitted
+    + actual - expected
+    
+    + []
+    - [
+    -   {
+    -     checkpoints: [
+    -       {
+    -         callId: 'call-034-view'
+    -       }
+    -     ],
+    -     sessionId: 'ses-plan-view-handover-034'
+    -   }
+    - ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0:
+      sessionId: 'ses-plan-view-handover-034'
+      checkpoints:
+        0:
+          callId: 'call-034-view'
+  actual:
+  operator: 'deepStrictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/034.test.mjs:492:12
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/034.test.mjs:429:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# (node:95243) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[work-050] js.ask in an S1 plan program records the question and parks the program
+ok 20 - WHAT[work-050] js.ask in an S1 plan program records the question and parks the program
+  ---
+  duration_ms: 591.382667
+  ...
+# Subtest: WHAT[work-050] js.ask outside S1 is refused with ASK_REFUSED
+ok 21 - WHAT[work-050] js.ask outside S1 is refused with ASK_REFUSED
+  ---
+  duration_ms: 200.9285
+  ...
+# Subtest: WHAT[work-050] a pending question blocks every new plan call until the user replies
+ok 22 - WHAT[work-050] a pending question blocks every new plan call until the user replies
+  ---
+  duration_ms: 216.319292
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 21
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2322.243791

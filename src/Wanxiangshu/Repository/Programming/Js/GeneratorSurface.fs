@@ -77,7 +77,6 @@ module JsGeneratorSurface =
         match capability with
         | JsCapability.Read -> "Read"
         | JsCapability.Write -> "Write"
-        | JsCapability.Edit -> "Edit"
         | JsCapability.Glob -> "Glob"
         | JsCapability.Grep -> "Grep"
         | JsCapability.Move -> "Move"

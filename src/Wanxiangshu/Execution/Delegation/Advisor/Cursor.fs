@@ -10,25 +10,25 @@ open System.Collections.Generic
 module Cursor =
 
     // DSL-MUTABLE: resource — callerSessionId → delivered anchor numbers
-    let private cursors = Dictionary<string, HashSet<int>>()
+    let private cursors = Dictionary<string, HashSet<string>>()
 
-    let private cursorOf (callerSessionId: string) : HashSet<int> =
+    let private cursorOf (callerSessionId: string) : HashSet<string> =
         match cursors.TryGetValue callerSessionId with
         | true, existing -> existing
         | false, _ ->
-            let fresh = HashSet<int>()
+            let fresh = HashSet<string>()
             cursors.[callerSessionId] <- fresh
             fresh
 
     /// Every anchor number already delivered to this caller session's advisor.
-    let delivered (callerSessionId: string) : Set<int> =
+    let delivered (callerSessionId: string) : Set<string> =
         match cursors.TryGetValue callerSessionId with
         | true, existing -> existing |> Set.ofSeq
         | false, _ -> Set.empty
 
     /// Record the anchors one consult delivered. The cursor only grows: an
     /// anchor already delivered stays delivered.
-    let record (callerSessionId: string) (anchors: int list) : unit =
+    let record (callerSessionId: string) (anchors: string list) : unit =
         if not (List.isEmpty anchors) then
             let cursor = cursorOf callerSessionId
 

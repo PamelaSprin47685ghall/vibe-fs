@@ -403,135 +403,8 @@ module ToolRegistry =
         | Some(ToolAdmission.PrivateAttachment _)
         | None -> fun _ -> false
 
-    /// A refused `js.ask` must reject the program's await with the stable
-    /// failure sentinel instead of resolving to a data object.
-    [<Emit("Promise.reject(Object.assign(new Error($1), { __jsFailure: { code: $0, reason: $1 } }))")>]
-    let private rejectedJsFailure (code: string) (reason: string) : obj = jsNative
-
     [<Emit("typeof $0 === 'string'")>]
     let private isStringValue (value: obj) : bool = jsNative
-
-    let private recordParkStack (state: Wanxiangshu.Process.JsSandbox.ParkState) (stack: obj) =
-        if not (isNull stack) then
-            state.ParkStack <- string stack
-
-    let private finishPlanAskOutcome
-        (state: Wanxiangshu.Process.JsSandbox.ParkState)
-        (text: string)
-        (stack: obj)
-        (asked: Result<unit, string>)
-        =
-        match asked with
-        | Ok() ->
-            recordParkStack state stack
-            Wanxiangshu.Process.JsSandbox.suspendProgram state (createObj [ "question" ==> text ])
-        | Error reason ->
-            let failure = JsFailure.AskRefused reason
-            rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
-
-    let private performPlanAsk
-        (state: Wanxiangshu.Process.JsSandbox.ParkState)
-        (invoke: string -> Task<Result<unit, string>>)
-        (text: string)
-        (stack: obj)
-        : Task<obj> =
-        task {
-            if System.String.IsNullOrWhiteSpace text then
-                let failure = JsFailure.InvalidArgument "ask requires a question"
-                return rejectedJsFailure (JsFailure.code failure) (JsFailure.reason failure)
-            else
-                let! asked = invoke text
-                return finishPlanAskOutcome state text stack asked
-        }
-
-    let private handlePlanAsk
-        (state: Wanxiangshu.Process.JsSandbox.ParkState)
-        (invoke: string -> Task<Result<unit, string>>)
-        (question: obj)
-        (stack: obj)
-        : obj =
-        if state.AbandonRequested then
-            rejectedJsFailure
-                (JsFailure.code JsFailure.CannotParkWhileAbandoning)
-                (JsFailure.reason JsFailure.CannotParkWhileAbandoning)
-        else
-            performPlanAsk state invoke (string question) stack |> box
-
-    let private createPlanSandboxApi
-        (currentContent: string)
-        (stagedMutation: string option ref)
-        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
-        (askInvoke: (string -> Task<Result<unit, string>>) option)
-        =
-        let members =
-            [ "read" ==> fun (_: obj) -> currentContent
-              "edit"
-              ==> fun (_path: string) (newText: string) ->
-                  stagedMutation.Value <- Some newText
-                  createObj [ "ok" ==> true ] ]
-
-        let askMembers =
-            match parkState, askInvoke with
-            | Some state, Some invoke ->
-                [ "ask"
-                  ==> fun (question: obj) (stack: obj) -> handlePlanAsk state invoke question stack ]
-            | _ -> []
-
-        createObj [ "js" ==> createObj (members @ askMembers) ]
-
-    let private writePlanFile root sessionId newText value =
-        match PlanPath.rewritePlanAtomic root sessionId newText with
-        | Ok(_path, _digest) ->
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [ "plan.md" ], [], [], []))
-        | Error err ->
-            JsToolsResult.render (
-                JsToolWorkflow.JsToolOutcome.Failed(
-                    JsFailure.ProgramFailed(sprintf "Failed to write plan artifact: %s" err),
-                    [],
-                    [],
-                    [],
-                    []
-                )
-            )
-
-    let private commitPlanMutation root sessionId hasReviewed newTextOpt value =
-        match newTextOpt with
-        | None -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [], [], [], []))
-        | Some _ when not hasReviewed ->
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.PlanReviewRequired, [], [], [], []))
-        | Some newText -> writePlanFile root sessionId newText value
-
-    let private renderPlanParseOutcome root sessionId hasReviewed stagedMutation json =
-        match JsToolsData.parse json with
-        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-        | Ok value -> commitPlanMutation root sessionId hasReviewed stagedMutation value
-
-    let private renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation runOutcome =
-        match runOutcome with
-        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-        | Ok json -> renderPlanParseOutcome root sessionId hasReviewed stagedMutation json
-
-    let private executePlanSandbox prose root sessionId hasReviewed programSource =
-        task {
-            let currentContent =
-                match PlanPath.readPlan root sessionId with
-                | Ok c -> c
-                | Error _ -> ""
-
-            // DSL-MUTABLE: algorithm-scratch — staged mutation accumulator for Plan sandbox
-            let stagedMutation = ref None
-            let api = createPlanSandboxApi currentContent stagedMutation None None
-            let baseClassSource = JsCanonicalDescription.runtimePlanBaseClass prose
-            let deadlineMs = 10000
-            let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
-            let outputBoundBytes = 1 <<< 20
-
-            let! handle = JsSandbox.runSurface baseClassSource programSource api deadlineMs deadlineEpochMs
-
-            let! runOutcome = JsSandbox.awaitResult handle outputBoundBytes
-
-            return renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation.Value runOutcome
-        }
 
     let private activeReviewed (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
         match work.ActiveId with
@@ -543,12 +416,68 @@ module ToolRegistry =
         | Some work -> activeReviewed work
         | None -> Error "No active incumbency found for this work"
 
+    let private planWritePermission gitCommonDir sessionId =
+        let read () =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId
+
+        let incumbent = read () |> Option.bind _.ActiveId
+
+        fun () ->
+            match incumbent, read () with
+            | Some expected, Some work -> work.ActiveId = Some expected && work.Reviewed
+            | _ -> false
+
+    [<Import("dirname", "node:path")>]
+    let private directoryOf (path: string) : string = jsNative
+
+    [<Import("mkdirSync", "node:fs")>]
+    let private createDirectory (path: string) (options: obj) : unit = jsNative
+
+    [<Import("realpathSync", "node:fs")>]
+    let private realPath (path: string) : string = jsNative
+
+    let private planDirectory root sessionId =
+        try
+            createDirectory root (createObj [ "recursive" ==> true ])
+
+            PlanPath.resolvePlanPath (realPath root) sessionId
+            |> Result.map (fun path ->
+                let directory = directoryOf path
+                createDirectory directory (createObj [ "recursive" ==> true ])
+                directory)
+        with error ->
+            Error error.Message
+
     let private executeTenureSandbox prose root gitCommonDir sessionId programSource =
-        match resolveActiveTenure gitCommonDir sessionId with
-        | Error reason ->
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason, [], [], [], []))
-            |> Task.FromResult
-        | Ok hasReviewed -> executePlanSandbox prose root sessionId hasReviewed programSource
+        task {
+            match resolveActiveTenure gitCommonDir sessionId, planDirectory root sessionId with
+            | Error reason, _
+            | _, Error reason ->
+                return
+                    JsToolsResult.render (
+                        JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason, [], [], [], [])
+                    )
+            | Ok _, Ok directory ->
+                let canWrite = planWritePermission gitCommonDir sessionId
+
+                let! outcome =
+                    JsToolWorkflow.executeWithApiScope
+                        (fun _ api -> JsToolsBindings.scopePlanFile directory canWrite api)
+                        sessionId
+                        (set [ JsCapability.Read; JsCapability.Write ])
+                        directory
+                        (JsCanonicalDescription.runtimePlanBaseClass prose)
+                        (createObj [ "program" ==> programSource ])
+                        10000
+                        (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L)
+                        (1 <<< 20)
+                        None
+                        None
+                        None
+                        None
+
+                return JsToolsResult.render outcome
+        }
 
     let private runPlanProgramCore
         (prose: JsCanonicalDescription.Prose)
@@ -580,102 +509,11 @@ module ToolRegistry =
     [<Emit("$0 === undefined || $0 === null")>]
     let private isNullishValue (value: obj) : bool = jsNative
 
-    [<Emit("typeof $0 === 'number'")>]
-    let private isNumberValue (value: obj) : bool = jsNative
-
-    [<Emit("typeof $0 === 'object'")>]
-    let private isObjectValue (value: obj) : bool = jsNative
-
-    [<Emit("Array.isArray($0)")>]
-    let private isArrayValue (value: obj) : bool = jsNative
-
-    [<Emit("$0[$1]")>]
-    let private propertyOf (value: obj) (name: string) : obj = jsNative
-
-    [<Emit("Object.keys($0)")>]
-    let private objectKeys (value: obj) : string[] = jsNative
-
-    let private advisorInvalid (detail: string) : Result<'a, JsFailure> =
-        Error(JsFailure.ViewDeclarationInvalid detail)
-
-    let private advisorAnchorOfKey (key: string) : int option =
-        match System.Int32.TryParse key with
-        | true, anchor when string anchor = key -> Some anchor
-        | _ -> None
-
-    let private advisorPrefixUntilOf (raw: obj) : Result<int, JsFailure> =
-        if isNumberValue raw then
-            Ok(int (unbox<float> raw))
-        else
-            advisorInvalid
-                "prefixUntil must be an anchor number; pass one above every anchor you have seen to keep everything"
-
-    /// `thenRemove` is an anchor→summary map: the summary is what stands in for
-    /// that anchor from here on, so a missing or blank summary is a declaration
-    /// that would silently drop knowledge.
-    let private advisorReplacePair (source: obj) (key: string) : Result<int * string, JsFailure> =
-        let summary = propertyOf source key
-
-        let isSummary =
-            isStringValue summary && not (String.IsNullOrWhiteSpace(unbox<string> summary))
-
-        match advisorAnchorOfKey key, isSummary with
-        | None, _ -> advisorInvalid (sprintf "thenRemove keys must be anchor numbers; \"%s\" is not one" key)
-        | Some _, false ->
-            advisorInvalid (
-                sprintf
-                    "thenRemove[%s] must be a non-blank summary string (the summary replaces that anchor's segments, not deletes them)"
-                    key
-            )
-        | Some anchor, true -> Ok(anchor, string summary)
-
-    let private advisorAppendPair
-        (accumulated: Result<(int * string) list, JsFailure>)
-        (pair: Result<int * string, JsFailure>)
-        : Result<(int * string) list, JsFailure> =
-        match accumulated, pair with
-        | Ok pairs, Ok entry -> Ok(pairs @ [ entry ])
-        | Error failure, _ -> Error failure
-        | _, Error failure -> Error failure
-
-    /// `prefixUntil` is a required anchor number (never "all"); `thenRemove` is
-    /// an optional anchor→summary map naming what stands in for which anchor.
-    /// The parse is the same one `AnchorSurface.setView` applies to a tool-level
-    /// declaration, but a consult never writes it back into the ANCHOR ledger:
-    /// the ledger's pending declaration belongs to the caller's own next
-    /// request, and consulting the advisor must not rewrite it (advisor-[005]).
-    let private advisorParseDeclaration (view: obj) : Result<AdvisorViewDeclaration, JsFailure> =
-        let thenRemoveOf (raw: obj) : Result<(int * string) list, JsFailure> =
-            if isNullishValue raw then
-                Ok []
-            elif isArrayValue raw || not (isObjectValue raw) then
-                advisorInvalid
-                    "thenRemove must be an object mapping anchor numbers to summaries, e.g. { \"3\": \"what segment 3 held\" }"
-            else
-                objectKeys raw
-                |> Array.toList
-                |> List.map (advisorReplacePair raw)
-                |> List.fold advisorAppendPair (Ok [])
-                |> Result.map (List.sortBy fst)
-
-        let prefixUntil = advisorPrefixUntilOf (propertyOf view "prefixUntil")
-        let thenRemove = thenRemoveOf (propertyOf view "thenRemove")
-
-        match prefixUntil, thenRemove with
-        | Ok prefixUntil, Ok thenRemove ->
-            Ok
-                { PrefixUntil = prefixUntil
-                  ThenRemove = thenRemove }
-        | Error failure, _
-        | _, Error failure -> Error failure
-
-    /// A missing declaration hands over no material (`PrefixUntil = 0`), the
-    /// same default the transform applies when a request carries no view.
     let private advisorDeclarationOf (view: obj) : Result<AdvisorViewDeclaration, JsFailure> =
         if isNullishValue view then
-            Ok { PrefixUntil = 0; ThenRemove = [] }
+            Ok AnchorViewDeclaration.empty
         else
-            advisorParseDeclaration view
+            AnchorSurface.parseDeclaration view
 
     /// The transform's own wire text over a decoded snapshot part: the advisor
     /// reads exactly what the caller's request carried, tool calls included.
@@ -722,8 +560,13 @@ module ToolRegistry =
             let sessionId = ctx.SessionId
 
             let request: AdvisorViewRequest =
-                { Messages = messages |> List.map (advisorViewMessage sessionId)
-                  Declaration = declaration }
+                { Messages =
+                    AnchorLedger.context sessionId
+                    |> List.map (fun (id, text) ->
+                        { Anchor = id |> Option.map (AnchorLedger.numberMessage sessionId) |> Option.defaultValue 0
+                          Text = text })
+                  Declaration = declaration
+                  History = AnchorLedger.replacements sessionId }
 
             let plan =
                 AdvisorView.plan (ProviderLanguage.label (lang ctx)) (Cursor.delivered sessionId) request
@@ -738,7 +581,7 @@ module ToolRegistry =
 
             match answered with
             | Ok advice ->
-                Cursor.record sessionId plan.DeliveredAnchors
+                Cursor.record sessionId plan.DeliveredMaterial
                 return createObj [ "ok" ==> true; "advice" ==> advice ]
             | Error reason -> return advisorRefusal "advisor-unavailable" reason
         }
@@ -810,13 +653,11 @@ module ToolRegistry =
         let jsRootOf (sessionId: string) =
             JsToolSpec.rootForSession sessionDirectories (defaultArg workspaceDirectory "") sessionId
 
-        let groundingObservation (ctx: HostToolContext) (reads: JsExplicitFileRead list) effectPaths =
+        let groundingObservationAt root (ctx: HostToolContext) (reads: JsExplicitFileRead list) effectPaths =
             match workspaceDirectory with
             | None -> Task.FromResult(())
             | Some _ when System.String.IsNullOrWhiteSpace ctx.SessionId -> Task.FromResult(())
             | Some _ ->
-                let root = jsRootOf ctx.SessionId
-
                 let observed =
                     reads
                     |> List.map (fun read ->
@@ -825,6 +666,9 @@ module ToolRegistry =
                           Coverage = GroundingReadCoverage.CompleteFile })
 
                 RequirementGroundingGate.programObservation journal root ctx.SessionId observed effectPaths
+
+        let groundingObservation (ctx: HostToolContext) reads effectPaths =
+            groundingObservationAt (jsRootOf ctx.SessionId) ctx reads effectPaths
 
         let runtime =
             new ToolRuntimeScope(
@@ -1033,58 +877,51 @@ module ToolRegistry =
         let planBaseClassSource () =
             JsCanonicalDescription.runtimePlanBaseClass jsProse
 
-        let resolveHasReviewed (planGitCommonDir: string option) (sessionId: string) : bool =
-            planGitCommonDir
-            |> Option.bind (fun gitCommonDir -> resolveActiveTenure gitCommonDir sessionId |> Result.toOption)
-            |> Option.defaultValue false
-
-        let commitOrRenderPlanOutcome root sessionId hasReviewed stagedMutation value outcome =
-            match stagedMutation with
-            | None -> JsToolsResult.render outcome
-            | Some _ -> commitPlanMutation root sessionId hasReviewed stagedMutation value
-
-        let finishPlanOutcome root sessionId hasReviewed stagedMutation outcome =
-            match outcome with
-            | JsToolWorkflow.JsToolOutcome.Succeeded(value, _, _, _, _) ->
-                commitOrRenderPlanOutcome root sessionId hasReviewed stagedMutation value outcome
-            | _ -> JsToolsResult.render outcome
-
-        let executePlanProgramWithPark (root: string) (ctx: HostToolContext) (programSource: string) : Task<string> =
+        let executePlanInput (root: string) (ctx: HostToolContext) (input: obj) : Task<string> =
             task {
-                let currentContent =
-                    match PlanPath.readPlan root ctx.SessionId with
-                    | Ok c -> c
-                    | Error _ -> ""
+                match planDirectory root ctx.SessionId with
+                | Error reason ->
+                    return
+                        JsToolsResult.render (
+                            JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason, [], [], [], [])
+                        )
+                | Ok directory ->
+                    let canWrite =
+                        planGitCommonDir
+                        |> Option.map (fun common -> planWritePermission common ctx.SessionId)
+                        |> Option.defaultValue (fun () -> false)
 
-                // DSL-MUTABLE: algorithm-scratch — staged plan mutation
-                let stagedMutation = ref None
+                    let scopeApi state api =
+                        let scoped = JsToolsBindings.scopePlanFile directory canWrite api
 
-                let makeApi (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
-                    createPlanSandboxApi
-                        currentContent
-                        stagedMutation
-                        (Some parkState)
-                        (Some(fun question -> runtime.AskUser(ctx, question)))
+                        let _, ask =
+                            JsToolsBindings.makeAskMember state (fun question -> runtime.AskUser(ctx, question))
 
-                let now = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                        scoped?js?ask <- ask
+                        scoped
 
-                let! outcome =
-                    JsToolWorkflow.runWithParkApi
-                        ctx.SessionId
-                        (planBaseClassSource ())
-                        programSource
-                        makeApi
-                        planDeadlineMs
-                        (now + int64 planDeadlineMs)
-                        planOutputBoundBytes
+                    let! outcome =
+                        JsToolWorkflow.executeWithApiScope
+                            scopeApi
+                            ctx.SessionId
+                            (set [ JsCapability.Read; JsCapability.Write ])
+                            directory
+                            (planBaseClassSource ())
+                            input
+                            planDeadlineMs
+                            (System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + int64 planDeadlineMs)
+                            planOutputBoundBytes
+                            jsTransactionPersistence
+                            jsLifecyclePersistence
+                            (Some(groundingObservationAt directory ctx))
+                            (Some(jsProcessHost ctx))
 
-                let hasReviewed = resolveHasReviewed planGitCommonDir ctx.SessionId
-                return finishPlanOutcome root ctx.SessionId hasReviewed stagedMutation.Value outcome
+                    return JsToolsResult.render outcome
             }
 
-        let executePlanProgramRoute (root: string option) (ctx: HostToolContext) (source: string) : Task<string> =
+        let executePlanProgramRoute (root: string option) (ctx: HostToolContext) (input: obj) : Task<string> =
             match root with
-            | Some rootDir -> executePlanProgramWithPark rootDir ctx source
+            | Some rootDir -> executePlanInput rootDir ctx input
             | None ->
                 Task.FromResult(
                     JsToolsResult.render (
@@ -1101,11 +938,22 @@ module ToolRegistry =
         let executeJsPlanTool (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
             task {
                 let viewFailure =
-                    match
-                        Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId (args.Raw?view)
-                    with
-                    | Ok() -> None
-                    | Error failure -> Some failure
+                    if not (emitJsExpr args.Raw?view "$0 === undefined") then
+                        Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and thenMap, not view")
+                    else
+                        let declaration =
+                            if
+                                emitJsExpr
+                                    (args.Raw?prefixUntil, args.Raw?thenMap)
+                                    "$0 === undefined && $1 === undefined"
+                            then
+                                null
+                            else
+                                createObj [ "prefixUntil" ==> args.Raw?prefixUntil; "thenMap" ==> args.Raw?thenMap ]
+
+                        AnchorSurface.setView ctx.SessionId declaration
+                        |> Result.map (fun () -> None)
+                        |> Result.defaultWith Some
 
                 let program = args.OptionalText "program"
 
@@ -1116,22 +964,12 @@ module ToolRegistry =
                 match viewFailure, program, unpark, abandon with
                 | Some failure, _, _, _ ->
                     return JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-                | None, Some source, _, _ -> return! executePlanProgramRoute planRoot ctx source
+                | None, Some source, _, _ ->
+                    return! executePlanProgramRoute planRoot ctx (createObj [ "program" ==> source ])
                 | None, None, unparkValue, _ when not (isNull unparkValue) ->
-                    let! outcome =
-                        JsToolWorkflow.resumeParked
-                            (string (unparkValue?handle))
-                            (unparkValue?value)
-                            (planBaseClassSource ())
-                            planDeadlineMs
-                            planOutputBoundBytes
-
-                    return JsToolsResult.render outcome
+                    return! executePlanProgramRoute planRoot ctx (createObj [ "unpark" ==> unparkValue ])
                 | None, None, _, abandonValue when not (isNull abandonValue) ->
-                    let! outcome =
-                        JsToolWorkflow.abandonParked (string (abandonValue?handle)) planDeadlineMs planOutputBoundBytes
-
-                    return JsToolsResult.render outcome
+                    return! executePlanProgramRoute planRoot ctx (createObj [ "abandon" ==> abandonValue ])
                 | _ ->
                     return
                         JsToolsResult.render (
@@ -1498,20 +1336,11 @@ module ToolRegistry =
             let planAbandonSchema =
                 ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
-            // ANCHOR handover view (context-compression [031]): a retiring
-            // tenure declares what the successor request must keep. Same
-            // contract as the generated surfaces: prefixUntil protects the
-            // cache prefix, thenRemove replaces anchors with the tenure's own
-            // summaries for good.
-            let planViewSchema =
-                ToolHostCodec.objectSchemaOf
-                    [ "prefixUntil", ToolHostCodec.numberSchema factory
-                      "thenRemove",
-                      ToolHostCodec.recordSchemaOf
-                          (ToolHostCodec.stringSchema factory)
-                          (ToolHostCodec.stringSchema factory)
-                          (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
-                          factory ]
+            let planMappingSchema =
+                ToolHostCodec.recordSchemaOf
+                    (ToolHostCodec.stringSchema factory)
+                    (ToolHostCodec.nullableStringSchema factory)
+                    (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
                     factory
 
             [ { Name = "todowrite-for-plan"
@@ -1526,7 +1355,8 @@ module ToolRegistry =
                         factory
                     "unpark", planUnparkSchema
                     "abandon", planAbandonSchema
-                    "view", planViewSchema ]
+                    "prefixUntil", ToolHostCodec.optionalNumberSchema factory
+                    "thenMap", ToolHostCodec.optionalSchema planMappingSchema ]
                 Admission = planningAdmission
                 Execute = fun args ctx -> executeJsPlanTool args ctx }
               { Name = "devops"

@@ -1,0 +1,152 @@
+TAP version 13
+# Subtest: WHAT[advisor-002] the shared view retains the full context and protects its prefix in blogger tables
+ok 1 - WHAT[advisor-002] the shared view retains the full context and protects its prefix in blogger tables
+  ---
+  duration_ms: 4.002
+  ...
+# Subtest: WHAT[advisor-002] interval projection includes prior summaries before emitting the view
+ok 2 - WHAT[advisor-002] interval projection includes prior summaries before emitting the view
+  ---
+  duration_ms: 0.77825
+  ...
+# Subtest: WHAT[advisor-002] an empty context has no new material and keeps the authored header
+ok 3 - WHAT[advisor-002] an empty context has no new material and keeps the authored header
+  ---
+  duration_ms: 0.374584
+  ...
+# Subtest: WHAT[advisor-003] follow-up delivery filters exact material after generating the full view
+ok 4 - WHAT[advisor-003] follow-up delivery filters exact material after generating the full view
+  ---
+  duration_ms: 4.740833
+  ...
+# Subtest: WHAT[advisor-003] a new summary for previously delivered material is delivered once
+ok 5 - WHAT[advisor-003] a new summary for previously delivered material is delivered once
+  ---
+  duration_ms: 1.284083
+  ...
+# Subtest: WHAT[advisor-003] material cursors grow per caller and clear independently
+ok 6 - WHAT[advisor-003] material cursors grow per caller and clear independently
+  ---
+  duration_ms: 0.407625
+  ...
+# Subtest: WHAT[context-compression-031] anchor numbers are stable per session and message id
+ok 7 - WHAT[context-compression-031] anchor numbers are stable per session and message id
+  ---
+  duration_ms: 1.61625
+  ...
+# Subtest: WHAT[context-compression-031] a view declaration is consumed exactly once
+ok 8 - WHAT[context-compression-031] a view declaration is consumed exactly once
+  ---
+  duration_ms: 0.566709
+  ...
+# Subtest: WHAT[context-compression-031] a malformed view declaration is refused and changes nothing
+ok 9 - WHAT[context-compression-031] a malformed view declaration is refused and changes nothing
+  ---
+  duration_ms: 3.368291
+  ...
+# Subtest: WHAT[context-compression-031] without a declaration applyView leaves the message list unchanged
+ok 10 - WHAT[context-compression-031] without a declaration applyView leaves the message list unchanged
+  ---
+  duration_ms: 0.177417
+  ...
+# Subtest: WHAT[context-compression-031] prefixUntil protects a prefix without replacing anything
+ok 11 - WHAT[context-compression-031] prefixUntil protects a prefix without replacing anything
+  ---
+  duration_ms: 0.5145
+  ...
+# Subtest: WHAT[context-compression-031] a summary stands in for its anchor for the rest of the session
+ok 12 - WHAT[context-compression-031] a summary stands in for its anchor for the rest of the session
+  ---
+  duration_ms: 0.649833
+  ...
+# Subtest: WHAT[context-compression-031] separate replacements each stand in place
+ok 13 - WHAT[context-compression-031] separate replacements each stand in place
+  ---
+  duration_ms: 0.351125
+  ...
+# Subtest: WHAT[context-compression-031] replacing an earlier anchor folds the replacements inside its span
+ok 14 - WHAT[context-compression-031] replacing an earlier anchor folds the replacements inside its span
+  ---
+  duration_ms: 0.286917
+  ...
+# Subtest: WHAT[context-compression-031] unidentified content remains when no interval replaces it
+ok 15 - WHAT[context-compression-031] unidentified content remains when no interval replaces it
+  ---
+  duration_ms: 0.481042
+  ...
+# Subtest: WHAT[context-compression-031] countTokens reports the o200k_base token count
+ok 16 - WHAT[context-compression-031] countTokens reports the o200k_base token count
+  ---
+  duration_ms: 0.15275
+  ...
+# Subtest: WHAT[context-compression-031] protected items and null mappings keep their current material
+ok 17 - WHAT[context-compression-031] protected items and null mappings keep their current material
+  ---
+  duration_ms: 0.37075
+  ...
+# Subtest: WHAT[context-compression-031] same-round adjacent summaries use the input partition
+ok 18 - WHAT[context-compression-031] same-round adjacent summaries use the input partition
+  ---
+  duration_ms: 0.15775
+  ...
+# Subtest: WHAT[context-compression-031] anchor zero persists and earlier replacement includes prior summaries
+ok 19 - WHAT[context-compression-031] anchor zero persists and earlier replacement includes prior summaries
+  ---
+  duration_ms: 0.29325
+  ...
+# Subtest: WHAT[context-compression-031] a captured tail interval cannot swallow a later message
+ok 20 - WHAT[context-compression-031] a captured tail interval cannot swallow a later message
+  ---
+  duration_ms: 0.129333
+  ...
+# Subtest: WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one
+ok 21 - WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one
+  ---
+  duration_ms: 55.198125
+  ...
+# (node:95286) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[work-029] Plan path derivation is deterministic and rejects insecure work identities
+ok 22 - WHAT[work-029] Plan path derivation is deterministic and rejects insecure work identities
+  ---
+  duration_ms: 0.655791
+  ...
+# Subtest: WHAT[work-029] Plan uses common text primitives and exposes no retired file edit or rewrite aliases
+ok 23 - WHAT[work-029] Plan uses common text primitives and exposes no retired file edit or rewrite aliases
+  ---
+  duration_ms: 45.814875
+  ...
+# Subtest: WHAT[work-029] public and raw API calls cannot read or write outside P
+ok 24 - WHAT[work-029] public and raw API calls cannot read or write outside P
+  ---
+  duration_ms: 92.175333
+  ...
+# Subtest: WHAT[work-029] current tenure review gates each actual P write and relay revokes the permission
+ok 25 - WHAT[work-029] current tenure review gates each actual P write and relay revokes the permission
+  ---
+  duration_ms: 65.204416
+  ...
+# Subtest: WHAT[work-029] P symlinks and a substituted plan directory cannot escape the bound artifact
+ok 26 - WHAT[work-029] P symlinks and a substituted plan directory cannot escape the bound artifact
+  ---
+  duration_ms: 48.622375
+  ...
+# Subtest: WHAT[work-029] the shared as-is write remains on disk after a later program failure
+ok 27 - WHAT[work-029] the shared as-is write remains on disk after a later program failure
+  ---
+  duration_ms: 36.796042
+  ...
+# Subtest: WHAT[work-029] both Plan descriptions teach PLAN_PATH with the shared SDK and current view contract
+ok 28 - WHAT[work-029] both Plan descriptions teach PLAN_PATH with the shared SDK and current view contract
+  ---
+  duration_ms: 6.48725
+  ...
+1..28
+# tests 28
+# suites 0
+# pass 28
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1069.120375

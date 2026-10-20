@@ -18,6 +18,13 @@ module JsToolsBindings =
 
     val createLedger: persistence: IJsTransactionPersistence option -> JsAsIsLedger
 
+    val makeAskMember:
+        state: Wanxiangshu.Process.JsSandbox.ParkState ->
+        invoke: (string -> Task<Result<unit, string>>) ->
+            (string * obj)
+
+    val scopePlanFile: root: string -> canWrite: (unit -> bool) -> api: obj -> obj
+
     /// `js.horizon()`: the `(memberName, member)` pair for the horizon roster
     /// envelope; refuses with DELEGATION_UNAVAILABLE when no host is installed.
     val makeHorizonMember: host: JsDelegationHost option -> (string * obj)

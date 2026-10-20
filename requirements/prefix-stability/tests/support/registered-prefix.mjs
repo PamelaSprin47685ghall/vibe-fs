@@ -145,7 +145,7 @@ export const coveredSession = async (hooks, runtime, directory, sessionID, testC
   const running = { info: { id: 'msg-covered-next-run', sessionID, parentID: physical, role: 'assistant', agent: 'manager', providerID: 'provider', modelID: 'manager-model', time: { created: 6 } }, parts: [] }
   await check('actual Chronicle execution and Host transcript commit the covered frame', async () => {
     Object.assign(checkpoint.info, { finish: 'tool-calls', time: { created: 4, completed: 5 } })
-    checkpoint.parts = [{ type: 'tool-call', tool: 'todowrite-for-manager', callID: 'call-checkpoint', args: { program: 'class Js extends JsProgram { async run() { return {}; } }', view: { prefixUntil: 1 } } }]
+    checkpoint.parts = [{ type: 'tool-call', tool: 'todowrite-for-manager', callID: 'call-checkpoint', args: { program: 'class Js extends JsProgram { async run() { return {}; } }', prefixUntil: 1, thenMap: {} } }]
     messages.push(structuredClone(checkpoint), { info: { id: 'msg-checkpoint-result', sessionID, role: 'tool', time: { created: 5 } }, parts: [{ type: 'tool-result', callID: 'call-checkpoint', output: 'Todos updated' }] })
     push(structuredClone(messages.at(-1)))
     push(running)
@@ -176,7 +176,7 @@ export const coveredSession = async (hooks, runtime, directory, sessionID, testC
             callID,
             state: {
               status: 'completed',
-              input: { program: 'class Js extends JsProgram { async run() { return {}; } }', view: { prefixUntil: 1 } },
+              input: { program: 'class Js extends JsProgram { async run() { return {}; } }', prefixUntil: 1, thenMap: {} },
             },
           },
         },

@@ -1,0 +1,64 @@
+{
+  "package": "UM-2",
+  "state": "SOURCE_READY_LIMITED",
+  "base_commit": "24462522f8c37d898f0b07f8723c7cf9f99dae05",
+  "upstream_target": "11052493bedb4edbcbe0c341fa677afd44c486f1",
+  "generation": 48,
+  "freshness": {
+    "ok": true,
+    "sources": 1792,
+    "artifacts": 882,
+    "compilerInputDigest": "2fe1115b68c148dc9c81086cb81dc12396e733b6709016d437519bf499c2ad59",
+    "generatedInputDigest": "0f9dbf7777a24c587a6955388bef49b5ed353ab768d4e057e5c10ae350507d0b",
+    "artifactInputDigest": "f0a9653daa2a1254a5cad632cdb82354a68bd9a930e7854417eb5c42fad91faf"
+  },
+  "checks": {
+    "build": { "exit": 0, "log": "um2-build-sixth.log" },
+    "format": { "exit": 0, "log": "um2-format-fourth.log" },
+    "static": { "exit": 0, "log": "um2-check-final.log" },
+    "core": {
+      "log": "um2-regression-final.log",
+      "exit": 1,
+      "files": 22,
+      "passed": 165,
+      "failed": 0,
+      "skipped": 1,
+      "todo": 1,
+      "files_drained": 22,
+      "reclamation_accepted": true
+    },
+    "checkpoint_integration": {
+      "log": "um2-checkpoint-final.log",
+      "exit": 0,
+      "files": 5,
+      "passed": 23,
+      "failed": 0,
+      "files_drained": 5,
+      "reclamation_accepted": true
+    }
+  },
+  "scope": [
+    "Shared ordered interval projection, permanent history, anchor zero, null keep, protected prefix, frozen tail",
+    "Flat prefixUntil/thenMap schema and durable call-identity checkpoint consumers",
+    "Inline user and terminal-result anchors without rewriting physical originals or Trace",
+    "Advisor projection before exact-material cursor filtering; current answer isolation retained",
+    "Shared Plan SDK and real file primitives restricted to P, including raw API and symlinks",
+    "Per-write original-incumbency and review checks, including saved method after park and relay",
+    "Plan ask keeps the durable S1 user-question owner and common park lifecycle",
+    "File-access observation stays enabled and uses the actual Plan directory"
+  ],
+  "formal_acceptance": false,
+  "remaining": [
+    "GAP-106 is an existing TODO; it was not accepted or converted to pass",
+    "prefix-stability-014 actual installed Host case was not enabled in this core run; UM-5 owns it",
+    "UM-3 reviewOnly and UM-4 durable delivery witness are not implemented yet",
+    "This source group remains off master until UM-2 through UM-4 are coherent",
+    "Full release, package consumption and deployment have not run"
+  ],
+  "disposition": {
+    "provider011_baseline": "Old candidate reproduced 6 pass / 2 fail. Both failures came from the fixture reading .git. The fixture now uses the existing state-root owner and passes in the final core run.",
+    "checkpoint004_cold": "The cold-reader fixture used .git. It now uses the existing state-root owner and passes with all other projection slices unchanged.",
+    "advisor_full_attempt_fixture": "The attempted full provider fixture triggered a second-prompt authority conflict. Raw logs are retained. The member isolation test prepares its own view through AnchorSurface; this is not a full provider/Advisor recovery claim.",
+    "automatic_review": "A proposal to remove Plan file-access observation was rejected. That deletion was not applied. The accepted implementation preserves observation and corrects its root."
+  }
+}

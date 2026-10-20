@@ -257,11 +257,10 @@ Manager 与 Plan 的目标义务独立于物理回合：空 stop、合格收尾�
 
 底稿 `P` 是模型唯一可读写的持久化文件产物，其路径由系统确定性派生。
 
-- 允许后果：系统以 `workId` 派生安全编码的 `canonical-work-key`，路径固定为 `<主工作树>/.Herdchestra/wanxiangshu/plan/<canonical-work-key>/plan.md`。`todowrite-for-plan` 是标准的 JS 编程面工具（接受单一参数 `program: string`，在沙箱中执行继承自 `JsProgram` 的类并实现 `async run()`），仅作用于该单一底稿 `P`。它直接模仿其它 `js-*` 工具的锚点编辑法，但因为作用域严格限定于单一底稿 `P`，严禁且无需传入任何路径参数：提供 `file(matches)` 读快照与锚点切片、`edit(changes)` 局部修改与 `rewrite(newText)` 全量覆盖能力；无 `glob`/`grep` 仓库检索能力。写入采用排他临时文件写入、flush 后原子替换的方式发布。
-- 允许后果：交给模型的 `todowrite-for-plan` 工具描述复用其它 `js-*` 的同一套教程面：有序锚点、`text(from, to)`、精确 `edit`、结构重组，以及一份按底稿职责成形的样例。教程按本工具的无路径签名填写：`file(matches = [])`、`edit(changes)`、`rewrite(newText)`。`P` 的单一作用域、禁路径和写前评审只作为作用域约束放在教程前面，不另写一套锚点用法。
-- 禁止后果：模型不得在工具参数中使用多余字段，只传递 `program`。在 `JsProgram` 的 `file`、`edit`、`rewrite` 方法中严禁传入任何路径参数，若调用时尝试传入路径参数，沙箱必须直接报错拒绝。严禁路径穿越（path traversal）、符号链接逃逸、不安全 ID 注入或根目录漂移。`todowrite-for-plan` 严禁提供任何超出 `P` 之外的文件系统能力，严禁暴露目录列表或仓库文件读写。写盘完成后取消读回校验。
-- 禁止后果：工具描述不得另写精简教程替代共享教程，不得在教程或样例中教模型传入路径参数，不得把运行时内部对象暴露给模型。
-- 失败后果：检测到路径异常、传入路径参数、尝试访问 `P` 之外的文件或目标文件被外部非法篡改时，操作必须立即拒绝。
+- 允许后果：系统以 `workId` 派生安全的 `canonical-work-key`，路径固定为 `<主工作树>/.Herdchestra/wanxiangshu/plan/<canonical-work-key>/plan.md`。`todowrite-for-plan` 使用共享 JS 编程面、三态输入和可选顶层 `prefixUntil/thenMap` 声明，在沙箱内运行 `JsProgram.run()`。模型通过 `PLAN_PATH` 常量访问唯一底稿 P，复用 `cat/stat/where/whereAll/write/park` 和 S1 的 `ask`；不再提供 file/edit/rewrite 别名。
+- 允许后果：读取、定位文本、写入与效果记账复用普通文件原语。写入在真实调用前查询当前活跃任期的评审事实，未评审以 `PLAN_REVIEW_REQUIRED` 拒绝；接力后重新要求本任评审。保存的方法引用、原始 API 与 park 恢复后的写入同样检查。成功写入立即生效，后续程序失败不撤回已落盘效果。
+- 禁止后果：P 以外的路径一律拒绝，包括兄弟文件、仓库文件、路径穿越和符号链接逃逸。目录列表、目录创建、仓库搜索与 Exec 不属于 Plan 编程面；不得在缺失路径或任期事实时退回仓库根目录，不得通过 SDK 外观隐藏可绕过的原始 API。
+- 失败后果：路径异常、越界、外部改写或当前写权限缺失时立即拒绝该操作，既有成功效果如实报告。工具描述与真实成员必须一致，中英说明共同使用 PLAN_PATH 和共享方法。
 
 ## [030] 工具注册与分类
 

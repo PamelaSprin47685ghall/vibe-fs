@@ -20,23 +20,17 @@ module AnchorSurface =
     [<Emit("typeof $0 === 'string'")>]
     let private isString (value: obj) : bool = jsNative
 
-    [<Emit("typeof $0 === 'number'")>]
-    let private isNumber (value: obj) : bool = jsNative
+    [<Emit("typeof $0 === 'number' && Number.isInteger($0) && $0 >= 0 && $0 < 2147483647")>]
+    let private isAnchor (value: obj) : bool = jsNative
 
-    [<Emit("Array.isArray($0)")>]
-    let private isArray (value: obj) : bool = jsNative
+    [<Emit("$0 === null")>]
+    let private isNullValue (value: obj) : bool = jsNative
 
-    [<Emit("typeof $0 === 'object'")>]
-    let private isObject (value: obj) : bool = jsNative
+    [<Emit("typeof $0 === 'object' && $0 !== null && !Array.isArray($0)")>]
+    let private isRecord (value: obj) : bool = jsNative
 
     [<Emit("$0[$1]")>]
     let private getProperty (value: obj) (name: string) : obj = jsNative
-
-    [<Emit("$0[$1]")>]
-    let private getIndex (value: obj) (index: int) : obj = jsNative
-
-    [<Emit("$0.length")>]
-    let private length (value: obj) : int = jsNative
 
     [<Emit("Object.keys($0)")>]
     let private keys (value: obj) : string[] = jsNative
@@ -48,79 +42,60 @@ module AnchorSurface =
 
     let private anchorOfKey (key: string) : int option =
         match System.Int32.TryParse key with
-        | true, anchor when string anchor = key -> Some anchor
+        | true, anchor when anchor >= 0 && anchor < System.Int32.MaxValue && string anchor = key -> Some anchor
         | _ -> None
 
-    /// `thenRemove` is an anchor→summary map: the summary is what stands in for
-    /// that anchor from here on, so a missing or blank summary is a declaration
-    /// that would silently drop knowledge.
-    let private replacePair (source: obj) (key: string) : Result<int * string, JsFailure> =
+    let private replacePair (source: obj) (key: string) : Result<int * string option, JsFailure> =
         match anchorOfKey key with
-        | None -> invalid (sprintf "thenRemove keys must be anchor numbers; \"%s\" is not one" key)
+        | None -> invalid (sprintf "thenMap keys must be non-negative anchor numbers; \"%s\" is not one" key)
         | Some anchor ->
             let summary = getProperty source key
 
-            if
-                not (isString summary)
-                || System.String.IsNullOrWhiteSpace(unbox<string> summary)
+            if isNullValue summary then
+                Ok(anchor, None)
+            elif
+                isString summary
+                && not (System.String.IsNullOrWhiteSpace(unbox<string> summary))
             then
-                invalid (
-                    sprintf
-                        "thenRemove[%s] must be a non-blank summary string (the summary replaces that anchor's segments, not deletes them)"
-                        key
-                )
+                Ok(anchor, Some(unbox<string> summary))
             else
-                Ok(anchor, string summary)
+                invalid (sprintf "thenMap[%s] must be null or a non-blank summary string" key)
 
-    /// Parse one `view` argument against the declaration contract:
-    /// `prefixUntil` is a required anchor number (never "all"), and `thenRemove`
-    /// is an optional anchor→summary map naming what to replace for good.
-    /// Anything may be replaced, including anchors below `prefixUntil`; the
-    /// prefix is a price boundary, not a protection fence.
-    let private declarationOf (value: obj) : Result<AnchorViewDeclaration, JsFailure> =
-        let rawPrefixUntil = getProperty value "prefixUntil"
-        let rawThenRemove = getProperty value "thenRemove"
+    let parseDeclaration (value: obj) : Result<AnchorViewDeclaration, JsFailure> =
+        if not (isRecord value) then
+            invalid "view must contain prefixUntil and thenMap"
+        elif keys value |> Array.exists (fun key -> key <> "prefixUntil" && key <> "thenMap") then
+            invalid "view accepts only prefixUntil and thenMap"
+        else
+            let prefix = getProperty value "prefixUntil"
+            let mapping = getProperty value "thenMap"
 
-        let prefixUntil =
-            if isNumber rawPrefixUntil then
-                Ok(int (unbox<float> rawPrefixUntil))
+            if not (isAnchor prefix) then
+                invalid "prefixUntil is required and must be a non-negative integer anchor number"
+            elif not (isRecord mapping) then
+                invalid "thenMap is required and must map anchor numbers to summaries or null"
             else
-                invalid
-                    "prefixUntil must be an anchor number; pass one above every anchor you have seen to keep everything"
-
-        let thenRemove =
-            if isNullish rawThenRemove then
-                Ok []
-            elif isArray rawThenRemove || not (isObject rawThenRemove) then
-                invalid
-                    "thenRemove must be an object mapping anchor numbers to summaries, e.g. { \"3\": \"what segment 3 held\" }"
-            else
-                keys rawThenRemove
+                keys mapping
                 |> Array.toList
-                |> List.map (replacePair rawThenRemove)
+                |> List.map (replacePair mapping)
                 |> List.fold
-                    (fun accumulated pair ->
-                        match accumulated, pair with
-                        | Ok pairs, Ok entry -> Ok(pairs @ [ entry ])
-                        | Error failure, _ -> Error failure
+                    (fun result pair ->
+                        match result, pair with
+                        | Ok pairs, Ok entry -> Ok(entry :: pairs)
+                        | Error failure, _
                         | _, Error failure -> Error failure)
                     (Ok [])
-                |> Result.map (List.sortBy fst)
-
-        match prefixUntil, thenRemove with
-        | Ok prefixUntil, Ok thenRemove ->
-            Ok
-                { PrefixUntil = prefixUntil
-                  ThenRemove = thenRemove }
-        | Error failure, _
-        | _, Error failure -> Error failure
+                |> Result.map (fun pairs ->
+                    { PrefixUntil = int (unbox<float> prefix)
+                      ThenMap = pairs |> List.sortBy fst })
 
     let private declarationValue (declaration: AnchorViewDeclaration) : obj =
         createObj
             [ "prefixUntil" ==> declaration.PrefixUntil
-              "thenRemove"
-              ==> (declaration.ThenRemove
-                   |> List.map (fun (anchor, summary) -> string anchor, box summary)
+              "thenMap"
+              ==> (declaration.ThenMap
+                   |> List.map (fun (anchor, summary) ->
+                       string anchor, (summary |> Option.map box |> Option.defaultValue null))
                    |> List.toArray
                    |> createObj) ]
 
@@ -141,12 +116,19 @@ module AnchorSurface =
         if isNullish declaration then
             Ok()
         else
-            match declarationOf declaration with
-            | Error failure -> Error failure
-            | Ok view ->
-                AnchorLedger.replaceAnchors sessionId view.ThenRemove
-                AnchorLedger.setView sessionId view
-                Ok()
+            parseDeclaration declaration |> Result.map (AnchorLedger.setView sessionId)
+
+    let parse (declaration: obj) : Result<obj, JsFailure> =
+        parseDeclaration declaration |> Result.map (fun _ -> declaration)
+
+    let captureView (sessionId: string) (declaration: obj) : obj =
+        match setView sessionId declaration with
+        | Ok() -> createObj [ "ok" ==> true ]
+        | Error failure ->
+            createObj
+                [ "ok" ==> false
+                  "code" ==> JsFailure.code failure
+                  "reason" ==> JsFailure.reason failure ]
 
     let takeView (sessionId: string) : obj =
         match AnchorLedger.takeView sessionId with
@@ -154,12 +136,6 @@ module AnchorSurface =
         | None -> null
 
     let applyView (sessionId: string) (messages: obj array) : obj =
-        let declaration =
-            AnchorLedger.takeView sessionId
-            |> Option.defaultValue { PrefixUntil = 0; ThenRemove = [] }
-
-        let replaced = AnchorLedger.replacements sessionId
-
         let inputs =
             if isNullish (box messages) then
                 []
@@ -173,8 +149,24 @@ module AnchorSurface =
                         getProperty raw "text" |> fun text -> if isString text then string text else ""
                       AnchorView.AnchorMessage.Raw = raw })
 
+        AnchorLedger.remember sessionId (inputs |> List.map (fun message -> message.Id, message.Text))
+
+        inputs
+        |> List.iter (fun message ->
+            message.Id
+            |> Option.iter (fun id -> AnchorLedger.numberMessage sessionId id |> ignore))
+
+        let declaration =
+            AnchorLedger.takeView sessionId
+            |> Option.defaultValue AnchorViewDeclaration.empty
+
         let entries, report =
-            AnchorView.apply (AnchorLedger.numberMessage sessionId) countTokens replaced declaration inputs
+            AnchorView.apply
+                (AnchorLedger.numberMessage sessionId)
+                countTokens
+                (AnchorLedger.replacements sessionId)
+                declaration
+                inputs
 
         createObj
             [ "entries"
@@ -182,7 +174,9 @@ module AnchorSurface =
                    |> List.map (function
                        | AnchorView.Kept message -> createObj [ "kind" ==> "kept"; "message" ==> message.Raw ]
                        | AnchorView.Summarized(message, summary) ->
-                           createObj [ "kind" ==> "summarized"; "message" ==> message.Raw; "summary" ==> summary ])
+                           createObj [ "kind" ==> "summarized"; "message" ==> message.Raw; "summary" ==> summary ]
+                       | AnchorView.OpeningSummary summary ->
+                           createObj [ "kind" ==> "summarized"; "anchor" ==> 0; "summary" ==> summary ])
                    |> List.toArray
                    |> box)
               "report"

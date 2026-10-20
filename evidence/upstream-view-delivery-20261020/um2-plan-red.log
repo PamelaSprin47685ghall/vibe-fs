@@ -1,0 +1,908 @@
+TAP version 13
+# (node:94320) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[work-029] Plan path derivation is deterministic and rejects insecure work identities
+not ok 1 - WHAT[work-029] Plan path derivation is deterministic and rejects insecure work identities
+  ---
+  duration_ms: 4.622541
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:31:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      {
+    +   error: null,
+        ok: true,
+        path: '/workspace/repo/.Herdchestra/wanxiangshu/plan/task_42-v1/plan.md'
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    ok: true
+    path: '/workspace/repo/.Herdchestra/wanxiangshu/plan/task_42-v1/plan.md'
+  actual:
+    error: ~
+    ok: true
+    path: '/workspace/repo/.Herdchestra/wanxiangshu/plan/task_42-v1/plan.md'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:33:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.start (node:internal/test_runner/test:829:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: WHAT[work-029] Plan uses common text primitives and exposes no retired file edit or rewrite aliases
+not ok 2 - WHAT[work-029] Plan uses common text primitives and exposes no retired file edit or rewrite aliases
+  ---
+  duration_ms: 57.25525
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:41:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /# ok/. Input:
+    
+    '# failed\n' +
+      '\n' +
+      'code = "PROGRAM_FAILED"\n' +
+      'reason = "program threw: PLAN_PATH is not defined"\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # failed
+    
+    code = "PROGRAM_FAILED"
+    reason = "program threw: PLAN_PATH is not defined"
+    
+  operator: 'match'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:49:12
+    async withPlan (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:25:5)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:42:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[work-029] public and raw API calls cannot read or write outside P
+not ok 3 - WHAT[work-029] public and raw API calls cannot read or write outside P
+  ---
+  duration_ms: 40.286334
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:57:1'
+  failureType: 'testCodeFailure'
+  error: 'return await this.cat("sibling.txt");'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # failed
+    
+    code = "PROGRAM_FAILED"
+    reason = "program threw: this.cat is not a function"
+    
+  operator: 'match'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:70:16
+    async withPlan (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:25:5)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:58:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[work-029] current tenure review gates each actual P write and relay revokes the permission
+not ok 4 - WHAT[work-029] current tenure review gates each actual P write and relay revokes the permission
+  ---
+  duration_ms: 45.354125
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:79:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /Keep this fact/. Input:
+    
+    '# failed\n' +
+      '\n' +
+      'code = "PROGRAM_FAILED"\n' +
+      'reason = "program threw: PLAN_PATH is not defined"\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # failed
+    
+    code = "PROGRAM_FAILED"
+    reason = "program threw: PLAN_PATH is not defined"
+    
+  operator: 'match'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:81:12
+    async withPlan (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:25:5)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:80:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[work-029] P symlinks and a substituted plan directory cannot escape the bound artifact
+not ok 5 - WHAT[work-029] P symlinks and a substituted plan directory cannot escape the bound artifact
+  ---
+  duration_ms: 39.5255
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:96:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /PATH_DENIED/. Input:
+    
+    '# failed\n' +
+      '\n' +
+      'code = "PROGRAM_FAILED"\n' +
+      'reason = "program threw: PLAN_PATH is not defined"\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # failed
+    
+    code = "PROGRAM_FAILED"
+    reason = "program threw: PLAN_PATH is not defined"
+    
+  operator: 'match'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:103:12
+    async withPlan (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:25:5)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:97:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[work-029] the shared as-is write remains on disk after a later program failure
+not ok 6 - WHAT[work-029] the shared as-is write remains on disk after a later program failure
+  ---
+  duration_ms: 38.644541
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:112:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + '# Draft\nKeep this fact.'
+    - '# Saved'
+         ^
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '# Saved'
+  actual: |-
+    # Draft
+    Keep this fact.
+  operator: 'strictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:117:12
+    async withPlan (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:25:5)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:113:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[work-029] both Plan descriptions teach PLAN_PATH with the shared SDK and current view contract
+not ok 7 - WHAT[work-029] both Plan descriptions teach PLAN_PATH with the shared SDK and current view contract
+  ---
+  duration_ms: 5.673584
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:121:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /write\(path, content\)/. Input:
+    
+    'The planning draft `P` is the only file this programming surface can read or write. Use `PLAN_PATH` with the shared `cat`, `stat`, `where`, `whereAll`, and `write` methods. Other paths fail with `PATH_DENIED`. There are no file/edit/rewrite aliases, directory listing, directory creation, repository search, or command execution. Use `devops` for repository facts.\n' +
+      '\n' +
+      'Before writing, call `review` in this incumbency. Every write checks the current incumbency again; a relayed successor must obtain its own review.\n' +
+      '\n' +
+      '`await this.ask(question)` records a durable user question, notifies the user, and parks the program. Only S1 may ask; other stages refuse with `ASK_REFUSED`. After a real user reply, resume with `{ unpark: { handle, value } }`.\n' +
+      '\n' +
+      'The tool also accepts optional top-level `prefixUntil` and `thenMap` together. They use the shared ANCHOR view contract. Plan user originals remain raw. Numbers and replacement history last only in this process; a durable call checkpoint does not save the view. Keep enduring knowledge in P.\n' +
+      '\n' +
+      'For ordinary edits, start with edit(changes).\n' +
+      '\n' +
+      'Decision ladder:\n' +
+      '1. For one exact replacement, insertion, deletion, or repeated replacement, use edit().\n' +
+      '2. Put every independent change to one file in one edit call per path, using canonical\n' +
+      '   { find, put, all? } changes.\n' +
+      '3. Set all: true only when every exact occurrence should change.\n' +
+      '4. For computed, reordered, or generated whole-file output, use rewrite(newText).\n' +
+      '\n' +
+      'Near matches are diagnostics, never write authority. edit() stages only after exact, unambiguous,\n' +
+      'non-overlapping hits. A failed edit stages nothing and tells you what current text to quote next.\n' +
+      '\n' +
+      'When Read is available, use file(matches) + text() + rewrite() for structural recomposition.\n' +
+      '\n' +
+      'file(matches = []) reads the plan artifact as an immutable UTF-8 snapshot and resolves **ordered anchors**; it returns an immutable FileView.\n' +
+      '\n' +
+      'matches is Array<[beginAnchor, endAnchor, pattern]> where pattern is a non-empty string or a RegExp. Anchors are position names, not matched text. Every FileView has built-in anchors ^ (start) and $ (end); do not declare them.\n' +
+      '\n' +
+      'Ordered matching: each pattern is searched from the current cursor; after a match, cursor = match.end. Duplicate source text does not need to be globally unique. Caller RegExp g/y flags and lastIndex are ignored.\n' +
+      '\n' +
+      'text(from, to) — default text("^", "$") — returns the exact original substring between two resolved anchors; reverse slices fail. from/to may be a declared name, ^, $, or a temporary shift `name+N / name-N` (for example h1+200, $+0). N is a JS string index delta — the same unit as String.length / slice — **not a line number** and not a UTF-8 byte count. Shifts are not stored; the resulting caret is clipped to [0, file_len] inclusive.\n' +
+      '\n' +
+      'Recommended workflow:\n' +
+      '1. Declare the minimal begin/end anchors needed to locate spans (read or edit).\n' +
+      '2. Let Host resolve those positions.\n' +
+      '3. Read with text(from, to). Adjacent headers make a body slice: text("h1end", "h2").\n' +
+      '4. For edits, build the complete resulting file from text(...) slices plus new content.\n' +
+      '5. Near matches are diagnostics, never write authority.\n' +
+      '\n' +
+      'If you are about to calculate structural boundaries by hand, first ask whether file(matches) + ordered anchors + text() already owns that boundary. If yes, use it. If a result later violates an obvious invariant, treat that as a stop signal, not an invitation to keep guessing.\n' +
+      '\n' +
+      'WARNING: You may be about to turn a bounded filesystem task into a self-inflicted repair job.\n' +
+      '\n' +
+      'The Host already owns this boundary. That is not a style preference; it is the execution contract.\n' +
+      'There are only two acceptable moves: use the primitive that owns it, or prove it cannot express the\n' +
+      'job before dropping lower. "I know indexOf better" is not a third option.\n' +
+      '\n' +
+      'You do not need to feel certain before stopping. Suspicion is enough to trigger verification; only\n' +
+      'facts earn permission to continue. When the cheap check and your intuition disagree, distrust\n' +
+      'the intuition first.\n' +
+      '\n' +
+      `If your next thought is "I'll just indexOf this marker", "grep the headings and piece it together",\n` +
+      'or "replace the bad parts and clean up whatever remains", stop before writing that program. Those\n' +
+      'are exactly the moves that feel fast because they are familiar, then quietly discard the structure,\n' +
+      'snapshot, and transaction guarantees this tool already gives you. One careless program can create\n' +
+      'more work than the original task; the expensive part is rarely the first mistake, but the second and\n' +
+      'third programs written to repair it.\n' +
+      '\n' +
+      'If a result violates an obvious invariant, treat that as a stop signal, not an invitation to keep\n' +
+      'guessing with a lower-level technique.\n' +
+      '\n' +
+      'Anchor discipline, learned the hard way. Prefer a longer anchor over a shorter\n' +
+      'one: include the brackets, the attribute markers, the surrounding line — the\n' +
+      'extra tokens are what make the span unique. A needle that misses its `[<...>]`\n' +
+      'wrapping parks on zero matches, and the repair is one unpark — the nearest\n' +
+      'diagnosis already points at the right position. For program self-checks,\n' +
+      'prefer structure assertions (the sentinel exists, the heading count is\n' +
+      'unchanged) over string counting — intuition-guessed counts are wrong more\n' +
+      'often than right, and a wrong count rejects a correct edit.\n' +
+      '\n' +
+      'Independent tasks can go out in parallel: one assistant message may carry several\n' +
+      'todowrite-for-* tool calls, and unrelated jobs (read this file, rewrite that one) run\n' +
+      'as separate transactions without waiting on each other. Batch the independent,\n' +
+      'serialize the dependent.\n' +
+      '\n' +
+      'When the same text appears in several places, take all spans from `whereAll` and replace them one by one — no need to rewrite the whole file just to dodge the ambiguity.\n' +
+      '\n' +
+      'This is the programmable filesystem tool for the current agent.\n' +
+      '\n' +
+      'The base class below is generated from the capabilities actually available in\n' +
+      'this request. If a method is present, you may use it. If a method is absent,\n' +
+      'that capability is not available.\n' +
+      '\n' +
+      'Define exactly one class named Js that extends JsProgram and implement\n' +
+      'async run().\n' +
+      '\n' +
+      'Prefer todowrite-for-plan for all filesystem work.\n' +
+      '\n' +
+      'Do not use the legacy tools read/edit/write/glob/grep/patch for new work when todowrite-for-plan is available.\n' +
+      'todowrite-for-plan is the capability-projected JavaScript filesystem SDK for this\n' +
+      'request. It can read, cat, stat, where, whereAll, transform, rewrite files in one program — including large parallel batches.\n' +
+      '\n' +
+      'Strongly recommended:\n' +
+      '- Call todowrite-for-plan instead of read/edit/write/glob/grep/patch whenever possible.\n' +
+      '- Use edit(changes) for ordinary exact changes; use rewrite(newText) only when the complete final file must be computed, reordered, or generated.\n' +
+      '- Write complex JavaScript in one todowrite-for-plan program rather than many legacy RPCs.\n' +
+      '- Parallel todowrite-for-plan calls are absolutely safe for same-file and cross-file edits.\n' +
+      '\n' +
+      'Call tools in parallel whenever needed. Parallel reads, parallel edits, same-file\n' +
+      'and cross-file calls are all absolutely safe. The Host serializes one assistant\n' +
+      "message's tool calls in deterministic order; each call is its own transaction.\n" +
+      '\n' +
+      'Write complex JavaScript in one program. Every write lands immediately (as-is):\n' +
+      'there is no rollback of earlier writes, so validate before each write you cannot\n' +
+      'afford to keep.\n' +
+      '\n' +
+      '```js\n' +
+      'class JsProgram {\n' +
+      '\n' +
+      '  async file(matches = []) {\n' +
+      '    const path = "plan.md";\n' +
+      '    const fail = (code, reason) => {\n' +
+      '      throw new Error(reason);\n' +
+      '    };\n' +
+      '    const source = await HOST_READ_IMMUTABLE_UTF8_SNAPSHOT(path);\n' +
+      '\n' +
+      '    const anchors = new Map([\n' +
+      '      ["^", 0],\n' +
+      '      ["$", source.length],\n' +
+      '    ]);\n' +
+      '\n' +
+      '    let cursor = 0;\n' +
+      '\n' +
+      '    const preview = pattern => {\n' +
+      '      if (typeof pattern === "string") {\n' +
+      '        return pattern.length > 80\n' +
+      '          ? JSON.stringify(pattern.slice(0, 80)) + "…"\n' +
+      '          : JSON.stringify(pattern);\n' +
+      '      }\n' +
+      '\n' +
+      '      if (pattern instanceof RegExp) {\n' +
+      '        const shown = "/" + pattern.source + "/";\n' +
+      '        return shown.length > 80 ? shown.slice(0, 80) + "…" : shown;\n' +
+      '      }\n' +
+      '\n' +
+      '      return String(pattern);\n' +
+      '    };\n' +
+      '\n' +
+      '    const locatePattern = pattern => {\n' +
+      '      if (typeof pattern === "string") {\n' +
+      '        if (pattern.length === 0)\n' +
+      '          fail("EMPTY_ANCHOR_CONTENT", "string anchor patterns must be non-empty");\n' +
+      '\n' +
+      '        const start = source.indexOf(pattern, cursor);\n' +
+      '\n' +
+      '        if (start < 0)\n' +
+      '          return null;\n' +
+      '\n' +
+      '        return {\n' +
+      '          start,\n' +
+      '          end: start + pattern.length,\n' +
+      '        };\n' +
+      '      }\n' +
+      '\n' +
+      '      if (pattern instanceof RegExp) {\n' +
+      '        // Anchor matching defines its own forward-search semantics.\n' +
+      '        // Caller g/y state and lastIndex are ignored.\n' +
+      '        const flags =\n' +
+      '          [...new Set(\n' +
+      '            pattern.flags.replace(/[gy]/g, "") + "g"\n' +
+      '          )].join("");\n' +
+      '\n' +
+      '        let regexp;\n' +
+      '        try {\n' +
+      '          regexp = new RegExp(pattern.source, flags);\n' +
+      '        } catch {\n' +
+      '          fail("INVALID_ANCHOR_PATTERN", "anchor RegExp is invalid");\n' +
+      '        }\n' +
+      '\n' +
+      '        regexp.lastIndex = cursor;\n' +
+      '\n' +
+      '        const match = regexp.exec(source);\n' +
+      '\n' +
+      '        if (!match)\n' +
+      '          return null;\n' +
+      '\n' +
+      '        return {\n' +
+      '          start: match.index,\n' +
+      '          end: match.index + match[0].length,\n' +
+      '        };\n' +
+      '      }\n' +
+      '\n' +
+      '      fail("INVALID_ANCHOR_PATTERN", "anchor pattern must be a string or RegExp");\n' +
+      '    };\n' +
+      '\n' +
+      '    let declaration = 0;\n' +
+      '\n' +
+      '    for (const [begin, end, pattern] of matches) {\n' +
+      '      declaration += 1;\n' +
+      '\n' +
+      '      if (!begin || !end)\n' +
+      '        fail("EMPTY_ANCHOR_CONTENT", `anchor ${declaration}: names must be non-empty`);\n' +
+      '\n' +
+      '      if (\n' +
+      '        begin === "^" || begin === "$" ||\n' +
+      '        end === "^" || end === "$"\n' +
+      '      )\n' +
+      '        fail("INVALID_ANCHOR_PATTERN", `anchor ${declaration}: ^ and $ are reserved`);\n' +
+      '\n' +
+      '      if (begin === end)\n' +
+      '        fail(\n' +
+      '          "INVALID_ANCHOR_PATTERN",\n' +
+      '          `anchor ${declaration}: begin and end names must differ`\n' +
+      '        );\n' +
+      '\n' +
+      '      if (anchors.has(begin) || anchors.has(end))\n' +
+      '        fail("INVALID_ANCHOR_PATTERN", `anchor ${declaration}: names must be unique`);\n' +
+      '\n' +
+      '      const match = locatePattern(pattern);\n' +
+      '\n' +
+      '      if (!match)\n' +
+      '        fail(\n' +
+      '          '... 14243 more characters
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    The planning draft `P` is the only file this programming surface can read or write. Use `PLAN_PATH` with the shared `cat`, `stat`, `where`, `whereAll`, and `write` methods. Other paths fail with `PATH_DENIED`. There are no file/edit/rewrite aliases, directory listing, directory creation, repository search, or command execution. Use `devops` for repository facts.
+    
+    Before writing, call `review` in this incumbency. Every write checks the current incumbency again; a relayed successor must obtain its own review.
+    
+    `await this.ask(question)` records a durable user question, notifies the user, and parks the program. Only S1 may ask; other stages refuse with `ASK_REFUSED`. After a real user reply, resume with `{ unpark: { handle, value } }`.
+    
+    The tool also accepts optional top-level `prefixUntil` and `thenMap` together. They use the shared ANCHOR view contract. Plan user originals remain raw. Numbers and replacement history last only in this process; a durable call checkpoint does not save the view. Keep enduring knowledge in P.
+    
+    For ordinary edits, start with edit(changes).
+    
+    Decision ladder:
+    1. For one exact replacement, insertion, deletion, or repeated replacement, use edit().
+    2. Put every independent change to one file in one edit call per path, using canonical
+       { find, put, all? } changes.
+    3. Set all: true only when every exact occurrence should change.
+    4. For computed, reordered, or generated whole-file output, use rewrite(newText).
+    
+    Near matches are diagnostics, never write authority. edit() stages only after exact, unambiguous,
+    non-overlapping hits. A failed edit stages nothing and tells you what current text to quote next.
+    
+    When Read is available, use file(matches) + text() + rewrite() for structural recomposition.
+    
+    file(matches = []) reads the plan artifact as an immutable UTF-8 snapshot and resolves **ordered anchors**; it returns an immutable FileView.
+    
+    matches is Array<[beginAnchor, endAnchor, pattern]> where pattern is a non-empty string or a RegExp. Anchors are position names, not matched text. Every FileView has built-in anchors ^ (start) and $ (end); do not declare them.
+    
+    Ordered matching: each pattern is searched from the current cursor; after a match, cursor = match.end. Duplicate source text does not need to be globally unique. Caller RegExp g/y flags and lastIndex are ignored.
+    
+    text(from, to) — default text("^", "$") — returns the exact original substring between two resolved anchors; reverse slices fail. from/to may be a declared name, ^, $, or a temporary shift `name+N / name-N` (for example h1+200, $+0). N is a JS string index delta — the same unit as String.length / slice — **not a line number** and not a UTF-8 byte count. Shifts are not stored; the resulting caret is clipped to [0, file_len] inclusive.
+    
+    Recommended workflow:
+    1. Declare the minimal begin/end anchors needed to locate spans (read or edit).
+    2. Let Host resolve those positions.
+    3. Read with text(from, to). Adjacent headers make a body slice: text("h1end", "h2").
+    4. For edits, build the complete resulting file from text(...) slices plus new content.
+    5. Near matches are diagnostics, never write authority.
+    
+    If you are about to calculate structural boundaries by hand, first ask whether file(matches) + ordered anchors + text() already owns that boundary. If yes, use it. If a result later violates an obvious invariant, treat that as a stop signal, not an invitation to keep guessing.
+    
+    WARNING: You may be about to turn a bounded filesystem task into a self-inflicted repair job.
+    
+    The Host already owns this boundary. That is not a style preference; it is the execution contract.
+    There are only two acceptable moves: use the primitive that owns it, or prove it cannot express the
+    job before dropping lower. "I know indexOf better" is not a third option.
+    
+    You do not need to feel certain before stopping. Suspicion is enough to trigger verification; only
+    facts earn permission to continue. When the cheap check and your intuition disagree, distrust
+    the intuition first.
+    
+    If your next thought is "I'll just indexOf this marker", "grep the headings and piece it together",
+    or "replace the bad parts and clean up whatever remains", stop before writing that program. Those
+    are exactly the moves that feel fast because they are familiar, then quietly discard the structure,
+    snapshot, and transaction guarantees this tool already gives you. One careless program can create
+    more work than the original task; the expensive part is rarely the first mistake, but the second and
+    third programs written to repair it.
+    
+    If a result violates an obvious invariant, treat that as a stop signal, not an invitation to keep
+    guessing with a lower-level technique.
+    
+    Anchor discipline, learned the hard way. Prefer a longer anchor over a shorter
+    one: include the brackets, the attribute markers, the surrounding line — the
+    extra tokens are what make the span unique. A needle that misses its `[<...>]`
+    wrapping parks on zero matches, and the repair is one unpark — the nearest
+    diagnosis already points at the right position. For program self-checks,
+    prefer structure assertions (the sentinel exists, the heading count is
+    unchanged) over string counting — intuition-guessed counts are wrong more
+    often than right, and a wrong count rejects a correct edit.
+    
+    Independent tasks can go out in parallel: one assistant message may carry several
+    todowrite-for-* tool calls, and unrelated jobs (read this file, rewrite that one) run
+    as separate transactions without waiting on each other. Batch the independent,
+    serialize the dependent.
+    
+    When the same text appears in several places, take all spans from `whereAll` and replace them one by one — no need to rewrite the whole file just to dodge the ambiguity.
+    
+    This is the programmable filesystem tool for the current agent.
+    
+    The base class below is generated from the capabilities actually available in
+    this request. If a method is present, you may use it. If a method is absent,
+    that capability is not available.
+    
+    Define exactly one class named Js that extends JsProgram and implement
+    async run().
+    
+    Prefer todowrite-for-plan for all filesystem work.
+    
+    Do not use the legacy tools read/edit/write/glob/grep/patch for new work when todowrite-for-plan is available.
+    todowrite-for-plan is the capability-projected JavaScript filesystem SDK for this
+    request. It can read, cat, stat, where, whereAll, transform, rewrite files in one program — including large parallel batches.
+    
+    Strongly recommended:
+    - Call todowrite-for-plan instead of read/edit/write/glob/grep/patch whenever possible.
+    - Use edit(changes) for ordinary exact changes; use rewrite(newText) only when the complete final file must be computed, reordered, or generated.
+    - Write complex JavaScript in one todowrite-for-plan program rather than many legacy RPCs.
+    - Parallel todowrite-for-plan calls are absolutely safe for same-file and cross-file edits.
+    
+    Call tools in parallel whenever needed. Parallel reads, parallel edits, same-file
+    and cross-file calls are all absolutely safe. The Host serializes one assistant
+    message's tool calls in deterministic order; each call is its own transaction.
+    
+    Write complex JavaScript in one program. Every write lands immediately (as-is):
+    there is no rollback of earlier writes, so validate before each write you cannot
+    afford to keep.
+    
+    ```js
+    class JsProgram {
+    
+      async file(matches = []) {
+        const path = "plan.md";
+        const fail = (code, reason) => {
+          throw new Error(reason);
+        };
+        const source = await HOST_READ_IMMUTABLE_UTF8_SNAPSHOT(path);
+    
+        const anchors = new Map([
+          ["^", 0],
+          ["$", source.length],
+        ]);
+    
+        let cursor = 0;
+    
+        const preview = pattern => {
+          if (typeof pattern === "string") {
+            return pattern.length > 80
+              ? JSON.stringify(pattern.slice(0, 80)) + "…"
+              : JSON.stringify(pattern);
+          }
+    
+          if (pattern instanceof RegExp) {
+            const shown = "/" + pattern.source + "/";
+            return shown.length > 80 ? shown.slice(0, 80) + "…" : shown;
+          }
+    
+          return String(pattern);
+        };
+    
+        const locatePattern = pattern => {
+          if (typeof pattern === "string") {
+            if (pattern.length === 0)
+              fail("EMPTY_ANCHOR_CONTENT", "string anchor patterns must be non-empty");
+    
+            const start = source.indexOf(pattern, cursor);
+    
+            if (start < 0)
+              return null;
+    
+            return {
+              start,
+              end: start + pattern.length,
+            };
+          }
+    
+          if (pattern instanceof RegExp) {
+            // Anchor matching defines its own forward-search semantics.
+            // Caller g/y state and lastIndex are ignored.
+            const flags =
+              [...new Set(
+                pattern.flags.replace(/[gy]/g, "") + "g"
+              )].join("");
+    
+            let regexp;
+            try {
+              regexp = new RegExp(pattern.source, flags);
+            } catch {
+              fail("INVALID_ANCHOR_PATTERN", "anchor RegExp is invalid");
+            }
+    
+            regexp.lastIndex = cursor;
+    
+            const match = regexp.exec(source);
+    
+            if (!match)
+              return null;
+    
+            return {
+              start: match.index,
+              end: match.index + match[0].length,
+            };
+          }
+    
+          fail("INVALID_ANCHOR_PATTERN", "anchor pattern must be a string or RegExp");
+        };
+    
+        let declaration = 0;
+    
+        for (const [begin, end, pattern] of matches) {
+          declaration += 1;
+    
+          if (!begin || !end)
+            fail("EMPTY_ANCHOR_CONTENT", `anchor ${declaration}: names must be non-empty`);
+    
+          if (
+            begin === "^" || begin === "$" ||
+            end === "^" || end === "$"
+          )
+            fail("INVALID_ANCHOR_PATTERN", `anchor ${declaration}: ^ and $ are reserved`);
+    
+          if (begin === end)
+            fail(
+              "INVALID_ANCHOR_PATTERN",
+              `anchor ${declaration}: begin and end names must differ`
+            );
+    
+          if (anchors.has(begin) || anchors.has(end))
+            fail("INVALID_ANCHOR_PATTERN", `anchor ${declaration}: names must be unique`);
+    
+          const match = locatePattern(pattern);
+    
+          if (!match)
+            fail(
+              "ANCHOR_NOT_FOUND",
+              `anchor ${declaration} not found in ${path} (forward from cursor ${cursor}); pattern: ${preview(pattern)}`
+            );
+    
+          anchors.set(begin, match.start);
+          anchors.set(end, match.end);
+    
+          cursor = match.end;
+        }
+    
+        const clip = n => Math.min(Math.max(0, n), source.length);
+    
+        const offset = name => {
+          if (anchors.has(name))
+            return anchors.get(name);
+    
+          const shifted = /^(.*)([+-]\d+)$/.exec(name);
+    
+          if (!shifted || shifted[1].length === 0)
+            fail("ANCHOR_NOT_FOUND", `unknown anchor: ${name}`);
+    
+          return clip(offset(shifted[1]) + Number(shifted[2]));
+        };
+    
+        return Object.freeze({
+          text(from = "^", to = "$") {
+            const start = offset(from);
+            const end = offset(to);
+    
+            if (start > end)
+              fail("INVALID_ANCHOR_PATTERN", `invalid slice: ${from} is after ${to}`);
+    
+            return source.slice(start, end);
+          },
+        });
+      }
+    
+      edit(changes) {
+        // Host capability
+      }
+    
+      rewrite(newText) {
+        // Host capability
+      }
+    
+      async ask(question) {
+        // Host capability
+      }
+    
+      async run() {
+        throw new Error("Js.run() must be implemented.");
+      }
+    
+    }
+    ```
+    
+    Read with `cat(path)`: it returns the file as a string and registers the read snapshot used by the write-before FILE_CHANGED check. A missing path is FILE_NOT_FOUND, invalid encoding is INVALID_UTF8. `stat(path)` returns `{ exists, size, mtime, isDir }` — a missing path is `exists: false`, not an error.
+    
+    Locate with `where` / `whereAll`:
+    
+    - `whereAll(content, needle, from = 0)` returns every normalized match as `[[begin, end], ...]`.
+    - `where(content, needle, from = 0)` returns the single span. Zero or many matches suspend the program through the same channel as `park`, with `{ needle, candidates, nearest }`; resume by injecting the chosen span.
+    
+    Normalization collapses whitespace runs to one space and trims the needle; offsets always address the original string. `where` never throws a locating error and never silently picks a match: uniqueness is mechanical, ambiguity is yours.
+    
+    Recompose with slices — do not re-search what you already located:
+    
+    ```js
+    const text = await this.cat(path);
+    const [begin, end] = await this.where(text, "old");
+    this.write(path, text.slice(0, begin) + "new" + text.slice(end));
+    ```
+    
+    `Promise.all` / `Promise.allSettled` give you parallel IO inside one program; the host adds no lock or queue, and a failed sibling never undoes a write that already landed. Same-file races are yours.
+    
+    I have already paid for this mistake. I once treated a roughly 8k-line reorganization as manual string surgery: `indexOf`, `substring`, then join. One run turned it into roughly 31k lines, and I then spent more calls guessing at the damage — scanning for repeated headings and scraping away leftovers. Raw search was finding candidates, not owning structure. The primitives had already given me an immutable snapshot and exact spans; by computing boundaries by hand I threw those guards away and recreated the bugs they exist to prevent.
+    
+    So when the job is structural — keep these spans, drop those spans, reorder these sections — locate the structure first, then splice only the slices that belong in the target file. Do not let familiarity impersonate facts: `indexOf` feels simple because you have seen it thousands of times; that familiarity says nothing about whether it owns this file's structure. The primitive with the stronger contract gets the presumption.
+    
+    ## Editing existing files
+    
+    ### Default: edit(changes)
+    
+    Use edit() when you can state both the current text and the final text. It reads one immutable
+    snapshot of the existing UTF-8 target, plans every change against that same snapshot, and stages
+    at most one Rewrite intent. It never writes immediately.
+    
+    Canonical shape:
+    
+    ```js
+    this.edit({
+      find: "const timeout = 1000;",
+      put: "const timeout = 5000;",
+    });
+    ```
+    
+    changes may be one object or a non-empty array. Each canonical change is
+    { find, put, all? }:
+    
+    - find: a non-empty string or a non-zero-width RegExp describing current text.
+    - put: the complete final text for that matched span. It is always a string.
+    - all: false by default. Omit it for exactly one match; use true only when every exact,
+      non-overlapping match should receive the same put text.
+    
+    The four common forms are deliberately mechanical:
+    
+    ```js
+    // Replace one exact span.
+    this.edit({
+      find: "const timeout = 1000;",
+      put: "const timeout = 5000;",
+    });
+    
+    // Insert after an anchor: repeat the kept anchor in put, then add final text.
+    this.edit({
+      find: 'import { load } from "./load.js";',
+      put: 'import { load } from "./load.js";\nimport { save } from "./save.js";',
+    });
+    
+    // Delete: put is the empty string. Include the newline when deleting a whole line.
+    this.edit({
+      find: "const obsolete = true;\n",
+      put: "",
+    });
+    
+    // Replace every exact occurrence. all, not the RegExp g flag, owns multiplicity.
+    this.edit({
+      find: /\boldApi\b/,
+      put: "newApi",
+      all: true,
+    });
+    ```
+    
+    Put independent changes to one file in one call:
+    
+    ```js
+    const report = this.edit([
+      { find: "const timeout = 1000;", put: "const timeout = 5000;" },
+      { find: "const retries = 2;", put: "const retries = 3;" },
+    ]);
+    // report = { path, changed, operations, replacements }
+    ```
+    
+    All changes address the original snapshot, never text produced by an earlier array element. Thus
+    the second change cannot find text created by the first. Changes may appear in any order when their
+    original spans do not overlap. If two changes overlap, merge them into one change that states the
+    final text for the combined span.
+    
+    Exactness and line endings:
+    
+    - String find is exact. A consistently-CRLF file may be quoted with normal LF newlines; edit()
+      restores CRLF in the result. Mixed line endings remain byte-exact.
+    - RegExp flags such as i, m, s, u, and sticky y are preserved. g does not choose multiplicity;
+      all does. A sticky RegExp starts at offset 0 in the immutable snapshot.
+    - put is literal final text, not JavaScript replacement syntax. `$1` is written as `$1`; for
+      capture-dependent or computed output, compute the complete text in JavaScript and use rewrite().
+    - oldText/newText and search/replace are accepted as unambiguous recovery aliases, but always author
+      new code with canonical find/put.
+    - Unknown fields and exotic change objects fail INVALID_EDIT instead of being ignored. This catches
+      misspellings such as `al: true` before they can silently change multiplicity. Declaration shape is
+      validated before the target is read, so a malformed change is not masked by a path failure.
+    
+    Failure is conservative and copy-oriented:
+    
+    - INVALID_EDIT: wrong shape or types. Use { find, put, all? }.
+    - EDIT_NOT_FOUND: zero exact matches. The reason includes current numbered context near the closest
+      string candidate and, only when confidence is conservative and unique, a copy-ready corrected
+      change. The corrected find is an exact current subspan, not an approximate whole line. That
+      suggestion repairs find; it is never applied automatically.
+    - EDIT_AMBIGUOUS: more than one match without all: true. The reason lists candidate lines. Add
+      surrounding text that only the intended location has, or set all: true only when all are intended.
+    - EDIT_OVERLAP: planned original spans overlap. Merge them; array order is never a hidden priority.
+    
+    Every one of these failures occurs before this edit call stages anything. Near matches are useful
+    diagnostics, never permission to mutate. A successful no-op returns changed: false and stages no
+    write. Diagnostic windows and copy-ready payloads are bounded; a huge line or put cannot turn a
+    normal mismatch into an oversized failure. Because one program may mutate a path only once, do not
+    call edit()/rewrite() twice for the same path.
+    
+    ### Advanced escape hatch: rewrite(newText)
+    
+    Use rewrite() when the final file is computed, reordered, generated, or otherwise cannot be stated
+    as a few independent exact spans. newText is the complete resulting file, not a patch. The target
+    must already exist or the call fails FILE_NOT_FOUND. The call stages one Rewrite intent; it does not
+    write immediately. Build and validate the complete newText in memory, then call rewrite() exactly once.
+    
+    A program may mutate each canonical path exactly once. A second edit/rewrite/write
+    on the same path is DUPLICATE_MUTATION_TARGET. Put independent local changes in
+    one edit array; computed multi-phase edits belong in JavaScript variables, then
+    one rewrite/write.
+    
+    I have also made the worse version of that mistake: build too much, delete pieces
+    with replace, leave blank separators and dangling fragments, then write second
+    and third cleanup programs to repair the first program. That is not a healthy
+    "multi-step refactor"; it shows that the first program never defined the
+    target file clearly enough. Build the final text in memory from trusted slices,
+    then stage one mutation for that path.
+    
+    Before return, check cheap invariants that would make a bad result obvious:
+    rough line/length scale, required headings or sentinels, expected number of
+    critical sections. If an ordinary reorganization turns roughly 8k lines into
+    roughly 31k lines, do not inspect the first fifty lines, decide they look fine,
+    and continue guessing. throw before return. Because mutations are staged, that
+    failure leaves zero committed mutations. A ridiculous number is a signal; treat
+    it as a signal before you create a second problem to repair the first.
+    
+    Precommitment matters: decide the cheap invariants before you mutate. Once the
+    program has stated what must remain true, it does not get to renegotiate those
+    rules after seeing an inconvenient result. "The first screen looks fine" is not
+    proof. "One more replace will probably clean it up" is not a signal. Numbers,
+    required sentinels, and section counts outrank the story you are tempted to tell
+    yourself after a bad transformation.
+    
+    STOP SIGNAL: if size, section count, sentinel count, or another cheap invariant
+    is wildly outside the expected range, the current program has lost the right to
+    commit. Fail it. Do not reward a suspicious result with another speculative
+    transformation. The fastest path after a red flag is back to facts, not
+    forward into cleanup.
+    
+    The generated class has no commit, rollback, snapshot, or transaction methods.
+    run() returning normally → Host preflight → prepare → commit. run() throwing or
+    any generated filesystem method failure discards every staged mutation.
+    
+    run() must return a JSON-compatible value: null, boolean, finite number, string,
+    array, or plain object (recursive). undefined, BigInt, NaN, Infinity, function,
+    symbol, cyclic or exotic objects fail as INVALID_RETURN_VALUE before commit.
+    
+    park(payload) — suspend this program at this await point and hand control back to the orchestrator. The tool call returns a top-level parked payload `{ handle, payload }`; the caller resumes with `{ unpark: { handle, value } }` or gives up with `{ abandon: { handle } }`.
+    
+    The program sees park as an ordinary await of an external input: the resumed value is whatever the caller injects through unpark. The site stays alive in the host until it is resumed or abandoned; a parked program is not finished and its already-applied writes remain on disk (as-is).
+    
+    `unpark.value` is arbitrary JSON: the park point defines what it means and how it is consumed. A wrong injection fails naturally downstream; the host does not pre-validate it. The ambiguity branch of `where` uses this same channel (its payload is `{ needle, candidates, nearest }`).
+    
+    Decide cheap-to-expensive when a parked payload arrives: read the payload first. A `where` ambiguity carries `candidates`/`nearest` — if the diagnosis points at the right position, unpark with that span and the program continues from the exact await; that is the everyday outcome and costs one call. Abandon is the heavy weapon: it tears down the live site and the whole program has to be reissued, so use it only when the program logic itself must be rewritten — its own invariants would reject the resume anyway.
+    
+    deliver(value) — end this program now with an explicit terminal value. The program does not continue past the call: the delivery unwinds the stack, records `value` into the session's delivery cell, and makes it the call's result. Subagent programs must deliver explicitly; a plain `return` leaves the delivery cell empty and settles the child as `undelivered` (`node-undelivered` in `dag`).
+    
+    The value is the program's own data. Catching the internal delivery sentinel keeps the program alive — the later return value then wins — so a holder that catches it is knowingly cancelling the delivery.
+    
+    Mechanical branches belong inside the program. Semantic branches belong between programs. A program may know how to continue without pretending to know what the facts will mean.
+    
+    Ultra Example — responsibility-shaped, not a toy syntax sample:
+    
+    ```js
+    class Js extends JsProgram {
+      async run() {
+        const draft = await this.cat(PLAN_PATH);
+        const [start, end] = await this.where(draft, "undecidable");
+        this.write(PLAN_PATH, draft.slice(0, start) + "decidable" + draft.slice(end));
+        return { changed: true };
+      }
+    }
+    ```
+    
+    Use the generated API directly. Do not reimplement Host filesystem,
+    permission, anchor, snapshot, or transaction logic.
+    
+    Anchors locate. JavaScript transforms. Mutations are staged and committed by
+    the Host as one transaction.
+    
+    Do not confuse "I can reimplement this" with "I should reimplement this". I
+    have done that, and the bill was a simple one-program edit turning into bad
+    boundaries, duplicated text, cleanup debris, and extra programs whose only job
+    was to repair the previous program. A higher-level primitive is not decorative
+    sugar when it owns structure, snapshots, or commit semantics; it is the guard
+    rail. Use the highest-level primitive that already owns the boundary. Drop down
+    only when it genuinely cannot express the job, and validate the result before
+    you let the transaction commit.
+    
+    Remember the authority order: facts beat confidence; Host-owned semantics
+    beat hand-rolled duplicates; a red invariant beats a plausible-looking prefix.
+    Use the guardrail or prove the guardrail cannot carry the job. Do not invent a
+    third category called "probably fine".
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:127:12)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 0
+# fail 7
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 581.027833

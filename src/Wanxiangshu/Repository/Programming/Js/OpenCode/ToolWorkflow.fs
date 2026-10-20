@@ -472,8 +472,7 @@ module JsToolWorkflow =
             let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
 
             let hasMutationCapability =
-                Set.contains JsCapability.Edit capabilities
-                || Set.contains JsCapability.Write capabilities
+                Set.contains JsCapability.Write capabilities
                 || Set.contains JsCapability.Remove capabilities
                 || Set.contains JsCapability.Move capabilities
 
@@ -710,8 +709,7 @@ module JsToolWorkflow =
             let effectPaths = mutations |> List.map JsStagedMutation.path |> List.distinct
 
             let hasMutationCapability =
-                Set.contains JsCapability.Edit capabilities
-                || Set.contains JsCapability.Write capabilities
+                Set.contains JsCapability.Write capabilities
                 || Set.contains JsCapability.Remove capabilities
                 || Set.contains JsCapability.Move capabilities
 
@@ -783,6 +781,7 @@ module JsToolWorkflow =
             (JsDelegationBridge.hostFor sessionId)
 
     let private runProgramWithPark
+        (scopeApi: Wanxiangshu.Process.JsSandbox.ParkState -> obj -> obj)
         (sessionId: string)
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -810,7 +809,8 @@ module JsToolWorkflow =
             fileAccessObservation
             processHost
             (fun buffers parkState execution ->
-                bindingsApiFactory sessionId capabilities root buffers parkState execution)
+                bindingsApiFactory sessionId capabilities root buffers parkState execution
+                |> scopeApi parkState)
 
 
     /// Resume a parked site (algorithm E). `handle` must exist; the deferred
@@ -983,10 +983,10 @@ module JsToolWorkflow =
         else
             ToolWorkflowInvocation.Invalid
 
-    let private resolveParkedSite (handle: string) : Result<JsParkedSites.JsParkedSite, JsFailure> =
+    let private resolveParkedSite (sessionId: string) (handle: string) : Result<JsParkedSites.JsParkedSite, JsFailure> =
         match JsParkedSites.tryFind handle with
-        | Some site -> Ok site
-        | None -> Error(JsFailure.HandleUnknown handle)
+        | Some site when site.SessionId = sessionId -> Ok site
+        | _ -> Error(JsFailure.HandleUnknown handle)
 
     let private dispatchResolvedParkedSite
         (resolved: Result<JsParkedSites.JsParkedSite, JsFailure>)
@@ -1005,7 +1005,8 @@ module JsToolWorkflow =
     /// them. `lifecyclePersistence` records Parked/Unparked/Abandoned audit
     /// traces (best-effort; a failed audit never fails the tool call); Reaped
     /// is recorded by the session-close path (PluginSessionScope).
-    let execute
+    let executeWithApiScope
+        (scopeApi: Wanxiangshu.Process.JsSandbox.ParkState -> obj -> obj)
         (sessionId: string)
         (capabilities: Set<JsCapability>)
         (root: string)
@@ -1037,6 +1038,7 @@ module JsToolWorkflow =
             | ToolWorkflowInvocation.Program programSource ->
                 return!
                     runProgramWithPark
+                        scopeApi
                         sessionId
                         capabilities
                         root
@@ -1051,19 +1053,48 @@ module JsToolWorkflow =
                         processHost
             | ToolWorkflowInvocation.Unpark(handle, value) ->
                 return!
-                    dispatchResolvedParkedSite (resolveParkedSite handle) (fun site ->
+                    dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Unparked handle sessionId
 
                         useParked site (fun active ->
                             unparkSite active value baseClassSource deadlineMs outputBoundBytes))
             | ToolWorkflowInvocation.Abandon handle ->
                 return!
-                    dispatchResolvedParkedSite (resolveParkedSite handle) (fun site ->
+                    dispatchResolvedParkedSite (resolveParkedSite sessionId handle) (fun site ->
                         recordLifecycle lifecyclePersistence JsLifecycleEventType.Abandoned handle sessionId
                         useParked site (fun active -> abandonSite active deadlineMs outputBoundBytes))
             | ToolWorkflowInvocation.Invalid ->
                 return Failed(JsFailure.InvalidArgument "no program, unpark, or abandon input", [], [], [], [])
         }
+
+    let execute
+        sessionId
+        capabilities
+        root
+        baseClassSource
+        (input: obj)
+        deadlineMs
+        deadlineEpochMs
+        outputBoundBytes
+        persistence
+        lifecyclePersistence
+        fileAccessObservation
+        processHost
+        =
+        executeWithApiScope
+            (fun _ api -> api)
+            sessionId
+            capabilities
+            root
+            baseClassSource
+            input
+            deadlineMs
+            deadlineEpochMs
+            outputBoundBytes
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
+            processHost
 
 /// JS-016: stable LLM-visible result shapes, rendered as Synthetic TOML
 /// (the only rendering owner; ARCH-010). Success is `# ok` plus data/fs;

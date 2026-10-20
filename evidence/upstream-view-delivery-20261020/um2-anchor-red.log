@@ -1,0 +1,375 @@
+TAP version 13
+# Subtest: WHAT[context-compression-031] anchor numbers are stable per session and message id
+ok 1 - WHAT[context-compression-031] anchor numbers are stable per session and message id
+  ---
+  duration_ms: 1.403541
+  ...
+# Subtest: WHAT[context-compression-031] a view declaration is consumed exactly once
+not ok 2 - WHAT[context-compression-031] a view declaration is consumed exactly once
+  ---
+  duration_ms: 0.817292
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:48:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    the declaration echoes back as declared
+    + actual - expected
+    
+      {
+        prefixUntil: 3,
+    +   thenRemove: {}
+    -   thenMap: {
+    -     '7': 'segment 7 held the benchmark table'
+    -   }
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    prefixUntil: 3
+    thenMap:
+      7: 'segment 7 held the benchmark table'
+  actual:
+    prefixUntil: 3
+    thenRemove:
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:52:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[context-compression-031] a malformed view declaration is refused and changes nothing
+not ok 3 - WHAT[context-compression-031] a malformed view declaration is refused and changes nothing
+  ---
+  duration_ms: 0.476375
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:56:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    refused declaration must not be captured: {"prefixUntil":1}
+    + actual - expected
+    
+    + {
+    +   prefixUntil: 1,
+    +   thenRemove: {}
+    + }
+    - null
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: ~
+  actual:
+    prefixUntil: 1
+    thenRemove:
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:79:12)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[context-compression-031] without a declaration applyView leaves the message list unchanged
+ok 4 - WHAT[context-compression-031] without a declaration applyView leaves the message list unchanged
+  ---
+  duration_ms: 3.3735
+  ...
+# Subtest: WHAT[context-compression-031] prefixUntil protects a prefix without replacing anything
+ok 5 - WHAT[context-compression-031] prefixUntil protects a prefix without replacing anything
+  ---
+  duration_ms: 0.485
+  ...
+# Subtest: WHAT[context-compression-031] a summary stands in for its anchor for the rest of the session
+not ok 6 - WHAT[context-compression-031] a summary stands in for its anchor for the rest of the session
+  ---
+  duration_ms: 0.365166
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:117:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'kept',
+    -   'summarized',
+        'kept',
+    +   'kept'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'kept'
+    1: 'summarized'
+    2: 'kept'
+  actual:
+    0: 'kept'
+    1: 'kept'
+    2: 'kept'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:127:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[context-compression-031] separate replacements each stand in place
+not ok 7 - WHAT[context-compression-031] separate replacements each stand in place
+  ---
+  duration_ms: 0.506875
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:140:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   'alpha',
+    -   '#a held the brief',
+        'beta',
+    +   'gamma'
+    -   '#c held the tail'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: '#a held the brief'
+    1: 'beta'
+    2: '#c held the tail'
+  actual:
+    0: 'alpha'
+    1: 'beta'
+    2: 'gamma'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:152:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[context-compression-031] replacing an earlier anchor folds the replacements inside its span
+not ok 8 - WHAT[context-compression-031] replacing an earlier anchor folds the replacements inside its span
+  ---
+  duration_ms: 0.155792
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:156:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    anchor 2 stopped existing, so replacing anchor 1 folded its summary away
+    + actual - expected
+    
+      [
+    +   'alpha',
+    +   'beta',
+    -   '#a and the tool dump, in one paragraph',
+        'gamma'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: '#a and the tool dump, in one paragraph'
+    1: 'gamma'
+  actual:
+    0: 'alpha'
+    1: 'beta'
+    2: 'gamma'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:169:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[context-compression-031] unidentified content remains when no interval replaces it
+ok 9 - WHAT[context-compression-031] unidentified content remains when no interval replaces it
+  ---
+  duration_ms: 0.655416
+  ...
+# Subtest: WHAT[context-compression-031] countTokens reports the o200k_base token count
+ok 10 - WHAT[context-compression-031] countTokens reports the o200k_base token count
+  ---
+  duration_ms: 0.15725
+  ...
+# Subtest: WHAT[context-compression-031] protected items and null mappings keep their current material
+not ok 11 - WHAT[context-compression-031] protected items and null mappings keep their current material
+  ---
+  duration_ms: 0.268125
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:194:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'alpha',
+        'beta',
+    +   'gamma'
+    -   '#summary gamma'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'alpha'
+    1: 'beta'
+    2: '#summary gamma'
+  actual:
+    0: 'alpha'
+    1: 'beta'
+    2: 'gamma'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:200:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[context-compression-031] same-round adjacent summaries use the input partition
+not ok 12 - WHAT[context-compression-031] same-round adjacent summaries use the input partition
+  ---
+  duration_ms: 0.170166
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:209:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    +   'alpha',
+    +   'alpha reasoning',
+    +   'beta',
+    -   '#summary alpha',
+    -   '#summary beta',
+        'gamma'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: '#summary alpha'
+    1: '#summary beta'
+    2: 'gamma'
+  actual:
+    0: 'alpha'
+    1: 'alpha reasoning'
+    2: 'beta'
+    3: 'gamma'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:216:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[context-compression-031] anchor zero persists and earlier replacement includes prior summaries
+not ok 13 - WHAT[context-compression-031] anchor zero persists and earlier replacement includes prior summaries
+  ---
+  duration_ms: 0.135083
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:219:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'opening',
+        'alpha',
+    +   'beta',
+    +   'gamma',
+    -   '#beta and gamma',
+        'delta'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'opening'
+    1: 'alpha'
+    2: '#beta and gamma'
+    3: 'delta'
+  actual:
+    0: 'opening'
+    1: 'alpha'
+    2: 'beta'
+    3: 'gamma'
+    4: 'delta'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:228:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[context-compression-031] a captured tail interval cannot swallow a later message
+not ok 14 - WHAT[context-compression-031] a captured tail interval cannot swallow a later message
+  ---
+  duration_ms: 0.188667
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:235:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'alpha',
+    +   'beta',
+    -   '#summary beta',
+        'later gamma'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'alpha'
+    1: '#summary beta'
+    2: 'later gamma'
+  actual:
+    0: 'alpha'
+    1: 'beta'
+    2: 'later gamma'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:242:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one
+not ok 15 - WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one
+  ---
+  duration_ms: 96.965084
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:245:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+    + null
+    - {
+    -   prefixUntil: 2,
+    -   thenMap: {
+    -     '1': 'keep this'
+    -   }
+    - }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    prefixUntil: 2
+    thenMap:
+      1: 'keep this'
+  actual: ~
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:284:12)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..15
+# tests 15
+# suites 0
+# pass 5
+# fail 10
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 283.193959

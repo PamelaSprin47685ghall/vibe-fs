@@ -112,6 +112,7 @@ const toolModule = () => {
   tool.schema = {
     string: () => ({
       type: 'string',
+      nullable: () => ({ type: 'string', nullable: true }),
       describe: (description) => ({ type: 'string', description }),
     }),
     any: () => ({
@@ -128,7 +129,8 @@ const toolModule = () => {
       type: 'record',
       key,
       value,
-      describe: (description) => ({ type: 'record', key, value, description }),
+      describe: (description) => ({ type: 'record', key, value, description,
+        optional: () => ({ type: 'record', key, value, description, optional: true }) }),
     }),
     object: (shape) => ({ type: 'object', shape }),
   }

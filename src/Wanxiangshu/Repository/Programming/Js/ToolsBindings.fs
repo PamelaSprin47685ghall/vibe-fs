@@ -690,6 +690,95 @@ module JsToolsBindings =
     let private makeParkMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
         "park" ==> fun (payload: obj) -> suspend parkState payload
 
+    [<Emit("Promise.reject(Object.assign(new Error($1), { __jsFailure: { code: $0, reason: $1 } }))")>]
+    let private rejectFailure (code: string) (reason: string) : obj = jsNative
+
+    let private finishAsked state text stack asked =
+        match asked with
+        | Error reason ->
+            let failure = JsFailure.AskRefused reason
+            rejectFailure (JsFailure.code failure) (JsFailure.reason failure)
+        | Ok() ->
+            assignParkStack state stack
+            suspend state (createObj [ "question" ==> text ])
+
+    let makeAskMember (state: Wanxiangshu.Process.JsSandbox.ParkState) (invoke: string -> Task<Result<unit, string>>) =
+        "ask"
+        ==> fun (question: obj) (stack: obj) ->
+            let text =
+                if emitJsExpr question "typeof $0 === 'string'" then
+                    string question
+                else
+                    ""
+
+            let fail failure =
+                rejectFailure (JsFailure.code failure) (JsFailure.reason failure)
+
+            if System.String.IsNullOrWhiteSpace text then
+                fail (JsFailure.InvalidArgument "ask requires a question")
+            elif state.AbandonRequested then
+                fail JsFailure.CannotParkWhileAbandoning
+            else
+                task {
+                    let! asked = invoke text
+                    return finishAsked state text stack asked
+                }
+                |> box
+
+    let scopePlanFile (root: string) (canWrite: unit -> bool) (api: obj) : obj =
+        let source = api?js
+
+        let samePhysicalPath path full realFile =
+            if realFile = full then
+                Ok()
+            else
+                Error(JsFailure.PathDenied path)
+
+        let checkExisting path full =
+            if JsMutationFs.existsPath full then
+                resolveReadPath full |> Result.bind (samePhysicalPath path full)
+            else
+                Ok()
+
+        let checkPath (path: string) =
+            result {
+                let! full = resolveInside root path
+
+                if full <> pathResolve (pathJoin root "plan.md") then
+                    return! Error(JsFailure.PathDenied path)
+
+                let! realRoot = resolveReadPath root
+
+                if realRoot <> pathResolve root then
+                    return! Error(JsFailure.PathDenied path)
+
+                do! checkExisting path full
+            }
+
+        let read name =
+            name
+            ==> fun (path: string) ->
+                match checkPath path with
+                | Error failure -> box (Task.FromResult(failureObj failure))
+                | Ok() -> emitJsExpr (source, name, path) "$0[$1]($2)"
+
+        createObj
+            [ "js"
+              ==> createObj
+                      [ read "cat"
+                        read "stat"
+                        "where" ==> source?where
+                        "whereAll" ==> source?whereAll
+                        "park" ==> source?park
+                        "write"
+                        ==> fun (path: string) (text: string) ->
+                            match checkPath path with
+                            | Error failure -> failureObj failure
+                            | Ok() when not (canWrite ()) -> failureObj JsFailure.PlanReviewRequired
+                            | Ok() when System.String.IsNullOrWhiteSpace text ->
+                                failureObj (JsFailure.InvalidArgument "Plan content cannot be empty")
+                            | Ok() -> emitJsExpr (source, path, text) "$0.write($1,$2)" ] ]
+
     /// The host loop behind `js.call`, injected by the workflow.
     type JsCallHost =
         { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }

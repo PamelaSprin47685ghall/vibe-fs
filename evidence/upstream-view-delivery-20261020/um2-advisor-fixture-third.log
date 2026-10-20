@@ -1,0 +1,63 @@
+TAP version 13
+# HOOK CHAT MESSAGE FAILED: ChatAdmissionHookException {
+#   message: 'Managed chat admission failed: TransactionFailed (AcceptanceFailed (AuthorityRegistrationRejected (ActiveRunIdentityConflict ({ StoredSessionId = SessionId "host-child-1-5aeb9b05510f4"\\n' +
+#     '  StoredLogicalRunId = LogicalRunId "ea736944456c4bf1e04db98bf4fdb9eb77f6c176f26f0cd41fd707c57dd3a240"\\n' +
+#     '  StoredAuthorityRootUserMessageId = AuthorityRootUserMessageId "msg-host-child-1-5aeb9b05510f4-0"\\n' +
+#     '  StoredAuthorityKind = AgentOwnerRoot\\n' +
+#     '  StoredIdentitySeed = InheritedFromOwner ({ StoredOwnerSessionId = SessionId "advisor-live-answer-owner"\\n' +
+#     '  StoredOwnerLogicalRunId = LogicalRunId "7dab5aed7f2504680903d800f815521bd3c84d36d1e682b6838e6748394c792e"\\n' +
+#     '  StoredOwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId "advisor-owner-root"\\n' +
+#     '  StoredParticipantIdentity = { Identity = { SelectedAgent = PersonaName "advisor"\\n' +
+#     '  Kind = ManagedRole Advisor\\n' +
+#     '  Persona = "Lead"\\n' +
+#     '  PersonaCatalogVersion = PersonaCatalogVersion 1\\n' +
+#     '  Origin = InheritedFromOwner } } }) }, { StoredSessionId = SessionId "host-child-1-5aeb9b05510f4"\\n' +
+#     '  StoredLogicalRunId = LogicalRunId "07b709775ebd6c5f274f4d399e226d6eb2afc3b197709a10cfbdf759aac1ea26"\\n' +
+#     '  StoredAuthorityRootUserMessageId = AuthorityRootUserMessageId "msg-host-child-1-5aeb9b05510f4-1"\\n' +
+#     '  StoredAuthorityKind = AgentOwnerRoot\\n' +
+#     '  StoredIdentitySeed = InheritedFromOwner ({ StoredOwnerSessionId = SessionId "advisor-live-answer-owner"\\n' +
+#     '  StoredOwnerLogicalRunId = LogicalRunId "7dab5aed7f2504680903d800f815521bd3c84d36d1e682b6838e6748394c792e"\\n' +
+#     '  StoredOwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId "advisor-owner-root"\\n' +
+#     '  StoredParticipantIdentity = { Identity = { SelectedAgent = PersonaName "advisor"\\n' +
+#     '  Kind = ManagedRole Advisor\\n' +
+#     '  Persona = "Lead"\\n' +
+#     '  PersonaCatalogVersion = PersonaCatalogVersion 1\\n' +
+#     '  Origin = InheritedFromOwner } } }) }))))',
+#   innerException: undefined,
+#   failure: ChatAdmissionHookFailure {
+#     tag: 1,
+#     fields: [ [ChatAdmissionTransactionError] ]
+#   },
+#   executionKey: ChatExecutionKey {
+#     SessionId: SessionId { tag: 0, fields: [Array] },
+#     PhysicalUserMessageId: PhysicalUserMessageId { tag: 0, fields: [Array] }
+#   }
+# }
+# HOOK CHAT MESSAGE FAILED: ChatAdmissionHookException {
+#   message: 'Managed chat admission failed: TransactionFailed (PreProviderSettlementFailed (PersistenceFailed (WriterUnavailable (EventId "44a6aae91b2b4b95b7577d4759fab4a3", WriterDisposed))))',
+#   innerException: undefined,
+#   failure: ChatAdmissionHookFailure {
+#     tag: 1,
+#     fields: [ [ChatAdmissionTransactionError] ]
+#   },
+#   executionKey: ChatExecutionKey {
+#     SessionId: SessionId { tag: 0, fields: [Array] },
+#     PhysicalUserMessageId: PhysicalUserMessageId { tag: 0, fields: [Array] }
+#   }
+# }
+# Subtest: WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+ok 1 - WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+  ---
+  duration_ms: 855.019291
+  ...
+# (node:97595) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1152.053792

@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { parse } from 'smol-toml'
 import * as events from '../../../dist/OpenCode/Host/EventsSurface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
+import { applyView } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
 import { acceptAuthorityRoot, openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 const textOf = prompt => prompt.body.parts.filter(part => part.type === 'text').map(part => part.text).join('\n')
@@ -15,6 +16,7 @@ test('WHAT[advisor-004] the registered member reuses its live seat and refuses a
     await acceptAuthorityRoot(runtime, caller, 'manager', 'advisor-owner-root')
     await openIncumbency(runtime, caller)
     runtime.pushHostMessage(caller, { id: 'caller-material', role: 'user', parts: [{ type: 'text', text: 'CALLER_MATERIAL' }] })
+    applyView(caller, [{ id: 'caller-material', text: 'CALLER_MATERIAL' }])
     const authority = dispatch.projectionObservation(runtime.journal, caller)
     const tool = hooks.tool['todowrite-for-manager']
     const originalSend = runtime.client.session.promptAsync
@@ -32,7 +34,7 @@ test('WHAT[advisor-004] the registered member reuses its live seat and refuses a
       targetCount = start + 2
       const ready = new Promise(resolve => { sent = resolve })
       pending = tool.execute({
-        program: `class Js extends JsProgram { async run() { return await this.advisor(${JSON.stringify(intent)}, { prefixUntil: 100, thenRemove: {} }); } }`,
+        program: `class Js extends JsProgram { async run() { return await this.advisor(${JSON.stringify(intent)}, { prefixUntil: 100, thenMap: {} }); } }`,
       }, { sessionID: caller, agent: 'manager', messageID: 'advisor-owner-assistant', callID: `advisor-${start}` })
       await Promise.race([ready, pending.then(output => { throw new Error(`consult ended before its two prompts: ${output}`) })])
       assert.equal(children.length, 1, 'one live caller reuses its actual child')

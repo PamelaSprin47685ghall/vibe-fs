@@ -188,19 +188,11 @@ module JsToolSpec =
         let abandonSchema =
             ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
-        // ANCHOR view declaration (PLAN phase 3): prefixUntil protects the
-        // cache prefix and thenRemove replaces anchors with the model's own
-        // summaries for good. Optional; consumed once by the next transform.
-        // The bilingual resource states the whole contract.
-        let viewSchema =
-            ToolHostCodec.objectSchemaOf
-                [ "prefixUntil", ToolHostCodec.numberSchema factory
-                  "thenRemove",
-                  ToolHostCodec.recordSchemaOf
-                      (ToolHostCodec.stringSchema factory)
-                      (ToolHostCodec.stringSchema factory)
-                      (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
-                      factory ]
+        let mappingSchema =
+            ToolHostCodec.recordSchemaOf
+                (ToolHostCodec.stringSchema factory)
+                (ToolHostCodec.nullableStringSchema factory)
+                (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
                 factory
 
         { Name = surface.ToolName
@@ -212,7 +204,8 @@ module JsToolSpec =
                   factory
               "unpark", unparkSchema
               "abandon", abandonSchema
-              "view", viewSchema ]
+              "prefixUntil", ToolHostCodec.optionalNumberSchema factory
+              "thenMap", ToolHostCodec.optionalSchema mappingSchema ]
           Admission = admissionFor surface.RoleName
           Execute =
             fun args ctx ->
@@ -221,14 +214,19 @@ module JsToolSpec =
 
                     let hasProgram = not (isNull (input?program))
 
+                    let declaration =
+                        if isUndefined (args.Raw?prefixUntil) && isUndefined (args.Raw?thenMap) then
+                            null
+                        else
+                            createObj [ "prefixUntil" ==> args.Raw?prefixUntil; "thenMap" ==> args.Raw?thenMap ]
+
                     let viewFailure =
-                        match
-                            Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView
-                                ctx.SessionId
-                                (args.Raw?view)
-                        with
-                        | Ok() -> None
-                        | Error failure -> Some failure
+                        if not (isUndefined (args.Raw?view)) then
+                            Some(JsFailure.ViewDeclarationInvalid "use prefixUntil and thenMap, not view")
+                        else
+                            Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId declaration
+                            |> Result.map (fun () -> None)
+                            |> Result.defaultWith Some
 
                     match viewFailure with
                     | Some failure ->

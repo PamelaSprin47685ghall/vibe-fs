@@ -1,17 +1,8 @@
 class Js extends JsProgram {
   async run() {
-    const draft = await this.file([
-      ["facts", "afterFacts", "## 事实"],
-      ["target", "afterTarget", "## 目标"],
-    ]);
-    const current = draft.text("target", "afterTarget");
-    if (!current.includes("不可判定")) return { changed: false };
-
-    const rebuilt =
-      draft.text("^", "target")
-      + "## 目标\n"
-      + draft.text("afterTarget", "$").replace("不可判定", "可判定");
-    this.rewrite(rebuilt);
-    return { changed: true, headings: 2 };
+    const draft = await this.cat(PLAN_PATH);
+    const [start, end] = await this.where(draft, "undecidable");
+    this.write(PLAN_PATH, draft.slice(0, start) + "decidable" + draft.slice(end));
+    return { changed: true };
   }
 }

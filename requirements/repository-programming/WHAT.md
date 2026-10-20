@@ -284,7 +284,7 @@ Exec capability 投影出 `call` 成员与全局 `js.Callable`。模型写成 `a
 
 ## [053] view 视图声明捕获
 
-每个生成的编程工具接受可选 `view` 参数 `{ prefixUntil, thenRemove? }`：捕获发生在工具调用时、进入下一次请求前，写入进程内 ANCHOR 现场表（context-compression [031]），被下一请求消费一次。`prefixUntil` 必填且必须是锚点编号；`thenRemove` 是 `{ 锚点编号: 摘要 }` 映射，取代累计生效且不可撤销。声明形状非法（缺 `prefixUntil`、`prefixUntil` 不是编号、`thenRemove` 不是映射、键不是锚点编号、摘要为空或非字符串）时整次调用以 `VIEW_DECLARATION_INVALID` 失败：不执行程序，也不改动任何现场。缺失该参数时行为不变。参数描述由双语资源 `tool/js-program/view-declaration-extra` 提供。
+每个生成编程工具接受可选的顶层prefixUntil、thenMap参数，提供声明时两字段均必填；旧view包装和thenRemove别名拒绝。内部声明形状为 { prefixUntil, thenMap }，由context-compression [031]唯一规定区间、null保留、摘要累计替换、锚点0与前缀保护。声明形状非法时整次以VIEW_DECLARATION_INVALID拒绝，不执行程序、不留下部分效果；两参数均缺失时保持既有视图。声明供下一请求消费一次，替换状态持续存在。双语参数说明由tool/js-program/view-declaration-extra提供。
 
 ## [054] deliver 显式终值
 

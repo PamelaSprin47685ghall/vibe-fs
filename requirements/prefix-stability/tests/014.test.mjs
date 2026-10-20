@@ -221,7 +221,7 @@ const pair = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtSur
 const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
 const { join } = await import('node:path')
 const journal = await import('../../../dist/Persistence/Journal/Surface.js')
-const { withGuidanceHost, toolBody, separator } = await import('./support/guidance-host.mjs')
+const { withGuidanceHost, toolBody, separator, withoutAnchorMarker } = await import('./support/guidance-host.mjs')
 
 test('WHAT[prefix-stability-014] multiple terminal parts keep their physical originals through guidance replay', async () => {
   const secondBody = 'literal' + separator + pair.text
@@ -229,7 +229,8 @@ test('WHAT[prefix-stability-014] multiple terminal parts keep their physical ori
     const physical = JSON.stringify(host.raw)
     const projected = host.first
     const result = projected.find(message => message.info.id === host.result.info.id)
-    assert.equal(result.parts[0].state.output, toolBody + separator + host.guidance)
+    assert.match(result.parts[0].state.output, /^\[ANCHOR: \d+\]\0\uFEFF/)
+    assert.equal(host.textOf(result), toolBody + separator + host.guidance)
     assert.equal(result.parts[1].state.error, secondBody + separator + host.guidance)
     assert.equal(JSON.stringify(host.raw), physical)
     const captured = await host.current()
@@ -306,13 +307,14 @@ for (const [name, body] of [['empty', ''], ['whitespace', ' \t\r\n']]) {
     test(`WHAT[prefix-stability-014] a ${name} terminal user part with ${multiple ? 'multiple parts' : 'a single part'} cannot acquire an unprovable guidance suffix`, async () => {
       await withGuidanceHost('completed', async host => {
         const quoted = await host.quote(body, { multiple })
-        const expectedParts = multiple ? quoted.message.parts : [...quoted.message.parts, { type: 'text', text: '#' }]
-        assert.deepEqual(quoted.presentedParts, expectedParts, 'only the existing Host empty-content placeholder may be added')
+        const expectedParts = quoted.message.parts
+        assert.deepEqual(quoted.presentedParts, expectedParts, 'the inline anchor supplies provider content without inventing a guidance occurrence')
         assert.equal(quoted.message.parts.at(-1).text, body)
         const before = await host.current()
         const frontier = host.head()
         const replay = await host.transform([...host.raw, quoted.message])
-        assert.deepEqual(replay.find(message => message.info.id === quoted.message.info.id).parts, expectedParts)
+        assert.deepEqual(replay.find(message => message.info.id === quoted.message.info.id).parts.map(part =>
+          typeof part.text === 'string' ? { ...part, text: withoutAnchorMarker(part.text) } : part), expectedParts)
         assert.deepEqual(host.head(), frontier)
         assert.deepEqual(await host.current(), before)
         assert.deepEqual(host.cold().projection, before)
@@ -387,7 +389,7 @@ for (const physicalPart of [true, false]) {
       assert.equal(reanchored.ok, true, JSON.stringify(reanchored))
       const rendered = await host.transform([...host.raw, quoted.message])
       const carrier = rendered.find(message => message.info.id === quoted.message.info.id)
-      assert.ok(carrier.parts[0].text.startsWith(body), 'retired bytes now quoted by a physical user remain business material')
+      assert.ok(withoutAnchorMarker(carrier.parts[0].text).startsWith(body), 'retired bytes now quoted by a physical user remain business material')
       assert.deepEqual(quoted.message.parts, originalParts)
       const current = await host.current()
       assert.equal(current.messages.at(-1).parts.at(-1).text, body, 'the first new-generation capture must retain the complete edited body')

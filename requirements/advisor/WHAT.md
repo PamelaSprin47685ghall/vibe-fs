@@ -11,12 +11,12 @@
 一次调用交给顾问的完整请求是**若干条彼此独立的 prompt**，绝不拼成一段：
 
 1. 顾问自己的 system prompt（`resources/provider/role/advisor/**`，由 Host agent 配置与 system transform 投影）；
-2. `view`——调用者交出的上下文视图，按仓库既有的 blogger input 格式渲染（`# ` 注释表头 + `[[new_work_to_record]]` 数据表，`BloggerToml`/`SyntheticToml` 词汇）；
+2. `view`——调用者交出的上下文视图，与共享 `{ prefixUntil, thenMap }` 使用同一套区间选择和历史替换规则；prefixUntil 是替换保护边界，不截断发送材料。按仓库既有的 blogger input 格式渲染（`# ` 注释表头 + `[[new_work_to_record]]` 数据表，`SyntheticToml` 词汇）；
 3. `intent`——本次要顾问裁决的问题，**自成一条 user prompt**，与 view 不合并。
 
 ## [003] follow-up 追加 view 增量 + 新 intent
 
-同一进程内的后续调用**追加**而不是重发：只把 view 的**增量**（相对上次已成功交付的部分）渲染成新的 view prompt，其后追加新的 intent prompt。当前游标按调用 session 记录，随进程内专席一起失效；不宣称重启后能复用旧游标。
+同一进程内的后续调用追加 view 的增量及新的 intent。先生成完整视图，再按代表锚点与精确材料字节过滤已成功交付的内容；不得先删旧输入再计算区间。相同材料不重发，改变的摘要须交付一次。游标按调用 session 记录，随进程内专席一起失效；不宣称重启后能复用旧游标。
 
 ## [004] 无工具、散文返回
 

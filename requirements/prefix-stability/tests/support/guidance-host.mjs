@@ -6,6 +6,8 @@ import { sharedCapacitySnapshot } from '../../../../dist/OpenCode/Host/ModelRout
 import { acceptAuthorityRoot, withExecutablePlugin } from '../../../verification-system/tests/support/plugin-fixture.mjs'
 
 export const separator = '\0\uFEFF'
+
+export const withoutAnchorMarker = text => text.replace(/^\[ANCHOR: \d+\]\0\uFEFF/, '')
 export const toolBody = 'Original file content\r\n'
 
 export async function withGuidanceHost(status, action, identity = status, { role = 'manager', openWorkBeforeTool = false, additionalToolParts = [] } = {}) {
@@ -35,7 +37,7 @@ export async function withGuidanceHost(status, action, identity = status, { role
         runtime.pushHostMessage(sessionID, result)
       }
       const first = await transform(raw)
-      const textOf = message => message.parts[0].state[status === 'error' ? 'error' : 'output']
+      const textOf = message => withoutAnchorMarker(message.parts[0].state[status === 'error' ? 'error' : 'output'])
       const presented = textOf(first.find(message => message.info.id === result.info.id))
       assert.ok(presented.startsWith(toolBody + separator))
       const guidance = presented.slice(toolBody.length + separator.length)
@@ -64,7 +66,8 @@ export async function withGuidanceHost(status, action, identity = status, { role
           await hooks['chat.message']({ sessionID, messageID: message.info.id, agent: role }, { message: message.info, parts: message.parts })
           currentRun = nextRun
           const output = await transform([...raw, message])
-          const presentedParts = output.find(item => item.info.id === message.info.id).parts
+          const presentedParts = output.find(item => item.info.id === message.info.id).parts.map(part =>
+            typeof part.text === 'string' ? { ...part, text: withoutAnchorMarker(part.text) } : part)
           return { message, presented: presentedParts.at(-1).text, presentedParts }
         },
       })

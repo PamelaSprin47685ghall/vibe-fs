@@ -2,7 +2,7 @@ namespace Wanxiangshu.Repository.Programming.Js.Anchor
 
 /// ANCHOR view application: pure selection over one outgoing message list.
 /// The caller supplies identity numbering, token counting and the accumulated
-/// replacement map so this module stays free of process interop, and builds the
+/// replacement history so this module stays free of process interop, and builds the
 /// replacement messages itself.
 [<RequireQualifiedAccess>]
 module AnchorView =
@@ -15,6 +15,7 @@ module AnchorView =
     type AnchorViewEntry =
         | Kept of AnchorMessage
         | Summarized of message: AnchorMessage * summary: string
+        | OpeningSummary of summary: string
 
     type AnchorViewReport =
         { Total: int
@@ -25,15 +26,24 @@ module AnchorView =
           Folded: int
           Replaced: int list }
 
-    /// Apply one declaration to a message list. A replaced anchor stops being
-    /// an anchor: its row stands in as the summary and its span runs to the next
-    /// anchor that still exists, folding in anything already replaced inside it.
-    /// Unnamed rows are never dropped. `Cached` counts the kept anchors below
-    /// `PrefixUntil`.
+    /// Replay captured intervals in order. Anonymous rows belong to the preceding
+    /// anchor, or to zero before the first anchor. Cached counts all surviving
+    /// material below PrefixUntil, including earlier summaries.
     val apply:
         numberOf: (string -> int) ->
         countTokens: (string -> int) ->
-        replaced: Map<int, string> ->
+        history: AnchorReplacement list ->
         declaration: AnchorViewDeclaration ->
         messages: AnchorMessage list ->
             AnchorViewEntry list * AnchorViewReport
+
+    val generate:
+        numberOf: (string -> int) ->
+        countTokens: (string -> int) ->
+        history: AnchorReplacement list ->
+        declaration: AnchorViewDeclaration ->
+        messages: AnchorMessage list ->
+            AnchorViewEntry list * AnchorViewReport
+
+    val material: numberOf: (string -> int) -> entries: AnchorViewEntry list -> (int * string) list
+    val materialKey: anchor: int -> text: string -> string

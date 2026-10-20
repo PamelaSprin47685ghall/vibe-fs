@@ -1,0 +1,134 @@
+TAP version 13
+# Subtest: WHAT[context-compression-031] anchor numbers are stable per session and message id
+ok 1 - WHAT[context-compression-031] anchor numbers are stable per session and message id
+  ---
+  duration_ms: 2.028583
+  ...
+# Subtest: WHAT[context-compression-031] a view declaration is consumed exactly once
+ok 2 - WHAT[context-compression-031] a view declaration is consumed exactly once
+  ---
+  duration_ms: 0.584917
+  ...
+# Subtest: WHAT[context-compression-031] a malformed view declaration is refused and changes nothing
+ok 3 - WHAT[context-compression-031] a malformed view declaration is refused and changes nothing
+  ---
+  duration_ms: 3.618708
+  ...
+# Subtest: WHAT[context-compression-031] without a declaration applyView leaves the message list unchanged
+ok 4 - WHAT[context-compression-031] without a declaration applyView leaves the message list unchanged
+  ---
+  duration_ms: 0.174666
+  ...
+# Subtest: WHAT[context-compression-031] prefixUntil protects a prefix without replacing anything
+ok 5 - WHAT[context-compression-031] prefixUntil protects a prefix without replacing anything
+  ---
+  duration_ms: 0.501291
+  ...
+# Subtest: WHAT[context-compression-031] a summary stands in for its anchor for the rest of the session
+ok 6 - WHAT[context-compression-031] a summary stands in for its anchor for the rest of the session
+  ---
+  duration_ms: 0.650333
+  ...
+# Subtest: WHAT[context-compression-031] separate replacements each stand in place
+ok 7 - WHAT[context-compression-031] separate replacements each stand in place
+  ---
+  duration_ms: 0.340292
+  ...
+# Subtest: WHAT[context-compression-031] replacing an earlier anchor folds the replacements inside its span
+ok 8 - WHAT[context-compression-031] replacing an earlier anchor folds the replacements inside its span
+  ---
+  duration_ms: 0.292458
+  ...
+# Subtest: WHAT[context-compression-031] unidentified content remains when no interval replaces it
+ok 9 - WHAT[context-compression-031] unidentified content remains when no interval replaces it
+  ---
+  duration_ms: 0.808959
+  ...
+# Subtest: WHAT[context-compression-031] countTokens reports the o200k_base token count
+ok 10 - WHAT[context-compression-031] countTokens reports the o200k_base token count
+  ---
+  duration_ms: 0.152875
+  ...
+# (node:99198) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[context-compression-031] registered Host inline anchors are stable projections and do not alter physical originals
+ok 11 - WHAT[context-compression-031] registered Host inline anchors are stable projections and do not alter physical originals
+  ---
+  duration_ms: 1127.614042
+  ...
+# Subtest: WHAT[context-compression-031] protected items and null mappings keep their current material
+ok 12 - WHAT[context-compression-031] protected items and null mappings keep their current material
+  ---
+  duration_ms: 0.405833
+  ...
+# Subtest: WHAT[context-compression-031] same-round adjacent summaries use the input partition
+ok 13 - WHAT[context-compression-031] same-round adjacent summaries use the input partition
+  ---
+  duration_ms: 0.104334
+  ...
+# Subtest: WHAT[context-compression-031] anchor zero persists and earlier replacement includes prior summaries
+ok 14 - WHAT[context-compression-031] anchor zero persists and earlier replacement includes prior summaries
+  ---
+  duration_ms: 0.198625
+  ...
+# Subtest: WHAT[context-compression-031] a captured tail interval cannot swallow a later message
+ok 15 - WHAT[context-compression-031] a captured tail interval cannot swallow a later message
+  ---
+  duration_ms: 0.08275
+  ...
+# Subtest: WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one
+ok 16 - WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one
+  ---
+  duration_ms: 11.21825
+  ...
+# Subtest: WHAT[provider-projection-011] semantic digest is invariant to physical call IDs but sensitive to actual arguments
+ok 17 - WHAT[provider-projection-011] semantic digest is invariant to physical call IDs but sensitive to actual arguments
+  ---
+  duration_ms: 1.646209
+  ...
+# Subtest: WHAT[provider-projection-011] cutoff digest includes exactly the selected semantic prefix
+ok 18 - WHAT[provider-projection-011] cutoff digest includes exactly the selected semantic prefix
+  ---
+  duration_ms: 0.345583
+  ...
+# Subtest: WHAT[provider-projection-011] the Host crypto adapter agrees with the reference hash and transport fields stay out of the semantic projection
+ok 19 - WHAT[provider-projection-011] the Host crypto adapter agrees with the reference hash and transport fields stay out of the semantic projection
+  ---
+  duration_ms: 0.19075
+  ...
+# (node:99219) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[provider-projection-011] registered production transforms persist and replay the exact semantic prefix digest
+ok 20 - WHAT[provider-projection-011] registered production transforms persist and replay the exact semantic prefix digest
+  ---
+  duration_ms: 1899.591917
+  ...
+# Subtest: WHAT[provider-projection-011] real argument changes alter the durable production digest
+ok 21 - WHAT[provider-projection-011] real argument changes alter the durable production digest
+  ---
+  duration_ms: 1513.28475
+  ...
+# Subtest: WHAT[provider-projection-011] registered production boundary proof rejects crossing material
+ok 22 - WHAT[provider-projection-011] registered production boundary proof rejects crossing material
+  ---
+  duration_ms: 480.798
+  ...
+# Subtest: WHAT[provider-projection-011] phase and failure-recovery candidates reject a changed confirmed prefix after a real frame commit
+ok 23 - WHAT[provider-projection-011] phase and failure-recovery candidates reject a changed confirmed prefix after a real frame commit
+  ---
+  duration_ms: 55.3705
+  ...
+# Subtest: WHAT[provider-projection-011] the registered production proof detects a boundary-crossing prefix promotion
+ok 24 - WHAT[provider-projection-011] the registered production proof detects a boundary-crossing prefix promotion
+  ---
+  duration_ms: 1277.940708
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6742.700125

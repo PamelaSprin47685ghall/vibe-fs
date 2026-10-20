@@ -56,7 +56,6 @@ module JsRuntimeSurface =
         match label with
         | "Read" -> Some JsCapability.Read
         | "Write" -> Some JsCapability.Write
-        | "Edit" -> Some JsCapability.Edit
         | "Glob" -> Some JsCapability.Glob
         | "Grep" -> Some JsCapability.Grep
         | "Move" -> Some JsCapability.Move

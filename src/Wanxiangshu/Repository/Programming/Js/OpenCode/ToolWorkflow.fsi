@@ -90,6 +90,22 @@ module JsToolWorkflow =
         processHost: ProcessHost option ->
             Task<JsToolOutcome>
 
+    val executeWithApiScope:
+        scopeApi: (Wanxiangshu.Process.JsSandbox.ParkState -> obj -> obj) ->
+        sessionId: string ->
+        capabilities: Set<JsCapability> ->
+        root: string ->
+        baseClassSource: string ->
+        input: obj ->
+        deadlineMs: int ->
+        deadlineEpochMs: int64 ->
+        outputBoundBytes: int ->
+        persistence: IJsTransactionPersistence option ->
+        lifecyclePersistence: IJsLifecyclePersistence option ->
+        fileAccessObservation: FileAccessObservation option ->
+        processHost: ProcessHost option ->
+            Task<JsToolOutcome>
+
     /// Run a program whose api is caller-supplied while the park lifecycle,
     /// race and outcome stay workflow-owned (the plan tenure sandbox).
     val runWithParkApi:

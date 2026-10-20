@@ -6,7 +6,6 @@ open Wanxiangshu.Foundation
 type JsCapability =
     | Read
     | Write
-    | Edit
     | Glob
     | Grep
     | Move

@@ -1,0 +1,200 @@
+TAP version 13
+# HOOK CHAT MESSAGE FAILED: ChatAdmissionHookException {
+#   message: 'Managed chat admission failed: TransactionFailed (AcceptanceFailed (AuthorityRegistrationRejected (ActiveRunIdentityConflict ({ StoredSessionId = SessionId "host-child-2-4845770ad1834"\\n' +
+#     '  StoredLogicalRunId = LogicalRunId "8abf57ef9e986a5e037900fdb6b328b1aa85e77e7524805b9d294170987021f3"\\n' +
+#     '  StoredAuthorityRootUserMessageId = AuthorityRootUserMessageId "msg-host-child-2-4845770ad1834-0"\\n' +
+#     '  StoredAuthorityKind = AgentOwnerRoot\\n' +
+#     '  StoredIdentitySeed = InheritedFromOwner ({ StoredOwnerSessionId = SessionId "advisor-live-answer-owner"\\n' +
+#     '  StoredOwnerLogicalRunId = LogicalRunId "d8597d0f327732368d94d139029d2de568b72dac8cee11f8554b46c4134f6be0"\\n' +
+#     '  StoredOwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId "advisor-owner-root"\\n' +
+#     '  StoredParticipantIdentity = { Identity = { SelectedAgent = PersonaName "advisor"\\n' +
+#     '  Kind = ManagedRole Advisor\\n' +
+#     '  Persona = "Lead"\\n' +
+#     '  PersonaCatalogVersion = PersonaCatalogVersion 1\\n' +
+#     '  Origin = InheritedFromOwner } } }) }, { StoredSessionId = SessionId "host-child-2-4845770ad1834"\\n' +
+#     '  StoredLogicalRunId = LogicalRunId "4798fffcbc0fde2f5feaf2ecd21ee740e33a155dd2116af77133d448ecb61e86"\\n' +
+#     '  StoredAuthorityRootUserMessageId = AuthorityRootUserMessageId "msg-host-child-2-4845770ad1834-1"\\n' +
+#     '  StoredAuthorityKind = AgentOwnerRoot\\n' +
+#     '  StoredIdentitySeed = InheritedFromOwner ({ StoredOwnerSessionId = SessionId "advisor-live-answer-owner"\\n' +
+#     '  StoredOwnerLogicalRunId = LogicalRunId "d8597d0f327732368d94d139029d2de568b72dac8cee11f8554b46c4134f6be0"\\n' +
+#     '  StoredOwnerAuthorityRootUserMessageId = AuthorityRootUserMessageId "advisor-owner-root"\\n' +
+#     '  StoredParticipantIdentity = { Identity = { SelectedAgent = PersonaName "advisor"\\n' +
+#     '  Kind = ManagedRole Advisor\\n' +
+#     '  Persona = "Lead"\\n' +
+#     '  PersonaCatalogVersion = PersonaCatalogVersion 1\\n' +
+#     '  Origin = InheritedFromOwner } } }) }))))',
+#   innerException: undefined,
+#   failure: ChatAdmissionHookFailure {
+#     tag: 1,
+#     fields: [ [ChatAdmissionTransactionError] ]
+#   },
+#   executionKey: ChatExecutionKey {
+#     SessionId: SessionId { tag: 0, fields: [Array] },
+#     PhysicalUserMessageId: PhysicalUserMessageId { tag: 0, fields: [Array] }
+#   }
+# }
+# (node:97190) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+not ok 1 - WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+  ---
+  duration_ms: 999.715708
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:12:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:524:28)
+    process.processEmit [as emit] (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/node_modules/signal-exit/index.js:199:34)
+  ...
+# Subtest: WHAT[prefix-stability-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections
+ok 2 - WHAT[prefix-stability-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections
+  ---
+  duration_ms: 0.851875
+  ...
+# Subtest: WHAT[prefix-stability-014] PPT_source_is_the_frozen_side_channel_identity
+ok 3 - WHAT[prefix-stability-014] PPT_source_is_the_frozen_side_channel_identity
+  ---
+  duration_ms: 0.128791
+  ...
+# Subtest: WHAT[prefix-stability-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker
+ok 4 - WHAT[prefix-stability-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker
+  ---
+  duration_ms: 1.915417
+  ...
+# Subtest: WHAT[prefix-stability-014] bare semantic capture preserves supplied bytes rather than guessing guidance from prose
+ok 5 - WHAT[prefix-stability-014] bare semantic capture preserves supplied bytes rather than guessing guidance from prose
+  ---
+  duration_ms: 61.3145
+  ...
+# (node:97219) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[prefix-stability-014] multiple terminal parts keep their physical originals through guidance replay
+ok 6 - WHAT[prefix-stability-014] multiple terminal parts keep their physical originals through guidance replay
+  ---
+  duration_ms: 721.085875
+  ...
+# Subtest: WHAT[prefix-stability-014] a failed guidance assertion ends its exact mock provider step before another single-slot fixture starts
+ok 7 - WHAT[prefix-stability-014] a failed guidance assertion ends its exact mock provider step before another single-slot fixture starts
+  ---
+  duration_ms: 748.689541
+  ...
+# Subtest: WHAT[prefix-stability-014] registered Host completed tool presentation leaves physical snapshot and durable originals unchanged
+ok 8 - WHAT[prefix-stability-014] registered Host completed tool presentation leaves physical snapshot and durable originals unchanged
+  ---
+  duration_ms: 433.151083
+  ...
+# Subtest: WHAT[prefix-stability-014] registered Host error tool presentation leaves physical snapshot and durable originals unchanged
+ok 9 - WHAT[prefix-stability-014] registered Host error tool presentation leaves physical snapshot and durable originals unchanged
+  ---
+  duration_ms: 457.94
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user plain quotation of previous guidance is preserved in the request and cold trace
+ok 10 - WHAT[prefix-stability-014] a real user plain quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 478.437
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user enclosed quotation of previous guidance is preserved in the request and cold trace
+ok 11 - WHAT[prefix-stability-014] a real user enclosed quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 539.818959
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user embedded quotation of previous guidance is preserved in the request and cold trace
+ok 12 - WHAT[prefix-stability-014] a real user embedded quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 486.332958
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user position quotation of previous guidance is preserved in the request and cold trace
+ok 13 - WHAT[prefix-stability-014] a real user position quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 481.335167
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user multiple quotation of previous guidance is preserved in the request and cold trace
+ok 14 - WHAT[prefix-stability-014] a real user multiple quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 502.884542
+  ...
+# Subtest: WHAT[prefix-stability-014] a empty terminal user part with a single part cannot acquire an unprovable guidance suffix
+ok 15 - WHAT[prefix-stability-014] a empty terminal user part with a single part cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 484.200875
+  ...
+# Subtest: WHAT[prefix-stability-014] a empty terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+ok 16 - WHAT[prefix-stability-014] a empty terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 475.605583
+  ...
+# Subtest: WHAT[prefix-stability-014] a whitespace terminal user part with a single part cannot acquire an unprovable guidance suffix
+ok 17 - WHAT[prefix-stability-014] a whitespace terminal user part with a single part cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 497.79025
+  ...
+# Subtest: WHAT[prefix-stability-014] a whitespace terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+ok 18 - WHAT[prefix-stability-014] a whitespace terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 493.640792
+  ...
+# Subtest: WHAT[prefix-stability-014] an old user occurrence without its original text is refused rather than inferred from its presentation
+ok 19 - WHAT[prefix-stability-014] an old user occurrence without its original text is refused rather than inferred from its presentation
+  ---
+  duration_ms: 567.946875
+  ...
+# Subtest: WHAT[prefix-stability-014] a same-generation physical user edit cannot disguise an original conflict as guidance replay
+ok 20 - WHAT[prefix-stability-014] a same-generation physical user edit cannot disguise an original conflict as guidance replay
+  ---
+  duration_ms: 484.799833
+  ...
+# Subtest: WHAT[prefix-stability-014] a same-generation position user edit cannot disguise an original conflict as guidance replay
+ok 21 - WHAT[prefix-stability-014] a same-generation position user edit cannot disguise an original conflict as guidance replay
+  ---
+  duration_ms: 480.586625
+  ...
+# Subtest: WHAT[prefix-stability-014] the first reanchored capture of edited physical user text does not borrow retired original evidence
+ok 22 - WHAT[prefix-stability-014] the first reanchored capture of edited physical user text does not borrow retired original evidence
+  ---
+  duration_ms: 547.24525
+  ...
+# Subtest: WHAT[prefix-stability-014] the first reanchored capture of edited position user text does not borrow retired original evidence
+ok 23 - WHAT[prefix-stability-014] the first reanchored capture of edited position user text does not borrow retired original evidence
+  ---
+  duration_ms: 530.552042
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with same text
+ok 24 - WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with same text
+  ---
+  duration_ms: 642.255708
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with changed text
+ok 25 - WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with changed text
+  ---
+  duration_ms: 651.091458
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with same text
+ok 26 - WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with same text
+  ---
+  duration_ms: 769.266167
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with changed text
+ok 27 - WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with changed text
+  ---
+  duration_ms: 661.136125
+  ...
+# Subtest: WHAT[prefix-stability-014] a captured user carrier presentation replays from its proven original without adding trace material
+ok 28 - WHAT[prefix-stability-014] a captured user carrier presentation replays from its proven original without adding trace material
+  ---
+  duration_ms: 478.113833
+  ...
+# Subtest: WHAT[prefix-stability-014] actual OpenCode Host provider requests preserve user quotations and keep guidance out of physical tool originals through cold recovery
+ok 29 - WHAT[prefix-stability-014] actual OpenCode Host provider requests preserve user quotations and keep guidance out of physical tool originals through cold recovery # SKIP integration tier not enabled
+  ---
+  duration_ms: 0.034667
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 27
+# fail 0
+# cancelled 1
+# skipped 1
+# todo 0
+# duration_ms 14149.92775

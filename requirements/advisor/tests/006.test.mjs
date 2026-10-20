@@ -65,7 +65,7 @@ test('WHAT[advisor-006] js.advisor returns the installed host closure value back
 
     const outcome = await managerRun(
       dir,
-      '    return await this.advisor("review this delta", { prefixUntil: 3, thenRemove: [] });',
+      '    return await this.advisor("review this delta", { prefixUntil: 3, thenMap: {} });',
       sessionId,
     )
     assert.equal(caseName(outcome), 'Succeeded')
@@ -92,7 +92,7 @@ test('WHAT[advisor-006] an absent delegation host refuses with DELEGATION_UNAVAI
     clearDelegationHost(sessionId)
     const outcome = await managerRun(
       dir,
-      '    return await this.advisor("review this delta", { prefixUntil: 3, thenRemove: [] });',
+      '    return await this.advisor("review this delta", { prefixUntil: 3, thenMap: {} });',
       sessionId,
     )
     assert.equal(caseName(outcome), 'Succeeded', 'the refusal is data, not a program failure')

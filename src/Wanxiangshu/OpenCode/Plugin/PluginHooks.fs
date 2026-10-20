@@ -91,9 +91,6 @@ module PluginHooks =
     [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
     let private hasOwnProperty (target: obj) (prop: string) : bool = jsNative
 
-    [<Emit("$0 !== null && $0 !== undefined && typeof $0 === 'object' && !Array.isArray($0) && Object.keys($0).length > 0")>]
-    let private isNonEmptyObject (value: obj) : bool = jsNative
-
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (transform: obj -> obj -> Task<unit>) : Task<obj> =
@@ -449,7 +446,16 @@ module PluginHooks =
                 let part = if isNull properties then null else properties?part
                 let state = if isNull part then null else part?state
                 let input = if isNull state then null else state?input
-                let view = if isNull input then null else input?view
+
+                let view =
+                    if isNull input then
+                        null
+                    else
+                        createObj [ "prefixUntil" ==> input?prefixUntil; "thenMap" ==> input?thenMap ]
+
+                let validView =
+                    Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parseDeclaration view
+                    |> Result.isOk
 
                 let sessionId =
                     HostEventEnvelope.trySessionId raw
@@ -467,7 +473,7 @@ module PluginHooks =
                 | "message.part.updated", Some sessionId, Some tool, Some callId, Some status when
                     tool.StartsWith("todowrite-for-", StringComparison.OrdinalIgnoreCase)
                     && (status = "completed" || status = "error")
-                    && isNonEmptyObject view
+                    && validView
                     ->
                     Some(SessionId.value sessionId, ToolCallId.create callId, status)
                 | _ -> None

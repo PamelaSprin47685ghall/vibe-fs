@@ -44,7 +44,7 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a n
             type: 'tool',
             tool: 'todowrite',
             callID: 'retired-native-call',
-            state: { status: 'completed', input: { todos: [{ content: 'x', status: 'pending' }], view: { prefixUntil: 1 } } },
+            state: { status: 'completed', input: { todos: [{ content: 'x', status: 'pending' }], prefixUntil: 1, thenMap: {} } },
           },
         },
       },
@@ -93,7 +93,7 @@ integrationTest('WHAT[obligation-ledger-001] only todowrite-for-* calls with a n
               status: 'completed',
               input: {
                 program: 'class Js extends JsProgram { async run() { return 1; } }',
-                view: { prefixUntil: 2, thenRemove: { 4: 'keep anchor 2' } },
+                prefixUntil: 2, thenMap: { 4: 'keep anchor 2' },
               },
             },
           },

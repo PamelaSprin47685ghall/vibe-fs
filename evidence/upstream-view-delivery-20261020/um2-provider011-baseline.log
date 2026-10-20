@@ -1,0 +1,80 @@
+TAP version 13
+# Subtest: WHAT[provider-projection-011] semantic digest is invariant to physical call IDs but sensitive to actual arguments
+ok 1 - WHAT[provider-projection-011] semantic digest is invariant to physical call IDs but sensitive to actual arguments
+  ---
+  duration_ms: 1.708
+  ...
+# Subtest: WHAT[provider-projection-011] cutoff digest includes exactly the selected semantic prefix
+ok 2 - WHAT[provider-projection-011] cutoff digest includes exactly the selected semantic prefix
+  ---
+  duration_ms: 0.335834
+  ...
+# Subtest: WHAT[provider-projection-011] the Host crypto adapter agrees with the reference hash and transport fields stay out of the semantic projection
+ok 3 - WHAT[provider-projection-011] the Host crypto adapter agrees with the reference hash and transport fields stay out of the semantic projection
+  ---
+  duration_ms: 0.191541
+  ...
+# (node:96664) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[provider-projection-011] registered production transforms persist and replay the exact semantic prefix digest
+not ok 4 - WHAT[provider-projection-011] registered production transforms persist and replay the exact semantic prefix digest
+  ---
+  duration_ms: 1071.957958
+  location: '/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-projection/tests/011.test.mjs:253:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'Evidence')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    record (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-projection/tests/011.test.mjs:211:26)
+    async withJournalRuntime (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:45:12)
+    async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-projection/tests/011.test.mjs:235:5
+    async withRestartablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:321:5)
+    async productionDigest (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-projection/tests/011.test.mjs:232:3)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-projection/tests/011.test.mjs:254:17)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[provider-projection-011] real argument changes alter the durable production digest
+not ok 5 - WHAT[provider-projection-011] real argument changes alter the durable production digest
+  ---
+  duration_ms: 621.458042
+  location: '/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-projection/tests/011.test.mjs:259:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'Evidence')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    record (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-projection/tests/011.test.mjs:211:26)
+    async withJournalRuntime (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:45:12)
+    async file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-projection/tests/011.test.mjs:235:5
+    async withRestartablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:321:5)
+    async productionDigest (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-projection/tests/011.test.mjs:232:3)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/provider-projection/tests/011.test.mjs:260:17)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[provider-projection-011] registered production boundary proof rejects crossing material
+ok 6 - WHAT[provider-projection-011] registered production boundary proof rejects crossing material
+  ---
+  duration_ms: 496.475334
+  ...
+# Subtest: WHAT[provider-projection-011] phase and failure-recovery candidates reject a changed confirmed prefix after a real frame commit
+ok 7 - WHAT[provider-projection-011] phase and failure-recovery candidates reject a changed confirmed prefix after a real frame commit
+  ---
+  duration_ms: 55.419
+  ...
+# Subtest: WHAT[provider-projection-011] the registered production proof detects a boundary-crossing prefix promotion
+ok 8 - WHAT[provider-projection-011] the registered production proof detects a boundary-crossing prefix promotion
+  ---
+  duration_ms: 1311.010292
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 6
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3806.852083

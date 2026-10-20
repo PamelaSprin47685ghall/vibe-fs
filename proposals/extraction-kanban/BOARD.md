@@ -13,7 +13,7 @@
 |---|---|---|
 | UM-0 固定版本与合并计划 | DONE（计划） | fetch 与静态源码核对；新增 17 提交、386 路径；三方预演 162 冲突路径；未运行产品测试 |
 | UM-1 Pair Hint 与保证书清理 | READY（限定） | gen43 构建/格式/静态通过；正式七文件175/0/2旧TODO，实际Host两文件109/0/1旧TODO，均排空回收；[原始证据](../../evidence/upstream-view-delivery-20261020/README.md)，完整发行及部署待后续 |
-| UM-2 view/Anchor 与 Plan 编程面 | PLANNED | 先统一扁平参数、正式合同、区间规则和 P 路径限制 |
+| UM-2 view/Anchor 与 Plan 编程面 | DOING | root 接续24462522f；公共区间、顶层声明、P-only 调用门禁与原任期写权限已接通；最终同候选验收见 um2-delivery.json，未关闭 |
 | UM-3 Manager reviewOnly | PLANNED | 依赖 UM-2；入口常开、逐次读取授权，保留本地 rg 监管 |
 | UM-4 交付见证与真实工作收束 | PLANNED | 依赖 UM-2/UM-3；实际委派、join、Fission、持久恢复；不接半成品 reportMapping |
 | UM-5 同候选验收与源码集成 | PLANNED | 前包完成后执行；相关验证、完整发行、推送、运行切换分别记录 |

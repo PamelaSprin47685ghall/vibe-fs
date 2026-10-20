@@ -18,11 +18,12 @@ module AnchorLedger =
     /// Consume the pending declaration exactly once.
     val takeView: sessionId: string -> AnchorViewDeclaration option
 
-    /// Record summaries that stand in for their anchors from now on.
-    val replaceAnchors: sessionId: string -> pairs: (int * string) list -> unit
-
-    /// The accumulated anchor→summary map for this session.
-    val replacements: sessionId: string -> Map<int, string>
+    val knownAnchors: sessionId: string -> int list
+    val remember: sessionId: string -> messages: (string option * string) list -> unit
+    val context: sessionId: string -> (string option * string) list
+    val protect: sessionId: string -> anchors: Set<int> -> unit
+    val protectedReplacements: sessionId: string -> int list
+    val replacements: sessionId: string -> AnchorReplacement list
 
     val clearSession: sessionId: string -> unit
     val clearAll: unit -> unit

@@ -162,7 +162,7 @@ test('WHAT[work-020] synthetic rows are stripped and never re-injected during as
   assert.deepEqual(ids(result.messages), ['u-1', 'a-1'])
 })
 
-test('WHAT[work-020] a relaying tenure declaring view: { extra } commits ViewCheckpointCommitted and carries the declared handover text into the successor request', async () => {
+test('WHAT[work-020] a relaying tenure view checkpoints call identity without carrying a replacement for Plan user originals', async () => {
   clearAll()
   const life = lifecycle.LifecycleSurface ?? lifecycle
   await withExecutablePlugin(async (hooks, directory, _createdIds, runtime) => {
@@ -208,7 +208,7 @@ test('WHAT[work-020] a relaying tenure declaring view: { extra } commits ViewChe
             status: 'completed',
             input: {
               program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-              view: { prefixUntil: 1, thenRemove: { 1: handoverProse } },
+              prefixUntil: 1, thenMap: { 1: handoverProse },
             },
             output: 'ok',
           },
@@ -219,7 +219,7 @@ test('WHAT[work-020] a relaying tenure declaring view: { extra } commits ViewChe
     await hooks.tool['todowrite-for-plan'].execute(
       {
         program: 'class Js extends JsProgram { async run() { return { ok: true }; } }',
-        view: { prefixUntil: 1, thenRemove: { 1: handoverProse } },
+        prefixUntil: 1, thenMap: { 1: handoverProse },
       },
       { sessionID, agent: 'plan', callID: 'call-plan-view-1', messageID: 'run-plan-view-1', providerRunID: 'run-plan-view-1' },
     )
@@ -295,6 +295,7 @@ test('WHAT[work-020] a relaying tenure declaring view: { extra } commits ViewChe
     assert.ok(!wireIds.includes('run-plan-view-1'), 'predecessor tool exchange must be stripped')
     assert.ok(!wireIds.includes('run-plan-deliver-1'), 'predecessor deliver exchange must be stripped')
     const serialized = JSON.stringify(successorOut.messages)
-    assert.ok(serialized.includes(handoverProse), 'successor request must carry the predecessor declared view.extra text')
+    assert.equal(serialized.includes(handoverProse), false, 'a view cannot replace Plan user originals or restore stripped predecessor interactions')
+    assert.ok(serialized.includes(userRoot.parts[0].text), 'the successor retains the original user material')
   })
 })

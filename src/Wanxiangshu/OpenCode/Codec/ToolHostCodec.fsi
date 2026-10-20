@@ -57,6 +57,8 @@ module ToolHostCodec =
     val argumentsOfRaw: raw: obj -> HostToolArguments
     val internal schemaValue: schema: HostSchema -> obj
     val stringSchema: factory: HostToolFactory -> HostSchema
+    val nullableStringSchema: factory: HostToolFactory -> HostSchema
+    val optionalSchema: schema: HostSchema -> HostSchema
     val anySchema: factory: HostToolFactory -> HostSchema
     val stringSchemaDescribed: description: string -> factory: HostToolFactory -> HostSchema
     val numberSchema: factory: HostToolFactory -> HostSchema
