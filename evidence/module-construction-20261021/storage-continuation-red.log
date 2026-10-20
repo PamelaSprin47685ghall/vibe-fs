@@ -1,0 +1,28 @@
+▶ WHAT[durable-events-005] interrupted_line_continuation_resumes_after_each_complete_copied_prefix
+  ✖ 1 copied legacy lines across segment boundaries (29.891541ms)
+  ✖ 2 copied legacy lines across segment boundaries (35.138666ms)
+  ✖ 3 copied legacy lines across segment boundaries (25.028084ms)
+✖ WHAT[durable-events-005] interrupted_line_continuation_resumes_after_each_complete_copied_prefix (90.715042ms)
+✔ WHAT[durable-events-005] copied_legacy_identity_with_different_bytes_still_refuses_without_writes (28.768583ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 1
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 251.422042
+
+✖ failing tests:
+
+test at requirements/durable-events/tests/005.test.mjs:454:13
+✖ 1 copied legacy lines across segment boundaries (29.891541ms)
+  { message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")', innerException: undefined }
+
+test at requirements/durable-events/tests/005.test.mjs:454:13
+✖ 2 copied legacy lines across segment boundaries (35.138666ms)
+  { message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")', innerException: undefined }
+
+test at requirements/durable-events/tests/005.test.mjs:454:13
+✖ 3 copied legacy lines across segment boundaries (25.028084ms)
+  { message: 'local EventStore boot failed: local event history read failed: NonCanonical ("writer files diverged: resume-law")', innerException: undefined }

@@ -11,11 +11,11 @@
 | 包 | 状态 | 证据与剩余边界 |
 |---|---|---|
 | MF-00 | DONE（基线） | c78c9d53c完整CI成功；两仓输入、精确写集合和保留合同已登记 |
-| MF-01 | DOING | root接收独立sandbox并保持deadline/park/abandon；运行验收尚未开始 |
-| MF-02A | DOING | delivery_audit修交付停止的精确物理输入绑定；先留真实交错反例 |
-| MF-02B | PLANNED | delivery材料封存、prefix/compression；projection仍需交接，不搬弱wrapper |
-| MF-03A | DOING | physical_storage_audit修legacy续接崩溃窗口；热缓存前缀改写另记P2 |
-| MF-03B | PLANNED | spool/PTY与时间等待组合，保留本地物理终态保证 |
+| MF-01 | DOING + BLOCKED（Bun期限） | 隔离候选Node22 14/0；Bun的await后死循环未按期终止，不接入宿主；deadline/park组合尚未验 |
+| MF-02A | REVIEW（限定修复） | gen95目标集合38/0；严格S4夹具已证明持久准入；Host缺原子attempt中断，check到abort窗口仍在 |
+| MF-02B | DOING | prefix/compression库内、公开tarball和Node/Bun/strict TS消费已验；精确epoch与宿主接线施工，delivery封存能力待承接 |
+| MF-03A | REVIEW（续接恢复） | gen95目标集合38/0含旧ID重入拒绝；独立邻域32/0/3旧TODO，GAP-151不销项，见[收据](../../evidence/module-construction-20261021/delivery-storage-receipt.json) |
+| MF-03B | DOING（cwd子包） | 真实Bun复现无效cwd落到用户主目录；先修启动前校验，保留本地物理终态保证 |
 | MF-04 | PLANNED | 逐事实族接收存储纯规则与真实恢复验收 |
 | MF-05 | WAITING_HANDOFF | 调度、派发、会话的在建部分不抢公共编辑面 |
 | MF-06 | PLANNED | 知识复用和实测成本；边缘问题先留档 |

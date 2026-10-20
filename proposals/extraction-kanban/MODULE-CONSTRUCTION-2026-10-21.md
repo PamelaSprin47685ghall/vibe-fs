@@ -51,6 +51,14 @@ Process保留真实End/StopRequested/Output/Fault结果、compiled Bun Worker私
 
 ## 交付纪律
 
+### 第一组验收
+
+MF-02A与MF-03A的统一候选经gen95正式入口验证：durable-events/005、work/026、039共38通过、零失败、零skip/TODO，3/3文件排空，进程组回收通过。严格S4夹具直接传播准入错误并检查持久authority/physical Accepted；它不证明provider已经开始执行。独立交付邻域gen94为21/0；存储邻域为32/0/3既有TODO，严格出口1，不能算全绿。原始日志、红例与边界见[验收收据](../../evidence/module-construction-20261021/delivery-storage-receipt.json)。
+
+交付修复还包含fresh Started之后的持久Accepted结算、重读blocker、Unknown保留不重发、NotStarted清理后拒绝，以及精确退休事实回放。停止登记只用owning assistant的真实user parent，不借当前输入。Host仍只有session级abort，不能闭合检查后接纳新输入的原子窗口。
+
+续接修复仅承认完整规范字节一致的series后缀/legacy前缀；重复旧ID、同ID异字节、分叉和半行继续拒绝。跨段、Unicode、独立冷读与二次恢复已验；完整native write/fsync故障切点矩阵仍未完成。
+
 先反例、合同、实现，再独立产物与主仓组合。程序代码手工局部编辑；只用Fable正式构建入口，不运行dotnet build。库提交先验证并普通推自有main、核对可获取SHA，再更新主仓确切gitlink；主仓按包普通推master，禁止force push。临时tarball不入Git。
 
 各包完成追加实际证据和剩余范围。批次末做统一CI及PR状态核对；部署另列。本轮新上游差异不自动扩大固定输入，也不关闭历史GAP或把局部修复算作全系统验收。

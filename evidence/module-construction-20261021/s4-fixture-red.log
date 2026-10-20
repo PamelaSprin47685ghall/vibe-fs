@@ -1,0 +1,66 @@
+TAP version 13
+# HOOK CHAT MESSAGE FAILED: ChatAdmissionHookException {
+#   message: 'Managed chat admission failed: IntentRejected (MalformedIdentityCarrier PromptKey)',
+#   innerException: undefined,
+#   failure: ChatAdmissionHookFailure { tag: 0, fields: [ [Rejection] ] },
+#   executionKey: undefined
+# }
+# (node:67762) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[work-026] each successful post-S3 execution launch registers one interrupt for its bound physical input
+not ok 1 - WHAT[work-026] each successful post-S3 execution launch registers one interrupt for its bound physical input
+  ---
+  duration_ms: 694.686
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/026.test.mjs:142:1'
+  failureType: 'testCodeFailure'
+  error: 'the spawned S4 must have a durable managed authority profile'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: ~
+  operator: '=='
+  stack: |-
+    assertS4Admission (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/026.test.mjs:19:10)
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/026.test.mjs:155:5
+    async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/026.test.mjs:81:5
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async withAuthorizedS3 (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/026.test.mjs:58:3)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/026.test.mjs:143:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# HOOK CHAT MESSAGE FAILED: ChatAdmissionHookException {
+#   message: 'Managed chat admission failed: IntentRejected (MalformedIdentityCarrier PromptKey)',
+#   innerException: undefined,
+#   failure: ChatAdmissionHookFailure { tag: 0, fields: [ [Rejection] ] },
+#   executionKey: undefined
+# }
+# Subtest: WHAT[work-026] S3 authorized deliver enters post-S3 state without starting S4, interrupts the conversation, disables nudges, and later user-commanded delivers can repeatedly start S4
+not ok 2 - WHAT[work-026] S3 authorized deliver enters post-S3 state without starting S4, interrupts the conversation, disables nudges, and later user-commanded delivers can repeatedly start S4
+  ---
+  duration_ms: 227.871333
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/026.test.mjs:198:1'
+  failureType: 'testCodeFailure'
+  error: 'the spawned S4 must have a durable managed authority profile'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: ~
+  operator: '=='
+  stack: |-
+    assertS4Admission (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/026.test.mjs:19:10)
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/026.test.mjs:287:5
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/026.test.mjs:199:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1105.929042

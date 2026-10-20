@@ -1,0 +1,65 @@
+{
+  "packages": [
+    "MF-02A",
+    "MF-03A"
+  ],
+  "base": "c78c9d53c7aa3037995f2ec09848adaca9407ff7",
+  "library": "a12ff4a99d401d9a8e8d9c57cb9a0eb1173a7d1b",
+  "target": {
+    "generation": 95,
+    "tests": [
+      "durable-events/005",
+      "work/026",
+      "work/039"
+    ],
+    "passed": 38,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "exit": 0,
+    "filesDrained": "3/3",
+    "reclamationAccepted": true
+  },
+  "deliveryAdjacent": {
+    "generation": 94,
+    "tests": [
+      "work/025",
+      "work/049",
+      "repository-programming/059"
+    ],
+    "passed": 21,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0,
+    "exit": 0,
+    "filesDrained": "3/3",
+    "reclamationAccepted": true
+  },
+  "storageAdjacent": {
+    "generation": 94,
+    "tests": [
+      "durable-events/007",
+      "durable-events/012",
+      "durable-events/017",
+      "durable-convergence/003",
+      "durable-convergence/004",
+      "durable-convergence/007"
+    ],
+    "passed": 32,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 3,
+    "exit": 1,
+    "filesDrained": "6/6",
+    "reclamationAccepted": true,
+    "accepted": false,
+    "reason": "Existing GAP-151 TODO proof remains pending"
+  },
+  "limits": [
+    "S4 fixture proves durable managed admission, not actual provider execution.",
+    "Host AbortSession has no atomic expected-physical/provider guard; the check-to-abort race remains.",
+    "Disk recovery tests reopen actual intermediate states; the complete native write/fsync crash-cut matrix remains GAP-151.",
+    "Same-inode external historical rewrite can leave the hot prefix cache stale; P2 pending contract assessment."
+  ],
+  "deployed": false
+}

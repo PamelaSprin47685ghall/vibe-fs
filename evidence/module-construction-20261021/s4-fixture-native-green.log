@@ -1,0 +1,37 @@
+TAP version 13
+# (node:67861) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[work-026] a delivery awaiting its owning snapshot cannot aim its interrupt at a later accepted physical input
+ok 1 - WHAT[work-026] a delivery awaiting its owning snapshot cannot aim its interrupt at a later accepted physical input
+  ---
+  duration_ms: 645.692333
+  ...
+# Subtest: WHAT[work-026] each successful post-S3 execution launch registers one interrupt for its bound physical input
+ok 2 - WHAT[work-026] each successful post-S3 execution launch registers one interrupt for its bound physical input
+  ---
+  duration_ms: 256.161167
+  ...
+# Subtest: WHAT[work-026] an owning exchange without physical parent evidence cannot borrow the current input for an interrupt
+ok 3 - WHAT[work-026] an owning exchange without physical parent evidence cannot borrow the current input for an interrupt
+  ---
+  duration_ms: 222.582167
+  ...
+# Subtest: WHAT[work-026] authorized deliver without retirement evidence fails closed with no spawn
+ok 4 - WHAT[work-026] authorized deliver without retirement evidence fails closed with no spawn
+  ---
+  duration_ms: 5.2585
+  ...
+# Subtest: WHAT[work-026] S3 authorized deliver enters post-S3 state without starting S4, interrupts the conversation, disables nudges, and later user-commanded delivers can repeatedly start S4
+ok 5 - WHAT[work-026] S3 authorized deliver enters post-S3 state without starting S4, interrupts the conversation, disables nudges, and later user-commanded delivers can repeatedly start S4
+  ---
+  duration_ms: 308.875333
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1604.389291
