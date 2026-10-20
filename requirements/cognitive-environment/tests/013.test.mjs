@@ -8,11 +8,15 @@ const en = read('../../../resources/provider/host/pair-programming-guideline/en.
 const commonZh = read('../../../resources/provider/world/common-law/zh-CN.md')
 const commonEn = read('../../../resources/provider/world/common-law/en.md')
 
-test('WHAT[cognitive-environment-013] Pair Hint carries the bound-language anchor in both locales', () => {
+test('WHAT[cognitive-environment-013] Pair Hint carries the bound-language anchor and 80/20 iron rule in both locales', () => {
   assert.match(zh, /简体中文/)
   assert.match(zh, /「我」/)
   assert.match(en, /English/)
   assert.match(en, /"I"/)
+  assert.match(zh, /80\/20/)
+  assert.match(zh, /强制铁律/)
+  assert.match(en, /80\/20/)
+  assert.match(en, /mandatory iron rule/)
 })
 
 test('WHAT[cognitive-environment-013] work disciplines live in Common Law, not in the per-turn Pair Hint', () => {
