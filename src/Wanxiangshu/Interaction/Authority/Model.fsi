@@ -37,6 +37,8 @@ module DispatchLaw =
     val settle: event: string -> pending: bool -> continuation: bool -> Edit list
     val occasionAdmitted: pendingSameOccasion: bool -> landedOrigin: string option -> origin: string -> bool
 
+    val answer: sent: string -> string * bool * string
+
     val recover:
         promptKey: string ->
         hasReceipt: bool ->

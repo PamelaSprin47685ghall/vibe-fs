@@ -21,6 +21,16 @@
 
 宿主保留：`PromptAuthorityProjection` 记录与 typed 认领、sha256、journal 写入、Host 发送与 `PromptRecovery.reconcile` 的 I/O、`AcceptAgentOwnerRoot`/`AcceptContinuation` 的权威接线。
 
+## 2b. 子范围②：Host 发送回答 → `wanxiangli/dispatch` `answer`（0.42.0）
+
+| 规则 | 需求 | 旧 owner（已删） | 现在 |
+|---|---|---|---|
+| 回执 → 只记 Submitted；真实物理 id → Submitted 再 PhysicalAccepted；物理承接前的确定拒绝 → 显式 Abandoned(SendFailed)；结局未知 → 什么都不写、保持待决 | dispatch-protocol [002][003][007]，effect-accounting [002][006] | Send.fs `awaitPhysicalAwareSend` 与 `RecordSendOutcome` 两份五分支 match | `answer` 的 ledger；宿主 `answerOf` 只把标签还原为 typed `SendLedger` |
+| 只有确定拒绝算"确定未发送"（gate nudge 才可归还 permit） | [007] | `continuationAttemptOutcome` 的 `(Retryable _ \| Fatal _)` | `answer` 的 definitelyNotSent |
+| Detached 观察：承接即 OwnedSettled（不凭 SDK 返回值写 PhysicalAccepted）、拒绝、未知 | [009] | `ObserveDetachedSend` 的 `classifyDetachedOutcome` | `answer` 的 detached |
+
+宿主保留：持久化、`Runtime.Abandon` 单写者、确认等待者、Host 调用与 Detached 的进程级审计。代价：Send.fs/Model.fs 净增 44 行（标签与 typed 还原）。证据见 evidence README 子范围②。
+
 ## 3. 验收（§9）
 
 证据见 [evidence/CUT-11](../evidence/CUT-11/README.md)。
@@ -34,6 +44,6 @@
 
 ## 4. 余项（本卡仍 DOING）
 
-- ② 一条真实发送链（`Interaction/Dispatch/Send.fs`）：claim → Host 发送 → 回执 → 物理承接的次序与"已发但提交未知不再发送"。
+- ② 已合入（见 §2b）。发送链的其余部分（gate nudge 单 flight、Detached 入栈后立即返回）是宿主异步编排，不再有可抽的纯裁决。
 - ③ Work.operation 与 dispatch claim 的关联：同一发送行为只能有一个认领 owner，两类事实明确关联而不合并成一张账。
 - ④ 旧 claim 写入口退出与投影重置（清 run-scoped claims、continuation 映射、序列号），后者 CUT-09 §6 移交至此。

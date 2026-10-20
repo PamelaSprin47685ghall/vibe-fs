@@ -24,6 +24,7 @@ module DispatchLaw =
         abstract settle: input: obj -> string array
         abstract occasionAdmitted: input: obj -> bool
         abstract recover: input: obj -> obj
+        abstract answer: sent: string -> obj
 
     [<Import("Dispatch", "wanxiangli/dispatch")>]
     let private dispatchClass: obj = jsNative
@@ -107,6 +108,13 @@ module DispatchLaw =
                   "landedOrigin" ==> orNull landedOrigin
                   "origin" ==> origin ]
         )
+
+    /// Host send answer label → (ledger action, definitely-not-sent, detached verdict).
+    /// Labels: "AdmittedWithReceipt" | "AdmittedWithPhysicalMessage" | "Retryable" |
+    /// "Fatal" | "AcceptanceUnknown".
+    let answer (sent: string) : string * bool * string =
+        let verdict = law.answer sent
+        unbox<string> verdict?ledger, unbox<bool> verdict?definitelyNotSent, unbox<string> verdict?detached
 
     /// messages: (role, PromptKey carrier, physical id), oldest first.
     /// Ok physical = proven; Error hasReceipt = still pending.

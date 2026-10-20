@@ -14,3 +14,9 @@
 - 库测试：`src/dispatch/tests/001.test.mjs` 5/5（独立 oracle）；对库产物 9 个变异全部报红；build-001 dispatch 隔离构建通过；scripts 测试 60/61，唯一失败是既有的 build-001 sandbox 编译警告（与本卡无关）。
 - 套件（candidate 与 base 计数相同，失败/取消用例名集合逐行 diff 为空）：interaction-authority 104 pass/13 todo；dispatch-protocol 99 pass/1 cancel/1 skip/7 todo；crash-reconciliation 52/2 skip/15 todo；managed-chat-execution 82/2 skip/4 todo；effect-accounting 34 pass/5 cancel/3 skip/1 todo。
 - 如实记录：主仓现有需求测试没有任何一条覆盖 `PromptRecovery` 的窗口与 role 规则（把这两条变异放进 candidate，dispatch-protocol 与 crash-reconciliation 计数不变），所以恢复等价只由上面的恢复差分和库测试证明。
+
+## 子范围②：Host 发送回答（wanxiangli `c73eb2f` / `d0318dc` **0.42.0**）
+
+- 差分 `node send-diff.mjs <base> <cand>` → [send-diff.out](send-diff.out)：base 与 candidate 的私有 `awaitPhysicalAwareSend`、`continuationAttemptOutcome`（各自给 Send.js 临时拷贝追加一行 export，导入后即删）在 5 种 SendOutcome × persist/accept/abandon 成败 × 有无确认等待者上比较端口调用序列、参数和返回值，另比较 attempt 分类：**90 次，0 处不同**。
+- 变异 → [send-mutants.out](send-mutants.out)：对库产物 6 个语义变异（未知结局被放弃、未知结局算确定未发送、拒绝不算确定未发送、物理 id 跳过 PhysicalAccepted、回执不记 Submitted、Detached 拒绝当成未知）全部被抓住；前 5 个由 send-diff 抓住，Detached 那个由 dispatch-protocol 套件抓住（Detached 分类是成员内闭包，差分够不到）。
+- 套件（rebase 前后 dist 相同，上游只改 `requirements/work/tests`）：interaction-authority 104/13 todo；dispatch-protocol 99/1 cancel/1 skip/7 todo；crash-reconciliation 52/2/15；managed-chat-execution 82/2/4；effect-accounting 34/5 cancel/3/1；degeneration-guard 55/6 todo，与 base 相同。

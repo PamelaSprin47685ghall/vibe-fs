@@ -41,6 +41,47 @@ module PromptDispatcherSend =
                 return outcome
             }
 
+    /// What one Host send answer obliges the claim ledger to do, as
+    /// `wanxiangli/dispatch` answer decides it (CUT-11): a receipt only reaches
+    /// Submitted; a real physical id reaches Submitted then PhysicalAccepted; a
+    /// refusal before physical acceptance is an explicit Abandoned and the only
+    /// definitely-not-sent answer; acceptance unknown writes nothing and stays
+    /// pending. Detached never writes PhysicalAccepted from an SDK return value.
+    [<RequireQualifiedAccess>]
+    type private SendLedger =
+        | Submit of TransportReceipt
+        | SubmitThenAccept of PhysicalUserMessageId
+        | Abandon of reason: string
+        | KeepPending of reason: string
+
+    let private answerOf (outcome: SendOutcome) =
+        let label, payload =
+            match outcome with
+            | AdmittedWithReceipt receipt -> "AdmittedWithReceipt", box receipt
+            | AdmittedWithPhysicalMessage physicalId -> "AdmittedWithPhysicalMessage", box physicalId
+            | Retryable error -> "Retryable", box error
+            | Fatal error -> "Fatal", box error
+            | AcceptanceUnknown reason -> "AcceptanceUnknown", box reason
+
+        let ledger, definitelyNotSent, detached = DispatchLaw.answer label
+
+        let action =
+            match ledger with
+            | "Submit" -> SendLedger.Submit(unbox<TransportReceipt> payload)
+            | "SubmitThenAccept" -> SendLedger.SubmitThenAccept(unbox<PhysicalUserMessageId> payload)
+            | "Abandon" -> SendLedger.Abandon(unbox<string> payload)
+            | "KeepPending" -> SendLedger.KeepPending(unbox<string> payload)
+            | other -> failwithf "wanxiangli/dispatch returned an unknown send ledger action %s" other
+
+        let verdict =
+            match detached with
+            | "OwnedSettled" -> DetachedSendVerdict.OwnedSettled
+            | "Refused" -> DetachedSendVerdict.Refused(unbox<string> payload)
+            | "OutcomeUnknown" -> DetachedSendVerdict.OutcomeUnknown(unbox<string> payload)
+            | other -> failwithf "wanxiangli/dispatch returned an unknown detached verdict %s" other
+
+        action, definitelyNotSent, verdict
+
     /// PROMPT-011: the key is derived, never generated.
     ///
     /// Every input comes from the journal fold or the payload, so the same logical
@@ -179,24 +220,22 @@ module PromptDispatcherSend =
         let settle =
             task {
                 let! outcome = sendTask
+                let action, _, _ = answerOf outcome
 
-                match outcome with
-                | AdmittedWithReceipt receipt ->
+                match action with
+                | SendLedger.Submit receipt ->
                     return! settleAdmittedReceipt key sessionId persist confirmationWaiterOpt receipt
-                | AdmittedWithPhysicalMessage physicalId ->
+                | SendLedger.SubmitThenAccept physicalId ->
                     return!
                         handleAdmittedPhysical
                             (persistSubmittedFact key sessionId persist)
                             acceptPhysical
                             physicalId
                             key
-                | Retryable error ->
+                | SendLedger.Abandon error ->
                     let! _ = abandon (PromptAbandonReason.SendFailed error) error
                     return Error error
-                | Fatal error ->
-                    let! _ = abandon (PromptAbandonReason.SendFailed error) error
-                    return Error error
-                | AcceptanceUnknown reason ->
+                | SendLedger.KeepPending reason ->
                     return Error(sprintf "Acceptance unknown for PromptKey %s: %s" (PromptKey.value key) reason)
             }
 
@@ -216,10 +255,12 @@ module PromptDispatcherSend =
             Error(sprintf "idle-derived send admission rejected before physical dispatch: %A" failure)
 
     let private continuationAttemptOutcome (outcome: SendOutcome) (result: Result<PromptKey, string>) =
-        match outcome, result with
-        | (Retryable _ | Fatal _), Error error -> PromptDispatcher.SendAttemptOutcome.NotSent error
-        | _, Ok sentKey -> PromptDispatcher.SendAttemptOutcome.Sent sentKey
-        | _, Error error -> PromptDispatcher.SendAttemptOutcome.Failed error
+        let _, definitelyNotSent, _ = answerOf outcome
+
+        match result with
+        | Error error when definitelyNotSent -> PromptDispatcher.SendAttemptOutcome.NotSent error
+        | Ok sentKey -> PromptDispatcher.SendAttemptOutcome.Sent sentKey
+        | Error error -> PromptDispatcher.SendAttemptOutcome.Failed error
 
     let private awaitPhysicalAwareContinuationAttempt
         (sendTask: Task<SendOutcome>)
@@ -287,8 +328,10 @@ module PromptDispatcherSend =
                         | Error persistError -> return Error persistError
                     }
 
-                match outcome with
-                | AdmittedWithReceipt receipt ->
+                let action, _, _ = answerOf outcome
+
+                match action with
+                | SendLedger.Submit receipt ->
                     // PROMPT-005: an `accepted-*` receipt is not a message identity, so
                     // the chain stops at Submitted. `chat.message` supplies the physical
                     // id later and PromptIngress writes PhysicalAccepted then.
@@ -296,16 +339,15 @@ module PromptDispatcherSend =
                     let! persisted = submitted receipt
                     return persisted |> Result.map (fun () -> key)
 
-                | AdmittedWithPhysicalMessage physicalId ->
+                | SendLedger.SubmitThenAccept physicalId ->
                     // The Host answered with a real id. That answer is still the
                     // transport receipt — it is simply not admission-shaped — so the
                     // four-stage chain stays intact instead of skipping Submitted.
                     return! handleAdmittedPhysical submitted acceptPhysical physicalId key
 
-                | Retryable error -> return! abandon (PromptAbandonReason.SendFailed error) error
-                | Fatal error -> return! abandon (PromptAbandonReason.SendFailed error) error
+                | SendLedger.Abandon error -> return! abandon (PromptAbandonReason.SendFailed error) error
 
-                | AcceptanceUnknown reason ->
+                | SendLedger.KeepPending reason ->
                     return Error(sprintf "Acceptance unknown for PromptKey %s: %s" (PromptKey.value key) reason)
             }
 
@@ -366,16 +408,8 @@ module PromptDispatcherSend =
             (onFailure: (string -> Task) option)
             : unit =
             let classifyDetachedOutcome outcome =
-                match outcome with
-                | AdmittedWithReceipt _
-                | AdmittedWithPhysicalMessage _ ->
-                    // Detached never races chat.message by writing
-                    // PhysicalAccepted from an SDK return value. The exact
-                    // Host ingress is the sole physical-identity authority.
-                    DetachedSendVerdict.OwnedSettled
-                | Retryable error
-                | Fatal error -> DetachedSendVerdict.Refused error
-                | AcceptanceUnknown reason -> DetachedSendVerdict.OutcomeUnknown reason
+                let _, _, verdict = answerOf outcome
+                verdict
 
             task {
                 let! verdict =
