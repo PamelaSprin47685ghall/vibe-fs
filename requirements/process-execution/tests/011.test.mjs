@@ -7,7 +7,7 @@ import { oneCommand } from './support/runnable.mjs'
 
 const { contextDecode, contextView } = await import('../../../dist/OpenCode/Codec/ToolHostSurface.js')
 
-// Host-native `run` tool is retired; `js.run` supersedes it (repository-programming [050]-[052]).
+// Host-native `run` tool is retired; `js.call` supersedes it (repository-programming [050]-[052]).
 
 test('WHAT[process-execution-011] RUN_host_context_codec_exposes_plain_snapshot', () => {
   const decoded = contextDecode({ sessionID: 'ses-exec', agent: 'devops' })
@@ -20,7 +20,7 @@ test('WHAT[process-execution-011] RUN_host_context_codec_exposes_plain_snapshot'
   })
 })
 
-test('WHAT[process-execution-011] js.run rejects incomplete Runnable specs before spawning', async () => {
+test('WHAT[process-execution-011] js.call rejects incomplete Callable specs before spawning', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-011a-')
   try {
     const marker = join(dir, 'spawned')
@@ -33,9 +33,9 @@ test('WHAT[process-execution-011] js.run rejects incomplete Runnable specs befor
       `class { maxDuration = 1000; next() { return ${JSON.stringify(cmd)}; } }`,
     ]
     for (const spec of incompleteSpecs) {
-      const outcome = await runProgram(dir, `    return await js.run(${spec});`)
+      const outcome = await runProgram(dir, `    return await js.call(${spec});`)
       assert.equal(caseName(outcome), 'Failed')
-      assert.match(render(outcome), /RUNNABLE_SPEC_INCOMPLETE/)
+      assert.match(render(outcome), /CALLABLE_SPEC_INCOMPLETE/)
       assert.equal(existsSync(marker), false, 'incomplete Runnable spec must not spawn the command')
     }
   } finally {
@@ -43,37 +43,37 @@ test('WHAT[process-execution-011] js.run rejects incomplete Runnable specs befor
   }
 })
 
-test('WHAT[process-execution-011] js.run rejects unsupported command descriptors with RUN_COMMAND_UNSUPPORTED', async () => {
+test('WHAT[process-execution-011] js.call rejects unsupported command descriptors with CALL_COMMAND_UNSUPPORTED', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-011b-')
   try {
     const outcome = await runProgram(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class extends js.Callable {
       maxDuration = 2000;
       next(ctx) { return ctx.step === 0 ? { unsupported: true } : null; }
       watch(ctx) { return ctx.remainingMs > 0; }
-      sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      sanity() { return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] }; }
     });`,
     )
     assert.equal(caseName(outcome), 'Failed')
-    assert.match(render(outcome), /RUN_COMMAND_UNSUPPORTED/)
+    assert.match(render(outcome), /CALL_COMMAND_UNSUPPORTED/)
   } finally {
     cleanup()
   }
 })
 
-test('WHAT[process-execution-011] js.run maxDuration overrun terminates the foreground command and reports timeout', async () => {
+test('WHAT[process-execution-011] js.call maxDuration overrun terminates the foreground command and reports timeout', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-011c-')
   try {
     const marker = join(dir, 'late-marker')
     const outcome = await runProgram(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class extends js.Callable {
       maxDuration = 150;
       interval = 30;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late-marker" : null; }
       watch(ctx) { return ctx.remainingMs > 0; }
-      sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      sanity() { return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] }; }
     });`,
     )
     assert.equal(caseName(outcome), 'Succeeded')
@@ -94,9 +94,9 @@ test('WHAT[process-execution-011] malformed command descriptors and output budge
       'outputBudgetBytes = NaN;', 'outputBudgetBytes = Infinity;',
       'outputBudgetBytes = "2048";', 'worldLock = "true";',
     ]) {
-      const outcome = await runProgram(dir, `return await js.run(${oneCommand(command, { fields })});`)
+      const outcome = await runProgram(dir, `return await js.call(${oneCommand(command, { fields })});`)
       assert.equal(caseName(outcome), 'Failed')
-      assert.match(render(outcome), /RUN_OUTPUT_BUDGET_INVALID|RUN_WORLD_LOCK_INVALID/)
+      assert.match(render(outcome), /CALL_OUTPUT_BUDGET_INVALID|CALL_WORLD_LOCK_INVALID/)
       assert.equal(existsSync(marker), false)
     }
     for (const descriptor of [
@@ -110,14 +110,14 @@ test('WHAT[process-execution-011] malformed command descriptors and output budge
       '{ waitFor: { port: 80, timeoutMs: NaN } }',
       `{ spawn: ${JSON.stringify(command)}, name: "invalid", signal: "SIGTERM" }`,
     ]) {
-      const outcome = await runProgram(dir, `return await js.run(class extends js.Runnable {
+      const outcome = await runProgram(dir, `return await js.call(class extends js.Callable {
         maxDuration = 1000;
         next(ctx) { return ctx.step === 0 ? ${descriptor} : null; }
         watch(ctx) { return ctx.remainingMs > 0; }
-        sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+        sanity() { return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] }; }
       });`)
       assert.equal(caseName(outcome), 'Failed')
-      assert.match(render(outcome), /RUN_COMMAND_UNSUPPORTED/)
+      assert.match(render(outcome), /CALL_COMMAND_UNSUPPORTED/)
       assert.equal(existsSync(marker), false)
     }
   } finally {

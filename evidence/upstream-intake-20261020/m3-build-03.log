@@ -1,0 +1,320 @@
+
+added 9 packages in 603ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/assembly/Wanxiangli.Assembly.fsproj, FCS time: 865 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/assembly/DurableWork.fs, Fable time: 78 ms
+[build] assembly: 1440 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/Wanxiangli.Events.fsproj, FCS time: 880 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalJson.fs (47,24): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (11,27): Warning: The value 'bytes' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (14,27): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (17,24): Warning: The value 'algorithm' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (20,24): Warning: The value 'hash' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (20,36): Warning: The value 'data' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (23,21): Warning: The value 'hash' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (26,29): Warning: The value 'bytes' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (29,24): Warning: The value 'bytes' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (35,22): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (38,21): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (57,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (62,16): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (63,17): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (64,18): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (65,16): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (66,16): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (67,20): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (68,17): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (133,35): Warning: The value 'parsed' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (139,15): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (141,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (177,24): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (178,25): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (179,26): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (180,24): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (181,24): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (182,28): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (238,18): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (243,18): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalJson.fs, Fable time: 15 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/Envelope.fs, Fable time: 18 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs, Fable time: 157 ms
+[build] events: 1316 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/eventstore/Wanxiangli.EventStore.fsproj, FCS time: 722 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/eventstore/SqliteJournal.fs, Fable time: 88 ms
+[build] eventstore: 1042 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Wanxiangli.Fs.fsproj, FCS time: 1327 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/GlobMatch.fs (131,85): Warning: This expression implicitly converts type 'ResizeArray<int>' to type 'seq<int>'. See https://aka.ms/fsharp-implicit-convs.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (17,19): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (18,19): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (40,37): Warning: The value 'text' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (40,52): Warning: The value 're' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (40,62): Warning: The value 'occurrence' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (53,30): Warning: The value 'text' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (53,45): Warning: The value 're' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (56,28): Warning: The value 'm' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (59,28): Warning: The value 'm' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (62,26): Warning: The value 'm' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (69,19): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (79,22): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (80,31): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs (94,54): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Transaction.fs (116,14): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Transaction.fs (117,31): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Transaction.fs (117,50): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Transaction.fs (117,77): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Transaction.fs (118,29): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Transaction.fs (118,48): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Utf8Fs.fs (11,19): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/GlobFs.fs (40,23): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/GlobFs.fs (101,32): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/GlobFs.fs (148,19): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/MutationFs.fs (107,34): Warning: The value 'root' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Filesystem.fs (40,18): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Filesystem.fs (45,14): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Filesystem.fs (46,34): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Filesystem.fs (47,34): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Filesystem.fs (51,51): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Filesystem.fs (59,22): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Filesystem.fs (66,42): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Filesystem.fs (66,64): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Native.fs, Fable time: 31 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/GlobMatch.fs, Fable time: 92 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Anchor.fs, Fable time: 44 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Transaction.fs, Fable time: 36 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Utf8Fs.fs, Fable time: 8 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/GlobFs.fs, Fable time: 107 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/AnchorFs.fs, Fable time: 16 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/MutationFs.fs, Fable time: 26 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/fs/Filesystem.fs, Fable time: 77 ms
+[build] fs: 2021 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/grounding.fsproj, FCS time: 809 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Wire.fs (26,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Wire.fs (27,12): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Wire.fs (30,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Wire.fs (33,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Wire.fs (34,12): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Wire.fs (37,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (9,24): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (12,26): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (12,40): Warning: The value 'encoding' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (15,25): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (18,22): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (21,23): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (24,26): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (27,22): Warning: The value 'a' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (27,33): Warning: The value 'b' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (30,26): Warning: The value 'fromPath' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (30,44): Warning: The value 'toPath' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (33,27): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (36,22): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (39,25): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (42,28): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (45,25): Warning: The value 'stat' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (48,20): Warning: The value 'stat' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (264,12): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs (264,55): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Wire.fs, Fable time: 29 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Catalog.fs, Fable time: 111 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/grounding/Grounding.fs, Fable time: 6 ms
+[build] grounding: 1186 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/identity/Wanxiangli.Identity.fsproj, FCS time: 1064 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/identity/ExecutionBinding.fs (40,16): Warning: The value 'rawRole' is unused
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/identity/Wire.fs, Fable time: 30 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/identity/Roles.fs, Fable time: 22 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/identity/PersonaCatalog.fs, Fable time: 6 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/identity/ParticipantIdentity.fs, Fable time: 58 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/identity/PromptOrigin.fs, Fable time: 21 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/identity/ExecutionBinding.fs, Fable time: 40 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/identity/Identity.fs, Fable time: 26 ms
+[build] identity: 1506 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/lifecycle/Wanxiangli.Lifecycle.fsproj, FCS time: 1148 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/lifecycle/Wire.fs, Fable time: 118 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/lifecycle/State.fs, Fable time: 241 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/lifecycle/Work.fs, Fable time: 96 ms
+[build] lifecycle: 1839 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/process/Wanxiangli.Process.fsproj, FCS time: 989 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/native-process/BunProcess.fs, Fable time: 22 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/process/Native.fs, Fable time: 120 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/process/OutputTail.fs, Fable time: 168 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/process/ProcessSession.fs, Fable time: 91 ms
+[build] process: 1648 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Wanxiangli.Resources.fsproj, FCS time: 1021 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Template.fs (21,53): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Template.fs (32,44): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Resources.fs (17,29): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Resources.fs (17,43): Warning: The value 'encoding' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Resources.fs (20,27): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Resources.fs (23,25): Warning: The value 'a' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Resources.fs (23,36): Warning: The value 'b' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Resources.fs (26,24): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Resources.fs (29,30): Warning: The value 'url' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Resources.fs (91,41): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Language.fs, Fable time: 75 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Template.fs, Fable time: 16 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/resources/Resources.fs, Fable time: 72 ms
+[build] resources: 1431 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/session/Wanxiangli.Session.fsproj, FCS time: 1078 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/session/Wire.fs, Fable time: 71 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/session/Message.fs, Fable time: 40 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/session/Ownership.fs, Fable time: 158 ms
+[build] session: 1581 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/supervision/Wanxiangli.Supervision.fsproj, FCS time: 925 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/native-process/BunProcess.fs, Fable time: 22 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/supervision/Native.fs, Fable time: 93 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/supervision/Worker.fs, Fable time: 32 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/supervision/SupervisedProcess.fs, Fable time: 78 ms
+[build] supervision: 1384 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time/Wanxiangli.Time.fsproj, FCS time: 825 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time/Time.fs (12,25): Warning: The value 'value' is unused
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time/Temporal.fs, Fable time: 4 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time/Deadline.fs, Fable time: 42 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time/Time.fs, Fable time: 14 ms
+[build] time: 1111 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time-node/Wanxiangli.Time.Node.fsproj, FCS time: 874 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs (22,12): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs (25,12): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs (80,28): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time/Temporal.fs, Fable time: 4 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs, Fable time: 53 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time-node/NodeTime.fs, Fable time: 5 ms
+[build] time-node: 1172 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time-testing/Wanxiangli.Time.Testing.fsproj, FCS time: 856 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time/Temporal.fs, Fable time: 3 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time-testing/VirtualTiming.fs, Fable time: 71 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/time-testing/TimeTesting.fs, Fable time: 9 ms
+[build] time-testing: 1165 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/trace/Wanxiangli.Trace.fsproj, FCS time: 1123 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/trace/Wire.fs, Fable time: 70 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/trace/Observation.fs, Fable time: 76 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/trace/Trace.fs, Fable time: 193 ms
+[build] trace: 1686 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wanxiangli.Wait.fsproj, FCS time: 1675 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Registry.fs (50,26): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Await.fs (60,27): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Await.fs (66,27): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Await.fs (113,39): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Await.fs (119,39): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (11,19): Warning: The value 'fn' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (11,29): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (14,19): Warning: The value 'fn' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (17,23): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (27,23): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (404,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (405,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (406,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (407,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (408,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (409,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (410,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (411,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (411,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (412,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (413,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (413,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (414,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (415,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (416,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (417,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (418,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (418,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (419,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (420,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (422,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (423,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (423,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (423,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (424,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (424,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (424,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (424,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs (424,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/CausalWait.fs, Fable time: 99 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Registry.fs, Fable time: 39 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/CompletionMailbox.fs, Fable time: 55 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Await.fs, Fable time: 47 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/wanxiangli/src/wait/Wait.fs, Fable time: 99 ms
+[build] wait: 2248 ms
+[36m[build][0m Compiling F# (focused)...
+[37mFable 5.13.0: F# to JavaScript compiler
+[39m[22m[37mMinimum @fable-org/fable-library-js version (when installed from npm): 2.5.1
+[39m[22m[37m
+Thanks to the contributor! @voronoipotato
+[39m[22m[37mStand with Ukraine! https://standwithukraine.com.ua/
+
+[39m[22m[37mParsing src/Wanxiangshu/.fable-build/output-compile/ec33bf9ae7ca95968c56c3c81aba2f761f3e4638c343d1b30397dc092d08c76f/Wanxiangshu.Impact.fsproj...
+[39m[22m[37mProject and references (1548 source files) parsed in 1055ms
+
+[39m[22m[37mStarted Fable compilation...
+[39m[22m[37m
+Fable compilation finished in 48595ms
+
+[39m[22m[37m./src/Wanxiangshu/Repository/Programming/Js/OpenCode/ParkedSites.fs(36,9): (36,13) info FSHARP: The use of 'incr' from the F# library is deprecated. See https://aka.ms/fsharp-refcell-ops. For example, please change 'incr cell' to 'cell.Value <- cell.Value + 1'. (code 3370)
+[39m[22m[37m./src/Wanxiangshu/Repository/Programming/Js/OpenCode/ParkedSites.fs(37,27): (37,28) info FSHARP: The use of '!' from the F# library is deprecated. See https://aka.ms/fsharp-refcell-ops. For example, please change '!cell' to 'cell.Value'. (code 3370)
+[39m[22m[owner-compile] OK: Wanxiangshu.Impact.fsproj in 50530ms (noRestore, fp:311a34ea7033)
+[36m[build][0m compiled focused impact (1510 items in 50530ms)
+js-surface-manifest: OK — 171 registered surfaces, laws and contract imports closed
+js-module-linkage: OK — 825 emitted modules linked and loaded
+[36m[build][0m build ok (generation 27)

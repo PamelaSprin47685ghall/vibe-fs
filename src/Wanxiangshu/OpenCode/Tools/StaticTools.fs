@@ -27,11 +27,11 @@ module StaticTools =
         | ToolPermission.Move -> []
         | ToolPermission.Remove -> []
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
-        // Exec grants the programming surface's `js.run` loop; the Host-native
+        // Exec grants the programming surface's `js.call` loop; the Host-native
         // `run` tool is retired (repository-programming [050]-[052] supersede it).
         | ToolPermission.Exec -> []
         // Pty is retired: interactive execution is the programming surface's
-        // `js.run` ({ spawn, name } + { send, name, input } + { signal, name }).
+        // `js.call` ({ spawn, name } + { send, name, input } + { signal, name }).
         | ToolPermission.Pty -> []
         | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Chronicle -> [ "chronicle" ]

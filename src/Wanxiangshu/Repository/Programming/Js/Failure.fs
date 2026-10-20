@@ -140,13 +140,13 @@ module JsFailure =
         | JsFailure.HandleUnknown _ -> "HANDLE_UNKNOWN"
         | JsFailure.CannotParkWhileAbandoning -> "CANNOT_PARK_WHILE_ABANDONING"
         | JsFailure.Abandoned -> "ABANDONED"
-        | JsFailure.RunnableSpecIncomplete _ -> "RUNNABLE_SPEC_INCOMPLETE"
-        | JsFailure.RunCommandUnsupported _ -> "RUN_COMMAND_UNSUPPORTED"
-        | JsFailure.RunWaitTimeout -> "RUN_WAIT_TIMEOUT"
-        | JsFailure.RunChildUnknown _ -> "RUN_CHILD_UNKNOWN"
-        | JsFailure.RunParkUnsupported -> "RUN_PARK_UNSUPPORTED"
-        | JsFailure.RunHostUnavailable -> "RUN_HOST_UNAVAILABLE"
-        | JsFailure.RunOutputBudgetTooSmall _ -> "RUN_OUTPUT_BUDGET_TOO_SMALL"
+        | JsFailure.RunnableSpecIncomplete _ -> "CALLABLE_SPEC_INCOMPLETE"
+        | JsFailure.RunCommandUnsupported _ -> "CALL_COMMAND_UNSUPPORTED"
+        | JsFailure.RunWaitTimeout -> "CALL_WAIT_TIMEOUT"
+        | JsFailure.RunChildUnknown _ -> "CALL_CHILD_UNKNOWN"
+        | JsFailure.RunParkUnsupported -> "CALL_PARK_UNSUPPORTED"
+        | JsFailure.RunHostUnavailable -> "CALL_HOST_UNAVAILABLE"
+        | JsFailure.RunOutputBudgetTooSmall _ -> "CALL_OUTPUT_BUDGET_TOO_SMALL"
         | JsFailure.RunRejected(code, _) -> code
         | JsFailure.AskRefused _ -> "ASK_REFUSED"
         | JsFailure.DelegationUnavailable -> "DELEGATION_UNAVAILABLE"
@@ -207,12 +207,12 @@ module JsFailure =
         | JsFailure.HandleUnknown handle -> "no parked site with this handle: " + handle
         | JsFailure.CannotParkWhileAbandoning -> "park is refused while the site is in its abandon cleanup window"
         | JsFailure.Abandoned -> "the parked program was abandoned; its finalizer has run"
-        | JsFailure.RunnableSpecIncomplete detail -> reasonWithMessage "Runnable spec is incomplete" "" detail
+        | JsFailure.RunnableSpecIncomplete detail -> reasonWithMessage "Callable spec is incomplete" "" detail
         | JsFailure.RunCommandUnsupported detail -> reasonWithMessage "next() returned an unsupported command" "" detail
         | JsFailure.RunWaitTimeout -> "waitFor condition was not met before its timeout"
         | JsFailure.RunChildUnknown name -> "no background process with this name: " + name
         | JsFailure.RunParkUnsupported -> "park verdict requires the orchestrated execution path"
-        | JsFailure.RunHostUnavailable -> "js.run has no host loop in this execution path"
+        | JsFailure.RunHostUnavailable -> "js.call has no host loop in this execution path"
         | JsFailure.RunOutputBudgetTooSmall _ -> "outputBudgetBytes cannot encode the required result"
         | JsFailure.RunRejected(_, detail) -> detail
         | JsFailure.AskRefused detail -> reasonWithMessage "ask was refused" "" detail
@@ -280,20 +280,20 @@ module JsFailure =
         | "HANDLE_UNKNOWN" -> JsFailure.HandleUnknown(after "no parked site with this handle: ")
         | "CANNOT_PARK_WHILE_ABANDONING" -> JsFailure.CannotParkWhileAbandoning
         | "ABANDONED" -> JsFailure.Abandoned
-        | "RUNNABLE_SPEC_INCOMPLETE" -> JsFailure.RunnableSpecIncomplete text
-        | "RUN_COMMAND_UNSUPPORTED" -> JsFailure.RunCommandUnsupported text
-        | "RUN_WAIT_TIMEOUT" -> JsFailure.RunWaitTimeout
-        | "RUN_CHILD_UNKNOWN" -> JsFailure.RunChildUnknown(after "no background process with this name: ")
-        | "RUN_PARK_UNSUPPORTED" -> JsFailure.RunParkUnsupported
-        | "RUN_HOST_UNAVAILABLE" -> JsFailure.RunHostUnavailable
-        | "RUN_OUTPUT_BUDGET_INVALID"
-        | "RUN_WORLD_LOCK_INVALID"
-        | "RUN_HARD_LIMIT_INVALID"
-        | "RUN_CANCELLED_BEFORE_START"
-        | "RUN_DEADLINE_BEFORE_START"
-        | "RUN_SANITY_TIMEOUT"
-        | "RUN_INPUT_UNCONFIRMED"
-        | "RUN_CHILD_NAME_CONFLICT" -> JsFailure.RunRejected(code, text)
+        | "CALLABLE_SPEC_INCOMPLETE" -> JsFailure.RunnableSpecIncomplete text
+        | "CALL_COMMAND_UNSUPPORTED" -> JsFailure.RunCommandUnsupported text
+        | "CALL_WAIT_TIMEOUT" -> JsFailure.RunWaitTimeout
+        | "CALL_CHILD_UNKNOWN" -> JsFailure.RunChildUnknown(after "no background process with this name: ")
+        | "CALL_PARK_UNSUPPORTED" -> JsFailure.RunParkUnsupported
+        | "CALL_HOST_UNAVAILABLE" -> JsFailure.RunHostUnavailable
+        | "CALL_OUTPUT_BUDGET_INVALID"
+        | "CALL_WORLD_LOCK_INVALID"
+        | "CALL_HARD_LIMIT_INVALID"
+        | "CALL_CANCELLED_BEFORE_START"
+        | "CALL_DEADLINE_BEFORE_START"
+        | "CALL_SANITY_TIMEOUT"
+        | "CALL_INPUT_UNCONFIRMED"
+        | "CALL_CHILD_NAME_CONFLICT" -> JsFailure.RunRejected(code, text)
         | "ASK_REFUSED" -> JsFailure.AskRefused text
         | "DELEGATION_UNAVAILABLE" -> JsFailure.DelegationUnavailable
         | "VIEW_DECLARATION_INVALID" -> JsFailure.ViewDeclarationInvalid text

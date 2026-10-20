@@ -69,9 +69,9 @@ module JsToolHostSurface =
                         JsToolSpec.rootForSession map workspaceRoot
 
                 let processHost (ctx: HostToolContext) : JsToolWorkflow.ProcessHost =
-                    { HardLimit = Wanxiangshu.Process.JsRunLoop.standalone.HardLimit
-                      Own = Wanxiangshu.Process.JsRunLoop.standalone.Own
-                      ReadOutput = Wanxiangshu.Process.JsRunLoop.standalone.ReadOutput
+                    { HardLimit = Wanxiangshu.Process.JsCallLoop.standalone.HardLimit
+                      Own = Wanxiangshu.Process.JsCallLoop.standalone.Own
+                      ReadOutput = Wanxiangshu.Process.JsCallLoop.standalone.ReadOutput
                       AttachLifetimeAbort = fun _ _ -> ignore
                       AttachAbort = ctx.AttachAbort }
 

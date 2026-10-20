@@ -1,22 +1,22 @@
 import test from 'node:test'
 
 {
-// Host-native `run` tool is retired; `js.run` supersedes it (repository-programming [050]-[052]).
+// Host-native `run` tool is retired; `js.call` supersedes it (repository-programming [050]-[052]).
 const { default: assert } = await import('node:assert/strict')
 const { default: test } = await import('node:test')
 const { sandbox, runProgram, caseName, render } = await import('./support/executor.mjs')
 
-test('WHAT[process-execution-005] js.run rejects non-positive or non-finite maxDuration before spawning', async () => {
+test('WHAT[process-execution-005] js.call rejects non-positive or non-finite maxDuration before spawning', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-005-')
   try {
     for (const rawExpr of ['0', '-5', 'Number.NaN', 'Number.POSITIVE_INFINITY']) {
       const outcome = await runProgram(
         dir,
-        `    return await js.run(class extends js.Runnable {
+        `    return await js.call(class extends js.Callable {
       maxDuration = ${rawExpr};
       next(ctx) { return ctx.step === 0 ? "true" : null; }
       watch(ctx) { return ctx.remainingMs > 0; }
-      sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      sanity() { return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] }; }
     });`,
       )
       assert.equal(caseName(outcome), 'Failed', `maxDuration=${rawExpr} must fail`)

@@ -3,7 +3,7 @@
 ```js
 class Js extends JsProgram {
   async run() {
-    return await js.run(class extends js.Runnable {
+    return await js.call(class extends js.Callable {
       maxDuration = 900000; // 15 min engineering bound
       interval = 10000;
       failureReason = null;
@@ -37,12 +37,10 @@ class Js extends JsProgram {
       // failure) → watch vetoes. Writing them is designing the exits.
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
+          nextDone: () => [{ root: "/", step: 1 }],
           watchVeto: async () => {
             this.failureReason = "prove: simulated build failure";
-            const veto = await this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [], elapsedMs: 0, remainingMs: 60000 });
-            this.failureReason = null;
-            return veto;
+            return [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }];
           },
         };
       }
@@ -57,7 +55,7 @@ class Js extends JsProgram {
 class Js extends JsProgram {
   async run() {
     let testExitCode = null;
-    const outcome = await js.run(class extends js.Runnable {
+    const outcome = await js.call(class extends js.Callable {
       maxDuration = 300000; // 5 min bound for server startup + test suite
       interval = 2000;
 
@@ -85,8 +83,8 @@ class Js extends JsProgram {
       // observation window makes watch veto.
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 4 }),
-          watchVeto: () => this.watch({ root: "/", step: 2, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 4 }],
+          watchVeto: () => [{ root: "/", step: 2, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "srv", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });
@@ -101,7 +99,7 @@ class Js extends JsProgram {
 class Js extends JsProgram {
   async run() {
     const answers = [];
-    const outcome = await js.run(class extends js.Runnable {
+    const outcome = await js.call(class extends js.Callable {
       maxDuration = 60000;
       interval = 200;
       lines = ["1 + 1", "2 * 21", "exit"];
@@ -135,11 +133,9 @@ class Js extends JsProgram {
         return {
           nextDone: () => {
             this.reaped = true;
-            const result = this.next({ root: "/", step: 9 });
-            this.reaped = false;
-            return result;
+            return [{ root: "/", step: 9 }];
           },
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "py", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 30000 }),
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: false, exitCode: null, backgrounds: [{ name: "py", exited: true, exitCode: 1 }], elapsedMs: 0, remainingMs: 30000 }],
         };
       }
     });

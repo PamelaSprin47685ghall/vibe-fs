@@ -17,7 +17,7 @@
 /src/Wanxiangshu/Process/LargeGate.fs
 /src/Wanxiangshu/Process/LargeGateSurface.fs
 /src/Wanxiangshu/Host/Contract/ToolResultBound.fs
-/src/Wanxiangshu/Process/JsRunLoop.fs
+/src/Wanxiangshu/Process/JsCallLoop.fs
 /src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs
 /src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
 /src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs

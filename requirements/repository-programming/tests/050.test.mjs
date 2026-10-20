@@ -27,33 +27,97 @@ const runProgram = (dir, body, sessionId = 'sess-050') =>
 
 const runText = async (dir, body) => render(await runProgram(dir, body))
 
-test('WHAT[repository-programming-050] a Runnable missing watch is refused with RUNNABLE_SPEC_INCOMPLETE', async () => {
+test('WHAT[repository-programming-050] call proofs use argument arrays, preserve this and ignore a forged method apply', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    const doc = await runText(
-      dir,
-      `    return await js.run(class { maxDuration = 1000; next() { return null; } });`,
-    )
-    assert.match(doc, /# failed/)
-    assert.match(doc, /RUNNABLE_SPEC_INCOMPLETE/)
+    const outcome = await runProgram(dir, `
+      let calls = 0;
+      const result = await js.call(class extends js.Callable {
+        maxDuration = 1000;
+        value = 7;
+        next(value) { if (value === 7) { calls++; return null; } return null; }
+        watch(value) { return value === this.value ? false : true; }
+        sanity() {
+          this.next.apply = () => { throw new Error('forged apply used'); };
+          return { nextDone: () => [7], watchVeto: () => [7] };
+        }
+      });
+      return { result, calls, oldEntry: typeof js.run, oldBase: typeof js.Runnable };
+    `)
+    assert.equal(caseName(outcome), 'Succeeded', render(outcome))
+    assert.match(render(outcome), /calls = 1/)
+    assert.match(render(outcome), /oldEntry = "undefined"/)
+    assert.match(render(outcome), /oldBase = "undefined"/)
   } finally {
     cleanup()
   }
 })
 
-test('WHAT[repository-programming-050] a Runnable missing sanity is refused with RUNNABLE_SPEC_INCOMPLETE', async () => {
+test('WHAT[repository-programming-050] a no-op legacy proof cannot bypass the actual nonterminating next', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const outcome = await runProgram(dir, `return await js.call(class extends js.Callable {
+      maxDuration = 1000;
+      next() { return "touch bypass.marker"; }
+      watch() { return true; }
+      sanity() { return { nextDone: () => null, watchVeto: () => false }; }
+    });`)
+    assert.equal(caseName(outcome), 'Parked', render(outcome))
+    assert.equal(existsSync(join(dir, 'bypass.marker')), false)
+    assert.match(JSON.stringify(parkedPayload(outcome)), /argument array/)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-050] actual proof callbacks and unresolved argument promises consume the same finite deadline', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    for (const proof of ['next', 'watch', 'promise']) {
+      const outcome = await runProgram(dir, `return await js.call(class extends js.Callable {
+        maxDuration = 100;
+        next() { ${proof === 'next' ? 'while (true) {}' : 'return null;'} }
+        watch() { ${proof === 'watch' ? 'while (true) {}' : 'return false;'} }
+        sanity() { return {
+          nextDone: () => ${proof === 'promise' ? 'new Promise(() => {})' : '[]'},
+          watchVeto: () => []
+        }; }
+      });`)
+      assert.equal(caseName(outcome), 'Failed', render(outcome))
+      assert.match(render(outcome), /CALL_SANITY_TIMEOUT/)
+    }
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-050] a Callable missing watch is refused with CALLABLE_SPEC_INCOMPLETE', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const doc = await runText(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class { maxDuration = 1000; next() { return null; } });`,
+    )
+    assert.match(doc, /# failed/)
+    assert.match(doc, /CALLABLE_SPEC_INCOMPLETE/)
+  } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-050] a Callable missing sanity is refused with CALLABLE_SPEC_INCOMPLETE', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    const doc = await runText(
+      dir,
+      `    return await js.call(class extends js.Callable {
       maxDuration = 1000;
       next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
       watch() { return true; }
     });`,
     )
     assert.match(doc, /# failed/)
-    assert.match(doc, /RUNNABLE_SPEC_INCOMPLETE/)
+    assert.match(doc, /CALLABLE_SPEC_INCOMPLETE/)
     assert.match(doc, /sanity/)
   } finally {
     cleanup()
@@ -65,7 +129,7 @@ test('WHAT[repository-programming-050] the host loop runs one foreground command
   try {
     const doc = await runText(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class extends js.Callable {
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
@@ -76,8 +140,8 @@ test('WHAT[repository-programming-050] the host loop runs one foreground command
       }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });`,
@@ -97,7 +161,7 @@ test('WHAT[repository-programming-050] onExit dispatches every exited command wi
     const doc = await runText(
       dir,
       `    const dispatched = [];
-    const outcome = await js.run(class extends js.Runnable {
+    const outcome = await js.call(class extends js.Callable {
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "exit 4" : null; }
@@ -108,8 +172,8 @@ test('WHAT[repository-programming-050] onExit dispatches every exited command wi
       onExit(result) { dispatched.push(result.exitCode); }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });
@@ -127,15 +191,15 @@ test('WHAT[repository-programming-050] a watch abort kills the foreground comman
   try {
     const doc = await runText(
       dir,
-      `    const outcome = await js.run(class extends js.Runnable {
+      `    const outcome = await js.call(class extends js.Callable {
       maxDuration = 8000;
       interval = 200;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late.marker" : null; }
       watch() { return { abort: "stalled" }; }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });
@@ -153,13 +217,13 @@ test('WHAT[repository-programming-050] watch returning false is a real veto, not
   try {
     const doc = await runText(
       dir,
-      `    const outcome = await js.run(class extends js.Runnable {
+      `    const outcome = await js.call(class extends js.Callable {
       maxDuration = 8000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch veto.marker" : null; }
       watch() { return false; }
       sanity() {
-        return { nextDone: () => this.next({ root: "/", step: 1 }), watchVeto: () => this.watch({}) };
+        return { nextDone: () => [{ root: "/", step: 1 }], watchVeto: () => [{}] };
       }
     });
     return outcome;`,
@@ -176,7 +240,7 @@ test('WHAT[repository-programming-050] a watch park suspends the run and resumes
   try {
     const parked = await runProgram(
       dir,
-      `    const outcome = await js.run(class extends js.Runnable {
+      `    const outcome = await js.call(class extends js.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? "sleep 0.3" : null; }
@@ -187,10 +251,10 @@ test('WHAT[repository-programming-050] a watch park suspends the run and resumes
       }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
+          nextDone: () => [{ root: "/", step: 1 }],
           watchVeto: () => {
             this.parked = true;
-            return this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 });
+            return [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }];
           },
         };
       }
@@ -223,14 +287,14 @@ test('WHAT[repository-programming-050] a sanity thunk that fails to show its exi
   try {
     const parked = await runProgram(
       dir,
-      `    const outcome = await js.run(class extends js.Runnable {
+      `    const outcome = await js.call(class extends js.Callable {
       maxDuration = 3000;
       next(ctx) { return "echo never-terminates"; }
       watch() { return true; }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });
@@ -262,12 +326,12 @@ test('WHAT[repository-programming-050] a sanity thunk that fails to show its exi
   }
 })
 
-test('WHAT[repository-programming-050] a sanity that returns non-thunks is refused with RUNNABLE_SPEC_INCOMPLETE', async () => {
+test('WHAT[repository-programming-050] a sanity that returns non-thunks is refused with CALLABLE_SPEC_INCOMPLETE', async () => {
   const { dir, cleanup } = sandbox()
   try {
     const doc = await runText(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class extends js.Callable {
       maxDuration = 1000;
       next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
       watch() { return true; }
@@ -275,7 +339,7 @@ test('WHAT[repository-programming-050] a sanity that returns non-thunks is refus
     });`,
     )
     assert.match(doc, /# failed/)
-    assert.match(doc, /RUNNABLE_SPEC_INCOMPLETE/)
+    assert.match(doc, /CALLABLE_SPEC_INCOMPLETE/)
     assert.match(doc, /nextDone/)
   } finally {
     cleanup()
@@ -288,7 +352,7 @@ test('WHAT[repository-programming-050] maxDuration expiry kills the command and 
     const started = Date.now()
     const doc = await runText(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class extends js.Callable {
       maxDuration = 400;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch too-late.marker" : null; }
@@ -298,8 +362,8 @@ test('WHAT[repository-programming-050] maxDuration expiry kills the command and 
       }
       sanity() {
         return {
-          nextDone: () => this.next({ root: "/", step: 1 }),
-          watchVeto: () => this.watch({ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }),
+          nextDone: () => [{ root: "/", step: 1 }],
+          watchVeto: () => [{ root: "/", step: 0, stdout: "", stderr: "", exited: true, exitCode: 2, backgrounds: [], elapsedMs: 0, remainingMs: 60000 }],
         };
       }
     });`,

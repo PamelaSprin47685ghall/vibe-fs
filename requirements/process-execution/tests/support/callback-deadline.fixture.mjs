@@ -12,9 +12,9 @@ const watch = mode === 'watch'
   : 'return ctx.remainingMs > 0;'
 const sanity = mode === 'sanity'
   ? 'entered = true; while (true) {}'
-  : 'return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) };'
+  : 'return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] };'
 const outcome = await runProgram(directory, `let entered = false;
-  const result = await js.run(class extends js.Runnable {
+  const result = await js.call(class extends js.Callable {
     maxDuration = ${mode === 'watch' ? 1000 : 250};
     interval = 25;
     next(ctx) { ${next} }

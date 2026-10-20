@@ -58,7 +58,7 @@ export const RAW_TIME_ALLOWLIST = Object.freeze([
   'Persistence/EventStore/WriterStreamSync.fs',
   'Persistence/Journal/EventStoreJournalWriter.fs',
   'Process/JsSandbox.fs',
-  'Process/JsRunLoop.fs',
+  'Process/JsCallLoop.fs',
   'Process/NodeProcessWait.fs',
   'Process/ProcessRunner.fs',
   'Process/Pty.fs',

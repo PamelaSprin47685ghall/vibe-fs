@@ -42,7 +42,7 @@ module JsToolsBindings =
     [<Emit("new Error().stack")>]
     let private currentStack () : string = jsNative
 
-    /// `js.run` returns a structured outcome; a host failure must surface as a
+    /// `js.call` returns a structured outcome; a host failure must surface as a
     /// decoded js failure, so reject the promise with the `__jsFailure`
     /// sentinel the wrapper classifies instead of returning ok:false as data.
     [<Emit("Promise.resolve($0).then(function(value) { if (value && value.ok === false) { const err = new Error(value.reason || value.code); err.__jsFailure = { code: value.code, reason: value.reason || value.code, minimumOutputBudgetBytes: value.minimumOutputBudgetBytes }; throw err; } return value; })")>]
@@ -690,22 +690,21 @@ module JsToolsBindings =
     let private makeParkMember (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
         "park" ==> fun (payload: obj) -> suspend parkState payload
 
-    /// The host loop behind `js.run`. The closure is injected by the workflow
-    /// (Process.JsRunLoop) so this module stays free of process interop.
-    type JsRunHost =
+    /// The host loop behind `js.call`, injected by the workflow.
+    type JsCallHost =
         { Loop: Wanxiangshu.Process.JsSandbox.ParkState option -> obj -> string -> Task<obj> }
 
-    /// `js.run(class extends js.Runnable { ... })`: hand the class to the host
+    /// `js.call(class extends js.Callable { ... })`: hand the class to the host
     /// loop and await its structured outcome. Without an injected host loop
-    /// the member refuses with RUN_HOST_UNAVAILABLE instead of pretending.
-    let private makeRunMember (host: JsRunHost option) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
+    /// the member refuses with CALL_HOST_UNAVAILABLE instead of pretending.
+    let private makeCallMember (host: JsCallHost option) (parkState: Wanxiangshu.Process.JsSandbox.ParkState option) =
         let settled =
             fun (runnableClass: obj) ->
                 match host with
                 | Some injected -> box (injected.Loop parkState runnableClass (currentStack ()))
                 | None -> box (task { return failureObj JsFailure.RunHostUnavailable })
 
-        "run" ==> fun (runnableClass: obj) -> rejectRunFailure (settled runnableClass)
+        "call" ==> fun (callableClass: obj) -> rejectRunFailure (settled callableClass)
 
     /// `js.fork(payload)` hands the payload to the wiring-owned fork spec and
     /// returns its receipt text; `js.join()` waits for this session's children.
@@ -763,7 +762,7 @@ module JsToolsBindings =
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
-        (runHost: JsRunHost option)
+        (runHost: JsCallHost option)
         (delegationHost: JsDelegationHost option)
         : obj =
         let members =
@@ -787,7 +786,7 @@ module JsToolsBindings =
                   makeMvMember root staging readSnapshots ledger
 
               if Set.contains JsCapability.Exec capabilities then
-                  makeRunMember runHost parkState
+                  makeCallMember runHost parkState
 
               if Set.contains JsCapability.Fork capabilities then
                   makeForkMember delegationHost
@@ -822,7 +821,7 @@ module JsToolsBindings =
         (readSnapshots: ResizeArray<JsReadSnapshot>)
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
-        (runHost: JsRunHost option)
+        (runHost: JsCallHost option)
         (delegationHost: JsDelegationHost option)
         : obj =
         createApiCore capabilities root staging readSnapshots explicitReads ledger None runHost delegationHost
@@ -838,7 +837,7 @@ module JsToolsBindings =
         (explicitReads: ResizeArray<JsExplicitFileRead>)
         (ledger: JsAsIsLedger)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
-        (runHost: JsRunHost option)
+        (runHost: JsCallHost option)
         (delegationHost: JsDelegationHost option)
         : obj =
         createApiCore

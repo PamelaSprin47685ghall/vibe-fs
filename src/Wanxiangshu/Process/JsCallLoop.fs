@@ -10,8 +10,8 @@ open Wanxiangshu.Foundation
 open Wanxiangshu.Host.Contract
 open Wanxiangshu.Repository.Programming.Js
 
-/// Physical execution and control flow for js.run.
-module JsRunLoop =
+/// Physical execution and control flow for js.call.
+module JsCallLoop =
     type ExecutionScope =
         { Cancellation: CancellationToken
           HardLimit: TimeSpan
@@ -75,7 +75,7 @@ module JsRunLoop =
 
     let private boundedCall code bindings remaining =
         if remaining <= 0 then
-            raise (TimeoutException "Runnable callback deadline exceeded")
+            raise (TimeoutException "Callable callback deadline exceeded")
 
         runInContext code bindings (createObj [ "timeout" ==> remaining ])
 
@@ -108,6 +108,15 @@ module JsRunLoop =
 
     let private invokeThunk thunk remaining =
         boundedCall "thunk()" (createObj [ "thunk" ==> thunk ]) remaining
+
+    [<Emit("Array.isArray($0)")>]
+    let private isArray (value: obj) : bool = jsNative
+
+    let private applyArguments instance methodName arguments remaining =
+        boundedCall
+            "Reflect.apply(target[method], target, args)"
+            (createObj [ "target" ==> instance; "method" ==> methodName; "args" ==> arguments ])
+            remaining
 
     [<Emit("Buffer.byteLength($0, 'utf8')")>]
     let private utf8Bytes (text: string) : int = jsNative
@@ -791,7 +800,7 @@ module JsRunLoop =
         | SlicePark _ when decision = "unsupported" -> PortUnsupported
         | _ -> PortPending
 
-    type private RunnableValidated =
+    type private CallableValidated =
         { Class: obj
           Instance: obj
           MaxDurationMs: int64
@@ -812,9 +821,9 @@ module JsRunLoop =
         else
             int64 (unbox<float> budget)
 
-    let private validateRunnableSpec (runnableClass: obj) : Result<RunnableValidated, obj> =
+    let private validateCallableSpec (runnableClass: obj) : Result<CallableValidated, obj> =
         if not (isFunction runnableClass) then
-            Error(failure "RUNNABLE_SPEC_INCOMPLETE" "js.run expects a class extending js.Runnable")
+            Error(failure "CALLABLE_SPEC_INCOMPLETE" "js.call expects a class extending js.Callable")
         else
             let instance = construct runnableClass
             let maxDurationValue = getProperty instance "maxDuration"
@@ -830,16 +839,16 @@ module JsRunLoop =
                 || not (isFiniteNumber maxDurationValue)
                 || unbox<float> maxDurationValue <= 0.0
             then
-                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must declare a positive maxDuration")
+                Error(failure "CALLABLE_SPEC_INCOMPLETE" "Callable must declare a positive maxDuration")
             elif not hasNext then
-                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement next(ctx)")
+                Error(failure "CALLABLE_SPEC_INCOMPLETE" "Callable must implement next(ctx)")
             elif not hasWatch then
-                Error(failure "RUNNABLE_SPEC_INCOMPLETE" "Runnable must implement watch(ctx)")
+                Error(failure "CALLABLE_SPEC_INCOMPLETE" "Callable must implement watch(ctx)")
             elif not (isFunction (getProperty instance "sanity")) then
                 Error(
                     failure
-                        "RUNNABLE_SPEC_INCOMPLETE"
-                        "Runnable must implement sanity() — a control-flow self-test returning { nextDone, watchVeto } thunks"
+                        "CALLABLE_SPEC_INCOMPLETE"
+                        "Callable must implement sanity() — a control-flow self-test returning argument-array thunks"
                 )
             elif
                 not (isNullish budget)
@@ -848,9 +857,9 @@ module JsRunLoop =
                     || unbox<float> budget > 9007199254740991.0
                     || floor (unbox<float> budget) <> unbox<float> budget)
             then
-                Error(failure "RUN_OUTPUT_BUDGET_INVALID" "outputBudgetBytes must be a non-negative safe integer")
+                Error(failure "CALL_OUTPUT_BUDGET_INVALID" "outputBudgetBytes must be a non-negative safe integer")
             elif not (isNullish worldLock) && typeOf worldLock <> "boolean" then
-                Error(failure "RUN_WORLD_LOCK_INVALID" "worldLock must be boolean")
+                Error(failure "CALL_WORLD_LOCK_INVALID" "worldLock must be boolean")
             else
                 let maxDurationMs = int64 (unbox<float> maxDurationValue)
                 let hasOnExit = isFunction (getProperty instance "onExit")
@@ -897,7 +906,7 @@ module JsRunLoop =
 
     /// A failed prove() is a semantic fork, not a terminal failure: suspend
     /// through the shared park channel with the diagnosis payload, and let the
-    /// injected unpark value become the js.run outcome by this park point's
+    /// injected unpark value become the js.call outcome by this park point's
     /// contract. Without a park channel the diagnosis cannot be presented, so
     /// the run refuses instead of silently degrading.
     let private parkOrFailProof
@@ -908,7 +917,7 @@ module JsRunLoop =
         match parkState with
         | None ->
             Task.FromResult(
-                failure "RUN_PARK_UNSUPPORTED" "prove failure requires the park channel to present its diagnosis"
+                failure "CALL_PARK_UNSUPPORTED" "prove failure requires the park channel to present its diagnosis"
             )
         | Some state ->
             task {
@@ -929,7 +938,7 @@ module JsRunLoop =
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
         (root: string)
         (stack: string)
-        (spec: RunnableValidated)
+        (spec: CallableValidated)
         (owned: ResizeArray<ManagedChild>)
         (startedMs: int64)
         : Task<obj> =
@@ -1073,7 +1082,7 @@ module JsRunLoop =
 
             let interpretParkDecision (decision: string) : string =
                 if decision = "unsupported" then
-                    result <- failure "RUN_PARK_UNSUPPORTED" "park verdict requires the orchestrated execution path"
+                    result <- failure "CALL_PARK_UNSUPPORTED" "park verdict requires the orchestrated execution path"
 
                     "unsupported"
                 else
@@ -1238,7 +1247,7 @@ module JsRunLoop =
             let signalChildProcess (name: string) (signalName: string) : Task<unit> =
                 task {
                     match children.TryGetValue name with
-                    | false, _ -> result <- failure "RUN_CHILD_UNKNOWN" ("signal names an unknown background: " + name)
+                    | false, _ -> result <- failure "CALL_CHILD_UNKNOWN" ("signal names an unknown background: " + name)
                     | true, managed ->
                         killManaged managed signalName
                         let! _ = awaitExit managed signalGraceMs
@@ -1255,7 +1264,7 @@ module JsRunLoop =
             let acceptInputReceipt delivered =
                 match delivered |> Option.map unbox<Result<int, string>> with
                 | Some(Ok _) -> ()
-                | Some(Error reason) -> result <- failure "RUN_INPUT_UNCONFIRMED" reason
+                | Some(Error reason) -> result <- failure "CALL_INPUT_UNCONFIRMED" reason
                 | None ->
                     status <- "timeout"
                     outcomeReason <- "maxDuration exceeded while sending input"
@@ -1290,14 +1299,14 @@ module JsRunLoop =
             let sendToManagedChild (managed: ManagedChild) input =
                 task {
                     match managed.Child with
-                    | None -> result <- failure "RUN_INPUT_UNCONFIRMED" "Target start was not confirmed"
+                    | None -> result <- failure "CALL_INPUT_UNCONFIRMED" "Target start was not confirmed"
                     | Some child -> do! writeChildInput child input
                 }
 
             let sendChildInput (name: string) (input: string) : Task<unit> =
                 task {
                     match children.TryGetValue name with
-                    | false, _ -> result <- failure "RUN_CHILD_UNKNOWN" ("send names an unknown background: " + name)
+                    | false, _ -> result <- failure "CALL_CHILD_UNKNOWN" ("send names an unknown background: " + name)
                     | true, managed -> do! sendToManagedChild managed input
                 }
 
@@ -1370,7 +1379,7 @@ module JsRunLoop =
                         applyPortOutcome outcome
 
                     if failureReason = Some "timeout" && isNull result then
-                        result <- failure "RUN_WAIT_TIMEOUT" "waitFor condition was not met before its timeout"
+                        result <- failure "CALL_WAIT_TIMEOUT" "waitFor condition was not met before its timeout"
                     elif failureReason = Some "abort" then
                         status <- "aborted"
                         outcomeReason <- "watch aborted while waiting for the port"
@@ -1382,13 +1391,15 @@ module JsRunLoop =
             let spawnBackground name command =
                 task {
                     if children.ContainsKey name then
-                        result <- failure "RUN_CHILD_NAME_CONFLICT" ("A background already owns this name: " + name)
+                        result <- failure "CALL_CHILD_NAME_CONFLICT" ("A background already owns this name: " + name)
                     elif
-                        backgroundBudgetMinimum name > min spec.OutputBudgetBytes (int64 (ToolResultBound.HostMaxBytes()))
+                        backgroundBudgetMinimum name > min
+                            spec.OutputBudgetBytes
+                            (int64 (ToolResultBound.HostMaxBytes()))
                     then
                         result <-
                             failure
-                                "RUN_OUTPUT_BUDGET_TOO_SMALL"
+                                "CALL_OUTPUT_BUDGET_TOO_SMALL"
                                 "outputBudgetBytes cannot encode the background observation"
 
                         result?minimumOutputBudgetBytes <- float (backgroundBudgetMinimum name)
@@ -1409,7 +1420,7 @@ module JsRunLoop =
                     | InvalidCommand ->
                         result <-
                             failure
-                                "RUN_COMMAND_UNSUPPORTED"
+                                "CALL_COMMAND_UNSUPPORTED"
                                 "next() must return a command string, null, { spawn, name }, { send: { name, input } }, { signal, name } or { waitFor: { port, timeoutMs } }"
                 }
 
@@ -1625,7 +1636,7 @@ module JsRunLoop =
                             if scope.Cancellation.IsCancellationRequested then
                                 published.SetResult(
                                     failure
-                                        "RUN_CANCELLED_BEFORE_START"
+                                        "CALL_CANCELLED_BEFORE_START"
                                         "Host cancellation was requested before execution"
                                 )
                             elif
@@ -1634,7 +1645,7 @@ module JsRunLoop =
                             then
                                 published.SetResult(
                                     failure
-                                        "RUN_DEADLINE_BEFORE_START"
+                                        "CALL_DEADLINE_BEFORE_START"
                                         "The run deadline expired before physical execution"
                                 )
                             else
@@ -1645,9 +1656,9 @@ module JsRunLoop =
                     let publishFailure (error: exn) =
                         let noStartCode =
                             if scope.Cancellation.IsCancellationRequested then
-                                "RUN_CANCELLED_BEFORE_START"
+                                "CALL_CANCELLED_BEFORE_START"
                             else
-                                "RUN_DEADLINE_BEFORE_START"
+                                "CALL_DEADLINE_BEFORE_START"
 
                         if hasProperty (box error) "__jsAbandoned" then
                             published.SetException error
@@ -1699,12 +1710,12 @@ module JsRunLoop =
         if admitted then
             published.Task
         else
-            Task.FromResult(failure "RUN_HOST_UNAVAILABLE" "The process owner is closing")
+            Task.FromResult(failure "CALL_HOST_UNAVAILABLE" "The process owner is closing")
 
     let private startWithinProgramDeadline scope start =
         task {
             if scope.Cancellation.IsCancellationRequested then
-                return failure "RUN_CANCELLED_BEFORE_START" "Host cancellation was requested before execution"
+                return failure "CALL_CANCELLED_BEFORE_START" "Host cancellation was requested before execution"
             else
                 return! start ()
         }
@@ -1736,21 +1747,34 @@ module JsRunLoop =
 
                 match observed with
                 | Some value -> return value
-                | None -> return raise (TimeoutException "Runnable sanity deadline exceeded")
+                | None -> return raise (TimeoutException "Callable sanity deadline exceeded")
             }
 
         let mutable proofPassed = false
 
         let proveWatch watchVeto =
             task {
-                let! verdict = awaitSanity (invokeThunk watchVeto (callbackBudget scope sanityDeadline))
+                let! arguments = awaitSanity (invokeThunk watchVeto (callbackBudget scope sanityDeadline))
 
-                if not (isVeto verdict) then
+                let! verdict =
+                    if isArray arguments then
+                        awaitSanity (
+                            applyArguments spec.Instance "watch" arguments (callbackBudget scope sanityDeadline)
+                        )
+                    else
+                        Task.FromResult null
+
+                if not (isArray arguments) || not (isVeto verdict) then
                     return!
                         parkOrFailProof
                             parkState
                             stack
-                            (sanityPayload "watch has no veto path — the watchdog cannot say no" verdict)
+                            (sanityPayload
+                                (if isArray arguments then
+                                     "watch has no veto path — the watchdog cannot say no"
+                                 else
+                                     "watchVeto must return the argument array for watch")
+                                verdict)
                 else
                     proofPassed <- true
                     return null
@@ -1758,14 +1782,27 @@ module JsRunLoop =
 
         let proveNext nextDone watchVeto =
             task {
-                let! result = awaitSanity (invokeThunk nextDone (callbackBudget scope sanityDeadline))
+                let! arguments = awaitSanity (invokeThunk nextDone (callbackBudget scope sanityDeadline))
 
-                if not (isNullish result) then
+                let! result =
+                    if isArray arguments then
+                        awaitSanity (
+                            applyArguments spec.Instance "next" arguments (callbackBudget scope sanityDeadline)
+                        )
+                    else
+                        Task.FromResult null
+
+                if not (isArray arguments) || not (isNullish result) then
                     return!
                         parkOrFailProof
                             parkState
                             stack
-                            (sanityPayload "next has no null path — the termination condition does not exist yet" result)
+                            (sanityPayload
+                                (if isArray arguments then
+                                     "next has no null path — the termination condition does not exist yet"
+                                 else
+                                     "nextDone must return the argument array for next")
+                                result)
                 else
                     return! proveWatch watchVeto
             }
@@ -1773,14 +1810,21 @@ module JsRunLoop =
         let driveProof () =
             task {
                 let! sanity = awaitSanity (callMethod spec.Instance "sanity" null (callbackBudget scope sanityDeadline))
-                let nextDone = getProperty sanity "nextDone"
-                let watchVeto = getProperty sanity "watchVeto"
+
+                let readThunk name =
+                    boundedCall
+                        "target[name]"
+                        (createObj [ "target" ==> sanity; "name" ==> name ])
+                        (callbackBudget scope sanityDeadline)
+
+                let nextDone = readThunk "nextDone"
+                let watchVeto = readThunk "watchVeto"
 
                 if not (isFunction nextDone) || not (isFunction watchVeto) then
                     return
                         failure
-                            "RUNNABLE_SPEC_INCOMPLETE"
-                            "sanity() must return { nextDone, watchVeto } — two thunks: one drives next to null, one drives watch to a veto"
+                            "CALLABLE_SPEC_INCOMPLETE"
+                            "sanity() must return { nextDone, watchVeto } — two thunks returning argument arrays"
                 else
                     return! proveNext nextDone watchVeto
             }
@@ -1789,12 +1833,14 @@ module JsRunLoop =
             if hasProperty (box error) "__jsAbandoned" then
                 task { return raise error }
             elif scope.Cancellation.IsCancellationRequested then
-                Task.FromResult(failure "RUN_CANCELLED_BEFORE_START" "Host cancellation was requested before execution")
+                Task.FromResult(
+                    failure "CALL_CANCELLED_BEFORE_START" "Host cancellation was requested before execution"
+                )
             elif
                 error :? TimeoutException
                 || string (getProperty (box error) "code") = "ERR_SCRIPT_EXECUTION_TIMEOUT"
             then
-                Task.FromResult(failure "RUN_SANITY_TIMEOUT" error.Message)
+                Task.FromResult(failure "CALL_SANITY_TIMEOUT" error.Message)
             else
                 parkOrFailProof parkState stack (sanityPayload error.Message null)
 
@@ -1827,8 +1873,8 @@ module JsRunLoop =
                         return proofOutcome
                 })
 
-    /// Execute one Runnable class. `root` is the shell working directory;
-    /// `stack` is the model stack captured at the `js.run(...)` call site so a
+    /// Execute one Callable class. `root` is the shell working directory;
+    /// `stack` is the model stack captured at the `js.call(...)` call site so a
     /// check-park carries the same execution marker as a direct park.
     let execute
         (scope: ExecutionScope)
@@ -1845,15 +1891,15 @@ module JsRunLoop =
 
         let validation =
             if scope.Cancellation.IsCancellationRequested then
-                Error(failure "RUN_CANCELLED_BEFORE_START" "Host cancellation was already requested")
+                Error(failure "CALL_CANCELLED_BEFORE_START" "Host cancellation was already requested")
             elif
                 Double.IsNaN scope.HardLimit.TotalMilliseconds
                 || Double.IsInfinity scope.HardLimit.TotalMilliseconds
                 || scope.HardLimit.TotalMilliseconds <= 0.0
             then
-                Error(failure "RUN_HARD_LIMIT_INVALID" "The Host hard limit must be finite and positive")
+                Error(failure "CALL_HARD_LIMIT_INVALID" "The Host hard limit must be finite and positive")
             else
-                validateRunnableSpec runnableClass
+                validateCallableSpec runnableClass
 
         match validation with
         | _ when parkState |> Option.exists (fun state -> state.AbandonRequested) ->
@@ -1864,7 +1910,7 @@ module JsRunLoop =
             || not (ToolResultBound.fitsInWindow (minimumResult root (scope.OutputNotice())))
             ->
             let refused =
-                failure "RUN_OUTPUT_BUDGET_TOO_SMALL" "outputBudgetBytes cannot encode the required result"
+                failure "CALL_OUTPUT_BUDGET_TOO_SMALL" "outputBudgetBytes cannot encode the required result"
 
             refused?minimumOutputBudgetBytes <- float (minimumOutputBudget root (scope.OutputNotice()))
             Task.FromResult refused

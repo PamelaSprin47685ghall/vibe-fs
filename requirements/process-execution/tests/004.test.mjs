@@ -17,7 +17,7 @@ for (const callback of ['sanity', 'next', 'watch']) {
       const observed = JSON.parse(result.stdout)
       if (callback === 'sanity') {
         assert.equal(observed.kind, 'Failed')
-        assert.match(observed.wire, /RUN_SANITY_TIMEOUT/)
+        assert.match(observed.wire, /CALL_SANITY_TIMEOUT/)
       } else {
         assert.equal(observed.kind, 'Succeeded', observed.wire)
         assert.equal(observed.data.entered, true)
@@ -69,7 +69,7 @@ test('WHAT[process-execution-004] the real registered loop applies the administr
       const ready = join(directory, 'target-started')
       const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(ready)}, 'ready'); setInterval(() => {}, 1000)`)
       const wire = await hooks.tool['todowrite-for-devops'].execute({
-        program: program(`return await js.run(${oneCommand(command, { maxDuration: 60000 })});`),
+        program: program(`return await js.call(${oneCommand(command, { maxDuration: 60000 })});`),
       }, { sessionID, agent: 'devops', messageID: 'hard-limit-assistant', callID: 'hard-limit-run' })
       const result = parse(wire).data
       assert.equal(existsSync(ready), true)
@@ -99,7 +99,7 @@ for (const exhaustAfterRun of [false, true]) {
         const host = this;
         let observedLate = false;
         function runnable(command) {
-          return class extends js.Runnable {
+          return class extends js.Callable {
             maxDuration = 1500;
             interval = 25;
             next(ctx) { return ctx.step === 0 ? command : null; }
@@ -109,10 +109,10 @@ for (const exhaustAfterRun of [false, true]) {
               if (ctx.elapsedMs > 200 && observed.exists) observedLate = true;
               return true;
             }
-            sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+            sanity() { return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] }; }
           };
         }
-        const results = await Promise.all([js.run(runnable('sleep 0.1')), js.run(runnable(${JSON.stringify(command)}))]);
+        const results = await Promise.all([js.call(runnable('sleep 0.1')), js.call(runnable(${JSON.stringify(command)}))]);
         await host.write('runs-finished', JSON.stringify({ observedLate, statuses: results.map(result => result.status) }));
         ${exhaustAfterRun ? 'const until = Date.now() + 250; while (Date.now() < until) {}' : ''}
         const after = await host.stat('probe');
@@ -161,13 +161,13 @@ test('WHAT[process-execution-004] a parked run still stops at its deadline and r
     assert.equal(gate.getCount(), 1)
     const witness = join(dir, 'target')
     const command = `exec ${nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(witness)}, String(process.pid)); process.stdout.write('READY'); setInterval(() => {}, 1000)`)}`
-    const parked = await runProgram(dir, `return await js.run(class extends js.Runnable {
+    const parked = await runProgram(dir, `return await js.call(class extends js.Callable {
       maxDuration = 500;
       interval = 25;
       worldLock = true;
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(command)} : null; }
       watch(ctx) { if (ctx.stdout) return { park: { ready: true } }; return ctx.remainingMs > 0; }
-      sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      sanity() { return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] }; }
     });`, 'park-deadline')
     assert.equal(caseName(parked), 'Parked')
     handle = parkedHandle(parked)

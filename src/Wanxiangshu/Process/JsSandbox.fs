@@ -146,7 +146,7 @@ module JsSandbox =
         + baseClassSource
         + "\n"
         + "const js = api.js;\n"
-        + "if (typeof JsRunnable === 'function') { js.Runnable = JsRunnable; }\n"
+        + "if (typeof JsCallable === 'function') { js.Callable = JsCallable; }\n"
         + modelSource
         + "\n"
         + "const __wrap = (target) => new Proxy(target, {\n"
@@ -210,7 +210,7 @@ module JsSandbox =
         let minimum: obj = payload?minimumOutputBudgetBytes
         let validMinimum: bool = emitJsExpr minimum "Number.isSafeInteger($0) && $0 > 0"
 
-        if string payload?code = "RUN_OUTPUT_BUDGET_TOO_SMALL" && validMinimum then
+        if string payload?code = "CALL_OUTPUT_BUDGET_TOO_SMALL" && validMinimum then
             JsFailure.RunOutputBudgetTooSmall(int64 (unbox<float> minimum))
         else
             JsFailure.ofWire (string payload?code) (string payload?reason)
@@ -395,7 +395,7 @@ module JsSandbox =
     let sourceWithExecutionMarker (baseClassSource: string) (modelSource: string) (stack: string) : string =
         let lines = modelSource.Split('\n')
         // Wrapper lines: 1 = "(async () => {", then the base class, then the
-        // `const js = api.js;` prelude and the optional JsRunnable bind.
+        // `const js = api.js;` prelude and the optional JsCallable bind.
         let modelStartLine = baseClassSource.Split('\n').Length + 4
         let modelEndLine = modelStartLine + lines.Length - 1
         let currentLine = locateSuspendedLine modelStartLine modelEndLine stack

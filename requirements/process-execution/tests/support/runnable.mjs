@@ -1,4 +1,4 @@
-export const oneCommand = (command, { maxDuration = 5000, onExit = '', fields = '' } = {}) => `class extends js.Runnable {
+export const oneCommand = (command, { maxDuration = 5000, onExit = '', fields = '' } = {}) => `class extends js.Callable {
   maxDuration = ${maxDuration};
   interval = 25;
   ${fields}
@@ -6,8 +6,8 @@ export const oneCommand = (command, { maxDuration = 5000, onExit = '', fields = 
   watch(ctx) { return ctx.remainingMs > 0; }
   sanity() {
     return {
-      nextDone: () => this.next({ step: 1 }),
-      watchVeto: () => this.watch({ remainingMs: 0 }),
+      nextDone: () => [{ step: 1 }],
+      watchVeto: () => [{ remainingMs: 0 }],
     };
   }
   ${onExit}

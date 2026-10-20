@@ -71,7 +71,7 @@ const MEMBERS_BY_PERMISSION = {
   Write: ['write', 'mkdir'],
   Move: ['mv'],
   Remove: ['rm'],
-  Exec: ['run'],
+  Exec: ['call'],
   Fork: ['fork', 'dag'],
   Join: ['join'],
   Fission: ['fission'],
@@ -89,7 +89,7 @@ const BINDING_BY_MEMBER = {
   mkdir: 'js.mkdir',
   whereAll: 'js.whereAll',
   where: 'js.where',
-  run: 'js.run',
+  call: 'js.call',
   fork: 'js.fork',
   dag: 'js.dag',
   join: 'js.join',
@@ -101,7 +101,7 @@ const BINDING_BY_MEMBER = {
 const MEMBER_ORDER = [
   'write', 'rm', 'mv',
   'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
-  'run',
+  'call',
   'fork', 'dag', 'join', 'fission', 'horizon', 'advisor',
 ]
 
@@ -113,7 +113,7 @@ const expectedMembers = (permissionNames) =>
 // Sugar members are compiled inside the base class itself instead of
 // delegating to `_api` (dag builds fork waves plus one join; run is the Exec
 // Runnable gate), so their base-class layer is the public method they declare.
-const SUGAR_MEMBERS = ['dag', 'run']
+const SUGAR_MEMBERS = ['dag']
 
 const layersOf = (s) =>
   Object.fromEntries(
@@ -154,7 +154,7 @@ test('WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra
   assert.equal(result.description.includes('_api'), false)
   assert.equal(result.description.includes('__jsFailure'), false)
   assert.equal(result.examples.length, 1, 'one responsibility-shaped Ultra Example')
-  assert.match(result.examples[0], /RetryPolicy/)
+  assert.match(result.examples[0], /oldApi/)
 })
 
 test('WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers', () => {
@@ -265,9 +265,8 @@ test('WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_ev
     assert.equal(layers.horizon.binding, 'js.horizon', `${role}: horizon binding key`)
     assert.equal(layers.horizon.example.includes('horizon'), true, `${role}: horizon canonical example`)
     for (const [member, layer] of Object.entries(layers)) {
-      const baseClassMarker = SUGAR_MEMBERS.includes(member)
-        ? `async ${member}(`
-        : `this._api.${layer.binding}`
+      const baseClassMarker = member === 'call' ? 'class JsCallable'
+        : SUGAR_MEMBERS.includes(member) ? `async ${member}(` : `this._api.${layer.binding}`
       assert.equal(
         result.baseClassSource.includes(baseClassMarker),
         true,
@@ -303,9 +302,8 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
     assert.equal(layers.advisor.binding, 'js.advisor', `${role}: advisor binding key`)
     assert.equal(layers.advisor.example.includes('advisor'), true, `${role}: advisor canonical example`)
     for (const [member, layer] of Object.entries(layers)) {
-      const baseClassMarker = SUGAR_MEMBERS.includes(member)
-        ? `async ${member}(`
-        : `this._api.${layer.binding}`
+      const baseClassMarker = member === 'call' ? 'class JsCallable'
+        : SUGAR_MEMBERS.includes(member) ? `async ${member}(` : `this._api.${layer.binding}`
       assert.equal(
         result.baseClassSource.includes(baseClassMarker),
         true,

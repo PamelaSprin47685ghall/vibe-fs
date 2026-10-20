@@ -421,11 +421,11 @@ module JsToolWorkflow =
 
             let! outcome =
                 taskResult {
-                    let runHost: JsToolsBindings.JsRunHost =
+                    let runHost: JsToolsBindings.JsCallHost =
                         { Loop =
                             fun parkState runnableClass stack ->
-                                JsRunLoop.execute
-                                    { JsRunLoop.standalone with
+                                JsCallLoop.execute
+                                    { JsCallLoop.standalone with
                                         OutputNotice = outputNotice ""
                                         SynchronousBudgetMs = deadlineMs }
                                     parkState
@@ -552,7 +552,7 @@ module JsToolWorkflow =
         (lifecyclePersistence: IJsLifecyclePersistence option)
         (fileAccessObservation: FileAccessObservation option)
         (processHost: ProcessHost option)
-        (makeApi: RunBuffers -> Wanxiangshu.Process.JsSandbox.ParkState -> JsRunLoop.ExecutionScope -> obj)
+        (makeApi: RunBuffers -> Wanxiangshu.Process.JsSandbox.ParkState -> JsCallLoop.ExecutionScope -> obj)
         : Task<JsToolOutcome> =
         task {
             let cancellation = new System.Threading.CancellationTokenSource()
@@ -564,18 +564,18 @@ module JsToolWorkflow =
                 |> Option.map (fun host -> host.AttachAbort cancellation.Cancel)
                 |> Option.defaultValue ignore
 
-            let execution: JsRunLoop.ExecutionScope =
+            let execution: JsCallLoop.ExecutionScope =
                 { Cancellation = cancellation.Token
                   HardLimit =
                     processHost
                     |> Option.map (fun host -> host.HardLimit)
-                    |> Option.defaultValue JsRunLoop.standalone.HardLimit
+                    |> Option.defaultValue JsCallLoop.standalone.HardLimit
                   SynchronousBudgetMs = deadlineMs
                   OutputNotice = outputNotice sessionId
                   ReadOutput =
                     processHost
                     |> Option.map (fun host -> host.ReadOutput)
-                    |> Option.defaultValue JsRunLoop.standalone.ReadOutput
+                    |> Option.defaultValue JsCallLoop.standalone.ReadOutput
                   BorrowDeadline =
                     fun duration ->
                         task {
@@ -585,7 +585,7 @@ module JsToolWorkflow =
                   Own =
                     processHost
                     |> Option.map (fun host -> host.Own)
-                    |> Option.defaultValue JsRunLoop.standalone.Own }
+                    |> Option.defaultValue JsCallLoop.standalone.Own }
             // DSL-MUTABLE: algorithm-scratch — JS as-is write ledger. Every
             // edit/write is persisted atomically at call time; this buffer
             // records what was actually written, so any termination (throw,
@@ -746,10 +746,11 @@ module JsToolWorkflow =
         (root: string)
         (buffers: RunBuffers)
         (parkState: Wanxiangshu.Process.JsSandbox.ParkState)
-        (execution: JsRunLoop.ExecutionScope)
+        (execution: JsCallLoop.ExecutionScope)
         : obj =
-        let runHost: JsToolsBindings.JsRunHost =
-            { Loop = fun parkState runnableClass stack -> JsRunLoop.execute execution parkState root runnableClass stack }
+        let runHost: JsToolsBindings.JsCallHost =
+            { Loop =
+                fun parkState callableClass stack -> JsCallLoop.execute execution parkState root callableClass stack }
 
         JsToolsBindings.createApiWithPark
             capabilities

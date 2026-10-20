@@ -7,16 +7,16 @@ import { program } from './support/executor.mjs'
 import { parse } from 'smol-toml'
 import { refreshGlobalLanguage } from '../../../dist/Participant/Provider/LanguageSurface.js'
 
-// Host-native `run` tool is retired; `js.run` supersedes it (repository-programming [050]-[052]).
+// Host-native `run` tool is retired; `js.call` supersedes it (repository-programming [050]-[052]).
 
-test('WHAT[process-execution-013] js.run bounds large output deterministically to head+tail without model distillation', async () => {
+test('WHAT[process-execution-013] js.call bounds large output deterministically to head+tail without model distillation', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-013a-')
   try {
     const cmd1 = nodeCommand(`process.stdout.write('HEAD-MARK-' + 'a'.repeat(200000))`)
     const cmd2 = nodeCommand(`process.stdout.write('b'.repeat(200000) + '-TAIL-MARK')`)
     const outcome = await runProgram(
       dir,
-      `    const r = await js.run(class extends js.Runnable {
+      `    const r = await js.call(class extends js.Callable {
       maxDuration = 10000;
       interval = 100;
       next(ctx) {
@@ -25,7 +25,7 @@ test('WHAT[process-execution-013] js.run bounds large output deterministically t
         return null;
       }
       watch(ctx) { return ctx.remainingMs > 0; }
-      sanity() { return { nextDone: () => this.next({ step: 2 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      sanity() { return { nextDone: () => [{ step: 2 }], watchVeto: () => [{ remainingMs: 0 }] }; }
     });
     return {
       exitCode: r.exitCode,
@@ -56,12 +56,12 @@ test('WHAT[process-execution-013] small output preserves separate stdout and std
     const outcome = await runProgram(
       dir,
       `    let exited = null;
-    const r = await js.run(class extends js.Runnable {
+    const r = await js.call(class extends js.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
       watch(ctx) { return ctx.remainingMs > 0; }
-      sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      sanity() { return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] }; }
       onExit(res) { exited = { stdout: res.stdout, stderr: res.stderr }; }
     });
     return { exitCode: r.exitCode, truncated: r.truncated, stdout: exited.stdout, stderr: exited.stderr };`,
@@ -103,7 +103,7 @@ test('WHAT[process-execution-013] the actual registered tool returns bilingual b
         const beforePrompts = runtime.prompts.length
         const command = nodeCommand("process.stdout.write('RAW-HEAD-' + '中文🔥'.repeat(40000) + '-RAW-TAIL'); process.stderr.write('诊断😀'.repeat(30000)); process.exitCode = 7")
         const wire = await hooks.tool['todowrite-for-devops'].execute({
-          program: program(`return await js.run(${oneCommand(command, { fields: 'outputBudgetBytes = 2048; worldLock = true;' })});`),
+          program: program(`return await js.call(${oneCommand(command, { fields: 'outputBudgetBytes = 2048; worldLock = true;' })});`),
         }, { sessionID, agent: 'devops', messageID: 'large-output-assistant', callID: `large-${language}` })
         const result = parse(wire).data
         assert.equal(result.status, 'completed', wire)

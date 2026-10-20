@@ -1,0 +1,56 @@
+✖ WHAT[repository-programming-050] call proofs use argument arrays, preserve this and ignore a forged method apply (27.821042ms)
+✖ WHAT[repository-programming-050] a no-op legacy proof cannot bypass the actual nonterminating next (6.643958ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 235.664791
+
+✖ failing tests:
+
+test at requirements/repository-programming/tests/050.test.mjs:30:1
+✖ WHAT[repository-programming-050] call proofs use argument arrays, preserve this and ignore a forged method apply (27.821042ms)
+  AssertionError [ERR_ASSERTION]: # failed
+  
+  code = "PROGRAM_FAILED"
+  reason = "program threw: Class extends value undefined is not a constructor or null"
+  
+  + actual - expected
+  
+  + 'Failed'
+  - 'Succeeded'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/050.test.mjs:47:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'Failed',
+    expected: 'Succeeded',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at requirements/repository-programming/tests/050.test.mjs:56:1
+✖ WHAT[repository-programming-050] a no-op legacy proof cannot bypass the actual nonterminating next (6.643958ms)
+  AssertionError [ERR_ASSERTION]: # failed
+  
+  code = "PROGRAM_FAILED"
+  reason = "program threw: Class extends value undefined is not a constructor or null"
+  
+  
+  'Failed' !== 'Parked'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-semantic-merge-20261019/vibe-fs/requirements/repository-programming/tests/050.test.mjs:65:12)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'Failed',
+    expected: 'Parked',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

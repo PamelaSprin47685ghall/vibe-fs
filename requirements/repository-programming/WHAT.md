@@ -250,17 +250,17 @@ parked 载荷的 `source` 字段携带完整程序与执行点标记（[037]）�
 
 `unpark.value` 的 host schema 是任意 JSON 值（可选），执行端零校验；注入值的语义由 park 点定义，错误注入由下游自然失败。工具描述与 `tool/js-program/park` 资源明确这一责任边界。
 
-## [050] js.run：宿主拥有的工程执行循环
+## [050] js.call：宿主拥有的工程执行循环
 
-Exec capability 投影出 `run` 成员与全局 `js.Runnable`。模型写成 `await js.run(class extends js.Runnable { ... })`；控制流归宿主：宿主实例化类、校验规格、驱动 sanity thunk、执行命令、按时间片调用 `watch`、派发 `onExit`、执行 `maxDuration` 上界，模型只写语义回调。
+Exec capability 投影出 `call` 成员与全局 `js.Callable`。模型写成 `await js.call(class extends js.Callable { ... })`；程序入口仍为 `async run()`。控制流归宿主：宿主实例化类、校验规格、驱动 sanity thunk、执行命令、按时间片调用 `watch`、派发 `onExit`、执行 `maxDuration` 上界，模型只写语义回调。旧 `js.run/js.Runnable` 不提供别名；存量历史代码不改写、不自动重播。
 
-必选 `maxDuration`（正数毫秒）、`next(ctx)`、`watch(ctx)` 与 `sanity()`；缺任一以 `RUNNABLE_SPEC_INCOMPLETE` 失败。可选 `interval`（默认 10000ms，下限钳制）、`onExit(result)`、`outputBudgetBytes` 与 `worldLock`。有效运行上界取 `maxDuration` 与管理员硬顶的较小值；排队和启动握手计入运行上界。sanity 自证另有同一上界，尚未开始物理执行。同步回调在 VM 的剩余时限内执行，异步等待也不能绕过这一运行期限。
+必选 `maxDuration`（正数毫秒）、`next(ctx)`、`watch(ctx)` 与 `sanity()`；缺任一以 `CALLABLE_SPEC_INCOMPLETE` 失败。可选 `interval`（默认 10000ms，下限钳制）、`onExit(result)`、`outputBudgetBytes` 与 `worldLock`。有效运行上界取 `maxDuration` 与管理员硬顶的较小值；排队和启动握手计入运行上界。sanity 自证另有同一上界，尚未开始物理执行。同步回调在 VM 的剩余时限内执行，异步等待也不能绕过这一运行期限。
 
-`sanity()` 是控制流自证，先于一切执行。它返回 `{ nextDone, watchVeto }` 两个 thunk，宿主驱动并机械检测：`nextDone` 把实例拨到「全部完成」状态并驱动 `next`（宿主要求返回 `null`），`watchVeto` 把实例拨到「出了问题」状态并驱动 `watch`（宿主要求一次否决——`false` 或 `{ abort }`）——写 thunk 就是在设计终止条件，断言代码由宿主承担。thunk 未展示出出口，整个 `js.run` 在调用点经统一 park 通道挂起，载荷携带 `{ sanity: { failure, returned } }` 诊断——在新调用里修好类，或以 unpark 注入值作为程序消费的 js.run 结局。
+`sanity()` 是控制流自证，先于一切执行。它返回 `{ nextDone, watchVeto }` 两个 thunk；每个 thunk 返回对应方法的参数数组。宿主调用实际 `next/watch`，保留实例 `this`，不使用用户可覆盖的 `.apply`；要求 `next` 返回 `null`、`watch` 否决（`false` 或 `{ abort }`）。方法查找和调用均纳入受限 VM，异步等待消费同一个绝对 sanity 期限，取消立即生效。非数组及未展示出口的证明经统一 park 通道挂起，载荷携带 `{ sanity: { failure, returned } }`；超时/取消按 `CALL_SANITY_TIMEOUT/CALL_CANCELLED_BEFORE_START` 拒绝，失败零物理启动。证明通过后重新构造正式实例，证明状态不进入实际执行。unpark 注入值可作为程序消费的 js.call 结局。
 
-`next(ctx)` 返回代数：非空命令字符串（前台跑到退出）| `null`（完工）| `{ spawn, name }`（命名后台，立即继续）| `{ signal, name }`（支持 SIGTERM/SIGKILL/SIGINT/SIGHUP；2 秒后仍存活则请求 SIGKILL）| `{ waitFor: { port, timeoutMs } }`（等待有效 TCP 端口）| `{ send: { name, input } }`（写命名子进程 stdin，见 [058]）。名称冲突在新启动前拒绝；未确认关闭不能复用名称。非法形态以 `RUN_COMMAND_UNSUPPORTED` 失败；`waitFor` 超时以 `RUN_WAIT_TIMEOUT` 失败；`signal` 指向未知后台以 `RUN_CHILD_UNKNOWN` 失败。输入未获确认时返回 `RUN_INPUT_UNCONFIRMED`，不自动重发。
+`next(ctx)` 返回代数：非空命令字符串（前台跑到退出）| `null`（完工）| `{ spawn, name }`（命名后台，立即继续）| `{ signal, name }`（支持 SIGTERM/SIGKILL/SIGINT/SIGHUP；2 秒后仍存活则请求 SIGKILL）| `{ waitFor: { port, timeoutMs } }`（等待有效 TCP 端口）| `{ send: { name, input } }`（写命名子进程 stdin，见 [058]）。名称冲突在新启动前拒绝；未确认关闭不能复用名称。非法形态以 `CALL_COMMAND_UNSUPPORTED` 失败；`waitFor` 超时以 `CALL_WAIT_TIMEOUT` 失败；`signal` 指向未知后台以 `CALL_CHILD_UNKNOWN` 失败。输入未获确认时返回 `CALL_INPUT_UNCONFIRMED`，不自动重发。
 
-`watch(ctx)` 每片返回 continue（无返回/true）、否决（`false` 或 `{ abort: reason }`）或 `{ park: payload }`；`false` 是真实否决。park 走与 `js.park` 相同的挂起通道；恢复值 `'abort'` 中止，其余继续。abort/timeout 请求终止前台；结束时先向全部剩余范围请求 SIGTERM，再对未关闭范围升级 SIGKILL。请求终止不证明退出或关闭。park 需要编排路径，否则以 `RUN_PARK_UNSUPPORTED` 失败。插件退出和会话关闭取消该程序，展开 finalizer 并等待其日志借用与物理排空；Unknown 有界报错，原资源归属保留到真实关闭。
+`watch(ctx)` 每片返回 continue（无返回/true）、否决（`false` 或 `{ abort: reason }`）或 `{ park: payload }`；`false` 是真实否决。park 走与 `js.park` 相同的挂起通道；恢复值 `'abort'` 中止，其余继续。abort/timeout 请求终止前台；结束时先向全部剩余范围请求 SIGTERM，再对未关闭范围升级 SIGKILL。请求终止不证明退出或关闭。park 需要编排路径，否则以 `CALL_PARK_UNSUPPORTED` 失败。插件退出和会话关闭取消该程序，展开 finalizer 并等待其日志借用与物理排空；Unknown 有界报错，原资源归属保留到真实关闭。
 
 `next` 收到 `{ root, step }`；`watch` 收到分路本片增量、`exited/exitCode/signal/scopeClosed`、命名后台状态、`elapsedMs/remainingMs`。`onExit` 收到该前台的分路输出与真实物理事实。观察对象及最终结果按 process-execution-015 的完整编码预算保留头尾。
 
@@ -268,11 +268,11 @@ Exec capability 投影出 `run` 成员与全局 `js.Runnable`。模型写成 `aw
 
 每路内存呈现保留至多 256 KiB，完整采集超过阈值转 spool；呈现还须满足较小的总编码预算。`bytes` 计实际收到的原始字节；`truncated` 与 `outputNotice` 明示中段缺失。已关闭且已交付观察的单次缓冲及时释放。磁盘不回滚，剧本自行幂等。
 
-## [051] js.run 的多进程形态
+## [051] js.call 的多进程形态
 
 `spawn` 起的后台进入本次 run 的进程表，`watch.backgrounds` 报告其退出、原生 signal 与范围关闭；`signal` 在真实关闭后收割名称。run 结束时逐一请求关闭全部所属范围；`waitFor` 期间仍按片调用 `watch`，后台崩溃可被观察并触发 abort。pipe 交互不代证内部 PTY 的恢复合同。
 
-## [052] js.run 教学与验证形态
+## [052] js.call 教学与验证形态
 
 双语资源 `tool/js-program/run-rules` 与 `tool/js-program/ultra-devops`（wget 批量下载 Ultra Example）成对；示例覆盖断点续传、停滞/过慢检测、退出码分派与逐文件 park 汇报。测试以本地限速 Range 服务器真实驱动 `wget -c`：中断后恢复、部分文件保留、逐文件 park/unpark、404 退出码 8 分派给 `onExit`。教学与示例不以无观察的恒真 `watch`（裸 `return true`）为示范：`watch` 的教学形态是先读 ctx 增量与实例状态再作裁决；宿主不拦恒真，但教学不示范它。ultra-devops 示例覆盖 where 歧义 park → unpark 恢复的完整路径：故意触发一次真实歧义（清单中目标名出现两次），读 `{ needle, candidates, nearest }` 诊断、unpark 注入选中 span、程序从原 await 继续——不以 happy path 为唯一示范。
 
@@ -313,9 +313,9 @@ Exec capability 投影出 `run` 成员与全局 `js.Runnable`。模型写成 `aw
 
 据此彻底退役 `glob`/`grep` 两个 js 成员：fragment、运行时绑定、四层投影、描述与规则资源一并删除；`Grep` capability 不再投影任何成员。旧 `file`/`edit`/`rewrite` 成员亦已从生成编程面退役（仅 Plan tenure 编程面 `todowrite-for-plan` 保留其专用无路径实现）。
 
-## [058] js.run 的交互形态（send）与唯一执行面
+## [058] js.call 的交互形态（send）与唯一执行面
 
-Host 原生 `run` 工具与四个 pty 工具（`open-terminal`/`send-terminal`/`read-terminal`/`signal-terminal`）整体退役；`ToolPermission.Exec` 只投影编程面的 `run` 成员，`ToolPermission.Pty` 不再投影任何宿主工具。交互执行由 `js.run` 承担：`next()` 返回 `{ spawn, name }` 起后台子进程，`watch(ctx)` 的 `stdout`/`stderr` 是**该时间片的增量**（前台命令与全部后台子进程的增量合并为一个观察窗），`{ send: { name, input } }` 写进命名子进程的 stdin（缺行尾换行时补一个），`{ signal, name }` 收割，`{ waitFor: { port, timeoutMs } }` 等端口就绪。`send` 指向未知后台名以 `RUN_CHILD_UNKNOWN` 失败；嵌套 `{ send: { name, input } }` 是 canonical 形态，平铺 `{ send: input, name }` 拼写被接受为同一语义，`send` 载荷解析不出目标名时同样以 `RUN_CHILD_UNKNOWN` 失败；子进程 stdout 没有换行协议假设，增量就是字节。
+Host 原生 `run` 工具与四个 pty 工具（`open-terminal`/`send-terminal`/`read-terminal`/`signal-terminal`）整体退役；`ToolPermission.Exec` 只投影编程面的 `call` 成员，`ToolPermission.Pty` 不再投影任何宿主工具。交互执行由 `js.call` 承担：`next()` 返回 `{ spawn, name }` 起后台子进程，`watch(ctx)` 的 `stdout`/`stderr` 是**该时间片的增量**（前台命令与全部后台子进程的增量合并为一个观察窗），`{ send: { name, input } }` 写进命名子进程的 stdin（缺行尾换行时补一个），`{ signal, name }` 收割，`{ waitFor: { port, timeoutMs } }` 等端口就绪。`send` 指向未知后台名以 `CALL_CHILD_UNKNOWN` 失败；嵌套 `{ send: { name, input } }` 是 canonical 形态，平铺 `{ send: input, name }` 拼写被接受为同一语义，`send` 载荷解析不出目标名时同样以 `CALL_CHILD_UNKNOWN` 失败；子进程 stdout 没有换行协议假设，增量就是字节。
 
 ## [059] js.deliver 的终值记录
 

@@ -64,7 +64,7 @@ let terminal = PtyCommand.Signal PtySignal.Interrupt
       ['spawn', 'NodeProcessHost.spawn'], ['runner', 'ProcessRunner.run'],
       ['session', 'PtySession.create "id" null'], ['spool', 'Spool.delete "path"'],
       ['read-plan', 'ReadPlan.ClosedImmediate'],
-      ['js-run-loop', 'JsRunLoop.execute'],
+      ['js-call-loop', 'JsCallLoop.execute'],
     ]) {
       const negative = await compile(name, `module IllegalConsumer\nopen Wanxiangshu.Process\nlet leaked = ${expression}\n`)
       assert.equal(negative.ok, false, `${name} must not be reachable through the pure contract closure`)

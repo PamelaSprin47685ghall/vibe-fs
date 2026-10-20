@@ -4,10 +4,10 @@ open System
 open System.Threading
 open System.Threading.Tasks
 
-/// Host-owned execution loop for `js.run` (PLAN phase 2). The model writes one
-/// Runnable class; this module owns the loop and returns one structured
+/// Host-owned execution loop for `js.call`. The model writes one
+/// Callable class; this module owns the loop and returns one structured
 /// outcome or a stable failure object.
-module JsRunLoop =
+module JsCallLoop =
     type ExecutionScope =
         { Cancellation: CancellationToken
           HardLimit: TimeSpan
@@ -19,8 +19,8 @@ module JsRunLoop =
 
     val standalone: ExecutionScope
 
-    /// Execute one Runnable class against `root` as the shell working
-    /// directory. `stack` is the model stack of the `js.run(...)` call site,
+    /// Execute one Callable class against `root` as the shell working
+    /// directory. `stack` is the model stack of the `js.call(...)` call site,
     /// used as the execution marker when a check verdict parks the run.
     val execute:
         scope: ExecutionScope ->

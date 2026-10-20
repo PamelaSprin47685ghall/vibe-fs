@@ -1,22 +1,20 @@
-await js.run(class extends js.Runnable { ... }) — the engineering member.
+await js.call(class extends js.Callable { ... }) — the engineering member.
 
-Call it on the global `js` object: `this.run` is YOUR program entry, never this
-member — the names collide on purpose, so the engineering run never lands on the
-base class.
+Call it on the global `js` object. Your program entry remains `async run()`.
 
 The Host owns the loop. You write only the semantic callbacks. On each round the
 Host calls `next(ctx)`, runs what you returned, supervises it once per interval
 slice with `watch(ctx)`, dispatches the exit with `onExit(result)`, then calls
 `next(ctx)` again — until it returns `null` or `maxDuration` expires. Your code
 never runs between slices, and the slice clock, the child kill, and the outcome
-stay Host-owned: a Runnable cannot skip, stretch, or reorder a slice.
+stay Host-owned: a Callable cannot skip, stretch, or reorder a slice.
 
 `next` is a loop callback, not a one-shot declaration. After every command exits
 the Host calls `next` again; when the work is done it must return `null`, typically
 `ctx.step === 0 ? "command" : null` for a fixed script, or a state read for
 everything that reacts to what happened.
 
-Required members; a missing or malformed one is `RUNNABLE_SPEC_INCOMPLETE`:
+Required members; a missing or malformed one is `CALLABLE_SPEC_INCOMPLETE`:
 - `maxDuration` — milliseconds, positive. The engineering bound for the whole run.
 - `next(ctx)` — the next step, called once per loop round.
 - `watch(ctx)` — the watchdog. Mandatory, and it runs once per slice.
@@ -38,17 +36,16 @@ results, so no assertion code is yours to write:
 ```
 sanity() {
   return {
-    nextDone: () => { this.index = this.files.length; return this.next({ root: "/", step: 99 }); },
-    watchVeto: () => { this.stalled = 6; this.current = this.files[0]; return this.watch({ ...ctx }); },
+    nextDone: () => { this.index = this.files.length; return [{ root: "/", step: 99 }]; },
+    watchVeto: () => { this.stalled = 6; this.current = this.files[0]; return [{ ...ctx }]; },
   };
 }
 ```
-`nextDone` puts the instance into the "all done" state and drives `next` — the
-host requires `null` back. `watchVeto` puts the instance into the
-"something is wrong" state and drives `watch` — the host requires a veto
-(`false` or `{ abort }`). A thunk that fails parks the whole `js.run` at the
+Each thunk returns the argument array for its method. The Host calls actual
+`next` and requires `null`, then calls actual `watch` and requires a veto
+(`false` or `{ abort }`). A thunk that fails parks the whole `js.call` at the
 call site with the diagnosis payload — fix the class in a new call, or unpark
-with a value your program consumes as the js.run outcome. Writing the thunks is
+with a value your program consumes as the js.call outcome. Writing the thunks is
 designing the termination condition: if you cannot mock a state where next
 returns null, the exit does not exist yet.
 
@@ -121,9 +118,9 @@ Failure modes, stated once:
   `maxDuration`. Check `steps`: many rounds around one short command is the signature.
 - A flat `{ send, name, input }` object does not name a child: the nested
   `{ send: { name, input } }` is canonical (the flat `{ send: input, name }` spelling
-  is accepted). A missing or invalid name fails with `RUN_COMMAND_UNSUPPORTED`;
-  a valid name with no live child fails with `RUN_CHILD_UNKNOWN`.
-- `this.run` is your program entry. The engineering loop is `js.run` only.
+  is accepted). A missing or invalid name fails with `CALL_COMMAND_UNSUPPORTED`;
+  a valid name with no live child fails with `CALL_CHILD_UNKNOWN`.
+- `this.run` is your program entry. The engineering loop is `js.call` only.
 
 Consequences, stated once:
 - Abort SIGKILLs the foreground process; `maxDuration` expiry does the same and
@@ -139,12 +136,12 @@ Consequences, stated once:
   input, with `minimumOutputBudgetBytes`. Names that cannot fit in the background
   observation are refused before that background starts.
 
-Stable failure codes: `RUNNABLE_SPEC_INCOMPLETE`, `RUN_COMMAND_UNSUPPORTED`,
-`RUN_WAIT_TIMEOUT`, `RUN_CHILD_UNKNOWN`, `RUN_PARK_UNSUPPORTED`,
-`RUN_OUTPUT_BUDGET_INVALID`, `RUN_OUTPUT_BUDGET_TOO_SMALL`, `RUN_WORLD_LOCK_INVALID`,
-`RUN_HARD_LIMIT_INVALID`, `RUN_CANCELLED_BEFORE_START`, `RUN_DEADLINE_BEFORE_START`,
-`RUN_SANITY_TIMEOUT`, `RUN_INPUT_UNCONFIRMED`, `RUN_CHILD_NAME_CONFLICT`,
-`RUN_HOST_UNAVAILABLE`.
+Stable failure codes: `CALLABLE_SPEC_INCOMPLETE`, `CALL_COMMAND_UNSUPPORTED`,
+`CALL_WAIT_TIMEOUT`, `CALL_CHILD_UNKNOWN`, `CALL_PARK_UNSUPPORTED`,
+`CALL_OUTPUT_BUDGET_INVALID`, `CALL_OUTPUT_BUDGET_TOO_SMALL`, `CALL_WORLD_LOCK_INVALID`,
+`CALL_HARD_LIMIT_INVALID`, `CALL_CANCELLED_BEFORE_START`, `CALL_DEADLINE_BEFORE_START`,
+`CALL_SANITY_TIMEOUT`, `CALL_INPUT_UNCONFIRMED`, `CALL_CHILD_NAME_CONFLICT`,
+`CALL_HOST_UNAVAILABLE`.
 
 Mechanical rules belong in the callbacks; semantic forks — including a rejected
 sanity thunk — belong in parked payloads.

@@ -7,7 +7,7 @@ import { sandbox, runProgram, caseName, parseData } from './support/executor.mjs
 
 // Host-native `run` tool and its 10-second `deadline_seconds` policy (along with
 // the four PTY tools `open-terminal`, `send-terminal`, `read-terminal`, `signal-terminal`)
-// are retired and superseded by `js.run` with explicit `maxDuration` and sliced `check(ctx)`
+// are retired and superseded by `js.call` with explicit `maxDuration` and sliced `watch(ctx)`
 // (repository-programming [050]-[052]).
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -18,17 +18,17 @@ test('WHAT[process-execution-017] retired host run and PTY tool resources and Ex
   assert.equal(existsSync(join(root, 'resources/provider/tool/run')), false)
 })
 
-test('WHAT[process-execution-017] js.run accepts multi-minute maxDuration without an artificial 10-second cap and completes fast commands', async () => {
+test('WHAT[process-execution-017] js.call accepts multi-minute maxDuration without an artificial 10-second cap and completes fast commands', async () => {
   const { dir, cleanup } = sandbox('wxs-proc-017-')
   try {
     const outcome = await runProgram(
       dir,
-      `    return await js.run(class extends js.Runnable {
+      `    return await js.call(class extends js.Callable {
       maxDuration = 60000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "printf 'ok'" : null; }
       watch(ctx) { return ctx.remainingMs > 0; }
-      sanity() { return { nextDone: () => this.next({ step: 1 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      sanity() { return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] }; }
     });`,
     )
     assert.equal(caseName(outcome), 'Succeeded')

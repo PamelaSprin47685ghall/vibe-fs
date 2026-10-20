@@ -7,7 +7,7 @@ import { runWithSpoolFault } from './support/spool-fault.mjs'
 const executeOne = async (command, options = {}) => {
   const { dir, cleanup } = sandbox('wxs-physical-run-018-')
   try {
-    const outcome = await runProgram(dir, `return await js.run(${oneCommand(command, options)});`)
+    const outcome = await runProgram(dir, `return await js.call(${oneCommand(command, options)});`)
     assert.equal(caseName(outcome), 'Succeeded')
     return parseData(outcome)
   } finally {
@@ -15,7 +15,7 @@ const executeOne = async (command, options = {}) => {
   }
 }
 
-test('WHAT[process-execution-018] js.run keeps split UTF-8 bytes, BOM and trailing CRLF in both native streams', async () => {
+test('WHAT[process-execution-018] js.call keeps split UTF-8 bytes, BOM and trailing CRLF in both native streams', async () => {
   const { dir, cleanup } = sandbox('wxs-physical-bytes-018-')
   const stdout = '\uFEFF汉🔥\r\n'
   const stderr = '诊断😀\r\n'
@@ -32,7 +32,7 @@ test('WHAT[process-execution-018] js.run keeps split UTF-8 bytes, BOM and traili
   try {
     const runnable = oneCommand(command, { onExit: 'onExit(result) { observed = result; }' })
     const outcome = await runProgram(dir, `let observed;
-      await js.run(${runnable});
+      await js.call(${runnable});
       return { stdout: observed.stdout, stderr: observed.stderr, exitCode: observed.exitCode, bytes: observed.bytes };`)
     assert.equal(caseName(outcome), 'Succeeded')
     assert.deepEqual(parseData(outcome), { stdout, stderr, exitCode: 7, bytes: Buffer.byteLength(stdout) + Buffer.byteLength(stderr) })
@@ -73,7 +73,7 @@ test('WHAT[process-execution-018] killing the supervisor group preserves an unkn
   const { dir, cleanup } = sandbox('wxs-background-unknown-018-')
   try {
     const command = `exec ${nodeCommand('setInterval(() => {}, 1000)')}`
-    const outcome = await runProgram(dir, `return await js.run(class extends js.Runnable {
+    const outcome = await runProgram(dir, `return await js.call(class extends js.Callable {
       maxDuration = 3000;
       interval = 25;
       next(ctx) {
@@ -83,7 +83,7 @@ test('WHAT[process-execution-018] killing the supervisor group preserves an unkn
         return null;
       }
       watch(ctx) { return ctx.remainingMs > 0; }
-      sanity() { return { nextDone: () => this.next({ step: 3 }), watchVeto: () => this.watch({ remainingMs: 0 }) }; }
+      sanity() { return { nextDone: () => [{ step: 3 }], watchVeto: () => [{ remainingMs: 0 }] }; }
     });`)
     assert.equal(caseName(outcome), 'Succeeded')
     const result = parseData(outcome)

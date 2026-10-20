@@ -142,7 +142,9 @@ module ToolResultBound =
         p + 1, p
 
     let private overflowTail (text: string) (segStart: int) (segEnd: int) : string list =
-        let tail = utf8Tail (text.Substring(segStart, segEnd - segStart)) (ContentMaxBytes())
+        let tail =
+            utf8Tail (text.Substring(segStart, segEnd - segStart)) (ContentMaxBytes())
+
         if tail = "" then [] else [ tail ]
 
     let rec private collectTail

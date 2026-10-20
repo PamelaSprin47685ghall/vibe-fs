@@ -10,7 +10,7 @@
     <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-runtime.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.host-contract-toolresultbound.fsproj"/>
-    <Compile Include="Process/JsRunLoop.fsi"/>
-    <Compile Include="Process/JsRunLoop.fs"/>
+    <Compile Include="Process/JsCallLoop.fsi"/>
+    <Compile Include="Process/JsCallLoop.fs"/>
   </ItemGroup>
 </Project>
