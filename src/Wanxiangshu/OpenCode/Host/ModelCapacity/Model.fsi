@@ -196,21 +196,3 @@ type internal BorrowingCapacitySnapshot<'target> =
       IdleCount: int
       InFlightCount: int
       RetiringCount: int }
-
-[<RequireQualifiedAccess>]
-type internal CapacityReconciliationFailure =
-    | ActiveOutsideLedgerBounds
-    | TokenStateCountMismatch
-    | MapLedgerDivergence
-    | UntraceableTokenOwner
-    | UntraceableWaiterOwner
-    | UntraceableExecutionCustody
-    | CounterRegression
-
-[<RequireQualifiedAccess>]
-type internal CapacityReconciliationDecision =
-    | NoOp
-    | FailClosed of CapacityReconciliationFailure array
-
-module internal CapacityReconciliation =
-    val decide: evidence: CapacityInvariantEvidence -> CapacityReconciliationDecision

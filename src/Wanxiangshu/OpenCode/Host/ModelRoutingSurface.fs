@@ -212,15 +212,54 @@ module ModelRoutingSurface =
               Stale = int64Of (field counters [ "stale"; "Stale" ])
               Conflict = int64Of (field counters [ "conflict"; "Conflict" ]) } }
 
-    let private reconciliationFailureName =
-        function
-        | CapacityReconciliationFailure.ActiveOutsideLedgerBounds -> "ActiveOutsideLedgerBounds"
-        | CapacityReconciliationFailure.TokenStateCountMismatch -> "TokenStateCountMismatch"
-        | CapacityReconciliationFailure.MapLedgerDivergence -> "MapLedgerDivergence"
-        | CapacityReconciliationFailure.UntraceableTokenOwner -> "UntraceableTokenOwner"
-        | CapacityReconciliationFailure.UntraceableWaiterOwner -> "UntraceableWaiterOwner"
-        | CapacityReconciliationFailure.UntraceableExecutionCustody -> "UntraceableExecutionCustody"
-        | CapacityReconciliationFailure.CounterRegression -> "CounterRegression"
+    /// The slice of the `wanxiangli/capacity` reconciliation law (CUT-10) this
+    /// host reads: the seven invariant checks and their fixed report order are
+    /// decided there; the host only decodes its snapshot and encodes owners.
+    type private CapacityReconciliationLibrary =
+        abstract decide: evidence: obj -> obj
+
+    [<Import("CapacityReconciliation", "wanxiangli/capacity")>]
+    let private capacityReconciliationClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private constructReconciliation (cls: obj) : CapacityReconciliationLibrary = jsNative
+
+    let private capacityReconciliation = constructReconciliation capacityReconciliationClass
+
+    let private reconciliationOwner (owner: CapacityExactOwnerSnapshot) : obj =
+        createObj
+            [ "sessionId" ==> owner.SessionId
+              "physicalUserMessageId" ==> owner.PhysicalUserMessageId
+              "role" ==> (owner.Role |> Option.map (Roles.roleLabel >> box) |> Option.defaultValue null)
+              "participant" ==> (owner.Participant |> Option.map box |> Option.defaultValue null) ]
+
+    let private reconciliationEvidence (evidence: CapacityInvariantEvidence) : obj =
+        createObj
+            [ "ledgerEntries"
+              ==> (evidence.LedgerEntries |> Array.map (fun entry -> createObj [ "credit" ==> float entry.Credit ]))
+              "tokens"
+              ==> (evidence.Tokens
+                   |> Array.map (fun token ->
+                       createObj
+                           [ "credit" ==> float token.Credit
+                             "state" ==> token.State
+                             "owner" ==> reconciliationOwner token.Owner ]))
+              "custodies"
+              ==> (evidence.Custodies
+                   |> Array.map (fun custody ->
+                       createObj [ "credit" ==> float custody.Credit; "owner" ==> reconciliationOwner custody.Owner ]))
+              "executions" ==> (evidence.Executions |> Array.map reconciliationOwner)
+              "waiters" ==> (evidence.Waiters |> Array.map (fun waiter -> createObj [ "owner" ==> reconciliationOwner waiter.Owner ]))
+              "owners" ==> (evidence.Owners |> Array.map reconciliationOwner)
+              "idleCount" ==> evidence.IdleCount
+              "inFlightCount" ==> evidence.InFlightCount
+              "retiringCount" ==> evidence.RetiringCount
+              "activeCount" ==> evidence.ActiveCount
+              "counters"
+              ==> createObj
+                      [ "duplicate" ==> float evidence.Counters.Duplicate
+                        "stale" ==> float evidence.Counters.Stale
+                        "conflict" ==> float evidence.Counters.Conflict ] ]
 
     let private capacitySnapshotObject (snapshot: CapacityInvariantEvidence) : obj =
         let ledgerEntries =
@@ -846,13 +885,17 @@ module ModelRoutingSurface =
         (runtimeOf runtime).CapacitySnapshot() |> capacitySnapshotObject
 
     let reconcileCapacityEvidence (evidence: obj) : obj =
-        match evidence |> invariantEvidenceOf |> CapacityReconciliation.decide with
-        | CapacityReconciliationDecision.NoOp -> box {| kind = "NoOp" |}
-        | CapacityReconciliationDecision.FailClosed failures ->
+        let decision =
+            evidence |> invariantEvidenceOf |> reconciliationEvidence |> capacityReconciliation.decide
+
+        match unbox<string> decision?decision with
+        | "NoOp" -> box {| kind = "NoOp" |}
+        | "FailClosed" ->
             box
                 {| kind = "FailClosed"
-                   reasons = failures |> Array.map reconciliationFailureName |}
+                   reasons = (decision?failures: string array) |> Array.copy |}
             |> deepFreeze
+        | other -> invalidOp (sprintf "execution-model-routing: unknown capacity reconciliation decision '%s'" other)
 
     let pendingCount (runtime: obj) : int = (runtimeOf runtime).PendingCount
 
