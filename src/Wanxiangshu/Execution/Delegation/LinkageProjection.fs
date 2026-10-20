@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -190,6 +192,95 @@ module HandleProjection =
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
         linkNamed handle childSessionId targetAgent targetAgent role ownership current
 
+    /// CUT-13 sub-loop 1: the single-winner lifecycle of a handle cell and of an
+    /// admitted work cell has one owner, wanxiangli/handle-lifecycle. This module
+    /// answers the lookups and value equalities, maps the verdict back to the typed
+    /// rejection and writes the named phase together with its own payload.
+    [<Import("HandleLifecycleLaw", "wanxiangli/handle-lifecycle")>]
+    let private lawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
+
+    let private law: obj = construct lawClass
+
+    let private phaseName (lifecycle: HandleLifecycle) =
+        match lifecycle with
+        | Active -> "Active"
+        | CompletedAwaitingJoin _ -> "CompletedAwaitingJoin"
+        | Abandoned _ -> "Abandoned"
+        | Retired -> "Retired"
+
+    let private optionalPhase (lifecycle: HandleLifecycle option) : obj =
+        match lifecycle with
+        | Some lifecycle -> box (phaseName lifecycle)
+        | None -> null
+
+    let private completionShape (completion: HandleCompletion) : obj =
+        createObj
+            [ "kind"
+              ==> (match completion.Kind with
+                   | HandleCompletionKind.Terminal -> "Terminal"
+                   | HandleCompletionKind.SendFailure -> "SendFailure"
+                   | HandleCompletionKind.Cancelled -> "Cancelled")
+              "hasRef" ==> completion.CompletionRef.IsSome
+              "hasDigest" ==> completion.CompletionDigest.IsSome ]
+
+    let private rejection (name: string) : HandleTransitionRejection =
+        match name with
+        | "UnknownHandle" -> UnknownHandle
+        | "HandleIsRetired" -> HandleIsRetired
+        | "AlreadyCompleted" -> AlreadyCompleted
+        | "AlreadyAbandoned" -> AlreadyAbandoned
+        | "NotCompleted" -> NotCompleted
+        | "WorkNotAdmitted" -> WorkNotAdmitted
+        | "ConsumptionMismatch" -> ConsumptionMismatch
+        | "LegacyWorkAmbiguous" -> LegacyWorkAmbiguous
+        | other -> invalidOp ("wanxiangli/handle-lifecycle returned an unknown rejection: " + other)
+
+    [<RequireQualifiedAccess>]
+    type private Verdict =
+        | Assign of string
+        | Keep
+        | Reject of HandleTransitionRejection
+
+    let private verdictOf (verdict: obj) =
+        match unbox<string> verdict?verdict with
+        | "set" -> Verdict.Assign(unbox<string> verdict?phase)
+        | "keep" -> Verdict.Keep
+        | "reject" -> Verdict.Reject(rejection (unbox<string> verdict?rejection))
+        | other -> invalidOp ("wanxiangli/handle-lifecycle returned an unknown verdict: " + other)
+
+    let private judgeHandle (event: string) (record: HandleRecord option) (extra: (string * obj) list) =
+        law?handle (
+            createObj (
+                [ "event" ==> event
+                  "phase" ==> optionalPhase (record |> Option.map (fun r -> r.Lifecycle)) ]
+                @ extra
+            )
+        )
+        |> verdictOf
+
+    let private judgeWork
+        (event: string)
+        (work: HandleWorkId)
+        (current: AgentLinkageProjection)
+        (extra: (string * obj) list)
+        =
+        law?work (
+            createObj (
+                [ "event" ==> event
+                  "phase"
+                  ==> optionalPhase (Map.tryFind work current.Works |> Option.map (fun r -> r.Lifecycle))
+                  "legacy" ==> Set.contains work.Handle current.LegacyWorkHandles ]
+                @ extra
+            )
+        )
+        |> verdictOf
+
+    let private unexpectedPhase (event: string) (phase: string) : 'T =
+        invalidOp (sprintf "wanxiangli/handle-lifecycle answered %s with phase %s" event phase)
+
     /// EXEC-004: terminal, send-failure and cancel race for one cell. Whoever
     /// arrives first wins; later arrivals are refused, not overwritten.
     let complete
@@ -197,12 +288,11 @@ module HandleProjection =
         (completion: HandleCompletion)
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        match Map.tryFind handle current.Handles with
-        | None -> Error UnknownHandle
-        | Some { Lifecycle = Retired } -> Error HandleIsRetired
-        | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
-        | Some { Lifecycle = CompletedAwaitingJoin _ } -> Error AlreadyCompleted
-        | Some record ->
+        let found = Map.tryFind handle current.Handles
+
+        match judgeHandle "complete" found [], found with
+        | Verdict.Reject reason, _ -> Error reason
+        | Verdict.Assign "CompletedAwaitingJoin", Some record ->
             Ok
                 { current with
                     Handles =
@@ -213,6 +303,8 @@ module HandleProjection =
                                 LastCompletion = Some completion }
                             current.Handles
                     LegacyWorkHandles = Set.add handle current.LegacyWorkHandles }
+        | Verdict.Assign phase, _ -> unexpectedPhase "complete" phase
+        | Verdict.Keep, _ -> unexpectedPhase "complete" "keep"
 
     /// EXEC-009: durable abandon. Active or CompletedAwaitingJoin → Abandoned.
     /// First winner wins; later abandons are refused.
@@ -221,11 +313,11 @@ module HandleProjection =
         (reason: HandleAbandonReason)
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        match Map.tryFind handle current.Handles with
-        | None -> Error UnknownHandle
-        | Some { Lifecycle = Retired } -> Error HandleIsRetired
-        | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
-        | Some record ->
+        let found = Map.tryFind handle current.Handles
+
+        match judgeHandle "abandon" found [], found with
+        | Verdict.Reject rejected, _ -> Error rejected
+        | Verdict.Assign "Abandoned", Some record ->
             Ok
                 { current with
                     Handles =
@@ -234,6 +326,8 @@ module HandleProjection =
                             { record with
                                 Lifecycle = Abandoned reason }
                             current.Handles }
+        | Verdict.Assign phase, _ -> unexpectedPhase "abandon" phase
+        | Verdict.Keep, _ -> unexpectedPhase "abandon" "keep"
 
     /// EXEC-004/EXEC-009: join consumed a reportable terminal (CompletedAwaitingJoin
     /// or Abandoned) and wrote the tombstone. Active has no payload to consume.
@@ -242,47 +336,45 @@ module HandleProjection =
         (handle: HandleId)
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        match Map.tryFind handle current.Handles with
-        | None -> Error UnknownHandle
-        | Some { Lifecycle = Retired } -> Error HandleIsRetired
-        | Some { Lifecycle = Active } -> Error NotCompleted
-        | Some record ->
+        let found = Map.tryFind handle current.Handles
+
+        match judgeHandle "retire" found [], found with
+        | Verdict.Reject rejected, _ -> Error rejected
+        | Verdict.Assign "Retired", Some record ->
             Ok
                 { current with
                     Handles = Map.add handle { record with Lifecycle = Retired } current.Handles }
+        | Verdict.Assign phase, _ -> unexpectedPhase "retire" phase
+        | Verdict.Keep, _ -> unexpectedPhase "retire" "keep"
 
     /// Clean-break: reject a false completion cell only when lifecycle is
     /// CompletedAwaitingJoin and ref/digest match exactly → Active. Mismatch
     /// refuses so a true terminal cannot be revoked by a bad compensation fact.
     /// Already Active = prior reject succeeded (idempotent Ok).
-    let private verifyFalseCompletionCell
-        (handle: HandleId)
-        (expectedRef: BlobRef)
-        (expectedDigest: BlobDigest)
-        (current: AgentLinkageProjection)
-        (record: HandleRecord)
-        (cell: HandleCompletion)
-        =
-        match cell.CompletionRef, cell.CompletionDigest with
-        | Some blobRef, Some digest when blobRef = expectedRef && digest = expectedDigest ->
-            Ok
-                { current with
-                    Handles = Map.add handle { record with Lifecycle = Active } current.Handles }
-        | _ -> Error AlreadyCompleted
-
     let rejectFalseCompletion
         (handle: HandleId)
         (expectedRef: BlobRef)
         (expectedDigest: BlobDigest)
         (current: AgentLinkageProjection)
         : Result<AgentLinkageProjection, HandleTransitionRejection> =
-        match Map.tryFind handle current.Handles with
-        | None -> Error UnknownHandle
-        | Some { Lifecycle = Retired } -> Error HandleIsRetired
-        | Some { Lifecycle = Abandoned _ } -> Error AlreadyAbandoned
-        | Some { Lifecycle = Active } -> Ok current
-        | Some({ Lifecycle = CompletedAwaitingJoin cell } as record) ->
-            verifyFalseCompletionCell handle expectedRef expectedDigest current record cell
+        let found = Map.tryFind handle current.Handles
+
+        let cellMatches =
+            match found with
+            | Some { Lifecycle = CompletedAwaitingJoin cell } ->
+                match cell.CompletionRef, cell.CompletionDigest with
+                | Some blobRef, Some digest -> blobRef = expectedRef && digest = expectedDigest
+                | _ -> false
+            | _ -> false
+
+        match judgeHandle "rejectFalseCompletion" found [ "cellMatches" ==> cellMatches ], found with
+        | Verdict.Reject rejected, _ -> Error rejected
+        | Verdict.Keep, _ -> Ok current
+        | Verdict.Assign "Active", Some record ->
+            Ok
+                { current with
+                    Handles = Map.add handle { record with Lifecycle = Active } current.Handles }
+        | Verdict.Assign phase, _ -> unexpectedPhase "rejectFalseCompletion" phase
 
     let private admitValidatedWork
         handle
@@ -375,86 +467,73 @@ module HandleProjection =
         | Some _ -> Error HandleIsRetired
         | None -> Error WorkNotAdmitted
 
-    let private updateWork work update current =
-        match tryWork work current with
-        | None -> Error WorkNotAdmitted
-        | Some _ when Set.contains work.Handle current.LegacyWorkHandles -> Error LegacyWorkAmbiguous
-        | Some existing ->
-            update existing
-            |> Result.map (fun value ->
-                { current with
-                    Works = Map.add work value current.Works })
+    let private writeWork work (value: HandleWork) current =
+        Ok
+            { current with
+                Works = Map.add work value current.Works }
 
     let completeWork work completion current =
-        updateWork
-            work
-            (fun record ->
-                match record.Lifecycle with
-                | Active when
-                    completion.Kind <> HandleCompletionKind.Cancelled
-                    && completion.CompletionRef.IsSome
-                    && completion.CompletionDigest.IsSome
-                    ->
-                    Ok
-                        { record with
-                            Lifecycle = CompletedAwaitingJoin completion
-                            LastCompletion = Some completion }
-                | Active -> Error NotCompleted
-                | CompletedAwaitingJoin _ -> Error AlreadyCompleted
-                | Abandoned _ -> Error AlreadyAbandoned
-                | Retired -> Error HandleIsRetired)
-            current
+        match
+            judgeWork "complete" work current [ "completion" ==> completionShape completion ], tryWork work current
+        with
+        | Verdict.Reject rejected, _ -> Error rejected
+        | Verdict.Assign "CompletedAwaitingJoin", Some record ->
+            writeWork
+                work
+                { record with
+                    Lifecycle = CompletedAwaitingJoin completion
+                    LastCompletion = Some completion }
+                current
+        | Verdict.Assign phase, _ -> unexpectedPhase "completeWork" phase
+        | Verdict.Keep, _ -> unexpectedPhase "completeWork" "keep"
 
     let abandonWork work reason current =
-        updateWork
-            work
-            (fun record ->
-                match record.Lifecycle with
-                | Active ->
-                    Ok
-                        { record with
-                            Lifecycle = Abandoned reason }
-                | CompletedAwaitingJoin _ -> Error AlreadyCompleted
-                | Abandoned _ -> Error AlreadyAbandoned
-                | Retired -> Error HandleIsRetired)
-            current
+        match judgeWork "abandon" work current [], tryWork work current with
+        | Verdict.Reject rejected, _ -> Error rejected
+        | Verdict.Assign "Abandoned", Some record ->
+            writeWork
+                work
+                { record with
+                    Lifecycle = Abandoned reason }
+                current
+        | Verdict.Assign phase, _ -> unexpectedPhase "abandonWork" phase
+        | Verdict.Keep, _ -> unexpectedPhase "abandonWork" "keep"
 
     let voidWork work current =
-        updateWork
-            work
-            (fun record ->
-                match record.Lifecycle with
-                | Active -> Ok { record with Lifecycle = Retired }
-                | CompletedAwaitingJoin _ -> Error AlreadyCompleted
-                | Abandoned _ -> Error AlreadyAbandoned
-                | Retired -> Error HandleIsRetired)
-            current
+        match judgeWork "void" work current [], tryWork work current with
+        | Verdict.Reject rejected, _ -> Error rejected
+        | Verdict.Assign "Retired", Some record -> writeWork work { record with Lifecycle = Retired } current
+        | Verdict.Assign phase, _ -> unexpectedPhase "voidWork" phase
+        | Verdict.Keep, _ -> unexpectedPhase "voidWork" "keep"
 
-    let consumeWork work consumptionId expected current =
-        updateWork
-            work
-            (fun record ->
-                match record.Lifecycle with
-                | _ when System.String.IsNullOrWhiteSpace consumptionId -> Error ConsumptionMismatch
-                | CompletedAwaitingJoin cell when cell = expected ->
-                    Ok
-                        { record with
-                            Lifecycle = Retired
-                            ConsumptionId = Some consumptionId }
-                | Abandoned _ when
-                    expected.Kind = HandleCompletionKind.Cancelled
-                    && expected.CompletionRef.IsNone
-                    && expected.CompletionDigest.IsNone
-                    ->
-                    Ok
-                        { record with
-                            Lifecycle = Retired
-                            ConsumptionId = Some consumptionId }
-                | CompletedAwaitingJoin _ -> Error ConsumptionMismatch
-                | Retired -> Error HandleIsRetired
-                | Active -> Error NotCompleted
-                | Abandoned _ -> Error ConsumptionMismatch)
-            current
+    let consumeWork work (consumptionId: string) expected current =
+        let found = tryWork work current
+
+        let cellEqualsExpected =
+            match found with
+            | Some { Lifecycle = CompletedAwaitingJoin cell } -> cell = expected
+            | _ -> false
+
+        match
+            judgeWork
+                "consume"
+                work
+                current
+                [ "consumptionId" ==> consumptionId
+                  "expected" ==> completionShape expected
+                  "cellEqualsExpected" ==> cellEqualsExpected ],
+            found
+        with
+        | Verdict.Reject rejected, _ -> Error rejected
+        | Verdict.Assign "Retired", Some record ->
+            writeWork
+                work
+                { record with
+                    Lifecycle = Retired
+                    ConsumptionId = Some consumptionId }
+                current
+        | Verdict.Assign phase, _ -> unexpectedPhase "consumeWork" phase
+        | Verdict.Keep, _ -> unexpectedPhase "consumeWork" "keep"
 
     let private workView (binding: HandleRecord) (work: HandleWork) =
         { binding with
