@@ -4,7 +4,7 @@
 
 ## 1. 当前状态与前置核对
 
-- **当前列状态**：`DOING`（eng-cut07b-goose 接手 eng-cut07-goose）。第 1 段（矩阵与拒绝行为、Manager 事实门禁）已合入，见 §3。
+- **当前列状态**：`DONE`（eng-cut08c-goose 接手 eng-cut07b-goose，2026-10-21）。范围按 §6 收窄：能力事实（矩阵、Manager 门禁、能力↔工具名映射、实用工具准入）只剩库一个 owner；未完成的部分已写明归属，不算本卡完成。
 - **前置**：CUT-07 已 DONE（master 587cd7b3c）。
 - **边界**：工具实际执行仍属各能力 owner；库内不启动进程、不读仓库。
 
@@ -14,8 +14,8 @@
 |---|---|---|
 | 1 | 角色 × 能力矩阵、未知/历史角色失败关闭、Manager 精确事实门禁 | 已合入（§3） |
 | 2 | 能力 ↔ 宿主工具名唯一映射；schema 投影、派发映射、执行门禁读同一份 | 已合入（§4） |
-| 3 | schema / 描述 / 示例 / 运行门禁一致 | 见 §5 |
-| 4 | 删除每角色手写的同义权威表 | 部分（§4.2 删除 StaticTools 中 7 行冗余覆写）；余见 §5 |
+| 3 | schema / 描述 / 示例 / 运行门禁一致 | schema 投影、请求工具表、执行准入已读同一份（§4、§5）；描述/示例的语义评审见 §6 |
+| 4 | 删除每角色手写的同义权威表 | 已合入：§4.2 删除 StaticTools 中 7 行冗余覆写；§5 删除 `cognitiveUtilityRoleAllowed` 与 Fission 角色守卫；余项按 §6 移交 |
 
 ## 3. 第 1 段：矩阵与 Manager 门禁（2026-10-21）
 
@@ -101,6 +101,16 @@ base 的 `assume` 有两份答案：`StaticTools.permissionObj` 和 `AssumeTool.
 
 这些退役角色在 base 上本来就跑不起来：`ManagedAgentConfig` 不给它们 agent 配置，`PromptResources` 不给 provider prompt，`ModelRouting.isDeprecatedRole` 拒绝它们的容量预约。所以它们的工具面从"无人使用的 allow"变为 deny，等于把 SPEC[capability-002] 的失败关闭延伸到实用工具，同时消除了 §5.1 的分叉。第 2 段差分（differential-tools.mjs）在新 candidate 上是 `784 / 10`，10 处是同样这 5 个退役角色的 `permissionObj` / `requestToolMap`，原因相同；第 1 段差分仍为 `3950 / 0`。
 
-## 6. 剩余
+## 6. 收窄范围与移交（DONE 的边界）
 
-- 第 3 段（schema、描述、示例与运行门禁一致）：action-affordance 001–013 都是 GAP-078 语义评审 TODO，需要人工审阅描述文本，不是单纯的代码抽取。`StaticTools.jsPermission` / `hasFsCapability` 中 todowrite-for-* 的编程面准入，以及 `ToolRegistry` 的 JS 生成器归 CUT-25（已被他人认领）。
+本卡完成的是：角色 × 能力矩阵、Manager 事实门禁、能力↔宿主工具名映射、实用工具（skill/assume）准入，这四份事实在主仓里不再有手写副本，schema 投影（`permissionObj`）、请求工具表（`requestToolMap`）和执行准入（`ToolAdmission`）都从库读同一份答案。以下几项不在本卡完成范围内，如实列出：
+
+| 余项 | 为什么不在本卡 | 去向 |
+|---|---|---|
+| action-affordance 001–013（描述、示例的语义一致） | 都是 GAP-078 的人工语义评审 TODO，要审描述文本，不是代码抽取 | 保持 GAP-078，不关闭 |
+| `StaticTools.jsPermission` / `hasFsCapability`（todowrite-for-* 编程面准入）、`ToolRegistry` 的 JS 生成器、`Js/OpenCode/ToolHost.fs` 的编程面准入 | 属于受限 JS 编程面 | CUT-25（eng-cut25b-goose 持有） |
+| `ForkTool.managerAdmission` / `resumeAdmission`（Manager‖Plan）/ `orchestratorAdmission` | fork/resume/commission 已不注册为宿主工具，测试 harness 直接调 Execute，不经准入；`resumeAdmission` 放行 Plan 来自 9fcc15824 的接力式规划协议，是否收回属于委派产品语义 | CUT-13 处理委派 spec 时一并裁决 |
+| `permissionFor` 中 Orchestrator 的 `fork` deny 与 `commission` allow | 宿主注册事实（Fork 职责在编程面、commission 是宿主动词），矩阵表达不了，明确保留在宿主 | 保留 |
+| `ToolRegistry` 中 Plan 内层 `deliver` spec 的 `role = Plan` | 只经外层路由调用，外层准入已读矩阵（Finality ‖ Deliver） | 随 CUT-13/23 的交付路由处理 |
+
+旧 owner 退出情况：`OfficeCapability` 的矩阵和判定链、`OfficeCapabilitySurface.officeName`、`StaticTools.toolNames` 的手写 match、7 行冗余覆写、`cognitiveUtilityRoleAllowed`、`requestToolMap` 写死的实用工具名、Fission 的 `r = Role.Engineer` 守卫，全部已删除。

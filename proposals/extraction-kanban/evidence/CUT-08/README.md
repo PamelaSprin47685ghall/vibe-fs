@@ -74,7 +74,7 @@ differential.mjs:       compared 3950; differing 0
 |---|---|
 | 库 | `0aa7b39` 实现，`06e6535` 0.22.0 发布；`npm run build && node --test --test-force-exit <scripts.test 全部文件>` 614/614 pass；capability 11/11 |
 | 主仓 base（差分） | `b40dd6efa` 源码的 dist（gitlink `b6b05e2`），快照于 box `logs-cut08c/base-b40` |
-| 主仓 candidate | `0a186821c` + 本段 + gitlink `06e6535`，`node scripts/build.mjs` exit 0（node 22.23.3） |
+| 主仓 candidate | 先在 `0a186821c` + 本段 + gitlink `06e6535` 上验证；落地前 master 前进到 `dc3096154`（gitlink `7b06b93` / 0.23.2，已包含 `06e6535`），rebase 后本段只剩源码改动，重新 `node scripts/build.mjs` exit 0（node 22.23.3）并重跑下列差分与套件，数字相同 |
 
 ```
 differential-utility.mjs: compared 55;   differing 18   （全部为退役角色，27 个字段全是 allow→deny / true→false）
@@ -96,7 +96,7 @@ differential.mjs:         compared 3950; differing 0
 | feature-ablation | 20 / 19 / 1 skip | — |
 | intra-participant-parallelism | 45 / 27 / 3 fail | 同；`not ok` 名单 diff 为空 |
 | structured-workflow | 116 / 102 / 1 fail | 同；diff 为空 |
-| repository-programming | 335 / 320 / 11 fail | 见下 |
+| repository-programming | 337 / 322 / 11 fail（rebase 后；rebase 前 335 / 320 / 11） | 见下 |
 | host-boundary（rebase 前） | 232 / 225 / 2 fail | 023 是本机 `--ignore-scripts` 未跑 opencode postinstall；026 在 base 源码上同样失败（bookkeepertool 闭包含 HostEventCodec） |
 
 repository-programming 比旧 base 多 5 个用例、多 3 个失败，都是 048（parked payload 的源码标记），来自 master 上 CUT-25 的 `0a186821c` 沙箱修复，不在本段 diff 内。在纯 master `68582b84b`（含 `0a186821c`，未带本段）的独立构建上跑同一套件：335 / 320 / 11 fail，`not ok` 名单与 candidate 的 diff 为空。
