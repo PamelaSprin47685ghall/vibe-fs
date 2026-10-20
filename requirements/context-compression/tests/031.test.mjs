@@ -165,3 +165,32 @@ test('WHAT[context-compression-031] generated Host schema accepts null map value
     assert.equal(schema.safeParse(bad).success, false, JSON.stringify(bad))
   }
 })
+
+
+test('WHAT[context-compression-031] inline anchors mark user and tool results only and preserve the request prefix', async () => {
+  const pair = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js')
+  const user = { info: { id: 'u', role: 'user' }, parts: [{ type: 'text', text: 'question' }] }
+  const prose = { info: { id: 'a', role: 'assistant' }, parts: [{ type: 'reasoning', text: 'thinking' }, { type: 'text', text: 'answer' }] }
+  const call = { info: { id: 'c', role: 'assistant' }, parts: [{ type: 'tool', tool: 'read', callID: 'call', state: { status: 'running', input: {} } }] }
+  const result = { info: { id: 'r', role: 'assistant' }, parts: [{ type: 'tool', tool: 'read', callID: 'call', state: { status: 'completed', input: {}, output: 'result' } }] }
+  const raw = [user, prose, call, result]
+  const snapshot = structuredClone(raw)
+  const first = pair.applyAnchorView(session, raw)
+  assert.equal(first.messages[0].parts[0].text, '[ANCHOR: 1] question')
+  assert.deepEqual(first.messages[1], prose)
+  assert.deepEqual(first.messages[2], call)
+  assert.equal(first.messages[3].parts[0].state.output, '[ANCHOR: 2] result')
+  assert.equal(first.messages[3].parts.length, 1, 'no assistant prose carrier for a tool result')
+  assert.deepEqual(anchors(session).map(row => row.anchor), [1, 2])
+  assert.deepEqual(raw, snapshot, 'the projection must not mutate source messages')
+  assert.equal(first.report, null, 'no changing tail map without a declaration')
+  declare(3, {})
+  const next = pair.applyAnchorView(session, [...raw, { info: { id: 'u2', role: 'user' }, parts: [{ type: 'text', text: 'next' }] }])
+  assert.deepEqual(next.messages.slice(0, raw.length), first.messages)
+  assert.doesNotMatch(next.report, /ANCHOR map/)
+  declare(2, { 2: 'short result' })
+  const compressed = pair.applyAnchorView(session, raw)
+  assert.deepEqual(compressed.messages.slice(0, 3), first.messages.slice(0, 3))
+  assert.equal(compressed.messages[3].parts[0].text, 'short result')
+  assert.deepEqual(anchors(session).map(row => row.anchor), [1, 3])
+})

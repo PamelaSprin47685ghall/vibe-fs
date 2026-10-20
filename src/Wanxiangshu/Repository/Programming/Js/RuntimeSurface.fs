@@ -66,6 +66,7 @@ module JsRuntimeSurface =
         | "Fission" -> Some JsCapability.Fission
         | "Horizon" -> Some JsCapability.Horizon
         | "Advisor" -> Some JsCapability.Advisor
+        | "Ask" -> Some JsCapability.Ask
         | "Park" -> Some JsCapability.Park
         | _ -> None
 

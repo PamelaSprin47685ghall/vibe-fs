@@ -1345,11 +1345,7 @@ module PairProgrammingThoughtTransform =
             }
         | None -> Task.FromResult()
 
-    /// ANCHOR stage (PLAN phase 3): number every identified outgoing message,
-    /// consume one pending view declaration, apply its selection, and build the
-    /// instruction block that carries the anchor map, the declaration echo and
-    /// the token economy. Without a declaration the messages pass through
-    /// untouched and only the bounded anchor map is reported.
+    /// Stable anchor markers are projected at their original message positions.
     let private wireTextOf (raw: obj) : string =
         ProviderWireDecode.rawPartsOf raw
         |> List.choose ProviderWireDecode.decodePart
@@ -1361,9 +1357,18 @@ module PairProgrammingThoughtTransform =
             | ProviderProjection.WireMedia _ -> "")
         |> String.concat "\n"
 
+    let private anchorMessageId (raw: obj) =
+        if
+            messageRole raw = "user"
+            || (rawParts raw |> Array.mapi terminalGuidanceIndex |> Array.exists Option.isSome)
+        then
+            ProviderWireDecode.hostMessageId raw
+        else
+            None
+
     let private numberHostMessages (sessionId: string) (messages: obj list) =
         for raw in messages do
-            ProviderWireDecode.hostMessageId raw
+            anchorMessageId raw
             |> Option.iter (fun messageId -> AnchorLedger.numberMessage sessionId messageId |> ignore)
 
     let private hashText (anchors: int list) : string =
@@ -1382,10 +1387,45 @@ module PairProgrammingThoughtTransform =
     /// Selection applies on every request: a consumed declaration states this
     /// turn's statement (protected prefix, new summaries), while the summaries
     /// already recorded are permanent and outlive the declaration that made them.
+    let private markAnchor (sessionId: string) (raw: obj) =
+        match anchorMessageId raw with
+        | None -> raw
+        | Some messageId ->
+            let marker =
+                sprintf "[ANCHOR: %d] " (AnchorLedger.numberMessage sessionId messageId)
+
+            let cloned = emitJsExpr raw "Object.assign({}, $0)"
+            let parts = rawParts raw
+
+            if messageRole raw = "user" then
+                let index =
+                    parts
+                    |> Array.tryFindIndex (fun part ->
+                        not (isNull part) && isString part?text && partTypeKind part = Some "text")
+
+                match index with
+                | Some index ->
+                    let projected = Array.copy parts
+                    let part = emitJsExpr parts.[index] "Object.assign({}, $0)"
+                    part?text <- box (marker + unbox<string> parts.[index]?text)
+                    projected.[index] <- part
+                    cloned?parts <- box projected
+                | None ->
+                    let part = createObj [ "type", box "text"; "text", box marker ]
+                    cloned?parts <- box (Array.append [| part |] parts)
+            else
+                let index =
+                    parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.head
+
+                let projected = Array.copy parts
+                projected.[index] <- mapTerminalResultText (fun text -> marker + text) parts.[index]
+                cloned?parts <- box projected
+
+            cloned
+
     let private applyDeclaredAnchorView
         (sessionId: string)
         (messages: obj list)
-        (mapLines: string list)
         (declaration: AnchorViewDeclaration option)
         (replaced: AnchorReplacement list)
         : obj list * string option =
@@ -1394,7 +1434,7 @@ module PairProgrammingThoughtTransform =
         let inputs =
             messages
             |> List.map (fun raw ->
-                { AnchorView.AnchorMessage.Id = ProviderWireDecode.hostMessageId raw
+                { AnchorView.AnchorMessage.Id = anchorMessageId raw
                   AnchorView.AnchorMessage.Text = wireTextOf raw
                   AnchorView.AnchorMessage.Raw = raw })
 
@@ -1406,7 +1446,7 @@ module PairProgrammingThoughtTransform =
         let projected =
             entries
             |> List.map (function
-                | AnchorView.Kept message -> message.Raw
+                | AnchorView.Kept message -> markAnchor sessionId message.Raw
                 | AnchorView.Summarized(message, summary) -> summarizedMessage message.Raw summary
                 | AnchorView.OpeningSummary summary -> openingSummary summary)
 
@@ -1435,47 +1475,22 @@ module PairProgrammingThoughtTransform =
                       "replacement history for anchors [%s] is permanent; live anchors represent the latest intervals, including prior summaries; implicit anchor 0 always represents the beginning"
                       (hashText report.Replaced) ]
 
-        let block =
-            declaredLines
-            @ replacedLines
-            @ (if List.isEmpty mapLines then
-                   []
-               else
-                   "ANCHOR map (reference these numbers in a js- tool's view declaration):"
-                   :: mapLines)
+        let block = declaredLines @ replacedLines
 
-        projected, Some(String.concat "\n" block)
+        projected,
+        (if List.isEmpty block then
+             None
+         else
+             Some(String.concat "\n" block))
 
-    let private resolveAnchorView
-        (sessionId: string)
-        (messages: obj list)
-        (mapLines: string list)
-        : obj list * string option =
-        let declaration = AnchorLedger.takeView sessionId
-        let replaced = AnchorLedger.replacements sessionId
+    let applyAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
+        numberHostMessages sessionId messages
 
-        if declaration.IsNone && List.isEmpty replaced && List.isEmpty mapLines then
-            messages, None
-        else
-            applyDeclaredAnchorView sessionId messages mapLines declaration replaced
-
-    let private applyAnchorView
-        (projectionSessionIdOpt: string option)
-        (messages: obj list)
-        : obj list * string option =
-        match projectionSessionIdOpt with
-        | None -> messages, None
-        | Some sessionId ->
-            numberHostMessages sessionId messages
-
-            let mapLines =
-                AnchorLedger.anchors sessionId
-                |> List.rev
-                |> List.truncate 20
-                |> List.rev
-                |> List.map (fun (anchor, messageId) -> sprintf "[ANCHOR: %d] %s" anchor messageId)
-
-            resolveAnchorView sessionId messages mapLines
+        applyDeclaredAnchorView
+            sessionId
+            messages
+            (AnchorLedger.takeView sessionId)
+            (AnchorLedger.replacements sessionId)
 
     let private markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored =
         // crash-reconciliation-018: the restart guidance is delivered
@@ -1533,7 +1548,10 @@ module PairProgrammingThoughtTransform =
                 |> Option.bind DeclaredContextLimit.tryFind
                 |> Option.map (PairProgrammingCalibration.renderContextLimit language)
 
-            let messages, anchorBlock = applyAnchorView projectionSessionIdOpt messages
+            let messages, anchorBlock =
+                match projectionSessionIdOpt with
+                | Some sessionId -> applyAnchorView sessionId messages
+                | None -> messages, None
 
             let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
 

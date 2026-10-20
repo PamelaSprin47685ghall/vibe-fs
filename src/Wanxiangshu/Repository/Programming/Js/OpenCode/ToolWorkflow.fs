@@ -303,12 +303,22 @@ module JsToolWorkflow =
             parseRawView json |> Result.bind decodeViewDeclaration
 
     let private recordDeliveredValueIfNeeded sessionId (json: string) (parsed: Result<obj, JsFailure>) =
-        match parsed, deliveredView json with
-        | Ok _, Ok view when JsToolsData.isDelivered json ->
-            JsDeliveredValues.recordView sessionId (JsToolsData.parseDeliveredValue json) view
+        if JsToolsData.isDelivered json then
+            // Algorithm G1: the deliver hard gate. A program cannot deliver while
+            // unresolved parked sites exist.
+            let parkedHandles = JsParkedSites.parkedHandles ()
+            if not (List.isEmpty parkedHandles) then
+                let handles = System.String.Join(", ", parkedHandles)
+                Error(JsFailure.ProgramFailed (sprintf "delivery is blocked while parked handles are unresolved: %s" handles))
+            else
+                match parsed, deliveredView json with
+                | Ok _, Ok view ->
+                    JsDeliveredValues.recordView sessionId (JsToolsData.parseDeliveredValue json) view
+                    parsed
+                | _, Error failure -> Error failure
+                | _ -> parsed
+        else
             parsed
-        | _, Error failure when JsToolsData.isDelivered json -> Error failure
-        | _ -> parsed
 
     let private decodeRunResult (sessionId: string) (decoded: Result<string, JsFailure>) =
         match decoded with
@@ -688,7 +698,7 @@ module JsToolWorkflow =
             parkState
             (Some callHost)
             (JsDelegationBridge.hostFor sessionId)
-            None
+            (JsDelegationBridge.askFor sessionId)
 
     let private runProgramWithPark
         (sessionId: string)

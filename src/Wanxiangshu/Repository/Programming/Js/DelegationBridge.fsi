@@ -18,3 +18,5 @@ module JsDelegationBridge =
     val hostFor: sessionId: string -> JsDelegationHost option
     val clear: sessionId: string -> unit
     val clearAll: unit -> unit
+    val installAsk: sessionId: string -> ask: (string -> Task<Result<unit, string>>) -> unit
+    val askFor: sessionId: string -> (string -> Task<Result<unit, string>>) option

@@ -97,6 +97,9 @@ const COGNITIVE_UTILITY_ALLOW = [
 ]
 const hostUtilityAllowFor = (_role) => HOST_UTILITY_ALLOW
 const cognitiveUtilityAllowFor = (_role) => COGNITIVE_UTILITY_ALLOW
+// Clean-break: all host delegation and lifecycle verbs are subsumed into the
+// programming surface (todowrite-for-<role>). Only the surface itself and host
+// utilities (bash-honeypot) appear in the host schema allow list.
 const ROLE_ALLOW = {
   Manager: [
     'fork',
@@ -134,7 +137,7 @@ test('WHAT[capability-enforcement-002] AGENT_006_role_tool_matrix_reaches_the_ho
 test('WHAT[capability-enforcement-002] office_capability_permissions_agree_with_the_host_schema_matrix', () => {
   // Edit remains an office permission but projects no separate JS capability
   // (string replacement uses Read + Write; Grep projects rg).
-  const DIRECT_PERMISSION_ONLY = new Set(['Edit'])
+  const DIRECT_PERMISSION_ONLY = new Set(['Edit', 'Ask', 'JsPlan'])
   const permissionOf = (toolName) =>
     ({
       fork: 'Fork',

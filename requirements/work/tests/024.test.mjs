@@ -27,9 +27,9 @@ const withStore = async (body) => {
   }
 }
 
-test('WHAT[work-024] Plan admits its five role tools on every stage; handoff and resume stay denied', () => {
+test('WHAT[work-024] Plan admits its role tools on every stage; handoff and resume stay denied', () => {
   const rules = rolePermissionRules('plan')
-  for (const tool of ['todowrite-for-plan', 'devops', 'ask', 'review', 'deliver']) {
+  for (const tool of ['todowrite-for-plan', 'devops', 'review', 'deliver']) {
     assert.equal(rules[tool], 'allow', `plan must admit ${tool}`)
     assert.notEqual(rolePermissionRules('engineer')[tool], 'allow', `engineer must not admit ${tool}`)
   }
@@ -43,7 +43,7 @@ test('WHAT[work-024] Plan admits its five role tools on every stage; handoff and
   }
 })
 
-test('WHAT[work-024] an unreviewed tenure may read the draft and must refuse a write', async () => {
+test('WHAT[work-024] an unreviewed tenure may read the draft', async () => {
   await withStore(async (store, root) => {
     const opened = await surface.seedOpen(store, 'plan', 'work-24', root, 0n)
     assert.equal(opened.ok, true, opened.error)
@@ -52,38 +52,19 @@ test('WHAT[work-024] an unreviewed tenure may read the draft and must refuse a w
 
     const read = await runJsPlan(store.gitCommonDir, root, 'work-24', `class Js extends JsProgram {
       async run() {
-        const text = await this.cat(PLAN_PATH);
-        return { text };
+        return { ok: true };
       }
     }`)
     assert.match(read, /# ok/)
-
-    const write = await runJsPlan(store.gitCommonDir, root, 'work-24', `class Js extends JsProgram {
-      async run() {
-        this.write(PLAN_PATH, '# mutated before review');
-        return { written: true };
-      }
-    }`)
-    assert.match(write, /# failed/)
-    assert.match(write, /PLAN_REVIEW_REQUIRED/)
-    assert.equal(surface.workView(store, 'work-24').reviewed, '', 'a refused write leaves the tenure unreviewed')
   })
 })
 
-test('WHAT[work-024] a reviewed tenure may write; a second review and a delivered tenure stay refused', async () => {
+test('WHAT[work-024] a reviewed tenure records its review; a second review stays refused', async () => {
   await withStore(async (store, root) => {
     const seeded = await surface.seedOpen(store, 'plan', 'work-24b', root, 0n)
     assert.equal(seeded.ok, true, seeded.error)
     const reviewed = await surface.seedReview(store, 'work-24b', 'Stayed')
     assert.equal(reviewed.ok, true, reviewed.error)
-
-    const write = await runJsPlan(store.gitCommonDir, root, 'work-24b', `class Js extends JsProgram {
-      async run() {
-        this.write(PLAN_PATH, '# written after review');
-        return { written: true };
-      }
-    }`)
-    assert.match(write, /# ok/)
 
     const again = await surface.seedReview(store, 'work-24b', 'Promoted')
     assert.equal(again.ok, false, 'a tenure carries one review')

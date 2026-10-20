@@ -180,6 +180,14 @@ module PairProgrammingThoughtSurface =
                 {| ok = false
                    error = rejection.Reason |}
 
+    let applyAnchorView (sessionId: string) (messages: obj array) : obj =
+        let projected, report =
+            PairProgrammingThoughtTransform.applyAnchorView sessionId (Array.toList messages)
+
+        box
+            {| messages = List.toArray projected
+               report = Option.toObj report |}
+
     let text = PairProgrammingThoughtTransform.text
     let source = PairProgrammingThoughtTransform.source
     let markerSource = source

@@ -16,9 +16,6 @@ module StaticTools =
         | ToolPermission.Join -> [ "join" ]
         | ToolPermission.Horizon -> [ "horizon" ]
         | ToolPermission.Fission -> [ "fission" ]
-        // The direct filesystem tools are retired: Read/Write/Edit/Glob/Grep/
-        // Move/Remove stay as permissions (they gate the programming surface's
-        // cat/write/ls/mv/rm members) but project no host tool name.
         | ToolPermission.Read -> []
         | ToolPermission.Write -> []
         | ToolPermission.Edit -> []
@@ -27,25 +24,16 @@ module StaticTools =
         | ToolPermission.Move -> []
         | ToolPermission.Remove -> []
         | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
-        // Exec grants the programming surface's `this.call` loop; the Host-native
-        // `run` tool is retired (repository-programming [050]-[052] supersede it).
         | ToolPermission.Exec -> []
-        // Pty is retired: interactive execution is the programming surface's
-        // `this.call` ({ spawn, name } + { send, name, input } + { signal, name }).
         | ToolPermission.Pty -> []
         | ToolPermission.ReviewAssessment -> [ "review" ]
         | ToolPermission.Fetch -> [ "fetch" ]
         | ToolPermission.Finality -> [ "deliver" ]
         | ToolPermission.JsPlan -> [ "todowrite-for-plan" ]
-        // Ask is a programming-surface member (this.ask), never a host tool.
         | ToolPermission.Ask -> []
         | ToolPermission.DevOpsConsultation -> [ "devops" ]
-        // advisor gates the programming surface's `this.advisor` member: a
-        // consult seat that returns an envelope, never a host tool of its own.
         | ToolPermission.Advisor -> []
         | ToolPermission.Deliver -> [ "deliver" ]
-        // work-021: Plan's review shares the `review` verb with Manager's
-        // ReviewAssessment. The reverse lookup decides by role, not by this order.
         | ToolPermission.Review -> [ "review" ]
 
     /// Primary name for permissions with a single verb (tests / simple maps).
@@ -211,7 +199,6 @@ module StaticTools =
     let private permissionFor (registry: AblationRegistry) allowed role name =
         match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
-        // 普通工具准入与可见性使用同一份能力映射。
         | true, ("devops" | "review" | "deliver" | "todowrite-for-plan"), Role.Plan -> "allow"
         | true, "fission", Role.Manager -> "deny"
         | true, "commission", Role.Manager -> "deny"

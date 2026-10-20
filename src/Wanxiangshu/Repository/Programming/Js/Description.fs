@@ -1,4 +1,6 @@
 namespace Wanxiangshu.Repository.Programming.Js
+open Wanxiangshu.Foundation
+
 
 /// Canonical example with capability requirements (proposal §44).
 type JsExample =
@@ -221,6 +223,7 @@ class JsProgram {"""
             ""
 
     let publicBaseClass (prose: Prose) (capabilities: Set<JsCapability>) : string =
+        "const PLAN_PATH = \"plan.md\";\n" +
         fill
             prose.BaseClass
             [
@@ -249,6 +252,7 @@ class JsProgram {"""
     }"""
 
     let runtimeBaseClass (prose: Prose) (capabilities: Set<JsCapability>) : string =
+        "const PLAN_PATH = \"plan.md\";\n" +
         let methods =
             [ """
     constructor(api) { this._api = api; }"""
@@ -495,6 +499,7 @@ class JsProgram {"""
     return { ok: true, results: results, skipped: skipped };
   }"""
                       []
+              // resume/review/fetch/devops before park.
               // park is a lifecycle capability every js-* surface carries; it
               // is not a filesystem permission projection, so it is always
               // present in the runtime base class.
@@ -503,6 +508,9 @@ class JsProgram {"""
     return await this._api.park(payload);
   }"""
                   []
+              // Universal deliver(value, view): ends this program with an
+              // explicit terminal value; Algorithm G1 gate is verified at
+              // settlement time.
               fill
                   """  async deliver(value, view) {
     const err = new Error("delivered");
@@ -513,14 +521,6 @@ class JsProgram {"""
               runStub prose ]
 
         String.concat "\n\n" ((callableOpen capabilities + classOpen) :: methods @ [ "}" ])
-
-    let private planCapabilities = set [ JsCapability.Read; JsCapability.Write; JsCapability.Ask ]
-
-    let runtimePlanBaseClass (prose: Prose) : string =
-        "const PLAN_PATH = \"plan.md\";\n" + runtimeBaseClass prose planCapabilities
-
-    let publicPlanBaseClass (prose: Prose) : string =
-        "const PLAN_PATH = \"plan.md\";\n" + publicBaseClass prose planCapabilities
 
     let contract (prose: Prose) (toolName: string) (capabilities: Set<JsCapability>) =
         let verbs =
@@ -622,11 +622,3 @@ class JsProgram {"""
 
     let render (prose: Prose) (roleName: string) (toolName: string) (capabilities: Set<JsCapability>) : string =
         renderFor prose roleName toolName capabilities (publicBaseClass prose capabilities)
-
-    let renderPlan (prose: Prose) (scope: string) : string =
-
-        let blocks =
-            [ scope
-              renderFor prose "plan" "todowrite-for-plan" planCapabilities (publicPlanBaseClass prose) ]
-
-        String.concat "\n\n" blocks

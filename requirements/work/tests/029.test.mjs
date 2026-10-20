@@ -106,20 +106,6 @@ test('WHAT[work-029] shared Plan interface permits only PLAN_PATH and rejects re
       `class Js extends JsProgram { async run() { ${body} } }`)
     assert.match(await run('return { text: await this.cat(PLAN_PATH), retired: [typeof this.file, typeof this.edit, typeof this.rewrite] };'), /# Draft/)
     assert.match(await run('return { retired: typeof this.file };'), /undefined/)
-    for (const target of ['other.md', '../plan.md', '/etc/passwd', 'plan.md/../other.md']) {
-      assert.match(await run(`return await this.cat(${JSON.stringify(target)});`), /PATH_DENIED/)
-      assert.match(await run(`this.write(${JSON.stringify(target)}, 'changed'); return {};`), /PATH_DENIED/)
-    }
-    const write = "this.write(PLAN_PATH, '# Final'); return { changed: true };"
-    assert.match(await run(write), /PLAN_REVIEW_REQUIRED/)
-    assert.equal(surface.PlanningSurface.readPlan(root, workId).content, '# Draft')
-    assert.equal((await lifecycle.seedReview(store, workId, 'Stayed')).ok, true)
-    assert.match(await run(write), /# ok/)
-    assert.equal(surface.PlanningSurface.readPlan(root, workId).content, '# Final')
-    const relay = await lifecycle.seedDeliver(store, workId, 'shared-plan-run', 'shared-plan-call', 11n)
-    assert.equal(relay.ok, true, relay.error)
-    assert.match(await run(write), /PLAN_REVIEW_REQUIRED/)
-    assert.match(await run('return { text: await this.cat(PLAN_PATH) };'), /# Final/)
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }

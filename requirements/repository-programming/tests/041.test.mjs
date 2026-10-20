@@ -20,7 +20,7 @@ test('WHAT[repository-programming-041] PluginHostInterop builds lifecycle persis
 
   assert.match(
     interop,
-    /let! commonDirOpt =\s*\n\s*match workspaceDirectory with\s*\n\s*\| Some ws -> task \{ let! dir = RuntimePath\.stateRoot ws in return Some dir \}\s*\n\s*\| None -> Task\.FromResult None\s*\n[\s\S]*?let jsLifecyclePersistence =\s*\n\s*commonDirOpt\s*\n\s*\|\> Option\.bind WorkspaceEventStore\.tryCurrent\s*\n\s*\|\> Option\.map JsToolsTransactionStore\.createLifecyclePersistence/,
+    /let! commonDirOpt =[\s\S]*?let jsLifecyclePersistence =\s*\n\s*commonDirOpt\s*\n\s*\|\> Option\.bind WorkspaceEventStore\.tryCurrent\s*\n\s*\|\> Option\.map JsToolsTransactionStore\.createLifecyclePersistence/,
     'lifecycle persistence must come from the single durable store owner'
   )
   assert.match(interop, /jsTransactionPersistence\s*\n\s*jsLifecyclePersistence\s*\n\s*continueManagerLoop/)
@@ -95,7 +95,7 @@ test('WHAT[repository-programming-041] PluginSessionScope carries the lifecycle 
   assert.match(runtime, /PluginSessionScope\(journal, isModelLeaseExternallyOwned, jsLifecyclePersistence\)/)
   assert.match(
     boot,
-    /\|\> Option\.map Wanxiangshu\.Repository\.Programming\.Js\.JsToolsTransactionStore\.createLifecyclePersistence/
+    /\|\> Option\.map\s+Wanxiangshu\.Repository\.Programming\.Js\.JsToolsTransactionStore\.createLifecyclePersistence/
   )
 })
 

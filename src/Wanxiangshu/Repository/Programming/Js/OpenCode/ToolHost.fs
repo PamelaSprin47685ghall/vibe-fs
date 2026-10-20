@@ -86,7 +86,10 @@ module JsDescriptionAssets =
 module JsToolSpec =
 
     let admissionFor (roleName: string) : ToolAdmission =
-        let fsPermissions =
+        // Any office permission that projects a programming-surface member
+        // admits the role's todowrite-for-* tool. JsPlan expands to Read/Write/Ask
+        // at projection time; keep the grant itself so Plan is not special-cased.
+        let surfacePermissions =
             set
                 [ ToolPermission.Read
                   ToolPermission.Write
@@ -95,12 +98,25 @@ module JsToolSpec =
                   ToolPermission.Grep
                   ToolPermission.Move
                   ToolPermission.Remove
+                  ToolPermission.Exec
                   ToolPermission.Fork
-                  ToolPermission.Join ]
+                  ToolPermission.Join
+                  ToolPermission.Fission
+                  ToolPermission.Horizon
+                  ToolPermission.Advisor
+                  ToolPermission.Ask
+                  ToolPermission.JsPlan
+                  ToolPermission.Resume
+                  ToolPermission.Review
+                  ToolPermission.ReviewAssessment
+                  ToolPermission.Fetch
+                  ToolPermission.DevOpsConsultation
+                  ToolPermission.Deliver
+                  ToolPermission.Finality ]
 
         ToolAdmission.OfficeRole(fun _ r ->
             (string r).ToLowerInvariant() = roleName.ToLowerInvariant()
-            && not (Set.isEmpty (Set.intersect (OfficeCapability.permissions r) fsPermissions)))
+            && not (Set.isEmpty (Set.intersect (OfficeCapability.permissions r) surfacePermissions)))
 
     [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative

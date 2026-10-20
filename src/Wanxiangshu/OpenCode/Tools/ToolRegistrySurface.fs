@@ -61,7 +61,6 @@ module ToolRegistrySurface =
             Wanxiangshu.Repository.Programming.Js.OpenCode.JsDescriptionAssets.load (
                 ProviderLanguageBinding.readGlobalPreference ()
             )
-
         ToolRegistry.runPlanProgram prose gitCommonDir root workId program
 
     let jsPlanDescription (language: string) : string =
@@ -70,9 +69,9 @@ module ToolRegistrySurface =
         let prose =
             Wanxiangshu.Repository.Programming.Js.OpenCode.JsDescriptionAssets.load parsed
 
-        Wanxiangshu.Repository.Programming.Js.JsCanonicalDescription.renderPlan
-            prose
-            (ProviderProse.render parsed "tool/js-plan" Map.empty)
+        Wanxiangshu.Repository.Programming.Js.JsToolGenerator.generate "plan" (OfficeCapability.permissions Role.Plan) prose
+        |> Option.map (fun s -> s.Description)
+        |> Option.defaultValue ""
 
     let permissionOfToolName (role: Role) (name: string) : ToolPermission option =
         StaticTools.permissionOfToolName role name

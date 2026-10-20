@@ -9,7 +9,7 @@ open Wanxiangshu.Foundation
 type JsCapability =
     | Read
     | Write
-    
+
     | Glob
     /// `rg(argv)`: one ripgrep argv, always invoked as `rg --json`.
     | Grep
@@ -37,8 +37,9 @@ type JsCapability =
 module JsCapability =
 
     /// The only ToolPermission → JsCapability mapping. A permission without a
-    /// js-* projection (edit, pty, review, …) produces no member
-    /// (JS-004 four-layer exactness).
+    /// js-* projection (edit, pty, …) produces no member (JS-004 four-layer
+    /// exactness). Commission stays on the Fork path: Orchestrator's host
+    /// commission verb is the same executeReceipt the fork member already runs.
     let ofToolPermission (permission: ToolPermission) : JsCapability option =
         match permission with
         | ToolPermission.Read -> Some JsCapability.Read
@@ -53,10 +54,25 @@ module JsCapability =
         | ToolPermission.Fission -> Some JsCapability.Fission
         | ToolPermission.Horizon -> Some JsCapability.Horizon
         | ToolPermission.Advisor -> Some JsCapability.Advisor
+        | ToolPermission.Ask -> Some JsCapability.Ask
         | _ -> None
 
     let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
-        capabilities |> Set.toList |> List.choose ofToolPermission |> Set.ofList
+        // JsPlan is the office grant for the plan programming surface. It is
+        // not itself a member; it expands into the same Read/Write/Ask set the
+        // plan base class has always carried, so the plan surface is born from
+        // the one projection instead of a private capability list.
+        let expanded =
+            if Set.contains ToolPermission.JsPlan capabilities then
+                [ JsCapability.Read; JsCapability.Write; JsCapability.Ask ]
+            else
+                []
+
+        capabilities
+        |> Set.toList
+        |> List.choose ofToolPermission
+        |> List.append expanded
+        |> Set.ofList
 
 /// One capability's SDK projection: the single source for the member name a
 /// capability brings into the base class. The member's signature and prose

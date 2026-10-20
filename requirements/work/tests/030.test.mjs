@@ -3,7 +3,7 @@ import test from 'node:test'
 import * as ToolSurface from '../../../dist/OpenCode/Tools/ToolSurface.js'
 
 test('WHAT[work-030] StaticTools explicitly registers all five plan tools and excludes handoff/resume', () => {
-  const planTools = ['todowrite-for-plan', 'devops', 'ask', 'review', 'deliver']
+  const planTools = ['todowrite-for-plan', 'devops', 'review', 'deliver']
 
   // ToolSurface exports toolSpecNames as an array of all recognized tool names
   const names = ToolSurface.toolSpecNames()
@@ -18,7 +18,7 @@ test('WHAT[work-030] StaticTools explicitly registers all five plan tools and ex
   assert.ok(!names.includes('resume'))
   assert.ok(!names.includes('handoff'))
 
-  // Admission is by exact registered name: the five plan tools are the only
+  // Admission is by exact registered name: the plan tools are the only
   // plan-admitted entries beyond the shared base permissions.
   const planRules = ToolSurface.rolePermissionRules('plan')
   for (const tool of planTools) {
@@ -27,8 +27,6 @@ test('WHAT[work-030] StaticTools explicitly registers all five plan tools and ex
 })
 
 test('WHAT[work-030] tool registration does not allow prefix or wildcard matching for plan tools', () => {
-  // Prefix or wildcard attempts must be denied; the only wildcard is the
-  // fail-closed `*` fallback that denies every unlisted name.
   const planRules = ToolSurface.rolePermissionRules('plan')
   const invalidAttempts = ['js-plan-fake', 'plan*', 'ask_question', 'devops_extra', 'review_next', 'deliver_final']
   for (const attempt of invalidAttempts) {

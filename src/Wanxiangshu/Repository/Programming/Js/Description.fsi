@@ -199,8 +199,6 @@ module JsCanonicalDescription =
           BaseClassAsk: string
           BaseClassLifecycle: string }
 
-    val runtimePlanBaseClass: prose: Prose -> string
-    val publicPlanBaseClass: prose: Prose -> string
     val has: capabilities: Set<JsCapability> -> capability: JsCapability -> bool
     val publicBaseClass: prose: Prose -> capabilities: Set<JsCapability> -> string
     val runtimeBaseClass: prose: Prose -> capabilities: Set<JsCapability> -> string
@@ -208,4 +206,3 @@ module JsCanonicalDescription =
     val rules: prose: Prose -> capabilities: Set<JsCapability> -> string
     val ultraExample: prose: Prose -> roleName: string -> capabilities: Set<JsCapability> -> JsExample option
     val render: prose: Prose -> roleName: string -> toolName: string -> capabilities: Set<JsCapability> -> string
-    val renderPlan: prose: Prose -> scope: string -> string

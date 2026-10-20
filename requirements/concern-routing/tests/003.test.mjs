@@ -30,9 +30,9 @@ test('WHAT[concern-routing-003] publish is retired from ToolRegistry and provide
     'resources/provider/concern-routing must be deleted',
   )
 
-  assert.match(read('resources/provider/tool/js-plan/en.md'), /\bjs\.ask\(question\)/)
+  assert.match(read('resources/provider/tool/js-plan/en.md'), /\b(?:js|this)\.ask\(question\)/)
   assert.match(read('resources/provider/tool/js-program/deliver/en.md'), /\bdeliver\(value\)/)
   const delegationEn = read('resources/provider/tool/js-program/delegation-rules/en.md')
-  assert.match(delegationEn, /\bjs\.fork\(/)
-  assert.match(delegationEn, /\bjs\.join\(/)
+  assert.match(delegationEn, /\b(?:js|this)\.fork\(/)
+  assert.match(delegationEn, /\b(?:js|this)\.join\(/)
 })

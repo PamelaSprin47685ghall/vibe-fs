@@ -10,13 +10,13 @@ type JsDelegationHost =
       Horizon: unit -> Task<obj>
       Advisor: obj -> obj -> Task<obj> } // (intent, view)
 
-/// Process-live delegation seam. One host per session; the wiring installs it
-/// around a generated tool execution and clears it afterwards. Single-threaded
-/// host ordering means one session runs one programming call at a time.
 module JsDelegationBridge =
 
     // DSL-MUTABLE: resource — sessionId → delegation host
     let private hosts = Dictionary<string, JsDelegationHost>()
+
+    // DSL-MUTABLE: resource — sessionId → ask channel
+    let private askChannels = Dictionary<string, string -> Task<Result<unit, string>>>()
 
     let install (sessionId: string) (host: JsDelegationHost) : unit = hosts.[sessionId] <- host
 
@@ -25,6 +25,18 @@ module JsDelegationBridge =
         | true, host -> Some host
         | false, _ -> None
 
-    let clear (sessionId: string) : unit = hosts.Remove sessionId |> ignore
+    let installAsk (sessionId: string) (ask: string -> Task<Result<unit, string>>) : unit =
+        askChannels.[sessionId] <- ask
 
-    let clearAll () : unit = hosts.Clear()
+    let askFor (sessionId: string) : (string -> Task<Result<unit, string>>) option =
+        match askChannels.TryGetValue sessionId with
+        | true, ask -> Some ask
+        | false, _ -> None
+
+    let clear (sessionId: string) : unit =
+        hosts.Remove sessionId |> ignore
+        askChannels.Remove sessionId |> ignore
+
+    let clearAll () : unit =
+        hosts.Clear()
+        askChannels.Clear()

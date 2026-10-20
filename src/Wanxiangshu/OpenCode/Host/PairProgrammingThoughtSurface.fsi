@@ -25,32 +25,33 @@ module PairProgrammingThoughtSurface =
     /// Fold one anchored pair without opening a journal; used by the pure law test.
     val foldAnchoredPair: payload: obj -> obj
 
-    val text: string
-    val source: string
-    val markerSource: string
-    val markerToolName: string
-    val canonicalText: string
-    val deniedText: string
+    val applyAnchorView: sessionId: string -> messages: obj array -> obj
 
-    /// Executes the production pair constructor with an observable pure callback.
-    val gapConstructorTrace: messageId: string -> obj
+val text: string
+val source: string
+val markerSource: string
+val markerToolName: string
+val canonicalText: string
+val deniedText: string
 
-    /// Observes fail-fast behavior without weakening the production exception edge.
-    val gapConstructorFailureTrace: messageId: string -> obj
+/// Executes the production pair constructor with an observable pure callback.
+val gapConstructorTrace: messageId: string -> obj
 
-    val stableCallId: sessionId: obj -> ordinal: int64 -> string
+/// Observes fail-fast behavior without weakening the production exception edge.
+val gapConstructorFailureTrace: messageId: string -> obj
 
-    val isPairProgrammingThought: raw: obj -> bool
+val stableCallId: sessionId: obj -> ordinal: int64 -> string
 
-    val providerIdOfMessage: raw: obj -> obj
+val isPairProgrammingThought: raw: obj -> bool
 
-    val providerIdFromMessages: raw: obj array -> obj
+val providerIdOfMessage: raw: obj -> obj
 
-    val skipAutoInjectedRequested: providerId: obj -> bool
+val providerIdFromMessages: raw: obj array -> obj
 
-    val tryInject: sessionId: obj -> markerText: string -> rawMessages: obj array -> Task<obj>
+val skipAutoInjectedRequested: providerId: obj -> bool
 
-    /// Durable owner path for anchored replay tests. The journal remains opaque to
-    /// callers; only the transform may read/append its pair-placement facts.
-    val tryInjectWithJournal:
-        journal: obj -> sessionId: obj -> markerText: string -> rawMessages: obj array -> Task<obj>
+val tryInject: sessionId: obj -> markerText: string -> rawMessages: obj array -> Task<obj>
+
+/// Durable owner path for anchored replay tests. The journal remains opaque to
+/// callers; only the transform may read/append its pair-placement facts.
+val tryInjectWithJournal: journal: obj -> sessionId: obj -> markerText: string -> rawMessages: obj array -> Task<obj>

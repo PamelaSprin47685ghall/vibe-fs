@@ -396,175 +396,47 @@ module ToolRegistry =
     [<Emit("typeof $0 === 'string'")>]
     let private isStringValue (value: obj) : bool = jsNative
 
-    let private createPlanSandboxApi
-        (artifactPath: Result<string, string>)
-        (currentContent: string)
-        (stagedMutation: string option ref)
-        (parkState: Wanxiangshu.Process.JsSandbox.ParkState option)
-        (askInvoke: (string -> Task<Result<unit, string>>) option)
-        =
-        let denied () =
-            createObj
-                [ "ok" ==> false
-                  "code" ==> "PATH_DENIED"
-                  "reason" ==> "Only PLAN_PATH may be read or written" ]
-
-        let statPath fullPath =
-            match JsMutationFs.statPath fullPath with
-            | Ok stat -> createObj [ "ok" ==> true; "stat" ==> stat ]
-            | Error failure ->
-                createObj
-                    [ "ok" ==> false
-                      "code" ==> JsFailure.code failure
-                      "reason" ==> JsFailure.reason failure ]
-
-        let artifactStat () =
-            match artifactPath with
-            | Error reason -> createObj [ "ok" ==> false; "code" ==> "PROGRAM_FAILED"; "reason" ==> reason ]
-            | Ok fullPath -> statPath fullPath
-
-        let members =
-            [ "cat"
-              ==> fun (path: obj) ->
-                  if isStringValue path && string path = "plan.md" then
-                      createObj [ "ok" ==> true; "text" ==> currentContent ]
-                  else
-                      denied ()
-              "write"
-              ==> fun (path: obj) (newText: obj) ->
-                  if not (isStringValue path) || string path <> "plan.md" then
-                      denied ()
-                  elif not (isStringValue newText) then
-                      createObj
-                          [ "ok" ==> false
-                            "code" ==> "INVALID_ARGUMENT"
-                            "reason" ==> "write requires string content" ]
-                  else
-                      stagedMutation.Value <- Some(string newText)
-                      createObj [ "ok" ==> true ]
-              "stat"
-              ==> fun (path: obj) ->
-                  if isStringValue path && string path = "plan.md" then
-                      artifactStat ()
-                  else
-                      denied ()
-              "mkdir" ==> fun (_: obj) -> denied ()
-              JsToolsBindings.makeWhereAllMember ()
-              JsToolsBindings.makeWhereMember parkState
-              JsToolsBindings.makeAskMember parkState askInvoke
-              match parkState with
-              | Some state -> JsToolsBindings.makeParkMember state
-              | None -> () ]
-
-        createObj members
-
-    let private writePlanFile root sessionId newText value =
-        match PlanPath.rewritePlanAtomic root sessionId newText with
-        | Ok(_path, _digest) ->
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [ "plan.md" ], [], [], []))
-        | Error err ->
-            JsToolsResult.render (
-                JsToolWorkflow.JsToolOutcome.Failed(
-                    JsFailure.ProgramFailed(sprintf "Failed to write plan artifact: %s" err),
-                    [],
-                    [],
-                    [],
-                    []
-                )
-            )
-
-    let private commitPlanMutation root sessionId hasReviewed newTextOpt value =
-        match newTextOpt with
-        | None -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Succeeded(value, [], [], [], []))
-        | Some _ when not hasReviewed ->
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.PlanReviewRequired, [], [], [], []))
-        | Some newText -> writePlanFile root sessionId newText value
-
-    let private renderPlanParseOutcome root sessionId hasReviewed stagedMutation json =
-        match JsToolsData.parse json with
-        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-        | Ok value -> commitPlanMutation root sessionId hasReviewed stagedMutation value
-
-    let private renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation runOutcome =
-        match runOutcome with
-        | Error failure -> JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-        | Ok json -> renderPlanParseOutcome root sessionId hasReviewed stagedMutation json
-
-    let private executePlanSandbox prose root sessionId hasReviewed programSource =
+    let runPlanProgram
+        (prose: JsCanonicalDescription.Prose)
+        (gitCommonDir: string)
+        (root: string)
+        (sessionId: string)
+        (program: string)
+        : Task<string> =
         task {
-            let currentContent =
-                match PlanPath.readPlan root sessionId with
-                | Ok c -> c
-                | Error _ -> ""
+            // Plan is unified: uses the standard JsToolWorkflow.execute with
+            // the Plan role's projected capabilities. The working directory
+            // is the plan work's assigned directory (root/plan/sessionId).
+            let planRoot =
+                match Wanxiangshu.Mission.Planning.PlanPath.resolvePlanPath root sessionId with
+                | Ok fullPath ->
+                    let idx = fullPath.LastIndexOf('/')
+                    if idx >= 0 then fullPath.Substring(0, idx) else root
+                | Error _ -> root
 
-            // DSL-MUTABLE: algorithm-scratch — staged mutation accumulator for Plan sandbox
-            let stagedMutation = ref None
-
-            let api =
-                createPlanSandboxApi (PlanPath.resolvePlanPath root sessionId) currentContent stagedMutation None None
-
-            let baseClassSource = JsCanonicalDescription.runtimePlanBaseClass prose
-            let deadlineMs = 10000
+            let capabilities =
+                JsCapability.ofToolCapabilities (OfficeCapability.permissions Role.Plan)
+            let baseClass = JsCanonicalDescription.runtimeBaseClass prose capabilities
             let deadlineEpochMs = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() + 10000L
-            let outputBoundBytes = 1 <<< 20
-
-            let! handle = JsSandbox.runSurface baseClassSource programSource api deadlineMs deadlineEpochMs
-
-            let! runOutcome = JsSandbox.awaitResult handle outputBoundBytes
-
-            return renderPlanSandboxOutcome root sessionId hasReviewed stagedMutation.Value runOutcome
+            let input = createObj [ "program" ==> program ]
+            let! outcome =
+                JsToolWorkflow.execute
+                    sessionId
+                    capabilities
+                    planRoot
+                    baseClass
+                    input
+                    10000
+                    deadlineEpochMs
+                    (1 <<< 20)
+                    None
+                    None
+                    None
+            return JsToolsResult.render outcome
         }
 
-    let private activeReviewed (work: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork) =
-        match work.ActiveId with
-        | None -> Error "No active incumbency found for this work"
-        | Some _ -> Ok work.Reviewed
-
-    let private resolveActiveTenure (gitCommonDir: string) (sessionId: string) =
-        match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected gitCommonDir sessionId with
-        | Some work -> activeReviewed work
-        | None -> Error "No active incumbency found for this work"
-
-    let private executeTenureSandbox prose root gitCommonDir sessionId programSource =
-        match resolveActiveTenure gitCommonDir sessionId with
-        | Error reason ->
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.ProgramFailed reason, [], [], [], []))
-            |> Task.FromResult
-        | Ok hasReviewed -> executePlanSandbox prose root sessionId hasReviewed programSource
-
-    let private runPlanProgramCore
-        (prose: JsCanonicalDescription.Prose)
-        gitCommonDirOpt
-        (rootOpt: string option)
-        (sessionId: string)
-        (programSourceOpt: string option)
-        : Task<string> =
-        if Option.isNone programSourceOpt then
-            JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(JsFailure.InvalidProgram, [], [], [], []))
-            |> Task.FromResult
-        elif Option.isNone rootOpt || Option.isNone gitCommonDirOpt then
-            JsToolsResult.render (
-                JsToolWorkflow.JsToolOutcome.Failed(
-                    JsFailure.ProgramFailed "The plan workspace is unavailable",
-                    [],
-                    [],
-                    [],
-                    []
-                )
-            )
-            |> Task.FromResult
-        else
-            executeTenureSandbox prose rootOpt.Value gitCommonDirOpt.Value sessionId programSourceOpt.Value
-
-    let runPlanProgram prose gitCommonDir root sessionId program =
-        runPlanProgramCore prose (Some gitCommonDir) (Some root) sessionId (Some program)
-
-    [<Emit("$0 === undefined || $0 === null")>]
-    let private isNullishValue (value: obj) : bool = jsNative
-
-    /// Consulting validates the shared declaration but does not capture or mutate it.
     let private advisorDeclarationOf (view: obj) =
-        if isNullishValue view then
+        if isNull view then
             Ok AnchorViewDeclaration.empty
         else
             AnchorSurface.parseDeclaration view
@@ -735,15 +607,11 @@ module ToolRegistry =
                         None
                         jsRootOf
 
-                // Delegation seam: the programming surface's delegation members
-                // return data envelopes built from the delegation shard's
-                // structured entries. The host tool prose (fork/join/fission)
-                // is untouched; the host is process-live for one programming
-                // call and capability gating stays on the surface.
                 { spec with
                     Execute =
                         fun args ctx ->
-                            let envelopeOk (fields: (string * obj) list) : obj = createObj (("ok" ==> true) :: fields)
+                            let envelopeOk (fields: (string * obj) list) : obj =
+                                createObj (("ok" ==> true) :: fields)
 
                             let refusal (code: string) : obj =
                                 createObj [ "ok" ==> false; "code" ==> code ]
@@ -759,7 +627,10 @@ module ToolRegistry =
                                                     payload
 
                                             let! receipt =
-                                                ForkTool.executeReceipt runtime ctx (ToolHostCodec.argumentsOfRaw raw)
+                                                ForkTool.executeReceipt
+                                                    runtime
+                                                    ctx
+                                                    (ToolHostCodec.argumentsOfRaw raw)
 
                                             return
                                                 match receipt with
@@ -787,7 +658,8 @@ module ToolRegistry =
                                                               "view" ==> record.View ]
 
                                                     envelopeOk
-                                                        [ "records" ==> (records |> List.map toObj |> Array.ofList)
+                                                        [ "records"
+                                                          ==> (records |> List.map toObj |> Array.ofList)
                                                           "byName"
                                                           ==> createObj
                                                                   [ for record in records ->
@@ -817,11 +689,6 @@ module ToolRegistry =
                                                                |> Array.ofList) ]
                                                 | Error code -> refusal code
                                         }
-                                  // The horizon roster envelope comes from the
-                                  // horizon owner; the test-facing fork receipt
-                                  // entry takes the JS harness, so the
-                                  // generated-surface host builds the context
-                                  // from its own production runtime scope.
                                   Horizon =
                                     fun () ->
                                         let horizonContext: HorizonTool.HorizonRuntimeContext =
@@ -839,6 +706,7 @@ module ToolRegistry =
                                   Advisor = fun intent view -> advisorConsult runtime ctx intent view }
 
                             JsDelegationBridge.install ctx.SessionId host
+                            JsDelegationBridge.installAsk ctx.SessionId (fun question -> runtime.AskUser(ctx, question))
 
                             task {
                                 try
@@ -851,10 +719,353 @@ module ToolRegistry =
             [ for role in Roles.all do
                   yield! generatedJsSpecFor role |> Option.toList ]
 
+        // work-028: the real delegation capability — the SyncDelegate
+        // runtime runs the bound fixed DevOps for this work synchronously and
+        // hands back its complete delivered view. A missing runtime fails closed.
+        let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
+            let invokeRuntime (runtime: SyncDelegateRuntime) (intent: string) : Task<string> =
+                task {
+                    let! outcome = runtime.Invoke(ctx.SessionId, SyncDelegateRole.DevOps, intent)
 
+                    return
+                        match outcome with
+                        | Ok record -> record
+                        | Error reason ->
+                            raise (InvalidOperationException(sprintf "DevOps delegation failed: %s" reason))
+                }
 
-        // Lifecycle uses its own wanxiangli journal. The common directory is
-        // data passed to that owner, not a borrowed workspace EventStore.
+            fun (intent: string) ->
+                task {
+                    match syncRuntime with
+                    | None -> return raise (InvalidOperationException "sync delegate runtime unavailable")
+                    | Some runtime -> return! invokeRuntime runtime intent
+                }
+
+        let renderAskOutcome (outcome: Result<AskResult, string>) : string =
+            match outcome with
+            | Ok res -> res.View
+            | Error err -> sprintf "devops failed: %s" err
+
+        let askGitCommonDir (directory: string option) : Task<string> =
+            task {
+                match directory with
+                | Some workspace ->
+                    let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+                    return commonDir
+                | None -> return ""
+            }
+
+        let askWithLifecycle
+            (syncRuntime: SyncDelegateRuntime option)
+            (args: HostToolArguments)
+            (ctx: HostToolContext)
+            : Task<string> =
+            task {
+                let! gitCommonDir = askGitCommonDir workspaceDirectory
+
+                if String.IsNullOrWhiteSpace gitCommonDir then
+                    return "devops failed: git common directory is missing"
+                else
+                    let delegateTo = devopsDelegateOf syncRuntime ctx
+
+                    let! outcome =
+                        Wanxiangshu.Mission.Planning.PlanTools.executeAsk
+                            gitCommonDir
+                            ctx.SessionId
+                            (args.Text "intent")
+                            delegateTo
+
+                    return renderAskOutcome outcome
+            }
+
+        let executeAskTool
+            (syncRuntime: SyncDelegateRuntime option)
+            (args: HostToolArguments)
+            (ctx: HostToolContext)
+            : Task<string> =
+            askWithLifecycle syncRuntime args ctx
+
+        let lifecycleWorkOf
+            (runtime: ToolRuntimeScope)
+            (sessionId: string)
+            : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+            runtime.LifecycleWorkFor sessionId
+
+        let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : Task<string option> =
+            task {
+                let! work = lifecycleWorkOf runtime sessionId
+                return work |> Option.bind (fun work -> work.ActiveId)
+            }
+
+        // work-026: the receipt names the artifact path and the fact that
+        // an execution session started; the spawned session id stays out of
+        // the provider-visible text.
+        let renderDeliverReceipt (res: DeliverResult) : string =
+            if res.Relayed then
+                res.Message
+            elif res.RetirementOutcome = "PostS3" then
+                sprintf
+                    "%s The plan artifact is ready at %s; nudges are permanently disabled and this session is now in post-S3 state."
+                    res.Message
+                    res.Path
+            elif res.Delivered then
+                sprintf "%s The plan artifact is at %s; an execution session has been started." res.Message res.Path
+            else
+                res.Message
+
+        // work-025/026: the retirement cursor is the exact consumed-through
+        // XTrace frontier of the physical exchange that owns this deliver call.
+        // The snapshot may already contain a newer user/provider message appended
+        // while this deliver tool runs; retirement is fenced to the exact
+        // assistant/tool exchange in ctx (its ProviderRunId message and the
+        // ToolCallId it answers), never the indiscriminate session head. The
+        // whole physical call/result exchange is kept atomic: the frontier lands
+        // after the owning assistant message, so the deliver call's own result
+        // (appended after retirement) belongs to the successor tenure, and no
+        // prior call/result pair is split. A missing snapshot, journal, or
+        // owning-exchange identity fails closed with no Plan writes or spawn.
+        let deliverPorts (runtime: ToolRuntimeScope) =
+            match runtime.Snapshot, runtime.Journal with
+            | Some snapshotPort, Some journal -> Ok(snapshotPort, journal)
+            | None, _ -> Error "deliver failed: session snapshot is unavailable"
+            | _, None -> Error "deliver failed: journal is unavailable"
+
+        let deliverOwnership (ctx: HostToolContext) =
+            match ctx.ProviderRunId, ctx.ToolCallId with
+            | Some providerRun, Some toolCall -> Ok(ProviderRunIdentity.value providerRun, ToolCallId.value toolCall)
+            | None, _ -> Error "deliver failed: owning provider message identity is unavailable"
+            | _, None -> Error "deliver failed: owning tool call identity is unavailable"
+
+        let messageOwnsDeliver (message: SessionMessage) (owningCallId: string) =
+            message.ToolParts
+            |> Array.exists (fun part -> ToolCallId.value part.ToolCallId = owningCallId && part.ToolName = "deliver")
+
+        // Fence to the owning exchange: keep every message up to and including
+        // the assistant message that owns this deliver call. The snapshot port
+        // pins `order = "asc"` (HOST 1.18.9 session.messages), so the list is
+        // already physical append order; it is preserved verbatim. Any newer
+        // user/provider message appended while deliver runs stays out of range.
+        let tryOwningExchange (messages: SessionMessage list) (owningMessageId: string) (owningCallId: string) =
+            let owningIndex =
+                messages
+                |> List.tryFindIndex (fun (message: SessionMessage) ->
+                    message.Id = owningMessageId && message.Role = "assistant")
+
+            match owningIndex with
+            | None -> Error "deliver failed: the owning provider message is absent from the session snapshot"
+            | Some index when not (messageOwnsDeliver messages.[index] owningCallId) ->
+                Error "deliver failed: the owning tool call does not match this deliver invocation"
+            | Some index -> Ok(messages.[0..index])
+
+        let readOwningExchange
+            (snapshotPort: ISessionSnapshotPort)
+            (sessionId: SessionId)
+            (owningMessageId: string)
+            (owningCallId: string)
+            =
+            task {
+                match! snapshotPort.GetMessages sessionId with
+                | Error reason -> return Error(sprintf "deliver failed: cannot read the session snapshot: %s" reason)
+                | Ok messages -> return tryOwningExchange messages owningMessageId owningCallId
+            }
+
+        let captureFencedFrontier journal sessionId fenced =
+            task {
+                match!
+                    Wanxiangshu.Context.Trace.XTraceCapture.captureSessionMessagesWithReceipt
+                        (Some journal)
+                        sessionId
+                        fenced
+                with
+                | Ok receipt -> return Ok(Wanxiangshu.Context.Trace.XTraceCursor.sequence receipt.CurrentHead)
+                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.Refused reason) ->
+                    return Error(sprintf "deliver failed: XTrace capture refused: %s" reason)
+                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.StorageAppendFailed failure) ->
+                    return
+                        Error(
+                            sprintf
+                                "deliver failed: XTrace capture append failed: %s"
+                                (JournalOutcome.JournalAppendFailure.describe failure)
+                        )
+                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.StorageFailed reason) ->
+                    return Error(sprintf "deliver failed: XTrace capture failed: %s" reason)
+            }
+
+        let captureOrPropagate journal sessionId =
+            function
+            | Error err -> Task.FromResult(Error err)
+            | Ok fenced -> captureFencedFrontier journal sessionId fenced
+
+        let fenceAndCapture journal sessionId snapshotPort owningMessageId owningCallId =
+            task {
+                let! exchange = readOwningExchange snapshotPort sessionId owningMessageId owningCallId
+                return! captureOrPropagate journal sessionId exchange
+            }
+
+        let resolveDeliverRetirementCursor
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            : Task<Result<int64, string>> =
+            task {
+                match deliverPorts runtime, deliverOwnership ctx with
+                | Ok(snapshotPort, journal), Ok(owningMessageId, owningCallId) ->
+                    return!
+                        fenceAndCapture
+                            journal
+                            (SessionId.create ctx.SessionId)
+                            snapshotPort
+                            owningMessageId
+                            owningCallId
+                | Error err, _ -> return Error err
+                | _, Error err -> return Error err
+            }
+
+        let deliverCreate (runtime: ToolRuntimeScope) (operationId: string) (agent: string) =
+            runtime.CreateExecutionSession(operationId, agent)
+
+        let deliverPrompt (runtime: ToolRuntimeScope) (execSessionId: string) (agent: string) (prompt: string) =
+            runtime.PromptExecutionSession(execSessionId, agent, prompt)
+
+        let deliverDiscard (runtime: ToolRuntimeScope) (execSessionId: string) =
+            runtime.DiscardExecutionSession execSessionId
+
+        let renderDeliverOutcome outcome =
+            match outcome with
+            | Ok res -> renderDeliverReceipt res
+            | Error err -> sprintf "deliver failed: %s" err
+
+        let registerPostS3IfEntered
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (outcome: Result<DeliverResult, string>)
+            =
+            match outcome, ctx.ProviderRunId, ctx.ToolCallId with
+            | Ok res, Some runId, Some callId when res.RetirementOutcome = "PostS3" ->
+                runtime.RegisterPostS3Interrupt(SessionId.create ctx.SessionId, runId, callId)
+            | _ -> ()
+
+        let deliverCursor
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (incumbencyId: string)
+            (gitCommonDir: string)
+            : Task<string> =
+            task {
+                let providerRunId =
+                    ctx.ProviderRunId
+                    |> Option.map ProviderRunIdentity.value
+                    |> Option.defaultValue ""
+
+                let toolCallId =
+                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
+
+                let retirementBlockers () =
+                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
+
+                match! resolveDeliverRetirementCursor runtime ctx with
+                | Error err -> return sprintf "deliver failed: %s" err
+                | Ok retirementCursor ->
+                    let! outcome =
+                        PlanTools.enterPostS3OrRelay
+                            gitCommonDir
+                            root
+                            ctx.SessionId
+                            incumbencyId
+                            providerRunId
+                            toolCallId
+                            retirementBlockers
+                            retirementCursor
+
+                    registerPostS3IfEntered runtime ctx outcome
+
+                    return renderDeliverOutcome outcome
+            }
+
+        let deliverPostS3
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (gitCommonDir: string)
+            : Task<string> =
+            task {
+                let providerRunId =
+                    ctx.ProviderRunId
+                    |> Option.map ProviderRunIdentity.value
+                    |> Option.defaultValue ""
+
+                let toolCallId =
+                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
+
+                let retirementBlockers () =
+                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
+
+                match! resolveDeliverRetirementCursor runtime ctx with
+                | Error err -> return sprintf "deliver failed: %s" err
+                | Ok retirementCursor ->
+                    let! outcome =
+                        PlanTools.startPostS3Execution
+                            gitCommonDir
+                            root
+                            ctx.SessionId
+                            providerRunId
+                            toolCallId
+                            retirementBlockers
+                            (deliverCreate runtime)
+                            (deliverPrompt runtime)
+                            (deliverDiscard runtime)
+                            retirementCursor
+
+                    return renderDeliverOutcome outcome
+            }
+
+        let deliverForIncumbency
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (incumbencyId: string)
+            : Task<string> =
+            task {
+                let! gitCommonDir =
+                    task {
+                        match runtime.WorkspaceDirectory with
+                        | Some ws -> return! Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot ws
+                        | None -> return ""
+                    }
+
+                if String.IsNullOrWhiteSpace gitCommonDir then
+                    return "deliver failed: git common directory is missing"
+                else
+                    return! deliverCursor root runtime ctx incumbencyId gitCommonDir
+            }
+
+        let runDeliver (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
+            task {
+                let! gitCommonDir =
+                    task {
+                        match runtime.WorkspaceDirectory with
+                        | Some ws -> return! Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot ws
+                        | None -> return ""
+                    }
+
+                match! lifecycleWorkOf runtime ctx.SessionId with
+                | Some work when work.ActiveId.IsSome ->
+                    return! deliverForIncumbency root runtime ctx work.ActiveId.Value
+                | Some work when
+                    work.Delivered
+                    && work.Sequence = [ "S1"; "S2"; "S3" ]
+                    && String.IsNullOrWhiteSpace gitCommonDir
+                    ->
+                    return "deliver failed: git common directory is missing"
+                | Some work when work.Delivered && work.Sequence = [ "S1"; "S2"; "S3" ] ->
+                    return! deliverPostS3 root runtime ctx gitCommonDir
+                | _ -> return "deliver failed: no active incumbency found for this work"
+            }
+
+        // Clean-break: all host delegation and lifecycle verbs (fork, resume,
+        // commission, join, horizon, fission, review, deliver, devops, fetch)
+        // are retired from host registration and live exclusively as
+        // programming-surface members.
         let resolvePlanGitCommonDir () : Task<string option> =
             task {
                 match workspaceDirectory with
@@ -873,130 +1084,369 @@ module ToolRegistry =
                 | None -> return None
             }
 
-        let planningAdmission: ToolAdmission =
-            ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
+        // work-028: the real delegation capability — the SyncDelegate
+        // runtime runs the bound fixed DevOps for this work synchronously and
+        // hands back its complete delivered view. A missing runtime fails closed.
+        let devopsDelegateOf (syncRuntime: SyncDelegateRuntime option) (ctx: HostToolContext) : string -> Task<string> =
+            let invokeRuntime (runtime: SyncDelegateRuntime) (intent: string) : Task<string> =
+                task {
+                    let! outcome = runtime.Invoke(ctx.SessionId, SyncDelegateRole.DevOps, intent)
 
-        // 只有 S1 阶段的 Plan 可以提问；阶段门禁由 AskUser 与 durable work 共同兜底。
-        let planDeadlineMs = 10000
-        let planOutputBoundBytes = 1 <<< 20
+                    return
+                        match outcome with
+                        | Ok record -> record
+                        | Error reason ->
+                            raise (InvalidOperationException(sprintf "DevOps delegation failed: %s" reason))
+                }
 
-        let planBaseClassSource () =
-            JsCanonicalDescription.runtimePlanBaseClass jsProse
+            fun (intent: string) ->
+                task {
+                    match syncRuntime with
+                    | None -> return raise (InvalidOperationException "sync delegate runtime unavailable")
+                    | Some runtime -> return! invokeRuntime runtime intent
+                }
 
-        let resolveHasReviewed (planGitCommonDir: string option) (sessionId: string) : bool =
-            planGitCommonDir
-            |> Option.bind (fun gitCommonDir -> resolveActiveTenure gitCommonDir sessionId |> Result.toOption)
-            |> Option.defaultValue false
-
-        let commitOrRenderPlanOutcome root sessionId hasReviewed stagedMutation value outcome =
-            match stagedMutation with
-            | None -> JsToolsResult.render outcome
-            | Some _ -> commitPlanMutation root sessionId hasReviewed stagedMutation value
-
-        let finishPlanOutcome root sessionId hasReviewed stagedMutation outcome =
+        let renderAskOutcome (outcome: Result<AskResult, string>) : string =
             match outcome with
-            | JsToolWorkflow.JsToolOutcome.Succeeded(value, _, _, _, _) ->
-                commitOrRenderPlanOutcome root sessionId hasReviewed stagedMutation value outcome
-            | _ -> JsToolsResult.render outcome
+            | Ok res -> res.View
+            | Error err -> sprintf "devops failed: %s" err
 
-        let executePlanProgramWithPark (root: string) (ctx: HostToolContext) (programSource: string) : Task<string> =
+        let askGitCommonDir (directory: string option) : Task<string> =
             task {
-                let currentContent =
-                    match PlanPath.readPlan root ctx.SessionId with
-                    | Ok c -> c
-                    | Error _ -> ""
-
-                // DSL-MUTABLE: algorithm-scratch — staged plan mutation
-                let stagedMutation = ref None
-
-                let makeApi (parkState: Wanxiangshu.Process.JsSandbox.ParkState) =
-                    createPlanSandboxApi
-                        (PlanPath.resolvePlanPath root ctx.SessionId)
-                        currentContent
-                        stagedMutation
-                        (Some parkState)
-                        (Some(fun question -> runtime.AskUser(ctx, question)))
-
-                let now = System.DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-
-                let! outcome =
-                    JsToolWorkflow.runWithParkApi
-                        ctx.SessionId
-                        (planBaseClassSource ())
-                        programSource
-                        makeApi
-                        planDeadlineMs
-                        (now + int64 planDeadlineMs)
-                        planOutputBoundBytes
-
-                let! commonDirOpt = resolvePlanGitCommonDir ()
-                let hasReviewed = resolveHasReviewed commonDirOpt ctx.SessionId
-                return finishPlanOutcome root ctx.SessionId hasReviewed stagedMutation.Value outcome
+                match directory with
+                | Some workspace ->
+                    let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+                    return commonDir
+                | None -> return ""
             }
 
-        let executePlanProgramRoute (root: string option) (ctx: HostToolContext) (source: string) : Task<string> =
-            match root with
-            | Some rootDir -> executePlanProgramWithPark rootDir ctx source
-            | None ->
-                Task.FromResult(
-                    JsToolsResult.render (
-                        JsToolWorkflow.JsToolOutcome.Failed(
-                            JsFailure.ProgramFailed "The plan workspace is unavailable",
-                            [],
-                            [],
-                            [],
-                            []
-                        )
-                    )
-                )
-
-        let executeJsPlanTool (args: HostToolArguments) (ctx: HostToolContext) : Task<string> =
+        let askWithLifecycle
+            (syncRuntime: SyncDelegateRuntime option)
+            (args: HostToolArguments)
+            (ctx: HostToolContext)
+            : Task<string> =
             task {
-                let viewFailure =
-                    match
-                        Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.setView ctx.SessionId (args.Raw?view)
-                    with
-                    | Ok() -> None
-                    | Error failure -> Some failure
+                let! gitCommonDir = askGitCommonDir workspaceDirectory
 
-                let program = args.OptionalText "program"
+                if String.IsNullOrWhiteSpace gitCommonDir then
+                    return "devops failed: git common directory is missing"
+                else
+                    let delegateTo = devopsDelegateOf syncRuntime ctx
 
-                let unpark = if isNull (args.Raw?unpark) then null else args.Raw?unpark
-
-                let abandon = if isNull (args.Raw?abandon) then null else args.Raw?abandon
-
-                match viewFailure, program, unpark, abandon with
-                | Some failure, _, _, _ ->
-                    return JsToolsResult.render (JsToolWorkflow.JsToolOutcome.Failed(failure, [], [], [], []))
-                | None, Some source, _, _ ->
-                    let! root = resolvePlanRoot ()
-                    return! executePlanProgramRoute root ctx source
-                | None, None, unparkValue, _ when not (isNull unparkValue) ->
                     let! outcome =
-                        JsToolWorkflow.resumeParked
-                            (string (unparkValue?handle))
-                            (unparkValue?value)
-                            (planBaseClassSource ())
-                            planDeadlineMs
-                            planOutputBoundBytes
+                        Wanxiangshu.Mission.Planning.PlanTools.executeAsk
+                            gitCommonDir
+                            ctx.SessionId
+                            (args.Text "intent")
+                            delegateTo
 
-                    return JsToolsResult.render outcome
-                | None, None, _, abandonValue when not (isNull abandonValue) ->
-                    let! outcome =
-                        JsToolWorkflow.abandonParked (string (abandonValue?handle)) planDeadlineMs planOutputBoundBytes
+                    return renderAskOutcome outcome
+            }
 
-                    return JsToolsResult.render outcome
-                | _ ->
+        let executeAskTool
+            (syncRuntime: SyncDelegateRuntime option)
+            (args: HostToolArguments)
+            (ctx: HostToolContext)
+            : Task<string> =
+            askWithLifecycle syncRuntime args ctx
+
+        let lifecycleWorkOf
+            (runtime: ToolRuntimeScope)
+            (sessionId: string)
+            : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+            runtime.LifecycleWorkFor sessionId
+
+        let lifecycleActiveIncumbencyOf (runtime: ToolRuntimeScope) (sessionId: string) : Task<string option> =
+            task {
+                let! work = lifecycleWorkOf runtime sessionId
+                return work |> Option.bind (fun work -> work.ActiveId)
+            }
+
+        // work-026: the receipt names the artifact path and the fact that
+        // an execution session started; the spawned session id stays out of
+        // the provider-visible text.
+        let renderDeliverReceipt (res: DeliverResult) : string =
+            if res.Relayed then
+                res.Message
+            elif res.RetirementOutcome = "PostS3" then
+                sprintf
+                    "%s The plan artifact is ready at %s; nudges are permanently disabled and this session is now in post-S3 state."
+                    res.Message
+                    res.Path
+            elif res.Delivered then
+                sprintf "%s The plan artifact is at %s; an execution session has been started." res.Message res.Path
+            else
+                res.Message
+
+        // work-025/026: the retirement cursor is the exact consumed-through
+        // XTrace frontier of the physical exchange that owns this deliver call.
+        // The snapshot may already contain a newer user/provider message appended
+        // while this deliver tool runs; retirement is fenced to the exact
+        // assistant/tool exchange in ctx (its ProviderRunId message and the
+        // ToolCallId it answers), never the indiscriminate session head. The
+        // whole physical call/result exchange is kept atomic: the frontier lands
+        // after the owning assistant message, so the deliver call's own result
+        // (appended after retirement) belongs to the successor tenure, and no
+        // prior call/result pair is split. A missing snapshot, journal, or
+        // owning-exchange identity fails closed with no Plan writes or spawn.
+        let deliverPorts (runtime: ToolRuntimeScope) =
+            match runtime.Snapshot, runtime.Journal with
+            | Some snapshotPort, Some journal -> Ok(snapshotPort, journal)
+            | None, _ -> Error "deliver failed: session snapshot is unavailable"
+            | _, None -> Error "deliver failed: journal is unavailable"
+
+        let deliverOwnership (ctx: HostToolContext) =
+            match ctx.ProviderRunId, ctx.ToolCallId with
+            | Some providerRun, Some toolCall -> Ok(ProviderRunIdentity.value providerRun, ToolCallId.value toolCall)
+            | None, _ -> Error "deliver failed: owning provider message identity is unavailable"
+            | _, None -> Error "deliver failed: owning tool call identity is unavailable"
+
+        let messageOwnsDeliver (message: SessionMessage) (owningCallId: string) =
+            message.ToolParts
+            |> Array.exists (fun part -> ToolCallId.value part.ToolCallId = owningCallId && part.ToolName = "deliver")
+
+        // Fence to the owning exchange: keep every message up to and including
+        // the assistant message that owns this deliver call. The snapshot port
+        // pins `order = "asc"` (HOST 1.18.9 session.messages), so the list is
+        // already physical append order; it is preserved verbatim. Any newer
+        // user/provider message appended while deliver runs stays out of range.
+        let tryOwningExchange (messages: SessionMessage list) (owningMessageId: string) (owningCallId: string) =
+            let owningIndex =
+                messages
+                |> List.tryFindIndex (fun (message: SessionMessage) ->
+                    message.Id = owningMessageId && message.Role = "assistant")
+
+            match owningIndex with
+            | None -> Error "deliver failed: the owning provider message is absent from the session snapshot"
+            | Some index when not (messageOwnsDeliver messages.[index] owningCallId) ->
+                Error "deliver failed: the owning tool call does not match this deliver invocation"
+            | Some index -> Ok(messages.[0..index])
+
+        let readOwningExchange
+            (snapshotPort: ISessionSnapshotPort)
+            (sessionId: SessionId)
+            (owningMessageId: string)
+            (owningCallId: string)
+            =
+            task {
+                match! snapshotPort.GetMessages sessionId with
+                | Error reason -> return Error(sprintf "deliver failed: cannot read the session snapshot: %s" reason)
+                | Ok messages -> return tryOwningExchange messages owningMessageId owningCallId
+            }
+
+        let captureFencedFrontier journal sessionId fenced =
+            task {
+                match!
+                    Wanxiangshu.Context.Trace.XTraceCapture.captureSessionMessagesWithReceipt
+                        (Some journal)
+                        sessionId
+                        fenced
+                with
+                | Ok receipt -> return Ok(Wanxiangshu.Context.Trace.XTraceCursor.sequence receipt.CurrentHead)
+                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.Refused reason) ->
+                    return Error(sprintf "deliver failed: XTrace capture refused: %s" reason)
+                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.StorageAppendFailed failure) ->
                     return
-                        JsToolsResult.render (
-                            JsToolWorkflow.JsToolOutcome.Failed(
-                                JsFailure.InvalidArgument "no program, unpark, or abandon input",
-                                [],
-                                [],
-                                [],
-                                []
-                            )
+                        Error(
+                            sprintf
+                                "deliver failed: XTrace capture append failed: %s"
+                                (JournalOutcome.JournalAppendFailure.describe failure)
                         )
+                | Error(Wanxiangshu.Context.Trace.XTraceCaptureError.StorageFailed reason) ->
+                    return Error(sprintf "deliver failed: XTrace capture failed: %s" reason)
+            }
+
+        let captureOrPropagate journal sessionId =
+            function
+            | Error err -> Task.FromResult(Error err)
+            | Ok fenced -> captureFencedFrontier journal sessionId fenced
+
+        let fenceAndCapture journal sessionId snapshotPort owningMessageId owningCallId =
+            task {
+                let! exchange = readOwningExchange snapshotPort sessionId owningMessageId owningCallId
+                return! captureOrPropagate journal sessionId exchange
+            }
+
+        let resolveDeliverRetirementCursor
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            : Task<Result<int64, string>> =
+            task {
+                match deliverPorts runtime, deliverOwnership ctx with
+                | Ok(snapshotPort, journal), Ok(owningMessageId, owningCallId) ->
+                    return!
+                        fenceAndCapture
+                            journal
+                            (SessionId.create ctx.SessionId)
+                            snapshotPort
+                            owningMessageId
+                            owningCallId
+                | Error err, _ -> return Error err
+                | _, Error err -> return Error err
+            }
+
+        let deliverCreate (runtime: ToolRuntimeScope) (operationId: string) (agent: string) =
+            runtime.CreateExecutionSession(operationId, agent)
+
+        let deliverPrompt (runtime: ToolRuntimeScope) (execSessionId: string) (agent: string) (prompt: string) =
+            runtime.PromptExecutionSession(execSessionId, agent, prompt)
+
+        let deliverDiscard (runtime: ToolRuntimeScope) (execSessionId: string) =
+            runtime.DiscardExecutionSession execSessionId
+
+        let renderDeliverOutcome outcome =
+            match outcome with
+            | Ok res -> renderDeliverReceipt res
+            | Error err -> sprintf "deliver failed: %s" err
+
+        let registerPostS3IfEntered
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (outcome: Result<DeliverResult, string>)
+            =
+            match outcome, ctx.ProviderRunId, ctx.ToolCallId with
+            | Ok res, Some runId, Some callId when res.RetirementOutcome = "PostS3" ->
+                runtime.RegisterPostS3Interrupt(SessionId.create ctx.SessionId, runId, callId)
+            | _ -> ()
+
+        let deliverCursor
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (incumbencyId: string)
+            (gitCommonDir: string)
+            : Task<string> =
+            task {
+                let providerRunId =
+                    ctx.ProviderRunId
+                    |> Option.map ProviderRunIdentity.value
+                    |> Option.defaultValue ""
+
+                let toolCallId =
+                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
+
+                let retirementBlockers () =
+                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
+
+                match! resolveDeliverRetirementCursor runtime ctx with
+                | Error err -> return sprintf "deliver failed: %s" err
+                | Ok retirementCursor ->
+                    let! outcome =
+                        PlanTools.enterPostS3OrRelay
+                            gitCommonDir
+                            root
+                            ctx.SessionId
+                            incumbencyId
+                            providerRunId
+                            toolCallId
+                            retirementBlockers
+                            retirementCursor
+
+                    registerPostS3IfEntered runtime ctx outcome
+
+                    return renderDeliverOutcome outcome
+            }
+
+        let deliverPostS3
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (gitCommonDir: string)
+            : Task<string> =
+            task {
+                let providerRunId =
+                    ctx.ProviderRunId
+                    |> Option.map ProviderRunIdentity.value
+                    |> Option.defaultValue ""
+
+                let toolCallId =
+                    ctx.ToolCallId |> Option.map ToolCallId.value |> Option.defaultValue ""
+
+                let retirementBlockers () =
+                    runtime.RetirementBlockersFor ctx.SessionId |> List.toArray
+
+                match! resolveDeliverRetirementCursor runtime ctx with
+                | Error err -> return sprintf "deliver failed: %s" err
+                | Ok retirementCursor ->
+                    let! outcome =
+                        PlanTools.startPostS3Execution
+                            gitCommonDir
+                            root
+                            ctx.SessionId
+                            providerRunId
+                            toolCallId
+                            retirementBlockers
+                            (deliverCreate runtime)
+                            (deliverPrompt runtime)
+                            (deliverDiscard runtime)
+                            retirementCursor
+
+                    return renderDeliverOutcome outcome
+            }
+
+        let deliverForIncumbency
+            (root: string)
+            (runtime: ToolRuntimeScope)
+            (ctx: HostToolContext)
+            (incumbencyId: string)
+            : Task<string> =
+            task {
+                let! gitCommonDir =
+                    task {
+                        match runtime.WorkspaceDirectory with
+                        | Some ws -> return! Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot ws
+                        | None -> return ""
+                    }
+
+                if String.IsNullOrWhiteSpace gitCommonDir then
+                    return "deliver failed: git common directory is missing"
+                else
+                    return! deliverCursor root runtime ctx incumbencyId gitCommonDir
+            }
+
+        let runDeliver (root: string) (runtime: ToolRuntimeScope) (ctx: HostToolContext) : Task<string> =
+            task {
+                let! gitCommonDir =
+                    task {
+                        match runtime.WorkspaceDirectory with
+                        | Some ws -> return! Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot ws
+                        | None -> return ""
+                    }
+
+                match! lifecycleWorkOf runtime ctx.SessionId with
+                | Some work when work.ActiveId.IsSome ->
+                    return! deliverForIncumbency root runtime ctx work.ActiveId.Value
+                | Some work when
+                    work.Delivered
+                    && work.Sequence = [ "S1"; "S2"; "S3" ]
+                    && String.IsNullOrWhiteSpace gitCommonDir
+                    ->
+                    return "deliver failed: git common directory is missing"
+                | Some work when work.Delivered && work.Sequence = [ "S1"; "S2"; "S3" ] ->
+                    return! deliverPostS3 root runtime ctx gitCommonDir
+                | _ -> return "deliver failed: no active incumbency found for this work"
+            }
+
+        // Clean-break: all host delegation and lifecycle verbs (fork, resume,
+        // commission, join, horizon, fission, review, deliver, devops, fetch)
+        // are retired from host registration and live exclusively as
+        // programming-surface members.
+        let resolvePlanGitCommonDir () : Task<string option> =
+            task {
+                match workspaceDirectory with
+                | Some ws ->
+                    let! root = RuntimePath.stateRoot ws
+                    return Some root
+                | None -> return None
+            }
+
+        let resolvePlanRoot () : Task<string option> =
+            task {
+                match workspaceDirectory with
+                | Some ws ->
+                    let! root = RuntimePath.stateRoot ws
+                    return Some(root + "/wanxiangshu")
+                | None -> return None
             }
 
         // work-028: the real delegation capability — the SyncDelegate
@@ -1353,54 +1803,7 @@ module ToolRegistry =
                 | None -> return "deliver failed: the plan workspace is unavailable"
             }
 
-        let planningSpecs () =
-            let planUnparkSchema =
-                ToolHostCodec.objectSchemaOf
-                    [ "handle", ToolHostCodec.stringSchema factory
-                      "value", ToolHostCodec.anySchema factory ]
-                    factory
 
-            let planAbandonSchema =
-                ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
-
-            // The Plan uses the same declaration as every generated programming surface.
-            let planViewSchema =
-                ToolHostCodec.objectSchemaOf
-                    [ "prefixUntil", ToolHostCodec.numberSchema factory
-                      "thenMap",
-                      ToolHostCodec.recordSchemaOf
-                          (ToolHostCodec.stringSchema factory)
-                          (ToolHostCodec.nullableStringSchema factory)
-                          (JsDescriptionAssets.viewDeclarationExtra (ProviderLanguageBinding.readGlobalPreference ()))
-                          factory ]
-                    factory
-
-            [ { Name = "todowrite-for-plan"
-                Description =
-                  JsCanonicalDescription.renderPlan
-                      jsProse
-                      (ProviderProse.render providerLanguage "tool/js-plan" Map.empty)
-                Arguments =
-                  [ "program",
-                    ToolHostCodec.stringSchemaDescribed
-                        (JsDescriptionAssets.argProgram (ProviderLanguageBinding.readGlobalPreference ()))
-                        factory
-                    "unpark", planUnparkSchema
-                    "abandon", planAbandonSchema
-                    "view", planViewSchema ]
-                Admission = planningAdmission
-                Execute = fun args ctx -> executeJsPlanTool args ctx }
-              { Name = "devops"
-                Description = ProviderProse.render providerLanguage "tool/devops" Map.empty
-                Arguments =
-                  [ "intent",
-                    ToolHostCodec.stringSchemaDescribed "Investigation intent handed to the bound fixed DevOps" factory ]
-                Admission = planningAdmission
-                Execute = fun args ctx -> executeAskTool syncDelegateRuntime args ctx } ]
-
-        /// Algorithm D/E: one `deliver` tool. The work's sequence decides the
-        /// path — S4 is the two-stage Manager deliver, S1–S3 the one-shot Plan
-        /// deliver. The name, the registration and the resource are single.
         let deliverSpec () =
             let managerSpec = DeliverTool.spec factory runtime
 
@@ -1408,7 +1811,7 @@ module ToolRegistry =
                 { Name = "deliver"
                   Description = ProviderProse.render providerLanguage "tool/deliver" Map.empty
                   Arguments = [ "note", ToolHostCodec.optionalStringSchema factory ]
-                  Admission = planningAdmission
+                  Admission = ToolAdmission.OfficeRole(fun _ role -> role = Role.Plan)
                   Execute =
                     fun _ ctx ->
                         task {
@@ -1437,12 +1840,7 @@ module ToolRegistry =
                 Execute =
                     fun args ctx ->
                         task {
-                            // Algorithm G1: the deliver hard gate. While any
-                            // parked site is unresolved (state=Parked and no
-                            // unpark/abandon has been taken), delivery is
-                            // refused and every handle is listed. The parked
-                            // site table and its read-only query are owned by
-                            // lane-a-core (JsParkedSites.parkedHandles).
+                            // Algorithm G1: the deliver hard gate.
                             let parkedHandles = JsParkedSites.parkedHandles ()
 
                             if not (List.isEmpty parkedHandles) then
@@ -1460,33 +1858,7 @@ module ToolRegistry =
                                 return! executeDeliverRoute ctx args
                         } }
 
-        let baseSpecs =
-            [ yield ForkTool.managerSpec factory runtime
-              yield ForkTool.resumeSpec factory runtime
-
-              yield ForkTool.orchestratorSpec factory runtime
-              yield JoinTool.spec runtime
-
-
-              let horizonContext: HorizonTool.HorizonRuntimeContext =
-                  { RuntimeFor = runtime.RuntimeFor
-                    LogicalOwnerFor = runtime.LogicalOwnerFor
-                    Journal = runtime.Journal
-                    EnsureWorkDevOpsBound = runtime.EnsureWorkDevOpsBound }
-
-              yield HorizonTool.spec horizonContext
-              yield FissionTool.spec factory runtime
-              // work-038: the shared review shell.
-              // Plan lifecycle reads its own durable owner directly.
-              yield ReviewShell.spec factory runtime
-              yield deliverSpec ()
-              yield BashHoneypotTool.spec
-              yield AssumeTool.spec factory
-
-              yield! casebookToolSpecs
-              yield! generatedJsSpecs ()
-
-              yield! planningSpecs () ]
+        let deliverTool = deliverSpec ()
 
         let recordedDeliverReplay (ctx: HostToolContext) : Task<bool> =
             task {
@@ -1501,21 +1873,39 @@ module ToolRegistry =
                 | _ -> return false
             }
 
+        let baseSpecs =
+            [ yield ForkTool.managerSpec factory runtime
+              yield ForkTool.resumeSpec factory runtime
+
+              yield ForkTool.orchestratorSpec factory runtime
+              yield JoinTool.spec runtime
+
+              let horizonContext: HorizonTool.HorizonRuntimeContext =
+                  { RuntimeFor = runtime.RuntimeFor
+                    LogicalOwnerFor = runtime.LogicalOwnerFor
+                    Journal = runtime.Journal
+                    EnsureWorkDevOpsBound = runtime.EnsureWorkDevOpsBound }
+
+              yield HorizonTool.spec horizonContext
+              yield FissionTool.spec factory runtime
+              yield ReviewShell.spec factory runtime
+              yield deliverTool
+              yield BashHoneypotTool.spec
+              yield AssumeTool.spec factory
+
+              yield! casebookToolSpecs
+              yield! generatedJsSpecs () ]
+
         let gateFacts: ToolGateFacts =
             { RoleFor = (fun ctx -> runtime.RoleFor ctx)
               EnsureRoleFor = (fun ctx -> runtime.EnsureRoleFor ctx)
               ManagerFactsFor = (fun sessionId -> runtime.ManagerCapabilityFactsFor sessionId)
-
               IsRetirementFrozen = (fun sessionId -> runtime.IsRetirementFrozen sessionId)
               IsWaitingForUser = runtime.IsWaitingForUser
               BeginToolExecution = beginToolExecution
               EndToolExecution = endToolExecution
               RecordedDeliverReplay = recordedDeliverReplay }
 
-        // Generic execute gate: every tool declares the authority it is admitted
-        // under, and the registry never invents one the session does not hold.
-        // capability-enforcement-012: Manager tool permissions come from the one
-        // StaticTools reverse lookup the schema projection already reads.
         let gateExecute (spec: ToolSpec) =
             let managerPermission =
                 match ManagerReviewTools.requiredPermissions spec.Name with
