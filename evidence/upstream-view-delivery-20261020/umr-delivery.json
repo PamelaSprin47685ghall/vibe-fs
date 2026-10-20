@@ -1,6 +1,6 @@
 {
   "package": "UM-R / UM-3 / UM-4 / UM-5",
-  "state": "SOURCE_VERIFIED_WITH_RECORDED_DEBT",
+  "state": "SOURCE_MERGED_AND_PUSHED_WITH_RECORDED_DEBT",
   "recordedAt": "2026-10-20T14:26:06Z",
   "upstreamTarget": "11052493bedb4edbcbe0c341fa677afd44c486f1",
   "deferredUpstream": "df7846ab8",
@@ -10,11 +10,15 @@
       "39b5dd04d7df2858225ca38182932d3bab555da3",
       "11052493bedb4edbcbe0c341fa677afd44c486f1"
     ],
-    "mergeCommit": null,
+    "mergeCommit": "f2f30d3fa7fd1fc84685b9c32cb4128f5999a4b3",
     "origin": "https://github.com/dyx13/vibe-fs.git",
     "originMasterBefore": "24462522f8c37d898f0b07f8723c7cf9f99dae05",
-    "sourceCommitted": false,
-    "published": false,
+    "sourceCommitted": true,
+    "published": true,
+    "sourcePushExit": 0,
+    "sourcePushConfirmedAt": "2026-10-20T14:33:21Z",
+    "observedOriginMaster": "f2f30d3fa7fd1fc84685b9c32cb4128f5999a4b3",
+    "receiptCommit": "A later evidence-only commit records this verified source push; its own SHA is reported after publication.",
     "pushRef": "refs/heads/master",
     "forcePush": false
   },
