@@ -4,7 +4,7 @@
 
 ## 1. 状态与范围
 
-- **owner**：eng-cut19-goose（2026-10-20 认领，`board(CUT-19): claim` 993e93683）。reviewer：未配非作者 reviewer（本轮全自治，见 §8）。
+- **owner**：eng-cut19c-goose（2026-10-20 接手 eng-cut19b-goose 中断后的工作树 `cut/CUT-19b`：库提交 3585c4f/66fd900 已在 wanxiangli main，主仓提交与本卡记录由 19c rebase、复验后落地；此前 eng-cut19b-goose 接手；原 owner eng-cut19-goose 已退出：其工作树 `cut/CUT-19` 干净、与 master 同步、无运行进程，交接提交 1c90ecf69）。原认领 993e93683。reviewer：未配非作者 reviewer（本轮全自治，见 §8）。
 - **本轮闭合的职责**：多 writer 事实流的**结构归并**（durable-convergence-001/002/003 与 011 的 retained 父边界）。唯一实现从主仓 `EventKWayMerge.fs` 迁到 `wanxiangli/convergence`（`KWayMerge`）。
 - **本卡整体未完成**：段文件原子追加与滚动（`ProcessEventLog`）、retention 截止与整 writer 过期、跨进程锁、物化缓存、`IntegratorEngine` 业务折叠与 cut-tail、`validateLocalHistory` 与 `wanxiangli/events.validate` 的同义校验收敛，都仍在主仓，归本卡后续子范围。故看板列为 `DOING`，不是 `DONE`。
 
@@ -69,6 +69,7 @@
 | `node scripts/check.mjs` | FAIL（既有，154 条列出项） | FAIL（既有，154 条；shard-edge 低级发现 256 → 255，少的是旧 EventKWayMerge 的 `Finished` 类型名边） |
 | fantomas --check（本卡三文件） | — | 格式化后通过 |
 
+- 接手复验（eng-cut19c-goose）：rebase 到 master b40dd6efa（期间新增 CUT-25 文档与 CUT-08 tool-name map 接线，后者已把 gitlink 推到 b6b05e2 / 0.20.0，含本卡 66fd900 的 0.19.0 内容）；gitlink 与 lock 取 master 的 0.20.0，重建库 dist 后同工作树 `node scripts/build.mjs` ok，durable-events + durable-convergence 35 文件 250 pass / 0 fail / 14 skip / 10 todo；日志 `/workspace/vfs-cut/wt/logs-cut19c/rebased-run2.log`。
 - 14 skip 是未开 integration tier 的编译闭包测试（durable-events 022/023 等）；10 todo 是既有登记。run.mjs 因此以「pending proof」退出 1，两侧相同，不是通过。
 - integration tier（`WXS_TIER_INTEGRATION=1` 跑 022/023/014）**未完成**：运行被会话中断，没有结果，不计入。
 - 成本：每次归并多一次 envelope→JS 对象转换，bench 中位慢约 6%，最小值慢约 30%；机器同时有其他 worker 在跑构建，噪声大。比较次数相同说明算法等价。只在本地变化时才会触发归并（durable-convergence-010），量级可接受，但这是实测回退，如实登记。
@@ -84,8 +85,53 @@
 - **比较**（同一工作树，base = b7d45b063 的 dist，`--skip-staleness-check` 因源码已改）：durable-convergence + durable-events 35 文件 base 245 pass / 1 fail（新反例）/ 14 skip / 10 todo；候选 **246 / 0** / 14 / 10。`check.mjs` 两侧都是既有 FAIL，154 条列出项、门禁计数相同。
 - **未做**：integration tier；全量 verify。
 
-## 10. 下一子范围（仍归本卡）
+## 10. 子范围③：已落盘行的闭包校验收敛到 `wanxiangli/events`
 
-1. `IntegratorEngine.validateLocalHistory` 的词汇/载荷闭包检查与 `wanxiangli/events.validate` 收敛（CUT-18 遗留，注意 027 锁定的错误消息形状）。
-2. writer 活动时刻的尾部判定（Journal `ObservedAt` 优先、`ProjectionCutTail` 跨段回溯）中的纯分类部分；文件读取留在主仓。
-3. 段聚合与原子追加（`ProcessEventLog`）：需持久数据计划，按 README §10 另行准备。
+- **职责**：本地已落盘行（追加批与保留窗口重放）必须满足的闭包——先对整个集合查词汇，再逐行严格载荷闭包：每个 PayloadRef（不论是否内容地址形态）都内联且 sha256 吻合，每个内联载荷都被某个 ref 指名。不查父闭包（保留窗口合法地指向已过期的父，归 convergence），不做身份合并。
+- **旧状**：两份手写实现。追加侧 `Store.validatePayloadClosure`（缺失/失配/无主都报 `MissingPayload`）；重放侧 `IntegratorEngine.validateLocalHistory`（词汇 + 缺失/失配，**不查无主载荷**）。库里 `validate` 又是第三种（只约束内容地址 ref、还查父闭包，不适用于保留窗口）。
+- **库**：`CanonicalEventCodec.checkClosure(events, isKnownEventType)`，新错误码 `PayloadDigestMismatch`、`UnreferencedPayload`（只由 checkClosure 产生），提交 `3585c4f`，随 `66fd900`（0.19.0）发布。库测试 `events/tests/012` 新增五例（自包含与无 ref 行通过；缺失/失配/无主分别命名；非内容地址 ref 不豁免；词汇先于载荷；不查父）。变异：去掉无主检查 → 012 红。
+- **主仓**：`CanonicalEventCodec.checkStoredClosure` 薄投影为 `StoredLineFault`；`Store.validatePayloadClosure` 与 `IntegratorEngine.validateLocalHistory` 都改为调用它，各自只保留错误形状（追加侧仍一律 `MissingPayload`；重放侧保留 027 锁定的消息，新增 `unreferenced durable inline payload during replay: <ref>`）。`ProcessEventLog.payloadDigest` 只剩 `WritePayload` 计算地址一个用途。
+- **反例（base 红）**：`requirements/durable-events/tests/012.test.mjs`「reload refuses inline bytes that no PayloadRef names instead of serving them by that address」。重放把每个内联载荷按键折进内容寻址的 PayloadIndex；旧重放不查无主载荷，于是一行在别人的内容地址下携带伪造字节就能装载，`readPayload(该地址)` 交出伪造字节。base 上 `create` 成功（Missing expected exception）；候选上 fail-closed，且不改写该行；去掉伪造字节后同目录正常装载、该地址读不到内容。追加侧早已拒绝这种行，所以合法写入的历史不受影响——这是把重放与追加对齐，不是范围缩减。
+
+## 11. 子范围④：writer 活动时刻的尾行判定交给 `wanxiangli/retention`
+
+- **职责**（durable-convergence-011）：哪一条尾行替 writer 说出活动时刻——逻辑流最末的 Journal 信封的有限 `ObservedAt`；尾部连续的 `ProjectionCutTail` 是前一条事实的整合元数据，往前走（可跨段）；其它任何尾行或行已读尽都是“没有持久活动”，退回最新文件时间。
+- **库**：`WriterRetention.classifyTail(line)` 与 `lastActivity(linesNewestFirst: Iterable<string>)`（只拉取到第一个结论，不读盘），提交 `3585c4f` / 0.19.0。库测试 `retention/tests/011-tail` 6 例（含“只拉 3 行就停”的惰性证明、坏 JSON/非对象/缺字段/非字符串或不可解析时刻一律 silent、非可迭代与非字符串行拒绝）。变异：让 cutTail 也停 → 2 例红。`convergence-package` 干净安装消费同时覆盖 `lastActivity` 与 `checkClosure`（Node + Bun 1.4.2，tsc strict）。
+- **主仓**：`ProcessEventLog.writerActivityOf` 只剩物理读取：按“最新段在前”惰性地逐行倒读（每次拉取 O(该行字节)），在旧扫描停下的地方停止供行（空文件、不完整尾行、空行或非 UTF-8 行、读失败），文件描述符在一次查找结束后统一关闭；判定交给库。删除 `TailActivity`/`TailSearch`/`FileTailOutcome`/`classify*`/`findDurableActivity`/`scanFileTail` 等约 130 行与 `Date.parse`/`isFinite` 两个 Emit。
+- **行为差异**：旧实现对非字符串 `ObservedAt` 会 `Date.parse` 强转（如数字 `1760918400000` 被当作公元 1760918400000 年附近的字符串解析）；库只接受字符串，其余为 silent。写入方一律以 `ToString("O")` 写字符串，生产不产生此差异。
+- **正控（base 与候选都通过）**：`requirements/durable-convergence/tests/011.test.mjs` 新增三例走真实读取链 `retainedWriterIdsAt`：Journal ObservedAt 胜过文件时间；cut-tail 链跨段回溯到上一段的 Journal；其它尾行让最新文件时间说话。没有找到旧实现上会红的反例，不伪造红。
+
+## 12. 验证（同一工作树、同一机器，Node 22.21.1，dotnet 10.0.401）
+
+| 项 | base（master 1c90ecf69，gitlink c9a943d / 0.16.0） | candidate（rebase 到 0c9ae2c3f 之后，gitlink 66fd900 / 0.19.0） |
+|---|---|---|
+| `node scripts/build.mjs` | ok | ok（725 模块链接） |
+| durable-events + durable-convergence（run.mjs，35 文件；base 用 `--skip-staleness-check`，因新增测试是被跟踪文档） | 249 pass / **1 fail**（新反例）/ 14 skip / 10 todo | **250 pass / 0 fail** / 14 skip / 10 todo |
+| 其余 94 个导入 EventStore/Journal 的测试文件（run.mjs，候选） | 未在 base 重跑 | 660 pass / 20 fail：work 009/011/019/020/024/026 九项与 CUT-07 的 base 日志 `logs-cut07/b4-work.log` 一致（master 既有）；delegation-029、host-boundary-026、repository-programming-041 是源码词法/编译清单断言；knowledge-reuse-010、managed-session-lifecycle-022 失败于 `view declaration is invalid: thenMap key 'question'`。都不经过本卡改动的函数，但这 5 个文件**没有在 base 上重跑**，如实记为“推断无关、未对照” |
+| fantomas --check（EventStore 目录） | — | 通过 |
+| 库定向集（events、retention、convergence、exports、build、repository、convergence-package） | — | 87/87（rebase 到 71958aa 后、发布前） |
+
+- 14 skip 是未开 integration tier 的编译闭包测试；10 todo 是既有登记；run.mjs 因此以 pending proof 退出 1，两侧相同，不是通过。
+- 日志：`/workspace/vfs-cut/wt/logs-cut19b/`（base-run、cand-run、cand-wide、rebased-run）。
+- 回退：纯校验与纯判定，不写新数据、不改任何文件字节；`git revert` 主仓提交即回到旧实现（库 0.19.0 可保留）。被新规则拒绝装载的只有含无主内联载荷的行，而追加侧从来不写这种行。
+- 未做：全量 `scripts/verify.mjs` 与 integration run.mjs（同机重型套件，留给集成者）。
+
+## 13. 段存储（`ProcessEventLog` 段聚合、原子追加、滚动、共存收敛）的持久数据计划（README §10）
+
+动手之前先写清；本轮**未改动**段存储的任何代码。
+
+- **真实旧数据**：每个仓库的 `<common-dir>/wanxiangshu/events/` 下，legacy `<writer>.ndjson` 与段系列 `<writer>-NNNN.ndjson` 可能同时存在（durable-events-005 的中断整理/版本过渡中间态）；还有进程内解码前缀缓存。真实主仓 `.git/wanxiangshu` 是在用数据，**任何实验都不触碰**；只用夹具临时目录。
+- **六类状态**：未开始（无文件）；已预留未承接（段文件已建、无完整行）；已绑定未确认（追加中、半行）；活动（当前段正在追加）；已终结（封存段）；损坏/未知（坏尾、非规范行、共存形态不成立）。核对者是读取链 `writerFileGroups → coexistingFormsOf → decode`，停止准入的是 `withStoreLock` 跨进程锁。
+- **冻结点**：字节格式（canonical NDJSON + LF）、文件名规则（`-` + 4 位数字 + `.ndjson`）、段上限默认 64 MiB、共存判定（字节前缀 / 行续接）全部不变。抽取只允许把**纯命名与分组律**（文件名 → writer 分组、序号、legacy 与段系列的共存裁决输入）搬入库，物理读写、锁、fsync、rename 留在主仓。
+- **验证方式**：只做影子纯计算——同一份目录列表与字节由新旧两份分组律各算一次，逐项相等（含边界名：writer 名本身以 `-dddd` 结尾、超 9999 段、legacy 与段同名前缀）；禁止开第二条真实写入链或双执行追加。
+- **备份与回退**：不迁移、不转换、不覆盖任何原件，因此没有回退截止点；代码 revert 即回旧律。若将来需要新格式，另立子卡写冻结、备份、完整性检查、幂等转换与回退截止。
+- **下一步候选**：上述纯命名/分组律（`isSegmentFileName`、`parseSegmentTail`、`writerFileGroups` 的分组与排序、`coexistingFormsOf` 的裁决部分）。
+
+## 14. 本卡剩余（仍归本卡，看板保持 DOING）
+
+1. §13 的段命名与分组律（按计划，先影子双算）。
+2. `IntegratorEngine` 业务折叠的故障隔离与 cut-tail 重放（`integrateOne`/`applyCut`/全量重放预算）。
+3. Journal 侧多 writer 接线与 Git/Hook 同步、旧 Store/Journal 退出（CARDS 的“退出”条件：数据格式、恢复、同步、关闭各有 owner，最后一个旧消费者退出后才删旧实现）。
+4. 跨进程锁与原子追加是真实宿主 I/O，预计明确保留在主仓（需在关闭本卡时写入保留理由）。
+
+本卡的“退出”条件远未满足，故不标 DONE；原 owner 已退出不改变这一点。
