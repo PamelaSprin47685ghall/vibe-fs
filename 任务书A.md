@@ -520,6 +520,45 @@ dotnet tool run fantomas src/Wanxiangshu
 
 `work-021` / `work-024` 的根因是上游把 `devops` **宿主工具**整体退役（`StaticTools.fs:52-54`：devops 离开目录与 ToolSpec，只以编程面成员 `this.devops` 存活），这些用例仍在断言已退役的宿主工具。其余 7 条同属「用例仍在调用已退役宿主工具/旧契约」。
 
+#### 十·二·三 B9：退休 attempt 的停止与接力分离（`PluginTransforms.fs`，唯一编辑文件）
+
+**五项判定**（按当前代码与现行 WHAT 核实，不沿用旧结论）：
+
+| # | 项 | 判定 | WHAT 依据 | file:line |
+|---|---|---|---|---|
+| 1 | 停止与接力混在 `interruptAttempt` 回调里 | **存在** | work [011]：接力路径**不发**终态中断；停止与接力是**两件事**；在途 Host 中断未完成精确的 provider-step 释放与物理中断之前不得派发后继 | `PluginTransforms.fs:796`（旧）、`Mission/Manager/Workflow.fs:352-369` |
+| 2 | 缺 `physicalUserMessageId` → `invalidOp`（钩子失败） | **存在** | work [011]：后任已有新根时「不中止会话，也不因拒绝中断而崩溃」；managed-session-lifecycle [016]：交付裁决只命中「登记时那次物理输入仍是当前物理输入」的交付 | `PluginTransforms.fs:806-812`（旧） |
+| 3 | `staleRetirement` 只匹配 `Outcome = "Relayed"`，终态 `Delivered` 残余不算过时 | **非缺陷** | work [011]：Delivered 的停止**由交付裁决**执行（另一 stage），Relayed 才走接力；CUT-17 的 `relayed` 标志与之一致 | `NarrativeTransform.fs:85`、`PluginTransforms.fs:670`（`adjudicateDelivery`）、`:922`（`StopAfterDelivery`） |
+| 4 | `staleRetirement` 取首个 Relayed cut，而 `afterCut`/`cutPresent` 用 `work.ProjectionCut`（末次 cut） | **已由 CUT-17 修** | CUT-17 内部自洽：切点 = 第一条带切点工具调用/结果的消息 | `wanxiangli/src/projection/Projection.fs:381`（`cutIndex` 用 `tryFindIndex`）、`:388-392` |
+| 5 | `acceptedSuccessorRequestFor` 只查 `ChatExecutionProjection.byKey` 是否存在，无逻辑运行/活跃根核对 | **已由 CUT-17 修** | CUT-17 的 `acceptedRun` 把「已接纳消息的根」与「当前逻辑运行的根」逐字比对；`successor` 分支另有 freshRoot / gatePhysical 两条独立判据 | `PluginTransforms.fs:645`（旧）、`wanxiangli/src/projection/Projection.fs:395-400` |
+
+**改法**（唯一编辑文件：`src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs`；`NarrativeTransform.fs` **未改**——第 3/4/5 项判定为非缺陷或已由 CUT-17 修，无需动它）：
+
+| 位置 | 改动 |
+|---|---|
+| `:730-748` `retiredAttemptFence` | 新增：退休 attempt 的精确围栏（providerRun + toolCallId），取**第一个** `ProjectionCut && Outcome = "Relayed"` 的退休——口径与 `NarrativeTransform.staleRetirement` 一致，否则中断事实会挂到另一个围栏上。Relayed 不登记「交付已成立」（`ToolRegistry.fs:1338` 的 `registerEstablishedDelivery` 只认 `PostS3`/`Delivered`），故与交付围栏**不重叠** |
+| `:752-760` `requestRetiredAttemptInterrupt` | 宿主拒绝或抛错都只记成「已观察到失败」，不向上抛 |
+| `:775-779` `retiredInterruptIssued` | 同一退休 attempt 的第二次请求**不再发**一次旧任期会话中止（work [011] 禁止后果） |
+| `:791-798` `suppressRetiredProviderStepOnly` | 重复请求仍**抑制下一次 provider step**（本次请求不得放行），只是不再发中断 |
+| `:800-833` `stopRetiredAttempt` | **停止**＝抑制下一次 provider step + 发出本次 attempt 的中断。「已发出」与「已观察到结算结果」分别登记（`DeliveryAttemptLedger.recordInterruptIssued` / `recordInterruptObserved`）。**缺精确物理围栏时只记诊断、不中断、不崩溃**——此时中断可能停住新输入或后任（条款 016），比不停更坏 |
+| `:835-855` `dispatchSuccessorPrompt` | **接力**＝派发后继提示（`ManagerWorkflow.maybeDeliverLoop`），与停止**分别取证**：停止失败不吞掉接力，接力失败也不抹掉停止的证据。派发在停止结算**之后**（条款 011 的「在途中断未完成前不得派发后继」） |
+| `:896-923` 调用点 | 旧的 `ManagerWorkflow.continueAfterRetiredAttempt` 回调拆成 `stopRetiredAttempt` → `dispatchSuccessorPrompt` 两步；删掉 `handleInterruptionError`（其中把非 `MANAGED-SESSION-016` 错误抛成 `invalidOp` 的分支） |
+
+**未改的既有死代码**：`ManagerWorkflow.continueAfterRetiredAttempt`（`Mission/Manager/Workflow.fs:352-369`）现在**没有调用方**（原唯一调用方即本批改掉的 `PluginTransforms.fs:796`）。它属于 `Mission/Manager` 包的改动面，本批按「只改必需文件」**未删**；删除归入 C3 死代码清理。`clean-break-symbols` 与 `aggregate-retired` 门禁均 **OK**（该 API 仍被 `Workflow.fsi` 导出，不是「已删符号仍被引用」的违规）。
+
+**实测**：
+
+- `node scripts/compile-owner.mjs src/Wanxiangshu/Wanxiangshu.Owner.opencode-plugin.plugin-composition.fsproj` → `[owner-compile] OK`（无警告无错误）。
+- `node scripts/build.mjs` → `[build] build ok`；`js-surface-manifest: OK — 151 registered surfaces`；`js-module-linkage: OK — 724 emitted modules linked and loaded`。
+- `node scripts/checks/fsharp-control-pyramid.mjs` → 全局 **105**（改前 105），`PluginTransforms.fs` 仍只有既有的 `:711 match → try` 一处，**净增 0**。首版曾净增 1 处 `if → if`（`stopRetiredAttempt` 里的两层判定），已把判定摊平为单层 `match`（`None` / `Some when alreadyIssued` / `Some`）后归零。
+- `node scripts/checks/clean-break-symbols.mjs` → `clean-break-symbols: OK`；`node scripts/checks/aggregate-retired.mjs` → `aggregate-retired: OK — no active pipeline can reach the deleted wrapper`。
+- `node --test requirements/work/tests/*.test.mjs` → `tests 192 / pass 192 / fail 0`（含 work-011 的 12 条：Delivered 停住且不派发后继、rejected/thrown 中断不把交付呈现为失败、Stayed 接力只发一次、post-cut 唤醒清空而不崩、同一 attempt 的第二次请求不重复发中断）。
+- `node --test requirements/managed-session-lifecycle/tests/016.test.mjs` → `tests 3 / pass 3 / fail 0`。
+
+**一处上游既有红（非本批引入，已实证）**：`requirements/managed-session-lifecycle/tests/018.test.mjs:215` 的 `unknown-stop` 断言（`actual 'CompletedAwaitingJoin'` vs `expected 'Active'`）。该用例只 import `dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js` 等 Fork 面，**不触及** relay transform。为排除本批影响，已把源文件临时还原为 HEAD 版并重建 `dist`（`[build] build ok (generation 99)`，且 `dist/OpenCode/Plugin/PluginTransforms.js` 中 `retired-attempt` 命中数为 **0**）后重跑：**同样 5 pass / 1 fail、同一条断言、同一个实际值** ⇒ 该红是**上游既有**，与本批无关。
+
+**解释点（可能有另一种读法，已按现行 WHAT 取此读）**：用户要求「停止失败不得吞掉接力」。条款 011 又要求「在途 Host 中断未完成精确的 provider-step 释放与物理中断之前，不得派发后继」。本批取法：**总是先 await 停止尝试**，再派发后继；停止**失败**时该中断已不在途（不再有未完成的释放/中断），故仍派发后继，同时把停止失败**独立**记成诊断（`retired-attempt-interrupt-observed` 的 `result = "failed"`），接力失败另记（`retired-attempt-successor-dispatch-failed`）。另一种读法是「停止失败即视为仍在途 ⇒ 不派发后继」——本批不取该读法，因为它会让一次宿主拒绝把整个接力永久饿死，且条款 011 的失败后果只要求「如实登记已发出/已观察两事实」，未要求停止失败即停止接力。
+
 **`work-026` 单列（可能不是「旧契约」，而是真生产缺陷 C2）**：`requirements/work/tests/026.test.mjs:124` 的 `AssertionError: post-S3 deliver must interrupt the conversation`。该红在 pristine `435eac2d9` 上同样存在，所以**不是本批引入**；但它与「用例仍调用已退役宿主工具」的其它 8 条不同类：**post-S3 交付是否登记「已成立」正是 C2 的内容**（`OpenCode/Tools/ToolRuntimeScope.fs:1333` 有 `RegisterPostS3Interrupt`，`PluginHooks.fs:533-544` 的 `settlePostS3Deliver` 只做 `RecordDeliveryPresented`）。build-doctor 正在审计 C2；**在 C2 审计结论出来前，不得把 `work-026` 归为「旧契约」豁免**。
 
 ### 十·三·五 `npm run check` 的 167 项去重分类
@@ -543,7 +582,7 @@ dotnet tool run fantomas src/Wanxiangshu
 - **B4** —— **已闭合**（2026-10-21 按当前代码核实，非本批引入）。`ReviewOnly` 子对象的成员读 `this._api`（构造器收到的就是 `api.reviewOnly` 命名空间本身，`Description.fs:771-778`），不再误访问 `this._api.reviewOnly`；缺失成员由 `missingMemberGuard`（`Description.fs:440-448`）以 `{ ok: false, code: "REVIEW_ONLY", reason: ... }` 拒绝。
 - **B5** `tryTakeRenderedFor` 只比 `ProviderRun` 不比 `ToolCallId` —— **仍未修**。本批的处置是**删除**了新增的 `tryTakeRenderedFenced`（它无调用方，且 owner 的 `claim` 只支持 `peek`/`cache`/`run` 三种 mode，`run` 只比 providerRun，见 `wanxiangli/src/delivery/Delivery.fs:154-176`），并把 `tryTakeRenderedFor` 的注释改成实话：它只比 provider run、是 harness/fallback 通道、**不是交付证据**，真正的证据是 durable 见证。按最新 WHAT（`repository-programming` [054]/[059]）核对后，**完整 ToolCallId 围栏消费仍是未闭合项**，保留在本任务书待办。
 - **B8** S4 终态中断未按当前物理输入设围栏 —— 未核。
-- **B9** `PluginTransforms.fs` + `NarrativeTransform.fs` 五项 —— 未核。
+- **B9** `PluginTransforms.fs` + `NarrativeTransform.fs` 五项 —— **已闭合**（2026-10-21，见「十·二·三」）。五项判定：①停止与接力混同 **存在**、②缺物理围栏抛 `invalidOp` **存在**、③`staleRetirement` 只匹配 `Relayed` **非缺陷**（Delivered 由交付裁决 stage 处理）、④首个/末次 cut 不一致 **已由 CUT-17 修**、⑤`acceptedSuccessorRequestFor` 无逻辑运行核对 **已由 CUT-17 修**。改法：`PluginTransforms.fs` 里把停止（抑制 provider step + 发中断 + 分别登记「已发出/已观察到」）与接力（派发后继提示）拆成两个独立取证的动作，停止失败不吞掉接力、接力失败不抹掉停止的证据；缺精确物理围栏时只记诊断、不中断、不崩溃（不再 `invalidOp`）。`NarrativeTransform.fs` **未改**（第 3/4/5 项判定为非缺陷或已由 CUT-17 修）。遗留：`ManagerWorkflow.continueAfterRetiredAttempt` 现无调用方，归 C3 死代码清理。
 - **B10** `requirements/work/tests/011.test.mjs:233` 的 `test.todo` **仍是 todo**；`requirements/work/tests/049.test.mjs` 的中断断言仍需核（空断言）—— 未修。
 - **C1** Plan 路径无 settlement —— 未核。
 - **C2** post-S3 交付未登记「已成立」 —— **已闭合**（2026-10-21，见「十·二·二」）。`deliverPostS3` 与 `deliverCursor` 现在都登记「已成立」，且登记携带**交付当时绑定**的物理输入（登记时刻不再重读 `CurrentPhysicalUserMessage`）；删除了那个回落到登记时刻重读的 `RegisterPostS3Interrupt` 别名。`work-026` 仍红，但红点已不是登记缺失，而是该用例的断言还挂在工具事件边界上（现行契约把中断放在 transform 裁决边界）——迁移属 B10/work-049 下一轮。

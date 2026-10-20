@@ -727,6 +727,144 @@ module PluginTransforms =
                           "result", deliveryInterruptResultName outcome ]
             }
 
+        /// 退休 attempt 的精确围栏：被退休的那次 deliver 的 provider run 与
+        /// tool call id。中断的「已发出 / 已观察到」登记在这个围栏上。
+        ///
+        /// 选退休的口径与 `RelayNarrativeTransform.staleRetirement` 相同：
+        /// 第一个带投影切点、结果为 Relayed 的退休。两处口径必须一致，否则
+        /// 中断事实会挂到另一个围栏上。
+        let retiredAttemptFence
+            (sessionId: SessionId)
+            (lifecycle: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option)
+            : DeliveryAttemptLedger.Fence option =
+            let retirement =
+                lifecycle
+                |> Option.bind (fun work ->
+                    work.Retirements
+                    |> List.tryFind (fun entry -> entry.ProjectionCut && entry.Outcome = "Relayed"))
+
+            retirement
+            |> Option.map (fun entry ->
+                { SessionId = sessionId
+                  ProviderRun = ProviderRunIdentity.create entry.Fence.ProviderRunId
+                  CallId = ToolCallId.create entry.Fence.ToolCallId })
+
+        /// 中断请求本身：宿主拒绝或抛错都只记成「已观察到失败」，不向上抛。
+        let requestRetiredAttemptInterrupt (exactSessionId: SessionId) : Task<Result<unit, string>> =
+            task {
+                try
+                    let! outcome = sessionPort.InterruptAttempt exactSessionId
+                    return outcome
+                with ex ->
+                    return Error ex.Message
+            }
+
+        let recordRetiredInterruptIssued (fence: DeliveryAttemptLedger.Fence option) (issued: Task) =
+            match fence with
+            | Some exact -> DeliveryAttemptLedger.recordInterruptIssued exact issued
+            | None -> ()
+
+        let recordRetiredInterruptObserved
+            (fence: DeliveryAttemptLedger.Fence option)
+            (outcome: Result<unit, string>)
+            =
+            match fence with
+            | Some exact -> DeliveryAttemptLedger.recordInterruptObserved exact outcome
+            | None -> ()
+
+        /// 本次退休 attempt 的中断是否已经发出过。同一退休 attempt 的第二次
+        /// 请求不得再发一次旧任期的会话中止（条款 011 禁止后果）。
+        let retiredInterruptIssued (fence: DeliveryAttemptLedger.Fence option) =
+            fence
+            |> Option.exists (fun exact -> (DeliveryAttemptLedger.interruptFacts exact).Issued)
+
+        /// 抑制下一次 provider step + 登记「已发出」。
+        let releaseRetiredProviderStep
+            (exactSessionId: SessionId)
+            (physical: PhysicalUserMessageId)
+            (fence: DeliveryAttemptLedger.Fence option)
+            (interrupt: Task)
+            =
+            ModelRouting.suppressProviderStep exactSessionId physical
+            recordRetiredInterruptIssued fence interrupt
+
+        /// 只抑制下一次 provider step，不发中断。同一退休 attempt 的第二次
+        /// 请求仍须被抑制（本次请求不得放行），但不得再发一次旧任期的会话
+        /// 中止（条款 011 禁止后果）。
+        let suppressRetiredProviderStepOnly
+            (exactSessionId: SessionId)
+            (physical: PhysicalUserMessageId)
+            =
+            ModelRouting.suppressProviderStep exactSessionId physical
+
+        /// 停止（条款 4/6）：抑制下一次 provider step + 发出本次 attempt 的中断。
+        ///
+        /// 「已发出」与「已观察到中断成功」是两个分别登记的事实。没有精确物理
+        /// 围栏时既无法释放这次 provider step，也无法把中断绑定到这次 attempt
+        /// ——此时中断可能停住新输入或后任（条款 016）。所以缺围栏只记诊断、
+        /// 不中断、不崩溃。
+        let stopRetiredAttempt
+            (exactSessionId: SessionId)
+            (sessionText: string)
+            (physicalUserMessageId: PhysicalUserMessageId option)
+            (fence: DeliveryAttemptLedger.Fence option)
+            : Task =
+            task {
+                let alreadyIssued = retiredInterruptIssued fence
+
+                match physicalUserMessageId with
+                | None ->
+                    Diagnostic.emit
+                        "retired-attempt-stop-skipped-no-physical-fence"
+                        [ "session_id", sessionText ]
+                | Some physical when alreadyIssued ->
+                    suppressRetiredProviderStepOnly exactSessionId physical
+
+                    Diagnostic.emit
+                        "retired-attempt-stop-already-issued"
+                        [ "session_id", sessionText ]
+                | Some physical ->
+                    let interrupt = requestRetiredAttemptInterrupt exactSessionId
+
+                    releaseRetiredProviderStep exactSessionId physical fence (interrupt :> Task)
+
+                    let! outcome = interrupt
+
+                    recordRetiredInterruptObserved fence outcome
+
+                    Diagnostic.emit
+                        "retired-attempt-interrupt-observed"
+                        [ "session_id", sessionText
+                          "physical_user_message_id", PhysicalUserMessageId.value physical
+                          "result", deliveryInterruptResultName outcome ]
+            }
+
+        /// 接力（条款 011）：派发后继提示。
+        ///
+        /// 接力与停止是两个分别取证的动作：停止失败不吞掉接力，接力失败也不
+        /// 抹掉停止的证据。派发发生在停止结算之后——在途 Host 中断未完成精确
+        /// 的 provider-step 释放与物理中断之前不得派发后继。
+        let dispatchSuccessorPrompt (sessionText: string) : Task =
+            task {
+                try
+                    do!
+                        ManagerWorkflow.maybeDeliverLoop
+                            sessionPort
+                            host.RootWorkspace
+                            journal
+                            workspaceDirectory
+                            (Some sessionText)
+
+                    Diagnostic.emit
+                        "retired-attempt-successor-dispatched"
+                        [ "session_id", sessionText ]
+                with ex ->
+                    Diagnostic.emit
+                        "retired-attempt-successor-dispatch-failed"
+                        [ "session_id", sessionText
+                          "result", deliveryInterruptResultName (Error ex.Message) ]
+            }
+
         { BeginPhysicalProviderAttempt =
             fun sessionId output ->
                 task {
@@ -782,37 +920,31 @@ module PluginTransforms =
                         | Some sid -> tryReadLifecycleWork sid
                         | None -> Task.FromResult None
 
-                    let handleInterruptionError (error: string) : unit =
-                        if error.Contains "MANAGED-SESSION-016" then
-                            ()
-                        else
-                            invalidOp ("MANAGER-LOOP-004: retired attempt interrupt failed: " + error)
-
                     return!
                         RelayNarrativeTransform.apply
                             journal
                             acceptedSuccessorRequest
                             (fun sid ->
-                                ManagerWorkflow.continueAfterRetiredAttempt
-                                    sessionPort
-                                    host.RootWorkspace
-                                    journal
-                                    workspaceDirectory
-                                    (fun exactSessionId ->
-                                        task {
-                                            match physicalUserMessageId with
-                                            | None ->
-                                                return
-                                                    invalidOp
-                                                        "MANAGER-LOOP-004: retired attempt has no exact physical user message"
-                                            | Some physical ->
-                                                ModelRouting.suppressProviderStep exactSessionId physical
+                                task {
+                                    let sessionText = SessionId.value sid
 
-                                                let! interruption = sessionPort.InterruptAttempt exactSessionId
+                                    // 停止（条款 4/6）：抑制下一次 provider step +
+                                    // 发出本次 attempt 的中断。缺精确物理围栏时只记
+                                    // 诊断、不中断、不崩溃——中断若停住新输入或后任，
+                                    // 比不停更坏（条款 016）。
+                                    do!
+                                        stopRetiredAttempt
+                                            sid
+                                            sessionText
+                                            physicalUserMessageId
+                                            (retiredAttemptFence sid lifecycle)
 
-                                                return interruption |> Result.defaultWith handleInterruptionError
-                                        })
-                                    sid)
+                                    // 接力（条款 011）：后继提示是另一个动作，
+                                    // 独立取证。派发发生在停止结算之后——在途
+                                    // Host 中断未完成精确的 provider-step 释放与
+                                    // 物理中断之前不得派发后继。
+                                    do! dispatchSuccessorPrompt sessionText
+                                })
                             sidOpt
                             lifecycle
                             outObj
