@@ -33,25 +33,33 @@ module RelayNarrativeTransform =
         else
             emitJsExpr (value, name) "$0[$1]"
 
-    let private messageRole message =
-        readField (readField message "info") "role"
-        |> Option.ofObj
-        |> Option.orElseWith (fun () -> readField message "role" |> Option.ofObj)
-        |> Option.map (fun value -> unbox<string> value)
+    /// 退休 attempt 判定的唯一实现：wanxiangli/projection `retired`（CUT-17）。
+    [<AllowNullLiteral>]
+    type private RetiredRule =
+        abstract retired: request: obj -> bool
 
-    let private messageRoleIsUser message =
-        messageRole message
-        |> Option.exists (fun role -> role.ToLowerInvariant() = "user")
+    [<Import("Projection", "wanxiangli/projection")>]
+    let private createProjection: unit -> RetiredRule = jsNative
 
-    let private cutToolIndex (cutToolCallId: string) messages =
-        messages
-        |> List.tryFindIndex (fun message ->
-            ProviderWireDecode.rawPartsOf message
-            |> List.choose ProviderWireDecode.decodePart
-            |> List.exists (function
-                | WireToolCall(toolCallId, _, _)
-                | WireToolResult(toolCallId, _) -> ToolCallId.value toolCallId = cutToolCallId
-                | _ -> false))
+    let private projection = createProjection ()
+
+    /// 宿主消息 id 从不为空白（`ProviderWireDecode.hostMessageId`），所以空白的根/物理 id 永远匹配不上；
+    /// 交库前记为 null，库只收非空 id。
+    let private nonBlank (value: string option) =
+        value |> Option.filter (String.IsNullOrWhiteSpace >> not) |> Option.toObj
+
+    let private messageRole message : obj =
+        let info = readField (readField message "info") "role"
+
+        if isNull info then readField message "role" else info
+
+    let private carriesCut (cutToolCallId: string) message =
+        ProviderWireDecode.rawPartsOf message
+        |> List.choose ProviderWireDecode.decodePart
+        |> List.exists (function
+            | WireToolCall(toolCallId, _, _)
+            | WireToolResult(toolCallId, _) -> ToolCallId.value toolCallId = cutToolCallId
+            | _ -> false)
 
     /// The projection disposition of one request. An active tenure means the
     /// message set belongs to the current iteration; a work with no active
@@ -61,21 +69,6 @@ module RelayNarrativeTransform =
         match work with
         | Some current when current.ActiveId.IsSome -> RelayProjectionDisposition.CurrentTenure
         | _ -> RelayProjectionDisposition.Unchanged
-
-    let private requestBelongsToSuccessor (physical: string option) afterCut freshRoot acceptedRequest gatePhysical =
-        match physical with
-        | Some current ->
-            freshRoot = Some current
-            || gatePhysical = Some current
-            || (afterCut && acceptedRequest)
-        | _ -> false
-
-    /// A request is after the cut when its last real user message sits past
-    /// the message that carries the cut tool call.
-    let private afterCut (cutToolCallId: string) (lastUserIndex: int option) messages =
-        match lastUserIndex, cutToolIndex cutToolCallId messages with
-        | Some userIndex, Some cutIndex -> userIndex > cutIndex
-        | _ -> false
 
     /// The retired attempt is decided from the unified lifecycle work: an S4
     /// work whose current tenure was Relayed, with a durable retirement cut.
@@ -88,95 +81,63 @@ module RelayNarrativeTransform =
         (acceptedRequest: bool)
         (messages: obj list)
         =
-        let relayedCut =
-            work.Retirements
-            |> List.tryFind (fun retirement -> retirement.ProjectionCut && retirement.Outcome = "Relayed")
+        work.Retirements
+        |> List.tryFind (fun retirement -> retirement.ProjectionCut && retirement.Outcome = "Relayed")
+        |> Option.filter (fun retirement ->
+            let projections = (AgentJournal.snapshot journal).AgentProjections
+            let sessionProjection = AgentProjection.tryFind sessionId projections
 
-        let sessionProjection =
-            AgentProjection.tryFind sessionId (AgentJournal.snapshot journal).AgentProjections
+            let authority =
+                sessionProjection |> Option.bind (fun session -> session.PromptAuthority)
 
-        let lastUserIndex =
-            messages
-            |> List.indexed
-            |> List.rev
-            |> List.tryPick (fun (index, message) -> if messageRoleIsUser message then Some index else None)
-
-        let physical =
-            lastUserIndex
-            |> Option.bind (fun index -> messages |> List.tryItem index)
-            |> Option.bind messageId
-
-        let requestIsSuccessor (retirement: Wanxiangshu.Mission.Lifecycle.DurableWorkHost.HostRetirement) =
-            let physicalAfterCut =
-                work.ProjectionCut
-                |> Option.map (fun cut -> afterCut cut.ToolCallId lastUserIndex messages)
-                |> Option.defaultValue false
-
-            let freshRoot =
-                if physicalAfterCut then
-                    sessionProjection
-                    |> Option.bind (fun session -> session.PromptAuthority)
-                    |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                    |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
-                else
-                    None
+            let activeRoot =
+                authority
+                |> Option.bind (fun value -> value.ActiveLogicalRun)
+                |> Option.map (fun profile -> AuthorityRootUserMessageId.value profile.AuthorityRootUserMessageId)
 
             let gatePhysical =
-                sessionProjection
-                |> Option.bind (fun session -> session.PromptAuthority)
-                |> Option.bind (fun authority ->
+                authority
+                |> Option.bind (fun value ->
                     PromptAuthority.gateNudgeAcceptedPhysical
                         sessionId
                         PromptAuthority.ContinuationKind.ManagerGuard
                         (ManagerLoopGate.gateKind (RetirementId.create retirement.RetirementId))
                         (ProviderRunIdentity.create retirement.Fence.ProviderRunId)
-                        authority)
+                        value)
                 |> Option.map PhysicalUserMessageId.value
 
-            let successorIdentity =
-                requestBelongsToSuccessor physical physicalAfterCut freshRoot acceptedRequest gatePhysical
+            let accepted (id: string option) =
+                id
+                |> Option.bind (fun physicalId ->
+                    ChatExecutionProjection.byKey
+                        { ChatExecutionKey.SessionId = sessionId
+                          PhysicalUserMessageId = PhysicalUserMessageId.create physicalId }
+                        projections.ChatExecutions)
+                |> Option.map (fun execution ->
+                    AuthorityRootUserMessageId.value execution.acceptedEvidence.AuthorityRootUserMessageId)
 
-            // A request whose own last user message carries a durable
-            // ChatExecution acceptance under the session's CURRENT logical run is
-            // a legitimate current-tenure request — but only when the retired
-            // attempt's cut tool call is no longer present in the wire (the
-            // tenure projection strips the predecessor's interactions). If the
-            // wire still carries the cut, the message set demonstrably belongs
-            // to the retired attempt, and its acceptance evidence is that
-            // attempt's own — never a successor's.
-            let cutPresent =
-                work.ProjectionCut
-                |> Option.map (fun cut -> (cutToolIndex cut.ToolCallId messages).IsSome)
-                |> Option.defaultValue false
+            let cutOf =
+                match work.ProjectionCut with
+                | Some cut -> carriesCut cut.ToolCallId
+                | None -> fun _ -> false
 
-            let acceptedRunIdentity =
-                (not cutPresent)
-                && (match physical with
-                    | Some physicalId ->
-                        let key =
-                            { ChatExecutionKey.SessionId = sessionId
-                              PhysicalUserMessageId = PhysicalUserMessageId.create physicalId }
+            let messageOf message =
+                let id = messageId message
 
-                        let accepted =
-                            ChatExecutionProjection.byKey
-                                key
-                                (AgentJournal.snapshot journal).AgentProjections.ChatExecutions
+                createObj
+                    [ "role" ==> messageRole message
+                      "id" ==> Option.toObj id
+                      "cut" ==> cutOf message
+                      "accepted" ==> nonBlank (accepted id) ]
 
-                        let activeRoot =
-                            sessionProjection
-                            |> Option.bind (fun session -> session.PromptAuthority)
-                            |> Option.bind (fun authority -> authority.ActiveLogicalRun)
-                            |> Option.map (fun profile -> profile.AuthorityRootUserMessageId)
-
-                        match accepted, activeRoot with
-                        | Some execution, Some active -> execution.acceptedEvidence.AuthorityRootUserMessageId = active
-                        | _ -> false
-                    | None -> false)
-
-            successorIdentity || acceptedRunIdentity
-
-        relayedCut
-        |> Option.filter (fun retirement -> not (requestIsSuccessor retirement))
+            projection.retired (
+                createObj
+                    [ "relayed" ==> true
+                      "acceptedRequest" ==> acceptedRequest
+                      "activeRoot" ==> nonBlank activeRoot
+                      "gatePhysical" ==> nonBlank gatePhysical
+                      "messages" ==> (messages |> List.map messageOf |> List.toArray) ]
+            ))
 
     let isStaleRetiredAttempt
         (journal: AgentJournal option)

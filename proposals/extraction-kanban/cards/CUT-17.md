@@ -15,6 +15,7 @@
 | `isCurrentTenurePhysical` | 无调用者的同义规则副本 | 删除 |
 | 意图规划（基底去重与冲突、插入键冲突、锚点/key 规范序） | `ProjectionPlanner.plan` 内联 `reduceBase`/`reduceInsertions`/`insertionSortKey` | **抽出** → `wanxiangli/projection.plan`（子范围②） |
 | 布局（基底替换、锚点拼接、append、宿主 id/物理标记对齐） | `ProjectionRenderer` 内联 `spliceBefore`/`applyInsertions` | **抽出** → `wanxiangli/projection.layout`（子范围③） |
+| 退休 attempt 的请求归属（Relayed 切点后请求是否仍属旧 attempt） | `RelayNarrativeTransform.staleRetirement` 内联 `cutToolIndex`/`afterCut`/`requestBelongsToSuccessor`/接纳根判定 | **抽出** → `wanxiangli/projection.retired`（子范围④） |
 | 消息解码、XTrace 首次观测游标、重锚事实写入、保留消息写回 | `PlanningSurface`、`PluginTransforms.isolatePlanTenure` | 留主仓（宿主 codec / Trace / journal） |
 
 ## 3. 子范围①：任期过滤（eng-cut17b-goose）
@@ -45,3 +46,13 @@
 - F：渲染器先用 `plan` 拒绝冲突，再由 `ProjectionPlanner.layout` 交库布局，按 `{ intent, row }` 取回行。负/越界锚点的拒绝文案改为库的校验文案（无依赖者）。
 - G：删除 `renderedRows`、`emptyRendered`、`spliceBefore`、`applyInsertions`。
 - H：双算 18000 次 0 分歧，负控 C/D 分别 714/1116 次分歧；88 文件 verdict 不变。见[证据](../evidence/CUT-17/README.md)。
+
+## 6. 子范围④：退休 attempt 的请求归属（LWR 交接，eng-cut17d-goose）
+
+- B 契约：`Projection().retired({ relayed, acceptedRequest, activeRoot, gatePhysical, messages: { role, id, cut, accepted }[] })` → boolean；见库 `src/projection/AGENTS.md` LEMMA 7、`index.d.ts`，库测试 004。
+- C 反例：切点仍在却放行旧 attempt；后任新根/门控 nudge/已接纳请求被误清；切点前的接纳被当作后任；最后一条 user 无 id 却被认成后任；非法输入与 accessor → 库 004；主仓 work-011 两个退休用例（宿主负控 E/F 均转红）。
+- D：库 `584d06f`、`6c9845d`（release 0.39.0）。
+- E：gitlink `d2ce694`（0.35.0）→ `6c9845d`（0.39.0）；`package-lock.json` 中 `wanxiangli` 版本同步。
+- F：宿主只解 journal 证据、标切点、交库裁决；`isStaleRetiredAttempt`/`apply` 签名与调用者（`PluginTransforms`、`Mission.Work.ProjectionSurface`）不变。
+- G：删除 `messageRoleIsUser`、`cutToolIndex`、`afterCut`、`requestBelongsToSuccessor` 与内联判定。
+- H：90 文件 392 条 verdict base/candidate 逐条相同；宿主负控 E/F 各抓到 2 个用例；规则级双算 60000 次 0 分歧、三种变异均被抓到。见[证据](../evidence/CUT-17/README.md)。

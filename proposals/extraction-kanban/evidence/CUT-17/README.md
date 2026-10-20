@@ -35,3 +35,12 @@
 - 负控（候选 dist 拷贝）：C）基底行报告为物理行 → 714 次分歧；D）意图内的行倒序 → 1116 次分歧。
 - 相关测试（同 `planner-suite.files` 88 文件，增量构建 generation 31）：375 pass / 2 fail / 8 cancelled / 1 skipped / 20 todo，verdict 与子范围② candidate **逐条相同**（`layout-suite.verdicts`）。
 - 生产调用面核对：`ProjectionIntent`/`ProjectionRenderer.renderMessages*` 在 `src/` 中只被 `ProjectionSurface`（纯 JS 契约面，供 provider-projection 测试与集成 harness 使用）调用；`XWireSurface` 只用 `cutoffDigest`。
+
+## 子范围④：退休 attempt 的请求归属（wanxiangli/projection `retired`，0.39.0 发布，gitlink `d2ce694`/0.35.0 → `6c9845d`/0.39.0）
+
+- 库：`584d06f`（`retired()` 实现 + 库测试 004，9 个用例）、`6c9845d`（release 0.39.0，已在 origin/main）。projection 全部 25 个库测试 + exports/contracts 5 个通过。
+- 宿主改动：`RelayNarrativeTransform.staleRetirement` 只在有 Relayed 且带投影切点的退休时，从 journal 取出证据（当前逻辑运行根、该退休门控 nudge 的接纳物理消息、每条带 id 消息的 ChatExecution 接纳根）、按消息标出是否带切点工具 call/result，交库 `retired` 裁决。删除宿主自有的 `messageRoleIsUser`、`cutToolIndex`、`afterCut`、`requestBelongsToSuccessor` 与内联的 successor/acceptedRun 判定。空白根/物理 id 交库前记为 null：宿主消息 id 从不为空白（`ProviderWireDecode.hostMessageId`），空白 id 本来就匹配不上，语义不变。
+- 相关测试（`retired-suite.files`，90 文件：上面 88 文件 + host-boundary 019、durable-events 027；work 001–050 全部在内）：base（master `2eab66e14` 的 dist）与 candidate 均为 378 pass / 2 fail / 8 cancelled / 2 skipped / 20 todo，392 条 verdict **逐条相同**（`retired-suite.verdicts`）。
+- 宿主负控（在候选 dist 上就地改、跑完复原并 `cmp` 核对）：E）`retired` 恒为不过时 → work-011 两个用例转红（“post-cut wake after a fresh successor root is cleared…”、“actual Stayed deliver … the next transform stops the retired attempt…”）；F）恒为过时 → 同样两个 work-011 用例转红。真实的宿主路径确实经过本规则。
+- 规则级双算（`retired-diff.mjs`，`retired-diff.txt`）：把 master `2eab66e14` 的 F# 判定逐行转写成 JS（journal 查询已解成证据），与库 `retired` 在随机请求上比较（角色含大小写变体与 null、id 含 null、切点、接纳根、门控）。3 种子 × 20000 = 60000 次 **0 分歧**（约 2/3 判为过时）。对转写一侧做三种变异（切点后改成 `>=`、取第一条而非最后一条 user、忽略切点是否仍在）分别抓到 498 / 2131 / 276 次分歧。注意：这一层的旧实现是转写而非编译产物，主证据是上面的宿主测试与宿主负控。
+- 已知边界差异（如实记录）：消息角色为非字符串时，旧实现只在从末尾向前扫到第一条 user 之前碰到它才会抛 TypeError，新实现由库对整批消息校验后拒绝；宿主 codec 产出的角色总是字符串或缺失，此差异只在畸形输入上出现。
