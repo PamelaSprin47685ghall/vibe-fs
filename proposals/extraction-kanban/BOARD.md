@@ -38,7 +38,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-03 | 原始轨迹与固定区间 | 上下文 | DONE | CUT-00 | eng-cut03 | manager |
 | CUT-04 | 唯一资源归属与关闭 | 执行 | DONE | CUT-00, CUT-01 | eng-cut04 | manager |
 | CUT-05 | 双语资源与包内定位 | 表达 | DONE | CUT-00 | — | 2026-10-15 主线提交 2f98049e5：wanxiangli 0.7.0 resources 模块合入，库侧 8 测试 + 主仓 provider-language 25 项回归全绿，证据链见 cards/CUT-05.md §10 |
-| CUT-06 | WorkRecord 取材与视图 | 上下文 | BACKLOG | CUT-03 | — | — |
+| CUT-06 | WorkRecord 取材与视图 | 上下文 | DOING | CUT-03 | eng-cut06-goose | 2026-10-20 认领：三段式 WorkRecord 已于 master 6eef89d1e 由仓主退役（requirements/work-record 删除，participant-horizon 改为 TOML 视图记录），本卡改为交账旧职责 + 抽取其现行继任者「交付视图格」（JsDeliveredValues 的 fence/returned 游标状态）入 wanxiangli；证据链见 cards/CUT-06.md |
 | CUT-07 | 参与者身份与执行绑定分离 | 权威 | INTEGRATING | CUT-00 | eng-cut07-goose | 2026-10-20 认领主仓切换（库侧 identity 已 LIB_READY，wanxiangli main a8b89a4）；证据链见 cards/CUT-07.md |
 | CUT-08 | 能力事实与双侧门禁 | 权威 | BACKLOG | CUT-07 | — | — |
 | CUT-09 | 来源、逻辑根与关闭权威 | 权威 | BACKLOG | CUT-07 | — | — |
@@ -115,6 +115,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | `src/Wanxiangshu/Foundation/{Roles,RolesSurface}.fs(.fsi), src/Wanxiangshu/Participant/Persona/{Catalog,Identity,ManagedCatalog,Surface}.fs(.fsi), src/Wanxiangshu/Interaction/Authority/{IdentitySeed,Origin}.fs(.fsi); wanxiangli src/identity/*` | `CUT-07` | `eng-cut07-goose` | `48dff9349` / wxl `a8b89a4` | `CUT-07 主仓切换合入 master 并更新卡片证据` | `持有` |
 | `src/Wanxiangshu/Process/{Pty,PtyApi,PtyBackend,PtySession,PtySupervisor,PtyTypes,Spool,ProcessOutput}.fs(.fsi)`；wanxiangli `src/pty/`、`src/spool/` | `CUT-20` | `eng-cut20-goose` | `48dff9349` | `CUT-20 完成 PTY/spool 库实现、主仓接线与旧 owner 退出` | `持有` |
 | `src/Wanxiangshu/Persistence/EventStore/{EventKWayMerge,MergeSurface,IntegratorEngine}.fs(.fsi)`、`Wanxiangshu.Owner.durable-convergence.eventstore-merge-runtime.fsproj`；wanxiangli `src/convergence/` | `CUT-19` | `eng-cut19-goose` | `ca9d710c7` / wxl `a8b89a4` | `CUT-19 KWayMerge 子范围合入 master 并更新卡片证据` | `持有` |
+| `src/Wanxiangshu/Repository/Programming/Js/DeliveredValues.fs(.fsi)`；wanxiangli `src/workrecord/`→`src/delivery/` | `CUT-06` | `eng-cut06-goose` | `993e93683` / wxl `a8b89a4` | `CUT-06 交付视图格接线合入 master 并更新卡片证据` | `持有` |
 
 ## 两仓集成队列
 
