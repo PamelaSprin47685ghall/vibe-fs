@@ -1020,8 +1020,7 @@ module PairProgrammingThoughtTransform =
                        CallId = ToolCallId.create pair.CallId
                        MarkerText = pair.MarkerText
                        CallGap = pair.CallGap
-                       ResultGap = pair.ResultGap
-                       ConcernPlacement = None |}
+                       ResultGap = pair.ResultGap |}
 
             match! AgentJournal.appendAgent (StreamId.Session sessionId) None fact journal with
             | Ok _ -> return Ok()

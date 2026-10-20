@@ -280,7 +280,6 @@ module PromptAuthority =
         | Continuation ProviderRetryAttempt -> "ProviderRetryAttempt"
         | Continuation DegenerationGuard -> "DegenerationGuard"
         | Continuation FissionHandoff -> "FissionHandoff"
-        | Continuation DeferredWorkPresentation -> "DeferredWorkPresentation"
         | HostInternal -> "HostInternal"
         | UnknownOrigin -> "UnknownOrigin"
 
@@ -295,7 +294,6 @@ module PromptAuthority =
         | "ProviderRetryAttempt" -> Some ProviderRetryAttempt
         | "DegenerationGuard" -> Some DegenerationGuard
         | "FissionHandoff" -> Some FissionHandoff
-        | "DeferredWorkPresentation" -> Some DeferredWorkPresentation
         | _ -> None
 
     /// Why a managed agent name was refused.

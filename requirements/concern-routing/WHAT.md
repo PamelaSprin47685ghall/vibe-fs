@@ -28,4 +28,4 @@
 
 ## [007] durable fact 与 projection 不含 Concern
 
-`AgentFact`、`AgentProjectionSet`、`ProjectionUpdate`、`Fold`、`AgentJournalPortAdapter` 与 `resources/ablation/fact-map.json` 均不得包含 `Concern`、`MailboxSubscribed`、`MessagePublished`、`MailboxRetired` 或同义持久状态。
+`AgentFact`、`AgentProjectionSet`、`ProjectionUpdate`、`Fold`、`AgentJournalPortAdapter` 与 `resources/ablation/fact-map.json` 均不得包含 `Concern`、`MailboxSubscribed`、`MessagePublished`、`MailboxRetired` 或同义持久状态。Host 事实族（`HostFactCases.PairProgrammingGuidelineAnchored`）同样是持久 AgentFact，不得携带 `ConcernPlacement` 字段。

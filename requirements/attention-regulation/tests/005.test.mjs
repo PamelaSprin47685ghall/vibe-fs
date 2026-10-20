@@ -13,3 +13,10 @@ test('WHAT[attention-regulation-005] OrdinaryTurnWorkflow and DeliverTool have n
   assert.doesNotMatch(workflow, /presentPendingDeferredWork|presentDeferredWork|DeferredWorkConsumed|defer-presentation/)
   assert.doesNotMatch(deliver, /pendingDeferred|pendingAttentionWorkPairs|Interaction\.Attention/)
 })
+
+// CUT-22: with no producer left, a DeferredWorkPresentation continuation kind would only be a dead admission label.
+test('WHAT[attention-regulation-005] the prompt continuation kinds no longer include DeferredWorkPresentation', () => {
+  for (const path of ['src/Wanxiangshu/Interaction/Authority/Origin.fs', 'src/Wanxiangshu/Interaction/Authority/Origin.fsi', 'src/Wanxiangshu/Interaction/Authority/Model.fs']) {
+    assert.doesNotMatch(read(path), /DeferredWorkPresentation/, path)
+  }
+})

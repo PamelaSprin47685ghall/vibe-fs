@@ -16,3 +16,10 @@ test('WHAT[concern-routing-007] durable fact, fold, adapter, and ablation fact-m
   const factMap = JSON.parse(read('resources/ablation/fact-map.json'))
   assert.equal('AgentFact.Concern' in (factMap.facts ?? {}), false)
 })
+
+// CUT-22: the Host fact family is also durable AgentFact state; the always-None ConcernPlacement batch was a residue there.
+test('WHAT[concern-routing-007] the durable Host fact family carries no ConcernPlacement residue', () => {
+  for (const path of ['src/Wanxiangshu/Host/Facts.fs', 'src/Wanxiangshu/Host/Facts.fsi', 'src/Wanxiangshu/Host/Fact.fsi']) {
+    assert.doesNotMatch(read(path), /ConcernPlacement/, path)
+  }
+})

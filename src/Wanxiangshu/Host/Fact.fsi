@@ -11,8 +11,7 @@ module HostFact =
                CallId: ToolCallId
                MarkerText: string
                CallGap: TranscriptGap
-               ResultGap: TranscriptGap
-               ConcernPlacement: ConcernPlacementBatch option |} ->
+               ResultGap: TranscriptGap |} ->
             AgentFact
 
 
