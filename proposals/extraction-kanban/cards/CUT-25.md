@@ -92,3 +92,35 @@ schema、执行准入、生成器都读 `JsCapability.admitsProgrammingSurface`�
 反例（旧列表会分叉）：仅 Edit → 旧 hasFs 放行、生成器拒绝；仅 Exec → 旧 hasFs 拒绝、旧 admission 放行、生成器放行。
 证据：`evidence/CUT-25/differential-admission.mjs` → `admission-unified.json`（11 角色 compared / differing 0）。
 capability-enforcement 002/006 与 006-cut25-escapes 全绿。
+
+## 编程面投影交库（2026-10-21，eng-cut25c/f-goose → eng-cut25g-goose 合入）
+
+Office 权限 → JS 能力投影（JsPlan 展开、Orchestrator Fork→Commission）、`admitsSurface`、`toolNameFor`、
+成员目录（dag 需 Join、Manager 的 `reviewOnly.*`）与 `projectRole` 只剩 `wanxiangli/programming` 一个 owner；
+主仓只留 label ↔ `JsCapability` DU 表一份（RuntimeSurface 改读它）。证据 `differential-surface.mjs`：
+11 角色 × 2 语言整面比较 22/0 不同；`admission-unified.json` 重跑字节相同。
+
+## 基类、运行时 api 与成员目录同源（2026-10-21，eng-cut25g-goose）
+
+`Description.fs` 的公开基类、Manager `ReviewOnly` 类、运行时基类与 `Callable`，以及 `ToolsBindings.createApi`
+的运行时 api 安装，原来各自手写"哪个能力投影哪个成员"（共 33 处 `has`/`Set.contains` 门禁，`dag = Fork && Join`
+写了两遍）。现在一律问 `present member`，答案来自 `JsCapability.memberNamesFor` = 库 `membersFor`，
+与 schema 成员列表同一份目录。
+
+- `differential-surface-directory.json`：基线 15f3c721e dist 对候选，22 个面（描述、基类、示例、成员、绑定）0 不同。
+- `differential-runtime-api.json`：11 个角色的运行时 api 成员 0 不同；每个角色的 api 都等于库目录去掉基类语法糖 `dag`。
+- 定向测试（repository-programming 全部、capability-enforcement 全部、work/024、advisor/006）：共 496 个，472 个通过，8 个 TODO，12 个跳过。
+  失败的是 048 的 3 条，master 上原本就失败；另有 043 #6，它按源码文本钉住旧的 `Set.contains JsCapability.Remove`
+  门禁，本刀改成钉住目录门禁，同一 dist 上 8/8 通过。
+
+## 关卡（DONE）
+
+- **退出条件**："同一能力不再有两套 generator/runtime gate"——满足。schema 成员列表、公开基类、运行时基类、
+  运行时 api 安装、执行准入（`admitsProgrammingSurface`）与生成器准入，都读 `wanxiangli/programming` 同一份投影和目录。
+  "公开 Surface 坚持普通 JS 数据"——`GeneratorSurface`/`WorkflowSurface` 只出普通对象，库面也只收发字符串数组和冻结对象。
+- **沙箱**：membrane 驱动在 `wanxiangli/sandbox` 0.23.2，已知逃逸路径（宿主 realm 对象、公开 API 返回值、
+  WeakMap/Reflect 固有方法篡改）都有先红后绿的回归测试，`await` 之后的死循环也会 `PROGRAM_TIMEOUT`。
+- **诚实残余**：node:vm 不是 OS 级隔离，Node 文档明确说它不是安全机制。membrane 只堵住了上面列出的已知路径，
+  不能当作完整证明；要真正隔离需要 worker/子进程加 OS 沙箱，这超出本卡"不降低原沙箱保证"的范围，
+  留作产品决定。契约/规则的散文段和 ultra 示例仍按能力（不是按成员）选文本，因为那是规则文案，
+  不是成员门禁。
