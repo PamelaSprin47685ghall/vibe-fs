@@ -56,3 +56,7 @@ JsSandbox / ToolsBindings / RuntimeSurface 在 6859577a7 与本次提交的 base
 
 未做：能力面 / generator / Plan 接线；抽 `wanxiangli/sandbox` 模块（membrane 仍在主仓字符串内，下一步抽取）。
 
+## 库抽取（2026-10-21）
+
+membrane 驱动已抽入 `wanxiangli/sandbox`（库提交 `50f5e4c`，发布 `0.23.1` / `d2a9f3b`）。主仓 `JsSandbox` 组合 `Sandbox().run`；ParkState / sentinel 解码 / 能力投影仍在主仓。库测试 `src/sandbox/tests` 含 naive base-red 与 membrane 绿证。
+
