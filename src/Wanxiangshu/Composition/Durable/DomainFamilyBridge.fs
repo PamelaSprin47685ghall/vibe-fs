@@ -137,11 +137,34 @@ module ContextProjectionBridge =
     let private retireAuxiliaryVisibility projection sessionId =
         ProjectionUpdate.updateSession sessionId ProjectionUpdate.retireAuxiliaryInjectionVisibility projection
 
+    /// PERSIST-010 / HOST-006: an epoch-advancing line commits through the prefix
+    /// owner (`wanxiangli/prefix`). Only a committed advance retires the old horizon:
+    /// a replayed line or a repeated observation is absorbed and changes nothing, so
+    /// it can neither clear rebuilt checkpoints nor retire visibility a second time.
+    let private reanchor factName projection sessionId apply =
+        match ProjectionUpdate.tryUpdatePrefix sessionId apply projection with
+        | Ok advanced -> Ok(clearCheckpointGeneration (retireAuxiliaryVisibility advanced sessionId) sessionId)
+        | Error rejection -> ProjectionUpdate.prefixOutcome factName projection (Error rejection)
+
     let fold (projection: AgentProjectionSet) (fact: ContextFactCases) : Result<AgentProjectionSet, FoldRejection> =
         match fact with
         | ContextFactCases.ViewCheckpointCommitted payload ->
             Ok(appendCheckpoint projection payload.SessionId payload.ToolCallId)
         | ContextFactCases.ContextReanchored payload ->
-            Ok(clearCheckpointGeneration (retireAuxiliaryVisibility projection payload.SessionId) payload.SessionId)
+            reanchor
+                "ContextReanchored"
+                projection
+                payload.SessionId
+                (PrefixEpochProjection.applyReanchor
+                    payload.PreviousEpochId
+                    payload.NextEpochId
+                    payload.ObservedCompactionRun)
         | ContextFactCases.TenureReanchored payload ->
-            Ok(clearCheckpointGeneration (retireAuxiliaryVisibility projection payload.SessionId) payload.SessionId)
+            reanchor
+                "TenureReanchored"
+                projection
+                payload.SessionId
+                (PrefixEpochProjection.applyTenureReanchor
+                    payload.PreviousEpochId
+                    payload.NextEpochId
+                    payload.IncumbencyId)

@@ -26,9 +26,6 @@ module HostCompactionPolicy =
     val autoContinueEnabled: bool
     val isContainableCompaction: isCompaction: bool -> bool
 
-    val nextReanchor:
-        observed: ProviderRunIdentity list -> isReanchored: (ProviderRunIdentity -> bool) -> ProviderRunIdentity option
-
     val firstTurnCompactionRuns: messages: CompactionWindowMessage list -> int option
 
     val judgeFirstTurn:

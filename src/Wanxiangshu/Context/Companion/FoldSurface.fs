@@ -291,7 +291,11 @@ module ContextFoldSurface =
                PrefixEpoch =
                 match session.PrefixEpoch with
                 | None -> null
-                | Some epoch -> box {| EpochId = PrefixEpochId.value epoch.EpochId |}
+                | Some epoch ->
+                    box
+                        {| EpochId = PrefixEpochId.value epoch.EpochId
+                           ReanchoredRuns = epoch.ReanchoredRuns |> Set.toArray |> Array.map ProviderRunIdentity.value
+                           ReanchoredTenures = epoch.ReanchoredTenures |> Set.toArray |}
                Handles = session.Handles |> Option.map handlesToJs |> Option.toObj
                ProviderFailures = session.ProviderFailures |> Option.map providerFailuresToJs |> Option.toObj
                PromptAuthority = session.PromptAuthority |> Option.map promptAuthorityToJs |> Option.toObj

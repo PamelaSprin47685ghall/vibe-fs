@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Participant.Provider.Projection
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation.Identity
 
 /// The two provider projections (provider-projection-003).
@@ -219,19 +221,32 @@ module ProviderProjection =
 
     // ── the questions each projection answers ───────────────────────────────
 
-    /// ARCH-004: `next` must keep `previous` as a byte prefix.
-    ///
-    /// Tools must be identical, not merely prefixed: a changed tool set
-    /// invalidates the KV cache entirely, so treating it as an append would
-    /// report a cache hit the provider will not honour.
+    [<Import("Prefix", "wanxiangli/prefix")>]
+    let private prefixOwnerCtor: obj = jsNative
+
+    let private prefixOwner: obj = createNew prefixOwnerCtor ()
+
+    let private messageBytes (message: WireMessage) =
+        jsonObject
+            [ field "role" (quote message.Role)
+              field "parts" (jsonArray (message.Parts |> List.map wirePartJson)) ]
+
+    let private appendLawView (wire: ProviderWireProjection) : obj =
+        createObj
+            [ "provider", box (Option.toObj wire.ProviderId)
+              "model", box (Option.toObj wire.ModelId)
+              "variant", box (Option.toObj wire.Variant)
+              "tools", box (List.toArray wire.Tools)
+              "system", box (List.toArray wire.System)
+              "messages", box (wire.Messages |> List.map messageBytes |> List.toArray) ]
+
+    /// ARCH-004: `next` must keep `previous` as a byte prefix. The append law
+    /// (identical provider/model/variant/tools/system, exact message prefix) is
+    /// owned by `wanxiangli/prefix`; this projection only supplies each message's
+    /// canonical wire bytes.
     let isAppendOnlyPrefix (previous: ProviderWireProjection) (next: ProviderWireProjection) : bool =
-        previous.Tools = next.Tools
-        && previous.System = next.System
-        && previous.ProviderId = next.ProviderId
-        && previous.ModelId = next.ModelId
-        && previous.Variant = next.Variant
-        && List.length previous.Messages <= List.length next.Messages
-        && (next.Messages |> List.truncate (List.length previous.Messages)) = previous.Messages
+        let verdict: obj = prefixOwner?classify (appendLawView previous, appendLawView next)
+        unbox<bool> verdict?append
 
     /// Compares semantic projections, never wire ones.
     let semanticallyEqual (left: ProviderSemanticProjection) (right: ProviderSemanticProjection) : bool =

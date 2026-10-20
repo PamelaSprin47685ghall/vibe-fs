@@ -56,9 +56,9 @@ module HostCompactionGate =
     /// HOST-006 containment: write one `ContextReanchored` for an observed pseudo-run.
     ///
     /// `observed` is every compaction run in the session's snapshot, oldest first.
-    /// Which one to act on — and whether any is left — is
-    /// `HostCompactionPolicy.nextReanchor`'s decision; this function supplies the
-    /// "already handled" predicate from the journal and does the append.
+    /// Which one to act on — and whether any is left — is the prefix owner's
+    /// candidate (`PrefixEpochProjection.proposeCompaction`, wanxiangli/prefix); this
+    /// function supplies the journal's committed state and does the append.
     ///
     /// Idempotency has two independent guards, deliberately. Here, the predicate skips
     /// a run the journal already reanchored. At the fold, `PrefixEpochProjection`

@@ -1,5 +1,11 @@
 # Changelog — 版本历史
 
+## Unreleased — 前缀世代重新由已提交事实推进（CUT-15）
+
+- **修复：宿主压缩与任期交接不再反复重锚**。cutover（6eef89d1e）之后，持久投影折叠 `ContextReanchored` / `TenureReanchored` 时只清检查点、退休辅助呈现，不再推进 `PrefixEpoch`：世代永远停在 0，已处理的压缩 run 也不入账。于是 `HostCompactionGate` 每次核对都对同一次压缩再写一行 0→1，每一行都把会话此后重建的 view 检查点清空、把 guidance 可见性再退休一次。现在折叠经前缀 owner 提交：只有被接受的推进才清检查点与退休可见性；重放行与重复观察被吸收、什么都不改；非后继世代照旧报 PERSIST-010。
+- **前缀规则改由 `wanxiangli/prefix`（0.10.0 起）唯一拥有**：世代推进（两类证据：宿主压缩伪 run、Plan 任期 incumbencyId）、候选与提交分离、吸收策略、view 检查点去重、同代追加律（provider/model/variant/工具集/system/逐条消息字节）。主仓 `Context/Prefix/Epoch`、`PhaseWindow`、`ProviderProjection.isAppendOnlyPrefix` 只做类型投影；`HostCompactionPolicy.nextReanchor` 删除，选哪一个压缩由库的 `proposeCompaction` 回答。
+- 既有日志：重放时首个压缩行生效，同 run 的重复行被吸收；故障期间若真有第二次压缩被写成 0→1，它会被当作过期行吸收，下一次核对由宿主重新观察到并以正确世代补写——自愈，不改写原件。
+
 ## Unreleased — 宿主工程循环改名：js.run → js.call
 
 - **宿主工程循环成员改名，混淆随之解除**。`js.run` 与模型程序入口 `this.run` 同名，模型在两处都看见 `run`，分不清「执行一次工程」和「运行我的程序」。宿主面成员改为 `js.call(class extends js.Callable { ... })`，只在全局 `js` 对象上调用；基类不提供 `this.call(...)`。模型程序入口仍是基类的 `async run()`——两个不同的名字，两件不同的事。
