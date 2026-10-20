@@ -146,11 +146,11 @@ test('WHAT[repository-programming-009] inherited rg configuration is disabled an
   }
 })
 
-test('WHAT[repository-programming-009] invalid JSON and invalid UTF-8 paths cannot become successful query results', async () => {
-  for (const [args, source] of [
-    [['needle', '.'], "process.stdout.write('invalid JSON\\n')"],
-    [['--files', '.'], 'process.stdout.write(Buffer.from([255, 0]))'],
-  ]) {
+for (const [label, args, source] of [
+  ['invalid JSON', ['needle', '.'], "process.stdout.write('invalid JSON\\n')"],
+  ['invalid UTF-8 paths', ['--files', '.'], 'process.stdout.write(Buffer.from([255, 0]))'],
+]) {
+  test(`WHAT[repository-programming-009] ${label} cannot become successful query results`, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'wxs-rg-invalid-'))
     try {
       await withSearchLauncher(directory, source, async () => {
@@ -162,8 +162,8 @@ test('WHAT[repository-programming-009] invalid JSON and invalid UTF-8 paths cann
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
-  }
-})
+  })
+}
 
 test('WHAT[repository-programming-009] consecutive queries consume the current absolute program deadline without borrowing another budget', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-rg-deadline-'))
