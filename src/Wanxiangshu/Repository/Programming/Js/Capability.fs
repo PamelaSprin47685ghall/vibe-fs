@@ -1,5 +1,7 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
 /// DSL-class: Vocabulary — filesystem primitive capabilities projected into
@@ -43,52 +45,124 @@ type JsCapability =
 
 module JsCapability =
 
-    /// The only ToolPermission → JsCapability mapping. A permission without a
-    /// js-* projection (edit, pty, …) produces no member (JS-004 four-layer
-    /// exactness). Commission stays on the Fork path: Orchestrator's host
-    /// commission verb is the same executeReceipt the fork member already runs.
-    let ofToolPermission (permission: ToolPermission) : JsCapability option =
-        match permission with
-        | ToolPermission.Read -> Some JsCapability.Read
-        | ToolPermission.Write -> Some JsCapability.Write
-        | ToolPermission.Glob -> Some JsCapability.Glob
-        | ToolPermission.Grep -> Some JsCapability.Grep
-        | ToolPermission.Move -> Some JsCapability.Move
-        | ToolPermission.Remove -> Some JsCapability.Remove
-        | ToolPermission.Exec -> Some JsCapability.Exec
-        | ToolPermission.Fork -> Some JsCapability.Fork
-        | ToolPermission.Resume -> Some JsCapability.Resume
-        | ToolPermission.DevOpsConsultation -> Some JsCapability.DevOps
-        | ToolPermission.Join -> Some JsCapability.Join
-        | ToolPermission.Fission -> Some JsCapability.Fission
-        | ToolPermission.Horizon -> Some JsCapability.Horizon
-        | ToolPermission.Advisor -> Some JsCapability.Advisor
-        | ToolPermission.Ask -> Some JsCapability.Ask
+    /// Stateless `wanxiangli/programming` surface (CUT-25). Office→JS projection,
+    /// JsPlan expansion and admitsSurface live in the library; this module maps
+    /// labels onto the host `JsCapability` DU for Description/ToolsBindings.
+    type private ProgrammingLibrary =
+        abstract projectPermission: label: string -> obj
+        abstract projectPermissions: labels: string array -> string array
+        abstract admitsSurface: labels: string array -> bool
+        abstract toolNameFor: role: string -> string
+        abstract membersFor: jsCapabilities: string array * roleName: string -> string array
+        abstract projectRole: role: string * officePermissions: string array -> obj
+
+    [<Import("Programming", "wanxiangli/programming")>]
+    let private programmingFactory: unit -> ProgrammingLibrary = jsNative
+
+    let private law: ProgrammingLibrary = programmingFactory ()
+
+    /// Host label ↔ DU (the one table; RuntimeSurface reads it too).
+    let ofLabel (label: string) : JsCapability option =
+        match label with
+        | "Read" -> Some JsCapability.Read
+        | "Write" -> Some JsCapability.Write
+        | "Glob" -> Some JsCapability.Glob
+        | "Grep" -> Some JsCapability.Grep
+        | "Move" -> Some JsCapability.Move
+        | "Remove" -> Some JsCapability.Remove
+        | "Exec" -> Some JsCapability.Exec
+        | "Fork" -> Some JsCapability.Fork
+        | "Resume" -> Some JsCapability.Resume
+        | "Commission" -> Some JsCapability.Commission
+        | "DevOps" -> Some JsCapability.DevOps
+        | "Join" -> Some JsCapability.Join
+        | "Fission" -> Some JsCapability.Fission
+        | "Horizon" -> Some JsCapability.Horizon
+        | "Advisor" -> Some JsCapability.Advisor
+        | "Ask" -> Some JsCapability.Ask
+        | "Deliver" -> Some JsCapability.Deliver
+        | "Park" -> Some JsCapability.Park
         | _ -> None
 
-    let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
-        // JsPlan is the office grant for the plan programming surface. It is
-        // not itself a member; it expands into the same Read/Write/Ask set the
-        // plan base class has always carried, so the plan surface is born from
-        // the one projection instead of a private capability list.
-        let expanded =
-            if Set.contains ToolPermission.JsPlan capabilities then
-                [ JsCapability.Read; JsCapability.Write; JsCapability.Ask ]
-            else
-                []
+    let labelOf (capability: JsCapability) : string =
+        match capability with
+        | JsCapability.Read -> "Read"
+        | JsCapability.Write -> "Write"
+        | JsCapability.Glob -> "Glob"
+        | JsCapability.Grep -> "Grep"
+        | JsCapability.Move -> "Move"
+        | JsCapability.Remove -> "Remove"
+        | JsCapability.Exec -> "Exec"
+        | JsCapability.Fork -> "Fork"
+        | JsCapability.Resume -> "Resume"
+        | JsCapability.Commission -> "Commission"
+        | JsCapability.DevOps -> "DevOps"
+        | JsCapability.Join -> "Join"
+        | JsCapability.Fission -> "Fission"
+        | JsCapability.Horizon -> "Horizon"
+        | JsCapability.Advisor -> "Advisor"
+        | JsCapability.Ask -> "Ask"
+        | JsCapability.Deliver -> "Deliver"
+        | JsCapability.Park -> "Park"
 
-        capabilities
-        |> Set.toList
-        |> List.choose ofToolPermission
-        |> List.append expanded
-        |> Set.ofList
+    /// The only ToolPermission → JsCapability mapping (library-owned).
+    let ofToolPermission (permission: ToolPermission) : JsCapability option =
+        let projected = law.projectPermission (OfficeCapability.permissionLabel permission)
+
+        if isNull projected then
+            None
+        else
+            ofLabel (string projected)
+
+    let ofToolCapabilities (capabilities: Set<ToolPermission>) : Set<JsCapability> =
+        let labels =
+            capabilities
+            |> Set.toList
+            |> List.map OfficeCapability.permissionLabel
+            |> List.toArray
+
+        law.projectPermissions labels |> Array.choose ofLabel |> Set.ofArray
 
     /// True iff the office permission set projects at least one programming-surface
-    /// member. Schema (permissionObj), execution admission (JsToolSpec) and the
-    /// generator (JsToolGenerator) all ask this one question — there is no second
-    /// "fs capability" or "surface permission" list.
+    /// member. Schema, execution admission and the generator all ask this one question.
     let admitsProgrammingSurface (capabilities: Set<ToolPermission>) : bool =
-        not (Set.isEmpty (ofToolCapabilities capabilities))
+        let labels =
+            capabilities
+            |> Set.toList
+            |> List.map OfficeCapability.permissionLabel
+            |> List.toArray
+
+        law.admitsSurface labels
+
+    let toolNameFor (roleName: string) : string = law.toolNameFor roleName
+
+    /// Library member directory for a JS capability set, in canonical order.
+    /// Lifecycle members (deliver, park) are never part of it.
+    let memberNamesFor (capabilities: Set<JsCapability>) (roleName: string) : string array =
+        let labels = capabilities |> Set.toArray |> Array.map labelOf
+        law.membersFor (labels, roleName)
+
+    /// Library projectRole: Some (toolName, jsCapabilities, memberNames) or None.
+    let projectRole
+        (roleName: string)
+        (capabilities: Set<ToolPermission>)
+        : (string * Set<JsCapability> * string array) option =
+        let labels =
+            capabilities
+            |> Set.toList
+            |> List.map OfficeCapability.permissionLabel
+            |> List.toArray
+
+        let raw = law.projectRole (roleName, labels)
+
+        if isNull raw then
+            None
+        else
+            let toolName = string raw?toolName
+            let caps: string array = unbox raw?capabilities
+            let members: string array = unbox raw?members
+            let jsCaps = caps |> Array.choose ofLabel |> Set.ofArray
+            Some(toolName, jsCaps, members)
 
 /// One capability's SDK projection: the single source for the member name a
 /// capability brings into the base class. The member's signature and prose

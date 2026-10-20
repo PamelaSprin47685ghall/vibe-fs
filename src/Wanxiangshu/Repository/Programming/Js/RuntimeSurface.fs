@@ -56,32 +56,13 @@ module JsRuntimeSurface =
 
         box (JsBindingsHandle(api, staging, readSnapshots))
 
-    let private capabilityOfLabel (label: string) : JsCapability option =
-        match label with
-        | "Read" -> Some JsCapability.Read
-        | "Write" -> Some JsCapability.Write
-        | "Glob" -> Some JsCapability.Glob
-        | "Grep" -> Some JsCapability.Grep
-        | "Move" -> Some JsCapability.Move
-        | "Remove" -> Some JsCapability.Remove
-        | "Exec" -> Some JsCapability.Exec
-        | "Fork" -> Some JsCapability.Fork
-        | "Resume" -> Some JsCapability.Resume
-        | "Commission" -> Some JsCapability.Commission
-        | "DevOps" -> Some JsCapability.DevOps
-        | "Join" -> Some JsCapability.Join
-        | "Fission" -> Some JsCapability.Fission
-        | "Horizon" -> Some JsCapability.Horizon
-        | "Advisor" -> Some JsCapability.Advisor
-        | "Ask" -> Some JsCapability.Ask
-        | "Park" -> Some JsCapability.Park
-        | _ -> None
-
     let createApiFor (root: string) (permissionLabels: string array) : obj =
         // DSL-MUTABLE: resource — JS mutation staging buffer handed off in handle
         let staging = ResizeArray<JsStagedMutation>()
         let readSnapshots = ResizeArray<JsReadSnapshot>()
-        let capabilities = permissionLabels |> Array.choose capabilityOfLabel |> Set.ofArray
+
+        let capabilities =
+            permissionLabels |> Array.choose JsCapability.ofLabel |> Set.ofArray
 
         let api =
             JsToolsBindings.createApi
@@ -111,7 +92,9 @@ module JsRuntimeSurface =
         : unit =
         JsDelegationBridge.install
             sessionId
-            { Delegate = fun name payload mapping -> unbox<Task<obj>> (emitJsExpr (delegation, name, payload, mapping) "$0($1,$2,$3)")
+            { Delegate =
+                fun name payload mapping ->
+                    unbox<Task<obj>> (emitJsExpr (delegation, name, payload, mapping) "$0($1,$2,$3)")
               Join = fun () -> unbox<Task<obj>> (emitJsExpr join "$0()")
               Fission = fun payload -> unbox<Task<obj>> (emitJsExpr (fission, payload) "$0($1)")
               Horizon = fun () -> unbox<Task<obj>> (emitJsExpr horizon "$0()")
@@ -127,12 +110,7 @@ module JsRuntimeSurface =
 
     /// Test hook: record a delivery carrying the exact call fence that
     /// produced it, so old-terminal/old-consumer fencing is observable.
-    let recordFencedDeliveredView
-        (sessionId: string)
-        (providerRun: string)
-        (toolCallId: string)
-        (view: obj)
-        : unit =
+    let recordFencedDeliveredView (sessionId: string) (providerRun: string) (toolCallId: string) (view: obj) : unit =
         JsDeliveredValues.recordFencedView
             sessionId
             (ProviderRunIdentity.create providerRun)
@@ -143,7 +121,8 @@ module JsRuntimeSurface =
     let deliveredReturned (sessionId: string) : string array =
         JsDeliveredValues.alreadyReturned sessionId |> Set.toArray
 
-    let clearDeliveredReturned (sessionId: string) : unit = JsDeliveredValues.clearReturned sessionId
+    let clearDeliveredReturned (sessionId: string) : unit =
+        JsDeliveredValues.clearReturned sessionId
 
     /// Test hook: consume the handoff the completion path reads.
     let takeDeliveredHandoffWith (sessionId: string) (assistantProse: string option) : obj =
@@ -154,7 +133,9 @@ module JsRuntimeSurface =
     /// Test hook: consume the handoff only when the cell carries this exact
     /// provider run; a fenced cell from another run stays untouched.
     let takeDeliveredHandoffFor (sessionId: string) (providerRun: string) (assistantProse: string option) : obj =
-        match JsDeliveredValues.tryTakeRenderedFor sessionId (ProviderRunIdentity.create providerRun) assistantProse with
+        match
+            JsDeliveredValues.tryTakeRenderedFor sessionId (ProviderRunIdentity.create providerRun) assistantProse
+        with
         | Some text -> box text
         | None -> null
 

@@ -32,6 +32,17 @@ module JsCapability =
 
     val admitsProgrammingSurface: capabilities: Set<ToolPermission> -> bool
 
+    val toolNameFor: roleName: string -> string
+
+    val labelOf: capability: JsCapability -> string
+
+    val ofLabel: label: string -> JsCapability option
+
+    val memberNamesFor: capabilities: Set<JsCapability> -> roleName: string -> string array
+
+    val projectRole:
+        roleName: string -> capabilities: Set<ToolPermission> -> (string * Set<JsCapability> * string array) option
+
 type JsCapabilityFragment =
     { Capability: JsCapability
       MemberName: string }

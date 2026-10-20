@@ -18,47 +18,37 @@ type JsSurface =
 
 module JsToolGenerator =
 
+    /// Rebuild host fragments from the library's member names (in the library's
+    /// canonical order) so Description still receives typed `JsCapabilityFragment`
+    /// values. The `reviewOnly.` prefix is the library's Manager projection.
+    let private fragmentsOf (memberNames: string array) : JsCapabilityFragment list =
+        let byName =
+            JsFragmentRegistry.all
+            |> List.map (fun fragment -> fragment.MemberName, fragment)
+            |> Map.ofList
+
+        memberNames
+        |> Array.toList
+        |> List.choose (fun name ->
+            let bare =
+                if name.StartsWith "reviewOnly." then
+                    name.Substring("reviewOnly.".Length)
+                else
+                    name
+
+            Map.tryFind bare byName
+            |> Option.map (fun fragment -> { fragment with MemberName = name }))
+
+    /// The role-independent member directory, read from the library law.
     let membersFor (capabilities: Set<JsCapability>) : JsCapabilityFragment list =
-        JsFragmentRegistry.all
-        |> List.filter (fun fragment ->
-            // The lifecycle members (deliver, park) are carried by every
-            // generated surface and are never the projection of a
-            // ToolPermission, so they never count among a role's members.
-            fragment.Capability <> JsCapability.Park
-            && fragment.Capability <> JsCapability.Deliver
-            && JsFragmentRegistry.isProjected capabilities fragment)
+        fragmentsOf (JsCapability.memberNamesFor capabilities "")
 
-    let toolNameFor (roleName: string) : string =
-        "todowrite-for-" + roleName.ToLowerInvariant()
-
-    let private membersForRole (roleName: string) capabilities =
-        membersFor capabilities
-        |> List.map (fun fragment ->
-            if
-                roleName.Trim().ToLowerInvariant() = "manager"
-                && List.contains fragment.MemberName [ "cat"; "stat"; "ls"; "rg" ]
-            then
-                { fragment with
-                    MemberName = "reviewOnly." + fragment.MemberName }
-            else
-                fragment)
+    let toolNameFor (roleName: string) : string = JsCapability.toolNameFor roleName
 
     let private tryProject (roleName: string) (capabilities: Set<ToolPermission>) =
-        let projected = JsCapability.ofToolCapabilities capabilities
-
-        let jsCapabilities =
-            if
-                roleName.Trim().ToLowerInvariant() = "orchestrator"
-                && Set.contains JsCapability.Fork projected
-            then
-                projected |> Set.remove JsCapability.Fork |> Set.add JsCapability.Commission
-            else
-                projected
-
-        if Set.isEmpty jsCapabilities then
-            None
-        else
-            Some(toolNameFor roleName, jsCapabilities, membersForRole roleName jsCapabilities)
+        match JsCapability.projectRole roleName capabilities with
+        | None -> None
+        | Some(toolName, jsCapabilities, memberNames) -> Some(toolName, jsCapabilities, fragmentsOf memberNames)
 
     let renderBaseClass (prose: JsCanonicalDescription.Prose) (capabilities: Set<JsCapability>) : string =
         JsCanonicalDescription.runtimeBaseClass prose capabilities
