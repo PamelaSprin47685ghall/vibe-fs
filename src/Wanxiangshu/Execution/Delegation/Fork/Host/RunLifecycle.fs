@@ -605,12 +605,33 @@ module HostForkRunLifecycle =
                     match journal with
                     | None -> true
                     | Some durable ->
+                        // LogicalRunId 是实值：写入端与本处同源。
+                        // 写入端取被调会话的 activeProfile.LogicalRunId
+                        // （ToolRegistry.fs:821），而该 profile 就是子会话自己的
+                        // ActiveLogicalRun（ProjectionQueries.fs:16-21，profileOwner
+                        // 对非 fission lane 就是会话自己）；本处取子会话准入时记下的
+                        // 逻辑运行（LinkageProjection.fs:310，准入用的也是该子会话
+                        // 自己的 ActiveLogicalRun —— DelegationProjectionBridge.fs:100
+                        // 取 childId 的 PromptAuthority）。同一条逻辑运行，
+                        // 别的逻辑运行的见证不得满足本子运行的交付门禁。
+                        let logicalRunId = run.Work |> Option.map AdmittedWork.logicalRunId
+
                         TaskDeliveryJournal.tryFindByFenceFields
                             durable
                             childId
                             result.ProviderRun
                             None
                             (Some result.AuthorityRootUserMessageId)
+                            None
+                            logicalRunId
+                            // Task 不启用：写入端按「本会话的 lifecycle 退休 → 本会话
+                            // 的子句柄 → 本次 toolCall」三级判定
+                            // （ToolRegistry.fs:768-800），Manager 子运行的交付会落到
+                            // Lifecycle 分支，其余才可能是 ChildWork 或 Invocation。
+                            // 本处只能确定「这是哪个子运行」，断定不了写入端落到了哪一支；
+                            // 断言 ChildWork 会让本该命中的见证永不匹配，D6 门禁下子运行
+                            // 永远 witnessed=false 而卡死。缺失的这一位由交付见证的写入方
+                            // 另行核对。
                             None
                         |> Option.isSome
 

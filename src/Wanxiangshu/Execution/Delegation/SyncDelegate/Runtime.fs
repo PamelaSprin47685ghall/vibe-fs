@@ -131,6 +131,12 @@ module internal SyncDelegateInternals =
                     None
                     root
                     input
+                    // 本次只有子集围栏：这一轮 turn 不携带逻辑运行 id，
+                    // 也不携带交付任务；缺失的两位（逻辑运行 / 交付任务）
+                    // 由交付见证的写入方（settle 侧按 activeProfile 与
+                    // deliveryTaskOf 登记）另行核对。
+                    None
+                    None
                 |> Option.map (fun witness -> witness.View))
             |> Option.filter (fun view -> not (System.String.IsNullOrWhiteSpace view))
 

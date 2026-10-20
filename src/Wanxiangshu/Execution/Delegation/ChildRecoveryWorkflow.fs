@@ -147,6 +147,15 @@ module ChildRecoveryWorkflow =
                         None
                         (Some authorityRoot)
                         None
+                        // 本次只有子集围栏：恢复端口只给出子会话与 agent 句柄，
+                        // 没有该子运行的逻辑运行 id，缺失的那一位（逻辑运行）
+                        // 由子运行自身的准入记录（AdmittedWork.logicalRunId）
+                        // 另行核对。
+                        None
+                        // 交付任务的种类（ChildWork / Invocation / Lifecycle）
+                        // 恢复端口并不掌握：写入侧按 settle 时的退役状态决定，
+                        // 缺失的这一位（交付任务）由交付见证的写入方另行核对。
+                        None
                         (AgentJournal.snapshot journal).AgentProjections.Deliveries
                     |> Option.isSome
 

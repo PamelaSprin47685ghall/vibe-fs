@@ -45,6 +45,8 @@ module TaskDeliveryJournal =
         (toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId option)
         (authorityRoot: Wanxiangshu.Foundation.Identity.AuthorityRootUserMessageId option)
         (physicalUserMessageId: Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option)
+        (logicalRunId: Wanxiangshu.Foundation.Identity.LogicalRunId option)
+        (task: Wanxiangshu.Host.TaskDeliveryTask option)
         =
         TaskDelivery.tryFindByFenceFields
             sessionId
@@ -52,6 +54,8 @@ module TaskDeliveryJournal =
             toolCallId
             authorityRoot
             physicalUserMessageId
+            logicalRunId
+            task
             (AgentJournal.snapshot journal).AgentProjections.Deliveries
 
     /// 粗粒度读取：只知道 (SessionId, ProviderRun) 时委托围栏子集读取。
@@ -60,7 +64,7 @@ module TaskDeliveryJournal =
         (sessionId: Wanxiangshu.Foundation.Identity.SessionId)
         (providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity)
         =
-        tryFindByFenceFields journal sessionId providerRun None None None
+        tryFindByFenceFields journal sessionId providerRun None None None None None
 
     let commit (journal: AgentJournal) (witness: TaskDeliveryWitness) =
         task {

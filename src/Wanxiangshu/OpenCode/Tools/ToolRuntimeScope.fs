@@ -221,6 +221,11 @@ module DeliveryAttemptLedger =
                         (Some witness.Fence.ToolCallId)
                         None
                         (Some physical)
+                        // 这条见证自身的围栏已登记逻辑运行与交付任务：
+                        // 用它们做同一围栏的复核，别的逻辑运行 / 别的交付任务的
+                        // 见证不得满足「本次交付已成立」的判定。
+                        (Some witness.Fence.LogicalRunId)
+                        (Some witness.Fence.Task)
                     |> Option.map (fun confirmed ->
                         { SessionId = sessionId
                           ProviderRun = confirmed.Fence.ProviderRun

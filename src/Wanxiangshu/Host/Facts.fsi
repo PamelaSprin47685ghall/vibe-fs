@@ -49,6 +49,8 @@ module TaskDelivery =
         toolCallId: ToolCallId option ->
         authorityRoot: AuthorityRootUserMessageId option ->
         physicalUserMessageId: PhysicalUserMessageId option ->
+        logicalRunId: LogicalRunId option ->
+        task: TaskDeliveryTask option ->
         witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness> -> TaskDeliveryWitness option
     /// 粗粒度读取：同一 (SessionId, ProviderRun) 下多条见证不再整体丢弃证据。
     val tryFind:

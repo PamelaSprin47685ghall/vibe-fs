@@ -21,6 +21,8 @@ module TaskDeliveryJournal =
         toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId option ->
         authorityRoot: Wanxiangshu.Foundation.Identity.AuthorityRootUserMessageId option ->
         physicalUserMessageId: Wanxiangshu.Foundation.Identity.PhysicalUserMessageId option ->
+        logicalRunId: Wanxiangshu.Foundation.Identity.LogicalRunId option ->
+        task: Wanxiangshu.Host.TaskDeliveryTask option ->
             Wanxiangshu.Host.TaskDeliveryWitness option
     val tryFind:
         journal: AgentJournal -> sessionId: Wanxiangshu.Foundation.Identity.SessionId ->

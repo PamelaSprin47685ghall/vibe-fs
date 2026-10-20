@@ -95,6 +95,8 @@ module TaskDelivery =
         (toolCallId: ToolCallId option)
         (authorityRoot: AuthorityRootUserMessageId option)
         (physicalUserMessageId: PhysicalUserMessageId option)
+        (logicalRunId: LogicalRunId option)
+        (task: TaskDeliveryTask option)
         (witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness>)
         =
         let matches (witness: TaskDeliveryWitness) =
@@ -102,6 +104,8 @@ module TaskDelivery =
             (toolCallId.IsNone || fence.ToolCallId = toolCallId.Value)
             && (authorityRoot.IsNone || fence.AuthorityRoot = authorityRoot.Value)
             && (physicalUserMessageId.IsNone || fence.PhysicalUserMessageId = physicalUserMessageId.Value)
+            && (logicalRunId.IsNone || fence.LogicalRunId = logicalRunId.Value)
+            && (task.IsNone || fence.Task = task.Value)
 
         underRun sessionId providerRun witnesses
         |> List.filter matches
@@ -115,7 +119,7 @@ module TaskDelivery =
     /// 粗粒度读取：不再因为同一 (SessionId, ProviderRun) 下"不止一条"就整体丢弃证据。
     /// 需要指定某一次调用时用 tryFindByFence。
     let tryFind sessionId providerRun (witnesses: Map<SessionId * ProviderRunIdentity * ToolCallId, TaskDeliveryWitness>) =
-        tryFindByFenceFields sessionId providerRun None None None witnesses
+        tryFindByFenceFields sessionId providerRun None None None None None witnesses
 
 type HostFactCases =
     | TaskDeliveryCommitted of TaskDeliveryWitness
