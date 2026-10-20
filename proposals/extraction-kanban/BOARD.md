@@ -4,6 +4,24 @@
 
 返回 [施工指南](README.md)；具体工作见 [职责卡](CARDS.md)。
 
+## 2026-10-21 已拆模块修正施工
+
+用户已授权按[本轮施工范围](MODULE-CONSTRUCTION-2026-10-21.md)持续施工至少五小时（全部计划提前完成除外），允许subagent与独立测试。固定主仓c78c9d53c、库a12ff4a，上游只读参照5880b824f/202a41ab；原运行目录保持原版。
+
+| 包 | 状态 | 证据与剩余边界 |
+|---|---|---|
+| MF-00 | DONE（基线） | c78c9d53c完整CI成功；两仓输入、精确写集合和保留合同已登记 |
+| MF-01 | DOING | root接收独立sandbox并保持deadline/park/abandon；运行验收尚未开始 |
+| MF-02A | DOING | delivery_audit修交付停止的精确物理输入绑定；先留真实交错反例 |
+| MF-02B | PLANNED | delivery材料封存、prefix/compression；projection仍需交接，不搬弱wrapper |
+| MF-03A | DOING | physical_storage_audit修legacy续接崩溃窗口；热缓存前缀改写另记P2 |
+| MF-03B | PLANNED | spool/PTY与时间等待组合，保留本地物理终态保证 |
+| MF-04 | PLANNED | 逐事实族接收存储纯规则与真实恢复验收 |
+| MF-05 | WAITING_HANDOFF | 调度、派发、会话的在建部分不抢公共编辑面 |
+| MF-06 | PLANNED | 知识复用和实测成本；边缘问题先留档 |
+
+先前N1—N6和UM记录保留历史含义，发行阻断以最终通过CI的精确候选为准，不重复认领已修问题；历史TODO、异常收尾证据和全链缺口不自动销项。
+
 <a id="upstream-view-delivery-20261020"></a>
 ## 2026-10-20 最新上游：view、交付与权限
 
