@@ -17,3 +17,12 @@
 - base = master `0ba124c4a` 全新构建（`wt/CUT-17-base`）；candidate = 变基后本提交全新构建。同一 66 文件：两边均 223 pass / 8 fail / 1 skipped / 11 todo，225 条 verdict **逐条相同**（`tenure-suite.verdicts` 已按此次 candidate 重写）。与首次记录相比多出一条 work-020 新用例、work-020 旧失败转绿，两边同样如此，来自 master 其间的提交，不是本刀。
 - 双算 `tenure-diff.mjs`（旧实现改指 `wt/CUT-17-base/dist`）3 种子 × 3000 = 9000 次 **0 分歧**，与首次数字一致。
 - 再次变基到 master `03295f1fd`（落地 CUT-10 路由/许可/容量与 work 测试迁移，gitlink → `d2ce694`/0.35.0）后重建 candidate：同一 66 文件 233 pass / 2 fail / 1 skipped / 11 todo；2 个失败均在上面 base 的 8 个失败之内（其余 6 个由 master 其间的测试迁移转绿），无新增失败；双算 9000 次仍 0 分歧。本刀不改 gitlink。
+
+## 子范围②：ProjectionPlanner.plan（wanxiangli/projection `plan`，0.34.0 发布，gitlink 仍为 master 的 `d2ce694`/0.35.0）
+
+- 由 eng-cut17c-goose 写成本地 WIP 后中断，eng-cut17d-goose 接手、变基到 master `981008460` 后全新构建并核对。本刀不改 gitlink、lockfile。
+- 宿主改动：`Planner.fs` 只把每条意图翻成 `{ kind, key, anchor, rows, fingerprint }`（指纹 = 行内容含宿主 id/物理标记的嵌套数组 JSON），交给库 `plan`，再按库返回的 `order` 取回原意图；冲突原样映射回 `ProjectionConflict`。宿主锚点可为任意 int（越界由 `ProjectionRenderer` 拒绝），库只收非负锚点，故把最小锚点平移到 0——plan 只比较锚点的先后与相等，平移不改变答案。删除宿主自有的 `insertionSortKey`/`reduceBase`/`reduceInsertions`。
+- 双算（`plan-diff.mjs`，`plan-diff.txt`）：经公开面 `ProjectionSurface.plan` 与 `renderMessagesWithHostIds`，旧实现取 `wt/CUT-17-base/dist`（master `0ba124c4a`，其 `Participant/Provider/Projection/` 与当前 master 逐字节相同，`git diff --stat` 为空），新实现取本工作树 dist；随机意图含重复/冲突基底、同键同值与同键异值插入、负锚点与越界锚点、append、含引号/逗号的文本。3 种子 × 3000 轮 × 2 个面 = 18000 次比较 **0 分歧**（约 1/2 规划冲突，约 3/4 渲染以越界抛错，双方一致）。
+- 负控：在候选 dist 的拷贝上 A）去掉锚点平移 → 1818 次分歧；B）插入意图指纹置空 → 40 次分歧。两者都被抓到。
+- 相关测试（`planner-suite.files`，88 文件：上面 66 文件 + provider-projection、prefix-stability、participant-horizon 全部、interaction-authority 008、host-boundary 020）：candidate 375 pass / 2 fail / 8 cancelled / 1 skipped / 20 todo（`planner-suite.verdicts`）。base 取 `wt/CUT-17-base`（master `0ba124c4a` 的 dist 与测试）：365 pass / 8 fail / 8 cancelled；差异（`planner-suite.base-vs-cand.diff`）全部来自 master 在 `0ba124c4a` 之后对 work 009/019/021/024 测试的迁移（失败转绿与新增用例），**没有 base 通过而 candidate 失败的用例**。prefix-stability-001 的 8 条在两边同样失败（文件级取消），work-011/026 两边同样失败，均为既有问题。
+- 产物：`dist/Participant/Provider/Projection/Planner.js` import `wanxiangli/projection` 的 `Projection` 并调用 `projection.plan`。

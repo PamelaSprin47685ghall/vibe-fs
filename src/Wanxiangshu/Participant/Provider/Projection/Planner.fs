@@ -1,56 +1,94 @@
 namespace Wanxiangshu.Participant.Provider.Projection
 
+open Fable.Core
+open Fable.Core.JsInterop
+open Wanxiangshu.Foundation.Identity
+
 [<RequireQualifiedAccess>]
 module ProjectionPlanner =
 
-    let private insertionSortKey (insertion: ProjectionMessageInsertion) =
-        match insertion.Anchor with
-        | ProjectionMessageAnchor.BeforeMessageIndex index -> 0, index, insertion.Key
-        | ProjectionMessageAnchor.Append -> 1, 0, insertion.Key
+    /// 意图规划规则的唯一实现：wanxiangli/projection `plan`（CUT-17）。宿主只把意图翻成
+    /// `{ kind, key, anchor, rows, fingerprint }`，再按库给出的规范顺序取回原意图。
+    [<AllowNullLiteral>]
+    type private ProjectionPlans =
+        abstract plan: intents: obj -> obj
 
-    let private reduceBase (items: ProjectionMessageBase list) : Result<ProjectionIntent option, ProjectionConflict> =
-        match items with
-        | [] -> Ok None
-        | head :: tail when tail |> List.forall ((=) head) -> Ok(Some(ProjectionIntent.ReplaceMessageBase head))
-        | _ -> Error ProjectionConflict.ConflictingMessageBase
+    [<Import("Projection", "wanxiangli/projection")>]
+    let private createProjection: unit -> ProjectionPlans = jsNative
 
-    let private reduceInsertions
-        (items: ProjectionMessageInsertion list)
-        : Result<ProjectionIntent list, ProjectionConflict> =
-        let groups =
-            items |> List.groupBy (fun insertion -> insertion.Key) |> List.sortBy fst
+    let private projection = createProjection ()
 
-        let rec reduce remaining acc =
-            match remaining with
-            | [] ->
-                acc
-                |> List.sortBy insertionSortKey
-                |> List.map ProjectionIntent.InsertMessageRows
-                |> Ok
-            | (_, head :: tail) :: rest when tail |> List.forall ((=) head) -> reduce rest (head :: acc)
-            | (key, _) :: _ -> Error(ProjectionConflict.ConflictingMessageRows key)
+    [<Emit("JSON.stringify($0)")>]
+    let private json (value: obj) : string = jsNative
 
-        reduce groups []
+    let private partValue (part: ProviderProjection.WirePart) : obj =
+        match part with
+        | ProviderProjection.WireText text -> box [| box "text"; box text |]
+        | ProviderProjection.WireReasoning text -> box [| box "reasoning"; box text |]
+        | ProviderProjection.WireToolCall(callId, name, args) ->
+            box [| box "call"; box (ToolCallId.value callId); box name; box args |]
+        | ProviderProjection.WireToolResult(callId, result) ->
+            box [| box "result"; box (ToolCallId.value callId); box result |]
+        | ProviderProjection.WireMedia(mediaType, digest) ->
+            box [| box "media"; Option.toObj mediaType |> box; box digest |]
+
+    let private rowValue (row: ProjectionMessageRow) : obj =
+        box
+            [| box row.Message.Role
+               box (row.Message.Parts |> List.map partValue |> List.toArray)
+               Option.toObj row.HostMessageId |> box
+               box row.HostIsPhysical |]
+
+    /// 行内容的规范指纹：结构相等当且仅当指纹相等（嵌套数组的 JSON，字符串逐字转义）。
+    let private fingerprint (rows: ProjectionMessageRow list) : string =
+        json (box (rows |> List.map rowValue |> List.toArray))
+
+    /// 规划只比较锚点之间的先后与相等，整体平移不改变答案；库只收非负锚点，
+    /// 所以把最小锚点移到 0（宿主允许任意 int 锚点，越界由渲染器拒绝）。
+    let private anchorOffset (intents: ProjectionIntent list) : float =
+        intents
+        |> List.choose (function
+            | ProjectionIntent.InsertMessageRows { Anchor = ProjectionMessageAnchor.BeforeMessageIndex index } ->
+                Some(float index)
+            | _ -> None)
+        |> function
+            | [] -> 0.0
+            | anchors -> min 0.0 (List.min anchors)
+
+    let private layoutIntent (offset: float) (intent: ProjectionIntent) : obj =
+        match intent with
+        | ProjectionIntent.ReplaceMessageBase replacement ->
+            createObj
+                [ "kind" ==> "ReplaceMessageBase"
+                  "key" ==> replacement.Key
+                  "rows" ==> List.length replacement.Rows
+                  "fingerprint" ==> fingerprint replacement.Rows ]
+        | ProjectionIntent.InsertMessageRows insertion ->
+            createObj
+                [ "kind" ==> "InsertMessageRows"
+                  "key" ==> insertion.Key
+                  "anchor"
+                  ==> (match insertion.Anchor with
+                       | ProjectionMessageAnchor.Append -> null
+                       | ProjectionMessageAnchor.BeforeMessageIndex index -> box (float index - offset))
+                  "rows" ==> List.length insertion.Rows
+                  "fingerprint" ==> fingerprint insertion.Rows ]
 
     /// Dedupe owner keys, reject conflicts, and return base then canonically sorted insertions.
     /// The result is invariant under registration order for every conflict-free multiset.
     let plan (intents: ProjectionIntent list) : Result<ProjectionIntent list, ProjectionConflict> =
-        let bases =
-            intents
-            |> List.choose (function
-                | ProjectionIntent.ReplaceMessageBase replacement -> Some replacement
-                | _ -> None)
+        let source = List.toArray intents
+        let offset = anchorOffset intents
 
-        let insertions =
-            intents
-            |> List.choose (function
-                | ProjectionIntent.InsertMessageRows insertion -> Some insertion
-                | _ -> None)
+        let answer = projection.plan (box (source |> Array.map (layoutIntent offset)))
 
-        reduceBase bases
-        |> Result.bind (fun replacement ->
-            reduceInsertions insertions
-            |> Result.map (fun orderedInsertions ->
-                match replacement with
-                | Some baseIntent -> baseIntent :: orderedInsertions
-                | None -> orderedInsertions))
+        if unbox<bool> answer?ok then
+            unbox<int array> answer?order
+            |> Array.map (fun position -> source[position])
+            |> Array.toList
+            |> Ok
+        else
+            match unbox<string> answer?conflict with
+            | "ConflictingMessageBase" -> Error ProjectionConflict.ConflictingMessageBase
+            | "ConflictingMessageRows" -> Error(ProjectionConflict.ConflictingMessageRows(unbox<string> answer?key))
+            | other -> invalidOp ("wanxiangli/projection plan returned an unknown conflict: " + other)
