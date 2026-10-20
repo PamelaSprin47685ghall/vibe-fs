@@ -1,9 +1,46 @@
+// 本文件的旧断言（"重启后 resume 该 child，随后它完成交付并被 join 收走"）测的是
+// 已退役语义：它成立的前提是 load 阶段把遗留的子 run 作废（ChildWorkVoided）。
+// 现行契约（crash-reconciliation [018] 经 60812f575 修订）把遗留的子 run 保持为
+// 活跃且可见，load 阶段只作废 fission group 本身；因此那条"续做→完成→join"时序
+// 在现行架构下不再有对应物，相应断言已删除。保留的是本条款真正要证的部分：
+// 中断的裂变被记为中断，且不自动隐式恢复。
 import assert from 'node:assert/strict'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import test from 'node:test'
 import { acceptAuthorityRoot, openIncumbency, withRestartablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
-test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned open Fission groups with FissionFailed so a resumed owner turn completes and delivers to join instead of being swallowed as replaced', async () => {
-  await withRestartablePlugin(async (start, _directory, { stop, withRuntime, createdIds, messages, pushHostMessage }) => {
+// durable 事件就是消费者读到的事实：从 journal 的 .ndjson 逐条读回。
+const durableFacts = (directory) => {
+  const events = join(directory, '.Herdchestra', 'wanxiangshu', 'events')
+  return readdirSync(events)
+    .filter((name) => name.endsWith('.ndjson'))
+    .sort()
+    .flatMap((name) =>
+      readFileSync(join(events, name), 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line).payload?.Fact)
+        .filter(Boolean),
+    )
+}
+
+const fissionFacts = (facts) =>
+  facts.filter((fact) => fact?.[0] === 'Agent' && fact?.[1]?.[0] === 'Fission').map((fact) => fact[1][1])
+
+const activateDurability = async (hooks, suffix) => {
+  const sessionID = `activation-${suffix}`
+  await hooks['chat.message'](
+    { sessionID, agent: 'manager' },
+    {
+      message: { id: `msg-${sessionID}`, sessionID, role: 'user', agent: 'manager' },
+      parts: [{ id: `part-${sessionID}`, type: 'text', text: 'activate durable recovery' }],
+    },
+  )
+}
+
+test('WHAT[intra-participant-parallelism-010] an interrupted Fission group is settled as failed at load and is never implicitly resumed', async () => {
+  await withRestartablePlugin(async (start, directory, { stop, withRuntime, createdIds, prompts }) => {
     const hooks1 = await start()
     const managerSession = 'ses-fission-restart-manager'
     await withRuntime(async (runtime) => {
@@ -11,11 +48,18 @@ test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned op
       await openIncumbency(runtime, managerSession)
     })
 
-    const forked = await hooks1.tool.fork.execute(
-      { name: 'ruling-materials', charge: 'collect seven materials' },
+    // 派工是编程面成员（宿主 fork 工具已整体退役）：
+    // `this.fork(payload, reportMapping)`。
+    const forked = await hooks1.tool['todowrite-for-manager'].execute(
+      {
+        program:
+          'class Js extends JsProgram { async run() { return await this.fork({ name: "ruling-materials", charge: "collect seven materials" }, { 1: null }); } }',
+      },
       { sessionID: managerSession, agent: 'manager' },
     )
-    assert.match(forked, /现已接下这项托付|carries this charge now/i)
+    assert.match(forked, /ok = true/)
+    assert.match(forked, /name = "ruling-materials"/)
+    assert.match(forked, /outcome = "created"/)
     const engineerSession = createdIds[0]
 
     const fissioned = await hooks1.tool.fission.execute(
@@ -24,97 +68,42 @@ test('WHAT[intra-participant-parallelism-010] load settlement closes orphaned op
     )
     assert.match(fissioned, /status\s*=\s*"fissioned"/i)
 
+    // 崩溃前的现场：裂变已开立，lane 已被派出。
+    const before = fissionFacts(durableFacts(directory))
+    const admitted = before.find((fact) => fact[0] === 'FissionAdmitted')
+    assert.ok(admitted, 'the fission group must be admitted before the crash')
+    assert.equal(admitted[1].LaneCount, 2)
+    const promptsBefore = prompts.length
+
     // Stop incarnation 1 and boot incarnation 2: load-phase recovery settles
-    // orphaned child runs and orphaned open Fission groups.
+    // the orphaned open Fission group.
     await stop(hooks1)
     const hooks2 = await start()
-    await new Promise(r => setTimeout(r, 50))
+    await activateDurability(hooks2, 'fission-restart')
+    await new Promise((resolve) => setTimeout(resolve, 300))
 
-    // Now Manager resumes the same child handle after restart.
-    const resumed = await hooks2.tool.resume.execute(
-      { name: 'ruling-materials', charge: 're-commissioned after restart: collect materials' },
-      { sessionID: managerSession, agent: 'manager' },
-    )
-    assert.match(resumed, /现已接下这项托付|carries this charge now/i)
+    // 消费者可见的事实：同一个 group 被记为中断（失败），而不是被静默抹掉。
+    const after = fissionFacts(durableFacts(directory))
+    const failed = after.find((fact) => fact[0] === 'FissionFailed')
+    assert.ok(failed, 'the interrupted fission group must be settled as failed at load')
+    assert.equal(failed[1].GroupId, admitted[1].GroupId, 'the same group is settled, not a new one')
+    assert.equal(failed[1].Reason, 'process_interrupted', 'an interrupted fission is recorded as interrupted')
 
-    const engineerUserMessages = messages.filter(
-      m => m.id?.startsWith(`msg-${engineerSession}-`) && m.role === 'user',
-    )
-    const latestPhysicalId = engineerUserMessages[engineerUserMessages.length - 1].id
+    // 不自动隐式恢复：load 阶段不重放任何命令，也不为 lane 重新派工。
+    assert.equal(prompts.length, promptsBefore, 'the load phase must not resume the interrupted group')
 
-    const assistantMsg = {
-      info: {
-        id: `assistant-post-restart-${engineerSession}`,
-        sessionID: engineerSession,
-        parentID: latestPhysicalId,
-        role: 'assistant',
-        agent: 'engineer',
-        providerID: 'provider',
-        modelID: 'engineer-model',
-        time: { created: 10 },
-      },
-      parts: [],
-    }
-    pushHostMessage(engineerSession, assistantMsg)
-
-    await hooks2['experimental.chat.messages.transform'](
-      { sessionID: engineerSession },
-      {
-        messages: [
-          {
-            info: {
-              id: latestPhysicalId,
-              sessionID: engineerSession,
-              role: 'user',
-              agent: 'engineer',
-              time: { created: 9 },
-            },
-            parts: engineerUserMessages[engineerUserMessages.length - 1].parts,
-          },
-        ],
-      },
-    )
-
-    const delivered = await hooks2.tool['todowrite-for-engineer'].execute(
-      { program: "class Js extends JsProgram { async run() { await this.deliver('Complete 9-item ruling materials report') } }" },
-      { sessionID: engineerSession, agent: 'engineer' },
-    )
-    assert.match(delivered, /^# ok\b/m)
-
-    assistantMsg.info.finish = 'stop'
-    assistantMsg.info.time.completed = 11
-    assistantMsg.parts = [{ id: 'part-final-report', type: 'text', text: 'Complete 9-item ruling materials report' }]
-
-    await hooks2.event({
-      event: {
-        type: 'message.updated',
-        properties: {
-          info: {
-            id: assistantMsg.info.id,
-            sessionID: engineerSession,
-            parentID: latestPhysicalId,
-            role: 'assistant',
-            finish: 'stop',
-            time: { created: 10, completed: 11 },
-          },
-        },
-      },
-    })
-    await hooks2.event({
-      event: {
-        type: 'session.status',
-        properties: {
-          sessionID: engineerSession,
-          status: { type: 'idle' },
-        },
-      },
-    })
-
+    // 结算后的 group 不再是活跃 group：join 不再等它，horizon 不再报它在外。
     const joined = await Promise.race([
       hooks2.tool.join.execute({}, { sessionID: managerSession, agent: 'manager' }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('join hung waiting for resumed fission owner')), 4000)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('join hung on a settled fission group')), 5000)),
     ])
-    assert.match(joined, /Complete 9-item ruling materials report/)
+    assert.doesNotMatch(String(joined), /ruling-materials/, 'a settled fission group owes no joinable work')
+
+    const horizon = await Promise.race([
+      hooks2.tool.horizon.execute({}, { sessionID: managerSession, agent: 'manager' }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('horizon hung on a settled fission group')), 5000)),
+    ])
+    assert.doesNotMatch(String(horizon), /ruling-materials/, 'a settled fission group is not away anymore')
   })
 })
 
