@@ -131,5 +131,5 @@ test('WHAT[repository-programming-006] output budget measures UTF-8 bytes and ac
 })
 }
 
-test.todo('WHAT[repository-programming-006] pending async work and post-await computation terminate within the execution budget')
+// post-await budget: covered in 006-cut25-escapes.test.mjs (CUT-25 membrane + afterEvaluate driver)
 test.todo('WHAT[repository-programming-006] memory exhaustion is contained without exhausting the Host process')

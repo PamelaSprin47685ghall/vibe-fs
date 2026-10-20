@@ -43,3 +43,16 @@ JsSandbox / ToolsBindings / RuntimeSurface 在 6859577a7 与本次提交的 base
 ## 未做
 
 能力面 / generator / file/run/Plan 接线（依赖 CUT-08 DONE）、教程/描述/schema 同源，均未开始。
+
+## 修复进度（2026-10-21，eng-cut25-goose）
+
+子范围①安全修复已合入主仓 `Process/JsSandbox.fs`（本卡后续提交）：
+
+- 上下文改为 `vm.constants.DONT_CONTEXTIFY` + `microtaskMode: "afterEvaluate"`，不再把宿主 `api` / `__deadlineRef` / `__parkState` 挂到全局。
+- 宿主值经 membrane 复制/包装成 sandbox-realm 值；Callable 实例经 bridge proxy 进入宿主回调时参数同样包装。
+- 期限用宿主 `Date.now`（`Number(deadlineRef.current)`，避免 Fable int64/BigInt 混算）。
+- 驱动循环在每次 drain 时施加 `runInContext` timeout，因此 `await` 之后的同步死循环也会 `PROGRAM_TIMEOUT`（证据：006-cut25-escapes 与 await-loop 探针）。
+- 回归：`requirements/repository-programming/tests/006-cut25-escapes.test.mjs`；探针绿证 `evidence/CUT-25/fixed-green-escapes.json`。
+
+未做：能力面 / generator / Plan 接线；抽 `wanxiangli/sandbox` 模块（membrane 仍在主仓字符串内，下一步抽取）。
+
