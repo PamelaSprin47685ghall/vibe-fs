@@ -57,3 +57,11 @@ module OfficeCapability =
     /// surface that carries permissions across the JS edge.
     val permissionLabel: permission: ToolPermission -> string
     val permissionOfLabel: label: string -> ToolPermission option
+    /// capability-enforcement-012: permission → host provider tool names (may be empty:
+    /// the duty lives on the programming surface only). Answered by wanxiangli/capability.
+    val toolNames: permission: ToolPermission -> string list
+    /// The sole reverse lookup tool name → permission for one role; a verb shared by two
+    /// permissions resolves to the one this role owns.
+    val permissionOfToolName: role: Role -> name: string -> ToolPermission option
+    /// Visible equals callable: the role owns the permission this exact name maps to.
+    val admitsToolForRole: role: Role -> name: string -> bool

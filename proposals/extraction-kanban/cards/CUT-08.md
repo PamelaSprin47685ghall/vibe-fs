@@ -13,9 +13,9 @@
 | 段 | 内容 | 状态 |
 |---|---|---|
 | 1 | 角色 × 能力矩阵、未知/历史角色失败关闭、Manager 精确事实门禁 | 已合入（§3） |
-| 2 | 原生 / JS 工具共同使用同一结果 | 见 §4 |
-| 3 | schema / 描述 / 示例 / 运行门禁一致 | 见 §4 |
-| 4 | 删除每角色手写的同义权威表 | 见 §4 |
+| 2 | 能力 ↔ 宿主工具名唯一映射；schema 投影、派发映射、执行门禁读同一份 | 已合入（§4） |
+| 3 | schema / 描述 / 示例 / 运行门禁一致 | 见 §5 |
+| 4 | 删除每角色手写的同义权威表 | 部分（§4.2 删除 StaticTools 中 7 行冗余覆写）；余见 §5 |
 
 ## 3. 第 1 段：矩阵与 Manager 门禁（2026-10-21）
 
@@ -53,3 +53,30 @@
 - 差分 3950 次双算，0 处不同。
 - check.mjs 无新增发现；shard-edge-audit 253 → 252。
 - 净改进：能力矩阵只剩一个 owner（库），宿主少约 60 行判定逻辑，行为不变，权限未扩大。
+
+## 4. 第 2 段：能力 ↔ 工具名唯一映射（2026-10-21）
+
+### 4.1 库侧
+
+- wanxiangli `8cadb12`：`ToolSurface.toolNames`、`permissionOfToolName`、`admitsToolForRole`，以及 `tests/002.test.mjs`（SPEC[capability-004]）。
+- `274d9c0`（测试修复）：eventstore-001 竞态用例改为等两个 worker 都退出后再重开库。原因：worker 回复后关闭连接，最后一次关闭会做 WAL checkpoint；`busy_timeout=0` 下父进程提前重开会报 `database is locked`。这台负载机上修复前 3 次失败 2 次，修复后 8/8 通过；断言没有改。
+- `b6b05e2` 发布 **0.20.0**，库全套 596/596 pass。
+
+### 4.2 主仓接线
+
+- `Foundation/OfficeCapability.fs(.fsi)` 新增 `toolNames`、`permissionOfToolName`、`admitsToolForRole`，都是对库的类型化投影。
+- `OpenCode/Tools/StaticTools.fs`：删除手写的 `toolNames` match（24 行）和 `allPermissions` 构造子列表，三处函数改为委托给库，`.fsi` 未改。
+- `permissionFor` 删除 7 行冗余的每角色覆写：Plan 的 review/deliver/todowrite-for-plan allow；Manager 的 fission/commission deny；Orchestrator 的 resume deny；DevOps 的 fork/resume deny。这些结果矩阵和反查本来就给出相同答案，差分已证明逐项一致。
+- 保留 2 行矩阵表达不了的宿主注册例外：Orchestrator 的 `fork` deny（Fork 职责在编程面上），以及 `commission` allow（宿主动词，没有对应的办公能力）。
+- gitlink → `b6b05e2`（0.20.0），lockfile 同步。0.19.0 是 CUT-19 的 events/retention 增量，随 gitlink 一并进入；durable-convergence 18/13 pass、durable-events 252/233 pass，均 0 fail。
+
+### 4.3 验收
+
+- 差分 [differential-tools.mjs](../evidence/CUT-08/differential-tools.mjs)：11 角色 × 33 名字，覆盖 toolNames、反查、准入、`permissionObj`、`requestToolMap`。结果 `compared 784; differing 0`；第 1 段差分在新 candidate 上仍为 `3950 / 0`。
+- 套件计数与 base 相同，已有失败的用例名 diff 为空（repository-programming 8、structured-workflow 1、intra-participant-parallelism 3、work 9，都是 base 已有）。
+- check.mjs：本卡文件无新增发现。新出现的 2 条 `Ablation/Manifest.fs` match-pyramid 来自 master 上他人的 `3e7f7e302`，不在本卡 diff 内。
+
+## 5. 剩余（CUT-08 未 DONE 的原因）
+
+- 第 3 段（schema、描述、示例与运行门禁一致）：action-affordance 001–013 都是 GAP-078 语义评审 TODO，需要人工审阅描述文本，不是单纯的代码抽取。`StaticTools.jsPermission` / `hasFsCapability` 中 todowrite-for-* 的编程面准入，以及 `ToolRegistry` 的 JS 生成器归 CUT-25（已被他人认领）。
+- 第 4 段余项：`Execution/Fission/OpenCode/Tool.fs:963` 的 `r = Role.Engineer &&` 与矩阵冗余（矩阵里只有 Engineer 持有 Fission），`cognitiveUtilityRoleAllowed` 是另一张手写角色表。这两处都可以收进库，作为下一刀。

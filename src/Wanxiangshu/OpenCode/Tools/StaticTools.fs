@@ -8,93 +8,22 @@ open Wanxiangshu.Foundation
 
 module StaticTools =
 
-    /// One permission may expand to several provider verb names (Pty, Behavior, Exec).
-    /// `fork` / `resume` keep their provider verb names: their ToolSpec
-    /// constructors are retained for the delegation wire protocol, so the
-    /// static catalog still carries those names. A permission with no provider
-    /// tool name expands to the empty list: its office duty lives on the
-    /// programming surface only (this.devops), not as a host provider tool.
-    let toolNames (p: ToolPermission) : string list =
-        match p with
-        | ToolPermission.Fork -> [ "fork" ]
-        | ToolPermission.Resume -> [ "resume" ]
-        | ToolPermission.Join -> [ "join" ]
-        | ToolPermission.Horizon -> [ "horizon" ]
-        | ToolPermission.Fission -> [ "fission" ]
-        | ToolPermission.Read -> []
-        | ToolPermission.Write -> []
-        | ToolPermission.Edit -> []
-        | ToolPermission.Glob -> []
-        | ToolPermission.Grep -> []
-        | ToolPermission.Move -> []
-        | ToolPermission.Remove -> []
-        | ToolPermission.BashHoneypot -> [ "bash-honeypot" ]
-        | ToolPermission.Exec -> []
-        | ToolPermission.Pty -> []
-        | ToolPermission.ReviewAssessment -> [ "review" ]
-        | ToolPermission.Fetch -> [ "fetch" ]
-        | ToolPermission.Finality -> [ "deliver" ]
-        | ToolPermission.JsPlan -> [ "todowrite-for-plan" ]
-        | ToolPermission.Ask -> []
-        | ToolPermission.DevOpsConsultation -> []
-        | ToolPermission.Advisor -> []
-        | ToolPermission.Deliver -> [ "deliver" ]
-        | ToolPermission.Review -> [ "review" ]
-
-    /// The complete constructor list of ToolPermission. It enumerates the
-    /// catalog type for the reverse lookup; the name↔permission mapping itself
-    /// stays in `toolNames`.
-    let private allPermissions =
-        [ ToolPermission.Fork
-          ToolPermission.Resume
-          ToolPermission.Join
-          ToolPermission.Horizon
-          ToolPermission.Fission
-          ToolPermission.Read
-          ToolPermission.Write
-          ToolPermission.Edit
-          ToolPermission.Glob
-          ToolPermission.Grep
-          ToolPermission.Move
-          ToolPermission.Remove
-          ToolPermission.Exec
-          ToolPermission.Pty
-          ToolPermission.ReviewAssessment
-          ToolPermission.Fetch
-          ToolPermission.Finality
-          ToolPermission.BashHoneypot
-          ToolPermission.JsPlan
-          ToolPermission.Ask
-          ToolPermission.DevOpsConsultation
-          ToolPermission.Advisor
-          ToolPermission.Deliver
-          ToolPermission.Review ]
+    /// capability-enforcement-012: permission → provider verb names. The single
+    /// map lives in wanxiangli/capability (via OfficeCapability); an empty list
+    /// means the duty lives on the programming surface only (this.devops).
+    let toolNames (p: ToolPermission) : string list = OfficeCapability.toolNames p
 
     /// capability-enforcement-012: the sole reverse lookup for tool name →
-    /// permission. The schema projection, the dispatch tool map and the
-    /// execute gate all read this, so no consumer keeps a second
-    /// name→permission table. A verb shared by two permissions resolves to the
-    /// one this role owns. Catalog order is not an override. A verb owned by
-    /// exactly one permission keeps that mapping for every role.
+    /// permission, answered by wanxiangli/capability. The schema projection, the
+    /// dispatch tool map and the execute gate all read this. A verb shared by two
+    /// permissions resolves to the one this role owns.
     let permissionOfToolName (role: Role) (name: string) : ToolPermission option =
-        let named =
-            allPermissions
-            |> List.filter (fun permission -> toolNames permission |> List.contains name)
-
-        let ownedByRole =
-            named
-            |> List.filter (fun permission -> OfficeCapability.permissions role |> Set.contains permission)
-
-        match ownedByRole, named with
-        | [ permission ], _ -> Some permission
-        | _, [ permission ] -> Some permission
-        | _ -> None
+        OfficeCapability.permissionOfToolName role name
 
     /// The office projection of one name: true only when the role's permission
     /// set owns the permission this exact name maps to.
     let admitsToolForRole (role: Role) (name: string) : bool =
-        permissionOfToolName role name
-        |> Option.exists (fun permission -> OfficeCapability.permissions role |> Set.contains permission)
+        OfficeCapability.admitsToolForRole role name
 
 
     /// JS-001: the generated todowrite-for-ROLE tool name for a role.
@@ -203,14 +132,11 @@ module StaticTools =
     let private permissionFor (registry: AblationRegistry) allowed role name =
         match not (AblationGate.toolSchemaDenied registry name), name, role with
         | false, _, _ -> "deny"
-        | true, ("review" | "deliver" | "todowrite-for-plan"), Role.Plan -> "allow"
-        | true, "fission", Role.Manager -> "deny"
-        | true, "commission", Role.Manager -> "deny"
+        // Host-registration exceptions the office matrix cannot express: the
+        // Orchestrator's Fork duty runs on the programming surface, and its
+        // host verb is `commission` (no office permission of its own).
         | true, "fork", Role.Orchestrator -> "deny"
-        | true, "resume", Role.Orchestrator -> "deny"
         | true, "commission", Role.Orchestrator -> "allow"
-        | true, "fork", Role.DevOps -> "deny"
-        | true, "resume", Role.DevOps -> "deny"
         | true, "skill", _ -> "allow"
         | true, "assume", role when not (cognitiveUtilityRoleAllowed role) -> "deny"
         | true, "assume", _ -> "allow"

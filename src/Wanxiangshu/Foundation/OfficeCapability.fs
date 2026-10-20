@@ -64,6 +64,9 @@ module OfficeCapability =
         abstract managerReviewReadOnlyPermissions: unit -> string array
         abstract managerFinishPermissions: unit -> string array
         abstract permissionsForManagerFacts: facts: obj -> string array
+        abstract toolNames: permission: string -> string array
+        abstract permissionOfToolName: role: string * name: string -> string option
+        abstract admitsToolForRole: role: string * name: string -> bool
 
     [<Import("Capability", "wanxiangli/capability")>]
     let private capabilityClass: obj = jsNative
@@ -165,3 +168,16 @@ module OfficeCapability =
 
     let isAllowedForManagerFacts (facts: ManagerCapabilityFacts) (permission: ToolPermission) : bool =
         permissionsForManagerFacts facts |> Set.contains permission
+
+    let toolNames (permission: ToolPermission) : string list =
+        library.toolNames (permissionLabel permission) |> Array.toList
+
+    let permissionOfToolName (role: Role) (name: string) : ToolPermission option =
+        library.permissionOfToolName (Roles.roleLabel role, name)
+        |> Option.map (fun label ->
+            match permissionOfLabel label with
+            | Some permission -> permission
+            | None -> failwithf "wanxiangli/capability returned an unknown permission %s" label)
+
+    let admitsToolForRole (role: Role) (name: string) : bool =
+        library.admitsToolForRole (Roles.roleLabel role, name)
