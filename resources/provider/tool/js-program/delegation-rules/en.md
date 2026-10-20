@@ -5,7 +5,7 @@ Every delegation member returns **data**, never rendered text. The harness rende
 { ok: false, code: "..." } refusal (stable kebab code)
 ```
 
-Every member that hands work to someone else — `fork`, `resume`, `commission`, `devops`, `dag` — carries a **report mapping** as its last argument: a `Record<string, null|string>` that maps an anchor number to a summary string or `null` (keep). The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`, so a `{ prefixUntil, thenMap }` wrapper is not accepted. The mapping is the context the host projects into the child; a missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
+Every member that hands work to someone else — `fork`, `resume`, `commission`, `devops`, `dag`, `advisor` — carries a **report mapping** as its last argument: a `Record<string, null|string>` that maps an anchor number to a summary string or `null` (keep). The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`, so a `{ prefixUntil, thenMap }` wrapper is not accepted. The mapping is the context the host projects into the child; a missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`. The pull-side members — `join`, `horizon`, `fission` — take no report mapping.
 
 ## fork
 
@@ -22,10 +22,10 @@ await this.fork({ charge: "index the parser", name: "parser-index", calling: "en
 ## resume
 
 ```js
-const resumed = await this.resume("continue the audit", { 1: null, 4: "audit findings so far" });
+const resumed = await this.resume({ name: "audit-road", charge: "continue the audit" }, { 1: null, 4: "audit findings so far" });
 ```
 
-- Hand the next charge to a delegated worker that already exists. `resume` takes **no `calling`**: it continues the worker already in place instead of calling out to a role, so a payload carrying `calling` is refused.
+- Hand the next charge to a delegated worker that already exists. `resume` takes **no `calling`**: it continues the worker already in place instead of calling out to a role, so a payload carrying `calling` is refused. The payload is `{ charge, name }`: `name` names the road to continue and is required — a payload without it refuses with `name-required`.
 - `reportMapping` is required: `Record<string, null|string>` — anchor number → summary or `null`. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
 - Result: `{ ok: true, name, agentId, outcome }`.
 
@@ -35,7 +35,7 @@ const resumed = await this.resume("continue the audit", { 1: null, 4: "audit fin
 await this.commission({ charge: "write the interface spec", name: "spec" }, { 1: null });
 ```
 
-- The orchestrator's own way to hand a charge to a worker: an orchestrator commissions the work instead of doing it. Payload is a string (charge) or `{ charge, name?, calling?, keywords? }`.
+- The orchestrator's own way to hand a charge to a worker: an orchestrator commissions the work instead of doing it. Payload is a string (charge) or `{ charge, name?, calling? }` — the same shape as `fork`, without `keywords`. A missing `name` is derived from the charge; `calling` is derived from the role when omitted, and an explicit `calling` that disagrees with the derivation is refused with `unknown-calling`.
 - `reportMapping` is required: `Record<string, null|string>` — anchor number → summary or `null`. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
 - Result: `{ ok: true, name, agentId, outcome }`.
 
@@ -45,8 +45,9 @@ await this.commission({ charge: "write the interface spec", name: "spec" }, { 1:
 const answer = await this.devops("find the flaky test", { 1: null });
 ```
 
-- A DevOps consultation that runs synchronously inside this call: the host consults DevOps and hands the answer back right away. There is no child to join and nothing is left running.
+- A DevOps consultation that runs synchronously inside this call: the host consults DevOps and hands the answer back right away. There is no child to join and nothing is left running. `intent` is the question to ask — it carries no charge, unlike `fork` and `resume`.
 - `reportMapping` is required: `Record<string, null|string>` — anchor number → summary or `null`. The host reads it as `{ prefixUntil: 0, thenMap: reportMapping }`. A missing or invalid mapping refuses with `{ ok: false, code: "VIEW_DECLARATION_INVALID" }`.
+- Refusal codes: `assessment-pending-for-devops` when the DevOps seat is not bound yet or is already closed.
 - Result: `{ ok: true, record }` — the investigation's record as data.
 
 ## join

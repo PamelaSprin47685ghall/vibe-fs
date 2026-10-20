@@ -12,6 +12,7 @@ WHAT 定义意图、确认与未知的边界，本目录只说明证据范围。
 - 008 保留真实协调/核对用例，并按新版 cognitive-workspace-003/006 验证生产 Assume runtime 的 Blob→提交顺序、两个拒绝边界与原子 canvas/todos 投影。受控端口接实际 fold；重建 runtime 证明从提供的提交事实恢复，不冒充真实磁盘、jq 或跨进程证明。旧待办实现不再加载，各效果家族的完整生命周期仍未全部证明。
 - 010 用真实 codec 拒绝旧通用事实并接受现行 typed 事实；不再以源码包含某个名字为证明。
 - 012 驱动真实发布程序及受控物理 port，确认变基、重新评审、Claim 和物理更新的次序，并拒绝缺少变基见证的 claim。内存 fixture 代替日志落盘，因此只证明程序的决策顺序，不重复声称持久化已证明。
+- 013 用真实 journal 与真实效果账分型记账：交付见证落在 Host 家族 `TaskDeliveryCommitted`，效果落在 Orchestrator 家族，二者互不替代——已提交交付不新增效果事实、账上 worktree 仍由自己的物理确认判为 `Created`，交付只作交付事实记；材料摘要与 view 不符的提交被拒且不留见证，账上只剩 `Requested`，终态判为 RejectedUndelivered 且不发布通知；散文与 provider stop 不补成完成，也不写效果事实；已提交交付在后续一次失败提交后仍被读到，终态仍认它，交付格记为已提交但尚未呈现。效果由自己的确认证据成立，交付不代替它。
 
 原 004 中的 provider failure 幂等、两个不同 attempt 与失败预算，已有 provider-attempt-recovery 003/004/005 正式覆盖；其测试内自行过滤 Blogger/join 观察的“交错证明”不涉及生产分派，已删除。真实 handle 完成/退休用例合并迁回 delegation 013，仍检查重复操作的拒绝及状态。
 

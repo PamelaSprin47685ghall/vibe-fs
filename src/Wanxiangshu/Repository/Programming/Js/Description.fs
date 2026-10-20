@@ -406,8 +406,11 @@ class JsProgram {"""
 
     /// The name a dispatch member derives when the payload carries only a
     /// charge: a slug of the charge, or "child" when the charge yields no
-    /// slug. One rule, shared by fork, resume and commission, so the same
-    /// charge always names the same road.
+    /// slug. One rule, shared by fork and commission — the two members whose
+    /// payload shape is `{ charge, name?, ... }` — so the same charge always
+    /// names the same road. Resume is deliberately absent: its payload must
+    /// carry the name of an existing road, and a missing name is refused by
+    /// the host with `name-required`.
     let private deriveNameFromCharge =
         """    if (!spec.name) {
       const slug = String(spec.charge || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24);
@@ -546,20 +549,18 @@ class JsProgram {"""
                   fill
                       """  async commission(payload, reportMapping) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
+{{name_derivation}}
     return await this._api.commission(spec, reportMapping);
   }"""
-                      []
+                      [ "name_derivation", deriveNameFromCharge ]
               if has capabilities JsCapability.Fork then
                   fill
                       """  async fork(payload, reportMapping) {
     const spec = typeof payload === "string" ? { charge: payload } : Object.assign({}, payload);
-    if (!spec.name) {
-      const slug = String(spec.charge || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24);
-      spec.name = slug || "child";
-    }
+{{name_derivation}}
     return await this._api.fork(spec, reportMapping);
   }"""
-                      []
+                      [ "name_derivation", deriveNameFromCharge ]
               if has capabilities JsCapability.Resume then
                   fill
                       """  async resume(payload, reportMapping) {

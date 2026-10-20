@@ -335,7 +335,6 @@ module DeliverTool =
         let durableOutcome =
             receipt.Status = "Committed"
             || receipt.Status = "Replayed"
-            || receipt.Status = "Observed"
 
         if
             receipt.Status = "Unknown"

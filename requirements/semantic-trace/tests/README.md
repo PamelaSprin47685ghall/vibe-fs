@@ -10,5 +10,6 @@
 - 009 现有用例只追加标有新 generation 的部件，没有执行 Host compaction 或重锚；保留局部证据，完整链标 TODO。
 - 010 对比纯裁决与真实捕获，覆盖相同重放、任务正文冲突、权威要求冲突及拒绝后状态不变。
 - 011/012 原 Surface 内自行排序数组、每次游标加十的模型已撤下；它们没有执行 Fission 或 Resume。真实汇聚、区间和消费者证据仍须分别在相应生命周期补齐，GAP-101 记录缺口。
+- 013 驱动真实 journal 与 `hostFactFold`/`facts` 表面：交付见证按 (session, providerRun, toolCallId) 三元组与完整围栏读取，散文、view 声明与物化 view 连同材料摘要原样取回；换围栏得到另一份见证且互不覆盖，同围栏重放不产生第二条，经 `hostFactFold.fold` 的材料冲突被拒且原见证保留，冷重开同一目录可从 durable 事实重放同一见证。散文、view 声明文本与 provider stop 只是材料，被拒的提交不落见证；缺见证的终态由 `TerminalReporter` 判为 RejectedUndelivered 且不发布完成。它不证明 Fission 或 Resume 侧的见证消费。
 
 完成节点先运行正式构建，再通过 `requirements/verification-system/tests/run.mjs` 的 `TESTS_MJS_FILES` 指定本包及受影响调用方。TODO 不计通过；发布节点已同步保留未完成状态。
