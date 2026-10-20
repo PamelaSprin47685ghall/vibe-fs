@@ -65,7 +65,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-30 | Rulebook、指导与退化观察去向 | 产品裁决 | DECISION | CUT-03, CUT-05, CUT-16, CUT-19 | — | — |
 | CUT-31 | Sphinx 与认识运行时去向 | 产品裁决 | DECISION | CUT-09, CUT-10, CUT-11, CUT-13, CUT-19 | — | — |
 | CUT-32 | 可独立验证的执行设施 | 验证 | BACKLOG | CUT-00 | — | — |
-| CUT-33 | 两仓构建、打包与发布闭环 | 验证 | DOING | CUT-00 | eng-cut06-goose | 2026-10-20 认领：按现行仓规（AGENTS.md：wanxiangli 为 submodule + `file:wanxiangli`，禁止跟踪 .tgz）重判本卡；交付库侧 exports/files/模块一致性门禁、主仓打包链实测与指南分发段校正；证据链见 cards/CUT-33.md |
+| CUT-33 | 两仓构建、打包与发布闭环 | 验证 | DONE | CUT-00 | eng-cut06-goose | 2026-10-20：按仓主现行规则（submodule + `file:wanxiangli`，禁止 .tgz）重判；库 5edd3c7 加 SPEC[build-008] exports/files/模块一致性门禁（三种变异实测报红），主仓 verify-package 实测 bundle 0.9.0 通过，指南分发段校正；gitlink 祖先校验等残项见 cards/CUT-33.md §5 |
 | CUT-34 | OpenCode 适配边界 | 宿主 | BACKLOG | CUT-11, CUT-12, CUT-17, CUT-25 | — | — |
 | CUT-35 | 顶层组装与逐域恢复 | 宿主 | BACKLOG | CUT-13, CUT-14, CUT-16, CUT-17, CUT-19, CUT-22, CUT-23, CUT-27, CUT-28, CUT-29, CUT-30, CUT-31, CUT-34 | — | — |
 | CUT-36 | 第二宿主真实 canary | 可选 | OPTIONAL | CUT-34, CUT-35 | — | — |

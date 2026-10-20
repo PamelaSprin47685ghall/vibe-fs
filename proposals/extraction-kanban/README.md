@@ -26,7 +26,7 @@ Lifecycle 已通过 `wanxiangli/work`、`eventstore`、`durable-work` 接回主�
 
 `wanxiangli/process`、`trace`、`ownership` 有独立实现与测试，但当前主仓生产 F# 只从 `Mission/Lifecycle/DurableWorkHost.fs` 导入前三个生命周期入口。CUT-02、03、04 的起点是“库就绪，接线未完成”，不是已抽干。不得仅因 tarball 带着这些文件就记为接线成功。
 
-主仓锁定并跟踪 `vendor/wanxiangli-0.5.2.tgz`。旁边的 `wanxiangli/` 是另一 Git 仓，不是主仓源码依赖；新成员只克隆主仓也必须能构建。位置变化不应影响 npm 消费。[分发要求](../../requirements/distribution/WHAT.md)
+**分发方式已由仓主改定（2026-10-20 核对，CUT-33）**：`wanxiangli/` 是主仓的正式 Git submodule，跟踪库 `main`；npm 以 `file:wanxiangli` 消费并列入 `bundleDependencies`，`node scripts/build.mjs` 先在 submodule 内 `npm ci` 并构建库。任何 `.tgz` 不得进入 Git（主仓 AGENTS.md「源码与运行数据分离」，`npm run check` 的 `wanxiangli-source.mjs check` 强制）。下文早期 vendor tarball 流程已作废，以 §8 为准。[分发要求](../../requirements/distribution/WHAT.md)
 
 ### 第一批怎么分人
 
@@ -79,7 +79,7 @@ Lifecycle 已通过 `wanxiangli/work`、`eventstore`、`durable-work` 接回主�
 
 细分到文件才能并行：例如 CUT-02 持有进程启动链，CUT-20 持有 PTY 链，但它们不能同时修改共同的 `Process/Surface.fs`。同理，CUT-03、15、16、17 都涉及请求投影，业务代码可并行，最终 hook 接线必须排队。
 
-公共编辑面包括两仓 package/lock/export、主仓 `vendor/`、`compile-order.txt` 与重叠 fsproj、`ToolRegistry`、`PluginTransforms`、`PluginRecoveryWiring`、`Composition/Durable`、共享夹具、根规则与看板。**只预约修改权，不限制其他人阅读和提出反例。** 表见 [BOARD.md](BOARD.md#shared-surfaces)。
+公共编辑面包括两仓 package/lock/export、主仓 `wanxiangli` gitlink、`compile-order.txt` 与重叠 fsproj、`ToolRegistry`、`PluginTransforms`、`PluginRecoveryWiring`、`Composition/Durable`、共享夹具、根规则与看板。**只预约修改权，不限制其他人阅读和提出反例。** 表见 [BOARD.md](BOARD.md#shared-surfaces)。
 
 ## 5. 两仓、两套独立工作树
 
@@ -110,7 +110,7 @@ git -C "$WXL_WT" rev-parse HEAD
 
 **Git worktree 只隔离源码与产物，不隔离 Git common-dir。** 不同 worktree 仍共享 refs、部分配置、hooks 和 common-dir 下的业务数据；本项目 work.sqlite 正位于该处。测试必须使用夹具建立的独立临时 Git 仓和存储，不能拿真实主仓的 `.git/wanxiangshu` 做破坏试验。需要修改 hooks、运行真实插件或验证 Git 集成时，用独立 clone/临时仓和隔离配置，不在活跃开发仓启动。
 
-只改主仓接线、且无需修改库时，不必创建空的库分支；认领中写明使用的已发布库提交及 tarball。禁止在共享 `master`、`main` 或原 lifecycle-cutover 工作树里多人直接编辑。
+只改主仓接线、且无需修改库时，不必创建空的库分支；认领中写明使用的库 main 精确提交（即主仓 gitlink）。禁止在共享 `master`、`main` 或原 lifecycle-cutover 工作树里多人直接编辑。
 
 ## 6. 每刀从开始到结束
 
@@ -120,7 +120,7 @@ git -C "$WXL_WT" rev-parse HEAD
 | B. 固定契约 | 输入/结果/错误/副作用、状态与身份、当前行为差异裁决 | 大 Context、只列方法签名 |
 | C. 先找反例 | 一个可能推翻边界的真实失败；已有正确行为则保留正控，不伪造红 | 在测试里自抛异常再 assert.throws |
 | D. 独立实现 | 最简对象、局部规则、编号测试、隔离构建与公开产物 | 把旧代码搬到新目录，仍回读旧源码 |
-| E. 实际 npm 消费 | 精确库提交、不可变 tarball、摘要与锁定依赖，干净目录导入 | npm link、workspace link、NODE_PATH |
+| E. 实际 npm 消费 | 库提交已在库 main、主仓 gitlink 指向它；临时 `npm pack` 的干净目录导入与主仓 `verify-package.mjs` 包内验收 | npm link、workspace link、NODE_PATH |
 | F. 接回一条真实链 | C 接线、失败/重复/未知/重启用例、现行 WHAT 回归 | 测试单独调用新库，生产仍走旧实现 |
 | G. 旧 owner 退出 | 每个旧符号的调用者去向、实现/工程/过期测试清理，历史数据处置 | 同时保留两个可写账本，用同步器维持一致 |
 | H. 审查与集成 | 候选与最新主线比较、证据范围、已知不足、回退方案 | 用测试数量或“全绿”一句话代替风险判断 |
@@ -139,32 +139,33 @@ git -C "$WXL_WT" rev-parse HEAD
 
 ## 8. 两仓发布与主仓集成，统一串行
 
-库发布负责人从已审的精确提交建立干净发布工作树，集中处理 package version、exports、files、锁与产物。以下流程没有 `npm publish`；公共 registry 发布不是本计划的默认动作。
+库改动先在自己的库分支完成测试，再 rebase 到最新库 `main` 后 fast-forward 推送；需要改 package version、exports、files 或锁时串行处理（不复用版本号）。以下流程没有 `npm publish`；公共 registry 发布不是本计划的默认动作。
 
 ```sh
-# In the selected library release worktree.
+# In the library worktree, after rebasing onto origin/main.
 npm ci --ignore-scripts
-npm test
-npm pack --json
+npm test                        # includes scripts/tests/exports.test.mjs (exports/files/modules agree)
+npm pack --json --pack-destination "$(mktemp -d)"   # temporary only; never commit the .tgz
 ```
 
-记录 npm pack 返回的实际文件名、SHA-256、库 commit 与验证环境。检查包内容白名单、ESM 与 .d.ts 一致，消费者不安装编译器也能使用；支持 Node/Bun 的声明分别验证。扩展能力并不意味着现有 Linux 证据自动覆盖 macOS/Windows。
+临时包只用于干净目录的 Node/Bun 导入与类型验收，记录库 commit 与验证环境；扩展能力并不意味着现有 Linux 证据自动覆盖 macOS/Windows。
 
-由主仓集成者复制该唯一产物到 `vendor/` 并更新依赖。`TARBALL` 填实际文件名，`WXL_RELEASE` 指刚才验收的工作树，不能取任意协作者目录的最新构建。
+主仓集成者把 submodule 移到已推送的库提交，提交 gitlink 与锁文件中的版本行：
 
 ```sh
 # In the host integration worktree.
-export TARBALL="wanxiangli-<exact-version>.tgz"
-export WXL_RELEASE="/absolute/path/to/validated/library/worktree"
-cp "$WXL_RELEASE/$TARBALL" "vendor/$TARBALL"
-sha256sum "vendor/$TARBALL"
-npm install --save-exact --ignore-scripts "./vendor/$TARBALL"
-git diff -- package.json package-lock.json
+git -C wanxiangli fetch origin main
+git -C wanxiangli checkout <library-commit-on-main>
+npm install --package-lock-only --ignore-scripts
+node scripts/wanxiangli-source.mjs check
+node scripts/build.mjs
+node scripts/verify-package.mjs   # real host pack: node_modules/wanxiangli is bundled from the gitlinked source
+git add wanxiangli package-lock.json
 ```
 
-核对 `bundleDependencies` 仍包含 wanxiangli；tarball 被 Git 跟踪，锁指向同一文件与完整性值。若被忽略，只允许对这个明确文件执行定点 `git add -f`，不强加整个 vendor。接线作者不要各自制造不同版本的根锁文件。
+gitlink 只能指向已在库 `main` 上的提交，否则别人克隆主仓时取不到。接线作者不要各自制造不同版本的根锁文件。
 
-建议合入顺序：库实现/测试 → 库发布提交与 tarball → 主仓依赖及调用链 → 旧路径退出 → 主仓验收。跨仓没有原子 Git 提交，故两边 PR 互相记录精确 SHA；主仓未合入前，旧 master 仍锁旧包，不受新库 main 变化影响。
+建议合入顺序：库实现/测试 → 库 main → 主仓 gitlink 与调用链 → 旧路径退出 → 主仓验收。跨仓没有原子 Git 提交，故两边提交互相记录精确 SHA；主仓未移动 gitlink 前，旧 master 仍构建旧库提交，不受新库 main 变化影响。
 
 同一批多卡进入集成时，先确定发布批次包含哪些库提交；每卡保持独立回退点。合入前再 fetch 并复核最新 master；若前进，重建合并候选并重跑受影响验证，不把原 base 的证据粘到新候选上。
 

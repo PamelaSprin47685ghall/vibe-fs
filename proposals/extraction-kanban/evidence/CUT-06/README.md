@@ -29,7 +29,9 @@
 
 既有失败（两侧相同，非本卡引入）：delegation-024 五项、intra-participant-parallelism-003/018 各一项、repository-programming-002 三项、work-027 三项与 work-033 文件级 cancelled，主要报 "Promise resolution is still pending but the event loop has already resolved"，对应 master 上交付语义 WIP（`c4991268c` / `task.md`）。
 
+| 宿主包验收 | `node scripts/verify-package.mjs`（`7f28c3562`，generation 4） | OK；1356 members；包内 bundled `node_modules/wanxiangli` 为 0.9.0，含 `dist/delivery/Delivery.js` |
+
 ## 4. 未做
 
-- `env -u TESTS_MJS_FILES -u WXS_ACCEPT_TODO node scripts/verify.mjs`、集成 `run.mjs`、`verify-package.mjs`：未跑。原因：共享机器内存不足以与其他 worker 并行全量，且 master 本身已有上述既有失败；不宣称全量通过。
+- `env -u TESTS_MJS_FILES -u WXS_ACCEPT_TODO node scripts/verify.mjs`、集成 `run.mjs`：未跑（`verify-package.mjs` 已于合入后补跑，见上表）。原因：共享机器内存不足以与其他 worker 并行全量，且 master 本身已有上述既有失败；不宣称全量通过。
 - 原始日志：`/workspace/vfs-cut/wt/logs-cut06/`（box 本机，不入 Git）。

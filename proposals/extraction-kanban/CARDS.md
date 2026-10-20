@@ -323,7 +323,8 @@
 - **入口**：两仓 package/lock/build 脚本，主仓 [scripts/verify-package.mjs](../../scripts/verify-package.mjs)、[distribution](../../requirements/distribution/WHAT.md)。
 - **顺序**：记录已工作的 0.5.2 vendor/bundle 链 → 为新导出补实际包验收 → 从精确库提交产生不可变包 → 主仓干净安装、删除额外顶层副本后消费 → 发布批次收尾。
 - **反例**：同版本不同字节；类型有导出但 JS 没有；main/exports/files 漏项；开发目录可用、安装包不可用；本机 node_modules 兜底；并行卡锁文件互相覆盖；文档入 Git 后指纹仍借旧 manifest。
-- **退出**：不再存在源码链接/隐式 fallback/个人路径；主仓只依赖明确 tarball。阶段性交付不意味着已获 npm registry 发布许可，实际 release 证明另记。
+- **2026-10-20 重判**：仓主已把分发改为 submodule + `file:wanxiangli`、禁止跟踪 `.tgz`（主仓 AGENTS.md）；"主仓只依赖明确 tarball"由"主仓只依赖明确 gitlink，发行验收用实际 pack"替代，见 [cards/CUT-33.md](cards/CUT-33.md)。
+- **退出**：不再存在 npm link/NODE_PATH/隐式 fallback/个人路径；主仓只依赖明确 gitlink。阶段性交付不意味着已获 npm registry 发布许可，实际 release 证明另记。
 
 <a id="cut-34"></a>
 ### CUT-34　OpenCode 适配边界

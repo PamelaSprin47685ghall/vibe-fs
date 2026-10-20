@@ -94,7 +94,7 @@
 | [Strength](../../src/Wanxiangshu/Strength/) | CUT-29 | 估计、预算、Replica 和 Host 各自盘点，不批量退役 |
 | [Verification](../../src/Wanxiangshu/Verification/) | CUT-32 | 只承接真实测试边界，不复制生产规则做 oracle |
 
-非 `src` 资产同样有 owner：`resources/` 归 CUT-05 与其内容卡；`scripts/`、`.config/`、`Directory.Build.props`、`global.json` 归 CUT-32/33；`.github/`、`Dockerfile.ci` 归 CUT-33；`vendor/` 与 package 元数据归 CUT-33；`requirements/` 语义不迁成包内副本，逐卡更新映射；`proposals/` 与 README 归 CUT-00/38。原独立 `wanxiangli/` Git 仓不被主仓提交为 gitlink。
+非 `src` 资产同样有 owner：`resources/` 归 CUT-05 与其内容卡；`scripts/`、`.config/`、`Directory.Build.props`、`global.json` 归 CUT-32/33；`.github/`、`Dockerfile.ci` 归 CUT-33；`wanxiangli` gitlink 与 package 元数据归 CUT-33（原 `vendor/` 已退役）；`requirements/` 语义不迁成包内副本，逐卡更新映射；`proposals/` 与 README 归 CUT-00/38。仓主已改定 `wanxiangli/` 为主仓 submodule（gitlink 跟踪库 main），见 CUT-33。
 
 ## 3. 独立库目录和草稿
 
