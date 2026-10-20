@@ -216,7 +216,7 @@
     "currentStatic": {
       "status": "passed",
       "exit": 0,
-      "log": "umr-review-static-final.log"
+      "log": "umr-review-static-17.log"
     },
     "currentFormat": {
       "status": "passed",
@@ -226,8 +226,8 @@
     "currentBuild": {
       "status": "passed",
       "exit": 0,
-      "generation": 91,
-      "log": "umr-review-build-28.log"
+      "generation": 92,
+      "log": "umr-review-build-29.log"
     },
     "integrationInitial": {
       "generation": 75,
@@ -489,8 +489,8 @@
       "log": "umr-review-ci-f042-failed.log"
     },
     "githubCi": {
-      "state": "AWAITING_PUSH_OF_CI_STEP_FIX",
-      "note": "The next full Ubuntu run will verify the unchanged production source plus the precise CI self-test selector."
+      "state": "AWAITING_PUSH_OF_COMPILER_CASE_FIX",
+      "note": "Every affected compile assertion passed through the unchanged formal supervisor. The next complete Ubuntu run will determine full pipeline acceptance."
     },
     "githubCiBeforeStepFix": {
       "state": "completed",
@@ -530,6 +530,47 @@
       "reclamationAccepted": true,
       "wallSeconds": 4.43,
       "log": "umr-review-ci-step-formal.log"
+    },
+    "githubCiBeforeCompileCases": {
+      "state": "completed",
+      "sourceCommit": "ea7c67a2f1adb0111dd7f37a85a1c5bc3f87cf5c",
+      "runId": 39489971167,
+      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39489971167",
+      "conclusion": "failure",
+      "unit": {
+        "passed": 4379,
+        "failed": 0,
+        "skipped": 194,
+        "todo": 277,
+        "plannedFiles": 756,
+        "drainedFiles": 756,
+        "reclamationAccepted": true,
+        "wallSeconds": 380.86
+      },
+      "integration": {
+        "status": "truncated",
+        "plannedFiles": 40,
+        "drainedFiles": 19,
+        "verdictCountsAvailable": false,
+        "groupsPassed": 2,
+        "groupsFailed": 1,
+        "wallSeconds": 218.4,
+        "failure": "The durable-events-022 case batches 18 independent closure compilations before a verdict; the Ubuntu run reached its unchanged 185000 ms per-file silence deadline. Other file verdicts correctly did not renew this file.",
+        "terminationDiagnostic": "Owned termination and remaining group observation failed; subsequent runner group observation was accepted. Do not claim complete owned termination from this failed run."
+      },
+      "log": "umr-review-ci-ea7c-failed.log"
+    },
+    "compileCasesFinal": {
+      "status": "passed",
+      "generation": 92,
+      "passed": 49,
+      "failed": 0,
+      "plannedFiles": 2,
+      "drainedFiles": 2,
+      "reclamationAccepted": true,
+      "silenceMs": 185000,
+      "wallSeconds": 213.56,
+      "log": "umr-review-compile-cases-formal.log"
     }
   },
   "resolved": [
@@ -608,6 +649,10 @@
     {
       "id": "CI-STEP-SELF-TEST",
       "change": "Select the workflow step by id: verify and include its last line before executing real failure and success exit-code assertions."
+    },
+    {
+      "id": "COMPILE-PROOF-GRANULARITY",
+      "change": "Expose each independently asserted closure compile and each owner/fold probe pair as a real awaited node:test subtest, retaining every assertion and the existing file silence deadline."
     }
   ],
   "remaining": [
@@ -673,6 +718,13 @@
       "priority": "P2",
       "impact": "The report-only shard audit has four high and 270 low findings; full Fable compilation succeeds but independent owner compilation is not yet proved.",
       "action": "Resolve with the existing GAP-153 locality work; the report-only policy was not changed."
+    },
+    {
+      "id": "CI-ABORT-RECLAMATION",
+      "priority": "P2",
+      "impact": "The aborted Ubuntu compile suite reported unknown owned termination before a later runner-group observation was accepted. The failed run does not prove cleanup of every owned descendant; no leak is asserted without further evidence.",
+      "action": "Preserve the failed run and reproduce the compile-timeout cleanup path separately. Successful-run reclamation does not close this exceptional-path proof.",
+      "evidence": "umr-review-ci-ea7c-failed.log"
     }
   ],
   "pr": null,
@@ -686,9 +738,9 @@
   "mergeCommit": "f2f30d3fa7fd1fc84685b9c32cb4128f5999a4b3",
   "submoduleCommit": "a12ff4a99d401d9a8e8d9c57cb9a0eb1173a7d1b",
   "candidate": {
-    "generation": 91,
+    "generation": 92,
     "compilerInputDigest": "1014511c090d14b71548f0134e62cff179e86540cd6d4c4058280d36a6ca3597",
-    "generatedInputDigest": "1ed1abc1993b1ce2189ac5056163cf2c80c4151f9cc55e603b7066b1d9d78632",
+    "generatedInputDigest": "8bb102cd5aad433edb122e2263580ef6ff3706995896adaea62116684e155f4c",
     "artifactInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
   },
   "formalAcceptance": false,
@@ -698,7 +750,7 @@
     "generatedInputDigest": "2ca568febaf7a88aff7ab281af40997335cd906168c8e46f03e63e353e271b4b",
     "artifactsInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
   },
-  "sourceCommit": "85274a7e6cdf1a7911a3c2cc702c780fd5f100ab",
+  "sourceCommit": "ea7c67a2f1adb0111dd7f37a85a1c5bc3f87cf5c",
   "push": {
     "originMaster": "f04201465dee7f1cb8e93094097ba12ccaef3b8f",
     "originPrBranch": "codex/upstream-plan-20261020",
@@ -707,5 +759,5 @@
     "transport": "existing SSH identity",
     "httpsAttempt": "GitHub rejected the OAuth token because workflow scope was absent; no remote refs changed by that atomic attempt."
   },
-  "sourceCommitNote": "The CI self-test selector correction is staged on this source commit; the final GitHub CI receipt will identify the committed candidate."
+  "sourceCommitNote": "Independent compile case boundaries are staged on this commit; the final full CI receipt will identify the next committed candidate."
 }

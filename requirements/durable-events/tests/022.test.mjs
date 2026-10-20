@@ -296,7 +296,7 @@ test('WHAT[durable-events-022] append results have one pure compile owner withou
 // legitimately owns the symbol, so the only remaining cause of each negative
 // failure is the locality boundary — not probe syntax, not a missing
 // reference, not toolchain drift.
-integrationTest('WHAT[durable-events-022] each actual bounded locality compiles as one flat project and a reversed dependency is rejected', async () => {
+integrationTest('WHAT[durable-events-022] each actual bounded locality compiles as one flat project and a reversed dependency is rejected', async (t) => {
   const { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } = await import('node:fs')
   const { createHash } = await import('node:crypto')
   const { dirname: dirnameOf, join: joinPath, relative: relativeOf } = await import('node:path')
@@ -319,31 +319,33 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
     // closure is missing a declared edge fails here for real — that is a
     // shard-graph gap, not a test defect, and it must surface as red.
     for (const shard of LOCALITIES) {
-      const project = requireShard(shard)
-      const plan = planOwnerCompile({ projectPath: project.projectPath, aggregatePath: null })
-      const materialized = materializeOwnerCompile(plan, { scratchRoot: scratch })
-      const flatXml = readFileSync(materialized.projectPath, 'utf8')
-      assert.ok(
-        !flatXml.includes('<ProjectReference'),
-        `${shard} flat project must carry zero ProjectReference`,
-      )
-      assert.equal(
-        (flatXml.match(/<Compile Include=/g) ?? []).length,
-        plan.compileItems.length,
-        `${shard} flat project must carry the full closure compile list`,
-      )
-      const result = await compileOwnerProject({
-        projectPath: project.projectPath,
-        aggregatePath: null,
-        scratchRoot: scratch,
-        stdio: 'pipe',
-        compilePlan: plan,
+      await t.test(`WHAT[durable-events-022] ${shard} compiles its complete flat closure`, async () => {
+        const project = requireShard(shard)
+        const plan = planOwnerCompile({ projectPath: project.projectPath, aggregatePath: null })
+        const materialized = materializeOwnerCompile(plan, { scratchRoot: scratch })
+        const flatXml = readFileSync(materialized.projectPath, 'utf8')
+        assert.ok(
+          !flatXml.includes('<ProjectReference'),
+          `${shard} flat project must carry zero ProjectReference`,
+        )
+        assert.equal(
+          (flatXml.match(/<Compile Include=/g) ?? []).length,
+          plan.compileItems.length,
+          `${shard} flat project must carry the full closure compile list`,
+        )
+        const result = await compileOwnerProject({
+          projectPath: project.projectPath,
+          aggregatePath: null,
+          scratchRoot: scratch,
+          stdio: 'pipe',
+          compilePlan: plan,
+        })
+        assert.equal(
+          result.ok,
+          true,
+          `${shard} locality must compile as one flat project\n${result.stdout}\n${result.stderr}`,
+        )
       })
-      assert.equal(
-        result.ok,
-        true,
-        `${shard} locality must compile as one flat project\n${result.stdout}\n${result.stderr}`,
-      )
     }
 
     // Negative probes (WHAT-022: a business consumer's transitive compile

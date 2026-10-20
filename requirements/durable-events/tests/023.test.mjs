@@ -335,7 +335,7 @@ integrationTest('WHAT[durable-events-023] isolated compilation rejects physical-
 // green in the closure that legitimately owns the symbol, so the only
 // remaining cause of each negative failure is the domain-fold boundary —
 // not probe syntax, not a missing reference, not toolchain drift.
-integrationTest('WHAT[durable-events-023] isolated compilation rejects aggregate authority in domain folds', async () => {
+integrationTest('WHAT[durable-events-023] isolated compilation rejects aggregate authority in domain folds', async (t) => {
   const { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } = await import('node:fs')
   const { createHash } = await import('node:crypto')
   const { dirname: dirnameOf, join: joinPath, relative: relativeOf, resolve: resolveRoot } = await import('node:path')
@@ -480,43 +480,45 @@ integrationTest('WHAT[durable-events-023] isolated compilation rejects aggregate
     // inside the domain fold closure with a not-defined diagnostic naming
     // the target symbol.
     for (const { name, symbol, ownerIso, foldIso } of isolated) {
-      const ownerCompile = await compileOwnerProject({
-        projectPath: ownerIso.projectPath,
-        aggregatePath: null,
-        scratchRoot: scratch,
-        stdio: 'pipe',
-        compilePlan: ownerIso.plan,
-      })
-      assert.equal(
-        ownerCompile.ok,
-        true,
-        `${name}: the probe compiles in the owner closure (symbol and usage are valid): `
-          + String(ownerCompile.stdout ?? '').slice(-400),
-      )
+      await t.test(`WHAT[durable-events-023] ${name} compiles in its owner and is rejected by the fold`, async () => {
+        const ownerCompile = await compileOwnerProject({
+          projectPath: ownerIso.projectPath,
+          aggregatePath: null,
+          scratchRoot: scratch,
+          stdio: 'pipe',
+          compilePlan: ownerIso.plan,
+        })
+        assert.equal(
+          ownerCompile.ok,
+          true,
+          `${name}: the probe compiles in the owner closure (symbol and usage are valid): `
+            + String(ownerCompile.stdout ?? '').slice(-400),
+        )
 
-      const foldCompileProbe = await compileOwnerProject({
-        projectPath: foldIso.projectPath,
-        aggregatePath: null,
-        scratchRoot: scratch,
-        stdio: 'pipe',
-        compilePlan: foldIso.plan,
+        const foldCompileProbe = await compileOwnerProject({
+          projectPath: foldIso.projectPath,
+          aggregatePath: null,
+          scratchRoot: scratch,
+          stdio: 'pipe',
+          compilePlan: foldIso.plan,
+        })
+        assert.equal(
+          foldCompileProbe.ok,
+          false,
+          `${name}: the same probe must fail in the domain fold closure`,
+        )
+        const output = String(foldCompileProbe.stdout ?? '') + String(foldCompileProbe.stderr ?? '')
+        assert.match(
+          output,
+          symbol,
+          `${name}: the diagnostic names the target symbol`,
+        )
+        assert.match(
+          output,
+          /is not defined/,
+          `${name}: the diagnostic is a not-defined rejection, not a syntax or toolchain error`,
+        )
       })
-      assert.equal(
-        foldCompileProbe.ok,
-        false,
-        `${name}: the same probe must fail in the domain fold closure`,
-      )
-      const output = String(foldCompileProbe.stdout ?? '') + String(foldCompileProbe.stderr ?? '')
-      assert.match(
-        output,
-        symbol,
-        `${name}: the diagnostic names the target symbol`,
-      )
-      assert.match(
-        output,
-        /is not defined/,
-        `${name}: the diagnostic is a not-defined rejection, not a syntax or toolchain error`,
-      )
     }
 
     // Isolation evidence: the real sources were never touched.
