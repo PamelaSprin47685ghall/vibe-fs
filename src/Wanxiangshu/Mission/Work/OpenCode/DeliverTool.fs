@@ -165,6 +165,7 @@ module DeliverTool =
     type private BoundRetirement =
         { ToolCallId: ToolCallId
           ProviderRun: ProviderRunIdentity
+          PhysicalUserMessageId: PhysicalUserMessageId
           Directory: string
           Journal: AgentJournal }
 
@@ -191,12 +192,13 @@ module DeliverTool =
             scope.WorkspaceDirectory,
             scope.Journal
         with
-        | Some Role.Manager, Some toolCallId, Some providerRun, Some _, Some directory, Some journal when
+        | Some Role.Manager, Some toolCallId, Some providerRun, Some physical, Some directory, Some journal when
             not (String.IsNullOrWhiteSpace context.SessionId)
             ->
             Ok
                 { ToolCallId = toolCallId
                   ProviderRun = providerRun
+                  PhysicalUserMessageId = PhysicalUserMessageId.create physical
                   Directory = directory
                   Journal = journal }
         | Some Role.Manager, _, _, _, _, _ -> Error(text Path.BindingUnavailable)
@@ -297,11 +299,27 @@ module DeliverTool =
             // 条款 3/4/6：交付已成立是提交面事实，登记精确 attempt 围栏；
             // 物理中断不在工具内部发起——停止由 transform 钩子的交付裁决执行。
             // 中断未确认时，已提交的交付不得呈现为失败。
-            scope.RegisterEstablishedDelivery(
-                prepared.SessionId,
-                prepared.Bound.ProviderRun,
-                prepared.Bound.ToolCallId
-            )
+            //
+            // 登记前复核当前物理输入：交付之后到达的新输入不得被本次交付的
+            // 停止瞄准（对齐 ask 路径「落地前有新输入 → 只记诊断、不视为失败」）。
+            let boundPhysical = prepared.Bound.PhysicalUserMessageId
+
+            let currentPhysical =
+                scope.CurrentPhysicalUserMessage (SessionId.value prepared.SessionId)
+                |> Option.map PhysicalUserMessageId.create
+
+            if currentPhysical = Some boundPhysical then
+                scope.RegisterEstablishedDelivery(
+                    prepared.SessionId,
+                    prepared.Bound.ProviderRun,
+                    prepared.Bound.ToolCallId,
+                    ?physicalUserMessageId = Some boundPhysical
+                )
+            else
+                Diagnostic.emit
+                    "delivery-interrupt-skipped-new-input"
+                    [ "session_id", SessionId.value prepared.SessionId
+                      "physical_user_message_id", PhysicalUserMessageId.value boundPhysical ]
 
             closureOutcome
             |> Result.defaultWith (fun ex -> raise ex)
@@ -375,6 +393,11 @@ module DeliverTool =
                             retirementResult receipt.Kind
                     )
             }
+        else if receipt.Status = "Observed" then
+            // Observed 是 Work 的无新事实观察（requirements/work/WHAT.md 015）：
+            // 本次调用没有落地任何事实，因此不派发后继、不解冻、不登记交付成立。
+            // 裸状态名对模型没有意义，这里给一句稳定的可读说明。
+            Task.FromResult(Error(text Path.FinishFailed))
         else
             Task.FromResult(
                 Error(

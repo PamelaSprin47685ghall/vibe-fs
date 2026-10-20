@@ -518,32 +518,12 @@ test('WHAT[repository-programming-002] dag is emitted only when Fork and Join bo
   }
 })
 
-test('WHAT[repository-programming-002] resume and commission derive the name from a single charge', async () => {
+test('WHAT[repository-programming-002] commission derives the name from a single charge', async () => {
   const { dir, cleanup } = sandbox()
-  const sessionId = `sess-name-${Math.random().toString(36).slice(2, 8)}`
-  const commissionSessionId = `${sessionId}-commission`
+  const commissionSessionId = `sess-commission-name-${Math.random().toString(36).slice(2, 8)}`
   try {
     const host = recordingHost()
-    install(sessionId, host)
     install(commissionSessionId, host)
-
-    const resumed = await runProgram(
-      dir,
-      'Manager',
-      sessionId,
-      `    const derived = await this.resume("resume the audit", { 1: null });
-    const explicit = await this.resume({ charge: "resume the audit", name: "audit-road" }, { 1: null });
-    return { derived, explicit };`,
-    )
-    assert.equal(caseName(resumed), 'Succeeded')
-    const resumeCalls = host.calls.filter((call) => call.member === 'resume')
-    assert.equal(resumeCalls.length, 2, 'both resume calls reach the delegation host')
-    assert.equal(resumeCalls[0].payload.charge, 'resume the audit')
-    assert.equal(typeof resumeCalls[0].payload.name, 'string', 'a single charge derives the name')
-    assert.ok(resumeCalls[0].payload.name.length > 0, 'the derived name is not empty')
-    assert.match(resumeCalls[0].payload.name, /audit/i, 'the derived name comes from the charge')
-    assert.equal(resumeCalls[1].payload.name, 'audit-road', 'an explicit name is kept')
-    assert.equal(resumeCalls[0].reportMapping['1'], null, 'the report mapping travels unchanged')
 
     const commissioned = await runProgram(
       dir,
@@ -559,8 +539,45 @@ test('WHAT[repository-programming-002] resume and commission derive the name fro
     assert.ok(commissionCalls[0].payload.name.length > 0, 'the derived name is not empty')
     assert.match(commissionCalls[0].payload.name, /audit|parser/i, 'the derived name comes from the charge')
   } finally {
-    clearDelegationHost(sessionId)
     clearDelegationHost(commissionSessionId)
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-002] resume does not derive the name from a single charge', async () => {
+  const { dir, cleanup } = sandbox()
+  const sessionId = `sess-resume-name-${Math.random().toString(36).slice(2, 8)}`
+  try {
+    const host = recordingHost()
+    install(sessionId, host)
+
+    const resumed = await runProgram(
+      dir,
+      'Manager',
+      sessionId,
+      `    const derived = await this.resume("resume the audit", { 1: null });
+    const explicit = await this.resume({ charge: "resume the audit", name: "audit-road" }, { 1: null });
+    return { derived, explicit };`,
+    )
+    assert.equal(caseName(resumed), 'Succeeded')
+    const resumeCalls = host.calls.filter((call) => call.member === 'resume')
+    assert.equal(resumeCalls.length, 2, 'both resume calls reach the delegation host')
+
+    // WHAT[repository-programming-056]: resume 的 payload 必带 name（缺 name 由
+    // 宿主以 name-required 拒绝）。生成侧不派生命名，所以单参 charge 抵达宿主
+    // 时没有 name——这里断言可观察事实：抵达宿主的载荷形状。
+    assert.equal(resumeCalls[0].payload.charge, 'resume the audit', 'the charge travels unchanged')
+    assert.equal(
+      'name' in resumeCalls[0].payload,
+      false,
+      'a single charge derives no name for resume; the host refuses a nameless resume',
+    )
+    assert.equal(resumeCalls[0].payload.name, undefined, 'the nameless resume carries no name value')
+    assert.equal(resumeCalls[1].payload.name, 'audit-road', 'an explicit name is kept')
+    assert.equal(resumeCalls[0].reportMapping['1'], null, 'the report mapping travels unchanged')
+    assert.equal(resumeCalls[1].reportMapping['1'], null, 'the report mapping travels unchanged')
+  } finally {
+    clearDelegationHost(sessionId)
     cleanup()
   }
 })

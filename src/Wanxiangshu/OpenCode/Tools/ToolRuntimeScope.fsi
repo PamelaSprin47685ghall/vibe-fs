@@ -114,7 +114,7 @@ type ToolRuntimeScope =
 
     /// The delivery of this attempt is established (commit face). The physical
     /// interrupt is not issued here: the transform hook adjudicates it.
-    member RegisterEstablishedDelivery: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> unit
+    member RegisterEstablishedDelivery: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId * ?physicalUserMessageId: PhysicalUserMessageId -> unit
 
     /// The Host accepted this delivery's tool result (presentation face).
     member RecordDeliveryPresented: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> unit

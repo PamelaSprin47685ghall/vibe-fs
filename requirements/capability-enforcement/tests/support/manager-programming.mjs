@@ -499,7 +499,7 @@ test('WHAT[capability-enforcement-025] J13_delegation_members_require_a_report_m
         const missing = await this.fork('index the parser module');
         const illegal = await this.fork('index the parser module', { 'not-an-anchor': null });
         const placed = await this.fork('index the parser module', { 1: null });
-        const resumed = await this.resume('continue the audit', { 2: 'audit summary' });
+        const resumed = await this.resume({ name: 'audit-road', charge: 'continue the audit' }, { 2: 'audit summary' });
         const advised = await this.advisor('review this delta', { 1: null });
         const joined = await this.join();
         return { missing, illegal, placed, resumed, advised, joined, continued: true };

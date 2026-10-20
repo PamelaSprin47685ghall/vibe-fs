@@ -1286,10 +1286,15 @@ type ToolRuntimeScope
     /// 交付已成立（提交面事实）：本次 attempt 的交付已提交，登记精确 attempt
     /// 围栏与当时的物理输入。物理中断不在工具内部发生——停止由 transform 钩子
     /// 的交付裁决执行（条款 4），交付已提交不因中断未确认而呈现为失败（条款 6）。
-    member this.RegisterEstablishedDelivery(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) =
+    member this.RegisterEstablishedDelivery
+        (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId, ?physicalUserMessageId: PhysicalUserMessageId)
+        =
         let physical =
-            currentPhysicalUserMessage (SessionId.value sessionId)
-            |> Option.map PhysicalUserMessageId.create
+            match physicalUserMessageId with
+            | Some physical -> Some physical
+            | None ->
+                currentPhysicalUserMessage (SessionId.value sessionId)
+                |> Option.map PhysicalUserMessageId.create
 
         DeliveryAttemptLedger.recordEstablished
             { SessionId = sessionId
