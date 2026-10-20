@@ -143,7 +143,9 @@ Host signal subscription必须返回closed `HostSignalSubscriptionError`与`Loca
 
 Root workspace 是process-local Host资源定位结果，不是公开可变状态。private Host runtime只在当前值为`None`且候选为非空白`Some path`时完成首次绑定；`None`、空串与纯空白均不占用绑定，首次绑定后的任意候选不得改写结果。Host composition是binder的唯一production consumer；其余production路径只能消费显式注入的只读capability。不得从Git推导workspace family root，不得按consumer自行重算或直接读取全局atom。
 
-## [032] Contract 提示字段解耦与参数清理安全
+## [032] 不注入评审保证书参数
+
+`todowrite-for-manager` 的工具定义不得追加 `contract` 参数、固定 token 或必填签署字段。评审接纳前后的定义保持一致；是否允许执行只由当前 Manager capability facts 决定，不依赖模型承诺。
 
 工具入参中的 `contract` 仅作为对 provider 的提示字段；插件本地对缺失或错误的 `contract` 采取乐观处理，不进行二次强校验。执行清理时，对需要暂存的参数执行私有暂存，并在 `after` 回调中原样恢复；异常退出路径同样保证同源恢复，确保历史原始调用与上下文记录不被参数清理逻辑改写。此处「历史」指每次 provider 请求发给模型的 provider wire 层历史投影：参数清理后由 provider-facing transform 从 before 期私有暂存还原协议字段，使 wire 层历史保留原始入参；宿主持久化快照的内部形态属宿主实现，在公开 Hook API 内既不可满足也不可观测，不作为本仓门禁对象。参数恢复后的对象身份与原始键顺序必须以真实 canary 得到严格证明。参数清理机制只按字段所有权处理服务评审提示字段 `contract`。不为工具定义追加估计轮次或短记字段。原始参数保证主要落在 provider wire 历史投影，不得承诺 Host 持久化快照对象形态或宣称重启后宿主内部字段必然完整。
 

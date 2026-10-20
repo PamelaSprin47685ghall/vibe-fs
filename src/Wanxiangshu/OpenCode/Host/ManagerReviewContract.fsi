@@ -2,10 +2,7 @@ namespace Wanxiangshu.OpenCode.Host
 
 module ManagerReviewContract =
 
-    /// Decorates the tool definition for the four manager review tools by adding
-    /// the contract property to parameters and appending contract to required.
-    /// Non-review tools are returned unmodified.
-    val decorateDefinition: toolInput: obj -> toolOutput: obj -> unit
+
 
     /// Hides the contract argument by saving its original property descriptor (or undefined)
     /// under a private module Symbol on the args object with enumerable:false, configurable:true,

@@ -312,8 +312,7 @@ module PluginHooks =
                 | Some registration -> registration.Runtime.ManagerCapabilityFactsFor sessionId
                 | None -> Task.FromResult ToolRuntimeScope.emptyManagerFacts
 
-            let toolDefinition (toolInput: obj) (toolOutput: obj) =
-                ManagerReviewContract.decorateDefinition toolInput toolOutput
+            let toolDefinition (_toolInput: obj) (_toolOutput: obj) = ()
 
 
             let reviewToolPermitted toolName (facts: ManagerCapabilityFacts) =

@@ -29,8 +29,7 @@ module PluginHooksSurface =
                settlement = sprintf "%A" outcome.Settlement
                hasExecutionKey = outcome.ExecutionKey.IsSome |}
 
-    let decorateReviewToolDefinition (toolID: string) (definition: obj) : unit =
-        ManagerReviewContract.decorateDefinition (box {| toolID = toolID |}) definition
+
 
     let hookFailurePolicy failure settlement : string =
         let typedFailure =

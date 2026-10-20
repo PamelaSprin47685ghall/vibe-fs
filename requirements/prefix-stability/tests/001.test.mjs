@@ -681,16 +681,7 @@ const createRawManagerTools = () => [
   },
 ]
 
-// 评审专用工具的 contract 装饰由 host owner 面提供（HOST-BOUNDARY-032）。
-const buildDecoratedManagerTools = () => {
-  const managerTools = createRawManagerTools()
-  for (const tool of managerTools) {
-    if (tools.isReviewTool(tool.name)) {
-      pluginHooks.decorateReviewToolDefinition(tool.name, tool)
-    }
-  }
-  return managerTools
-}
+const buildDecoratedManagerTools = () => createRawManagerTools()
 
 const wire = (
   messages,
@@ -747,16 +738,8 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
   for (const reviewToolName of REVIEW_TOOLS) {
     const tool = toolsBefore.find((candidate) => candidate.name === reviewToolName)
     assert.ok(tool, `review tool '${reviewToolName}' must exist in Manager tools`)
-    assert.ok(
-      tool.parameters.properties?.contract,
-      `Tool ${reviewToolName} must be decorated with contract parameter`,
-    )
-    assert.equal(tool.parameters.properties.contract.type, 'string')
-    assert.deepEqual(tool.parameters.properties.contract.enum, [CONTRACT_TOKEN])
-    assert.ok(
-      tool.parameters.required.includes('contract'),
-      `Tool ${reviewToolName} must mark contract as required`,
-    )
+    assert.equal(Object.hasOwn(tool.parameters.properties, 'contract'), false)
+    assert.equal(tool.parameters.required.includes('contract'), false)
   }
 
   // 2. Provider Attempt 1 (Before Review):
@@ -885,7 +868,7 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
 
   const alteredContractTools = buildDecoratedManagerTools()
   const readTool = alteredContractTools.find((tool) => tool.name === 'todowrite-for-manager')
-  readTool.parameters.properties.contract.enum = ['altered-contract-enum']
+  readTool.parameters.properties.contract = { type: 'string', enum: ['unexpected-attestation'] }
   assert.notEqual(
     canonicalJson.canonicalJson(toolsBefore.find((tool) => tool.name === 'todowrite-for-manager')),
     canonicalJson.canonicalJson(readTool),
