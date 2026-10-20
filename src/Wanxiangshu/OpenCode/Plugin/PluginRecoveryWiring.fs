@@ -48,12 +48,12 @@ module PluginRecoveryWiring =
             if String.IsNullOrWhiteSpace stateRoot then
                 return [||]
             else
-            let workIds =
-                (AgentJournal.snapshot journal).AgentProjections.Sessions
-                |> Seq.map (fun (KeyValue(sessionId, _)) -> SessionId.value sessionId)
-                |> Seq.toArray
+                let workIds =
+                    (AgentJournal.snapshot journal).AgentProjections.Sessions
+                    |> Seq.map (fun (KeyValue(sessionId, _)) -> SessionId.value sessionId)
+                    |> Seq.toArray
 
-            return queryInspectedWorks stateRoot workIds
+                return queryInspectedWorks stateRoot workIds
         }
 
     let private seedDevOpsTarget roadSessionId childSessionId target =

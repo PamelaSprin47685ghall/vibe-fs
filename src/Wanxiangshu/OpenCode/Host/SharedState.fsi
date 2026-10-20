@@ -12,5 +12,3 @@ module SharedState =
 
     /// Cross-instance session directory map.
     val SessionDirectories: Dictionary<string, string>
-
-

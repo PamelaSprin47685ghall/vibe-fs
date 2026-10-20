@@ -21,6 +21,7 @@
         "repository-programming": "ablated",
         "time-capability": "ablated",
         "process-execution": "ablated",
+        "advisor": "ablated",
         "causal-wait": "ablated",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -53,8 +54,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-06": {
@@ -78,6 +78,7 @@
         "repository-programming": "ablated",
         "time-capability": "ablated",
         "process-execution": "ablated",
+        "advisor": "ablated",
         "causal-wait": "ablated",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -110,8 +111,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-07": {
@@ -135,6 +135,7 @@
         "repository-programming": "ablated",
         "time-capability": "ablated",
         "process-execution": "ablated",
+        "advisor": "ablated",
         "causal-wait": "ablated",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -167,8 +168,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-08": {
@@ -192,6 +192,7 @@
         "repository-programming": "ablated",
         "time-capability": "ablated",
         "process-execution": "ablated",
+        "advisor": "ablated",
         "causal-wait": "ablated",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -224,8 +225,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-09": {
@@ -249,6 +249,7 @@
         "repository-programming": "ablated",
         "time-capability": "ablated",
         "process-execution": "ablated",
+        "advisor": "ablated",
         "causal-wait": "ablated",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -281,8 +282,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-10": {
@@ -306,6 +306,7 @@
         "repository-programming": "ablated",
         "time-capability": "ablated",
         "process-execution": "ablated",
+        "advisor": "ablated",
         "causal-wait": "ablated",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -338,8 +339,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-11": {
@@ -363,6 +363,7 @@
         "repository-programming": "ablated",
         "time-capability": "ablated",
         "process-execution": "ablated",
+        "advisor": "ablated",
         "causal-wait": "ablated",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -395,8 +396,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-12": {
@@ -420,6 +420,7 @@
         "repository-programming": "ablated",
         "time-capability": "ablated",
         "process-execution": "ablated",
+        "advisor": "ablated",
         "causal-wait": "ablated",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -452,8 +453,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-13": {
@@ -477,6 +477,7 @@
         "repository-programming": "ablated",
         "time-capability": "ablated",
         "process-execution": "ablated",
+        "advisor": "ablated",
         "causal-wait": "ablated",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -509,8 +510,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-14": {
@@ -534,6 +534,7 @@
         "repository-programming": "ablated",
         "time-capability": "ablated",
         "process-execution": "ablated",
+        "advisor": "ablated",
         "causal-wait": "ablated",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -566,8 +567,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-15": {
@@ -591,6 +591,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -623,8 +624,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-16": {
@@ -648,6 +648,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -680,8 +681,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-17": {
@@ -705,6 +705,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -737,8 +738,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-18": {
@@ -762,6 +762,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -794,8 +795,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-19": {
@@ -819,6 +819,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -851,8 +852,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-20": {
@@ -876,6 +876,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -908,8 +909,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-21": {
@@ -933,6 +933,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "ablated",
         "effect-accounting": "ablated",
@@ -965,8 +966,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-22": {
@@ -990,6 +990,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1022,8 +1023,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-23": {
@@ -1047,6 +1047,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1079,8 +1080,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-24": {
@@ -1104,6 +1104,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1136,8 +1137,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-25": {
@@ -1161,6 +1161,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1193,8 +1194,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-26": {
@@ -1218,6 +1218,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1250,8 +1251,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-27": {
@@ -1275,6 +1275,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1307,8 +1308,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-28": {
@@ -1332,6 +1332,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1364,8 +1365,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-29": {
@@ -1389,6 +1389,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1421,8 +1422,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-30": {
@@ -1446,6 +1446,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1478,8 +1479,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-31": {
@@ -1503,6 +1503,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1535,8 +1536,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-32": {
@@ -1560,6 +1560,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1592,8 +1593,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-33": {
@@ -1617,6 +1617,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1649,8 +1650,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-34": {
@@ -1674,6 +1674,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1706,8 +1707,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-35": {
@@ -1731,6 +1731,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1763,8 +1764,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-36": {
@@ -1788,6 +1788,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1820,8 +1821,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-37": {
@@ -1845,6 +1845,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1877,8 +1878,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-38": {
@@ -1902,6 +1902,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1934,8 +1935,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-39": {
@@ -1959,6 +1959,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -1991,8 +1992,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-40": {
@@ -2016,6 +2016,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2048,8 +2049,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-41": {
@@ -2073,6 +2073,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2105,8 +2106,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "ablated",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-42": {
@@ -2130,6 +2130,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2162,8 +2163,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-43": {
@@ -2187,6 +2187,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2219,8 +2220,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-44": {
@@ -2244,6 +2244,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2276,8 +2277,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-45": {
@@ -2301,6 +2301,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2333,8 +2334,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-46": {
@@ -2358,6 +2358,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2390,8 +2391,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-47": {
@@ -2415,6 +2415,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2447,8 +2448,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-48": {
@@ -2472,6 +2472,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2504,8 +2505,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-49": {
@@ -2529,6 +2529,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2561,8 +2562,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "ablated",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-50": {
@@ -2586,6 +2586,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2618,8 +2619,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-51": {
@@ -2643,6 +2643,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2675,8 +2676,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-52": {
@@ -2700,6 +2700,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2732,8 +2733,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-53": {
@@ -2757,6 +2757,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2789,8 +2790,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-54": {
@@ -2814,6 +2814,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2846,8 +2847,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-55": {
@@ -2871,6 +2871,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2903,8 +2904,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "station-56": {
@@ -2928,6 +2928,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "ablated",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -2960,8 +2961,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "work": "ablated",
-        "advisor": "ablated"
+        "work": "ablated"
       }
     },
     "production": {
@@ -2985,6 +2985,7 @@
         "repository-programming": "active",
         "time-capability": "active",
         "process-execution": "active",
+        "advisor": "active",
         "causal-wait": "active",
         "durable-events": "active",
         "effect-accounting": "active",
@@ -3017,8 +3018,7 @@
         "feature-ablation": "active",
         "cognitive-workspace": "active",
         "sphinx-v2": "active",
-        "work": "active",
-        "advisor": "active"
+        "work": "active"
       }
     }
   }

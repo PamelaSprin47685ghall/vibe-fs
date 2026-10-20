@@ -111,9 +111,10 @@ module AgentJournalPortAdapter =
                     authority.PendingClaims
                     |> Map.exists (fun _ claim ->
                         claim.Origin = PromptAuthority.PromptOrigin.Continuation
-                                           PromptAuthority.ContinuationKind.JoinGuard
+                            PromptAuthority.ContinuationKind.JoinGuard
                         && claim.PayloadDigest = payloadDigest))
                 |> Option.defaultValue false }
+
     let forWire (journal: AgentJournal) : WireJournalPort =
         let failurePort = forProviderFailure journal
 

@@ -26,7 +26,7 @@ open Wanxiangshu.Process
 
 module HostSignalBootstrap =
 
-    
+
 
     type internal ChatAdmissionHookFailure =
         | IntentRejected of ChatAdmissionIntent.Rejection
@@ -75,7 +75,7 @@ module HostSignalBootstrap =
         (sessionPort: ISessionHostPort)
         (eventPort: IEventObservationPort)
         (snapshotOpt: ISessionSnapshotPort option)
-                (journal: AgentJournal option)
+        (journal: AgentJournal option)
         (scope: PluginRuntimeScope)
 
         (rootWorkspace: IRootWorkspaceReader)
@@ -142,13 +142,7 @@ module HostSignalBootstrap =
             let binding = TurnBinding.Store()
 
             let onTurn =
-                HostTurnObserver.observe
-                    observeTurnWorkflow
-                    sessionPort
-                    rootWorkspace
-                    eventPort
-                    journal
-                    scope
+                HostTurnObserver.observe observeTurnWorkflow sessionPort rootWorkspace eventPort journal scope
 
 
             let compactionProbe: CompactionProbe =
@@ -251,7 +245,7 @@ module HostSignalBootstrap =
                                     scope
                                     cleanupDelegateDraft
                                     reconciler.Signal
-                                                                        sessionId
+                                    sessionId
                                     None
                                     deletion
 
@@ -1127,9 +1121,8 @@ module HostSignalBootstrap =
                 |> Option.filter (fun _ ->
                     ProviderWireDecode.firstString info [ "role" ] = Some "user"
                     && ProviderWireDecode.firstString info [ "sessionID"; "sessionId" ] = Some(
-                                                                                              SessionId.value
-                                                                                                  selected.SessionId
-                                                                                          ))
+                        SessionId.value selected.SessionId
+                    ))
                 |> Option.map (fun physical ->
                     { SessionId = selected.SessionId
                       PhysicalUserMessageId = PhysicalUserMessageId.create physical })

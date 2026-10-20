@@ -112,7 +112,8 @@ module SessionAssociationProjection =
         current
         |> Map.tryPick (fun candidateId candidate ->
             match candidate.Kind with
-            | ManagedSessionKind.SatelliteSession(owner, SatelliteKind.Companion) when owner = sessionId -> Some candidateId
+            | ManagedSessionKind.SatelliteSession(owner, SatelliteKind.Companion) when owner = sessionId ->
+                Some candidateId
             | _ -> None)
 
     /// COMPANION-002: the main session a Companion belongs to.

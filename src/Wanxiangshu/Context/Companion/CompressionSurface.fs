@@ -33,7 +33,7 @@ module CompressionSurface =
         match text value |> fun value -> value.ToLowerInvariant() with
         | "workmain"
         | "work-main" -> Some ProviderRequestKind.WorkMain
-                | "interactionrepair"
+        | "interactionrepair"
         | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
         | _ -> None
 
@@ -46,7 +46,7 @@ module CompressionSurface =
             | Some requestKind -> Ok requestKind
             | None -> Error(sprintf "unknown request kind: %s" (text value))
 
-    
+
 
     let private outcomeResult (value: obj) : Result<AttemptOutcome, string> =
         match text value with
@@ -83,7 +83,7 @@ module CompressionSurface =
                     (PhysicalUserMessageId.create "surface-user")
                     (ProviderRunIdentity.create "surface-provider-run")
                     (PromptAuthority.PromptOrigin.AuthorityRoot PromptAuthority.RootAuthorityKind.HumanRoot)
-                                        requestKind)
+                    requestKind)
 
         | Error error, _
         | _, Error error -> Error error
@@ -152,7 +152,7 @@ module CompressionSurface =
         | Ok plan -> attemptPlanView plan
         | Error error -> box {| ok = false; error = error |}
 
-        /// JSON/opaque owner API for semantic tests.
+    /// JSON/opaque owner API for semantic tests.
 
     let private attemptPlanWithHandle (value: obj) : obj =
         match attemptPlanCore value with

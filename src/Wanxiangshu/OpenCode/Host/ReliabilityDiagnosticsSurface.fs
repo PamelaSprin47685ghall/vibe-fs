@@ -61,7 +61,7 @@ module ReliabilityDiagnosticsSurface =
     let private requestKindOf value =
         match requiredText "providerRequestKind" value with
         | "work-main" -> ProviderRequestKind.WorkMain
-                | "interaction-repair" -> ProviderRequestKind.InteractionRepair
+        | "interaction-repair" -> ProviderRequestKind.InteractionRepair
         | kind -> invalidArg "providerRequestKind" $"unknown provider request kind '{kind}'"
 
 

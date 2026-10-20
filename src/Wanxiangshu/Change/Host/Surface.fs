@@ -392,9 +392,10 @@ module OrchestratorHostSurface =
             | Some(Some ManagerLoopSignal.Continue) -> return box {| kind = "Continue"; detail = "" |}
             | Some(Some ManagerLoopSignal.Candidate) -> return box {| kind = "Candidate"; detail = "" |}
             | Some(Some(ManagerLoopSignal.ExceptionalTerminal reason)) ->
-                return box
-                    {| kind = "Exceptional"
-                       detail = reason |}
+                return
+                    box
+                        {| kind = "Exceptional"
+                           detail = reason |}
         }
 
     /// change-integration-005/013: invoke the exact hand-off the Host applies when
@@ -420,41 +421,46 @@ module OrchestratorHostSurface =
 
             match Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir managerSessionId with
             | None ->
-                return box
-                    {| ok = false
-                       kind = "NoWork"
-                       incumbencyId = ""
-                       error = "lifecycle work is missing" |}
+                return
+                    box
+                        {| ok = false
+                           kind = "NoWork"
+                           incumbencyId = ""
+                           error = "lifecycle work is missing" |}
             | Some work ->
                 match work.ActiveId, work.Retirements |> List.tryLast with
                 | Some activeId, _ ->
-                    return box
-                        {| ok = true
-                           kind = "AlreadyWalking"
-                           incumbencyId = activeId
-                           error = "" |}
+                    return
+                        box
+                            {| ok = true
+                               kind = "AlreadyWalking"
+                               incumbencyId = activeId
+                               error = "" |}
                 | None, None ->
-                    return box
-                        {| ok = false
-                           kind = "NoRetirement"
-                           incumbencyId = ""
-                           error = "no committed retirement to continue" |}
+                    return
+                        box
+                            {| ok = false
+                               kind = "NoRetirement"
+                               incumbencyId = ""
+                               error = "no committed retirement to continue" |}
                 | None, Some retirement ->
                     match
                         DeliveredTenureHandOff.continuation commonDir managerSessionId work retirement cursor requestId
                     with
                     | Ok incumbencyId ->
-                        return box
-                            {| ok = true
-                               kind = "HandOff"
-                               incumbencyId = IncumbencyId.value incumbencyId
-                               error = "" |}
+                        return
+                            box
+                                {| ok = true
+                                   kind = "HandOff"
+                                   incumbencyId = IncumbencyId.value incumbencyId
+                                   error = "" |}
                     | Error error ->
-                        return box
-                            {| ok = false
-                               kind = "Refused"
-                               incumbencyId = ""
-                               error = error |}
+                        return
+                            box
+                                {| ok = false
+                                   kind = "Refused"
+                                   incumbencyId = ""
+                                   error = error |}
         }
 
     /// change-integration-005/013: the durable review evidence the publish gate
@@ -470,15 +476,17 @@ module OrchestratorHostSurface =
 
             match evidence with
             | Some(outcome, authority) ->
-                return box
-                    {| kind = "Reviewed"
-                       outcome = outcome
-                       authority = authority |}
+                return
+                    box
+                        {| kind = "Reviewed"
+                           outcome = outcome
+                           authority = authority |}
             | None ->
-                return box
-                    {| kind = "Refused"
-                       outcome = ""
-                       authority = "" |}
+                return
+                    box
+                        {| kind = "Refused"
+                           outcome = ""
+                           authority = "" |}
         }
 
     let hasChild (handle: obj) (agentId: string) : bool =

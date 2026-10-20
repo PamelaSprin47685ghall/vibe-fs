@@ -40,14 +40,14 @@ module HostSignalBootstrap =
           ObserveEvent: obj -> Task<unit>
           EnsureVisibleInputAdmission: obj -> Task<unit> }
 
-    
+
 
     val wire:
         observeTurnWorkflow: (AbortCause -> ReconciledTurnContext -> Task) ->
         sessionPort: ISessionHostPort ->
         eventPort: IEventObservationPort ->
         snapshotOpt: ISessionSnapshotPort option ->
-                journal: AgentJournal option ->
+        journal: AgentJournal option ->
         scope: PluginRuntimeScope ->
 
         rootWorkspace: IRootWorkspaceReader ->

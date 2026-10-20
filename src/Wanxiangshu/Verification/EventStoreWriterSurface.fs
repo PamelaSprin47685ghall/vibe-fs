@@ -39,7 +39,9 @@ module EventStoreWriterSurface =
                     {| SessionId = sessionId
                        AssignmentText = "test"
                        AuthoritativeRequirements = []
-                       ProviderRun = None |}))
+                       ProviderRun = None |}
+            )
+        )
 
     let private commitResultName (result: CommitResult<Envelope>) =
         match result with

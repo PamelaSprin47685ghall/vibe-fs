@@ -274,7 +274,11 @@ module ForkTool =
         | Some attach ->
             taskResult {
                 let! record = resolveAttachmentRecord handles attach
-                let! view = scope.ViewForSession(SessionId.value record.ChildSessionId) |> TaskResultCE.ofTask
+
+                let! view =
+                    scope.ViewForSession(SessionId.value record.ChildSessionId)
+                    |> TaskResultCE.ofTask
+
                 return view
             }
 
@@ -1091,13 +1095,20 @@ module ForkTool =
         else
             Ok()
 
-    let private validateManagerRequestPrerequisites (scope: ToolRuntimeScope) (request: Request) (sessionId: string) : Task<Result<unit, string>> =
+    let private validateManagerRequestPrerequisites
+        (scope: ToolRuntimeScope)
+        (request: Request)
+        (sessionId: string)
+        : Task<Result<unit, string>> =
         taskResult {
             do! validateManagerRequestSyntax request
             let parentSessionId = resolveParentSessionId scope sessionId
+
             let isDevOps =
                 String.Equals(request.Name.Trim(), "devops", StringComparison.OrdinalIgnoreCase)
+
             let! refusal = boundDevOpsDispatchRefusal scope parentSessionId isDevOps |> TaskResultCE.ofTask
+
             return!
                 match refusal with
                 | Some _ -> Error "placement-failed"

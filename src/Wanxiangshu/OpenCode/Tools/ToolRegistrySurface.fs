@@ -36,7 +36,7 @@ module ToolRegistrySurface =
     let private requestKindOf (label: string) : ProviderRequestKind option =
         match label.ToLowerInvariant() with
         | "work-main" -> Some ProviderRequestKind.WorkMain
-                | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
+        | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
         | _ -> None
 
 

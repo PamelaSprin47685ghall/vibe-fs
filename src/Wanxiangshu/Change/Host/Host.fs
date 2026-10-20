@@ -291,14 +291,18 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         | Some record -> Ok record
         | None -> Error(sprintf "No durable job record for '%s'" (ManagerJobId.value jobId))
 
-    let lifecycleWorkOf (record: ManagerJobProjection) : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
+    let lifecycleWorkOf
+        (record: ManagerJobProjection)
+        : Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option =
         let directory = WorktreePath.value record.WorktreePath
         let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.forStateRoot directory
         Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value record.ManagerSessionId)
 
     let loopSignalOfWork = DurableLoopSignal.ofWork
 
-    let requireOpenWork (record: ManagerJobProjection) : Result<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork, string> =
+    let requireOpenWork
+        (record: ManagerJobProjection)
+        : Result<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork, string> =
         lifecycleWorkOf record |> Result.requireSome "Manager session is not open"
 
     /// The last committed retirement on this work. The list is projected from
@@ -668,19 +672,20 @@ type OrchestratorHost(deps: OrchestratorHostDeps, orchestratorId: SessionId) =
         (next: string)
         : Task<Result<string, string>> =
         task {
-        let directory = WorktreePath.value record.WorktreePath
-        let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot directory
+            let directory = WorktreePath.value record.WorktreePath
+            let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot directory
 
-        if String.IsNullOrWhiteSpace commonDir then
-            return Error "lifecycle store is unavailable"
-        else
-            return executeAuthorityAdvance
-                directory
-                commonDir
-                (SessionId.value record.ManagerSessionId)
-                incumbent
-                expected
-                next
+            if String.IsNullOrWhiteSpace commonDir then
+                return Error "lifecycle store is unavailable"
+            else
+                return
+                    executeAuthorityAdvance
+                        directory
+                        commonDir
+                        (SessionId.value record.ManagerSessionId)
+                        incumbent
+                        expected
+                        next
         }
 
     let advanceAuthorityRevision

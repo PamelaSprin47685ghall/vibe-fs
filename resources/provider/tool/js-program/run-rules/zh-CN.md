@@ -76,7 +76,7 @@ hold 一片、推进，或 `null`。完整示例两种都有：`run-recipes` 是
   即中止；注入其他任何值都继续。
 
 先观察，再裁决。`watch` 应当读 ctx 增量、把要紧的状态记在实例字段
-（`this.lastSize`、`this.stalled`）上，然后再决定。一个什么都不看就返回 `true` 的
+（`this.lastSize`、`this.stalled`）上，然后再决定。一个什么都不看就 `return true` 的
 watch 是没有在监督的 watchdog——Host 不会拦你，但也没有任何东西在被监督。
 `next` 或 `watch` 抛异常会让整个程序失败。
 

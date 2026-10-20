@@ -93,21 +93,23 @@ module PluginHost =
         (familyParent: (SessionId -> SessionId option) option)
         (isLifecycleTerminated: (SessionId -> bool) option)
         (isUserQuestionWaiting: (SessionId -> bool) option)
-        : Task<Result<
-              IEventObservationPort *
-              ISessionHostPort *
-              ISessionSnapshotPort option *
-              string option *
-              Events.HostEventPort option,
-              string
-           >
+        : Task<
+              Result<
+                  IEventObservationPort *
+                  ISessionHostPort *
+                  ISessionSnapshotPort option *
+                  string option *
+                  Events.HostEventPort option,
+                  string
+               >
            >
         =
         task {
-        // Completion/output port is process-local per workspace runtime path so
-        // root + worktree plugin instances share AwaitAgent / NotifyTerminal.
-        // Host SSE remains only a coarse idle/retry/deleted signal source.
+            // Completion/output port is process-local per workspace runtime path so
+            // root + worktree plugin instances share AwaitAgent / NotifyTerminal.
+            // Host SSE remains only a coarse idle/retry/deleted signal source.
             let! shared = SharedTerminalBus.tryAcquireForWorkspace (workspaceDirectory input)
+
             let hostEventPort, terminalKey =
                 match shared with
                 | Some(key, port) -> port, Some key

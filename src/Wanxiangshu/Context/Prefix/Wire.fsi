@@ -6,9 +6,7 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider.Attempt
 
-type XWireReconciliationDecision =
-    { Cleared: bool
-      KeptPlan: bool }
+type XWireReconciliationDecision = { Cleared: bool; KeptPlan: bool }
 
 type AttemptPlanCapability =
     { TryAttemptPlan: SessionId -> ProviderRunIdentity -> AttemptPlan option
@@ -19,14 +17,11 @@ type AttemptPlanCapability =
 
 module XWire =
 
-    val reconciliationDecision:
-        hasPlan: bool ->
-        outcome: AttemptOutcome option ->
-            XWireReconciliationDecision
+    val reconciliationDecision: hasPlan: bool -> outcome: AttemptOutcome option -> XWireReconciliationDecision
 
     val suppressHostMessagesByIds: rawMessages: obj list -> hostMessageIds: Set<string> -> obj list
 
-        val applyTransform:
+    val applyTransform:
         snapshot: ISessionSnapshotPort option ->
 
         port: WireJournalPort option ->

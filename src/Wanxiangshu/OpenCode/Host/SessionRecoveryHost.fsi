@@ -34,4 +34,3 @@ type SessionRecoveryHost =
     /// 返回值是该信号的可观察结局：`terminalized` | `already-terminal` |
     /// `no-execution` | `ignored`。
     member SettleProviderStartBoundaryRejected: key: ChatExecutionKey * reason: string -> Task<string>
-

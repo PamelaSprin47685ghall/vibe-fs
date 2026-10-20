@@ -53,7 +53,10 @@ module OrdinaryTurnWorkflow =
             | None -> return false
             | Some directory ->
                 let! commonDir = RuntimePath.stateRoot directory
-                let workOpt = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value turn.SessionId)
+
+                let workOpt =
+                    Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir (SessionId.value turn.SessionId)
+
                 return
                     workOpt
                     |> Option.exists (fun work ->
@@ -75,34 +78,31 @@ module OrdinaryTurnWorkflow =
         | _ -> Ordinary
 
     let private classifyManagedTurnGate settled context =
-        if settled then
-            Wait
-        else
-            classifyManagerOrPlanTurn context
+        if settled then Wait else classifyManagerOrPlanTurn context
 
     let private longWorkGate (journal: AgentJournal option) (context: ReconciledTurnContext) : Task<LongWorkGate> =
         task {
-        let turn = context.Turn
+            let turn = context.Turn
 
-        let isManaged =
-            match turn.Role with
-            | Some(Role.Manager | Role.Plan) -> true
-            | _ -> false
+            let isManaged =
+                match turn.Role with
+                | Some(Role.Manager | Role.Plan) -> true
+                | _ -> false
 
-        let authority () =
-            journal
-            |> Option.bind (fun durable ->
-                (AgentJournal.snapshot durable).AgentProjections.Sessions
-                |> Map.tryFind turn.SessionId
-                |> Option.bind (fun session -> session.PromptAuthority))
+            let authority () =
+                journal
+                |> Option.bind (fun durable ->
+                    (AgentJournal.snapshot durable).AgentProjections.Sessions
+                    |> Map.tryFind turn.SessionId
+                    |> Option.bind (fun session -> session.PromptAuthority))
 
-        if not isManaged then
-            return Ordinary
-        elif isExplicitWaitOrOldTurn (authority ()) turn then
-            return Wait
-        else
-            let! settled = isTurnWorkSettled turn
-            return classifyManagedTurnGate settled context
+            if not isManaged then
+                return Ordinary
+            elif isExplicitWaitOrOldTurn (authority ()) turn then
+                return Wait
+            else
+                let! settled = isTurnWorkSettled turn
+                return classifyManagedTurnGate settled context
         }
 
     let private requestKindOfCompleted (port: TurnObservationJournalPort) (turn: ReconciledTurn) =
@@ -215,15 +215,7 @@ module OrdinaryTurnWorkflow =
         if isFissionReplaced then
             AsyncSupport.completedTask ()
         else
-            dispatchIdleTurn
-                quiescence
-                sessionPort
-                rootWorkspace
-                eventPort
-                journal
-                observation
-                context
-                observer
+            dispatchIdleTurn quiescence sessionPort rootWorkspace eventPort journal observation context observer
 
     /// Own the reconciled ordinary-turn outcome match.
     /// `abortCause` is the Host boundary typed outcome consumed exactly once (structured-workflow-017 ①).
@@ -456,6 +448,7 @@ module OrdinaryTurnWorkflow =
                 quiescence
                 context
                 completeAgent
+
     /// degenerate attempt from entering the ordinary completion path and
     /// re-triggers execution on that branch.
     /// If execution failed (e.g. timeout), report the error and do not record
@@ -476,6 +469,7 @@ module OrdinaryTurnWorkflow =
         (observer: ContinuationAcceptanceObserver option)
         : Task =
         let turn = context.Turn
+
         task {
             let! workGate = longWorkGate journal context
 
@@ -507,19 +501,20 @@ module OrdinaryTurnWorkflow =
                     let tracePort = journal |> Option.map TerminalTracePort.forJournal
                     TerminalReporter.completeWithEvidence eventPort tracePort turn
 
-                return! handleOutcome
-                    sessionPort
-                    rootWorkspace
-                    eventPort
-                    journal
-                    observation
-                    joinGuardNudges
-                    hasLivePty
-                    abortCause
-                    quiescence
-                    context
-                    completeAgent
-                    observer
+                return!
+                    handleOutcome
+                        sessionPort
+                        rootWorkspace
+                        eventPort
+                        journal
+                        observation
+                        joinGuardNudges
+                        hasLivePty
+                        abortCause
+                        quiescence
+                        context
+                        completeAgent
+                        observer
         }
 
     let observe

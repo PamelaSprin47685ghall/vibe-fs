@@ -22,12 +22,13 @@ module PluginHost =
         familyParent: (SessionId -> SessionId option) option ->
         isLifecycleTerminated: (SessionId -> bool) option ->
         isUserQuestionWaiting: (SessionId -> bool) option ->
-            Task<Result<
-                IEventObservationPort *
-                ISessionHostPort *
-                ISessionSnapshotPort option *
-                string option *
-                Events.HostEventPort option,
-                string
+            Task<
+                Result<
+                    IEventObservationPort *
+                    ISessionHostPort *
+                    ISessionSnapshotPort option *
+                    string option *
+                    Events.HostEventPort option,
+                    string
+                 >
              >
-            >

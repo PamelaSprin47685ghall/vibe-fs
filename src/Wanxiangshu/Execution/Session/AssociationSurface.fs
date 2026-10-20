@@ -19,8 +19,7 @@ module AssociationSurface =
         else
             Some value
 
-    let private pairCompanion (pair: obj) : string option =
-        optionalText (pair?companion)
+    let private pairCompanion (pair: obj) : string option = optionalText (pair?companion)
 
     let private pairsOf (state: obj) : obj array =
         if isNull state then [||] else unbox<obj array> state
@@ -89,7 +88,7 @@ module AssociationSurface =
         | AttachmentKind.SyncCoder -> "SyncCoder", null
         | AttachmentKind.SyncEngineer -> "SyncEngineer", null
         | AttachmentKind.SyncDevOps -> "SyncDevOps", null
-                | AttachmentKind.Bookkeeper transactionId -> "Bookkeeper", box transactionId
+        | AttachmentKind.Bookkeeper transactionId -> "Bookkeeper", box transactionId
 
 
     let private ownershipToJs (ownership: SessionOwnership) : obj =
@@ -126,10 +125,12 @@ module AssociationSurface =
 
     let link (pair: obj) (state: obj) : obj =
         let main = SessionId.create (text (pair?main))
+
         let companionText =
             match pairCompanion pair with
             | Some c -> c
             | None -> ""
+
         let companionId = SessionId.create companionText
         let parent = optionalText (pair?parent) |> Option.map SessionId.create
 
@@ -206,7 +207,7 @@ module AssociationSurface =
             | "SyncCoder" -> AttachmentKind.SyncCoder
             | "SyncEngineer" -> AttachmentKind.SyncEngineer
             | "SyncDevOps" -> AttachmentKind.SyncDevOps
-                        | "Bookkeeper" -> AttachmentKind.Bookkeeper ""
+            | "Bookkeeper" -> AttachmentKind.Bookkeeper ""
 
             | _ -> AttachmentKind.Companion
 
@@ -219,7 +220,7 @@ module AssociationSurface =
             | "SyncCoder" -> AttachmentKind.SyncCoder
             | "SyncEngineer" -> AttachmentKind.SyncEngineer
             | "SyncDevOps" -> AttachmentKind.SyncDevOps
-                        | "Bookkeeper" -> AttachmentKind.Bookkeeper ""
+            | "Bookkeeper" -> AttachmentKind.Bookkeeper ""
 
             | _ -> AttachmentKind.Companion
 
@@ -255,6 +256,3 @@ module AssociationSurface =
         |> SyncDelegateRole.toAttachmentKind
         |> attachmentLabel
         |> fst
-
-    
-

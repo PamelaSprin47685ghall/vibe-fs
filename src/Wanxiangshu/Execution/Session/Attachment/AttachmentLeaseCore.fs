@@ -69,7 +69,7 @@ module AttachmentLeaseCore =
         | AttachmentKind.SyncCoder -> "sync-coder"
         | AttachmentKind.SyncEngineer -> "sync-engineer"
         | AttachmentKind.SyncDevOps -> "sync-devops"
-                | AttachmentKind.Bookkeeper transactionId -> "bookkeeper\u001f" + transactionId
+        | AttachmentKind.Bookkeeper transactionId -> "bookkeeper\u001f" + transactionId
 
 
     let leaseKey (owner: SessionId) (kind: AttachmentKind) =
