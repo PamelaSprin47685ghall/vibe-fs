@@ -15,13 +15,16 @@ const sandbox = () => {
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
 
-// The fake host schema builders mirror the real ones: every builder can be
-// marked optional, so the registered schema can say "this argument may be
-// absent" the way the zod-based host schema does. Optionality is what lets a
-// model send one state (program / unpark / abandon) and nothing else.
+// The fake host schema builders mirror the real ones. In zod `optional()` is
+// a chainable method on the schema — `z.string().optional()` returns a
+// schema whose own `.optional` is still a function — and optionality is
+// readable separately (`isOptional()`, or the 'optional' node type). The
+// fake keeps that shape: `optional` stays the chainable function and the
+// optionalized flag records that the chain was taken. Optionality is what
+// lets a model send one state (program / unpark / abandon) and nothing else.
 const schemaOf = (state) => ({
   ...state,
-  optional: () => schemaOf({ ...state, optional: true }),
+  optional: () => schemaOf({ ...state, optionalized: true }),
   nullable: () => schemaOf({ ...state, nullable: true }),
   describe: (text) => schemaOf({ ...state, description: text }),
   int: () => schemaOf({ ...state, integer: true }),
@@ -64,17 +67,17 @@ test('WHAT[repository-programming-049] program, unpark and abandon are all optio
 
     const program = argumentSchema(registered, 'program')
     assert.equal(program.type, 'string')
-    assert.equal(program.optional, true, 'program must be optional: a resume or abandon call carries no program')
+    assert.equal(program.optionalized, true, 'program must be optional: a resume or abandon call carries no program')
     assert.equal(typeof program.description, 'string')
     assert.ok(program.description.length > 0, 'the program argument keeps its teaching description')
 
     const unpark = argumentSchema(registered, 'unpark')
     assert.equal(unpark.type, 'object')
-    assert.equal(unpark.optional, true, 'unpark must be optional: a program call carries no unpark')
+    assert.equal(unpark.optionalized, true, 'unpark must be optional: a program call carries no unpark')
 
     const abandon = argumentSchema(registered, 'abandon')
     assert.equal(abandon.type, 'object')
-    assert.equal(abandon.optional, true, 'abandon must be optional: a program call carries no abandon')
+    assert.equal(abandon.optionalized, true, 'abandon must be optional: a program call carries no abandon')
   } finally {
     cleanup()
   }
@@ -87,7 +90,7 @@ test('WHAT[repository-programming-049] unpark.value is declared as an optional f
     const unpark = argumentSchema(registered, 'unpark')
     assert.equal(unpark.shape.handle.type, 'string')
     assert.equal(unpark.shape.value.type, 'any')
-    assert.equal(unpark.shape.value.optional, true)
+    assert.equal(unpark.shape.value.optionalized, true)
   } finally {
     cleanup()
   }
@@ -112,11 +115,11 @@ test('WHAT[repository-programming-049] the flat view parameters stay optional to
 
     const prefixUntil = argumentSchema(registered, 'prefixUntil')
     assert.equal(prefixUntil.type, 'number')
-    assert.equal(prefixUntil.optional, true, 'prefixUntil must be optional: a call may declare no view at all')
+    assert.equal(prefixUntil.optionalized, true, 'prefixUntil must be optional: a call may declare no view at all')
 
     const thenMap = argumentSchema(registered, 'thenMap')
     assert.equal(thenMap.type, 'record')
-    assert.equal(thenMap.optional, true, 'thenMap must be optional: a call may declare no view at all')
+    assert.equal(thenMap.optionalized, true, 'thenMap must be optional: a call may declare no view at all')
   } finally {
     cleanup()
   }

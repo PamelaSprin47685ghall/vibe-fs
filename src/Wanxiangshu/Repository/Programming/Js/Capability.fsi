@@ -21,6 +21,9 @@ type JsCapability =
     | Horizon
     | Advisor
     | Ask
+    /// A lifecycle capability, not a ToolPermission projection: `deliver`
+    /// ends a program by handing over its view.
+    | Deliver
     | Park
 
 module JsCapability =
@@ -56,6 +59,7 @@ module JsFragmentRegistry =
     val advisor: JsCapabilityFragment
     val ask: JsCapabilityFragment
     val park: JsCapabilityFragment
+    val deliver: JsCapabilityFragment
     val additionalCapabilities: fragment: JsCapabilityFragment -> JsCapability list
     val all: JsCapabilityFragment list
     val byCapability: Map<JsCapability, JsCapabilityFragment list>

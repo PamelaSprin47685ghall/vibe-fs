@@ -16,61 +16,6 @@ module JsGeneratorSurface =
     [<Emit("undefined")>]
     let private jsUndefined: obj = jsNative
 
-    let private permissionOf (label: string) : ToolPermission option =
-        match label with
-        | "Fork" -> Some ToolPermission.Fork
-        | "Resume" -> Some ToolPermission.Resume
-        | "Join" -> Some ToolPermission.Join
-        | "Horizon" -> Some ToolPermission.Horizon
-        | "Fission" -> Some ToolPermission.Fission
-        | "Advisor" -> Some ToolPermission.Advisor
-        | "Read" -> Some ToolPermission.Read
-        | "Write" -> Some ToolPermission.Write
-        | "Edit" -> Some ToolPermission.Edit
-        | "Glob" -> Some ToolPermission.Glob
-        | "Grep" -> Some ToolPermission.Grep
-        | "Move" -> Some ToolPermission.Move
-        | "Remove" -> Some ToolPermission.Remove
-        | "Exec" -> Some ToolPermission.Exec
-        | "Pty" -> Some ToolPermission.Pty
-        | "ReviewAssessment" -> Some ToolPermission.ReviewAssessment
-        | "Fetch" -> Some ToolPermission.Fetch
-        | "Finality" -> Some ToolPermission.Finality
-        | "BashHoneypot" -> Some ToolPermission.BashHoneypot
-        | "JsPlan" -> Some ToolPermission.JsPlan
-        | "Ask" -> Some ToolPermission.Ask
-        | "DevOpsConsultation" -> Some ToolPermission.DevOpsConsultation
-        | "Deliver" -> Some ToolPermission.Deliver
-        | "Review" -> Some ToolPermission.Review
-        | _ -> None
-
-    let private permissionLabel permission =
-        match permission with
-        | ToolPermission.Fork -> "Fork"
-        | ToolPermission.Resume -> "Resume"
-        | ToolPermission.Join -> "Join"
-        | ToolPermission.Horizon -> "Horizon"
-        | ToolPermission.Fission -> "Fission"
-        | ToolPermission.Advisor -> "Advisor"
-        | ToolPermission.Read -> "Read"
-        | ToolPermission.Write -> "Write"
-        | ToolPermission.Edit -> "Edit"
-        | ToolPermission.Glob -> "Glob"
-        | ToolPermission.Grep -> "Grep"
-        | ToolPermission.Move -> "Move"
-        | ToolPermission.Remove -> "Remove"
-        | ToolPermission.Exec -> "Exec"
-        | ToolPermission.Pty -> "Pty"
-        | ToolPermission.ReviewAssessment -> "ReviewAssessment"
-        | ToolPermission.Fetch -> "Fetch"
-        | ToolPermission.Finality -> "Finality"
-        | ToolPermission.BashHoneypot -> "BashHoneypot"
-        | ToolPermission.JsPlan -> "JsPlan"
-        | ToolPermission.Ask -> "Ask"
-        | ToolPermission.DevOpsConsultation -> "DevOpsConsultation"
-        | ToolPermission.Deliver -> "Deliver"
-        | ToolPermission.Review -> "Review"
-
     let private capabilityLabel capability =
         match capability with
         | JsCapability.Read -> "Read"
@@ -90,6 +35,7 @@ module JsGeneratorSurface =
         | JsCapability.Horizon -> "Horizon"
         | JsCapability.Advisor -> "Advisor"
         | JsCapability.Ask -> "Ask"
+        | JsCapability.Deliver -> "Deliver"
         | JsCapability.Park -> "Park"
 
     let private languageOf (value: string) = ProviderLanguage.parse value
@@ -98,7 +44,9 @@ module JsGeneratorSurface =
         Roles.tryParseRole role |> Option.isSome
 
     let private permissionsOfLabels (labels: string array) =
-        labels |> Array.choose permissionOf |> Set.ofArray
+        labels
+        |> Array.choose (fun label -> OfficeCapability.permissionOfLabel label)
+        |> Set.ofArray
 
     let private canonicalLabels (role: string) =
         match
@@ -110,7 +58,10 @@ module JsGeneratorSurface =
                     Some Role.Engineer)
         with
         | None -> [||]
-        | Some parsed -> OfficeCapability.permissions parsed |> Set.toArray |> Array.map permissionLabel
+        | Some parsed ->
+            OfficeCapability.permissions parsed
+            |> Set.toArray
+            |> Array.map OfficeCapability.permissionLabel
 
     let internal typedFor (role: string) (labels: string array) (language: string) : JsSurface option =
         if not (roleExists role) then

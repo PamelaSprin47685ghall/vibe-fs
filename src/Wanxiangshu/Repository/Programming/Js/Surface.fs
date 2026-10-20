@@ -21,7 +21,11 @@ module JsToolGenerator =
     let membersFor (capabilities: Set<JsCapability>) : JsCapabilityFragment list =
         JsFragmentRegistry.all
         |> List.filter (fun fragment ->
+            // The lifecycle members (deliver, park) are carried by every
+            // generated surface and are never the projection of a
+            // ToolPermission, so they never count among a role's members.
             fragment.Capability <> JsCapability.Park
+            && fragment.Capability <> JsCapability.Deliver
             && JsFragmentRegistry.isProjected capabilities fragment)
 
     let toolNameFor (roleName: string) : string =

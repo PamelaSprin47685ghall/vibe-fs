@@ -62,7 +62,7 @@ test('WHAT[repository-programming-041] host-side ToolHostSurface and WorkflowSur
   const workflowSurface = read(join(SOURCE_ROOT, 'Repository/Programming/Js/WorkflowSurface.fs'))
 
   assert.match(toolHostSurface, /Some\(JsTransactionSurface\.lifecyclePersistenceOf store\)/)
-  assert.match(toolHostSurface, /JsToolSpec\.create factory surface workspaceRoot persistence lifecyclePersistence None/)
+  assert.match(toolHostSurface, /JsToolSpec\.create\s+factory\s+surface\s+workspaceRoot\s+persistence\s+lifecyclePersistence\s+None/)
   assert.match(workflowSurface, /Some\(JsTransactionSurface\.lifecyclePersistenceOf store\)/)
   assert.match(workflowSurface, /persistence\s*\n\s*lifecyclePersistence\s*\n\s*None/)
 })

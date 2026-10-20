@@ -35,6 +35,10 @@ type JsCapability =
     | Advisor
     /// The one question a program may put to the user (`this.ask`).
     | Ask
+    /// A lifecycle capability, not a ToolPermission projection: `deliver`
+    /// ends a program by handing over its view. Like `park`, every generated
+    /// surface carries it unconditionally.
+    | Deliver
     | Park
 
 module JsCapability =
@@ -200,6 +204,13 @@ module JsFragmentRegistry =
         { Capability = JsCapability.Park
           MemberName = "park" }
 
+    /// deliver fragment — the terminal view handoff. A lifecycle member like
+    /// park: not the projection of a ToolPermission, carried by every
+    /// generated surface, and never part of a role's capability members.
+    let deliver: JsCapabilityFragment =
+        { Capability = JsCapability.Deliver
+          MemberName = "deliver" }
+
     /// Canonical member order inside capability families. Filtering this list
     /// is the deterministic projection; never rebuild member order elsewhere.
     let all: JsCapabilityFragment list =
@@ -224,6 +235,7 @@ module JsFragmentRegistry =
           horizon
           advisor
           ask
+          deliver
           park ]
 
     let byCapability: Map<JsCapability, JsCapabilityFragment list> =

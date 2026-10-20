@@ -26,7 +26,7 @@ import {
 
 const caps = (...permissions) => permissions
 
-const surface = (role, permissionNames) => generate(role, caps(...permsOf(permissionNames)), 'en')
+const surface = (role, permissionNames) => generate(role, caps(...permissionNames), 'en')
 
 const memberNames = (s) => s.members.map((fragment) => fragment.memberName)
 
@@ -39,18 +39,6 @@ const projectedMembers = (s) => memberNames(s).filter((name) => !LIFECYCLE_MEMBE
 const isNone = (value) => value === null
 
 const isSome = (value) => value !== null
-
-const PERMISSION_NAMES = [
-  'Fork', 'Resume', 'Join', 'Horizon', 'Fission', 'Advisor', 'Ask', 'DevOpsConsultation',
-  'Read', 'Write', 'Edit', 'Glob', 'Grep', 'Move', 'Remove', 'Exec', 'Pty', 'Fetch',
-  'ReviewAssessment', 'Review', 'Finality',
-]
-
-const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, n]))
-
-const ToolPermission = toolPermissionByName
-
-const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 
 // The member expectation map is the JS-side encoding of the code's
 // ToolPermission -> JsCapability mapping: the expected set is rolePermissions
@@ -333,7 +321,7 @@ test('WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_r
 })
 
 test('WHAT[repository-programming-002] JS004_member_gate_binds_present_members_only', () => {
-  const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
+  const perms = caps('Read', 'Glob', 'Grep')
   assert.equal(memberBinding('Engineer', perms, 'file'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'glob'), undefined)
   assert.equal(memberBinding('Engineer', perms, 'grep'), undefined)
@@ -352,7 +340,7 @@ test('WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_r
   // failure mode the four-layer invariant exists to make impossible. The gate
   // must refuse the member: memberBinding returns undefined for it, so a
   // forged call cannot resolve an executor (JS-004).
-  const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
+  const perms = caps('Read', 'Glob', 'Grep')
   // lie: retired 'file'/'edit'/'rewrite' and absent 'write' are NOT in this surface's bindings
   assert.equal(memberBinding('Inspector', perms, 'file'), undefined)
   assert.equal(memberBinding('Inspector', perms, 'edit'), undefined)
@@ -405,7 +393,7 @@ test('WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_ev
 
   // The permission is the sole source of the member: Fork/Join without Horizon
   // project fork/dag/join but never horizon.
-  assert.equal(memberBinding('Engineer', caps(ToolPermission.Fork, ToolPermission.Join), 'horizon'), undefined)
+  assert.equal(memberBinding('Engineer', caps('Fork', 'Join'), 'horizon'), undefined)
 })
 
 test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_every_holding_role', () => {
@@ -442,10 +430,10 @@ test('WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_ev
 
   // The permission is the sole source of the member: Fork/Join without Advisor
   // project fork/dag/join but never advisor.
-  const delegationOnly = surface('Engineer', caps(ToolPermission.Fork, ToolPermission.Join))
+  const delegationOnly = surface('Engineer', caps('Fork', 'Join'))
   assert.deepEqual(memberNames(delegationOnly), ['fork', 'dag', 'join'])
-  assert.equal(memberBinding('Engineer', caps(ToolPermission.Fork, ToolPermission.Join), 'advisor'), undefined)
-  assert.deepEqual(memberNames(surface('Engineer', caps(ToolPermission.Advisor))), ['advisor'])
+  assert.equal(memberBinding('Engineer', caps('Fork', 'Join'), 'advisor'), undefined)
+  assert.deepEqual(memberNames(surface('Engineer', caps('Advisor'))), ['advisor'])
 
   // Absence: a role without the permission never projects the member — the
   // advisor seat itself holds no permission at all, and plan keeps its

@@ -34,6 +34,46 @@ module OfficeCapabilitySurface =
         | Some role, Some permission when Roles.all |> List.contains role -> OfficeCapability.isAllowed role permission
         | _ -> false
 
+    /// The canonical permission labels, in catalog order, derived from the one
+    /// label function. This list is the single authority: no consumer keeps
+    /// its own copy, because a hand-copied table is a thing to rot. The order
+    /// is the ToolPermission declaration order.
+    let permissionLabels () : string array =
+        [ ToolPermission.Fork
+          ToolPermission.Resume
+          ToolPermission.Join
+          ToolPermission.Horizon
+          ToolPermission.Fission
+          ToolPermission.Read
+          ToolPermission.Write
+          ToolPermission.Edit
+          ToolPermission.Glob
+          ToolPermission.Grep
+          ToolPermission.Move
+          ToolPermission.Remove
+          ToolPermission.Exec
+          ToolPermission.Pty
+          ToolPermission.ReviewAssessment
+          ToolPermission.Fetch
+          ToolPermission.Finality
+          ToolPermission.BashHoneypot
+          ToolPermission.JsPlan
+          ToolPermission.Ask
+          ToolPermission.Deliver
+          ToolPermission.Review
+          ToolPermission.DevOpsConsultation
+          ToolPermission.Advisor ]
+        |> List.map OfficeCapability.permissionLabel
+        |> List.toArray
+
+    /// The canonical label for a permission label, or None when the label is
+    /// not a permission at all. A caller can therefore tell "unknown label"
+    /// apart from "known label that projects no member".
+    let permissionOfLabel (label: string) : string option =
+        match OfficeCapability.permissionOfLabel label with
+        | Some permission -> Some(OfficeCapability.permissionLabel permission)
+        | None -> None
+
     /// capability-enforcement-025: manager gate facts as a plain JS object. The
     /// caller declares the four facts and never sees the F# record.
     let managerFacts

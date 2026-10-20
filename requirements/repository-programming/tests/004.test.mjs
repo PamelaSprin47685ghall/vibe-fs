@@ -9,24 +9,13 @@ import { permissions as rolePermissions } from '../../../dist/Participant/Person
 
 const caps = (...permissions) => permissions
 
-const surface = (role, permissionNames) => generate(role, caps(...permsOf(permissionNames)), 'en')
+const surface = (role, permissionNames) => generate(role, caps(...permissionNames), 'en')
 
 const memberNames = (s) => s.members.map((fragment) => fragment.memberName)
 
 const isNone = (value) => value === null
 
 const isSome = (value) => value !== null
-
-const PERMISSION_NAMES = [
-  'Fork', 'Join', 'Horizon', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
-  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment',
-]
-
-const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, n]))
-
-const ToolPermission = toolPermissionByName
-
-const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 
 const fsPermissionsOf = (role) =>
   rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Glob', 'Move', 'Remove'].includes(n))
@@ -69,10 +58,18 @@ const layersOf = (s) =>
   )
 
 test('WHAT[repository-programming-004] JS001_generated_name_gate_rejects_forged_names', () => {
-  const perms = caps(ToolPermission.Read, ToolPermission.Glob, ToolPermission.Grep)
+  const perms = caps('Read', 'Glob', 'Grep')
   assert.equal(isGeneratedToolName('Engineer', perms, 'todowrite-for-engineer'), true)
   assert.equal(isGeneratedToolName('Engineer', perms, 'todowrite-for-devops'), false)
   assert.equal(isGeneratedToolName('Engineer', perms, 'read'), false)
-  // a role without the capability set never admits its own name
-  assert.equal(isGeneratedToolName('Engineer', caps(ToolPermission.Ask), 'todowrite-for-engineer'), false)
+
+  // A permission that projects no member at all generates no surface, so the
+  // role never admits its own name. Edit is such a permission: it is a real
+  // permission that resolves, but the js-* projection of it is empty.
+  assert.equal(isGeneratedToolName('Engineer', caps('Edit'), 'todowrite-for-engineer'), false)
+
+  // The control: Ask is a real permission that does project a member, so the
+  // role does admit its own name. Without this the negative probe above could
+  // pass for the wrong reason.
+  assert.equal(isGeneratedToolName('Engineer', caps('Ask'), 'todowrite-for-engineer'), true)
 })

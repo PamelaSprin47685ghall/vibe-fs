@@ -16,6 +16,7 @@ import {
   takeView,
   clearAll as clearViews,
 } from '../../../dist/Repository/Programming/Js/Anchor/AnchorSurface.js'
+import * as language from '../../../dist/Participant/Provider/LanguageSurface.js'
 
 // 调用面的三态互斥：一次编程调用只携带 program / unpark / abandon 之一。
 // 这里走真实的工具调用面（ToolHostSurface 装配出来的注册工具）与真实的
@@ -26,6 +27,25 @@ const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-064-exclusive-'))
   return { dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
+
+// The refusal messages come from the bilingual resource, and the language is
+// a global preference. Pin it to English for this file so the assertions
+// read a known wording, and restore the caller's preference afterwards.
+let previousLanguage
+
+test.beforeEach(() => {
+  previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
+  language.refreshGlobalLanguage()
+  clearAll()
+  clearViews()
+})
+
+test.afterEach(() => {
+  if (previousLanguage === undefined) delete process.env.WANXIANGSHU_PROVIDER_LANGUAGE
+  else process.env.WANXIANGSHU_PROVIDER_LANGUAGE = previousLanguage
+  language.refreshGlobalLanguage()
+})
 
 // 假宿主 schema 构造器：optional() 把 inner 摊平并标出 optional，
 // 于是 type/shape 仍然可读，可选性也可读。
@@ -59,7 +79,7 @@ const register = (dir) => createRegistered(toolModule(), 'Engineer', 'en', dir, 
 const parkProgram = `class Js extends JsProgram {
   async run() {
     const decision = await this.park({ stage: 'exclusivity' });
-    return { decided: decision.value };
+    return { decided: decision };
   }
 }`
 
@@ -80,11 +100,6 @@ const parkOnce = async (registered, session) => {
   assert.ok(doc.handle.length > 0, 'the parked handle must not be empty')
   return doc.handle
 }
-
-test.beforeEach(() => {
-  clearAll()
-  clearViews()
-})
 
 test('WHAT[repository-programming-064] a call carrying two states is refused with INVALID_ARGUMENT and runs nothing', async () => {
   const { dir, cleanup } = sandbox()
@@ -164,7 +179,11 @@ test('WHAT[repository-programming-064] unpark alone still resumes the parked pro
 
     assert.equal(result.startsWith('# ok'), true, `the resume must continue the program: ${result}`)
     const doc = parseToml(result)
-    assert.equal(doc.data.decided, 'resumed', 'the injected value must reach the parked await')
+    assert.equal(
+      doc.data.decided,
+      'resumed',
+      'the injected value must reach the parked await',
+    )
     assert.deepEqual(
       Array.from(handlesForSession(session)),
       [],

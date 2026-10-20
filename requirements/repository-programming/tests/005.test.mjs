@@ -7,17 +7,10 @@ const { generate, isGeneratedToolName, memberBinding } = await import("../../../
 const { permissions: rolePermissions } = await import("../../../dist/Participant/Persona/OfficeCapabilitySurface.js");
 
 const caps = (...permissions) => permissions
-const surface = (role, permissionNames) => generate(role, caps(...permsOf(permissionNames)), 'en')
+const surface = (role, permissionNames) => generate(role, caps(...permissionNames), 'en')
 const memberNames = (s) => s.members.map((fragment) => fragment.memberName)
 const isNone = (value) => value === null
 const isSome = (value) => value !== null
-const PERMISSION_NAMES = [
-  'Fork', 'Join', 'Horizon', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
-  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment',
-]
-const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, n]))
-const ToolPermission = toolPermissionByName
-const permsOf = (names) => names.map((n) => toolPermissionByName[n])
 const fsPermissionsOf = (role) =>
   rolePermissions(role.toLowerCase()).filter((n) => ['Read', 'Write', 'Glob', 'Move', 'Remove'].includes(n))
 const MEMBERS_BY_PERMISSION = {
@@ -86,7 +79,7 @@ test('WHAT[repository-programming-005] JS010_description_never_dilutes_the_ultra
   }
 })
 test('WHAT[repository-programming-005] JS_description_retains_no_unsubstituted_placeholders', () => {
-  const result = generate('Coder', caps(ToolPermission.Read, ToolPermission.Edit, ToolPermission.Write), 'en')
+  const result = generate('Coder', caps('Read', 'Edit', 'Write'), 'en')
   assert.equal(result.description.includes('{{'), false)
 })
 }
