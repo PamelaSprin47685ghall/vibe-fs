@@ -39,7 +39,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-04 | 唯一资源归属与关闭 | 执行 | DONE | CUT-00, CUT-01 | eng-cut04 | manager |
 | CUT-05 | 双语资源与包内定位 | 表达 | DONE | CUT-00 | — | 2026-10-15 主线提交 2f98049e5：wanxiangli 0.7.0 resources 模块合入，库侧 8 测试 + 主仓 provider-language 25 项回归全绿，证据链见 cards/CUT-05.md §10 |
 | CUT-06 | WorkRecord 取材与视图 | 上下文 | BACKLOG | CUT-03 | — | — |
-| CUT-07 | 参与者身份与执行绑定分离 | 权威 | LIB_READY | CUT-00 | — | 2026-10-15 库侧 identity 模块 24 测试全绿并随 0.7.0 发布；主仓切换按 eng-cut07 报告推迟至后续集成队列（主仓消费面与 Interaction 层进行中改动交叠，避免同窗冲突），证据链见 cards/CUT-07.md §10 |
+| CUT-07 | 参与者身份与执行绑定分离 | 权威 | INTEGRATING | CUT-00 | eng-cut07-goose | 2026-10-20 认领主仓切换（库侧 identity 已 LIB_READY，wanxiangli main a8b89a4）；证据链见 cards/CUT-07.md |
 | CUT-08 | 能力事实与双侧门禁 | 权威 | BACKLOG | CUT-07 | — | — |
 | CUT-09 | 来源、逻辑根与关闭权威 | 权威 | BACKLOG | CUT-07 | — | — |
 | CUT-10 | 模型路由与精确容量许可 | 执行 | BACKLOG | CUT-07 | — | — |
@@ -112,6 +112,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | `src/Wanxiangshu/Execution/Session/Ownership.fs(.fsi), src/Wanxiangshu/Mission/Lifecycle/DurableWorkHost.fs(.fsi)` | `CUT-04` | `eng-cut04` | `b322c180b` | `CUT-04 完成资源归属接线与 session/work 测试回归`（2026-10-15 删除清单闭合与 work 009/044、025 全绿，主线提交 62dbebc5d，证据见 cards/CUT-04.md） | `已释放` |
 | `src/Wanxiangshu/Foundation/CanonicalJson.fs(.fsi), src/Wanxiangshu/Persistence/EventStore/CanonicalEventCodec.fs(.fsi)` | `CUT-18` | `eng-cut18` | `62dbebc5d`（认领时未运行 git，base 以 DevOps 核实为准） | `CUT-18 完成 wanxiangli/events 0.6.0 验证、vendor tarball 落位与 durable-events 测试回归`（2026-10-15 随 0.7.0 主线提交 2f98049e5 合入，durable-events 244 项全绿，证据见 cards/CUT-18.md） | `已释放` |
 | `src/Wanxiangshu/Process/{Deadline,NodeTiming,VirtualTiming}.fs(.fsi), src/Wanxiangshu/Execution/Session/Wait/{Registry,CompletionMailbox}.fs(.fsi)` | `CUT-21` | `devops`（受委派集成） | `2f98049e5` | `CUT-21 完成 wanxiangli 0.8.0 time/wait 发布与主仓桥接切换`（2026-10-15 库 commit 8422617，干净 HEAD worktree 验证全绿后主线合入） | `已释放` |
+| `src/Wanxiangshu/Foundation/{Roles,RolesSurface}.fs(.fsi), src/Wanxiangshu/Participant/Persona/{Catalog,Identity,ManagedCatalog,Surface}.fs(.fsi), src/Wanxiangshu/Interaction/Authority/{IdentitySeed,Origin}.fs(.fsi); wanxiangli src/identity/*` | `CUT-07` | `eng-cut07-goose` | `48dff9349` / wxl `a8b89a4` | `CUT-07 主仓切换合入 master 并更新卡片证据` | `持有` |
 | `src/Wanxiangshu/Process/{Pty,PtyApi,PtyBackend,PtySession,PtySupervisor,PtyTypes,Spool,ProcessOutput}.fs(.fsi)`；wanxiangli `src/pty/`、`src/spool/` | `CUT-20` | `eng-cut20-goose` | `48dff9349` | `CUT-20 完成 PTY/spool 库实现、主仓接线与旧 owner 退出` | `持有` |
 
 ## 两仓集成队列
