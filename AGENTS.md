@@ -1,4 +1,4 @@
-[Apply ASD-STE100 to source code, Mise-en-place to code design. Adapt Gall’s Law, Chesterton’s Fence, and Poka-yoke. Invoke Goodhart’s Law and Via Negativa when needed. Treat these principles as Wittgenstein’s Ladder. Build the real thing, not its imitation. Try to falsify it.] [For natural-language discussion, follow Fei Xiaotong’s plain precision and Kunihiko Kodaira’s quiet clarity. Avoid officialese, performative rhetoric, translationese, and textbook cadence. Let the subject shape the prose.]
+[GUIDE: Apply ASD-STE100 to source code. Use Mise-en-place for code design and reasoning: prepare complete, independent responsibilities, then compose them explicitly. Prefer flat dependencies and autonomous, message-oriented objects inspired by Smalltalk and the Actor Model, even without concurrency. Start with minimal complete parts; strengthen them independently in small, verified steps, using removable, decorator-inspired enhancements where they simplify the whole. Adapt Gall’s Law, Chesterton’s Fence, and Poka-yoke. Invoke Goodhart’s Law and Via Negativa when needed. Treat these principles as Wittgenstein’s Ladder. Build the real thing, not its imitation. Try to falsify it.] [For natural-language discussion, follow Fei Xiaotong’s plain precision and Kunihiko Kodaira’s quiet clarity. Avoid officialese, performative rhetoric, translationese, and textbook cadence. Let the subject shape the prose.]
 
 ## 工具调用纪律
 
@@ -18,7 +18,7 @@
 ### 长程委托的连续性
 
 - 公理：使用者委托的是目标的完成，不是一条回复的结束。目标尚未完成时，长程工作不能静默停止；有下一步就继续，遇到阻塞就明确呈现，不能靠用户再次催促维持推进。
-- 推论：provider 的自然 stop、空输出和进度小结都是物理回合的边界，不是业务完成证据。Manager 与 Plan 必须通过既有 `deliver` 形成有效交接或完成；否则自然停机应触发当前任务的 nudge，并说明尚未解除的义务。
+- 推论：provider 的自然 stop、空输出和进度小结都是物理回合的边界，不是业务完成证据。所有承担任务的角色（Manager、Orchestrator、Engineer、DevOps、Plan）必须通过既有 `deliver` 形成有效交接或完成；否则自然停机应触发当前任务的 nudge，并说明尚未解除的义务。internal 末梢 Advisor/Bookkeeper 不走公开 deliver，沿各自的专用提交事实收敛，不以一段内部散文解除外层目标义务。
 - 显式等待：Plan 真正缺少用户决定或信息时使用 `ask(question)`（Manager 禁用 `ask`）。工具只返回询问已发出的占位回执，系统中断本次 attempt、保留未完成委托；新的真实用户输入到来后接续。`devops(intent)` 负责原 Plan 的固定 DevOps 调查，`join` 负责 Manager 临时等待后台工作，二者都不证明任务结束。
 - 边界：禁止模型自行放弃，不等于禁止用户取消、强迫重试基础设施故障或复活已退休者。用户明确取消、已证明的交接/完成、显式提问等待和可见的运行故障分别处理；不能把失败或未知伪造成成功，也不能把 `ask` 的暂停当作逻辑运行关闭。
 
