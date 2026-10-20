@@ -55,3 +55,33 @@ wanxiangli `468991f`（0.21.0）：`node --test src/compression/tests/*.test.mjs
 ## 5. 落地前复验
 
 rebase 到 master `636f8d847`（含 CUT-15 prefix、CUT-19 events/retention、CUT-25 沙箱与 wanxiangli/sandbox 0.23.1 gitlink）后，在 wanxiangli `d2a9f3b`（0.23.1，以 0.21.0 为祖先）上重新全量构建（build ok，manifest/linkage OK）并复跑 32 文件：168 用例 verdict 与 §1 base 逐条相同；产物 `Anchor*.js` 与差分所用 candidate 字节一致（md5 相同）；库侧 compression + exports 在 0.23.1 上仍 16 pass / 0 fail。
+
+# 子范围②：view 检查点追加准入（eng-cut16d-goose）
+
+## 6. 库侧
+
+wanxiangli `5f15de3`（实现 + `tests/004.test.mjs`）、`a699b95`（release 0.25.1，以 master 当时 gitlink `40265dd` 为祖先）。`Compression().checkpoints()` 返回有状态台账：`observe({session, callId, status})` → `append`/`join`/`skip`，`settle(call, outcome)` → `settled`/`released`/`failed`。`node --test src/compression/tests/*.test.mjs scripts/tests/exports.test.mjs`：22 pass / 0 fail。
+
+## 7. 同树 base / candidate
+
+同一工作树、同一 wanxiangli `a699b95`、Node v22.21.1；base = 接线前 `PluginHooks.fs`，candidate = 接线后；两侧各一次全量 `node scripts/build.mjs`（build ok，manifest 151 / linkage 725 OK）。
+
+- 单元层（[checkpoint-suite.files](checkpoint-suite.files) 共 72 个文件：所有提到 `ViewCheckpointCommitted`/`todowrite-for-` 的测试 + context-compression 全部）：两侧 450 用例均为 378 pass / 9 fail / 16 cancelled / 32 skip / 15 todo，逐用例 verdict diff 为空（[checkpoint-suite.verdicts](checkpoint-suite.verdicts)）。另与接线前、旧 lib（`5319733` on 0.23.2）上的 base 也逐条相同。
+- 集成层：obligation-ledger 005 等在默认层是 SKIP，因此另以 `WXS_TIER_INTEGRATION=1` 跑 obligation-ledger 001–005 与 work 020/034：两侧 42 用例均为 40 pass / 2 fail，verdict 相同（[checkpoint-integration.verdicts](checkpoint-integration.verdicts)）；两处失败（obligation-ledger-002 已装宿主、work-020 接力）base 同样失败，非本卡引入。candidate 集成层所用 dist 为 base 全量构建后替换 candidate 的 `PluginHooks.js`（唯一改动的源文件）。
+- 产物：candidate `dist/OpenCode/Plugin/PluginHooks.js` 实际 `import { Compression } from "wanxiangli/compression"`。
+
+## 8. 负控（证明宿主真的走库）
+
+在 candidate 上逐个改写 `wanxiangli/dist/compression/Compression.js`，跑集成层 obligation-ledger 005（[checkpoint-mutants.txt](checkpoint-mutants.txt)）：
+
+| 变异 | 被抓到的用例 |
+|---|---|
+| M1 `WriterUnavailable` 不释放 | 005 “WriterUnavailable releases the call…” |
+| M2 `committed` 后清除 settled | 005 “exact completed terminal commits exactly one durable checkpoint” |
+| M3 去掉在途 `join` | 005 “concurrent duplicate terminals share one append outcome…”、“WriteUnknown … never retried” |
+
+还原后 8/8 pass。
+
+## 9. 退出
+
+主仓删除 `settledViewCheckpoints` HashSet、`removePendingViewCheckpoint`/`releaseUnattemptedViewCheckpoint`/`startTerminalViewCheckpoint`/`settleNewViewCheckpointTerminal`/`joinPending` 及其中的准入判断；宿主只保留 `appendViewCheckpoint`（真实 journal 写入）、`JournalAppendFailure`→结局名映射与在途 `Task` 字典（等待者会合）。

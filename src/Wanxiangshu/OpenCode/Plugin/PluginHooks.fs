@@ -80,6 +80,33 @@ module PluginHooks =
     [<Emit("$0 !== null && $0 !== undefined && typeof $0 === 'object' && !Array.isArray($0) && Object.keys($0).length > 0")>]
     let private isNonEmptyObject (value: obj) : bool = jsNative
 
+    /// obligation-ledger-005 / context-compression-028: the view checkpoint
+    /// admission law (one append per exact completed call, in-flight duplicates
+    /// join, final failures never rewritten, WriterUnavailable released) is owned
+    /// by wanxiangli/compression; this host keeps the journal write and the
+    /// waiter rendezvous on the one in-flight Task.
+    [<AllowNullLiteral>]
+    type private CheckpointAdmission =
+        abstract observe: terminal: obj -> string
+        abstract settle: call: obj * outcome: obj -> string
+
+    [<AllowNullLiteral>]
+    type private CompressionCheckpoints =
+        abstract checkpoints: unit -> CheckpointAdmission
+
+    [<Import("Compression", "wanxiangli/compression")>]
+    let private createCompression: unit -> CompressionCheckpoints = jsNative
+
+    let private checkpointCall (sessionText: string) (callId: ToolCallId) =
+        createObj [ "session" ==> sessionText; "callId" ==> ToolCallId.value callId ]
+
+    let private appendOutcome (failure: JournalAppendFailure) =
+        match failure with
+        | JournalAppendFailure.WriterUnavailable _ -> "WriterUnavailable"
+        | JournalAppendFailure.WriteUnknown _ -> "WriteUnknown"
+        | JournalAppendFailure.NoNewWriteReleaseFailed _ -> "NoNewWriteReleaseFailed"
+        | JournalAppendFailure.FactRejected _ -> "FactRejected"
+
     /// Host hook surface: chat / transform / config / compaction / text /
     /// tool hooks plus event + dispose, and the optional client tool module.
     let create (boot: PluginBoot.Boot) (host: PluginHostWiring.Host) (transform: obj -> obj -> Task<unit>) : Task<obj> =
@@ -143,9 +170,9 @@ module PluginHooks =
                 | None -> false
 
             // Programming-surface calls carrying a non-empty `view` argument establish
-            // the compression checkpoint. The plugin records one durable compression
-            // checkpoint per successfully completed call, keyed by exact call id.
-            let settledViewCheckpoints = HashSet<SessionId * ToolCallId>()
+            // the compression checkpoint: one durable checkpoint per successfully
+            // completed call, keyed by exact call id (admission: wanxiangli/compression).
+            let viewCheckpointAdmission = createCompression().checkpoints ()
             // obligation-ledger-005: the in-flight append for each identity, so a
             // concurrent duplicate terminal waits for the same append's final
             // outcome instead of reporting an early success.
@@ -481,70 +508,45 @@ module PluginHooks =
                 journal
                 |> Option.defaultWith (fun () -> invalidOp "view compression checkpoint requires a durable journal")
 
-            let removePendingViewCheckpoint key =
-                lock pendingViewCheckpointAppends (fun () -> pendingViewCheckpointAppends.Remove(key) |> ignore)
-
-            let releaseUnattemptedViewCheckpoint key failure =
-                match failure with
-                | JournalAppendFailure.WriterUnavailable _ ->
-                    removePendingViewCheckpoint key
-                    settledViewCheckpoints.Remove(key) |> ignore
-                | JournalAppendFailure.WriteUnknown _
-                | JournalAppendFailure.NoNewWriteReleaseFailed _
-                | JournalAppendFailure.FactRejected _ -> ()
-
             let appendTerminalViewCheckpoint key sessionText callId =
                 task {
+                    let call = checkpointCall sessionText callId
+
                     try
                         do! appendViewCheckpoint (requiredViewJournal ()) sessionText callId
-                        removePendingViewCheckpoint key
+                        viewCheckpointAdmission.settle (call, "committed") |> ignore
+                        pendingViewCheckpointAppends.Remove(key) |> ignore
                     with :? JournalAppendException as appendFailure ->
-                        releaseUnattemptedViewCheckpoint key appendFailure.Failure
+                        match viewCheckpointAdmission.settle (call, appendOutcome appendFailure.Failure) with
+                        | "released" -> pendingViewCheckpointAppends.Remove(key) |> ignore
+                        | _ -> ()
+
                         return raise appendFailure
                 }
-
-            let startTerminalViewCheckpoint key sessionText callId =
-                lock pendingViewCheckpointAppends (fun () ->
-                    match pendingViewCheckpointAppends.TryGetValue(key) with
-                    | true, pending -> pending
-                    | false, _ ->
-                        let append = appendTerminalViewCheckpoint key sessionText callId
-                        pendingViewCheckpointAppends[key] <- append
-                        append)
-
-            let settleNewViewCheckpointTerminal key sessionText callId status =
-                if not (settledViewCheckpoints.Add(key)) then
-                    Task.FromResult(())
-                elif status = "completed" then
-                    startTerminalViewCheckpoint key sessionText callId
-                else
-                    Task.FromResult(())
 
             /// One durable checkpoint per exact terminal call. A repeated Host
             /// part update for the same call id is a replay, not a second fact.
             /// obligation-ledger-005: concurrent duplicates of the same terminal
-            /// share the one in-flight append and observe its final outcome.
-            /// A failed append propagates its error to every waiter. The settled
-            /// mark is only kept when the outcome is final: WriteUnknown and
-            /// FactRejected stay settled (the event may already be durable or is
-            /// semantically refused — repeating it is unsafe), while
-            /// WriterUnavailable (NotAttempted) releases the mark so the Host's
-            /// retry gets a real second attempt.
+            /// share the one in-flight append and observe its final outcome; a
+            /// failed append propagates its error to every waiter. Which terminal
+            /// appends, joins or is skipped, and which outcomes release the call
+            /// for a real retry, is answered by the compression admission ledger.
             let settleViewCheckpointTerminal (sessionText, callId, status) =
                 let key = SessionId.create sessionText, callId
 
-                // A concurrent duplicate first joins the in-flight append (it
-                // must observe the same final outcome); only a terminal with no
-                // pending append consults the settled mark.
-                let joinPending () =
-                    lock pendingViewCheckpointAppends (fun () ->
-                        match pendingViewCheckpointAppends.TryGetValue(key) with
-                        | true, pending -> Some(pending)
-                        | false, _ -> None)
+                let terminal =
+                    createObj
+                        [ "session" ==> sessionText
+                          "callId" ==> ToolCallId.value callId
+                          "status" ==> status ]
 
-                match joinPending () with
-                | Some pending -> pending
-                | None -> settleNewViewCheckpointTerminal key sessionText callId status
+                match viewCheckpointAdmission.observe terminal with
+                | "append" ->
+                    let append = appendTerminalViewCheckpoint key sessionText callId
+                    pendingViewCheckpointAppends[key] <- append
+                    append
+                | "join" -> pendingViewCheckpointAppends[key]
+                | _ -> Task.FromResult(())
 
             let settleViewCheckpointEvent rawInput =
                 viewTerminalObservation rawInput

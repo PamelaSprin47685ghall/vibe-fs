@@ -4,7 +4,8 @@
 
 ## 1. 认领
 
-- Owner：`eng-cut06b-goose` 认领（`0c9ae2c3f`），库侧子范围①完成后中断；`eng-cut16c-goose` 接手同一工作树 `wt/CUT-06-main`（分支 `cut/CUT-16`）完成接线、复验与落地。
+- Owner：`eng-cut06b-goose` 认领（`0c9ae2c3f`），库侧子范围①完成后中断；`eng-cut16c-goose` 接手同一工作树 `wt/CUT-06-main`（分支 `cut/CUT-16`）完成接线、复验与落地；`eng-cut16d-goose` 接手子范围②及以后。
+- 写集合（子范围②）：`src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs`（view 检查点结算段）；wanxiangli `src/compression/`。
 - 写集合（子范围①）：`src/Wanxiangshu/Repository/Programming/Js/Anchor/{AnchorModel.fs,AnchorModel.fsi,AnchorSurface.fs,AnchorView.fs}`；wanxiangli `src/compression/`（新模块）。与 CUT-15 的 `Context/Prefix`、`HostCompactionGate` 及 CUT-25 的 `Process/JsSandbox` 不相交。
 
 ## 2. 处置
@@ -17,7 +18,9 @@
 | 按 history 先后折叠（覆盖区间连同此前摘要、opening 行、kept/summarized/folded/cached 计数） | `AnchorView.apply` 内 `replace` 折叠 | **抽出** → `compression.project`（返回指回输入的 index，宿主据此取原消息） |
 | 编号台账（`AnchorLedger`：会话内 messageId→锚点号、待用声明、history 存储） | 主仓 | 留主仓（宿主会话状态） |
 | o200k token 计量、摘要渲染回宿主消息（`summarizedMessage`/`openingSummary`） | 主仓 | 留主仓（宿主线格式与分词器） |
-| checkpoint / todo hook / 真实压缩候选接受拒绝 / 退休重启恢复（CARDS 顺序 2–4） | `Context/Companion`、todo hook、Host 压缩路径 | 本次未切；CUT-15 已于 `aa93dc3f1` DONE，作为后续子范围继续，见 §6 |
+| view 检查点追加准入（每个 completed 调用恰好一次、在途重复 join、error 封口、WriterUnavailable 释放、终局失败不重写） | `PluginHooks` 内 `settledViewCheckpoints` + 五个局部函数 | **抽出** → `compression.checkpoints()`（子范围②，见 §7） |
+| 检查点真实 journal 写入、在途 Task 会合、`JournalAppendFailure` 结局名映射 | `PluginHooks` | 留主仓（宿主 I/O 与等待者） |
+| todo hook / 真实压缩候选接受拒绝 / 退休重启恢复（CARDS 顺序 3–4） | todo hook、Host 压缩路径 | 见 §6 |
 
 ## 3. B. 契约（wanxiangli/compression 0.21.0）
 
@@ -42,6 +45,16 @@
 
 ## 6. 余项（本卡仍为 DOING）
 
-- 子范围②：checkpoint 精确 coverage 与 `ViewCheckpointCommitted` 的唯一 owner（`Context/Companion`、work 020/034 的接力 view）。
+- 子范围②：已完成，见 §7。
 - 子范围③：todo hook（todowrite 失败不落 checkpoint、不重写原生 todo 列表）与压缩候选接受/拒绝、退休/重启从原件恢复。
 - 已知不足：本机 Node 22.21.1 下有 7 个文件中 13 个用例既有失败（base 同样失败，见证据），全量 verify 与集成 run.mjs 未跑。
+
+## 7. 子范围②：view 检查点追加准入（eng-cut16d-goose）
+
+- B 契约：`Compression().checkpoints()` → `{ observe(terminal), settle(call, outcome) }`，键为长度前缀的 `(session, callId)`；见库 `src/compression/AGENTS.md` LEMMA 5 / SPEC 4、`index.d.ts`。
+- C 反例：重复终态、在途重复、error 后 completed、键别名、WriteUnknown/NoNewWriteReleaseFailed/FactRejected 重试、WriterUnavailable 不释放、accessor/非法状态 → 库 004；主仓 obligation-ledger 005（集成层）。行为本来正确，无可伪造的红；以三处库变异体被主仓 005 抓到作负控。
+- D：库 `5f15de3`（实现 + 测试）、`a699b95`（release 0.25.1）。
+- E：gitlink `40265dd` → `a699b95`，`package-lock.json` 中 `wanxiangli` 版本同步为 0.25.1。
+- F：`PluginHooks` 持有一个 `checkpoints()` 台账；`observe` 回答 `append` 时宿主才写 journal 并登记在途 Task，`join` 取同一 Task，`skip` 直接完成；写入结局经 `settle` 决定是否摘除在途 Task。
+- G：删除 `settledViewCheckpoints`、`removePendingViewCheckpoint`、`releaseUnattemptedViewCheckpoint`、`startTerminalViewCheckpoint`、`settleNewViewCheckpointTerminal`、`joinPending`。
+- H：72 文件 450 用例 base/candidate 逐用例相同；集成层 obligation-ledger 001–005 + work 020/034 42 用例相同；变异体 M1–M3 均被抓到。见[证据](../evidence/CUT-16/README.md) §6–9。
