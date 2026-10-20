@@ -2,8 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { allPublicRoleLabels, allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
 import { admissionAuthority, capabilityToolNames, rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
-import { knownToolNames } from '../../../dist/OpenCode/Tools/StaticTools.js'
+import { toolSpecNames } from '../../../dist/OpenCode/Tools/ToolSurface.js'
+import { generateRole } from '../../../dist/Repository/Programming/Js/GeneratorSurface.js'
 import { isAllowed, permissions } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
+import { acceptAuthorityRoot, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 
 test('WHAT[work-021] Role catalog contains Plan and wire label is plan', () => {
   // Roles.all must contain Role.Plan with wire label 'plan'
@@ -55,15 +57,66 @@ test('WHAT[work-021] Plan separates human ask from devops investigation and deni
     assert.equal(isAllowed('plan', perm), false, `Plan must be denied ${perm}`)
   }
 
-  // 真实注册的 devops 工具存在且 Plan 角色可调用；非 Plan 角色拒绝
-  assert.ok([...knownToolNames].includes('devops'), 'Tool catalog must contain registered devops tool')
-  assert.equal(admissionAuthority('devops'), 'office', 'devops tool must resolve to office admission authority')
-  assert.equal(rolePredicate('devops', 'plan'), true, 'Plan role must be admitted to devops tool')
-  assert.ok(capabilityToolNames('plan', 'work-main').includes('devops'), 'Plan work-main capabilities must include devops')
+  // 宿主 devops 工具已退役：它不在注册表里，也不再解析到 office 准入权威。
+  assert.ok(!toolSpecNames().includes('devops'), 'the host devops tool must be retired')
+  assert.notEqual(admissionAuthority('devops'), 'office', 'the retired devops name must resolve to no office admission authority')
+  assert.equal(rolePredicate('devops', 'plan'), false, 'no role is admitted to a host devops tool')
+  assert.ok(
+    !capabilityToolNames('plan', 'work-main').includes('devops'),
+    'the Plan work-main capability set must not carry the retired host devops tool',
+  )
+})
 
-  const nonPlanRoles = allRoleLabels.filter((role) => role !== 'plan')
-  for (const role of nonPlanRoles) {
-    assert.equal(rolePredicate('devops', role), false, `Non-plan role "${role}" must be denied devops tool`)
-    assert.equal(capabilityToolNames(role, 'work-main').includes('devops'), false, `Non-plan role "${role}" must not expose devops tool`)
+test('WHAT[work-021] the devops verb survives as a Plan programming-surface member only', () => {
+  const plan = generateRole('plan', 'en')
+  const planMembers = plan.members.map((member) => member.memberName)
+  assert.ok(planMembers.includes('devops'), 'the Plan surface carries the devops member')
+  assert.ok(
+    plan.baseClassSource.includes('async devops(intent, reportMapping)'),
+    'the Plan base class declares devops with an explicit report mapping',
+  )
+
+  // 其它角色没有这个成员：DevOps 调查只对 Plan 开放。
+  for (const role of allRoleLabels.filter((label) => label !== 'plan')) {
+    const surface = generateRole(role, 'en')
+    if (!surface) continue
+    const members = surface.members.map((member) => member.memberName)
+    assert.ok(!members.includes('devops'), `the "${role}" surface must carry no devops member`)
   }
+})
+
+test('WHAT[work-021] the Plan devops member refuses a missing or malformed report mapping as data', async () => {
+  await withExecutablePlugin(async (hooks, _directory, _createdIds, runtime) => {
+    const sessionID = 'ses-work-021-devops-mapping'
+    await acceptAuthorityRoot(runtime, sessionID, 'plan', 'user-plan-root')
+
+    const runPlan = async (body) =>
+      String(
+        await hooks.tool['todowrite-for-plan'].execute(
+          { program: `class Js extends JsProgram { async run() { ${body} } }` },
+          { sessionID, agent: 'plan' },
+        ),
+      )
+
+    const missing = await runPlan('return await this.devops("find the flaky test");')
+    assert.match(missing, /ok = false/)
+    assert.match(missing, /code = "VIEW_DECLARATION_INVALID"/)
+    assert.match(missing, /reportMapping is required/)
+
+    const malformed = await runPlan('return await this.devops("find the flaky test", { "not-an-anchor": null });')
+    assert.match(malformed, /ok = false/)
+    assert.match(malformed, /code = "VIEW_DECLARATION_INVALID"/)
+    assert.match(malformed, /must be a non-negative anchor number/)
+
+    // 非 Plan 角色没有这个成员：调用在编程面直接失败关闭，而不是静默成功。
+    const engineerSession = 'ses-work-021-devops-engineer'
+    await acceptAuthorityRoot(runtime, engineerSession, 'engineer', 'user-engineer-root')
+    const engineer = String(
+      await hooks.tool['todowrite-for-engineer'].execute(
+        { program: 'class Js extends JsProgram { async run() { return await this.devops("find the flaky test", { 1: null }); } }' },
+        { sessionID: engineerSession, agent: 'engineer' },
+      ),
+    )
+    assert.match(engineer, /this\.devops is not a function/)
+  })
 })
