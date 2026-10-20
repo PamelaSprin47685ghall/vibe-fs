@@ -4,7 +4,7 @@
 
 ## 1. 认领
 
-- Owner：`eng-cut17e-goose`（现任；接手中断的 `eng-cut17d-goose`，其子范围②–④均已落地，无遗留 WIP）。`eng-cut17d-goose` 接手 `eng-cut17c-goose` 未推的子范围② WIP。此前 `eng-cut17c-goose` 接手 `eng-cut17b-goose` 未推的本地提交。`eng-cut16d-goose` 认领（`9242aecbc`），完成库侧 `tenure` 规则并发布 0.27.0（`c3cd45e` + `c51f35e`）后中断；`eng-cut17b-goose` 接手同一工作树 `wt/CUT-06-main` / `wt/CUT-06-wxl`（分支 `cut/CUT-17`）。
+- Owner：`eng-cut17f-goose`（现任；接手中断的 `eng-cut17e-goose`，其子范围⑤本地提交经变基复核后落地为 `ec036a317`，并做本卡收口）。`eng-cut17e-goose` 接手中断的 `eng-cut17d-goose`（子范围②–④均已落地，无遗留 WIP）。`eng-cut17d-goose` 接手 `eng-cut17c-goose` 未推的子范围② WIP。此前 `eng-cut17c-goose` 接手 `eng-cut17b-goose` 未推的本地提交。`eng-cut16d-goose` 认领（`9242aecbc`），完成库侧 `tenure` 规则并发布 0.27.0（`c3cd45e` + `c51f35e`）后中断；`eng-cut17b-goose` 接手同一工作树 `wt/CUT-06-main` / `wt/CUT-06-wxl`（分支 `cut/CUT-17`）。
 - 写集合：`src/Wanxiangshu/Mission/Planning/TenureIsolation.{fs,fsi}`；`src/Wanxiangshu/Participant/Provider/Projection/{Planner,Renderer,Surface}.fs`；wanxiangli `src/projection/`。
 
 ## 2. 处置
@@ -67,3 +67,13 @@
 - F：`ProviderProjection.renderWire`/`renderSemantic` 签名与全部调用者（`ProjectionSurface.sealDigest`/`renderWire`/`renderSemantic`、`ProjectionRenderer.cutoffDigest`、`ProjectionMessageEdit` 派生宿主 id、`Context/Trace`、追加律 `isAppendOnlyPrefix` 的逐条字节）不变；宿主只把已类型化的部件降成普通视图交库。
 - G：删除宿主自有的 `quote`/`optional`/`jsonArray`/`field`/`jsonObject`/`wirePartJson`/`semanticPartJson` 与内联 `messageBytes` JSON。
 - H：501 条 verdict base/candidate 逐条相同；另 23 个触及封印/截止/语义轨迹的文件 426 pass / 0 fail；双算 54000 次 0 分歧；负控 G/H 分别 6252/10461 次分歧。见[证据](../evidence/CUT-17/README.md)。
+
+## 8. 退出核对（eng-cut17f-goose，DONE）
+
+- 处置表中标为“抽出”的六项（任期过滤、意图规划、布局、退休 attempt 归属、规范线格式字节、语义字节）在 master 上只有 `wanxiangli/projection` 一个 owner：`tenure`/`plan`/`layout`/`retired`/`wire`/`wireMessage`/`semantic`。主仓同名私有规则均已删除（各子范围 G 项）；`isCurrentTenurePhysical` 已删除。
+- “不在 PluginTransforms 与业务域各渲染一份”：`src/` 中引用 `ProviderProjection` 的只剩 `Participant/Provider/Projection/*`（降视图交库）、`OpenCode/Codec/{ProviderProjectionSurface,ProjectionMessageEdit}`（宿主 codec，调用同一 `renderWire`）、`Context/Trace/Materialization`、`Context/Prefix/WirePort`（只构造 Semantic 类型取材）、`OpenCode/Host/PairProgrammingThoughtTransform`（`wireTextOf` 只把部件拼成纯文本供锚点标记查找，不产生线格式字节）。没有第二份线格式/语义渲染器。
+- “证明实际发出的字节”：子范围⑤双算经 `sealDigest`（恒等哈希＝完整线格式字节）、`renderWire`、`cutoffDigest`、追加律等六个公开面 54000 次 0 分歧，负控 G/H 均被抓到。
+- 顺序项“角色与工具材料”：投影只把角色字符串与工具名列表当不透明输入、按序写入线格式字节（已由 `wire`/`semantic` 持有字段顺序）；角色提示词与工具暴露本身的内容不在本卡写集合。
+- 留主仓（如实记录）：消息解码、XTrace 首次观测游标、重锚事实写入、保留消息写回（宿主 codec / Trace / journal）；`toSemantic` 与两种类型（`Context/Trace` 以类型取材）。
+- 落地复核：`ec036a317` 变基到 `48c6872b2`（CUT-12，gitlink → `80b0eaf`/0.44.0）后全新构建（generation 39），重跑 `files3` 集：382 pass / 0 fail / 8 cancelled（prefix-stability-001 文件级既有）/ 2 skipped / 19 todo，相对子范围⑤ candidate 无新增失败；推前核对 lockfile JSON、gitlink 已在 wanxiangli origin/main 且不后退、lock 版本 0.44.0 与 gitlink 一致。
+- 已知不足：全量 `scripts/verify.mjs` 与集成 `run.mjs` 未跑（共享机，只跑受影响文件集）。
