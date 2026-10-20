@@ -1,6 +1,8 @@
 namespace Wanxiangshu.Repository.Knowledge.Casebook
 
 open System
+open Fable.Core
+open Fable.Core.JsInterop
 
 /// DSL-class: DurableFact — CASE-003: one typed observation captured from the
 /// final execution layer (builtin read/glob/grep Host execution). Never
@@ -107,6 +109,14 @@ module Observations =
 /// later resolution/refresh/evict events — never via revision/wall_clock LWW.
 module CasebookProjection =
 
+    [<Import("CasebookIndexLaw", "wanxiangli/casebook")>]
+    let private casebookLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
+
+    let private casebookLaw: obj = construct casebookLawClass
+
     /// Incremental Current owned by the canonical Integrator. The access counter
     /// is part of the derived state so boot replay and live integration use the
     /// exact same single-event rule.
@@ -178,17 +188,16 @@ module CasebookProjection =
 
     /// CASE-008: LRU eviction — keep the capacity most-recently-accessed
     /// Cases; the evicted session ids are returned so the caller can append
-    /// Evicted facts (tombstones are events too).
+    /// Evicted facts (tombstones are events too). The victim choice is
+    /// wanxiangli/casebook `evictionVictims` (CUT-27); this only removes them.
     let evict (capacity: int) (cases: Map<string, Case>) : Map<string, Case> * string list =
-        if capacity <= 0 || Map.count cases <= capacity then
-            cases, []
-        else
-            let victims =
-                cases
-                |> Map.toList
-                |> List.sortBy (fun (_, case) -> case.AccessOrder)
-                |> List.take (Map.count cases - capacity)
-                |> List.map fst
+        let victims =
+            cases
+            |> Map.toArray
+            |> Array.map (fun (sessionId, case) ->
+                createObj [ "sessionId" ==> sessionId; "accessOrder" ==> case.AccessOrder ])
+            |> fun items -> unbox<string array> (casebookLaw?evictionVictims (capacity, items))
+            |> Array.toList
 
-            let remaining = victims |> List.fold (fun acc id -> Map.remove id acc) cases
-            remaining, victims
+        let remaining = victims |> List.fold (fun acc id -> Map.remove id acc) cases
+        remaining, victims

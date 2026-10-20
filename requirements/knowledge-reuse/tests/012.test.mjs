@@ -86,3 +86,23 @@ test('WHAT[knowledge-reuse-012] CASEBOOK_visible_set_change_advances_epoch', asy
     local.close()
   }
 })
+
+test('WHAT[knowledge-reuse-012] CASEBOOK_shelfmark_of_a_long_title_survives_utf8_and_still_resolves', async () => {
+  // The title is cut to 71 UTF-16 code units. When that cut falls inside a surrogate pair the shelfmark
+  // carries a lone surrogate; any UTF-8 transport (the provider wire) turns it into U+FFFD, so the
+  // shelfmark the model sends back no longer addresses the Case it was shown.
+  const local = openStore()
+  try {
+    const question = 'a'.repeat(70) + '😀 why does the cache forget after restart?'
+    assert.equal((await casebook.archive(local.handle, caseRec('idx-long-title', question, 'A'))).ok, true)
+    const snap = await index.refresh(local.handle, 10)
+    const shown = snap.cases.find(entry => entry.question === question).shelfmark
+    assert.equal(shown.isWellFormed(), true, 'a public locator must be a well-formed string')
+    const echoed = Buffer.from(shown, 'utf8').toString('utf8')
+    const found = await index.resolve(local.handle, 10, echoed)
+    assert.equal(found.ok, true)
+    assert.equal(found.value?.sessionId, 'idx-long-title', 'the shelfmark echoed over UTF-8 must address the shown Case')
+  } finally {
+    local.close()
+  }
+})
