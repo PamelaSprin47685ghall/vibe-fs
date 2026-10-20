@@ -12,9 +12,31 @@ open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 open Wanxiangshu.Persistence.EventStore
 
+/// knowledge-reuse-003: which accesses count and the relatedPaths normal form are
+/// wanxiangli/casebook-access `CasebookAccessLaw` (CUT-27); this keeps only the
+/// per-session accumulator.
+module private CasebookAccessLawInstance =
+    [<Import("CasebookAccessLaw", "wanxiangli/casebook-access")>]
+    let private accessLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
+
+    let law: obj = construct accessLawClass
+
+    let accessPaths (access: obj) : string array =
+        unbox<string array> (law?accessPaths access)
+
 /// Access tracker for substantive file access collection.
 type AccessTracker() =
     let paths = HashSet<string>()
+
+    let add (access: obj) =
+        for path in CasebookAccessLawInstance.accessPaths access do
+            paths.Add path |> ignore
+
+    let ofPath (kind: string) (path: string) =
+        createObj [ "kind" ==> kind; "path" ==> path ]
 
     member this.recordRead(path: string, contentHash: string) : unit = this.RecordRead(path, contentHash)
     member this.recordCreate(path: string) : unit = this.RecordCreate(path)
@@ -29,37 +51,28 @@ type AccessTracker() =
 
     member this.getRelatedPaths() : string array = this.GetRelatedPaths() |> List.toArray
 
-    member _.RecordRead(path: string, contentHash: string) : unit =
-        if not (String.IsNullOrWhiteSpace path) then
-            paths.Add path |> ignore
-
-    member _.RecordCreate(path: string) : unit =
-        if not (String.IsNullOrWhiteSpace path) then
-            paths.Add path |> ignore
-
-    member _.RecordEdit(path: string) : unit =
-        if not (String.IsNullOrWhiteSpace path) then
-            paths.Add path |> ignore
-
-    member _.RecordDelete(path: string) : unit =
-        if not (String.IsNullOrWhiteSpace path) then
-            paths.Add path |> ignore
+    member _.RecordRead(path: string, contentHash: string) : unit = add (ofPath "read" (string path))
+    member _.RecordCreate(path: string) : unit = add (ofPath "create" (string path))
+    member _.RecordEdit(path: string) : unit = add (ofPath "edit" (string path))
+    member _.RecordDelete(path: string) : unit = add (ofPath "delete" (string path))
 
     member _.RecordMove(source: string, destination: string) : unit =
-        if not (String.IsNullOrWhiteSpace source) then
-            paths.Add source |> ignore
-
-        if not (String.IsNullOrWhiteSpace destination) then
-            paths.Add destination |> ignore
+        add (
+            createObj
+                [ "kind" ==> "move"
+                  "source" ==> string source
+                  "destination" ==> string destination ]
+        )
 
     member _.RecordGrep(pattern: string, path: string) : unit = ()
     member _.RecordGlob(pattern: string) : unit = ()
 
     member _.RecordAttemptedMutation(path: string, committed: bool) : unit =
-        if committed && not (String.IsNullOrWhiteSpace path) then
-            paths.Add path |> ignore
+        add (createObj [ "kind" ==> "mutation"; "path" ==> string path; "committed" ==> committed ])
 
-    member _.GetRelatedPaths() : string list = paths |> Seq.toList |> List.sort
+    member _.GetRelatedPaths() : string list =
+        unbox<string array> (CasebookAccessLawInstance.law?relatedPaths (Seq.toArray paths))
+        |> Array.toList
 
 /// CASE-003 / KR-003 / KR-014: typed observation capture and substantive access.
 module CasebookCapture =
@@ -97,106 +110,35 @@ module CasebookCapture =
         else
             Some(string value)
 
-    let private pathArg (args: obj) : string option =
-        [ "path"; "filePath"; "file" ]
-        |> List.tryPick (fun key ->
-            let raw = args?(key)
-            if isNull raw then None else Some(string raw))
-
-    // ---- executor reading tolerance (§63) ---------------------------------
-
-    /// Split a command line on whitespace, honoring single quotes (best-effort
-    /// — this is typed command parsing, never transcript inference).
-    let private tokenize (command: string) : string list =
-        let rec go (chars: char list) (current: string) (inQuote: bool) (acc: string list) : string list =
-            match chars with
-            | [] -> List.rev (if current = "" then acc else current :: acc)
-            | ''' :: rest -> go rest current (not inQuote) acc
-            | c :: rest when (c = ' ' || c = '\t') && not inQuote ->
-                go rest "" false (if current = "" then acc else current :: acc)
-            | c :: rest -> go rest (current + string c) inQuote acc
-
-        go (List.ofSeq command) "" false []
-
-    /// §63 positives: single-file reads via cat/head/tail/sed (with or without
-    /// option prefixes). `cat file | grep bar` still counts as reading `file`.
-    let rec private firstReadFile (tokens: string list) : string option =
-        match tokens with
-        | [] -> None
-        | "-n" :: value :: tail when value |> Seq.forall System.Char.IsDigit -> firstReadFile tail
-        | "-n" :: tail -> firstReadFile tail
-        | token :: tail when token.StartsWith "-" -> firstReadFile tail
-        | file :: _ -> Some file
-
-    let private sedReadFile (rest: string list) =
-        match rest |> List.skipWhile (fun token -> token.StartsWith "-") with
-        | _script :: file :: _ -> Some(Observation.FileRead(file, contentHash ""))
-        | _ -> None
-
-    let private dispatchExecTokens tokens : Observation option =
-        match tokens with
-        | [] -> None
-        | "sh" :: _
-        | "bash" :: _ -> None
-        | "cat" :: rest
-        | "head" :: rest
-        | "tail" :: rest ->
-            firstReadFile rest
-            |> Option.map (fun file -> Observation.FileRead(file, contentHash ""))
-        | "sed" :: rest -> sedReadFile rest
-        | _ -> None
-
+    /// §63 executor reads (cat/head/tail/sed single-file reads) are
+    /// wanxiangli/casebook-access `execRead`.
     let ofExecCommand (command: string) : Observation option =
-        if System.String.IsNullOrWhiteSpace command then
-            None
-        elif command.Contains "$(" || command.Contains "\`" then
+        if isNull command then
             None
         else
-            tokenize command |> dispatchExecTokens
+            CasebookAccessLawInstance.law?execRead command
+            |> unbox<string>
+            |> Option.ofObj
+            |> Option.map (fun file -> Observation.FileRead(file, contentHash ""))
 
     // ---- Substantive Access & Dual Baselines (KR-003, KR-004, KR-010, KR-014) ----
 
     let isSubstantiveTool (toolName: string) : bool =
-        match toolName with
-        | "create"
-        | "rewrite" -> true
-        | _ -> false
+        unbox<bool> (CasebookAccessLawInstance.law?isSubstantiveTool (string toolName))
 
     let createAccessTracker () : AccessTracker = AccessTracker()
 
-    let private withPathArg (args: obj) (record: string -> unit) : unit =
-        match pathArg args with
-        | Some p -> record p
-        | None -> ()
-
-    let private moveEndpoints (args: obj) : (string * string) option =
-        match args?source |> text, args?destination |> text with
-        | Some s, Some d -> Some(s, d)
-        | _ -> None
-
-    let private recordMoveIfCommitted (tracker: AccessTracker) (args: obj) (committed: bool) : unit =
-        if committed then
-            moveEndpoints args |> Option.iter (fun (s, d) -> tracker.RecordMove(s, d))
-
+    /// Tool results → paths (committed create/rewrite/delete/move only) is
+    /// wanxiangli/casebook-access `toolPaths`.
     let recordSubstantiveAccess (tracker: AccessTracker) (toolName: string) (args: obj) (committed: bool) : unit =
-        match toolName with
-        | "create"
-        | "rewrite"
-        | "delete" -> withPathArg args (fun p -> tracker.RecordAttemptedMutation(p, committed))
-        | "move" -> recordMoveIfCommitted tracker args committed
-        | _ -> ()
-
-    let private addPath (paths: HashSet<string>) (p: string) : unit =
-        if not (String.IsNullOrWhiteSpace p) then
-            paths.Add p |> ignore
+        for path in unbox<string array> (CasebookAccessLawInstance.law?toolPaths (string toolName, args, committed)) do
+            tracker.RecordAttemptedMutation(path, true)
 
     let mergeFissionSubstantiveAccess (preFission: string list) (laneAccesses: string list list) : string list =
-        let allPaths = HashSet<string>()
-
-        for p in Seq.append preFission (laneAccesses |> Seq.collect id) do
-            addPath allPaths p
-
-        allPaths |> Seq.toList |> List.sort
+        unbox<string array> (
+            CasebookAccessLawInstance.law?relatedPaths (Seq.append preFission (Seq.concat laneAccesses) |> Seq.toArray)
+        )
+        |> Array.toList
 
     let caseIdentityForInvocation (sessionId: string) (invocationId: string) : string =
         sprintf "%s:%s" sessionId invocationId
