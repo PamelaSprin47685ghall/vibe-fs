@@ -151,3 +151,136 @@
 - 并行会话在同一工作树施工时，每次写前必须重新 cat/where；本会话多次 FILE_CHANGED 与拼接伤都源于对陈旧快照续写。
 - park 现场必须当场 unpark/abandon 闭环（park-1/park-2 均已闭环），否则交付被泄漏兜底门禁拦截。
 - 验证结论必须绑定代码状态：并行改动落地后，先前绿轮不再作数，最终构建+测试必须重跑。
+
+---
+
+# 八、接棒状态与剩余任务（2026-10-20 停电前盘点）
+
+本节是**续接入口**。上文一到七节是当初的施工书；本节记录**已落地的部分**、**当前红/未验的部分**、**明确未做完的剩余任务**，以及**续接命令**。
+
+## 八·一 基准与工作树现状
+
+- 基准提交（原任务书所写）：`60812f575`。**当前 HEAD**：`df7846ab8 refactor: move delegation onto the programming surface and retire the devops tool`（由飞行中的一个 agent 在中途提交并推送，含委派迁移主体）。
+- HEAD 之后**未提交**：受跟踪改动 **104** 个文件（`src/` 49、`requirements/` 35、`resources/` 20），新增未跟踪 **8** 个文件（见八·四）。
+- **工作树里有第二个会话在同时施工**（做 `task.md` 的 deliver 语义）。它的产物 `debug/`（会话转储）与 `task.md`（它的任务书）**不属于本任务**，提交时**不要**带上。它在 19:41 留下过 `Description.fs` 的半成品（`deriveNameFromCharge` 重复定义 + `runtimeFileMethods` 的 `namespace` 保留字参数），本轮已修好：`runtimeFileMethods (capabilities) (memberNamespace) (guardOf)`，普通面走 `this._api` 无守卫，ReviewOnly 面走 `this._api.reviewOnly` + `REVIEW_ONLY` 守卫。
+
+## 八·二 已落地（按层）
+
+### 委派接口迁移（任务书A §一—§三）
+
+| 层 | 落点 | 状态 |
+|---|---|---|
+| 委派入口 | `Js/DelegationBridge.fs`/`.fsi`：`Fork: obj -> Task<obj>` → `Delegate: string -> obj -> obj -> Task<obj>`（name, payload, reportMapping） | ✅ |
+| 成员工厂 | `Js/ToolsBindings.fs`：`makeDelegateMember` 统一生成 `fork`/`resume`/`commission`/`devops`（各带 reportMapping）；`advisor` 强制 reportMapping | ✅ |
+| 宿主闭包 | `OpenCode/Tools/ToolRegistry.fs`：`Delegate` 按 name 分派（fork/commission → `ForkTool.executeReceipt`；resume → `executeResumeReceipt`；devops → `devopsDelegateOf` + `PlanTools.executeAsk`；未知 → `unknown-delegate`）；报告材料来自 `AnchorSurface.reportMaterial` | ✅ |
+| 退役 host 注册 | `staticAdmissions` 与 `baseSpecs` 不再含 fork/resume/commission/devops；`devopsTool` 整体删除 | ✅ |
+| 运行时基类 | `Js/Description.fs`：`fork/resume/commission/devops/advisor` 双参、`dag(spec, reportMapping)` 一份映射发所有节点、`deliver(reportMapping)` → `{prefixUntil:0, thenMap:reportMapping}` | ✅ |
+| 公开基类 | `Description.fs` + `ToolHost.fs`：新增 `baseClassResume`/`baseClassCommission`/`baseClassDevOps` 三槽位 | ✅ |
+| 资源 | `base-class`/`base-class-fork`/`base-class-advisor`/`base-class-lifecycle`/`deliver`/`delegation-rules` 改写；新建 `base-class-resume`/`base-class-commission`/`base-class-devops`（均双语）；`js-plan` 改述 | ✅ |
+| 能力 | `Js/Capability.fs` 的 `Resume`/`Commission`/`DevOps` 投影；`GeneratorSurface.fs` 标签；`RuntimeSurface.fs` 的 `capabilityOfLabel` | ✅ |
+
+### 迁移过程中发现并修掉的**真实缺陷**（不是文字对齐）
+
+1. **跨 realm 载荷被丢弃**（致命）：JS 程序在 `node:vm` 沙箱 realm 运行，其对象原型不是宿主 realm 的 `Object.prototype`，而 `ToolHostCodec` 的 plain-record 判定按 realm 比较 → 委派载荷字段全丢，所有 `this.fork(...)` 恒返回 `name-required`。修法：在委派接缝归一（`ToolRegistry.fs` 的 `plainRecordCopy` + `payloadWithRecord`），`fork`/`commission`/`resume`/`devops`/`fission` 全覆盖。修后实测：`this.fork({calling:'devops',name:'Op',charge:'x'},{1:null})` → `calling-conflict`；`name:'devops'` → `assessment-pending-for-devops`；`name:'Op'` → `ok=true, outcome="created"`。
+2. **fork 结构化路径丢了 DevOps 评审门的拒绝特异性**：原先一律报 `placement-failed`。现与 resume 共用一套 `refusalCode` 映射（`assessment-pending-for-devops` / `dispatch-closed` / `name-required` / `calling-conflict` / `unknown-calling` …）。
+3. **Manager 生成面丢了 ultraExample**：`ultraExample` 的 manager 能力子集缺 `Resume` → Manager 的示例消失（025 的 J01 红）。已补。
+4. **失败调用抹掉先前合法交付**：`ToolWorkflow.fs` 的 `JsDeliveredValues.clear sessionId` 改为 `clearOwnDelivery`（只清围栏正好等于本次调用者）。
+5. **失败程序留下可呈现的视图声明**：顶层参数改为**结算成功后**才提交（`ToolHost.fs`）。
+6. **交付格收紧为两级**：带围栏 cell = 交付证据；无围栏 cell = 渲染缓存；`restoreMaterial`（任意成品字符串入口）已删除。
+7. **见证读取因「同 (session, run) 多条」而丢证据**：`TaskDelivery.tryFind` 改为 `tryFindByFence` / `tryFindByFenceFields` 围栏感知读取；三处调用方（`DelegationJournalAdapter` / `Fission/Host` / `ChildRecoveryWorkflow`）已切。
+8. **见证生产者为零**：`TaskDeliveryJournal.commit` 原本**全仓零调用方**。现由 `ToolRegistry.settlementOf` 装配归属、`OpenCode/Host/DeliveryWitnessWriter.fs`（新 shard `Wanxiangshu.Owner.host-boundary.opencode-host-deliverywitnesswriter`）唯一实现写入器、`ToolWorkflow.settleDeliveredView` 在提交成功后才写交付格。
+9. **交付停止位置错**：原先在 deliver 工具内部 + event 钩子物理中断（user-facing 会话上必被 `MANAGED-SESSION-016` 拒绝）。现改为 **transform 钩子**的 `delivery-adjudication` stage：抑制下一次 provider step + 清空消息 + 中断本次 attempt；「已发出」与「已观察到」分别取证。
+10. **SyncDelegate 把「完成但未交付」判成失败**：改为与 fork 侧一致的**未解除义务**（父方可重派）。
+
+### 测试与文档
+
+- 新增：`requirements/repository-programming/tests/063.test.mjs`（顶层扁平参数 + `view` 拒绝）、`064.test.mjs`（另一会话产物）、`requirements/context-compression/tests/032.test.mjs`（reportMaterial 纯投影）、`requirements/intra-participant-parallelism/tests/018.test.mjs`（fission 上下文继承）、`requirements/semantic-trace/tests/013.test.mjs`、`requirements/effect-accounting/tests/013.test.mjs`。
+- 迁移：`repository-programming/056`（委派成员带 reportMapping + 两条拒绝用例）、`advisor/006`、`capability-enforcement/009/024/025/026`（从退役 host 工具迁到编程面成员）、`support/manager-programming.mjs`（J01 能力集含 Resume、api 绑定键含 resume、J13 拒绝用例）、`work/030`/`031`、`delegation/027`。
+- 交付形态迁移：`repository-programming/030/054/059/060`、`e2e/scenarios/long-stroke.toml`、`context-compression/031`（改扁平参数 + 新增「失败不提交声明」用例）。
+- WHAT：`delegation`、`advisor`、`context-compression`（+新条款 032）、`repository-programming`、`work`（[011][021][024][026][028][030][032]）、`intra-participant-parallelism`（新条款 018）、`managed-session-lifecycle`（[016]）、`semantic-trace`（新条款 013）、`effect-accounting`（新条款 013）、`GAP.md`、`INDEX.md`（条款计数同步）。
+
+## 八·三 当前验证状态（**结论绑定于此刻的代码**）
+
+- **全量 build 尚未重跑**。上一次全量 build 是红的，5 个文件破损（`ToolRuntimeScope.fs`、`ToolWorkflow.fs` 的 `.fsi`、`PluginTransformSurface.fs`、`OrdinaryTurnWorkflow.fs`、`Fork/Host/RunLifecycle.fsi`）—— 已由 5 个 repair agent 分别用 `node scripts/compile-owner.mjs <shard>.fsproj` 验证**各自 shard 编译通过**。**全量绿是下一步第一件事**。
+- 委派迁移期实测：`node --test requirements/capability-enforcement/tests/{002,006,009,010,011,024,025,026}.test.mjs` → **110 tests / 100 pass / 0 fail / 10 skipped**（10 条是未开 integration tier 的）。
+- **未跑**：`npm run check`（全门禁）、fantomas 格式化、目标套件全量、integration tier。
+- **既有红（非本任务造成，基线已存在）**：
+  - `requirements/delegation/tests/026.test.mjs` —— 在**迁移前**的提交 `842a144af` 上以同样方式挂死（`Promise resolution is still pending but the event loop has already resolved`）。已用独立 worktree 实测确认，**不是**本次迁移造成的。
+  - `requirements/capability-enforcement/tests/006.test.mjs` 的两条 Pair Hint 断言 —— 自 `60f0802fd`（锚点头标记改变字节偏移）起恒红；本轮已改成语义断言（不钉死字节偏移），整文件 16/16 绿。
+
+## 八·四 未提交的新增文件
+
+```
+src/Wanxiangshu/OpenCode/Host/DeliveryWitnessWriter.fs        （新）
+src/Wanxiangshu/OpenCode/Host/DeliveryWitnessWriter.fsi       （新）
+src/Wanxiangshu/Wanxiangshu.Owner.host-boundary.opencode-host-deliverywitnesswriter.fsproj （新）
+requirements/repository-programming/tests/064.test.mjs        （另一会话产物，需其属主确认）
+requirements/context-compression/tests/032.test.mjs           （本轮）
+requirements/intra-participant-parallelism/tests/018.test.mjs （本轮）
+requirements/semantic-trace/tests/013.test.mjs                （本轮）
+requirements/effect-accounting/tests/013.test.mjs             （本轮）
+```
+另有 `src/Wanxiangshu/compile-order.txt` 登记了 `OpenCode/Host/DeliveryWitnessWriter.fsi`/`.fs`（新 shard 的全序位置）。
+
+**不属于本任务、提交时不要带上**：`debug/`（另一会话的会话转储）、`task.md`（另一会话的任务书）。
+
+## 八·五 剩余任务（按顺序做）
+
+### R1 编译绿（第一件事）
+1. 等飞行中的两个 agent 落地：`PlanDeliverReceiptShape`（`Mission/Planning/PlanTools.fs` 交付回执形状）、`FixPluginTransformSurface`（`OpenCode/Host/PluginTransformSurface.fs` 补 `AdjudicateDelivery` 能力桩）。
+2. `node scripts/build.mjs` → 必须 `build ok`。若仍红：按错误所在 shard 用 `node scripts/compile-owner.mjs <shard>.fsproj` 定位（这是定向编译检查，不是项目门禁）。
+
+### R2 格式化
+`dotnet tool run fantomas src/Wanxiangshu` —— 本轮触碰的 .fs/.fsi 很多（49 个 src 文件），**在阶段末统一跑一次**，不要让 agent 各跑。
+
+### R3 目标测试全绿
+```
+node --test requirements/capability-enforcement/tests/*.test.mjs
+node --test requirements/repository-programming/tests/*.test.mjs
+node --test requirements/advisor/tests/*.test.mjs
+node --test requirements/delegation/tests/{019,021,024,027}.test.mjs   # 026 是既有红
+node --test requirements/work/tests/*.test.mjs
+node --test requirements/context-compression/tests/*.test.mjs
+node --test requirements/semantic-trace/tests/013.test.mjs
+node --test requirements/effect-accounting/tests/013.test.mjs
+node --test requirements/intra-participant-parallelism/tests/018.test.mjs
+WXS_TIER_INTEGRATION=1 node --test requirements/capability-enforcement/tests/025.test.mjs
+```
+
+### R4 全门禁
+`npm run check`（含 architecture / subsystems / language-parity / ablation-manifest / tool-referential-integrity / js-surface-manifest / clean-break-symbols 等）。注意两个新风险点：
+- **新跨子系统边** `host → application-composition`（`repository-programming-js-toolbindings` → `opencode-tools-toolruntimescope`，为 `DeliveryAttemptLedger`）—— 使最大 SCC 由 10 升到 16。`scripts/checks/subsystems.mjs` 只报不失败，但**层向需要复核**。
+- `resources/ablation/tool-map.json` 与 `StaticTools.knownToolNames` 必须保持**双射**（`scripts/checks/ablation-manifest.mjs`：`tool-unmapped` / `tool-stale`）。
+
+### R5 提交并推送
+只提交**本任务与已合流**的文件；**排除** `debug/` 与 `task.md`。分两次提交更安全：先「委派接口迁移与交付语义改造」（src + resources + requirements），再「任务书与索引同步」。
+
+### R6 已识别、尚未做完的遗留（**不要**当成已完成）
+
+| # | 遗留 | 位置 | 影响 |
+|---|---|---|---|
+| a | **Plan 路径没有 settlement** | `ToolRegistry.fs` 的 `runPlanProgram` → `JsToolWorkflow.execute`（无围栏归属） | Plan 的 `this.deliver` **不产生** durable 见证；Plan 侧只有进程内交付格 |
+| b | **post-S3 交付未登记「已成立」** | `ToolRegistry.fs` 的 `deliverPostS3`（S1/S2/S3 → `PlanTools.startPostS3Execution`）不调登记；只有 `deliverCursor` 调 | 该 post-S3 交付**不会**被 transform 停住（旧代码也没中断过它，非回归，但新契约下应登记） |
+| c | **`office-capability/WHAT.md` [021] 措辞** | 仍写「Plan 的工作工具权限集为 todowrite-for-plan、devops、review、deliver」 | 与「devops 已从宿主注册工具退役」的口径需统一（权限集本身仍含 `DevOpsConsultation`，不矛盾，但措辞易误读） |
+| d | **测试 README 缺条目** | `requirements/semantic-trace/tests/README.md`、`requirements/effect-accounting/tests/README.md` 缺 013 | 证据页未登记（README 约定是「说明当前证据，不增加合同」） |
+| e | **durable 读只判「本 session 有任一见证」** | `ToolRuntimeScope.fs` 的 `hasDurableEstablished` | 粗判；精确围栏判定在 `tryFindDurableEstablished` |
+| f | **交付回执形状刚落地未验证** | `Mission/Planning/PlanTools.fs` 的 Relayed/Delivered 说明 + `NextIncumbencyId` 真实填充 | 条款 5 的「原因/尚欠/下一步」是否真的到模型眼前，**未跑过测试** |
+| g | **新 shard 的层向** | `opencode-host-deliverywitnesswriter` | 见 R4 |
+
+## 八·六 续接命令
+
+```bash
+node scripts/build.mjs                                   # 全量 Fable 编译
+node scripts/compile-owner.mjs <shard>.fsproj              # 定向编译某个 shard
+node --test requirements/<包>/tests/<NNN>.test.mjs          # 单条用例
+WXS_TIER_INTEGRATION=1 node --test requirements/host-boundary/tests/032.test.mjs   # integration canary
+npm run check                                            # 全门禁
+dotnet tool run fantomas src/Wanxiangshu                 # 格式化（阶段末一次）
+```
+
+## 八·七 纪律提醒（承接上文六节）
+
+- 同一工作树有**第二个会话**在施工：每次写前必须重新读文件；`git status` 里的改动**未必**都是本任务的。
+- 验证结论绑定代码状态：并行改动落地后，先前绿轮不作数，**最终 build + 测试必须重跑**。
+- 提交前确认没有残留临时文件、调试打印、未跟踪生成物（`debug/` 是另一会话的，别带）。
+- park 现场必须当场 unpark/abandon 闭环。
