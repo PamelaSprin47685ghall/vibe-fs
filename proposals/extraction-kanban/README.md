@@ -209,6 +209,8 @@ env -u TESTS_MJS_FILES -u WXS_ACCEPT_TODO node requirements/verification-system/
 node scripts/verify-package.mjs
 ```
 
+单卡的窄验证入口用现有 supervisor，不另写 runner（[CUT-32](cards/CUT-32.md)）：`TESTS_MJS_FILES=<逗号分隔的本卡用例> node requirements/verification-system/tests/run.mjs`。它先做构建新鲜度门禁（dist 落后于源码即拒跑），只跑列出的文件但仍核对每个计划文件排空、权威计数、子进程组回收，cancel/skip/TODO 不计通过，并在 stderr 公告范围被收窄。裸 `node --test` 只适合补充逐用例 verdict 列表做 base/candidate 对照，不单独作为验收结论。
+
 路径和用例集合按卡替换；不存在的模块不运行示例命令来凑证据。全量验证由集成者负责，避免多人在同机反复竞争完整编译与物理套件。真实 Host canary、平台测试及 release 另按原入口准备环境，不假造凭据、不用模拟服务替代它们。
 
 每份证据保留两仓 commit、dirty 状态、Node/npm/Bun/Host 版本、输入指纹、命令、退出码、pass/fail/skip/TODO/cancel/container counts、计划文件与完成文件数、产物摘要、原始日志位置。先跟踪候选新增文件再生成最终指纹：本仓 Git 跟踪的文档会进入 loop detector 语料，新增跟踪文件后旧 manifest 可能失效。不要为了指纹通过手改 manifest。
