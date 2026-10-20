@@ -3,6 +3,8 @@ namespace Wanxiangshu.Execution.Session.Attachment
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open FsToolkit.ErrorHandling
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Foundation
@@ -75,46 +77,91 @@ module AttachmentLeaseCore =
     let leaseKey (owner: SessionId) (kind: AttachmentKind) =
         SessionId.value owner + "\u001f" + kindKey kind
 
-    /// A restored child is trusted only when it matches the kind's parameters
-    /// exactly. Partial matches are ambiguity, not reuse.
-    let private exact (spec: Spec) (child: Child) =
-        child.Agent = Some spec.Agent && child.Title = Some spec.Title
+    /// CUT-12 sub-loop 3: which child the kind's lease uses (reuse / conflict /
+    /// replacement / ambiguity / create) and whether a fresh child is aborted on a
+    /// failed close or link have one owner, wanxiangli/attachment-lease. This module
+    /// lists the children, performs the operations and maps the verdict back.
+    [<Import("AttachmentLeaseLaw", "wanxiangli/attachment-lease")>]
+    let private lawClass: obj = jsNative
 
-    /// Resolve which child this kind should use. Never guesses: an exact match is
-    /// reused, an explicit restore hint that is absent yields a Replacement (the
-    /// caller closes the vanished association), and everything else creates.
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
+
+    let private law: obj = construct lawClass
+
+    let private optionalText (value: string option) : obj =
+        match value with
+        | Some text -> box text
+        | None -> null
+
+    let private originName (origin: Origin) =
+        match origin with
+        | Created -> "Created"
+        | Reused -> "Reused"
+        | Replacement -> "Replacement"
+
+    /// Resolve which child this kind should use. Never guesses: the library decides,
+    /// this side creates the child a `create` verdict asks for.
     let private resolve
         (operations: Operations)
         (owner: SessionId)
         (spec: Spec)
         (children: Child list)
-        : Task<Result<Lease, string>> =
+        : Task<Result<Lease * bool, string>> =
         let ownerText = SessionId.value owner
 
-        let create origin =
+        let create origin closeReplacedBeforeLink =
             task {
                 match! operations.CreateChild ownerText spec.Agent spec.Directory with
                 | Ok child ->
                     return
-                        Ok
+                        Ok(
                             { SessionId = child
                               Origin = origin
-                              Agent = spec.Agent }
+                              Agent = spec.Agent },
+                            closeReplacedBeforeLink
+                        )
                 | Error error -> return Error error
             }
 
-        /// The children the hint's durable association points at: exactly one is the
-        /// reused child, none authorizes a Replacement, more is ambiguity.
-        let resolveHint (hash: string) (children: Child list) : Task<Result<Lease, string>> =
-            match children |> List.filter (fun child -> child.SessionId = hash) with
-            | [ child ] when exact spec child ->
-                Task.FromResult(
-                    Ok
-                        { SessionId = child.SessionId
-                          Origin = Reused
-                          Agent = spec.Agent }
+        let verdict: obj =
+            law?resolve (
+                createObj
+                    [ "restoreHint" ==> optionalText spec.RestoreHint
+                      "agent" ==> spec.Agent
+                      "title" ==> spec.Title
+                      "children"
+                      ==> (children
+                           |> List.map (fun child ->
+                               createObj
+                                   [ "sessionId" ==> child.SessionId
+                                     "agent" ==> optionalText child.Agent
+                                     "title" ==> optionalText child.Title ])
+                           |> List.toArray) ]
+            )
+
+        match unbox<string> verdict?verdict with
+        | "reuse" ->
+            Task.FromResult(
+                Ok(
+                    { SessionId = unbox<string> verdict?child
+                      Origin = Reused
+                      Agent = spec.Agent },
+                    false
                 )
-            | [ _ ] ->
+            )
+        | "create" ->
+            let closeFirst = unbox<bool> verdict?closeReplacedBeforeLink
+
+            match unbox<string> verdict?origin with
+            | "Created" -> create Created closeFirst
+            | "Replacement" -> create Replacement closeFirst
+            | other -> invalidOp ("wanxiangli/attachment-lease returned an unknown origin: " + other)
+        | "reject" ->
+            let hash = unbox<string> verdict?child
+
+            match unbox<string> verdict?rejection with
+            | "Conflicting" ->
                 Task.FromResult(
                     Error(
                         sprintf
@@ -124,33 +171,21 @@ module AttachmentLeaseCore =
                             hash
                     )
                 )
-            | [] -> create Replacement
-            | _ ->
+            | "Ambiguous" ->
                 Task.FromResult(
                     Error(
                         sprintf "Ambiguous %s recovery for %s: duplicate child id %s" (kindKey spec.Kind) ownerText hash
                     )
                 )
-
-        match spec.RestoreHint with
-        // No durable association: `RestoreHint` is the caller's durable state, so its
-        // absence is "this kind has no linked child". Recovery never adopts an
-        // unassociated child merely because it looks identical
-        // (managed-session-lifecycle [003]: 不收养无关联会话) — a duplicate-shaped child
-        // is not this kind's association.
-        | None -> create Created
-        | Some hint -> resolveHint hint children
+            | other -> invalidOp ("wanxiangli/attachment-lease returned an unknown rejection: " + other)
+        | other -> invalidOp ("wanxiangli/attachment-lease returned an unknown verdict: " + other)
 
     /// A lease that was created or replaced must not survive a failed link: the
-    /// caller's durable association is what makes a child real, so a link failure
-    /// aborts the fresh child instead of leaving an unowned one behind. A reused
-    /// lease is never aborted — it was already real.
+    /// caller's durable association is what makes a child real. Which origins are
+    /// fresh is the library's answer.
     let private abortFresh (operations: Operations) (lease: Lease) =
         task {
-            match lease.Origin with
-            | Reused -> ()
-            | Created
-            | Replacement ->
+            if unbox<bool> (law?abortOnFailure (originName lease.Origin)) then
                 let! _ = operations.AbortChild lease.SessionId
                 ()
         }
@@ -169,16 +204,16 @@ module AttachmentLeaseCore =
         taskResult {
             // A replacement is a real transition, not a repoint: close the vanished
             // association before establishing the new one.
-            let closeReplaced (lease: Lease) =
-                match lease.Origin, spec.RestoreHint with
-                | Replacement, Some _ ->
+            let closeReplaced (lease: Lease) closeFirst =
+                if closeFirst then
                     operations.Close(SessionId.value owner)
                     |> keepFreshOnlyOnSuccess operations lease
-                | _ -> Task.FromResult(Ok())
+                else
+                    Task.FromResult(Ok())
 
             let! children = operations.ListChildren(SessionId.value owner)
-            let! lease = resolve operations owner spec children
-            do! closeReplaced lease
+            let! lease, closeFirst = resolve operations owner spec children
+            do! closeReplaced lease closeFirst
 
             do!
                 operations.Link (SessionId.value owner) lease.SessionId spec.Agent
