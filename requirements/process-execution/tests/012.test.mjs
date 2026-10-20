@@ -24,7 +24,7 @@ test('WHAT[process-execution-012] request vocabulary is compiled separately from
 
 const { integrationTest } = await import('../../verification-system/tests/support/tier-gate.mjs')
 
-integrationTest('WHAT[process-execution-012] an isolated Fable consumer uses request and PTY contracts but cannot reach physical adapters', async () => {
+integrationTest('WHAT[process-execution-012] an isolated Fable consumer uses request and PTY contracts but cannot reach physical adapters', async (t) => {
   const { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
   const { compileOwnerProject, planOwnerCompile } = await import('../../../scripts/lib/owner-compile.mjs')
@@ -48,7 +48,8 @@ integrationTest('WHAT[process-execution-012] an isolated Fable consumer uses req
     return compileOwnerProject({ projectPath: selected.projectPath, scratchRoot: directory, stdio: 'pipe', compilePlan: { ...selected, compileItems: [...items, probe] } })
   }
   try {
-    const positive = await compile('legal', `module ContractConsumer
+    await t.test('WHAT[process-execution-012] the public request contract compiles for a legal consumer', async () => {
+      const positive = await compile('legal', `module ContractConsumer
 open System
 open System.Threading
 open System.Threading.Tasks
@@ -59,36 +60,45 @@ let context = { WorkingDirectory = None; HardLimit = TimeSpan.FromSeconds 1.0 }
 let execute (run: RunProcess) = run request estimate context CancellationToken.None
 let terminal = PtyCommand.Signal PtySignal.Interrupt
 `)
-    assert.equal(positive.ok, true, String(positive.stdout) + String(positive.stderr))
+      assert.equal(positive.ok, true, String(positive.stdout) + String(positive.stderr))
+    })
     for (const [name, expression] of [
       ['spawn', 'NodeProcessHost.spawn'], ['runner', 'ProcessRunner.run'],
       ['session', 'PtySession.create "id" null'], ['spool', 'Spool.delete "path"'],
       ['read-plan', 'ReadPlan.ClosedImmediate'],
       ['js-call-loop', 'JsCallLoop.execute'],
     ]) {
-      const negative = await compile(name, `module IllegalConsumer\nopen Wanxiangshu.Process\nlet leaked = ${expression}\n`)
-      assert.equal(negative.ok, false, `${name} must not be reachable through the pure contract closure`)
-      assert.match(String(negative.stdout) + String(negative.stderr), /not defined|FS0039/)
+      await t.test(`WHAT[process-execution-012] the request contract rejects ${name}`, async () => {
+        const negative = await compile(name, `module IllegalConsumer\nopen Wanxiangshu.Process\nlet leaked = ${expression}\n`)
+        assert.equal(negative.ok, false, `${name} must not be reachable through the pure contract closure`)
+        assert.match(String(negative.stdout) + String(negative.stderr), /not defined|FS0039/)
+      })
     }
     for (const [name, body] of [
       ['unknown-is-not-end', 'let invalid: ProgramEnd = EndEvidence.Unconfirmed'],
       ['signal-is-not-code', 'let invalid: int = ProgramEnd.Signaled "SIGTERM"'],
     ]) {
-      const negative = await compile(name, `module IllegalEvidence\nopen Wanxiangshu.Process\n${body}\n`)
-      assert.equal(negative.ok, false)
-      assert.match(String(negative.stdout) + String(negative.stderr), /expected to have type|type.*does not match|FS0001/s)
+      await t.test(`WHAT[process-execution-012] the request contract rejects ${name}`, async () => {
+        const negative = await compile(name, `module IllegalEvidence\nopen Wanxiangshu.Process\n${body}\n`)
+        assert.equal(negative.ok, false)
+        assert.match(String(negative.stdout) + String(negative.stderr), /expected to have type|type.*does not match|FS0001/s)
+      })
     }
     const pty = planOwnerCompile({ projectPath: path.join(source, 'Wanxiangshu.Owner.delegation.delegation-pty-port.fsproj') })
     assert.equal(pty.compileItems.some(file => /Process\/(?:Pty|PtyBackend|PtySession)\.fs$/.test(file)), false)
-    const ptyConsumer = await compile('pty-consumer', `module PtyConsumer
+    await t.test('WHAT[process-execution-012] the public PTY contract compiles for its consumer', async () => {
+      const ptyConsumer = await compile('pty-consumer', `module PtyConsumer
 open Wanxiangshu.Execution.Delegation
 let lookup (capability: DelegationPtyCapability) name = capability.TryPtyByName name
 let openTerminal (capability: DelegationPtyCapability) command agent = capability.ForkPty(command, agent, None)
 `, pty)
-    assert.equal(ptyConsumer.ok, true, String(ptyConsumer.stdout) + String(ptyConsumer.stderr))
-    const physicalPty = await compile('pty-physical', 'module IllegalPty\nopen Wanxiangshu.Process\nlet leaked = PtyBackend.createPort ()\n', pty)
-    assert.equal(physicalPty.ok, false, 'the real PTY consumer contract must not import its physical adapter')
-    assert.match(String(physicalPty.stdout) + String(physicalPty.stderr), /not defined|FS0039/)
+      assert.equal(ptyConsumer.ok, true, String(ptyConsumer.stdout) + String(ptyConsumer.stderr))
+    })
+    await t.test('WHAT[process-execution-012] the PTY contract rejects its physical adapter', async () => {
+      const physicalPty = await compile('pty-physical', 'module IllegalPty\nopen Wanxiangshu.Process\nlet leaked = PtyBackend.createPort ()\n', pty)
+      assert.equal(physicalPty.ok, false, 'the real PTY consumer contract must not import its physical adapter')
+      assert.match(String(physicalPty.stdout) + String(physicalPty.stderr), /not defined|FS0039/)
+    })
   } finally {
     rmSync(scratch, { recursive: true, force: true })
   }

@@ -408,23 +408,27 @@ integrationTest('WHAT[durable-events-022] each actual bounded locality compiles 
         compilePlan: plan,
       })
 
-      const hostPositive = await compileIsolated(hostAdapterPositive)
-      assert.equal(
-        hostPositive.ok,
-        true,
-        'probe compiles in the host workspace-event-store closure (symbol and usage are valid): '
-          + String(hostPositive.stdout ?? '').slice(-400),
-      )
+      await t.test('WHAT[durable-events-022] the Host adapter probe compiles in its owner closure', async () => {
+        const hostPositive = await compileIsolated(hostAdapterPositive)
+        assert.equal(
+          hostPositive.ok,
+          true,
+          'probe compiles in the host workspace-event-store closure (symbol and usage are valid): '
+            + String(hostPositive.stdout ?? '').slice(-400),
+        )
+      })
 
-      const hostNegative = await compileIsolated(hostAdapterNegative)
-      assert.equal(
-        hostNegative.ok,
-        false,
-        'the host-adapter probe must fail in the eventstore-model-contract closure',
-      )
-      const hostOutput = String(hostNegative.stdout ?? '') + String(hostNegative.stderr ?? '')
-      assert.match(hostOutput, /OpenCode|WorkspaceEventStore/, 'the diagnostic names the host adapter namespace or module')
-      assert.match(hostOutput, /is not defined/, 'the diagnostic is a not-defined rejection, not a syntax or toolchain error')
+      await t.test('WHAT[durable-events-022] the model contract rejects the same Host adapter probe', async () => {
+        const hostNegative = await compileIsolated(hostAdapterNegative)
+        assert.equal(
+          hostNegative.ok,
+          false,
+          'the host-adapter probe must fail in the eventstore-model-contract closure',
+        )
+        const hostOutput = String(hostNegative.stdout ?? '') + String(hostNegative.stderr ?? '')
+        assert.match(hostOutput, /OpenCode|WorkspaceEventStore/, 'the diagnostic names the host adapter namespace or module')
+        assert.match(hostOutput, /is not defined/, 'the diagnostic is a not-defined rejection, not a syntax or toolchain error')
+      })
 
       // Isolation evidence: the real owner sources were never touched.
       const after = [digestOf(realStoreTypes), digestOf(realModel), digestOf(realHostAdapter)]

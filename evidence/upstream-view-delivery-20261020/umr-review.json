@@ -3,7 +3,7 @@
   "startedAt": "2026-10-21",
   "sourceBase": "0831239737c56a6eb36b96b663ffa46e0cafdfdd",
   "upstreamTarget": "11052493bedb4edbcbe0c341fa677afd44c486f1",
-  "observedPrBase": "08a350dc52ee4a9f04b6e84679139018aa39ee91",
+  "observedPrBase": "981008460c4518d9fca2f38054dc083e161a75db",
   "fixedCandidatePreserved": true,
   "checks": {
     "static": {
@@ -216,7 +216,7 @@
     "currentStatic": {
       "status": "passed",
       "exit": 0,
-      "log": "umr-review-static-17.log"
+      "log": "umr-review-static-18.log"
     },
     "currentFormat": {
       "status": "passed",
@@ -226,8 +226,8 @@
     "currentBuild": {
       "status": "passed",
       "exit": 0,
-      "generation": 92,
-      "log": "umr-review-build-29.log"
+      "generation": 93,
+      "log": "umr-review-build-30.log"
     },
     "integrationInitial": {
       "generation": 75,
@@ -489,8 +489,8 @@
       "log": "umr-review-ci-f042-failed.log"
     },
     "githubCi": {
-      "state": "AWAITING_PUSH_OF_COMPILER_CASE_FIX",
-      "note": "Every affected compile assertion passed through the unchanged formal supervisor. The next complete Ubuntu run will determine full pipeline acceptance."
+      "state": "AWAITING_PUSH_OF_REMAINING_COMPILER_CASES",
+      "note": "The eleven test files that reference compileOwnerProject were inspected. The three changed files and dispatch boundary control passed 116 assertions under the original formal supervisor and CI file concurrency. Full Ubuntu acceptance remains pending."
     },
     "githubCiBeforeStepFix": {
       "state": "completed",
@@ -571,6 +571,48 @@
       "silenceMs": 185000,
       "wallSeconds": 213.56,
       "log": "umr-review-compile-cases-formal.log"
+    },
+    "githubCiBeforeRemainingCompileCases": {
+      "state": "completed",
+      "sourceCommit": "aa8a5ab1a9d709250a2895682aee08c7c7639fc4",
+      "runId": 39493535460,
+      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39493535460",
+      "conclusion": "failure",
+      "unit": {
+        "passed": 4379,
+        "failed": 0,
+        "skipped": 194,
+        "todo": 277,
+        "plannedFiles": 756,
+        "drainedFiles": 756,
+        "wallSeconds": 322.15
+      },
+      "integration": {
+        "status": "truncated",
+        "plannedFiles": 40,
+        "drainedFiles": 36,
+        "verdictCountsAvailable": false,
+        "groupsPassed": 2,
+        "groupsFailed": 1,
+        "wallSeconds": 452.8,
+        "failure": "The process-execution-012 case performed eleven compiler probes without an intermediate assertion verdict and reached the unchanged 185000 ms per-file deadline. The structured-workflow boundary case concurrently spawned nine Fable processes in addition to the file-level concurrency.",
+        "reclamationAccepted": false,
+        "reclamationDiagnostic": "Two residual processes in the inner runner group were observed and reclaimed; the failed run remained rejected."
+      },
+      "log": "umr-review-ci-aa8a-failed.log"
+    },
+    "remainingCompileCasesFinal": {
+      "status": "passed",
+      "generation": 93,
+      "passed": 116,
+      "failed": 0,
+      "plannedFiles": 4,
+      "drainedFiles": 4,
+      "reclamationAccepted": true,
+      "fileConcurrency": 4,
+      "silenceMs": 185000,
+      "wallSeconds": 220.57,
+      "log": "umr-review-compile-cases-final.log"
     }
   },
   "resolved": [
@@ -653,6 +695,10 @@
     {
       "id": "COMPILE-PROOF-GRANULARITY",
       "change": "Expose each independently asserted closure compile and each owner/fold probe pair as a real awaited node:test subtest, retaining every assertion and the existing file silence deadline."
+    },
+    {
+      "id": "COMPILER-FAN-OUT",
+      "change": "Expose all process contract probes and Host boundary probes as awaited assertion cases. Run the nine independent source-visibility compilers sequentially within their file, retaining file-level concurrency and all original checks."
     }
   ],
   "remaining": [
@@ -668,14 +714,22 @@
       "id": "UPSTREAM-CONFLICT",
       "priority": "P1",
       "impact": "The PR cannot merge directly into the newly advanced upstream master.",
-      "commitsAfterFixedTarget": 75,
-      "conflictedPaths": 72,
-      "action": "Keep this fixed candidate as a Draft PR. A later batch must reconcile the 75 subsequent upstream commits.",
+      "commitsAfterFixedTarget": 105,
+      "conflictedPaths": 88,
+      "action": "Keep this fixed candidate as a Draft PR. A later batch must reconcile the 105 subsequent upstream commits observed at this snapshot.",
       "previousTrial": {
         "base": "f7d112dad75007f9ec2af754b95a8c264c359287",
         "conflictedPaths": 56
       },
       "finalTrial": {
+        "head": "aa8a5ab1a9d709250a2895682aee08c7c7639fc4",
+        "base": "981008460c4518d9fca2f38054dc083e161a75db",
+        "exit": 1,
+        "conflictedPaths": 88,
+        "log": "umr-review-upstream-pr-preview.log",
+        "observedAt": "2026-10-20T20:47:27.143868+00:00"
+      },
+      "priorReviewTrial": {
         "head": "85274a7e6cdf1a7911a3c2cc702c780fd5f100ab",
         "base": "08a350dc52ee4a9f04b6e84679139018aa39ee91",
         "exit": 1,
@@ -724,7 +778,12 @@
       "priority": "P2",
       "impact": "The aborted Ubuntu compile suite reported unknown owned termination before a later runner-group observation was accepted. The failed run does not prove cleanup of every owned descendant; no leak is asserted without further evidence.",
       "action": "Preserve the failed run and reproduce the compile-timeout cleanup path separately. Successful-run reclamation does not close this exceptional-path proof.",
-      "evidence": "umr-review-ci-ea7c-failed.log"
+      "evidence": "umr-review-ci-ea7c-failed.log",
+      "laterObservation": {
+        "sourceCommit": "aa8a5ab1a9d709250a2895682aee08c7c7639fc4",
+        "log": "umr-review-ci-aa8a-failed.log",
+        "finding": "The later interrupted run observed and reclaimed two residual runner-group processes and correctly kept reclamation acceptance false. This does not resolve the earlier unknown owned-termination report."
+      }
     }
   ],
   "pr": null,
@@ -738,9 +797,9 @@
   "mergeCommit": "f2f30d3fa7fd1fc84685b9c32cb4128f5999a4b3",
   "submoduleCommit": "a12ff4a99d401d9a8e8d9c57cb9a0eb1173a7d1b",
   "candidate": {
-    "generation": 92,
+    "generation": 93,
     "compilerInputDigest": "1014511c090d14b71548f0134e62cff179e86540cd6d4c4058280d36a6ca3597",
-    "generatedInputDigest": "8bb102cd5aad433edb122e2263580ef6ff3706995896adaea62116684e155f4c",
+    "generatedInputDigest": "bacaad61198bab6fcce8c6875274a3d777eeaa44a553b1970bab547aadcf720f",
     "artifactInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
   },
   "formalAcceptance": false,
@@ -750,7 +809,7 @@
     "generatedInputDigest": "2ca568febaf7a88aff7ab281af40997335cd906168c8e46f03e63e353e271b4b",
     "artifactsInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
   },
-  "sourceCommit": "ea7c67a2f1adb0111dd7f37a85a1c5bc3f87cf5c",
+  "sourceCommit": "aa8a5ab1a9d709250a2895682aee08c7c7639fc4",
   "push": {
     "originMaster": "f04201465dee7f1cb8e93094097ba12ccaef3b8f",
     "originPrBranch": "codex/upstream-plan-20261020",
@@ -759,5 +818,5 @@
     "transport": "existing SSH identity",
     "httpsAttempt": "GitHub rejected the OAuth token because workflow scope was absent; no remote refs changed by that atomic attempt."
   },
-  "sourceCommitNote": "Independent compile case boundaries are staged on this commit; the final full CI receipt will identify the next committed candidate."
+  "sourceCommitNote": "Remaining independent compile case boundaries and bounded compiler concurrency are staged on this commit."
 }

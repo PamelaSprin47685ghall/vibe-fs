@@ -2349,61 +2349,67 @@ integrationTest('WHAT[structured-workflow-012] deleting a source purges its stal
   }
 })
 
-integrationTest('WHAT[structured-workflow-012] independent Fable checks enforce compile-shard input boundaries', async () => {
-  const [
-    green,
-    red,
-    merged,
-    transitiveLeak,
-    privateModuleLeak,
-    privateBinding,
-    signedGreen,
-    signedRed,
-    signatureOnly,
-  ] = await Promise.all([
-    'GreenConsumer.fsproj',
-    'RedConsumer.fsproj',
-    'MergedConsumer.fsproj',
-    'LeakyConsumer.fsproj',
-    'PrivateConsumer.fsproj',
-    'PrivateBindingConsumer.fsproj',
-    'SignedGreenConsumer.fsproj',
-    'SignedRedConsumer.fsproj',
-    'SignatureOnlyGreenConsumer.fsproj',
-  ].map(compileFableDirect))
-  assert.equal(green.status, 0, `public contract must compile\n${green.stdout}\n${green.stderr}`)
+integrationTest('WHAT[structured-workflow-012] independent Fable checks enforce compile-shard input boundaries', async (t) => {
+  await t.test('WHAT[structured-workflow-012] the declared public contract compiles', async () => {
+    const green = await compileFableDirect('GreenConsumer.fsproj')
+    assert.equal(green.status, 0, `public contract must compile\n${green.stdout}\n${green.stderr}`)
+  })
 
-  assert.notEqual(red.status, 0, 'runtime symbol without a ProjectReference must be a compiler error')
-  assert.match(`${red.stdout}\n${red.stderr}`, /Runtime|secretValue|not defined/i)
+  await t.test('WHAT[structured-workflow-012] an unreferenced runtime symbol is rejected', async () => {
+    const red = await compileFableDirect('RedConsumer.fsproj')
+    assert.notEqual(red.status, 0, 'runtime symbol without a ProjectReference must be a compiler error')
+    assert.match(`${red.stdout}\n${red.stderr}`, /Runtime|secretValue|not defined/i)
+  })
 
-  assert.equal(
-    merged.status,
-    0,
-    `Fable ProjectReference source-merging canary: internal is not an assembly firewall\n${merged.stdout}\n${merged.stderr}`,
-  )
+  await t.test('WHAT[structured-workflow-012] Fable source merging preserves internal symbol visibility', async () => {
+    const merged = await compileFableDirect('MergedConsumer.fsproj')
+    assert.equal(
+      merged.status,
+      0,
+      `Fable ProjectReference source-merging canary: internal is not an assembly firewall\n${merged.stdout}\n${merged.stderr}`,
+    )
+  })
 
-  assert.equal(
-    transitiveLeak.status,
-    0,
-    `Fable transitively source-merges ProjectReference closure even when DisableTransitiveProjectReferences=true\n${transitiveLeak.stdout}\n${transitiveLeak.stderr}`,
-  )
+  await t.test('WHAT[structured-workflow-012] Fable merges transitive project sources', async () => {
+    const transitiveLeak = await compileFableDirect('LeakyConsumer.fsproj')
+    assert.equal(
+      transitiveLeak.status,
+      0,
+      `Fable transitively source-merges ProjectReference closure even when DisableTransitiveProjectReferences=true\n${transitiveLeak.stdout}\n${transitiveLeak.stderr}`,
+    )
+  })
 
-  assert.equal(
-    privateModuleLeak.status,
-    0,
-    `Fable source-merging canary: top-level private module is not a foreign-owner firewall\n${privateModuleLeak.stdout}\n${privateModuleLeak.stderr}`,
-  )
+  await t.test('WHAT[structured-workflow-012] a top-level private module remains visible after source merging', async () => {
+    const privateModuleLeak = await compileFableDirect('PrivateConsumer.fsproj')
+    assert.equal(
+      privateModuleLeak.status,
+      0,
+      `Fable source-merging canary: top-level private module is not a foreign-owner firewall\n${privateModuleLeak.stdout}\n${privateModuleLeak.stderr}`,
+    )
+  })
 
-  assert.notEqual(privateBinding.status, 0, 'module-local private binding must stay inaccessible after Fable source merge')
-  assert.match(`${privateBinding.stdout}\n${privateBinding.stderr}`, /privateValue|not accessible|not defined|private/i)
+  await t.test('WHAT[structured-workflow-012] a module-local private binding remains inaccessible', async () => {
+    const privateBinding = await compileFableDirect('PrivateBindingConsumer.fsproj')
+    assert.notEqual(privateBinding.status, 0, 'module-local private binding must stay inaccessible after Fable source merge')
+    assert.match(`${privateBinding.stdout}\n${privateBinding.stderr}`, /privateValue|not accessible|not defined|private/i)
+  })
 
-  assert.equal(signedGreen.status, 0, `F# signature must expose declared contract\n${signedGreen.stdout}\n${signedGreen.stderr}`)
+  await t.test('WHAT[structured-workflow-012] a signature exposes its declared contract', async () => {
+    const signedGreen = await compileFableDirect('SignedGreenConsumer.fsproj')
+    assert.equal(signedGreen.status, 0, `F# signature must expose declared contract\n${signedGreen.stdout}\n${signedGreen.stderr}`)
+  })
 
-  assert.notEqual(signedRed.status, 0, 'F# signature must hide implementation symbols from source-merged consumers')
-  assert.match(`${signedRed.stdout}\n${signedRed.stderr}`, /hiddenValue|not defined|not accessible/i)
+  await t.test('WHAT[structured-workflow-012] a signature hides implementation symbols', async () => {
+    const signedRed = await compileFableDirect('SignedRedConsumer.fsproj')
+    assert.notEqual(signedRed.status, 0, 'F# signature must hide implementation symbols from source-merged consumers')
+    assert.match(`${signedRed.stdout}\n${signedRed.stderr}`, /hiddenValue|not defined|not accessible/i)
+  })
 
-  assert.notEqual(signatureOnly.status, 0, 'Fable does not materialize a consumable module from a signature-only project')
-  assert.match(`${signatureOnly.stdout}\n${signatureOnly.stderr}`, /SignedProvider|not defined/i)
+  await t.test('WHAT[structured-workflow-012] a signature-only project has no consumable module', async () => {
+    const signatureOnly = await compileFableDirect('SignatureOnlyGreenConsumer.fsproj')
+    assert.notEqual(signatureOnly.status, 0, 'Fable does not materialize a consumable module from a signature-only project')
+    assert.match(`${signatureOnly.stdout}\n${signatureOnly.stderr}`, /SignedProvider|not defined/i)
+  })
 })
 
 
