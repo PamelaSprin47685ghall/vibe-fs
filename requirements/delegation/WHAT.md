@@ -18,7 +18,7 @@
 
 ## [005] 委托面不暴露机器拓扑
 
-参数和返回结果不得包含 SessionId、AgentId、ManagerJobId、worktree、reused 等物理拓扑标识。跨 horizon 只传语义后果与 bounded WorkRecord。
+参数和返回结果不得包含 SessionId、AgentId、ManagerJobId、worktree、reused 等物理拓扑标识。跨 horizon 只传语义后果与 `js.deliver` 交回的 view。
 
 ## [006] 承接后果与绑定连续性
 
@@ -44,15 +44,15 @@ fork 成功只表示该 Byname 已承接 charge。续做按 Byname 找到既有 
 
 ## [011] 普通完成结束同步批次
 
-不设独立 return 工具或双重 await。被委托方的普通 Assistant completion 结束批次，由宿主物化为 `includeOpening=false` 的 bounded WorkRecord 返回。
+不设独立 return 工具或双重 await。被委托方的普通 Assistant completion 结束批次，由宿主交回该次 `js.deliver` 的 view。
 
 ## [012] Canonical 正文与 sibling 引用
 
-批次内仅首个 canonical 调用方获得完整 bounded WorkRecord，其余 sibling 只获得指向该结果的简要引用。
+批次内仅首个 canonical 调用方获得完整 view，其余 sibling 只获得指向该结果的简要引用。此前已经交回过的内容，即使再次出现，也不再返回。
 
 ## [013] Join 有界消费
 
-Join 只消费当前 owner 可用的 completion，批次受全局上限约束，稳定排序并逐项 CAS 消费。每个完成项呈现为 entry-local WorkRecord，不以字段式 DTO 包装。
+Join 只消费当前 owner 可用的 completion，批次受全局上限约束，稳定排序并逐项 CAS 消费。每个完成项呈现为该次已交付的 view，不以字段式 DTO 包装。
 
 ## [014] Commission Join
 
@@ -68,11 +68,11 @@ Join 只在新输入已由 Host 保存、且属于该 owner 的已接纳物理�
 
 ## [017] 返回不转移权威
 
-返回的 WorkRecord 或建议只是调用方的决策证据，不自动改变全局请求方向，不扩权，也不免除既定义务。
+返回的 view 或建议只是调用方的决策证据，不自动改变全局请求方向，不扩权，也不免除既定义务。
 
 ## [019] Typed 首提示词
 
-fork 首 prompt 必须 typed 渲染，区分 Assignment 指令与 Attachment 只读背景。父到子背景用 TOML 数据字段，子到父完成项来自显式 js.deliver，不得把历史附件当作当前交付。
+fork 首 prompt 必须 typed 渲染，区分 Assignment 指令与 CommissionerRecord/Attachment 只读背景。父到子背景用 TOML 数据字段，子到父完成项用 `js.deliver` 交回的 view，不得混淆方向。
 
 ## [020] 语义不依赖物理工具名
 
@@ -80,7 +80,7 @@ fork 首 prompt 必须 typed 渲染，区分 Assignment 指令与 Attachment 只
 
 ## [021] Attachment 只作背景
 
-attachment 只将指定同伴的历史 WorkRecord 作为只读数据放入首 prompt，不将其中未竟工作转成新任务义务，不克隆 authority。
+attachment 只将指定同伴已经交回的 view 作为只读数据放入首 prompt，不将其中未竟工作转成新任务义务，不克隆 authority。
 
 ## [022] 建议性工具次数
 
@@ -94,9 +94,9 @@ attachment 只将指定同伴的历史 WorkRecord 作为只读数据放入首 pr
 
 复用 participant 的每个新工作是独立 direct-CE invocation，不建立 durable Stage/Phase/ActiveWorkUnit 或第二状态机。resume route 由 Byname 标识，SyncDelegate route 由 caller scope + dedicated role 标识；物理 SessionId 不拥有 handoff 连续性。
 
-输入为新 charge（调用方在 charge 中显式提供上下文，SyncDelegate/dag 可直接拼接上游 `workRecord`，且 ANCHOR 编号共享同一进程地址空间；父到子 `DelegationHandoff` delta tracking 已退役）。
+输入为新 charge（调用方在 charge 中显式提供上下文，SyncDelegate/dag 可直接拼接上游已交付的 view，且 ANCHOR 编号共享同一进程地址空间；父到子 `DelegationHandoff` delta tracking 已退役）。
 
-同步调用等待自己完成，只返回本次调用的终值记录。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回 WorkRecord；完成结果只经 join/horizon 拉取，子→父 `WorkRecord` 来自 `js.deliver` 交付格终值（未交付的子工作在结构化 join 记录中报告 `status = "undelivered"`）。
+同步调用等待自己完成，只返回本次 `js.deliver` 交回的 view。异步 fork/resume 按 [026] 完成 admission/dispatch 即返回 Byname 承接后果，不等待 completion，不直接返回该 view。完成结果只经 join/horizon 拉取。子到父的返回来自 `js.deliver` 交付格的 view；未交付的子工作不写完成、join 不关闭，保持可见的未解除义务——父方可以继续等待或重派，原子工作保持活跃，不把 undelivered 结算成终态。S1/S2/S3/S4 接力不再主动清除上下文。
 
 ## [025] Completion 以因果身份认领
 
@@ -124,11 +124,9 @@ Join 只等待当前进程真正在跑或已产生可 join 结果的工作：真
 
 委托合同只含 command/result、fact、typed payload、logical route、completion evidence 和 injected capability；fold 纯计算，durable composition 连接 canonical journal，各 workflow 消费合同与 fold。Host dispatch 和 PTY adapter 只由 composition root 绑定，合同的直接及传递依赖不得包含 Host、工具、PTY、process、EventStore runtime 或委托/恢复 workflow。
 
-合同传递 production `.fs` 上限100；fold/runtime/sync/fork 目标185。Host/PTY adapter 因组装共享 durable/wait/signal/identity 能力，以全仓 production `.fs` 的60%为硬上限，超过须 full fallback；实测规模作 ratchet，增长须修订本条。2026-10-17 的 `97abafc4a` 与 CUT-06-R3 均为391，312 是未随既有依赖更新的旧记录。CUT-06-R2 对照 `2ec1a5400` 后为392，新增集合只有 `Mission/WorkRecord/CompletionProjection.fs`：在完成事实折叠时派生历史摘要引用，复用已有依赖，不引入新的 Host、I/O 或恢复能力。合同、恢复消费者的实现隔离与60%硬上限保持。owner compile 将所选 locality 的传递 ProjectReference 展成唯一计划，单次 Compile Include 保持拓扑偏序，不得退回目录通配。
+合同传递 production `.fs` 上限100；fold/runtime/sync/fork 目标185。Host/PTY adapter 因组装共享 durable/wait/signal/identity 能力，以全仓 production `.fs` 的60%为硬上限，超过须 full fallback；实测规模作 ratchet，增长须修订本条，当前 Host adapter 为312。owner compile 将所选 locality 的传递 ProjectReference 展成唯一计划，单次 Compile Include 保持拓扑偏序，不得退回目录通配。
 
 ## [029] 领域意图与物理能力单向注入
-
-显式子终值的进程内 cell 由独立 `repository-programming-js-delivered-values` owner 编译，只依赖 LlmFacing 渲染。委派 Host adapter 读取该窄 owner，不得为此传递编译 JS sandbox、文件变更或整个 programming capability。
 
 委托领域只产生 typed intent；linkage、estimate、child handle index 和 closed rejection 由委托纯 fold/decision 拥有。只有 durable composition 将意图包入外层持久事件并组合 projection。
 
@@ -140,7 +138,7 @@ sync invariant 违例由委托 owner 构造 typed incident；先保留已发生 
 
 ## [031] Checkpoint 保留已完成事实
 
-（父到子 `DelegationHandoff` 及其 `HandoffCheckpointSettlement` 已随显式 charge 上下文传递与共享 ANCHOR 地址空间退役。）child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交付终值 `WorkRecord`，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
+（父到子 `DelegationHandoff` 及其 `HandoffCheckpointSettlement` 已随显式 charge 上下文传递与共享 ANCHOR 地址空间退役。）child 已完成的事实独立保留：同步调用连续复用同一 child 并各自交付终值 view，旧 authority root 的晚到完成不能认领新调用，父会话 supersede 或取消与完成在任意顺序下均精确结算一次，不遗留孤儿 claim，不重跑已完成 child。
 
 ## [032] Engineer 与 DevOps 不相互差遣
 

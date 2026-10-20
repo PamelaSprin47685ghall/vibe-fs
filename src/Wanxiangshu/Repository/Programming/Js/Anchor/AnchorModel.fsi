@@ -1,6 +1,6 @@
 namespace Wanxiangshu.Repository.Programming.Js.Anchor
 
-/// Required prefix boundary and keep-or-summary map.
+/// Required prefix boundary and required keep-or-summary map.
 type AnchorViewDeclaration =
     { PrefixUntil: int
       ThenMap: (int * string option) list }

@@ -97,21 +97,20 @@ type ToolRuntimeScope
         currentPhysicalUserMessage: string -> string option,
         sessionDirectories: Dictionary<string, string>,
         onRunStarted: (SessionId -> Role -> string option -> unit) option,
-        parentWorkRecordFor: (string -> Task<string option>) option,
-        childWorkRecordFor: (string -> Task<string option>) option,
+        viewForSession: (string -> Task<string option>) option,
         snapshot: ISessionSnapshotPort option,
         cancelSignals: (SessionId seq -> unit) option,
+        ?childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>),
         ?continueManagerLoop: (SessionId -> string -> Task<Result<unit, string>>),
         ?eventPort: IEventObservationPort,
-        ?ptyPortFactory: (unit -> PtyPort)
+        ?ptyPortFactory: (unit -> PtyPort),
+        ?ownershipStateRoot: string
     ) =
 
     let gate = obj ()
     let ownedWorkGate = obj ()
 
-    let ownershipCommonDir =
-        workspaceDirectory
-        |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
+    let ownershipCommonDir = ownershipStateRoot
 
     let createPtyPort () =
         match ptyPortFactory, ownershipCommonDir with
@@ -136,9 +135,7 @@ type ToolRuntimeScope
     let orchestratorHosts = Dictionary<string, OrchestratorHost>()
     let onCancelSignals = defaultArg cancelSignals ignore
     let onStarted = defaultArg onRunStarted (fun _ _ _ -> ())
-    // COMPANION-003: parent→child keeps Opening; child→parent omits it (includeOpening=false).
-    let parentRecord = defaultArg parentWorkRecordFor (fun _ -> Task.FromResult None)
-    let childRecord = defaultArg childWorkRecordFor (fun _ -> Task.FromResult None)
+    let sessionView = defaultArg viewForSession (fun _ -> Task.FromResult None)
 
     // Manager-loop delivery is an injected capability: the Change/Host
     // OrchestratorHostDeps model already owns this edge, and the
@@ -151,6 +148,8 @@ type ToolRuntimeScope
 
     // Workspace-snapshot capture is an injected capability: Relay certificate
     // binding owns the capture vocabulary, the composition root supplies it.
+
+    let childViewForRun = defaultArg childViewForRun (fun _ _ -> Task.FromResult None)
 
     /// change-integration-005/013: the head cursor this process observed for one
     /// session, read from the same journal projection the Manager deliver used for
@@ -182,7 +181,7 @@ type ToolRuntimeScope
     let questionInterrupts = HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
 
     let postS3PendingInterrupts =
-        HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
+        HashSet<SessionId * ProviderRunIdentity * ToolCallId * PhysicalUserMessageId option>()
 
     let postS3SettledInterrupts =
         HashSet<SessionId * ProviderRunIdentity * ToolCallId>()
@@ -501,6 +500,7 @@ type ToolRuntimeScope
             NodeTiming.nodeClockPort (),
             NodeTiming.raceExit,
             ?journal = journal,
+            childViewForRun = childViewForRun,
             ?ownershipCommonDir = ownershipCommonDir,
             ptyPort = createPtyPort (),
             recoverPty = PtyBackend.recover,
@@ -749,38 +749,55 @@ type ToolRuntimeScope
           IsFinalIncumbent = false
           CleanupBlockerDigest = None }
 
-    let lifecycleWorkOfDirectory (directory: string option) (sessionId: string) =
-        directory
-        |> Option.bind (fun workspace ->
-            let commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
+    // Class-body let bindings are always private; an explicit visibility
+    // attribute here is a duplicate and the compiler rejects it.
+    let inspectWorkspaceWork workspace sessionId =
+        task {
+            let! commonDir = Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot workspace
 
             if String.IsNullOrWhiteSpace commonDir then
-                None
+                return None
             else
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId)
+                return Wanxiangshu.Mission.Lifecycle.DurableWorkHost.inspected commonDir sessionId
+        }
+
+    let lifecycleWorkOfDirectory
+        (directory: string option)
+        (sessionId: string)
+        : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+        match directory with
+        | None -> Task.FromResult None
+        | Some workspace -> inspectWorkspaceWork workspace sessionId
 
     /// The active unified incumbency id for this session.
-    let activeIncumbencyOfSession (directory: string option) (sessionId: string) : string option =
-        lifecycleWorkOfDirectory directory sessionId
-        |> Option.bind (fun work -> work.ActiveId)
+    let activeIncumbencyOfSession (directory: string option) (sessionId: string) : Task<string option> =
+        task {
+            let! work = lifecycleWorkOfDirectory directory sessionId
+            return work |> Option.bind (fun work -> work.ActiveId)
+        }
 
-    let managerFactsOfSession (directory: string option) (sessionId: string) : ManagerCapabilityFacts =
-        // The capability gate reads the wanxiangli work snapshot for this
-        // session. No phase enum crosses this boundary: an inactive work grants
-        // nothing, a recorded cleanup blocker confines to the finish window, a
-        // promoted final incumbent keeps the read/cleanup/close-out surface, and
-        // every other active fact keeps the full Manager set.
-        lifecycleWorkOfDirectory directory sessionId
-        |> Option.map (fun work ->
-            match work.ActiveId, work.Reviewed with
-            | None, _ -> defaultEmptyManagerFacts
-            | Some _, reviewed ->
-                { HasActiveIncumbency = true
-                  HasAssessment = reviewed
-                  HasConfirmation = work.Confirmed
-                  IsFinalIncumbent = work.ReviewOutcome = Some "Promoted"
-                  CleanupBlockerDigest = work.BlockerDigest })
-        |> Option.defaultValue defaultEmptyManagerFacts
+    let managerFactsOfSession (directory: string option) (sessionId: string) : Task<ManagerCapabilityFacts> =
+        task {
+            // The capability gate reads the wanxiangli work snapshot for this
+            // session. No phase enum crosses this boundary: an inactive work grants
+            // nothing, a recorded cleanup blocker confines to the finish window, a
+            // promoted final incumbent keeps the read/cleanup/close-out surface, and
+            // every other active fact keeps the full Manager set.
+            let! work = lifecycleWorkOfDirectory directory sessionId
+
+            return
+                work
+                |> Option.map (fun work ->
+                    match work.ActiveId, work.Reviewed with
+                    | None, _ -> defaultEmptyManagerFacts
+                    | Some _, reviewed ->
+                        { HasActiveIncumbency = true
+                          HasAssessment = reviewed
+                          HasConfirmation = work.Confirmed
+                          IsFinalIncumbent = work.ReviewOutcome = Some "Promoted"
+                          CleanupBlockerDigest = work.BlockerDigest })
+                |> Option.defaultValue defaultEmptyManagerFacts
+        }
 
     let devopsBindingTasks = Dictionary<string, Task<unit>>()
 
@@ -826,7 +843,7 @@ type ToolRuntimeScope
             // delegation-026: a reopened road's idle companion handle registers its
             // identity only (AdoptChild). Restore would plant an active ChildRun with no
             // work behind it, so the next dispatch's backend Fork answers Nudged, its
-            // runTask never starts, and settle's AwaitCurrentWorkRecord waits on the
+            // runTask never starts, and settle's AwaitCurrentView waits on the
             // restored cell forever.
             runtime.AdoptChild(agentId, existingHandle.ChildSessionId)
             runtime.ChildCreated agentId existingHandle.CanonicalRole existingHandle.ChildSessionId
@@ -1016,6 +1033,12 @@ type ToolRuntimeScope
         |> Option.bind (fun durable -> UserQuestionJournal.pending durable (SessionId.create sessionId))
         |> Option.isSome
 
+    /// LC-017: 精确重放豁免依据——等待中问题的 (ProviderRunId, ToolCallId) 围栏。
+    member _.WaitingQuestionFenceFor(sessionId: string) =
+        journal
+        |> Option.bind (fun durable -> UserQuestionJournal.pending durable (SessionId.create sessionId))
+        |> Option.map (fun question -> (question.ProviderRunId, question.ToolCallId))
+
     member private _.ClearQuestionInterrupts(sid: SessionId) =
         let stale =
             questionInterrupts
@@ -1060,24 +1083,26 @@ type ToolRuntimeScope
             sessionIdText: string,
             notify: string -> Task<Result<unit, string>>,
             request: UserQuestionAskedPayload
-        ) =
-        let work =
-            lifecycleWorkOfDirectory (directoryFor sessionIdText |> Option.orElse workspaceDirectory) sessionIdText
+        ) : Task<Result<unit, string>> =
+        task {
+            let! work =
+                lifecycleWorkOfDirectory (directoryFor sessionIdText |> Option.orElse workspaceDirectory) sessionIdText
 
-        if
-            not (
-                work
-                |> Option.exists (fun current -> current.ActiveId.IsSome && not current.Delivered)
-            )
-        then
-            Task.FromResult(Error "ask requires an unfinished work with an active incumbency")
-        elif not (work |> Option.exists (fun current -> current.Stage = "S1")) then
-            // 产品裁决：只有 S1 阶段的 Plan 可以向用户中断提问。
-            Task.FromResult(Error "ask is allowed only in the S1 planning stage")
-        elif not (questionRequests.Add sid) then
-            Task.FromResult(Error "a question is already being sent for this session")
-        else
-            this.SendFreshQuestion(durable, sid, sessionIdText, notify, request)
+            if
+                not (
+                    work
+                    |> Option.exists (fun current -> current.ActiveId.IsSome && not current.Delivered)
+                )
+            then
+                return Error "ask requires an unfinished work with an active incumbency"
+            elif not (work |> Option.exists (fun current -> current.Stage = "S1")) then
+                // 产品裁决：只有 S1 阶段的 Plan 可以向用户中断提问。
+                return Error "ask is allowed only in the S1 planning stage"
+            elif not (questionRequests.Add sid) then
+                return Error "a question is already being sent for this session"
+            else
+                return! this.SendFreshQuestion(durable, sid, sessionIdText, notify, request)
+        }
 
     member private this.ResolveOrSendQuestion
         (
@@ -1134,10 +1159,28 @@ type ToolRuntimeScope
 
         stopped
 
-    member private this.RunQuestionInterrupt(sessionId: SessionId, key: SessionId * ProviderRunIdentity * ToolCallId) =
+    /// LC-016: InterruptAttempt 是 session 级能力，检查之后仍可能在真正 abort
+    /// 落地前有新输入准入——返回后复核 current physical，若已变则只记诊断、
+    /// 不视为失败（旧 attempt 不再瞄准）。session 级 abort 的精确 attempt
+    /// 围栏需要带 attempt 参数的 Host AbortSession API，本 slice 不新造。
+    member private this.RunQuestionInterrupt
+        (sessionId: SessionId, question: UserQuestionAskedPayload, key: SessionId * ProviderRunIdentity * ToolCallId)
+        =
         task {
             try
                 let! stopped = sessions.InterruptAttempt sessionId
+
+                if
+                    currentPhysicalUserMessage (SessionId.value sessionId)
+                    <> Some(PhysicalUserMessageId.value question.PhysicalUserMessageId)
+                then
+                    Diagnostic.emit
+                        "question-interrupt-skipped-new-input"
+                        [ "session_id", SessionId.value sessionId
+                          "physical_user_message_id", PhysicalUserMessageId.value question.PhysicalUserMessageId ]
+
+                    questionInterrupts.Remove key |> ignore
+
                 return this.PruneFailedQuestionInterrupt(key, stopped)
             with ex ->
                 questionInterrupts.Remove key |> ignore
@@ -1161,7 +1204,7 @@ type ToolRuntimeScope
                 )
                 && questionInterrupts.Add(sessionId, question.ProviderRunId, callId)
                 ->
-                return! this.RunQuestionInterrupt(sessionId, (sessionId, question.ProviderRunId, callId))
+                return! this.RunQuestionInterrupt(sessionId, question, (sessionId, question.ProviderRunId, callId))
             | _ -> return Ok()
         }
 
@@ -1173,9 +1216,19 @@ type ToolRuntimeScope
                 let! stopped = sessions.InterruptAttempt sessionId
 
                 lock gate (fun () ->
-                    let _ =
-                        Result.isError stopped && postS3SettledInterrupts.Remove key
-                        || postS3PendingInterrupts.Remove key
+                    if Result.isError stopped then
+                        postS3SettledInterrupts.Remove key |> ignore
+
+                    // pending 已在 InterruptForPostS3Deliver 中按物理围栏移出；
+                    // 这里防御性清掉同 (session, run, call) 的任何残留元组。
+                    for stale in
+                        postS3PendingInterrupts
+                        |> Seq.filter (fun (owner, run, call, _) ->
+                            let (_, keyRun, keyCall) = key
+
+                            owner = sessionId && run = keyRun && call = keyCall)
+                        |> Seq.toList do
+                        postS3PendingInterrupts.Remove stale |> ignore
 
                     ())
 
@@ -1185,25 +1238,56 @@ type ToolRuntimeScope
                 return Error ex.Message
         }
 
+    /// LC-018: 登记时保存当时的 current physical；旧 deliver 完成事件只在
+    /// 该输入仍是最新输入时才允许触发 session 级中断。
     member _.RegisterPostS3Interrupt(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) =
-        lock gate (fun () -> postS3PendingInterrupts.Add(sessionId, providerRun, callId) |> ignore)
+        let physical =
+            currentPhysicalUserMessage (SessionId.value sessionId)
+            |> Option.map PhysicalUserMessageId.create
+
+        lock gate (fun () -> postS3PendingInterrupts.Add(sessionId, providerRun, callId, physical) |> ignore)
 
     member _.HasPendingPostS3Interrupt(sessionId: string) =
         let sid = SessionId.create sessionId
-        lock gate (fun () -> postS3PendingInterrupts |> Seq.exists (fun (owner, _, _) -> owner = sid))
+        lock gate (fun () -> postS3PendingInterrupts |> Seq.exists (fun (owner, _, _, _) -> owner = sid))
 
     member this.InterruptForPostS3Deliver
         (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId)
         : Task<Result<unit, string>> =
-        let key = sessionId, providerRun, callId
+        task {
+            let key = sessionId, providerRun, callId
 
-        let shouldInterrupt =
-            lock gate (fun () -> postS3PendingInterrupts.Contains key && postS3SettledInterrupts.Add key)
+            // LC-018: 用户问题中断至少核对 current physical；post-S3 此前只查
+            // 进程集合。若登记之后已有新输入准入，清除 pending 并跳过中断，
+            // 旧 deliver 完成事件不得停止新执行。
+            let current =
+                currentPhysicalUserMessage (SessionId.value sessionId)
+                |> Option.map PhysicalUserMessageId.create
 
-        if shouldInterrupt then
-            this.RunPostS3InterruptAttempt(sessionId, key)
-        else
-            Task.FromResult(Ok())
+            let shouldInterrupt =
+                lock gate (fun () ->
+                    match
+                        postS3PendingInterrupts
+                        |> Seq.tryFind (fun (owner, run, call, _) ->
+                            owner = sessionId && run = providerRun && call = callId)
+                    with
+                    | None -> false
+                    | Some(_, _, _, savedPhysical) when savedPhysical <> current ->
+                        postS3PendingInterrupts.Remove(sessionId, providerRun, callId, savedPhysical)
+                        |> ignore
+
+                        false
+                    | Some(_, _, _, savedPhysical) ->
+                        postS3PendingInterrupts.Remove(sessionId, providerRun, callId, savedPhysical)
+                        |> ignore
+
+                        postS3SettledInterrupts.Add key)
+
+            if shouldInterrupt then
+                return! this.RunPostS3InterruptAttempt(sessionId, key)
+            else
+                return Ok()
+        }
 
     /// Run-started callback wired by plugin bootstrap for Host child reconciliation.
     member _.RunStarted = onStarted
@@ -1226,6 +1310,7 @@ type ToolRuntimeScope
 
     member _.SessionParents = sessionParents
     member _.CurrentPhysicalUserMessage(sessionId) = currentPhysicalUserMessage sessionId
+    member _.ViewForSession(sessionId) = sessionView sessionId
     member _.DirectoryFor(sessionId) = directoryFor sessionId
     member _.LogicalOwnerFor(sessionId: SessionId) = logicalOwnerFor sessionId
 
@@ -1234,8 +1319,6 @@ type ToolRuntimeScope
         | Some parent -> sessionParents.[SessionId.value sessionId] <- SessionId.value parent
         | None -> sessionParents.Remove(SessionId.value sessionId) |> ignore
 
-    member _.ParentWorkRecordFor(sessionId) = parentRecord sessionId
-    member _.ChildWorkRecordFor(sessionId) = childRecord sessionId
 
     member _.RegisterDirectory(sessionId, path) = sessionDirectories.[sessionId] <- path
 
@@ -1288,8 +1371,13 @@ type ToolRuntimeScope
           IsFinalIncumbent = false
           CleanupBlockerDigest = None }
 
-    member self.ManagerCapabilityFactsFor(sessionId: string) : ManagerCapabilityFacts =
+    member self.ManagerCapabilityFactsFor(sessionId: string) : Task<ManagerCapabilityFacts> =
         managerFactsOfSession self.WorkspaceDirectory sessionId
+
+    member self.LifecycleWorkFor
+        (sessionId: string)
+        : Task<Wanxiangshu.Mission.Lifecycle.DurableWorkHost.InspectedWork option> =
+        lifecycleWorkOfDirectory self.WorkspaceDirectory sessionId
 
     member private _.OpenAndDrainTenureScope (sessionId: string) (incumbentId: string) (gen: int) =
         let rootScope = "session:" + sessionId
@@ -1351,20 +1439,24 @@ type ToolRuntimeScope
                 this.CloseTenureScope sessionId incumbentId gen
                 tenureScopes.Remove sessionId |> ignore)
 
-    member _.IsRetirementFrozen(sessionId: string) =
-        let activeIncumbency = activeIncumbencyOfSession workspaceDirectory sessionId
+    member _.IsRetirementFrozen(sessionId: string) : Task<bool> =
+        task {
+            let! activeIncumbency = activeIncumbencyOfSession workspaceDirectory sessionId
 
-        lock gate (fun () ->
-            match tenureScopes.TryGetValue sessionId, activeIncumbency with
-            | (false, _), _ -> false
-            | (true, (frozen, _)), Some active when active <> frozen ->
-                tenureScopes.Remove sessionId |> ignore
-                false
-            | (true, (frozen, gen)), _ ->
-                let tenureScope = sprintf "tenure:%s:%s:%d" sessionId frozen gen
+            return
+                lock gate (fun () ->
+                    match tenureScopes.TryGetValue sessionId, activeIncumbency with
+                    | (false, _), _ -> false
+                    | (true, (frozen, _)), Some active when active <> frozen ->
+                        tenureScopes.Remove sessionId |> ignore
+                        false
+                    | (true, (frozen, gen)), _ ->
+                        let tenureScope = sprintf "tenure:%s:%s:%d" sessionId frozen gen
 
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipScopePhaseInMemory scopeOwnership tenureScope = Some
-                    "Draining")
+                        Wanxiangshu.Mission.Lifecycle.DurableWorkHost.ownershipScopePhaseInMemory
+                            scopeOwnership
+                            tenureScope = Some "Draining")
+        }
 
     member _.RetirementBlockersFor(sessionId: string) =
         let persistedProjections =
@@ -1605,6 +1697,7 @@ type ToolRuntimeScope
                         NodeTiming.nodeClockPort (),
                         NodeTiming.raceExit,
                         ?journal = journal,
+                        childViewForRun = childViewForRun,
                         ?ownershipCommonDir = ownershipCommonDir,
                         ptyPort = createPtyPort (),
                         recoverPty = PtyBackend.recover,
@@ -1774,7 +1867,7 @@ type ToolRuntimeScope
         lock gate (fun () ->
             for key in
                 postS3PendingInterrupts
-                |> Seq.filter (fun (owner, _, _) -> owner = questionOwner)
+                |> Seq.filter (fun (owner, _, _, _) -> owner = questionOwner)
                 |> Seq.toArray do
                 postS3PendingInterrupts.Remove key |> ignore
 

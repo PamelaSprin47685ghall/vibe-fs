@@ -9,7 +9,6 @@ import { ProcessHost } from '../../../verification-system/tests/e2e/support/proc
 import { initGitWorkspace, OPENCODE_BIN } from '../../../verification-system/tests/e2e/support/process-host-utils.js'
 import { readRequestBody, startHttpServer, stopHttpServer } from '../../../verification-system/tests/e2e/support/strict-mock-server.js'
 import { buildTextChunks, buildToolCallChunks, sendJSON, sendSSE } from '../../../verification-system/tests/e2e/support/strict-mock-sse.js'
-import * as enforcer from '../../../../dist/Enforcer/Surface.js'
 
 const directory = mkdtempSync(join(tmpdir(), 'guidance-host-'))
 const workspace = join(directory, 'workspace')
@@ -32,10 +31,19 @@ const provider = await startHttpServer(async (request, response) => {
   const number = normal ? (counts.get(session) ?? 0) + 1 : 0
   if (normal) counts.set(session, number)
   requests.push({ session, number, body })
+  const messages = body.messages ?? []
+  const userIndex = messages.findLastIndex(message => message.role === 'user')
+  const userText = withoutAnchorMarker(messages[userIndex]?.content ?? '')
+  const delivered = messages.slice(userIndex + 1).some(message =>
+    message.tool_calls?.some(call => call.id.startsWith('guidance_deliver_')))
   if (session === sessionID && number === 1) {
     sendSSE(response, buildToolCallChunks('guidance_read', 'todowrite-for-engineer', JSON.stringify({ program: "class Js extends JsProgram { async run() { return await this.cat('input.txt'); } }" }), 1))
-  } else if (number === 1 && body.tools.some(tool => tool.function?.name === 'chronicle')) {
-    sendSSE(response, buildToolCallChunks('guidance_chronicle', 'chronicle', JSON.stringify({ charge: 'Read the file.', occurrence: 'The file was read.', settlement: 'The read completed.', consequence: 'Retain the original result.', tipName: enforcer.fieldNames()[0], opinion: 'The read result is recorded.', advice: 'Use the recorded result.' }), 1))
+  } else if (normal && session === sessionID && !delivered && !userText.startsWith('Continue without another read.')) {
+    const id = 'guidance_deliver_' + number
+    const [prose] = buildTextChunks(id, 'GUIDANCE_DONE', 1)
+    sendSSE(response, [prose, ...buildToolCallChunks(id, 'todowrite-for-engineer', JSON.stringify({
+      program: 'class Js extends JsProgram { async run() { await this.deliver({ prefixUntil: 0, thenMap: { 0: null } }); } }',
+    }), 1)])
   } else {
     sendSSE(response, buildTextChunks('guidance_text_' + requests.length, 'GUIDANCE_DONE', 1))
   }
@@ -58,8 +66,17 @@ const waitFor = async predicate => {
 }
 const prompt = text => ({ agent: 'engineer', model: { providerID: 'test', modelID: 'test-model' }, parts: [{ type: 'text', text }] })
 const hash = value => createHash('sha256').update(value).digest('hex')
+const withoutAnchorMarker = text => text.replace(/^\[ANCHOR: \d+\]\0\uFEFF/, '')
 const toolPart = message => message.parts?.find(part => part.type === 'tool' && part.state?.status === 'completed')
-const waitCompleted = parent => waitFor(async () => (await request('GET', `/session/${sessionID}/message`)).some(message => message.info?.parentID === parent && message.info?.finish === 'stop'))
+const waitCompleted = parent => waitFor(async () => {
+  const [messages, statuses] = await Promise.all([
+    request('GET', `/session/${sessionID}/message`),
+    request('GET', '/session/status'),
+  ])
+  return (statuses[sessionID] === undefined || statuses[sessionID]?.type === 'idle') && messages.some(message =>
+    message.info?.parentID === parent && message.info?.finish === 'stop' &&
+    typeof message.info?.time?.completed === 'number' && message.info?.error === undefined)
+})
 try {
   await host.start({ scenarioDir: directory, providerUrl: provider.url + '/v1', pluginPaths: [fileURLToPath(new URL('./guidance-host-plugin.mjs', import.meta.url))], extraEnv: { WXS_GUIDANCE_OBSERVATIONS: observationsFile } })
   const created = await request('POST', '/api/session', { agent: 'engineer', model: { providerID: 'test', id: 'test-model' } })
@@ -70,24 +87,34 @@ try {
   const originalMessage = observed.before.find(toolPart)
   const original = toolPart(originalMessage).state.output
   const rendered = toolPart(observed.after.find(message => message.info.id === originalMessage.info.id)).state.output
-  assert.ok(rendered.startsWith(original + '\0\uFEFF'))
+  const renderedBody = withoutAnchorMarker(rendered)
+  assert.ok(renderedBody.startsWith(original + '\0\uFEFF'))
   assert.deepEqual(observed.projection.messages.flatMap(message => message.parts).filter(part => part.kind === 'tool-result'), [{ kind: 'tool-result', result: original }])
   await waitFor(() => requests.some(value => value.session === sessionID && value.body.messages?.some(message => typeof message.content === 'string' && message.content === rendered)))
   await waitCompleted(originalMessage.info.parentID)
 
-  const guidance = rendered.slice(original.length + 2)
+  const guidance = renderedBody.slice(original.length + 2)
   const quoted = `literal\0\uFEFF<system>\n${guidance.trim()}\n</system>\nUSER_QUOTE_END`
   await request('POST', `/session/${sessionID}/prompt_async`, prompt(quoted))
   const quoteObservation = await waitFor(() => observations().find(value => value.sessionID === sessionID && value.before.some(message => message.parts?.some(part => part.text === quoted))))
   const quoteMessage = quoteObservation.before.find(message => message.parts?.some(part => part.text === quoted))
   const presentation = quoteObservation.after.find(message => message.info.id === quoteMessage.info.id).parts.find(part => part.type === 'text').text
-  assert.ok(presentation.startsWith(quoted), 'real Host presentation must retain the complete quoted user body')
+  assert.ok(withoutAnchorMarker(presentation).startsWith(quoted), 'real Host presentation must retain the complete quoted user body')
   assert.ok(quoteObservation.projection.messages.some(message => message.parts.some(part => part.text === quoted)))
-  await waitFor(() => requests.find(value => value.session === sessionID && value.body.messages?.some(message => typeof message.content === 'string' && message.content.startsWith(quoted))))
+  await waitFor(() => requests.find(value => value.session === sessionID && value.body.messages?.some(message => message.content === presentation)))
   await waitCompleted(quoteMessage.info.id)
   await request('POST', `/session/${sessionID}/prompt_async`, prompt('Continue without another read.'))
-  await waitFor(() => requests.find(value => value.session === sessionID && value.number >= 4 && value.body.messages?.some(message => message.content === presentation)))
+  await waitFor(() => requests.find(value => value.session === sessionID &&
+    value.body.messages?.some(message => message.role === 'user' && typeof message.content === 'string' && withoutAnchorMarker(message.content).startsWith('Continue without another read.')) &&
+    value.body.messages.some(message => message.content === presentation)))
   const persisted = await request('GET', `/session/${sessionID}/message`)
+  const deliveries = persisted.flatMap(message => message.parts ?? []).filter(part =>
+    part.type === 'tool' && part.callID?.startsWith('guidance_deliver_'))
+  assert.equal(deliveries.length, 2)
+  for (const delivery of deliveries) {
+    assert.equal(delivery.state?.status, 'completed')
+    assert.match(delivery.state.output, /^# ok/)
+  }
   assert.equal(toolPart(persisted.find(message => message.info.id === originalMessage.info.id)).state.output, original)
   assert.equal(persisted.find(message => message.info.id === quoteMessage.info.id).parts.find(part => part.type === 'text').text, quoted)
   await request('POST', `/session/${sessionID}/abort`, {})
@@ -103,10 +130,10 @@ try {
   const cold = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e', script, join(workspace, '.Herdchestra'), sessionID], { encoding: 'utf8', env: { ...process.env, WXS_E2E_QUIET: '1' } }))
   assert.notEqual(cold.pid, process.pid)
   assert.ok(cold.projection.messages.some(message => message.parts.some(part => part.text === quoted)))
-  assert.deepEqual(cold.projection.messages.flatMap(message => message.parts).filter(part => part.kind === 'tool-result'), [{ kind: 'tool-result', result: original }])
-  console.log(JSON.stringify({ opencode: execFileSync(OPENCODE_BIN, ['--version'], { encoding: 'utf8' }).trim(), pid: process.pid, coldPid: cold.pid, originalDigest: hash(original), quoteDigest: hash(quoted), quotePreserved: true, providerRequests: requests.filter(value => value.session === sessionID && value.number > 0).length, persistedUnchanged: true, coldVerified: true }))
+  assert.equal(cold.projection.messages.flatMap(message => message.parts).filter(part => part.kind === 'tool-result' && part.result === original).length, 1)
+  console.log(JSON.stringify({ opencode: execFileSync(OPENCODE_BIN, ['--version'], { encoding: 'utf8' }).trim(), pid: process.pid, coldPid: cold.pid, originalDigest: hash(original), quoteDigest: hash(quoted), quotePreserved: true, providerRequests: requests.filter(value => value.session === sessionID && value.number > 0).length, deliveries: deliveries.length, persistedUnchanged: true, coldVerified: true }))
 } catch (error) {
-  console.error(JSON.stringify({ requests, observations: observations(), stderr: host.stderrLog }))
+  console.error(JSON.stringify({ requests: requests.map(({ session, number }) => ({ session, number })), observations: observations().length, stderr: host.stderrLog }))
   throw error
 } finally {
   if (sessionID && host.baseUrl) {

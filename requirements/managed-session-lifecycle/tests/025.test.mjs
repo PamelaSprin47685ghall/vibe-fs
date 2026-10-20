@@ -54,12 +54,12 @@ const withRecoveryJournal = async (workspace, action) => {
   }
 }
 
-test('WHAT[managed-session-lifecycle-025] load recovery stops old round admission before voiding canonical work in another process', { timeout: 20000 }, async () => {
+test('WHAT[managed-session-lifecycle-025] load recovery stops admission and keeps work active without a delivery witness', { timeout: 20000 }, async () => {
   await withAdmissionWorkers('void-stops-admission', async (producer, _other, workspace) => {
     await withRecoveryJournal(workspace, async (journal, active) => {
       assert.ok(active())
       await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
-      assert.equal(active(), null)
+      assert.ok(active(), 'resource cleanup cannot fabricate delivery')
       assert.equal((await producer.call('open', 'late-after-void')).ok, false)
       assert.equal(await producer.call('spawns'), 0)
     })
@@ -78,7 +78,7 @@ test('WHAT[managed-session-lifecycle-025] load recovery preserves canonical work
       assert.equal((await producer.call('open', 'late-before-ended')).ok, false)
       await producer.call('complete', 'foreign-before-void')
       await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
-      assert.equal(active(), null)
+      assert.deepEqual(active(), before, 'an Ended PTY is not a task delivery')
       assert.equal((await producer.call('open', 'late-after-ended')).ok, false)
     })
   })
@@ -97,7 +97,7 @@ for (const afterCommit of [false, true]) {
         assert.equal(late.ok, !afterCommit)
         if (late.ok) await producer.call('complete', 'after-unknown-void')
         await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
-        assert.equal(active(), null)
+        assert.ok(active(), 'a confirmed Drain does not complete the task')
         assert.equal((await producer.call('open', 'after-confirmed-void')).ok, false)
       })
     })
@@ -395,7 +395,7 @@ for (const runtime of ['node', 'bun']) {
         if (mode === 'cold-load') {
           await withRecoveryJournal(workspace, async (journal, active) => {
             await loadRecovery.settleChildRuns(journal, join(workspace, '.Herdchestra'))
-            assert.equal(active(), null)
+            assert.ok(active(), 'cold recovery cannot fabricate delivery from process exit')
           })
         } else {
           const restarted = await start()

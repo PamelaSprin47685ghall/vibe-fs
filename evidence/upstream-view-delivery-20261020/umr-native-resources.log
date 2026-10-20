@@ -1,0 +1,726 @@
+TAP version 13
+# (node:20587) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+not ok 1 - WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+  ---
+  duration_ms: 674.94925
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:13:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:524:28)
+    process.processEmit [as emit] (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/node_modules/signal-exit/index.js:199:34)
+  ...
+# (node:20597) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, rename)
+ok 2 - WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, rename)
+  ---
+  duration_ms: 2285.147834
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, directory-sync)
+ok 3 - WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, directory-sync)
+  ---
+  duration_ms: 1707.4865
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, owner-lost)
+ok 4 - WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (node, owner-lost)
+  ---
+  duration_ms: 2026.914333
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, rename)
+ok 5 - WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, rename)
+  ---
+  duration_ms: 2130.560416
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, directory-sync)
+ok 6 - WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, directory-sync)
+  ---
+  duration_ms: 1748.318416
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, owner-lost)
+ok 7 - WHAT[managed-session-lifecycle-025] publication failure preserves the durable PTY obligation (bun, owner-lost)
+  ---
+  duration_ms: 2041.925125
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] another process cannot reserve a PTY after the work round stops admission
+ok 8 - WHAT[managed-session-lifecycle-025] another process cannot reserve a PTY after the work round stops admission
+  ---
+  duration_ms: 777.119833
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] load recovery stops admission and keeps work active without a delivery witness
+ok 9 - WHAT[managed-session-lifecycle-025] load recovery stops admission and keeps work active without a delivery witness
+  ---
+  duration_ms: 678.905125
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] load recovery preserves canonical work and an unbound PTY until its producer proves Ended
+ok 10 - WHAT[managed-session-lifecycle-025] load recovery preserves canonical work and an unbound PTY until its producer proves Ended
+  ---
+  duration_ms: 696.271958
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost before COMMIT
+ok 11 - WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost before COMMIT
+  ---
+  duration_ms: 688.144917
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost after COMMIT
+ok 12 - WHAT[managed-session-lifecycle-025] load recovery cannot void a round after Drain acknowledgement is lost after COMMIT
+  ---
+  duration_ms: 690.035708
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a foreign committed reservation prevents premature terminal settlement
+ok 13 - WHAT[managed-session-lifecycle-025] a foreign committed reservation prevents premature terminal settlement
+  ---
+  duration_ms: 1086.015917
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with reserve first
+ok 14 - WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with reserve first
+  ---
+  duration_ms: 1381.191333
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with drain first
+ok 15 - WHAT[managed-session-lifecycle-025] two processes at the same ownership revision arbitrate Reserve/Drain with drain first
+  ---
+  duration_ms: 768.0295
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] two concurrent process reservations can grant only one first launch at the same revision
+ok 16 - WHAT[managed-session-lifecycle-025] two concurrent process reservations can grant only one first launch at the same revision
+  ---
+  duration_ms: 731.958959
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] duplicate tool calls across processes never grant another launch, including after Ended
+ok 17 - WHAT[managed-session-lifecycle-025] duplicate tool calls across processes never grant another launch, including after Ended
+  ---
+  duration_ms: 720.378375
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] detaching one runtime closes only its round subtree and keeps the other process eligible
+ok 18 - WHAT[managed-session-lifecycle-025] detaching one runtime closes only its round subtree and keeps the other process eligible
+  ---
+  duration_ms: 807.752292
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a later Host-observed assistant run shares the admitted physical execution while an unknown run cannot borrow it
+ok 19 - WHAT[managed-session-lifecycle-025] a later Host-observed assistant run shares the admitted physical execution while an unknown run cannot borrow it
+  ---
+  duration_ms: 706.634
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost before COMMIT cannot launch in either process
+ok 20 - WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost before COMMIT cannot launch in either process
+  ---
+  duration_ms: 764.988875
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT never reports terminal success
+ok 21 - WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT never reports terminal success
+  ---
+  duration_ms: 1071.552583
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT still closes exact local PTYs and retains foreign blockers
+ok 22 - WHAT[managed-session-lifecycle-025] Drain acknowledgement lost before COMMIT still closes exact local PTYs and retains foreign blockers
+  ---
+  duration_ms: 1047.665875
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost after COMMIT cannot launch in either process
+ok 23 - WHAT[managed-session-lifecycle-025] Reserve acknowledgement lost after COMMIT cannot launch in either process
+  ---
+  duration_ms: 683.330375
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT never reports terminal success
+ok 24 - WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT never reports terminal success
+  ---
+  duration_ms: 1046.81375
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT still closes exact local PTYs and retains foreign blockers
+ok 25 - WHAT[managed-session-lifecycle-025] Drain acknowledgement lost after COMMIT still closes exact local PTYs and retains foreign blockers
+  ---
+  duration_ms: 1024.175
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a conflicting round Drain still closes local PTYs without clearing the winning foreign reservation
+ok 26 - WHAT[managed-session-lifecycle-025] a conflicting round Drain still closes local PTYs without clearing the winning foreign reservation
+  ---
+  duration_ms: 1077.298167
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] failed ownership journal initialization preserves its error, closes its native connection and grants no launch
+ok 27 - WHAT[managed-session-lifecycle-025] failed ownership journal initialization preserves its error, closes its native connection and grants no launch
+  ---
+  duration_ms: 8.057917
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, running)
+ok 28 - WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, running)
+  ---
+  duration_ms: 1290.304542
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, exited)
+ok 29 - WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, exited)
+  ---
+  duration_ms: 1242.042041
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, cold-load)
+ok 30 - WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (node, cold-load)
+  ---
+  duration_ms: 1003.725625
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, running)
+ok 31 - WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, running)
+  ---
+  duration_ms: 1399.59
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, exited)
+ok 32 - WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, exited)
+  ---
+  duration_ms: 1329.416667
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, cold-load)
+ok 33 - WHAT[managed-session-lifecycle-025] a fresh Host takes over the exact PTY after creator SIGKILL without replay (bun, cold-load)
+  ---
+  duration_ms: 1028.229333
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] SIGKILL before Ended COMMIT recovers the same native exit without replay (node)
+ok 34 - WHAT[managed-session-lifecycle-025] SIGKILL before Ended COMMIT recovers the same native exit without replay (node)
+  ---
+  duration_ms: 1309.873
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] SIGKILL after Ended COMMIT recovers the same native exit without replay (node)
+ok 35 - WHAT[managed-session-lifecycle-025] SIGKILL after Ended COMMIT recovers the same native exit without replay (node)
+  ---
+  duration_ms: 1278.525916
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] SIGKILL before Ended COMMIT recovers the same native exit without replay (bun)
+ok 36 - WHAT[managed-session-lifecycle-025] SIGKILL before Ended COMMIT recovers the same native exit without replay (bun)
+  ---
+  duration_ms: 1374.411417
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] SIGKILL after Ended COMMIT recovers the same native exit without replay (bun)
+ok 37 - WHAT[managed-session-lifecycle-025] SIGKILL after Ended COMMIT recovers the same native exit without replay (bun)
+  ---
+  duration_ms: 1453.667708
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] SIGKILL after Reserve COMMIT before physical preparation preserves its unknown obligation and never launches on restart
+ok 38 - WHAT[managed-session-lifecycle-025] SIGKILL after Reserve COMMIT before physical preparation preserves its unknown obligation and never launches on restart
+  ---
+  duration_ms: 975.473334
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (node)
+ok 39 - WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (node)
+  ---
+  duration_ms: 1630.773958
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (node)
+ok 40 - WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (node)
+  ---
+  duration_ms: 1756.310542
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (bun)
+ok 41 - WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost before COMMIT preserves failure and never replays (bun)
+  ---
+  duration_ms: 1807.172125
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (bun)
+ok 42 - WHAT[managed-session-lifecycle-025] recovered Ended acknowledgement lost after COMMIT preserves failure and never replays (bun)
+  ---
+  duration_ms: 1737.0885
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (node)
+ok 43 - WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (node)
+  ---
+  duration_ms: 2160.791291
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (node)
+ok 44 - WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (node)
+  ---
+  duration_ms: 2248.50225
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (bun)
+ok 45 - WHAT[managed-session-lifecycle-025] a foreign proof receipt preserves the exact blocker while another PTY drains (bun)
+  ---
+  duration_ms: 2336.34275
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (bun)
+ok 46 - WHAT[managed-session-lifecycle-025] a foreign instance receipt preserves the exact blocker while another PTY drains (bun)
+  ---
+  duration_ms: 2507.437333
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] local late-not-started preserves its exact evidence kind (node)
+ok 47 - WHAT[managed-session-lifecycle-025] local late-not-started preserves its exact evidence kind (node)
+  ---
+  duration_ms: 5526.381459
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (node)
+ok 48 - WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (node)
+  ---
+  duration_ms: 1334.613209
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] local missing-bun preserves its exact evidence kind (node)
+ok 49 - WHAT[managed-session-lifecycle-025] local missing-bun preserves its exact evidence kind (node)
+  ---
+  duration_ms: 5422.41875
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (node)
+ok 50 - WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (node)
+  ---
+  duration_ms: 1368.71325
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] local late-not-started preserves its exact evidence kind (bun)
+ok 51 - WHAT[managed-session-lifecycle-025] local late-not-started preserves its exact evidence kind (bun)
+  ---
+  duration_ms: 5544.008042
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (bun)
+ok 52 - WHAT[managed-session-lifecycle-025] local stream-loss preserves its exact evidence kind (bun)
+  ---
+  duration_ms: 1371.261
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (bun)
+ok 53 - WHAT[managed-session-lifecycle-025] a local observation failure still drains another recoverable old instance (bun)
+  ---
+  duration_ms: 1362.003333
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (node)
+ok 54 - WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (node)
+  ---
+  duration_ms: 1178.901666
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (bun)
+ok 55 - WHAT[managed-session-lifecycle-025] losing both creator and physical owner cannot clear a PTY from missing PIDs or replay it (bun)
+  ---
+  duration_ms: 1292.290042
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost before COMMIT
+ok 56 - WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost before COMMIT
+  ---
+  duration_ms: 1030.766333
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost after COMMIT
+ok 57 - WHAT[managed-session-lifecycle-025] a real local PTY exits despite Drain acknowledgement lost after COMMIT
+  ---
+  duration_ms: 1056.760708
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] two Bun processes enforce stop-first admission with the real PTY backend
+ok 58 - WHAT[managed-session-lifecycle-025] two Bun processes enforce stop-first admission with the real PTY backend
+  ---
+  duration_ms: 758.510042
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] two Bun processes enforce reserve-first admission with the real PTY backend
+ok 59 - WHAT[managed-session-lifecycle-025] two Bun processes enforce reserve-first admission with the real PTY backend
+  ---
+  duration_ms: 1427.19275
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] controlled PTY port completion clears actual HostForkRuntime ownership and name bookkeeping
+ok 60 - WHAT[managed-session-lifecycle-025] controlled PTY port completion clears actual HostForkRuntime ownership and name bookkeeping
+  ---
+  duration_ms: 2.121375
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] an unproven spawn exception retains its ownership blocker
+ok 61 - WHAT[managed-session-lifecycle-025] an unproven spawn exception retains its ownership blocker
+  ---
+  duration_ms: 0.321125
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] the production backend refuses a PTY without a durable owner before reservation or spawn
+ok 62 - WHAT[managed-session-lifecycle-025] the production backend refuses a PTY without a durable owner before reservation or spawn
+  ---
+  duration_ms: 0.21575
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] synchronous backend exit is observed before Fork returns
+ok 63 - WHAT[managed-session-lifecycle-025] synchronous backend exit is observed before Fork returns
+  ---
+  duration_ms: 0.472
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] close without an exit witness fails and preserves the live blocker
+ok 64 - WHAT[managed-session-lifecycle-025] close without an exit witness fails and preserves the live blocker
+  ---
+  duration_ms: 0.894458
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a failed startup observation cannot publish Ended for an unresolved process
+ok 65 - WHAT[managed-session-lifecycle-025] a failed startup observation cannot publish Ended for an unresolved process
+  ---
+  duration_ms: 0.533375
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] closeAll Cancel receipt loss before COMMIT still closes each exact local process
+ok 66 - WHAT[managed-session-lifecycle-025] closeAll Cancel receipt loss before COMMIT still closes each exact local process
+  ---
+  duration_ms: 12.656583
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] closeAll Cancel receipt loss after COMMIT still closes each exact local process
+ok 67 - WHAT[managed-session-lifecycle-025] closeAll Cancel receipt loss after COMMIT still closes each exact local process
+  ---
+  duration_ms: 11.293708
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] detach Cancel receipt loss before COMMIT still closes each exact local process
+ok 68 - WHAT[managed-session-lifecycle-025] detach Cancel receipt loss before COMMIT still closes each exact local process
+  ---
+  duration_ms: 13.018875
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] detach Cancel receipt loss after COMMIT still closes each exact local process
+ok 69 - WHAT[managed-session-lifecycle-025] detach Cancel receipt loss after COMMIT still closes each exact local process
+  ---
+  duration_ms: 11.655667
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] cancel Cancel receipt loss before COMMIT still closes each exact local process
+ok 70 - WHAT[managed-session-lifecycle-025] cancel Cancel receipt loss before COMMIT still closes each exact local process
+  ---
+  duration_ms: 9.856958
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] cancel Cancel receipt loss after COMMIT still closes each exact local process
+ok 71 - WHAT[managed-session-lifecycle-025] cancel Cancel receipt loss after COMMIT still closes each exact local process
+  ---
+  duration_ms: 10.619292
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] close Cancel receipt loss before COMMIT still closes each exact local process
+ok 72 - WHAT[managed-session-lifecycle-025] close Cancel receipt loss before COMMIT still closes each exact local process
+  ---
+  duration_ms: 9.260291
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] close Cancel receipt loss after COMMIT still closes each exact local process
+ok 73 - WHAT[managed-session-lifecycle-025] close Cancel receipt loss after COMMIT still closes each exact local process
+  ---
+  duration_ms: 10.127709
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Reserve receipt loss before COMMIT never authorizes Spawn
+ok 74 - WHAT[managed-session-lifecycle-025] Reserve receipt loss before COMMIT never authorizes Spawn
+  ---
+  duration_ms: 7.837083
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Reserve receipt loss after COMMIT never authorizes Spawn
+ok 75 - WHAT[managed-session-lifecycle-025] Reserve receipt loss after COMMIT never authorizes Spawn
+  ---
+  duration_ms: 7.932208
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Drain receipt loss before COMMIT cannot reopen a permanently detaching runtime
+ok 76 - WHAT[managed-session-lifecycle-025] Drain receipt loss before COMMIT cannot reopen a permanently detaching runtime
+  ---
+  duration_ms: 8.833417
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Drain receipt loss after COMMIT cannot reopen a permanently detaching runtime
+ok 77 - WHAT[managed-session-lifecycle-025] Drain receipt loss after COMMIT cannot reopen a permanently detaching runtime
+  ---
+  duration_ms: 8.578167
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] detach reconciles Ended receipt loss before COMMIT before reporting success
+ok 78 - WHAT[managed-session-lifecycle-025] detach reconciles Ended receipt loss before COMMIT before reporting success
+  ---
+  duration_ms: 11.037541
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] detach reconciles Ended receipt loss after COMMIT before reporting success
+ok 79 - WHAT[managed-session-lifecycle-025] detach reconciles Ended receipt loss after COMMIT before reporting success
+  ---
+  duration_ms: 12.589459
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] detach with no local PTY preserves another runtime on the same port and durable root
+ok 80 - WHAT[managed-session-lifecycle-025] detach with no local PTY preserves another runtime on the same port and durable root
+  ---
+  duration_ms: 8.87225
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] detach with one local PTY preserves another runtime on the same port and durable root
+ok 81 - WHAT[managed-session-lifecycle-025] detach with one local PTY preserves another runtime on the same port and durable root
+  ---
+  duration_ms: 14.845375
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] cancel with no local PTY preserves another runtime on the same port and durable root
+ok 82 - WHAT[managed-session-lifecycle-025] cancel with no local PTY preserves another runtime on the same port and durable root
+  ---
+  duration_ms: 8.359583
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] cancel with one local PTY preserves another runtime on the same port and durable root
+ok 83 - WHAT[managed-session-lifecycle-025] cancel with one local PTY preserves another runtime on the same port and durable root
+  ---
+  duration_ms: 11.317875
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] permanent detach removes its shared port listener while reusable drain keeps its listener
+ok 84 - WHAT[managed-session-lifecycle-025] permanent detach removes its shared port listener while reusable drain keeps its listener
+  ---
+  duration_ms: 0.672625
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a terminated parent runtime without an initial PTY refuses new reserve or spawn and releases its listener
+ok 85 - WHAT[managed-session-lifecycle-025] a terminated parent runtime without an initial PTY refuses new reserve or spawn and releases its listener
+  ---
+  duration_ms: 0.1895
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a terminated parent runtime with an initial PTY refuses new reserve or spawn and releases its listener
+ok 86 - WHAT[managed-session-lifecycle-025] a terminated parent runtime with an initial PTY refuses new reserve or spawn and releases its listener
+  ---
+  duration_ms: 0.8985
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] cancellation that retains the canonical fixed DevOps keeps PTY reuse and completion delivery
+ok 87 - WHAT[managed-session-lifecycle-025] cancellation that retains the canonical fixed DevOps keeps PTY reuse and completion delivery
+  ---
+  duration_ms: 46.471458
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] failed terminal cancellation retains observation until exit while keeping new PTY admission closed
+ok 88 - WHAT[managed-session-lifecycle-025] failed terminal cancellation retains observation until exit while keeping new PTY admission closed
+  ---
+  duration_ms: 0.390666
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] failed detach retains its exit listener until a late exit observation settles the last lease
+ok 89 - WHAT[managed-session-lifecycle-025] failed detach retains its exit listener until a late exit observation settles the last lease
+  ---
+  duration_ms: 0.300958
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] detach rejects when the exact Ended observation still cannot be committed
+ok 90 - WHAT[managed-session-lifecycle-025] detach rejects when the exact Ended observation still cannot be committed
+  ---
+  duration_ms: 9.452208
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Ended receipt loss before COMMIT replays the exact exit observation
+ok 91 - WHAT[managed-session-lifecycle-025] Ended receipt loss before COMMIT replays the exact exit observation
+  ---
+  duration_ms: 9.170708
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] Ended receipt loss after COMMIT replays the exact exit observation
+ok 92 - WHAT[managed-session-lifecycle-025] Ended receipt loss after COMMIT replays the exact exit observation
+  ---
+  duration_ms: 9.76775
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a durable reservation precedes Spawn and survives runtime reconstruction without replay
+ok 93 - WHAT[managed-session-lifecycle-025] a durable reservation precedes Spawn and survives runtime reconstruction without replay
+  ---
+  duration_ms: 8.409334
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] ending one runtime scope does not close a successor scope in the same durable registry
+ok 94 - WHAT[managed-session-lifecycle-025] ending one runtime scope does not close a successor scope in the same durable registry
+  ---
+  duration_ms: 9.745875
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a fresh process sees a prior reservation and refuses to close or replay an unbound instance
+ok 95 - WHAT[managed-session-lifecycle-025] a fresh process sees a prior reservation and refuses to close or replay an unbound instance
+  ---
+  duration_ms: 675.502083
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a run drain rejects new local PTYs until exit and permits the next DevOps run
+ok 96 - WHAT[managed-session-lifecycle-025] a run drain rejects new local PTYs until exit and permits the next DevOps run
+  ---
+  duration_ms: 0.863166
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] DevOps run terminal settlement closes every PTY the DevOps child owns at the port boundary
+ok 97 - WHAT[managed-session-lifecycle-025] DevOps run terminal settlement closes every PTY the DevOps child owns at the port boundary
+  ---
+  duration_ms: 47.287334
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] fixed DevOps work return drains its PTY residue without affecting other runtimes
+ok 98 - WHAT[managed-session-lifecycle-025] fixed DevOps work return drains its PTY residue without affecting other runtimes
+  ---
+  duration_ms: 42.171333
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] registered production terminal callback drains DevOps once and ignores a late callback after completion
+ok 99 - WHAT[managed-session-lifecycle-025] registered production terminal callback drains DevOps once and ignores a late callback after completion
+  ---
+  duration_ms: 113.780041
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] registered Aborted terminal preserves eligibility and can receive a later valid terminal
+not ok 100 - WHAT[managed-session-lifecycle-025] registered Aborted terminal preserves eligibility and can receive a later valid terminal
+  ---
+  duration_ms: 75.665458
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1261:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] registered Missing terminal preserves eligibility and can receive a later valid terminal
+not ok 101 - WHAT[managed-session-lifecycle-025] registered Missing terminal preserves eligibility and can receive a later valid terminal
+  ---
+  duration_ms: 77.777167
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1261:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] registered Empty terminal preserves eligibility and can receive a later valid terminal
+not ok 102 - WHAT[managed-session-lifecycle-025] registered Empty terminal preserves eligibility and can receive a later valid terminal
+  ---
+  duration_ms: 73.371625
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1261:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] registered ForeignRoot terminal preserves eligibility and can receive a later valid terminal
+not ok 103 - WHAT[managed-session-lifecycle-025] registered ForeignRoot terminal preserves eligibility and can receive a later valid terminal
+  ---
+  duration_ms: 74.436666
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1261:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] registered ForeignChild terminal preserves eligibility and can receive a later valid terminal
+not ok 104 - WHAT[managed-session-lifecycle-025] registered ForeignChild terminal preserves eligibility and can receive a later valid terminal
+  ---
+  duration_ms: 73.311
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1251:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/managed-session-lifecycle/tests/025.test.mjs:1261:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] registered Failed terminal preserves eligibility and can receive a later valid terminal
+ok 105 - WHAT[managed-session-lifecycle-025] registered Failed terminal preserves eligibility and can receive a later valid terminal
+  ---
+  duration_ms: 83.198166
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget durable PTYs without local physical bindings
+ok 106 - WHAT[managed-session-lifecycle-025] a cold DevOps terminal cannot forget durable PTYs without local physical bindings
+  ---
+  duration_ms: 86.139709
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a DevOps terminal cannot silently bypass a missing round-drain capability
+ok 107 - WHAT[managed-session-lifecycle-025] a DevOps terminal cannot silently bypass a missing round-drain capability
+  ---
+  duration_ms: 43.722292
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] a cold return with zero known PTYs still durably stops admission for the exact round
+ok 108 - WHAT[managed-session-lifecycle-025] a cold return with zero known PTYs still durably stops admission for the exact round
+  ---
+  duration_ms: 93.507292
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty TERM waits for exit and escalates to KILL before releasing ownership
+ok 109 - WHAT[managed-session-lifecycle-025] real bun-pty TERM waits for exit and escalates to KILL before releasing ownership
+  ---
+  duration_ms: 827.424292
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty ended-before preserves ownership until scope exit is known
+ok 110 - WHAT[managed-session-lifecycle-025] real bun-pty ended-before preserves ownership until scope exit is known
+  ---
+  duration_ms: 616.687375
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty ended-after preserves ownership until scope exit is known
+ok 111 - WHAT[managed-session-lifecycle-025] real bun-pty ended-after preserves ownership until scope exit is known
+  ---
+  duration_ms: 599.47925
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty shared-detach preserves ownership until scope exit is known
+ok 112 - WHAT[managed-session-lifecycle-025] real bun-pty shared-detach preserves ownership until scope exit is known
+  ---
+  duration_ms: 919.210917
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty shared-cancel preserves ownership until scope exit is known
+ok 113 - WHAT[managed-session-lifecycle-025] real bun-pty shared-cancel preserves ownership until scope exit is known
+  ---
+  duration_ms: 888.784667
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty cancel-close-before preserves ownership until scope exit is known
+ok 114 - WHAT[managed-session-lifecycle-025] real bun-pty cancel-close-before preserves ownership until scope exit is known
+  ---
+  duration_ms: 903.445709
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty cancel-close-after preserves ownership until scope exit is known
+ok 115 - WHAT[managed-session-lifecycle-025] real bun-pty cancel-close-after preserves ownership until scope exit is known
+  ---
+  duration_ms: 888.23925
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty cancel-closeAll-before preserves ownership until scope exit is known
+ok 116 - WHAT[managed-session-lifecycle-025] real bun-pty cancel-closeAll-before preserves ownership until scope exit is known
+  ---
+  duration_ms: 879.069416
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty cancel-closeAll-after preserves ownership until scope exit is known
+ok 117 - WHAT[managed-session-lifecycle-025] real bun-pty cancel-closeAll-after preserves ownership until scope exit is known
+  ---
+  duration_ms: 891.119208
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty cancel-detach-before preserves ownership until scope exit is known
+ok 118 - WHAT[managed-session-lifecycle-025] real bun-pty cancel-detach-before preserves ownership until scope exit is known
+  ---
+  duration_ms: 970.174792
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty cancel-detach-after preserves ownership until scope exit is known
+ok 119 - WHAT[managed-session-lifecycle-025] real bun-pty cancel-detach-after preserves ownership until scope exit is known
+  ---
+  duration_ms: 933.776917
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty cancel-cancel-before preserves ownership until scope exit is known
+ok 120 - WHAT[managed-session-lifecycle-025] real bun-pty cancel-cancel-before preserves ownership until scope exit is known
+  ---
+  duration_ms: 865.618792
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty cancel-cancel-after preserves ownership until scope exit is known
+ok 121 - WHAT[managed-session-lifecycle-025] real bun-pty cancel-cancel-after preserves ownership until scope exit is known
+  ---
+  duration_ms: 900.54125
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty leader-exit preserves ownership until scope exit is known
+ok 122 - WHAT[managed-session-lifecycle-025] real bun-pty leader-exit preserves ownership until scope exit is known
+  ---
+  duration_ms: 700.063875
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty leader-natural preserves ownership until scope exit is known
+ok 123 - WHAT[managed-session-lifecycle-025] real bun-pty leader-natural preserves ownership until scope exit is known
+  ---
+  duration_ms: 664.593959
+  ...
+# Subtest: WHAT[managed-session-lifecycle-025] real bun-pty owner-lost preserves ownership until scope exit is known
+ok 124 - WHAT[managed-session-lifecycle-025] real bun-pty owner-lost preserves ownership until scope exit is known
+  ---
+  duration_ms: 510.364084
+  ...
+1..124
+# tests 124
+# suites 0
+# pass 118
+# fail 5
+# cancelled 1
+# skipped 0
+# todo 0
+# duration_ms 103048.418209

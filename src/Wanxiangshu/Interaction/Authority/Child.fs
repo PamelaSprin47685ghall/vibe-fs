@@ -4,8 +4,6 @@ open Wanxiangshu.Participant.Provider.Attempt.Fallback
 
 open Wanxiangshu.Composition.Turn
 open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session.Recovery
 open Wanxiangshu.Foundation

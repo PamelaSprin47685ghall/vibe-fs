@@ -73,10 +73,10 @@ test('WHAT[repository-programming-007] JS005_bindings_file_reads_utf8', () => {
   try {
     writeFileSync(join(dir, 'a.txt'), 'hello', 'utf8')
     const binding = createApi(dir)
-    const result = apiOf(binding).js.cat('a.txt')
+    const result = apiOf(binding).cat('a.txt')
     assert.equal(result.ok, true)
     assert.equal(result.text, 'hello')
-    const missing = apiOf(binding).js.cat('nope.txt')
+    const missing = apiOf(binding).cat('nope.txt')
     assert.equal(missing.ok, false)
     assert.equal(missing.code, 'FILE_NOT_FOUND')
   } finally {

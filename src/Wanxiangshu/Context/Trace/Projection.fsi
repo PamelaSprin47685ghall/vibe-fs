@@ -1,6 +1,5 @@
 namespace Wanxiangshu.Context.Trace
 
-open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Foundation
 
@@ -156,7 +155,6 @@ module XTraceProjection =
     val internal currentGenerationParts: parts: XTracePartRef list -> XTracePartRef list
     val internal canonicalParts: ordered: XTracePartRef list -> XTracePartRef list
     val currentGenerationSemanticParts: state: XTraceProjectionState -> XTraceSemanticPartView list
-    val lastCursorBeforeSemantic: nextCursor: SemanticCursor -> state: XTraceProjectionState -> XTraceCursor option
 
     val providerRunParts:
         providerRun: ProviderRunIdentity -> state: XTraceProjectionState -> XTraceSemanticPartView list
@@ -185,6 +183,6 @@ module XTraceProjection =
     val frontierTurn: state: XTraceProjectionState -> int option
     val tryOpeningHostMessageId: state: XTraceProjectionState -> string option
     val hostMessageIdsBeforeTurn: cutoffExclusive: int -> state: XTraceProjectionState -> string list
-    val internal semanticCursorFor: sequence: int64 -> state: XTraceProjectionState -> SemanticCursor
-    val semanticCursorAfter: cursor: XTraceCursor -> state: XTraceProjectionState -> SemanticCursor
-    val semanticCursorAfterCoverage: coverage: RecordCoverage -> state: XTraceProjectionState -> SemanticCursor
+    val internal semanticCursorFor: sequence: int64 -> state: XTraceProjectionState -> XTraceCursor
+    val semanticCursorAfter: cursor: XTraceCursor -> state: XTraceProjectionState -> XTraceCursor
+    val semanticCursorAfterCoverage: coverage: RecordCoverage -> state: XTraceProjectionState -> XTraceCursor

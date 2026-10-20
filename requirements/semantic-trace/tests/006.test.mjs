@@ -1,10 +1,10 @@
 import test from 'node:test'
 
 for (const layout of ['single tool', 'late result after text', 'late result after another message']) {
-  test(`WHAT[semantic-trace-006] Blogger coverage consumes only the durable prefix it received (${layout})`, async () => {
+  test(`WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (${layout})`, async () => {
     const assert = (await import('node:assert/strict')).default
     const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
-    const { withReopenableJournal, commitFrame, record } = await import('../../work-record/tests/support/record.mjs')
+    const { withReopenableJournal } = await import('./support/journal.mjs')
     await withReopenableJournal(async (handle, reopen) => {
       const session = `facet-prefix-${layout}`
       const withText = layout === 'late result after text'
@@ -23,32 +23,23 @@ for (const layout of ['single tool', 'late result after text', 'late result afte
       const canonical = await trace.currentProjection(handle, session)
       const kinds = canonical.messages.flatMap(message => message.parts.map(part => part.kind))
       assert.deepEqual(kinds, ['tool-call', ...(withText || withOther ? ['text'] : []), 'tool-result'])
-      const first = await record.nextBloggerRequest(handle, session)
-      assert.equal(first.nextSequence, 1n)
-      assert.equal(first.toml.includes(result), false)
-      assert.equal(first.toml.includes('TEXT-BEFORE-LATE-RESULT'), false)
-      assert.equal(first.toml.includes('OTHER-MESSAGE'), false)
-      await commitFrame(handle, session, { from: 0, through: first.nextSequence, body: 'Only the offered tool call', id: layout })
       const expectedCursor = withOther ? { turn: 1, partIndex: 0 } : { turn: 0, partIndex: 1 }
       assert.deepEqual(trace.semanticCursorAfter(trace.cursor(1), trace.snapshot(handle, session)), expectedCursor)
-      const next = await record.nextBloggerRequest(handle, session)
-      assert.equal(next.previousSequence, 1n)
-      assert.equal(next.nextSequence, withText || withOther ? 3n : 2n)
-      assert.equal(next.toml.includes(result), true)
-      assert.equal(next.toml.includes('CALL-'), false)
-      if (withText) assert.equal(next.toml.includes('TEXT-BEFORE-LATE-RESULT'), true)
-      if (withOther) assert.equal(next.toml.includes('OTHER-MESSAGE'), true)
+      const material = JSON.stringify(canonical)
+      assert.ok(material.includes(call))
+      assert.ok(material.includes(result))
+      if (withText) assert.ok(material.includes('TEXT-BEFORE-LATE-RESULT'))
+      if (withOther) assert.ok(material.includes('OTHER-MESSAGE'))
       const cold = await reopen()
-      assert.deepEqual(await record.nextBloggerRequest(cold, session), next)
       assert.deepEqual(await trace.currentProjection(cold, session), canonical)
     })
   })
 }
 
-test('WHAT[semantic-trace-006] actual Blogger request evidence preserves a durable cursor beyond Int32', async () => {
+test('WHAT[semantic-trace-006] a semantic cursor beyond Int32 selects the exact durable material after reopen', async () => {
   const assert = (await import('node:assert/strict')).default
   const journal = await import('../../../dist/Persistence/Journal/Surface.js')
-  const record = await import('../../../dist/Mission/WorkRecord/Surface.js')
+  const trace = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
   const { withReopenableJournal } = await import('./support/journal.mjs')
   await withReopenableJournal(async (handle, reopen) => {
     const session = 'large-cursor-proof'
@@ -63,13 +54,14 @@ test('WHAT[semantic-trace-006] actual Blogger request evidence preserves a durab
       },
     })
     assert.equal(appended.ok, true, JSON.stringify(appended.error))
-    const offered = await record.nextBloggerRequest(handle, session)
-    assert.ok(offered)
-    assert.equal(offered.nextSequence, sequence)
-    assert.equal(offered.previousSequence, 0n)
-    assert.equal(offered.frameEpoch, 0n)
-    assert.equal(offered.observedPrefixEpoch, 0n)
-    assert.deepEqual(await record.nextBloggerRequest(await reopen(), session), offered)
+    const cursor = { sequence: sequence.toString() }
+    const cut = trace.traceCutAt(cursor, trace.snapshot(handle, session))
+    const range = { start: cursor, endExclusive: { sequence: (sequence + 1n).toString() } }
+    const material = await trace.renderRange(handle, session, range)
+    assert.match(material, /actual confirmed material/)
+    const cold = await reopen()
+    assert.deepEqual(trace.traceCutAt(cursor, trace.snapshot(cold, session)), cut)
+    assert.equal(await trace.renderRange(cold, session, range), material)
   })
 })
 

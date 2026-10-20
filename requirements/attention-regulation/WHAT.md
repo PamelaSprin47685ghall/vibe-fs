@@ -1,6 +1,6 @@
 # attention-regulation — WHAT
 
-本包现为退休边界（superseded by `assume` and the `todowrite-for-<role>` ANCHOR `view.thenRemove` summary declaration）：`enough`、`abandon` 与 `defer` 工具及其 `Attention` 持久投影均已退役。保留这些条款，是为了锚定替代路径并防止已退役的注意力状态机回流生产路径。
+本包现为退休边界（superseded by `assume` and the `todowrite-for-<role>` ANCHOR `view.thenMap` summary declaration）：`enough`、`abandon` 与 `defer` 工具及其 `Attention` 持久投影均已退役。保留这些条款，是为了锚定替代路径并防止已退役的注意力状态机回流生产路径。
 
 ## [001] enough 语义并入 assume
 
@@ -10,9 +10,9 @@
 
 `abandon` 工具已退休。放弃自行形成的计划、推论或假设（无须审批或理由检验，使其不再自动占用注意力）的语义，改由 `assume(assumption)` 表达。放弃自我承诺不得取消真实任务义务、撤销用户授权、删除工作产物或终止会话。禁止以兼容、别名或历史名义重新注册 `abandon` 或任何同名工具。
 
-## [003] defer 退役，旁支记录并入编程面与 ANCHOR view.thenRemove 摘要
+## [003] defer 退役，旁支记录并入编程面与 ANCHOR view.thenMap 摘要
 
-`defer(new_work)` 工具已彻底退役，不在 `StaticTools.knownToolNames`、`permissionFor`、`requestToolMap`、`ToolRegistry` 或 `resources/ablation/tool-map.json` 中登记或放行。非阻塞旁支工作改由编程面（`todowrite-for-<role>`）内顺序编排、ANCHOR 视图声明的 `thenRemove` 摘要（把旧段替换成模型自己写的过话）以及 `assume(assumption)` 承载。Pair Hint（`resources/provider/host/pair-programming-guideline/**`）不再注入 `defer` 鼓励句；`resources/provider/attention-regulation/**` 资源文件全部删除。
+`defer(new_work)` 工具已彻底退役，不在 `StaticTools.knownToolNames`、`permissionFor`、`requestToolMap`、`ToolRegistry` 或 `resources/ablation/tool-map.json` 中登记或放行。非阻塞旁支工作改由编程面（`todowrite-for-<role>`）内顺序编排、ANCHOR 视图声明的 `thenMap` 摘要（把旧段替换成模型自己写的过话）以及 `assume(assumption)` 承载。Pair Hint（`resources/provider/host/pair-programming-guideline/**`）不再注入 `defer` 鼓励句；`resources/provider/attention-regulation/**` 资源文件全部删除。
 
 ## [004] 不存在 Interaction/Attention 运行时或工具模块
 

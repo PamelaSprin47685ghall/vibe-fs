@@ -9,6 +9,14 @@ open Wanxiangshu.Persistence.Journal
 [<RequireQualifiedAccess>]
 module SemanticTraceSurface =
 
+    val completeWithoutDelivery:
+        role: string ->
+        session: string ->
+        authorityRoot: string ->
+        providerRun: string ->
+        text: string ->
+            System.Threading.Tasks.Task<obj>
+
     /// Opaque proof capability for the semantic-trace owner.
     type SemanticTraceProjection =
         private new: state: XTraceProjectionState -> SemanticTraceProjection
@@ -83,7 +91,6 @@ module SemanticTraceSurface =
     val sliceBetween: start: 'a -> endExclusive: 'b -> values: 'c -> obj array
     val sliceFrom: start: 'a -> values: 'b -> obj array
     val forOpening: values: 'a -> obj array
-    val forWorkRecord: values: 'a -> obj array
     val render: values: 'a -> string
     val flatten: messages: 'a -> obj array
     val snapshot: handle: JournalHandle -> sessionId: string -> SemanticTraceProjection

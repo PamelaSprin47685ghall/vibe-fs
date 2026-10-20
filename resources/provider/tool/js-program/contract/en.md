@@ -6,7 +6,7 @@ request. It can {{verbs}} files in one program — including large parallel batc
 
 Strongly recommended:
 - Call {{toolName}} instead of read/edit/write/glob/grep/patch whenever possible.
-{{editRecommendation}}
+
 - Write complex JavaScript in one {{toolName}} program rather than many legacy RPCs.
 {{parallelLine}}
 

@@ -1,4 +1,4 @@
-export const oneCommand = (command, { maxDuration = 5000, onExit = '', fields = '' } = {}) => `class extends js.Callable {
+export const oneCommand = (command, { maxDuration = 5000, onExit = '', fields = '' } = {}) => `class extends this.Callable {
   maxDuration = ${maxDuration};
   interval = 25;
   ${fields}

@@ -9,8 +9,7 @@ type JsSurface =
       Members: JsCapabilityFragment list
       Description: string
       BaseClassSource: string
-      Examples: string list
-      RuntimeBindings: Map<string, string> }
+      Examples: string list }
 
 module JsToolGenerator =
     val membersFor: capabilities: Set<JsCapability> -> JsCapabilityFragment list
@@ -25,8 +24,6 @@ module JsToolGenerator =
 
     val generate:
         roleName: string -> capabilities: Set<ToolPermission> -> prose: JsCanonicalDescription.Prose -> JsSurface option
-
-    val generatePredictor: prose: JsCanonicalDescription.Prose -> JsSurface
 
     val isGeneratedToolName: roleName: string -> capabilities: Set<ToolPermission> -> toolName: string -> bool
     val memberBinding: roleName: string -> capabilities: Set<ToolPermission> -> memberName: string -> string option

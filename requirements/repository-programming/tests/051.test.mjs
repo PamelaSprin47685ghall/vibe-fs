@@ -47,7 +47,7 @@ test('WHAT[repository-programming-051] spawn, waitFor and signal drive one backg
     )
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 15000;
       interval = 100;
       next(ctx) {
@@ -79,7 +79,7 @@ test('WHAT[repository-programming-051] waitFor on a closed port fails with CALL_
     const port = await freePort()
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? { waitFor: { port: ${port}, timeoutMs: 300 } } : null; }
@@ -102,7 +102,7 @@ test('WHAT[repository-programming-051] signal on an unknown name fails with CALL
   try {
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? { signal: "SIGTERM", name: "nope" } : null; }
@@ -126,7 +126,7 @@ test('WHAT[repository-programming-051] a crashed background is visible to watch 
     const port = await freePort()
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 10000;
       interval = 100;
       next(ctx) {

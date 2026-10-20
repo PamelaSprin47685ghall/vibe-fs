@@ -16,7 +16,7 @@ test('WHAT[process-execution-013] js.call bounds large output deterministically 
     const cmd2 = nodeCommand(`process.stdout.write('b'.repeat(200000) + '-TAIL-MARK')`)
     const outcome = await runProgram(
       dir,
-      `    const r = await js.call(class extends js.Callable {
+      `    const r = await this.call(class extends this.Callable {
       maxDuration = 10000;
       interval = 100;
       next(ctx) {
@@ -56,7 +56,7 @@ test('WHAT[process-execution-013] small output preserves separate stdout and std
     const outcome = await runProgram(
       dir,
       `    let exited = null;
-    const r = await js.call(class extends js.Callable {
+    const r = await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
@@ -103,7 +103,7 @@ test('WHAT[process-execution-013] the actual registered tool returns bilingual b
         const beforePrompts = runtime.prompts.length
         const command = nodeCommand("process.stdout.write('RAW-HEAD-' + '中文🔥'.repeat(40000) + '-RAW-TAIL'); process.stderr.write('诊断😀'.repeat(30000)); process.exitCode = 7")
         const wire = await hooks.tool['todowrite-for-devops'].execute({
-          program: program(`return await js.call(${oneCommand(command, { fields: 'outputBudgetBytes = 2048; worldLock = true;' })});`),
+          program: program(`return await this.call(${oneCommand(command, { fields: 'outputBudgetBytes = 2048; worldLock = true;' })});`),
         }, { sessionID, agent: 'devops', messageID: 'large-output-assistant', callID: `large-${language}` })
         const result = parse(wire).data
         assert.equal(result.status, 'completed', wire)

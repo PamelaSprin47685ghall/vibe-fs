@@ -33,7 +33,7 @@ test('WHAT[process-execution-011] js.call rejects incomplete Callable specs befo
       `class { maxDuration = 1000; next() { return ${JSON.stringify(cmd)}; } }`,
     ]
     for (const spec of incompleteSpecs) {
-      const outcome = await runProgram(dir, `    return await js.call(${spec});`)
+      const outcome = await runProgram(dir, `    return await this.call(${spec});`)
       assert.equal(caseName(outcome), 'Failed')
       assert.match(render(outcome), /CALLABLE_SPEC_INCOMPLETE/)
       assert.equal(existsSync(marker), false, 'incomplete Runnable spec must not spawn the command')
@@ -48,7 +48,7 @@ test('WHAT[process-execution-011] js.call rejects unsupported command descriptor
   try {
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 2000;
       next(ctx) { return ctx.step === 0 ? { unsupported: true } : null; }
       watch(ctx) { return ctx.remainingMs > 0; }
@@ -68,7 +68,7 @@ test('WHAT[process-execution-011] js.call maxDuration overrun terminates the for
     const marker = join(dir, 'late-marker')
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 150;
       interval = 30;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late-marker" : null; }
@@ -94,7 +94,7 @@ test('WHAT[process-execution-011] malformed command descriptors and output budge
       'outputBudgetBytes = NaN;', 'outputBudgetBytes = Infinity;',
       'outputBudgetBytes = "2048";', 'worldLock = "true";',
     ]) {
-      const outcome = await runProgram(dir, `return await js.call(${oneCommand(command, { fields })});`)
+      const outcome = await runProgram(dir, `return await this.call(${oneCommand(command, { fields })});`)
       assert.equal(caseName(outcome), 'Failed')
       assert.match(render(outcome), /CALL_OUTPUT_BUDGET_INVALID|CALL_WORLD_LOCK_INVALID/)
       assert.equal(existsSync(marker), false)
@@ -110,7 +110,7 @@ test('WHAT[process-execution-011] malformed command descriptors and output budge
       '{ waitFor: { port: 80, timeoutMs: NaN } }',
       `{ spawn: ${JSON.stringify(command)}, name: "invalid", signal: "SIGTERM" }`,
     ]) {
-      const outcome = await runProgram(dir, `return await js.call(class extends js.Callable {
+      const outcome = await runProgram(dir, `return await this.call(class extends this.Callable {
         maxDuration = 1000;
         next(ctx) { return ctx.step === 0 ? ${descriptor} : null; }
         watch(ctx) { return ctx.remainingMs > 0; }

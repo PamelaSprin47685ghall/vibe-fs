@@ -8,8 +8,12 @@ import {
   caseName,
   parkedHandle,
   parkedPayload,
+  failureCode,
+  failureReason,
+  clearParkedSites,
   render,
 } from '../../../dist/Repository/Programming/Js/WorkflowSurface.js'
+import { deliveredValue, clearDeliveredValue } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
 const sandbox = () => {
   const dir = mkdtempSync(join(tmpdir(), 'wxs-park-'))
@@ -67,6 +71,66 @@ test('WHAT[repository-programming-030] park is an async member that suspends at 
     assert.equal(caseName(outcome), 'Parked')
     assert.deepEqual(parkedPayload(outcome), { n: 1 }, 'the first park wins the race')
   } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-030] another session parking does not block this session deliver (LC-008)', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    clearParkedSites()
+    clearDeliveredValue('sess-030-a')
+    clearDeliveredValue('sess-030-b')
+
+    // Session A parks and never resolves: the site stays in the table.
+    const parked = await runProgram(dir, `    await this.park({ stage: 'review' });`, 'sess-030-a')
+    assert.equal(caseName(parked), 'Parked')
+    const handle = parkedHandle(parked)
+
+    // LC-008: session A's own deliver is blocked by its own parked handle...
+    const blocked = await runProgram(dir, `    await this.deliver({ final: true });`, 'sess-030-a')
+    assert.equal(caseName(blocked), 'Failed')
+    assert.equal(failureCode(blocked), 'PROGRAM_FAILED')
+    assert.match(failureReason(blocked), /delivery is blocked while this session has unresolved parked handles/)
+    assert.match(failureReason(blocked), new RegExp(handle), 'refusal names the offending handle')
+    assert.equal(deliveredValue('sess-030-a'), null, 'a blocked deliver never populates the session cell')
+
+    // ...while session B's deliver goes through untouched by A's park.
+    const other = await runProgram(dir, `    await this.deliver({ prefixUntil: 0, thenMap: {} });`, 'sess-030-b')
+    assert.equal(caseName(other), 'Succeeded')
+  } finally {
+    clearParkedSites()
+    clearDeliveredValue('sess-030-a')
+    clearDeliveredValue('sess-030-b')
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-030] another session cannot unpark or abandon this session park (LC-009)', async () => {
+  const { dir, cleanup } = sandbox()
+  try {
+    clearParkedSites()
+
+    // Session A parks; session B must not be able to resolve A's site.
+    const parked = await runProgram(dir, `    await this.park({ stage: 'review' });`, 'sess-030-a')
+    assert.equal(caseName(parked), 'Parked')
+    const handle = parkedHandle(parked)
+
+    const crossUnpark = await execute(dir, 'Coder', 'en', 'sess-030-b', { unpark: { handle, value: { ok: true } } }, 2000, Date.now() + 60_000, 1 << 20, null)
+    assert.equal(caseName(crossUnpark), 'Failed')
+    assert.equal(failureCode(crossUnpark), 'HANDLE_UNKNOWN')
+    assert.doesNotMatch(failureReason(crossUnpark), /another session/)
+
+    const crossAbandon = await execute(dir, 'Coder', 'en', 'sess-030-b', { abandon: { handle } }, 2000, Date.now() + 60_000, 1 << 20, null)
+    assert.equal(caseName(crossAbandon), 'Failed')
+    assert.equal(failureCode(crossAbandon), 'HANDLE_UNKNOWN')
+    assert.doesNotMatch(failureReason(crossAbandon), /another session/)
+
+    // The foreign session's failed attempts leave A's site resolvable by A.
+    const ownAbandon = await execute(dir, 'Coder', 'en', 'sess-030-a', { abandon: { handle } }, 2000, Date.now() + 60_000, 1 << 20, null)
+    assert.equal(caseName(ownAbandon), 'Failed', 'abandon ends with Failed (Abandoned)')
+  } finally {
+    clearParkedSites()
     cleanup()
   }
 })

@@ -28,7 +28,7 @@ test('WHAT[process-execution-010] js.call completed command reports exit code an
     const outcome = await runProgram(
       dir,
       `    let exitedWith = null;
-    const result = await js.call(class extends js.Callable {
+    const result = await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? "printf 'hello-stdout'; printf 'hello-stderr' >&2" : null; }
@@ -53,7 +53,7 @@ test('WHAT[process-execution-010] js.call nonzero exit is reported as data rathe
   try {
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? "exit 3" : null; }

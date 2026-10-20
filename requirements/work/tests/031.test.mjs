@@ -100,9 +100,9 @@ test('WHAT[work-031] plan prompts state that S1/S2 review gaps are entry-bar gap
   assert.doesNotMatch(promotedEn, /will be presented on the next request/i)
   assert.doesNotMatch(promotedZh, /将在下一次请求时呈现/)
 
-  // S3 deliver enters post-S3 state, permanently disables nudges, interrupts like ask, and allows repeated S4 starts on user command
-  assert.match(roleEn, /`post-S3`[\s\S]*permanently disables nudges[\s\S]*interrupts the conversation[\s\S]*repeatedly request starting `S4`/i)
-  assert.match(roleZh, /`post-S3`[\s\S]*永久关闭[\s\S]*中断[\s\S]*反复要求启动 `S4`/)
+  // Retirement ends this run's nudges; a genuine new input may open a fresh incumbency.
+  assert.match(roleEn, /`post-S3`[\s\S]*interrupts the conversation[\s\S]*neither nudged nor revived[\s\S]*reopens a fresh incumbency[\s\S]*repeatedly request starting `S4`/i)
+  assert.match(roleZh, /`post-S3`[\s\S]*中断[\s\S]*不再被催促也不复活[\s\S]*新任期[\s\S]*反复要求启动 `S4`/)
   assert.match(s3En, /`post-S3`[\s\S]*repeatedly request starting `S4`/i)
   assert.match(s3Zh, /`post-S3`[\s\S]*反复要求启动 `S4`/)
   assert.match(deliverEn, /`post-S3`[\s\S]*repeatedly request starting `S4`/i)

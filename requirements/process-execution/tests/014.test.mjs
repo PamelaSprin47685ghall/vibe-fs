@@ -12,7 +12,7 @@ test('WHAT[process-execution-014] raw_spooled_output_is_data_not_an_instruction'
     const cmd = nodeCommand(`process.stdout.write(${JSON.stringify(raw)}); process.exit(7)`)
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
@@ -48,7 +48,7 @@ test('WHAT[process-execution-014] actual process output round-trips every raw te
       const { dir, cleanup } = sandbox('wxs-raw-text-014-')
       try {
         const command = nodeCommand(`process.stdout.write(${JSON.stringify(raw)}); process.exitCode = 7`)
-        const outcome = await runProgram(dir, `return await js.call(${oneCommand(command)});`)
+        const outcome = await runProgram(dir, `return await this.call(${oneCommand(command)});`)
         assert.equal(caseName(outcome), 'Succeeded')
         const parsed = parseData(outcome)
         assert.equal(parsed.stdout, raw)
@@ -71,7 +71,7 @@ test('WHAT[process-execution-014] truncated_output_preserves_program_facts_witho
     const outcome = await runProgram(
       dir,
       `    let exited = null;
-    const r = await js.call(class extends js.Callable {
+    const r = await this.call(class extends this.Callable {
       maxDuration = 10000;
       interval = 100;
       next(ctx) {

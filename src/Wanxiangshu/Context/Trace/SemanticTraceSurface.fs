@@ -12,11 +12,51 @@ open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.Participant.Provider.Projection.ProviderProjection
 open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Foundation
+open Wanxiangshu.Composition.Turn
+open Wanxiangshu.OpenCode
 
 /// JS proof surface for semantic-trace owner operations.
 /// Typed owner state never crosses this boundary; queries return copied plain evidence.
 [<RequireQualifiedAccess>]
 module SemanticTraceSurface =
+
+    let private completionLabel outcome =
+        match outcome with
+        | XTraceTerminalCompletion.Published _ -> "Published"
+        | XTraceTerminalCompletion.CaptureFailed _ -> "CaptureFailed"
+        | XTraceTerminalCompletion.RejectedMissingRole -> "RejectedMissingRole"
+        | XTraceTerminalCompletion.RejectedEmptyOutput -> "RejectedEmptyOutput"
+        | XTraceTerminalCompletion.RejectedUndelivered -> "RejectedUndelivered"
+
+    let completeWithoutDelivery role session authorityRoot providerRun text : Task<obj> =
+        task {
+            let events = Events.HostEventPort() :> IEventObservationPort
+            let notifications = ref 0
+
+            use _subscription =
+                events.SubscribeTerminalListener(fun _ _ -> notifications.Value <- notifications.Value + 1)
+
+            let turn: ReconciledTurn =
+                { SessionId = SessionId.create session
+                  PhysicalUserMessageId = PhysicalUserMessageId.create authorityRoot
+                  AuthorityRootUserMessageId = AuthorityRootUserMessageId.create authorityRoot
+                  ProviderRun = ProviderRunIdentity.create providerRun
+                  Role = Roles.tryParseRole role
+                  Directory = None
+                  Parts = [| MessagePart.Text text |]
+                  Finish = Some "stop"
+                  ErrorName = None
+                  Model = None
+                  Outcome = ReconcileProgram.TurnOutcome.TurnCompleted
+                  Observation = None }
+
+            let! result = TerminalReporter.completeWithEvidence events None turn false
+
+            return
+                box
+                    {| caseName = completionLabel result
+                       terminalNotifications = notifications.Value |}
+        }
 
     /// Opaque proof capability for the semantic-trace owner.
     type SemanticTraceProjection private (state: XTraceProjectionState) =
@@ -435,12 +475,24 @@ module SemanticTraceSurface =
         |> List.toArray
 
     let semanticCursorAfter cursor projection : obj =
-        let value =
+        let afterCursor =
             XTraceProjection.semanticCursorAfter (cursorOf cursor) (stateOf projection)
 
-        box
-            {| turn = value.TurnIndex
-               partIndex = value.PartIndex |}
+        let state = stateOf projection
+        let currentParts = XTraceProjection.currentGenerationSemanticParts state
+
+        match currentParts |> List.tryFind (fun part -> part.Cursor = afterCursor) with
+        | Some part ->
+            box
+                {| turn = part.Turn
+                   partIndex = part.PartIndex |}
+        | None ->
+            match List.tryLast currentParts with
+            | Some last ->
+                box
+                    {| turn = last.Turn + 1
+                       partIndex = 0 |}
+            | None -> box {| turn = 0; partIndex = 0 |}
 
     let originCursor: obj = XTraceCursor.originCursor |> cursorView
 
@@ -511,14 +563,6 @@ module SemanticTraceSurface =
         |> Array.toList
         |> List.map itemOf
         |> XTrace.forOpening
-        |> List.map itemView
-        |> List.toArray
-
-    let forWorkRecord values =
-        arrayOf values
-        |> Array.toList
-        |> List.map itemOf
-        |> XTrace.forWorkRecord
         |> List.map itemView
         |> List.toArray
 

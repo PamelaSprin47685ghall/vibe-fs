@@ -19,8 +19,7 @@ const isSome = (value) => value !== null
 
 const PERMISSION_NAMES = [
   'Fork', 'Join', 'Horizon', 'Advisor', 'TodoWrite', 'Fission', 'Read', 'Write', 'Edit', 'Fetch', 'Glob', 'Grep', 'Move',
-  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment', 'Chronicle',
-  'Finality', 'BashHoneypot',
+  'Remove', 'Inspect', 'Behavior', 'Exec', 'Pty', 'Network', 'ReviewAssessment',
 ]
 
 const toolPermissionByName = Object.fromEntries(PERMISSION_NAMES.map((n) => [n, n]))
@@ -51,29 +50,29 @@ const MEMBERS_BY_PERMISSION = {
 }
 
 const BINDING_BY_MEMBER = {
-  write: 'js.write',
-  rm: 'js.rm',
-  mv: 'js.mv',
-  cat: 'js.cat',
-  ls: 'js.ls',
-  stat: 'js.stat',
-  mkdir: 'js.mkdir',
-  whereAll: 'js.whereAll',
-  where: 'js.where',
-  rg: 'js.rg',
-  call: 'js.call',
-  fork: 'js.fork',
-  dag: 'js.dag',
-  join: 'js.join',
-  fission: 'js.fission',
-  horizon: 'js.horizon',
-  advisor: 'js.advisor',
+  write: 'write',
+  rm: 'rm',
+  mv: 'mv',
+  cat: 'cat',
+  ls: 'ls',
+  rg: 'rg',
+  stat: 'stat',
+  mkdir: 'mkdir',
+  whereAll: 'whereAll',
+  where: 'where',
+  call: 'call',
+  fork: 'fork',
+  dag: 'dag',
+  join: 'join',
+  fission: 'fission',
+  horizon: 'horizon',
+  advisor: 'advisor',
 }
 
 const MEMBER_ORDER = [
   'write', 'rm', 'mv',
-  'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where',
-  'rg', 'call',
+  'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where',
+  'call',
   'fork',
   'dag',
   'join',
@@ -87,10 +86,8 @@ const layersOf = (s) =>
     s.members.map((fragment) => [
       fragment.memberName,
       {
-        description: fragment.description,
-        example: fragment.canonicalExample,
-        binding: fragment.runtimeBindingKey,
-        inBaseClass: s.baseClassSource.includes(`this._api.${fragment.runtimeBindingKey}`),
+        binding: fragment.memberName,
+        inBaseClass: s.baseClassSource.includes(`this._api.${fragment.memberName}`),
         inDescription: s.description.includes(fragment.memberName),
         inExamples: s.examples.some((example) => example.includes(fragment.memberName)),
       },
@@ -98,7 +95,7 @@ const layersOf = (s) =>
   )
 
 test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_capability', () => {
-  for (const role of ['Inquiry', 'Distiller', 'Blogger']) {
+  for (const role of ['Inquiry', 'Distiller']) {
     const perms = caps(...permsOf(rolePermissions(role.toLowerCase())))
     assert.equal(isNone(surface(role, rolePermissions(role.toLowerCase()))), true, `${role} must get no js-* surface`)
     assert.equal(isGeneratedToolName(role, perms, `todowrite-for-${role.toLowerCase()}`), false)
@@ -110,12 +107,12 @@ test('WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_ca
   assert.equal(isNone(orchestrator), false, 'Orchestrator gets the delegation-only surface')
   assert.deepEqual(
     orchestrator.members.map((fragment) => fragment.memberName),
-    ['fork', 'dag', 'join', 'horizon', 'advisor'],
+    ['commission', 'join', 'horizon', 'advisor'],
   )
 })
 
 test('WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_permissions_intersection', () => {
-  for (const role of ['Manager', 'Orchestrator', 'Engineer', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'DevOps', 'Distiller', 'Blogger']) {
+  for (const role of ['Manager', 'Orchestrator', 'Engineer', 'Coder', 'Inspector', 'Browser', 'Inquiry', 'DevOps', 'Distiller']) {
     const fsPerms = fsPermissionsOf(role)
     const result = surface(role, rolePermissions(role.toLowerCase()))
     if (fsPerms.length === 0) {
@@ -125,7 +122,11 @@ test('WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_pe
       const expected = fsPerms
         .flatMap((name) => MEMBERS_BY_PERMISSION[name])
         .sort((left, right) => MEMBER_ORDER.indexOf(left) - MEMBER_ORDER.indexOf(right))
-      assert.deepEqual(memberNames(result), expected, `${role} member set`)
+      const delegated = role.toLowerCase() === 'orchestrator'
+        ? expected.filter(name => name !== 'dag').map(name => name === 'fork' ? 'commission' : name)
+        : expected
+      const scoped = delegated.map(name => role.toLowerCase() === 'manager' && ['cat', 'stat', 'ls', 'rg'].includes(name) ? 'reviewOnly.' + name : name)
+      assert.deepEqual(memberNames(result), scoped, `${role} member set`)
     }
   }
 })

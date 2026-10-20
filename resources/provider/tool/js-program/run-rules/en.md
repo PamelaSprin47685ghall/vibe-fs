@@ -1,6 +1,6 @@
-await js.call(class extends js.Callable { ... }) — the engineering member.
+await this.call(class extends this.Callable { ... }) — the engineering member.
 
-Call it on the global `js` object. Your program entry remains `async run()`.
+Call it on the program instance. Your program entry remains `async run()`.
 
 The Host owns the loop. You write only the semantic callbacks. On each round the
 Host calls `next(ctx)`, runs what you returned, supervises it once per interval
@@ -43,9 +43,9 @@ sanity() {
 ```
 Each thunk returns the argument array for its method. The Host calls actual
 `next` and requires `null`, then calls actual `watch` and requires a veto
-(`false` or `{ abort }`). A thunk that fails parks the whole `js.call` at the
+(`false` or `{ abort }`). A thunk that fails parks the whole `this.call` at the
 call site with the diagnosis payload — fix the class in a new call, or unpark
-with a value your program consumes as the js.call outcome. Writing the thunks is
+with a value your program consumes as the this.call outcome. Writing the thunks is
 designing the termination condition: if you cannot mock a state where next
 returns null, the exit does not exist yet.
 
@@ -85,7 +85,7 @@ slice misses.
 - nothing, or `true` — continue.
 - `false`, or `{ abort: reason }` — veto the run now. `false` is a real veto, not
   a synonym for continue.
-- `{ park: payload }` — suspend through the same channel as `js.park`. Resuming it
+- `{ park: payload }` — suspend through the same channel as `this.park`. Resuming it
   with the string 'abort' aborts; any other unparked value continues.
 
 Observe before ruling. `watch` should read the ctx deltas, keep what matters on
@@ -120,7 +120,7 @@ Failure modes, stated once:
   `{ send: { name, input } }` is canonical (the flat `{ send: input, name }` spelling
   is accepted). A missing or invalid name fails with `CALL_COMMAND_UNSUPPORTED`;
   a valid name with no live child fails with `CALL_CHILD_UNKNOWN`.
-- `this.run` is your program entry. The engineering loop is `js.call` only.
+- `this.run` is your program entry. The engineering loop is `this.call` only.
 
 Consequences, stated once:
 - Abort SIGKILLs the foreground process; `maxDuration` expiry does the same and

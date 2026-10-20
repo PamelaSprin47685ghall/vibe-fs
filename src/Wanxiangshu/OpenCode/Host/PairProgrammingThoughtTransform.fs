@@ -16,14 +16,11 @@ open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Execution.Delegation
-open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.OpenCode.Host.PairProgramming
 open Wanxiangshu.Context.Trace
-open Wanxiangshu.OpenCode.Host.RequirementGrounding
 open Wanxiangshu.Repository.Programming.Js.OpenCode
 open Wanxiangshu.Repository.Programming.Js.Anchor
 open Wanxiangshu.Participant.Provider.Projection
-open Wanxiangshu.Requirement.Grounding
 
 /// HOST-013：永久 pair-programming auto-injected pairs。
 ///
@@ -37,9 +34,7 @@ open Wanxiangshu.Requirement.Grounding
 module PairProgrammingThoughtTransform =
 
     [<RequireQualifiedAccess>]
-    type CursorPresentationOwner =
-        | PairGuidance
-        | RequirementGrounding
+    type CursorPresentationOwner = | PairGuidance
 
     [<Literal>]
     let private PairProgrammingGuidelinePath = "host/pair-programming-guideline"
@@ -341,9 +336,6 @@ module PairProgrammingThoughtTransform =
     /// 组内排序唯一合法：`Ordinal` 升序。
     ///
     /// Anchor 不在当前真实消息里的 historical pair **不重放、不报错**。
-    /// XWire prefix probe 用 FrozenRecordPrefix 替换已覆盖前缀时会 drop 那些
-    /// 消息（CTX-010 canonical `CutoffExclusive`）；被覆盖区里的 pair 属于被替换的前缀，
-    /// 不应再注入 rewritten view，更不能因此 AbortSession 杀死当前物理 retry。
     /// Durable fact 仍保留；完整 transcript 回来时 anchor 在场即可再 replay。
     let cursorGuidanceSeparator = "\u0000\uFEFF"
 
@@ -599,11 +591,7 @@ module PairProgrammingThoughtTransform =
                   PartId = partId
                   CallId = ToolCallId.create (unbox<string> parts.[index]?callID) }))
 
-    let private cursorPresentationPrefixes
-        userMessage
-        (guidance: PairProgrammingGuideline list)
-        (occurrences: RequirementGroundingOccurrence list)
-        =
+    let private cursorPresentationPrefixes userMessage (guidance: PairProgrammingGuideline list) =
         let guidanceBytes =
             guidance
             |> List.map (fun pair ->
@@ -614,21 +602,10 @@ module PairProgrammingThoughtTransform =
                        pair.MarkerText))
             |> String.concat ""
 
-        occurrences
-        |> List.scan
-            (fun prefix occurrence ->
-                let bytes =
-                    occurrence.Reads
-                    |> List.map (fun read -> cursorGuidanceSeparator + read.CursorResultBytes)
-                    |> String.concat ""
-
-                prefix + bytes)
-            ""
-        |> List.collect (fun reads ->
-            [ { GuidanceBytes = guidanceBytes
-                RequirementBytes = reads }
-              { GuidanceBytes = ""
-                RequirementBytes = reads } ])
+        [ { GuidanceBytes = guidanceBytes
+            RequirementBytes = "" }
+          { GuidanceBytes = ""
+            RequirementBytes = "" } ]
 
     let private presentationsAtMessage includeRetired (session: SessionAgentProjection option) (rawMsg: obj) =
         let atMessage gap =
@@ -643,23 +620,16 @@ module PairProgrammingThoughtTransform =
         | Some state ->
             let guidance = state.Guidelines |> Option.defaultValue GuidelineProjection.empty
 
-            let grounding =
-                state.RequirementGrounding
-                |> Option.defaultValue RequirementGroundingProjection.empty
-
-            let atAnchor (pairs: PairProgrammingGuideline list) (occurrences: RequirementGroundingOccurrence list) =
+            let atAnchor (pairs: PairProgrammingGuideline list) =
                 cursorPresentationPrefixes
                     (messageRole rawMsg = "user")
                     (pairs |> List.filter (fun pair -> atMessage pair.ResultGap))
-                    (occurrences |> List.filter (fun occurrence -> atMessage occurrence.ResultGap))
 
             (if includeRetired then
-                 atAnchor (GuidelineProjection.pairs guidance) (RequirementGroundingProjection.occurrences grounding)
+                 atAnchor (GuidelineProjection.pairs guidance)
              else
                  [])
-            @ atAnchor
-                (GuidelineProjection.visiblePairs guidance)
-                (RequirementGroundingProjection.visibleOccurrences grounding)
+            @ atAnchor (GuidelineProjection.visiblePairs guidance)
             |> List.distinct
 
     let private captureCursorResult trace session (rawMsg: obj) =
@@ -785,8 +755,7 @@ module PairProgrammingThoughtTransform =
     let private stripCapturedPresentation owner captured value =
         let retain presentation =
             match owner with
-            | CursorPresentationOwner.PairGuidance -> captured.Body + presentation.RequirementBytes
-            | CursorPresentationOwner.RequirementGrounding -> captured.Body + presentation.GuidanceBytes
+            | CursorPresentationOwner.PairGuidance -> captured.Body
 
         match matchingPresentations captured value |> List.map retain |> List.distinct with
         | [] -> Ok value
@@ -1437,19 +1406,20 @@ module PairProgrammingThoughtTransform =
         (restartGuidance: string option)
         : Task<LlmFacing.Document> =
         task {
-            let! guidance =
-                match journal, projectionSessionIdOpt with
-                | Some durable, Some sessionId ->
-                    EnforcerTipGuidance.latestTipGuidance durable (SessionId.create sessionId)
-                | _ -> Task.FromResult None
+            let guidance: string option = None
 
             // Algorithm G2: every round that carries a PairHint also lists the
             // unresolved parked handles, so the AI is pressed to take a
             // position (unpark/abandon) without being forced to resume. The
-            // parked site table and its read-only query are owned by
-            // lane-a-core (JsParkedSites.parkedHandles). A carrier-less round
-            // never reaches this point (decideCurrentPlacement).
-            let parkedHandles = JsParkedSites.parkedHandles ()
+            // parked site table and its per-session read-only query are owned
+            // by lane-a-core (JsParkedSites.handlesForSession); a hint must
+            // only mention handles parked by this session, never another
+            // session's. A carrier-less round never reaches this point
+            // (decideCurrentPlacement).
+            let parkedHandles =
+                match projectionSessionIdOpt with
+                | Some sessionId -> JsParkedSites.handlesForSession sessionId
+                | None -> []
 
             let resolveLanguage =
                 match journal, projectionSessionIdOpt with
@@ -1485,11 +1455,7 @@ module PairProgrammingThoughtTransform =
             }
         | None -> Task.FromResult()
 
-    /// ANCHOR stage (PLAN phase 3): number every identified outgoing message,
-    /// consume one pending view declaration, apply its selection, and build the
-    /// instruction block that carries the anchor map, the declaration echo and
-    /// the token economy. Without a declaration the messages pass through
-    /// untouched and only the bounded anchor map is reported.
+    /// Stable anchor markers are projected at their original message positions.
     let private wireTextOf (raw: obj) : string =
         ProviderWireDecode.rawPartsOf raw
         |> List.choose ProviderWireDecode.decodePart
@@ -1575,9 +1541,6 @@ module PairProgrammingThoughtTransform =
         | Some sessionId -> messages |> List.map (markAnchor sessionId)
         | None -> messages
 
-    /// Selection applies on every request: a consumed declaration states this
-    /// turn's statement (protected prefix, new summaries), while the summaries
-    /// already recorded are permanent and outlive the declaration that made them.
     let private applyDeclaredAnchorView
         (sessionId: string)
         (messages: obj list)
@@ -1638,48 +1601,18 @@ module PairProgrammingThoughtTransform =
          else
              Some(String.concat "\n" block))
 
-    let private protectedUserAnchors journal sessionId messages =
-        if sessionRole journal (SessionId.create sessionId) = Some Role.Plan then
+    let private selectAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
+        numberHostMessages sessionId messages
+
+        applyDeclaredAnchorView
+            sessionId
             messages
-            |> List.filter (fun message ->
-                messageRole message = "user"
-                && not (ProviderWireCapture.isSyntheticMessage message))
-            |> List.choose ProviderWireDecode.hostMessageId
-            |> List.map (AnchorLedger.numberMessage sessionId)
-            |> Set.ofList
-        else
-            Set.empty
+            (AnchorLedger.takeView sessionId)
+            (AnchorLedger.replacements sessionId)
 
-    let private withProtectedAnchorReceipt projected block protectedReplacements =
-        if List.isEmpty protectedReplacements then
-            projected, block
-        else
-            projected,
-            Some(
-                defaultArg block ""
-                + "\nPlan user originals kept raw; thenMap did not replace anchors ["
-                + hashText protectedReplacements
-                + "]."
-            )
-
-    let private applyAnchorView
-        (journal: AgentJournal option)
-        (projectionSessionIdOpt: string option)
-        (messages: obj list)
-        : obj list * string option =
-        match projectionSessionIdOpt with
-        | None -> messages, None
-        | Some sessionId ->
-            numberHostMessages sessionId messages
-
-            AnchorLedger.protect sessionId (protectedUserAnchors journal sessionId messages)
-            let protectedReplacements = AnchorLedger.protectedReplacements sessionId
-            let declaration = AnchorLedger.takeView sessionId
-
-            let projected, block =
-                applyDeclaredAnchorView sessionId messages declaration (AnchorLedger.replacements sessionId)
-
-            withProtectedAnchorReceipt projected block protectedReplacements
+    let applyAnchorView (sessionId: string) (messages: obj list) : obj list * string option =
+        let projected, report = selectAnchorView sessionId messages
+        projected |> List.map (markAnchor sessionId), report
 
     let private markDeliveredIfAnchored restartGuidance markRestartGuidanceDelivered anchored =
         // crash-reconciliation-018: the restart guidance is delivered
@@ -1740,7 +1673,10 @@ module PairProgrammingThoughtTransform =
                 |> Option.bind DeclaredContextLimit.tryFind
                 |> Option.map (PairProgrammingCalibration.renderContextLimit language)
 
-            let messages, anchorBlock = applyAnchorView journal projectionSessionIdOpt messages
+            let messages, anchorBlock =
+                match projectionSessionIdOpt with
+                | Some sessionId -> selectAnchorView sessionId messages
+                | None -> messages, None
 
             let guideline = ProviderProse.render language PairProgrammingGuidelinePath Map.empty
 

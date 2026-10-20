@@ -32,7 +32,7 @@ test('WHAT[repository-programming-050] call proofs use argument arrays, preserve
   try {
     const outcome = await runProgram(dir, `
       let calls = 0;
-      const result = await js.call(class extends js.Callable {
+      const result = await this.call(class extends this.Callable {
         maxDuration = 1000;
         value = 7;
         next(value) { if (value === 7) { calls++; return null; } return null; }
@@ -42,12 +42,12 @@ test('WHAT[repository-programming-050] call proofs use argument arrays, preserve
           return { nextDone: () => [7], watchVeto: () => [7] };
         }
       });
-      return { result, calls, oldEntry: typeof js.run, oldBase: typeof js.Runnable };
+      return { result, calls, oldBase: typeof this.Runnable, oldGlobal: typeof js };
     `)
     assert.equal(caseName(outcome), 'Succeeded', render(outcome))
     assert.match(render(outcome), /calls = 1/)
-    assert.match(render(outcome), /oldEntry = "undefined"/)
     assert.match(render(outcome), /oldBase = "undefined"/)
+    assert.match(render(outcome), /oldGlobal = "undefined"/)
   } finally {
     cleanup()
   }
@@ -56,7 +56,7 @@ test('WHAT[repository-programming-050] call proofs use argument arrays, preserve
 test('WHAT[repository-programming-050] a no-op legacy proof cannot bypass the actual nonterminating next', async () => {
   const { dir, cleanup } = sandbox()
   try {
-    const outcome = await runProgram(dir, `return await js.call(class extends js.Callable {
+    const outcome = await runProgram(dir, `return await this.call(class extends this.Callable {
       maxDuration = 1000;
       next() { return "touch bypass.marker"; }
       watch() { return true; }
@@ -74,7 +74,7 @@ test('WHAT[repository-programming-050] actual proof callbacks and unresolved arg
   const { dir, cleanup } = sandbox()
   try {
     for (const proof of ['next', 'watch', 'promise']) {
-      const outcome = await runProgram(dir, `return await js.call(class extends js.Callable {
+      const outcome = await runProgram(dir, `return await this.call(class extends this.Callable {
         maxDuration = 100;
         next() { ${proof === 'next' ? 'while (true) {}' : 'return null;'} }
         watch() { ${proof === 'watch' ? 'while (true) {}' : 'return false;'} }
@@ -96,7 +96,7 @@ test('WHAT[repository-programming-050] a Callable missing watch is refused with 
   try {
     const doc = await runText(
       dir,
-      `    return await js.call(class { maxDuration = 1000; next() { return null; } });`,
+      `    return await this.call(class { maxDuration = 1000; next() { return null; } });`,
     )
     assert.match(doc, /# failed/)
     assert.match(doc, /CALLABLE_SPEC_INCOMPLETE/)
@@ -110,7 +110,7 @@ test('WHAT[repository-programming-050] a Callable missing sanity is refused with
   try {
     const doc = await runText(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 1000;
       next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
       watch() { return true; }
@@ -129,7 +129,7 @@ test('WHAT[repository-programming-050] the host loop runs one foreground command
   try {
     const doc = await runText(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
@@ -161,7 +161,7 @@ test('WHAT[repository-programming-050] onExit dispatches every exited command wi
     const doc = await runText(
       dir,
       `    const dispatched = [];
-    const outcome = await js.call(class extends js.Callable {
+    const outcome = await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "exit 4" : null; }
@@ -191,7 +191,7 @@ test('WHAT[repository-programming-050] a watch abort kills the foreground comman
   try {
     const doc = await runText(
       dir,
-      `    const outcome = await js.call(class extends js.Callable {
+      `    const outcome = await this.call(class extends this.Callable {
       maxDuration = 8000;
       interval = 200;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch late.marker" : null; }
@@ -217,7 +217,7 @@ test('WHAT[repository-programming-050] watch returning false is a real veto, not
   try {
     const doc = await runText(
       dir,
-      `    const outcome = await js.call(class extends js.Callable {
+      `    const outcome = await this.call(class extends this.Callable {
       maxDuration = 8000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch veto.marker" : null; }
@@ -240,7 +240,7 @@ test('WHAT[repository-programming-050] a watch park suspends the run and resumes
   try {
     const parked = await runProgram(
       dir,
-      `    const outcome = await js.call(class extends js.Callable {
+      `    const outcome = await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? "sleep 0.3" : null; }
@@ -287,7 +287,7 @@ test('WHAT[repository-programming-050] a sanity thunk that fails to show its exi
   try {
     const parked = await runProgram(
       dir,
-      `    const outcome = await js.call(class extends js.Callable {
+      `    const outcome = await this.call(class extends this.Callable {
       maxDuration = 3000;
       next(ctx) { return "echo never-terminates"; }
       watch() { return true; }
@@ -331,7 +331,7 @@ test('WHAT[repository-programming-050] a sanity that returns non-thunks is refus
   try {
     const doc = await runText(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 1000;
       next(ctx) { return ctx.step === 0 ? "echo hello" : null; }
       watch() { return true; }
@@ -352,7 +352,7 @@ test('WHAT[repository-programming-050] maxDuration expiry kills the command and 
     const started = Date.now()
     const doc = await runText(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 400;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "sleep 5 && touch too-late.marker" : null; }

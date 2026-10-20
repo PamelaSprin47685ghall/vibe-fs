@@ -1,0 +1,330 @@
+{
+  "package": "UM-R / UM-3 / UM-4 / UM-5",
+  "state": "SOURCE_VERIFIED_WITH_RECORDED_DEBT",
+  "recordedAt": "2026-10-20T14:26:06Z",
+  "upstreamTarget": "11052493bedb4edbcbe0c341fa677afd44c486f1",
+  "deferredUpstream": "df7846ab8",
+  "userScope": "完整对齐固定上游新模型，包含旧功能退役；边缘问题记录后继续。",
+  "git": {
+    "mergeParents": [
+      "39b5dd04d7df2858225ca38182932d3bab555da3",
+      "11052493bedb4edbcbe0c341fa677afd44c486f1"
+    ],
+    "mergeCommit": null,
+    "origin": "https://github.com/dyx13/vibe-fs.git",
+    "originMasterBefore": "24462522f8c37d898f0b07f8723c7cf9f99dae05",
+    "sourceCommitted": false,
+    "published": false,
+    "pushRef": "refs/heads/master",
+    "forcePush": false
+  },
+  "candidate": {
+    "freshness": {
+      "generation": 60,
+      "compilerInputDigest": "7543ef0eda4d218415812ef98249398c4fb7667222ab13a761076292c7dc84db",
+      "generatedInputDigest": "a8891e11f23c8d6cd3c7a1e624ea1fce62e9602d1900d81183b7e7812a4004b5",
+      "artifactInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
+    },
+    "candidateDigest": "899b38632270957cb542cb1a4e88bc97a31b9be223714f4851deca34e3c84fca",
+    "outputsDigest": "ed6a2072db6ed144f334d3f01d1531c0b482fcd23a8f55ba091b26ef88f3514d",
+    "outputs": 783,
+    "compilerSources": 1568,
+    "artifactInputs": 539
+  },
+  "runtime": {
+    "node": "22.13.0",
+    "bun": "1.3.14",
+    "opencode": "1.18.29",
+    "fable": "5.13.0",
+    "wget": "GNU 1.25.0, temporary test PATH only",
+    "platform": "darwin-arm64",
+    "linuxVerified": false
+  },
+  "library": {
+    "origin": "https://github.com/dyx13/wanxiangli.git",
+    "mergeCommit": "fc75b85876f61073ec4f256e77729aaf6f63caf3",
+    "publishedOnOwnMaster": true,
+    "publicExports": 15,
+    "build": {
+      "exit": 0,
+      "log": "umr-library-build.log"
+    },
+    "nativeSelection": {
+      "exit": 0,
+      "passed": 62,
+      "failed": 0,
+      "skipped": 4,
+      "todo": 0,
+      "log": "umr-library-tests-final.log",
+      "skipReason": "Four Bun-only process cases are skipped by the Node invocation; host resource selection separately executes real Node/Bun paths."
+    },
+    "packageConsumptionVerified": true
+  },
+  "scope": [
+    "Retire Blogger, Chronicle, WorkRecord, Replica, Predictor and automatic requirement grounding production paths with their obsolete contracts and compile graph.",
+    "Use flat prefixUntil/thenMap and a shared ordered view with anchors, implicit zero, null keep, frozen tail and physical originals.",
+    "Bind Manager reviewOnly reads to current authority on each physical access; retain supervised rg, cancellation and resource ownership.",
+    "Keep Plan P-only and symlink boundaries, shared SDK, review rechecks and ordinary park/ask lifecycle.",
+    "Commit exact durable TaskDelivery witnesses before publishing delivered values; reject old-run and stop-only completion.",
+    "Fence Advisor to the accepted intent and its own formal answer; retain its dedicated terminal protocol.",
+    "Use sealed witness views during cold recovery through an injected read capability; preserve recovery owner layering.",
+    "Retain real commission/fork/resume/devops Host registrations and hide unwired Resume/DevOps SDK members."
+  ],
+  "checks": {
+    "cleanBuild": {
+      "exit": 0,
+      "generation": 57,
+      "command": "node scripts/build.mjs --clean",
+      "log": "umr-build-clean-final.log"
+    },
+    "finalBuild": {
+      "exit": 0,
+      "generation": 60,
+      "command": "node scripts/build.mjs",
+      "surfaces": 151,
+      "linkedModules": 727,
+      "log": "umr-build-delivery-final.log"
+    },
+    "format": {
+      "exit": 0,
+      "log": "umr-release-phase-format-check.log"
+    },
+    "static": {
+      "exit": 1,
+      "issues": 34,
+      "gates": 1,
+      "gate": "fsharp-control-pyramid",
+      "jsBoundaryIssues": 0,
+      "gateRelaxed": false,
+      "log": "umr-check-delivery-final.log"
+    },
+    "combined": {
+      "generation": 60,
+      "command": "WXS_TIER_INTEGRATION=1 TESTS_MJS_FILES=<files> NODE_TEST_CONCURRENCY=1 node requirements/verification-system/tests/run.mjs",
+      "files": [
+        "requirements/context-compression/tests/031.test.mjs",
+        "requirements/repository-programming/tests/001.test.mjs",
+        "requirements/repository-programming/tests/002.test.mjs",
+        "requirements/repository-programming/tests/030.test.mjs",
+        "requirements/repository-programming/tests/041.test.mjs",
+        "requirements/repository-programming/tests/050.test.mjs",
+        "requirements/repository-programming/tests/051.test.mjs",
+        "requirements/repository-programming/tests/052.test.mjs",
+        "requirements/repository-programming/tests/053.test.mjs",
+        "requirements/repository-programming/tests/054.test.mjs",
+        "requirements/repository-programming/tests/056.test.mjs",
+        "requirements/repository-programming/tests/058.test.mjs",
+        "requirements/repository-programming/tests/059.test.mjs",
+        "requirements/repository-programming/tests/060.test.mjs",
+        "requirements/work/tests/026.test.mjs",
+        "requirements/work/tests/027.test.mjs",
+        "requirements/work/tests/029.test.mjs",
+        "requirements/work/tests/030.test.mjs",
+        "requirements/work/tests/031.test.mjs",
+        "requirements/work/tests/032.test.mjs",
+        "requirements/work/tests/033.test.mjs",
+        "requirements/work/tests/034.test.mjs",
+        "requirements/work/tests/039.test.mjs",
+        "requirements/work/tests/048.test.mjs",
+        "requirements/work/tests/049.test.mjs",
+        "requirements/work/tests/050.test.mjs",
+        "requirements/capability-enforcement/tests/002.test.mjs",
+        "requirements/capability-enforcement/tests/023.test.mjs",
+        "requirements/capability-enforcement/tests/025.test.mjs",
+        "requirements/capability-enforcement/tests/026.test.mjs",
+        "requirements/advisor/tests/002.test.mjs",
+        "requirements/advisor/tests/003.test.mjs",
+        "requirements/advisor/tests/004.test.mjs",
+        "requirements/provider-projection/tests/009.test.mjs",
+        "requirements/semantic-trace/tests/003.test.mjs",
+        "requirements/semantic-trace/tests/006.test.mjs",
+        "requirements/semantic-trace/tests/010.test.mjs",
+        "requirements/delegation/tests/024.test.mjs",
+        "requirements/delegation/tests/025.test.mjs",
+        "requirements/delegation/tests/031.test.mjs",
+        "requirements/intra-participant-parallelism/tests/014.test.mjs",
+        "requirements/intra-participant-parallelism/tests/015.test.mjs",
+        "requirements/crash-reconciliation/tests/018.test.mjs",
+        "requirements/obligation-ledger/tests/004.test.mjs",
+        "requirements/durable-events/tests/015.test.mjs",
+        "requirements/repository-programming/tests/009.test.mjs",
+        "requirements/repository-programming/tests/018.test.mjs",
+        "requirements/work/tests/021.test.mjs",
+        "requirements/obligation-ledger/tests/001.test.mjs",
+        "requirements/prefix-stability/tests/014.test.mjs",
+        "requirements/knowledge-reuse/tests/010.test.mjs",
+        "requirements/delegation/tests/009.test.mjs",
+        "requirements/delegation/tests/028.test.mjs",
+        "requirements/host-boundary/tests/032.test.mjs",
+        "requirements/effect-accounting/tests/008.test.mjs"
+      ],
+      "exit": 1,
+      "passed": 421,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 6,
+      "plannedFiles": 55,
+      "drainedFiles": 55,
+      "reclamationAccepted": true,
+      "completeAcceptance": false,
+      "exitReason": "Existing pending proofs remain; WXS_ACCEPT_TODO was not used.",
+      "realHost": [
+        "Manager review tool contract",
+        "User quotation, raw tool original, two successful real deliveries, later provider replay and independent cold read"
+      ],
+      "physicalWait": "Existing begin/end ACK, at most 30000ms for each real Host operation; default 5000ms verdict silence unchanged.",
+      "log": "umr-formal-delivery-final.log"
+    },
+    "resources": {
+      "generation": 57,
+      "files": [
+        "requirements/managed-session-lifecycle/tests/025.test.mjs",
+        "requirements/managed-session-lifecycle/tests/028.test.mjs",
+        "requirements/process-execution/tests/001.test.mjs",
+        "requirements/process-execution/tests/004.test.mjs",
+        "requirements/process-execution/tests/005.test.mjs",
+        "requirements/process-execution/tests/006.test.mjs",
+        "requirements/process-execution/tests/010.test.mjs",
+        "requirements/process-execution/tests/011.test.mjs",
+        "requirements/process-execution/tests/013.test.mjs",
+        "requirements/process-execution/tests/014.test.mjs",
+        "requirements/process-execution/tests/015.test.mjs",
+        "requirements/process-execution/tests/017.test.mjs",
+        "requirements/process-execution/tests/018.test.mjs"
+      ],
+      "exit": 0,
+      "passed": 278,
+      "failed": 0,
+      "skipped": 0,
+      "todo": 0,
+      "plannedFiles": 13,
+      "drainedFiles": 13,
+      "reclamationAccepted": true,
+      "appliesToFinalProductionContent": "Only test fixtures and status Markdown changed after generation 57. Final compilerInputDigest and artifactInputDigest are identical to generation 57; no production source or resource changed.",
+      "log": "umr-formal-resources-final.log"
+    },
+    "checkpointIntegration": {
+      "generation": 57,
+      "exit": 0,
+      "passed": 11,
+      "failed": 0,
+      "plannedFiles": 4,
+      "drainedFiles": 4,
+      "reclamationAccepted": true,
+      "files": [
+        "requirements/obligation-ledger/tests/001.test.mjs",
+        "requirements/obligation-ledger/tests/004.test.mjs",
+        "requirements/durable-events/tests/015.test.mjs",
+        "requirements/effect-accounting/tests/008.test.mjs"
+      ],
+      "log": "umr-formal-checkpoint-final.log",
+      "overlapsCombined": true
+    },
+    "package": {
+      "generation": 60,
+      "exit": 0,
+      "memberCount": 1366,
+      "totalBytes": 11514045,
+      "tarballDigest": "de74c106322507c4d3da69eeeb6b77bbdbe9b21ac90841e80dcdcb10ca53dbbe",
+      "externalInstallAndConsumer": true,
+      "activeRegistrationsAndResources": true,
+      "initialAndFinalFreshnessChecked": true,
+      "log": "umr-package-delivery-final.log"
+    },
+    "release": {
+      "generation": 60,
+      "exit": 1,
+      "stoppedAt": "check",
+      "formatPassed": true,
+      "notRun": [
+        "build within release pipeline",
+        "unit within release pipeline",
+        "integration within release pipeline",
+        "e2e within release pipeline",
+        "package within release pipeline"
+      ],
+      "log": "umr-release-delivery-final.log",
+      "independentChecksAreNotFullReleaseAcceptance": true
+    },
+    "evidenceIndex": "umr-log-index.json",
+    "sourceWhitespace": {
+      "exit": 0,
+      "rawLogsExcluded": true,
+      "reason": "Raw failed-run logs retain their original whitespace as evidence; all 80 staged log blobs match the SHA-256 index. Production code, tests and documents pass the normal diff whitespace check. No gate or baseline was changed."
+    },
+    "overlappingSuitesMustNotBeAdded": true
+  },
+  "remaining": [
+    {
+      "id": "STYLE-34",
+      "impact": "Static control-pyramid debt blocks the complete release gate.",
+      "action": "Record only in this integration; gate and baseline unchanged.",
+      "revisit": "Before full release acceptance."
+    },
+    {
+      "id": "V02",
+      "impact": "Unified reportMapping delegation is incomplete in the fixed upstream.",
+      "action": "Keep real current Host entries; hide unwired SDK members.",
+      "revisit": "Implement the full upstream contract in a separate package."
+    },
+    {
+      "id": "TRACE-INT32",
+      "impact": "SemanticTraceSurface convenience numeric cursor truncates values above Int32; real journal 64-bit material selection and cold reopen pass.",
+      "action": "Use the exact durable string cursor; leave convenience projection unchanged.",
+      "revisit": "When a consumer needs the numeric projection above Int32."
+    },
+    {
+      "id": "GAP-153",
+      "tests": [
+        "delegation-025",
+        "delegation-028"
+      ],
+      "impact": "Actual late fork events and every independent locality compile remain pending proofs."
+    },
+    {
+      "id": "GAP-158",
+      "tests": [
+        "intra-participant-parallelism-014",
+        "intra-participant-parallelism-015"
+      ],
+      "impact": "Full real Fission lane/takeover proof remains pending."
+    },
+    {
+      "id": "GAP-149",
+      "tests": [
+        "crash-reconciliation-018"
+      ],
+      "impact": "Full restarted-plugin normalization without replay remains pending; sealed-view fix is narrower."
+    },
+    {
+      "id": "GAP-160",
+      "tests": [
+        "knowledge-reuse-010"
+      ],
+      "impact": "Actual Engineer resume/Fission archive boundary proof remains pending."
+    },
+    {
+      "id": "NEXT-UPSTREAM",
+      "impact": "df7846ab8 and later revisions were observed after the fixed target.",
+      "action": "Keep this merge at 11052493b as the accepted plan specifies."
+    }
+  ],
+  "intermediateFailures": {
+    "logsRetained": true,
+    "diagnosis": [
+      "Retired model fixtures and exact TaskDelivery fences migrated together.",
+      "Owner recovery module now takes a read capability instead of a concrete aggregate journal dependency.",
+      "Real Host guidance fixture strips only defined anchors, waits for exact-turn idle, and performs two actual view deliveries; stop-only mock loops were not waived."
+    ],
+    "earlierFailureLogsDoNotRepresentFinalResults": true
+  },
+  "formalAcceptance": false,
+  "fullReleaseAccepted": false,
+  "deployment": {
+    "performed": false,
+    "originalCheckout": "/Users/yuanxi/Workwork/vibe-fs",
+    "originalCommit": "8db33b3429a70d5cdbea30e393363666b3649573",
+    "originalCheckoutSwitched": false,
+    "runtimeStateDeletedOrMigrated": false
+  }
+}

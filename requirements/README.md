@@ -17,12 +17,12 @@ APPLIES-TO  可选的包外正向代码覆盖声明；仓库根相对、gitignor
 ```
 
 `requirements/<package>/` 下的全部内容天然属于该 package 的覆盖范围，包括文档、tests 与
-`APPLIES-TO` 本身；包自身路径的覆盖规则见 `requirement-grounding`。
+`APPLIES-TO` 本身；包自身路径的覆盖规则由 `requirement-system` 定义。
 
 `APPLIES-TO` 不改变 package 的语义所有权，也不是新的 normative 文档。它只补充声明“这个
 package 还覆盖哪些包外仓库路径”。同一个源码文件可以同时命中多个 package；未提供该文件的
 package 仍天然覆盖自身目录，只是不额外关联包外路径。自动路径关联与 read-equivalent provider
-grounding 由 `requirement-grounding` package 拥有。
+grounding 由 `requirement-system` package 拥有。
 
 已知 proof gap 聚合台账见 [GAP.md](GAP.md)；包清单与依赖骨架见 [INDEX.md](INDEX.md)。
 
@@ -60,7 +60,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | [participant-horizon](participant-horizon/WHAT.md) | 只有会改变合法行动的最小事实应穿过 horizon。 |
 | [cognitive-environment](cognitive-environment/WHAT.md) | 长期认知层与瞬时 runtime/mission 分开；knowledge 不创造 authority。 |
 | [cognitive-workspace](cognitive-workspace/WHAT.md) | 持久认知画板已经退休；本包只保留负向合同，禁止 jq/canvas、TodoSink 与 Assume durable runtime 回流。 |
-| [attention-regulation](attention-regulation/WHAT.md) | `enough`、`abandon` 与 `defer` 已经退休；注意力动作并入 `assume` 与编程面 ANCHOR `view.thenRemove` 摘要，本包只保留负向边界。 |
+| [attention-regulation](attention-regulation/WHAT.md) | `enough`、`abandon` 与 `defer` 已经退休；注意力动作并入 `assume` 与编程面 ANCHOR `view.thenMap` 摘要，本包只保留负向边界。 |
 | [action-affordance](action-affordance/WHAT.md) | 决策点必须知道 act 的正负边界、成功后果与参数意义。 |
 | [provider-language](provider-language/WHAT.md) | 一个 life 一个稳定 natural-language world；protocol identifiers 不翻译。 |
 | [provider-projection](provider-projection/WHAT.md) | typed semantic intent 经唯一确定性投影成为 provider representation，表示不反向创造 authority。 |
@@ -89,7 +89,7 @@ grounding 由 `requirement-grounding` package 拥有。
 | Package | 一句话 WHY |
 |---|---|
 | [semantic-trace](semantic-trace/WHAT.md) | participant life 的原始 semantic history append-only、可定位。 |
-| [work-record](work-record/WHAT.md) | bounded work 跨 participant、review 与 deliver 传递有 canonical statement。 |
+
 | [context-compression](context-compression/WHAT.md) | 历史过长时只在证据边界用 semantic memory 替换可压缩区。 |
 | [prefix-stability](prefix-stability/WHAT.md) | 同一 semantic epoch 已呈现前缀 byte-stable；冷边界由事实驱动。 |
 
@@ -111,8 +111,8 @@ grounding 由 `requirement-grounding` package 拥有。
 ### 10. Feedback
 | Package | 一句话 WHY |
 |---|---|
-| [behavior-diagnosis](behavior-diagnosis/WHAT.md) | pathology 只有满足 trigger/negative/distinction 的 evidence 才成立。 |
-| [guidance-delivery](guidance-delivery/WHAT.md) | diagnosis 与何时/如何再次告知分离。 |
+
+
 
 `institutional-learning` 已随 WP-036 退役，不再是现行包。
 
@@ -122,12 +122,11 @@ grounding 由 `requirement-grounding` package 拥有。
 | [repository-investigation](repository-investigation/WHAT.md) | repository claim 由可定位可追溯真实 observation 建立。 |
 | [knowledge-reuse](knowledge-reuse/WHAT.md) | 历史 repository knowledge 是 best-effort cache/hint，不冒充当前证明。 |
 | [repository-programming](repository-programming/WHAT.md) | repository mutation 用 capability-projected、sandboxed、As-Is 逐笔落盘 surface。 |
-| [requirement-grounding](requirement-grounding/WHAT.md) | 代码路径触碰时自动把相关 requirement 文档与测试按 read 语义投影进当前开发上下文。 |
 
 ### 12. Optimization / epistemics
 | Package | 一句话 WHY |
 |---|---|
-| [speculative-investigation](speculative-investigation/WHAT.md) | disposable speculation 只在 authoritative world 零影响时才可换成本收益。 |
+
 | [epistemic-reasoning](epistemic-reasoning/WHAT.md) | 认识状态区分 proposal/evidence 与不确定性，由 controller 治理信息动作与停止。 |
 
 ### 13. Delivery

@@ -1,0 +1,55 @@
+TAP version 13
+# Subtest: WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (single tool)
+ok 1 - WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (single tool)
+  ---
+  duration_ms: 190.923958
+  ...
+# Subtest: WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (late result after text)
+ok 2 - WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (late result after text)
+  ---
+  duration_ms: 53.053292
+  ...
+# Subtest: WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (late result after another message)
+ok 3 - WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (late result after another message)
+  ---
+  duration_ms: 42.307291
+  ...
+# Subtest: WHAT[semantic-trace-006] a semantic cursor beyond Int32 selects the exact durable material after reopen
+ok 4 - WHAT[semantic-trace-006] a semantic cursor beyond Int32 selects the exact durable material after reopen
+  ---
+  duration_ms: 13.44925
+  ...
+# Subtest: WHAT[semantic-trace-006] a physical prefix cannot cut across repeated canonical segments of one Host message
+ok 5 - WHAT[semantic-trace-006] a physical prefix cannot cut across repeated canonical segments of one Host message
+  ---
+  duration_ms: 32.978708
+  ...
+# Subtest: WHAT[semantic-trace-006] Host message set resolves only to its exact contiguous range
+ok 6 - WHAT[semantic-trace-006] Host message set resolves only to its exact contiguous range
+  ---
+  duration_ms: 0.995791
+  ...
+# Subtest: WHAT[semantic-trace-006] a cursor gap or intervening unrequested identity cannot be a contiguous range
+ok 7 - WHAT[semantic-trace-006] a cursor gap or intervening unrequested identity cannot be a contiguous range
+  ---
+  duration_ms: 0.761125
+  ...
+# Subtest: WHAT[semantic-trace-006] range and frontier queries preserve half-open boundaries
+ok 8 - WHAT[semantic-trace-006] range and frontier queries preserve half-open boundaries
+  ---
+  duration_ms: 0.537542
+  ...
+# Subtest: WHAT[semantic-trace-006] range vocabulary is half-open
+ok 9 - WHAT[semantic-trace-006] range vocabulary is half-open
+  ---
+  duration_ms: 0.25625
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 401.194375

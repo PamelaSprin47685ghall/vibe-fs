@@ -1,6 +1,5 @@
 namespace Wanxiangshu.OpenCode
 
-open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Foundation
 open Wanxiangshu.Interaction.Authority
 open Wanxiangshu.OpenCode.Host
@@ -15,7 +14,7 @@ module ToolRegistrySurface =
     let rolePredicate (toolName: string) (roleLabel: string) : bool =
         match Roles.tryParseRole roleLabel with
         | None -> false
-        | Some role -> ToolRegistry.rolePredicate toolName None "surface-session" role
+        | Some role -> ToolRegistry.rolePredicate toolName "surface-session" role
 
     /// capability-enforcement-006: which authority the execute gate resolves for a tool. `office`
     /// needs the session's established public Role; `private-attachment` is an
@@ -24,7 +23,7 @@ module ToolRegistrySurface =
         Wanxiangshu.Mission.Work.OpenCode.DeliverTool.description ()
 
     let admissionAuthority (toolName: string) : string =
-        match ToolRegistry.tryAdmission toolName None with
+        match ToolRegistry.tryAdmission toolName with
         | Some(ToolAdmission.OfficeRole _) -> "office"
         | Some(ToolAdmission.PrivateAttachment _) -> "private-attachment"
         | None -> "unknown"
@@ -32,15 +31,14 @@ module ToolRegistrySurface =
     /// capability-enforcement-006: the internal-leaf decision for a session holding no public
     /// office profile. Office tools always answer false here.
     let privateAttachmentAdmits (toolName: string) (sessionId: string) : bool =
-        ToolRegistry.privateAttachmentAdmits toolName None sessionId
+        ToolRegistry.privateAttachmentAdmits toolName sessionId
 
     let private requestKindOf (label: string) : ProviderRequestKind option =
         match label.ToLowerInvariant() with
         | "work-main" -> Some ProviderRequestKind.WorkMain
-        | "blogger-main" -> Some ProviderRequestKind.BloggerMain
         | "interaction-repair" -> Some ProviderRequestKind.InteractionRepair
-        | "strength-replica" -> Some ProviderRequestKind.StrengthReplica
         | _ -> None
+
 
     /// Provider tool names projected from the same capability set as the gate.
     let capabilityToolNames (roleLabel: string) (requestKindLabel: string) : string array =
@@ -72,9 +70,12 @@ module ToolRegistrySurface =
         let prose =
             Wanxiangshu.Repository.Programming.Js.OpenCode.JsDescriptionAssets.load parsed
 
-        Wanxiangshu.Repository.Programming.Js.JsCanonicalDescription.renderPlan
+        Wanxiangshu.Repository.Programming.Js.JsToolGenerator.generate
+            "plan"
+            (OfficeCapability.permissions Role.Plan)
             prose
-            (ProviderProse.render parsed "tool/js-plan" Map.empty)
+        |> Option.map (fun s -> s.Description)
+        |> Option.defaultValue ""
 
     let permissionOfToolName (role: Role) (name: string) : ToolPermission option =
         StaticTools.permissionOfToolName role name

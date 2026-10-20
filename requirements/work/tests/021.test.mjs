@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { allPublicRoleLabels, allRoleLabels } from '../../../dist/Foundation/RolesSurface.js'
+import { admissionAuthority, capabilityToolNames, rolePredicate } from '../../../dist/OpenCode/Tools/ToolRegistrySurface.js'
+import { toolSpecNames } from '../../../dist/OpenCode/Tools/ToolSurface.js'
 import { isAllowed, permissions } from '../../../dist/Participant/Persona/OfficeCapabilitySurface.js'
 
 test('WHAT[work-021] Role catalog contains Plan and wire label is plan', () => {
@@ -45,12 +47,23 @@ test('WHAT[work-021] Plan separates human ask from devops investigation and deni
     'Pty',
     'Fork',
     'Fission',
-    'Chronicle',
     'Fetch',
     'Finality',
     'BashHoneypot',
   ]
   for (const perm of forbiddenPermissions) {
     assert.equal(isAllowed('plan', perm), false, `Plan must be denied ${perm}`)
+  }
+
+  // 真实注册的 devops 工具存在且 Plan 角色可调用；非 Plan 角色拒绝
+  assert.ok(toolSpecNames().includes('devops'), 'Tool catalog must contain registered devops tool')
+  assert.equal(admissionAuthority('devops'), 'office', 'devops tool must resolve to office admission authority')
+  assert.equal(rolePredicate('devops', 'plan'), true, 'Plan role must be admitted to devops tool')
+  assert.ok(capabilityToolNames('plan', 'work-main').includes('devops'), 'Plan work-main capabilities must include devops')
+
+  const nonPlanRoles = allRoleLabels.filter((role) => role !== 'plan')
+  for (const role of nonPlanRoles) {
+    assert.equal(rolePredicate('devops', role), false, `Non-plan role "${role}" must be denied devops tool`)
+    assert.equal(capabilityToolNames(role, 'work-main').includes('devops'), false, `Non-plan role "${role}" must not expose devops tool`)
   }
 })

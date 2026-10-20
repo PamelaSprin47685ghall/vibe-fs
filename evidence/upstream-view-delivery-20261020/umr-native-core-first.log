@@ -1,0 +1,369 @@
+TAP version 13
+# Subtest: WHAT[context-compression-031] anchor numbers are stable per session and message id
+ok 1 - WHAT[context-compression-031] anchor numbers are stable per session and message id
+  ---
+  duration_ms: 2.071209
+  ...
+# Subtest: WHAT[context-compression-031] a view declaration is consumed exactly once
+ok 2 - WHAT[context-compression-031] a view declaration is consumed exactly once
+  ---
+  duration_ms: 0.538542
+  ...
+# Subtest: WHAT[context-compression-031] a malformed view declaration is refused and changes nothing
+ok 3 - WHAT[context-compression-031] a malformed view declaration is refused and changes nothing
+  ---
+  duration_ms: 3.724375
+  ...
+# Subtest: WHAT[context-compression-031] without a declaration applyView leaves the message list unchanged
+ok 4 - WHAT[context-compression-031] without a declaration applyView leaves the message list unchanged
+  ---
+  duration_ms: 0.187958
+  ...
+# Subtest: WHAT[context-compression-031] prefixUntil protects a prefix without replacing anything
+ok 5 - WHAT[context-compression-031] prefixUntil protects a prefix without replacing anything
+  ---
+  duration_ms: 0.540583
+  ...
+# Subtest: WHAT[context-compression-031] a summary stands in for its anchor for the rest of the session
+ok 6 - WHAT[context-compression-031] a summary stands in for its anchor for the rest of the session
+  ---
+  duration_ms: 0.649459
+  ...
+# Subtest: WHAT[context-compression-031] separate replacements each stand in place
+ok 7 - WHAT[context-compression-031] separate replacements each stand in place
+  ---
+  duration_ms: 0.3605
+  ...
+# Subtest: WHAT[context-compression-031] replacing an earlier anchor folds the replacements inside its span
+ok 8 - WHAT[context-compression-031] replacing an earlier anchor folds the replacements inside its span
+  ---
+  duration_ms: 0.299667
+  ...
+# Subtest: WHAT[context-compression-031] unidentified content remains when no interval replaces it
+ok 9 - WHAT[context-compression-031] unidentified content remains when no interval replaces it
+  ---
+  duration_ms: 0.661375
+  ...
+# Subtest: WHAT[context-compression-031] countTokens reports the o200k_base token count
+ok 10 - WHAT[context-compression-031] countTokens reports the o200k_base token count
+  ---
+  duration_ms: 0.157375
+  ...
+# Subtest: WHAT[context-compression-031] registered Host inline anchors are stable projections and do not alter physical originals
+not ok 11 - WHAT[context-compression-031] registered Host inline anchors are stable projections and do not alter physical originals
+  ---
+  duration_ms: 106.023208
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/context-compression/tests/031.test.mjs:196:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot find module '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Context/Companion/RuntimeSurface.js' imported from /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs"
+  code: 'ERR_MODULE_NOT_FOUND'
+  stack: |-
+    finalizeResolution (node:internal/modules/esm/resolve:275:11)
+    moduleResolve (node:internal/modules/esm/resolve:932:10)
+    defaultResolve (node:internal/modules/esm/resolve:1056:11)
+    ModuleLoader.defaultResolve (node:internal/modules/esm/loader:654:12)
+    #cachedDefaultResolve (node:internal/modules/esm/loader:603:25)
+    ModuleLoader.resolve (node:internal/modules/esm/loader:586:38)
+    ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:242:38)
+    onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:546:36)
+    TracingChannel.tracePromise (node:diagnostics_channel:344:14)
+    ModuleLoader.import (node:internal/modules/esm/loader:545:21)
+  ...
+# Subtest: WHAT[context-compression-031] protected items and null mappings keep their current material
+ok 12 - WHAT[context-compression-031] protected items and null mappings keep their current material
+  ---
+  duration_ms: 1.236
+  ...
+# Subtest: WHAT[context-compression-031] same-round adjacent summaries use the input partition
+ok 13 - WHAT[context-compression-031] same-round adjacent summaries use the input partition
+  ---
+  duration_ms: 0.116292
+  ...
+# Subtest: WHAT[context-compression-031] anchor zero persists and earlier replacement includes prior summaries
+ok 14 - WHAT[context-compression-031] anchor zero persists and earlier replacement includes prior summaries
+  ---
+  duration_ms: 0.269792
+  ...
+# Subtest: WHAT[context-compression-031] a captured tail interval cannot swallow a later message
+ok 15 - WHAT[context-compression-031] a captured tail interval cannot swallow a later message
+  ---
+  duration_ms: 0.102709
+  ...
+# Subtest: WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one
+ok 16 - WHAT[context-compression-031] a generated tool captures the view argument and refuses a malformed one
+  ---
+  duration_ms: 67.478917
+  ...
+# Subtest: WHAT[provider-projection-009] hostile multiline records remain data in the canonical TOML view
+not ok 17 - WHAT[provider-projection-009] hostile multiline records remain data in the canonical TOML view
+  ---
+  duration_ms: 1.947125
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/provider-projection/tests/009.test.mjs:6:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      {
+        records: [
+          {
+    +       record: 'first\r\nsecond'
+    -       record: 'first\nsecond'
+          }
+        ]
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    records:
+      0:
+        record: |-
+          first
+          second
+  actual:
+    records:
+      0:
+        record: |-
+          first
+          second
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/provider-projection/tests/009.test.mjs:17:12)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.start (node:internal/test_runner/test:829:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: WHAT[provider-projection-009] MISC_join_render_batch_empty_view_no_comment
+ok 18 - WHAT[provider-projection-009] MISC_join_render_batch_empty_view_no_comment
+  ---
+  duration_ms: 2.399958
+  ...
+# Subtest: WHAT[provider-projection-009] MISC_join_render_batch_child_to_parent_view_stays_entry_local_comment
+ok 19 - WHAT[provider-projection-009] MISC_join_render_batch_child_to_parent_view_stays_entry_local_comment
+  ---
+  duration_ms: 0.406791
+  ...
+# Subtest: WHAT[provider-projection-009] CODEC_toml_object_with_instructions_prepends_them
+ok 20 - WHAT[provider-projection-009] CODEC_toml_object_with_instructions_prepends_them
+  ---
+  duration_ms: 0.352375
+  ...
+# Subtest: WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_capability
+ok 21 - WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_capability
+  ---
+  duration_ms: 12.132375
+  ...
+# Subtest: WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_permissions_intersection
+not ok 22 - WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_permissions_intersection
+  ---
+  duration_ms: 6.150291
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/001.test.mjs:114:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Orchestrator member set
+    + actual - expected
+    
+      [
+    +   'commission',
+    -   'fork',
+    -   'dag',
+        'join',
+        'horizon',
+        'advisor'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'fork'
+    1: 'dag'
+    2: 'join'
+    3: 'horizon'
+    4: 'advisor'
+  actual:
+    0: 'commission'
+    1: 'join'
+    2: 'horizon'
+    3: 'advisor'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/001.test.mjs:126:14)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: WHAT[repository-programming-001] JS001_non_fs_permissions_never_produce_members
+ok 23 - WHAT[repository-programming-001] JS001_non_fs_permissions_never_produce_members
+  ---
+  duration_ms: 18.548875
+  ...
+# Subtest: WHAT[repository-programming-002] registered_js_tools_match_js_tool_generator_output
+ok 24 - WHAT[repository-programming-002] registered_js_tools_match_js_tool_generator_output
+  ---
+  duration_ms: 30.31625
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra_example_coder
+ok 25 - WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra_example_coder
+  ---
+  duration_ms: 2.70525
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers
+ok 26 - WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers
+  ---
+  duration_ms: 2.494833
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_read_or_write_members
+ok 27 - WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_read_or_write_members
+  ---
+  duration_ms: 9.369625
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_member_gate_binds_present_members_only
+ok 28 - WHAT[repository-programming-002] JS004_member_gate_binds_present_members_only
+  ---
+  duration_ms: 0.358042
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_rejected
+ok 29 - WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_rejected
+  ---
+  duration_ms: 2.152208
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_every_holding_role
+not ok 30 - WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_every_holding_role
+  ---
+  duration_ms: 7.361667
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/002.test.mjs:240:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    orchestrator: commission binding
+    + actual - expected
+    
+    + 'commission'
+    - undefined
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  actual: 'commission'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/002.test.mjs:268:14)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_every_holding_role
+not ok 31 - WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_every_holding_role
+  ---
+  duration_ms: 8.442958
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/002.test.mjs:278:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    orchestrator: commission binding
+    + actual - expected
+    
+    + 'commission'
+    - undefined
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  actual: 'commission'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/002.test.mjs:306:14)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[repository-programming-053] the actual registered schema exposes optional flat view fields and nullable mapping values
+ok 32 - WHAT[repository-programming-053] the actual registered schema exposes optional flat view fields and nullable mapping values
+  ---
+  duration_ms: 21.002292
+  ...
+# Subtest: WHAT[repository-programming-053] malformed or legacy view declarations refuse before the program can write
+ok 33 - WHAT[repository-programming-053] malformed or legacy view declarations refuse before the program can write
+  ---
+  duration_ms: 5.687834
+  ...
+# Subtest: WHAT[repository-programming-059] this.deliver records its view declaration and does not run later statements
+ok 34 - WHAT[repository-programming-059] this.deliver records its view declaration and does not run later statements
+  ---
+  duration_ms: 10.675291
+  ...
+# Subtest: WHAT[repository-programming-059] a fenced cell answers only its own provider run
+ok 35 - WHAT[repository-programming-059] a fenced cell answers only its own provider run
+  ---
+  duration_ms: 4.822958
+  ...
+# Subtest: WHAT[repository-programming-059] permanent compression survives a later protected handoff and latest interval replacement
+ok 36 - WHAT[repository-programming-059] permanent compression survives a later protected handoff and latest interval replacement
+  ---
+  duration_ms: 0.479417
+  ...
+# Subtest: WHAT[repository-programming-059] implicit zero can return the opening interval after anchor 1 disappears
+ok 37 - WHAT[repository-programming-059] implicit zero can return the opening interval after anchor 1 disappears
+  ---
+  duration_ms: 0.425292
+  ...
+# Subtest: WHAT[repository-programming-059] handoff returns the assistant prose once and only through the owning run
+ok 38 - WHAT[repository-programming-059] handoff returns the assistant prose once and only through the owning run
+  ---
+  duration_ms: 0.497125
+  ...
+# Subtest: WHAT[repository-programming-059] an ordinary return does not populate the delivered cell
+ok 39 - WHAT[repository-programming-059] an ordinary return does not populate the delivered cell
+  ---
+  duration_ms: 4.024667
+  ...
+# Subtest: WHAT[repository-programming-059] changed opening material is returned once even though anchor zero remains
+ok 40 - WHAT[repository-programming-059] changed opening material is returned once even though anchor zero remains
+  ---
+  duration_ms: 0.417833
+  ...
+# node:internal/modules/esm/resolve:275
+#     throw new ERR_MODULE_NOT_FOUND(
+#           ^
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Context/Companion/RuntimeSurface.js' imported from /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs
+#     at finalizeResolution (node:internal/modules/esm/resolve:275:11)
+#     at moduleResolve (node:internal/modules/esm/resolve:932:10)
+#     at defaultResolve (node:internal/modules/esm/resolve:1056:11)
+#     at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:654:12)
+#     at \#cachedDefaultResolve (node:internal/modules/esm/loader:603:25)
+#     at ModuleLoader.resolve (node:internal/modules/esm/loader:586:38)
+#     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:242:38)
+#     at onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:546:36)
+#     at TracingChannel.tracePromise (node:diagnostics_channel:344:14)
+#     at ModuleLoader.import (node:internal/modules/esm/loader:545:21) {
+#   code: 'ERR_MODULE_NOT_FOUND',
+#   url: 'file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Context/Companion/RuntimeSurface.js'
+# }
+# Node.js v22.13.0
+# Subtest: requirements/work/tests/029.test.mjs
+not ok 7 - requirements/work/tests/029.test.mjs
+  ---
+  duration_ms: 279.066375
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/work/tests/029.test.mjs:1:1'
+  failureType: 'testCodeFailure'
+  exitCode: 1
+  signal: ~
+  error: 'test failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..41
+# tests 41
+# suites 0
+# pass 35
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1657.389542

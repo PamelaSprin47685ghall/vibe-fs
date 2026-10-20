@@ -1,0 +1,501 @@
+Auto-merging AGENTS.md
+CONFLICT (content): Merge conflict in AGENTS.md
+Auto-merging README.md
+Auto-merging requirements/GAP.md
+Auto-merging requirements/advisor/README.md
+Auto-merging requirements/advisor/WHAT.md
+CONFLICT (content): Merge conflict in requirements/advisor/WHAT.md
+Auto-merging requirements/advisor/tests/002.test.mjs
+CONFLICT (content): Merge conflict in requirements/advisor/tests/002.test.mjs
+Auto-merging requirements/advisor/tests/003.test.mjs
+CONFLICT (content): Merge conflict in requirements/advisor/tests/003.test.mjs
+Auto-merging requirements/advisor/tests/006.test.mjs
+Auto-merging requirements/advisor/tests/README.md
+CONFLICT (content): Merge conflict in requirements/advisor/tests/README.md
+Auto-merging requirements/capability-enforcement/tests/002.test.mjs
+CONFLICT (content): Merge conflict in requirements/capability-enforcement/tests/002.test.mjs
+Auto-merging requirements/capability-enforcement/tests/023.test.mjs
+CONFLICT (content): Merge conflict in requirements/capability-enforcement/tests/023.test.mjs
+Auto-merging requirements/capability-enforcement/tests/support/manager-programming.mjs
+CONFLICT (content): Merge conflict in requirements/capability-enforcement/tests/support/manager-programming.mjs
+Auto-merging requirements/change-integration/tests/005.test.mjs
+Auto-merging requirements/cognitive-environment/WHAT.md
+Auto-merging requirements/cognitive-environment/tests/013.test.mjs
+Auto-merging requirements/concern-routing/tests/007.test.mjs
+CONFLICT (content): Merge conflict in requirements/concern-routing/tests/007.test.mjs
+Auto-merging requirements/context-compression/WHAT.md
+CONFLICT (content): Merge conflict in requirements/context-compression/WHAT.md
+CONFLICT (modify/delete): requirements/context-compression/tests/022.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/context-compression/tests/022.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/context-compression/tests/025.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/context-compression/tests/025.test.mjs left in tree.
+Auto-merging requirements/context-compression/tests/031.test.mjs
+CONFLICT (content): Merge conflict in requirements/context-compression/tests/031.test.mjs
+Auto-merging requirements/crash-reconciliation/tests/018.test.mjs
+CONFLICT (content): Merge conflict in requirements/crash-reconciliation/tests/018.test.mjs
+Auto-merging requirements/crash-reconciliation/tests/020.test.mjs
+Auto-merging requirements/delegation/WHAT.md
+CONFLICT (content): Merge conflict in requirements/delegation/WHAT.md
+Auto-merging requirements/delegation/tests/019.test.mjs
+CONFLICT (content): Merge conflict in requirements/delegation/tests/019.test.mjs
+Auto-merging requirements/delegation/tests/021.test.mjs
+Auto-merging requirements/delegation/tests/023.test.mjs
+CONFLICT (content): Merge conflict in requirements/delegation/tests/023.test.mjs
+Auto-merging requirements/delegation/tests/024.test.mjs
+Auto-merging requirements/delegation/tests/026.test.mjs
+Auto-merging requirements/delegation/tests/027.test.mjs
+Auto-merging requirements/dispatch-protocol/WHAT.md
+Auto-merging requirements/dispatch-protocol/tests/008.test.mjs
+Auto-merging requirements/durable-events/WHAT.md
+Auto-merging requirements/durable-events/tests/012.test.mjs
+Auto-merging requirements/durable-events/tests/013.test.mjs
+Auto-merging requirements/durable-events/tests/015.test.mjs
+CONFLICT (content): Merge conflict in requirements/durable-events/tests/015.test.mjs
+Auto-merging requirements/durable-events/tests/018.test.mjs
+Auto-merging requirements/durable-events/tests/019.test.mjs
+Auto-merging requirements/durable-events/tests/022.test.mjs
+Auto-merging requirements/effect-accounting/tests/008.test.mjs
+CONFLICT (content): Merge conflict in requirements/effect-accounting/tests/008.test.mjs
+Auto-merging requirements/execution-model-routing/tests/020.test.mjs
+CONFLICT (content): Merge conflict in requirements/execution-model-routing/tests/020.test.mjs
+Auto-merging requirements/host-boundary/WHAT.md
+CONFLICT (content): Merge conflict in requirements/host-boundary/WHAT.md
+Auto-merging requirements/host-boundary/tests/015.test.mjs
+CONFLICT (content): Merge conflict in requirements/host-boundary/tests/015.test.mjs
+Auto-merging requirements/host-boundary/tests/032.test.mjs
+CONFLICT (content): Merge conflict in requirements/host-boundary/tests/032.test.mjs
+Auto-merging requirements/host-boundary/tests/fixtures/fatal-process-child.fixture.mjs
+Auto-merging requirements/host-boundary/tests/support/run-manager-review-tools-canary.mjs
+CONFLICT (content): Merge conflict in requirements/host-boundary/tests/support/run-manager-review-tools-canary.mjs
+Auto-merging requirements/host-boundary/tests/support/run-user-input-canary.mjs
+Auto-merging requirements/intra-participant-parallelism/tests/017.test.mjs
+CONFLICT (content): Merge conflict in requirements/intra-participant-parallelism/tests/017.test.mjs
+Auto-merging requirements/managed-chat-execution/tests/005.test.mjs
+Auto-merging requirements/managed-session-lifecycle/WHAT.md
+Auto-merging requirements/managed-session-lifecycle/tests/025.test.mjs
+CONFLICT (content): Merge conflict in requirements/managed-session-lifecycle/tests/025.test.mjs
+Auto-merging requirements/managed-session-lifecycle/tests/028.test.mjs
+CONFLICT (content): Merge conflict in requirements/managed-session-lifecycle/tests/028.test.mjs
+Auto-merging requirements/managed-session-lifecycle/tests/README.md
+CONFLICT (content): Merge conflict in requirements/managed-session-lifecycle/tests/README.md
+Auto-merging requirements/obligation-ledger/tests/001.test.mjs
+CONFLICT (content): Merge conflict in requirements/obligation-ledger/tests/001.test.mjs
+Auto-merging requirements/obligation-ledger/tests/002.test.mjs
+Auto-merging requirements/obligation-ledger/tests/003.test.mjs
+CONFLICT (content): Merge conflict in requirements/obligation-ledger/tests/003.test.mjs
+Auto-merging requirements/obligation-ledger/tests/004.test.mjs
+CONFLICT (content): Merge conflict in requirements/obligation-ledger/tests/004.test.mjs
+Auto-merging requirements/obligation-ledger/tests/005.test.mjs
+CONFLICT (content): Merge conflict in requirements/obligation-ledger/tests/005.test.mjs
+Auto-merging requirements/obligation-ledger/tests/support/run-native-todo-replacement-canary.mjs
+Auto-merging requirements/participant-horizon/tests/011.test.mjs
+Auto-merging requirements/participant-identity/tests/001.test.mjs
+CONFLICT (content): Merge conflict in requirements/participant-identity/tests/001.test.mjs
+Auto-merging requirements/participant-identity/tests/002.test.mjs
+CONFLICT (content): Merge conflict in requirements/participant-identity/tests/002.test.mjs
+Auto-merging requirements/participant-identity/tests/003.test.mjs
+CONFLICT (content): Merge conflict in requirements/participant-identity/tests/003.test.mjs
+Auto-merging requirements/participant-identity/tests/008.test.mjs
+CONFLICT (content): Merge conflict in requirements/participant-identity/tests/008.test.mjs
+Auto-merging requirements/prefix-stability/WHAT.md
+CONFLICT (content): Merge conflict in requirements/prefix-stability/WHAT.md
+Auto-merging requirements/prefix-stability/tests/001.test.mjs
+CONFLICT (content): Merge conflict in requirements/prefix-stability/tests/001.test.mjs
+CONFLICT (modify/delete): requirements/prefix-stability/tests/003.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/prefix-stability/tests/003.test.mjs left in tree.
+Auto-merging requirements/prefix-stability/tests/010.test.mjs
+CONFLICT (modify/delete): requirements/prefix-stability/tests/012.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/prefix-stability/tests/012.test.mjs left in tree.
+Auto-merging requirements/prefix-stability/tests/014.test.mjs
+Auto-merging requirements/prefix-stability/tests/README.md
+CONFLICT (content): Merge conflict in requirements/prefix-stability/tests/README.md
+CONFLICT (modify/delete): requirements/prefix-stability/tests/support/registered-prefix.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/prefix-stability/tests/support/registered-prefix.mjs left in tree.
+Auto-merging requirements/process-execution/WHAT.md
+CONFLICT (content): Merge conflict in requirements/process-execution/WHAT.md
+Auto-merging requirements/process-execution/tests/001.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/001.test.mjs
+Auto-merging requirements/process-execution/tests/005.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/005.test.mjs
+Auto-merging requirements/process-execution/tests/010.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/010.test.mjs
+Auto-merging requirements/process-execution/tests/011.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/011.test.mjs
+Auto-merging requirements/process-execution/tests/013.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/013.test.mjs
+Auto-merging requirements/process-execution/tests/014.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/014.test.mjs
+Auto-merging requirements/process-execution/tests/015.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/015.test.mjs
+Auto-merging requirements/process-execution/tests/017.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/017.test.mjs
+Auto-merging requirements/process-execution/tests/README.md
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/README.md
+Auto-merging requirements/process-execution/tests/support/executor.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/support/executor.mjs
+Auto-merging requirements/provider-attempt-recovery/WHAT.md
+CONFLICT (modify/delete): requirements/provider-projection/tests/011.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/provider-projection/tests/011.test.mjs left in tree.
+Auto-merging requirements/repository-programming/APPLIES-TO
+CONFLICT (content): Merge conflict in requirements/repository-programming/APPLIES-TO
+Auto-merging requirements/repository-programming/README.md
+CONFLICT (content): Merge conflict in requirements/repository-programming/README.md
+Auto-merging requirements/repository-programming/WHAT.md
+CONFLICT (content): Merge conflict in requirements/repository-programming/WHAT.md
+Auto-merging requirements/repository-programming/tests/001.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/001.test.mjs
+Auto-merging requirements/repository-programming/tests/002.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/002.test.mjs
+Auto-merging requirements/repository-programming/tests/005.test.mjs
+Auto-merging requirements/repository-programming/tests/008.test.mjs
+Auto-merging requirements/repository-programming/tests/009.test.mjs
+Auto-merging requirements/repository-programming/tests/016.test.mjs
+Auto-merging requirements/repository-programming/tests/018.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/018.test.mjs
+Auto-merging requirements/repository-programming/tests/027.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/027.test.mjs
+Auto-merging requirements/repository-programming/tests/038.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/038.test.mjs
+Auto-merging requirements/repository-programming/tests/043.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/043.test.mjs
+Auto-merging requirements/repository-programming/tests/049.test.mjs
+Auto-merging requirements/repository-programming/tests/050.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/050.test.mjs
+Auto-merging requirements/repository-programming/tests/051.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/051.test.mjs
+Auto-merging requirements/repository-programming/tests/052.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/052.test.mjs
+Auto-merging requirements/repository-programming/tests/058.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/058.test.mjs
+CONFLICT (modify/delete): requirements/requirement-grounding/WHAT.md deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/requirement-grounding/WHAT.md left in tree.
+CONFLICT (modify/delete): requirements/requirement-grounding/tests/002.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/requirement-grounding/tests/002.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/requirement-grounding/tests/007.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/requirement-grounding/tests/007.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/requirement-grounding/tests/008.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/requirement-grounding/tests/008.test.mjs left in tree.
+Auto-merging requirements/semantic-trace/WHAT.md
+CONFLICT (content): Merge conflict in requirements/semantic-trace/WHAT.md
+Auto-merging requirements/semantic-trace/tests/007.test.mjs
+Auto-merging requirements/semantic-trace/tests/009.test.mjs
+CONFLICT (modify/delete): requirements/speculative-investigation/tests/013.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/speculative-investigation/tests/013.test.mjs left in tree.
+Auto-merging requirements/verification-system/tests/007.test.mjs
+Auto-merging requirements/verification-system/tests/016.test.mjs
+CONFLICT (content): Merge conflict in requirements/verification-system/tests/016.test.mjs
+Auto-merging requirements/verification-system/tests/support/plugin-fixture.mjs
+CONFLICT (content): Merge conflict in requirements/verification-system/tests/support/plugin-fixture.mjs
+Auto-merging requirements/verification-system/tests/support/run-inner.mjs
+CONFLICT (content): Merge conflict in requirements/verification-system/tests/support/run-inner.mjs
+CONFLICT (modify/delete): requirements/work-record/WHAT.md deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/WHAT.md left in tree.
+CONFLICT (modify/delete): requirements/work-record/tests/004.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/tests/004.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/work-record/tests/010.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/tests/010.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/work-record/tests/011.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/tests/011.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/work-record/tests/README.md deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/tests/README.md left in tree.
+CONFLICT (modify/delete): requirements/work-record/tests/support/record.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/tests/support/record.mjs left in tree.
+Auto-merging requirements/work/WHAT.md
+CONFLICT (content): Merge conflict in requirements/work/WHAT.md
+Auto-merging requirements/work/tests/009.test.mjs
+Auto-merging requirements/work/tests/011.test.mjs
+Auto-merging requirements/work/tests/020.test.mjs
+CONFLICT (content): Merge conflict in requirements/work/tests/020.test.mjs
+Auto-merging requirements/work/tests/029.test.mjs
+CONFLICT (content): Merge conflict in requirements/work/tests/029.test.mjs
+Auto-merging requirements/work/tests/033.test.mjs
+Auto-merging requirements/work/tests/034.test.mjs
+CONFLICT (content): Merge conflict in requirements/work/tests/034.test.mjs
+Auto-merging resources/provider/tool/js-plan/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-plan/en.md
+Auto-merging resources/provider/tool/js-plan/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-plan/zh-CN.md
+Auto-merging resources/provider/tool/js-program/delegation-rules/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/delegation-rules/en.md
+Auto-merging resources/provider/tool/js-program/delegation-rules/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/delegation-rules/zh-CN.md
+Auto-merging resources/provider/tool/js-program/run-recipes/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/run-recipes/en.md
+Auto-merging resources/provider/tool/js-program/run-recipes/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/run-recipes/zh-CN.md
+Auto-merging resources/provider/tool/js-program/run-rules/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/run-rules/en.md
+Auto-merging resources/provider/tool/js-program/run-rules/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/run-rules/zh-CN.md
+Auto-merging resources/provider/tool/js-program/ultra-devops/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/ultra-devops/en.md
+Auto-merging resources/provider/tool/js-program/ultra-devops/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/ultra-devops/zh-CN.md
+Auto-merging resources/provider/tool/js-program/ultra-plan/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/ultra-plan/en.md
+Auto-merging resources/provider/tool/js-program/ultra-plan/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/ultra-plan/zh-CN.md
+Auto-merging resources/provider/tool/js-program/view-declaration-extra/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/view-declaration-extra/en.md
+Auto-merging resources/provider/tool/js-program/view-declaration-extra/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/view-declaration-extra/zh-CN.md
+Auto-merging scripts/checks/unified-store-gate.mjs
+Auto-merging scripts/lib/raw-time-scan.mjs
+Auto-merging scripts/lib/test-surface-scan.mjs
+Auto-merging scripts/verify-package.mjs
+CONFLICT (content): Merge conflict in scripts/verify-package.mjs
+Auto-merging scripts/verify.mjs
+CONFLICT (content): Merge conflict in scripts/verify.mjs
+Auto-merging src/Wanxiangshu/Change/Host/Host.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Change/Host/Host.fs
+Auto-merging src/Wanxiangshu/Change/Host/Surface.fs
+Auto-merging src/Wanxiangshu/Change/Surface.fs
+Auto-merging src/Wanxiangshu/Change/Types.fs
+Auto-merging src/Wanxiangshu/Change/Types.fsi
+Auto-merging src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
+Auto-merging src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs
+Auto-merging src/Wanxiangshu/Composition/Durable/Fold.fs
+Auto-merging src/Wanxiangshu/Composition/Durable/Projection.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Composition/Durable/Projection.fs
+Auto-merging src/Wanxiangshu/Composition/Durable/Projection.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Composition/Durable/Projection.fsi
+Auto-merging src/Wanxiangshu/Composition/Durable/PromptJournalAdapter.fs
+Auto-merging src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs
+CONFLICT (modify/delete): src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Context/Companion/Blogger/MainContext.fsi deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Context/Companion/Blogger/MainContext.fsi left in tree.
+Auto-merging src/Wanxiangshu/Context/Companion/CompanionFactFold.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Companion/CompanionFactFold.fs
+Auto-merging src/Wanxiangshu/Context/Companion/CompanionFactFold.fsi
+Auto-merging src/Wanxiangshu/Context/Companion/FoldSurface.fs
+Auto-merging src/Wanxiangshu/Context/Companion/Transform.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Companion/Transform.fs
+Auto-merging src/Wanxiangshu/Context/Prefix/Wire.fs
+Auto-merging src/Wanxiangshu/Context/Prefix/WirePort.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Prefix/WirePort.fs
+Auto-merging src/Wanxiangshu/Context/Prefix/WirePort.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Prefix/WirePort.fsi
+Auto-merging src/Wanxiangshu/Context/Prefix/XWireSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Prefix/XWireSurface.fs
+Auto-merging src/Wanxiangshu/Context/Trace/Capture.fs
+Auto-merging src/Wanxiangshu/Context/Trace/Materialization.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Trace/Materialization.fs
+Auto-merging src/Wanxiangshu/Context/Trace/Materialization.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Trace/Materialization.fsi
+Auto-merging src/Wanxiangshu/Context/Trace/Model.fs
+Auto-merging src/Wanxiangshu/Context/Trace/Model.fsi
+Auto-merging src/Wanxiangshu/Context/Trace/Projection.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Trace/Projection.fs
+Auto-merging src/Wanxiangshu/Context/Trace/Projection.fsi
+Auto-merging src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs
+Auto-merging src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fsi
+CONFLICT (modify/delete): src/Wanxiangshu/Enforcer/BlogSurface.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Enforcer/BlogSurface.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Enforcer/Continuation.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Enforcer/Continuation.fs left in tree.
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/View.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/View.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/PendingRun.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fsi
+Auto-merging src/Wanxiangshu/Host/Contract/ToolResultBound.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Host/Contract/ToolResultBound.fs
+Auto-merging src/Wanxiangshu/Host/Contract/ToolResultBound.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Host/Contract/ToolResultBound.fsi
+Auto-merging src/Wanxiangshu/Interaction/Authority/Child.fs
+Auto-merging src/Wanxiangshu/Interaction/Authority/Model.fs
+Auto-merging src/Wanxiangshu/Interaction/Authority/Model.fsi
+Auto-merging src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs
+Auto-merging src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fsi
+Auto-merging src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs
+Auto-merging src/Wanxiangshu/Interaction/Dispatch/Send.fs
+Auto-merging src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs
+Auto-merging src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs
+Auto-merging src/Wanxiangshu/Mission/Planning/TenureIsolation.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Mission/Planning/TenureIsolation.fs
+CONFLICT (modify/delete): src/Wanxiangshu/Mission/WorkRecord/Materialize.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Mission/WorkRecord/Materialize.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Mission/WorkRecord/Model.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Mission/WorkRecord/Model.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Mission/WorkRecord/Surface.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Mission/WorkRecord/Surface.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Mission/WorkRecord/Surface.fsi deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Mission/WorkRecord/Surface.fsi left in tree.
+Auto-merging src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs
+Auto-merging src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/ChildWorkRecovery.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/ChildWorkRecovery.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/ChildWorkRecovery.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/EventsSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/EventsSurface.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/EventsSurface.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/EventsSurface.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/LoadRecoverySurface.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/LoadRecoverySurface.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/ManagerReviewContract.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/ManagerReviewContract.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/ManagerReviewContract.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/SessionBindingRecovery.fs
+Auto-merging src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+Auto-merging src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
+Auto-merging src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fs
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Tools/StaticTools.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/StaticTools.fs
+Auto-merging src/Wanxiangshu/OpenCode/Tools/StaticTools.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs
+Auto-merging src/Wanxiangshu/Participant/Persona/Identity.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Participant/Persona/Identity.fs
+Auto-merging src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs
+Auto-merging src/Wanxiangshu/Participant/Persona/Surface.fs
+Auto-merging src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs
+Auto-merging src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fsi
+Auto-merging src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Retry.fs
+Auto-merging src/Wanxiangshu/Persistence/Journal/Envelope.fs
+Auto-merging src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs
+Auto-merging src/Wanxiangshu/Persistence/Journal/Surface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Persistence/Journal/Surface.fs
+Auto-merging src/Wanxiangshu/Persistence/Journal/Surface.fsi
+CONFLICT (rename/delete): src/Wanxiangshu/Process/JsRunLoop.fs renamed to src/Wanxiangshu/Process/JsCallLoop.fs in 11052493bedb4edbcbe0c341fa677afd44c486f1, but deleted in HEAD.
+Auto-merging src/Wanxiangshu/Process/JsCallLoop.fs
+CONFLICT (add/add): Merge conflict in src/Wanxiangshu/Process/JsCallLoop.fs
+Auto-merging src/Wanxiangshu/Process/JsCallLoop.fsi
+CONFLICT (add/add): Merge conflict in src/Wanxiangshu/Process/JsCallLoop.fsi
+Auto-merging src/Wanxiangshu/Process/JsSandbox.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Process/JsSandbox.fs
+Auto-merging src/Wanxiangshu/Process/JsSandbox.fsi
+Auto-merging src/Wanxiangshu/Process/PtyBackend.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Process/PtyBackend.fs
+Auto-merging src/Wanxiangshu/Process/PtySupervisor.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Process/PtySupervisor.fs
+Auto-merging src/Wanxiangshu/Process/PtySupervisor.fsi
+Auto-merging src/Wanxiangshu/Process/Surface.fs
+Auto-merging src/Wanxiangshu/Process/Surface.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Capability.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Capability.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Capability.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Capability.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Description.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Description.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Description.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Description.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Failure.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Failure.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Failure.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Failure.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs
+CONFLICT (modify/delete): src/Wanxiangshu/Strength/IntegrationRules.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Strength/IntegrationRules.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Strength/OpenCode/Replay.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Strength/OpenCode/Replay.fs left in tree.
+Auto-merging src/Wanxiangshu/Verification/JournalPortObservationSurface.fs
+Auto-merging src/Wanxiangshu/Verification/TemporalSurface.fs
+Auto-merging src/Wanxiangshu/Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj
+Auto-merging src/Wanxiangshu/Wanxiangshu.Owner.delegation.runtime.fsproj
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Wanxiangshu.Owner.delegation.runtime.fsproj
+Auto-merging src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-fold.fsproj
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-fold.fsproj
+Auto-merging src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj
+Auto-merging src/Wanxiangshu/Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj
+CONFLICT (modify/delete): src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-surface.fsproj deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-surface.fsproj left in tree.
+Auto-merging src/Wanxiangshu/compile-order.txt
+CONFLICT (chint: Recursive merging with submodules currently only supports trivial cases.
+hint: Please manually handle the merging of each conflicted submodule.
+hint: This can be accomplished with the following steps:
+hint:  - come back to superproject and run:
+hint:
+hint:       git add wanxiangli
+hint:
+hint:    to record the above merge or update
+hint:  - resolve any other conflicts in the superproject
+hint:  - commit the resulting index in the superproject
+hint:
+hint: Disable this message with "git config set advice.submoduleMergeConflict false"
+ontent): Merge conflict in src/Wanxiangshu/compile-order.txt
+Failed to merge submodule wanxiangli (commits not present)
+CONFLICT (submodule): Merge conflict in wanxiangli
+Automatic merge failed; fix conflicts and then commit the result.

@@ -12,9 +12,7 @@ open Wanxiangshu.Persistence.Journal
 module PairProgrammingThoughtTransform =
 
     [<RequireQualifiedAccess>]
-    type CursorPresentationOwner =
-        | PairGuidance
-        | RequirementGrounding
+    type CursorPresentationOwner = | PairGuidance
 
     /// Durable/memory pair with both halves' transcript gap anchors.
     type PairProgrammingGuidelineWire =
@@ -81,6 +79,8 @@ module PairProgrammingThoughtTransform =
             Result<TranscriptGap * TranscriptGap, string>
 
     val decideCurrentPlacement: realMessages: obj list -> Result<(TranscriptGap * TranscriptGap) option, string>
+
+    val applyAnchorView: sessionId: string -> messages: obj list -> obj list * string option
 
     val maybeInjectGuideline:
         journal: AgentJournal option ->

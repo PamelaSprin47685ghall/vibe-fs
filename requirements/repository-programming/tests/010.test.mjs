@@ -23,13 +23,13 @@ test('WHAT[repository-programming-010] JS008_012_bindings_rewrite_requires_exist
   try {
     writeFileSync(join(dir, 'a.txt'), 'old text', 'utf8')
     const binding = createApi(dir)
-    assert.equal(apiOf(binding).js.edit, undefined, 'legacy js.edit is retired from bindings')
-    assert.equal(apiOf(binding).js.cat('a.txt').ok, true)
-    const result = apiOf(binding).js.write('a.txt', 'new text')
+    assert.equal(apiOf(binding).edit, undefined, 'legacy this.edit is retired from bindings')
+    assert.equal(apiOf(binding).cat('a.txt').ok, true)
+    const result = apiOf(binding).write('a.txt', 'new text')
     assert.equal(result.ok, true)
     assert.deepEqual(stagedKinds(binding), ['Rewrite'])
     writeFileSync(join(dir, 'a.txt'), 'concurrent change', 'utf8')
-    const stale = apiOf(binding).js.write('a.txt', 'stale overwrite')
+    const stale = apiOf(binding).write('a.txt', 'stale overwrite')
     assert.equal(stale.ok, false)
     assert.equal(stale.code, 'FILE_CHANGED')
   } finally {
@@ -40,7 +40,7 @@ test('WHAT[repository-programming-010] JS009_012_bindings_write_stages_create', 
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
-    const result = apiOf(binding).js.write('new.txt', 'fresh')
+    const result = apiOf(binding).write('new.txt', 'fresh')
     assert.equal(result.ok, true)
     assert.equal(stagedCount(binding), 1)
     assert.deepEqual(stagedKinds(binding), ['Create'])
@@ -53,7 +53,7 @@ test('WHAT[repository-programming-010] JS009_bindings_write_overwrites_an_existi
   try {
     writeFileSync(join(dir, 'existing.txt'), 'external', 'utf8')
     const binding = createApi(dir)
-    const result = apiOf(binding).js.write('existing.txt', 'tool')
+    const result = apiOf(binding).write('existing.txt', 'tool')
     assert.equal(result.ok, true)
     assert.equal(readFileSync(join(dir, 'existing.txt'), 'utf8'), 'tool')
     assert.equal(stagedCount(binding), 1)

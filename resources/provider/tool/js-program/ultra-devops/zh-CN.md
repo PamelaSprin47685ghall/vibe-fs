@@ -12,7 +12,7 @@ class Js extends JsProgram {
     const section = manifest.slice(heading);
     const url = section.slice(section.indexOf("https://")).split(/\s/)[0];
 
-    return await js.call(class extends js.Callable {
+    return await this.call(class extends this.Callable {
       maxDuration = 3600000; // 整个工程：60 分钟
       interval = 10000;      // watch() 每 10 秒时间片跑一次
 
@@ -33,15 +33,15 @@ class Js extends JsProgram {
       stalled = 0;
       slow = 0;
 
-      // 控制流自证：两个 thunk，宿主驱动并机械检查。跑在独立实例上
-      // （真实运行用全新构造）——写 thunk 就是在设计出口。
+      // 控制流自证：两个 thunk，只拨状态并返回参数数组。宿主调用 next/watch
+      // 并机械检查。跑在独立实例上（真实运行用全新构造）——写 thunk 就是在设计出口。
       sanity() {
         return {
           nextDone: () => {
             this.index = this.files.length;
             return [{ root: "/", step: 99 }];
           },
-          watchVeto: async () => {
+          watchVeto: () => {
             this.index = 0;
             this.current = this.files[0];
             this.seenBytes = 0;

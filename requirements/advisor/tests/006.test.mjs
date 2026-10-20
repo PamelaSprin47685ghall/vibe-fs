@@ -11,7 +11,7 @@ import {
   clearDelegationHost,
 } from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 
-// advisor-[006]: `js.advisor(intent, view)` is an ordinary delegation member — its value crosses as
+// advisor-[006]: `this.advisor(intent, view)` is an ordinary delegation member — its value crosses as
 // data, never as rendered prose, and a surface without the capability never carries it.
 const program = (body) => `class Js extends JsProgram {
   async run() {
@@ -32,24 +32,20 @@ test('WHAT[advisor-006] todowrite-for-manager carries the advisor member in desc
   const fragment = surface.members.find((member) => member.memberName === 'advisor')
   assert.ok(fragment, 'the manager surface carries the advisor member')
   assert.equal(fragment.capability, 'Advisor')
-  assert.equal(fragment.signature, 'async advisor(intent, view)')
-  assert.equal(fragment.runtimeBindingKey, 'js.advisor')
+  assert.equal(fragment.memberName, 'advisor')
 
   assert.equal(surface.description.includes('advisor(intent, view)'), true)
-  assert.equal(surface.baseClassSource.includes('this._api.js.advisor(intent, view)'), true)
-  assert.equal(
-    surface.runtimeBindings.some((entry) => entry.memberName === 'advisor' && entry.binding === 'js.advisor'),
-    true,
-  )
+  assert.equal(surface.baseClassSource.includes('this._api.advisor(intent, view)'), true)
+  assert.equal(surface.members.filter((member) => member.memberName === 'advisor').length, 1)
 
   // The member is capability-gated: the same role without ToolPermission.Advisor loses it in all layers.
   const withoutAdvisor = generate('Manager', ['Read'], 'en')
   assert.equal(withoutAdvisor.members.some((member) => member.memberName === 'advisor'), false)
   assert.equal(withoutAdvisor.description.includes('advisor(intent, view)'), false)
-  assert.equal(withoutAdvisor.baseClassSource.includes('js.advisor'), false)
+  assert.equal(withoutAdvisor.baseClassSource.includes('this._api.advisor'), false)
 })
 
-test('WHAT[advisor-006] js.advisor returns the installed host closure value back verbatim as data', async () => {
+test('WHAT[advisor-006] this.advisor returns the installed host closure value back verbatim as data', async () => {
   const dir = sandbox()
   const sessionId = `sess-advisor-${Math.random().toString(36).slice(2, 8)}`
   const observed = []

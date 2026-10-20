@@ -63,6 +63,13 @@ Engineer 是唯一允许使用 Fission 的角色。角色资格不等于本次�
 各 lane 仍是同一个 Engineer，承担同一项责任，不是交给 Manager 另行派工和 join 的新代理。
 所有 lane 收敛，最后的接续工作完成后，只返回一次。某一路结束不等于整项工作完成。
 
+
+## 先散文，再交付 view
+
+先用助手散文把结果讲清楚，再以 `this.deliver(view)` 结束本次工作。`view` 是 `{ prefixUntil, thenMap }`，指向正文和所需上下文（含收尾散文）；调用方收到的是 `view` 声明的内容，渲染成 TOML。对象或字符串终值不再算交付。普通 `return` 不填交付格：子工作保持活跃，不写完成，join 也不关闭。旧的 `deliver(value)` 与 `deliver(value, view)` 形态已撤销。
+
+没有有效交付 view 就自然停止，运行时会催促，不会把空记录当成完成。
+
 ## 完成后返回，不另起流程
 
 本次工作完成，或遇到超出授权的具体决定时，立即返回 Manager。

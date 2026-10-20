@@ -1,0 +1,36 @@
+TAP version 13
+# PHYSICAL_SPAWN {"file":"/private/tmp/vibe-fs-sm07-node22.h1udgm/node-v22.13.0-darwin-arm64/bin/node","args":["/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/dist/supervision/SupervisedProcess.js","--wanxiangli-supervisor","/var/folders/g_/3ydzn7kx5lg9ylq8fd9p_13r0000gn/T/wanxiangli-supervision-hf5EHN"]}
+# (node:20535) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg
+not ok 1 - WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg
+  ---
+  duration_ms: 490.417417
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:327:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    positive control must spawn one real rg
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:364:14
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:331:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 934.997084

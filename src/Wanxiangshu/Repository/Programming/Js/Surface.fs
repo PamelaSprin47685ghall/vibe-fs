@@ -14,9 +14,6 @@ type JsSurface =
         BaseClassSource: string
         /// GrandRewrite §6.10: exactly one responsibility-shaped Ultra Example.
         Examples: string list
-        /// member name → runtime binding key; the runtime gate checks the
-        /// invoked member against this exact map (JS-004).
-        RuntimeBindings: Map<string, string>
     }
 
 module JsToolGenerator =
@@ -30,13 +27,35 @@ module JsToolGenerator =
     let toolNameFor (roleName: string) : string =
         "todowrite-for-" + roleName.ToLowerInvariant()
 
+    let private membersForRole (roleName: string) capabilities =
+        membersFor capabilities
+        |> List.filter (fun fragment -> roleName.Trim().ToLowerInvariant() <> "plan" || fragment.MemberName <> "mkdir")
+        |> List.map (fun fragment ->
+            if
+                roleName.Trim().ToLowerInvariant() = "manager"
+                && List.contains fragment.MemberName [ "cat"; "stat"; "ls"; "rg" ]
+            then
+                { fragment with
+                    MemberName = "reviewOnly." + fragment.MemberName }
+            else
+                fragment)
+
     let private tryProject (roleName: string) (capabilities: Set<ToolPermission>) =
-        let jsCapabilities = JsCapability.ofToolCapabilities capabilities
+        let projected = JsCapability.ofToolCapabilities capabilities
+
+        let jsCapabilities =
+            if
+                roleName.Trim().ToLowerInvariant() = "orchestrator"
+                && Set.contains JsCapability.Fork projected
+            then
+                projected |> Set.remove JsCapability.Fork |> Set.add JsCapability.Commission
+            else
+                projected
 
         if Set.isEmpty jsCapabilities then
             None
         else
-            Some(toolNameFor roleName, jsCapabilities, membersFor jsCapabilities)
+            Some(toolNameFor roleName, jsCapabilities, membersForRole roleName jsCapabilities)
 
     let renderBaseClass (prose: JsCanonicalDescription.Prose) (capabilities: Set<JsCapability>) : string =
         JsCanonicalDescription.runtimeBaseClass prose capabilities
@@ -73,32 +92,8 @@ module JsToolGenerator =
                   Capabilities = jsCapabilities
                   Members = members
                   Description = renderDescription prose roleName jsCapabilities
-                  BaseClassSource = renderBaseClass prose jsCapabilities
-                  Examples = renderExamples prose roleName jsCapabilities
-                  RuntimeBindings =
-                    members
-                    |> List.map (fun fragment -> fragment.MemberName, fragment.RuntimeBindingKey)
-                    |> Map.ofList }
-
-    /// Dedicated readonly projection for the StrengthReplica JS surface (JS-PREDICTOR).
-    /// Role is not a public office Role; capabilities are exactly {Read, Glob}
-    /// (grep retired in favour of walk + whereAll, [057]).
-    let generatePredictor (prose: JsCanonicalDescription.Prose) : JsSurface =
-        let roleName = "predictor"
-        let jsCapabilities = set [ JsCapability.Read; JsCapability.Glob ]
-        let members = membersFor jsCapabilities
-
-        { ToolName = toolNameFor roleName
-          RoleName = roleName
-          Capabilities = jsCapabilities
-          Members = members
-          Description = renderDescription prose roleName jsCapabilities
-          BaseClassSource = renderBaseClass prose jsCapabilities
-          Examples = renderExamples prose roleName jsCapabilities
-          RuntimeBindings =
-            members
-            |> List.map (fun fragment -> fragment.MemberName, fragment.RuntimeBindingKey)
-            |> Map.ofList }
+                  BaseClassSource = JsCanonicalDescription.runtimeBaseClassForRole roleName prose jsCapabilities
+                  Examples = renderExamples prose roleName jsCapabilities }
 
     /// Generated-name gate: a js-* tool call is accepted iff its name is the
     /// surface this profile generates; any other name fails closed (JS-001).
@@ -115,7 +110,7 @@ module JsToolGenerator =
         |> Option.bind (fun (_, _, members) ->
             members
             |> List.tryFind (fun fragment -> fragment.MemberName = memberName)
-            |> Option.map (fun fragment -> fragment.RuntimeBindingKey))
+            |> Option.map (fun fragment -> fragment.MemberName))
 
 /// Transaction context supporting separation of ReadSnapshots and SubstantiveAccess (repository-programming-026 / T18 / T19).
 type JsTransactionContext() =

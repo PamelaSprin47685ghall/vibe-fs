@@ -8,15 +8,15 @@
 
 ## 三材料装配
 
-`AdvisorView.plan(language, delivered, request)` 是纯函数（无 Host、无 journal、无时钟，同输入必得同字节）：把调用者交出的 messages（anchor + 文本）按声明裁到 `prefixUntil` 之上、排除已交付的 anchor，`thenRemove` 命中的 anchor 用摘要替换其文本，然后渲染成 blogger 形状的一条 view prompt——作者写的 `# ` 注释表头、一个空行、之后每记录一张 `[[new_work_to_record]]` 表。表头文本取自 `resources/provider/lifecycle/advisor/view`（双语同一语义路径，按 `language` 选 locale），因此顾问读调用者材料的方式与 Blogger 读 delta 的方式一致。intent 不进入这条 prompt：`consult` 时 view prompt 与 intent 作为两条独立 prompt 追加，顾问自己的 law 由 Host 的 agent 配置与 system transform 投影，三条材料永不拼接。
+`AdvisorView.plan(language, delivered, request)` 是纯函数。它先复用 AnchorView 生成完整 view：输入为调用者消息、已有区间替换历史和统一声明 `{ prefixUntil, thenMap }`；再按宿主已交付集合取增量。prefixUntil 只保护当轮修改，不是交付上界或下界；首次交付整个 view。TOML 保持 `# ` 注释表头、空行及每记录一张 `[[new_work_to_record]]` 表，正文放在 record 字段。view 与 intent 独立发送，不合并。
 
 ## 增量与游标
 
-`Cursor` 是已交付游标，按调用 session 记 anchor 集合，`record` 只增不减，`clear`/`clearAll` 只影响指定 session。下一次 `plan` 只渲染游标之外的 anchor，于是 follow-up 只携带 view 增量加新的 intent。无新材料的请求得到一条只含表头的 prompt 且 `HasNewMaterial = false`；`HasNewMaterial` 不是发问的门禁——intent 本身就是新材料，所以宿主按 intent 是否为空继续咨询。
+`Cursor` 按调用 session 记录已经成功交付的视图材料身份。身份包含代表锚点和精确呈现内容，不能仅记编号：隐含锚点 0 永久存在，其新摘要仍是新材料。同一份材料不会重复发送；同编号的内容变化会产生增量。只有咨询成功后调用 `record`；失败与未确认结果不推进。`clear` / `clearAll` 用于相应专席清理。无增量时仍可独立追加新 intent。
 
 ## 成员与信封
 
-`js.advisor(intent, view)` 由 `JsCapability.Advisor` 投影：capability fragment（成员名、签名、描述、示例、binding key）与生成面的描述、基类 stub、运行时绑定同源，`ToolsBindings.makeAdvisorMember` 把宿主闭包（`JsDelegationHost.Advisor`）注入成员，两处 install 分别在 `ToolRegistry` 的生成面宿主与 `RuntimeSurface`。宿主闭包本身实现 view 声明解析（非法声明拒绝为 `VIEW_DECLARATION_INVALID`）、调用 `AdvisorView.plan` + `AdvisorSeat.consult`、成功后推进游标，返回值是数据信封：`{ ok: true, advice }`，或 `{ ok: false, code, reason }`——席位无法作答为 `advisor-unavailable`，宿主缺席为 `DELEGATION_UNAVAILABLE`。拒绝是数据而非抛出，程序不需要为它写 catch；渲染只在工具结果边界发生。
+`this.advisor(intent, view)` 由 `JsCapability.Advisor` 投影：注册表提供成员名，本地化基类伪代码提供接口、说明与例子，运行时按同一能力集提供绑定，`ToolsBindings.makeAdvisorMember` 把宿主闭包（`JsDelegationHost.Advisor`）注入成员，两处 install 分别在 `ToolRegistry` 的生成面宿主与 `RuntimeSurface`。宿主闭包本身实现 view 声明解析（非法声明拒绝为 `VIEW_DECLARATION_INVALID`）、调用 `AdvisorView.plan` + `AdvisorSeat.consult`、成功后推进游标，返回值是数据信封：`{ ok: true, advice }`，或 `{ ok: false, code, reason }`——席位无法作答为 `advisor-unavailable`，宿主缺席为 `DELEGATION_UNAVAILABLE`。拒绝是数据而非抛出，程序不需要为它写 catch；渲染只在工具结果边界发生。
 
 ## 无工具与无副作用
 

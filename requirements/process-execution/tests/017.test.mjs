@@ -23,7 +23,7 @@ test('WHAT[process-execution-017] js.call accepts multi-minute maxDuration witho
   try {
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 60000;
       interval = 100;
       next(ctx) { return ctx.step === 0 ? "printf 'ok'" : null; }

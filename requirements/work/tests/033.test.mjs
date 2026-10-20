@@ -38,7 +38,7 @@ const withStore = async (body) => {
   try {
     // The journal directory is fixed next to the events dir; tests that open
     // the database directly create it here rather than relying on the host.
-    const stateDir = journalSurface.JournalSurface_initializeStateRoot(root)
+    const stateDir = await journalSurface.JournalSurface_initializeStateRoot(root)
     mkdirSync(join(stateDir, 'wanxiangshu'), { recursive: true })
     await body(workspace.acquire(stateDir), root)
   } finally {
@@ -273,6 +273,31 @@ test('WHAT[work-033] an illegal first stage is rejected by the fold before any l
       journal.close()
     }
   })
+})
+
+test('WHAT[work-033] Engineer/DevOps/Orchestrator TurnCompleted+stop without TaskDelivery witness does not complete or close logical run', async () => {
+  const { completeWithoutDelivery } = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  const { withReview } = await import('./support/plugin.mjs')
+  const dispatch = await import('../../../dist/Interaction/Dispatch/DispatchSurface.js')
+
+  for (const name of ['Engineer', 'DevOps', 'Orchestrator']) {
+    const session = `session-undelivered-${name.toLowerCase()}`
+    const outcome = await completeWithoutDelivery(name, session, 'msg-root-1', 'run-1', 'I finished the task but did not call deliver.')
+    assert.equal(outcome.caseName, 'RejectedUndelivered')
+    assert.equal(outcome.terminalNotifications, 0)
+  }
+
+  // 2. 验证真实插件运行时下未交付 stop 不写入完成事实、logical run 保持活跃
+  await withReview(async ({ runtime, session }) => {
+    const before = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+    assert.ok(before !== null, 'logical run must be active initially')
+
+    const result = await completeWithoutDelivery('engineer', session, 'user-root', 'engineer-run-1', 'Work done without deliver witness')
+    assert.equal(result.caseName, 'RejectedUndelivered')
+
+    const after = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+    assert.deepEqual(after, before, 'logical run must not be closed when delivery witness is missing')
+  }, { session: 'engineer-undelivered-logical-run' })
 })
 
 test('WHAT[work-033] a same-request replay is idempotent and a different payload is a structured conflict', async () => {

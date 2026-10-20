@@ -70,7 +70,7 @@ const { run } = await import("../../../dist/Repository/Programming/Js/RuntimeSur
 
 const BASE = `class JsProgram {
   constructor(api) { this._api = api; }
-  cat(path) { return this._api.js.cat(path); }
+  cat(path) { return this._api.cat(path); }
 }`
 const runWrapped = async (
   program,

@@ -99,3 +99,19 @@ test('WHAT[work-027] a missing lifecycle projection is not evidence that the Man
     assert.equal(sent, 1)
   }, { session: 'manager-missing-projection-fixture' })
 })
+
+test('WHAT[work-027] Engineer/DevOps/Orchestrator progress stop cannot count as complete without TaskDelivery witness', async () => {
+  const { completeWithoutDelivery } = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  for (const name of ['engineer', 'devops', 'orchestrator']) {
+    await withReview(async ({ runtime, session }) => {
+      const before = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+      assert.ok(before !== null, `${name} logical run must start active`)
+
+      const outcome = await completeWithoutDelivery(name, session, 'user-root', `${name}-run-1`, `${name} progress report without delivery`)
+      assert.equal(outcome.caseName, 'RejectedUndelivered')
+      assert.equal(outcome.terminalNotifications, 0)
+      const after = dispatch.projectionObservation(runtime.journal, session).activeLogicalRun
+      assert.deepEqual(after, before, `${name} logical run must not close without delivery witness`)
+    }, { session: `${name}-progress-stop-without-witness` })
+  }
+})

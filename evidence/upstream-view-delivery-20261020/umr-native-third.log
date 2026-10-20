@@ -1,0 +1,738 @@
+TAP version 13
+# (node:19647) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+not ok 1 - WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+  ---
+  duration_ms: 3723.653625
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:13:1'
+  failureType: 'testCodeFailure'
+  error: 'Process scope closure was not confirmed: 9dd855de9c9b476cad686607a9488acf'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: WHAT[capability-enforcement-002] AGENT_006_role_tool_matrix_reaches_the_host_schema
+ok 2 - WHAT[capability-enforcement-002] AGENT_006_role_tool_matrix_reaches_the_host_schema
+  ---
+  duration_ms: 80.8535
+  ...
+# Subtest: WHAT[capability-enforcement-002] office_capability_permissions_agree_with_the_host_schema_matrix
+ok 3 - WHAT[capability-enforcement-002] office_capability_permissions_agree_with_the_host_schema_matrix
+  ---
+  duration_ms: 426.544541
+  ...
+# Subtest: WHAT[capability-enforcement-002] P7_SURFACE_role_labels_are_js_native_strings
+ok 4 - WHAT[capability-enforcement-002] P7_SURFACE_role_labels_are_js_native_strings
+  ---
+  duration_ms: 0.197667
+  ...
+# Subtest: WHAT[capability-enforcement-002] P7_SURFACE_public_internal_partition_and_managed_agent_name_are_js_native
+ok 5 - WHAT[capability-enforcement-002] P7_SURFACE_public_internal_partition_and_managed_agent_name_are_js_native
+  ---
+  duration_ms: 0.1625
+  ...
+# Subtest: WHAT[capability-enforcement-002] TOOLSPEC_delegation_tools_have_owner_defined_admission
+ok 6 - WHAT[capability-enforcement-002] TOOLSPEC_delegation_tools_have_owner_defined_admission
+  ---
+  duration_ms: 0.518458
+  ...
+# Subtest: WHAT[capability-enforcement-002] TOOLSPEC_engineer_and_devops_tools_have_owner_defined_admission
+ok 7 - WHAT[capability-enforcement-002] TOOLSPEC_engineer_and_devops_tools_have_owner_defined_admission
+  ---
+  duration_ms: 0.318084
+  ...
+# Subtest: WHAT[capability-enforcement-002] TOOLSPEC_plugin_owned_cognitive_utility_tools_admission
+ok 8 - WHAT[capability-enforcement-002] TOOLSPEC_plugin_owned_cognitive_utility_tools_admission
+  ---
+  duration_ms: 0.18425
+  ...
+# Subtest: WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generator_output
+ok 9 - WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generator_output
+  ---
+  duration_ms: 33.944166
+  ...
+# Subtest: WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only
+ok 10 - WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only
+  ---
+  duration_ms: 3.330625
+  ...
+# Subtest: WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mutation_methods
+ok 11 - WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mutation_methods
+  ---
+  duration_ms: 1.305375
+  ...
+# Subtest: WHAT[capability-enforcement-025] J03_manager_execution_blocks_write_and_edit_without_disk_mutations
+ok 12 - WHAT[capability-enforcement-025] J03_manager_execution_blocks_write_and_edit_without_disk_mutations
+  ---
+  duration_ms: 16.590333
+  ...
+# Subtest: WHAT[capability-enforcement-025] J04_shared_read_execution_returns_success_without_file_effects
+ok 13 - WHAT[capability-enforcement-025] J04_shared_read_execution_returns_success_without_file_effects
+  ---
+  duration_ms: 5.947375
+  ...
+# Subtest: WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_edit_capabilities
+ok 14 - WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_edit_capabilities
+  ---
+  duration_ms: 7.166667
+  ...
+# Subtest: WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_not_broadened
+ok 15 - WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_not_broadened
+  ---
+  duration_ms: 0.263875
+  ...
+# Subtest: WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data
+ok 16 - WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data
+  ---
+  duration_ms: 5.00775
+  ...
+# Subtest: WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_root_boundaries
+ok 17 - WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_root_boundaries
+  ---
+  duration_ms: 1.878083
+  ...
+# Subtest: WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_endings
+ok 18 - WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_endings
+  ---
+  duration_ms: 1.43825
+  ...
+# Subtest: WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_search_errors_and_output_limits
+ok 19 - WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_search_errors_and_output_limits
+  ---
+  duration_ms: 9.14725
+  ...
+# Subtest: WHAT[capability-enforcement-025] J11_shared_adapter_observation_records_only_successful_distinct_reads
+ok 20 - WHAT[capability-enforcement-025] J11_shared_adapter_observation_records_only_successful_distinct_reads
+  ---
+  duration_ms: 15.224042
+  ...
+# Subtest: WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_ambient_os_capabilities
+ok 21 - WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_ambient_os_capabilities
+  ---
+  duration_ms: 4.326958
+  ...
+# Subtest: WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_permissions_include_read_glob_grep
+ok 22 - WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_permissions_include_read_glob_grep
+  ---
+  duration_ms: 0.328959
+  ...
+# Subtest: WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_readonly_capabilities
+ok 23 - WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_readonly_capabilities
+  ---
+  duration_ms: 0.371625
+  ...
+# Subtest: WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny
+ok 24 - WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny
+  ---
+  duration_ms: 13.291958
+  ...
+# Subtest: WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role
+ok 25 - WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role
+  ---
+  duration_ms: 5.724166
+  ...
+# Subtest: WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface
+ok 26 - WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface
+  ---
+  duration_ms: 6.308833
+  ...
+# Subtest: WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission
+ok 27 - WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission
+  ---
+  duration_ms: 0.125333
+  ...
+# Subtest: WHAT[capability-enforcement-025] P06_unknown_identity_never_authorized_by_tool_name_suffix
+ok 28 - WHAT[capability-enforcement-025] P06_unknown_identity_never_authorized_by_tool_name_suffix
+  ---
+  duration_ms: 0.23075
+  ...
+# (node:19673) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retains_readonly_permissions
+ok 29 - WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retains_readonly_permissions
+  ---
+  duration_ms: 352.246334
+  ...
+# Subtest: WHAT[capability-enforcement-025] P07_cleanup_blocker_or_inactive_incumbency_denies_review_tool
+ok 30 - WHAT[capability-enforcement-025] P07_cleanup_blocker_or_inactive_incumbency_denies_review_tool
+  ---
+  duration_ms: 0.290125
+  ...
+# Subtest: WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_and_closeout_permissions
+ok 31 - WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_and_closeout_permissions
+  ---
+  duration_ms: 0.044458
+  ...
+# Subtest: WHAT[capability-enforcement-025] P17_final_incumbent_loses_every_new_work_capability
+ok 32 - WHAT[capability-enforcement-025] P17_final_incumbent_loses_every_new_work_capability
+  ---
+  duration_ms: 0.031792
+  ...
+# Subtest: WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_in_both_languages
+ok 33 - WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_in_both_languages
+  ---
+  duration_ms: 0.436958
+  ...
+# Subtest: WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads closed
+ok 34 - WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads closed
+  ---
+  duration_ms: 278.732
+  ...
+# Subtest: WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and refused after review
+ok 35 - WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and refused after review
+  ---
+  duration_ms: 315.407375
+  ...
+# Subtest: WHAT[capability-enforcement-025] P14_saved object, method and raw binding recheck authority after park
+ok 36 - WHAT[capability-enforcement-025] P14_saved object, method and raw binding recheck authority after park
+  ---
+  duration_ms: 229.778667
+  ...
+# Subtest: WHAT[capability-enforcement-025] P15_access denied before path validation, final incumbent has no exception
+ok 37 - WHAT[capability-enforcement-025] P15_access denied before path validation, final incumbent has no exception
+  ---
+  duration_ms: 256.6995
+  ...
+# Subtest: WHAT[capability-enforcement-025] identity and cross-role denial remain independent of Review
+ok 38 - WHAT[capability-enforcement-025] identity and cross-role denial remain independent of Review
+  ---
+  duration_ms: 191.627459
+  ...
+# Subtest: WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg
+not ok 39 - WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg
+  ---
+  duration_ms: 264.614791
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:327:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    positive control must spawn one real rg
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:364:14
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:254:7)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:331:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[capability-enforcement-025] an admitted physical rg may finish after acceptance, but a later call is refused
+not ok 40 - WHAT[capability-enforcement-025] an admitted physical rg may finish after acceptance, but a later call is refused
+  ---
+  duration_ms: 237.883833
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:379:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:524:28)
+    process.processEmit [as emit] (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/node_modules/signal-exit/index.js:199:34)
+  ...
+# (node:19762) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[managed-session-lifecycle-028] child completion reads its delivery through the current view boundary
+ok 41 - WHAT[managed-session-lifecycle-028] child completion reads its delivery through the current view boundary
+  ---
+  duration_ms: 188.529834
+  ...
+# Subtest: WHAT[managed-session-lifecycle-028] a proven terminal that faults during settlement resolves the run with an explicit failure instead of stranding the join
+ok 42 - WHAT[managed-session-lifecycle-028] a proven terminal that faults during settlement resolves the run with an explicit failure instead of stranding the join
+  ---
+  duration_ms: 90.515583
+  ...
+# Subtest: WHAT[managed-session-lifecycle-028] a PERSIST-settled Source with durable work still Active wakes the join instead of hanging on the journal revision
+ok 43 - WHAT[managed-session-lifecycle-028] a PERSIST-settled Source with durable work still Active wakes the join instead of hanging on the journal revision
+  ---
+  duration_ms: 70.557833
+  ...
+# Subtest: WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_capability
+ok 44 - WHAT[repository-programming-001] JS001_generate_none_when_no_filesystem_capability
+  ---
+  duration_ms: 14.033
+  ...
+# Subtest: WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_permissions_intersection
+ok 45 - WHAT[repository-programming-001] JS001_role_projection_is_exactly_roles_permissions_intersection
+  ---
+  duration_ms: 32.608917
+  ...
+# Subtest: WHAT[repository-programming-001] JS001_non_fs_permissions_never_produce_members
+ok 46 - WHAT[repository-programming-001] JS001_non_fs_permissions_never_produce_members
+  ---
+  duration_ms: 16.118292
+  ...
+# Subtest: WHAT[repository-programming-002] registered_js_tools_match_js_tool_generator_output
+ok 47 - WHAT[repository-programming-002] registered_js_tools_match_js_tool_generator_output
+  ---
+  duration_ms: 31.412167
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra_example_coder
+ok 48 - WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra_example_coder
+  ---
+  duration_ms: 3.137084
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers
+ok 49 - WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers
+  ---
+  duration_ms: 3.159625
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_read_or_write_members
+ok 50 - WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_read_or_write_members
+  ---
+  duration_ms: 9.398458
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_member_gate_binds_present_members_only
+ok 51 - WHAT[repository-programming-002] JS004_member_gate_binds_present_members_only
+  ---
+  duration_ms: 0.423167
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_rejected
+ok 52 - WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_rejected
+  ---
+  duration_ms: 2.606417
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_every_holding_role
+not ok 53 - WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_every_holding_role
+  ---
+  duration_ms: 9.256042
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/002.test.mjs:241:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+    -   'commission',
+        'join',
+        'horizon'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'commission'
+    1: 'join'
+    2: 'horizon'
+  actual:
+    0: 'join'
+    1: 'horizon'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/002.test.mjs:276:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_every_holding_role
+ok 54 - WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_every_holding_role
+  ---
+  duration_ms: 11.131125
+  ...
+# Subtest: WHAT[repository-programming-030] a program that parks returns a top-level parked payload with handle and payload
+ok 55 - WHAT[repository-programming-030] a program that parks returns a top-level parked payload with handle and payload
+  ---
+  duration_ms: 12.563583
+  ...
+# Subtest: WHAT[repository-programming-030] a program that does not park completes normally
+ok 56 - WHAT[repository-programming-030] a program that does not park completes normally
+  ---
+  duration_ms: 5.467041
+  ...
+# Subtest: WHAT[repository-programming-030] park is an async member that suspends at the await point
+ok 57 - WHAT[repository-programming-030] park is an async member that suspends at the await point
+  ---
+  duration_ms: 4.525875
+  ...
+# Subtest: WHAT[repository-programming-030] another session parking does not block this session deliver (LC-008)
+ok 58 - WHAT[repository-programming-030] another session parking does not block this session deliver (LC-008)
+  ---
+  duration_ms: 12.517375
+  ...
+# Subtest: WHAT[repository-programming-030] another session cannot unpark or abandon this session park (LC-009)
+ok 59 - WHAT[repository-programming-030] another session cannot unpark or abandon this session park (LC-009)
+  ---
+  duration_ms: 20.585291
+  ...
+# Subtest: WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run
+not ok 60 - WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run
+  ---
+  duration_ms: 219.353459
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/052.test.mjs:69:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /status = "aborted"/. Input:
+    
+    '# ok\n' +
+      '\n' +
+      '[data]\n' +
+      'ok = true\n' +
+      'status = "completed"\n' +
+      'exitCode = 127\n' +
+      'scopeClosed = true\n' +
+      'endUnconfirmed = false\n' +
+      'outputComplete = true\n' +
+      'stdout = ""\n' +
+      "stderr = '''\n" +
+      '/bin/sh: wget: command not found\n' +
+      "'''\n" +
+      'truncated = false\n' +
+      'bytes = 33\n' +
+      'durationMs = 194\n' +
+      'steps = 4\n' +
+      'notStarted = false\n' +
+      'diagnosticTruncated = false\n' +
+      'outputNotice = ""\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # ok
+    
+    [data]
+    ok = true
+    status = "completed"
+    exitCode = 127
+    scopeClosed = true
+    endUnconfirmed = false
+    outputComplete = true
+    stdout = ""
+    stderr = '''
+    /bin/sh: wget: command not found
+    '''
+    truncated = false
+    bytes = 33
+    durationMs = 194
+    steps = 4
+    notStarted = false
+    diagnosticTruncated = false
+    outputNotice = ""
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/052.test.mjs:106:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed
+not ok 61 - WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed
+  ---
+  duration_ms: 194.585708
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/052.test.mjs:184:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The input did not match the regular expression /dispatched = \[8\]/. Input:
+    
+    '# ok\n' +
+      '\n' +
+      '[data]\n' +
+      'dispatched = [127]\n' +
+      '[data.result]\n' +
+      'ok = true\n' +
+      'status = "completed"\n' +
+      'exitCode = 127\n' +
+      'scopeClosed = true\n' +
+      'endUnconfirmed = false\n' +
+      'outputComplete = true\n' +
+      'stdout = ""\n' +
+      "stderr = '''\n" +
+      '/bin/sh: wget: command not found\n' +
+      "'''\n" +
+      'truncated = false\n' +
+      'bytes = 33\n' +
+      'durationMs = 185\n' +
+      'steps = 4\n' +
+      'notStarted = false\n' +
+      'diagnosticTruncated = false\n' +
+      'outputNotice = ""\n'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # ok
+    
+    [data]
+    dispatched = [127]
+    [data.result]
+    ok = true
+    status = "completed"
+    exitCode = 127
+    scopeClosed = true
+    endUnconfirmed = false
+    outputComplete = true
+    stdout = ""
+    stderr = '''
+    /bin/sh: wget: command not found
+    '''
+    truncated = false
+    bytes = 33
+    durationMs = 185
+    steps = 4
+    notStarted = false
+    diagnosticTruncated = false
+    outputNotice = ""
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/052.test.mjs:222:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[repository-programming-059] prepare failure leaves delivery empty and preserves actual file effects
+ok 62 - WHAT[repository-programming-059] prepare failure leaves delivery empty and preserves actual file effects
+  ---
+  duration_ms: 26.395708
+  ...
+# Subtest: WHAT[repository-programming-059] commit failure leaves delivery empty and preserves actual file effects
+ok 63 - WHAT[repository-programming-059] commit failure leaves delivery empty and preserves actual file effects
+  ---
+  duration_ms: 12.51775
+  ...
+# Subtest: WHAT[repository-programming-059] this.deliver records its view declaration and does not run later statements
+ok 64 - WHAT[repository-programming-059] this.deliver records its view declaration and does not run later statements
+  ---
+  duration_ms: 5.651542
+  ...
+# Subtest: WHAT[repository-programming-059] a fenced cell answers only its own provider run
+ok 65 - WHAT[repository-programming-059] a fenced cell answers only its own provider run
+  ---
+  duration_ms: 5.584875
+  ...
+# Subtest: WHAT[repository-programming-059] permanent compression survives a later protected handoff and latest interval replacement
+ok 66 - WHAT[repository-programming-059] permanent compression survives a later protected handoff and latest interval replacement
+  ---
+  duration_ms: 0.991959
+  ...
+# Subtest: WHAT[repository-programming-059] implicit zero can return the opening interval after anchor 1 disappears
+ok 67 - WHAT[repository-programming-059] implicit zero can return the opening interval after anchor 1 disappears
+  ---
+  duration_ms: 0.541083
+  ...
+# Subtest: WHAT[repository-programming-059] handoff returns the assistant prose once and only through the owning run
+ok 68 - WHAT[repository-programming-059] handoff returns the assistant prose once and only through the owning run
+  ---
+  duration_ms: 0.3925
+  ...
+# Subtest: WHAT[repository-programming-059] an ordinary return does not populate the delivered cell
+ok 69 - WHAT[repository-programming-059] an ordinary return does not populate the delivered cell
+  ---
+  duration_ms: 5.803875
+  ...
+# Subtest: WHAT[repository-programming-059] changed opening material is returned once even though anchor zero remains
+ok 70 - WHAT[repository-programming-059] changed opening material is returned once even though anchor zero remains
+  ---
+  duration_ms: 0.661833
+  ...
+# Subtest: WHAT[repository-programming-060] the executed SDK uses this members and exposes no global js or nested api
+not ok 71 - WHAT[repository-programming-060] the executed SDK uses this members and exposes no global js or nested api
+  ---
+  duration_ms: 12.800709
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/060.test.mjs:9:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      {
+    +   call: 'undefined',
+    +   callable: 'undefined',
+    -   call: 'function',
+    -   callable: 'function',
+        global: 'undefined',
+        nested: 'undefined',
+        write: 'function'
+      }
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    global: 'undefined'
+    nested: 'undefined'
+    call: 'function'
+    callable: 'function'
+    write: 'function'
+  actual:
+    global: 'undefined'
+    nested: 'undefined'
+    call: 'undefined'
+    callable: 'undefined'
+    write: 'function'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/repository-programming/tests/060.test.mjs:18:12)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: WHAT[work-029] Plan path derivation is deterministic and rejects insecure work identities
+ok 72 - WHAT[work-029] Plan path derivation is deterministic and rejects insecure work identities
+  ---
+  duration_ms: 0.86175
+  ...
+# (node:19804) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[work-029] Plan uses common text primitives and exposes no retired file edit or rewrite aliases
+ok 73 - WHAT[work-029] Plan uses common text primitives and exposes no retired file edit or rewrite aliases
+  ---
+  duration_ms: 52.756375
+  ...
+# Subtest: WHAT[work-029] public and raw API calls cannot read or write outside P
+ok 74 - WHAT[work-029] public and raw API calls cannot read or write outside P
+  ---
+  duration_ms: 92.411125
+  ...
+# Subtest: WHAT[work-029] current tenure review gates each actual P write and relay revokes the permission
+ok 75 - WHAT[work-029] current tenure review gates each actual P write and relay revokes the permission
+  ---
+  duration_ms: 68.912
+  ...
+# Subtest: WHAT[work-029] P symlinks and a substituted plan directory cannot escape the bound artifact
+ok 76 - WHAT[work-029] P symlinks and a substituted plan directory cannot escape the bound artifact
+  ---
+  duration_ms: 51.699916
+  ...
+# Subtest: WHAT[work-029] the shared as-is write remains on disk after a later program failure
+ok 77 - WHAT[work-029] the shared as-is write remains on disk after a later program failure
+  ---
+  duration_ms: 56.163666
+  ...
+# Subtest: WHAT[work-029] both Plan descriptions teach PLAN_PATH with the shared SDK and current view contract
+ok 78 - WHAT[work-029] both Plan descriptions teach PLAN_PATH with the shared SDK and current view contract
+  ---
+  duration_ms: 8.020333
+  ...
+# Subtest: WHAT[work-029] a saved Plan write resumed after relay cannot borrow the successor review
+ok 79 - WHAT[work-029] a saved Plan write resumed after relay cannot borrow the successor review
+  ---
+  duration_ms: 361.849
+  ...
+# Subtest: WHAT[work-031] plan role, stages, and tool resources exist in paired English and Simplified Chinese markdown files
+ok 80 - WHAT[work-031] plan role, stages, and tool resources exist in paired English and Simplified Chinese markdown files
+  ---
+  duration_ms: 3.711125
+  ...
+# Subtest: WHAT[work-031] the prompt catalog carries a localized PlanSystemPrompt for real system transform wiring
+ok 81 - WHAT[work-031] the prompt catalog carries a localized PlanSystemPrompt for real system transform wiring
+  ---
+  duration_ms: 10.695625
+  ...
+# Subtest: WHAT[work-031] plan prompts state that S1/S2 review gaps are entry-bar gaps to start the next stage and promoted reviews return the next stage method immediately
+ok 82 - WHAT[work-031] plan prompts state that S1/S2 review gaps are entry-bar gaps to start the next stage and promoted reviews return the next stage method immediately
+  ---
+  duration_ms: 1.316458
+  ...
+# (node:19862) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[work-034] initial tenure (S1) assembles U + current messages with no synthetic record and requests reanchor on first turn
+ok 83 - WHAT[work-034] initial tenure (S1) assembles U + current messages with no synthetic record and requests reanchor on first turn
+  ---
+  duration_ms: 1.99625
+  ...
+# Subtest: WHAT[work-034] non-initial tenure strips prior assistant/tool messages, injects no synthetic-prev-* row, and preserves the current user reply in chronological order
+ok 84 - WHAT[work-034] non-initial tenure strips prior assistant/tool messages, injects no synthetic-prev-* row, and preserves the current user reply in chronological order
+  ---
+  duration_ms: 0.354125
+  ...
+# Subtest: WHAT[work-034] user messages U preserve original bytes and order verbatim without modification
+ok 85 - WHAT[work-034] user messages U preserve original bytes and order verbatim without modification
+  ---
+  duration_ms: 0.179834
+  ...
+# Subtest: WHAT[work-034] the first part immediately after the opening cursor survives tenure assembly
+ok 86 - WHAT[work-034] the first part immediately after the opening cursor survives tenure assembly
+  ---
+  duration_ms: 0.121417
+  ...
+# Subtest: WHAT[work-034] a current assistant row with a Host id but no first-observation entry stays
+ok 87 - WHAT[work-034] a current assistant row with a Host id but no first-observation entry stays
+  ---
+  duration_ms: 0.127084
+  ...
+# Subtest: WHAT[work-034] a semantic assistant row with no Host info.id rejects assembly
+ok 88 - WHAT[work-034] a semantic assistant row with no Host info.id rejects assembly
+  ---
+  duration_ms: 0.336291
+  ...
+# Subtest: WHAT[work-034] synthetic rows are stripped and no synthetic record is ever injected
+ok 89 - WHAT[work-034] synthetic rows are stripped and no synthetic record is ever injected
+  ---
+  duration_ms: 0.159666
+  ...
+# Subtest: WHAT[work-034] durable Plan active state assembles U + current interactions in place
+ok 90 - WHAT[work-034] durable Plan active state assembles U + current interactions in place
+  ---
+  duration_ms: 0.137042
+  ...
+# Subtest: WHAT[work-034] the lifecycle document view is reachable as a pure function
+ok 91 - WHAT[work-034] the lifecycle document view is reachable as a pure function
+  ---
+  duration_ms: 5.273667
+  ...
+# Subtest: WHAT[work-034] reanchorRequested is returned by assemble and is true only on a fresh handover
+ok 92 - WHAT[work-034] reanchorRequested is returned by assemble and is true only on a fresh handover
+  ---
+  duration_ms: 0.402875
+  ...
+# Subtest: WHAT[work-034] S1 with no retirement carries no previous range
+ok 93 - WHAT[work-034] S1 with no retirement carries no previous range
+  ---
+  duration_ms: 1.171375
+  ...
+# Subtest: WHAT[work-034] S1 retirement preserves its opening range for the next tenure
+ok 94 - WHAT[work-034] S1 retirement preserves its opening range for the next tenure
+  ---
+  duration_ms: 5.171708
+  ...
+# Subtest: WHAT[work-034] tenure assembly strips prior interactions by openingCursor without materializing a previous record
+ok 95 - WHAT[work-034] tenure assembly strips prior interactions by openingCursor without materializing a previous record
+  ---
+  duration_ms: 0.173542
+  ...
+# Subtest: WHAT[work-034] tenure reanchor event shape carries session, epochs, work and incumbency
+ok 96 - WHAT[work-034] tenure reanchor event shape carries session, epochs, work and incumbency
+  ---
+  duration_ms: 0.039625
+  ...
+# Subtest: WHAT[work-034] duplicate incumbencyId is rejected on second tenure reanchor
+ok 97 - WHAT[work-034] duplicate incumbencyId is rejected on second tenure reanchor
+  ---
+  duration_ms: 0.502458
+  ...
+# Subtest: WHAT[work-034] reanchorRequested is true on fresh handover and deduplicated via isTenureReanchored
+ok 98 - WHAT[work-034] reanchorRequested is true on fresh handover and deduplicated via isTenureReanchored
+  ---
+  duration_ms: 0.095375
+  ...
+# Subtest: WHAT[work-034] successor projection strips earlier assistant and tool messages and never inserts a synthetic predecessor record
+ok 99 - WHAT[work-034] successor projection strips earlier assistant and tool messages and never inserts a synthetic predecessor record
+  ---
+  duration_ms: 0.1255
+  ...
+# Subtest: WHAT[work-034] post-S3 projection strips all S3-and-earlier context and injects no synthetic record
+ok 100 - WHAT[work-034] post-S3 projection strips all S3-and-earlier context and injects no synthetic record
+  ---
+  duration_ms: 0.151792
+  ...
+# Subtest: WHAT[work-034] Plan relays an explicit view, keeps physical originals, and restores only checkpoint identity after restart
+ok 101 - WHAT[work-034] Plan relays an explicit view, keeps physical originals, and restores only checkpoint identity after restart
+  ---
+  duration_ms: 891.006417
+  ...
+1..101
+# tests 101
+# suites 0
+# pass 94
+# fail 6
+# cancelled 1
+# skipped 0
+# todo 0
+# duration_ms 12265.21125

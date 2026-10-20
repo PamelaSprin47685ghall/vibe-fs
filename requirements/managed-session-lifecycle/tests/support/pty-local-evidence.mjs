@@ -7,6 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { withSharedAdmittedChildren } from './admitted-child-work.mjs'
 import { ToolRuntimeScopeSurface } from '../../../../dist/OpenCode/Tools/ToolRuntimeScopeSurface.js'
 import { ptyRecoveryDrain } from '../../../../dist/Process/Surface.js'
+import * as journalSurface from '../../../../dist/Persistence/Journal/Surface.js'
 
 const scenario = process.argv[2]
 const missingBun = scenario === 'missing-bun'
@@ -23,7 +24,8 @@ await withSharedAdmittedChildren(`local-evidence-${scenario}`, 'manager-pty', [
   { agentId: 'devops', sessionId: 'devops-pty', role: 'devops' },
 ], async (journal, _profiles, workspace) => {
   await ToolRuntimeScopeSurface.startPtyExecution(journal, 'devops-pty', `physical-local-evidence-${scenario}-devops`, 'pty-admission-provider')
-  const host = ToolRuntimeScopeSurface.ptyAdmissionProbe(journal, workspace, 'devops-pty', true)
+  const stateDirectory = await journalSurface.JournalSurface_initializeStateRoot(workspace)
+  const host = ToolRuntimeScopeSurface.ptyAdmissionProbe(journal, workspace, 'devops-pty', true, stateDirectory)
   const originalPath = process.env.PATH
   const originalOn = net.Socket.prototype.on
   const marker = join(workspace, 'launches')
@@ -67,7 +69,7 @@ await withSharedAdmittedChildren(`local-evidence-${scenario}`, 'manager-pty', [
       assert.match(first.failure, /connection|stream/i)
       assert.equal(second.finished, false)
       assert.deepEqual(host.blockers(), [opened.id])
-      const fresh = ToolRuntimeScopeSurface.ptyAdmissionProbe(journal, workspace, 'devops-pty', true)
+      const fresh = ToolRuntimeScopeSurface.ptyAdmissionProbe(journal, workspace, 'devops-pty', true, stateDirectory)
       const recovered = await fresh.stop()
       assert.equal(recovered.finished, true, recovered.failure)
       await fresh.dispose()

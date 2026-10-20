@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Threading.Tasks
 open Wanxiangshu.Composition.Durable
+open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -149,19 +150,6 @@ module AdvisorSeat =
                 return Error DidNotAnswer
         }
 
-    /// advisor-[002]: two physical prompts — the caller's view, then this consult's intent.
-    let private sendThenAwait
-        (completion: TaskCompletionSource<Result<string, string>>)
-        (send: string -> Task<Result<PromptKey, string>>)
-        (viewPrompt: string)
-        (intent: string)
-        : Task<Result<string, string>> =
-        taskResult {
-            let! _ = send viewPrompt
-            let! _ = send intent
-            return! awaitAdvisorProse completion
-        }
-
     let private runConsult
         (deps: AdvisorSeatDeps)
         (journal: AgentJournal)
@@ -183,17 +171,75 @@ module AdvisorSeat =
             let completion =
                 TaskCompletionSource<Result<string, string>>(TaskCreationOptions.RunContinuationsAsynchronously)
 
-            // AG-LISTENER-BEFORE-SEND: the Host port refuses a prompt for a session with no
-            // live terminal listener, and the listener must outlive both sends.
+            let intentPhysical = ref None
+            let pending = ResizeArray<TerminalOutcome>()
+            let registrations = ResizeArray<IDisposable>()
+
+            let belongsToIntent outcome =
+                match outcome, intentPhysical.Value with
+                | Completed result, Some physical ->
+                    (AgentJournal.snapshot journal).AgentProjections.ChatExecutions.ByKey
+                    |> Map.tryFind
+                        { SessionId = childId
+                          PhysicalUserMessageId = physical }
+                    |> Option.bind (fun state -> state.startedEvidence)
+                    |> Option.exists (fun evidence -> evidence.ProviderRun = result.ProviderRun)
+                | _ -> false
+
             let onTerminal _ outcome =
-                AsyncSupport.trySetResult completion (settleTerminal outcome) |> ignore
+                if belongsToIntent outcome then
+                    AsyncSupport.trySetResult completion (settleTerminal outcome) |> ignore
+                elif intentPhysical.Value.IsNone then
+                    pending.Add outcome
 
             use _subscription = deps.Sessions.SubscribeFutureTerminal(childId, onTerminal)
 
-            let send text =
-                dispatcher.SendManagedAssignment port childId text issueIdentitySeed deps.Directory None
+            let send text notify =
+                let observer =
+                    Some
+                        { Notify = notify
+                          AttachDisposable = registrations.Add }
 
-            return! sendThenAwait completion send viewPrompt intent
+                match
+                    PromptAuthorityProjectionQueries.activeProfile
+                        childId
+                        (AgentJournal.snapshot journal).AgentProjections
+                with
+                | Some profile ->
+                    dispatcher.SendContinuation
+                        port
+                        childId
+                        text
+                        PromptAuthority.ContinuationKind.ManagedDelegationAssignment
+                        profile
+                        deps.Directory
+                        PromptDispatcher.AwaitMode.Await
+                        observer
+                | None ->
+                    match issueIdentitySeed () with
+                    | Error error -> Task.FromResult(Error error)
+                    | Ok identity ->
+                        dispatcher.SendAgentOwnerRoot
+                            port
+                            childId
+                            text
+                            identity
+                            deps.Directory
+                            PromptDispatcher.AwaitMode.Await
+                            observer
+
+            try
+                return!
+                    taskResult {
+                        let! _ = send viewPrompt ignore
+                        let! _ = send intent (fun physical -> intentPhysical.Value <- Some physical)
+
+                        pending |> Seq.iter (onTerminal childId)
+
+                        return! awaitAdvisorProse completion
+                    }
+            finally
+                registrations |> Seq.iter (fun registration -> registration.Dispose())
         }
 
     let private requireJournal (deps: AdvisorSeatDeps) : Result<AgentJournal, string> =

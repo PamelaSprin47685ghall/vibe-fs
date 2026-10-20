@@ -3,7 +3,7 @@
 ```js
 class Js extends JsProgram {
   async run() {
-    return await js.call(class extends js.Callable {
+    return await this.call(class extends this.Callable {
       maxDuration = 900000; // 15 分钟工程总上界
       interval = 10000;
       failureReason = null;
@@ -53,7 +53,7 @@ class Js extends JsProgram {
 class Js extends JsProgram {
   async run() {
     let testExitCode = null;
-    const outcome = await js.call(class extends js.Callable {
+    const outcome = await this.call(class extends this.Callable {
       maxDuration = 300000; // 服务启动 + 测试套件的 5 分钟上界
       interval = 2000;
 
@@ -96,7 +96,7 @@ class Js extends JsProgram {
 class Js extends JsProgram {
   async run() {
     const answers = [];
-    const outcome = await js.call(class extends js.Callable {
+    const outcome = await this.call(class extends this.Callable {
       maxDuration = 60000;
       interval = 200;
       lines = ["1 + 1", "2 * 21", "exit"];

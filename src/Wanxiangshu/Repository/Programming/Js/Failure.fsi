@@ -63,6 +63,7 @@ type JsFailure =
     | HandleUnknown of string
     | CannotParkWhileAbandoning
     | Abandoned
+    | ReviewOnly
     | RunnableSpecIncomplete of string
     | RgFailed of string
     | RunCommandUnsupported of string

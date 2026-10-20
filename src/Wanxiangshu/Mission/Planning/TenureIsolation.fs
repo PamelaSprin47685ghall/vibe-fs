@@ -25,8 +25,8 @@ module TenureIsolation =
     /// plus current-tenure physical messages whose first XTrace observation
     /// cursor is `>= tenure.OpeningCursor` (or uncaptured with a stable Host
     /// identity). All prior-tenure assistant/tool messages and synthetic rows
-    /// are stripped. User originals, the durable ledger and plan document
-    /// carry the handover; process-live views do not restore removed rows.
+    /// are stripped; handover is carried by the predecessor's ANCHOR view
+    /// declaration rather than a machine-materialized record.
     let isCurrentTenurePhysical (openingCursor: int64) (cursor: int64 option) =
         match cursor with
         | None -> true

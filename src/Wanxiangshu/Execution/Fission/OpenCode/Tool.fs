@@ -9,6 +9,7 @@ open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation.Fork.Host
 open Wanxiangshu.Execution.Fission
 open Wanxiangshu.Execution.Session
+open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Host
@@ -21,8 +22,8 @@ open Wanxiangshu.Persistence.Journal
 
 /// Same-participant physical replacement. Fission never calls the Host session
 /// fork endpoint: it creates fresh sibling sessions, starts them from the
-/// canonical owner LWR + exact lane input, then physically interrupts the old
-/// present without terminating the logical owner.
+/// owner's already-delivered view (when there is one) + exact lane input, then
+/// physically interrupts the old present without terminating the logical owner.
 module FissionTool =
 
     [<RequireQualifiedAccess>]
@@ -109,9 +110,20 @@ module FissionTool =
     let private writeAndAppendCapture (durable: AgentJournal) owner groupId completionId payload =
         task {
             match! durable.WriteBlob payload with
-            | Error _ -> return ()
+            | Error reason ->
+                Diagnostic.emit
+                    "fission-capture-write-failed"
+                    [ "session_id", SessionId.value owner
+                      "result",
+                      sprintf
+                          "fission completion capture blob write failed: group=%s completion=%s reason=%s"
+                          groupId
+                          completionId
+                          reason ]
+
+                return ()
             | Ok blob ->
-                let! _ =
+                let! appended =
                     appendFission
                         durable
                         owner
@@ -122,6 +134,19 @@ module FissionTool =
                                CompletionId = completionId
                                PayloadRef = blob.BlobRef
                                PayloadDigest = blob.BlobDigest |})
+
+                match appended with
+                | Error failure ->
+                    Diagnostic.emit
+                        "fission-capture-fact-append-failed"
+                        [ "session_id", SessionId.value owner
+                          "result",
+                          sprintf
+                              "fission completion captured fact append failed: group=%s completion=%s reason=%s"
+                              groupId
+                              completionId
+                              failure ]
+                | Ok() -> ()
 
                 return ()
         }
@@ -180,9 +205,36 @@ module FissionTool =
                         PromptDispatcher.AwaitMode.Detached
                         None
                 with
-                | Error _ -> return ()
+                | Error reason ->
+                    Diagnostic.emit
+                        "fission-send-failed"
+                        [ "session_id", SessionId.value lane.SessionId
+                          "result",
+                          sprintf
+                              "fission shared completion send failed: group=%s completion=%s lane=%d reason=%s"
+                              groupId
+                              completionId
+                              lane.Index
+                              reason ]
+
+                    return ()
                 | Ok _ ->
-                    let! _ = appendDelivery durable owner None groupId completionId lane.Index
+                    let! appended = appendDelivery durable owner None groupId completionId lane.Index
+
+                    match appended with
+                    | Error failure ->
+                        Diagnostic.emit
+                            "fission-delivery-fact-append-failed"
+                            [ "session_id", SessionId.value owner
+                              "result",
+                              sprintf
+                                  "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
+                                  groupId
+                                  completionId
+                                  lane.Index
+                                  failure ]
+                    | Ok() -> ()
+
                     return ()
         }
 
@@ -199,7 +251,22 @@ module FissionTool =
         =
         task {
             if laneClosed then
-                let! _ = appendDelivery durable owner None groupId completionId lane.Index
+                let! appended = appendDelivery durable owner None groupId completionId lane.Index
+
+                match appended with
+                | Error failure ->
+                    Diagnostic.emit
+                        "fission-delivery-fact-append-failed"
+                        [ "session_id", SessionId.value owner
+                          "result",
+                          sprintf
+                              "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
+                              groupId
+                              completionId
+                              lane.Index
+                              failure ]
+                | Ok() -> ()
+
                 return ()
             else
                 return! continueLiveLane scope durable profile groupId owner lane completionId payload
@@ -314,21 +381,34 @@ module FissionTool =
         (completionId: string)
         (payload: string)
         =
+        let broadcast =
+            task {
+                do! ensureCompletionCaptured durable owner groupId completionId payload
+                do! deliverAllLaneCompletions scope durable profile groupId owner lanes completionId payload
+                do! convergeOwnerIfNeeded scope durable owner groupId
+            }
+
         task {
             try
-                do! ensureCompletionCaptured durable owner groupId completionId payload
+                do! broadcast
+            with ex ->
+                Diagnostic.emit
+                    "fission-broadcast-failed"
+                    [ "session_id", SessionId.value owner
+                      "result",
+                      sprintf
+                          "fission shared completion broadcast failed: group=%s completion=%s error=%s"
+                          groupId
+                          completionId
+                          ex.Message ]
 
-                do! deliverAllLaneCompletions scope durable profile groupId owner lanes completionId payload
-
-                do! convergeOwnerIfNeeded scope durable owner groupId
-            finally
-                FissionRuntime.endDelivery groupId completionId -1
+            FissionRuntime.endDelivery groupId completionId -1
         }
 
     /// Capture exactly one canonical payload for a pre-Fission completion, then
     /// account/deliver that same payload once per lane. Closed lanes are accounted
     /// through the durable group closure; live lanes also receive a same-run
-    /// continuation. No per-lane WorkRecord copy is created.
+    /// continuation. No per-lane view copy is created.
     let private captureAndBroadcast
         (scope: ToolRuntimeScope)
         (durable: AgentJournal)
@@ -346,8 +426,8 @@ module FissionTool =
                 return! broadcastAfterBegin scope durable profile groupId owner lanes completionId payload
         }
 
-    let private payloadFromWorkRecord workRecord fallback =
-        match workRecord with
+    let private payloadFromView view fallback =
+        match view with
         | Some record when not (String.IsNullOrWhiteSpace record) -> record
         | _ -> fallback
 
@@ -363,8 +443,8 @@ module FissionTool =
         (terminal: AgentRunResult)
         =
         task {
-            let! workRecord = scope.ChildWorkRecordFor(SessionId.value childId)
-            let payload = payloadFromWorkRecord workRecord terminal.TerminalText
+            let view = JsDeliveredValues.tryPeekRendered (SessionId.value childId)
+            let payload = payloadFromView view terminal.TerminalText
 
             do! captureAndBroadcast scope durable profile groupId owner lanes completionId payload
         }
@@ -506,11 +586,11 @@ module FissionTool =
 
             installPtyBroadcasts scope durable profile groupId owner lanes prePtys ownerRuntime
 
-    let private parentWorkRecordPort (scope: ToolRuntimeScope) sessionId =
+    let private ownerViewPort (scope: ToolRuntimeScope) sessionId =
         task {
-            match! scope.ParentWorkRecordFor(SessionId.value sessionId) with
-            | Some record when not (String.IsNullOrWhiteSpace record) -> return Ok record
-            | _ -> return Error "lifecycle_work_record_unavailable"
+            match! scope.ViewForSession(SessionId.value sessionId) with
+            | Some view when not (String.IsNullOrWhiteSpace view) -> return Ok(Some view)
+            | _ -> return Ok None
         }
 
     let private createLanePort
@@ -580,7 +660,16 @@ module FissionTool =
         task {
             FissionRuntime.unbindLane laneId
             ModelRouting.cancelUnacquiredExecution laneId |> ignore
-            let! _ = scope.Sessions.AbortSession laneId
+            let! aborted = scope.Sessions.AbortSession laneId
+
+            match aborted with
+            | Ok() -> ()
+            | Error reason ->
+                Diagnostic.emit
+                    "fission-lane-abort-failed"
+                    [ "session_id", SessionId.value laneId
+                      "result", "fission lane abort failed: reason=" + reason ]
+
             return ()
         }
         :> Task
@@ -605,11 +694,14 @@ module FissionTool =
         (providerRun: ProviderRunIdentity option)
         (logicalOwner: SessionId)
         (physicalParent: SessionId option)
-        (ownerWorkRecord: string)
+        (ownerView: string)
         (created: FissionStartedLane list)
         =
         task {
-            match! durable.WriteBlob ownerWorkRecord with
+            // The durable owner view records exactly what the lanes received: the
+            // owner's delivered view, or the empty view when the owner had not
+            // delivered one at admission time.
+            match! durable.WriteBlob ownerView with
             | Error error -> return Error error
             | Ok blob ->
                 let ordered = created |> List.sortBy (fun lane -> lane.Index)
@@ -627,8 +719,8 @@ module FissionTool =
                                LaneCount = parsedCount
                                LaneSessions = ordered |> List.map (fun lane -> lane.SessionId)
                                LanePrompts = ordered |> List.map (fun lane -> lane.Prompt)
-                               OwnerWorkRecordRef = blob.BlobRef
-                               OwnerWorkRecordDigest = blob.BlobDigest
+                               OwnerViewRef = blob.BlobRef
+                               OwnerViewDigest = blob.BlobDigest
                                PreFissionCompletionIds = preCompletionIds |})
         }
 
@@ -640,7 +732,7 @@ module FissionTool =
         (reason: string)
         =
         task {
-            let! _ =
+            let! appended =
                 appendFission
                     durable
                     logicalOwner
@@ -649,6 +741,14 @@ module FissionTool =
                         {| GroupId = groupId
                            OwnerSessionId = logicalOwner
                            Reason = reason |})
+
+            match appended with
+            | Error failure ->
+                Diagnostic.emit
+                    "fission-failed-fact-append-failed"
+                    [ "session_id", SessionId.value logicalOwner
+                      "result", sprintf "fission failed fact append failed: group=%s reason=%s" groupId failure ]
+            | Ok() -> ()
 
             return ()
         }
@@ -687,7 +787,7 @@ module FissionTool =
 
             let deps: FissionAdmissionDependencies =
                 { ParentOf = scope.Sessions.TryGetParentSession
-                  OwnerWorkRecord = parentWorkRecordPort scope
+                  OwnerView = ownerViewPort scope
                   CreateLane = createLanePort scope groupId owner profile.SelectedAgent directory parsed.Count
                   StartLane = startLanePort scope durable profile directory
                   AbortLane = abortLanePort scope
@@ -908,7 +1008,7 @@ module FissionTool =
 
             let deps: FissionAdmissionDependencies =
                 { ParentOf = scope.Sessions.TryGetParentSession
-                  OwnerWorkRecord = parentWorkRecordPort scope
+                  OwnerView = ownerViewPort scope
                   CreateLane = createLanePort scope groupId owner profile.SelectedAgent directory parsed.Count
                   StartLane = startLanePort scope durable profile directory
                   AbortLane = abortLanePort scope

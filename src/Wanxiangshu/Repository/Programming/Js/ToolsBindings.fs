@@ -33,7 +33,7 @@ module JsToolsBindings =
     [<Emit("$0 === undefined || $0 === null")>]
     let private isUndefined (value: obj) : bool = jsNative
 
-    let private failureObj (failure: JsFailure) : obj =
+    let internal failureObj (failure: JsFailure) : obj =
         createObj
             [ "ok" ==> false
               "code" ==> JsFailure.code failure
@@ -726,7 +726,7 @@ module JsToolsBindings =
                 |> box
 
     let scopePlanFile (root: string) (canWrite: unit -> bool) (api: obj) : obj =
-        let source = api?js
+        let source = api
 
         let samePhysicalPath path full realFile =
             if realFile = full then
@@ -763,21 +763,20 @@ module JsToolsBindings =
                 | Ok() -> emitJsExpr (source, name, path) "$0[$1]($2)"
 
         createObj
-            [ "js"
-              ==> createObj
-                      [ read "cat"
-                        read "stat"
-                        "where" ==> source?where
-                        "whereAll" ==> source?whereAll
-                        "park" ==> source?park
-                        "write"
-                        ==> fun (path: string) (text: string) ->
-                            match checkPath path with
-                            | Error failure -> failureObj failure
-                            | Ok() when not (canWrite ()) -> failureObj JsFailure.PlanReviewRequired
-                            | Ok() when System.String.IsNullOrWhiteSpace text ->
-                                failureObj (JsFailure.InvalidArgument "Plan content cannot be empty")
-                            | Ok() -> emitJsExpr (source, path, text) "$0.write($1,$2)" ] ]
+            [ read "cat"
+              read "stat"
+              "where" ==> source?where
+              "whereAll" ==> source?whereAll
+              "park" ==> source?park
+              "ask" ==> source?ask
+              "write"
+              ==> fun (path: string) (text: string) ->
+                  match checkPath path with
+                  | Error failure -> failureObj failure
+                  | Ok() when not (canWrite ()) -> failureObj JsFailure.PlanReviewRequired
+                  | Ok() when System.String.IsNullOrWhiteSpace text ->
+                      failureObj (JsFailure.InvalidArgument "Plan content cannot be empty")
+                  | Ok() -> emitJsExpr (source, path, text) "$0.write($1,$2)" ]
 
     /// The host loop behind `js.call`, injected by the workflow.
     type JsCallHost =
@@ -988,6 +987,10 @@ module JsToolsBindings =
             | Some delegation -> box (delegation.Fork payload)
             | None -> box (task { return failureObj JsFailure.DelegationUnavailable })
 
+    let private makeCommissionMember (host: JsDelegationHost option) =
+        let _, fork = makeForkMember host
+        "commission", fork
+
     let private makeJoinMember (host: JsDelegationHost option) =
         "join"
         ==> fun () ->
@@ -1036,6 +1039,7 @@ module JsToolsBindings =
         (runHost: JsCallHost option)
         (searchHost: JsSearchHost option)
         (delegationHost: JsDelegationHost option)
+        (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
         let members =
             [ if Set.contains JsCapability.Read capabilities then
@@ -1063,6 +1067,9 @@ module JsToolsBindings =
               if Set.contains JsCapability.Exec capabilities then
                   makeCallMember runHost parkState
 
+              if Set.contains JsCapability.Commission capabilities then
+                  makeCommissionMember delegationHost
+
               if Set.contains JsCapability.Fork capabilities then
                   makeForkMember delegationHost
 
@@ -1078,11 +1085,19 @@ module JsToolsBindings =
               if Set.contains JsCapability.Advisor capabilities then
                   makeAdvisorMember delegationHost
 
+              if Set.contains JsCapability.Ask capabilities then
+                  match parkState, askInvoke with
+                  | Some state, Some invoke -> makeAskMember state invoke
+                  | _ ->
+                      "ask"
+                      ==> fun (_: obj) (_: obj) ->
+                          rejectFailure "ASK_REFUSED" "this.ask has no user channel in this execution path"
+
               match parkState with
               | Some state -> makeParkMember state
               | None -> () ]
 
-        createObj [ "js" ==> createObj members ]
+        createObj members
 
     /// Build the api object for one sandbox run. `staging` records every
     /// mutation that was actually persisted as-is; `ledger` is the H1
@@ -1099,6 +1114,7 @@ module JsToolsBindings =
         (runHost: JsCallHost option)
         (searchHost: JsSearchHost option)
         (delegationHost: JsDelegationHost option)
+        (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
         createApiCore
             capabilities
@@ -1111,6 +1127,7 @@ module JsToolsBindings =
             runHost
             searchHost
             delegationHost
+            askInvoke
 
     /// Build the api object for one sandbox run that carries a park lifecycle
     /// state (PLAN S2 step 4). `parkState` is the mutable object shared with
@@ -1126,6 +1143,7 @@ module JsToolsBindings =
         (runHost: JsCallHost option)
         (searchHost: JsSearchHost option)
         (delegationHost: JsDelegationHost option)
+        (askInvoke: (string -> Task<Result<unit, string>>) option)
         : obj =
         createApiCore
             capabilities
@@ -1138,3 +1156,29 @@ module JsToolsBindings =
             runHost
             searchHost
             delegationHost
+            askInvoke
+
+module JsReviewOnly =
+    let scopeReviewOnly (check: unit -> Task<bool>) (api: obj) : obj =
+        let guarded name =
+            let invoke: obj = api?(name)
+
+            name
+            ==> fun (argument: obj) ->
+                task {
+                    let! allowed = check ()
+
+                    if not allowed then
+                        return JsToolsBindings.failureObj JsFailure.ReviewOnly
+                    else
+                        return! unbox<Task<obj>> (emitJsExpr (invoke, argument) "Promise.resolve($0($1))")
+                }
+
+        let members = [ "cat"; "stat"; "ls"; "rg" ]
+        let review = members |> List.map guarded |> createObj
+
+        for name in members do
+            emitJsExpr (api, name) "delete $0[$1]" |> ignore
+
+        api?reviewOnly <- review
+        api

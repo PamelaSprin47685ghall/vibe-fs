@@ -1,0 +1,234 @@
+TAP version 13
+# (node:20099) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+not ok 1 - WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+  ---
+  duration_ms: 3654.27825
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:13:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    TypeError: objectArg.NotifyTerminal is not a function
+        at Module.notifyForAuthority (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/OpenCode/Host/EventsSurface.js:84:22)
+        at file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:88:16
+        at async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+        at async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:14:3)
+        at async Test.run (node:internal/test_runner/test:932:9)
+        at async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+    Cleanup: Process scope closure was not confirmed: 6f29d4be99d14b548598cb7f5f75dad1
+  code: 'ERR_TEST_FAILURE'
+  name: 'AggregateError'
+  stack: |-
+    Module.notifyForAuthority (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/OpenCode/Host/EventsSurface.js:84:22)
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:88:16
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:14:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+    withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:268:32)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:14:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generator_output
+ok 2 - WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generator_output
+  ---
+  duration_ms: 36.981542
+  ...
+# Subtest: WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only
+ok 3 - WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only
+  ---
+  duration_ms: 3.454291
+  ...
+# Subtest: WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mutation_methods
+ok 4 - WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mutation_methods
+  ---
+  duration_ms: 1.450042
+  ...
+# Subtest: WHAT[capability-enforcement-025] J03_manager_execution_blocks_write_and_edit_without_disk_mutations
+ok 5 - WHAT[capability-enforcement-025] J03_manager_execution_blocks_write_and_edit_without_disk_mutations
+  ---
+  duration_ms: 23.927708
+  ...
+# Subtest: WHAT[capability-enforcement-025] J04_shared_read_execution_returns_success_without_file_effects
+ok 6 - WHAT[capability-enforcement-025] J04_shared_read_execution_returns_success_without_file_effects
+  ---
+  duration_ms: 5.548333
+  ...
+# Subtest: WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_edit_capabilities
+ok 7 - WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_edit_capabilities
+  ---
+  duration_ms: 5.639208
+  ...
+# Subtest: WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_not_broadened
+ok 8 - WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_not_broadened
+  ---
+  duration_ms: 0.252625
+  ...
+# Subtest: WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data
+ok 9 - WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data
+  ---
+  duration_ms: 4.608
+  ...
+# Subtest: WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_root_boundaries
+ok 10 - WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_root_boundaries
+  ---
+  duration_ms: 1.73175
+  ...
+# Subtest: WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_endings
+ok 11 - WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_endings
+  ---
+  duration_ms: 1.466417
+  ...
+# Subtest: WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_search_errors_and_output_limits
+ok 12 - WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_search_errors_and_output_limits
+  ---
+  duration_ms: 8.114583
+  ...
+# Subtest: WHAT[capability-enforcement-025] J11_shared_adapter_observation_records_only_successful_distinct_reads
+ok 13 - WHAT[capability-enforcement-025] J11_shared_adapter_observation_records_only_successful_distinct_reads
+  ---
+  duration_ms: 9.484042
+  ...
+# Subtest: WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_ambient_os_capabilities
+ok 14 - WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_ambient_os_capabilities
+  ---
+  duration_ms: 3.954084
+  ...
+# Subtest: WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_permissions_include_read_glob_grep
+ok 15 - WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_permissions_include_read_glob_grep
+  ---
+  duration_ms: 0.371834
+  ...
+# Subtest: WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_readonly_capabilities
+ok 16 - WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_readonly_capabilities
+  ---
+  duration_ms: 0.291
+  ...
+# Subtest: WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny
+ok 17 - WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny
+  ---
+  duration_ms: 13.082292
+  ...
+# Subtest: WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role
+ok 18 - WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role
+  ---
+  duration_ms: 8.347125
+  ...
+# Subtest: WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface
+ok 19 - WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface
+  ---
+  duration_ms: 5.715916
+  ...
+# Subtest: WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission
+ok 20 - WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission
+  ---
+  duration_ms: 0.242084
+  ...
+# Subtest: WHAT[capability-enforcement-025] P06_unknown_identity_never_authorized_by_tool_name_suffix
+ok 21 - WHAT[capability-enforcement-025] P06_unknown_identity_never_authorized_by_tool_name_suffix
+  ---
+  duration_ms: 0.346666
+  ...
+# (node:20116) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retains_readonly_permissions
+ok 22 - WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retains_readonly_permissions
+  ---
+  duration_ms: 329.396
+  ...
+# Subtest: WHAT[capability-enforcement-025] P07_cleanup_blocker_or_inactive_incumbency_denies_review_tool
+ok 23 - WHAT[capability-enforcement-025] P07_cleanup_blocker_or_inactive_incumbency_denies_review_tool
+  ---
+  duration_ms: 0.267333
+  ...
+# Subtest: WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_and_closeout_permissions
+ok 24 - WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_and_closeout_permissions
+  ---
+  duration_ms: 0.040709
+  ...
+# Subtest: WHAT[capability-enforcement-025] P17_final_incumbent_loses_every_new_work_capability
+ok 25 - WHAT[capability-enforcement-025] P17_final_incumbent_loses_every_new_work_capability
+  ---
+  duration_ms: 0.02925
+  ...
+# Subtest: WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_in_both_languages
+ok 26 - WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_in_both_languages
+  ---
+  duration_ms: 0.416625
+  ...
+# Subtest: WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads closed
+ok 27 - WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads closed
+  ---
+  duration_ms: 294.31075
+  ...
+# Subtest: WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and refused after review
+ok 28 - WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and refused after review
+  ---
+  duration_ms: 317.667958
+  ...
+# Subtest: WHAT[capability-enforcement-025] P14_saved object, method and raw binding recheck authority after park
+ok 29 - WHAT[capability-enforcement-025] P14_saved object, method and raw binding recheck authority after park
+  ---
+  duration_ms: 230.981833
+  ...
+# Subtest: WHAT[capability-enforcement-025] P15_access denied before path validation, final incumbent has no exception
+ok 30 - WHAT[capability-enforcement-025] P15_access denied before path validation, final incumbent has no exception
+  ---
+  duration_ms: 239.605959
+  ...
+# Subtest: WHAT[capability-enforcement-025] identity and cross-role denial remain independent of Review
+ok 31 - WHAT[capability-enforcement-025] identity and cross-role denial remain independent of Review
+  ---
+  duration_ms: 177.481125
+  ...
+# Subtest: WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg
+not ok 32 - WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg
+  ---
+  duration_ms: 273.897583
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:327:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    positive control must spawn one real rg
+    
+    0 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 0
+  operator: 'strictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:364:14
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:331:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[capability-enforcement-025] an admitted physical rg may finish after acceptance, but a later call is refused
+not ok 33 - WHAT[capability-enforcement-025] an admitted physical rg may finish after acceptance, but a later call is refused
+  ---
+  duration_ms: 238.429666
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:379:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:524:28)
+    process.processEmit [as emit] (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/node_modules/signal-exit/index.js:199:34)
+  ...
+# Subtest: WHAT[repository-programming-060] the executed SDK uses this members and exposes no global js or nested api
+ok 34 - WHAT[repository-programming-060] the executed SDK uses this members and exposes no global js or nested api
+  ---
+  duration_ms: 12.528916
+  ...
+1..34
+# tests 34
+# suites 0
+# pass 31
+# fail 2
+# cancelled 1
+# skipped 0
+# todo 0
+# duration_ms 6687.333834

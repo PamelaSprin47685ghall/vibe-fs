@@ -44,9 +44,9 @@ Review 接纳前不得向固定 DevOps 派工，已有只读 Engineer 的合法 
 
 Orchestrator 只委任或接续顶层道路的 Manager，不直接委任其他 Office，不介入具体执行，不使用 Fission。`commission` 的 `calling` 可选，省略时推导为 Manager persona；显式 `calling` 与推导不一致须 typed 拒绝。
 
-## [015] Predictor
+## [015] 不另设强度选择职位
 
-Predictor 只为 Strength 降级选择廉价 provider/model，不进入普通调度、Manager 的公开 fork 候选、工具门禁或用户可见接口。
+不存在为强度降级选择廉价模型的职位。该名字不进入普通调度、Manager 的公开 fork 候选、工具门禁或用户可见接口。
 
 ## [016] Engineer
 
@@ -68,6 +68,6 @@ Sphinx 不是 Role、Persona 或普通 subagent，不拥有独立 Fission 身份
 
 ## [019] Plan
 
-Plan 负责在同一物理会话内以多任期接力推进单一规划底稿 `P`：通过 `todowrite-for-plan` 读写底稿，用 `devops` 同步委派固定 DevOps 做只读调查，用与 Manager 共享的 `review` 承担阶段晋级硬门，用 `deliver` 持权交付或无权接力；需要用户决定时用 `ask(question)` 显式暂停。Plan 的工作工具权限集为 `todowrite-for-plan`、`devops`、`ask`、`review`、`deliver`；`resume` 与 `handoff` 不属于 Plan 的工具面。
+Plan 负责在同一物理会话内以多任期接力推进单一规划底稿 `P`：通过 `todowrite-for-plan` 读写底稿，用 `devops` 同步委派固定 DevOps 做只读调查，用与 Manager 共享的 `review` 承担阶段晋级硬门，用 `deliver` 持权交付或无权接力；需要用户决定时经编程面 `this.ask` 显式暂停。Plan 的工作工具权限集为 `todowrite-for-plan`、`devops`、`review`、`deliver`；`ask` 不注册独立宿主工具，`resume` 与 `handoff` 不属于 Plan 的工具面。
 
-Plan 不获得代码仓库与执行工具的权限，不开放任何真实 shell 或命令执行通道（`devops` 委派的调查含 bash，其只读约束由 office 提示词承担，不做运行时门）。Plan 与 Manager 都不得在目标完成前自然停止；Plan 可通过成功的 `ask` 形成等待用户的暂停（work-027/049），Manager 禁用 `ask`，`join` 只用于临时等待后台工作。其他角色不因这项修订取得 `ask` 或 `devops` 权限。
+Plan 不获得代码仓库与执行工具的权限，不开放任何真实 shell 或命令执行通道（`devops` 委派的调查含 bash，其只读约束由 office 提示词承担，不做运行时门）。所有承担任务的角色（Manager、Orchestrator、Engineer、DevOps、Plan）都不得在目标完成前自然停止，义务范围与 internal 末梢 Advisor/Bookkeeper 的专用提交边界见 work [027]；Plan 可通过成功的 `ask`（编程面 `this.ask`，仅 S1，work-049/050）形成等待用户的暂停，Manager 禁用提问，`join` 只用于临时等待后台工作。其他角色不因这项修订取得 `ask` 或 `devops` 权限。

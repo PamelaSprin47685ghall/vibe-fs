@@ -191,7 +191,6 @@ const personas = {
   manager: 'Lead',
 }
 const rootSelection = (participant) => {
-  const role = participant === 'predictor' ? 'inspector' : participant
   return {
     kind: 'RootSelection',
     ownerSession: null,
@@ -199,7 +198,7 @@ const rootSelection = (participant) => {
     ownerAuthorityRoot: null,
     participantIdentity: {
       participant,
-      role,
+      role: participant,
       selectedTier: 'deep',
       persona: personas[participant] ?? 'Unknown',
       personaCatalogVersion: 1,

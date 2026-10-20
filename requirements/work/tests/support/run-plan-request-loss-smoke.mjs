@@ -113,7 +113,7 @@ let providerStep = 0
 const providerErrors = []
 
 // Plan leg requests carry the Plan tool surface; Host title generation and
-// blogger sidecars ride the same mock endpoint and must not shift the script.
+// internal sidecars ride the same mock endpoint and must not shift the script.
 const isPlanRequest = (body) =>
   (body?.tools ?? []).map((tool) => tool?.function?.name ?? tool?.name).includes('todowrite-for-plan')
 
@@ -145,13 +145,13 @@ const provider = await startHttpServer(async (request, response) => {
     }
     // Step 1: after the user follow-up — a todowrite-for-plan tool call (real JsProgram).
     if (step === 1) {
-      const program = `class Js extends JsProgram { async run() { const p = await this.file([]); const value = 'PLAN_SMOKE_TOOL_' + (p.text ? p.text.length : 0); return { computed: value, draftLength: p.text ? p.text.length : 0 }; } }`
+      const program = `class Js extends JsProgram { async run() { const text = await this.cat(PLAN_PATH); const value = 'PLAN_SMOKE_TOOL_' + text.length; return { computed: value, draftLength: text.length }; } }`
       sendSSE(response, buildToolCallsChunks(`plan-smoke-tool-${step}`, [{ name: 'todowrite-for-plan', argsStr: JSON.stringify({ program }) }], 1))
       return
     }
     // Step 2: tool result processed — deliver relay (unauthorized).
     if (step === 2) {
-      const program = `class Js extends JsProgram { async run() { const p = await this.file([]); const value = 'PLAN_SMOKE_TOOL_' + (p.text ? p.text.length : 0); return { computed: value, draftLength: p.text ? p.text.length : 0 }; } }`
+      const program = `class Js extends JsProgram { async run() { const text = await this.cat(PLAN_PATH); const value = 'PLAN_SMOKE_TOOL_' + text.length; return { computed: value, draftLength: text.length }; } }`
       sendSSE(response, buildToolCallsChunks(`plan-smoke-deliver-${step}`, [{ name: 'deliver', argsStr: JSON.stringify({}) }], 1))
       return
     }
@@ -181,10 +181,9 @@ const sessionIdOf = ({ data }) => data?.data?.data?.id ?? data?.data?.id ?? data
 const routingSource = `export const routingProtocol = 2
 export const hasTheoreticalCapacity = (role, purpose) => true
 export default function route(role, running, previous, purpose) {
-  if (new Set(['manager', 'orchestrator', 'engineer', 'devops', 'blogger', 'bookkeeper', 'predictor', 'plan']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
+  if (new Set(['manager', 'orchestrator', 'engineer', 'devops', 'bookkeeper', 'plan']).has(role)) return { model: 'test/test-model', reasoning: 'none' }
   throw new Error('unexpected managed role: ' + role)
 }
-export const predictorConfiguration = () => ({ state: 'configured', reason: null })
 `
 
 let host = new ProcessHost()
@@ -300,7 +299,7 @@ const run = async () => {
     // request (request 4) whose transform runs under the NEW tenure: it is the
     // relay successor's first assembled request. It must still carry the
     // original instruction (U is never stripped), with prior assistant/tool
-    // stripped and no synthetic lwr-prev-* row injected. The successor is also
+    // stripped and no synthetic-prev-* row injected. The successor is also
     // re-anchored (fresh prefix epoch).
     await waitForProviderCount(4)
 

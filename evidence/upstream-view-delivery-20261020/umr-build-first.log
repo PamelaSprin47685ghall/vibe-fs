@@ -1,0 +1,394 @@
+
+added 9 packages in 634ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/assembly/Wanxiangli.Assembly.fsproj, FCS time: 777 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/assembly/DurableWork.fs, Fable time: 76 ms
+[build] assembly: 4330 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/Wanxiangli.Events.fsproj, FCS time: 793 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalJson.fs (47,24): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (11,27): Warning: The value 'bytes' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (14,27): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (17,24): Warning: The value 'algorithm' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (20,24): Warning: The value 'hash' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (20,36): Warning: The value 'data' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (23,21): Warning: The value 'hash' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (26,29): Warning: The value 'bytes' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (29,24): Warning: The value 'bytes' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (35,22): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (38,21): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (57,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (62,16): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (63,17): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (64,18): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (65,16): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (66,16): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (67,20): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (68,17): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (133,35): Warning: The value 'parsed' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (139,15): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (141,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (177,24): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (178,25): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (179,26): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (180,24): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (181,24): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (182,28): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (238,18): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs (243,18): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalJson.fs, Fable time: 13 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/Envelope.fs, Fable time: 18 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/events/CanonicalEventCodec.fs, Fable time: 167 ms
+[build] events: 1203 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/eventstore/Wanxiangli.EventStore.fsproj, FCS time: 680 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/eventstore/SqliteJournal.fs, Fable time: 72 ms
+[build] eventstore: 951 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Wanxiangli.Fs.fsproj, FCS time: 1296 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/GlobMatch.fs (131,85): Warning: This expression implicitly converts type 'ResizeArray<int>' to type 'seq<int>'. See https://aka.ms/fsharp-implicit-convs.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (17,19): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (18,19): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (40,37): Warning: The value 'text' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (40,52): Warning: The value 're' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (40,62): Warning: The value 'occurrence' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (53,30): Warning: The value 'text' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (53,45): Warning: The value 're' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (56,28): Warning: The value 'm' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (59,28): Warning: The value 'm' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (62,26): Warning: The value 'm' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (69,19): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (79,22): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (80,31): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs (94,54): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Transaction.fs (116,14): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Transaction.fs (117,31): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Transaction.fs (117,50): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Transaction.fs (117,77): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Transaction.fs (118,29): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Transaction.fs (118,48): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Utf8Fs.fs (11,19): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/GlobFs.fs (40,23): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/GlobFs.fs (101,32): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/GlobFs.fs (148,19): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/MutationFs.fs (107,34): Warning: The value 'root' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Filesystem.fs (40,18): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Filesystem.fs (45,14): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Filesystem.fs (46,34): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Filesystem.fs (47,34): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Filesystem.fs (51,51): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Filesystem.fs (59,22): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Filesystem.fs (66,42): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Filesystem.fs (66,64): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Native.fs, Fable time: 29 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/GlobMatch.fs, Fable time: 101 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Anchor.fs, Fable time: 50 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Transaction.fs, Fable time: 43 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Utf8Fs.fs, Fable time: 7 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/GlobFs.fs, Fable time: 141 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/AnchorFs.fs, Fable time: 16 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/MutationFs.fs, Fable time: 28 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/fs/Filesystem.fs, Fable time: 60 ms
+[build] fs: 1980 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/identity/Wanxiangli.Identity.fsproj, FCS time: 984 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/identity/ExecutionBinding.fs (40,16): Warning: The value 'rawRole' is unused
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/identity/Wire.fs, Fable time: 40 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/identity/Roles.fs, Fable time: 21 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/identity/PersonaCatalog.fs, Fable time: 6 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/identity/ParticipantIdentity.fs, Fable time: 61 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/identity/PromptOrigin.fs, Fable time: 19 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/identity/ExecutionBinding.fs, Fable time: 23 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/identity/Identity.fs, Fable time: 26 ms
+[build] identity: 1379 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/lifecycle/Wanxiangli.Lifecycle.fsproj, FCS time: 1237 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/lifecycle/Wire.fs, Fable time: 87 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/lifecycle/State.fs, Fable time: 215 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/lifecycle/Work.fs, Fable time: 96 ms
+[build] lifecycle: 1844 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/process/Wanxiangli.Process.fsproj, FCS time: 886 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/native-process/BunProcess.fs, Fable time: 19 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/process/Native.fs, Fable time: 60 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/process/OutputTail.fs, Fable time: 65 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/process/ProcessSession.fs, Fable time: 81 ms
+[build] process: 1310 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Wanxiangli.Resources.fsproj, FCS time: 844 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Template.fs (21,53): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Template.fs (32,44): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Resources.fs (17,29): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Resources.fs (17,43): Warning: The value 'encoding' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Resources.fs (20,27): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Resources.fs (23,25): Warning: The value 'a' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Resources.fs (23,36): Warning: The value 'b' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Resources.fs (26,24): Warning: The value 'path' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Resources.fs (29,30): Warning: The value 'url' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Resources.fs (91,41): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Language.fs, Fable time: 64 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Template.fs, Fable time: 14 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/resources/Resources.fs, Fable time: 65 ms
+[build] resources: 1180 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/session/Wanxiangli.Session.fsproj, FCS time: 935 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/session/Wire.fs, Fable time: 78 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/session/Message.fs, Fable time: 41 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/session/Ownership.fs, Fable time: 158 ms
+[build] session: 1414 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/supervision/Wanxiangli.Supervision.fsproj, FCS time: 862 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/native-process/BunProcess.fs, Fable time: 20 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/supervision/Native.fs, Fable time: 72 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/supervision/Worker.fs, Fable time: 46 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/supervision/SupervisedProcess.fs, Fable time: 83 ms
+[build] supervision: 1279 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time/Wanxiangli.Time.fsproj, FCS time: 726 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time/Time.fs (12,25): Warning: The value 'value' is unused
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time/Temporal.fs, Fable time: 3 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time/Deadline.fs, Fable time: 39 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time/Time.fs, Fable time: 36 ms
+[build] time: 999 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/Wanxiangli.Time.Node.fsproj, FCS time: 711 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs (22,12): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs (25,12): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs (80,28): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time/Temporal.fs, Fable time: 4 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/NodeTiming.fs, Fable time: 41 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-node/NodeTime.fs, Fable time: 5 ms
+[build] time-node: 955 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-testing/Wanxiangli.Time.Testing.fsproj, FCS time: 771 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time/Temporal.fs, Fable time: 3 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-testing/VirtualTiming.fs, Fable time: 67 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/time-testing/TimeTesting.fs, Fable time: 9 ms
+[build] time-testing: 1054 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/trace/Wanxiangli.Trace.fsproj, FCS time: 1127 ms
+--------------------------------------------
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/trace/Wire.fs, Fable time: 76 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/trace/Observation.fs, Fable time: 61 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/trace/Trace.fs, Fable time: 187 ms
+[build] trace: 1647 ms
+fable-compiler-js v3.8.1
+--------------------------------------------
+InteractiveChecker created in 0 ms
+Project: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wanxiangli.Wait.fsproj, FCS time: 1591 ms
+--------------------------------------------
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Registry.fs (50,26): Warning: The syntax 'arr.[idx]' is now revised to 'arr[idx]'. Please update your code.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Await.fs (60,27): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Await.fs (66,27): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Await.fs (113,39): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Await.fs (119,39): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (11,19): Warning: The value 'fn' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (11,29): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (14,19): Warning: The value 'fn' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (17,23): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (27,23): Warning: The value 'value' is unused
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (404,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (405,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (406,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (407,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (408,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (409,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (410,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (411,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (411,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (412,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (413,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (413,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (414,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (415,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (416,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (417,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (418,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (418,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (419,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (420,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (422,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (423,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (423,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (423,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (424,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (424,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (424,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (424,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs (424,8): Warning: A type has been implicitly inferred as 'obj', which may be unintended. Consider adding explicit type annotations. You can disable this warning by using '#nowarn "3559"' or '--nowarn:3559'.
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/CausalWait.fs, Fable time: 99 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Registry.fs, Fable time: 36 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/CompletionMailbox.fs, Fable time: 51 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Await.fs, Fable time: 44 ms
+File: /Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/src/wait/Wait.fs, Fable time: 101 ms
+[build] wait: 2128 ms
+[36m[build][0m Compiling F# (full)...
+[37mFable 5.13.0: F# to JavaScript compiler
+[39m[22m[37mMinimum @fable-org/fable-library-js version (when installed from npm): 2.5.1
+[39m[22m[37m
+Thanks to the contributor! @johannesegger
+[39m[22m[37mStand with Ukraine! https://standwithukraine.com.ua/
+
+[39m[22m[37mParsing src/Wanxiangshu/.fable-build/output-compile/38f419aec20e4f48379e85e96f0dce8bde6f252dc86d1f310c6893be6f60390c/Wanxiangshu.Impact.fsproj...
+[39m[22m[37mProject and references (1352 source files) parsed in 1414ms
+
+[39m[22m[37mStarted Fable compilation...
+[39m[22m[37m
+Fable compilation finished in 35331ms
+
+[39m[22m[37m./src/Wanxiangshu/Repository/Programming/Js/OpenCode/ParkedSites.fs(36,9): (36,13) info FSHARP: The use of 'incr' from the F# library is deprecated. See https://aka.ms/fsharp-refcell-ops. For example, please change 'incr cell' to 'cell.Value <- cell.Value + 1'. (code 3370)
+[39m[22m[37m./src/Wanxiangshu/Repository/Programming/Js/OpenCode/ParkedSites.fs(37,27): (37,28) info FSHARP: The use of '!' from the F# library is deprecated. See https://aka.ms/fsharp-refcell-ops. For example, please change '!cell' to 'cell.Value'. (code 3370)
+[39m[22m[31m./src/Wanxiangshu/Context/Trace/Projection.fsi(158,47): (158,61) error FSHARP: The type 'SemanticCursor' is not defined. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Context/Trace/Projection.fs(704,47): (704,61) error FSHARP: The type 'SemanticCursor' is not defined. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Context/Trace/Projection.fs(707,25): (707,45) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/Context/Trace/Projection.fs(708,29): (708,49) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs(99,15): (99,113) error FSHARP: Incomplete pattern matches on this expression. (code 25)
+[39m[22m[31m./src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs(99,38): (99,61) error FSHARP: This expression was expected to have type    '(EventId * (EventId -> bool)) option'    but here has type    'Map<SessionId,Wanxiangshu.Execution.Session.SessionAssociation>' (code 1)
+[39m[22m[31m./src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs(99,63): (99,85) error FSHARP: This expression was expected to have type    'string'    but here has type    'SessionId -> CompanionProjection option' (code 1)
+[39m[22m[31m./src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs(99,88): (99,107) error FSHARP: This expression was expected to have type    'Map<SessionId,Wanxiangshu.Execution.Session.SessionAssociation>'    but here has type    'SessionId -> XTraceProjectionState option' (code 1)
+[39m[22m[31m./src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs(99,109): (99,113) error FSHARP: This expression was expected to have type    'SessionId -> CompanionProjection option'    but here has type    'CompanionFactCases' (code 1)
+[39m[22m[31m./src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs(100,11): (100,21) error FSHARP: This expression was expected to have type    '(SessionId -> XTraceProjectionState option) -> CompanionFactCases -> Result<CompanionProjectionChange list,CompanionFoldRejection>'    but here has type    'Result<CompanionProjectionChange list,'a>' (code 1)
+[39m[22m[31m./src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs(101,11): (101,26) error FSHARP: This expression was expected to have type    '(SessionId -> XTraceProjectionState option) -> CompanionFactCases -> Result<CompanionProjectionChange list,CompanionFoldRejection>'    but here has type    'Result<'a,CompanionFoldRejection>' (code 1)
+[39m[22m[31m./src/Wanxiangshu/Process/PtySupervisor.fs(18,8): (18,21) error FSHARP: Module 'Wanxiangshu.Process.PtySupervisor' requires a value 'spawn' (code 193)
+[39m[22m[31m./src/Wanxiangshu/Process/PtyBackend.fs(35,19): (35,28) error FSHARP: The value or constructor 'spawnSync' is not defined. Maybe you want one of the following:   spawn   Span (code 39)
+[39m[22m[31m./src/Wanxiangshu/Context/Trace/Capture.fs(287,36): (287,53) error FSHARP: The type 'ActivePrefixEpoch' is not defined. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Context/Trace/Capture.fs(289,47): (289,67) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs(5,36): (5,43) error FSHARP: The namespace 'Blogger' is not defined. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs(6,18): (6,26) error FSHARP: The namespace 'Enforcer' is not defined. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs(7,18): (7,26) error FSHARP: The namespace 'Enforcer' is not defined. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs(4,36): (4,43) error FSHARP: The namespace 'Blogger' is not defined. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs(5,18): (5,26) error FSHARP: The namespace 'Enforcer' is not defined. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs(23,36): (23,43) error FSHARP: The namespace 'Blogger' is not defined. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs(26,18): (26,26) error FSHARP: The namespace 'Enforcer' is not defined. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs(42,8): (42,19) error FSHARP: Module 'Wanxiangshu.Execution.Delegation.Advisor.AdvisorSeat' requires a value 'clearConsultFences' (code 193)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs(350,13): (358,14) error FSHARP: The member or object constructor 'HostForkRuntime' requires 11 additional argument(s). The required signature is 'new: parentId: SessionId * sessions: ISessionHostPort * childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) * createMailbox: (obj -> ForkCompletionMailbox) * clock: IClockPort * raceExit: (Task -> int -> Task<bool>) * ptyPort: PtyPort option * recoverPty: RecoverPty * ?journal: Wanxiangshu.Persistence.Journal.AgentJournal * ?onChildCreated: (string -> Role -> SessionId -> unit) * ?onChildCreatedDir: (string -> SessionId -> string option -> unit) * ?directoryFor: (string -> string option) * ?onRunStarted: (SessionId -> Role -> string option -> unit) * ?sessionSnapshot: ISessionSnapshotPort * ?cancelSignals: (SessionId seq -> unit) * ?ownership: Wanxiangshu.Execution.Delegation.HandleOwnership * ?drainChildPtys: (Wanxiangshu.Execution.Delegation.AdmittedWork -> Task<unit>) * ?ownershipCommonDir: string -> HostForkRuntime'. (code 497)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(26,13): (36,14) error FSHARP: The member or object constructor 'HostForkRuntime' requires 9 additional argument(s). The required signature is 'new: parentId: SessionId * sessions: ISessionHostPort * childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) * createMailbox: (obj -> Fork.ForkCompletionMailbox) * clock: IClockPort * raceExit: (Task -> int -> Task<bool>) * ptyPort: PtyPort option * recoverPty: RecoverPty * ?journal: AgentJournal * ?onChildCreated: (string -> Role -> SessionId -> unit) * ?onChildCreatedDir: (string -> SessionId -> string option -> unit) * ?directoryFor: (string -> string option) * ?onRunStarted: (SessionId -> Role -> string option -> unit) * ?sessionSnapshot: ISessionSnapshotPort * ?cancelSignals: (SessionId seq -> unit) * ?ownership: HandleOwnership * ?drainChildPtys: (AdmittedWork -> Task<unit>) * ?ownershipCommonDir: string -> HostForkRuntime'. (code 497)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(39,19): (39,46) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(40,38): (40,56) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(47,46): (47,84) error FSHARP: Type mismatch. Expecting a tuple of length 3 of type    string * ManagedAgent * string option    but given a tuple of length 2 of type    obj * ManagedAgent (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(52,69): (52,101) error FSHARP: This expression was expected to have type    'PtyId'    but here has type    'PtyId * bool' (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(52,86): (52,93) error FSHARP: The value or constructor 'graceMs' is not defined. Maybe you want one of the following:   grace (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(53,52): (53,66) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'CloseOwnedPtys'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(54,47): (54,61) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'DetachAndDrain'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(55,47): (55,61) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'CancelAndDrain'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(57,38): (57,64) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'SnapshotOutstandingPtyRuns'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(68,52): (68,74) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'PendingCompletionCount'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(213,17): (221,18) error FSHARP: The member or object constructor 'HostForkRuntime' requires 11 additional argument(s). The required signature is 'new: parentId: SessionId * sessions: ISessionHostPort * childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) * createMailbox: (obj -> Fork.ForkCompletionMailbox) * clock: IClockPort * raceExit: (Task -> int -> Task<bool>) * ptyPort: PtyPort option * recoverPty: RecoverPty * ?journal: AgentJournal * ?onChildCreated: (string -> Role -> SessionId -> unit) * ?onChildCreatedDir: (string -> SessionId -> string option -> unit) * ?directoryFor: (string -> string option) * ?onRunStarted: (SessionId -> Role -> string option -> unit) * ?sessionSnapshot: ISessionSnapshotPort * ?cancelSignals: (SessionId seq -> unit) * ?ownership: HandleOwnership * ?drainChildPtys: (AdmittedWork -> Task<unit>) * ?ownershipCommonDir: string -> HostForkRuntime'. (code 497)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(228,21): (236,22) error FSHARP: The member or object constructor 'HostForkRuntime' requires 11 additional argument(s). The required signature is 'new: parentId: SessionId * sessions: ISessionHostPort * childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) * createMailbox: (obj -> Fork.ForkCompletionMailbox) * clock: IClockPort * raceExit: (Task -> int -> Task<bool>) * ptyPort: PtyPort option * recoverPty: RecoverPty * ?journal: AgentJournal * ?onChildCreated: (string -> Role -> SessionId -> unit) * ?onChildCreatedDir: (string -> SessionId -> string option -> unit) * ?directoryFor: (string -> string option) * ?onRunStarted: (SessionId -> Role -> string option -> unit) * ?sessionSnapshot: ISessionSnapshotPort * ?cancelSignals: (SessionId seq -> unit) * ?ownership: HandleOwnership * ?drainChildPtys: (AdmittedWork -> Task<unit>) * ?ownershipCommonDir: string -> HostForkRuntime'. (code 497)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(238,51): (238,63) error FSHARP: Type mismatch. Expecting a tuple of length 3 of type    string * ManagedAgent * string option    but given a tuple of length 2 of type    string * ManagedAgent (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(239,51): (239,61) error FSHARP: The type 'DelegationPtyCapability' is not compatible with the type 'HostForkRuntime' (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(252,47): (252,61) error FSHARP: Type mismatch. Expecting a tuple of length 3 of type    string * ManagedAgent * string option    but given a tuple of length 2 of type    string * ManagedAgent (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(259,45): (259,59) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'CloseOwnedPtys'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(267,44): (267,48) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'List'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(273,50): (273,72) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'PendingCompletionCount'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(274,40): (274,56) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(278,47): (278,61) error FSHARP: Type mismatch. Expecting a tuple of length 3 of type    string * ManagedAgent * string option    but given a tuple of length 2 of type    string * ManagedAgent (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(290,40): (290,54) error FSHARP: Type mismatch. Expecting a tuple of length 3 of type    string * ManagedAgent * string option    but given a tuple of length 2 of type    string * ManagedAgent (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(300,53): (300,79) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'SnapshotOutstandingPtyRuns'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(307,52): (307,78) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'SnapshotOutstandingPtyRuns'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(334,21): (343,22) error FSHARP: The member or object constructor 'HostForkRuntime' requires 10 additional argument(s). The required signature is 'new: parentId: SessionId * sessions: ISessionHostPort * childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) * createMailbox: (obj -> Fork.ForkCompletionMailbox) * clock: IClockPort * raceExit: (Task -> int -> Task<bool>) * ptyPort: PtyPort option * recoverPty: RecoverPty * ?journal: AgentJournal * ?onChildCreated: (string -> Role -> SessionId -> unit) * ?onChildCreatedDir: (string -> SessionId -> string option -> unit) * ?directoryFor: (string -> string option) * ?onRunStarted: (SessionId -> Role -> string option -> unit) * ?sessionSnapshot: ISessionSnapshotPort * ?cancelSignals: (SessionId seq -> unit) * ?ownership: HandleOwnership * ?drainChildPtys: (AdmittedWork -> Task<unit>) * ?ownershipCommonDir: string -> HostForkRuntime'. (code 497)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(345,62): (345,95) error FSHARP: Type mismatch. Expecting a tuple of length 3 of type    string * ManagedAgent * string option    but given a tuple of length 2 of type    string * ManagedAgent (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(357,21): (365,22) error FSHARP: The member or object constructor 'HostForkRuntime' requires 11 additional argument(s). The required signature is 'new: parentId: SessionId * sessions: ISessionHostPort * childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) * createMailbox: (obj -> Fork.ForkCompletionMailbox) * clock: IClockPort * raceExit: (Task -> int -> Task<bool>) * ptyPort: PtyPort option * recoverPty: RecoverPty * ?journal: AgentJournal * ?onChildCreated: (string -> Role -> SessionId -> unit) * ?onChildCreatedDir: (string -> SessionId -> string option -> unit) * ?directoryFor: (string -> string option) * ?onRunStarted: (SessionId -> Role -> string option -> unit) * ?sessionSnapshot: ISessionSnapshotPort * ?cancelSignals: (SessionId seq -> unit) * ?ownership: HandleOwnership * ?drainChildPtys: (AdmittedWork -> Task<unit>) * ?ownershipCommonDir: string -> HostForkRuntime'. (code 497)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(367,66): (367,114) error FSHARP: Type mismatch. Expecting a tuple of length 3 of type    string * ManagedAgent * string option    but given a tuple of length 2 of type    string * ManagedAgent (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(378,47): (378,58) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'ClosePtyRun'. Maybe you want one of the following:   ClosePty (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(405,21): (415,22) error FSHARP: The member or object constructor 'HostForkRuntime' requires 9 additional argument(s). The required signature is 'new: parentId: SessionId * sessions: ISessionHostPort * childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) * createMailbox: (obj -> Fork.ForkCompletionMailbox) * clock: IClockPort * raceExit: (Task -> int -> Task<bool>) * ptyPort: PtyPort option * recoverPty: RecoverPty * ?journal: AgentJournal * ?onChildCreated: (string -> Role -> SessionId -> unit) * ?onChildCreatedDir: (string -> SessionId -> string option -> unit) * ?directoryFor: (string -> string option) * ?onRunStarted: (SessionId -> Role -> string option -> unit) * ?sessionSnapshot: ISessionSnapshotPort * ?cancelSignals: (SessionId seq -> unit) * ?ownership: HandleOwnership * ?drainChildPtys: (AdmittedWork -> Task<unit>) * ?ownershipCommonDir: string -> HostForkRuntime'. (code 497)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(418,21): (418,46) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(420,54): (420,80) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'SnapshotOutstandingPtyRuns'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(423,37): (423,63) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'SnapshotOutstandingPtyRuns'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(436,17): (436,40) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(438,21): (438,50) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(440,53): (440,79) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'SnapshotOutstandingPtyRuns'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(441,57): (441,83) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'SnapshotOutstandingPtyRuns'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(443,21): (443,50) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(444,35): (444,49) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'DetachAndDrain'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(445,37): (445,51) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'DetachAndDrain'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(446,29): (446,43) error FSHARP: The type 'DelegationPtyCapability' does not define the field, constructor or member 'DetachAndDrain'. (code 39)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(461,48): (461,60) error FSHARP: Type mismatch. Expecting a tuple of length 3 of type    string * ManagedAgent * string option    but given a tuple of length 2 of type    string * ManagedAgent (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(462,51): (462,58) error FSHARP: The type 'DelegationPtyCapability' is not compatible with the type 'HostForkRuntime' (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkPtySurface.fs(464,40): (464,54) error FSHARP: Type mismatch. Expecting a tuple of length 3 of type    string * ManagedAgent * string option    but given a tuple of length 2 of type    string * ManagedAgent (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs(477,84): (477,93) error FSHARP: This expression was expected to have type    'string'    but here has type    'Task<string>' (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs(504,35): (504,53) error FSHARP: Type mismatch. Expecting a    'string option'    but given a    'Task<string> option'    The type 'string' does not match the type 'Task<string>' (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs(1606,29): (1606,38) error FSHARP: This expression was expected to have type    'string'    but here has type    'Task<string>' (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs(1704,47): (1704,65) error FSHARP: The type 'string' does not match the type 'Task<string>' (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs(276,21): (276,25) error FSHARP: This expression was expected to have type    'SessionId -> ProviderRunIdentity -> Task<string option>'    but here has type    ''a option' (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs(537,17): (542,49) error FSHARP: This value is not a function and cannot be applied. (code 3)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs(581,17): (581,21) error FSHARP: This expression was expected to have type    'SessionId -> ProviderRunIdentity -> Task<string option>'    but here has type    ''a option' (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs(724,17): (733,18) error FSHARP: The member or object constructor 'HostForkRuntime' requires 10 additional argument(s). The required signature is 'new: parentId: SessionId * sessions: ISessionHostPort * childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) * createMailbox: (obj -> Fork.ForkCompletionMailbox) * clock: IClockPort * raceExit: (Task -> int -> Task<bool>) * ptyPort: PtyPort option * recoverPty: RecoverPty * ?journal: AgentJournal * ?onChildCreated: (string -> Role -> SessionId -> unit) * ?onChildCreatedDir: (string -> SessionId -> string option -> unit) * ?directoryFor: (string -> string option) * ?onRunStarted: (SessionId -> Role -> string option -> unit) * ?sessionSnapshot: ISessionSnapshotPort * ?cancelSignals: (SessionId seq -> unit) * ?ownership: HandleOwnership * ?drainChildPtys: (AdmittedWork -> Task<unit>) * ?ownershipCommonDir: string -> HostForkRuntime'. (code 497)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs(736,17): (736,35) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs(754,44): (754,69) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs(756,38): (756,60) error FSHARP: Lookup on object of indeterminate type based on information prior to this program point. A type annotation may be needed prior to this program point to constrain the type of the object. This may allow the lookup to be resolved. (code 72)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs(793,21): (793,25) error FSHARP: This expression was expected to have type    'SessionId -> ProviderRunIdentity -> Task<string option>'    but here has type    ''a option' (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs(861,21): (861,25) error FSHARP: This expression was expected to have type    'SessionId -> ProviderRunIdentity -> Task<string option>'    but here has type    ''a option' (code 1)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs(941,21): (941,25) error FSHARP: This expression was expected to have type    'SessionId -> ProviderRunIdentity -> Task<string option>'    but here has type    ''a option' (code 1)
+[39m[22m[31m./src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs(1651,65): (1651,71) error FSHARP: The value, constructor, namespace or type 'record' is not defined. Maybe you want one of the following:   recordView   recordFencedView (code 39)
+[39m[22m[31m./src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs(1187,9): (1187,31) error FSHARP: Module 'Wanxiangshu.Repository.Programming.Js.OpenCode.JsToolWorkflow' contains    val executeWithReviewCheck<'a> : reviewCheck: (unit -> Task<bool>) option -> sessionId: string -> fence: (ProviderRunIdentity * ToolCallId) option -> (Set<JsCapability> -> string -> string -> 'a -> int -> int64 -> int -> IJsTransactionPersistence option -> IJsLifecyclePersistence option -> JsToolWorkflow.FileAccessObservation option -> JsToolWorkflow.ProcessHost option -> Task<JsToolWorkflow.JsToolOutcome>)    but its signature specifies    val executeWithReviewCheck: reviewCheck: (unit -> Task<bool>) option -> sessionId: string -> fence: (ProviderRunIdentity * ToolCallId) option -> capabilities: Set<JsCapability> -> root: string -> baseClassSource: string -> input: obj -> deadlineMs: int -> deadlineEpochMs: int64 -> outputBoundBytes: int -> persistence: IJsTransactionPersistence option -> lifecyclePersistence: IJsLifecyclePersistence option -> fileAccessObservation: JsToolWorkflow.FileAccessObservation option -> processHost: JsToolWorkflow.ProcessHost option -> Task<JsToolWorkflow.JsToolOutcome>    The respective type parameter counts differ (code 34)
+[39m[22m[31m./src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs(1190,9): (1190,28) error FSHARP: Module 'Wanxiangshu.Repository.Programming.Js.OpenCode.JsToolWorkflow' contains    val executeWithApiScope<'a> : scopeApi: (JsSandbox.ParkState -> obj -> obj) -> sessionId: string -> fence: (ProviderRunIdentity * ToolCallId) option -> (Set<JsCapability> -> string -> string -> 'a -> int -> int64 -> int -> IJsTransactionPersistence option -> IJsLifecyclePersistence option -> JsToolWorkflow.FileAccessObservation option -> JsToolWorkflow.ProcessHost option -> Task<JsToolWorkflow.JsToolOutcome>)    but its signature specifies    val executeWithApiScope: scopeApi: (JsSandbox.ParkState -> obj -> obj) -> sessionId: string -> fence: (ProviderRunIdentity * ToolCallId) option -> capabilities: Set<JsCapability> -> root: string -> baseClassSource: string -> input: obj -> deadlineMs: int -> deadlineEpochMs: int64 -> outputBoundBytes: int -> persistence: IJsTransactionPersistence option -> lifecyclePersistence: IJsLifecyclePersistence option -> fileAccessObservation: JsToolWorkflow.FileAccessObservation option -> processHost: JsToolWorkflow.ProcessHost option -> Task<JsToolWorkflow.JsToolOutcome>    The respective type parameter counts differ (code 34)
+[39m[22m[31m./src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs(541,19): (541,27) error FSHARP: The record type 'AdvisorSeatDeps' does not contain a label 'Snapshot'. (code 1129)
+[39m[22m[31m./src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs(1,1): error EXCEPTION: error recovery at (101,10--101,25)
+   at FSharp.Compiler.Symbols.ExprTranslationImpl.wfail[a](String msg, Range m) in /home/dev/Projects/fsharp/src/Compiler/Symbols/Exprs.fs:line 85
+   at FSharp.Compiler.Symbols.FSharpExprConvert.ConvDecisionTreeCase(SymbolEnv cenv, ExprTranslationEnv env, Range m, Expr inpExpr, TType dtreeRetTy, DecisionTreeCase dcase, E acc) in /home/dev/Projects/fsharp/src/Compiler/Symbols/Exprs.fs:line 1335
+   at FSharp.Compiler.Symbols.FSharpExprConvert.ConvDecisionTreePrim@1277.Invoke(DecisionTreeCase dcase, E acc)
+   at FSharp.Compiler.Symbols.FSharpExprConvert.ConvDecisionTreePrim(SymbolEnv cenv, ExprTranslationEnv env, TType dtreeRetTy, DecisionTree x) in /home/dev/Projects/fsharp/src/Compiler/Symbols/Exprs.fs:line 1290
+   at FSharp.Compiler.Symbols.FSharpExprConvert.ConvExprPrimLinear(SymbolEnv cenv, ExprTranslationEnv env, Expr expr, FSharpFunc`2 contF) in /home/dev/Projects/fsharp/src/Compiler/Symbols/Exprs.fs:line 420
+   at FSharp.Compiler.Symbols.FSharpExprConvert.ConvExprOnDemand@1340.Invoke(Unit unitVar0) in /home/dev/Projects/fsharp/src/Compiler/Symbols/Exprs.fs:line 1340
+   at FSharp.Compiler.Symbols.FSharpExpr.get_E() in /home/dev/Projects/fsharp/src/Compiler/Symbols/Exprs.fs:line 153
+   at FSharp.Compiler.Symbols.FSharpExprPatterns.|Coerce|_|(FSharpExpr e) in /home/dev/Projects/fsharp/src/Compiler/Symbols/Exprs.fs:line 1452
+   at Fable.Transforms.FSharp2Fable.Compiler.transformExpr@639.Invoke(Unit unitVar) in /home/runner/work/Fable/Fable/src/Fable.Transforms/FSharp2Fable.fs:line 733
+   at MonadicTrampoline.run[a](Thunk`1 _arg1) in /home/runner/work/Fable/Fable/src/Fable.Transforms/MonadicTrampoline.fs:line 9
+   at Fable.Transforms.FSharp2Fable.Compiler.transformMemberFunction(IFableCompiler com, Context ctx, String name, FSharpMemberOrFunctionOrValue memb, FSharpList`1 args, FSharpExpr body) in /home/runner/work/Fable/Fable/src/Fable.Transforms/FSharp2Fable.fs:line 1842
+   at Fable.Transforms.FSharp2Fable.Compiler.transformMemberFunctionOrValue(IFableCompiler com, Context ctx, FSharpMemberOrFunctionOrValue memb, FSharpList`1 args, FSharpExpr body) in /home/runner/work/Fable/Fable/src/Fable.Transforms/FSharp2Fable.fs:line 1924
+   at Fable.Transforms.FSharp2Fable.Compiler.transformMemberDecl(FableCompiler com, Context ctx, FSharpMemberOrFunctionOrValue memb, FSharpList`1 args, FSharpExpr body) in /home/runner/work/Fable/Fable/src/Fable.Transforms/FSharp2Fable.fs:line 2089
+   at Microsoft.FSharp.Primitives.Basics.List.collectToFreshConsTail[T,TResult](FSharpFunc`2 f, FSharpList`1 list, FSharpList`1 cons) in /home/dev/Projects/fsharp/src/FSharp.Core/local.fs:line 436
+   at Microsoft.FSharp.Primitives.Basics.List.collect[T,TResult](FSharpFunc`2 f, FSharpList`1 list) in /home/dev/Projects/fsharp/src/FSharp.Core/local.fs:line 443
+   at Microsoft.FSharp.Primitives.Basics.List.collectToFreshConsTail[T,TResult](FSharpFunc`2 f, FSharpList`1 list, FSharpList`1 cons) in /home/dev/Projects/fsharp/src/FSharp.Core/local.fs:line 436
+   at Microsoft.FSharp.Primitives.Basics.List.collect[T,TResult](FSharpFunc`2 f, FSharpList`1 list) in /home/dev/Projects/fsharp/src/FSharp.Core/local.fs:line 443
+   at Fable.Transforms.FSharp2Fable.Compiler.transformFile(Compiler com) in /home/runner/work/Fable/Fable/src/Fable.Transforms/FSharp2Fable.fs:line 2984
+   at Fable.Cli.Pipeline.Js.compileFile@174.Invoke(Unit unitVar) in /home/runner/work/Fable/Fable/src/Fable.Cli/Pipeline.fs:line 180
+   at Microsoft.FSharp.Control.AsyncPrimitives.CallThenInvoke[T,TResult](AsyncActivation`1 ctxt, TResult result1, FSharpFunc`2 part2) in /home/dev/Projects/fsharp/src/FSharp.Core/async.fs:line 509
+   at Microsoft.FSharp.Control.Trampoline.Execute(FSharpFunc`2 firstAction) in /home/dev/Projects/fsharp/src/FSharp.Core/async.fs:line 112
+[39m[22m[31mCompilation failed
+[39m[22m[31m════════════════════════════════════════════════════════════════════════════════
+  BUILD FAILED
+════════════════════════════════════════════════════════════════════════════════[0m
+Fable compilation failed with exit code 1

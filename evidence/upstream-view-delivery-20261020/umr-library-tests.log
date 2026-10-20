@@ -1,0 +1,390 @@
+TAP version 13
+# Subtest: SPEC[build-009] every declared library and type is delivered unchanged without evidence archives or compiler dependencies
+not ok 1 - SPEC[build-009] every declared library and type is delivered unchanged without evidence archives or compiler dependencies
+  ---
+  duration_ms: 1035.948583
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/scripts/tests/exports-package.test.mjs:18:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        './durable-work',
+        './events',
+        './eventstore',
+        './fs',
+    -   './grounding',
+        './identity',
+        './ownership',
+        './process',
+        './resources',
+        './supervision',
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: './durable-work'
+    1: './events'
+    2: './eventstore'
+    3: './fs'
+    4: './grounding'
+    5: './identity'
+    6: './ownership'
+    7: './process'
+    8: './resources'
+    9: './supervision'
+    10: './time'
+    11: './time-node'
+    12: './time-testing'
+    13: './trace'
+    14: './wait'
+    15: './work'
+  actual:
+    0: './durable-work'
+    1: './events'
+    2: './eventstore'
+    3: './fs'
+    4: './identity'
+    5: './ownership'
+    6: './process'
+    7: './resources'
+    8: './supervision'
+    9: './time'
+    10: './time-node'
+    11: './time-testing'
+    12: './trace'
+    13: './wait'
+    14: './work'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/wanxiangli/scripts/tests/exports-package.test.mjs:29:10)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.start (node:internal/test_runner/test:829:17)
+    startSubtestAfterBootstrap (node:internal/test_runner/harness:296:17)
+  ...
+# Subtest: SPEC[build-007] source dependencies exclude tarballs while fixed historical evidence keeps its bytes
+ok 2 - SPEC[build-007] source dependencies exclude tarballs while fixed historical evidence keeps its bytes
+  ---
+  duration_ms: 74.808292
+  ...
+# Subtest: WHAT[participant-identity-001] active parsing accepts exactly the five active roles
+ok 3 - WHAT[participant-identity-001] active parsing accepts exactly the five active roles
+  ---
+  duration_ms: 4.41225
+  ...
+# Subtest: WHAT[participant-identity-001] active parsing rejects historical, internal and malformed inputs
+ok 4 - WHAT[participant-identity-001] active parsing rejects historical, internal and malformed inputs
+  ---
+  duration_ms: 0.910625
+  ...
+# Subtest: WHAT[participant-identity-001] historical decoding accepts all ten roles for journal replay only
+ok 5 - WHAT[participant-identity-001] historical decoding accepts all ten roles for journal replay only
+  ---
+  duration_ms: 0.301167
+  ...
+# Subtest: WHAT[participant-identity-001] persona catalog maps every role to its V1 persona
+ok 6 - WHAT[participant-identity-001] persona catalog maps every role to its V1 persona
+  ---
+  duration_ms: 0.167125
+  ...
+# Subtest: WHAT[participant-identity-002] root resolution yields immutable canonical evidence
+ok 7 - WHAT[participant-identity-002] root resolution yields immutable canonical evidence
+  ---
+  duration_ms: 2.2445
+  ...
+# Subtest: WHAT[participant-identity-002] root resolution rejects legacy, malformed and unknown names without fallback
+ok 8 - WHAT[participant-identity-002] root resolution rejects legacy, malformed and unknown names without fallback
+  ---
+  duration_ms: 0.223625
+  ...
+# Subtest: WHAT[participant-identity-002] internal slot names resolve with explicit role projection
+ok 9 - WHAT[participant-identity-002] internal slot names resolve with explicit role projection
+  ---
+  duration_ms: 0.071834
+  ...
+# Subtest: WHAT[participant-identity-002] retired slot names resolve to no identity, never to a live role
+ok 10 - WHAT[participant-identity-002] retired slot names resolve to no identity, never to a live role
+  ---
+  duration_ms: 0.390958
+  ...
+# Subtest: WHAT[participant-identity-002] rehydrated evidence round-trips through the plain view
+ok 11 - WHAT[participant-identity-002] rehydrated evidence round-trips through the plain view
+  ---
+  duration_ms: 0.255667
+  ...
+# Subtest: WHAT[participant-identity-002] rehydration rejects every field mismatch
+ok 12 - WHAT[participant-identity-002] rehydration rejects every field mismatch
+  ---
+  duration_ms: 0.294166
+  ...
+# Subtest: WHAT[participant-identity-002] bookkeeper evidence requires a missing role field
+ok 13 - WHAT[participant-identity-002] bookkeeper evidence requires a missing role field
+  ---
+  duration_ms: 0.191334
+  ...
+# Subtest: WHAT[participant-identity-003] human-root requires an explicit participant proof
+ok 14 - WHAT[participant-identity-003] human-root requires an explicit participant proof
+  ---
+  duration_ms: 2.586125
+  ...
+# Subtest: WHAT[participant-identity-003] agent-owner-root requires owner and child proof
+ok 15 - WHAT[participant-identity-003] agent-owner-root requires owner and child proof
+  ---
+  duration_ms: 0.391
+  ...
+# Subtest: WHAT[participant-identity-003] continuation accepts only the closed vocabulary
+ok 16 - WHAT[participant-identity-003] continuation accepts only the closed vocabulary
+  ---
+  duration_ms: 0.380166
+  ...
+# Subtest: WHAT[participant-identity-003] host-internal is the only proof-free origin
+ok 17 - WHAT[participant-identity-003] host-internal is the only proof-free origin
+  ---
+  duration_ms: 0.075208
+  ...
+# Subtest: WHAT[participant-identity-003] malformed raw input is rejected without any fallback
+ok 18 - WHAT[participant-identity-003] malformed raw input is rejected without any fallback
+  ---
+  duration_ms: 0.37525
+  ...
+# Subtest: WHAT[participant-identity-003] no rejection path ever yields a human origin (D-01)
+ok 19 - WHAT[participant-identity-003] no rejection path ever yields a human origin (D-01)
+  ---
+  duration_ms: 0.065542
+  ...
+# Subtest: WHAT[participant-identity-004] binding requires every field and an active role
+ok 20 - WHAT[participant-identity-004] binding requires every field and an active role
+  ---
+  duration_ms: 1.532333
+  ...
+# Subtest: WHAT[participant-identity-004] retired slot names never produce bindable evidence
+ok 21 - WHAT[participant-identity-004] retired slot names never produce bindable evidence
+  ---
+  duration_ms: 0.228584
+  ...
+# Subtest: WHAT[participant-identity-004] binding rejects evidence whose role disagrees with the binding role
+ok 22 - WHAT[participant-identity-004] binding rejects evidence whose role disagrees with the binding role
+  ---
+  duration_ms: 0.112958
+  ...
+# Subtest: WHAT[participant-identity-004] model rebind changes only the physical target, never the identity
+ok 23 - WHAT[participant-identity-004] model rebind changes only the physical target, never the identity
+  ---
+  duration_ms: 0.126917
+  ...
+# Subtest: WHAT[participant-identity-004] tampered binding views are rejected at rebind (fail-closed)
+ok 24 - WHAT[participant-identity-004] tampered binding views are rejected at rebind (fail-closed)
+  ---
+  duration_ms: 0.143583
+  ...
+# Subtest: WHAT[participant-identity-005] inherited identity carries the owner persona and catalog version
+ok 25 - WHAT[participant-identity-005] inherited identity carries the owner persona and catalog version
+  ---
+  duration_ms: 7.449791
+  ...
+# Subtest: WHAT[participant-identity-005] inherited identity without an owner witness is rejected
+ok 26 - WHAT[participant-identity-005] inherited identity without an owner witness is rejected
+  ---
+  duration_ms: 0.558083
+  ...
+# Subtest: WHAT[participant-identity-005] owner persona mismatch between witness and input is rejected
+ok 27 - WHAT[participant-identity-005] owner persona mismatch between witness and input is rejected
+  ---
+  duration_ms: 0.760125
+  ...
+# Subtest: WHAT[participant-identity-005] agent-owner-root origin proof and inherited identity compose
+ok 28 - WHAT[participant-identity-005] agent-owner-root origin proof and inherited identity compose
+  ---
+  duration_ms: 0.513458
+  ...
+# Subtest: SPEC[process-001] the native spawn observer reaches one actual validated launch
+ok 29 - SPEC[process-001] the native spawn observer reaches one actual validated launch
+  ---
+  duration_ms: 72.956791
+  ...
+# Subtest: SPEC[process-001] direct argv, explicit cwd and environment reach a real process unchanged
+ok 30 - SPEC[process-001] direct argv, explicit cwd and environment reach a real process unchanged
+  ---
+  duration_ms: 159.716958
+  ...
+# Subtest: SPEC[process-001] nonzero exit remains a real exit, not a spawn failure
+ok 31 - SPEC[process-001] nonzero exit remains a real exit, not a spawn failure
+  ---
+  duration_ms: 50.222
+  ...
+# Subtest: SPEC[process-001] environment property names are literal data, not prototype mutation
+ok 32 - SPEC[process-001] environment property names are literal data, not prototype mutation
+  ---
+  duration_ms: 148.085667
+  ...
+# Subtest: SPEC[process-001] the actual child receives the exact environment and never inherits a host sentinel
+ok 33 - SPEC[process-001] the actual child receives the exact environment and never inherits a host sentinel
+  ---
+  duration_ms: 65.179292
+  ...
+# Subtest: SPEC[process-001] absent executable produces one failed start and no invented zero exit
+ok 34 - SPEC[process-001] absent executable produces one failed start and no invented zero exit
+  ---
+  duration_ms: 2.373834
+  ...
+# Subtest: SPEC[process-001] a partially prepared Bun output pipe fails before the target starts
+ok 35 - SPEC[process-001] a partially prepared Bun output pipe fails before the target starts # SKIP
+  ---
+  duration_ms: 0.124667
+  ...
+# Subtest: SPEC[process-001] a Bun parent writer close failure preserves the actual started target
+ok 36 - SPEC[process-001] a Bun parent writer close failure preserves the actual started target # SKIP
+  ---
+  duration_ms: 0.038667
+  ...
+# Subtest: SPEC[process-001] Bun startup cleanup failures are visible without an unhandled stream error
+ok 37 - SPEC[process-001] Bun startup cleanup failures are visible without an unhandled stream error # SKIP
+  ---
+  duration_ms: 0.112
+  ...
+# Subtest: SPEC[process-001] relative executable is refused before external effect
+ok 38 - SPEC[process-001] relative executable is refused before external effect
+  ---
+  duration_ms: 1.118917
+  ...
+# Subtest: SPEC[process-001] relative cwd is refused before external effect
+ok 39 - SPEC[process-001] relative cwd is refused before external effect
+  ---
+  duration_ms: 0.810834
+  ...
+# Subtest: SPEC[process-001] NUL argument is refused before external effect
+ok 40 - SPEC[process-001] NUL argument is refused before external effect
+  ---
+  duration_ms: 0.584292
+  ...
+# Subtest: SPEC[process-001] bad Unicode argument is refused before external effect
+ok 41 - SPEC[process-001] bad Unicode argument is refused before external effect
+  ---
+  duration_ms: 0.953833
+  ...
+# Subtest: SPEC[process-001] negative capacity is refused before external effect
+ok 42 - SPEC[process-001] negative capacity is refused before external effect
+  ---
+  duration_ms: 0.394167
+  ...
+# Subtest: SPEC[process-001] fractional capacity is refused before external effect
+ok 43 - SPEC[process-001] fractional capacity is refused before external effect
+  ---
+  duration_ms: 0.291375
+  ...
+# Subtest: SPEC[process-001] NaN capacity is refused before external effect
+ok 44 - SPEC[process-001] NaN capacity is refused before external effect
+  ---
+  duration_ms: 0.578375
+  ...
+# Subtest: SPEC[process-001] unbounded capacity is refused before external effect
+ok 45 - SPEC[process-001] unbounded capacity is refused before external effect
+  ---
+  duration_ms: 0.567084
+  ...
+# Subtest: SPEC[process-001] excessive capacity is refused before external effect
+ok 46 - SPEC[process-001] excessive capacity is refused before external effect
+  ---
+  duration_ms: 0.372458
+  ...
+# Subtest: SPEC[process-001] zero write capacity is refused before external effect
+ok 47 - SPEC[process-001] zero write capacity is refused before external effect
+  ---
+  duration_ms: 0.264417
+  ...
+# Subtest: SPEC[process-001] fractional write capacity is refused before external effect
+ok 48 - SPEC[process-001] fractional write capacity is refused before external effect
+  ---
+  duration_ms: 0.712917
+  ...
+# Subtest: SPEC[process-001] undefined env value is refused before external effect
+ok 49 - SPEC[process-001] undefined env value is refused before external effect
+  ---
+  duration_ms: 0.322292
+  ...
+# Subtest: SPEC[process-001] bad env key is refused before external effect
+ok 50 - SPEC[process-001] bad env key is refused before external effect
+  ---
+  duration_ms: 0.256459
+  ...
+# Subtest: SPEC[process-001] hidden shell option is refused before external effect
+ok 51 - SPEC[process-001] hidden shell option is refused before external effect
+  ---
+  duration_ms: 0.263042
+  ...
+# Subtest: SPEC[process-001] argument hole is refused before external effect
+ok 52 - SPEC[process-001] argument hole is refused before external effect
+  ---
+  duration_ms: 0.291834
+  ...
+# Subtest: SPEC[process-001] accessors are rejected without evaluating them
+ok 53 - SPEC[process-001] accessors are rejected without evaluating them
+  ---
+  duration_ms: 0.425209
+  ...
+# Subtest: SPEC[process-006] capture preserves both complete byte streams with a slow consumer
+ok 54 - SPEC[process-006] capture preserves both complete byte streams with a slow consumer
+  ---
+  duration_ms: 224.325125
+  ...
+# Subtest: SPEC[process-006] paused capture blocks the actual writer and resumes both complete channels
+ok 55 - SPEC[process-006] paused capture blocks the actual writer and resumes both complete channels
+  ---
+  duration_ms: 511.3415
+  ...
+# Subtest: SPEC[process-006] Bun idle capture reads do not occupy the filesystem I/O pool
+ok 56 - SPEC[process-006] Bun idle capture reads do not occupy the filesystem I/O pool # SKIP
+  ---
+  duration_ms: 0.07775
+  ...
+# Subtest: SPEC[process-006] capture rejects overlapping readers without consuming another chunk
+ok 57 - SPEC[process-006] capture rejects overlapping readers without consuming another chunk
+  ---
+  duration_ms: 69.800542
+  ...
+# Subtest: SPEC[process-006] discarding capture releases a pending reader without inventing process exit
+ok 58 - SPEC[process-006] discarding capture releases a pending reader without inventing process exit
+  ---
+  duration_ms: 53.744125
+  ...
+# Subtest: SPEC[process-006] failed startup also settles capture with the original failure
+ok 59 - SPEC[process-006] failed startup also settles capture with the original failure
+  ---
+  duration_ms: 0.895166
+  ...
+# Subtest: SPEC[process-006] a killed capture drains accepted bytes before its closed receipt
+ok 60 - SPEC[process-006] a killed capture drains accepted bytes before its closed receipt
+  ---
+  duration_ms: 52.692291
+  ...
+# Subtest: SPEC[process-006] killing a forwarding process reaches actual pipe EOF after all captured bytes
+ok 61 - SPEC[process-006] killing a forwarding process reaches actual pipe EOF after all captured bytes
+  ---
+  duration_ms: 129.578208
+  ...
+# Subtest: SPEC[process-006] native output errors settle a waiting consumer without fabricating exit
+ok 62 - SPEC[process-006] native output errors settle a waiting consumer without fabricating exit
+  ---
+  duration_ms: 47.773666
+  ...
+# Subtest: SPEC[resources-002] template trimming preserves every character of injected values
+ok 63 - SPEC[resources-002] template trimming preserves every character of injected values
+  ---
+  duration_ms: 10.927041
+  ...
+# Subtest: SPEC[resources-002] placeholder parity and missing substitutions fail closed
+ok 64 - SPEC[resources-002] placeholder parity and missing substitutions fail closed
+  ---
+  duration_ms: 7.1555
+  ...
+1..64
+# tests 64
+# suites 0
+# pass 59
+# fail 1
+# cancelled 0
+# skipped 4
+# todo 0
+# duration_ms 2200.021041

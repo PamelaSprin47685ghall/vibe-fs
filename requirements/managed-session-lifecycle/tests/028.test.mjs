@@ -15,17 +15,16 @@ import { toolModule } from '../../delegation/tests/support/fork-runtime.mjs'
 // ever appended, so the parent join waited forever and only shutdown
 // cancellation ended it.
 
-test('WHAT[managed-session-lifecycle-028] child completion uses its delivery without reading a historical WorkRecord', async () => {
+test('WHAT[managed-session-lifecycle-028] child completion reads its delivery through the current view boundary', async () => {
   const owner = 'manager-settlement-workrecord-fault'
   const directory = mkdtempSync(join(tmpdir(), 'wxs-settle-workrecord-'))
 
   let readFaults = 0
-  const runtime = await forkTool.createRuntimeWithWorkRecordRead(
+  const runtime = await forkTool.createRuntimeWithViewRead(
     directory,
     [{ sessionId: owner, agent: 'manager' }],
     async () => {
       readFaults += 1
-      throw new Error('injected work-record read fault')
     }
   )
 
@@ -37,7 +36,7 @@ test('WHAT[managed-session-lifecycle-028] child completion uses its delivery wit
 
     assert.equal(await forkTool.settle(runtime, owner, 'WORK-RECORD-FAULT-DONE', 'fault-provider-run'), true)
 
-    assert.equal(readFaults, 0, 'historical attachment reads are not child completion inputs')
+    assert.equal(readFaults, 1, 'the current view boundary is observed once')
 
     const works = forkTool.workSnapshot(runtime, owner)
     assert.ok(works.length > 0, 'the owner keeps a work record')

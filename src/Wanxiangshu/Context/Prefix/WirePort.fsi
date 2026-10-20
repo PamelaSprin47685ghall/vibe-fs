@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Context.Prefix
 
 open System.Threading.Tasks
-open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
@@ -12,7 +11,6 @@ open Wanxiangshu.Participant.Provider.Projection
 type WireSessionState =
     {
         XTrace: XTraceProjectionState option
-        Blog: BlogProjectionState option
         PrefixEpoch: ActivePrefixEpoch option
         /// Successful view declaration checkpoints still on the raw side of the
         /// committed prefix.
@@ -37,24 +35,10 @@ type WireBlobRecord =
     { BlobRef: BlobRef
       BlobDigest: BlobDigest }
 
-type WirePrefixRebasePayload =
-    {| SessionId: SessionId
-       PreviousEpochId: PrefixEpochId
-       NextEpochId: PrefixEpochId
-       FrozenRecordPrefixRef: BlobRef
-       FrozenRecordPrefixDigest: BlobDigest
-       CutoffExclusive: int
-       CoveredPrefixDigest: string
-       SealRoot: string
-       SyntheticMessageId: string
-       ProbeId: string
-       SolvingProviderRun: ProviderRunIdentity |}
-
 type WireJournalPort =
     { ReadView: SessionId -> WireSnapshotView
       ReadBlob: BlobRef -> Task<Result<string, string>>
       WriteBlob: string -> Task<Result<WireBlobRecord, string>>
       CurrentProjection: XTraceProjectionState -> Task<Result<ProviderProjection.ProviderSemanticProjection, string>>
       RecordConfirmedSuccess:
-          SessionId -> AuthorityRootUserMessageId -> ProviderRunIdentity -> Task<Result<unit, string>>
-      CommitPrefixRebase: SessionId -> ProviderRunIdentity -> WirePrefixRebasePayload -> Task<Result<unit, string>> }
+          SessionId -> AuthorityRootUserMessageId -> ProviderRunIdentity -> Task<Result<unit, string>> }

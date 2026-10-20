@@ -9,7 +9,6 @@ module JsToolsData =
     val parse: json: string -> Result<obj, JsFailure>
     val isDelivered: json: string -> bool
     val parseOutcome: json: string -> Result<obj, JsFailure>
-    val parseDeliveredValue: json: string -> obj
     val parseParkedPayload: json: string -> obj
 
 /// JS-085: one js-* tool invocation, end to end — the only orchestration of
@@ -29,7 +28,7 @@ module JsToolWorkflow =
 
     /// Outcome of one invocation: the program's structured value plus the
     /// commit report — or a stable JsFailure. `Parked` is the top-level parked
-    /// payload: the program suspended at `await js.park(payload)` and the site
+    /// payload: the program suspended at `await this.park(payload)` and the site
     /// is registered under `handle` (PLAN S2 step 4).
     [<RequireQualifiedAccess>]
     type JsToolOutcome =
@@ -70,6 +69,19 @@ module JsToolWorkflow =
         fileAccessObservation: FileAccessObservation ->
             Task<JsToolOutcome>
 
+    val runScoped:
+        scopeApi: (obj -> obj) ->
+        capabilities: Set<JsCapability> ->
+        root: string ->
+        baseClassSource: string ->
+        modelSource: string ->
+        deadlineMs: int ->
+        deadlineEpochMs: int64 ->
+        outputBoundBytes: int ->
+        persistence: IJsTransactionPersistence option ->
+        fileAccessObservation: FileAccessObservation option ->
+            Task<JsToolOutcome>
+
     /// Execute one js-* tool invocation under the three-state input protocol
     /// (PLAN S2 step 5): `{ program }` runs a new program, `{ unpark: {
     /// handle, value } }` resumes a parked site, `{ abandon: { handle } }`
@@ -77,6 +89,24 @@ module JsToolWorkflow =
     /// parked site so session close can reap it.
     val execute:
         sessionId: string ->
+        fence: (Wanxiangshu.Foundation.Identity.ProviderRunIdentity * Wanxiangshu.Foundation.Identity.ToolCallId) option ->
+        capabilities: Set<JsCapability> ->
+        root: string ->
+        baseClassSource: string ->
+        input: obj ->
+        deadlineMs: int ->
+        deadlineEpochMs: int64 ->
+        outputBoundBytes: int ->
+        persistence: IJsTransactionPersistence option ->
+        lifecyclePersistence: IJsLifecyclePersistence option ->
+        fileAccessObservation: FileAccessObservation option ->
+        processHost: ProcessHost option ->
+            Task<JsToolOutcome>
+
+    val executeWithReviewCheck:
+        reviewCheck: (unit -> Task<bool>) option ->
+        sessionId: string ->
+        fence: (Wanxiangshu.Foundation.Identity.ProviderRunIdentity * Wanxiangshu.Foundation.Identity.ToolCallId) option ->
         capabilities: Set<JsCapability> ->
         root: string ->
         baseClassSource: string ->
@@ -93,6 +123,7 @@ module JsToolWorkflow =
     val executeWithApiScope:
         scopeApi: (Wanxiangshu.Process.JsSandbox.ParkState -> obj -> obj) ->
         sessionId: string ->
+        fence: (Wanxiangshu.Foundation.Identity.ProviderRunIdentity * Wanxiangshu.Foundation.Identity.ToolCallId) option ->
         capabilities: Set<JsCapability> ->
         root: string ->
         baseClassSource: string ->

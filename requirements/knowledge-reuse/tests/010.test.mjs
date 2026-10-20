@@ -319,6 +319,7 @@ const { parse: parseToml } = await import("smol-toml");
 const eventStore = await import("../../../dist/Persistence/EventStore/Surface.js");
 const syncDelegate = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
 const jsWorkflow = await import("../../../dist/Repository/Programming/Js/WorkflowSurface.js");
+const jsRuntime = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
 const casebook = await import("../../../dist/Repository/Knowledge/Casebook/Surface.js");
 const lifecycle = await import("../../../dist/Repository/Knowledge/Casebook/LifecycleSurface.js");
 const bookkeeper = await import("../../../dist/Repository/Knowledge/Casebook/BookkeeperSurface.js");
@@ -357,13 +358,14 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
       }
 
       lifecycle.notePrompt(delegateId, question)
+      const view = { prefixUntil: 0, thenMap: { 0: `${question}\n${answer}\nturn = ${i + 1}` } }
       const delivered = await jsWorkflow.execute(
         dir,
         'Engineer',
         'en',
         delegateId,
         {
-          program: `class Js extends JsProgram { async run() { await this.deliver({ question: ${JSON.stringify(question)}, answer: ${JSON.stringify(answer)}, turn: ${i + 1} }); } }`,
+          program: `class Js extends JsProgram { async run() { await this.deliver(${JSON.stringify(view)}); } }`,
         },
         3000,
         Date.now() + 60_000,
@@ -371,15 +373,17 @@ test('WHAT[knowledge-reuse-010] actual Engineer charge results can be manually s
         null,
       )
       assert.equal(jsWorkflow.caseName(delivered), 'Succeeded', jsWorkflow.render(delivered))
-      assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', `RAW-PROSE-Q${i + 1}`, `asst_q${i + 1}`), true)
+      assert.deepEqual(jsRuntime.deliveredViewOf(delegateId), view)
+      jsRuntime.recordFencedDeliveredView(delegateId, `asst_q${i + 1}`, `delivery_q${i + 1}`, view)
+      assert.equal(await syncDelegate.settle(runtime, owner, 'Engineer', `FORMAL-Q${i + 1}`, `asst_q${i + 1}`), true)
       const text = await pending
-      assert.match(text, /\[data\]/, `Engineer Q${i + 1} must return the delivered LlmFacing.Data record`)
+      assert.match(text, /^# \[\[returned\]\]/, `Engineer Q${i + 1} must return its declared view as reference material`)
       assert.match(text, new RegExp(`turn = ${i + 1}`), `Engineer Q${i + 1} must carry its own delivered turn`)
       assert.match(text, new RegExp(answer.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
       assert.equal(
-        text.includes(`RAW-PROSE-Q${i + 1}`),
-        false,
-        `Engineer Q${i + 1} must take the explicit js.deliver record rather than raw turn prose`,
+        text.includes(`FORMAL-Q${i + 1}`),
+        true,
+        `Engineer Q${i + 1} must include its own final formal prose`,
       )
       for (let prior = 0; prior < i; prior += 1) {
         assert.equal(

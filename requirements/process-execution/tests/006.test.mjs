@@ -32,7 +32,7 @@ test('WHAT[process-execution-006] registered pre-cancellation has zero command e
     const controller = new AbortController()
     controller.abort()
     const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`)
-    const wire = await tool.execute({ program: program(`return await js.call(${oneCommand(command)});`) }, {
+    const wire = await tool.execute({ program: program(`return await this.call(${oneCommand(command)});`) }, {
       ...context, abort: controller.signal,
     })
     assert.equal(parse(wire).code, 'CALL_CANCELLED_BEFORE_START')
@@ -50,7 +50,7 @@ test('WHAT[process-execution-006] cancellation during a pending sanity proof ref
     const entered = join(directory, 'proof-entered')
     const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`)
     const pending = tool.execute({ program: program(`const host = this;
-      return await js.call(class extends js.Callable {
+      return await this.call(class extends this.Callable {
         maxDuration = 10000;
         next() { return ${JSON.stringify(command)}; }
         watch() { return false; }
@@ -139,7 +139,7 @@ test('WHAT[process-execution-006] registered cancellation while queued neither s
     await gate.acquire(gate.createToken(false))
     let held = true
     const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`)
-    const pending = tool.execute({ program: program(`return await js.call(${oneCommand(command, { fields: 'worldLock = true;' })});`) }, {
+    const pending = tool.execute({ program: program(`return await this.call(${oneCommand(command, { fields: 'worldLock = true;' })});`) }, {
       ...context, abort: controller.signal,
     })
     try {
@@ -152,7 +152,7 @@ test('WHAT[process-execution-006] registered cancellation while queued neither s
       assert.equal(gate.getCount(), 0)
       gate.release()
       held = false
-      const completed = await tool.execute({ program: program(`return await js.call(${oneCommand(command, { fields: 'worldLock = true;' })});`) }, context)
+      const completed = await tool.execute({ program: program(`return await this.call(${oneCommand(command, { fields: 'worldLock = true;' })});`) }, context)
       assert.equal(parse(completed).data.exitCode, 0)
       assert.equal(existsSync(marker), true)
       assert.equal(gate.getCount(), 1)
@@ -183,7 +183,7 @@ test('WHAT[process-execution-006] cancellation during a lost startup acknowledge
     syncBuiltinESMExports()
     const controller = new AbortController()
     const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(ready)}, 'started'); setInterval(() => {}, 1000)`)
-    const pending = tool.execute({ program: program(`return await js.call(${oneCommand(command)});`) }, {
+    const pending = tool.execute({ program: program(`return await this.call(${oneCommand(command)});`) }, {
       ...context, abort: controller.signal,
     })
     try {
@@ -265,7 +265,7 @@ test('WHAT[process-execution-006] the registered DevOps tool observes real Host 
         const promptsBefore = runtime.prompts.length
         const command = nodeCommand(`const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(`${ready}.pending`)}, String(process.pid)); fs.renameSync(${JSON.stringify(`${ready}.pending`)}, ${JSON.stringify(ready)}); setInterval(() => {}, 1000)`)
         const pending = hooks.tool['todowrite-for-devops'].execute({
-          program: program(`return await js.call(${oneCommand(command, { maxDuration: 60000, fields: 'outputBudgetBytes = 1024;' })});`),
+          program: program(`return await this.call(${oneCommand(command, { maxDuration: 60000, fields: 'outputBudgetBytes = 1024;' })});`),
         }, { sessionID, agent: 'devops', messageID: 'registered-abort-assistant', callID: `abort-${language}`, abort: controller.signal })
         let pid
         try {
@@ -323,7 +323,7 @@ test('WHAT[process-execution-006] runtime disposal cancels a real registered pip
     const controller = new AbortController()
     const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(ready)}, String(process.pid)); setInterval(() => {}, 1000)`)
     const pending = hooks.tool['todowrite-for-devops'].execute({
-      program: program(`return await js.call(${oneCommand(command, { maxDuration: 60000 })});`),
+      program: program(`return await this.call(${oneCommand(command, { maxDuration: 60000 })});`),
     }, { sessionID, agent: 'devops', messageID: 'dispose-assistant', callID: 'dispose-run', abort: controller.signal })
     let disposing
     try {
@@ -367,7 +367,7 @@ test('WHAT[process-execution-006] a parked registered run keeps its owner until 
     const command = `exec ${nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); process.stdout.write('READY'); setInterval(() => {}, 1000)`)}`
     const wire = await tool.execute({ program: program(`const host = this;
       try {
-        await js.call(class extends js.Callable {
+        await this.call(class extends this.Callable {
           maxDuration = 60000;
           interval = 25;
           next(ctx) { return ctx.step === 0 ? ${JSON.stringify(command)} : null; }

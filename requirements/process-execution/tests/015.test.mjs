@@ -34,7 +34,7 @@ test('WHAT[process-execution-015] the complete visible result fits the Host wind
     const cmd = nodeCommand("process.stdout.write(('中文🔥line\\n').repeat(3000))")
     const outcome = await runProgram(
       dir,
-      `    return await js.call(class extends js.Callable {
+      `    return await this.call(class extends this.Callable {
       maxDuration = 5000;
       interval = 50;
       next(ctx) { return ctx.step === 0 ? ${JSON.stringify(cmd)} : null; }
@@ -59,12 +59,12 @@ test('WHAT[process-execution-015] a lowered Host ceiling refuses before spawn an
   try {
     for (const [lines, bytes] of [[2000, 128], [3, 51200]]) {
       toolResultBound.setHostLimits(lines, bytes)
-      const refused = await runProgram(dir, `return await js.call(${oneCommand(command)});`)
+      const refused = await runProgram(dir, `return await this.call(${oneCommand(command)});`)
       assert.equal(caseName(refused), 'Failed', render(refused))
       assert.equal(existsSync(marker), false, 'unrepresentable results must refuse before effects')
     }
     toolResultBound.setHostLimits(2000, 4096)
-    const result = await runProgram(dir, `return await js.call(${oneCommand(command)});`)
+    const result = await runProgram(dir, `return await this.call(${oneCommand(command)});`)
     assert.equal(caseName(result), 'Succeeded', render(result))
     assert.equal(existsSync(marker), true)
     assert.ok(Buffer.byteLength(render(result)) <= 4096)
@@ -84,13 +84,13 @@ test('WHAT[process-execution-015] the encoded minimum rejects before execution a
       refreshGlobalLanguage()
       const marker = join(dir, `started-${language}`)
       const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started')`)
-      const refused = await runProgram(dir, `return await js.call(${oneCommand(command, { fields: 'outputBudgetBytes = 0;' })});`)
+      const refused = await runProgram(dir, `return await this.call(${oneCommand(command, { fields: 'outputBudgetBytes = 0;' })});`)
       const refusal = parse(render(refused))
       assert.equal(caseName(refused), 'Failed')
       assert.equal(refusal.code, 'CALL_OUTPUT_BUDGET_TOO_SMALL')
       const minimum = refusal.minimumOutputBudgetBytes
       assert.ok(Number.isSafeInteger(minimum) && minimum > 0)
-      const below = await runProgram(dir, `return await js.call(${oneCommand(command, { fields: `outputBudgetBytes = ${minimum - 1};` })});`)
+      const below = await runProgram(dir, `return await this.call(${oneCommand(command, { fields: `outputBudgetBytes = ${minimum - 1};` })});`)
       assert.equal(parse(render(below)).minimumOutputBudgetBytes, minimum)
       assert.equal(existsSync(marker), false, 'minimum-1 must have zero physical effects')
       const cases = [
@@ -104,7 +104,7 @@ test('WHAT[process-execution-015] the encoded minimum rejects before execution a
         }],
       ]
       for (const [script, maxDuration, verify] of cases) {
-        const outcome = await runProgram(dir, `return await js.call(${oneCommand(script, { maxDuration, fields: `outputBudgetBytes = ${minimum};` })});`)
+        const outcome = await runProgram(dir, `return await this.call(${oneCommand(script, { maxDuration, fields: `outputBudgetBytes = ${minimum};` })});`)
         assert.equal(caseName(outcome), 'Succeeded', render(outcome))
         const wire = render(outcome)
         assert.ok(Buffer.byteLength(wire) <= minimum, wire)
@@ -139,7 +139,7 @@ test('WHAT[process-execution-015] a small explicit budget counts escaped Unicode
     for (const language of ['en', 'zh-CN']) {
       process.env.WANXIANGSHU_PROVIDER_LANGUAGE = language
       refreshGlobalLanguage()
-      const outcome = await runProgram(dir, `return await js.call(${oneCommand(command, { fields: 'outputBudgetBytes = 2048;' })});`)
+      const outcome = await runProgram(dir, `return await this.call(${oneCommand(command, { fields: 'outputBudgetBytes = 2048;' })});`)
       assert.equal(caseName(outcome), 'Succeeded', render(outcome))
       const wire = render(outcome)
       const result = parse(wire).data
@@ -166,7 +166,7 @@ test('WHAT[process-execution-015] returning onExit observation cannot bypass the
   try {
     const command = nodeCommand("process.stdout.write('中文🔥'.repeat(6000)); process.exitCode = 7")
     const runnable = oneCommand(command, { fields: 'outputBudgetBytes = 2048;', onExit: 'onExit(result) { observed = result; }' })
-    const outcome = await runProgram(dir, `let observed; await js.call(${runnable}); return observed;`)
+    const outcome = await runProgram(dir, `let observed; await this.call(${runnable}); return observed;`)
     assert.equal(caseName(outcome), 'Succeeded')
     const wire = render(outcome)
     assert.ok(Buffer.byteLength(wire) <= 2048, 'callback observations must use the same complete encoding budget')
@@ -181,7 +181,7 @@ test('WHAT[process-execution-015] returning one watch observation cannot bypass 
   try {
     const command = nodeCommand("process.stdout.write('中文🔥'.repeat(6000)); setInterval(() => {}, 1000)")
     const outcome = await runProgram(dir, `let observed;
-      await js.call(class extends js.Callable {
+      await this.call(class extends this.Callable {
         maxDuration = 2000;
         interval = 25;
         outputBudgetBytes = 2048;

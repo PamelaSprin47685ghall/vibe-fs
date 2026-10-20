@@ -1,0 +1,75 @@
+TAP version 13
+# Subtest: WHAT[knowledge-reuse-010] CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper
+ok 1 - WHAT[knowledge-reuse-010] CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper
+  ---
+  duration_ms: 67.269291
+  ...
+# Subtest: WHAT[knowledge-reuse-010] CASE010_finalize_uses_synthesizer_not_raw_noteAnswer
+ok 2 - WHAT[knowledge-reuse-010] CASE010_finalize_uses_synthesizer_not_raw_noteAnswer
+  ---
+  duration_ms: 55.28325
+  ...
+# Subtest: WHAT[knowledge-reuse-010] CASE010_cleanup_never_synthesizes
+ok 3 - WHAT[knowledge-reuse-010] CASE010_cleanup_never_synthesizes
+  ---
+  duration_ms: 18.70625
+  ...
+# Subtest: WHAT[knowledge-reuse-010] CASE010_finalize_is_exactly_once_per_scope
+ok 4 - WHAT[knowledge-reuse-010] CASE010_finalize_is_exactly_once_per_scope
+  ---
+  duration_ms: 11.308542
+  ...
+# Subtest: WHAT[knowledge-reuse-010] CASE010_finalize_is_exactly_once_per_scope
+ok 5 - WHAT[knowledge-reuse-010] CASE010_finalize_is_exactly_once_per_scope
+  ---
+  duration_ms: 11.0565
+  ...
+# Subtest: WHAT[knowledge-reuse-010] actual Engineer charge results can be manually supplied to one Casebook draft and finalized
+ok 6 - WHAT[knowledge-reuse-010] actual Engineer charge results can be manually supplied to one Casebook draft and finalized
+  ---
+  duration_ms: 216.60275
+  ...
+# Subtest: WHAT[knowledge-reuse-010] actual reusable Engineer results can be manually collected and archived; cleanup retains that archive
+ok 7 - WHAT[knowledge-reuse-010] actual reusable Engineer results can be manually collected and archived; cleanup retains that archive
+  ---
+  duration_ms: 142.134833
+  ...
+# Subtest: WHAT[knowledge-reuse-010] lifecycle_cleanupInspector_never_publishes_case
+ok 8 - WHAT[knowledge-reuse-010] lifecycle_cleanupInspector_never_publishes_case
+  ---
+  duration_ms: 31.13925
+  ...
+# Subtest: WHAT[knowledge-reuse-010] lifecycle_missing_answer_is_noop_finalize
+ok 9 - WHAT[knowledge-reuse-010] lifecycle_missing_answer_is_noop_finalize
+  ---
+  duration_ms: 25.80075
+  ...
+# Subtest: WHAT[knowledge-reuse-010] G6_G_universal_loop_archive_finalize_fetch
+ok 10 - WHAT[knowledge-reuse-010] G6_G_universal_loop_archive_finalize_fetch
+  ---
+  duration_ms: 5.812583
+  ...
+# Subtest: WHAT[knowledge-reuse-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup
+ok 11 - WHAT[knowledge-reuse-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup
+  ---
+  duration_ms: 42.834333
+  ...
+# Subtest: WHAT[knowledge-reuse-010] G6_G_cancel_session_cleanup_no_publication
+ok 12 - WHAT[knowledge-reuse-010] G6_G_cancel_session_cleanup_no_publication
+  ---
+  duration_ms: 19.759958
+  ...
+# Subtest: WHAT[knowledge-reuse-010] GAP-160: actual Engineer resume boundaries and Fission takeover each archive exactly one distinct logical invocation, rejecting lane, late and duplicate terminal events
+ok 13 - WHAT[knowledge-reuse-010] GAP-160: actual Engineer resume boundaries and Fission takeover each archive exactly one distinct logical invocation, rejecting lane, late and duplicate terminal events # TODO
+  ---
+  duration_ms: 0.032958
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 1
+# duration_ms 1000.877084

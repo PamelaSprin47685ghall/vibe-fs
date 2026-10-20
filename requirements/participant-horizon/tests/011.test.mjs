@@ -76,7 +76,7 @@ test('WHAT[participant-horizon-011] a restarted process does not present the pre
 test.todo('WHAT[participant-horizon-011] Join delivers the abandoned consequence and retires the handle; real scenario stalls at Join after successful cancellation, root cause still under investigation (GAP-080)')
 test.todo('WHAT[participant-horizon-011] latest durable record selection and corrupt-latest rejection must exercise journal/blob reads; a separately implemented HorizonSurface renderer is insufficient (GAP-079)')
 
-test('WHAT[participant-horizon-011] the same roster reaches a program as js.horizon data with the four numbers withheld when no delegated estimate exists', async () => {
+test('WHAT[participant-horizon-011] the same roster reaches a program as this.horizon data with the four numbers withheld when no delegated estimate exists', async () => {
   await withForkRuntime(async ({ runtime, owner }) => {
     await placeEngineer(runtime, owner, 'Ada')
     const receipt = await forkTool.executeHorizonReceipt(runtime, owner)

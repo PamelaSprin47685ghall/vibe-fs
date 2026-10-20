@@ -1,15 +1,59 @@
 namespace Wanxiangshu.Repository.Programming.Js
 
-/// Process-live cell holding the value a program handed over through
-/// `js.deliver(value)`. The completion path reads it to build the child's
-/// terminal record (replacing the XTrace-materialized LWR for subagents);
-/// an ordinary `return` leaves the cell untouched.
+/// Process-live delivered-view cell, keyed by session. The cell holds the
+/// view declaration `this.deliver(view)` handed over, or material restored
+/// from a durable delivery witness after a restart. A separate returned
+/// cursor records each representative together with its rendered material,
+/// so identical deliveries are not repeated and changed summaries remain
+/// visible. Restart drops both; the durable witness is written when the
+/// call settles.
 module JsDeliveredValues =
-    val record: sessionId: string -> value: obj -> unit
+
+    /// The exact tool invocation that produced a cell. A terminal from an
+    /// older provider run cannot consume a newer run's delivery, and vice
+    /// versa. `None` exists only for the test/dev harness and restored
+    /// material whose call fence is no longer live.
+    type DeliveryFence =
+        { ProviderRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity
+          ToolCallId: Wanxiangshu.Foundation.Identity.ToolCallId }
+
+    type ReturnedPiece = { Key: string; Text: string }
+
+    val alreadyReturned: sessionId: string -> Set<string>
+    val recordView: sessionId: string -> view: obj option -> unit
+
+    val recordFencedView:
+        sessionId: string ->
+        providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+        toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId ->
+        view: obj option ->
+            unit
+
+    val restoreMaterial: sessionId: string -> text: string -> unit
+
+    val restoreFencedMaterial:
+        sessionId: string ->
+        providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+        toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId ->
+        text: string ->
+            unit
+
     val take: sessionId: string -> obj
     val peek: sessionId: string -> obj
-    val render: value: obj -> string option
+    val select: sessionId: string -> view: obj option -> already: Set<string> -> ReturnedPiece list
+    val tryTakeRenderedWith: sessionId: string -> assistant: string option -> string option
+
+    val tryTakeRenderedFor:
+        sessionId: string ->
+        providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
+        assistant: string option ->
+            string option
+
     val tryTakeRendered: sessionId: string -> string option
     val tryPeekRendered: sessionId: string -> string option
+    val tryPeekRenderedWith: sessionId: string -> assistant: string option -> string option
+    val peekView: sessionId: string -> obj option
+    val peekFence: sessionId: string -> DeliveryFence option
     val clear: sessionId: string -> unit
+    val clearReturned: sessionId: string -> unit
     val clearAll: unit -> unit

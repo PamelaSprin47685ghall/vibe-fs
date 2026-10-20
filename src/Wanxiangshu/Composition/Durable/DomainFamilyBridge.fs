@@ -1,12 +1,10 @@
 namespace Wanxiangshu.Composition.Durable
 
 open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Context.Prefix
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Interaction.Authority
-open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
 open Wanxiangshu.Foundation
 
@@ -97,31 +95,6 @@ module CompanionProjectionBridge =
         | CompanionProjectionChange.XTraceSet(sessionId, xTrace) ->
             ProjectionUpdate.updateSession sessionId (fun session -> { session with XTrace = Some xTrace }) projection
 
-    let private captureCompletedRecord causality providerRun (session: SessionAgentProjection) =
-        let completed =
-            session.CompletedWorkRecords
-            |> Option.defaultValue CompletedWorkRecordProjection.empty
-
-        let updated =
-            session.XTrace
-            |> Option.bind (XTraceProjection.completionRangeForProviderRun providerRun)
-            |> Option.map (function
-                | Ok terminal -> CompletedWorkRecordProjection.capture causality providerRun terminal.Frontier completed
-                | Error through -> CompletedWorkRecordProjection.markUnproven providerRun through completed)
-            |> Option.defaultValue completed
-
-        { session with
-            CompletedWorkRecords = Some updated }
-
-    let private captureCompletion causality fact projection =
-        match fact with
-        | CompanionFactCases.TerminalOutputCaptured payload ->
-            ProjectionUpdate.updateSession
-                payload.SessionId
-                (captureCompletedRecord causality payload.ProviderRun)
-                projection
-        | _ -> projection
-
     let fold
         causality
         body
@@ -137,37 +110,16 @@ module CompanionProjectionBridge =
                 (xTraceOf projection)
                 fact
         with
-        | Ok changes -> Ok(captureCompletion causality fact (List.fold applyChange projection changes))
+        | Ok changes -> Ok(List.fold applyChange projection changes)
         | Error rejection ->
             FoldRejection.reject (CompanionFoldRejection.fact rejection) (CompanionFoldRejection.message rejection)
 
 module ContextProjectionBridge =
 
-    let private cyclesOf (projection: AgentProjectionSet) (sessionId: SessionId) =
-        Map.tryFind sessionId projection.Sessions
-        |> Option.bind (fun session -> session.BloggerCycles)
-
-    let private enforcementOf (projection: AgentProjectionSet) (sessionId: SessionId) =
-        Map.tryFind sessionId projection.Sessions
-        |> Option.bind (fun session -> session.Enforcement)
-
-    let private blogOf (projection: AgentProjectionSet) (sessionId: SessionId) =
-        Map.tryFind sessionId projection.Sessions
-        |> Option.bind (fun session -> session.Blog)
-
-    let private prefixEpochOf (projection: AgentProjectionSet) (sessionId: SessionId) =
-        Map.tryFind sessionId projection.Sessions
-        |> Option.bind (fun session -> session.PrefixEpoch)
-
     let private checkpointWindowOf (projection: AgentProjectionSet) (sessionId: SessionId) =
         projection.ViewCheckpoints
         |> Map.tryFind sessionId
         |> Option.defaultValue PhaseWindow.emptyWindow
-
-    let private turnOfCheckpoint (projection: AgentProjectionSet) (sessionId: SessionId) (callId: ToolCallId) =
-        AgentProjection.tryFind sessionId projection
-        |> Option.bind (fun session -> session.XTrace)
-        |> Option.bind (XTraceProjection.tryTurnOfToolCallId callId)
 
     let private setCheckpointWindow
         (sessionId: SessionId)
@@ -188,122 +140,44 @@ module ContextProjectionBridge =
         |> PhaseWindow.appendCheckpoint callId
         |> fun updated -> setCheckpointWindow sessionId updated projection
 
-    let private pruneCommittedPrefix projection sessionId cutoffExclusive =
-        checkpointWindowOf projection sessionId
-        |> PhaseWindow.pruneBefore (turnOfCheckpoint projection sessionId) cutoffExclusive
-        |> fun updated -> setCheckpointWindow sessionId updated projection
-
     let private clearCheckpointGeneration projection sessionId =
         { projection with
             ViewCheckpoints = Map.remove sessionId projection.ViewCheckpoints }
 
-    let private applyChange (projection: AgentProjectionSet) (change: ContextProjectionChange) =
-        match change with
-        | ContextProjectionChange.BloggerCyclesSet(sessionId, cycles) ->
-            ProjectionUpdate.updateSession
-                sessionId
-                (fun session ->
-                    { session with
-                        BloggerCycles = Some cycles })
-                projection
-        | ContextProjectionChange.EnforcementSet(sessionId, enforcement) ->
-            ProjectionUpdate.updateSession
-                sessionId
-                (fun session ->
-                    { session with
-                        Enforcement = Some enforcement })
-                projection
-        | ContextProjectionChange.BlogSet(sessionId, blog) ->
-            ProjectionUpdate.updateSession sessionId (fun session -> { session with Blog = Some blog }) projection
-        | ContextProjectionChange.PrefixEpochSet(sessionId, epoch) ->
-            ProjectionUpdate.updateSession
-                sessionId
-                (fun session ->
-                    { session with
-                        PrefixEpoch = Some epoch })
-                projection
-        | ContextProjectionChange.BlogReanchored sessionId ->
-            ProjectionUpdate.updateSession
-                sessionId
-                (fun session ->
-                    { session with
-                        Blog = session.Blog |> Option.map BlogProjection.applyReanchor })
-                projection
-        | ContextProjectionChange.AuxiliaryVisibilityRetired sessionId ->
-            ProjectionUpdate.updateSession sessionId ProjectionUpdate.retireAuxiliaryInjectionVisibility projection
+    /// context-compression-019: a reanchor retires the auxiliary injection
+    /// visibility of the old provider horizon. The durable facts stay as audit
+    /// history; only the visible floor moves.
+    let private retireAuxiliaryVisibility projection sessionId =
+        ProjectionUpdate.updateSession sessionId ProjectionUpdate.retireAuxiliaryInjectionVisibility projection
 
-    let private foldOwned
-        (projection: AgentProjectionSet)
-        (fact: ContextFactCases)
-        : Result<AgentProjectionSet, FoldRejection> =
-        match
-            ContextFactFold.fold
-                (cyclesOf projection)
-                (enforcementOf projection)
-                (blogOf projection)
-                (prefixEpochOf projection)
-                fact
-        with
-        | Ok changes -> Ok(List.fold applyChange projection changes)
-        | Error rejection ->
-            FoldRejection.reject (ContextFoldRejection.fact rejection) (ContextFoldRejection.message rejection)
-
-    let private captureFrame causality fact projection =
-        let frameChange =
-            match fact with
-            | ContextFactCases.BlogObservationCommitted payload -> Some(payload.SessionId, 0)
-            | _ -> None
-
-        frameChange
-        |> Option.map (fun (sessionId, replacedCount) ->
-            ProjectionUpdate.updateSession
-                sessionId
-                (fun session ->
-                    let frame =
-                        session.Blog
-                        |> Option.bind (fun blog ->
-                            (if replacedCount = 0 then
-                                 List.tryHead blog.Frames
-                             else
-                                 List.tryLast blog.Frames)
-                            |> Option.map (fun frame -> frame, blog.Frames))
-
-                    frame
-                    |> Option.map (fun (frame, currentFrames) ->
-                        let completed =
-                            session.CompletedWorkRecords
-                            |> Option.defaultValue CompletedWorkRecordProjection.empty
-
-                        { session with
-                            CompletedWorkRecords =
-                                Some(
-                                    CompletedWorkRecordProjection.recordFrame
-                                        causality
-                                        replacedCount
-                                        frame
-                                        currentFrames
-                                        completed
-                                ) })
-                    |> Option.defaultValue session)
-                projection)
-        |> Option.defaultValue projection
+    let private reanchor factName projection sessionId apply =
+        ProjectionUpdate.tryUpdatePrefix sessionId apply projection
+        |> ProjectionUpdate.prefixOutcome factName projection
+        |> Result.map (fun updated -> clearCheckpointGeneration (retireAuxiliaryVisibility updated sessionId) sessionId)
 
     let fold
-        causality
+        (causality: (EventId * (EventId -> bool)) option)
         (projection: AgentProjectionSet)
         (fact: ContextFactCases)
         : Result<AgentProjectionSet, FoldRejection> =
-        (match fact with
-         | ContextFactCases.ViewCheckpointCommitted payload ->
-             Ok(appendCheckpoint projection payload.SessionId payload.ToolCallId)
-         | ContextFactCases.PrefixRebaseCommitted payload ->
-             foldOwned projection fact
-             |> Result.map (fun updated -> pruneCommittedPrefix updated payload.SessionId payload.CutoffExclusive)
-         | ContextFactCases.ContextReanchored payload ->
-             foldOwned projection fact
-             |> Result.map (fun updated -> clearCheckpointGeneration updated payload.SessionId)
-         | ContextFactCases.TenureReanchored payload ->
-             foldOwned projection fact
-             |> Result.map (fun updated -> clearCheckpointGeneration updated payload.SessionId)
-         | _ -> foldOwned projection fact)
-        |> Result.map (captureFrame causality fact)
+        match fact with
+        | ContextFactCases.ViewCheckpointCommitted payload ->
+            Ok(appendCheckpoint projection payload.SessionId payload.ToolCallId)
+        | ContextFactCases.ContextReanchored payload ->
+            reanchor
+                "ContextReanchored"
+                projection
+                payload.SessionId
+                (PrefixEpochProjection.applyReanchor
+                    payload.PreviousEpochId
+                    payload.NextEpochId
+                    payload.ObservedCompactionRun)
+        | ContextFactCases.TenureReanchored payload ->
+            reanchor
+                "TenureReanchored"
+                projection
+                payload.SessionId
+                (PrefixEpochProjection.applyTenureReanchor
+                    payload.PreviousEpochId
+                    payload.NextEpochId
+                    payload.IncumbencyId)

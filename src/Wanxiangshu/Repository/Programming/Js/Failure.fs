@@ -68,6 +68,7 @@ type JsFailure =
     | HandleUnknown of string
     | CannotParkWhileAbandoning
     | Abandoned
+    | ReviewOnly
     | RunnableSpecIncomplete of string
     | RgFailed of string
     | RunCommandUnsupported of string
@@ -141,6 +142,7 @@ module JsFailure =
         | JsFailure.HandleUnknown _ -> "HANDLE_UNKNOWN"
         | JsFailure.CannotParkWhileAbandoning -> "CANNOT_PARK_WHILE_ABANDONING"
         | JsFailure.Abandoned -> "ABANDONED"
+        | JsFailure.ReviewOnly -> "REVIEW_ONLY"
         | JsFailure.RunnableSpecIncomplete _ -> "CALLABLE_SPEC_INCOMPLETE"
         | JsFailure.RgFailed _ -> "RG_FAILED"
         | JsFailure.RunCommandUnsupported _ -> "CALL_COMMAND_UNSUPPORTED"
@@ -209,6 +211,7 @@ module JsFailure =
         | JsFailure.HandleUnknown handle -> "no parked site with this handle: " + handle
         | JsFailure.CannotParkWhileAbandoning -> "park is refused while the site is in its abandon cleanup window"
         | JsFailure.Abandoned -> "the parked program was abandoned; its finalizer has run"
+        | JsFailure.ReviewOnly -> "repository access requires the current unaccepted Manager review"
         | JsFailure.RunnableSpecIncomplete detail -> reasonWithMessage "Callable spec is incomplete" "" detail
         | JsFailure.RgFailed detail -> reasonWithMessage "rg failed" "" detail
         | JsFailure.RunCommandUnsupported detail -> reasonWithMessage "next() returned an unsupported command" "" detail
@@ -283,6 +286,7 @@ module JsFailure =
         | "HANDLE_UNKNOWN" -> JsFailure.HandleUnknown(after "no parked site with this handle: ")
         | "CANNOT_PARK_WHILE_ABANDONING" -> JsFailure.CannotParkWhileAbandoning
         | "ABANDONED" -> JsFailure.Abandoned
+        | "REVIEW_ONLY" -> JsFailure.ReviewOnly
         | "CALLABLE_SPEC_INCOMPLETE" -> JsFailure.RunnableSpecIncomplete text
         | "RG_FAILED" -> JsFailure.RgFailed text
         | "CALL_COMMAND_UNSUPPORTED" -> JsFailure.RunCommandUnsupported text

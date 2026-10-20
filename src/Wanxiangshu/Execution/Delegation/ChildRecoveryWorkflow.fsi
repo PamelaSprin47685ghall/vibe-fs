@@ -1,6 +1,7 @@
 namespace Wanxiangshu.Execution.Delegation
 
 open System.Threading.Tasks
+open Wanxiangshu.Persistence.Journal
 open Wanxiangshu.Execution.Delegation.Fork.ChildRecovery
 open Wanxiangshu.Foundation
 open Wanxiangshu.Foundation.Identity
@@ -9,6 +10,7 @@ open Wanxiangshu.OpenCode
 module ChildRecoveryWorkflow =
     type Ports =
         { Journal: AgentJournalPort option
+          ReadDeliveryView: (SessionId -> ProviderRunIdentity -> AuthorityRootUserMessageId -> string option) option
           ParentId: SessionId
           Snapshot: ISessionSnapshotPort option
           AgentId: string

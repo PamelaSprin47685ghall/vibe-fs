@@ -30,3 +30,22 @@ module DelegationJournalAdapter =
                     | Error err -> return Error err
                 }
           Sha256 = HostDigest.sha256Hex }
+
+module TaskDeliveryJournal =
+    let tryFind (journal: AgentJournal) sessionId providerRun =
+        TaskDelivery.tryFind sessionId providerRun (AgentJournal.snapshot journal).AgentProjections.Deliveries
+
+    let commit (journal: AgentJournal) (witness: TaskDeliveryWitness) =
+        task {
+            match TaskDelivery.validate HostDigest.sha256Hex witness with
+            | Error reason -> return Error reason
+            | Ok() ->
+                let! appended =
+                    AgentJournal.appendAgent
+                        (StreamId.Session witness.Fence.SessionId)
+                        (Some witness.Fence.ProviderRun)
+                        (AgentFact.Host(HostFactCases.TaskDeliveryCommitted witness))
+                        journal
+
+                return appended |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
+        }

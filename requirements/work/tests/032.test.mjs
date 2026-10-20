@@ -18,7 +18,7 @@ import * as completedTurn from '../../../dist/Interaction/Repair/CompletedTurnSu
 
 test('WHAT[work-032] non-Plan roles never receive the Plan-only tool projection', () => {
   const planOnlyPermissions = ['JsPlan', 'DevOpsConsultation', 'Deliver', 'Review']
-  const nonPlanRoles = ['manager', 'engineer', 'devops', 'orchestrator', 'blogger']
+  const nonPlanRoles = ['manager', 'engineer', 'devops', 'orchestrator']
   // Each role label must resolve to a real role, so the deny below is a
   // genuine projection fact and not an unknown-role fallback.
   const roleWitness = {
@@ -26,7 +26,6 @@ test('WHAT[work-032] non-Plan roles never receive the Plan-only tool projection'
     engineer: 'Write',
     devops: 'Exec',
     orchestrator: 'Fork',
-    blogger: 'Chronicle',
   }
   for (const role of nonPlanRoles) {
     assert.equal(isAllowed(role, roleWitness[role]), true, `${role} must resolve as a real role`)
@@ -44,8 +43,24 @@ test('WHAT[work-032] non-Plan empty stops keep requiring interaction repair', ()
 
 test('WHAT[work-032] only Plan may ask the human; Manager and other roles are denied ask', () => {
   assert.equal(isAllowed('plan', 'Ask'), true)
-  for (const role of ['manager', 'engineer', 'devops', 'orchestrator', 'blogger', 'coder', 'inspector']) {
+  for (const role of ['manager', 'engineer', 'devops', 'orchestrator', 'coder', 'inspector']) {
     assert.equal(isAllowed(role, 'Ask'), false, role)
     assert.equal(isAllowed(role, 'DevOpsConsultation'), false, role)
   }
+})
+
+test('WHAT[work-032] Engineer, DevOps, and Orchestrator progress stops do not record completion fact without delivery witness', async () => {
+  const { completeWithoutDelivery } = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  for (const name of ['engineer', 'devops', 'orchestrator']) {
+    const outcome = await completeWithoutDelivery(name, `ses-${name}-progress`, `root-${name}-1`, `run-${name}-1`, 'Finished subtask progress summary.')
+    assert.equal(outcome.caseName, 'RejectedUndelivered')
+    assert.equal(outcome.terminalNotifications, 0)
+  }
+})
+
+test('WHAT[work-032] Advisor keeps its own terminal protocol without an outer TaskDelivery', async () => {
+  const { completeWithoutDelivery } = await import('../../../dist/Context/Trace/SemanticTraceSurface.js')
+  const outcome = await completeWithoutDelivery('advisor', 'ses-advisor', 'own-root', 'own-run', 'The dedicated role produced its formal result.')
+  assert.equal(outcome.caseName, 'Published')
+  assert.equal(outcome.terminalNotifications, 1)
 })

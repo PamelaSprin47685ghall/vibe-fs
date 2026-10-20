@@ -1,12 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { withForkRuntime, toolModule } from './support/fork-runtime.mjs'
+import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import * as forkTool from '../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
 import * as dispatch from '../../../dist/Interaction/Dispatch/DispatchSurface.js'
 import { withSyncRuntime } from './support/sync-runtime.mjs'
 
-test('WHAT[delegation-024] pre-join resume preserves both public join WorkRecords', async () => {
+test('WHAT[delegation-024] pre-join resume preserves both public join delivered views', async () => {
   const owner = 'prejoin-retained-delivery'
   await withForkRuntime(owner, async runtime => {
     const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'FIRST')
@@ -14,22 +15,24 @@ test('WHAT[delegation-024] pre-join resume preserves both public join WorkRecord
     assert.equal(forkTool.acceptPrompt(runtime, 0), true)
     assert.match(await first, /Ada/)
     const child = forkTool.child(runtime)
+    runtimeSurface.recordFencedDeliveredView(child, 'provider-a', 'call-a', { prefixUntil: 0, thenMap: { 0: 'DELIVERED-A' } })
     assert.equal(await forkTool.settle(runtime, owner, 'RETAINED-ANSWER-A', 'provider-a'), true)
     const second = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'SECOND')
     await forkTool.awaitPromptCount(runtime, 2)
     assert.equal(forkTool.acceptPrompt(runtime, 1), true)
     assert.match(await second, /Ada/)
     assert.equal(forkTool.child(runtime), child)
+    runtimeSurface.recordFencedDeliveredView(child, 'provider-b', 'call-b', { prefixUntil: 0, thenMap: { 0: 'DELIVERED-B' } })
     assert.equal(await forkTool.settle(runtime, owner, 'RETAINED-ANSWER-B', 'provider-b'), true)
     const result = await forkTool.executeJoin(runtime, owner)
-    assert.match(result, /RETAINED-ANSWER-A/)
-    assert.match(result, /RETAINED-ANSWER-B/)
-    assert.equal((result.match(/RETAINED-ANSWER-A/g) ?? []).length, 1)
-    assert.equal((result.match(/RETAINED-ANSWER-B/g) ?? []).length, 1)
+    assert.match(result, /DELIVERED-A/)
+    assert.match(result, /DELIVERED-B/)
+    assert.equal((result.match(/text = "DELIVERED-A"/g) ?? []).length, 1)
+    assert.equal((result.match(/text = "DELIVERED-B"/g) ?? []).length, 1)
   })
 })
 
-test('WHAT[delegation-024] child completion record comes from delivered value and an undelivered child reports status undelivered', async () => {
+test('WHAT[delegation-024] an undelivered Completed terminal does not close the child and join stays not-ready', async () => {
   const owner = 'delivered-and-undelivered-join'
   await withForkRuntime(owner, async runtime => {
     const first = forkTool.executeManagerFork(runtime, toolModule, owner, 'engineer', 'Ada', 'DELIVER-CHARGE')
@@ -37,30 +40,19 @@ test('WHAT[delegation-024] child completion record comes from delivered value an
     assert.equal(forkTool.acceptPrompt(runtime, 0), true)
     assert.match(await first, /Ada/)
     const childSession = forkTool.child(runtime)
-    forkTool.recordDeliveredValue(childSession, { summary: 'DELIVERED-RECORD', files: 2 })
+    runtimeSurface.recordFencedDeliveredView(childSession, 'provider-delivered', 'call-1', { prefixUntil: 1, thenMap: { 0: 'DELIVERED-RECORD with files = 2' } })
     assert.equal(await forkTool.settle(runtime, owner, 'RAW-PROSE-IGNORED', 'provider-delivered'), true)
-
-    const deliveredReceipt = await forkTool.executeJoinReceipt(runtime, owner)
-    assert.equal(deliveredReceipt.ok, true)
-    assert.equal(deliveredReceipt.records.length, 1)
-    assert.equal(deliveredReceipt.records[0].name, 'Ada')
-    assert.equal(deliveredReceipt.records[0].status, 'completed')
-    assert.match(deliveredReceipt.records[0].workRecord, /summary = "DELIVERED-RECORD"/)
-    assert.match(deliveredReceipt.records[0].workRecord, /files = 2/)
-    assert.doesNotMatch(deliveredReceipt.records[0].workRecord, /RAW-PROSE-IGNORED/)
 
     const second = forkTool.executeManagerResume(runtime, toolModule, owner, '', 'Ada', 'UNDELIVERED-CHARGE')
     await forkTool.awaitPromptCount(runtime, 2)
     assert.equal(forkTool.acceptPrompt(runtime, 1), true)
     assert.match(await second, /Ada/)
-    assert.equal(await forkTool.settleUndelivered(runtime, owner, 'PLAIN-RETURN-NO-DELIVER', 'provider-undelivered'), true)
 
-    const undeliveredReceipt = await forkTool.executeJoinReceipt(runtime, owner)
-    assert.equal(undeliveredReceipt.ok, true)
-    assert.equal(undeliveredReceipt.records.length, 1)
-    assert.equal(undeliveredReceipt.records[0].name, 'Ada')
-    assert.equal(undeliveredReceipt.records[0].status, 'undelivered')
-    assert.equal(undeliveredReceipt.records[0].workRecord, '')
+    // 空 view 的 Completed 不写完成、join 不关闭、child 仍活跃
+    await forkTool.settleUndelivered(runtime, owner, 'PLAIN-RETURN-NO-DELIVER', 'provider-undelivered')
+    assert.equal(forkTool.durableLifecycleByname(runtime, owner, 'Ada'), 'Active')
+    const joinReceipt = await forkTool.executeJoinReceipt(runtime, owner)
+    assert.equal(joinReceipt.ok, true)
   })
 })
 
@@ -74,17 +66,18 @@ test('WHAT[delegation-024] synchronous observed completion refuses undelivered p
       await sync.awaitPromptCount(runtime, owner, 'Engineer', count)
       assert.equal(sync.returnPromptOutcome(runtime, owner, 'Engineer', count - 1, dispatch.admittedWithPhysicalMessage(`explicit-physical-${delivered}`)), true)
       const accepted = await sync.observedAdmission(execution)
-      if (delivered) sync.recordDeliveredValue(accepted.sessionId, { summary: 'EXPLICIT-DELIVERY', files: 2 })
+      if (delivered) runtimeSurface.recordFencedDeliveredView(accepted.sessionId, `explicit-provider-${delivered}`, 'explicit-call', { prefixUntil: 0, thenMap: { 0: 'EXPLICIT-DELIVERY\nfiles = 2' } })
       assert.equal(await sync.settleExactTerminal(runtime, accepted.sessionId, accepted.physicalUserMessageId, accepted.authorityRootUserMessageId, `explicit-provider-${delivered}`, 'PROSE-IS-NOT-DELIVERY', 'REASONING-IS-NOT-DELIVERY'), true)
       const result = await completion
       assert.equal(result.ok, delivered)
       if (delivered) {
-        assert.match(result.value.formalText, /summary = "EXPLICIT-DELIVERY"/)
+        assert.match(result.value.formalText, /EXPLICIT-DELIVERY/)
         assert.match(result.value.formalText, /files = 2/)
-        assert.doesNotMatch(result.value.formalText, /PROSE-IS-NOT-DELIVERY|REASONING-IS-NOT-DELIVERY|TOOL-RESULT-ONLY/)
+        assert.match(result.value.formalText, /PROSE-IS-NOT-DELIVERY/)
+        assert.doesNotMatch(result.value.formalText, /REASONING-IS-NOT-DELIVERY|TOOL-RESULT-ONLY/)
         assert.equal(result.value.physicalUserMessageId, accepted.physicalUserMessageId)
       } else {
-        assert.match(result.error, /undelivered/)
+        assert.match(result.error, /without a bounded delivered view/)
       }
     }
   })
@@ -98,6 +91,7 @@ const { join } = await import("node:path");
 const { default: test } = await import("node:test");
 const fork = await import("../../../dist/Execution/Delegation/Fork/Surface.js");
 const forkTool = await import("../../../dist/Execution/Delegation/Fork/OpenCode/ToolSurface.js");
+const runtimeSurface = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
 
 const schemaNode = (kind, extra = {}) => ({
   kind,
@@ -142,6 +136,7 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
     assert.match(forkTool.prompt(runtime, 0), /FIRST-FORK-CHARGE/)
     assert.match(await first, /Ada/)
 
+    runtimeSurface.recordFencedDeliveredView(child, 'fork-run-1', 'call-1', { prefixUntil: 0, thenMap: { 0: 'FIRST-FORK-ANSWER' } })
     assert.equal(await forkTool.settle(runtime, owner, 'FIRST-FORK-ANSWER', 'fork-run-1'), true)
 
     const second = forkTool.executeManagerResume(
@@ -172,6 +167,7 @@ test('WHAT[delegation-024] FORK_TOOL_same_byname_reuse_dispatches_immediately_an
       'fork return must not imply that the reused child already completed',
     )
 
+    runtimeSurface.recordFencedDeliveredView(child, 'fork-run-2', 'call-2', { prefixUntil: 0, thenMap: { 0: 'SECOND-FORK-ANSWER' } })
     assert.equal(await forkTool.settle(runtime, owner, 'SECOND-FORK-ANSWER', 'fork-run-2'), true)
     assert.equal(
       forkTool.durableLifecycleByname(runtime, owner, 'Ada'),
@@ -191,6 +187,7 @@ const { mkdtemp } = await import("node:fs/promises");
 const { tmpdir } = await import("node:os");
 const { join } = await import("node:path");
 const sync = await import("../../../dist/Execution/Delegation/SyncDelegate/Surface.js");
+const runtimeSurface = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
 
 const live = async (owner) => sync.create(
   await mkdtemp(join(tmpdir(), 'wxs-sync-delegate-')),
@@ -204,7 +201,13 @@ const waitForPromptCount = async (h, owner, role, count) => {
   await sync.awaitPromptCount(h, owner, role, count)
   assert.equal(sync.acceptPrompt(h, owner, role, count - 1), true)
 }
-const settle = async (h, owner, role, answer, run = 'run-1') => sync.settle(h, owner, role, answer, run)
+const settle = async (h, owner, role, answer, run = 'run-1') => {
+  runtimeSurface.recordFencedDeliveredView(sync.child(h, owner, role), run, `call-${run}`, {
+    prefixUntil: 0,
+    thenMap: {},
+  })
+  return sync.settle(h, owner, role, answer, run)
+}
 const remainsPending = async (promise) =>
   Promise.race([
     promise.then((value) => ({ kind: 'resolved', value })),
@@ -252,7 +255,7 @@ test('WHAT[delegation-024] Engineer reuse sends parent delta waits for its own r
   await verifyReusableHandoff('Engineer')
 })
 
-test('WHAT[delegation-024] DevOps completion is claimed by HandleTurn and its LWR returns to the caller', async () => {
+test('WHAT[delegation-024] DevOps completion is claimed by HandleTurn and its delivered view returns to the caller', async () => {
   await verifyReusableHandoff('DevOps')
 })
 }

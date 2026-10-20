@@ -18,7 +18,7 @@ const withPlan = async (body) => {
   const workId = 'plan-work'
   try {
     execFileSync('git', ['init', '--quiet', root])
-    const store = workspaceEvents.acquire(journalSurface.JournalSurface_initializeStateRoot(root))
+    const store = workspaceEvents.acquire(await journalSurface.JournalSurface_initializeStateRoot(root))
     assert.equal((await lifecycle.seedOpen(store, 'plan', workId, root, 1n)).ok, true)
     const written = surface.PlanningSurface.rewritePlanAtomic(root, workId, '# Draft\nKeep this fact.')
     assert.equal(written.ok, true)
@@ -63,9 +63,9 @@ test('WHAT[work-029] public and raw API calls cannot read or write outside P', a
     for (const target of ['sibling.txt', '../../secret.txt', path.join(root, 'secret.txt')]) {
       for (const body of [
         `return await this.cat(${JSON.stringify(target)});`,
-        `return await this._api.js.cat(${JSON.stringify(target)});`,
+        `return await this._api.cat(${JSON.stringify(target)});`,
         `this.write(${JSON.stringify(target)}, 'damaged'); return {};`,
-        `return this._api.js.write(${JSON.stringify(target)}, 'damaged');`,
+        `return this._api.write(${JSON.stringify(target)}, 'damaged');`,
       ]) {
         const output = await run(body)
         assert.match(output, /PATH_DENIED/, body)
@@ -82,7 +82,7 @@ test('WHAT[work-029] current tenure review gates each actual P write and relay r
     assert.match(await run('return { text: await this.cat(PLAN_PATH) };'), /Keep this fact/)
     const rewrite = "this.write(PLAN_PATH, '# Reviewed'); return { done: true };"
     assert.match(await run(rewrite), /PLAN_REVIEW_REQUIRED/)
-    assert.match(await run("return this._api.js.write(PLAN_PATH, '# Bypass');"), /PLAN_REVIEW_REQUIRED/)
+    assert.match(await run("return this._api.write(PLAN_PATH, '# Bypass');"), /PLAN_REVIEW_REQUIRED/)
     assert.equal(fs.readFileSync(planPath, 'utf8'), '# Draft\nKeep this fact.')
     assert.equal((await lifecycle.seedReview(store, workId, 'Stayed')).ok, true)
     assert.match(await run(rewrite), /# ok/)
@@ -106,7 +106,7 @@ test('WHAT[work-029] P symlinks and a substituted plan directory cannot escape t
     assert.equal(fs.readFileSync(secret, 'utf8'), 'untouched')
     fs.rmSync(path.dirname(planPath), { recursive: true })
     fs.symlinkSync(root, path.dirname(planPath), 'dir')
-    assert.match(await run('return await this._api.js.cat(PLAN_PATH);'), /PATH_DENIED/)
+    assert.match(await run('return await this._api.cat(PLAN_PATH);'), /PATH_DENIED/)
   })
 })
 
@@ -143,7 +143,7 @@ test('WHAT[work-029] a saved Plan write resumed after relay cannot borrow the su
     })
     await openIncumbency(runtime, session, 'plan-inc-1', 'S1')
     const context = (call, run) => ({ sessionID: session, agent: 'plan', callID: call, messageID: run })
-    const common = journalSurface.JournalSurface_initializeStateRoot(runtime.directory)
+    const common = await journalSurface.JournalSurface_initializeStateRoot(runtime.directory)
     const store = workspaceEvents.acquire(common)
     const saved = surface.PlanningSurface.rewritePlanAtomic(path.join(common, 'wanxiangshu'), session, '# Original')
     assert.equal(saved.ok, true)

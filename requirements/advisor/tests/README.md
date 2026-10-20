@@ -2,15 +2,14 @@
 
 本目录不定义额外规则；条款正文在 `../WHAT.md`，用例标题以 `WHAT[advisor-NNN]` 锚定条款。当前只有 002、003、006 三个条款有可执行用例，其余条款的证明缺口见文末。
 
-- `002.test.mjs`（`WHAT[advisor-002]`）：对编译产物 `dist/Execution/Delegation/Advisor/Surface.js` 断言 view prompt 的 blogger 形状——`# ` 注释表头、空行之后每记录一张 `[[new_work_to_record]]` 表，记录保持调用者 anchor 序，`prefixUntil` 上的 anchor 一律不进 view；`thenRemove` 命中的 anchor 以摘要（而非原文本）到达；空增量报 `hasNewMaterial = false` 且不产出任何数据表，只留表头。JS 面由该 Surface 自己承担 Fable list/set 表示转换，故本目录不再有共享适配器。
-- `003.test.mjs`（`WHAT[advisor-003]`）：同一 `Surface.js` 里的 plan 走真实 follow-up——带上次 `deliveredAnchors` 的第二次规划只发出新增 anchor 的表，已交付 anchor 不重发，`thenRemove` 也不会重新打开已交付的 anchor；再走同一 Surface 的游标成员——游标按调用 session 累积、只增不减、session 之间不共享，`clear` 只重置一个 session。
-- `004.test.mjs`（`WHAT[advisor-004]`）：真实注册Manager工具、live Journal和终态端口完成两次咨询，检查独立view/intent、同一child复用、旧快照仍在时空的新回答明确拒绝、调用者authority/claims不变；Advisor实际调用Engineer写工具被拒绝且没有文件。确切不同ProviderRun由现有Host终态端口提交，不从历史记录伪造建议。
-- `006.test.mjs`（`WHAT[advisor-006]`）：`generateRole('manager','en')` 的生成面在成员表、描述文本、基类 stub 与运行时绑定四处都携带 advisor，且去掉 `ToolPermission.Advisor` 后四处同时消失；`installDelegationHost` 注入的宿主闭包值被 `js.advisor` 原样按数据返回（不重渲染、不落到 fork/join/fission/horizon 的宿主），未注入宿主时以 `code = "DELEGATION_UNAVAILABLE"` 拒绝，且拒绝不使程序失败。
+- `002.test.mjs`（WHAT[advisor-002]）：首次完整 view、前缀保护、null 和漏项、历史压缩不恢复、最新区间覆盖、隐含 0、统一形状校验及 TOML 记录。
+- `003.test.mjs`（WHAT[advisor-003]）：先完整 view 后 delta、成功材料记录、失败不推进、同锚点新摘要与永久 0、重复材料不重发、游标隔离与单调性。
+- `006.test.mjs`（WHAT[advisor-006]）：生成成员的能力投影、真实编程执行中的数据返回及宿主缺席拒绝。
 
 ## 证明缺口
 
-- `001`：004证明当前进程建立和复用；subagent下的实际家族根父级、durable link和重启收养没有由此证明。
-- `004`：004证明注册链上的当前回答与旧回答隔离；多个咨询重叠、旧终态晚到的确切归属、实际provider到终态的完整物理链路仍未由此覆盖。
-- `005`：004证明本次调用者投影不变和一次真实越权写拒绝，不代证所有物理读写路径的零效果。
+- `001`（专席归属与家族根父级）：需要真实 advisor child 的建立与父子关系观察口，尚无本包用例；`Seat.consult` 的复用路径也没有断言。
+- `004`（无工具、散文返回、空回答按失败）：仅由 `006` 间接覆盖成员路径；"顾问没有工具"与"空回答即失败"尚无直接用例。
+- `005`（无授权副作用）：运行时 capability 与 journal/authority 的观察口不在本包用例内。
 
-002/003的纯规划不代证004的注册链；004的受控终态也不代证原生provider。双语表头成对性由language parity门禁与provider-language承担，本目录不宣称完成整个Advisor耐久生命周期。
+`plan`/游标的用例只证明纯规划与进程内游标：它们不证明 view 与 intent 真的以两条独立 prompt 到达顾问，也不证明散文真的从真实 terminal 读回——这两件事归 001/004 的缺口。002 覆盖 en 与 zh-CN 的实际记录渲染；资源成对性仍由 language parity 门禁与 provider-language 承担。

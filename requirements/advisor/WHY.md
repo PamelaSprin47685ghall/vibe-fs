@@ -4,7 +4,7 @@
 
 顾问因此是按调用 session 归属的常驻专席：同一个 session 的请求永远落到同一个 advisor，首次咨询按需建立，之后逐次复用，历史随调用累积。专席由调用者的 child session 通道建立，物理父级是家族根而不是调用者本身（与 `delegation-007` 的压平规则同源：儿子生的儿子仍是儿子），所以子会话请顾问不会生出 sub-subagent，顾问的可见面也不会因为调用者自己的层级而改变。
 
-请求由三样彼此独立的材料组成，绝不合并：顾问自己的 law（角色资源，由 Host agent 配置与 system transform 投影）、调用者交出的 view（按仓库既有的 blogger/Chronicle 输入形状渲染：`# ` 注释表头加每记录一张 `[[new_work_to_record]]` 数据表），以及本轮 intent（自成一条 user prompt）。合并会同时坏掉两件事：调用者的自述会被读成对顾问的行为规范，而"这一轮到底问什么"会被长 view 淹没。分开之后，顾问能分清哪一段是它必须遵守的 law、哪一段只是待评审的材料、哪一段是它要回答的问题——role law 也据此把 view 明确标成材料而非指令。
+请求由三样彼此独立的材料组成，绝不合并：顾问自己的 law（角色资源，由 Host agent 配置与 system transform 投影）、调用者交出的 view（按统一的 TOML 视图形状渲染：`# ` 注释表头加每记录一张 `[[new_work_to_record]]` 数据表），以及本轮 intent（自成一条 user prompt）。合并会同时坏掉两件事：调用者的自述会被读成对顾问的行为规范，而"这一轮到底问什么"会被长 view 淹没。分开之后，顾问能分清哪一段是它必须遵守的 law、哪一段只是待评审的材料、哪一段是它要回答的问题——role law 也据此把 view 明确标成材料而非指令。
 
 follow-up 追加而不是重发：只把 view 相对上次已交付部分的增量渲染成新的 view prompt，随后追加新的 intent。整张 view 重发一遍既让每次追问按完整上下文计价，也让"已经交底过什么"失去边界——顾问会重新读到它已经排除过的材料，旧判断与新证据混在一起。已交付游标按（调用 session, 顾问 session）记录，顾问看到的永远是它已被交底的部分加上新增部分。
 
@@ -14,7 +14,7 @@ follow-up 追加而不是重发：只把 view 相对上次已交付部分的增�
 
 ## 边界与关系
 
-- view 的渲染归本包，但"view 声明"本身的捕获与 ANCHOR 编址分别归 `repository-programming` 与 `context-compression`；本包只把调用者的声明渲成顾问可读的一条 prompt（`prefixUntil` 独占上界、`thenRemove` 以摘要替换 anchor 文本），不重新定义声明语义。
+- view 的 TOML 渲染归本包，声明解析与区间投影复用 repository-programming 的 AnchorSurface / AnchorView，不另定义语义。prefixUntil 不是交付边界：先生成完整 view，再按宿主已交付事实取 delta。首次交付完整 view。
 - 顾问"不携带任何 ToolPermission"的效力来自 `office-capability`（`Role.Advisor` 的 office 为空集）与 `capability-enforcement`（provider 看见的能力与 runtime 真能执行的能力同源且不扩大）；本包不通过呈现创造或取消任何权限。
 - 专席的建立与收束走 Host 的 session 通道（`host-boundary`、`managed-session-lifecycle`），advisor child 的生命周期归 Host 所有；本包不维护第二套会话拓扑，也不把 seat 当成 durable 事实。
 - 名册与 `js.horizon` 的呈现归 `participant-horizon`；语言选择与双语 law 的成对性归 `provider-language`。

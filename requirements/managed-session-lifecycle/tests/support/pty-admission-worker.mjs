@@ -16,7 +16,7 @@ await routing.initialize()
 const opened = await journal.JournalSurface_acquireSharedForWorkspace(workspace, process.pid, '2026-10-16T00:00:00Z')
 if (!opened.ok) throw new Error(JSON.stringify(opened.error))
 await ToolRuntimeScopeSurface.startPtyExecution(opened.journal, child, physical, 'pty-admission-provider')
-const probe = ToolRuntimeScopeSurface.ptyAdmissionProbe(opened.journal, workspace, child, false)
+const probe = ToolRuntimeScopeSurface.ptyAdmissionProbe(opened.journal, workspace, child, false, await journal.JournalSurface_initializeStateRoot(workspace))
 const prepare = DatabaseSync.prototype.prepare
 const execute = DatabaseSync.prototype.exec
 const ownershipConnections = new WeakSet()

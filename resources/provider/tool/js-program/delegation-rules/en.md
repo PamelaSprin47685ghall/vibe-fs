@@ -8,8 +8,8 @@ Every delegation member returns **data**, never rendered text. The harness rende
 ## fork
 
 ```js
-await js.fork("index the parser module");                  // charge only
-await js.fork({ charge: "index the parser", name: "parser-index", calling: "engineer" });
+await this.fork("index the parser module");                  // charge only
+await this.fork({ charge: "index the parser", name: "parser-index", calling: "engineer" });
 ```
 
 - Payload: string (charge) or `{ charge, name?, calling?, keywords? }`. A missing `name` is derived from the charge.
@@ -19,18 +19,18 @@ await js.fork({ charge: "index the parser", name: "parser-index", calling: "engi
 ## join
 
 ```js
-const { records, byName } = await js.join();
+const { records, byName } = await this.join();
 ```
 
-- Result: `{ ok: true, records: [{ name, agentId, role, status, workRecord }], byName: { [name]: record } }`.
-- `status` is `completed` | `undelivered` | `failed` | `abandoned`; `workRecord` is the child's terminal record delivered via `js.deliver` (empty when `undelivered`, `failed`, or `abandoned`).
+- Result: `{ ok: true, records: [{ name, agentId, role, status, view }], byName: { [name]: record } }`.
+- `status` is `completed` | `failed` | `abandoned`; a child only enters the records after it ends with `this.deliver(view)` — a child that has not delivered is not settled: it stays active, the join does not close, and you may keep waiting or re-delegate. `view` is the child's delivered TOML view from `this.deliver` (empty when `failed` or `abandoned`).
 - Membership-scoped: it collects the children this session created. Refusal codes: `context-unavailable`, `not-ready`, `nothing-to-join`, `join-in-progress`, `interrupted`, `abandoned`.
 
 ## fission
 
 ```js
-const group = await js.fission({ charge: "explore three designs", lanes: 3 });
-const { records } = await js.join();          // collects the lanes of this group
+const group = await this.fission({ charge: "explore three designs", lanes: 3 });
+const { records } = await this.join();          // collects the lanes of this group
 ```
 
 - Same identity, several lanes: each lane is this participant over one slice of the charge, and the host converges them.
@@ -40,7 +40,7 @@ const { records } = await js.join();          // collects the lanes of this grou
 ## dag
 
 ```js
-const outcome = await js.dag({ nodes: [
+const outcome = await this.dag({ nodes: [
   { id: "spec",  charge: "write the interface spec" },
   { id: "impl",  charge: "implement it", deps: ["spec"] },
   { id: "probe", charge: "probe two designs", deps: ["spec"], lanes: 2 },
@@ -58,7 +58,7 @@ const outcome = await js.dag({ nodes: [
 ## horizon
 
 ```js
-const { agents, ptys } = await js.horizon();
+const { agents, ptys } = await this.horizon();
 ```
 
 - Who remains at your horizon, as data: `{ ok: true, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`.
@@ -69,10 +69,10 @@ const { agents, ptys } = await js.horizon();
 ## advisor
 
 ```js
-const advice = await js.advisor("Is the caching layer's eviction policy sound?", { prefixUntil: 12 });
+const advice = await this.advisor("Is the caching layer's eviction policy sound?", { prefixUntil: 12, thenMap: {} });
 ```
 
 - Consult this session's **dedicated advisor** — a reviewer holding no tools that answers in prose — before committing to an approach or declaring work done. The same session always reaches the same advisor, and later calls append only the view delta plus the new intent, so it keeps the thread.
-- `intent` is the question, sent as its own prompt. `view` uses the shared `{ prefixUntil, thenMap }` interval contract; the prefix protects material from replacement and does not truncate the view. The host renders the selected records in the Chronicle shape and sends them as one prompt, then the intent as another. They are never merged.
+- `intent` is a separate question prompt. `view` uses the shared declaration `{ prefixUntil, thenMap }`, with both fields required. Generate the full view from the current live intervals first, then take the delta against host-owned delivery facts. The first consult receives the complete view; prefixUntil is not a delivery boundary. thenMap must cover every visible anchor outside the protected prefix: null keeps, a summary replaces the whole interval, and missing keys default to null. View and intent remain separate prompts.
 - Result: `{ ok: true, advice }` (prose as data) or `{ ok: false, code: "advisor-unavailable", reason }`; a malformed view declaration refuses with `VIEW_DECLARATION_INVALID`.
 - Treat the answer as guidance: a plan, a correction, or a stop signal. The consult itself writes nothing into your transcript.

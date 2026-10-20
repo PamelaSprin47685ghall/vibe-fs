@@ -68,7 +68,7 @@ module ForkChildPayload =
                  [ LlmFacing.Data.stringField "content" payload ]
              | _ -> [])
             @ (match attachment with
-               | Some record -> [ LlmFacing.Data.stringField "attached_work_record" record ]
+               | Some record -> [ LlmFacing.Data.stringField "attached_view" record ]
                | None -> [])
 
         LlmFacing.instructions instructions |> LlmFacing.withData body

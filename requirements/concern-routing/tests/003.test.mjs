@@ -13,8 +13,8 @@ const listFiles = (dir) => {
   })
 }
 
-// Superseded by the programming surface (js.ask, js.deliver, js.fork, js.join): publish is retired and its provider resources are deleted.
-test('WHAT[concern-routing-003] publish is retired from ToolRegistry and provider resources, superseded by js.ask/js.deliver/js.fork/js.join', () => {
+// Superseded by the programming surface (this.ask, this.deliver, this.fork, this.join): publish is retired and its provider resources are deleted.
+test('WHAT[concern-routing-003] publish is retired from ToolRegistry and provider resources, superseded by this.ask/this.deliver/this.fork/this.join', () => {
   const staticTools = read('src/Wanxiangshu/OpenCode/Tools/StaticTools.fs')
   const toolRegistry = read('src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs')
   const toolMap = JSON.parse(read('resources/ablation/tool-map.json'))
@@ -30,9 +30,9 @@ test('WHAT[concern-routing-003] publish is retired from ToolRegistry and provide
     'resources/provider/concern-routing must be deleted',
   )
 
-  assert.match(read('resources/provider/tool/js-plan/en.md'), /\bjs\.ask\(question\)/)
+  assert.match(read('resources/provider/tool/js-plan/en.md'), /\b(?:js|this)\.ask\(question\)/)
   assert.match(read('resources/provider/tool/js-program/deliver/en.md'), /\bdeliver\(value\)/)
   const delegationEn = read('resources/provider/tool/js-program/delegation-rules/en.md')
-  assert.match(delegationEn, /\bjs\.fork\(/)
-  assert.match(delegationEn, /\bjs\.join\(/)
+  assert.match(delegationEn, /\b(?:js|this)\.fork\(/)
+  assert.match(delegationEn, /\b(?:js|this)\.join\(/)
 })

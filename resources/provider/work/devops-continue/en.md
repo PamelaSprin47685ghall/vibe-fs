@@ -1,0 +1,1 @@
+This charge has no delivered view yet. Printed text is not a return. State the outcome as prose, then call this.deliver(view) with a view covering the full material: what ran, what was seen, what was repaired, and what is still unobserved. Do not stop.

@@ -14,6 +14,7 @@ type XTraceTerminalCompletion =
     | CaptureFailed of XTraceCaptureError
     | RejectedMissingRole
     | RejectedEmptyOutput
+    | RejectedUndelivered
 
 /// Physical terminal materialisation: ReconciledTurn → AgentRunResult →
 /// XTrace capture → NotifyTerminal. No Fallback / Manager /
@@ -77,6 +78,7 @@ module TerminalReporter =
         (port: TerminalTracePort option)
         (turn: ReconciledTurn)
         (sessionWideText: string)
+        (deliveryWitness: bool)
         (role: Role)
         : Task<XTraceTerminalCompletion> =
         task {
@@ -89,9 +91,7 @@ module TerminalReporter =
                   TerminalText = sessionWideText
                   TurnFormalText = CompletedTurnClassifier.partsText turn.Parts }
 
-            if runResult.IsValid then
-                return! notifyTerminalCompletion eventPort port turn sessionWideText runResult
-            else
+            if not runResult.IsValid then
                 eventPort.NotifyTerminal
                     turn.SessionId
                     (TerminalOutcome.Failed(
@@ -100,15 +100,22 @@ module TerminalReporter =
                 |> ignore
 
                 return XTraceTerminalCompletion.RejectedEmptyOutput
+            elif not deliveryWitness && role <> Role.Advisor then
+                // A stop without a valid delivery of this run is not a completion:
+                // publish no terminal fact and keep the task active for its owner.
+                return XTraceTerminalCompletion.RejectedUndelivered
+            else
+                return! notifyTerminalCompletion eventPort port turn sessionWideText runResult
         }
 
-    /// Build the `AgentRunResult`, validate via `runResult.IsValid`, capture the
-    /// XTrace terminal segment, and report Completed / Failed.
+    /// Build the `AgentRunResult`, admit it through the delivery witness,
+    /// capture the XTrace terminal segment, and report Completed / Failed.
     let completeUsingTextEvidence
         (eventPort: IEventObservationPort)
         (port: TerminalTracePort option)
         (turn: ReconciledTurn)
         (sessionWideText: string)
+        (deliveryWitness: bool)
         : Task<XTraceTerminalCompletion> =
         task {
             match turn.Role with
@@ -121,16 +128,17 @@ module TerminalReporter =
                 |> ignore
 
                 return XTraceTerminalCompletion.RejectedMissingRole
-            | Some role -> return! reportResolvedRole eventPort port turn sessionWideText role
+            | Some role -> return! reportResolvedRole eventPort port turn sessionWideText deliveryWitness role
         }
 
     let completeWithEvidence
         (eventPort: IEventObservationPort)
         (port: TerminalTracePort option)
         (turn: ReconciledTurn)
+        (deliveryWitness: bool)
         : Task<XTraceTerminalCompletion> =
         let sessionWideText = CompletedTurnClassifier.partsSessionText turn.Parts
-        completeUsingTextEvidence eventPort port turn sessionWideText
+        completeUsingTextEvidence eventPort port turn sessionWideText deliveryWitness
 
     /// Legacy workflow result shape while foreign callers migrate. All terminal
     /// decisions and effects are owned by the typed operation above.
@@ -138,14 +146,16 @@ module TerminalReporter =
         (eventPort: IEventObservationPort)
         (port: TerminalTracePort option)
         (turn: ReconciledTurn)
+        (deliveryWitness: bool)
         : Task<bool * bool> =
         task {
-            let! completion = completeWithEvidence eventPort port turn
+            let! completion = completeWithEvidence eventPort port turn deliveryWitness
 
             return
                 match completion with
                 | XTraceTerminalCompletion.Published _ -> false, true
                 | XTraceTerminalCompletion.CaptureFailed _
                 | XTraceTerminalCompletion.RejectedMissingRole
-                | XTraceTerminalCompletion.RejectedEmptyOutput -> false, false
+                | XTraceTerminalCompletion.RejectedEmptyOutput
+                | XTraceTerminalCompletion.RejectedUndelivered -> false, false
         }

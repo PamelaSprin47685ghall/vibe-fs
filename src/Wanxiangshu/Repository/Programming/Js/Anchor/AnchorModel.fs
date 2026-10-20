@@ -1,9 +1,11 @@
 namespace Wanxiangshu.Repository.Programming.Js.Anchor
 
+/// One declaration protects the prefix and states the remaining anchors' actions.
 type AnchorViewDeclaration =
     { PrefixUntil: int
       ThenMap: (int * string option) list }
 
+/// Bounds are captured before the map runs; later anchors cannot enter an old replacement.
 type AnchorReplacement =
     { Anchor: int
       Until: int
@@ -13,7 +15,7 @@ type AnchorReplacement =
 module AnchorViewDeclaration =
     let empty = { PrefixUntil = 0; ThenMap = [] }
 
-    let live anchors history =
+    let live (anchors: int list) (history: AnchorReplacement list) =
         let removed = history |> List.map _.Anchor |> Set.ofList
 
         0
@@ -22,7 +24,7 @@ module AnchorViewDeclaration =
         |> List.distinct
         |> List.sort
 
-    let plan anchors history declaration =
+    let plan (anchors: int list) (history: AnchorReplacement list) (declaration: AnchorViewDeclaration) =
         let surviving = live anchors history
         let endOfInput = (anchors |> List.fold max 0) + 1
 

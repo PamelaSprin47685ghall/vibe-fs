@@ -93,8 +93,13 @@ module PromptAuthority =
           Count: int }
 
     type UserQuestion =
-        { Request: UserQuestionAskedPayload
-          Answer: PhysicalUserMessageId option }
+        {
+            Request: UserQuestionAskedPayload
+            Answer: PhysicalUserMessageId option
+            /// LC-015: 提问登记时已准入的所有物理输入（含引发提问的那条）。
+            /// 这些输入不能在提问后作为"新答复"解锁提问。
+            PriorPhysicalInputs: Set<PhysicalUserMessageId>
+        }
 
     type PromptAuthorityProjection =
         { LastAuthorityProfile: AuthorityExecutionProfile option
@@ -155,9 +160,9 @@ module PromptAuthority =
             PromptKey
 
     val repairPayloadDigest:
-        requestId: BloggerRequestId -> terminalProviderRun: ProviderRunIdentity -> repairKind: string -> string
+        requestId: RepairRequestId -> terminalProviderRun: ProviderRunIdentity -> repairKind: string -> string
 
-    val repairPayloadBelongsToRequest: requestId: BloggerRequestId -> payloadDigest: string -> bool
+    val repairPayloadBelongsToRequest: requestId: RepairRequestId -> payloadDigest: string -> bool
     val gateNudgePayloadDigest: gateKind: string -> terminalProviderRun: ProviderRunIdentity -> string
 
     val gateNudgeAlreadyAdmitted:
@@ -180,7 +185,7 @@ module PromptAuthority =
     val repairAlreadyClaimed:
         sessionId: SessionId ->
         logicalRunId: LogicalRunId ->
-        requestId: BloggerRequestId ->
+        requestId: RepairRequestId ->
         terminalProviderRun: ProviderRunIdentity ->
         repairKind: string ->
         projection: PromptAuthorityProjection ->

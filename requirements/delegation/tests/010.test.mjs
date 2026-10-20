@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as sync from '../../../dist/Execution/Delegation/SyncDelegate/Surface.js'
+import * as runtimeSurface from '../../../dist/Repository/Programming/Js/RuntimeSurface.js'
 import { withSyncRuntime } from './support/sync-runtime.mjs'
 
 test('WHAT[delegation-010] successive sync work reuses its child and requires a fresh managed assignment rather than an old completion', async () => {
@@ -11,6 +12,10 @@ test('WHAT[delegation-010] successive sync work reuses its child and requires a 
     assert.equal(sync.promptOrigin(runtime, owner, 'Engineer', 0), 'AgentOwnerRoot')
     assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 0), true)
     const child = sync.child(runtime, owner, 'Engineer')
+    runtimeSurface.recordFencedDeliveredView(child, 'run-first', 'call-first', {
+      prefixUntil: 0,
+      thenMap: {},
+    })
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'first answer', 'run-first'), true)
     assert.equal((await first).ok, true)
     const second = sync.invoke(runtime, owner, 'Engineer', 'second charge')
@@ -22,6 +27,10 @@ test('WHAT[delegation-010] successive sync work reuses its child and requires a 
     assert.equal(sync.promptOrigin(runtime, owner, 'Engineer', 1), 'ManagedDelegationAssignment')
     assert.equal(sync.acceptPrompt(runtime, owner, 'Engineer', 1), true)
     assert.equal(sync.child(runtime, owner, 'Engineer'), child)
+    runtimeSurface.recordFencedDeliveredView(child, 'run-second', 'call-second', {
+      prefixUntil: 0,
+      thenMap: {},
+    })
     assert.equal(await sync.settle(runtime, owner, 'Engineer', 'second answer', 'run-second'), true)
     const result = await second
     assert.equal(result.ok, true)

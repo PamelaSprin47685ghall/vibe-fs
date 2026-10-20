@@ -69,7 +69,7 @@ test('WHAT[process-execution-004] the real registered loop applies the administr
       const ready = join(directory, 'target-started')
       const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(ready)}, 'ready'); setInterval(() => {}, 1000)`)
       const wire = await hooks.tool['todowrite-for-devops'].execute({
-        program: program(`return await js.call(${oneCommand(command, { maxDuration: 60000 })});`),
+        program: program(`return await this.call(${oneCommand(command, { maxDuration: 60000 })});`),
       }, { sessionID, agent: 'devops', messageID: 'hard-limit-assistant', callID: 'hard-limit-run' })
       const result = parse(wire).data
       assert.equal(existsSync(ready), true)
@@ -98,8 +98,8 @@ for (const exhaustAfterRun of [false, true]) {
       const outcome = await execute(dir, 'DevOps', 'en', 'deadline-lease', { program: program(`
         const host = this;
         let observedLate = false;
-        function runnable(command) {
-          return class extends js.Callable {
+        const runnable = (command) => {
+          return class extends this.Callable {
             maxDuration = 1500;
             interval = 25;
             next(ctx) { return ctx.step === 0 ? command : null; }
@@ -112,7 +112,7 @@ for (const exhaustAfterRun of [false, true]) {
             sanity() { return { nextDone: () => [{ step: 1 }], watchVeto: () => [{ remainingMs: 0 }] }; }
           };
         }
-        const results = await Promise.all([js.call(runnable('sleep 0.1')), js.call(runnable(${JSON.stringify(command)}))]);
+        const results = await Promise.all([this.call(runnable('sleep 0.1')), this.call(runnable(${JSON.stringify(command)}))]);
         await host.write('runs-finished', JSON.stringify({ observedLate, statuses: results.map(result => result.status) }));
         ${exhaustAfterRun ? 'const until = Date.now() + 250; while (Date.now() < until) {}' : ''}
         const after = await host.stat('probe');
@@ -161,7 +161,7 @@ test('WHAT[process-execution-004] a parked run still stops at its deadline and r
     assert.equal(gate.getCount(), 1)
     const witness = join(dir, 'target')
     const command = `exec ${nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(witness)}, String(process.pid)); process.stdout.write('READY'); setInterval(() => {}, 1000)`)}`
-    const parked = await runProgram(dir, `return await js.call(class extends js.Callable {
+    const parked = await runProgram(dir, `return await this.call(class extends this.Callable {
       maxDuration = 500;
       interval = 25;
       worldLock = true;

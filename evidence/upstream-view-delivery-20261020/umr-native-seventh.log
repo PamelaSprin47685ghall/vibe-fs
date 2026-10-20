@@ -1,0 +1,179 @@
+TAP version 13
+# (node:27422) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+ok 1 - WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+  ---
+  duration_ms: 775.853
+  ...
+# Subtest: WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generator_output
+ok 2 - WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generator_output
+  ---
+  duration_ms: 29.072334
+  ...
+# Subtest: WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only
+ok 3 - WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only
+  ---
+  duration_ms: 3.073166
+  ...
+# Subtest: WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mutation_methods
+ok 4 - WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mutation_methods
+  ---
+  duration_ms: 1.143541
+  ...
+# Subtest: WHAT[capability-enforcement-025] J03_manager_execution_blocks_write_and_edit_without_disk_mutations
+ok 5 - WHAT[capability-enforcement-025] J03_manager_execution_blocks_write_and_edit_without_disk_mutations
+  ---
+  duration_ms: 14.903334
+  ...
+# Subtest: WHAT[capability-enforcement-025] J04_shared_read_execution_returns_success_without_file_effects
+ok 6 - WHAT[capability-enforcement-025] J04_shared_read_execution_returns_success_without_file_effects
+  ---
+  duration_ms: 5.700542
+  ...
+# Subtest: WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_edit_capabilities
+ok 7 - WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_edit_capabilities
+  ---
+  duration_ms: 5.96875
+  ...
+# Subtest: WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_not_broadened
+ok 8 - WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_not_broadened
+  ---
+  duration_ms: 0.266125
+  ...
+# Subtest: WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data
+ok 9 - WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data
+  ---
+  duration_ms: 4.333833
+  ...
+# Subtest: WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_root_boundaries
+ok 10 - WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_root_boundaries
+  ---
+  duration_ms: 1.866291
+  ...
+# Subtest: WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_endings
+ok 11 - WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_endings
+  ---
+  duration_ms: 1.485292
+  ...
+# Subtest: WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_search_errors_and_output_limits
+ok 12 - WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_search_errors_and_output_limits
+  ---
+  duration_ms: 8.101334
+  ...
+# Subtest: WHAT[capability-enforcement-025] J11_shared_adapter_observation_records_only_successful_distinct_reads
+ok 13 - WHAT[capability-enforcement-025] J11_shared_adapter_observation_records_only_successful_distinct_reads
+  ---
+  duration_ms: 11.453875
+  ...
+# Subtest: WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_ambient_os_capabilities
+ok 14 - WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_ambient_os_capabilities
+  ---
+  duration_ms: 3.673291
+  ...
+# Subtest: WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_permissions_include_read_glob_grep
+ok 15 - WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_permissions_include_read_glob_grep
+  ---
+  duration_ms: 0.291375
+  ...
+# Subtest: WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_readonly_capabilities
+ok 16 - WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_readonly_capabilities
+  ---
+  duration_ms: 0.35375
+  ...
+# Subtest: WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny
+ok 17 - WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny
+  ---
+  duration_ms: 12.374042
+  ...
+# Subtest: WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role
+ok 18 - WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role
+  ---
+  duration_ms: 4.974584
+  ...
+# Subtest: WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface
+ok 19 - WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface
+  ---
+  duration_ms: 5.145625
+  ...
+# Subtest: WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission
+ok 20 - WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission
+  ---
+  duration_ms: 0.077125
+  ...
+# Subtest: WHAT[capability-enforcement-025] P06_unknown_identity_never_authorized_by_tool_name_suffix
+ok 21 - WHAT[capability-enforcement-025] P06_unknown_identity_never_authorized_by_tool_name_suffix
+  ---
+  duration_ms: 0.199959
+  ...
+# (node:27432) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retains_readonly_permissions
+ok 22 - WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retains_readonly_permissions
+  ---
+  duration_ms: 268.703333
+  ...
+# Subtest: WHAT[capability-enforcement-025] P07_cleanup_blocker_or_inactive_incumbency_denies_review_tool
+ok 23 - WHAT[capability-enforcement-025] P07_cleanup_blocker_or_inactive_incumbency_denies_review_tool
+  ---
+  duration_ms: 0.195625
+  ...
+# Subtest: WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_and_closeout_permissions
+ok 24 - WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_and_closeout_permissions
+  ---
+  duration_ms: 0.039667
+  ...
+# Subtest: WHAT[capability-enforcement-025] P17_final_incumbent_loses_every_new_work_capability
+ok 25 - WHAT[capability-enforcement-025] P17_final_incumbent_loses_every_new_work_capability
+  ---
+  duration_ms: 0.028708
+  ...
+# Subtest: WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_in_both_languages
+ok 26 - WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_in_both_languages
+  ---
+  duration_ms: 0.352958
+  ...
+# Subtest: WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads closed
+ok 27 - WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads closed
+  ---
+  duration_ms: 242.484375
+  ...
+# Subtest: WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and refused after review
+ok 28 - WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and refused after review
+  ---
+  duration_ms: 279.443792
+  ...
+# Subtest: WHAT[capability-enforcement-025] P14_saved object, method and raw binding recheck authority after park
+ok 29 - WHAT[capability-enforcement-025] P14_saved object, method and raw binding recheck authority after park
+  ---
+  duration_ms: 207.090167
+  ...
+# Subtest: WHAT[capability-enforcement-025] P15_access denied before path validation, final incumbent has no exception
+ok 30 - WHAT[capability-enforcement-025] P15_access denied before path validation, final incumbent has no exception
+  ---
+  duration_ms: 187.104917
+  ...
+# Subtest: WHAT[capability-enforcement-025] identity and cross-role denial remain independent of Review
+ok 31 - WHAT[capability-enforcement-025] identity and cross-role denial remain independent of Review
+  ---
+  duration_ms: 167.3165
+  ...
+# Subtest: WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg
+ok 32 - WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg
+  ---
+  duration_ms: 256.410208
+  ...
+# Subtest: WHAT[capability-enforcement-025] an admitted physical rg may finish after acceptance, but a later call is refused
+ok 33 - WHAT[capability-enforcement-025] an admitted physical rg may finish after acceptance, but a later call is refused
+  ---
+  duration_ms: 401.763166
+  ...
+1..33
+# tests 33
+# suites 0
+# pass 33
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3455.662583

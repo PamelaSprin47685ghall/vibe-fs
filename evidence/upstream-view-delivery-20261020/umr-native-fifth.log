@@ -1,0 +1,322 @@
+TAP version 13
+# (node:26202) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+not ok 1 - WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+  ---
+  duration_ms: 868.825583
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/advisor/tests/004.test.mjs:13:1'
+  failureType: 'cancelledByParent'
+  error: 'Promise resolution is still pending but the event loop has already resolved'
+  code: 'ERR_TEST_FAILURE'
+  stack: |-
+    process.emit (node:events:524:28)
+    process.processEmit [as emit] (/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/node_modules/signal-exit/index.js:199:34)
+  ...
+# Subtest: WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generator_output
+ok 2 - WHAT[capability-enforcement-025] registered_js_tools_match_js_tool_generator_output
+  ---
+  duration_ms: 32.734208
+  ...
+# Subtest: WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only
+ok 3 - WHAT[capability-enforcement-025] J01_manager_generated_surface_strictly_read_only
+  ---
+  duration_ms: 3.245791
+  ...
+# Subtest: WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mutation_methods
+ok 4 - WHAT[capability-enforcement-025] J02_unscoped_shared_read_adapter_omits_mutation_methods
+  ---
+  duration_ms: 1.154041
+  ...
+# Subtest: WHAT[capability-enforcement-025] J03_manager_execution_blocks_write_and_edit_without_disk_mutations
+ok 5 - WHAT[capability-enforcement-025] J03_manager_execution_blocks_write_and_edit_without_disk_mutations
+  ---
+  duration_ms: 15.480084
+  ...
+# Subtest: WHAT[capability-enforcement-025] J04_shared_read_execution_returns_success_without_file_effects
+ok 6 - WHAT[capability-enforcement-025] J04_shared_read_execution_returns_success_without_file_effects
+  ---
+  duration_ms: 5.454708
+  ...
+# Subtest: WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_edit_capabilities
+ok 7 - WHAT[capability-enforcement-025] J05_engineer_and_devops_retain_write_and_edit_capabilities
+  ---
+  duration_ms: 6.227625
+  ...
+# Subtest: WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_not_broadened
+ok 8 - WHAT[capability-enforcement-025] J06_internal_leaf_and_replica_admission_not_broadened
+  ---
+  duration_ms: 0.280125
+  ...
+# Subtest: WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data
+ok 9 - WHAT[capability-enforcement-025] J07_string_literals_and_paths_with_quotes_treated_as_pure_data
+  ---
+  duration_ms: 4.534625
+  ...
+# Subtest: WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_root_boundaries
+ok 10 - WHAT[capability-enforcement-025] J08_path_resolution_enforces_workspace_root_boundaries
+  ---
+  duration_ms: 1.582584
+  ...
+# Subtest: WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_endings
+ok 11 - WHAT[capability-enforcement-025] J09_readonly_api_preserves_utf8_and_line_endings
+  ---
+  duration_ms: 1.366625
+  ...
+# Subtest: WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_search_errors_and_output_limits
+ok 12 - WHAT[capability-enforcement-025] J10_readonly_api_reports_missing_files_search_errors_and_output_limits
+  ---
+  duration_ms: 7.277
+  ...
+# Subtest: WHAT[capability-enforcement-025] J11_shared_adapter_observation_records_only_successful_distinct_reads
+ok 13 - WHAT[capability-enforcement-025] J11_shared_adapter_observation_records_only_successful_distinct_reads
+  ---
+  duration_ms: 8.718083
+  ...
+# Subtest: WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_ambient_os_capabilities
+ok 14 - WHAT[capability-enforcement-025] J12_sandbox_context_strictly_excludes_ambient_os_capabilities
+  ---
+  duration_ms: 4.149917
+  ...
+# Subtest: WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_permissions_include_read_glob_grep
+ok 15 - WHAT[capability-enforcement-025] P01_unaccepted_review_manager_static_permissions_include_read_glob_grep
+  ---
+  duration_ms: 0.341833
+  ...
+# Subtest: WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_readonly_capabilities
+ok 16 - WHAT[capability-enforcement-025] P02_review_accepted_facts_exclude_review_readonly_capabilities
+  ---
+  duration_ms: 0.371833
+  ...
+# Subtest: WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny
+ok 17 - WHAT[capability-enforcement-025] P08_manager_native_read_glob_grep_projected_as_deny
+  ---
+  duration_ms: 13.057209
+  ...
+# Subtest: WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role
+ok 18 - WHAT[capability-enforcement-025] P09_manager_allows_sole_review_tool_and_retired_tools_not_admitted_to_any_role
+  ---
+  duration_ms: 5.194708
+  ...
+# Subtest: WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface
+ok 19 - WHAT[capability-enforcement-025] P10_sole_review_tool_allowed_and_retired_tools_absent_from_manager_surface
+  ---
+  duration_ms: 5.599708
+  ...
+# Subtest: WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission
+ok 20 - WHAT[capability-enforcement-025] P05_no_active_incumbency_and_no_assessment_denies_review_readonly_admission
+  ---
+  duration_ms: 0.094791
+  ...
+# Subtest: WHAT[capability-enforcement-025] P06_unknown_identity_never_authorized_by_tool_name_suffix
+ok 21 - WHAT[capability-enforcement-025] P06_unknown_identity_never_authorized_by_tool_name_suffix
+  ---
+  duration_ms: 0.205333
+  ...
+# (node:26212) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retains_readonly_permissions
+ok 22 - WHAT[capability-enforcement-025] P03_unaccepted_or_malformed_review_retains_readonly_permissions
+  ---
+  duration_ms: 285.839958
+  ...
+# Subtest: WHAT[capability-enforcement-025] P07_cleanup_blocker_or_inactive_incumbency_denies_review_tool
+ok 23 - WHAT[capability-enforcement-025] P07_cleanup_blocker_or_inactive_incumbency_denies_review_tool
+  ---
+  duration_ms: 0.242792
+  ...
+# Subtest: WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_and_closeout_permissions
+ok 24 - WHAT[capability-enforcement-025] P16_final_incumbent_keeps_read_cleanup_and_closeout_permissions
+  ---
+  duration_ms: 0.041292
+  ...
+# Subtest: WHAT[capability-enforcement-025] P17_final_incumbent_loses_every_new_work_capability
+ok 25 - WHAT[capability-enforcement-025] P17_final_incumbent_loses_every_new_work_capability
+  ---
+  duration_ms: 0.029291
+  ...
+# Subtest: WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_in_both_languages
+ok 26 - WHAT[capability-enforcement-025] P18_final_incumbent_notice_text_present_in_both_languages
+  ---
+  duration_ms: 0.396291
+  ...
+# Subtest: WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads closed
+ok 27 - WHAT[capability-enforcement-025] P11_restart keeps the entry open and the reviewed reads closed
+  ---
+  duration_ms: 298.910416
+  ...
+# Subtest: WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and refused after review
+ok 28 - WHAT[capability-enforcement-025] P13_each physical operation is admitted before review and refused after review
+  ---
+  duration_ms: 316.708084
+  ...
+# Subtest: WHAT[capability-enforcement-025] P14_saved object, method and raw binding recheck authority after park
+ok 29 - WHAT[capability-enforcement-025] P14_saved object, method and raw binding recheck authority after park
+  ---
+  duration_ms: 219.827667
+  ...
+# Subtest: WHAT[capability-enforcement-025] P15_access denied before path validation, final incumbent has no exception
+ok 30 - WHAT[capability-enforcement-025] P15_access denied before path validation, final incumbent has no exception
+  ---
+  duration_ms: 212.28025
+  ...
+# Subtest: WHAT[capability-enforcement-025] identity and cross-role denial remain independent of Review
+ok 31 - WHAT[capability-enforcement-025] identity and cross-role denial remain independent of Review
+  ---
+  duration_ms: 174.012458
+  ...
+# Subtest: WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg
+ok 32 - WHAT[capability-enforcement-025] denied repository calls perform zero physical target access and never spawn rg
+  ---
+  duration_ms: 275.558583
+  ...
+# Subtest: WHAT[capability-enforcement-025] an admitted physical rg may finish after acceptance, but a later call is refused
+not ok 33 - WHAT[capability-enforcement-025] an admitted physical rg may finish after acceptance, but a later call is refused
+  ---
+  duration_ms: 4033.18925
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:379:1'
+  failureType: 'testCodeFailure'
+  error: 'the actual query process must start'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:417:16
+    runNextTicks (node:internal/process/task_queues:65:5)
+    process.processTimers (node:internal/timers:526:9)
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/capability-enforcement/tests/025.test.mjs:382:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[repository-programming-002] registered_js_tools_match_js_tool_generator_output
+ok 34 - WHAT[repository-programming-002] registered_js_tools_match_js_tool_generator_output
+  ---
+  duration_ms: 33.511125
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra_example_coder
+ok 35 - WHAT[repository-programming-002] JS004_capability_exactness_plus_one_ultra_example_coder
+  ---
+  duration_ms: 3.105833
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers
+ok 36 - WHAT[repository-programming-002] JS004_absent_capability_is_absent_in_all_four_layers
+  ---
+  duration_ms: 3.212084
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_read_or_write_members
+ok 37 - WHAT[repository-programming-002] JS004_edit_guidance_never_names_missing_read_or_write_members
+  ---
+  duration_ms: 9.472667
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_member_gate_binds_present_members_only
+ok 38 - WHAT[repository-programming-002] JS004_member_gate_binds_present_members_only
+  ---
+  duration_ms: 0.449167
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_rejected
+ok 39 - WHAT[repository-programming-002] JS004_lying_generator_counterexample_is_rejected
+  ---
+  duration_ms: 2.385916
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_every_holding_role
+ok 40 - WHAT[repository-programming-002] JS004_horizon_projects_four_layers_for_every_holding_role
+  ---
+  duration_ms: 7.83875
+  ...
+# Subtest: WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_every_holding_role
+ok 41 - WHAT[repository-programming-002] JS004_advisor_projects_four_layers_for_every_holding_role
+  ---
+  duration_ms: 10.659542
+  ...
+# Subtest: WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run
+ok 42 - WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run # SKIP wget is not installed
+  ---
+  duration_ms: 1.889875
+  ...
+# Subtest: WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed
+ok 43 - WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed # SKIP wget is not installed
+  ---
+  duration_ms: 0.905166
+  ...
+# Subtest: WHAT[repository-programming-060] the executed SDK uses this members and exposes no global js or nested api
+ok 44 - WHAT[repository-programming-060] the executed SDK uses this members and exposes no global js or nested api
+  ---
+  duration_ms: 12.472333
+  ...
+# Subtest: WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (single tool)
+ok 45 - WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (single tool)
+  ---
+  duration_ms: 159.424416
+  ...
+# Subtest: WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (late result after text)
+ok 46 - WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (late result after text)
+  ---
+  duration_ms: 47.442625
+  ...
+# Subtest: WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (late result after another message)
+ok 47 - WHAT[semantic-trace-006] the captured prefix keeps late results and original bytes after reopen (late result after another message)
+  ---
+  duration_ms: 42.151584
+  ...
+# Subtest: WHAT[semantic-trace-006] the durable trace preserves a cursor beyond Int32
+not ok 48 - WHAT[semantic-trace-006] the durable trace preserves a cursor beyond Int32
+  ---
+  duration_ms: 13.476584
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/semantic-trace/tests/006.test.mjs:39:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + -2147483643
+    - 2147483653
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2147483653
+  actual: -2147483643
+  operator: 'strictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/semantic-trace/tests/006.test.mjs:59:12
+    async withReopenableJournal (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/semantic-trace/tests/support/journal.mjs:19:12)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/semantic-trace/tests/006.test.mjs:44:3)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[semantic-trace-006] a physical prefix cannot cut across repeated canonical segments of one Host message
+ok 49 - WHAT[semantic-trace-006] a physical prefix cannot cut across repeated canonical segments of one Host message
+  ---
+  duration_ms: 37.861666
+  ...
+# Subtest: WHAT[semantic-trace-006] Host message set resolves only to its exact contiguous range
+ok 50 - WHAT[semantic-trace-006] Host message set resolves only to its exact contiguous range
+  ---
+  duration_ms: 1.083583
+  ...
+# Subtest: WHAT[semantic-trace-006] a cursor gap or intervening unrequested identity cannot be a contiguous range
+ok 51 - WHAT[semantic-trace-006] a cursor gap or intervening unrequested identity cannot be a contiguous range
+  ---
+  duration_ms: 0.491541
+  ...
+# Subtest: WHAT[semantic-trace-006] range and frontier queries preserve half-open boundaries
+ok 52 - WHAT[semantic-trace-006] range and frontier queries preserve half-open boundaries
+  ---
+  duration_ms: 0.589708
+  ...
+# Subtest: WHAT[semantic-trace-006] range vocabulary is half-open
+ok 53 - WHAT[semantic-trace-006] range vocabulary is half-open
+  ---
+  duration_ms: 0.276959
+  ...
+1..53
+# tests 53
+# suites 0
+# pass 48
+# fail 2
+# cancelled 1
+# skipped 2
+# todo 0
+# duration_ms 8565.086667

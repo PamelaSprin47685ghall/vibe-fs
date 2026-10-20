@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:f
 import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
 import {
   execute,
   caseName,
@@ -66,7 +67,8 @@ http.createServer((req, res) => {
 
 const sizeOf = (file) => (existsSync(file) ? statSync(file).size : -1)
 
-test('WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run', async () => {
+test('WHAT[repository-programming-052] wget -c resumes a partial download after an aborted run', async t => {
+  if (spawnSync('wget', ['--version']).status !== 0) return t.skip('wget is not installed')
   const { dir, cleanup } = sandbox()
   try {
     const port = await freePort()
@@ -79,7 +81,7 @@ test('WHAT[repository-programming-052] wget -c resumes a partial download after 
     const aborted = await runProgram(
       dir,
       `    const host = this;
-    return await js.call(class extends js.Callable {
+    return await this.call(class extends this.Callable {
       maxDuration = 20000;
       interval = 20;
       next(ctx) {
@@ -110,7 +112,7 @@ test('WHAT[repository-programming-052] wget -c resumes a partial download after 
     const resumed = await runProgram(
       dir,
       `    const host = this;
-    return await js.call(class extends js.Callable {
+    return await this.call(class extends this.Callable {
       maxDuration = 30000;
       interval = 20;
       next(ctx) {
@@ -181,7 +183,8 @@ test('WHAT[repository-programming-052] wget -c resumes a partial download after 
   }
 })
 
-test('WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed', async () => {
+test('WHAT[repository-programming-052] wget exit 8 is dispatched to onExit instead of being guessed', async t => {
+  if (spawnSync('wget', ['--version']).status !== 0) return t.skip('wget is not installed')
   const { dir, cleanup } = sandbox()
   try {
     const port = await freePort()
@@ -191,7 +194,7 @@ test('WHAT[repository-programming-052] wget exit 8 is dispatched to onExit inste
     const outcome = await runProgram(
       dir,
       `    const dispatched = [];
-    const result = await js.call(class extends js.Callable {
+    const result = await this.call(class extends this.Callable {
       maxDuration = 15000;
       interval = 50;
       next(ctx) {

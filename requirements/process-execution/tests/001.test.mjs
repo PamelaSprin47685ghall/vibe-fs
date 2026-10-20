@@ -651,7 +651,7 @@ test('WHAT[process-execution-001] PTY_TYPES_read_plans_cover_unknown_in_progress
       const outcome = await runProgram(
         dir,
         `    const chunks = [];
-    const result = await js.call(class extends js.Callable {
+    const result = await this.call(class extends this.Callable {
       maxDuration = 8000;
       interval = 30;
       next(ctx) {

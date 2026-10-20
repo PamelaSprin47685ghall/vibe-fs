@@ -4,6 +4,7 @@ open Fable.Core.JsInterop
 open Wanxiangshu.Repository.Programming.Js
 open Wanxiangshu.Repository.Programming.Js.Anchor
 
+/// JS test/adapter boundary; already-delivered anchors come from the host, not a model declaration.
 [<RequireQualifiedAccess>]
 module Surface =
     let private arrayOf (value: obj) : obj array =

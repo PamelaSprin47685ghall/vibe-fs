@@ -31,7 +31,7 @@ test('WHAT[repository-programming-046] whereAll collapses whitespace runs and re
   const { dir, cleanup } = sandbox()
   try {
     const content = 'alpha   beta\n gamma'
-    const result = apiOf(createApi(dir)).js.whereAll(content, 'alpha beta gamma')
+    const result = apiOf(createApi(dir)).whereAll(content, 'alpha beta gamma')
     assert.equal(result.ok, true)
     assert.equal(result.spans.length, 1)
     const [begin, end] = result.spans[0]
@@ -46,9 +46,9 @@ test('WHAT[repository-programming-046] whereAll returns every non-overlapping ma
   try {
     const binding = createApi(dir)
     const content = 'x middle x tail x'
-    const all = apiOf(binding).js.whereAll(content, 'x')
+    const all = apiOf(binding).whereAll(content, 'x')
     assert.equal(all.spans.length, 3)
-    const later = apiOf(binding).js.whereAll(content, 'x', 2)
+    const later = apiOf(binding).whereAll(content, 'x', 2)
     assert.equal(later.spans.length, 2)
     assert.equal(later.spans[0][0], 'x middle '.length)
   } finally {

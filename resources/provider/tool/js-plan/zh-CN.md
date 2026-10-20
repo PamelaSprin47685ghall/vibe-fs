@@ -4,4 +4,4 @@
 
 `await this.ask(question)` 持久记录用户问题、通知用户并挂起程序。只有 S1 可以提问；其他阶段以 `ASK_REFUSED` 拒绝。真实用户答复后，用 `{ unpark: { handle, value } }` 恢复。
 
-工具还可同时携带可选顶层参数 `prefixUntil` 和 `thenMap`，遵循共享 ANCHOR 视图合同。Plan 用户原文保持原样。编号与替换历史只在本进程有效，持久调用 checkpoint 不保存视图；须长期保留的知识写入 P。
+工具还可同时携带可选顶层参数 `prefixUntil` 和 `thenMap`，遵循共享 ANCHOR 视图合同。显式 view 可以用摘要替换已有上下文；接力本身不主动清除前任消息。编号与替换历史只在本进程有效，持久调用 checkpoint 不保存视图；须长期保留的知识写入 P。

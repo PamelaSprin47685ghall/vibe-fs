@@ -8,8 +8,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Composition.Turn
-open Wanxiangshu.Context.Companion.Blogger.OpenCode
-open Wanxiangshu.Context.Companion.Blogger.Runtime
 open Wanxiangshu.Context.Trace
 open Wanxiangshu.Execution.Delegation
 open Wanxiangshu.Execution.Delegation.Fork
@@ -26,7 +24,6 @@ open Wanxiangshu.Interaction.Dispatch
 open Wanxiangshu.Interaction.Repair
 open Wanxiangshu.OpenCode
 open Wanxiangshu.Host
-open Wanxiangshu.Mission.WorkRecord
 open Wanxiangshu.Participant.Persona
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Participant.Provider.Attempt.Fallback
@@ -824,7 +821,6 @@ module SyncDelegateSurface =
                                     ProviderRecoveryWorkflow.continueDelegateCallAfterConfirmedFailure
                                         sessions
                                         rootWorkspace
-                                        owner.BloggerRuntimeHost
                                         journal
                                         turn
                                         observer
@@ -865,6 +861,8 @@ module SyncDelegateSurface =
             |> Option.iter (fun owner ->
                 HostTurnObserver.attachLoopSensor sessions rootWorkspace (Some journal) owner (fun _ _ -> ()))
 
+            let! ownershipStateRoot = RuntimePath.stateRoot directory
+
             let scope =
                 new ToolRuntimeScope(
                     sessions,
@@ -879,7 +877,7 @@ module SyncDelegateSurface =
                     None,
                     None,
                     None,
-                    None
+                    ownershipStateRoot = ownershipStateRoot
                 )
 
             return
@@ -1158,7 +1156,7 @@ module SyncDelegateSurface =
 
             return
                 match result with
-                | Ok workRecord -> Wanxiangshu.OpenCode.ToolHostCodec.tomlObjectWithInstructions [ workRecord ] []
+                | Ok view -> Wanxiangshu.OpenCode.ToolHostCodec.tomlObjectWithInstructions [ view ] []
                 | Error error -> failwith error
         }
 
@@ -1175,7 +1173,7 @@ module SyncDelegateSurface =
 
                 return
                     match result with
-                    | Ok workRecord -> box {| ok = true; value = workRecord |}
+                    | Ok view -> box {| ok = true; value = view |}
                     | Error error -> box {| ok = false; error = error |}
         }
 
@@ -1452,6 +1450,30 @@ module SyncDelegateSurface =
     let terminalListenerCount (value: obj) : int =
         (unbox<Harness> value).Sessions.TerminalListenerCount
 
+    let private fenceHarnessMaterial (harness: Harness) (turn: ReconciledTurn) =
+        let session = SessionId.value turn.SessionId
+        let material = Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peek session
+
+        let accepted =
+            harness.Runtime.TryAcceptedAuthorityRoot turn.SessionId = Some(
+                AuthorityRootUserMessageId.value turn.AuthorityRootUserMessageId
+            )
+            && harness.Sessions.LatestAcceptedPhysical turn.SessionId = Some turn.PhysicalUserMessageId
+
+        if
+            accepted
+            && turn.Outcome = ReconcileProgram.TurnCompleted
+            && not (String.IsNullOrWhiteSpace(CompletedTurnClassifier.partsText turn.Parts))
+            && (Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.peekFence session
+                |> Option.isNone)
+            && (emitJsExpr material "typeof $0 === 'string'": bool)
+        then
+            Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.restoreFencedMaterial
+                session
+                turn.ProviderRun
+                (ToolCallId.create "harness-delivery")
+                (unbox<string> material)
+
     let private handleTurn
         (harness: Harness)
         (child: SessionId)
@@ -1459,6 +1481,7 @@ module SyncDelegateSurface =
         (turn: ReconciledTurn)
         =
         task {
+            fenceHarnessMaterial harness turn
             // delegation-031: the terminal capture inside HandleTurn writes through
             // the production journal. A released writer surfaces as
             // XTraceCaptureError.StorageAppendFailed carrying the typed
@@ -1545,6 +1568,7 @@ module SyncDelegateSurface =
         let turn =
             exactTerminalTurn session physical authorityRoot providerRun [| MessagePart.Text formalText |]
 
+        fenceHarnessMaterial harness turn
         harness.Runtime.SettleCompletedFromTurn turn
 
     let observeExactProviderFailure (value: obj) session physical authorityRoot providerRun reason : Task<bool> =
@@ -1564,7 +1588,6 @@ module SyncDelegateSurface =
             harness.RootWorkspace
             harness.EventPort
             (Some harness.Journal)
-            owner.BloggerRuntimeHost
             (Some harness.Runtime)
             harness.NudgeSent
             harness.JoinGuardNudges
@@ -1591,10 +1614,9 @@ module SyncDelegateSurface =
             harness.RootWorkspace
             harness.EventPort
             (Some harness.Journal)
-            None
-            None
             harness.Plugin.Value
             context
+
 
     let observeRepairTurn
         (value: obj)
@@ -1655,7 +1677,10 @@ module SyncDelegateSurface =
         observeRecoveryTurn harness AbortCause.External context
 
     let recordDeliveredValue (sessionId: string) (deliveredValue: obj) : unit =
-        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.record sessionId deliveredValue
+        let material: string =
+            emitJsExpr deliveredValue "typeof $0 === 'string' ? $0 : JSON.stringify($0)"
+
+        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.restoreMaterial sessionId material
 
     let private settleReadyChild
         (harness: Harness)
@@ -2033,10 +2058,7 @@ module SyncDelegateSurface =
 
                 return
                     match result with
-                    | Ok(SyncDelegateInvocationResult.WorkRecord record) ->
-                        box
-                            {| kind = "WorkRecord"
-                               value = record |}
+                    | Ok(SyncDelegateInvocationResult.View record) -> box {| kind = "View"; value = record |}
                     | Ok(SyncDelegateInvocationResult.MergedInto canonical) ->
                         box
                             {| kind = "MergedInto"
@@ -2058,10 +2080,10 @@ module SyncDelegateSurface =
                 {| accepted = true
                    reason = "independent provider batch" |}
 
-    let evidenceBoundary (charge: string) (workRecord: string) : obj =
+    let evidenceBoundary (charge: string) (view: string) : obj =
         box
             {| charge = charge
-               workRecord = workRecord
+               view = view
                authorityTransferred = false |}
 
     /// Script the retry decorator's verdicts for the next confirmed failures:

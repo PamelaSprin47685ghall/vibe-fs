@@ -13,8 +13,7 @@ const read = (path) => readFileSync(path, 'utf8')
 // rm/mv 成员文案是 tool/js-program/rm、tool/js-program/mv 的 zh-CN.md/en.md
 // 成对双语资源，两语言陈述同一契约要素——签名、POSIX 语义、as-is 即时
 // 生效、EXDEV 拒绝且不留两侧并存中间态——且不携带未替换占位符。四层接线
-// 保持同构：JsFragmentRegistry 的 rm/mv fragment（含 js.rm/js.mv
-// RuntimeBindingKey）→ ToolsBindings 的成员绑定 → Description 的资源路径
+// 保持同构：JsFragmentRegistry 的 rm/mv fragment（含 MemberName）→ ToolsBindings 的成员绑定 → Description 的资源路径
 // 与 capability 条件规则块 → ToolHost 的双语装载。底层文件系统效果与稳定
 // 失败映射归 MutationFs 原语（removePath/movePath），不在成员绑定内二次
 // 定义。本文件为纯静态断言（读源码与资源文本），不 import dist 产物。
@@ -78,29 +77,29 @@ test('WHAT[repository-programming-043] both languages state the mv contract elem
   assert.ok(en.includes('never leaving both sides present'), 'en must state no two-sided intermediate state survives')
 })
 
-test('WHAT[repository-programming-043] JsFragmentRegistry carries the rm/mv fragments with js.rm and js.mv runtime binding keys', () => {
+test('WHAT[repository-programming-043] JsFragmentRegistry carries the rm/mv fragments with this.rm and this.mv runtime binding keys', () => {
   const capability = read(join(SOURCE_ROOT, 'Repository/Programming/Js/Capability.fs'))
 
   // rm fragment：Remove capability、成员名与签名同处一个 fragment。
   assert.match(
     capability,
-    /let rm: JsCapabilityFragment =\s*\n\s*\{ Capability = JsCapability\.Remove\s+MemberName = "rm"\s+Signature = "rm\(path\)"/,
+    /let rm: JsCapabilityFragment =\s*\n\s*\{ Capability = JsCapability\.Remove\s+MemberName = "rm"/,
   )
-  assert.match(capability, /RuntimeBindingKey = "js\.rm" }/, 'the rm fragment must bind js.rm')
+  assert.match(capability, /MemberName = "rm" }/, 'the rm fragment must name the member rm')
 
   // mv fragment：Move capability、成员名与签名同处一个 fragment。
   assert.match(
     capability,
-    /let mv: JsCapabilityFragment =\s*\n\s*\{ Capability = JsCapability\.Move\s+MemberName = "mv"\s+Signature = "mv\(from, to\)"/,
+    /let mv: JsCapabilityFragment =\s*\n\s*\{ Capability = JsCapability\.Move\s+MemberName = "mv"/,
   )
-  assert.match(capability, /RuntimeBindingKey = "js\.mv" }/, 'the mv fragment must bind js.mv')
+  assert.match(capability, /MemberName = "mv" }/, 'the mv fragment must name the member mv')
 
   // 两个 fragment 进入确定性投影的 canonical 成员序。
   const allBlock = capability.match(/let all: JsCapabilityFragment list =\s*\[([\s\S]*?)\]/)
   assert.ok(allBlock, 'the fragment registry must declare the canonical member list')
   assert.deepEqual(
     allBlock[1].split(/\s+/).filter(Boolean),
-    ['write', 'rm', 'mv', 'cat', 'ls', 'stat', 'mkdir', 'whereAll', 'where', 'rg', 'run', 'fork', 'dag', 'join', 'fission', 'horizon', 'advisor', 'park'],
+    ['write', 'rm', 'mv', 'cat', 'ls', 'rg', 'stat', 'mkdir', 'whereAll', 'where', 'call', 'fork', 'dag', 'join', 'fission', 'horizon', 'advisor', 'ask', 'park'],
   )
 })
 

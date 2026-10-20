@@ -8,6 +8,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="Wanxiangshu.Owner.process-execution.process-runtime.fsproj"/>
+    <ProjectReference Include="Wanxiangshu.Owner.repository-programming.repository-programming-js-filesystem.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.epistemic-reasoning.sphinx-v2-core.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.feature-ablation.ablation-kernel.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.action-affordance.opencode-tools-executortoolsurface.fsproj"/>
@@ -41,7 +42,6 @@
     <ProjectReference Include="Wanxiangshu.Owner.provider-language.participant-provider-language.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.work.mission-work-reviewtool.fsproj"/>
     <ProjectReference Include="Wanxiangshu.Owner.work.mission-deliver-tool.fsproj"/>
-    <ProjectReference Include="Wanxiangshu.Owner.requirement-grounding.opencode-host-requirementgrounding-runtime.fsproj"/>
     
     
 

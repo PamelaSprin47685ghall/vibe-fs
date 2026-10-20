@@ -8,8 +8,8 @@
 ## fork
 
 ```js
-await js.fork("为解析器模块建索引");                          // 只给任务
-await js.fork({ charge: "为解析器建索引", name: "parser-index", calling: "engineer" });
+await this.fork("为解析器模块建索引");                          // 只给任务
+await this.fork({ charge: "为解析器建索引", name: "parser-index", calling: "engineer" });
 ```
 
 - 载荷：字符串（任务）或 `{ charge, name?, calling?, keywords? }`；缺 `name` 时由任务文本派生。
@@ -19,18 +19,18 @@ await js.fork({ charge: "为解析器建索引", name: "parser-index", calling: 
 ## join
 
 ```js
-const { records, byName } = await js.join();
+const { records, byName } = await this.join();
 ```
 
-- 结果：`{ ok: true, records: [{ name, agentId, role, status, workRecord }], byName: { [name]: record } }`。
-- `status` 为 `completed` | `undelivered` | `failed` | `abandoned`；`workRecord` 是子工作经 `js.deliver` 交付的终值记录（`undelivered`、`failed` 或 `abandoned` 时为空）。
+- 结果：`{ ok: true, records: [{ name, agentId, role, status, view }], byName: { [name]: record } }`。
+- `status` 为 `completed` | `failed` | `abandoned`；子工作只有以 `this.deliver(view)` 结束才进入记录——未交付的子工作不结算：保持活跃，join 不关闭，你可以继续等待或重派。`view` 是子工作经 `this.deliver` 交回的 TOML 视图（`failed` 或 `abandoned` 时为空）。
 - 按成员归属收拢：收的是本会话创建的子工作。拒绝码：`context-unavailable`、`not-ready`、`nothing-to-join`、`join-in-progress`、`interrupted`、`abandoned`。
 
 ## fission
 
 ```js
-const group = await js.fission({ charge: "探索三种设计", lanes: 3 });
-const { records } = await js.join();          // 收拢本组的 lane
+const group = await this.fission({ charge: "探索三种设计", lanes: 3 });
+const { records } = await this.join();          // 收拢本组的 lane
 ```
 
 - 同身份多 lane：每条 lane 是同一参与者对任务某一分片的执行，宿主负责收拢。
@@ -40,7 +40,7 @@ const { records } = await js.join();          // 收拢本组的 lane
 ## dag
 
 ```js
-const outcome = await js.dag({ nodes: [
+const outcome = await this.dag({ nodes: [
   { id: "spec",  charge: "写出接口规格" },
   { id: "impl",  charge: "实现它", deps: ["spec"] },
   { id: "probe", charge: "并行探索两种设计", deps: ["spec"], lanes: 2 },
@@ -58,7 +58,7 @@ const outcome = await js.dag({ nodes: [
 ## horizon
 
 ```js
-const { agents, ptys } = await js.horizon();
+const { agents, ptys } = await this.horizon();
 ```
 
 - 谁还在你的视野里，以数据形式给出：`{ ok: true, agents: [{ label, status, target, workState, record, turnsUsed, turnsLeft, timeUsedMs, timeLeftMs }], ptys: [{ terminal }] }`。
@@ -69,10 +69,10 @@ const { agents, ptys } = await js.horizon();
 ## advisor
 
 ```js
-const advice = await js.advisor("Is the caching layer's eviction policy sound?", { prefixUntil: 12 });
+const advice = await this.advisor("Is the caching layer's eviction policy sound?", { prefixUntil: 12, thenMap: {} });
 ```
 
 - 请教这个 session 的**专属顾问**——一位不持有任何工具、只以散文作答的评审者——用在敲定路线之前，或宣布收工之前。同一个 session 永远落到同一个顾问，之后的调用只追加 view 的增量与新 intent，所以这条线是延续的。
-- `intent` 是要问的问题，自成一条 prompt。`view` 使用共享的 `{ prefixUntil, thenMap }` 区间合同，边界只保护材料免于新替换，不截断视图；宿主把所选记录按 Chronicle 的形状渲染成一条 prompt，再把 intent 作为另一条发出。二者永不合并。
+- `intent` 是独立的问题 prompt。`view` 使用统一声明 `{ prefixUntil, thenMap }`，两个字段都必填；先按当前存活区间生成完整 view，再按宿主掌握的已交付事实取 delta。首次拿到完整 view；prefixUntil 不是交付边界。thenMap 要覆盖所有保护范围外的可见编号，null 保留，摘要整段替换；漏项按 null。view 与 intent 分别发送，不合并。
 - 结果：`{ ok: true, advice }`（散文即数据）或 `{ ok: false, code: "advisor-unavailable", reason }`；视图声明非法时以 `VIEW_DECLARATION_INVALID` 拒绝。
 - 把回答当作指引：一个 plan、一个 correction，或一个 stop signal。这次请教本身不会往你的会话里写入任何东西。

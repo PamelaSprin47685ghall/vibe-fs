@@ -109,10 +109,9 @@ test('WHAT[prefix-stability-014] PREFIX_STABILITY_pair_body_stays_out_of_the_tra
   // The only projection the pair fact may grow is Guidelines (HOST-013 recovery).
   assert.equal(flags.guidelines, true, 'the anchored fact must land in Guidelines')
 
-  // This fact fold does not create trace or frame state. Message ingestion is
+  // This fact fold does not create trace state. Message ingestion is
   // a separate path and is not proved by these flags.
   assert.equal(flags.xTrace, false, 'XTrace must not be created by the pair fact')
-  assert.equal(flags.blog, false, 'Companion frame sequence must not be created by the pair fact')
 })
 }
 
@@ -474,13 +473,16 @@ const assert = (await import('node:assert/strict')).default
 const { execFileSync } = await import('node:child_process')
 const { fileURLToPath } = await import('node:url')
 const { integrationTest } = await import('../../verification-system/tests/support/tier-gate.mjs')
+const { withFinitePhysicalWait } = await import('../../verification-system/tests/support/finite-physical-wait.mjs')
 
-integrationTest('WHAT[prefix-stability-014] actual OpenCode Host provider requests preserve user quotations and keep guidance out of physical tool originals through cold recovery', () => {
-  const output = execFileSync(process.execPath, [fileURLToPath(new URL('./support/real-guidance-host.mjs', import.meta.url))], { encoding: 'utf8' })
+integrationTest('WHAT[prefix-stability-014] actual OpenCode Host provider requests preserve user quotations and keep guidance out of physical tool originals through cold recovery', async t => {
+  const output = await withFinitePhysicalWait(t, { operation: 'OpenCode guidance and cold recovery', limitMs: 30000 }, () =>
+    execFileSync(process.execPath, [fileURLToPath(new URL('./support/real-guidance-host.mjs', import.meta.url))], { encoding: 'utf8' }))
   const evidence = JSON.parse(output.trim().split('\n').at(-1))
   assert.equal(evidence.quotePreserved, true)
   assert.equal(evidence.persistedUnchanged, true)
   assert.equal(evidence.coldVerified, true)
+  assert.equal(evidence.deliveries, 2)
   assert.ok(evidence.providerRequests >= 4)
 })
 }

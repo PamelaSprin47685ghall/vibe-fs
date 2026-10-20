@@ -1,0 +1,1074 @@
+4f7e7025e16d878eb5dfee81739c32adac000e2c
+100644 bfeee7475f75d48c8e7069c1ef29d7afc6dd3d09 1	AGENTS.md
+100644 1ed393aa17b81cde118a8d11dcb34922a269d779 2	AGENTS.md
+100644 73be04d6ef6ecb72092081f19ce479cec94c9afb 3	AGENTS.md
+100644 9376a2ff2c720f66b1820adf9164541e6a3071d6 1	requirements/advisor/WHAT.md
+100644 f4348387a0f161435f9e48e16dd0ef33a210a08f 2	requirements/advisor/WHAT.md
+100644 caeb0761680d4e9b484b6366c03bec6041fb54a5 3	requirements/advisor/WHAT.md
+100644 052f57b045207aeed40696478268b169587e43e8 1	requirements/advisor/tests/002.test.mjs
+100644 a99d4cb86ffed1b6cf7025b0fa80139a2071df7c 2	requirements/advisor/tests/002.test.mjs
+100644 78ab6833766d03c9ce5c761d6252c7f1f94ade83 3	requirements/advisor/tests/002.test.mjs
+100644 fef4fb4b9f4225b15296492cd4551497e58fef15 1	requirements/advisor/tests/003.test.mjs
+100644 e4064a0cc1b7da2f5de2383477d8592c1b856fcd 2	requirements/advisor/tests/003.test.mjs
+100644 5730d5790ab8dc6bca85936ed078f54a6afc78b8 3	requirements/advisor/tests/003.test.mjs
+100644 d7f2a79e259a8d07a86ab6306f2f9e0c2cf574df 1	requirements/advisor/tests/README.md
+100644 fcaaa718d214639b3a49d4889c7df604ebfd7753 2	requirements/advisor/tests/README.md
+100644 7cd72d36e7a0958e11878a7afe5487042b4be8cc 3	requirements/advisor/tests/README.md
+100644 469746dc9e95fb512e2271121e337fbd5fc1c9f3 1	requirements/capability-enforcement/tests/002.test.mjs
+100644 4f110730be140b476b8819664dadcf2cf82bb494 2	requirements/capability-enforcement/tests/002.test.mjs
+100644 3a400f45d289465d100bb5090c542a0e90d032e0 3	requirements/capability-enforcement/tests/002.test.mjs
+100644 871c8ca7e747c7bb0fbbf90d5f0e90a82930f4fe 1	requirements/capability-enforcement/tests/023.test.mjs
+100644 1fd45f3e3d904b8d882025835e562e702d64c277 2	requirements/capability-enforcement/tests/023.test.mjs
+100644 13bf217c141ef330494b087bcfef7b2887088668 3	requirements/capability-enforcement/tests/023.test.mjs
+100644 97ee0ccaef7c40b12f9cb20f56434cbb10097a60 1	requirements/capability-enforcement/tests/support/manager-programming.mjs
+100644 e32109c6fe9d096ac7da29272f762a0b1f145c81 2	requirements/capability-enforcement/tests/support/manager-programming.mjs
+100644 bd064d5fb3e82971a340a95da10eed2ac42ed36c 3	requirements/capability-enforcement/tests/support/manager-programming.mjs
+100644 0b2c443134a153d2604d70c8054aef444f0a7e92 1	requirements/concern-routing/tests/007.test.mjs
+100644 64be6bd52216f5ab381b0a3c3e962604721e35c5 2	requirements/concern-routing/tests/007.test.mjs
+100644 d2bea4af1399a108348f3ff4f37202b5c36da465 3	requirements/concern-routing/tests/007.test.mjs
+100644 8466ec10aa87314f012dcb8e01c61f1dd9662c5f 1	requirements/context-compression/WHAT.md
+100644 9a6a10cd67941efaf7b05521bfa3732d970eef06 2	requirements/context-compression/WHAT.md
+100644 f1332af2eebca486d8c2bebaedc8d2fbe9383c70 3	requirements/context-compression/WHAT.md
+100644 f87906029b8fd19798317932ae120b9972268d51 1	requirements/context-compression/tests/022.test.mjs
+100644 f22df1c37663ac16ae6ce9ed03d371fc8f963d2b 2	requirements/context-compression/tests/022.test.mjs
+100644 3e6dcaa8e85827cc43f852d0dfa2a9d52fe8885d 1	requirements/context-compression/tests/025.test.mjs
+100644 5ee3c161ec85af4badf6d29469415655a3dd28a8 2	requirements/context-compression/tests/025.test.mjs
+100644 cd8bf23e94d76364f1677e204f720d311a0acaef 1	requirements/context-compression/tests/031.test.mjs
+100644 9f194638002ef605f5cf8f25febc462f89eb67db 2	requirements/context-compression/tests/031.test.mjs
+100644 5f0beaea39627d6e31549f2571b0f9a119ebd1b5 3	requirements/context-compression/tests/031.test.mjs
+100644 9e51b2755b6c4edc4342873923f04055e3a38d4d 1	requirements/crash-reconciliation/tests/018.test.mjs
+100644 853185d00d67224f06f66dbc4b942d577fbe5435 2	requirements/crash-reconciliation/tests/018.test.mjs
+100644 0f5dd27f6a08808f676e82b9a3e92ecaab646d8a 3	requirements/crash-reconciliation/tests/018.test.mjs
+100644 d4991eaaf01f19228fae75e85316de733fac083d 1	requirements/delegation/WHAT.md
+100644 8193c165a31a08d5a64383b0f92ec44038dee2e7 2	requirements/delegation/WHAT.md
+100644 7223852948485e82e60b7c37b1ab2020385ec1b5 3	requirements/delegation/WHAT.md
+100644 b0e2ba4fc8770860b542bd722e6d2af9f06591a6 1	requirements/delegation/tests/019.test.mjs
+100644 8cd6471edc0093ae6608552f779033655e82a900 2	requirements/delegation/tests/019.test.mjs
+100644 e9d3915eba8d04168adb6d12fbe6d0f1cb6d3897 3	requirements/delegation/tests/019.test.mjs
+100644 55aca575c608f2ba7468ed904a2a85a875eb248a 1	requirements/delegation/tests/023.test.mjs
+100644 9a1b09b936c4635f5f7f5ab073bf1ed529249f7d 2	requirements/delegation/tests/023.test.mjs
+100644 1767df9e172490caaaa2efd2f6383514063ae2a6 3	requirements/delegation/tests/023.test.mjs
+100644 59d5a8bae67964e5b642259d3d91aee23453b50a 1	requirements/durable-events/tests/015.test.mjs
+100644 559c657527d290a801f80e0551e7d67e71cd54b1 2	requirements/durable-events/tests/015.test.mjs
+100644 9ae09b38e9e0fd1942553d4060c1a15a98997476 3	requirements/durable-events/tests/015.test.mjs
+100644 1b14de7e18ef10baffcbd6dc1be42178bb13e4df 1	requirements/effect-accounting/tests/008.test.mjs
+100644 9e7e2c1020d50ff4bf58037cba4cb22a923288e9 2	requirements/effect-accounting/tests/008.test.mjs
+100644 42fa1302921a1d21ab3bb8e8d2c201bc29341312 3	requirements/effect-accounting/tests/008.test.mjs
+100644 84841cc212380392a4a99baec004c61af1c82308 1	requirements/execution-model-routing/tests/020.test.mjs
+100644 9306a29093c31686f70fa633c2de28196e8a87ca 2	requirements/execution-model-routing/tests/020.test.mjs
+100644 1b23bd9f031200190d45dbbdff7dda88db4973b6 3	requirements/execution-model-routing/tests/020.test.mjs
+100644 308767ad5bd6142239fe48c4e767f0863b3ca9df 1	requirements/host-boundary/WHAT.md
+100644 95cfa6483e8599cfa88c18c3c1adbd03654513c3 2	requirements/host-boundary/WHAT.md
+100644 732e14d511cd88bd028805265c6cf0b2c89e7282 3	requirements/host-boundary/WHAT.md
+100644 18d6a08c85a544f913f2fbe33043e72066584761 1	requirements/host-boundary/tests/015.test.mjs
+100644 7de0e3c57693c62d547bfca3ec13ec14d9b62ff2 2	requirements/host-boundary/tests/015.test.mjs
+100644 3203d298b4d898d607e24325c68574bd564aff2c 3	requirements/host-boundary/tests/015.test.mjs
+100644 bd6f70b0df4de7f0a5775e88d851ef81e38e1656 1	requirements/host-boundary/tests/032.test.mjs
+100644 634819cf038183e267ef78c0ce6458ca77bde764 2	requirements/host-boundary/tests/032.test.mjs
+100644 b6a4b4240925bcd3912d4c7dfda93320fed9772c 3	requirements/host-boundary/tests/032.test.mjs
+100644 b61b7f628ee12e41495cc25ea4bae150b77453ec 1	requirements/host-boundary/tests/support/run-manager-review-tools-canary.mjs
+100644 607e4a5eeab1ef34bb511523d2756a0cbe734b71 2	requirements/host-boundary/tests/support/run-manager-review-tools-canary.mjs
+100644 92edc1106e8f9d5c2659ad8d48296c6457a5ed97 3	requirements/host-boundary/tests/support/run-manager-review-tools-canary.mjs
+100644 6fd189e9b8cee5a7b5c4dbcd90965f6c1dae1528 1	requirements/intra-participant-parallelism/tests/017.test.mjs
+100644 579887c7091d80072f0ce38f7a3c1cba142e4587 2	requirements/intra-participant-parallelism/tests/017.test.mjs
+100644 d31d3227c6d02dc48d1741a3d39f98409745d973 3	requirements/intra-participant-parallelism/tests/017.test.mjs
+100644 ac0a5baa063ccb0064e17fee5259044c97440883 1	requirements/managed-session-lifecycle/tests/025.test.mjs
+100644 fed2b9bcc6814d83210f2325dda269dcf9f70ab1 2	requirements/managed-session-lifecycle/tests/025.test.mjs
+100644 6f6bb634f80bf62534558a66a6e59b21ed9017df 3	requirements/managed-session-lifecycle/tests/025.test.mjs
+100644 b79edbc4adac6f16456b035fe65fbcf3ce613860 1	requirements/managed-session-lifecycle/tests/028.test.mjs
+100644 d05fdaa3f08c578db6d18f3282043397b4409a12 2	requirements/managed-session-lifecycle/tests/028.test.mjs
+100644 87cca788ea31734af83b5d16648d545e2832fcfc 3	requirements/managed-session-lifecycle/tests/028.test.mjs
+100644 aa6f64b6b8ddc3838a512ae6fcdc54fc0e658e2c 1	requirements/managed-session-lifecycle/tests/README.md
+100644 532d2177da23851222e93486422be4d34ddf8bd8 2	requirements/managed-session-lifecycle/tests/README.md
+100644 c8630ddea4de96d0cd9f1525e1b59d0001dad6a7 3	requirements/managed-session-lifecycle/tests/README.md
+100644 ec13c79ab93ea7da7f1d2ad2a6ed18edfa8e84d8 1	requirements/obligation-ledger/tests/001.test.mjs
+100644 deefd297d5104535440aa79c7b41ed3a2093c878 2	requirements/obligation-ledger/tests/001.test.mjs
+100644 58e5a742d2322edd0a1a0eb50aefbdb2d0d21837 3	requirements/obligation-ledger/tests/001.test.mjs
+100644 e74de8e2dffadd6e693b137053372245a6cf7281 1	requirements/obligation-ledger/tests/003.test.mjs
+100644 bb381a9a2cc82d5d912ffb7d2007488872438b28 2	requirements/obligation-ledger/tests/003.test.mjs
+100644 f818650392b6ae7a8c6950f89fd0c98a28a88a38 3	requirements/obligation-ledger/tests/003.test.mjs
+100644 43a0645448691f21bbfe3f18127401f18b3e8dc1 1	requirements/obligation-ledger/tests/004.test.mjs
+100644 a1f24c535d41da818d074fe429c770bf5cda24ad 2	requirements/obligation-ledger/tests/004.test.mjs
+100644 2581eee9de64c8e8fa305240e34df1750714c49f 3	requirements/obligation-ledger/tests/004.test.mjs
+100644 84e75b1064353fffa1f7b48c914b1cd6d3b5f9c2 1	requirements/obligation-ledger/tests/005.test.mjs
+100644 36a96f00cc59744704efcaaac433be76d86aa3f9 2	requirements/obligation-ledger/tests/005.test.mjs
+100644 f943ea564d2239c6637f847b2444b6894a2613bc 3	requirements/obligation-ledger/tests/005.test.mjs
+100644 babd932e7f6a3f5861629f3639e203b504fdd0b9 1	requirements/participant-identity/tests/001.test.mjs
+100644 64720e84f19a495bfdd575463f5fac6cd885bb86 2	requirements/participant-identity/tests/001.test.mjs
+100644 d68bc950c13cea355afe6ae573d5932762978d3c 3	requirements/participant-identity/tests/001.test.mjs
+100644 b8e96f62f482421d6765bcd8f2d88b2b11b258d4 1	requirements/participant-identity/tests/002.test.mjs
+100644 015233943cee1c89936832a03fef9d592358d840 2	requirements/participant-identity/tests/002.test.mjs
+100644 3294f04e545d3e318a231c5ce04278e945a32ac4 3	requirements/participant-identity/tests/002.test.mjs
+100644 54ee86b7cfe9530b68450e644d31a997af87aef8 1	requirements/participant-identity/tests/003.test.mjs
+100644 a438c5e9fe48f9144ee22da2e94576f2f111be95 2	requirements/participant-identity/tests/003.test.mjs
+100644 3e7091ae38dd68bbb9733d3cb6d5b0343a67e19b 3	requirements/participant-identity/tests/003.test.mjs
+100644 db322620f2c2315ab2cd897cab9a3f2da9a5efcc 1	requirements/participant-identity/tests/008.test.mjs
+100644 3c842273be0b3f7bcbcc1d7846c3ff76f64a7869 2	requirements/participant-identity/tests/008.test.mjs
+100644 c6fbfd6d5ad52f0b2f42a1469cd43b8e2ab86d40 3	requirements/participant-identity/tests/008.test.mjs
+100644 a230414be0fec45e04bb09ab6dbe9c2feef66449 1	requirements/prefix-stability/WHAT.md
+100644 963f9ac42fa05c045a2a56a452fc51ff133563c6 2	requirements/prefix-stability/WHAT.md
+100644 909a92f0a0f8c67bf10ea10a0679cf243359d159 3	requirements/prefix-stability/WHAT.md
+100644 b4d992f8f6eca51689611bb2a268b5f9daae5677 1	requirements/prefix-stability/tests/001.test.mjs
+100644 50fda4842a1c00697421367911b7ae195a4b4e92 2	requirements/prefix-stability/tests/001.test.mjs
+100644 dd26411b904bcd700f671ca964c11fe432d7ed13 3	requirements/prefix-stability/tests/001.test.mjs
+100644 2a0ac054e25edb211a258247f8876c8f093e2aab 1	requirements/prefix-stability/tests/003.test.mjs
+100644 8f4cc0e468209edf18d6b170e888b58e8f2bc22e 2	requirements/prefix-stability/tests/003.test.mjs
+100644 b403505abc6c306ab205aed6a50202e719329a9c 1	requirements/prefix-stability/tests/012.test.mjs
+100644 ac0011e1aaa75624ecffef0eb32bd05e5982ba0b 2	requirements/prefix-stability/tests/012.test.mjs
+100644 41afb72a916a68bb9187c50d056378b0d5709bb5 1	requirements/prefix-stability/tests/README.md
+100644 84e9502775a7c2afa5671c8b228ef31b16cd0664 2	requirements/prefix-stability/tests/README.md
+100644 045e9e850c078dccc7efc1535d381ef14c197df1 3	requirements/prefix-stability/tests/README.md
+100644 77f217fc6564750e77fd2c86ed1bc7fedf12f981 1	requirements/prefix-stability/tests/support/registered-prefix.mjs
+100644 f1dd53a99b640aee446f4578a239492e88a2f466 2	requirements/prefix-stability/tests/support/registered-prefix.mjs
+100644 1c73317f71bb7c053c245d5e7d44b2a3e595982a 1	requirements/process-execution/WHAT.md
+100644 73d34bc01775c0a01e49674c77fa93fae5693465 2	requirements/process-execution/WHAT.md
+100644 17d10f0153103d558a9e7e007e00402bcc9187ec 3	requirements/process-execution/WHAT.md
+100644 e831f4c870cefc75f438852c2606097aa1d1ff92 1	requirements/process-execution/tests/001.test.mjs
+100644 8b9e055242b01f14cb09a1641d8e2195c1e7fd65 2	requirements/process-execution/tests/001.test.mjs
+100644 6797fbef93b4fafe5fcbe8dc7199ee8c5f8df88f 3	requirements/process-execution/tests/001.test.mjs
+100644 cd39c7cd947a10ebb6f00dee99d463d0a206f5aa 1	requirements/process-execution/tests/005.test.mjs
+100644 346d8cdd4b8a250e4eddfb72a8b97a3888ff2640 2	requirements/process-execution/tests/005.test.mjs
+100644 a638d7a06caae6fa8a15aa5d9cd2ddd5fc5677f5 3	requirements/process-execution/tests/005.test.mjs
+100644 59fd3c047c82fe2a2f8e7c7564baddbdd074ca18 1	requirements/process-execution/tests/010.test.mjs
+100644 1326043fb6cda56ecd1b33f7ddbced24727dbef3 2	requirements/process-execution/tests/010.test.mjs
+100644 9ff99b004cb8bbefc374919cdcd65db266270db3 3	requirements/process-execution/tests/010.test.mjs
+100644 343f62784fde7e7c4f1c6d5bb01cd3a241c7a8a4 1	requirements/process-execution/tests/011.test.mjs
+100644 f51af32bf0985aef8f3f9d72ce725f300e7cfbfc 2	requirements/process-execution/tests/011.test.mjs
+100644 31dc1d0b39c7d3f2daf2395e1e414a4230b6d040 3	requirements/process-execution/tests/011.test.mjs
+100644 af600a4aa50dfe90789ae36557cfa46b66a7e549 1	requirements/process-execution/tests/013.test.mjs
+100644 43b419c16fac3bdef681c590d322eca65bfe6739 2	requirements/process-execution/tests/013.test.mjs
+100644 de5f624b867fa4bc6a52b86b342eb6d579217bb7 3	requirements/process-execution/tests/013.test.mjs
+100644 9ced2fd1ab073610237ec4f812607ced8b238c8e 1	requirements/process-execution/tests/014.test.mjs
+100644 4949321495de16904472e9e19dfc18e3ec952d62 2	requirements/process-execution/tests/014.test.mjs
+100644 3717a27040f0f58855d8d1760f915594465176ff 3	requirements/process-execution/tests/014.test.mjs
+100644 d66d6887a849ba37e0c0f76b81b1f074b3553901 1	requirements/process-execution/tests/015.test.mjs
+100644 7badc8221e38c96f83f2e9bae09ad10856c68c5f 2	requirements/process-execution/tests/015.test.mjs
+100644 66fbf1b28ea9eb8114756cb672b6122b98e8b152 3	requirements/process-execution/tests/015.test.mjs
+100644 20e75b1b1f7f80cb749f2f48f7327e1d0fc3ad9b 1	requirements/process-execution/tests/017.test.mjs
+100644 36b726d1766bf7c4bf09392295ea013afa4bc796 2	requirements/process-execution/tests/017.test.mjs
+100644 97b31f2c58e09982229e01f59c91aede5da9f533 3	requirements/process-execution/tests/017.test.mjs
+100644 8e93c39d7c07178b0e45b97201d1daf03d3be355 1	requirements/process-execution/tests/README.md
+100644 74842fa17da213697d1c55570791090ec39f7de2 2	requirements/process-execution/tests/README.md
+100644 51c07cdd9121700989aef2a3ca526573f6550bd7 3	requirements/process-execution/tests/README.md
+100644 1f4eef9bf0336e11e16e1a39b228921d8a6bb59b 1	requirements/process-execution/tests/support/executor.mjs
+100644 bc3c9d6ab8ff984e721e6dda8e40baa70d0c75e9 2	requirements/process-execution/tests/support/executor.mjs
+100644 4754d2fe394f8cbbb98fa38ca7110d925b8bc594 3	requirements/process-execution/tests/support/executor.mjs
+100644 b696662952b53dee70cdd518fa5ec22891fb3276 1	requirements/provider-projection/tests/011.test.mjs
+100644 e12500fff202b9e2605b8fdf092882646e6187b5 2	requirements/provider-projection/tests/011.test.mjs
+100644 927a20bee6bda75d8b069c82b848a7bb9fe0af02 1	requirements/repository-programming/APPLIES-TO
+100644 63cf7b7432ce511f2f74788dac9061509fb8c561 2	requirements/repository-programming/APPLIES-TO
+100644 29389f72dfe28aa918b981af76d4d7ffa0891c2c 3	requirements/repository-programming/APPLIES-TO
+100644 ececde162b7cee8dece26edddf0038dc151b6e76 1	requirements/repository-programming/README.md
+100644 049ac0a5a7b1bbf790a5587460ca898d1ca402d8 2	requirements/repository-programming/README.md
+100644 b159e47b75cbc8264e11790d364ca3ef963740fb 3	requirements/repository-programming/README.md
+100644 b7863bf27e20ec1123ea2dbcfb9b01677ff10d33 1	requirements/repository-programming/WHAT.md
+100644 f8307417ee968a859b47ba477bf7530870ab4268 2	requirements/repository-programming/WHAT.md
+100644 ef59eca2dae1a6064533c636a761ab0bcd9484c9 3	requirements/repository-programming/WHAT.md
+100644 ace9145c03bb6408a411f013eab03cd73ac5e09d 1	requirements/repository-programming/tests/001.test.mjs
+100644 7bfa6037c6e0c38c8df99b5da85126551e204d54 2	requirements/repository-programming/tests/001.test.mjs
+100644 041fef2e501a9f91edf365290aee7a00378da7d8 3	requirements/repository-programming/tests/001.test.mjs
+100644 9808361465c79413494551fff9f035f72d028edf 1	requirements/repository-programming/tests/002.test.mjs
+100644 73393a0a382b6044dc42d6bf62ccde99ae297c05 2	requirements/repository-programming/tests/002.test.mjs
+100644 347fdc4d38b8e0a83055b19d67bec4082e4cdf4e 3	requirements/repository-programming/tests/002.test.mjs
+100644 0f0a94e84f63282465112e456fd58269d8fca31c 1	requirements/repository-programming/tests/018.test.mjs
+100644 5ecad75b7aad7fa2b7d038463eaff484144d248e 2	requirements/repository-programming/tests/018.test.mjs
+100644 301a4bf9e7e30fb00b78db7fa14d65b2e0578f3c 3	requirements/repository-programming/tests/018.test.mjs
+100644 895eb7dc5c531d3a575e6c7570db26fc2a05bffb 1	requirements/repository-programming/tests/027.test.mjs
+100644 287d65b8adada03c44db0f26a011ac2045c31e1e 2	requirements/repository-programming/tests/027.test.mjs
+100644 56a4c53a920a6e4877f93ebb69ea9c2476f2858b 3	requirements/repository-programming/tests/027.test.mjs
+100644 72f75483ac5e34ad101d2a4978bca5fae4805730 1	requirements/repository-programming/tests/038.test.mjs
+100644 a65b6311d1a2434e36903311b3c0c52aaf517fe9 2	requirements/repository-programming/tests/038.test.mjs
+100644 c166fd73fa1263c71354f19da37f224f8874b3fc 3	requirements/repository-programming/tests/038.test.mjs
+100644 bab69b103a3151a18253908a9e78b29851f7a7e9 1	requirements/repository-programming/tests/043.test.mjs
+100644 d78abf3ad2babd37a4e594414bc42e6b76354f80 2	requirements/repository-programming/tests/043.test.mjs
+100644 08f432e60a0fab592bd32aa0e8943859acf4e6bb 3	requirements/repository-programming/tests/043.test.mjs
+100644 1b45da17f55b67c3827aa06e205b593392c3cc95 1	requirements/repository-programming/tests/050.test.mjs
+100644 a4e4a611f476b7dec2a62e31a2550caf2c45a6e4 2	requirements/repository-programming/tests/050.test.mjs
+100644 637e777e61f0a8c2ef2cc30dafc9bac31c32cbc9 3	requirements/repository-programming/tests/050.test.mjs
+100644 f86e11ee9d7a109e2a19ebc012f0118d43cb0cfe 1	requirements/repository-programming/tests/051.test.mjs
+100644 e135caaaf940d683823c0982b36bf1d8d7a2c3f5 2	requirements/repository-programming/tests/051.test.mjs
+100644 81566a13d23d0575dec3167901843d0dc69a0081 3	requirements/repository-programming/tests/051.test.mjs
+100644 688f251499016963de22ba62800ac2dceaedeb2d 1	requirements/repository-programming/tests/052.test.mjs
+100644 61a6f269b2751facbd10dc43f9a6fd314c1e7a15 2	requirements/repository-programming/tests/052.test.mjs
+100644 0d1fc54ade02f59d7fb5134e8851d6ad549161b0 3	requirements/repository-programming/tests/052.test.mjs
+100644 c69cabb515df6924434ee65cf94f7c7e599da0af 1	requirements/repository-programming/tests/058.test.mjs
+100644 447c49a044fa4921d95389976df2ae251eaffe42 2	requirements/repository-programming/tests/058.test.mjs
+100644 75338c7624c925d629c3b82ef3bf9ecde69473bb 3	requirements/repository-programming/tests/058.test.mjs
+100644 031525d460c760f7e63697e016cee4e4f417bd7c 1	requirements/requirement-grounding/WHAT.md
+100644 e6f6123969f321c6ec3140be3d496b62c2dcdd98 2	requirements/requirement-grounding/WHAT.md
+100644 0c1444e6b53a9d315f33a8ab9452ea31b33166b3 1	requirements/requirement-grounding/tests/002.test.mjs
+100644 771ec7b3a55c9bb7b38f3b0c797c34335a7e6b01 2	requirements/requirement-grounding/tests/002.test.mjs
+100644 559f220d8a5528ed46258f86dd4f2ca472225dbc 1	requirements/requirement-grounding/tests/007.test.mjs
+100644 de47f41cf331ef2ad7be80465fc3a8325fb9413a 2	requirements/requirement-grounding/tests/007.test.mjs
+100644 a8e4a6fb08fb7b731e92e638c4adadb51bcee1be 1	requirements/requirement-grounding/tests/008.test.mjs
+100644 bed59a1274f73168ef9624e4d0e526ecfbcf0465 2	requirements/requirement-grounding/tests/008.test.mjs
+100644 efc2195dc82a232b5f27a5dafb6af6e5f31a3bab 1	requirements/semantic-trace/WHAT.md
+100644 289d5273f2049fd7520c0597896733db6de788c6 2	requirements/semantic-trace/WHAT.md
+100644 218673e9974d066fd7a2f9feecd1d8f6900d8acd 3	requirements/semantic-trace/WHAT.md
+100644 77a6c199609663236dbfd846c54768d7730119d8 1	requirements/speculative-investigation/tests/013.test.mjs
+100644 c3ca7143910d0f6ce576a3301f0ba7ad31efb09b 2	requirements/speculative-investigation/tests/013.test.mjs
+100644 33ec7a2ba3df7f1463eaf6f934137240e97ca60a 1	requirements/verification-system/tests/016.test.mjs
+100644 0bf19212bb813c96537c0db1bbd0395f328b9daa 2	requirements/verification-system/tests/016.test.mjs
+100644 af859ccfecca047ae690ed1dcdc2772bddc36123 3	requirements/verification-system/tests/016.test.mjs
+100644 f762d9cf6a1e81a415ac04b85e176821512f7214 1	requirements/verification-system/tests/support/plugin-fixture.mjs
+100644 7b4a0f064f9461b0cc11edac27a000e859be6f99 2	requirements/verification-system/tests/support/plugin-fixture.mjs
+100644 868ca5266d016d5afbc7b921540f242930595717 3	requirements/verification-system/tests/support/plugin-fixture.mjs
+100644 252508a7fdcae32fc016d0ae0dae80ba140cffb0 1	requirements/verification-system/tests/support/run-inner.mjs
+100644 e01192f1207b11d3b3ee70921acdccb4f708d546 2	requirements/verification-system/tests/support/run-inner.mjs
+100644 134f55163b56e09b71dafb4d687642082c4afa04 3	requirements/verification-system/tests/support/run-inner.mjs
+100644 cb7dec1da0d68b4b73eff6f810d2b0f8da767692 1	requirements/work-record/WHAT.md
+100644 e895c295599c0b9e16f8e4c2bb8247f4730ffb76 2	requirements/work-record/WHAT.md
+100644 2a84a8a4240b64e82387c7a1c656e62af9b1677e 1	requirements/work-record/tests/004.test.mjs
+100644 d0830b50c96340da9b64912814e647dfa4ec2977 2	requirements/work-record/tests/004.test.mjs
+100644 42f8fbb2ca36e23b6ffbe9f944fbb1dc4ac59cc1 1	requirements/work-record/tests/010.test.mjs
+100644 9a3f74e4bf6a2e2c92f4ac9b545d27d83ed5fd08 2	requirements/work-record/tests/010.test.mjs
+100644 051d65dbf46041b17803455d7e458f0ce9b74c32 1	requirements/work-record/tests/011.test.mjs
+100644 71279cc8d293f92843f291679950660821f01693 2	requirements/work-record/tests/011.test.mjs
+100644 bb592f04a4553f5e9d1254e8a7f0e1604c5edb31 1	requirements/work-record/tests/README.md
+100644 306db914ed0245d51e3da0238b843eb044133d73 2	requirements/work-record/tests/README.md
+100644 cbf7d016627962a70b1dce74bf77f99da7b11d0a 1	requirements/work-record/tests/support/record.mjs
+100644 e3ee4c2f8cd301d5872f2d2f0d30cefdf5df72f1 2	requirements/work-record/tests/support/record.mjs
+100644 e456ad8f7ef8e5c4b5c759e55be21b01e360be03 1	requirements/work/WHAT.md
+100644 d91b6d3b65a166bacb9622cbce750d18e1db4a32 2	requirements/work/WHAT.md
+100644 cb34424950a87f31b0bc906b3a984a0d26c2d73d 3	requirements/work/WHAT.md
+100644 7b2110efc5f2c22762646005a45fd17d2f9fc6ed 1	requirements/work/tests/020.test.mjs
+100644 dc6115096fc8b1fee7ff1e27c2c81ab931b18f2a 2	requirements/work/tests/020.test.mjs
+100644 06c6b774458f04a40b78f3ace069fb2cc53326b7 3	requirements/work/tests/020.test.mjs
+100644 2f4a73597e9747371357f51093df5650f19cff5a 1	requirements/work/tests/029.test.mjs
+100644 bf1e35d3d6a8d190e2b9b9e2e0004c119491c522 2	requirements/work/tests/029.test.mjs
+100644 647ff1c550b2dd3e7ffccebf62495b6c2c9c10d5 3	requirements/work/tests/029.test.mjs
+100644 57ef8a9550abaec102d93fd0ab37eb8e34303509 1	requirements/work/tests/034.test.mjs
+100644 2ca94d97b5018a453099e9a31ba328f94d834bdb 2	requirements/work/tests/034.test.mjs
+100644 3db51278083613a34e0220ef80c8a350c972059f 3	requirements/work/tests/034.test.mjs
+100644 a89b456d717b53435fe0ef68e6cba3188bafa169 1	resources/provider/tool/js-plan/en.md
+100644 4b2873caa3b6189ea286fb4696806c4e5f139cc6 2	resources/provider/tool/js-plan/en.md
+100644 d9428416cec4771f0a3ea507dc23e099176bf11f 3	resources/provider/tool/js-plan/en.md
+100644 3597f63ef0c97ebf6f8f2df41c69de0c3414e978 1	resources/provider/tool/js-plan/zh-CN.md
+100644 016ad3b4ea2ae8311101b63be86ebc08fbd274f8 2	resources/provider/tool/js-plan/zh-CN.md
+100644 b3953ec9224f1d8e63cd90daf3a7d8935bcb45f3 3	resources/provider/tool/js-plan/zh-CN.md
+100644 d4b676be34e185beda50d759d3bf3e8f1e5749ab 1	resources/provider/tool/js-program/delegation-rules/en.md
+100644 bd6264e56537046c7b6d6e5a7fd3cc1d16854cee 2	resources/provider/tool/js-program/delegation-rules/en.md
+100644 48bce11fa9effa2a9207c7a9cf82407940329092 3	resources/provider/tool/js-program/delegation-rules/en.md
+100644 de30118cb4308f8ee3328b2278919c4ef10e003a 1	resources/provider/tool/js-program/delegation-rules/zh-CN.md
+100644 e2b0213d4a319e8961d91b22a02a7e5715bfd421 2	resources/provider/tool/js-program/delegation-rules/zh-CN.md
+100644 4a1b5d14c9902c68a1c466b105624d1ab8b787ed 3	resources/provider/tool/js-program/delegation-rules/zh-CN.md
+100644 cfe0676a2c8837a47535248d04f97aa0b050512d 1	resources/provider/tool/js-program/run-recipes/en.md
+100644 888b079aa81be1126a410940451388162f64814e 2	resources/provider/tool/js-program/run-recipes/en.md
+100644 df43a28157863ee4919c1161dc0ef8ad2e2e235f 3	resources/provider/tool/js-program/run-recipes/en.md
+100644 a7e68ef0e783e0b22093db403eccfeff65591deb 1	resources/provider/tool/js-program/run-recipes/zh-CN.md
+100644 1d02af0c752d4826cf6d71bcd38490a02107da14 2	resources/provider/tool/js-program/run-recipes/zh-CN.md
+100644 cf52c91de8c8e5bb50305a524e562bbd4e0a6c09 3	resources/provider/tool/js-program/run-recipes/zh-CN.md
+100644 03a6fe06f306c076768b57833c153b0a211200fa 1	resources/provider/tool/js-program/run-rules/en.md
+100644 027e5d432f4b8370921e1c3672bdaf5f1214016c 2	resources/provider/tool/js-program/run-rules/en.md
+100644 752368ae42031795ca595486a7b6fb3afba436a1 3	resources/provider/tool/js-program/run-rules/en.md
+100644 95e9707339a4f3bfe9fb6ab5a8b8c726e15dce22 1	resources/provider/tool/js-program/run-rules/zh-CN.md
+100644 f660791cdae2578f4c30d801b7818fde2816710f 2	resources/provider/tool/js-program/run-rules/zh-CN.md
+100644 80385e578796452dab6ef28a3e12a249dc61aab6 3	resources/provider/tool/js-program/run-rules/zh-CN.md
+100644 7c6f19907478049e6cb1a586f7412acd0d6fd600 1	resources/provider/tool/js-program/ultra-devops/en.md
+100644 9d44692526105cdafdd952e5149b3b058f40f36e 2	resources/provider/tool/js-program/ultra-devops/en.md
+100644 617e7c7fd1c0ed49fd5c9a792d144bbca9792ecf 3	resources/provider/tool/js-program/ultra-devops/en.md
+100644 71657800b0b98b7c411f9417e8a7e83fea39e41b 1	resources/provider/tool/js-program/ultra-devops/zh-CN.md
+100644 0ebdb24031ca6a50610924f39345c9b78d4d5efb 2	resources/provider/tool/js-program/ultra-devops/zh-CN.md
+100644 232778c68c94e04d49e30cfc3844421c6ec4b06b 3	resources/provider/tool/js-program/ultra-devops/zh-CN.md
+100644 e28347ad39a3a5263e08de73eee951c39ae548b9 1	resources/provider/tool/js-program/ultra-plan/en.md
+100644 69d5002c389999e4fbfe6d7482d2ac26f28e12dc 2	resources/provider/tool/js-program/ultra-plan/en.md
+100644 6eb5ecf479bc64836f2153937f59c458f07b26c1 3	resources/provider/tool/js-program/ultra-plan/en.md
+100644 af288eb2ecda23663d215462b103c7cb5d007f71 1	resources/provider/tool/js-program/ultra-plan/zh-CN.md
+100644 69d5002c389999e4fbfe6d7482d2ac26f28e12dc 2	resources/provider/tool/js-program/ultra-plan/zh-CN.md
+100644 cf79c41ab94bff7c398bff9776204c69cabb8285 3	resources/provider/tool/js-program/ultra-plan/zh-CN.md
+100644 1da7179ea7b1e53133abc65efe8f8f462905555d 1	resources/provider/tool/js-program/view-declaration-extra/en.md
+100644 ce88c115cab24c9ddabc7b7468e40fb54981962b 2	resources/provider/tool/js-program/view-declaration-extra/en.md
+100644 232ef46c0b21399ca59416080414cf21b4fd07eb 3	resources/provider/tool/js-program/view-declaration-extra/en.md
+100644 8b2852260f8aaba131983b385be09312e45d37f6 1	resources/provider/tool/js-program/view-declaration-extra/zh-CN.md
+100644 681cd27776c1254c8935e48793faf53d05bc7d1c 2	resources/provider/tool/js-program/view-declaration-extra/zh-CN.md
+100644 dde2705019f0c5108c5c7722e5dc4c601a1590b2 3	resources/provider/tool/js-program/view-declaration-extra/zh-CN.md
+100644 a2942a23640a64ab0ed2b8982fbf6cffafd3129d 1	scripts/verify-package.mjs
+100644 0a11b61b27381b26bd625693300fb73042aa2791 2	scripts/verify-package.mjs
+100644 ee1ff0608b485538759fa10bf303cbaca397a1b5 3	scripts/verify-package.mjs
+100755 4ee37b72c5fad25fd5e968fa15beefd39ba774cb 1	scripts/verify.mjs
+100755 0cb42c7eee963791e8525012bd29acaa1dceea52 2	scripts/verify.mjs
+100755 efe4d8d39557a4e80b70cea1529707b17e4609b4 3	scripts/verify.mjs
+100644 5c83f99dfca9a6e0ba43eddd6730d57a7d8c357c 1	src/Wanxiangshu/Change/Host/Host.fs
+100644 de461ffbd880f29413fa26ea9ccdbc48c0ce5d10 2	src/Wanxiangshu/Change/Host/Host.fs
+100644 22a144a80f0eb7bef50e7a9a82463d2064a26187 3	src/Wanxiangshu/Change/Host/Host.fs
+100644 2fb4c486247226564b8bccfb03941f00218e0c86 1	src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
+100644 65564f6398aafdf1ad4d30e9c6a6400c610c4848 2	src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
+100644 d1b67c74ba26b5410bf6bb8d231052c36ed9851c 3	src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
+100644 27d47f67267b8c9ef03be404d7b7f8c8ffc15b28 1	src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs
+100644 fae01aea712fac7f47b63f30c3dc0e6f04ce7829 2	src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs
+100644 7a3c2e1b1da49358603701a828d773f889ccd8be 3	src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs
+100644 6456b788e86df38caf9a2e987656288c3cdd7a9f 1	src/Wanxiangshu/Composition/Durable/Projection.fs
+100644 3cb3f331b3e2465de2684203508af9a3a669d949 2	src/Wanxiangshu/Composition/Durable/Projection.fs
+100644 66443a25574d363669360f877ddd26363f231e8f 3	src/Wanxiangshu/Composition/Durable/Projection.fs
+100644 44dd3cea2b4c8a7fa9895dcb838544a202e96e9d 1	src/Wanxiangshu/Composition/Durable/Projection.fsi
+100644 9a9b3b32de2bb43a96e80dd4a4a3b43a2909b999 2	src/Wanxiangshu/Composition/Durable/Projection.fsi
+100644 a7ed4b9ec3fb88fd22fe7d0a8705f4a401b238d2 3	src/Wanxiangshu/Composition/Durable/Projection.fsi
+100644 5cc3aaad22a6c9e3aa478b4dff3ea9a0c20a6c34 1	src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs
+100644 f05e51416535e26ae3f07f58702217d9f5225d1a 2	src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs
+100644 aed89397ef6ae0559eb95a40f451956f128ee15a 1	src/Wanxiangshu/Context/Companion/Blogger/MainContext.fsi
+100644 d6e421b535c08dec0b083bc9ff03b0b6c6016e6b 2	src/Wanxiangshu/Context/Companion/Blogger/MainContext.fsi
+100644 2011a98a81cb1ce3c4bc690efdaa9d751b026637 1	src/Wanxiangshu/Context/Companion/CompanionFactFold.fs
+100644 6ddd136708bc5e2f553d08378251c3be3eedd5a6 2	src/Wanxiangshu/Context/Companion/CompanionFactFold.fs
+100644 f3548e610aadcfe7d4b67c145d99c83d83854c32 3	src/Wanxiangshu/Context/Companion/CompanionFactFold.fs
+100644 657e2e82aa5bb4c3fbe365f22834f86e4d39d9ac 1	src/Wanxiangshu/Context/Companion/Transform.fs
+100644 96931392af34bc023b532fe181cc3e45a3dbe741 2	src/Wanxiangshu/Context/Companion/Transform.fs
+100644 560129a8cdc75604b3533bdc286410ca83d43505 3	src/Wanxiangshu/Context/Companion/Transform.fs
+100644 1b6b45168e591e0fcfe73622d74b93fc226a8959 1	src/Wanxiangshu/Context/Prefix/WirePort.fs
+100644 83916cda2c673835bef094c4ce0ab61948a8f59d 2	src/Wanxiangshu/Context/Prefix/WirePort.fs
+100644 fbf5b6c0b561939244285a1034632ec965425079 3	src/Wanxiangshu/Context/Prefix/WirePort.fs
+100644 1b6b45168e591e0fcfe73622d74b93fc226a8959 1	src/Wanxiangshu/Context/Prefix/WirePort.fsi
+100644 83916cda2c673835bef094c4ce0ab61948a8f59d 2	src/Wanxiangshu/Context/Prefix/WirePort.fsi
+100644 fbf5b6c0b561939244285a1034632ec965425079 3	src/Wanxiangshu/Context/Prefix/WirePort.fsi
+100644 6576e74d936e6637b1a328ed455cefc9276735e9 1	src/Wanxiangshu/Context/Prefix/XWireSurface.fs
+100644 8fa6b3260098ead1520704d37f5cc28f65fb423c 2	src/Wanxiangshu/Context/Prefix/XWireSurface.fs
+100644 9dbcad0fc3820173a8a16efded45f4505f3b82c0 3	src/Wanxiangshu/Context/Prefix/XWireSurface.fs
+100644 9f7760b6c804415d8b8581cf72323afa00f11a94 1	src/Wanxiangshu/Context/Trace/Materialization.fs
+100644 346bbe5f5e64ffc5d7063a2928fa3c39e548a4fd 2	src/Wanxiangshu/Context/Trace/Materialization.fs
+100644 dfc95864d5cd09b22e69e7082ff1bc755b80a127 3	src/Wanxiangshu/Context/Trace/Materialization.fs
+100644 c6a3b508fb3be1e07c714d76b69571e49411c47f 1	src/Wanxiangshu/Context/Trace/Materialization.fsi
+100644 30b507a37058b7e2e1463f74963d89dda9f1d82d 2	src/Wanxiangshu/Context/Trace/Materialization.fsi
+100644 64cacc185a9d0e07424e2b060fe3ccf45bfe284a 3	src/Wanxiangshu/Context/Trace/Materialization.fsi
+100644 8951618f386aacdb8476d72d1aaec805a7b26e99 1	src/Wanxiangshu/Context/Trace/Projection.fs
+100644 bfd38de8561b1b933c3a1fd26dc0ffd7b8c17856 2	src/Wanxiangshu/Context/Trace/Projection.fs
+100644 d379446106ac7e7660e086644d166a4eec5b5196 3	src/Wanxiangshu/Context/Trace/Projection.fs
+100644 b202f152ba8228c698c856373de3a723040304ec 1	src/Wanxiangshu/Enforcer/BlogSurface.fs
+100644 200a2e74dd257cce749c61db63b6766e3e691dfb 2	src/Wanxiangshu/Enforcer/BlogSurface.fs
+100644 079233d61ef3ec0a8017e9ef41288d09e9d8e9c1 1	src/Wanxiangshu/Enforcer/Continuation.fs
+100644 e3f15fd898ceb19b70774045b4c0c13dfa30652a 2	src/Wanxiangshu/Enforcer/Continuation.fs
+100644 dda5eaeee1b6af7198628d705e9416d9e803bc20 1	src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fs
+100644 80a49243cb61853ae593fd58b87f04b897aa2deb 2	src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fs
+100644 7065536cdcdcb81ac02f05ee33e4aa2a52aac335 3	src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fs
+100644 46df75d5090358aa1068a017b51fe293f17d8ad1 1	src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fsi
+100644 d405d5b3b9f768592632566dfdeaf032c1c70907 2	src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fsi
+100644 49cd0f42c9070326efe9eeaee29a39ec8502ad80 3	src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fsi
+100644 5fe7910f6269507375d599dcdd5d6a51d4b31616 1	src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs
+100644 8b06cf2fed35aecdd57a53b8f8a188f4af0c4eef 2	src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs
+100644 1f4637d4a76e6ebc6c10eef09625df13db92cb23 3	src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs
+100644 375baa6a15037c857aa9d44514b323fd34d46463 1	src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fs
+100644 e8905d2867a5915d76c541971b7f40805fe2d6db 2	src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fs
+100644 5de250ac8b214aa6a76ee1591e07696a3a3e6969 3	src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fs
+100644 a107c4e3c9e57511e1a36634c06005df5133aab9 1	src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fsi
+100644 a028a19f6ee0a4ddc4dba0406a3b58551407e312 2	src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fsi
+100644 61fe89bb4cec6170ef61df20cfa8dec8e6f2e2d2 3	src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fsi
+100644 7047be786fb981177edece5f090e107bdc741128 1	src/Wanxiangshu/Execution/Delegation/Advisor/View.fs
+100644 533eba413fd76f43542c0d8883a9a1bdf8224143 2	src/Wanxiangshu/Execution/Delegation/Advisor/View.fs
+100644 bbbeecde26a3abd1b25461010c4c4dcd89fcb35c 3	src/Wanxiangshu/Execution/Delegation/Advisor/View.fs
+100644 6c79c1a6de5e0b26a30fbfcc073d6f0d450175de 1	src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs
+100644 957491dc987c28944344d6df0715fd25d601265c 2	src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs
+100644 9ae859f4536d5b928942eb4ed5f6ca1e228fce08 3	src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs
+100644 8127b4f3dec2a30c74115733717157628ed90fb0 1	src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs
+100644 5b1864287b6c27af10fe76ec2e2d17dd6049a8a9 2	src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs
+100644 0966d9fcfbbba714582b3a930dae58fd336835d8 3	src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs
+100644 90be7813f4145bb2f0651d49dd58be91f58b8ef4 1	src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fsi
+100644 d687813203c0b1b654135fb6add4a4fc9c11966b 2	src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fsi
+100644 50d3bfd39b67bb9977b0f770c0e58ca3c747736c 3	src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fsi
+100644 dad2ffaf7b34f3197f3e68f33e48ab3173c5d34f 1	src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs
+100644 96d3e52d774199bae561af01a6ac13f0497389ea 2	src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs
+100644 579a8f65fe153f0fbb05020c5d3c6eb3365d5664 3	src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs
+100644 77c68fde5fb204846ad194b58d8f826334ca8d4b 1	src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fsi
+100644 8a7ed25fda775db6ee5924a07cd96ff24ac72350 2	src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fsi
+100644 4cf7c2f9a5168cc3a23688537bc9a68e1397c656 3	src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fsi
+100644 39f55cf4a6583ad346603d866310bd9edccf7cee 1	src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs
+100644 8d18aa4d792d2cab9ffbefc05a180bf512e7d428 2	src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs
+100644 320aaa5d76cc62ac3049e79a3ff2dfe462cc7be1 3	src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs
+100644 176c59a273f4e622cba639e03fbcdb26ddca44ab 1	src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fsi
+100644 6b5f76b81bee8e7c3f8f4abac58caa66b224c75e 2	src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fsi
+100644 5d6e92e9419a32f4a578f55bf817787771883c06 3	src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fsi
+100644 21eb6433adca5b2ee08345de5a509a540eca6475 1	src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs
+100644 17fcfb8e1f507c70518f5706c9b6474b50677c68 2	src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs
+100644 325b8ed70d0f0fa5bc84815132115d7e7021b45b 3	src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs
+100644 3713be45236b02cdbd9570a38652ac24c6714049 1	src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi
+100644 7b020fd8dcd2a52728587f40ac49a88e013894f4 2	src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi
+100644 9307c66f68ffea76fc22fe5c4512fd0cb089b0eb 3	src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi
+100644 0fb6698e939b55e594b25622e0ca85ff132e8f59 1	src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs
+100644 fc787fa2494927380df9495a4b68ef4b345c607e 2	src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs
+100644 220784957d45bd7602debe3e86f14164e8a9bc36 3	src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs
+100644 f319209321ef95e1cdf249d9d1710d02ae51390a 1	src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs
+100644 8a7d57223959a238b9b6b0fe400096fe21d67b91 2	src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs
+100644 5500f84a52c21c09d1511a155f676b9d87efa58d 3	src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs
+100644 3adaffddf62e93134d22c0715b36573790c0cc05 1	src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs
+100644 41cc01f159bbbf5d8617b7bf60e08cc284dce3de 2	src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs
+100644 311ad1588ab9b862229586df003ce50f56a95e32 3	src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs
+100644 f59e807b6844d801681d05cf658ed20460031718 1	src/Wanxiangshu/Host/Contract/ToolResultBound.fs
+100644 d352e73eb4d03a6040aa9a05b18d185f5633a593 2	src/Wanxiangshu/Host/Contract/ToolResultBound.fs
+100644 07d9e9bcffd86df55c43b25d052bcad21bfee2b9 3	src/Wanxiangshu/Host/Contract/ToolResultBound.fs
+100644 8c4bb887f9d80e938d6b88cc1894731b881837b3 1	src/Wanxiangshu/Host/Contract/ToolResultBound.fsi
+100644 cac2ed44b09e412e06925a176f183180cdd51dd0 2	src/Wanxiangshu/Host/Contract/ToolResultBound.fsi
+100644 812d31ded4b499eba3c729f5670018838ab41cf1 3	src/Wanxiangshu/Host/Contract/ToolResultBound.fsi
+100644 85550238c51f143cec8d1335739f02ba2e6c915a 1	src/Wanxiangshu/Mission/Planning/TenureIsolation.fs
+100644 9113703845646b3204604f18ddaead68c2290a64 2	src/Wanxiangshu/Mission/Planning/TenureIsolation.fs
+100644 f01fa02ac1b0070527893cdbae6f6a5a342080e8 3	src/Wanxiangshu/Mission/Planning/TenureIsolation.fs
+100644 9792a4bd83af3dff392a61d2c29c1c450234c6d9 1	src/Wanxiangshu/Mission/WorkRecord/Materialize.fs
+100644 0a2bcf69cd77457d8cf44e1b5e46cb92dbc1c9f3 2	src/Wanxiangshu/Mission/WorkRecord/Materialize.fs
+100644 ebf17651327b7f2946dca766fe67f0ee7819193f 1	src/Wanxiangshu/Mission/WorkRecord/Model.fs
+100644 4a282b01405c9a3c4b0f48beaefe8c6040a2d9d8 2	src/Wanxiangshu/Mission/WorkRecord/Model.fs
+100644 d4214a0af6e4ae6b5ded748dcd26b8d580faac64 1	src/Wanxiangshu/Mission/WorkRecord/Surface.fs
+100644 97ead5f6372f2743f1ca7ac7b327ecac137f0a57 2	src/Wanxiangshu/Mission/WorkRecord/Surface.fs
+100644 4eb7784f063c4c72e91bccaf07a085002cb0f3ec 1	src/Wanxiangshu/Mission/WorkRecord/Surface.fsi
+100644 d88c313669fc21c835459408e9c604d8fb9b30f4 2	src/Wanxiangshu/Mission/WorkRecord/Surface.fsi
+100644 ae563f3260e3084f53da38c7e747fef329482454 1	src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs
+100644 edbccdfe366b9ebfbd37b36768dff5f5e2136e3a 2	src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs
+100644 d09a2fcb6360395fe4653a76436c4bba8f93e177 3	src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs
+100644 a9ccf647e64abaacaafbb9666ec6d76e4daca84b 1	src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fsi
+100644 cc423b773acd4754c291909155b640c1621a48c8 2	src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fsi
+100644 b8cf436163a48bf7fe82140cf990d9e5f6159e96 3	src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fsi
+100644 f1a94f15e45b4cf3e26aa1f8b69dcb0a3db80827 1	src/Wanxiangshu/OpenCode/Host/ChildWorkRecovery.fs
+100644 b01a144c81f4a9afae141ea797ff32686bc6e38e 2	src/Wanxiangshu/OpenCode/Host/ChildWorkRecovery.fs
+100644 4b4bf8df5e45e641537c51b1d934393fe3a5e797 3	src/Wanxiangshu/OpenCode/Host/ChildWorkRecovery.fs
+100644 a5373c4e1f936af6a2bfd417930fa0f3f27a7f34 1	src/Wanxiangshu/OpenCode/Host/EventsSurface.fs
+100644 28331925e0017585a2ddbb7149c0ca9cbd88697e 2	src/Wanxiangshu/OpenCode/Host/EventsSurface.fs
+100644 a15972a853d3a8c1ec9514cd2738214a3b729724 3	src/Wanxiangshu/OpenCode/Host/EventsSurface.fs
+100644 e03f3ea48af3abeb3372645698b51ab17127fa4d 1	src/Wanxiangshu/OpenCode/Host/EventsSurface.fsi
+100644 3af22caa69e7955d5890a4cc6e91cb3a02cb69eb 2	src/Wanxiangshu/OpenCode/Host/EventsSurface.fsi
+100644 48721d34d827e6b512ce8a437292cb7ef52ca4a2 3	src/Wanxiangshu/OpenCode/Host/EventsSurface.fsi
+100644 6cbdd1cdd1010ba1d3e9831b815baaabad40ba68 1	src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs
+100644 12620a341baced1c3452560405be93bf5d576011 2	src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs
+100644 e4199b1d61ecddd27b51f2ef447c1f3181b95dca 3	src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs
+100644 b448e6d165436c6f74f4e7593c294b1a0b5f066c 1	src/Wanxiangshu/OpenCode/Host/ManagerReviewContract.fsi
+100644 28998cdd5663b273f33e60b2a2fee0f2e804804e 2	src/Wanxiangshu/OpenCode/Host/ManagerReviewContract.fsi
+100644 07db2696ef48adac22b854073168b620cb698d91 3	src/Wanxiangshu/OpenCode/Host/ManagerReviewContract.fsi
+100644 7cc47b08f505da57e13e2e0e4f0235e2a4a73ac0 1	src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
+100644 82931d00b47808471e06d98f98add39f1f998afc 2	src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
+100644 140c9f21ce42ad8c5aaa7c08579a8b8064ebb30d 3	src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
+100644 b23909d5c4b9bcd18713c5125f2494d01c79afb6 1	src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
+100644 d1eef73e5fb2822322724ce71c486d4445517077 2	src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
+100644 aa39684cfda02777c1f3637947c3d13ffb0ad94c 3	src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
+100644 f70244f3428144ac2a9aa4becffd66c95f40b65f 1	src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fsi
+100644 c0f348134616f97c3c7b36a328c7708500fdcd13 2	src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fsi
+100644 363f57039d2ee93d3c55e9ad581ba0271c82841a 3	src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fsi
+100644 1108d75145300766e6d4870f7e350b166fa83379 1	src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
+100644 9c140804f6ffb88285cd6d5776b3a2dd2156ca46 2	src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
+100644 3f464a0461e4c3fd3ecec47b27d32ceafed814fc 3	src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
+100644 fafd179c8d6edd85df2ba47669cfd9cf02156c14 1	src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fsi
+100644 3b01f907b0f25ed59a9628bfa9d3006bfcfff4dd 2	src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fsi
+100644 dbaec7c1353ac3fa1f6b25886bf3b234d1e2ce04 3	src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fsi
+100644 eb877275db94ef29c7f773e4d86f0eca0d8dee69 1	src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+100644 3b042969598962ca6af5a91148d39f897d4347ab 2	src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+100644 e8031fcad007739010df195aaf407b80eea33f9f 3	src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+100644 7232fe47242a4f9f2e23b96c1631c5f06a07158f 1	src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
+100644 747b0a177ac1cccf985261c1327c4324ed7373fa 2	src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
+100644 5e4c2b94be8819572747e027cbbb9696681e6f6f 3	src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
+100644 af95527d2f536f44e68a04f09f48aaa2f6676b18 1	src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+100644 00f43c00f6433bbcda5e649fcd610990130d9978 2	src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+100644 2e806d31fca8a889a5610dce845d8e7ad2c0e527 3	src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+100644 0e892109ba72461844d66378e80f58f63fa43fc3 1	src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fs
+100644 76a57ee7bbd3c638994ba6c9dc6d55fba22fa619 2	src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fs
+100644 b7af124012e66c3f11bd3c5fed3e9dcbb573590a 3	src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fs
+100644 914365304df22b70153948b2d3e00fea0a28001b 1	src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fsi
+100644 9a6083b00bb43e58ffc313119e7d522db1bcde13 2	src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fsi
+100644 66606c3469bfe02a128cf98398a8647f71bb2437 3	src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fsi
+100644 182a8688462356019c48e6744d4a1923139616db 1	src/Wanxiangshu/OpenCode/Tools/StaticTools.fs
+100644 cad3976680ef9c7d61ef89abed72a5cdda2a5e19 2	src/Wanxiangshu/OpenCode/Tools/StaticTools.fs
+100644 7f91429e87bff19f43601dbd85f2c557510a8db3 3	src/Wanxiangshu/OpenCode/Tools/StaticTools.fs
+100644 55cec4fd9900bfc73220fefc8d75d341f4d06b5c 1	src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+100644 438f8c1b9e0d991dab67d07f17af094ef26d09e9 2	src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+100644 d6602c6b1b875ffa299f87aaf386b3366b0ef567 3	src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+100644 ba3e36cb3c41351acfcfb09150a244a9d2426396 1	src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fsi
+100644 ed8513dded685046585380df39f64bae3d514ed2 2	src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fsi
+100644 f654600e650bf88979905002c9c6e224799101ff 3	src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fsi
+100644 083786b2c23107c0694cd5c32ecf2964fa6411af 1	src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
+100644 350cd3cbc03e13729ba3160e46de810dea4435bb 2	src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
+100644 dc51e3876a26f03af0f6c7fc2e92d82594e05112 3	src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
+100644 0c802af5dc20131ccc019a1500ac34cc8a04e2d8 1	src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fsi
+100644 e9450e32176636918f2883bc617cfb82c91cae70 2	src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fsi
+100644 08ea6ac65755c780a83a295ecdd238cd180a86a8 3	src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fsi
+100644 abac054cb49beec32b62f93e69e30a743ac7608d 1	src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs
+100644 43effd2d9eefd9cfb6469edbea1685a79c10b572 2	src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs
+100644 e949483aab0502ca09319aa278224099222a83e5 3	src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs
+100644 40b89f1d645a67d660a83baa902656b2d5c26a1a 1	src/Wanxiangshu/Participant/Persona/Identity.fs
+100644 aee4680dc1c534c9566811446b19546b36f7273b 2	src/Wanxiangshu/Participant/Persona/Identity.fs
+100644 d1935aba3b950edd40c811b164526aee112c96e3 3	src/Wanxiangshu/Participant/Persona/Identity.fs
+100644 80b7477597f1960b6cf98ad63fc5dc224404bcf8 1	src/Wanxiangshu/Persistence/Journal/Surface.fs
+100644 fd30f43e9396e80771e3cc51b5c3c04cc2501d4e 2	src/Wanxiangshu/Persistence/Journal/Surface.fs
+100644 fd983f226ff4290d74b4caabf24b1eba63157874 3	src/Wanxiangshu/Persistence/Journal/Surface.fs
+100644 ac30523a21a5020bf8e90b0c361e736748ac044c 2	src/Wanxiangshu/Process/JsCallLoop.fs
+100644 9d454e32d1dcda30dbf9539e67a915b133272e68 3	src/Wanxiangshu/Process/JsCallLoop.fs
+100644 09e8d61fa4feb5e79833eef7c8628945cfd640c8 2	src/Wanxiangshu/Process/JsCallLoop.fsi
+100644 c7e67aa992022f32cc053db7f66a393d4ed5a31a 3	src/Wanxiangshu/Process/JsCallLoop.fsi
+100644 978d64a0118b6d7f2514f6cd9d0b1d484fe3bdab 1	src/Wanxiangshu/Process/JsSandbox.fs
+100644 86c0cb5ffb543cfe84a9fd99e692326c3ec16fe7 2	src/Wanxiangshu/Process/JsSandbox.fs
+100644 c29fd6551c0dc4e69a824c7566874d7b9a122966 3	src/Wanxiangshu/Process/JsSandbox.fs
+100644 acdcd769d2805b4ca1556cab2e518ef9f8671790 1	src/Wanxiangshu/Process/PtyBackend.fs
+100644 32b81d424a6ecb48d5b33d6ba079e303d316039e 2	src/Wanxiangshu/Process/PtyBackend.fs
+100644 d7476a6885f6e558c3ccdd760c6187415538c7a9 3	src/Wanxiangshu/Process/PtyBackend.fs
+100644 53e0e5cf8b1b31672572bc4b3d215e916d49f493 1	src/Wanxiangshu/Process/PtySupervisor.fs
+100644 5076330202e22e654fe7b7e949d39a96de2d98db 2	src/Wanxiangshu/Process/PtySupervisor.fs
+100644 4261a4545674addf5113d3bccd71e897c71267a6 3	src/Wanxiangshu/Process/PtySupervisor.fs
+100644 3c1394cb4376b2726de06aaade99d1a6684fc338 1	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fs
+100644 866ef13d4413d61e157d6baeac776ab66007e54c 2	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fs
+100644 e79fc9f414ecc0945131447cc4564b5f808912e8 3	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fs
+100644 f49b409c024a4bc7ab2e7d7491adf46c6d128616 1	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fsi
+100644 397a3a1acfef79bd97782ad07b2db110f06d26b9 2	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fsi
+100644 eaac84a689134e3121d1b1dcafb5e43dfa288307 3	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fsi
+100644 41eba78c804f36b54e1472e5ec2a8494d599e78d 1	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fs
+100644 95ea5408f06fdcff483b4f3b7fe2a68ad2ede407 2	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fs
+100644 52df7f7eb240cc55638b0870a7e629ca39eaad30 3	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fs
+100644 41eba78c804f36b54e1472e5ec2a8494d599e78d 1	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fsi
+100644 153566685622c44ebef50251e0e923129393ab7a 2	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fsi
+100644 f9fb7fcceb03a669cb1b9de6c948dc6bfe3d0195 3	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fsi
+100644 2f016a86b697e2d89e5241cbf01fe35b7b8d6d82 1	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fs
+100644 540c1e0af991a14737415149913230175754f44d 2	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fs
+100644 d07ad1679115bc96bc589f78b28853ffc533b363 3	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fs
+100644 43507cc250cc4774d76b3f007e63282d98a41c76 1	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fsi
+100644 040ef0e8f5b9a6a201d47322d16b73ba504c9613 2	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fsi
+100644 f806b09af3b9321d5908bb6a7632576394ff45ee 3	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fsi
+100644 c9b63a64ea4399cf13f3878421fe6110954a4a2e 1	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fs
+100644 8096ae0e206ebb68b5333f3966fe78122407dba2 2	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fs
+100644 0cda063d530825b074605b2fef64beb4f08079fa 3	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fs
+100644 4ecf9f4eab3a1855d119004644e97f14966e3457 1	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fsi
+100644 550b2828dd687688cc613a1fe72b821128e6ad18 2	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fsi
+100644 ae6178862e4a017db43d31cae13ad3054c330f4a 3	src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fsi
+100644 be99ee08ca7c62712eab2f6c8124a46dc97d834e 1	src/Wanxiangshu/Repository/Programming/Js/Capability.fs
+100644 3af988d74a232db02d83e77509b8730f1a23f555 2	src/Wanxiangshu/Repository/Programming/Js/Capability.fs
+100644 ea6fedbfb9427f9d3524957c457e65d1d566982f 3	src/Wanxiangshu/Repository/Programming/Js/Capability.fs
+100644 1a60dcc1b74a67ce260e4424fb795ff31f60cc63 1	src/Wanxiangshu/Repository/Programming/Js/Capability.fsi
+100644 414875535a70712ee6055474f87512e829343428 2	src/Wanxiangshu/Repository/Programming/Js/Capability.fsi
+100644 b4bfcb3f731e970db60692e96feed5be99f264a5 3	src/Wanxiangshu/Repository/Programming/Js/Capability.fsi
+100644 4cc261d094ed6d53541e3d3ea9cd92d2bbc3a70b 1	src/Wanxiangshu/Repository/Programming/Js/Description.fs
+100644 38d51d1d6c1cffd3ddcb0db511055353dfc54fad 2	src/Wanxiangshu/Repository/Programming/Js/Description.fs
+100644 5f48c0017d5c4236439dec2e72a8a726fc3c7a88 3	src/Wanxiangshu/Repository/Programming/Js/Description.fs
+100644 49d9d0efcaa9951314faee3f164b77a2b87f1b0a 1	src/Wanxiangshu/Repository/Programming/Js/Description.fsi
+100644 b6ab8746778330b1a0c0192ecb9de3e1687c5251 2	src/Wanxiangshu/Repository/Programming/Js/Description.fsi
+100644 95ed55de5e4ba4e11c61ffd9223ebb23d2e5f110 3	src/Wanxiangshu/Repository/Programming/Js/Description.fsi
+100644 ed574f2454f9ffe62b52a2768af0240d5cd9f7d6 1	src/Wanxiangshu/Repository/Programming/Js/Failure.fs
+100644 4a5e5ea33c6d84ee331d8aab46ae7d3303e5a772 2	src/Wanxiangshu/Repository/Programming/Js/Failure.fs
+100644 cd16a2649dd81960f1028588949cff90d3a3367c 3	src/Wanxiangshu/Repository/Programming/Js/Failure.fs
+100644 004d9c4a7d9ce1213d6e4832bd82551c1d6e26bd 1	src/Wanxiangshu/Repository/Programming/Js/Failure.fsi
+100644 73d1b741dbb90a081ecccf93e7153e56051a2446 2	src/Wanxiangshu/Repository/Programming/Js/Failure.fsi
+100644 f9ce28a5a7ddf146d23197e5f0e16759e6d1e6f0 3	src/Wanxiangshu/Repository/Programming/Js/Failure.fsi
+100644 673ab736aa8affefc4c20c992533044c0cfd7ecf 1	src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs
+100644 a256a243a4c2b7e9649ade0b4b34af583ec9d26c 2	src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs
+100644 b7ee2ce89bf05501ca98e2973ca49a46927b7c7a 3	src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs
+100644 784737a2f1550504174e93c87585e8a3d9cc01dd 1	src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs
+100644 b73e69e3edb9298c256b34525a16c029b83d278d 2	src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs
+100644 ed3ae7f561ec32e37fc79bd93fe9bb2e9bcf6635 3	src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs
+100644 5e6a436b11c14675cd820a3781b656394b698f17 1	src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
+100644 f3b7d31fe36d94b637239cc0b645cc28b759d0da 2	src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
+100644 c134c351a4da2641ac209f498c2dc290391f5016 3	src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
+100644 ecd2d6354ac298ba49f4d010e4b2d96c0faff8de 1	src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs
+100644 284e0270f7e5b85e22b6de3f4bdcf4d173c7f7e2 2	src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs
+100644 2d8ea1dc3a4ea7a35d50319997481deb3ba93ea4 3	src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs
+100644 5fbe979e6d670425d6573b049310c5feb5940944 1	src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fsi
+100644 b9cd61f660f9df08e66f662e20d13fe99816fcab 2	src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fsi
+100644 39cf6e6cba3f9a7057821e9a546009bac2d4b7cc 3	src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fsi
+100644 6e4b32a90bbd39e83010941abbcde00586bfa5a3 1	src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs
+100644 9c168bd15634c79f7e4aa2a4c885c4756ae8d1a1 2	src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs
+100644 a18e319c8504d6a66d28f56742df0bab877e4c24 3	src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs
+100644 81709c4abff418bd69027efac23d9883c35fc571 1	src/Wanxiangshu/Strength/IntegrationRules.fs
+100644 5acd3ccf6c6183143cf7f6baf9822e00a51f76e5 2	src/Wanxiangshu/Strength/IntegrationRules.fs
+100644 899e569c582ab664457d4a6f189faced4bac1232 1	src/Wanxiangshu/Strength/OpenCode/Replay.fs
+100644 1048240ea45b39b3750b1365580eaf320371de0d 2	src/Wanxiangshu/Strength/OpenCode/Replay.fs
+100644 7f4c32246cdff4bbd74fc02c7c1cf29d856081a8 1	src/Wanxiangshu/Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj
+100644 b9f23c0840d2cb9bfd3b2ceaf30467ea6d4c40c8 2	src/Wanxiangshu/Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj
+100644 0c3a28f4ee0bfb9324c8ee8cbf1de96e67756cd7 3	src/Wanxiangshu/Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj
+100644 733c62abe37322f7ce5598339dcbacf652bd14da 1	src/Wanxiangshu/Wanxiangshu.Owner.delegation.runtime.fsproj
+100644 cdf9840881d136246306eaf74439574c39088cfe 2	src/Wanxiangshu/Wanxiangshu.Owner.delegation.runtime.fsproj
+100644 726dda1ce9bec1b3aa4ea91fedac4d140debc60b 3	src/Wanxiangshu/Wanxiangshu.Owner.delegation.runtime.fsproj
+100644 8246c43886c501a827da49e057dae9f66bd80fd2 1	src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-fold.fsproj
+100644 943bb4737e5bc99b0af3886068ac72960f9bbcbe 2	src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-fold.fsproj
+100644 31fe68864e14b071264cbd793f1dc500850b8083 3	src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-fold.fsproj
+100644 9fc11297e888f741c454dd8c3e3073478f77bb30 1	src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj
+100644 529230f1093d38a015a1e2fedca89a87adbba3b0 2	src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj
+100644 0e7cf038a6757a2c20a2a2e28b7488105be8402b 3	src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj
+100644 dfd727228d7f062362d3e07fb8a1db2f2d638011 1	src/Wanxiangshu/Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj
+100644 312bf06fa906d1176d485adef1a6c6281dd62949 2	src/Wanxiangshu/Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj
+100644 cc3e94fa46e4e9e7387bd3c4835a47d6edc7382b 3	src/Wanxiangshu/Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj
+100644 8cd1f6242dd515ea19c18ae3c95306baf8c96dae 1	src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj
+100644 481a77679b609486c7f02d4cf45f16fc667e878e 2	src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj
+100644 9de7dea89d9460f39ee0c0422e3fe10c04c91146 1	src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-surface.fsproj
+100644 c8dc0bcebab2a66f0bed6666708fbea4826b0fb2 2	src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-surface.fsproj
+100644 bc2cb6af7951f077184c5f488509fcc664c93f10 1	src/Wanxiangshu/compile-order.txt
+100644 62c5208333e0ea176c985f0ecaf02bff515cfa10 2	src/Wanxiangshu/compile-order.txt
+100644 66a0b8a3d1cc69f1372e36ddf272e612b2a6e33e 3	src/Wanxiangshu/compile-order.txt
+160000 71c155f3a2d5e9d559beea602ce11694904c4e5f 1	wanxiangli
+160000 05f6b5acf63a29d758e08e3162bba4c547dfda8d 2	wanxiangli
+160000 a8b89a45607572a62e1ca085c907fb02c878e6c0 3	wanxiangli
+
+Auto-merging AGENTS.md
+CONFLICT (content): Merge conflict in AGENTS.md
+Auto-merging README.md
+Auto-merging requirements/GAP.md
+Auto-merging requirements/advisor/README.md
+Auto-merging requirements/advisor/WHAT.md
+CONFLICT (content): Merge conflict in requirements/advisor/WHAT.md
+Auto-merging requirements/advisor/tests/002.test.mjs
+CONFLICT (content): Merge conflict in requirements/advisor/tests/002.test.mjs
+Auto-merging requirements/advisor/tests/003.test.mjs
+CONFLICT (content): Merge conflict in requirements/advisor/tests/003.test.mjs
+Auto-merging requirements/advisor/tests/006.test.mjs
+Auto-merging requirements/advisor/tests/README.md
+CONFLICT (content): Merge conflict in requirements/advisor/tests/README.md
+Auto-merging requirements/capability-enforcement/tests/002.test.mjs
+CONFLICT (content): Merge conflict in requirements/capability-enforcement/tests/002.test.mjs
+Auto-merging requirements/capability-enforcement/tests/023.test.mjs
+CONFLICT (content): Merge conflict in requirements/capability-enforcement/tests/023.test.mjs
+Auto-merging requirements/capability-enforcement/tests/support/manager-programming.mjs
+CONFLICT (content): Merge conflict in requirements/capability-enforcement/tests/support/manager-programming.mjs
+Auto-merging requirements/change-integration/tests/005.test.mjs
+Auto-merging requirements/cognitive-environment/WHAT.md
+Auto-merging requirements/cognitive-environment/tests/013.test.mjs
+Auto-merging requirements/concern-routing/tests/007.test.mjs
+CONFLICT (content): Merge conflict in requirements/concern-routing/tests/007.test.mjs
+Auto-merging requirements/context-compression/WHAT.md
+CONFLICT (content): Merge conflict in requirements/context-compression/WHAT.md
+CONFLICT (modify/delete): requirements/context-compression/tests/022.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/context-compression/tests/022.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/context-compression/tests/025.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/context-compression/tests/025.test.mjs left in tree.
+Auto-merging requirements/context-compression/tests/031.test.mjs
+CONFLICT (content): Merge conflict in requirements/context-compression/tests/031.test.mjs
+Auto-merging requirements/crash-reconciliation/tests/018.test.mjs
+CONFLICT (content): Merge conflict in requirements/crash-reconciliation/tests/018.test.mjs
+Auto-merging requirements/crash-reconciliation/tests/020.test.mjs
+Auto-merging requirements/delegation/WHAT.md
+CONFLICT (content): Merge conflict in requirements/delegation/WHAT.md
+Auto-merging requirements/delegation/tests/019.test.mjs
+CONFLICT (content): Merge conflict in requirements/delegation/tests/019.test.mjs
+Auto-merging requirements/delegation/tests/021.test.mjs
+Auto-merging requirements/delegation/tests/023.test.mjs
+CONFLICT (content): Merge conflict in requirements/delegation/tests/023.test.mjs
+Auto-merging requirements/delegation/tests/024.test.mjs
+Auto-merging requirements/delegation/tests/026.test.mjs
+Auto-merging requirements/delegation/tests/027.test.mjs
+Auto-merging requirements/dispatch-protocol/WHAT.md
+Auto-merging requirements/dispatch-protocol/tests/008.test.mjs
+Auto-merging requirements/durable-events/WHAT.md
+Auto-merging requirements/durable-events/tests/012.test.mjs
+Auto-merging requirements/durable-events/tests/013.test.mjs
+Auto-merging requirements/durable-events/tests/015.test.mjs
+CONFLICT (content): Merge conflict in requirements/durable-events/tests/015.test.mjs
+Auto-merging requirements/durable-events/tests/018.test.mjs
+Auto-merging requirements/durable-events/tests/019.test.mjs
+Auto-merging requirements/durable-events/tests/022.test.mjs
+Auto-merging requirements/effect-accounting/tests/008.test.mjs
+CONFLICT (content): Merge conflict in requirements/effect-accounting/tests/008.test.mjs
+Auto-merging requirements/execution-model-routing/tests/020.test.mjs
+CONFLICT (content): Merge conflict in requirements/execution-model-routing/tests/020.test.mjs
+Auto-merging requirements/host-boundary/WHAT.md
+CONFLICT (content): Merge conflict in requirements/host-boundary/WHAT.md
+Auto-merging requirements/host-boundary/tests/015.test.mjs
+CONFLICT (content): Merge conflict in requirements/host-boundary/tests/015.test.mjs
+Auto-merging requirements/host-boundary/tests/032.test.mjs
+CONFLICT (content): Merge conflict in requirements/host-boundary/tests/032.test.mjs
+Auto-merging requirements/host-boundary/tests/fixtures/fatal-process-child.fixture.mjs
+Auto-merging requirements/host-boundary/tests/support/run-manager-review-tools-canary.mjs
+CONFLICT (content): Merge conflict in requirements/host-boundary/tests/support/run-manager-review-tools-canary.mjs
+Auto-merging requirements/host-boundary/tests/support/run-user-input-canary.mjs
+Auto-merging requirements/intra-participant-parallelism/tests/017.test.mjs
+CONFLICT (content): Merge conflict in requirements/intra-participant-parallelism/tests/017.test.mjs
+Auto-merging requirements/managed-chat-execution/tests/005.test.mjs
+Auto-merging requirements/managed-session-lifecycle/WHAT.md
+Auto-merging requirements/managed-session-lifecycle/tests/025.test.mjs
+CONFLICT (content): Merge conflict in requirements/managed-session-lifecycle/tests/025.test.mjs
+Auto-merging requirements/managed-session-lifecycle/tests/028.test.mjs
+CONFLICT (content): Merge conflict in requirements/managed-session-lifecycle/tests/028.test.mjs
+Auto-merging requirements/managed-session-lifecycle/tests/README.md
+CONFLICT (content): Merge conflict in requirements/managed-session-lifecycle/tests/README.md
+Auto-merging requirements/obligation-ledger/tests/001.test.mjs
+CONFLICT (content): Merge conflict in requirements/obligation-ledger/tests/001.test.mjs
+Auto-merging requirements/obligation-ledger/tests/002.test.mjs
+Auto-merging requirements/obligation-ledger/tests/003.test.mjs
+CONFLICT (content): Merge conflict in requirements/obligation-ledger/tests/003.test.mjs
+Auto-merging requirements/obligation-ledger/tests/004.test.mjs
+CONFLICT (content): Merge conflict in requirements/obligation-ledger/tests/004.test.mjs
+Auto-merging requirements/obligation-ledger/tests/005.test.mjs
+CONFLICT (content): Merge conflict in requirements/obligation-ledger/tests/005.test.mjs
+Auto-merging requirements/obligation-ledger/tests/support/run-native-todo-replacement-canary.mjs
+Auto-merging requirements/participant-horizon/tests/011.test.mjs
+Auto-merging requirements/participant-identity/tests/001.test.mjs
+CONFLICT (content): Merge conflict in requirements/participant-identity/tests/001.test.mjs
+Auto-merging requirements/participant-identity/tests/002.test.mjs
+CONFLICT (content): Merge conflict in requirements/participant-identity/tests/002.test.mjs
+Auto-merging requirements/participant-identity/tests/003.test.mjs
+CONFLICT (content): Merge conflict in requirements/participant-identity/tests/003.test.mjs
+Auto-merging requirements/participant-identity/tests/008.test.mjs
+CONFLICT (content): Merge conflict in requirements/participant-identity/tests/008.test.mjs
+Auto-merging requirements/prefix-stability/WHAT.md
+CONFLICT (content): Merge conflict in requirements/prefix-stability/WHAT.md
+Auto-merging requirements/prefix-stability/tests/001.test.mjs
+CONFLICT (content): Merge conflict in requirements/prefix-stability/tests/001.test.mjs
+CONFLICT (modify/delete): requirements/prefix-stability/tests/003.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/prefix-stability/tests/003.test.mjs left in tree.
+Auto-merging requirements/prefix-stability/tests/010.test.mjs
+CONFLICT (modify/delete): requirements/prefix-stability/tests/012.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/prefix-stability/tests/012.test.mjs left in tree.
+Auto-merging requirements/prefix-stability/tests/014.test.mjs
+Auto-merging requirements/prefix-stability/tests/README.md
+CONFLICT (content): Merge conflict in requirements/prefix-stability/tests/README.md
+CONFLICT (modify/delete): requirements/prefix-stability/tests/support/registered-prefix.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/prefix-stability/tests/support/registered-prefix.mjs left in tree.
+Auto-merging requirements/process-execution/WHAT.md
+CONFLICT (content): Merge conflict in requirements/process-execution/WHAT.md
+Auto-merging requirements/process-execution/tests/001.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/001.test.mjs
+Auto-merging requirements/process-execution/tests/005.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/005.test.mjs
+Auto-merging requirements/process-execution/tests/010.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/010.test.mjs
+Auto-merging requirements/process-execution/tests/011.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/011.test.mjs
+Auto-merging requirements/process-execution/tests/013.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/013.test.mjs
+Auto-merging requirements/process-execution/tests/014.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/014.test.mjs
+Auto-merging requirements/process-execution/tests/015.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/015.test.mjs
+Auto-merging requirements/process-execution/tests/017.test.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/017.test.mjs
+Auto-merging requirements/process-execution/tests/README.md
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/README.md
+Auto-merging requirements/process-execution/tests/support/executor.mjs
+CONFLICT (content): Merge conflict in requirements/process-execution/tests/support/executor.mjs
+Auto-merging requirements/provider-attempt-recovery/WHAT.md
+CONFLICT (modify/delete): requirements/provider-projection/tests/011.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/provider-projection/tests/011.test.mjs left in tree.
+Auto-merging requirements/repository-programming/APPLIES-TO
+CONFLICT (content): Merge conflict in requirements/repository-programming/APPLIES-TO
+Auto-merging requirements/repository-programming/README.md
+CONFLICT (content): Merge conflict in requirements/repository-programming/README.md
+Auto-merging requirements/repository-programming/WHAT.md
+CONFLICT (content): Merge conflict in requirements/repository-programming/WHAT.md
+Auto-merging requirements/repository-programming/tests/001.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/001.test.mjs
+Auto-merging requirements/repository-programming/tests/002.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/002.test.mjs
+Auto-merging requirements/repository-programming/tests/005.test.mjs
+Auto-merging requirements/repository-programming/tests/008.test.mjs
+Auto-merging requirements/repository-programming/tests/009.test.mjs
+Auto-merging requirements/repository-programming/tests/016.test.mjs
+Auto-merging requirements/repository-programming/tests/018.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/018.test.mjs
+Auto-merging requirements/repository-programming/tests/027.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/027.test.mjs
+Auto-merging requirements/repository-programming/tests/038.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/038.test.mjs
+Auto-merging requirements/repository-programming/tests/043.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/043.test.mjs
+Auto-merging requirements/repository-programming/tests/049.test.mjs
+Auto-merging requirements/repository-programming/tests/050.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/050.test.mjs
+Auto-merging requirements/repository-programming/tests/051.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/051.test.mjs
+Auto-merging requirements/repository-programming/tests/052.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/052.test.mjs
+Auto-merging requirements/repository-programming/tests/058.test.mjs
+CONFLICT (content): Merge conflict in requirements/repository-programming/tests/058.test.mjs
+CONFLICT (modify/delete): requirements/requirement-grounding/WHAT.md deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/requirement-grounding/WHAT.md left in tree.
+CONFLICT (modify/delete): requirements/requirement-grounding/tests/002.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/requirement-grounding/tests/002.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/requirement-grounding/tests/007.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/requirement-grounding/tests/007.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/requirement-grounding/tests/008.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/requirement-grounding/tests/008.test.mjs left in tree.
+Auto-merging requirements/semantic-trace/WHAT.md
+CONFLICT (content): Merge conflict in requirements/semantic-trace/WHAT.md
+Auto-merging requirements/semantic-trace/tests/007.test.mjs
+Auto-merging requirements/semantic-trace/tests/009.test.mjs
+CONFLICT (modify/delete): requirements/speculative-investigation/tests/013.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/speculative-investigation/tests/013.test.mjs left in tree.
+Auto-merging requirements/verification-system/tests/007.test.mjs
+Auto-merging requirements/verification-system/tests/016.test.mjs
+CONFLICT (content): Merge conflict in requirements/verification-system/tests/016.test.mjs
+Auto-merging requirements/verification-system/tests/support/plugin-fixture.mjs
+CONFLICT (content): Merge conflict in requirements/verification-system/tests/support/plugin-fixture.mjs
+Auto-merging requirements/verification-system/tests/support/run-inner.mjs
+CONFLICT (content): Merge conflict in requirements/verification-system/tests/support/run-inner.mjs
+CONFLICT (modify/delete): requirements/work-record/WHAT.md deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/WHAT.md left in tree.
+CONFLICT (modify/delete): requirements/work-record/tests/004.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/tests/004.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/work-record/tests/010.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/tests/010.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/work-record/tests/011.test.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/tests/011.test.mjs left in tree.
+CONFLICT (modify/delete): requirements/work-record/tests/README.md deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/tests/README.md left in tree.
+CONFLICT (modify/delete): requirements/work-record/tests/support/record.mjs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of requirements/work-record/tests/support/record.mjs left in tree.
+Auto-merging requirements/work/WHAT.md
+CONFLICT (content): Merge conflict in requirements/work/WHAT.md
+Auto-merging requirements/work/tests/009.test.mjs
+Auto-merging requirements/work/tests/011.test.mjs
+Auto-merging requirements/work/tests/020.test.mjs
+CONFLICT (content): Merge conflict in requirements/work/tests/020.test.mjs
+Auto-merging requirements/work/tests/029.test.mjs
+CONFLICT (content): Merge conflict in requirements/work/tests/029.test.mjs
+Auto-merging requirements/work/tests/033.test.mjs
+Auto-merging requirements/work/tests/034.test.mjs
+CONFLICT (content): Merge conflict in requirements/work/tests/034.test.mjs
+Auto-merging resources/provider/tool/js-plan/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-plan/en.md
+Auto-merging resources/provider/tool/js-plan/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-plan/zh-CN.md
+Auto-merging resources/provider/tool/js-program/delegation-rules/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/delegation-rules/en.md
+Auto-merging resources/provider/tool/js-program/delegation-rules/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/delegation-rules/zh-CN.md
+Auto-merging resources/provider/tool/js-program/run-recipes/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/run-recipes/en.md
+Auto-merging resources/provider/tool/js-program/run-recipes/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/run-recipes/zh-CN.md
+Auto-merging resources/provider/tool/js-program/run-rules/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/run-rules/en.md
+Auto-merging resources/provider/tool/js-program/run-rules/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/run-rules/zh-CN.md
+Auto-merging resources/provider/tool/js-program/ultra-devops/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/ultra-devops/en.md
+Auto-merging resources/provider/tool/js-program/ultra-devops/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/ultra-devops/zh-CN.md
+Auto-merging resources/provider/tool/js-program/ultra-plan/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/ultra-plan/en.md
+Auto-merging resources/provider/tool/js-program/ultra-plan/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/ultra-plan/zh-CN.md
+Auto-merging resources/provider/tool/js-program/view-declaration-extra/en.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/view-declaration-extra/en.md
+Auto-merging resources/provider/tool/js-program/view-declaration-extra/zh-CN.md
+CONFLICT (content): Merge conflict in resources/provider/tool/js-program/view-declaration-extra/zh-CN.md
+Auto-merging scripts/checks/unified-store-gate.mjs
+Auto-merging scripts/lib/raw-time-scan.mjs
+Auto-merging scripts/lib/test-surface-scan.mjs
+Auto-merging scripts/verify-package.mjs
+CONFLICT (content): Merge conflict in scripts/verify-package.mjs
+Auto-merging scripts/verify.mjs
+CONFLICT (content): Merge conflict in scripts/verify.mjs
+Auto-merging src/Wanxiangshu/Change/Host/Host.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Change/Host/Host.fs
+Auto-merging src/Wanxiangshu/Change/Host/Surface.fs
+Auto-merging src/Wanxiangshu/Change/Surface.fs
+Auto-merging src/Wanxiangshu/Change/Types.fs
+Auto-merging src/Wanxiangshu/Change/Types.fsi
+Auto-merging src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Composition/Durable/AgentJournalPortAdapter.fs
+Auto-merging src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Composition/Durable/DomainFamilyBridge.fs
+Auto-merging src/Wanxiangshu/Composition/Durable/Fold.fs
+Auto-merging src/Wanxiangshu/Composition/Durable/Projection.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Composition/Durable/Projection.fs
+Auto-merging src/Wanxiangshu/Composition/Durable/Projection.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Composition/Durable/Projection.fsi
+Auto-merging src/Wanxiangshu/Composition/Durable/PromptJournalAdapter.fs
+Auto-merging src/Wanxiangshu/Composition/Turn/OrdinaryTurnWorkflow.fs
+CONFLICT (modify/delete): src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Context/Companion/Blogger/MainContext.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Context/Companion/Blogger/MainContext.fsi deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Context/Companion/Blogger/MainContext.fsi left in tree.
+Auto-merging src/Wanxiangshu/Context/Companion/CompanionFactFold.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Companion/CompanionFactFold.fs
+Auto-merging src/Wanxiangshu/Context/Companion/CompanionFactFold.fsi
+Auto-merging src/Wanxiangshu/Context/Companion/FoldSurface.fs
+Auto-merging src/Wanxiangshu/Context/Companion/Transform.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Companion/Transform.fs
+Auto-merging src/Wanxiangshu/Context/Prefix/Wire.fs
+Auto-merging src/Wanxiangshu/Context/Prefix/WirePort.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Prefix/WirePort.fs
+Auto-merging src/Wanxiangshu/Context/Prefix/WirePort.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Prefix/WirePort.fsi
+Auto-merging src/Wanxiangshu/Context/Prefix/XWireSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Prefix/XWireSurface.fs
+Auto-merging src/Wanxiangshu/Context/Trace/Capture.fs
+Auto-merging src/Wanxiangshu/Context/Trace/Materialization.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Trace/Materialization.fs
+Auto-merging src/Wanxiangshu/Context/Trace/Materialization.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Trace/Materialization.fsi
+Auto-merging src/Wanxiangshu/Context/Trace/Model.fs
+Auto-merging src/Wanxiangshu/Context/Trace/Model.fsi
+Auto-merging src/Wanxiangshu/Context/Trace/Projection.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Context/Trace/Projection.fs
+Auto-merging src/Wanxiangshu/Context/Trace/Projection.fsi
+Auto-merging src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fs
+Auto-merging src/Wanxiangshu/Context/Trace/SemanticTraceSurface.fsi
+CONFLICT (modify/delete): src/Wanxiangshu/Enforcer/BlogSurface.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Enforcer/BlogSurface.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Enforcer/Continuation.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Enforcer/Continuation.fs left in tree.
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/Cursor.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Seat.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/Surface.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Advisor/View.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Advisor/View.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/Agent.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/ChildDispatch.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/HostForkRunLifecycleSurface.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/PendingRun.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/RunLifecycle.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Host/Runtime.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinResultRenderer.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinSurface.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/JoinTool.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/Tool.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/OpenCode/ToolSurface.fsi
+Auto-merging src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/Fork/Payload.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/LinkageProjection.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Execution/Delegation/SyncDelegate/Runtime.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fs
+Auto-merging src/Wanxiangshu/Execution/Delegation/SyncDelegate/Surface.fsi
+Auto-merging src/Wanxiangshu/Host/Contract/ToolResultBound.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Host/Contract/ToolResultBound.fs
+Auto-merging src/Wanxiangshu/Host/Contract/ToolResultBound.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Host/Contract/ToolResultBound.fsi
+Auto-merging src/Wanxiangshu/Interaction/Authority/Child.fs
+Auto-merging src/Wanxiangshu/Interaction/Authority/Model.fs
+Auto-merging src/Wanxiangshu/Interaction/Authority/Model.fsi
+Auto-merging src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fs
+Auto-merging src/Wanxiangshu/Interaction/Dispatch/Dispatcher.fsi
+Auto-merging src/Wanxiangshu/Interaction/Dispatch/OpenCode/SessionNudge.fs
+Auto-merging src/Wanxiangshu/Interaction/Dispatch/Send.fs
+Auto-merging src/Wanxiangshu/Interaction/Repair/CompletedTurnSurface.fs
+Auto-merging src/Wanxiangshu/Interaction/Repair/InteractionRepair.fs
+Auto-merging src/Wanxiangshu/Mission/Planning/TenureIsolation.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Mission/Planning/TenureIsolation.fs
+CONFLICT (modify/delete): src/Wanxiangshu/Mission/WorkRecord/Materialize.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Mission/WorkRecord/Materialize.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Mission/WorkRecord/Model.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Mission/WorkRecord/Model.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Mission/WorkRecord/Surface.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Mission/WorkRecord/Surface.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Mission/WorkRecord/Surface.fsi deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Mission/WorkRecord/Surface.fsi left in tree.
+Auto-merging src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fs
+Auto-merging src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Codec/ToolHostCodec.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/ChildWorkRecovery.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/ChildWorkRecovery.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/ChildWorkRecovery.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/EventsSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/EventsSurface.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/EventsSurface.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/EventsSurface.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/FissionHostSurface.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/HostSignalBootstrap.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/LoadRecoverySurface.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/LoadRecoverySurface.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/ManagedAgentConfig.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/ManagedAgentConfigSurface.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/ManagerReviewContract.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/ManagerReviewContract.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/ManagerReviewContract.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/PairProgrammingThoughtTransform.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/PluginHooksSurface.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fs
+Auto-merging src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Host/PluginHostInterop.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Host/SessionBindingRecovery.fs
+Auto-merging src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs
+Auto-merging src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Plugin/PluginRecoveryWiring.fs
+Auto-merging src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Plugin/PluginTransforms.fs
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fs
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ManagerReviewTools.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Tools/StaticTools.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/StaticTools.fs
+Auto-merging src/Wanxiangshu/OpenCode/Tools/StaticTools.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fs
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ToolRegistry.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fs
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScope.fsi
+Auto-merging src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/OpenCode/Tools/ToolRuntimeScopeSurface.fs
+Auto-merging src/Wanxiangshu/Participant/Persona/Identity.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Participant/Persona/Identity.fs
+Auto-merging src/Wanxiangshu/Participant/Persona/ManagedCatalog.fs
+Auto-merging src/Wanxiangshu/Participant/Persona/Surface.fs
+Auto-merging src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fs
+Auto-merging src/Wanxiangshu/Participant/Provider/Attempt/Fallback/ProviderFailureSurface.fsi
+Auto-merging src/Wanxiangshu/Participant/Provider/Attempt/Fallback/Retry.fs
+Auto-merging src/Wanxiangshu/Persistence/Journal/Envelope.fs
+Auto-merging src/Wanxiangshu/Persistence/Journal/EventStoreJournalWriter.fs
+Auto-merging src/Wanxiangshu/Persistence/Journal/Surface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Persistence/Journal/Surface.fs
+Auto-merging src/Wanxiangshu/Persistence/Journal/Surface.fsi
+CONFLICT (rename/delete): src/Wanxiangshu/Process/JsRunLoop.fs renamed to src/Wanxiangshu/Process/JsCallLoop.fs in 11052493bedb4edbcbe0c341fa677afd44c486f1, but deleted in HEAD.
+Auto-merging src/Wanxiangshu/Process/JsCallLoop.fs
+CONFLICT (add/add): Merge conflict in src/Wanxiangshu/Process/JsCallLoop.fs
+Auto-merging src/Wanxiangshu/Process/JsCallLoop.fsi
+CONFLICT (add/add): Merge conflict in src/Wanxiangshu/Process/JsCallLoop.fsi
+Auto-merging src/Wanxiangshu/Process/JsSandbox.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Process/JsSandbox.fs
+Auto-merging src/Wanxiangshu/Process/JsSandbox.fsi
+Auto-merging src/Wanxiangshu/Process/PtyBackend.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Process/PtyBackend.fs
+Auto-merging src/Wanxiangshu/Process/PtySupervisor.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Process/PtySupervisor.fs
+Auto-merging src/Wanxiangshu/Process/PtySupervisor.fsi
+Auto-merging src/Wanxiangshu/Process/Surface.fs
+Auto-merging src/Wanxiangshu/Process/Surface.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorLedger.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorModel.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorSurface.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Anchor/AnchorView.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Capability.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Capability.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Capability.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Capability.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Description.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Description.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Description.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Description.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Failure.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Failure.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/Failure.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/Failure.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/GeneratorSurface.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolHost.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/OpenCode/ToolWorkflow.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/RuntimeSurface.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fsi
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/ToolsBindings.fsi
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Repository/Programming/Js/TransactionSurface.fs
+Auto-merging src/Wanxiangshu/Repository/Programming/Js/WorkflowSurface.fs
+CONFLICT (modify/delete): src/Wanxiangshu/Strength/IntegrationRules.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Strength/IntegrationRules.fs left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Strength/OpenCode/Replay.fs deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Strength/OpenCode/Replay.fs left in tree.
+Auto-merging src/Wanxiangshu/Verification/JournalPortObservationSurface.fs
+Auto-merging src/Wanxiangshu/Verification/TemporalSurface.fs
+Auto-merging src/Wanxiangshu/Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Wanxiangshu.Owner.capability-enforcement.opencode-host-managedagentconfig.fsproj
+Auto-merging src/Wanxiangshu/Wanxiangshu.Owner.delegation.runtime.fsproj
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Wanxiangshu.Owner.delegation.runtime.fsproj
+Auto-merging src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-fold.fsproj
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-fold.fsproj
+Auto-merging src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Wanxiangshu.Owner.durable-events.composition-durable-projection.fsproj
+Auto-merging src/Wanxiangshu/Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj
+CONFLICT (content): Merge conflict in src/Wanxiangshu/Wanxiangshu.Owner.repository-programming.repository-programming-js-capability.fsproj
+CONFLICT (modify/delete): src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-materialize-runtime.fsproj left in tree.
+CONFLICT (modify/delete): src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-surface.fsproj deleted in 11052493bedb4edbcbe0c341fa677afd44c486f1 and modified in HEAD.  Version HEAD of src/Wanxiangshu/Wanxiangshu.Owner.work-record.mission-workrecord-surface.fsproj left in tree.
+Auto-merging src/Wanxiangshu/compile-order.txt
+CONFLICT (content): Merge conflict in src/Wanxiangshu/compile-order.txt
+Failed to merge submodule wanxiangli (commits not present)
+CONFLICT (submodule): Merge conflict in wanxiangli

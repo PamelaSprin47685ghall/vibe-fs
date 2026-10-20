@@ -2,9 +2,6 @@ namespace Wanxiangshu.Execution.Delegation.Fork.Host
 
 open Wanxiangshu.Composition.Durable
 open Wanxiangshu.Context.Companion
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Enforcer
-open Wanxiangshu.Enforcer.Guidance
 open Wanxiangshu.Execution.Delegation.Fork
 open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
@@ -231,11 +228,38 @@ module HostForkRunLifecycle =
             return interpretDispatchResult durable childId identitySeed prompt onAccepted sent
         }
 
-    let workRecordForOutcome (run: PendingHostRun) (outcome: TerminalOutcome) =
+    let private chooseView delivered observed =
+        match delivered with
+        | Some record -> Some record
+        | None -> observed
+
+    let private completedOutcomeView
+        (childViewForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
+        (run: PendingHostRun)
+        (result: AgentRunResult)
+        =
+        task {
+            let! observed = childViewForRun run.ChildId result.ProviderRun
+
+            let prose =
+                if System.String.IsNullOrWhiteSpace result.TurnFormalText then
+                    None
+                else
+                    Some result.TurnFormalText
+
+            let delivered =
+                JsDeliveredValues.tryTakeRenderedFor (SessionId.value run.ChildId) result.ProviderRun prose
+
+            return chooseView delivered observed
+        }
+
+    let viewForOutcome
+        (childViewForRun: SessionId -> ProviderRunIdentity -> Task<string option>)
+        (run: PendingHostRun)
+        (outcome: TerminalOutcome)
+        =
         match outcome with
-        | TerminalOutcome.Completed _ ->
-            JsDeliveredValues.tryTakeRendered (SessionId.value run.ChildId)
-            |> Task.FromResult
+        | TerminalOutcome.Completed result -> completedOutcomeView childViewForRun run result
         | _ -> Task.FromResult None
 
     /// Idle existing child / first prompt for an AgentOwnerRoot work unit.
@@ -358,7 +382,7 @@ module HostForkRunLifecycle =
         | None -> Task.FromResult agentOutcome
         | Some j -> committedOutcome (Some j) parentId proof run agentOutcome
 
-    let private isWorkCommittedOrRetired (work: HandleWorkRecord) =
+    let private isWorkCommittedOrRetired (work: HandleWork) =
         match work.Lifecycle with
         | CompletedAwaitingJoin _
         | Retired -> true
@@ -561,30 +585,34 @@ module HostForkRunLifecycle =
             Task.FromResult(())
         | Completed result when not (completionBelongsToRun run result) -> Task.FromResult(())
         | Completed result ->
-            prepareCurrentCompletion gate pendingRuns run (fun () -> prepareCompletion run outcome) (fun workRecord ->
+            prepareCurrentCompletion gate pendingRuns run (fun () -> prepareCompletion run outcome) (fun view ->
                 task {
-                    let agentOutcome =
-                        AgentCompletion.completed
-                            run.AgentId
-                            childId
-                            runId
-                            run.Role
-                            result.AuthorityRootUserMessageId
-                            result.ProviderRun
-                            (workRecord |> Option.defaultValue "")
-                            result.Directory
+                    match view with
+                    | None -> ()
+                    | Some text when System.String.IsNullOrWhiteSpace text -> ()
+                    | Some text ->
+                        let agentOutcome =
+                            AgentCompletion.completed
+                                run.AgentId
+                                childId
+                                runId
+                                run.Role
+                                result.AuthorityRootUserMessageId
+                                result.ProviderRun
+                                text
+                                result.Directory
 
-                    let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+                        let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
 
-                    do!
-                        deliverProvenCompletion
-                            gate
-                            pendingRuns
-                            journal
-                            parentId
-                            run
-                            (TerminalEvidence.completed run.AgentId handle childId body)
-                            agentOutcome
+                        do!
+                            deliverProvenCompletion
+                                gate
+                                pendingRuns
+                                journal
+                                parentId
+                                run
+                                (TerminalEvidence.completed run.AgentId handle childId body)
+                                agentOutcome
                 }
                 :> Task)
         | Failed stop when not (stopBelongsToRun run stop) -> Task.FromResult(())
@@ -767,6 +795,6 @@ module HostForkRunLifecycle =
         (_parentId: SessionId)
         (_sessions: ISessionHostPort)
         (_run: PendingHostRun)
-        (_workRecord: string option)
+        (_view: string option)
         =
         ()

@@ -58,29 +58,24 @@ module JsWorkflowSurface =
                     else
                         Some(JsTransactionSurface.persistenceOf store)
 
+                let scopeApi =
+                    if role.Trim().ToLowerInvariant() = "manager" then
+                        JsReviewOnly.scopeReviewOnly (fun () -> Task.FromResult false)
+                    else
+                        id
+
                 let! outcome =
-                    match fileAccessObservation with
-                    | None ->
-                        JsToolWorkflow.run
-                            surface.Capabilities
-                            workspaceRoot
-                            surface.BaseClassSource
-                            program
-                            deadlineMs
-                            deadlineEpochMs
-                            outputBoundBytes
-                            persistence
-                    | Some observe ->
-                        JsToolWorkflow.runWithFileAccessObservation
-                            surface.Capabilities
-                            workspaceRoot
-                            surface.BaseClassSource
-                            program
-                            deadlineMs
-                            deadlineEpochMs
-                            outputBoundBytes
-                            persistence
-                            observe
+                    JsToolWorkflow.runScoped
+                        scopeApi
+                        surface.Capabilities
+                        workspaceRoot
+                        surface.BaseClassSource
+                        program
+                        deadlineMs
+                        deadlineEpochMs
+                        outputBoundBytes
+                        persistence
+                        fileAccessObservation
 
                 return box (JsWorkflowOutcomeHandle outcome)
         }
@@ -131,6 +126,7 @@ module JsWorkflowSurface =
                 let! outcome =
                     JsToolWorkflow.execute
                         sessionId
+                        None
                         surface.Capabilities
                         workspaceRoot
                         surface.BaseClassSource

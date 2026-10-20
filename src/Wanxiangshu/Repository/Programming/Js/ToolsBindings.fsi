@@ -44,6 +44,7 @@ module JsToolsBindings =
         runHost: JsCallHost option ->
         searchHost: JsSearchHost option ->
         delegationHost: JsDelegationHost option ->
+        askInvoke: (string -> Task<Result<unit, string>>) option ->
             obj
 
     /// Build the api object for one sandbox run that carries a park lifecycle
@@ -60,4 +61,8 @@ module JsToolsBindings =
         runHost: JsCallHost option ->
         searchHost: JsSearchHost option ->
         delegationHost: JsDelegationHost option ->
+        askInvoke: (string -> Task<Result<unit, string>>) option ->
             obj
+
+module JsReviewOnly =
+    val scopeReviewOnly: check: (unit -> Task<bool>) -> api: obj -> obj

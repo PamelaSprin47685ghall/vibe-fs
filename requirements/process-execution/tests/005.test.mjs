@@ -12,7 +12,7 @@ test('WHAT[process-execution-005] js.call rejects non-positive or non-finite max
     for (const rawExpr of ['0', '-5', 'Number.NaN', 'Number.POSITIVE_INFINITY']) {
       const outcome = await runProgram(
         dir,
-        `    return await js.call(class extends js.Callable {
+        `    return await this.call(class extends this.Callable {
       maxDuration = ${rawExpr};
       next(ctx) { return ctx.step === 0 ? "true" : null; }
       watch(ctx) { return ctx.remainingMs > 0; }

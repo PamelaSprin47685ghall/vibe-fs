@@ -16,7 +16,7 @@ type ToolRuntimeScopeSurface =
     static member undrainedDevOpsReturn: journal: JournalHandle -> Task<obj>
 
     static member ptyAdmissionProbe:
-        journal: JournalHandle * workspace: string * child: string * realBackend: bool -> obj
+        journal: JournalHandle * workspace: string * child: string * realBackend: bool * stateDirectory: string -> obj
 
     static member startPtyExecution:
         journal: JournalHandle * child: string * physical: string * provider: string -> Task<unit>

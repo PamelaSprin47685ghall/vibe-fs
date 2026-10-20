@@ -13,6 +13,7 @@ open Wanxiangshu.Execution.Delegation.Handle
 open Wanxiangshu.Execution.Delegation.SyncDelegate
 open Wanxiangshu.Execution.Session
 open Wanxiangshu.Participant.Persona
+open Wanxiangshu.Persistence.Journal
 
 /// Direct-CE child recovery (FLOW-001 / P0-1).
 /// Recovery consumes canonical admission and commits only exact scoped completions.
@@ -26,6 +27,7 @@ module ChildRecoveryWorkflow =
     type Ports =
         {
             Journal: AgentJournalPort option
+            ReadDeliveryView: (SessionId -> ProviderRunIdentity -> AuthorityRootUserMessageId -> string option) option
             ParentId: SessionId
             Snapshot: ISessionSnapshotPort option
             AgentId: string
@@ -124,25 +126,36 @@ module ChildRecoveryWorkflow =
         | Some user when assistant.ParentId <> Some user.Id ->
             ChildSnapshotEvidence.Unreadable "terminal assistant does not answer the exact accepted physical message"
         | Some user ->
-            let runId = "run-restored-" + ports.AgentId
-            let workRecord = textOfParts assistant.Parts
+            let authorityRoot =
+                PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id)
 
-            let agentOutcome =
-                AgentCompletion.completed
-                    ports.AgentId
-                    ports.ChildSession
-                    runId
-                    ports.Role
-                    (PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id))
-                    (ProviderRunIdentity.create assistant.Id)
-                    workRecord
-                    None
+            let providerRun = ProviderRunIdentity.create assistant.Id
 
-            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+            let deliveredView =
+                ports.ReadDeliveryView
+                |> Option.bind (fun read -> read ports.ChildSession providerRun authorityRoot)
 
-            ChildSnapshotEvidence.Terminal(
-                TerminalEvidence.completed ports.AgentId ports.Handle ports.ChildSession body
-            )
+            match deliveredView with
+            | None -> ChildSnapshotEvidence.Unreadable "restart terminal has no durable delivery witness"
+            | Some view ->
+                let runId = "run-restored-" + ports.AgentId
+
+                let agentOutcome =
+                    AgentCompletion.completed
+                        ports.AgentId
+                        ports.ChildSession
+                        runId
+                        ports.Role
+                        (PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id))
+                        (ProviderRunIdentity.create assistant.Id)
+                        view
+                        None
+
+                let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+
+                ChildSnapshotEvidence.Terminal(
+                    TerminalEvidence.completed ports.AgentId ports.Handle ports.ChildSession body
+                )
 
     let private snapshotFromMessages (ports: Ports) (messages: SessionMessage list) : ChildSnapshotEvidence =
         match lastByRole messages "assistant" with

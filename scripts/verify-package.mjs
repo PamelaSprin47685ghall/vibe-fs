@@ -785,7 +785,6 @@ export function assertActiveRegistrations({ extractedPackageDir, root }) {
 
   const expectedActiveRoles = [
     'advisor',
-    'blogger',
     'bookkeeper',
     'devops',
     'engineer',

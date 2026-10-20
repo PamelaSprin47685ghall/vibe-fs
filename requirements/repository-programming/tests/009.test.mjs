@@ -28,7 +28,7 @@ test('WHAT[repository-programming-009] registered Engineer searches through the 
     })
     writeFileSync(join(directory, 'search-input'), 'actual-engineer-needle\n')
     const wire = await hooks.tool['todowrite-for-engineer'].execute({
-      program: searchProgram(`if (typeof js.call !== 'undefined' || typeof js.Callable !== 'undefined') throw new Error('unexpected Exec'); return await this.rg(['actual-engineer-needle', 'search-input']);`),
+      program: searchProgram(`if (typeof this.call !== 'undefined' || typeof this.Callable !== 'undefined') throw new Error('unexpected Exec'); return await this.rg(['actual-engineer-needle', 'search-input']);`),
     }, { sessionID, agent: 'engineer', messageID: 'search-assistant', callID: 'search-call' })
     const data = parse(wire).data
     assert.equal(data.exitCode, 0, wire)
@@ -55,9 +55,9 @@ test('WHAT[repository-programming-009] actual rg gives a Grep-only office JSON m
     const absent = await runSearch(directory, ['no-such-needle', '.'])
     assert.equal(caseName(absent), 'Succeeded', render(absent))
     assert.equal(parse(render(absent)).data.exitCode, 1)
-    assert.equal(apiFor(createApiFor(directory, ['Grep'])).js.call, undefined)
-    assert.equal(typeof apiFor(createApiFor(directory, ['Grep'])).js.rg, 'function')
-    assert.equal(apiFor(createApiFor(directory, ['Read', 'Glob'])).js.rg, undefined)
+    assert.equal(apiFor(createApiFor(directory, ['Grep'])).call, undefined)
+    assert.equal(typeof apiFor(createApiFor(directory, ['Grep'])).rg, 'function')
+    assert.equal(apiFor(createApiFor(directory, ['Read', 'Glob'])).rg, undefined)
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
@@ -229,14 +229,14 @@ test('WHAT[repository-programming-009] JS010_bindings_grep_returns_matches', asy
   try {
     writeFileSync(join(dir, 'a.txt'), 'one two one', 'utf8')
     const api = apiOf(createApi(dir))
-    assert.equal(api.js.grep, undefined)
-    const listed = api.js.ls('.')
+    assert.equal(api.grep, undefined)
+    const listed = api.ls('.')
     assert.equal(listed.ok, true)
     const hits = []
     for (const entry of listed.entries.filter((e) => e.endsWith('.txt'))) {
-      const read = api.js.cat(entry)
+      const read = api.cat(entry)
       assert.equal(read.ok, true)
-      for (const [begin, end] of api.js.whereAll(read.text, 'one').spans) {
+      for (const [begin, end] of api.whereAll(read.text, 'one').spans) {
         hits.push({ path: entry, text: read.text.slice(begin, end) })
       }
     }
@@ -244,6 +244,27 @@ test('WHAT[repository-programming-009] JS010_bindings_grep_returns_matches', asy
     assert.deepEqual(hits.map((m) => m.path), ['a.txt', 'a.txt'])
   } finally {
     cleanup()
+  }
+})
+}
+
+{
+const { default: assert } = await import("node:assert/strict");
+const { default: test } = await import("node:test");
+const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
+const { tmpdir } = await import("node:os");
+const { join } = await import("node:path");
+const { createApi, api: apiOf } = await import("../../../dist/Repository/Programming/Js/RuntimeSurface.js");
+
+test('WHAT[repository-programming-009] an unscoped rg binding returns a promise and refuses without a process Host', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'wxs-rg-promise-'))
+  try {
+    writeFileSync(join(dir, 'a.ts'), 'targetNeedle\n', 'utf8')
+    const pending = apiOf(createApi(dir)).rg(['targetNeedle', '.'])
+    assert.equal(typeof pending.then, 'function')
+    await assert.rejects(pending, /search Host is unavailable/)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
   }
 })
 }

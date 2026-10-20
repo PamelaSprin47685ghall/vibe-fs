@@ -2,8 +2,6 @@ namespace Wanxiangshu.OpenCode
 
 open System
 open System.Threading.Tasks
-open Wanxiangshu.Context.Companion.Blogger.Runtime
-open Wanxiangshu.Context.Companion.Blogger
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 open Wanxiangshu.Composition.Durable
@@ -43,27 +41,22 @@ module PluginRecoveryWiring =
             [||]
 
     let private inspectRecoveryWorks (journal: AgentJournal) (workspace: string option) =
-        let stateRoot =
-            workspace |> Option.map RuntimePath.stateRoot |> Option.defaultValue ""
+        task {
+            let! stateRoot =
+                match workspace with
+                | Some ws -> RuntimePath.stateRoot ws
+                | None -> Task.FromResult ""
 
-        if String.IsNullOrWhiteSpace stateRoot then
-            [||]
-        else
-            let workIds =
-                (AgentJournal.snapshot journal).AgentProjections.Sessions
-                |> Seq.map (fun (KeyValue(sessionId, _)) -> SessionId.value sessionId)
-                |> Seq.toArray
+            if String.IsNullOrWhiteSpace stateRoot then
+                return [||]
+            else
+                let workIds =
+                    (AgentJournal.snapshot journal).AgentProjections.Sessions
+                    |> Seq.map (fun (KeyValue(sessionId, _)) -> SessionId.value sessionId)
+                    |> Seq.toArray
 
-            queryInspectedWorks stateRoot workIds
-
-    let private isFlightActive
-        (bloggerHost: IBloggerRuntimeHost)
-        (bloggerSessionId: SessionId)
-        (requestId: BloggerRequestId)
-        : bool =
-        match bloggerHost.TryGetFlight(SessionId.value bloggerSessionId) with
-        | Some flight -> BloggerRequestContext.requestId flight = requestId
-        | None -> false
+                return queryInspectedWorks stateRoot workIds
+        }
 
     let private seedDevOpsTarget roadSessionId childSessionId target =
         try
@@ -262,10 +255,10 @@ module PluginRecoveryWiring =
         (retirementBlockers: string -> string array)
         : Task =
         task {
-            let gitCommonDir =
-                workspace
-                |> Option.map Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot
-                |> Option.defaultValue ""
+            let! gitCommonDir =
+                match workspace with
+                | Some ws -> Wanxiangshu.Persistence.Journal.RuntimePath.stateRoot ws
+                | None -> Task.FromResult ""
 
             let sessions =
                 works
@@ -296,6 +289,16 @@ module PluginRecoveryWiring =
         let snapshotPort = SessionSnapshotPort.create boot.Input
         let discoveryPort = SessionSnapshotPort.createDiscovery boot.Input
 
+        let drainPtys work =
+            task {
+                let workspace =
+                    boot.WorkspaceDirectory
+                    |> Option.defaultWith (fun () -> invalidOp "PTY recovery requires a workspace")
+
+                let! common = RuntimePath.stateRoot workspace
+                do! HostForkRuntime.CloseUnboundPtyRun(PtyBackend.recover, common, work)
+            }
+
         let retirementBlockers sessionId =
             scope.RetirementBlockersFor sessionId |> List.toArray
 
@@ -310,69 +313,22 @@ module PluginRecoveryWiring =
         scope.AttachDurabilityActivation(fun () ->
             scope.RunBackground(fun () ->
                 task {
-                    // crash-reconciliation-020: settle the child work runs the
-                    // previous runtime left active, so the next handoff to that
-                    // child is a fresh root instead of a refused identity.
+                    // crash-reconciliation-020: orphaned child runs maintain visible
+                    // obligations on restart rather than being voided or closed.
+                    // The active child work stays observable to the road, preserving
+                    // unfulfilled obligations across process restart without hiding them.
+                    match boot.Journal with
+                    | Some journal -> do! ChildWorkRecovery.settleOrphanedChildRuns drainPtys journal
+                    | None -> ()
+
                     // provider-attempt-recovery-024: the abandoned stale requests
-                    // owed one more settlement — their same-source accepted
-                    // executions never reached a provider. Decide them before the
-                    // runtime reload signal; one failed session must not block the
-                    // others, and a boot-time release is an idempotent request.
-                    let settleStaleBloggerSession (bloggerSessionId: SessionId) : Task =
-                        task {
-                            try
-                                do!
-                                    scope.SignalChatRecovery(
-                                        ChatExecutionRecoveryLifecycleEvent.BloggerStaleRequestAbandoned
-                                            bloggerSessionId
-                                    )
-                            with error ->
-                                Diagnostic.emit
-                                    "stale-blogger-execution-settlement-failed"
-                                    [ "blogger_session_id", SessionId.value bloggerSessionId
-                                      "error", error.Message ]
-                        }
-
-                    // ... and the Blog materializations it left open. No live
-                    // execution can own one, and while it stays open the
-                    // coordinator never materializes a fresh request — the
-                    // Blogger would never ingest the raw tail again
-                    // (crash-reconciliation-020 / context-compression-024).
-                    let settleAbandonedStaleBloggerSessions (journal: AgentJournal) =
-                        task {
-                            let bloggerHost = scope.BloggerRuntimeHost
-                            let liveFlight = isFlightActive bloggerHost
-
-                            let! staleBloggerSessions = BloggerAbandon.settleStaleOpenAtLoad liveFlight journal
-
-                            for bloggerSessionId in staleBloggerSessions do
-                                do! settleStaleBloggerSession bloggerSessionId
-                        }
-
-                    let recoveryWorks =
-                        boot.Journal
-                        |> Option.map (fun journal -> inspectRecoveryWorks journal boot.WorkspaceDirectory)
-                        |> Option.defaultValue [||]
+                    let! recoveryWorks =
+                        match boot.Journal with
+                        | Some journal -> inspectRecoveryWorks journal boot.WorkspaceDirectory
+                        | None -> Task.FromResult [||]
 
                     match boot.Journal with
                     | Some journal ->
-                        let drainPtys work =
-                            task {
-                                let workspace =
-                                    boot.WorkspaceDirectory
-                                    |> Option.defaultWith (fun () -> invalidOp "PTY recovery requires a workspace")
-
-                                do!
-                                    HostForkRuntime.CloseUnboundPtyRun(
-                                        PtyBackend.recover,
-                                        RuntimePath.stateRoot workspace,
-                                        work
-                                    )
-                            }
-
-                        do! ChildWorkRecovery.settleOrphanedChildRuns drainPtys journal
-                        do! settleAbandonedStaleBloggerSessions journal
-
                         do!
                             reconcilePendingDeliveries
                                 recoveryWorks

@@ -42,6 +42,30 @@ module JsToolSpec =
         rootOf: (string -> string) ->
             ToolSpec
 
+    val createWithReviewCheck:
+        check: (HostToolContext -> Task<bool>) ->
+        factory: HostToolFactory ->
+        surface: JsSurface ->
+        workspaceRoot: string ->
+        persistence: IJsTransactionPersistence option ->
+        lifecyclePersistence: IJsLifecyclePersistence option ->
+        fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
+        processHost: (HostToolContext -> JsToolWorkflow.ProcessHost) ->
+        rootOf: (string -> string) ->
+            ToolSpec
+
+    val createWithApiScope:
+        scope: (HostToolContext -> Wanxiangshu.Process.JsSandbox.ParkState -> obj -> obj) ->
+        factory: HostToolFactory ->
+        surface: JsSurface ->
+        workspaceRoot: string ->
+        persistence: IJsTransactionPersistence option ->
+        lifecyclePersistence: IJsLifecyclePersistence option ->
+        fileAccessObservation: (HostToolContext -> JsExplicitFileRead list -> string list -> Task<unit>) option ->
+        processHost: (HostToolContext -> JsToolWorkflow.ProcessHost) ->
+        rootOf: (string -> string) ->
+            ToolSpec
+
     val createWithAdmission:
         factory: HostToolFactory ->
         surface: JsSurface ->

@@ -8,7 +8,6 @@ open Wanxiangshu.OpenCode
 open Wanxiangshu.Participant.Provider
 open Wanxiangshu.Repository.Programming.Js
 
-
 /// PROMPT-019: load already-localized js-program prose. Domain assembles;
 /// this module binds language.
 module JsDescriptionAssets =
@@ -22,21 +21,19 @@ module JsDescriptionAssets =
 
     let load (lang: ProviderLanguage) : JsCanonicalDescription.Prose =
         { Header = text lang JsCanonicalDescription.Path.Header
-          EditPrelude = template lang JsCanonicalDescription.Path.EditPrelude
-          EditStructuralGuidance = template lang JsCanonicalDescription.Path.EditStructuralGuidance
+
           Footer = text lang JsCanonicalDescription.Path.Footer
           Contract = template lang JsCanonicalDescription.Path.Contract
-          ContractEditRecommendation = template lang JsCanonicalDescription.Path.ContractEditRecommendation
+
           ContractParallelEdits = template lang JsCanonicalDescription.Path.ContractParallelEdits
           ContractParallelReads = template lang JsCanonicalDescription.Path.ContractParallelReads
           VerbRead = text lang JsCanonicalDescription.Path.VerbRead
-          VerbSearch = text lang JsCanonicalDescription.Path.VerbSearch
-          VerbTransform = text lang JsCanonicalDescription.Path.VerbTransform
-          VerbRewrite = text lang JsCanonicalDescription.Path.VerbRewrite
+
           VerbCreate = text lang JsCanonicalDescription.Path.VerbCreate
           ReadRules = template lang JsCanonicalDescription.Path.ReadRules
+          ReviewOnlyRules = text lang JsCanonicalDescription.Path.ReviewOnlyRules
           Recipes = text lang JsCanonicalDescription.Path.Recipes
-          EditRules = template lang JsCanonicalDescription.Path.EditRules
+
           WriteRules = text lang JsCanonicalDescription.Path.WriteRules
           MutationRules = text lang JsCanonicalDescription.Path.MutationRules
           Rm = text lang JsCanonicalDescription.Path.Rm
@@ -52,35 +49,30 @@ module JsDescriptionAssets =
           UltraManagerInvestigation = text lang JsCanonicalDescription.Path.UltraManagerInvestigation
           UltraPlan = text lang JsCanonicalDescription.Path.UltraPlan
           MechanicalSemantic = text lang JsCanonicalDescription.Path.MechanicalSemantic
-          CommentAnchorOwnSearch = text lang JsCanonicalDescription.Path.CommentAnchorOwnSearch
-          CommentIgnoreGy = text lang JsCanonicalDescription.Path.CommentIgnoreGy
-          CommentHostCapability = text lang JsCanonicalDescription.Path.CommentHostCapability
-          ReasonEmptyStringPattern = text lang JsCanonicalDescription.Path.ReasonEmptyStringPattern
-          ReasonInvalidRegexp = text lang JsCanonicalDescription.Path.ReasonInvalidRegexp
-          ReasonPatternType = text lang JsCanonicalDescription.Path.ReasonPatternType
-          ReasonAnchorEmptyNames = text lang JsCanonicalDescription.Path.ReasonAnchorEmptyNames
-          ReasonAnchorReserved = text lang JsCanonicalDescription.Path.ReasonAnchorReserved
-          ReasonAnchorNamesDiffer = text lang JsCanonicalDescription.Path.ReasonAnchorNamesDiffer
-          ReasonAnchorNamesUnique = text lang JsCanonicalDescription.Path.ReasonAnchorNamesUnique
-          ReasonAnchorNotFound = text lang JsCanonicalDescription.Path.ReasonAnchorNotFound
-          ReasonUnknownAnchor = text lang JsCanonicalDescription.Path.ReasonUnknownAnchor
-          ReasonInvalidSlice = text lang JsCanonicalDescription.Path.ReasonInvalidSlice
-          ReasonFileReadFailed = text lang JsCanonicalDescription.Path.ReasonFileReadFailed
+
           ReasonRunUnimplemented = text lang JsCanonicalDescription.Path.ReasonRunUnimplemented
-          ReasonEditInvalid = text lang JsCanonicalDescription.Path.ReasonEditInvalid
-          ReasonEditNotFound = text lang JsCanonicalDescription.Path.ReasonEditNotFound
-          ReasonEditAmbiguous = text lang JsCanonicalDescription.Path.ReasonEditAmbiguous
-          ReasonEditOverlap = text lang JsCanonicalDescription.Path.ReasonEditOverlap
-          ReasonEditAtomicity = text lang JsCanonicalDescription.Path.ReasonEditAtomicity
-          ReasonEditPreview = text lang JsCanonicalDescription.Path.ReasonEditPreview
-          ReasonEditCopyReady = text lang JsCanonicalDescription.Path.ReasonEditCopyReady
-          ReasonEditAttempted = text lang JsCanonicalDescription.Path.ReasonEditAttempted
-          ReasonEditUnknownFields = text lang JsCanonicalDescription.Path.ReasonEditUnknownFields
-          ReasonEditCandidate = text lang JsCanonicalDescription.Path.ReasonEditCandidate
-          ReasonEditLine = text lang JsCanonicalDescription.Path.ReasonEditLine
-          ReasonEditOverlaps = text lang JsCanonicalDescription.Path.ReasonEditOverlaps
+
           Park = template lang JsCanonicalDescription.Path.Park
-          ParkedPayload = template lang JsCanonicalDescription.Path.ParkedPayload }
+          ParkedPayload = template lang JsCanonicalDescription.Path.ParkedPayload
+          BaseClass = template lang JsCanonicalDescription.Path.BaseClass
+          BaseClassCallable = template lang JsCanonicalDescription.Path.BaseClassCallable
+          BaseClassRead = template lang JsCanonicalDescription.Path.BaseClassRead
+          BaseClassAnchors = template lang JsCanonicalDescription.Path.BaseClassAnchors
+          BaseClassGlob = template lang JsCanonicalDescription.Path.BaseClassGlob
+          BaseClassGrep = template lang JsCanonicalDescription.Path.BaseClassGrep
+          BaseClassWrite = template lang JsCanonicalDescription.Path.BaseClassWrite
+          BaseClassMkdir = template lang JsCanonicalDescription.Path.BaseClassMkdir
+          BaseClassRemove = template lang JsCanonicalDescription.Path.BaseClassRemove
+          BaseClassMove = template lang JsCanonicalDescription.Path.BaseClassMove
+          BaseClassExec = template lang JsCanonicalDescription.Path.BaseClassExec
+          BaseClassFork = template lang JsCanonicalDescription.Path.BaseClassFork
+          BaseClassCommission = template lang JsCanonicalDescription.Path.BaseClassCommission
+          BaseClassJoin = template lang JsCanonicalDescription.Path.BaseClassJoin
+          BaseClassFission = template lang JsCanonicalDescription.Path.BaseClassFission
+          BaseClassHorizon = template lang JsCanonicalDescription.Path.BaseClassHorizon
+          BaseClassAdvisor = template lang JsCanonicalDescription.Path.BaseClassAdvisor
+          BaseClassAsk = template lang JsCanonicalDescription.Path.BaseClassAsk
+          BaseClassLifecycle = template lang JsCanonicalDescription.Path.BaseClassLifecycle }
 
     let argProgram (lang: ProviderLanguage) =
         text lang JsCanonicalDescription.Path.ArgProgram
@@ -98,7 +90,10 @@ module JsDescriptionAssets =
 module JsToolSpec =
 
     let admissionFor (roleName: string) : ToolAdmission =
-        let fsPermissions =
+        // Any office permission that projects a programming-surface member
+        // admits the role's todowrite-for-* tool. JsPlan expands to Read/Write/Ask
+        // at projection time; keep the grant itself so Plan is not special-cased.
+        let surfacePermissions =
             set
                 [ ToolPermission.Read
                   ToolPermission.Write
@@ -107,12 +102,25 @@ module JsToolSpec =
                   ToolPermission.Grep
                   ToolPermission.Move
                   ToolPermission.Remove
+                  ToolPermission.Exec
                   ToolPermission.Fork
-                  ToolPermission.Join ]
+                  ToolPermission.Join
+                  ToolPermission.Fission
+                  ToolPermission.Horizon
+                  ToolPermission.Advisor
+                  ToolPermission.Ask
+                  ToolPermission.JsPlan
+                  ToolPermission.Resume
+                  ToolPermission.Review
+                  ToolPermission.ReviewAssessment
+                  ToolPermission.Fetch
+                  ToolPermission.DevOpsConsultation
+                  ToolPermission.Deliver
+                  ToolPermission.Finality ]
 
         ToolAdmission.OfficeRole(fun _ r ->
             (string r).ToLowerInvariant() = roleName.ToLowerInvariant()
-            && not (Set.isEmpty (Set.intersect (OfficeCapability.permissions r) fsPermissions)))
+            && not (Set.isEmpty (Set.intersect (OfficeCapability.permissions r) surfacePermissions)))
 
     [<Emit("$0===undefined||$0===null")>]
     let private isUndefined (value: obj) : bool = jsNative
@@ -145,7 +153,9 @@ module JsToolSpec =
     /// durable transaction facts (JS-012) when the caller has an EventStore.
     /// `modelSourceProvider` supplies the model program (the tool arguments);
     /// the first version reads it from the Host arguments payload.
-    let create
+    let private createCore
+        (scopeApi: (HostToolContext -> Wanxiangshu.Process.JsSandbox.ParkState -> obj -> obj) option)
+        (reviewCheck: (HostToolContext -> Task<bool>) option)
         (factory: HostToolFactory)
         (surface: JsSurface)
         (workspaceRoot: string)
@@ -155,6 +165,11 @@ module JsToolSpec =
         (processHost: HostToolContext -> JsToolWorkflow.ProcessHost)
         (rootOf: string -> string)
         : ToolSpec =
+        let reviewCheck =
+            match reviewCheck with
+            | None when surface.RoleName.Trim().ToLowerInvariant() = "manager" -> Some(fun _ -> Task.FromResult false)
+            | configured -> configured
+
         let readProgram (args: HostToolArguments) : string option = args.OptionalText "program"
 
         /// Build the three-state input object from the Host arguments:
@@ -188,6 +203,7 @@ module JsToolSpec =
         let abandonSchema =
             ToolHostCodec.objectSchemaOf [ "handle", ToolHostCodec.stringSchema factory ] factory
 
+        // One view contract: the prefix is protected; the map states keep or summary.
         let mappingSchema =
             ToolHostCodec.recordSchemaOf
                 (ToolHostCodec.stringSchema factory)
@@ -250,8 +266,19 @@ module JsToolSpec =
                         let root = rootOf ctx.SessionId
 
                         let! outcome =
-                            JsToolWorkflow.execute
+                            let execute =
+                                match scopeApi with
+                                | Some scope -> JsToolWorkflow.executeWithApiScope (scope ctx)
+                                | None ->
+                                    JsToolWorkflow.executeWithReviewCheck (
+                                        reviewCheck |> Option.map (fun check -> fun () -> check ctx)
+                                    )
+
+                            execute
                                 ctx.SessionId
+                                (match ctx.ProviderRunId, ctx.ToolCallId with
+                                 | Some providerRun, Some toolCallId -> Some(providerRun, toolCallId)
+                                 | _ -> None)
                                 surface.Capabilities
                                 root
                                 surface.BaseClassSource
@@ -267,7 +294,66 @@ module JsToolSpec =
                         return JsToolsResult.render outcome
                 } }
 
-    /// Build a ToolSpec for the dedicated todowrite-for-predictor surface with PrivateAttachment admission.
+    let create factory surface workspaceRoot persistence lifecyclePersistence fileAccessObservation processHost rootOf =
+        createCore
+            None
+            None
+            factory
+            surface
+            workspaceRoot
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
+            processHost
+            rootOf
+
+    let createWithApiScope
+        scope
+        factory
+        surface
+        workspaceRoot
+        persistence
+        lifecyclePersistence
+        fileAccessObservation
+        processHost
+        rootOf
+        =
+        createCore
+            (Some scope)
+            None
+            factory
+            surface
+            workspaceRoot
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
+            processHost
+            rootOf
+
+    let createWithReviewCheck
+        check
+        factory
+        surface
+        workspaceRoot
+        persistence
+        lifecyclePersistence
+        fileAccessObservation
+        processHost
+        rootOf
+        =
+        createCore
+            None
+            (Some check)
+            factory
+            surface
+            workspaceRoot
+            persistence
+            lifecyclePersistence
+            fileAccessObservation
+            processHost
+            rootOf
+
+    /// Build a ToolSpec with dedicated ToolAdmission.
     let createWithAdmission
         (factory: HostToolFactory)
         (surface: JsSurface)

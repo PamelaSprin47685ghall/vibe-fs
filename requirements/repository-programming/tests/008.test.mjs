@@ -19,10 +19,10 @@ test('WHAT[repository-programming-008] JS007_bindings_path_boundary_denies_escap
   const { dir, cleanup } = sandbox()
   try {
     const binding = createApi(dir)
-    const denied = apiOf(binding).js.cat('../outside.txt')
+    const denied = apiOf(binding).cat('../outside.txt')
     assert.equal(denied.ok, false)
     assert.equal(denied.code, 'PATH_DENIED')
-    const deniedWrite = apiOf(binding).js.write('../outside.txt', 'x')
+    const deniedWrite = apiOf(binding).write('../outside.txt', 'x')
     assert.equal(deniedWrite.ok, false)
     assert.equal(deniedWrite.code, 'PATH_DENIED')
   } finally {
@@ -36,8 +36,8 @@ test('WHAT[repository-programming-008] JS007_bindings_glob_lists_matching_paths'
     writeFileSync(join(dir, 'src', 'a.fs'), 'x', 'utf8')
     writeFileSync(join(dir, 'src', 'b.txt'), 'y', 'utf8')
     const api = apiOf(createApi(dir))
-    assert.equal(api.js.glob, undefined)
-    const result = api.js.ls('src')
+    assert.equal(api.glob, undefined)
+    const result = api.ls('src')
     assert.equal(result.ok, true)
     assert.deepEqual(result.entries.filter((e) => e.endsWith('.fs')).map((e) => `src/${e}`), ['src/a.fs'])
     assert.equal('truncated' in result, false)

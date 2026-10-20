@@ -31,7 +31,8 @@ type HostForkRuntime =
         ?cancelSignals: (SessionId seq -> unit) *
         ?ownership: HandleOwnership *
         ?drainChildPtys: (AdmittedWork -> Task<unit>) *
-        ?ownershipCommonDir: string ->
+        ?ownershipCommonDir: string *
+        ?childViewForRun: (SessionId -> ProviderRunIdentity -> Task<string option>) ->
             HostForkRuntime
 
     member internal Runtime: ForkRuntime
@@ -54,7 +55,7 @@ type HostForkRuntime =
          >
 
     member internal Clock: IClockPort
-    member internal Now: unit -> DateTimeOffset
+    member Now: unit -> DateTimeOffset
     member internal AdoptChild: agentId: string * childId: SessionId -> unit
 
     member internal ObservePromptSend:
@@ -103,7 +104,7 @@ type HostForkRuntime =
 
     member FailRun: run: PendingHostRun * error: string -> Task
     member MarkReady: run: PendingHostRun -> unit
-    member internal AwaitCurrentWorkRecord: agentId: string -> Task<Result<string, string>>
+    member internal AwaitCurrentView: agentId: string -> Task<Result<string, string>>
     member internal EnqueueBufferedJoinItems: items: JoinItem seq -> unit
     member internal DrainBufferedJoinItems: maxCount: int -> JoinItem list
     member internal HasBufferedJoinItems: bool

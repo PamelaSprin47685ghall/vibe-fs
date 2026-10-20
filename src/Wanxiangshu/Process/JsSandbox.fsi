@@ -73,7 +73,7 @@ module JsSandbox =
     /// deferred promise the program awaits.
     val suspendProgram: parkState: ParkState -> payload: obj -> obj
 
-    /// Resolve the deferred promise the program is awaiting at `await js.park`
+    /// Resolve the deferred promise the program is awaiting at `await this.park`
     /// with the injected unpark value.
     val unpark: parkState: ParkState -> value: obj -> unit
 

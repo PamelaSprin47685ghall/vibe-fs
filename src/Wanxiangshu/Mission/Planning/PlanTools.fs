@@ -19,7 +19,7 @@ type DeliverResult =
 /// work-028: the outcome of one synchronous ask delegation.
 type AskResult =
     { Kind: string
-      WorkRecord: string
+      View: string
       Status: string }
 
 type DeliverySpawnOutcome =
@@ -28,6 +28,8 @@ type DeliverySpawnOutcome =
     | Unknown of reason: string
 
 module PlanTools =
+    let private executionFences =
+        System.Collections.Generic.Dictionary<string, string>()
 
     let private requireOpt (err: string) =
         function
@@ -540,9 +542,6 @@ module PlanTools =
                         receipt
         }
 
-    let private postS3SessionId (workId: string) =
-        "post-s3:" + (HostDigest.sha256Hex ("post-s3-session-v1\n" + workId)).[..15]
-
     let private settlePostS3Transition
         (gitCommonDir: string)
         (workId: string)
@@ -561,23 +560,29 @@ module PlanTools =
                     receipt.Reason
             )
         elif receipt.Kind = "DeliveryRequested" then
-            let operationId =
-                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "operationId"
-
+            // LC-019: a committed DeliveryRequested IS the durable fact of
+            // plan completion. Binding a synthesized execution session and
+            // settling an Accepted retirement here would fabricate an
+            // execution handoff no Host ever observed. The real handoff
+            // happens in startPostS3Execution against the same pending
+            // operation, so this branch only reports the requested intent.
             let digest =
                 Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "digest"
 
             let path = Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "path"
-            let sessionId = postS3SessionId workId
 
-            bindObservedExecutionSession gitCommonDir workId operationId sessionId
-            |> Result.bind (fun () ->
-                settleAcceptedDelivery gitCommonDir workId operationId sessionId digest path (retirementBlockers ()))
-            |> Result.map (fun settled ->
-                { settled with
-                    ExecSessionId = ""
-                    RetirementOutcome = "PostS3"
-                    Message = "Plan entered post-S3 state" })
+            Ok
+                { Ok = true
+                  Relayed = false
+                  Delivered = false
+                  RetiredIncumbencyId = ""
+                  RetirementOutcome = "PostS3"
+                  Digest = digest
+                  Path = path
+                  ExecSessionId = ""
+                  NextIncumbencyId = ""
+                  Message = "Plan delivery requested; awaiting execution handoff" }
+
         elif receipt.Kind = "ReviewRequired" then
             Error "assessment required"
         elif receipt.Kind = "Blocked" then
@@ -745,7 +750,37 @@ module PlanTools =
             | Ok() -> return Error reason
         }
 
+    /// LC-020: the fresh execution handoff settles through the same durable
+    /// ledger as the first handoff. The operation id is the pending
+    /// delivery's own identity, the created session is durably bound
+    /// (DeliverySessionBound) before any prompt, and an Unknown prompt only
+    /// observes the existing operation — it never spawns a second session.
+    let private observePendingOperation
+        (gitCommonDir: string)
+        (workId: string)
+        (operationId: string)
+        : Result<unit, string> =
+        let observation =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                "ResolveDelivery"
+                [ "operationId", box operationId; "outcome", box "Unknown" ]
+
+        let receipt =
+            durableObservation gitCommonDir workId (operationId + ":unknown") observation
+
+        if
+            receipt.Status = "Observed"
+            || receipt.Status = "Committed"
+            || receipt.Status = "Replayed"
+        then
+            Ok()
+        else
+            Error(receiptRefusal receipt)
+
     let private promptFreshExecution
+        (gitCommonDir: string)
+        (workId: string)
+        (operationId: string)
         (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
         (discardSession: string -> Task<Result<unit, string>>)
         (content: string)
@@ -756,10 +791,15 @@ module PlanTools =
         task {
             match! promptSession execSessionId "manager" content with
             | NotStarted err -> return! discardFreshExecution discardSession execSessionId err
-            | Unknown err -> return Error(sprintf "Execution session prompt outcome is unknown: %s" err)
+            | Unknown err ->
+                let! _ = observePendingOperation gitCommonDir workId operationId |> Task.FromResult
+
+                return Error(sprintf "Execution session prompt outcome is unknown: %s" err)
             | Started observedSession when observedSession <> execSessionId ->
                 return Error "Execution prompt returned a different session identity"
             | Started _ ->
+                executionFences[operationId] <- execSessionId
+
                 return
                     Ok
                         { Ok = true
@@ -775,53 +815,107 @@ module PlanTools =
         }
 
     let private createAndPromptFreshExecution
+        (gitCommonDir: string)
         (workId: string)
-        (providerRunId: string)
-        (toolCallId: string)
+        (operationId: string)
         (createSession: string -> string -> Task<Result<string, string>>)
         (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
         (discardSession: string -> Task<Result<unit, string>>)
-        ((content, digest, path): string * string * string)
+        (content: string)
+        (digest: string)
+        (path: string)
         : Task<Result<DeliverResult, string>> =
         task {
-            let operationId =
-                HostDigest.sha256Hex (String.concat "\n" [ "post-s3-execution-v1"; workId; providerRunId; toolCallId ])
-
             match! createSession operationId "manager" with
-            | Error reason -> return Error reason
+            | Error reason ->
+                let! _ = refuseDelivery gitCommonDir workId operationId reason |> Task.FromResult
+
+                return Error reason
             | Ok execSessionId ->
-                return! promptFreshExecution promptSession discardSession content digest path execSessionId
+                match bindObservedExecutionSession gitCommonDir workId operationId execSessionId with
+                | Error reason -> return Error reason
+                | Ok() ->
+                    return!
+                        promptFreshExecution
+                            gitCommonDir
+                            workId
+                            operationId
+                            promptSession
+                            discardSession
+                            content
+                            digest
+                            path
+                            execSessionId
         }
 
+    /// LC-020: the fresh handoff runs against the pending delivery's own
+    /// operation. The reserved digest is re-checked against the plan bytes
+    /// before any session is created, so a mutated artifact can never reach
+    /// a spawned execution session.
     let private startFreshPostS3Execution
+        (gitCommonDir: string)
         (root: string)
         (workId: string)
-        (providerRunId: string)
-        (toolCallId: string)
         (blockers: string array)
         (createSession: string -> string -> Task<Result<string, string>>)
         (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
         (discardSession: string -> Task<Result<unit, string>>)
         : Task<Result<DeliverResult, string>> =
         task {
-            let validated =
-                if not (Array.isEmpty blockers) then
-                    Error "Cannot deliver: live resources block starting execution"
-                else
-                    readAndValidatePlan root workId
+            if not (Array.isEmpty blockers) then
+                return Error "Cannot deliver: live resources block starting execution"
+            else
+                let pending =
+                    match lifecycleWorkOf gitCommonDir workId with
+                    | None -> Error "lifecycle work is missing"
+                    | Some work ->
+                        match
+                            work.PendingOperationId, work.PendingExecSessionId, work.PendingDigest, work.PendingPath
+                        with
+                        | Some operationId, None, Some digest, Some path -> Ok(operationId, digest, path)
+                        | Some _, Some bound, Some digest, Some path -> Ok("replay:" + bound, digest, path)
+                        | _ -> Error "pending delivery evidence is incomplete"
 
-            match validated with
-            | Error err -> return Error err
-            | Ok plan ->
-                return!
-                    createAndPromptFreshExecution
-                        workId
-                        providerRunId
-                        toolCallId
-                        createSession
-                        promptSession
-                        discardSession
-                        plan
+                match pending with
+                | Error err -> return Error err
+                | Ok(operationId, digest, path) when operationId.StartsWith "replay:" ->
+                    return
+                        Ok
+                            { Ok = true
+                              Relayed = false
+                              Delivered = true
+                              RetiredIncumbencyId = ""
+                              RetirementOutcome = "Delivered"
+                              Digest = digest
+                              Path = path
+                              ExecSessionId = operationId.Substring("replay:".Length)
+                              NextIncumbencyId = ""
+                              Message = "Delivered" }
+                | Ok(operationId, digest, path) ->
+                    match readAndValidatePlan root workId with
+                    | Error err -> return Error err
+                    | Ok(content, currentDigest, currentPath) when currentDigest = digest && currentPath = path ->
+                        return!
+                            createAndPromptFreshExecution
+                                gitCommonDir
+                                workId
+                                operationId
+                                createSession
+                                promptSession
+                                discardSession
+                                content
+                                digest
+                                path
+                    | Ok _ ->
+                        let! _ =
+                            refuseDelivery
+                                gitCommonDir
+                                workId
+                                operationId
+                                "Cannot deliver: plan artifact changed after delivery reservation"
+                            |> Task.FromResult
+
+                        return Error "Cannot deliver: plan artifact changed after delivery reservation"
         }
 
     let private reviewAndDeliverReopenedPostS3
@@ -963,7 +1057,41 @@ module PlanTools =
             |> List.filter (fun r -> r.Outcome = "Delivered")
             |> List.length
 
-        if retiredCount <= 1 then
+        if work.PendingDelivery && retiredCount = 0 then
+            work.PendingOperationId
+            |> Option.iter (fun operationId -> executionFences[providerRunId + ":" + toolCallId] <- operationId)
+
+            startFreshPostS3Execution
+                gitCommonDir
+                root
+                workId
+                (retirementBlockers ())
+                createSession
+                promptSession
+                discardSession
+        elif executionFences.ContainsKey(providerRunId + ":" + toolCallId) then
+            let remembered =
+                let key = executionFences[providerRunId + ":" + toolCallId]
+
+                if executionFences.ContainsKey key then
+                    executionFences[key]
+                else
+                    key
+
+            Task.FromResult(
+                Ok
+                    { Ok = true
+                      Relayed = false
+                      Delivered = true
+                      RetiredIncumbencyId = ""
+                      RetirementOutcome = "Delivered"
+                      Digest = ""
+                      Path = ""
+                      ExecSessionId = remembered
+                      NextIncumbencyId = ""
+                      Message = "Delivered" }
+            )
+        elif retiredCount <= 1 then
             startFirstPostS3Execution
                 gitCommonDir
                 root
@@ -978,10 +1106,9 @@ module PlanTools =
                 work
         else
             startFreshPostS3Execution
+                gitCommonDir
                 root
                 workId
-                providerRunId
-                toolCallId
                 (retirementBlockers ())
                 createSession
                 promptSession
@@ -1042,7 +1169,7 @@ module PlanTools =
             match inspected, recordedFence with
             | None, _ -> return Error "lifecycle work is missing"
             | Some _, Some retired -> return replayRecordedFence root workId retired
-            | Some work, None when not work.Delivered ->
+            | Some work, None when not (work.Delivered || work.PendingDelivery) ->
                 return Error "Cannot start S4 execution before entering post-S3 state"
             | Some work, None ->
                 return!
@@ -1181,7 +1308,7 @@ module PlanTools =
                 return
                     Ok
                         { Kind = "delegated"
-                          WorkRecord = record
+                          View = record
                           Status = "completed" }
         }
 
@@ -1195,7 +1322,7 @@ module PlanTools =
             match delegation with
             | Error err -> return Error err
             | Ok record when String.IsNullOrWhiteSpace record ->
-                return Error "The DevOps delegation returned an empty work record"
+                return Error "The DevOps delegation returned an empty delivered view"
             | Ok record -> return! bindDevOpsAndComplete gitCommonDir workId activeId record
         }
 

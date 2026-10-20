@@ -13,7 +13,7 @@ export async function runWithSpoolFault(options = {}) {
     const ready = join(dir, 'ready')
     const emit = join(dir, 'emit')
     const command = nodeCommand(`const fs = require('node:fs'); fs.writeFileSync(${JSON.stringify(ready)}, 'ready'); const timer = setInterval(() => { if (fs.existsSync(${JSON.stringify(emit)})) { clearInterval(timer); process.stdout.write('x'.repeat(600000)); process.exitCode = 7; } }, 10)`)
-    pending = runProgram(dir, `return await js.call(${oneCommand(command, options)});`)
+    pending = runProgram(dir, `return await this.call(${oneCommand(command, options)});`)
     const deadline = performance.now() + 4000
     while (!existsSync(ready) && performance.now() < deadline) await delay(10)
     assert.equal(existsSync(ready), true, 'the target must start before the capture fault is introduced')

@@ -4,4 +4,4 @@ Before writing, call `review` in this incumbency. Every write checks the current
 
 `await this.ask(question)` records a durable user question, notifies the user, and parks the program. Only S1 may ask; other stages refuse with `ASK_REFUSED`. After a real user reply, resume with `{ unpark: { handle, value } }`.
 
-The tool also accepts optional top-level `prefixUntil` and `thenMap` together. They use the shared ANCHOR view contract. Plan user originals remain raw. Numbers and replacement history last only in this process; a durable call checkpoint does not save the view. Keep enduring knowledge in P.
+The tool also accepts optional top-level `prefixUntil` and `thenMap` together. They use the shared ANCHOR view contract. An explicit view can replace earlier context with summaries; a relay does not clear earlier messages on its own. Numbers and replacement history last only in this process; a durable call checkpoint does not save the view. Keep enduring knowledge in P.

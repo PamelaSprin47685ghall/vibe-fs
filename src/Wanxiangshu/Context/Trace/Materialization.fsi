@@ -33,9 +33,4 @@ module XTraceMaterialization =
 
     val materializeRange: range: XTraceRange -> xTrace: XTraceProjectionState -> Task<Result<XTraceItem list, string>>
 
-    val materializeWorkRecordRange:
-        range: XTraceRange -> xTrace: XTraceProjectionState -> Task<Result<XTraceItem list, string>>
-
     val renderRange: range: XTraceRange -> xTrace: XTraceProjectionState -> Task<Result<string, string>>
-
-    val renderWorkRecordRange: range: XTraceRange -> xTrace: XTraceProjectionState -> Task<Result<string, string>>

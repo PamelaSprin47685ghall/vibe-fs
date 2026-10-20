@@ -13,12 +13,13 @@
 |---|---|---|
 | UM-0 固定版本与合并计划 | DONE（计划） | fetch 与静态源码核对；新增 17 提交、386 路径；三方预演 162 冲突路径；未运行产品测试 |
 | UM-1 Pair Hint 与保证书清理 | READY（限定） | gen43 构建/格式/静态通过；正式七文件175/0/2旧TODO，实际Host两文件109/0/1旧TODO，均排空回收；[原始证据](../../evidence/upstream-view-delivery-20261020/README.md)，完整发行及部署待后续 |
-| UM-2 view/Anchor 与 Plan 编程面 | DOING | root 接续24462522f；公共区间、顶层声明、P-only 调用门禁与原任期写权限已接通；最终同候选验收见 um2-delivery.json，未关闭 |
-| UM-3 Manager reviewOnly | PLANNED | 依赖 UM-2；入口常开、逐次读取授权，保留本地 rg 监管 |
-| UM-4 交付见证与真实工作收束 | PLANNED | 依赖 UM-2/UM-3；实际委派、join、Fission、持久恢复；不接半成品 reportMapping |
-| UM-5 同候选验收与源码集成 | PLANNED | 前包完成后执行；相关验证、完整发行、推送、运行切换分别记录 |
+| UM-2 view/Anchor 与 Plan 编程面 | SOURCE_READY_LIMITED | 整合分支39b5dd04d；gen48核心165/0/1skip/1旧TODO，checkpoint集成23/0；证据um2-delivery.json；不算完整验收，不单独推master |
+| UM-R 完整模型与旧功能退役 | SOURCE_READY_LIMITED | 固定11052493b真实合并，库fc75b85已推送，15入口及包外消费62/0/4skip；最终主仓证据见[收据](../../evidence/upstream-view-delivery-20261020/umr-delivery.json) |
+| UM-3 Manager reviewOnly | SOURCE_READY_LIMITED | 原生真实Host逐次授权、零拒绝读取/启动、绑定方法、park与重开通过；保留本地受监管rg；正式监督结果见最终收据 |
+| UM-4 交付见证与真实工作收束 | SOURCE_READY_LIMITED | 结算后入格、精确provider围栏、自然stop不完成、冷回收不补造交付、Advisor实际intent归属已落实；不接半成品reportMapping，最终收据列明持久/进程链证据 |
+| UM-5 同候选验收与源码集成 | RESULTS_IN_RECEIPT | 定向验收、完整发行、普通推master的最终状态均以[收据](../../evidence/upstream-view-delivery-20261020/umr-delivery.json)为准；控制流风格债不改基线掩盖。未切换原运行目录，未部署 |
 
-UM-2—UM-4 在整合分支按依赖串行接线，共同完成后作为一组进入 master。大范围退役和旧 GAP 清零不在本批；小的非阻断问题登记后继续。
+用户已明确选择完整对齐上游新模型，包含旧功能退役；此前暂缓大范围退役的处置被替代。UM-2—UM-R—UM-4 作为一致候选进入 master，最终验收和推送结果以收据为准。旧 GAP 不一并清零；超过Int32的便捷数字cursor投影与既有发行门禁另记，64位持久cut仍验证。最终下载测试使用已有临时GNU wget，未增添产品依赖。原运行目录保持原版本。
 
 <a id="module-improvement-20261020"></a>
 ## 2026-10-20 已拆模块改进

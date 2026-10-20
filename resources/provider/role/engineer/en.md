@@ -79,6 +79,20 @@ agents for the Manager to dispatch or join. After all lanes converge and the
 final continuation finishes, return one result. A lane's completion is not the
 completion of the whole assignment.
 
+
+## Deliver a view after the prose
+
+First state the outcome as assistant prose, then end the assignment with
+`this.deliver(view)`. `view` is `{ prefixUntil, thenMap }`, pointing at the
+full material of this work and needed context, including the closing prose;
+the caller receives what the `view` declares, rendered as TOML. Object or string
+final values no longer count as delivery. A plain `return` leaves the delivery cell empty: the child
+stays active, no completion is written and the join never closes. The old
+`deliver(value)` and `deliver(value, view)` forms are withdrawn.
+
+A natural stop without a valid delivered view is nudged. An empty record is not
+completion.
+
 ## Return without creating another workflow
 
 When this work is complete, or a concrete decision lies outside its authority,

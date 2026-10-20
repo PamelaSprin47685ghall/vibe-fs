@@ -1,0 +1,311 @@
+TAP version 13
+# (node:39315) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+ok 1 - WHAT[advisor-004] the registered member reuses its live seat and refuses an empty new answer instead of replaying previous advice
+  ---
+  duration_ms: 821.411458
+  ...
+# Subtest: WHAT[knowledge-reuse-010] CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper
+ok 2 - WHAT[knowledge-reuse-010] CASE010_finalize_create_child_once_and_cleanup_never_runs_bookkeeper
+  ---
+  duration_ms: 76.028125
+  ...
+# Subtest: WHAT[knowledge-reuse-010] CASE010_finalize_uses_synthesizer_not_raw_noteAnswer
+ok 3 - WHAT[knowledge-reuse-010] CASE010_finalize_uses_synthesizer_not_raw_noteAnswer
+  ---
+  duration_ms: 69.0065
+  ...
+# Subtest: WHAT[knowledge-reuse-010] CASE010_cleanup_never_synthesizes
+ok 4 - WHAT[knowledge-reuse-010] CASE010_cleanup_never_synthesizes
+  ---
+  duration_ms: 23.811333
+  ...
+# Subtest: WHAT[knowledge-reuse-010] CASE010_finalize_is_exactly_once_per_scope
+ok 5 - WHAT[knowledge-reuse-010] CASE010_finalize_is_exactly_once_per_scope
+  ---
+  duration_ms: 9.356667
+  ...
+# Subtest: WHAT[knowledge-reuse-010] CASE010_finalize_is_exactly_once_per_scope
+ok 6 - WHAT[knowledge-reuse-010] CASE010_finalize_is_exactly_once_per_scope
+  ---
+  duration_ms: 10.11025
+  ...
+# Subtest: WHAT[knowledge-reuse-010] actual Engineer charge results can be manually supplied to one Casebook draft and finalized
+not ok 7 - WHAT[knowledge-reuse-010] actual Engineer charge results can be manually supplied to one Casebook draft and finalized
+  ---
+  duration_ms: 128.082083
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/knowledge-reuse/tests/010.test.mjs:334:1'
+  failureType: 'testCodeFailure'
+  error: 'Engineer Q1 must return the delivered LlmFacing.Data record'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  actual: |-
+    # [[returned]]
+    # id = "0:61:Who owns PromptAuthority?\nHost owns PromptAuthority.\nturn = 1"
+    # text = "Who owns PromptAuthority?\nHost owns PromptAuthority.\nturn = 1"
+    # [[returned]]
+    # id = "prose:ses_meditator_engineer_charge-child-1:9:FORMAL-Q1"
+    # text = "FORMAL-Q1"
+    
+  operator: 'match'
+  stack: |-
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/knowledge-reuse/tests/010.test.mjs:380:14)
+    process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    async Test.run (node:internal/test_runner/test:932:9)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: WHAT[knowledge-reuse-010] actual reusable Engineer results can be manually collected and archived; cleanup retains that archive
+ok 8 - WHAT[knowledge-reuse-010] actual reusable Engineer results can be manually collected and archived; cleanup retains that archive
+  ---
+  duration_ms: 148.474375
+  ...
+# Subtest: WHAT[knowledge-reuse-010] lifecycle_cleanupInspector_never_publishes_case
+ok 9 - WHAT[knowledge-reuse-010] lifecycle_cleanupInspector_never_publishes_case
+  ---
+  duration_ms: 27.224459
+  ...
+# Subtest: WHAT[knowledge-reuse-010] lifecycle_missing_answer_is_noop_finalize
+ok 10 - WHAT[knowledge-reuse-010] lifecycle_missing_answer_is_noop_finalize
+  ---
+  duration_ms: 26.087833
+  ...
+# Subtest: WHAT[knowledge-reuse-010] G6_G_universal_loop_archive_finalize_fetch
+ok 11 - WHAT[knowledge-reuse-010] G6_G_universal_loop_archive_finalize_fetch
+  ---
+  duration_ms: 5.42125
+  ...
+# Subtest: WHAT[knowledge-reuse-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup
+ok 12 - WHAT[knowledge-reuse-010] G6_G_lifecycle_note_finalize_fetch_and_cleanup
+  ---
+  duration_ms: 47.703292
+  ...
+# Subtest: WHAT[knowledge-reuse-010] G6_G_cancel_session_cleanup_no_publication
+ok 13 - WHAT[knowledge-reuse-010] G6_G_cancel_session_cleanup_no_publication
+  ---
+  duration_ms: 17.590875
+  ...
+# Subtest: WHAT[knowledge-reuse-010] GAP-160: actual Engineer resume boundaries and Fission takeover each archive exactly one distinct logical invocation, rejecting lane, late and duplicate terminal events
+ok 14 - WHAT[knowledge-reuse-010] GAP-160: actual Engineer resume boundaries and Fission takeover each archive exactly one distinct logical invocation, rejecting lane, late and duplicate terminal events # TODO
+  ---
+  duration_ms: 0.026083
+  ...
+# Subtest: WHAT[prefix-stability-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections
+ok 15 - WHAT[prefix-stability-014] PREFIX_STABILITY_pair_body_stays_out_of_the_trace_projections
+  ---
+  duration_ms: 0.800042
+  ...
+# Subtest: WHAT[prefix-stability-014] PPT_source_is_the_frozen_side_channel_identity
+ok 16 - WHAT[prefix-stability-014] PPT_source_is_the_frozen_side_channel_identity
+  ---
+  duration_ms: 0.128083
+  ...
+# Subtest: WHAT[prefix-stability-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker
+ok 17 - WHAT[prefix-stability-014] PPT_tryInject_user_quoting_the_thought_text_is_not_a_marker
+  ---
+  duration_ms: 1.930416
+  ...
+# Subtest: WHAT[prefix-stability-014] bare semantic capture preserves supplied bytes rather than guessing guidance from prose
+ok 18 - WHAT[prefix-stability-014] bare semantic capture preserves supplied bytes rather than guessing guidance from prose
+  ---
+  duration_ms: 60.916083
+  ...
+# (node:39408) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[prefix-stability-014] multiple terminal parts keep their physical originals through guidance replay
+ok 19 - WHAT[prefix-stability-014] multiple terminal parts keep their physical originals through guidance replay
+  ---
+  duration_ms: 547.496625
+  ...
+# Subtest: WHAT[prefix-stability-014] a failed guidance assertion ends its exact mock provider step before another single-slot fixture starts
+ok 20 - WHAT[prefix-stability-014] a failed guidance assertion ends its exact mock provider step before another single-slot fixture starts
+  ---
+  duration_ms: 551.922375
+  ...
+# Subtest: WHAT[prefix-stability-014] registered Host completed tool presentation leaves physical snapshot and durable originals unchanged
+ok 21 - WHAT[prefix-stability-014] registered Host completed tool presentation leaves physical snapshot and durable originals unchanged
+  ---
+  duration_ms: 334.9645
+  ...
+# Subtest: WHAT[prefix-stability-014] registered Host error tool presentation leaves physical snapshot and durable originals unchanged
+ok 22 - WHAT[prefix-stability-014] registered Host error tool presentation leaves physical snapshot and durable originals unchanged
+  ---
+  duration_ms: 334.915083
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user plain quotation of previous guidance is preserved in the request and cold trace
+ok 23 - WHAT[prefix-stability-014] a real user plain quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 384.492209
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user enclosed quotation of previous guidance is preserved in the request and cold trace
+ok 24 - WHAT[prefix-stability-014] a real user enclosed quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 414.203542
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user embedded quotation of previous guidance is preserved in the request and cold trace
+ok 25 - WHAT[prefix-stability-014] a real user embedded quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 425.648208
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user position quotation of previous guidance is preserved in the request and cold trace
+ok 26 - WHAT[prefix-stability-014] a real user position quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 390.155417
+  ...
+# Subtest: WHAT[prefix-stability-014] a real user multiple quotation of previous guidance is preserved in the request and cold trace
+ok 27 - WHAT[prefix-stability-014] a real user multiple quotation of previous guidance is preserved in the request and cold trace
+  ---
+  duration_ms: 407.160625
+  ...
+# Subtest: WHAT[prefix-stability-014] a empty terminal user part with a single part cannot acquire an unprovable guidance suffix
+ok 28 - WHAT[prefix-stability-014] a empty terminal user part with a single part cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 403.653125
+  ...
+# Subtest: WHAT[prefix-stability-014] a empty terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+ok 29 - WHAT[prefix-stability-014] a empty terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 425.179042
+  ...
+# Subtest: WHAT[prefix-stability-014] a whitespace terminal user part with a single part cannot acquire an unprovable guidance suffix
+ok 30 - WHAT[prefix-stability-014] a whitespace terminal user part with a single part cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 394.646584
+  ...
+# Subtest: WHAT[prefix-stability-014] a whitespace terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+ok 31 - WHAT[prefix-stability-014] a whitespace terminal user part with multiple parts cannot acquire an unprovable guidance suffix
+  ---
+  duration_ms: 394.29825
+  ...
+# Subtest: WHAT[prefix-stability-014] an old user occurrence without its original text is refused rather than inferred from its presentation
+ok 32 - WHAT[prefix-stability-014] an old user occurrence without its original text is refused rather than inferred from its presentation
+  ---
+  duration_ms: 463.940208
+  ...
+# Subtest: WHAT[prefix-stability-014] a same-generation physical user edit cannot disguise an original conflict as guidance replay
+ok 33 - WHAT[prefix-stability-014] a same-generation physical user edit cannot disguise an original conflict as guidance replay
+  ---
+  duration_ms: 380.297
+  ...
+# Subtest: WHAT[prefix-stability-014] a same-generation position user edit cannot disguise an original conflict as guidance replay
+ok 34 - WHAT[prefix-stability-014] a same-generation position user edit cannot disguise an original conflict as guidance replay
+  ---
+  duration_ms: 379.440542
+  ...
+# Subtest: WHAT[prefix-stability-014] the first reanchored capture of edited physical user text does not borrow retired original evidence
+ok 35 - WHAT[prefix-stability-014] the first reanchored capture of edited physical user text does not borrow retired original evidence
+  ---
+  duration_ms: 438.421875
+  ...
+# Subtest: WHAT[prefix-stability-014] the first reanchored capture of edited position user text does not borrow retired original evidence
+ok 36 - WHAT[prefix-stability-014] the first reanchored capture of edited position user text does not borrow retired original evidence
+  ---
+  duration_ms: 447.248916
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with same text
+ok 37 - WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with same text
+  ---
+  duration_ms: 551.352083
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with changed text
+ok 38 - WHAT[prefix-stability-014] reanchored physical user proof uses the current capture generation with changed text
+  ---
+  duration_ms: 539.890083
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with same text
+ok 39 - WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with same text
+  ---
+  duration_ms: 557.793833
+  ...
+# Subtest: WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with changed text
+ok 40 - WHAT[prefix-stability-014] reanchored position user proof uses the current capture generation with changed text
+  ---
+  duration_ms: 554.785875
+  ...
+# Subtest: WHAT[prefix-stability-014] a captured user carrier presentation replays from its proven original without adding trace material
+ok 41 - WHAT[prefix-stability-014] a captured user carrier presentation replays from its proven original without adding trace material
+  ---
+  duration_ms: 426.648334
+  ...
+# Subtest: WHAT[prefix-stability-014] actual OpenCode Host provider requests preserve user quotations and keep guidance out of physical tool originals through cold recovery
+ok 42 - WHAT[prefix-stability-014] actual OpenCode Host provider requests preserve user quotations and keep guidance out of physical tool originals through cold recovery # SKIP integration tier not enabled
+  ---
+  duration_ms: 0.053125
+  ...
+# (node:39970) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[repository-programming-009] registered Engineer searches through the real plugin without Exec capability
+ok 43 - WHAT[repository-programming-009] registered Engineer searches through the real plugin without Exec capability
+  ---
+  duration_ms: 496.463916
+  ...
+# Subtest: WHAT[repository-programming-009] actual rg gives a Grep-only office JSON matches, ignored files and native no-match status
+ok 44 - WHAT[repository-programming-009] actual rg gives a Grep-only office JSON matches, ignored files and native no-match status
+  ---
+  duration_ms: 146.258375
+  ...
+# Subtest: WHAT[repository-programming-009] file lists preserve newline paths and explicit dash patterns, globs and pattern files work
+ok 45 - WHAT[repository-programming-009] file lists preserve newline paths and explicit dash patterns, globs and pattern files work
+  ---
+  duration_ms: 359.946667
+  ...
+# Subtest: WHAT[repository-programming-009] unsafe argv, missing paths and external side files are refused before search
+ok 46 - WHAT[repository-programming-009] unsafe argv, missing paths and external side files are refused before search
+  ---
+  duration_ms: 34.49075
+  ...
+# Subtest: WHAT[repository-programming-009] inherited rg configuration is disabled and missing rg is an explicit failure
+ok 47 - WHAT[repository-programming-009] inherited rg configuration is disabled and missing rg is an explicit failure
+  ---
+  duration_ms: 113.970666
+  ...
+# Subtest: WHAT[repository-programming-009] invalid JSON cannot become successful query results
+ok 48 - WHAT[repository-programming-009] invalid JSON cannot become successful query results
+  ---
+  duration_ms: 237.65425
+  ...
+# Subtest: WHAT[repository-programming-009] invalid UTF-8 paths cannot become successful query results
+ok 49 - WHAT[repository-programming-009] invalid UTF-8 paths cannot become successful query results
+  ---
+  duration_ms: 204.117542
+  ...
+# Subtest: WHAT[repository-programming-009] consecutive queries consume the current absolute program deadline without borrowing another budget
+ok 50 - WHAT[repository-programming-009] consecutive queries consume the current absolute program deadline without borrowing another budget
+  ---
+  duration_ms: 4014.199875
+  ...
+# Subtest: WHAT[repository-programming-009] excessive actual rg output fails instead of reporting truncated JSON success
+ok 51 - WHAT[repository-programming-009] excessive actual rg output fails instead of reporting truncated JSON success
+  ---
+  duration_ms: 79.37925
+  ...
+# Subtest: WHAT[repository-programming-009] JS010_bindings_grep_returns_matches
+ok 52 - WHAT[repository-programming-009] JS010_bindings_grep_returns_matches
+  ---
+  duration_ms: 2.100917
+  ...
+# Subtest: WHAT[repository-programming-009] an unscoped rg binding returns a promise and refuses without a process Host
+ok 53 - WHAT[repository-programming-009] an unscoped rg binding returns a promise and refuses without a process Host
+  ---
+  duration_ms: 0.564667
+  ...
+# Subtest: WHAT[repository-programming-009] JS020_grep_returns_line_column_and_skips_ignored
+ok 54 - WHAT[repository-programming-009] JS020_grep_returns_line_column_and_skips_ignored
+  ---
+  duration_ms: 2.585084
+  ...
+# Subtest: WHAT[repository-programming-009] grep character-class candidates cannot leak to another path prefix
+ok 55 - WHAT[repository-programming-009] grep character-class candidates cannot leak to another path prefix
+  ---
+  duration_ms: 2.278417
+  ...
+1..55
+# tests 55
+# suites 0
+# pass 52
+# fail 1
+# cancelled 0
+# skipped 1
+# todo 1
+# duration_ms 18204.827458

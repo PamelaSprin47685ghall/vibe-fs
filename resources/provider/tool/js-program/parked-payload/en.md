@@ -1,4 +1,4 @@
-The tool call returned a parked payload because the program suspended at `await js.park(payload)`.
+The tool call returned a parked payload because the program suspended at `await this.park(payload)`.
 
 - `handle` identifies the parked site. It is consumed exactly once: resume with `{ unpark: { handle, value } }` or give up with `{ abandon: { handle } }`.
 - `payload` is the value the program passed to park. It is the program's own data, not a host verdict.

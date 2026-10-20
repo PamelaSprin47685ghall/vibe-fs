@@ -111,6 +111,13 @@ type private ControlledPtyPorts() =
 
 [<AbstractClass; Sealed; AttachMembers>]
 type ToolRuntimeScopeSurface =
+    static member private recordChildDelivery(child: SessionId, provider: string, text: string) =
+        Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.recordFencedView
+            (SessionId.value child)
+            (ProviderRunIdentity.create provider)
+            (ToolCallId.create (provider + "-delivery"))
+            (Some(createObj [ "prefixUntil" ==> 0; "thenMap" ==> createObj [ "0" ==> text ] ]))
+
     [<Emit("$0 === undefined")>]
     static member private isUndefined(v: obj) : bool = jsNative
 
@@ -194,7 +201,6 @@ type ToolRuntimeScopeSurface =
                 None,
                 None,
                 None,
-                None,
                 ptyPortFactory = ptys.Create
             )
 
@@ -259,6 +265,8 @@ type ToolRuntimeScopeSurface =
         (journal: JournalHandle, workspace: string, managerSessionId: string)
         : Task<string array> =
         task {
+            let! stateDirectory = RuntimePath.stateRoot workspace
+
             let scope =
                 new ToolRuntimeScope(
                     DummySessionHostPort(),
@@ -274,7 +282,7 @@ type ToolRuntimeScopeSurface =
                     None,
                     None,
                     None,
-                    None
+                    ownershipStateRoot = stateDirectory
                 )
 
             let blockers = scope.RetirementBlockersFor managerSessionId |> List.toArray
@@ -296,6 +304,10 @@ type ToolRuntimeScopeSurface =
             let engineerChildSessionId =
                 ToolRuntimeScopeSurface.tryGetProperty<string> (scenario, "engineerChildSessionId")
                 |> Option.defaultValue "engineer-session-1"
+
+            for session in [ devopsChildSessionId; engineerChildSessionId ] do
+                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.clear session
+                Wanxiangshu.Repository.Programming.Js.JsDeliveredValues.clearReturned session
 
             let devopsPtys =
                 ToolRuntimeScopeSurface.tryGetProperty<string array> (scenario, "devopsPtys")
@@ -329,7 +341,6 @@ type ToolRuntimeScopeSurface =
                     sessionParents,
                     (fun _ -> None),
                     Dictionary<string, string>(),
-                    None,
                     None,
                     None,
                     None,
@@ -422,6 +433,9 @@ type ToolRuntimeScopeSurface =
             let emitDevops = sessionHost.CaptureTerminal devopsRun.ChildId
 
             if completeRole = "devops" then
+                if terminalKind = "Completed" then
+                    ToolRuntimeScopeSurface.recordChildDelivery (devopsRun.ChildId, "prov-run", "devops finished")
+
                 emitDevops outcome
                 emitDevops outcome
             elif completeRole = "engineer" then
@@ -435,6 +449,7 @@ type ToolRuntimeScopeSurface =
                           TerminalText = "eng finished"
                           TurnFormalText = "eng finished" }
 
+                ToolRuntimeScopeSurface.recordChildDelivery (engRun.ChildId, "prov-run-eng", "eng finished")
                 sessionHost.CaptureTerminal engRun.ChildId engOutcome
 
             do! mgrRuntime.AwaitObservedWork()
@@ -449,6 +464,7 @@ type ToolRuntimeScopeSurface =
                 |> Option.defaultValue false
 
             if followWithValid then
+                ToolRuntimeScopeSurface.recordChildDelivery (devopsRun.ChildId, "prov-run", "devops finished")
                 emitDevops (TerminalOutcome.Completed result)
                 do! mgrRuntime.AwaitObservedWork()
 
@@ -542,7 +558,6 @@ type ToolRuntimeScopeSurface =
                     evidence
                     (ProviderRunIdentity.create provider)
                     ProviderRequestKind.WorkMain
-                    XProjectionChoice.UseCommittedEpoch
 
             started |> Result.defaultWith (fun error -> failwithf "%A" error) |> ignore
 
@@ -553,7 +568,9 @@ type ToolRuntimeScopeSurface =
         }
 
     [<CompiledName("ptyAdmissionProbe")>]
-    static member ptyAdmissionProbe(journal: JournalHandle, workspace: string, child: string, realBackend: bool) : obj =
+    static member ptyAdmissionProbe
+        (journal: JournalHandle, workspace: string, child: string, realBackend: bool, stateDirectory: string)
+        : obj =
         let childId = SessionId.create child
 
         let profile =
@@ -580,7 +597,7 @@ type ToolRuntimeScopeSurface =
                 None,
                 None,
                 None,
-                None,
+                ownershipStateRoot = stateDirectory,
                 ptyPortFactory = (if realBackend then PtyBackend.createPort else ptys.Create)
             )
 
@@ -650,6 +667,8 @@ type ToolRuntimeScopeSurface =
 
         let stop () =
             task {
+                ToolRuntimeScopeSurface.recordChildDelivery (childId, "pty-admission-provider", "finished")
+
                 sessions.CaptureTerminal
                     childId
                     (TerminalOutcome.Completed
@@ -775,6 +794,7 @@ type ToolRuntimeScopeSurface =
             }
 
         task {
+            let! stateDirectory = RuntimePath.stateRoot workspace
             let sessions = DummySessionHostPort()
 
             let scope =
@@ -792,7 +812,7 @@ type ToolRuntimeScopeSurface =
                     None,
                     None,
                     None,
-                    None
+                    ownershipStateRoot = stateDirectory
                 )
 
             let manager =
@@ -818,6 +838,8 @@ type ToolRuntimeScopeSurface =
                 delivered <- true
             }
             |> ignore
+
+            ToolRuntimeScopeSurface.recordChildDelivery (childId, "cold-provider", "finished")
 
             sessions.CaptureTerminal
                 childId
@@ -856,7 +878,6 @@ type ToolRuntimeScopeSurface =
                     Dictionary<string, string>(),
                     (fun _ -> None),
                     Dictionary<string, string>(),
-                    None,
                     None,
                     None,
                     None,
@@ -936,7 +957,6 @@ type ToolRuntimeScopeSurface =
                     parents,
                     (fun _ -> None),
                     Dictionary<string, string>(),
-                    None,
                     None,
                     None,
                     None,
@@ -1022,7 +1042,6 @@ type ToolRuntimeScopeSurface =
                     None,
                     None,
                     None,
-                    None,
                     ptyPortFactory = ptys.Create
                 )
 
@@ -1073,9 +1092,9 @@ type ToolRuntimeScopeSurface =
 
             // Freeze retirement via Ownership tenure Drain: frozen while active, cleared on Unfreeze.
             let frozeFirst = scope.TryFreezeRetirement(managerSessionId, incumbentId)
-            let frozenWhileDraining = scope.IsRetirementFrozen managerSessionId
+            let! frozenWhileDraining = scope.IsRetirementFrozen managerSessionId
             scope.UnfreezeRetirement managerSessionId
-            let frozenAfterUnfreeze = scope.IsRetirementFrozen managerSessionId
+            let! frozenAfterUnfreeze = scope.IsRetirementFrozen managerSessionId
 
             // Settle the owned-work callback: its Ended removes the tool-owned-work blocker.
             workWaiter.SetResult(())

@@ -192,7 +192,7 @@ test('WHAT[delegation-026] RESTART_ADOPTED_IDLE_DEVOPS_does_not_block_join_with_
     rmSync(directory, { recursive: true, force: true })
   }
 })
-test('WHAT[delegation-026] RESTART_PENDING_CHILD_WORK_does_not_leak_into_horizon_or_join', async () => {
+test('WHAT[delegation-026] RESTART_PENDING_CHILD_WORK_remains_visible_obligation_in_horizon_and_join_stays_open', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'wxs-restart-pending-'))
   const owner = 'manager-restart-pending'
   const first = await forkTool.createRuntime(directory, ownerDescriptor(owner))
@@ -211,12 +211,16 @@ test('WHAT[delegation-026] RESTART_PENDING_CHILD_WORK_does_not_leak_into_horizon
 
   try {
     const horizon = await forkTool.executeHorizon(restarted, owner)
-    assert.doesNotMatch(horizon, /Ada/)
+    // horizon sees unfinished obligation (Still-Away)
+    assert.match(horizon, /Ada/)
+    assert.match(horizon, /Away|进行中|away|Still-Away/i)
 
+    // join does not close as NothingToJoin; it remains awaiting until timeout
     const joinPromise = forkTool.executeJoin(restarted, owner)
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('JOIN_HANG_DETECTED')), 1500))
-    const joinResult = await Promise.race([joinPromise, timeout])
-    assert.match(joinResult, /NothingToJoin|无可等待|没有|nothing away to receive/i)
+    await assert.rejects(Promise.race([joinPromise, timeout]), {
+      message: 'JOIN_HANG_DETECTED',
+    }, 'join does not close with NothingToJoin; it keeps awaiting the open obligation')
   } finally {
     await forkTool.disposeRuntime(restarted)
     rmSync(directory, { recursive: true, force: true })

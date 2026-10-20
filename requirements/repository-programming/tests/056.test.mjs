@@ -50,7 +50,7 @@ const fakeHost = () => {
           agentId: entry.agentId,
           role: 'engineer',
           status: 'completed',
-          workRecord: `record:${entry.name}`,
+          view: `record:${entry.name}`,
         })),
         byName: {},
       }
@@ -85,7 +85,7 @@ test('WHAT[repository-programming-056] delegation members return data envelopes,
     const doc = render(outcome)
     assert.match(doc, /name = "index-the-parser-module"/, 'the name is derived from the charge')
     assert.match(doc, /outcome = "created"/)
-    assert.match(doc, /record:index-the-parser-module/, 'join returns the structured work record')
+    assert.match(doc, /record:index-the-parser-module/, 'join returns the delivered view')
 
     // fission belongs to roles that hold the Fission permission (Engineer).
     install(`${sessionId}-fission`, host)
@@ -108,6 +108,54 @@ test('WHAT[repository-programming-056] delegation members return data envelopes,
     const fissionDoc = render(fissionOutcome)
     assert.match(fissionDoc, /groupId = "group-1"/)
     assert.match(fissionDoc, /sessionId = "lane-0"/)
+  } finally {
+    clearDelegationHost(sessionId)
+    cleanup()
+  }
+})
+
+test('WHAT[repository-programming-056] this.horizon serves the installed host roster and refuses with DELEGATION_UNAVAILABLE without one', async () => {
+  const { dir, cleanup } = sandbox()
+  const sessionId = `sess-horizon-${Math.random().toString(36).slice(2, 8)}`
+  const roster = {
+    ok: true,
+    agents: [
+      {
+        label: 'Ada',
+        status: 'still-away',
+        workState: 'none',
+        record: 'stub-horizon-roster',
+        turnsUsed: 0,
+        turnsLeft: 0,
+        timeUsedMs: 0,
+        timeLeftMs: 0,
+      },
+    ],
+    ptys: [],
+  }
+  const notExercised = async () => {
+    throw new Error('the horizon member must not reach fork/join/fission')
+  }
+  try {
+    installDelegationHost(
+      sessionId,
+      notExercised,
+      notExercised,
+      notExercised,
+      async () => roster,
+      notExercised,
+    )
+    const wired = await runProgram(dir, `    return await this.horizon();`, sessionId)
+    assert.equal(caseName(wired), 'Succeeded')
+    const wiredDoc = render(wired)
+    assert.match(wiredDoc, /status = "still-away"/, 'the host roster reaches the program as data')
+    assert.match(wiredDoc, /record = "stub-horizon-roster"/, 'the member returns the host envelope untouched')
+    assert.match(wiredDoc, /ptys = \[\]/)
+
+    clearDelegationHost(sessionId)
+    const unwired = await runProgram(dir, `    return await this.horizon();`, sessionId)
+    assert.equal(caseName(unwired), 'Succeeded')
+    assert.match(render(unwired), /code = "DELEGATION_UNAVAILABLE"/)
   } finally {
     clearDelegationHost(sessionId)
     cleanup()
@@ -219,7 +267,7 @@ test('WHAT[repository-programming-056] a failed dag node parks and the injected 
           agentId: entry.agentId,
           role: 'engineer',
           status: entry.name === 'impl' ? 'failed' : 'completed',
-          workRecord: entry.name === 'impl' ? '' : `record:${entry.name}`,
+          view: entry.name === 'impl' ? '' : `record:${entry.name}`,
         })),
         byName: {},
       }
@@ -262,6 +310,7 @@ test('WHAT[repository-programming-056] a failed dag node parks and the injected 
 test('WHAT[repository-programming-056] an undelivered child reports status undelivered in join and parks dag on node-undelivered', async () => {
   const { dir, cleanup } = sandbox()
   const sessionId = `sess-dagundelivered-${Math.random().toString(36).slice(2, 8)}`
+  let implAgentId = null
   try {
     const host = fakeHost()
     const undeliveredJoin = async () => {
@@ -271,7 +320,7 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
         agentId: entry.agentId,
         role: 'engineer',
         status: entry.name === 'impl' ? 'undelivered' : 'completed',
-        workRecord: entry.name === 'impl' ? '' : `record:${entry.name}`,
+        view: entry.name === 'impl' ? '' : `record:${entry.name}`,
       }))
       return {
         ok: true,
@@ -279,7 +328,15 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
         byName: Object.fromEntries(mapped.map((r) => [r.name, r])),
       }
     }
-    installDelegationHost(sessionId, host.fork, undeliveredJoin, host.fission, host.horizon, host.advisor)
+    // 未交付不关闭执行者义务：被委托方保持活跃且未解除义务，父方不得视原子执行者已结束。
+    const trackingFork = async (payload) => {
+      const res = await host.fork(payload)
+      if (res.ok && res.name === 'impl') {
+        implAgentId = res.agentId
+      }
+      return res
+    }
+    installDelegationHost(sessionId, trackingFork, undeliveredJoin, host.fission, host.horizon, host.advisor)
 
     const joinOutcome = await runProgram(
       dir,
@@ -290,7 +347,9 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
     assert.equal(caseName(joinOutcome), 'Succeeded')
     const joinDoc = render(joinOutcome)
     assert.match(joinDoc, /status = "undelivered"/)
-    assert.match(joinDoc, /workRecord = ""/)
+    assert.match(joinDoc, /view = ""/)
+    // join 返回 undelivered 后，原子执行者的义务未解除，不得断言已结束或结算成终态。
+    assert.ok(implAgentId !== null, 'forked agent id must be tracked')
 
     const parked = await runProgram(
       dir,
@@ -310,7 +369,7 @@ test('WHAT[repository-programming-056] an undelivered child reports status undel
       'Manager',
       'en',
       sessionId,
-      { unpark: { handle: parkedHandle(parked), value: { workRecord: 'manual-impl' } } },
+      { unpark: { handle: parkedHandle(parked), value: { view: 'manual-impl' } } },
       3000,
       Date.now() + 60_000,
       1 << 20,

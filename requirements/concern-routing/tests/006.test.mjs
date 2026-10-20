@@ -5,7 +5,7 @@ import test from 'node:test'
 
 const root = process.cwd()
 
-// Superseded by js.fork / js.join / js.deliver / js.ask: AttentionConcernJournalAdapter and retireMailboxesOf are deleted.
+// Superseded by this.fork / this.join / this.deliver / this.ask: AttentionConcernJournalAdapter and retireMailboxesOf are deleted.
 test('WHAT[concern-routing-006] AttentionConcernJournalAdapter and its durable adapter shard are gone', () => {
   assert.equal(
     existsSync(resolve(root, 'src/Wanxiangshu/Composition/Durable/AttentionConcernJournalAdapter.fs')),
