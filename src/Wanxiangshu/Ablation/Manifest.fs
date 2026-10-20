@@ -1,7 +1,6 @@
 namespace Wanxiangshu.Ablation
 
 open System
-open System.Collections.Generic
 open Thoth.Json
 open Fable.Core
 open Fable.Core.JsInterop
@@ -70,108 +69,62 @@ module AblationManifest =
             |> Decode.fromString decoder
             |> Result.mapError (fun reason -> InvalidManifest(sprintf "%s: %s" path reason))
 
-    let private validateSliceNode (nodeMap: Map<string, ManifestNode>) (node: ManifestNode) : AblationLoadError option =
-        let parentNode =
-            node.Parent |> Option.bind (fun parentId -> Map.tryFind parentId nodeMap)
+    [<AllowNullLiteral>]
+    type private AblationLaw =
+        abstract validateNodes: nodes: obj -> obj
+        abstract findCycle: nodes: obj * edges: obj -> obj
+        abstract validateModes: edges: obj * modes: obj -> obj
 
-        match node.Parent, parentNode with
-        | None, _ -> Some(InvalidManifest(sprintf "Slice node '%s' must declare parent" node.Id))
-        | Some parentId, None -> Some(InvalidManifest(sprintf "Slice node '%s' parent '%s' not found" node.Id parentId))
-        | Some parentId, Some parent when parent.Kind <> "package" ->
-            Some(
-                InvalidManifest(
-                    sprintf
-                        "Slice node '%s' parent '%s' must be kind 'package' but is '%s'"
-                        node.Id
-                        parentId
-                        parent.Kind
-                )
-            )
-        | Some parentId, Some parent when parent.Package <> node.Package ->
-            Some(
-                InvalidManifest(
-                    sprintf
-                        "Slice node '%s' (package '%s') and parent '%s' (package '%s') must belong to same package"
-                        node.Id
-                        node.Package
-                        parentId
-                        parent.Package
-                )
-            )
-        | Some _, Some _ -> None
+    [<Import("Ablation", "wanxiangli/ablation")>]
+    let private createAblation: unit -> AblationLaw = jsNative
 
-    let private validatePackageMainNodes (document: ManifestDocument) : AblationLoadError option =
-        let packages = document.Nodes |> List.map (fun n -> n.Package) |> List.distinct
+    /// The DAG law (main nodes, slice parents, cycles, three-state edges) is owned by
+    /// wanxiangli/ablation; this module keeps reading, decoding and registry assembly.
+    let private law = createAblation ()
 
-        packages
-        |> List.tryPick (fun pkg ->
-            let nodesInPkg = document.Nodes |> List.filter (fun n -> n.Package = pkg)
+    let private nodesToJs (document: ManifestDocument) : obj =
+        document.Nodes
+        |> List.map (fun node ->
+            createObj
+                [ "id" ==> node.Id
+                  "package" ==> node.Package
+                  "kind" ==> node.Kind
+                  "parent" ==> (node.Parent |> Option.toObj) ])
+        |> List.toArray
+        |> box
 
-            let mainNodes =
-                nodesInPkg |> List.filter (fun n -> n.Id = pkg && n.Kind = "package")
+    let private edgesToJs (document: ManifestDocument) : obj =
+        document.Edges
+        |> List.map (fun edge -> createObj [ "from" ==> edge.From; "to" ==> edge.To; "kind" ==> edge.Kind ])
+        |> List.toArray
+        |> box
 
-            let pkgKindNodes = nodesInPkg |> List.filter (fun n -> n.Kind = "package")
+    let private modesToJs (modes: Map<AblationNodeId, AblationMode>) : obj =
+        // DSL-MUTABLE: algorithm-scratch — plain record built once per call for the library message
+        let record = createEmpty<obj>
 
-            if mainNodes.IsEmpty then
-                Some(
-                    InvalidManifest(
-                        sprintf "Package '%s' is missing a main node (expected id '%s' and kind 'package')" pkg pkg
-                    )
-                )
-            elif mainNodes.Length > 1 || pkgKindNodes.Length > 1 then
-                Some(InvalidManifest(sprintf "Package '%s' has multiple main nodes" pkg))
-            else
-                None)
+        for KeyValue(id, mode) in modes do
+            record?(AblationNodeId.value id) <- AblationMode.wire mode
+
+        record
+
+    let private toError (violation: obj) : AblationLoadError option =
+        if isNull violation then
+            None
+        else
+            let reason: string = violation?reason
+
+            match (violation?kind: string) with
+            | "DagViolation" -> Some(DagViolation reason)
+            | _ -> Some(InvalidManifest reason)
 
     let validateNodes (document: ManifestDocument) : Result<unit, AblationLoadError> =
-        let nodeMap = document.Nodes |> List.map (fun n -> n.Id, n) |> Map.ofList
+        match law.validateNodes (nodesToJs document) |> toError with
+        | Some err -> Error err
+        | None -> Ok()
 
-        let sliceError =
-            document.Nodes
-            |> List.filter (fun node -> node.Kind = "slice")
-            |> List.tryPick (validateSliceNode nodeMap)
-
-        let mainNodeError = validatePackageMainNodes document
-
-        match sliceError, mainNodeError with
-        | Some err, _ -> Error err
-        | None, Some err -> Error err
-        | None, None -> Ok()
-
-    let private detectCycle (document: ManifestDocument) : string option =
-        let edges =
-            document.Edges
-            |> List.filter (fun e -> e.Kind = "station-order" || e.Kind = "borrow")
-
-        let adj =
-            edges
-            |> List.groupBy (fun e -> e.From)
-            |> List.map (fun (fromNode, es) -> fromNode, es |> List.map (fun e -> e.To))
-            |> Map.ofList
-
-        let allNodes = document.Nodes |> List.map (fun n -> n.Id)
-        let state = Dictionary<string, int>()
-
-        for id in allNodes do
-            state.[id] <- 0
-
-        let rec dfs node =
-            state.[node] <- 1
-            let neighbors = adj |> Map.tryFind node |> Option.defaultValue []
-
-            let cycleFound =
-                neighbors
-                |> List.tryPick (fun nextNode ->
-                    match state.TryGetValue nextNode with
-                    | true, 1 -> Some(sprintf "Cycle detected involving edge %s -> %s" node nextNode)
-                    | true, 0 -> dfs nextNode
-                    | _ -> None)
-
-            state.[node] <- 2
-            cycleFound
-
-        allNodes
-        |> List.tryPick (fun node -> if state.[node] = 0 then dfs node else None)
+    let private detectCycle (document: ManifestDocument) : AblationLoadError option =
+        law.findCycle (nodesToJs document, edgesToJs document) |> toError
 
     let loadNodes () =
         readJson (pathJoin (resourcesDir (), "nodes.json")) decodeDocument
@@ -179,7 +132,7 @@ module AblationManifest =
             validateNodes doc
             |> Result.bind (fun () ->
                 match detectCycle doc with
-                | Some cycle -> Error(DagViolation cycle)
+                | Some err -> Error err
                 | None -> Ok doc))
 
     let nodesFingerprint () =
@@ -215,48 +168,16 @@ module AblationManifest =
                 let facts = get.Required.Field "facts" (Decode.dict Decode.string)
                 { Facts = facts }))
 
-    let private validateEdge
-        (modes: Map<AblationNodeId, AblationMode>)
-        (edge: ManifestEdge)
-        : AblationLoadError option =
-        let modeOf raw =
-            modes
-            |> Map.tryFind (AblationNodeId.create raw)
-            |> Option.defaultValue AblationMode.Ablated
-
-        let fromMode = modeOf edge.From
-        let toMode = modeOf edge.To
-
-        let fromAtLeastBorrowed =
-            fromMode = AblationMode.Active || fromMode = AblationMode.Borrowed
-
-        let toActive = toMode = AblationMode.Active
-
-        let toAtLeastBorrowed =
-            toMode = AblationMode.Active || toMode = AblationMode.Borrowed
-
-        match edge.Kind with
-        | "station-order" when toActive && not fromAtLeastBorrowed ->
-            Some(
-                DagViolation(
-                    sprintf "station-order: %s requires %s at least borrowed before active downstream" edge.To edge.From
-                )
-            )
-        | "borrow" when toAtLeastBorrowed && not fromAtLeastBorrowed ->
-            Some(DagViolation(sprintf "borrow: %s requires %s at least borrowed" edge.To edge.From))
-        | _ -> None
-
     let validateDag
         (document: ManifestDocument)
         (modes: Map<AblationNodeId, AblationMode>)
         : Result<unit, AblationLoadError> =
-        let cycleError = detectCycle document |> Option.map DagViolation
-        let edgeError = document.Edges |> List.tryPick (validateEdge modes)
-
-        match cycleError, edgeError with
-        | Some err, _ -> Error err
-        | None, Some err -> Error err
-        | None, None -> Ok()
+        match detectCycle document with
+        | Some err -> Error err
+        | None ->
+            match law.validateModes (edgesToJs document, modesToJs modes) |> toError with
+            | Some err -> Error err
+            | None -> Ok()
 
     let nodeIds (document: ManifestDocument) =
         document.Nodes |> List.map (fun node -> AblationNodeId.create node.Id)
