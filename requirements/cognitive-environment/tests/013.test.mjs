@@ -8,7 +8,7 @@ const en = read('../../../resources/provider/host/pair-programming-guideline/en.
 const commonZh = read('../../../resources/provider/world/common-law/zh-CN.md')
 const commonEn = read('../../../resources/provider/world/common-law/en.md')
 
-test('WHAT[cognitive-environment-013] Pair Hint carries the bound-language anchor and 80/20 iron rule in both locales', () => {
+test('WHAT[cognitive-environment-013] Pair Hint carries the bound-language anchor, 80/20 iron rule and Common Law mnemonic in both locales', () => {
   assert.match(zh, /简体中文/)
   assert.match(zh, /「我」/)
   assert.match(en, /English/)
@@ -17,9 +17,11 @@ test('WHAT[cognitive-environment-013] Pair Hint carries the bound-language ancho
   assert.match(zh, /强制铁律/)
   assert.match(en, /80\/20/)
   assert.match(en, /mandatory iron rule/)
+  assert.match(zh, /落盘的因果/)
+  assert.match(en, /committed cause and effect/)
 })
 
-test('WHAT[cognitive-environment-013] work disciplines live in Common Law, not in the per-turn Pair Hint', () => {
+test('WHAT[cognitive-environment-013] full work disciplines live in Common Law; Pair Hint keeps only the mnemonic', () => {
   for (const heading of ['## 小步快跑', '## 不要吝啬', '## 笃定', '## 先想清楚再讲', '## 内省']) {
     assert.ok(commonZh.includes(heading), heading)
   }
