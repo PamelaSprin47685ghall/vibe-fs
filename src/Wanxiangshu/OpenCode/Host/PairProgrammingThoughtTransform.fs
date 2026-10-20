@@ -376,23 +376,26 @@ module PairProgrammingThoughtTransform =
 
     let appendCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj option =
         let parts = rawParts rawMsg
+        let indices = parts |> Array.mapi terminalGuidanceIndex |> Array.choose id
 
-        match parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.tryLast with
-        | None -> None
-        | Some index ->
+        if Array.isEmpty indices then
+            None
+        else
             let suffix =
                 suffixTexts
                 |> List.map (fun text -> cursorGuidanceSeparator + text)
                 |> String.concat ""
 
-            let originalPart = parts.[index]
-            let originalState = originalPart?state
-            let clonedState = emitJsExpr originalState "Object.assign({}, $0)"
-            applyGuidanceSuffix suffix originalPart clonedState
-            let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
-            clonedPart?state <- clonedState
             let clonedParts = Array.copy parts
-            clonedParts.[index] <- clonedPart
+
+            for index in indices do
+                let originalPart = parts.[index]
+                let clonedState = emitJsExpr originalPart?state "Object.assign({}, $0)"
+                applyGuidanceSuffix suffix originalPart clonedState
+                let clonedPart = emitJsExpr originalPart "Object.assign({}, $0)"
+                clonedPart?state <- clonedState
+                clonedParts.[index] <- clonedPart
+
             let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
             clonedMessage?parts <- box clonedParts
             Some clonedMessage
@@ -521,16 +524,21 @@ module PairProgrammingThoughtTransform =
 
     let stripCursorSuffixes (suffixTexts: string list) (rawMsg: obj) : obj =
         let parts = rawParts rawMsg
+        let indices = parts |> Array.mapi terminalGuidanceIndex |> Array.choose id
 
-        match parts |> Array.mapi terminalGuidanceIndex |> Array.choose id |> Array.tryLast with
-        | Some index ->
+        if not (Array.isEmpty indices) then
             let clonedParts = Array.copy parts
-            clonedParts.[index] <- stripKnownCursorSuffixes suffixTexts parts.[index]
+
+            for index in indices do
+                clonedParts.[index] <- stripKnownCursorSuffixes suffixTexts parts.[index]
+
             let clonedMessage = emitJsExpr rawMsg "Object.assign({}, $0)"
             clonedMessage?parts <- box clonedParts
             clonedMessage
-        | None when messageRole rawMsg = "user" -> stripUserMessageCursorSuffixes suffixTexts rawMsg
-        | None -> rawMsg
+        elif messageRole rawMsg = "user" then
+            stripUserMessageCursorSuffixes suffixTexts rawMsg
+        else
+            rawMsg
 
     type private CursorPresentation =
         { GuidanceBytes: string
@@ -563,9 +571,9 @@ module PairProgrammingThoughtTransform =
         parts
         |> Array.mapi terminalGuidanceIndex
         |> Array.choose id
-        |> Array.tryLast
-        |> Option.filter (fun index -> isString rawMsg?info?id && isString parts.[index]?callID)
-        |> Option.bind (fun index ->
+        |> Array.toList
+        |> List.filter (fun index -> isString rawMsg?info?id && isString parts.[index]?callID)
+        |> List.choose (fun index ->
             cursorPartId parts.[index]
             |> Option.map (fun partId ->
                 index,
@@ -623,9 +631,10 @@ module PairProgrammingThoughtTransform =
                           Presentations = presentationsAtMessage session rawMsg })
             }
 
-        cursorResultIdentity rawMsg
-        |> Option.map (snd >> capture)
-        |> Option.defaultWith (fun () -> Task.FromResult(Ok None))
+        taskResult {
+            let! captured = cursorResultIdentity rawMsg |> TaskResultList.traverseM (snd >> capture)
+            return captured |> List.choose id
+        }
 
     let private captureCursorResults journal sessionId rawMessages =
         let session =
@@ -640,7 +649,7 @@ module PairProgrammingThoughtTransform =
 
                 return
                     { HasTrace = true
-                      Results = captured |> List.choose id |> Map.ofList }
+                      Results = captured |> List.concat |> Map.ofList }
             }
 
         session
@@ -655,7 +664,7 @@ module PairProgrammingThoughtTransform =
 
     let private findCapturedCursorResult captures rawMsg =
         cursorResultIdentity rawMsg
-        |> Option.bind (fun (index, identity) ->
+        |> List.choose (fun (index, identity) ->
             captures.Results
             |> Map.tryFind identity
             |> Option.map (fun result -> index, result))
@@ -683,8 +692,8 @@ module PairProgrammingThoughtTransform =
         | _ -> Error "Cursor presentation ownership is ambiguous at the captured Host result"
 
     let private stripCapturedResult captures owner suffixTexts rawMsg =
-        let strip (index, captured) =
-            let originalPart = (rawParts rawMsg).[index]
+        let strip message (index, captured) =
+            let originalPart = (rawParts message).[index]
             let state = originalPart?state
 
             let value =
@@ -694,14 +703,13 @@ module PairProgrammingThoughtTransform =
                     unbox<string> state?output
 
             stripCapturedPresentation owner captured value
-            |> Result.map (fun retained -> mapCapturedResult index (fun _ -> retained) rawMsg)
+            |> Result.map (fun retained -> mapCapturedResult index (fun _ -> retained) message)
 
         if not captures.HasTrace || messageRole rawMsg = "user" then
             Ok(stripCursorSuffixes suffixTexts rawMsg)
         else
-            findCapturedCursorResult captures rawMsg
-            |> Option.map strip
-            |> Option.defaultValue (Ok rawMsg)
+            (Ok rawMsg, findCapturedCursorResult captures rawMsg)
+            ||> List.fold (fun result captured -> result |> Result.bind (fun message -> strip message captured))
 
     let stripCursorSuffixesWithJournal
         (journal: AgentJournal)
@@ -803,7 +811,7 @@ module PairProgrammingThoughtTransform =
             tryUnboxString state?output
 
     let private projectCapturedGuidance captures markerTexts message =
-        let insert (index, captured) =
+        let insert current (index, captured) =
             let guidanceBytes =
                 markerTexts
                 |> List.map (fun text -> cursorGuidanceSeparator + text)
@@ -816,12 +824,15 @@ module PairProgrammingThoughtTransform =
                     && value = captured.Body + presentation.RequirementBytes)
                 |> Option.map (fun presentation -> captured.Body + guidanceBytes + presentation.RequirementBytes)
 
-            rawParts message
+            rawParts current
             |> fun parts -> terminalResultText parts.[index]
             |> Option.bind present
-            |> Option.map (fun output -> mapCapturedResult index (fun _ -> output) message)
+            |> Option.map (fun output -> mapCapturedResult index (fun _ -> output) current)
+            |> Option.defaultValue current
 
-        findCapturedCursorResult captures message |> Option.bind insert
+        match findCapturedCursorResult captures message with
+        | [] -> None
+        | captured -> Some(List.fold insert message captured)
 
     let private projectGuidanceToMessage captures (markerTexts: string list) (message: obj) : obj =
         if messageRole message = "user" then
