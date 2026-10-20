@@ -15,3 +15,18 @@ test('WHAT[durable-convergence-001] merge preserves distinct concurrent facts an
   assert.equal(result.ok, true, JSON.stringify(result.error))
   assert.deepEqual(result.events, [left, right])
 })
+
+// CUT-19 counterexample: the previous host merge folded writer streams through
+// Map.ofList, so a second stream under the same WriterId silently replaced the
+// first and the union lost a legal branch while still reporting ok.
+test('WHAT[durable-convergence-001] a WriterId naming two streams fails closed instead of dropping one branch', () => {
+  const root = event('a'.repeat(40), [], { value: 'root' })
+  const left = event('b'.repeat(40), [root.id], { value: 'left' })
+  const right = event('c'.repeat(40), [root.id], { value: 'right' })
+  const result = merge.merge([
+    ['writer-1', [root, left]],
+    ['writer-1', [structuredClone(root), right]],
+  ])
+  assert.equal(result.ok, false, JSON.stringify(result.events))
+  assert.deepEqual(result.error, { code: 'NonCanonical', reason: 'duplicate writer stream: writer-1' })
+})

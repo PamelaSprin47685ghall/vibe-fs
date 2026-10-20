@@ -20,7 +20,9 @@ module CanonicalEventCodec =
     // Stateless library object; one shared instance.
     let private codec: obj = construct codecClass
 
-    let private eventToJs (envelope: EventEnvelope) : obj =
+    /// The wanxiangli/events `EventInput` shape of one envelope. Shared by the
+    /// facades over wanxiangli libraries that take events (codec, convergence).
+    let toLibraryEvent (envelope: EventEnvelope) : obj =
         let payloads =
             if Map.isEmpty envelope.Payloads then
                 []
@@ -64,7 +66,8 @@ module CanonicalEventCodec =
     let private errorText (value: obj) : string =
         if isNull value then "" else string value
 
-    let private invalidOf (error: obj) : StorageInvalid =
+    /// Map a wanxiangli CodecError-shaped value back to StorageInvalid.
+    let invalidOfLibraryError (error: obj) : StorageInvalid =
         match errorText (error?code) with
         | "IdentityCollision" -> StorageInvalid.IdentityCollision(EventId.create (unbox<string> error?eventId))
         | "MissingParent" -> StorageInvalid.MissingParent(EventId.create (unbox<string> error?eventId))
@@ -76,28 +79,28 @@ module CanonicalEventCodec =
 
     /// Canonical JSON text including exactly one trailing LF (§5.0).
     let encode (envelope: EventEnvelope) : string =
-        unbox<string> (codec?encode (eventToJs envelope))
+        unbox<string> (codec?encode (toLibraryEvent envelope))
 
     /// Same EventId with different canonical bytes → IdentityCollision (§5.3).
     /// Distinct EventIds are not a collision (Ok).
     let checkIdentity (left: EventEnvelope) (right: EventEnvelope) : Result<unit, StorageInvalid> =
-        let outcome: obj = codec?checkIdentity (eventToJs left, eventToJs right)
+        let outcome: obj = codec?checkIdentity (toLibraryEvent left, toLibraryEvent right)
 
         if unbox<bool> outcome?ok then
             Ok()
         else
-            Error(invalidOf outcome?error)
+            Error(invalidOfLibraryError outcome?error)
 
     /// Set-union by EventId with identity dedupe. Collision → fail closed.
     /// This is a pure identity utility; writer-stream ordering belongs to EventKWayMerge.
     let mergeByIdentity (events: EventEnvelope list) : Result<EventEnvelope list, StorageInvalid> =
         let outcome: obj =
-            codec?mergeByIdentity (events |> List.map eventToJs |> Array.ofList)
+            codec?mergeByIdentity (events |> List.map toLibraryEvent |> Array.ofList)
 
         if unbox<bool> outcome?ok then
             Ok((unbox<obj array> outcome?events) |> Array.toList |> List.map eventOfJs)
         else
-            Error(invalidOf outcome?error)
+            Error(invalidOfLibraryError outcome?error)
 
     /// Decode canonical JSON+LF into EventEnvelope. Re-encode must match (§5.0).
     let tryDecode (text: string) : Result<EventEnvelope, StorageInvalid> =
@@ -106,7 +109,7 @@ module CanonicalEventCodec =
         if unbox<bool> outcome?ok then
             Ok(eventOfJs outcome?event)
         else
-            Error(invalidOf outcome?error)
+            Error(invalidOfLibraryError outcome?error)
 
     let tryDecodeUtf8Text (bytes: byte[]) : Result<string, StorageInvalid> =
         let outcome: obj = codec?tryDecodeUtf8Text bytes
@@ -114,7 +117,7 @@ module CanonicalEventCodec =
         if unbox<bool> outcome?ok then
             Ok(unbox<string> outcome?text)
         else
-            Error(invalidOf outcome?error)
+            Error(invalidOfLibraryError outcome?error)
 
     let tryDecodeUtf8 (bytes: byte[]) : Result<EventEnvelope, StorageInvalid> =
         let outcome: obj = codec?tryDecodeUtf8 bytes
@@ -122,4 +125,4 @@ module CanonicalEventCodec =
         if unbox<bool> outcome?ok then
             Ok(eventOfJs outcome?event)
         else
-            Error(invalidOf outcome?error)
+            Error(invalidOfLibraryError outcome?error)

@@ -51,7 +51,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-16 | 压缩覆盖与 checkpoint | 上下文 | BACKLOG | CUT-03, CUT-06, CUT-15 | — | — |
 | CUT-17 | 请求投影与信息边界 | 表达 | BACKLOG | CUT-05, CUT-06, CUT-08, CUT-15, CUT-16 | — | — |
 | CUT-18 | 规范事实编码与校验 | 存储 | DONE | CUT-00 | eng-cut18 | 2026-10-15 主线提交 2f98049e5：wanxiangli events 模块合入 0.7.0，库侧 34 测试 + durable-events 244 项回归全绿，证据链见 cards/CUT-18.md §10 |
-| CUT-19 | 多 writer 存储与收敛 | 存储 | DOING | CUT-18 | eng-cut19-goose | 2026-10-20 认领首个子范围：KWayMerge / retained union 抽入 wanxiangli/convergence，主仓 EventKWayMerge 接线（wanxiangli main a8b89a4）；证据链见 cards/CUT-19.md |
+| CUT-19 | 多 writer 存储与收敛 | 存储 | DOING | CUT-18 | eng-cut19-goose | 2026-10-20 子范围①结构 k-way 归并已合入：wanxiangli/convergence 0.14.0（库 674bdfb），主仓 EventKWayMerge 改为 facade，真实链 IntegratorEngine.replay 走库实现；durable-convergence+durable-events 244/0（base 243/1，新增同名 writer 丢支反例）。retention/段追加/校验收敛仍在主仓，见 cards/CUT-19.md §9 |
 | CUT-20 | PTY 与完整输出外存 | 物理 | DOING | CUT-02, CUT-04 | eng-cut20-goose | 2026-10-20 第一步 spool 已落地：wanxiangli/spool（库 20e0372 / 0.13.0 发布 6bf65d3），主仓 ProcessOutput/Spool 改为组合者、NodeProcessHost spool I/O 删除；修复 GitAdapter 把 Spooled 变成空 stdout（大量冲突标记会被提交）与 spool 文件泄漏；第二步 PTY 进行中，证据见 cards/CUT-20.md |
 | CUT-21 | 显式时间与因果等待 | 物理 | DONE | CUT-00 | — | 2026-10-15 库侧 time/wait 模块随 0.8.0 发布（库 commit 8422617，全量 460 测试绿）；主仓 NodeTiming/Deadline/VirtualTiming/Wait Registry/CompletionMailbox 桥接切至 0.8.0，干净 HEAD worktree 验证 time-capability 24/0、causal-wait 52/0、subsystems OK；主仓共享工作树全量 build 因他人 Interaction 进行中改动阻断（非本卡引入），证据链见 cards/CUT-21.md §10 |
 | CUT-22 | attention、concern 与邮箱归属 | 权威 | BACKLOG | CUT-09 | — | — |
