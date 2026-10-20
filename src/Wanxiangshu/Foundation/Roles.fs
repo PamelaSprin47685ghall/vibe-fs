@@ -76,9 +76,7 @@ module Roles =
 
     /// Active roles in catalog order, as decided by the library.
     let all: Role list =
-        (identity?activeRoleLabels (): string array)
-        |> Array.toList
-        |> List.choose (box >> ofLabel)
+        identity.activeRoleLabels () |> Array.toList |> List.choose ofLabel
 
     /// Decodes an active or historical role label (case-insensitive). The host
     /// has always accepted historical labels here because journal decoding
