@@ -10,9 +10,9 @@ const commonEn = read('../../../resources/provider/world/common-law/en.md')
 
 test('WHAT[cognitive-environment-013] Pair Hint carries the bound-language anchor in both locales', () => {
   assert.match(zh, /简体中文/)
-  assert.match(zh, /我……/)
+  assert.match(zh, /「我」/)
   assert.match(en, /English/)
-  assert.match(en, /"I\.\.\."/)
+  assert.match(en, /"I"/)
 })
 
 test('WHAT[cognitive-environment-013] work disciplines live in Common Law, not in the per-turn Pair Hint', () => {

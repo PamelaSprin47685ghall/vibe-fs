@@ -547,13 +547,11 @@ const providerProjection = await import("../../../dist/Participant/Provider/Proj
 const strength = await import("../../../dist/Strength/Surface.js");
 const lifecycle = await import("../../../dist/Mission/Lifecycle/Surface.js");
 const tools = await import("../../../dist/OpenCode/Tools/ToolSurface.js");
-const pluginHooks = await import("../../../dist/OpenCode/Host/PluginHooksSurface.js");
 const { installDefaultResources } = await import("../../../dist/OpenCode/Host/ManagedAgentConfigSurface.js");
 
 installDefaultResources()
 
 const REVIEW_TOOLS = ['todowrite-for-manager']
-const CONTRACT_TOKEN = 'do-not-use-except-for-review'
 
 const createRawManagerTools = () => [
   {
@@ -660,17 +658,6 @@ const createRawManagerTools = () => [
   },
 ]
 
-// 评审专用工具的 contract 装饰由 host owner 面提供（HOST-BOUNDARY-032）。
-const buildDecoratedManagerTools = () => {
-  const managerTools = createRawManagerTools()
-  for (const tool of managerTools) {
-    if (tools.isReviewTool(tool.name)) {
-      pluginHooks.decorateReviewToolDefinition(tool.name, tool)
-    }
-  }
-  return managerTools
-}
-
 const wire = (
   messages,
   {
@@ -707,9 +694,8 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
   // Manager system prompt remains stable across the life
   const managerSystemPrompt = strength.systemPromptForRole('Manager')
 
-  // Tools definition: identical tool set with contract-decorated schemas for review tools
-  const toolsBefore = buildDecoratedManagerTools()
-  const toolsAfter = buildDecoratedManagerTools()
+  const toolsBefore = createRawManagerTools()
+  const toolsAfter = createRawManagerTools()
 
   assert.equal(toolsBefore.length, toolsAfter.length, 'tools count must be identical before and after review')
   for (let i = 0; i < toolsBefore.length; i += 1) {
@@ -726,16 +712,8 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
   for (const reviewToolName of REVIEW_TOOLS) {
     const tool = toolsBefore.find((candidate) => candidate.name === reviewToolName)
     assert.ok(tool, `review tool '${reviewToolName}' must exist in Manager tools`)
-    assert.ok(
-      tool.parameters.properties?.contract,
-      `Tool ${reviewToolName} must be decorated with contract parameter`,
-    )
-    assert.equal(tool.parameters.properties.contract.type, 'string')
-    assert.deepEqual(tool.parameters.properties.contract.enum, [CONTRACT_TOKEN])
-    assert.ok(
-      tool.parameters.required.includes('contract'),
-      `Tool ${reviewToolName} must mark contract as required`,
-    )
+    assert.equal(Object.hasOwn(tool.parameters.properties, 'contract'), false)
+    assert.equal(tool.parameters.required.includes('contract'), false)
   }
 
   // 2. Provider Attempt 1 (Before Review):
@@ -862,13 +840,13 @@ test('WHAT[prefix-stability-001] manager_life_review_acceptance_provider_wire_is
     'tools set drift across review must break prefix law even if messages prefix',
   )
 
-  const alteredContractTools = buildDecoratedManagerTools()
+  const alteredContractTools = createRawManagerTools()
   const readTool = alteredContractTools.find((tool) => tool.name === 'todowrite-for-manager')
-  readTool.parameters.properties.contract.enum = ['altered-contract-enum']
+  readTool.parameters.properties.contract = { type: 'string', enum: ['altered-contract-enum'] }
   assert.notEqual(
     canonicalJson.canonicalJson(toolsBefore.find((tool) => tool.name === 'todowrite-for-manager')),
     canonicalJson.canonicalJson(readTool),
-    'altering contract decoration enum must change canonical JSON',
+    'adding an attestation parameter must change canonical JSON',
   )
 })
 }

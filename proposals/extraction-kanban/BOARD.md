@@ -7,12 +7,12 @@
 <a id="upstream-view-delivery-20261020"></a>
 ## 2026-10-20 最新上游：view、交付与权限
 
-[本批计划](UPSTREAM-VIEW-DELIVERY-MERGE-2026-10-20.md)固定自有 `f04553e5a` 与上游 `11052493b`。当前只制定计划；UM-1—UM-5 未认领、未实施。前批接收和下方模块改进保持原状态，不重复认领 N1 的发行调查。
+[本批计划](UPSTREAM-VIEW-DELIVERY-MERGE-2026-10-20.md)固定自有 `f04553e5a` 与上游 `11052493b`。用户已授权逐包合并，root 在原计划独立工作树施工；前批接收和下方模块改进保持原状态，不重复认领 N1 的发行调查。
 
 | 包 | 当前状态 | 证据与剩余边界 |
 |---|---|---|
 | UM-0 固定版本与合并计划 | DONE（计划） | fetch 与静态源码核对；新增 17 提交、386 路径；三方预演 162 冲突路径；未运行产品测试 |
-| UM-1 Pair Hint 与保证书清理 | PLANNED | 终态投影和真实 schema 小包；不改变完成准入 |
+| UM-1 Pair Hint 与保证书清理 | READY（限定） | gen43 构建/格式/静态通过；正式七文件175/0/2旧TODO，实际Host两文件109/0/1旧TODO，均排空回收；[原始证据](../../evidence/upstream-view-delivery-20261020/README.md)，完整发行及部署待后续 |
 | UM-2 view/Anchor 与 Plan 编程面 | PLANNED | 先统一扁平参数、正式合同、区间规则和 P 路径限制 |
 | UM-3 Manager reviewOnly | PLANNED | 依赖 UM-2；入口常开、逐次读取授权，保留本地 rg 监管 |
 | UM-4 交付见证与真实工作收束 | PLANNED | 依赖 UM-2/UM-3；实际委派、join、Fission、持久恢复；不接半成品 reportMapping |

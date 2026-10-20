@@ -509,7 +509,7 @@ try {
   for (const tool of REVIEW_TOOLS) {
     const o = defObs.find(({ value }) => value?.toolName === tool);
     assert.ok(o, `missing definition observation for review tool ${tool}`);
-    assert.equal(o.value.hasContractProperty, true, `${tool} definition missing contract property`);
+    assert.equal(o.value.hasContractProperty, false, `${tool} definition must not add a contract property`);
   }
 
   // Normal terminal assertions

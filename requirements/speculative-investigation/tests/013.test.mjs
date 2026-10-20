@@ -438,7 +438,7 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_tool_definition_decorates
         assert.equal(unreviewedOutput.parameters.required.includes('estimated_readonly_rounds'), false)
         assert.equal(unreviewedOutput.description, 'custom unreviewed tool')
 
-        // todowrite-for-manager participating tool: review contract and delegation protocol coexist without mutual interference
+        // Delegation estimates do not restore the retired review attestation.
         const managerOutput = {
           description: 'Review workspace changes as manager',
           parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] },
@@ -456,12 +456,12 @@ test('WHAT[speculative-investigation-013] SPEC_INV_013_tool_definition_decorates
         )
         assert.equal(mgrProps.self_note?.type, 'string')
         assert.equal(managerOutput.parameters.required.includes('self_note'), false)
-        assert.equal(mgrProps.contract?.type, 'string', 'review contract property must coexist with delegation protocol')
-        assert.ok(managerOutput.parameters.required.includes('contract'), 'todowrite-for-manager must require review contract beside delegation protocol')
+        assert.equal(Object.hasOwn(mgrProps, 'contract'), false)
+        assert.equal(managerOutput.parameters.required.includes('contract'), false)
         assert.equal(
           managerOutput.parameters.required.filter((x) => x === 'contract').length,
-          1,
-          'todowrite-for-manager must require contract exactly once',
+          0,
+          'todowrite-for-manager must not require a review attestation',
         )
       } finally {
         if (previousLanguage === undefined) {
@@ -1021,7 +1021,7 @@ integrationTest(
       }
     }
 
-    // For todowrite-for-manager: review contract and delegation protocol coexist without mutual interference.
+    // The delegation protocol remains independent of the retired review attestation.
     // Because the canary runner session runs as engineer, todowrite-for-manager (a manager review tool) is not present
     // on the engineer wire tools. We directly execute the real tool definition decoration path for todowrite-for-manager.
     const managerDef = {
@@ -1033,21 +1033,11 @@ integrationTest(
       },
     }
     PluginHooksSurface.decorateReadonlyDelegationToolDefinition('todowrite-for-manager', managerDef)
-    PluginHooksSurface.decorateReviewToolDefinition('todowrite-for-manager', managerDef)
-
-    assert.ok(
-      managerDef.parameters.properties.contract,
-      'todowrite-for-manager must expose review contract property beside delegation protocol',
-    )
-    assert.equal(managerDef.parameters.properties.contract.type, 'string')
-    assert.ok(
-      managerDef.parameters.required.includes('contract'),
-      'todowrite-for-manager must require review contract beside delegation protocol',
-    )
+    assert.equal(Object.hasOwn(managerDef.parameters.properties, 'contract'), false)
     assert.equal(
       managerDef.parameters.required.filter((entry) => entry === 'contract').length,
-      1,
-      'todowrite-for-manager must require contract exactly once',
+      0,
+      'todowrite-for-manager must not require a review attestation',
     )
     assert.ok(
       managerDef.parameters.properties.estimated_readonly_rounds,

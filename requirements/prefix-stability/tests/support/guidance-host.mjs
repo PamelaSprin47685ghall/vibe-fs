@@ -8,11 +8,12 @@ import { acceptAuthorityRoot, withExecutablePlugin } from '../../../verification
 export const separator = '\0\uFEFF'
 export const toolBody = 'Original file content\r\n'
 
-export async function withGuidanceHost(status, action, identity = status, { role = 'manager', openWorkBeforeTool = false } = {}) {
+export async function withGuidanceHost(status, action, identity = status, { role = 'manager', openWorkBeforeTool = false, additionalToolParts = [] } = {}) {
   await withExecutablePlugin(async (hooks, directory, _created, runtime) => {
     const sessionID = `ses-guidance-ingress-${identity}`
     const root = { info: { id: 'msg-root', sessionID, role: 'user', agent: role, time: { created: 1 } }, parts: [{ id: 'part-root', type: 'text', text: 'read a file' }] }
     const result = { info: { id: 'msg-read', sessionID, role: 'assistant', agent: role, parentID: root.info.id, finish: 'tool-calls', time: { created: 2, completed: 3 } }, parts: [{ id: 'part-read', type: 'tool', tool: 'read', callID: 'call-read', state: { status, input: { filePath: 'x' }, [status === 'error' ? 'error' : 'output']: toolBody, time: { start: 2, end: 3 } } }] }
+    result.parts.push(...structuredClone(additionalToolParts))
     const running = { info: { id: 'msg-next', sessionID, role: 'assistant', agent: role, parentID: root.info.id, providerID: 'provider', modelID: `${role}-model`, time: { created: 4 } }, parts: [] }
     let currentRun
     const raw = [root, result]

@@ -2,7 +2,7 @@
 
 ## 最新上游增量合并计划（2026-10-20）
 
-[view、交付与权限合并计划](extraction-kanban/UPSTREAM-VIEW-DELIVERY-MERGE-2026-10-20.md)以自有 `f04553e5a` 和最新上游 `11052493b` 为固定输入，按功能接收新增变化。当前只完成调查与计划，产品合并尚未开始；优先保障常用功能，小的边缘问题留档。状态见[看板](extraction-kanban/BOARD.md#upstream-view-delivery-20261020)。前批已交付的 call/rg/预算继续复用，大范围退役另排；既有发行问题仍由[模块改进计划](extraction-kanban/MODULE-IMPROVEMENT-2026-10-20.md) N1 承接。
+[view、交付与权限合并计划](extraction-kanban/UPSTREAM-VIEW-DELIVERY-MERGE-2026-10-20.md)以自有 `f04553e5a` 和上游 `11052493b` 为固定输入，用户已授权逐包合并。UM-1 已取得限定接收证据；优先保障常用功能，小的边缘问题留档。状态见[看板](extraction-kanban/BOARD.md#upstream-view-delivery-20261020)。前批已交付的 call/rg/预算继续复用，大范围退役另排；既有发行问题仍由[模块改进计划](extraction-kanban/MODULE-IMPROVEMENT-2026-10-20.md) N1 承接。
 
 ## 上游语义更新整合（2026-10-19）
 

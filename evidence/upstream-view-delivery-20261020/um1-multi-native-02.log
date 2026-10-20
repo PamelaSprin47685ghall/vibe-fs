@@ -1,0 +1,33 @@
+TAP version 13
+# (node:87849) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[prefix-stability-014] multiple terminal parts keep their physical originals through guidance replay
+not ok 1 - WHAT[prefix-stability-014] multiple terminal parts keep their physical originals through guidance replay
+  ---
+  duration_ms: 859.188291
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:226:1'
+  failureType: 'testCodeFailure'
+  error: "Cannot read properties of undefined (reading 'disposed')"
+  code: 'ERR_TEST_FAILURE'
+  name: 'TypeError'
+  stack: |-
+    JournalHandle__get_Journal (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/Persistence/Journal/Surface.js:66:11)
+    agentJournalOf (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/OpenCode/Host/PairProgrammingThoughtSurface.js:52:12)
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/OpenCode/Host/PairProgrammingThoughtSurface.js:459:65
+    TaskBuilder.Run (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/fable_modules/fable-library-js.5.13.0/TaskBuilder.js:64:20)
+    Module.tryInjectWithJournal (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/dist/OpenCode/Host/PairProgrammingThoughtSurface.js:458:25)
+    withGuidanceHost.additionalToolParts.id (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:238:31)
+    async file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:55:7
+    async withExecutablePlugin (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/plugin-fixture.mjs:255:7)
+    async withGuidanceHost (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/support/guidance-host.mjs:12:3)
+    async TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/prefix-stability/tests/014.test.mjs:228:3)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1199.147875

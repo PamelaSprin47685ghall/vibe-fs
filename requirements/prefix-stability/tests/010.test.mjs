@@ -1,5 +1,27 @@
 import test from 'node:test'
 
+test('WHAT[prefix-stability-010] each terminal result receives guidance without changing physical input', async () => {
+  const assert = (await import('node:assert/strict')).default
+  const pair = await import('../../../dist/OpenCode/Host/PairProgrammingThoughtSurface.js')
+  const raw = [{ info: { id: 'multi-results', role: 'assistant' }, parts: [
+    { type: 'tool', callID: 'one', tool: 'read', state: { status: 'completed', output: 'first' } },
+    { type: 'tool', callID: 'two', tool: 'read', state: { status: 'error', error: 'second' } },
+    { type: 'tool', callID: 'three', tool: 'read', state: { status: 'error', output: 'third' } },
+    { type: 'tool', callID: 'four', tool: 'read', state: { status: 'running' } },
+  ] }]
+  const before = structuredClone(raw)
+  const once = await pair.tryInject('multi-results-session', 'hint', raw)
+  assert.equal(once.ok, true)
+  assert.equal(once.value[0].parts[0].state.output, 'first\0\uFEFFhint')
+  assert.equal(once.value[0].parts[1].state.error, 'second\0\uFEFFhint')
+  assert.equal(once.value[0].parts[2].state.output, 'third\0\uFEFFhint')
+  assert.deepEqual(once.value[0].parts[3], raw[0].parts[3])
+  assert.deepEqual(raw, before)
+  const twice = await pair.tryInject('multi-results-session', 'new hint', once.value)
+  assert.equal(twice.ok, true)
+  assert.deepEqual(twice.value, once.value)
+})
+
 {
 const { default: assert } = await import("node:assert/strict");
 const { mkdtempSync, rmSync } = await import("node:fs");

@@ -223,6 +223,27 @@ const { join } = await import('node:path')
 const journal = await import('../../../dist/Persistence/Journal/Surface.js')
 const { withGuidanceHost, toolBody, separator } = await import('./support/guidance-host.mjs')
 
+test('WHAT[prefix-stability-014] multiple terminal parts keep their physical originals through guidance replay', async () => {
+  const secondBody = 'literal' + separator + pair.text
+  await withGuidanceHost('completed', async host => {
+    const physical = JSON.stringify(host.raw)
+    const projected = host.first
+    const result = projected.find(message => message.info.id === host.result.info.id)
+    assert.equal(result.parts[0].state.output, toolBody + separator + host.guidance)
+    assert.equal(result.parts[1].state.error, secondBody + separator + host.guidance)
+    assert.equal(JSON.stringify(host.raw), physical)
+    const captured = await host.current()
+    assert.deepEqual(captured.messages.flatMap(message => message.parts)
+      .filter(part => part.kind === 'tool-result').map(part => part.result), [toolBody, secondBody])
+    assert.deepEqual(await host.transform(host.raw), projected)
+    assert.deepEqual(await host.current(), captured)
+    assert.deepEqual(host.cold().projection, captured)
+  }, 'multi-terminal-parts', { role: 'engineer', openWorkBeforeTool: true, additionalToolParts: [{
+    id: 'part-second', type: 'tool', tool: 'read', callID: 'call-second',
+    state: { status: 'error', input: {}, error: secondBody, time: { start: 2, end: 3 } },
+  }] })
+})
+
 test('WHAT[prefix-stability-014] a failed guidance assertion ends its exact mock provider step before another single-slot fixture starts', async () => {
   const previousDecision = globalThis.__wanxiangshu_test_routing_decision
   globalThis.__wanxiangshu_test_routing_decision = (role, running) => running.length === 0

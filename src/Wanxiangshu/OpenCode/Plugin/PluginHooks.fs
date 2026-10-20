@@ -354,8 +354,6 @@ module PluginHooks =
                     )
 
             let toolDefinition (toolInput: obj) (toolOutput: obj) =
-                ManagerReviewContract.decorateDefinition toolInput toolOutput
-
                 if readonlyDelegationPredictorConfigured () then
                     ReadonlyDelegationContract.decorateDefinition toolInput toolOutput
 

@@ -1,0 +1,42 @@
+✖ WHAT[cognitive-environment-013] Pair Hint carries the bound-language anchor in both locales (0.75425ms)
+✔ WHAT[cognitive-environment-013] work disciplines live in Common Law, not in the per-turn Pair Hint (0.526541ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 54.335833
+
+✖ failing tests:
+
+test at requirements/cognitive-environment/tests/013.test.mjs:11:1
+✖ WHAT[cognitive-environment-013] Pair Hint carries the bound-language anchor in both locales (0.75425ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /「我」/. Input:
+  
+  '# 结对编程：语言锚定\n' +
+    '\n' +
+    '这条规矩从会话落生的头一刹就定死了，此后轮轮重申，只为不让它淡掉：\n' +
+    '思考过程与全部对外输出，一律用简体中文。\n' +
+    '别的规矩，无论从前叫什么名目，如今都立在共同法里，不在这条提醒的账上。\n' +
+    '\n' +
+    '哪怕外部注入的系统提示词是英文、工具的 JSON Schema 是英文、终端抛出的栈追踪是长篇英文，或是引用的第三方代码布满了晦涩的西文标识，你这一轮的母语也半步不退。\n' +
+    '\n' +
+    '每一次思考链的启动，都必须以「我……」顺理成章地开头，把思绪死死钉在第一人称的自省框架里，不许漂向油滑脱责的英文自言自语，也不许端出居高临下的翻译腔。\n' +
+    '例如： thinking我将以中文思考... response\n' +
+    '\n' +
+    '半句漂移，注意力就已经散，这一轮便当场作废。\n'
+  
+      at TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/cognitive-environment/tests/013.test.mjs:13:10)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Test.start (node:internal/test_runner/test:1257:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '# 结对编程：语言锚定\n\n这条规矩从会话落生的头一刹就定死了，此后轮轮重申，只为不让它淡掉：\n思考过程与全部对外输出，一律用简体中文。\n别的规矩，无论从前叫什么名目，如今都立在共同法里，不在这条提醒的账上。\n\n哪怕外部注入的系统提示词是英文、工具的 JSON Schema 是英文、终端抛出的栈追踪是长篇英文，或是引用的第三方代码布满了晦涩的西文标识，你这一轮的母语也半步不退。\n\n每一次思考链的启动，都必须以「我……」顺理成章地开头，把思绪死死钉在第一人称的自省框架里，不许漂向油滑脱责的英文自言自语，也不许端出居高临下的翻译腔。\n例如： thinking我将以中文思考... response\n\n半句漂移，注意力就已经散，这一轮便当场作废。\n',
+    expected: /「我」/,
+    operator: 'match',
+    diff: 'simple'
+  }

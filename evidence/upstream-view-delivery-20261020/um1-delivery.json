@@ -1,0 +1,44 @@
+{
+  "package": "UM-1",
+  "source_baseline": "83875650a922100a04bd09d3df6dd4408ce928dc",
+  "upstream": "11052493bedb4edbcbe0c341fa677afd44c486f1",
+  "library": "05f6b5acf63a29d758e08e3162bba4c547dfda8d",
+  "source_ready_limited": true,
+  "formal_acceptance": false,
+  "freshness": {
+    "ok": true,
+    "generation": 44,
+    "sources": 1792,
+    "artifacts": 882,
+    "compilerInputDigest": "10e1365d1a83f7c1dbbb71498dea199554807f0e19f9d65c8d8e6ffca6c2f4a0",
+    "generatedInputDigest": "eef793e2a79d68bfe99421d6e753a98ae64faf75d3e65b580861f002184dfe4d",
+    "artifactInputDigest": "a5efd6747a358f382d5979defc54c7a972570a81777adc948167560b062cf58a"
+  },
+  "unit": {
+    "file": "um1-formal-final.log",
+    "exit_code": 1,
+    "authoritative_summary": "[test-summary] 7 file(s), 175 passed, 0 failed, 5 skipped, 2 todo (42.18s wall, 43.63s test time)",
+    "passed": 175,
+    "failed": 0,
+    "skipped": 5,
+    "todo": 2,
+    "reclamation_accepted": true
+  },
+  "host": {
+    "file": "um1-host-final.log",
+    "exit_code": 1,
+    "authoritative_summary": "[test-summary] 2 file(s), 109 passed, 0 failed, 1 todo (41.48s wall, 43.99s test time)",
+    "passed": 109,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 1,
+    "reclamation_accepted": true
+  },
+  "counts_overlap": true,
+  "remaining": [
+    "Two old unit TODOs and one overlapping Host TODO remain; formal entry points still exit 1.",
+    "Complete release and package consumption belong to UM-5.",
+    "Original runtime checkout is unchanged; not deployed."
+  ],
+  "raw_log_whitespace_preserved": true
+}

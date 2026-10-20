@@ -8,6 +8,7 @@ import * as PluginHooksSurface from '../../../dist/OpenCode/Host/PluginHooksSurf
 import * as ModelRoutingSurface from '../../../dist/OpenCode/Host/ModelRoutingSurface.js'
 import { openIncumbency, withExecutablePlugin } from '../../verification-system/tests/support/plugin-fixture.mjs'
 import { integrationTest } from '../../verification-system/tests/support/tier-gate.mjs'
+import { withFinitePhysicalWait } from '../../verification-system/tests/support/finite-physical-wait.mjs'
 import { OPENCODE_BIN } from '../../verification-system/tests/e2e/support/process-host-utils.js'
 import { isCanaryTurnSettled, managerReviewStage } from './support/manager-review-canary-turn.mjs'
 
@@ -60,7 +61,7 @@ test('WHAT[host-boundary-032] canary provider routes repeated requests by physic
 
 const REVIEW_TOOLS = ['todowrite-for-manager']
 
-test('WHAT[host-boundary-032] C01_tool_definition_decorates_the_review_tool_with_contract_enum', async () => {
+test('WHAT[host-boundary-032] C01_review_tool_definition_has_no_attestation_parameter', async () => {
   await withExecutablePlugin(async (hooks) => {
     for (const toolID of REVIEW_TOOLS) {
       const output = {
@@ -74,24 +75,8 @@ test('WHAT[host-boundary-032] C01_tool_definition_decorates_the_review_tool_with
         },
       }
       await hooks['tool.definition']({ toolID }, output)
-      assert.ok(
-        output.parameters.properties?.contract,
-        `Tool ${toolID} must be decorated with 'contract' property`,
-      )
-      assert.equal(output.parameters.properties.contract.type, 'string')
-      assert.ok(
-        Array.isArray(output.parameters.properties.contract.enum),
-        `Tool ${toolID} contract enum must be an array`,
-      )
-      assert.equal(
-        output.parameters.properties.contract.enum.length,
-        1,
-        `Tool ${toolID} contract enum must contain exactly one value`,
-      )
-      assert.ok(
-        output.parameters.required?.includes('contract'),
-        `Tool ${toolID} parameters must mark 'contract' as required`,
-      )
+      assert.equal(Object.hasOwn(output.parameters.properties, 'contract'), false)
+      assert.equal(output.parameters.required.includes('contract'), false)
     }
   })
 })
@@ -207,7 +192,7 @@ test('WHAT[host-boundary-032] C02_definition_decoration_leaves_native_and_non_re
   })
 })
 
-test('WHAT[host-boundary-032] C03_decorating_same_definition_multiple_times_is_idempotent_without_duplicates', async () => {
+test('WHAT[host-boundary-032] C03_repeated_definition_hooks_leave_review_schema_unchanged', async () => {
   await withExecutablePlugin(async (hooks) => {
     for (const toolID of REVIEW_TOOLS) {
       const output = {
@@ -229,8 +214,8 @@ test('WHAT[host-boundary-032] C03_decorating_same_definition_multiple_times_is_i
       assert.deepEqual(output, firstSnapshot, `Multiple decorations on ${toolID} must be idempotent`)
       assert.equal(
         output.parameters.required.filter((x) => x === 'contract').length,
-        1,
-        `'contract' must not be appended multiple times in required list of ${toolID}`,
+        0,
+        `'contract' must not be added to required for ${toolID}`,
       )
     }
   })
@@ -684,7 +669,7 @@ test('WHAT[host-boundary-032] C19_self_note_is_advisory_and_never_fails_the_call
   assert.equal(validPositive.note, noteText, 'note content must round-trip verbatim')
 })
 
-test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexists_with_review_contract', async () => {
+test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_without_review_attestation', async () => {
   const previousLanguage = process.env.WANXIANGSHU_PROVIDER_LANGUAGE
   const language = await import('../../../dist/Participant/Provider/LanguageSurface.js')
   process.env.WANXIANGSHU_PROVIDER_LANGUAGE = 'en'
@@ -699,15 +684,12 @@ test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexis
       },
     }
     PluginHooksSurface.decorateReadonlyDelegationToolDefinition('todowrite-for-manager', definition)
-    PluginHooksSurface.decorateReviewToolDefinition('todowrite-for-manager', definition)
     const firstSnapshot = structuredClone(definition)
 
     // 重复装饰、两类装饰交替都不产生重复项
     PluginHooksSurface.decorateReadonlyDelegationToolDefinition('todowrite-for-manager', definition)
     PluginHooksSurface.decorateReadonlyDelegationToolDefinition('todowrite-for-manager', definition)
-    PluginHooksSurface.decorateReviewToolDefinition('todowrite-for-manager', definition)
     PluginHooksSurface.decorateReadonlyDelegationToolDefinition('todowrite-for-manager', definition)
-    PluginHooksSurface.decorateReviewToolDefinition('todowrite-for-manager', definition)
 
     assert.deepEqual(definition, firstSnapshot, 'coexisting decorations must be idempotent across repeats')
     assert.equal(
@@ -722,8 +704,8 @@ test('WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_and_coexis
     )
     assert.equal(
       definition.parameters.required.filter((x) => x === 'contract').length,
-      1,
-      'review contract must appear exactly once and stay intact beside the delegation protocol',
+      0,
+      'review attestation must stay absent beside the delegation protocol',
     )
     assert.equal(
       definition.description.split('Investigation outlook: estimated_readonly_rounds estimates').length - 1,
@@ -1170,17 +1152,12 @@ test('WHAT[host-boundary-032] C29_configured_predictor_decorates_every_tool_thro
           `${toolID} description must gain the collaboration prose`,
         )
         if (toolID === 'todowrite-for-manager') {
-          // 与评审 contract 在同一 hook 路径并存，互不排斥
           assert.equal(
             output.parameters.required.includes('contract'),
-            true,
-            'review contract must coexist with the delegation budget on todowrite-for-manager',
+            false,
+            'review attestation must stay absent beside the delegation budget',
           )
-          assert.equal(
-            output.parameters.properties.contract.type,
-            'string',
-            'review contract property must coexist with the delegation protocol',
-          )
+          assert.equal(Object.hasOwn(output.parameters.properties, 'contract'), false)
         }
       }
 
@@ -1562,11 +1539,14 @@ integrationTest(
       )
     }
 
-    const launched = spawnSync(process.execPath, [runnerPath], {
+    const launched = await withFinitePhysicalWait(t, {
+      operation: 'actual Manager Host startup, protocol calls and shutdown',
+      limitMs: 30000,
+    }, () => spawnSync(process.execPath, [runnerPath], {
       cwd: repoRoot,
       encoding: 'utf8',
       timeout: 120000,
-    })
+    }))
 
     let stdoutSummary = null
     try {
@@ -1596,13 +1576,9 @@ integrationTest(
         `controlTools must not include review tool ${tool}`,
       )
     }
-    assert.equal(stdoutSummary.wireInspection?.contractRequired, true, 'wire contract must be required')
-    assert.equal(stdoutSummary.wireInspection?.contractType, 'string', 'wire contract type must be string')
-    assert.deepEqual(
-      stdoutSummary.wireInspection?.contractEnum,
-      ['do-not-use-except-for-review'],
-      'wire contract enum must contain exactly the single contract token',
-    )
+    assert.equal(stdoutSummary.wireInspection?.contractRequired, false)
+    assert.equal(stdoutSummary.wireInspection?.contractType, null)
+    assert.equal(stdoutSummary.wireInspection?.contractEnum, null)
     assert.equal(
       stdoutSummary.wireInspection?.historicalToolCallPreservesContract,
       true,

@@ -1,0 +1,789 @@
+TAP version 13
+# Subtest: WHAT[host-boundary-032] canary does not advance on a delayed idle from a previous physical turn
+ok 1 - WHAT[host-boundary-032] canary does not advance on a delayed idle from a previous physical turn
+  ---
+  duration_ms: 0.71325
+  ...
+# Subtest: WHAT[host-boundary-032] canary provider routes repeated requests by physical prompt and call history
+ok 2 - WHAT[host-boundary-032] canary provider routes repeated requests by physical prompt and call history
+  ---
+  duration_ms: 0.203709
+  ...
+# Subtest: WHAT[host-boundary-032] C01_review_tool_definition_has_no_attestation_parameter
+ok 3 - WHAT[host-boundary-032] C01_review_tool_definition_has_no_attestation_parameter
+  ---
+  duration_ms: 453.088416
+  ...
+# (node:84692) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[host-boundary-032] C05_tool_execute_before_strips_contract_and_after_restores
+ok 4 - WHAT[host-boundary-032] C05_tool_execute_before_strips_contract_and_after_restores
+  ---
+  duration_ms: 227.560334
+  ...
+# Subtest: WHAT[host-boundary-032] C09_concurrent_tool_invocations_do_not_mix_contract_parameters
+ok 5 - WHAT[host-boundary-032] C09_concurrent_tool_invocations_do_not_mix_contract_parameters
+  ---
+  duration_ms: 178.625625
+  ...
+# Subtest: WHAT[host-boundary-032] C02_definition_decoration_leaves_native_and_non_review_tools_unmodified
+ok 6 - WHAT[host-boundary-032] C02_definition_decoration_leaves_native_and_non_review_tools_unmodified
+  ---
+  duration_ms: 196.036875
+  ...
+# Subtest: WHAT[host-boundary-032] C03_repeated_definition_hooks_leave_review_schema_unchanged
+ok 7 - WHAT[host-boundary-032] C03_repeated_definition_hooks_leave_review_schema_unchanged
+  ---
+  duration_ms: 173.82975
+  ...
+# Subtest: WHAT[host-boundary-032] C04_definitions_generated_before_and_after_review_are_canonically_identical
+ok 8 - WHAT[host-boundary-032] C04_definitions_generated_before_and_after_review_are_canonically_identical
+  ---
+  duration_ms: 175.732333
+  ...
+# Subtest: WHAT[host-boundary-032] C06_missing_wrong_string_null_or_wrong_json_type_contract_not_rejected_by_plugin_and_restored
+ok 9 - WHAT[host-boundary-032] C06_missing_wrong_string_null_or_wrong_json_type_contract_not_rejected_by_plugin_and_restored
+  ---
+  duration_ms: 167.517834
+  ...
+# Subtest: WHAT[host-boundary-032] C07_contract_undefined_versus_completely_missing_preserves_own_property_state
+ok 10 - WHAT[host-boundary-032] C07_contract_undefined_versus_completely_missing_preserves_own_property_state
+  ---
+  duration_ms: 165.664625
+  ...
+# Subtest: WHAT[host-boundary-032] C08_repeated_before_and_repeated_after_preserves_original_and_restores_idempotently
+ok 11 - WHAT[host-boundary-032] C08_repeated_before_and_repeated_after_preserves_original_and_restores_idempotently
+  ---
+  duration_ms: 178.467917
+  ...
+# Subtest: WHAT[host-boundary-032] C10_model_submitted_pseudo_contract_fields_not_treated_as_private_record
+ok 12 - WHAT[host-boundary-032] C10_model_submitted_pseudo_contract_fields_not_treated_as_private_record
+  ---
+  duration_ms: 165.9835
+  ...
+# Subtest: WHAT[host-boundary-032] C11_reported_failure_after_callback_restores_contract_and_preserves_error
+ok 13 - WHAT[host-boundary-032] C11_reported_failure_after_callback_restores_contract_and_preserves_error
+  ---
+  duration_ms: 174.652792
+  ...
+# Subtest: WHAT[host-boundary-032] C12_after_hook_returns_with_original_contract_restored
+ok 14 - WHAT[host-boundary-032] C12_after_hook_returns_with_original_contract_restored
+  ---
+  duration_ms: 164.278208
+  ...
+# Subtest: WHAT[host-boundary-032] C13_frozen_or_non_extensible_args_fails_atomically_without_file_access
+ok 15 - WHAT[host-boundary-032] C13_frozen_or_non_extensible_args_fails_atomically_without_file_access
+  ---
+  duration_ms: 159.658375
+  ...
+# Subtest: WHAT[host-boundary-032] C14_direct_tool_execution_without_before_hook_performs_full_permission_check_without_missing_key_crash
+ok 16 - WHAT[host-boundary-032] C14_direct_tool_execution_without_before_hook_performs_full_permission_check_without_missing_key_crash
+  ---
+  duration_ms: 162.596709
+  ...
+# Subtest: WHAT[host-boundary-032] C15_contract_position_first_middle_or_last_restores_without_property_drift
+ok 17 - WHAT[host-boundary-032] C15_contract_position_first_middle_or_last_restores_without_property_drift
+  ---
+  duration_ms: 163.3105
+  ...
+# Subtest: WHAT[host-boundary-032] C16_upstream_validation_rejection_not_swallowed_and_local_missing_malformed_not_revalidated
+ok 18 - WHAT[host-boundary-032] C16_upstream_validation_rejection_not_swallowed_and_local_missing_malformed_not_revalidated
+  ---
+  duration_ms: 158.795958
+  ...
+# Subtest: WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_optional_note_without_dropping_tool_contract
+ok 19 - WHAT[host-boundary-032] C17_delegation_schema_adds_required_budget_and_optional_note_without_dropping_tool_contract
+  ---
+  duration_ms: 3.488541
+  ...
+# Subtest: WHAT[host-boundary-032] C18_budget_rejects_illegal_values_and_never_coerces_them
+ok 20 - WHAT[host-boundary-032] C18_budget_rejects_illegal_values_and_never_coerces_them
+  ---
+  duration_ms: 0.2015
+  ...
+# Subtest: WHAT[host-boundary-032] C19_self_note_is_advisory_and_never_fails_the_call
+ok 21 - WHAT[host-boundary-032] C19_self_note_is_advisory_and_never_fails_the_call
+  ---
+  duration_ms: 0.229125
+  ...
+# Subtest: WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_without_review_attestation
+ok 22 - WHAT[host-boundary-032] C20_delegation_decoration_is_idempotent_without_review_attestation
+  ---
+  duration_ms: 0.248375
+  ...
+# Subtest: WHAT[host-boundary-032] C21_collaboration_prose_follows_language_binding_and_switches_cleanly
+ok 23 - WHAT[host-boundary-032] C21_collaboration_prose_follows_language_binding_and_switches_cleanly
+  ---
+  duration_ms: 0.185916
+  ...
+# Subtest: WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_required_fail_loudly
+ok 24 - WHAT[host-boundary-032] C22_conflicting_same_name_properties_and_bad_required_fail_loudly
+  ---
+  duration_ms: 0.166583
+  ...
+# Subtest: WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_but_preserved_as_evidence
+ok 25 - WHAT[host-boundary-032] C23_delegation_fields_stripped_from_business_view_but_preserved_as_evidence
+  ---
+  duration_ms: 157.930416
+  ...
+# Subtest: WHAT[host-boundary-032] C24_review_contract_and_delegation_fields_coexist_without_crosstalk
+ok 26 - WHAT[host-boundary-032] C24_review_contract_and_delegation_fields_coexist_without_crosstalk
+  ---
+  duration_ms: 159.837583
+  ...
+# Subtest: WHAT[host-boundary-032] C25_frozen_delegation_fields_fail_atomically_without_losing_evidence
+ok 27 - WHAT[host-boundary-032] C25_frozen_delegation_fields_fail_atomically_without_losing_evidence
+  ---
+  duration_ms: 166.500334
+  ...
+# Subtest: WHAT[host-boundary-032] C26_concurrent_delegation_restores_do_not_crosstalk
+ok 28 - WHAT[host-boundary-032] C26_concurrent_delegation_restores_do_not_crosstalk
+  ---
+  duration_ms: 159.346791
+  ...
+# Subtest: WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protocol_fields
+ok 29 - WHAT[host-boundary-032] C27_business_tool_execution_never_receives_protocol_fields
+  ---
+  duration_ms: 167.383291
+  ...
+# Subtest: WHAT[host-boundary-032] C28_unconfigured_predictor_leaves_tool_definitions_undecorated
+ok 30 - WHAT[host-boundary-032] C28_unconfigured_predictor_leaves_tool_definitions_undecorated
+  ---
+  duration_ms: 156.178292
+  ...
+# Subtest: WHAT[host-boundary-032] C29_configured_predictor_decorates_every_tool_through_the_definition_hook
+ok 31 - WHAT[host-boundary-032] C29_configured_predictor_decorates_every_tool_through_the_definition_hook
+  ---
+  duration_ms: 161.271834
+  ...
+# Subtest: WHAT[host-boundary-032] C30_configured_decoration_through_hook_is_idempotent
+ok 32 - WHAT[host-boundary-032] C30_configured_decoration_through_hook_is_idempotent
+  ---
+  duration_ms: 160.9535
+  ...
+# Subtest: WHAT[host-boundary-032] C31_invalid_predictor_configuration_fails_closed_without_publishing_partial_protocol
+ok 33 - WHAT[host-boundary-032] C31_invalid_predictor_configuration_fails_closed_without_publishing_partial_protocol
+  ---
+  duration_ms: 171.16575
+  ...
+# Subtest: WHAT[host-boundary-032] C32_decoration_gate_shares_the_single_predictor_configuration_query
+ok 34 - WHAT[host-boundary-032] C32_decoration_gate_shares_the_single_predictor_configuration_query
+  ---
+  duration_ms: 314.161959
+  ...
+# Subtest: WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_plugin_instance
+ok 35 - WHAT[host-boundary-032] C33_gate_follows_configuration_changes_within_one_plugin_instance
+  ---
+  duration_ms: 162.787292
+  ...
+# Subtest: WHAT[host-boundary-032] C44_registered_hooks_restore_exact_argument_identity_values_and_key_order
+ok 36 - WHAT[host-boundary-032] C44_registered_hooks_restore_exact_argument_identity_values_and_key_order
+  ---
+  duration_ms: 172.094208
+  ...
+# Subtest: WHAT[host-boundary-032] C45_unrestorable_delegation_key_order_is_rejected_before_any_argument_mutation
+ok 37 - WHAT[host-boundary-032] C45_unrestorable_delegation_key_order_is_rejected_before_any_argument_mutation
+  ---
+  duration_ms: 0.163375
+  ...
+# Subtest: WHAT[host-boundary-032] C46_before_hide_failure_restores_the_already_hidden_review_contract
+ok 38 - WHAT[host-boundary-032] C46_before_hide_failure_restores_the_already_hidden_review_contract
+  ---
+  duration_ms: 168.455834
+  ...
+# Subtest: WHAT[host-boundary-032] installed Host executor throw path: after not invoked, durable error materialized, wire contract preserved (Host physical boundary contracted by the clause 019 executorThrow canary; narrow face: C44 in-memory restore absent on the throw path)
+ok 39 - WHAT[host-boundary-032] installed Host executor throw path: after not invoked, durable error materialized, wire contract preserved (Host physical boundary contracted by the clause 019 executorThrow canary; narrow face: C44 in-memory restore absent on the throw path) # TODO
+  ---
+  duration_ms: 0.0335
+  ...
+# Subtest: WHAT[host-boundary-032] C47_interrupted_field_deletion_restores_arguments_and_rethrows_the_original_error
+ok 40 - WHAT[host-boundary-032] C47_interrupted_field_deletion_restores_arguments_and_rethrows_the_original_error
+  ---
+  duration_ms: 178.636417
+  ...
+# Subtest: WHAT[host-boundary-032] canary_manager_review_tools_contract_observed_on_real_host
+not ok 41 - WHAT[host-boundary-032] canary_manager_review_tools_contract_observed_on_real_host
+  ---
+  duration_ms: 13480.306917
+  location: '/Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/verification-system/tests/support/tier-gate.mjs:26:12'
+  failureType: 'testCodeFailure'
+  error: |-
+    Real host canary runner exited with code 1.
+    [Runner Stderr]:
+    [run-manager-review-tools-canary] Canary failed: AssertionError [ERR_ASSERTION]: todowrite-for-manager definition missing contract property
+    
+    false !== true
+    
+        at file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/host-boundary/tests/support/run-manager-review-tools-canary.mjs:512:12 {
+      generatedMessage: false,
+      code: 'ERR_ASSERTION',
+      actual: false,
+      expected: true,
+      operator: 'strictEqual'
+    }
+    {"observations":[{"sequence":1448,"kind":"provider.request.observed","value":{"request":52,"route":"companion","stage":null,"prompts":["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"]}},{"sequence":1449,"kind":"provider.request.observed","value":{"request":53,"route":"companion","stage":null,"prompts":["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"]}},{"sequence":1466,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f2040014pMxAye3EgoeXB","parentID":"msg_158d2f1ca001EH7onquRQjPAXv","role":"assistant","finish":"stop","completed":1792491582278}},{"sequence":1467,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke"}},{"sequence":1468,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f2040014pMxAye3EgoeXB","parentID":"msg_158d2f1ca001EH7onquRQjPAXv","role":"assistant","finish":"stop","completed":1792491582278}},{"sequence":1469,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f2060015KIubroz4c2uzG","parentID":"msg_158d2f1cb002mY2bUHZzD5Qwwe","role":"assistant","finish":"stop","completed":1792491582287}},{"sequence":1470,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV"}},{"sequence":1471,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f2060015KIubroz4c2uzG","parentID":"msg_158d2f1cb002mY2bUHZzD5Qwwe","role":"assistant","finish":"stop","completed":1792491582287}},{"sequence":1476,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d0f5cffezjlC0qA8KSp10N","messageID":"msg_158d2f202001XGSEBdurU7J4N6","parentID":"msg_158d2f0f8001OZzEaquucmo4mw","role":"assistant","finish":"tool-calls","completed":1792491582302}},{"sequence":1586,"kind":"provider.request.observed","value":{"request":54,"route":"manager","stage":9,"prompts":["TRIGGER_EXECUTOR_THROW\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that d"]}},{"sequence":1587,"kind":"manager.executorThrow.history","value":{"observed":true,"contract":"do-not-use-except-for-review"}},{"sequence":1604,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f276001fsThRQnPpNV4rM","parentID":"msg_canary_prompt_6","role":"assistant","finish":"stop","completed":1792491582392}},{"sequence":1605,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ"}},{"sequence":1606,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f276001fsThRQnPpNV4rM","parentID":"msg_canary_prompt_6","role":"assistant","finish":"stop","completed":1792491582392}},{"sequence":1623,"kind":"chat.message.received","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f3dd0017Rm8urqKrVhre9"}},{"sequence":1624,"kind":"chat.message.received","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f3de001cFNb18Xs0Aq8oJ"}},{"sequence":1640,"kind":"chat.message.completed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f3de001cFNb18Xs0Aq8oJ"}},{"sequence":1641,"kind":"chat.message.completed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f3dd0017Rm8urqKrVhre9"}},{"sequence":1653,"kind":"chat.message.received","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f463001uPVMCgZWoOdXsM"}},{"sequence":1655,"kind":"chat.message.completed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f463001uPVMCgZWoOdXsM"}},{"sequence":1656,"kind":"provider.request.observed","value":{"request":55,"route":"companion","stage":null,"prompts":["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"]}},{"sequence":1657,"kind":"provider.request.observed","value":{"request":56,"route":"companion","stage":null,"prompts":["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"]}},{"sequence":1661,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d2f22ffeUZxwbEux582oH7","messageID":"msg_158d2f2f30017L1sztymgvDBRs","parentID":"msg_158d2d0fa001gx96r1cdm77TRD","role":"assistant","finish":"tool-calls","completed":1792491582655}},{"sequence":1665,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","messageID":"msg_158d2f2ea001nkLgOvqKTCEm7V","parentID":"msg_158d2e47a0010kzI9IDAUp6RE4","role":"assistant","finish":"tool-calls","completed":1792491582667}},{"sequence":1704,"kind":"provider.request.observed","value":{"request":57,"route":"companion","stage":null,"prompts":["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"]}},{"sequence":1706,"kind":"provider.request.observed","value":{"request":58,"route":"companion","stage":null,"prompts":["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"]}},{"sequence":1722,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f3fc001YSkykaPbETEoe4","parentID":"msg_158d2f3dd0017Rm8urqKrVhre9","role":"assistant","finish":"stop","completed":1792491582787}},{"sequence":1723,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke"}},{"sequence":1724,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f3fc001YSkykaPbETEoe4","parentID":"msg_158d2f3dd0017Rm8urqKrVhre9","role":"assistant","finish":"stop","completed":1792491582787}},{"sequence":1726,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f3fb001QipC49avyyboDT","parentID":"msg_158d2f3de001cFNb18Xs0Aq8oJ","role":"assistant","finish":"stop","completed":1792491582795}},{"sequence":1727,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV"}},{"sequence":1728,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f3fb001QipC49avyyboDT","parentID":"msg_158d2f3de001cFNb18Xs0Aq8oJ","role":"assistant","finish":"stop","completed":1792491582795}},{"sequence":1858,"kind":"provider.request.observed","value":{"request":59,"route":"companion","stage":null,"prompts":["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"]}},{"sequence":1867,"kind":"chat.message.received","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f5b6001GEuycSSvonkG2p"}},{"sequence":1868,"kind":"chat.message.received","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f5b7001Sop9BOvScJ5ayV"}},{"sequence":1873,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d0f5cffezjlC0qA8KSp10N","messageID":"msg_158d2f35f001YmDA2eQzHZo6D5","parentID":"msg_158d2f0f8001OZzEaquucmo4mw","role":"assistant","finish":"tool-calls","completed":1792491582918}},{"sequence":1881,"kind":"provider.request.observed","value":{"request":60,"route":"companion","stage":null,"prompts":["TRIGGER_EXECUTOR_THROW\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that d","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"]}},{"sequence":1886,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f4dd001a3Uny0qTAnAv2m","parentID":"msg_158d2f463001uPVMCgZWoOdXsM","role":"assistant","finish":"stop","completed":1792491582937}},{"sequence":1887,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ"}},{"sequence":1888,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f4dd001a3Uny0qTAnAv2m","parentID":"msg_158d2f463001uPVMCgZWoOdXsM","role":"assistant","finish":"stop","completed":1792491582937}},{"sequence":1896,"kind":"chat.message.completed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f5b6001GEuycSSvonkG2p"}},{"sequence":1897,"kind":"chat.message.completed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f5b7001Sop9BOvScJ5ayV"}},{"sequence":1934,"kind":"chat.message.received","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f6ad001gxpWZ8f2NuKdyk"}},{"sequence":1935,"kind":"provider.request.observed","value":{"request":61,"route":"companion","stage":null,"prompts":["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"]}},{"sequence":1936,"kind":"provider.request.observed","value":{"request":62,"route":"companion","stage":null,"prompts":["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"]}},{"sequence":1940,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","messageID":"msg_158d2f4cc001Ms3YEU6z36ZCf2","parentID":"msg_158d2e47a0010kzI9IDAUp6RE4","role":"assistant","finish":"tool-calls","completed":1792491583177}},{"sequence":1944,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d2f22ffeUZxwbEux582oH7","messageID":"msg_158d2f4c00011JxnPFWmI4JGJR","parentID":"msg_158d2d0fa001gx96r1cdm77TRD","role":"assistant","finish":"tool-calls","completed":1792491583188}},{"sequence":1945,"kind":"chat.message.completed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f6ad001gxpWZ8f2NuKdyk"}},{"sequence":1980,"kind":"provider.request.observed","value":{"request":63,"route":"companion","stage":null,"prompts":["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"]}},{"sequence":1982,"kind":"provider.request.observed","value":{"request":64,"route":"companion","stage":null,"prompts":["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"]}},{"sequence":1998,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f616001aG75xx7vZCZBPY","parentID":"msg_158d2f5b7001Sop9BOvScJ5ayV","role":"assistant","finish":"stop","completed":1792491583285}},{"sequence":1999,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV"}},{"sequence":2000,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f616001aG75xx7vZCZBPY","parentID":"msg_158d2f5b7001Sop9BOvScJ5ayV","role":"assistant","finish":"stop","completed":1792491583285}},{"sequence":2002,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f6140016qaD4FqNc2nE4x","parentID":"msg_158d2f5b6001GEuycSSvonkG2p","role":"assistant","finish":"stop","completed":1792491583295}},{"sequence":2003,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke"}},{"sequence":2004,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f6140016qaD4FqNc2nE4x","parentID":"msg_158d2f5b6001GEuycSSvonkG2p","role":"assistant","finish":"stop","completed":1792491583295}},{"sequence":2139,"kind":"chat.message.received","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f7ca0012GF9Oh0eseYoR0"}},{"sequence":2140,"kind":"chat.message.received","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f7cb001OLp1iH9I35mc9w"}},{"sequence":2160,"kind":"provider.request.observed","value":{"request":65,"route":"companion","stage":null,"prompts":["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"]}},{"sequence":2173,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d0f5cffezjlC0qA8KSp10N","messageID":"msg_158d2f5c60012AuHlhWAEZ0UMw","parentID":"msg_158d2f0f8001OZzEaquucmo4mw","role":"assistant","finish":"tool-calls","completed":1792491583464}},{"sequence":2181,"kind":"chat.message.completed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f7ca0012GF9Oh0eseYoR0"}},{"sequence":2182,"kind":"provider.request.observed","value":{"request":66,"route":"companion","stage":null,"prompts":["TRIGGER_EXECUTOR_THROW\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that d","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"]}},{"sequence":2183,"kind":"chat.message.completed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f7cb001OLp1iH9I35mc9w"}},{"sequence":2184,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f746001YBUKT4TBdS9aK9","parentID":"msg_158d2f6ad001gxpWZ8f2NuKdyk","role":"assistant","finish":"stop","completed":1792491583501}},{"sequence":2185,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ"}},{"sequence":2186,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f746001YBUKT4TBdS9aK9","parentID":"msg_158d2f6ad001gxpWZ8f2NuKdyk","role":"assistant","finish":"stop","completed":1792491583501}},{"sequence":2238,"kind":"provider.request.observed","value":{"request":67,"route":"companion","stage":null,"prompts":["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"]}},{"sequence":2239,"kind":"provider.request.observed","value":{"request":68,"route":"companion","stage":null,"prompts":["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"]}},{"sequence":2243,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d2f22ffeUZxwbEux582oH7","messageID":"msg_158d2f6d50015GCKKrK8WDZII1","parentID":"msg_158d2d0fa001gx96r1cdm77TRD","role":"assistant","finish":"tool-calls","completed":1792491583711}},{"sequence":2247,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","messageID":"msg_158d2f6ca001yZlp9pTfKRcgFH","parentID":"msg_158d2e47a0010kzI9IDAUp6RE4","role":"assistant","finish":"tool-calls","completed":1792491583722}},{"sequence":2248,"kind":"chat.message.received","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f9050016hBqAEf8mh2By5"}},{"sequence":2280,"kind":"provider.request.observed","value":{"request":69,"route":"companion","stage":null,"prompts":["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"]}},{"sequence":2281,"kind":"provider.request.observed","value":{"request":70,"route":"companion","stage":null,"prompts":["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"]}},{"sequence":2298,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f8150010oZLE3jrNxdXvU","parentID":"msg_158d2f7ca0012GF9Oh0eseYoR0","role":"assistant","finish":"stop","completed":1792491583808}},{"sequence":2299,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV"}},{"sequence":2300,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d30e9ffeeTix4RzSr2xpyV","messageID":"msg_158d2f8150010oZLE3jrNxdXvU","parentID":"msg_158d2f7ca0012GF9Oh0eseYoR0","role":"assistant","finish":"stop","completed":1792491583808}},{"sequence":2301,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f81a001YZfvTO4EmJ8cxV","parentID":"msg_158d2f7cb001OLp1iH9I35mc9w","role":"assistant","finish":"stop","completed":1792491583817}},{"sequence":2302,"kind":"session.idle.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke"}},{"sequence":2303,"kind":"message.updated.observed","value":{"sessionID":"ses_ea72d1d23ffesQwcajJmiD81ke","messageID":"msg_158d2f81a001YZfvTO4EmJ8cxV","parentID":"msg_158d2f7cb001OLp1iH9I35mc9w","role":"assistant","finish":"stop","completed":1792491583817}},{"sequence":2354,"kind":"chat.message.completed","value":{"sessionID":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","messageID":"msg_158d2f9050016hBqAEf8mh2By5"}}],"providerRequests":[["Generate a title for this conversation:\n","READ_SAMPLE"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["Generate a title for this conversation:\n","TRIGGER_ERROR"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["Generate a title for this conversation:\n","TRIGGER_CANCEL"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["TRIGGER_CANCEL\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration "],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_CANCEL\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration ","VERIFY_CANCEL_HISTORY\u0000﻿<system>\n# # Enforcer Tip\n# tip = \"canary-observation-preserved\"\n#\n# ## Opinion\n#\n# The inspected tool contract should stay rep"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["Generate a title for this conversation:\n","TRIGGER_EXECUTOR_THROW"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["TRIGGER_EXECUTOR_THROW\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that d"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_EXECUTOR_THROW\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that d"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_EXECUTOR_THROW\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that d","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["TRIGGER_EXECUTOR_THROW\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that d","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["# Call the chronicle tool exactly once now. Record the meaningful state transition\n# established by this work in all required fields:\n# charge, occurr"],["READ_SAMPLE\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration bes","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"],["TRIGGER_ERROR\u0000﻿<system>\n# # Wait-cost calibration: this session has existed for about 0 minutes 0 seconds of wall-clock time.\n# # Hold that duration b","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c","# The current user task has not been completed or durably handed over. A natural end of your reply does not end that obligation, even when the reply c"]],"providerRequestsCount":70}
+    Host stdout:
+    Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.
+    opencode server listening on http://127.0.0.1:4096
+    
+    Host stderr:
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_canary_prompt_1","result":"tail=absent;raw_tools=0/0;wire_tail=absent;calls=no;run=no;reason=absent-wire-tail-incomplete"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"not-work-main"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"delegation arguments of call call_read_norm_1 rejected: The estimated_readonly_rounds field must be provided"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2e2e8001Mby3FsK54aOpWw","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2e3ba001WTvmLcXiuQexJX","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_canary_prompt_3","result":"tail=absent;raw_tools=0/0;wire_tail=absent;calls=no;run=no;reason=absent-wire-tail-incomplete"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"not-work-main"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2e51b001lBwMRrrNd0tteY","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"delegation arguments of call call_read_err_1 rejected: The estimated_readonly_rounds field must be provided"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2e6c3001HmGVB5BHfxIZ2X","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_158d2e6e4001mHZR0Hgjyk97Uq","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2e86f001XSDw9Dmnc6Y931","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_158d2e884001xhr0ydeWj08tJI","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1933ffewQgXCqIBXlPTZd","physical_user_message_id":"msg_canary_prompt_4","result":"tail=absent;raw_tools=0/0;wire_tail=absent;calls=no;run=no;reason=absent-wire-tail-incomplete"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1933ffewQgXCqIBXlPTZd","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d166bffeTCfOUiKULFpS7U","result":"not-work-main"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_158d2ea9b001IYB6QfTOaCA1ut","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2ea9a001jm4Ji4T2DY6kgC","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d166bffeTCfOUiKULFpS7U","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1933ffewQgXCqIBXlPTZd","physical_user_message_id":"msg_canary_prompt_5","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-tool-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1933ffewQgXCqIBXlPTZd","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_158d2ec4a0016bcMf4m5FMjVXn","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2ec4a003xvr7z5Q04uEp5u","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_158d2ee40001FBU7rR5EcPMe00","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2ee41001IWG0iCwtzuUe6z","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_158d2efc400144mRVuf2P84HHP","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2efc5001WxRaZTKfYtXAWB","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","physical_user_message_id":"msg_canary_prompt_6","result":"tail=absent;raw_tools=0/0;wire_tail=absent;calls=no;run=no;reason=absent-wire-tail-incomplete"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d0f5cffezjlC0qA8KSp10N","result":"not-work-main"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_158d2f1ca001EH7onquRQjPAXv","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2f1cb002mY2bUHZzD5Qwwe","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d0f5cffezjlC0qA8KSp10N","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","physical_user_message_id":"msg_canary_prompt_6","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-tool-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_158d2f3dd0017Rm8urqKrVhre9","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2f3de001cFNb18Xs0Aq8oJ","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d0f5cffezjlC0qA8KSp10N","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","physical_user_message_id":"msg_158d2f463001uPVMCgZWoOdXsM","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_158d2f5b6001GEuycSSvonkG2p","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2f5b7001Sop9BOvScJ5ayV","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d0f5cffezjlC0qA8KSp10N","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","physical_user_message_id":"msg_158d2f6ad001gxpWZ8f2NuKdyk","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1205ffeX4oQ6VGsPb4VFZ","result":"no-completed-source-batch"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d2f22ffeUZxwbEux582oH7","result":"replica-or-internal-leaf"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1ba2ffeNVv9E0ZpmPGChn","result":"replica-or-internal-leaf"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","physical_user_message_id":"msg_158d2f7ca0012GF9Oh0eseYoR0","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d30e9ffeeTix4RzSr2xpyV","result":"no-completed-source-batch"}
+    {"operation":"strength-source-batch-unresolved","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","physical_user_message_id":"msg_158d2f7cb001OLp1iH9I35mc9w","result":"tail=incomplete;raw_tools=0[REDACTED];calls=no;run=no;reason=incomplete-text-tail"}
+    {"operation":"strength-delegation-skip","session_id":"ses_ea72d1d23ffesQwcajJmiD81ke","result":"no-completed-source-batch"}
+    
+    Host server log opencode.log:
+    timestamp=2026-10-20T10:19:41.666Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d2f22ffeUZxwbEux582oH7 step=11
+    timestamp=2026-10-20T10:19:41.760Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d1d23ffesQwcajJmiD81ke messageID=msg_158d2f00a0017P6nkkA1Ql3ASs
+    timestamp=2026-10-20T10:19:41.760Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d1d23ffesQwcajJmiD81ke small=false agent=manager mode=primary
+    timestamp=2026-10-20T10:19:41.762Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:41.767Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV messageID=msg_158d2f00d0014hFEYG3hRdOQ0L
+    timestamp=2026-10-20T10:19:41.768Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV small=false agent=manager mode=primary
+    timestamp=2026-10-20T10:19:41.770Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:41.781Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1d23ffesQwcajJmiD81ke step=1
+    timestamp=2026-10-20T10:19:41.782Z level=INFO run=0b568ad4 message="exiting loop" session.id=ses_ea72d1d23ffesQwcajJmiD81ke
+    timestamp=2026-10-20T10:19:41.793Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV step=1
+    timestamp=2026-10-20T10:19:41.793Z level=INFO run=0b568ad4 message="exiting loop" session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV
+    timestamp=2026-10-20T10:19:41.800Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d0f5cffezjlC0qA8KSp10N step=0
+    timestamp=2026-10-20T10:19:41.905Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ messageID=msg_158d2efcd001v6iNw7f7JBzEGa
+    timestamp=2026-10-20T10:19:41.905Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ small=false agent=manager mode=primary
+    timestamp=2026-10-20T10:19:41.908Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:41.934Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d0f5cffezjlC0qA8KSp10N messageID=msg_158d2f168001E9blBNRVq0Pilt
+    timestamp=2026-10-20T10:19:41.934Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d0f5cffezjlC0qA8KSp10N small=false agent=blogger mode=primary
+    timestamp=2026-10-20T10:19:41.937Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:41.954Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d0f5cffezjlC0qA8KSp10N step=1
+    timestamp=2026-10-20T10:19:41.956Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1d23ffesQwcajJmiD81ke step=0
+    timestamp=2026-10-20T10:19:41.958Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV step=0
+    timestamp=2026-10-20T10:19:42.070Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ step=1
+    timestamp=2026-10-20T10:19:42.166Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d1ba2ffeNVv9E0ZpmPGChn messageID=msg_158d2f0d8001I2CAN66DO3R19n
+    timestamp=2026-10-20T10:19:42.166Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d1ba2ffeNVv9E0ZpmPGChn small=false agent=blogger mode=primary
+    timestamp=2026-10-20T10:19:42.169Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.171Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d2f22ffeUZxwbEux582oH7 messageID=msg_158d2f0e3001op1CdeP0zcGi0O
+    timestamp=2026-10-20T10:19:42.171Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d2f22ffeUZxwbEux582oH7 small=false agent=blogger mode=primary
+    timestamp=2026-10-20T10:19:42.174Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.185Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1ba2ffeNVv9E0ZpmPGChn step=9
+    timestamp=2026-10-20T10:19:42.194Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d2f22ffeUZxwbEux582oH7 step=12
+    timestamp=2026-10-20T10:19:42.256Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d1d23ffesQwcajJmiD81ke messageID=msg_158d2f2040014pMxAye3EgoeXB
+    timestamp=2026-10-20T10:19:42.256Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d1d23ffesQwcajJmiD81ke small=false agent=manager mode=primary
+    timestamp=2026-10-20T10:19:42.258Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.263Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV messageID=msg_158d2f2060015KIubroz4c2uzG
+    timestamp=2026-10-20T10:19:42.264Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV small=false agent=manager mode=primary
+    timestamp=2026-10-20T10:19:42.265Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.271Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d0f5cffezjlC0qA8KSp10N messageID=msg_158d2f202001XGSEBdurU7J4N6
+    timestamp=2026-10-20T10:19:42.271Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d0f5cffezjlC0qA8KSp10N small=false agent=blogger mode=primary
+    timestamp=2026-10-20T10:19:42.273Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.279Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1d23ffesQwcajJmiD81ke step=1
+    timestamp=2026-10-20T10:19:42.279Z level=INFO run=0b568ad4 message="exiting loop" session.id=ses_ea72d1d23ffesQwcajJmiD81ke
+    timestamp=2026-10-20T10:19:42.287Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV step=1
+    timestamp=2026-10-20T10:19:42.288Z level=INFO run=0b568ad4 message="exiting loop" session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV
+    timestamp=2026-10-20T10:19:42.302Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d0f5cffezjlC0qA8KSp10N step=2
+    timestamp=2026-10-20T10:19:42.380Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ messageID=msg_158d2f276001fsThRQnPpNV4rM
+    timestamp=2026-10-20T10:19:42.381Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ small=false agent=manager mode=primary
+    timestamp=2026-10-20T10:19:42.383Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.393Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ step=2
+    timestamp=2026-10-20T10:19:42.393Z level=INFO run=0b568ad4 message="exiting loop" session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ
+    timestamp=2026-10-20T10:19:42.458Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV step=0
+    timestamp=2026-10-20T10:19:42.460Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1d23ffesQwcajJmiD81ke step=0
+    timestamp=2026-10-20T10:19:42.629Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d2f22ffeUZxwbEux582oH7 messageID=msg_158d2f2f30017L1sztymgvDBRs
+    timestamp=2026-10-20T10:19:42.629Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d2f22ffeUZxwbEux582oH7 small=false agent=blogger mode=primary
+    timestamp=2026-10-20T10:19:42.632Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.635Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d1ba2ffeNVv9E0ZpmPGChn messageID=msg_158d2f2ea001nkLgOvqKTCEm7V
+    timestamp=2026-10-20T10:19:42.635Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d1ba2ffeNVv9E0ZpmPGChn small=false agent=blogger mode=primary
+    timestamp=2026-10-20T10:19:42.639Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.656Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d2f22ffeUZxwbEux582oH7 step=13
+    timestamp=2026-10-20T10:19:42.667Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1ba2ffeNVv9E0ZpmPGChn step=10
+    timestamp=2026-10-20T10:19:42.684Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ step=0
+    timestamp=2026-10-20T10:19:42.769Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d1d23ffesQwcajJmiD81ke messageID=msg_158d2f3fc001YSkykaPbETEoe4
+    timestamp=2026-10-20T10:19:42.769Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d1d23ffesQwcajJmiD81ke small=false agent=manager mode=primary
+    timestamp=2026-10-20T10:19:42.771Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.776Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV messageID=msg_158d2f3fb001QipC49avyyboDT
+    timestamp=2026-10-20T10:19:42.776Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV small=false agent=manager mode=primary
+    timestamp=2026-10-20T10:19:42.778Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.787Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1d23ffesQwcajJmiD81ke step=1
+    timestamp=2026-10-20T10:19:42.787Z level=INFO run=0b568ad4 message="exiting loop" session.id=ses_ea72d1d23ffesQwcajJmiD81ke
+    timestamp=2026-10-20T10:19:42.796Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV step=1
+    timestamp=2026-10-20T10:19:42.796Z level=INFO run=0b568ad4 message="exiting loop" session.id=ses_ea72d30e9ffeeTix4RzSr2xpyV
+    timestamp=2026-10-20T10:19:42.896Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d0f5cffezjlC0qA8KSp10N messageID=msg_158d2f35f001YmDA2eQzHZo6D5
+    timestamp=2026-10-20T10:19:42.896Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d0f5cffezjlC0qA8KSp10N small=false agent=blogger mode=primary
+    timestamp=2026-10-20T10:19:42.899Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.918Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d0f5cffezjlC0qA8KSp10N step=3
+    timestamp=2026-10-20T10:19:42.920Z level=INFO run=0b568ad4 message=process session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ messageID=msg_158d2f4dd001a3Uny0qTAnAv2m
+    timestamp=2026-10-20T10:19:42.920Z level=INFO run=0b568ad4 message=stream providerID=test modelID=test-model session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ small=false agent=manager mode=primary
+    timestamp=2026-10-20T10:19:42.923Z level=INFO run=0b568ad4 message="llm runtime selected" llm.runtime=ai-sdk llm.provider=test llm.model=test-model
+    timestamp=2026-10-20T10:19:42.937Z level=INFO run=0b568ad4 message=loop session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ step=1
+    timestamp=2026-10-20T10:19:42.937Z level=INFO run=0b568ad4 message="exiting loop" session.id=ses_ea72d1205ffeX4oQ6VGsPb4VFZ
+    
+    
+    [Runner Stdout Summary]:
+    
+    
+    1 !== 0
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 0
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/host-boundary/tests/support/run-manager-review-tools-canary.mjs:512:12 {
+    TestContext.<anonymous> (file:///Users/yuanxi/.codex/worktrees/upstream-plan-20261020/vibe-fs/requirements/host-boundary/tests/032.test.mjs:1560:12)
+    Test.runInAsyncScope (node:async_hooks:211:14)
+    Test.run (node:internal/test_runner/test:931:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:629:18)
+    Test.postRun (node:internal/test_runner/test:1042:19)
+    Test.run (node:internal/test_runner/test:970:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:629:7)
+  ...
+# Subtest: WHAT[host-boundary-032] C34_transform_restores_hidden_protocol_fields_into_persisted_history
+ok 42 - WHAT[host-boundary-032] C34_transform_restores_hidden_protocol_fields_into_persisted_history
+  ---
+  duration_ms: 296.569917
+  ...
+# Subtest: WHAT[host-boundary-032] C35_unknown_tool_call_leaves_persisted_history_untouched
+ok 43 - WHAT[host-boundary-032] C35_unknown_tool_call_leaves_persisted_history_untouched
+  ---
+  duration_ms: 217.144125
+  ...
+# Subtest: WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stable
+ok 44 - WHAT[host-boundary-032] C36_repeated_transforms_restore_once_and_stay_stable
+  ---
+  duration_ms: 259.287542
+  ...
+# Subtest: WHAT[host-boundary-032] C37_tool_results_are_never_rewritten_by_the_restore
+ok 45 - WHAT[host-boundary-032] C37_tool_results_are_never_rewritten_by_the_restore
+  ---
+  duration_ms: 216.836459
+  ...
+# Subtest: WHAT[host-boundary-032] C38_restore_only_touches_protocol_fields_never_business_arguments
+ok 46 - WHAT[host-boundary-032] C38_restore_only_touches_protocol_fields_never_business_arguments
+  ---
+  duration_ms: 212.810209
+  ...
+# Subtest: WHAT[host-boundary-032] C39_legacy_delegate_readonly_rounds_rejected_by_tool_before_for_participating_tools
+ok 47 - WHAT[host-boundary-032] C39_legacy_delegate_readonly_rounds_rejected_by_tool_before_for_participating_tools
+  ---
+  duration_ms: 161.326
+  ...
+# Subtest: WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_and_non_participating_negative_cases
+ok 48 - WHAT[host-boundary-032] C40_sanitize_snapshot_cross_narrowing_non_review_and_non_participating_negative_cases
+  ---
+  duration_ms: 230.923417
+  ...
+# Subtest: WHAT[host-boundary-032] C41_unconfigured_predictor_no_interference_passthrough_and_no_vault
+ok 49 - WHAT[host-boundary-032] C41_unconfigured_predictor_no_interference_passthrough_and_no_vault
+  ---
+  duration_ms: 216.714583
+  ...
+# Subtest: WHAT[host-boundary-032] C42_mid_flight_predictor_revocation_restores_parameters_from_snapshot
+ok 50 - WHAT[host-boundary-032] C42_mid_flight_predictor_revocation_restores_parameters_from_snapshot
+  ---
+  duration_ms: 162.782791
+  ...
+# Subtest: WHAT[host-boundary-032] C43_participating_tool_missing_estimate_rejected_before_business_body
+ok 51 - WHAT[host-boundary-032] C43_participating_tool_missing_estimate_rejected_before_business_body
+  ---
+  duration_ms: 159.474958
+  ...
+# Subtest: WHAT[host-boundary-032] C48_configured_before_repeats_only_for_the_same_hidden_arguments_and_call
+ok 52 - WHAT[host-boundary-032] C48_configured_before_repeats_only_for_the_same_hidden_arguments_and_call
+  ---
+  duration_ms: 160.916334
+  ...
+# Subtest: WHAT[host-boundary-032] C49_hidden_arguments_do_not_exempt_other_call_identities_or_other_objects_from_validation
+ok 53 - WHAT[host-boundary-032] C49_hidden_arguments_do_not_exempt_other_call_identities_or_other_objects_from_validation
+  ---
+  duration_ms: 166.191958
+  ...
+# Subtest: WHAT[host-boundary-032] C50_same_call_with_reintroduced_protocol_fields_is_not_a_hidden_repeat
+ok 54 - WHAT[host-boundary-032] C50_same_call_with_reintroduced_protocol_fields_is_not_a_hidden_repeat
+  ---
+  duration_ms: 165.079125
+  ...
+# Subtest: WHAT[host-boundary-032] C51_missing_call_identity_does_not_grant_hidden_repeat_exemption
+ok 55 - WHAT[host-boundary-032] C51_missing_call_identity_does_not_grant_hidden_repeat_exemption
+  ---
+  duration_ms: 160.690292
+  ...
+# Subtest: WHAT[host-boundary-032] C52_review_contract_reintroduced_on_the_same_call_is_not_a_hidden_repeat
+ok 56 - WHAT[host-boundary-032] C52_review_contract_reintroduced_on_the_same_call_is_not_a_hidden_repeat
+  ---
+  duration_ms: 162.899292
+  ...
+# Subtest: WHAT[host-boundary-032] C53_concurrent_calls_sharing_arguments_have_only_one_hidden_owner
+ok 57 - WHAT[host-boundary-032] C53_concurrent_calls_sharing_arguments_have_only_one_hidden_owner
+  ---
+  duration_ms: 161.562458
+  ...
+# Subtest: WHAT[host-boundary-032] C54_late_after_does_not_restore_new_owner_unconfigured_todowrite-for-manager
+ok 58 - WHAT[host-boundary-032] C54_late_after_does_not_restore_new_owner_unconfigured_todowrite-for-manager
+  ---
+  duration_ms: 170.531834
+  ...
+# Subtest: WHAT[host-boundary-032] C54_late_after_does_not_restore_new_owner_configured_todowrite-for-manager
+ok 59 - WHAT[host-boundary-032] C54_late_after_does_not_restore_new_owner_configured_todowrite-for-manager
+  ---
+  duration_ms: 174.914458
+  ...
+# Subtest: WHAT[host-boundary-032] C54_late_after_does_not_restore_new_owner_configured_fetch
+ok 60 - WHAT[host-boundary-032] C54_late_after_does_not_restore_new_owner_configured_fetch
+  ---
+  duration_ms: 172.336584
+  ...
+# Subtest: WHAT[host-boundary-032] C55_business_getter_is_not_read_by_protocol_capture_join_estimated_readonly_rounds
+ok 61 - WHAT[host-boundary-032] C55_business_getter_is_not_read_by_protocol_capture_join_estimated_readonly_rounds
+  ---
+  duration_ms: 162.284333
+  ...
+# Subtest: WHAT[host-boundary-032] C55_business_getter_is_not_read_by_protocol_capture_join_self_note
+ok 62 - WHAT[host-boundary-032] C55_business_getter_is_not_read_by_protocol_capture_join_self_note
+  ---
+  duration_ms: 158.343625
+  ...
+# Subtest: WHAT[host-boundary-032] C55_business_getter_is_not_read_by_protocol_capture_fetch_contract
+ok 63 - WHAT[host-boundary-032] C55_business_getter_is_not_read_by_protocol_capture_fetch_contract
+  ---
+  duration_ms: 167.987
+  ...
+# Subtest: WHAT[requirement-grounding-007] compiled production owners preserve original material through the pinned Host actual provider serialization
+ok 64 - WHAT[requirement-grounding-007] compiled production owners preserve original material through the pinned Host actual provider serialization
+  ---
+  duration_ms: 4346.233084
+  ...
+# Subtest: WHAT[requirement-grounding-007] actual pair and grounding transforms append result-only bytes for each tested provider without synthetic calls
+ok 65 - WHAT[requirement-grounding-007] actual pair and grounding transforms append result-only bytes for each tested provider without synthetic calls
+  ---
+  duration_ms: 101.812458
+  ...
+# Subtest: WHAT[requirement-grounding-007] candidate discovery tools do not ground, while an explicit read does
+ok 66 - WHAT[requirement-grounding-007] candidate discovery tools do not ground, while an explicit read does
+  ---
+  duration_ms: 19.594
+  ...
+# Subtest: WHAT[requirement-grounding-007] original Markdown bytes survive the actual result suffix unchanged
+ok 67 - WHAT[requirement-grounding-007] original Markdown bytes survive the actual result suffix unchanged
+  ---
+  duration_ms: 20.168959
+  ...
+# (node:85193) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: WHAT[requirement-grounding-007] registered reads reject illegal self scope without consuming its materials
+    # Subtest: WHAT[requirement-grounding-007] legal scope with registered todowrite-for-manager
+    ok 1 - WHAT[requirement-grounding-007] legal scope with registered todowrite-for-manager
+      ---
+      duration_ms: 169.995666
+      ...
+    # Subtest: WHAT[requirement-grounding-007] positive scope with registered todowrite-for-manager
+    ok 2 - WHAT[requirement-grounding-007] positive scope with registered todowrite-for-manager
+      ---
+      duration_ms: 114.309958
+      ...
+    # Subtest: WHAT[requirement-grounding-007] negative scope with registered todowrite-for-manager
+    ok 3 - WHAT[requirement-grounding-007] negative scope with registered todowrite-for-manager
+      ---
+      duration_ms: 107.285208
+      ...
+    1..3
+ok 68 - WHAT[requirement-grounding-007] registered reads reject illegal self scope without consuming its materials
+  ---
+  duration_ms: 815.608375
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered original results retain complete saved presentation text (anthropic)
+ok 69 - WHAT[requirement-grounding-007] registered original results retain complete saved presentation text (anthropic)
+  ---
+  duration_ms: 473.553375
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered original results retain complete saved presentation text (cursor)
+ok 70 - WHAT[requirement-grounding-007] registered original results retain complete saved presentation text (cursor)
+  ---
+  duration_ms: 444.057833
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered original results retain complete saved presentation text (openai)
+ok 71 - WHAT[requirement-grounding-007] registered original results retain complete saved presentation text (openai)
+  ---
+  duration_ms: 438.077833
+  ...
+# Subtest: WHAT[requirement-grounding-007] missing physical part IDs bind only to exact captured missing-part results
+ok 72 - WHAT[requirement-grounding-007] missing physical part IDs bind only to exact captured missing-part results
+  ---
+  duration_ms: 392.913417
+  ...
+# Subtest: WHAT[requirement-grounding-007] new ambiguous missing-part material is refused and legacy ambiguity is rejected by both presentation owners
+ok 73 - WHAT[requirement-grounding-007] new ambiguous missing-part material is refused and legacy ambiguity is rejected by both presentation owners
+  ---
+  duration_ms: 190.138291
+  ...
+# Subtest: WHAT[requirement-grounding-007] same-anchor versions cannot turn a complete guidance and read combination into one later material
+ok 74 - WHAT[requirement-grounding-007] same-anchor versions cannot turn a complete guidance and read combination into one later material
+  ---
+  duration_ms: 368.480333
+  ...
+# Subtest: WHAT[requirement-grounding-007] captured original result missing blob fails both presentation owners
+ok 75 - WHAT[requirement-grounding-007] captured original result missing blob fails both presentation owners
+  ---
+  duration_ms: 309.593125
+  ...
+# Subtest: WHAT[requirement-grounding-007] captured original result changed blob fails both presentation owners
+ok 76 - WHAT[requirement-grounding-007] captured original result changed blob fails both presentation owners
+  ---
+  duration_ms: 298.176292
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for anthropic
+    # Subtest: WHAT[requirement-grounding-007] anthropic todowrite-for-manager crlf-blank-trailing exact content carrier and canonical history
+    ok 1 - WHAT[requirement-grounding-007] anthropic todowrite-for-manager crlf-blank-trailing exact content carrier and canonical history
+      ---
+      duration_ms: 130.262875
+      ...
+    # Subtest: WHAT[requirement-grounding-007] anthropic todowrite-for-manager bare-cr exact content carrier and canonical history
+    ok 2 - WHAT[requirement-grounding-007] anthropic todowrite-for-manager bare-cr exact content carrier and canonical history
+      ---
+      duration_ms: 122.611667
+      ...
+    # Subtest: WHAT[requirement-grounding-007] anthropic todowrite-for-manager empty exact content carrier and canonical history
+    ok 3 - WHAT[requirement-grounding-007] anthropic todowrite-for-manager empty exact content carrier and canonical history
+      ---
+      duration_ms: 126.730583
+      ...
+    # Subtest: WHAT[requirement-grounding-007] anthropic todowrite-for-manager no-final-lf exact content carrier and canonical history
+    ok 4 - WHAT[requirement-grounding-007] anthropic todowrite-for-manager no-final-lf exact content carrier and canonical history
+      ---
+      duration_ms: 129.068167
+      ...
+    # Subtest: WHAT[requirement-grounding-007] anthropic todowrite-for-manager unicode exact content carrier and canonical history
+    ok 5 - WHAT[requirement-grounding-007] anthropic todowrite-for-manager unicode exact content carrier and canonical history
+      ---
+      duration_ms: 131.6415
+      ...
+    # Subtest: WHAT[requirement-grounding-007] anthropic todowrite-for-manager nul-bom exact content carrier and canonical history
+    ok 6 - WHAT[requirement-grounding-007] anthropic todowrite-for-manager nul-bom exact content carrier and canonical history
+      ---
+      duration_ms: 134.401042
+      ...
+    # Subtest: WHAT[requirement-grounding-007] anthropic todowrite-for-manager marker-text exact content carrier and canonical history
+    ok 7 - WHAT[requirement-grounding-007] anthropic todowrite-for-manager marker-text exact content carrier and canonical history
+      ---
+      duration_ms: 137.48275
+      ...
+    1..7
+ok 77 - WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for anthropic
+  ---
+  duration_ms: 1078.65575
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for cursor
+    # Subtest: WHAT[requirement-grounding-007] cursor todowrite-for-manager crlf-blank-trailing exact content carrier and canonical history
+    ok 1 - WHAT[requirement-grounding-007] cursor todowrite-for-manager crlf-blank-trailing exact content carrier and canonical history
+      ---
+      duration_ms: 132.961084
+      ...
+    # Subtest: WHAT[requirement-grounding-007] cursor todowrite-for-manager bare-cr exact content carrier and canonical history
+    ok 2 - WHAT[requirement-grounding-007] cursor todowrite-for-manager bare-cr exact content carrier and canonical history
+      ---
+      duration_ms: 130.5755
+      ...
+    # Subtest: WHAT[requirement-grounding-007] cursor todowrite-for-manager empty exact content carrier and canonical history
+    ok 3 - WHAT[requirement-grounding-007] cursor todowrite-for-manager empty exact content carrier and canonical history
+      ---
+      duration_ms: 128.818375
+      ...
+    # Subtest: WHAT[requirement-grounding-007] cursor todowrite-for-manager no-final-lf exact content carrier and canonical history
+    ok 4 - WHAT[requirement-grounding-007] cursor todowrite-for-manager no-final-lf exact content carrier and canonical history
+      ---
+      duration_ms: 127.050333
+      ...
+    # Subtest: WHAT[requirement-grounding-007] cursor todowrite-for-manager unicode exact content carrier and canonical history
+    ok 5 - WHAT[requirement-grounding-007] cursor todowrite-for-manager unicode exact content carrier and canonical history
+      ---
+      duration_ms: 130.0885
+      ...
+    # Subtest: WHAT[requirement-grounding-007] cursor todowrite-for-manager nul-bom exact content carrier and canonical history
+    ok 6 - WHAT[requirement-grounding-007] cursor todowrite-for-manager nul-bom exact content carrier and canonical history
+      ---
+      duration_ms: 133.116917
+      ...
+    # Subtest: WHAT[requirement-grounding-007] cursor todowrite-for-manager marker-text exact content carrier and canonical history
+    ok 7 - WHAT[requirement-grounding-007] cursor todowrite-for-manager marker-text exact content carrier and canonical history
+      ---
+      duration_ms: 130.394167
+      ...
+    1..7
+ok 78 - WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for cursor
+  ---
+  duration_ms: 1078.221292
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for openai
+    # Subtest: WHAT[requirement-grounding-007] openai todowrite-for-manager crlf-blank-trailing exact content carrier and canonical history
+    ok 1 - WHAT[requirement-grounding-007] openai todowrite-for-manager crlf-blank-trailing exact content carrier and canonical history
+      ---
+      duration_ms: 132.277458
+      ...
+    # Subtest: WHAT[requirement-grounding-007] openai todowrite-for-manager bare-cr exact content carrier and canonical history
+    ok 2 - WHAT[requirement-grounding-007] openai todowrite-for-manager bare-cr exact content carrier and canonical history
+      ---
+      duration_ms: 125.958834
+      ...
+    # Subtest: WHAT[requirement-grounding-007] openai todowrite-for-manager empty exact content carrier and canonical history
+    ok 3 - WHAT[requirement-grounding-007] openai todowrite-for-manager empty exact content carrier and canonical history
+      ---
+      duration_ms: 124.684959
+      ...
+    # Subtest: WHAT[requirement-grounding-007] openai todowrite-for-manager no-final-lf exact content carrier and canonical history
+    ok 4 - WHAT[requirement-grounding-007] openai todowrite-for-manager no-final-lf exact content carrier and canonical history
+      ---
+      duration_ms: 127.830208
+      ...
+    # Subtest: WHAT[requirement-grounding-007] openai todowrite-for-manager unicode exact content carrier and canonical history
+    ok 5 - WHAT[requirement-grounding-007] openai todowrite-for-manager unicode exact content carrier and canonical history
+      ---
+      duration_ms: 124.055917
+      ...
+    # Subtest: WHAT[requirement-grounding-007] openai todowrite-for-manager nul-bom exact content carrier and canonical history
+    ok 6 - WHAT[requirement-grounding-007] openai todowrite-for-manager nul-bom exact content carrier and canonical history
+      ---
+      duration_ms: 128.03675
+      ...
+    # Subtest: WHAT[requirement-grounding-007] openai todowrite-for-manager marker-text exact content carrier and canonical history
+    ok 7 - WHAT[requirement-grounding-007] openai todowrite-for-manager marker-text exact content carrier and canonical history
+      ---
+      duration_ms: 128.593666
+      ...
+    1..7
+ok 79 - WHAT[requirement-grounding-007] registered actual JS read preserves original material bytes for openai
+  ---
+  duration_ms: 1066.35625
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered composition preserves result suffixes, orders guidance before grounding and keeps canonical X clean (anthropic)
+ok 80 - WHAT[requirement-grounding-007] registered composition preserves result suffixes, orders guidance before grounding and keeps canonical X clean (anthropic)
+  ---
+  duration_ms: 780.636041
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered composition preserves result suffixes, orders guidance before grounding and keeps canonical X clean (cursor)
+ok 81 - WHAT[requirement-grounding-007] registered composition preserves result suffixes, orders guidance before grounding and keeps canonical X clean (cursor)
+  ---
+  duration_ms: 797.078792
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered composition preserves result suffixes, orders guidance before grounding and keeps canonical X clean (openai)
+ok 82 - WHAT[requirement-grounding-007] registered composition preserves result suffixes, orders guidance before grounding and keeps canonical X clean (openai)
+  ---
+  duration_ms: 797.8085
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered composition keeps canonical suffix order when the production owner calls are reversed
+ok 83 - WHAT[requirement-grounding-007] registered composition keeps canonical suffix order when the production owner calls are reversed
+  ---
+  duration_ms: 1604.747458
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered composition proof rejects missing-guidance production wiring
+ok 84 - WHAT[requirement-grounding-007] registered composition proof rejects missing-guidance production wiring
+  ---
+  duration_ms: 1162.064834
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered composition proof rejects missing-grounding production wiring
+ok 85 - WHAT[requirement-grounding-007] registered composition proof rejects missing-grounding production wiring
+  ---
+  duration_ms: 1100.606042
+  ...
+# Subtest: WHAT[requirement-grounding-007] registered composition proof rejects reversed-delivery production wiring
+ok 86 - WHAT[requirement-grounding-007] registered composition proof rejects reversed-delivery production wiring
+  ---
+  duration_ms: 1053.155333
+  ...
+1..86
+# tests 110
+# suites 0
+# pass 108
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 1
+# duration_ms 42621.295791

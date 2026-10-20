@@ -40,7 +40,7 @@ ProviderRetryAttempt 不进入 X/Y/digest；定位当前 retry 的 request-start
 
 ## [010] guidance 原位、原字节 replay
 
-所有 provider 共用 cursor 呈现，不生成 synthetic skill 消息。guidance 只能附在**本次请求最新一条真实消息**上，且只有该消息本身承载呈现时才有载体：用户消息附于其末尾并使用无 name 属性的 `<system>` 包装；其余角色附于其 terminal 工具结果（completed/error）的 NUL+BOM 后缀。最新消息不承载载体时，本轮不生成新 occurrence，也不留下任何无法呈现的 durable 事实；不得把 occurrence 记在渲染器改不动的位置（`Before(user)`、`After(assistant 文本)` 等）上。
+所有 provider 共用 cursor 呈现，不生成 synthetic skill 消息。guidance 只能附在**本次请求最新一条真实消息**上，且只有该消息本身承载呈现时才有载体：用户消息附于其末尾并使用无 name 属性的 `<system>` 包装；其余角色附于其每个 terminal 工具结果（completed/error）的 NUL+BOM 后缀，未终结的工具 part 不附加。最新消息不承载载体时，本轮不生成新 occurrence，也不留下任何无法呈现的 durable 事实；不得把 occurrence 记在渲染器改不动的位置（`Before(user)`、`After(assistant 文本)` 等）上。
 
 用户消息的末尾文本 part 须能由同一 Host capture codec 解码为文本。被该 codec 省略的空字符串、纯空白或未识别 part 不承载新 occurrence；保留原始 Host part 的字节，也不把指导移到前面的文本 part。完全无内容的 provider 消息仍遵守 host-boundary-011 的无语义占位规则。
 
