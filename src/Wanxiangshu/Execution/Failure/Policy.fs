@@ -1,159 +1,152 @@
 namespace Wanxiangshu.Execution.Failure
 
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Participant.Provider.Attempt
 open Wanxiangshu.Execution.Session.ChatExecution
 open Wanxiangshu.Foundation.Identity
 
+/// The decision of one exact execution failure is owned by `wanxiangli/failure`
+/// (CUT-14 ①). This module only maps the host's typed facts to the library's
+/// plain input and its plain decision back; the execution key and the exact
+/// capacity fence travel by reference.
 [<RequireQualifiedAccess>]
 module ExecutionFailurePolicy =
 
-    let private requestKindIdentity =
+    type private FailureLibrary =
+        abstract decide: input: obj -> obj
+
+    [<Import("ExecutionFailurePolicy", "wanxiangli/failure")>]
+    let private failureLibraryClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : FailureLibrary = jsNative
+
+    let private library = construct failureLibraryClass
+
+    let private commitmentLabel =
+        function
+        | PersistenceCommitment.NotCommitted -> "NotCommitted"
+        | PersistenceCommitment.Committed -> "Committed"
+        | PersistenceCommitment.Unknown -> "Unknown"
+        | PersistenceCommitment.NoNewWrite -> "NoNewWrite"
+
+    let private failureView =
+        function
+        | ExecutionFailure.LocalInvariant -> box "LocalInvariant"
+        | ExecutionFailure.ProtocolRejection -> box "ProtocolRejection"
+        | ExecutionFailure.AuthorizationDenied -> box "AuthorizationDenied"
+        | ExecutionFailure.UserCancelled -> box "UserCancelled"
+        | ExecutionFailure.Superseded -> box "Superseded"
+        | ExecutionFailure.CapacityQueueFull -> box "CapacityQueueFull"
+        | ExecutionFailure.ProviderTransient -> box "ProviderTransient"
+        | ExecutionFailure.ProviderPermanent -> box "ProviderPermanent"
+        | ExecutionFailure.AcceptanceUnknown -> box "AcceptanceUnknown"
+        | ExecutionFailure.StreamInterruptedAfterFirstToken -> box "StreamInterruptedAfterFirstToken"
+        | ExecutionFailure.PersistenceFailure commitment ->
+            createObj [ "kind" ==> "PersistenceFailure"; "commitment" ==> commitmentLabel commitment ]
+
+    let private phaseLabel =
+        function
+        | DurableExecutionLifecycle.NoAcceptedFact -> "NoAcceptedFact"
+        | DurableExecutionLifecycle.AcceptedBeforeProvider -> "AcceptedBeforeProvider"
+        | DurableExecutionLifecycle.ProviderStarted -> "ProviderStarted"
+        | DurableExecutionLifecycle.Terminal -> "Terminal"
+
+    let private requestKindLabel =
         function
         | ProviderRequestKind.WorkMain -> "WorkMain"
         | ProviderRequestKind.InteractionRepair -> "InteractionRepair"
 
-    let private decisionId (facts: ProviderRecoveryFacts) =
-        [ LogicalRunId.value facts.LogicalRun
-          ProviderRunIdentity.value facts.ProviderRun
-          requestKindIdentity facts.RequestKind ]
-        |> List.map (fun value -> $"{value.Length}:{value}")
-        |> String.concat "|"
-        |> ProviderRecoveryDecisionId.Create
+    let private providerView (facts: ProviderRecoveryFacts) =
+        createObj
+            [ "logicalRun" ==> LogicalRunId.value facts.LogicalRun
+              "providerRun" ==> ProviderRunIdentity.value facts.ProviderRun
+              "requestKind" ==> requestKindLabel facts.RequestKind
+              "retryBudget"
+              ==> (match facts.RetryBudget with
+                   | ProviderRecoveryBudget.Available -> "Available"
+                   | ProviderRecoveryBudget.Exhausted -> "Exhausted")
+              "breaker"
+              ==> (match facts.Breaker with
+                   | ProviderBreakerState.Closed -> "Closed"
+                   | ProviderBreakerState.Open -> "Open") ]
 
-    let private authorization (facts: ProviderRecoveryFacts) : ProviderRecoveryAuthorization =
-        ProviderRecoveryAuthorization.Create(decisionId facts, facts.LogicalRun, facts.ProviderRun, facts.RequestKind)
-
-    let private releaseCapacity lifecycle capacity =
-        match lifecycle, capacity with
-        | _, CapacityOwnership.NoCapacityFence -> CapacitySettlement.NoCapacitySettlement
-        | DurableExecutionLifecycle.NoAcceptedFact, CapacityOwnership.OwnsExactFence _ownedFence ->
-            CapacitySettlement.NoCapacitySettlement
-        | _, CapacityOwnership.OwnsExactFence fence -> CapacitySettlement.ReleaseExactFence fence
-
-    let private retainCapacity capacity =
-        match capacity with
-        | CapacityOwnership.NoCapacityFence -> CapacitySettlement.NoCapacitySettlement
-        | CapacityOwnership.OwnsExactFence fence -> CapacitySettlement.RetainExactFence fence
-
-    let private terminalResolution key disposition lifecycle =
-        match lifecycle with
-        | DurableExecutionLifecycle.NoAcceptedFact
-        | DurableExecutionLifecycle.Terminal -> ExecutionFailureResolution.PreserveCurrentFact
-        | DurableExecutionLifecycle.AcceptedBeforeProvider ->
-            ExecutionFailureResolution.TerminalizeAcceptedPreProvider(key, disposition)
-        | DurableExecutionLifecycle.ProviderStarted ->
-            ExecutionFailureResolution.TerminalizeProviderStarted(key, disposition)
-
-    let private retryProviderResolution (key: ChatExecutionKey) (facts: ProviderRecoveryFacts) =
-        let licence = authorization facts
-
-        match facts.Breaker, facts.RetryBudget with
-        | ProviderBreakerState.Closed, ProviderRecoveryBudget.Available ->
-            ExecutionFailureResolution.RetryFreshAttempt licence
-        | _, _ ->
-            terminalResolution key ChatExecutionTerminalDisposition.Failed DurableExecutionLifecycle.ProviderStarted
-
-    let private providerResolution
-        (lifecycle: DurableExecutionLifecycle)
-        (key: ChatExecutionKey)
-        (facts: ProviderRecoveryFacts)
-        : ExecutionFailureResolution =
-        match lifecycle with
-        | DurableExecutionLifecycle.ProviderStarted -> retryProviderResolution key facts
-        | _ -> terminalResolution key ChatExecutionTerminalDisposition.Failed lifecycle
-
-    let private deriveBreaker =
+    let private fenceView =
         function
-        | ExecutionFailure.ProviderTransient -> BreakerDecision.RecordProviderTransientFailure
-        | ExecutionFailure.ProviderPermanent -> BreakerDecision.RecordProviderPermanentFailure
-        | ExecutionFailure.LocalInvariant
-        | ExecutionFailure.ProtocolRejection
-        | ExecutionFailure.AuthorizationDenied
-        | ExecutionFailure.UserCancelled
-        | ExecutionFailure.Superseded
-        | ExecutionFailure.CapacityQueueFull
-        | ExecutionFailure.AcceptanceUnknown
-        | ExecutionFailure.StreamInterruptedAfterFirstToken
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite -> BreakerDecision.NoBreakerTransition
+        | CapacityOwnership.NoCapacityFence -> null
+        | CapacityOwnership.OwnsExactFence fence -> box fence
 
-    let private deriveCapacitySettlement failure lifecycle capacity =
-        match failure with
-        | ExecutionFailure.AcceptanceUnknown
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite -> retainCapacity capacity
-        | ExecutionFailure.LocalInvariant
-        | ExecutionFailure.ProtocolRejection
-        | ExecutionFailure.AuthorizationDenied
-        | ExecutionFailure.UserCancelled
-        | ExecutionFailure.Superseded
-        | ExecutionFailure.CapacityQueueFull
-        | ExecutionFailure.ProviderTransient
-        | ExecutionFailure.ProviderPermanent
-        | ExecutionFailure.StreamInterruptedAfterFirstToken
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed -> releaseCapacity lifecycle capacity
+    let private unexpected (what: string) (value: obj) : 'T =
+        failwithf "wanxiangli/failure returned an unknown %s '%A'" what value
 
-    let private deriveFatality =
-        function
-        | ExecutionFailure.LocalInvariant
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite -> FatalityDecision.FatalAfterSettlement
-        | ExecutionFailure.ProtocolRejection
-        | ExecutionFailure.AuthorizationDenied
-        | ExecutionFailure.UserCancelled
-        | ExecutionFailure.Superseded
-        | ExecutionFailure.CapacityQueueFull
-        | ExecutionFailure.ProviderTransient
-        | ExecutionFailure.ProviderPermanent
-        | ExecutionFailure.AcceptanceUnknown
-        | ExecutionFailure.StreamInterruptedAfterFirstToken
-        | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted -> FatalityDecision.NoFatality
+    let private dispositionOf (value: obj) =
+        match unbox<string> value with
+        | "Cancelled" -> ChatExecutionTerminalDisposition.Cancelled
+        | "Rejected" -> ChatExecutionTerminalDisposition.Rejected
+        | "Failed" -> ChatExecutionTerminalDisposition.Failed
+        | _ -> unexpected "terminal disposition" value
 
-    [<Sealed>]
-    type private ExecutionFailureDecisionBuilder
-        (breaker: BreakerDecision, capacity: CapacitySettlement, fatality: FatalityDecision) =
-        member inline _.Return(resolution: ExecutionFailureResolution) : ExecutionFailureDecision =
-            { Resolution = resolution
-              Breaker = breaker
-              CapacitySettlement = capacity
-              Fatality = fatality }
+    let private decisionOf (key: ChatExecutionKey) (provider: ProviderRecoveryFacts option) (d: obj) =
+        let resolution =
+            match unbox<string> d?resolution with
+            | "PreserveCurrentFact" -> ExecutionFailureResolution.PreserveCurrentFact
+            | "AwaitAcceptanceReconciliation" -> ExecutionFailureResolution.AwaitAcceptanceReconciliation key
+            | "RetryFreshAttempt" ->
+                match provider with
+                | Some facts ->
+                    ExecutionFailureResolution.RetryFreshAttempt(
+                        ProviderRecoveryAuthorization.Create(
+                            ProviderRecoveryDecisionId.Create(unbox<string> d?authorization?decisionId),
+                            facts.LogicalRun,
+                            facts.ProviderRun,
+                            facts.RequestKind
+                        )
+                    )
+                | None -> unexpected "retry without provider facts" d?resolution
+            | "TerminalizeAcceptedPreProvider" ->
+                ExecutionFailureResolution.TerminalizeAcceptedPreProvider(key, dispositionOf d?terminalDisposition)
+            | "TerminalizeProviderStarted" ->
+                ExecutionFailureResolution.TerminalizeProviderStarted(key, dispositionOf d?terminalDisposition)
+            | _ -> unexpected "resolution" d?resolution
+
+        let breaker =
+            match unbox<string> d?breaker with
+            | "NoBreakerTransition" -> BreakerDecision.NoBreakerTransition
+            | "RecordProviderTransientFailure" -> BreakerDecision.RecordProviderTransientFailure
+            | "RecordProviderPermanentFailure" -> BreakerDecision.RecordProviderPermanentFailure
+            | _ -> unexpected "breaker decision" d?breaker
+
+        let capacity =
+            match unbox<string> d?capacitySettlement with
+            | "NoCapacitySettlement" -> CapacitySettlement.NoCapacitySettlement
+            | "RetainExactFence" -> CapacitySettlement.RetainExactFence(unbox<ExactCapacityFenceReference> d?capacityFence)
+            | "ReleaseExactFence" -> CapacitySettlement.ReleaseExactFence(unbox<ExactCapacityFenceReference> d?capacityFence)
+            | _ -> unexpected "capacity settlement" d?capacitySettlement
+
+        let fatality =
+            match unbox<string> d?fatality with
+            | "NoFatality" -> FatalityDecision.NoFatality
+            | "FatalAfterSettlement" -> FatalityDecision.FatalAfterSettlement
+            | _ -> unexpected "fatality" d?fatality
+
+        { Resolution = resolution
+          Breaker = breaker
+          CapacitySettlement = capacity
+          Fatality = fatality }
+
+    let private run failure lifecycle (key: ChatExecutionKey) capacity (provider: ProviderRecoveryFacts option) =
+        createObj
+            [ "failure" ==> failureView failure
+              "phase" ==> phaseLabel lifecycle
+              "executionKey" ==> box key
+              "capacityFence" ==> fenceView capacity
+              "provider" ==> (match provider with Some facts -> providerView facts | None -> null) ]
+        |> library.decide
+        |> decisionOf key provider
 
     let decideSupersession key lifecycle capacity : ExecutionFailureDecision =
-        { Resolution = terminalResolution key ChatExecutionTerminalDisposition.Cancelled lifecycle
-          Breaker = deriveBreaker ExecutionFailure.Superseded
-          CapacitySettlement = deriveCapacitySettlement ExecutionFailure.Superseded lifecycle capacity
-          Fatality = deriveFatality ExecutionFailure.Superseded }
+        run ExecutionFailure.Superseded lifecycle key capacity None
 
     let decide (input: ExecutionFailureInput) : ExecutionFailureDecision =
-        let breaker = deriveBreaker input.Failure
-        let capacity = deriveCapacitySettlement input.Failure input.Lifecycle input.Capacity
-        let fatality = deriveFatality input.Failure
-        let failureDecision = ExecutionFailureDecisionBuilder(breaker, capacity, fatality)
-
-        failureDecision {
-            match input.Failure with
-            | ExecutionFailure.LocalInvariant
-            | ExecutionFailure.CapacityQueueFull
-            | ExecutionFailure.StreamInterruptedAfterFirstToken ->
-                return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Failed input.Lifecycle
-            | ExecutionFailure.ProtocolRejection
-            | ExecutionFailure.AuthorizationDenied ->
-                return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Rejected input.Lifecycle
-            | ExecutionFailure.UserCancelled
-            | ExecutionFailure.Superseded ->
-                return terminalResolution input.ExecutionKey ChatExecutionTerminalDisposition.Cancelled input.Lifecycle
-            | ExecutionFailure.ProviderTransient
-            | ExecutionFailure.ProviderPermanent ->
-                return providerResolution input.Lifecycle input.ExecutionKey input.Provider
-            | ExecutionFailure.AcceptanceUnknown
-            | ExecutionFailure.PersistenceFailure PersistenceCommitment.Unknown ->
-                return ExecutionFailureResolution.AwaitAcceptanceReconciliation input.ExecutionKey
-            | ExecutionFailure.PersistenceFailure PersistenceCommitment.NotCommitted
-            | ExecutionFailure.PersistenceFailure PersistenceCommitment.Committed
-            | ExecutionFailure.PersistenceFailure PersistenceCommitment.NoNewWrite ->
-                return ExecutionFailureResolution.PreserveCurrentFact
-        }
+        run input.Failure input.Lifecycle input.ExecutionKey input.Capacity (Some input.Provider)

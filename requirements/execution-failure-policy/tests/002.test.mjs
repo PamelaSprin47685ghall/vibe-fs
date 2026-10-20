@@ -442,4 +442,15 @@ test('WHAT[execution-failure-policy-002] every phase and failure yields exactly 
   assert.equal(policy.recoveryStep(false), 'RetrySameProvider')
   assert.equal(policy.recoveryStep(true), 'BlacklistProviderThenRetry')
 })
+
+test('WHAT[execution-failure-policy-002] one failure decision owner: the host policy only adapts wanxiangli/failure', async () => {
+  // CUT-14 ①: the resolution, breaker, fence settlement and fatality of one failure are decided only by
+  // wanxiangli/failure; the host module maps typed facts in and the plain decision out.
+  const { readFileSync } = await import('node:fs')
+  const source = readFileSync(new URL('../../../src/Wanxiangshu/Execution/Failure/Policy.fs', import.meta.url), 'utf8')
+  assert.match(source, /Import\("ExecutionFailurePolicy", "wanxiangli\/failure"\)/)
+  assert.doesNotMatch(source, /deriveBreaker|deriveCapacitySettlement|deriveFatality|terminalResolution|retryProviderResolution|releaseCapacity|retainCapacity/)
+  const library = await import('wanxiangli/failure')
+  assert.equal(new library.ExecutionFailurePolicy().contractVersion, 1)
+})
 }
