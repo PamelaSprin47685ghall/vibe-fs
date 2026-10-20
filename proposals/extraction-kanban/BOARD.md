@@ -62,7 +62,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-27 | Casebook / 知识复用去向 | 产品裁决 | DECISION | CUT-06, CUT-19, CUT-24 | — | — |
 | CUT-28 | Fission 多 lane 执行 | 执行 | BACKLOG | CUT-03, CUT-10, CUT-12, CUT-13 | — | — |
 | CUT-29 | Strength / 投机调查去向 | 产品裁决 | DECISION | CUT-06, CUT-10, CUT-13, CUT-19 | — | — |
-| CUT-30 | Rulebook、指导与退化观察去向 | 产品裁决 | DECISION | CUT-03, CUT-05, CUT-16, CUT-19 | — | — |
+| CUT-30 | Rulebook、指导与退化观察去向 | 产品裁决 | DOING | CUT-03, CUT-05, CUT-16, CUT-19 | eng-cut06-goose | 2026-10-20 认领并裁决：Rulebook/Enforcer、Blogger 诊断、guidance-delivery、behavior-diagnosis 已由仓主于 6eef89d1e 删除（REMOVED）；degeneration-guard 仍生效——检测算法（加权相异计数、有界状态、分类）抽入 wanxiangli/degeneration，语料/包络派生与分词留主仓，LoopSensor 的中断/续发留作宿主组合者；CUT-16/19 前置对应的压缩/持久历史已随 Blogger 退役，现存检测无持久事实（WHAT[002][008]），不再阻塞；证据链见 cards/CUT-30.md |
 | CUT-31 | Sphinx 与认识运行时去向 | 产品裁决 | DECISION | CUT-09, CUT-10, CUT-11, CUT-13, CUT-19 | — | — |
 | CUT-32 | 可独立验证的执行设施 | 验证 | BACKLOG | CUT-00 | — | — |
 | CUT-33 | 两仓构建、打包与发布闭环 | 验证 | DONE | CUT-00 | eng-cut06-goose | 2026-10-20：按仓主现行规则（submodule + `file:wanxiangli`，禁止 .tgz）重判；库 5edd3c7 加 SPEC[build-008] exports/files/模块一致性门禁（三种变异实测报红），主仓 verify-package 实测 bundle 0.9.0 通过，指南分发段校正；gitlink 祖先校验等残项见 cards/CUT-33.md §5 |
@@ -116,6 +116,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | `src/Wanxiangshu/Process/{Pty,PtyApi,PtyBackend,PtySession,PtySupervisor,PtyTypes,Spool,ProcessOutput}.fs(.fsi)`；wanxiangli `src/pty/`、`src/spool/` | `CUT-20` | `eng-cut20-goose` | `48dff9349` | `CUT-20 完成 PTY/spool 库实现、主仓接线与旧 owner 退出` | `持有` |
 | `src/Wanxiangshu/Persistence/EventStore/{EventKWayMerge,MergeSurface,IntegratorEngine}.fs(.fsi)`、`Wanxiangshu.Owner.durable-convergence.eventstore-merge-runtime.fsproj`；wanxiangli `src/convergence/` | `CUT-19` | `eng-cut19-goose` | `ca9d710c7` / wxl `a8b89a4` | `CUT-19 KWayMerge 子范围合入 master 并更新卡片证据` | `持有` |
 | `src/Wanxiangshu/Repository/Programming/Js/DeliveredValues.fs(.fsi)`；wanxiangli `src/workrecord/`→`src/delivery/` | `CUT-06` | `eng-cut06-goose` | `993e93683` / wxl `a8b89a4` | `CUT-06 交付视图格接线合入 master 并更新卡片证据`（2026-10-20 wanxiangli 2564387 / 0.9.0，主仓接线合入） | `已释放` |
+| `src/Wanxiangshu/Execution/Session/{LoopDetector,LoopDetectorSurface}.fs(.fsi)`；wanxiangli `src/degeneration/` | `CUT-30` | `eng-cut06-goose` | `fa08a6100` / wxl `5edd3c7` | `CUT-30 检测算法接线合入 master 并更新卡片证据` | `持有` |
 
 ## 两仓集成队列
 
