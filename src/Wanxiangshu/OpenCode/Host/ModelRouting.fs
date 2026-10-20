@@ -309,6 +309,29 @@ module ModelRouting =
         | Some _ when String.IsNullOrWhiteSpace physicalUserMessageId -> None
         | Some normSessionId -> Some(normSessionId, physicalUserMessageId.Trim())
 
+    /// The `wanxiangli/run-witness` owner (CUT-10 ⑥a) of this process's exact
+    /// provider-run observations: the latest run → target witness per session,
+    /// run → (session, physical user message), and the single-consumption
+    /// recovery retry binding. Targets are stored and handed back by reference.
+    type private ProviderRunWitnessLibrary =
+        abstract remember: sessionId: string * providerRun: string * target: obj -> unit
+        abstract take: providerRun: string -> obj
+        abstract retainForRetry: sessionId: string * providerRun: string -> obj
+        abstract takeRetry: sessionId: string -> obj
+        abstract rememberStep: sessionId: string * physicalUserMessageId: string * providerRun: string -> unit
+        abstract stepOf: providerRun: string -> obj
+        abstract forgetSession: sessionId: string -> unit
+        abstract forgetPhysical: sessionId: string * physicalUserMessageId: string -> unit
+
+    [<Import("ProviderRunWitness", "wanxiangli/run-witness")>]
+    let private providerRunWitnessClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private constructWitness (cls: obj) : ProviderRunWitnessLibrary = jsNative
+
+    let private targetOrNone (value: obj) : ModelRoutingTarget option =
+        if isNull value then None else Some(unbox<ModelRoutingTarget> value)
+
     let private targetProvider (target: ModelRoutingTarget) =
         target.Model.Substring(0, target.Model.IndexOf '/')
 
@@ -323,19 +346,13 @@ module ModelRouting =
         let activeProviderStepTasks = Dictionary<string, Task>()
         let continuationInputs = Dictionary<string * string, ExecutionAdmissionLease>()
         let heldPhysicalReleases = HashSet<string * string>()
-        // DSL-MUTABLE: resource — one exact provider-run witness per live session
-        let targetByProviderRun = Dictionary<string, struct (string * ModelRoutingTarget)>()
-        let latestProviderRunBySession = Dictionary<string, string>()
-        // DSL-MUTABLE: resource — exact provider-run → (session, physical user message).
-        // Written only from the authoritative Host start observation or the exact
-        // provider-step end; a tool boundary reads it by the run id the Host put
-        // in its own tool context, so a stale tool call can never release the
-        // step of a newer execution.
-        let providerStepIdentityByRun = Dictionary<string, struct (string * string)>()
-        // DSL-MUTABLE: resource — one recovery retry target per session: the
-        // single-consumption binding written when a confirmed provider failure
-        // keeps its target (provider-attempt-recovery-021). Consumed by the next fresh admission.
-        let recoveryRetryTargetBySession = Dictionary<string, ModelRoutingTarget>()
+        // One exact provider-run witness per live session, the exact provider-run →
+        // (session, physical user message) relation (written only from the
+        // authoritative Host start observation or the exact provider-step end, so a
+        // stale tool call can never release the step of a newer execution) and the
+        // single-consumption recovery retry binding (provider-attempt-recovery-021)
+        // are owned by wanxiangli/run-witness.
+        let witness = constructWitness providerRunWitnessClass
         // DSL-MUTABLE: resource — bound ModelTarget per DevOps session (execution-model-routing-019 / managed-session-lifecycle-024 / interaction-authority-022)
         let boundDevopsTargetBySession = Dictionary<string, ModelRoutingTarget>()
         // DSL-MUTABLE: resource — superseded physical user message identities per session
@@ -401,63 +418,42 @@ module ModelRouting =
                 |> Option.map snd
             | false, _ -> None
 
-        let retireProviderRunTarget sessionId =
-            match latestProviderRunBySession.TryGetValue sessionId with
-            | true, providerRun ->
-                latestProviderRunBySession.Remove sessionId |> ignore
-                targetByProviderRun.Remove providerRun |> ignore
-            | false, _ -> ()
-
         let rememberProviderRunTarget sessionId physicalUserMessageId providerRun =
             match activeBySession.TryGetValue sessionId with
             | true, lease when lease.PhysicalUserMessageId = Some physicalUserMessageId ->
-                retireProviderRunTarget sessionId
-                targetByProviderRun.[providerRun] <- struct (sessionId, lease.Target)
-                latestProviderRunBySession.[sessionId] <- providerRun
-            | _ -> ()
-
-        let forgetLatestProviderRunIfCurrent sessionId providerRun =
-            match latestProviderRunBySession.TryGetValue sessionId with
-            | true, latest when latest = providerRun -> latestProviderRunBySession.Remove sessionId |> ignore
+                witness.remember (sessionId, providerRun, box lease.Target)
             | _ -> ()
 
         let takeProviderRunWitness providerRun =
-            match targetByProviderRun.TryGetValue providerRun with
-            | true, struct (sessionId, target) ->
-                targetByProviderRun.Remove providerRun |> ignore
-                forgetLatestProviderRunIfCurrent sessionId providerRun
-                Some(sessionId, target)
-            | false, _ -> None
+            let view = witness.take providerRun
+
+            if isNull view then
+                None
+            else
+                Some(unbox<string> view?sessionId, unbox<ModelRoutingTarget> view?target)
 
         let takeProviderRunTarget providerRun =
             takeProviderRunWitness providerRun |> Option.map snd
 
         /// Exact (session, physical user message) for one Host-observed provider
-        /// run. Written only here and by the authoritative start observation; a
-        /// lookup for a run this process never observed yields None, and the
-        /// caller must not guess a session-current substitute.
+        /// run. A lookup for a run this process never observed yields None, and
+        /// the caller must not guess a session-current substitute.
         let rememberProviderStepIdentity sessionId physicalUserMessageId providerRun =
-            providerStepIdentityByRun.[providerRun] <- struct (sessionId, physicalUserMessageId)
+            witness.rememberStep (sessionId, physicalUserMessageId, providerRun)
 
         let tryProviderStepIdentity providerRun =
-            match providerStepIdentityByRun.TryGetValue providerRun with
-            | true, struct (sessionId, physicalUserMessageId) -> Some(sessionId, physicalUserMessageId)
-            | false, _ -> None
+            let view = witness.stepOf providerRun
+
+            if isNull view then
+                None
+            else
+                Some(unbox<string> view?sessionId, unbox<string> view?physicalUserMessageId)
 
         let takeRecoveryRetryTarget sessionId =
-            match recoveryRetryTargetBySession.TryGetValue sessionId with
-            | true, target ->
-                recoveryRetryTargetBySession.Remove sessionId |> ignore
-                Some target
-            | false, _ -> None
+            witness.takeRetry sessionId |> targetOrNone
 
         let retainFailedTargetOfRun sessionId providerRun =
-            match takeProviderRunWitness providerRun with
-            | Some(witnessSession, target) when witnessSession = sessionId ->
-                recoveryRetryTargetBySession.[sessionId] <- target
-                Some target
-            | Some _
-            | None -> None
+            witness.retainForRetry (sessionId, providerRun) |> targetOrNone
 
         let markProviderOfTarget (target: ModelRoutingTarget) =
             if not (isNull markFailedFn) && isFunction markFailedFn then
@@ -658,8 +654,6 @@ module ModelRouting =
 
         let retireCurrentExecution sessionId =
             let changed = activeBySession.Remove sessionId
-            retireProviderRunTarget sessionId
-            recoveryRetryTargetBySession.Remove sessionId |> ignore
             leasePurposeBySession.Remove sessionId |> ignore
 
             continuationInputs.Keys
@@ -672,17 +666,12 @@ module ModelRouting =
             |> Seq.toArray
             |> Array.iter (fun key -> heldPhysicalReleases.Remove key |> ignore)
 
-            // The exact run->physical relations of this session's retired
-            // execution are process-local observations of an execution that no
-            // longer exists; keeping them would let a later tool call end a step
-            // of an execution the capacity owner already settled.
-            providerStepIdentityByRun.Keys
-            |> Seq.filter (fun run ->
-                match providerStepIdentityByRun.TryGetValue run with
-                | true, struct (runSession, _) -> runSession = sessionId
-                | false, _ -> false)
-            |> Seq.toArray
-            |> Array.iter (fun run -> providerStepIdentityByRun.Remove run |> ignore)
+            // The latest witness, the retry binding and the exact run->physical
+            // relations of this session's retired execution are process-local
+            // observations of an execution that no longer exists; keeping them
+            // would let a later tool call end a step of an execution the capacity
+            // owner already settled.
+            witness.forgetSession sessionId
 
             capacity.ReleaseSession sessionId |> ignore
 
@@ -1747,15 +1736,7 @@ module ModelRouting =
         member internal _.ReleasePhysicalExecution(sessionId: string, physicalUserMessageId: string) =
             normalizePhysicalExecutionKey sessionId physicalUserMessageId
             |> Option.map (fun normKey ->
-                lock gate (fun () ->
-                    providerStepIdentityByRun.Keys
-                    |> Seq.filter (fun run ->
-                        match providerStepIdentityByRun.TryGetValue run with
-                        | true, struct (runSession, runPhysical) ->
-                            runSession = fst normKey && runPhysical = snd normKey
-                        | false, _ -> false)
-                    |> Seq.toArray
-                    |> Array.iter (fun run -> providerStepIdentityByRun.Remove run |> ignore))
+                lock gate (fun () -> witness.forgetPhysical (fst normKey, snd normKey))
 
                 lock gate (fun () ->
                     releaseContinuationInputLocked normKey

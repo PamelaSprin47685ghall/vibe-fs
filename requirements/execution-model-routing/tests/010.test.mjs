@@ -671,6 +671,10 @@ test('WHAT[execution-model-routing-010] EMR_010_borrowing_complexity_is_owned_on
   assert.doesNotMatch(adapter, /routeDecision|recordRoutedCredit|ownedTokenByExecution|creditSourceByExecution|TokenState|CapacityLedger/)
   assert.match(routing, /BorrowingCapacity<ModelRoutingTarget>/)
   assert.doesNotMatch(routing, /routeDecision|recordRoutedCredit|ownedTokenByExecution|creditSourceByExecution/)
+  // CUT-10 ⑥a: the provider-run witness, run step identity and recovery retry binding are owned by
+  // wanxiangli/run-witness; the host runtime must not keep its own maps for them.
+  assert.match(routing, /Import\("ProviderRunWitness", "wanxiangli\/run-witness"\)/)
+  assert.doesNotMatch(routing, /targetByProviderRun|latestProviderRunBySession|providerStepIdentityByRun|recoveryRetryTargetBySession/)
 
   for (const main of [sessions, binding, transform, host]) {
     assert.doesNotMatch(main, /routeDecision|recordRoutedCredit|ownedTokenByExecution|creditSourceByExecution|CapacityCreditState|CapacityStepDemand/)
