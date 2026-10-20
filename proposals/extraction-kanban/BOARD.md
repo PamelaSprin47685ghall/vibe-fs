@@ -42,7 +42,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-07 | 参与者身份与执行绑定分离 | 权威 | DONE | CUT-00 | eng-cut07b-goose（接手 eng-cut07-goose） | 2026-10-20 wanxiangli 54dcc34 / 0.11.0 identity；主仓切换合入 master，旧 owner 退出；Origin/IdentitySeed 接线移交 CUT-09，ExecutionBinding 接线移交 CUT-10/12；证据 cards/CUT-07.md §11 |
 | CUT-08 | 能力事实与双侧门禁 | 权威 | DOING | CUT-07 | eng-cut08c-goose（接手 eng-cut07b-goose；其工作树 cut/CUT-08 干净、HEAD b40dd6efa 已在 master，无运行进程） | 2026-10-21 已合入两段：矩阵与 Manager 事实门禁（wanxiangli 0.18.0）；能力↔工具名唯一映射 + StaticTools 冗余覆写删除（0.20.0）；余项见 cards/CUT-08.md §5 |
 | CUT-09 | 来源、逻辑根与关闭权威 | 权威 | BACKLOG | CUT-07 | — | — |
-| CUT-10 | 模型路由与精确容量许可 | 执行 | BACKLOG | CUT-07 | — | — |
+| CUT-10 | 模型路由与精确容量许可 | 执行 | DOING | CUT-07 | eng-cut10-goose | 2026-10-21 认领：子范围①调度器 ABI（协议版本、导出形状、target 解码、同步调用、理论容量查询）抽入 wanxiangli/routing；②容量账本与 provider-step 许可随后。写集合 `OpenCode/Host/ModelRouting.fs(.fsi)` 的 ABI 段、`OpenCode/Host/ModelCapacity/*`；wanxiangli `src/routing/` |
 | CUT-11 | 派发认领与外部效果记账 | 执行 | BACKLOG | CUT-09, CUT-10 | — | — |
 | CUT-12 | 会话关联与执行事实 | 执行 | BACKLOG | CUT-04, CUT-11 | — | — |
 | CUT-13 | 委派、复用与结果认领 | 执行 | BACKLOG | CUT-06, CUT-12 | — | — |
