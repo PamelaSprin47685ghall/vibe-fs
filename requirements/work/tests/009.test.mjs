@@ -24,11 +24,17 @@ test('WHAT[work-009] a live owned resource blocks deliver without retiring', () 
 test('WHAT[work-009] the second deliver reports the live blocker instead of reporting an end', async () => {
   await withReview(async ({ hooks, runtime, session, execute }) => {
     await execute(scores('REVISE'))
-    const forked = await hooks.tool.fork.execute(
-      { calling: 'engineer', name: 'Ada', charge: 'implement' },
-      { sessionID: session, callID: 'call-fork', messageID: 'run-fork', agent: 'manager' },
+    // 派工是编程面成员：`this.fork(payload, reportMapping)`，宿主不再注册 fork 工具。
+    const forked = await hooks.tool['todowrite-for-manager'].execute(
+      {
+        program:
+          'class Js extends JsProgram { async run() { return await this.fork({ calling: "engineer", name: "Ada", charge: "implement" }, { 1: null }); } }',
+      },
+      { sessionID: session, agent: 'manager' },
     )
-    assert.match(String(forked), /carries this charge now|现已接下这项托付/)
+    assert.match(String(forked), /ok = true/)
+    assert.match(String(forked), /name = "Ada"/)
+    assert.match(String(forked), /outcome = "created"/)
     // The first call only confirms; Algorithm E4 does not read the blocker set.
     assert.match(
       await hooks.tool.deliver.execute({}, { sessionID: session, callID: 'deliver-confirm', messageID: 'run-confirm', agent: 'manager' }),
