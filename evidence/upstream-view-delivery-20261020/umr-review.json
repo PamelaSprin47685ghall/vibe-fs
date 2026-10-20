@@ -1,5 +1,5 @@
 {
-  "state": "VALIDATING_FINAL_CANDIDATE",
+  "state": "REVIEW_COMPLETE_DRAFT_PR_OPEN",
   "startedAt": "2026-10-21",
   "sourceBase": "0831239737c56a6eb36b96b663ffa46e0cafdfdd",
   "upstreamTarget": "11052493bedb4edbcbe0c341fa677afd44c486f1",
@@ -489,8 +489,67 @@
       "log": "umr-review-ci-f042-failed.log"
     },
     "githubCi": {
-      "state": "AWAITING_PUSH_OF_REMAINING_COMPILER_CASES",
-      "note": "The eleven test files that reference compileOwnerProject were inspected. The three changed files and dispatch boundary control passed 116 assertions under the original formal supervisor and CI file concurrency. Full Ubuntu acceptance remains pending."
+      "state": "completed",
+      "conclusion": "success",
+      "sourceCommit": "b73221cca534b901789c4124224e2e44d2604599",
+      "runId": 39497754975,
+      "url": "https://github.com/dyx13/vibe-fs/actions/runs/39497754975",
+      "jobStartedAt": "2026-10-20T21:07:17Z",
+      "jobCompletedAt": "2026-10-20T21:21:01Z",
+      "releaseSeconds": 785.4,
+      "exit": 0,
+      "phases": {
+        "format:check": {
+          "status": "passed",
+          "seconds": 7.0
+        },
+        "check": {
+          "status": "passed",
+          "seconds": 5.0
+        },
+        "build": {
+          "status": "passed",
+          "seconds": 77.4
+        },
+        "unit": {
+          "status": "passed",
+          "seconds": 230.6
+        },
+        "integration": {
+          "status": "passed",
+          "seconds": 445.8
+        },
+        "e2e": {
+          "status": "passed",
+          "seconds": 13.1
+        },
+        "package": {
+          "status": "passed",
+          "seconds": 4.7
+        }
+      },
+      "unit": {
+        "passed": 4379,
+        "failed": 0,
+        "skipped": 194,
+        "todo": 277,
+        "plannedFiles": 756,
+        "drainedFiles": 756,
+        "reclamationAccepted": true
+      },
+      "integration": {
+        "passed": 708,
+        "failed": 0,
+        "skipped": 23,
+        "todo": 7,
+        "plannedFiles": 40,
+        "drainedFiles": 40,
+        "reclamationAccepted": true
+      },
+      "todoPolicy": "Existing CI WXS_ACCEPT_TODO=1. Skipped and TODO cases are not passes; this does not close historical formal-proof gaps.",
+      "log": "umr-review-ci-b732-passed.log",
+      "metadata": "umr-review-ci-b732-result.json",
+      "scope": "The complete workflow passed for this exact source commit. The final receipt commit only adds JSON and raw logs; it is not the tested source commit."
     },
     "githubCiBeforeStepFix": {
       "state": "completed",
@@ -699,6 +758,11 @@
     {
       "id": "COMPILER-FAN-OUT",
       "change": "Expose all process contract probes and Host boundary probes as awaited assertion cases. Run the nine independent source-visibility compilers sequentially within their file, retaining file-level concurrency and all original checks."
+    },
+    {
+      "id": "FULL-RELEASE",
+      "change": "All required GitHub release verification phases passed for source commit b73221cca534b901789c4124224e2e44d2604599 without changing timeout limits, gate baselines, or the existing TODO policy.",
+      "evidence": "umr-review-ci-b732-passed.log"
     }
   ],
   "remaining": [
@@ -722,12 +786,11 @@
         "conflictedPaths": 56
       },
       "finalTrial": {
-        "head": "aa8a5ab1a9d709250a2895682aee08c7c7639fc4",
+        "head": "b73221cca534b901789c4124224e2e44d2604599",
         "base": "981008460c4518d9fca2f38054dc083e161a75db",
         "exit": 1,
         "conflictedPaths": 88,
-        "log": "umr-review-upstream-pr-preview.log",
-        "observedAt": "2026-10-20T20:47:27.143868+00:00"
+        "log": "umr-review-upstream-pr-final.log"
       },
       "priorReviewTrial": {
         "head": "85274a7e6cdf1a7911a3c2cc702c780fd5f100ab",
@@ -736,12 +799,6 @@
         "conflictedPaths": 72,
         "log": "umr-review-upstream-conflicts-final.log"
       }
-    },
-    {
-      "id": "FULL-RELEASE",
-      "priority": "P1",
-      "impact": "Static check and targeted regression do not prove complete release or GitHub CI acceptance.",
-      "action": "Keep complete release acceptance false until every required phase has authoritative passing evidence."
     },
     {
       "id": "GAP-123/133/149/153/158/160",
@@ -786,8 +843,22 @@
       }
     }
   ],
-  "pr": null,
-  "fullReleaseAccepted": false,
+  "pr": {
+    "number": 62,
+    "url": "https://github.com/PamelaSprin47685ghall/vibe-fs/pull/62",
+    "state": "OPEN",
+    "isDraft": true,
+    "baseRepository": "PamelaSprin47685ghall/vibe-fs",
+    "baseRefName": "master",
+    "headRepository": "dyx13/vibe-fs",
+    "headRefName": "codex/upstream-plan-20261020",
+    "headAtCreation": "b73221cca534b901789c4124224e2e44d2604599",
+    "mergeableAtCreation": "CONFLICTING",
+    "mergeStateStatusAtCreation": "DIRTY",
+    "attachedToTask": true,
+    "scope": "Fixed upstream target 11052493b plus reviewed repairs. Subsequent upstream commits remain a separate integration batch."
+  },
+  "fullReleaseAccepted": true,
   "deployment": {
     "performed": false,
     "originalWorktreeChanged": false,
@@ -809,14 +880,29 @@
     "generatedInputDigest": "2ca568febaf7a88aff7ab281af40997335cd906168c8e46f03e63e353e271b4b",
     "artifactsInputDigest": "08a9fdfc1cd8b200bc6d7cd7c6f447b9a31a0324b15c1de6d7314b86126de225"
   },
-  "sourceCommit": "aa8a5ab1a9d709250a2895682aee08c7c7639fc4",
+  "sourceCommit": "b73221cca534b901789c4124224e2e44d2604599",
   "push": {
-    "originMaster": "f04201465dee7f1cb8e93094097ba12ccaef3b8f",
+    "originMaster": "b73221cca534b901789c4124224e2e44d2604599",
     "originPrBranch": "codex/upstream-plan-20261020",
     "atomic": true,
     "force": false,
     "transport": "existing SSH identity",
-    "httpsAttempt": "GitHub rejected the OAuth token because workflow scope was absent; no remote refs changed by that atomic attempt."
+    "httpsAttempt": "GitHub rejected the OAuth token because workflow scope was absent; no remote refs changed by that atomic attempt.",
+    "originPrBranchCommit": "b73221cca534b901789c4124224e2e44d2604599",
+    "scope": "Verified source push. A later receipt-only commit can follow without changing this tested source."
   },
-  "sourceCommitNote": "Remaining independent compile case boundaries and bounded compiler concurrency are staged on this commit."
+  "fullReleaseAcceptanceScope": "Existing GitHub CI release policy at the exact source commit; no claim of completed formal proof, hostile-JS isolation, or mergeability with later upstream.",
+  "readyForDeployment": false,
+  "readyToMergeIntoObservedUpstream": false,
+  "receiptOnlyUpdate": {
+    "sourceCommit": "b73221cca534b901789c4124224e2e44d2604599",
+    "allowedPaths": [
+      "evidence/upstream-view-delivery-20261020/umr-review.json",
+      "evidence/upstream-view-delivery-20261020/umr-review-ci-b732-passed.log",
+      "evidence/upstream-view-delivery-20261020/umr-review-ci-b732-result.json",
+      "evidence/upstream-view-delivery-20261020/umr-review-upstream-pr-final.log"
+    ],
+    "sourceTestsAndBuildConfigurationChanged": false,
+    "policy": "The complete passing CI remains bound to the source commit above. Do not claim a later receipt-only commit passed until its own run completes."
+  }
 }
