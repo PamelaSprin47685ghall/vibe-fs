@@ -64,7 +64,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-29 | Strength / 投机调查去向 | 产品裁决 | DECISION | CUT-06, CUT-10, CUT-13, CUT-19 | — | — |
 | CUT-30 | Rulebook、指导与退化观察去向 | 产品裁决 | DONE | CUT-03, CUT-05, CUT-16, CUT-19 | eng-cut06-goose | 2026-10-20 裁决并完成：Rulebook/Enforcer、Blogger 诊断、guidance-delivery、behavior-diagnosis 已由仓主于 6eef89d1e 删除（REMOVED）；degeneration-guard 检测算法已抽入 wanxiangli/degeneration 0.12.0（a0f0de9），LoopDetector 改为组合者，语料/包络派生与分词、LoopSensor 中断/续发留主仓；差分逐位相等，见 cards/CUT-30.md |
 | CUT-31 | Sphinx 与认识运行时去向 | 产品裁决 | DECISION | CUT-09, CUT-10, CUT-11, CUT-13, CUT-19 | — | — |
-| CUT-32 | 可独立验证的执行设施 | 验证 | BACKLOG | CUT-00 | — | — |
+| CUT-32 | 可独立验证的执行设施 | 验证 | DOING | CUT-00 | eng-cut06-goose | 2026-10-20 认领：盘点现有 supervisor/独立构建与本卡反例的证明映射，为切刀提供窄而完整的验证入口 |
 | CUT-33 | 两仓构建、打包与发布闭环 | 验证 | DONE | CUT-00 | eng-cut06-goose | 2026-10-20：按仓主现行规则（submodule + `file:wanxiangli`，禁止 .tgz）重判；库 5edd3c7 加 SPEC[build-008] exports/files/模块一致性门禁（三种变异实测报红），主仓 verify-package 实测 bundle 0.9.0 通过，指南分发段校正；gitlink 祖先校验等残项见 cards/CUT-33.md §5 |
 | CUT-34 | OpenCode 适配边界 | 宿主 | BACKLOG | CUT-11, CUT-12, CUT-17, CUT-25 | — | — |
 | CUT-35 | 顶层组装与逐域恢复 | 宿主 | BACKLOG | CUT-13, CUT-14, CUT-16, CUT-17, CUT-19, CUT-22, CUT-23, CUT-27, CUT-28, CUT-29, CUT-30, CUT-31, CUT-34 | — | — |
