@@ -4,7 +4,7 @@
 
 ## 1. 当前状态与前置核对
 
-- **当前列状态**：`BACKLOG`（已完成全量路径与调用链盘点，待前置卡就绪后转 `READY`）
+- **当前列状态**：`DOING`（2026-10-21 由 `eng-cut17f-goose` 认领；先做前置已 DONE 的部分，CUT-11/12/25 相邻能力待其 DONE 后接续）
 - **所属泳道 / 波次**：宿主 / W5
 - **切换前置**：`CUT-11`（派发认领与外部效果记账）、`CUT-12`（会话关联与执行事实）、`CUT-17`（请求投影与信息边界）、`CUT-25`（受限 JS 编程面与执行组合）
 - **关联决策护栏**：受 `D-07` 约束——OpenCode SDK 与 Hook 适配能力留在主仓明确适配层，不要求另发布一个独立 npm 包；内核与独立库绝不反向导入 OpenCode 适配层。
@@ -97,3 +97,13 @@ node --test requirements/host-boundary/tests/*.test.mjs requirements/host-provid
 node scripts/checks/hook-policy.mjs
 node scripts/check.mjs
 ```
+
+## 10. 施工记录
+
+### 子范围①：宿主 SDK 只在适配区被消费（静态门禁，eng-cut17f-goose）
+
+- 现状核对（master `3e6f71c33`）：`@opencode-ai/*` 导入只在 `OpenCode/Codec/ToolHostCodec.fs`、`OpenCode/Host/PluginHostInterop.fs`；SDK `client` 句柄（`?client`、`client.session`/`client?…`）只在 `OpenCode/Host/{OpenCodePort,SessionSnapshotPort}.fs`、`OpenCode/Plugin/PluginHooks.fs`、`OpenCode/Signals/HostSignalSubscribe.fs`。退出条件前半句在代码上已经成立，但此前没有门禁：原 `architecture.mjs` ⑤ 只看 `Foundation/`。
+- 改动：`scripts/checks/architecture.mjs` 新增 ⑦ `host-sdk-boundary`：适配区（`OpenCode/{Codec,Host,Signals,Plugin}/`、`Host/`）以外的生产 `.fs` 一旦导入 `@opencode-ai/` 或触碰 SDK `client` 句柄即 fail-closed。随 `scripts/check.mjs` 运行。
+- 反例/负控（`evidence/CUT-34/sdk-boundary-negative.mjs`，`.txt`）：真实树 0 违规；在业务文件 `Mission/Work/Contract.fs` 上分别植入 SDK 导入、`input?client`、`client.session`、`client?session?list` 四种越界，各报 1 条违规；正控：门禁正则在真实适配文件 `OpenCodePort.fs`、`SessionSnapshotPort.fs` 上确实命中（排除适配区才不报）。
+- 全量静态检查 `node scripts/check.mjs`：base（未改）与 candidate 输出逐行相同（两边都因既有的 test 层 `deep-dist-import`/`du-shape` 报告返回 1，与本刀无关）。
+- 未覆盖（如实记录）：退出条件后半句“内核不导入本层”——`Composition/Turn`、`Interaction/Dispatch`、`Execution/{Delegation,Session}`、`Context/{Prefix,Trace,Companion}` 等仍 `open Wanxiangshu.OpenCode` 以使用 `ProviderWireDecode`/`ProviderWireCapture`/`HostMessageProjection` 等宿主 codec；其中大半属于 CUT-11/12/25 写集合，待这些卡 DONE 后逐一收窄，本刀不动。

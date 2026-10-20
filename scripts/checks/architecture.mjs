@@ -14,6 +14,11 @@ const PURE_DIRS = [`${PRODUCTION_ROOT}/Foundation/`]
 const RESOURCE_DIR = `${PRODUCTION_ROOT}/Resources/`
 const UPPER_NAMESPACES = ['Wanxiangshu.OpenCode', 'Wanxiangshu.Session', 'Wanxiangshu.Process']
 const PACKAGE_RESOURCE_READ = /PackageResources\./
+const HOST_ADAPTER_DIRS = ['Codec', 'Host', 'Signals', 'Plugin']
+  .map((dir) => `${PRODUCTION_ROOT}/OpenCode/${dir}/`)
+  .concat([`${PRODUCTION_ROOT}/Host/`])
+const HOST_SDK_IMPORT = /@opencode-ai\//
+const HOST_SDK_CLIENT = /\?client\b|\bclient\s*(?:\?|\.(?:session|event|app|config|tui|find|file|project|path)\b)/
 
 const norm = (path) => path.replace(/\\/g, '/')
 const isFs = (path) => path.endsWith('.fs')
@@ -96,6 +101,19 @@ export function scanArchitecture(productionFiles, read) {
     if (file.startsWith(RESOURCE_DIR)) continue
     if (PACKAGE_RESOURCE_READ.test(read(file))) {
       fail('resource-boundary', `${file}: package resource I/O must live under ${RESOURCE_DIR}`)
+    }
+  }
+
+  // ⑦ Host SDK is consumed only inside the explicit adapter area (CUT-34, D-07):
+  // `@opencode-ai/*` imports and the SDK `client` handle stay in OpenCode/{Host,Codec,Signals,Plugin}/ or Host/.
+  for (const file of productionFs) {
+    if (HOST_ADAPTER_DIRS.some((dir) => file.startsWith(dir))) continue
+    const text = read(file)
+    if (HOST_SDK_IMPORT.test(text)) {
+      fail('host-sdk-boundary', `${file}: imports the OpenCode SDK outside the adapter area`)
+    }
+    if (HOST_SDK_CLIENT.test(text)) {
+      fail('host-sdk-boundary', `${file}: touches the OpenCode SDK client outside the adapter area`)
     }
   }
 
