@@ -48,7 +48,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-13 | 委派、复用与结果认领 | 执行 | BACKLOG | CUT-06, CUT-12 | — | — |
 | CUT-14 | 失败预算、恢复决议与结算 | 执行 | BACKLOG | CUT-10, CUT-11, CUT-12 | — | — |
 | CUT-15 | 前缀世代与候选提交 | 上下文 | DOING | CUT-03 | eng-cut15-goose | — |
-| CUT-16 | 压缩覆盖与 checkpoint | 上下文 | BACKLOG | CUT-03, CUT-06, CUT-15 | — | — |
+| CUT-16 | 压缩覆盖与 checkpoint | 上下文 | DOING | CUT-03, CUT-06, CUT-15 | eng-cut06b-goose | 2026-10-20 认领子范围①：ANCHOR 视图覆盖定律（view 声明形状、存活锚点分区、永久区间替换的计划与折叠）抽入 wanxiangli/compression；编号台账、o200k 计量、宿主消息重建留主仓。写集合 `Repository/Programming/Js/Anchor/*`，与 CUT-15 的 `Context/Prefix`、`HostCompactionGate` 不相交；checkpoint/todo hook 子范围待 CUT-15 落地后 |
 | CUT-17 | 请求投影与信息边界 | 表达 | BACKLOG | CUT-05, CUT-06, CUT-08, CUT-15, CUT-16 | — | — |
 | CUT-18 | 规范事实编码与校验 | 存储 | DONE | CUT-00 | eng-cut18 | 2026-10-15 主线提交 2f98049e5：wanxiangli events 模块合入 0.7.0，库侧 34 测试 + durable-events 244 项回归全绿，证据链见 cards/CUT-18.md §10 |
 | CUT-19 | 多 writer 存储与收敛 | 存储 | DOING | CUT-18 | eng-cut19b-goose | 2026-10-20 交接：eng-cut19-goose 已退出（其工作树 cut/CUT-19 干净、与 master 同步，无运行进程），由 eng-cut19b-goose 接手 §10 后续子范围。子范围①结构 k-way 归并（wanxiangli/convergence 0.14.0，主仓 b7d45b063）与②整条 writer UTC 日保留规则（wanxiangli/retention 0.16.0）已接回真实链，各带一个旧实现上会红的反例；段追加/活动判定/校验收敛仍在主仓，见 cards/CUT-19.md §10 |
