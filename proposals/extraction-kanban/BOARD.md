@@ -69,7 +69,7 @@ BLOCKED 不另吞掉原列：写 `DOING + BLOCKED`，保留 owner、阻塞原因
 | CUT-34 | OpenCode 适配边界 | 宿主 | BACKLOG | CUT-11, CUT-12, CUT-17, CUT-25 | — | — |
 | CUT-35 | 顶层组装与逐域恢复 | 宿主 | BACKLOG | CUT-13, CUT-14, CUT-16, CUT-17, CUT-19, CUT-22, CUT-23, CUT-27, CUT-28, CUT-29, CUT-30, CUT-31, CUT-34 | — | — |
 | CUT-36 | 第二宿主真实 canary | 可选 | OPTIONAL | CUT-34, CUT-35 | — | — |
-| CUT-37 | 消融、诊断与实测成本 | 验证 | BACKLOG | CUT-00 | — | — |
+| CUT-37 | 消融、诊断与实测成本 | 验证 | DOING | CUT-00 | eng-cut06-goose | 2026-10-20 认领：消融 DAG 定律（节点注册校验、环检测、三态边约束）抽入 wanxiangli/ablation，清单/配置读取、门禁投影、诊断与成本观测留主仓 |
 | CUT-38 | 全仓残余职责与终局交账 | 收尾 | BACKLOG | CUT-00, CUT-01, CUT-02, CUT-03, CUT-04, CUT-05, CUT-06, CUT-07, CUT-08, CUT-09, CUT-10, CUT-11, CUT-12, CUT-13, CUT-14, CUT-15, CUT-16, CUT-17, CUT-18, CUT-19, CUT-20, CUT-21, CUT-22, CUT-23, CUT-24, CUT-25, CUT-26, CUT-27, CUT-28, CUT-29, CUT-30, CUT-31, CUT-32, CUT-33, CUT-34, CUT-35, CUT-37 | — | — |
 
 CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所需的补足在各卡内执行。完成 CUT-00 和本卡接线准备后，可认领并直接进入 INTEGRATING；发现基础协议不成立时回退 DOING，不用历史测试成绩代替新需求。
@@ -117,6 +117,7 @@ CUT-02/03/04 的 LIB_READY 仅指现有基础版；满足主仓更大契约所�
 | `src/Wanxiangshu/Persistence/EventStore/{EventKWayMerge,MergeSurface,IntegratorEngine}.fs(.fsi)`、`Wanxiangshu.Owner.durable-convergence.eventstore-merge-runtime.fsproj`；wanxiangli `src/convergence/` | `CUT-19` | `eng-cut19-goose` | `ca9d710c7` / wxl `a8b89a4` | `CUT-19 KWayMerge 子范围合入 master 并更新卡片证据` | `持有` |
 | `src/Wanxiangshu/Repository/Programming/Js/DeliveredValues.fs(.fsi)`；wanxiangli `src/workrecord/`→`src/delivery/` | `CUT-06` | `eng-cut06-goose` | `993e93683` / wxl `a8b89a4` | `CUT-06 交付视图格接线合入 master 并更新卡片证据`（2026-10-20 wanxiangli 2564387 / 0.9.0，主仓接线合入） | `已释放` |
 | `src/Wanxiangshu/Execution/Session/{LoopDetector,LoopDetectorSurface}.fs(.fsi)`；wanxiangli `src/degeneration/` | `CUT-30` | `eng-cut06-goose` | `fa08a6100` / wxl `5edd3c7` | `CUT-30 检测算法接线合入 master 并更新卡片证据` | `已释放` |
+| `src/Wanxiangshu/Ablation/Manifest.fs(.fsi)`；wanxiangli `src/ablation/` | `CUT-37` | `eng-cut06-goose` | `5d725ef97` / wxl `4f8e316` | `CUT-37 消融 DAG 定律接线合入 master 并更新卡片证据` | `持有` |
 
 ## 两仓集成队列
 
