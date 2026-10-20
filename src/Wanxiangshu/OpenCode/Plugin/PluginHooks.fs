@@ -80,8 +80,48 @@ module PluginHooks =
     [<Emit("$0 === undefined")>]
     let private isUndefined (value: obj) : bool = jsNative
 
-    [<Emit("$0 !== null && $0 !== undefined")>]
-    let private isPresent (value: obj) : bool = jsNative
+    /// The top-level context-compression declaration of one js-* call, read
+    /// from the flat arguments `prefixUntil` and `thenMap`. The retired
+    /// `view` wrapper is refused by the call surface, so it is never read
+    /// here. A call carries a declaration iff it gives either key; the
+    /// declaration object is assembled exactly as the call surface
+    /// assembles it, so the same validator decides.
+    let private declarationOf (input: obj) : obj option =
+        let fields =
+            if isNull input then
+                None
+            else
+                let prefixUntil = input?prefixUntil
+                let thenMap = input?thenMap
+
+                Some(prefixUntil, thenMap)
+
+        fields
+        |> Option.filter (fun (prefixUntil, thenMap) ->
+            not (isUndefined prefixUntil && isUndefined thenMap))
+        |> Option.map (fun (prefixUntil, thenMap) ->
+            createObj [ "prefixUntil" ==> prefixUntil; "thenMap" ==> thenMap ])
+
+    /// A declaration counts only when it is valid: an invalid one never
+    /// committed a view, so it must never commit a checkpoint.
+    ///
+    /// The call surface refuses a call that carries more than one of
+    /// program / unpark / abandon; such a call never ran, so it commits no
+    /// checkpoint either. That judgement is the call surface's own law, so
+    /// it is asked, not recounted here.
+    let private declaredViewOf (input: obj) : bool =
+        let conflictingState =
+            Wanxiangshu.Repository.Programming.Js.OpenCode.JsToolWorkflow.conflictingInputReason input
+            |> Option.isSome
+
+        if conflictingState then
+            false
+        else
+            declarationOf input
+            |> Option.map (fun declaration ->
+                Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse declaration
+                |> Result.isOk)
+            |> Option.defaultValue false
 
     /// obligation-ledger-005 / context-compression-028: the view checkpoint
     /// admission law (one append per exact completed call, in-flight duplicates
@@ -409,51 +449,7 @@ module PluginHooks =
                 let state = if isNull part then null else part?state
                 let input = if isNull state then null else state?input
 
-                // The top-level context-compression declaration is two flat
-                // arguments: `prefixUntil` and `thenMap`. The retired `view`
-                // wrapper is refused by the call surface, so it is never read
-                // here. A call carries a declaration iff it gives either key;
-                // the declaration object is assembled exactly as the call
-                // surface assembles it, so the same validator decides.
-                let declaration =
-                    if isNull input then
-                        None
-                    else
-                        let prefixUntil = input?prefixUntil
-                        let thenMap = input?thenMap
-
-                        if isUndefined prefixUntil && isUndefined thenMap then
-                            None
-                        else
-                            Some(createObj [ "prefixUntil" ==> prefixUntil; "thenMap" ==> thenMap ])
-
-                // A declaration counts only when it is valid: an invalid one
-                // never committed a view, so it must never commit a checkpoint.
-                let declaredView =
-                    // The call surface refuses a call that carries more than one
-                    // of program / unpark / abandon; such a call never ran, so
-                    // it commits no checkpoint either.
-                    let conflictingState =
-                        if isNull input then
-                            false
-                        else
-                            [ if isPresent (input?program) then
-                                  1
-                              if isPresent (input?unpark) then
-                                  1
-                              if isPresent (input?abandon) then
-                                  1 ]
-                            |> List.length > 1
-
-                    if conflictingState then
-                        false
-                    else
-                        match declaration with
-                        | None -> false
-                        | Some raw ->
-                            match Wanxiangshu.Repository.Programming.Js.Anchor.AnchorSurface.parse raw with
-                            | Ok _ -> true
-                            | Error _ -> false
+                let declaredView = declaredViewOf input
 
                 let sessionId =
                     HostEventEnvelope.trySessionId raw

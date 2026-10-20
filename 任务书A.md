@@ -451,6 +451,22 @@ dotnet tool run fantomas src/Wanxiangshu
   对照本批上游基线 `435eac2d9`（同两门禁 **96 + 67 = 163**），本批**净增 4 处**，全部在 `src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs`（`branch-pyramid` 0→3、`match-pyramid` 3→5），源于本批新增的扁平声明判定（`PluginHooks.fs:425`、`:442`、`:444`、`:451`、`:454`）。其余 163 处为上游既有欠账。
 - `node scripts/checks/language-parity-gate.mjs` → `OK — 266 semantic resource(s)`。
 
+#### 十·二·一 控制金字塔净增归零（`PluginHooks.fs`，唯一编辑文件）
+
+`src/Wanxiangshu/OpenCode/Plugin/PluginHooks.fs`：**+43 / −47**，唯一改动文件。扁平声明判定从 `viewTerminalObservation` 的内联判定提为两个模块级纯 helper：
+
+| helper | 位置 | 职责 |
+|---|---|---|
+| `declarationOf` | `PluginHooks.fs:89-102` | 从扁平参数 `prefixUntil` / `thenMap` 组装声明对象；两个键皆缺则无声明 |
+| `declaredViewOf` | `PluginHooks.fs:112-120` | 声明有效才计数：冲突输入 → false，无声明 → false，声明非法 → false，否则 true |
+
+两处复用既有判定，不复制三态计数：`conflictingInputReason`（`Repository/Programming/Js/OpenCode/ToolWorkflow.fs:1201-1207`，问调用面自己的法）、`AnchorSurface.parse`（`Repository/Programming/Js/Anchor/AnchorSurface.fs:70-71`）。原内联的 `isPresent (input?program / ?unpark / ?abandon)` 三态重数随之删除，其 `isPresent` 私有 helper 已无调用方，一并移除。未用注释白名单压警告，未改任何语义：冲突 / 无声明 / 非法声明三条路径的判定结果与改前逐条相同。
+
+- `node scripts/checks/fsharp-control-pyramid.mjs` → `PluginHooks.fs` 由 **8** 处降为 **3** 处（`:514`、`:556`、`:706`，均为上游既有欠账）；全局 **100 → 95**。本批净增 **4 → 0**。
+- `node scripts/build.mjs` → `[build] build ok (generation 79)`；`js-surface-manifest: OK — 151 registered surfaces`；`js-module-linkage: OK — 725 emitted modules linked and loaded`。
+- `WXS_TIER_INTEGRATION=1 node --test requirements/obligation-ledger/tests/002.test.mjs` → `tests 2 / pass 2 / fail 0`（含真实 OpenCode Host canary「installed OpenCode Host runs todowrite-for-engineer with view and commits ViewCheckpointCommitted per session」）。
+- `node --test requirements/work/tests/020.test.mjs` → `tests 8 / pass 8 / fail 0`（含「a flat prefixUntil/thenMap declaration commits the durable ViewCheckpointCommitted, and a call without or with an invalid declaration commits none」）。
+
 ### 十·三 R3 套件实测
 
 | 套件 | pass | fail | 判定 |
