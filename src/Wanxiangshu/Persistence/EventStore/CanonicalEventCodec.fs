@@ -9,6 +9,13 @@ open Wanxiangshu.Foundation.Identity
 /// contract over EventEnvelope / StorageInvalid. D-04: this codec serves the
 /// single-writer SQLite CAS protocol; multi-writer convergence (CUT-19) is a
 /// separate protocol and is not expressed here.
+[<RequireQualifiedAccess>]
+type StoredLineFault =
+    | UnknownEventType of eventType: string
+    | MissingPayload of payloadRef: PayloadRef
+    | PayloadDigestMismatch of payloadRef: PayloadRef
+    | UnreferencedPayload of payloadRef: PayloadRef
+
 module CanonicalEventCodec =
 
     [<Import("CanonicalEventCodec", "wanxiangli/events")>]
@@ -126,3 +133,28 @@ module CanonicalEventCodec =
             Ok(eventOfJs outcome?event)
         else
             Error(invalidOfLibraryError outcome?error)
+
+    let private storedLineFaultOf (error: obj) : StoredLineFault =
+        let payloadRef () =
+            PayloadRef.create (unbox<string> error?payloadRef)
+
+        match errorText (error?code) with
+        | "UnknownEventType" -> StoredLineFault.UnknownEventType(unbox<string> error?eventType)
+        | "MissingPayload" -> StoredLineFault.MissingPayload(payloadRef ())
+        | "PayloadDigestMismatch" -> StoredLineFault.PayloadDigestMismatch(payloadRef ())
+        | "UnreferencedPayload" -> StoredLineFault.UnreferencedPayload(payloadRef ())
+        | code -> failwithf "wanxiangli/events checkClosure returned an unknown fault code: %s" code
+
+    /// durable-events-012/027: the one closure rule for stored local lines lives in
+    /// wanxiangli/events (CUT-19); this facade only projects its verdict.
+    let checkStoredClosure
+        (isEventTypeKnown: string -> bool)
+        (events: EventEnvelope list)
+        : Result<unit, StoredLineFault> =
+        let outcome: obj =
+            codec?checkClosure (events |> List.map toLibraryEvent |> Array.ofList, isEventTypeKnown)
+
+        if unbox<bool> outcome?ok then
+            Ok()
+        else
+            Error(storedLineFaultOf outcome?error)

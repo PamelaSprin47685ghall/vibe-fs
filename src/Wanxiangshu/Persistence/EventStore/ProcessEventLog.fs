@@ -168,12 +168,6 @@ module ProcessEventLog =
     [<Emit("Date.now()")>]
     let private currentTimeMs () : float = jsNative
 
-    [<Emit("Date.parse($0)")>]
-    let private parseDateMs (value: string) : float = jsNative
-
-    [<Emit("Number.isFinite($0)")>]
-    let private isFiniteNumber (value: float) : bool = jsNative
-
     [<Import("openSync", "node:fs")>]
     let private openSync (path: string) (flags: string) : int = jsNative
 
@@ -830,134 +824,95 @@ module ProcessEventLog =
         |> Option.map (fun size -> withReadFd path (fun ex -> Error ex.Message) (readLastLineFromFd path size))
         |> Option.defaultValue (Ok None)
 
-    type private TailActivity =
-        | JournalActivity of float
-        | ProjectionCutTail
-        | NoDurableActivity
+    [<Emit("({ [Symbol.iterator]() { return { next: $0 } } })")>]
+    let private iterableOfNext (next: unit -> obj) : obj = jsNative
 
-    let private tryParseJson line =
-        try
-            Some(JS.JSON.parse line)
-        with _ ->
+    /// Where the reverse line reader stands: the open file and the LF that ends
+    /// the next line to supply, or not yet inside a file.
+    type private TailCursor =
+        | BetweenFiles
+        | InsideFile of fd: int * path: string * lineEnd: int
+
+    /// durable-convergence-011: which tail line speaks for a writer's activity
+    /// (a Journal `ObservedAt`, walking back past `ProjectionCutTail` lines,
+    /// across segment seams; anything else means no durable activity) is
+    /// wanxiangli/retention `lastActivity` (CUT-19). This log only supplies
+    /// complete lines newest first, lazily, reading O(line bytes) per pull, and
+    /// stops supplying where the physical read can no longer speak: an empty
+    /// file, an incomplete trailing line, an empty or non-UTF-8 line, or a read
+    /// failure. Only when no durable activity exists does the producer-side
+    /// file mtime speak, and the newest file wins.
+    let private writerActivityOf (paths: string list) : float =
+        // DSL-MUTABLE: resource — read fds opened lazily for this one lookup; all closed below.
+        let opened = ResizeArray<int>()
+        // DSL-MUTABLE: algorithm-scratch — remaining files, newest first.
+        let mutable files = List.rev paths
+        // DSL-MUTABLE: algorithm-scratch — reverse line cursor.
+        let mutable cursor = TailCursor.BetweenFiles
+        // DSL-MUTABLE: algorithm-scratch — once the physical read stops speaking it never resumes.
+        let mutable stopped = false
+
+        let stop () =
+            stopped <- true
             None
 
-    let private observedJournalActivity (value: obj) =
-        let payload: obj = value?payload
+        let enterFile path =
+            match nonEmptyFileSize path with
+            | None -> stop ()
+            | Some size ->
+                let fd = openSync path "r"
+                opened.Add fd
 
-        let observedAt =
-            if isNull payload || isNull payload?ObservedAt then
+                let endsWithLf =
+                    tryPhysical (fun () -> (readExactAt fd (size - 1) 1).[0] = 10uy) (fun _ -> false)
+
+                if endsWithLf then
+                    cursor <- TailCursor.InsideFile(fd, path, size - 1)
+                    Some()
+                else
+                    stop ()
+
+        let rec pull () : string option =
+            if stopped then
                 None
             else
-                Some(parseDateMs (unbox<string> payload?ObservedAt))
+                match cursor with
+                | TailCursor.BetweenFiles ->
+                    match files with
+                    | [] -> stop ()
+                    | path :: rest ->
+                        files <- rest
+                        enterFile path |> Option.bind pull
+                | TailCursor.InsideFile(fd, path, lineEnd) ->
+                    match
+                        tryPhysical (fun () -> readCompleteLineBefore fd path lineEnd) (fun ex -> Error ex.Message)
+                    with
+                    | Error _ -> stop ()
+                    | Ok line ->
+                        cursor <-
+                            if line.Start > 0 then
+                                TailCursor.InsideFile(fd, path, line.Start - 1)
+                            else
+                                TailCursor.BetweenFiles
 
-        observedAt
-        |> Option.filter isFiniteNumber
-        |> Option.map TailActivity.JournalActivity
-        |> Option.defaultValue TailActivity.NoDurableActivity
+                        Some line.Text
 
-    let private classifyParsedTail (value: obj) =
-        let eventType =
-            if isNull value?event_type then
-                ""
-            else
-                unbox<string> value?event_type
+        let next () : obj =
+            match pull () with
+            | Some line -> createObj [ "done" ==> false; "value" ==> line ]
+            | None -> createObj [ "done" ==> true ]
 
-        match eventType with
-        | "JournalEnvelope" -> observedJournalActivity value
-        | "ProjectionCutTail" -> TailActivity.ProjectionCutTail
-        | _ -> TailActivity.NoDurableActivity
+        let verdict: obj =
+            try
+                retention?lastActivity (iterableOfNext next)
+            finally
+                for fd in opened do
+                    closeSync fd
 
-    let private classifyTailActivity (line: string) =
-        tryParseJson line
-        |> Option.map classifyParsedTail
-        |> Option.defaultValue TailActivity.NoDurableActivity
-
-    type private TailSearch =
-        | SearchBefore of int
-        | TailCutTailExhausted
-        | TailResolved of float option
-
-    let private decideTailSearch (line: TailLine) =
-        match classifyTailActivity line.Text with
-        | TailActivity.JournalActivity observedAt -> TailResolved(Some observedAt)
-        | TailActivity.ProjectionCutTail when line.Start > 0 -> SearchBefore(line.Start - 1)
-        | TailActivity.ProjectionCutTail -> TailCutTailExhausted
-        | TailActivity.NoDurableActivity -> TailResolved None
-
-    let private advanceTailSearch fd path lineEnd =
-        readCompleteLineBefore fd path lineEnd
-        |> Result.map decideTailSearch
-        |> Result.defaultValue (TailResolved None)
-
-    type private FileTailOutcome =
-        | FileTailActivity of float
-        | FileTailCutTailChain
-        | FileTailNoDurable
-
-    let private findDurableActivity fd path lineEnd =
-        // DSL-MUTABLE: algorithm-scratch — finite reverse scan verdict.
-        let mutable search = SearchBefore lineEnd
-
-        let isSearching () =
-            match search with
-            | SearchBefore _ -> true
-            | _ -> false
-
-        let advance () =
-            let cursor =
-                match search with
-                | SearchBefore value -> value
-                | _ -> 0
-
-            search <- advanceTailSearch fd path cursor
-
-        while isSearching () do
-            advance ()
-
-        match search with
-        | TailResolved(Some observedAt) -> FileTailActivity observedAt
-        | TailResolved None -> FileTailNoDurable
-        | TailCutTailExhausted -> FileTailCutTailChain
-        | SearchBefore _ -> FileTailNoDurable
-
-    let private durableActivityFromFd path size fd =
-        let trailing = readExactAt fd (size - 1) 1
-
-        if trailing.[0] = 10uy then
-            findDurableActivity fd path (size - 1)
+        if isNull verdict then
+            paths |> List.map (fun path -> statSync path |> fileActivityMs) |> List.max
         else
-            FileTailNoDurable
-
-    /// Journal envelopes carry their producer observation time in durable
-    /// bytes. A trailing ProjectionCutTail is integrator metadata for the
-    /// immediately preceding fact, so it does not advance process activity by
-    /// itself; the scan may walk backwards across the whole file and, for a
-    /// segment series, into the previous segment (durable-events-005).
-    let private scanFileTail (path: string) : FileTailOutcome =
-        nonEmptyFileSize path
-        |> Option.map (fun size -> withReadFd path (fun _ -> FileTailNoDurable) (durableActivityFromFd path size))
-        |> Option.defaultValue FileTailNoDurable
-
-    /// durable-convergence-011: the writer's activity is the durable Journal
-    /// observation at the logical-stream tail (highest segment first); a
-    /// trailing ProjectionCutTail chain may walk back across segment
-    /// boundaries. Only when no durable activity exists does the
-    /// producer-side file mtime speak, and the newest file wins.
-    let private writerActivityOf (paths: string list) : float =
-        let rec scanDescending remaining =
-            match remaining with
-            | [] -> None
-            | path :: tail -> scanPastTail path tail
-
-        and scanPastTail (path: string) (tail: string list) =
-            match scanFileTail path with
-            | FileTailActivity observedAt -> Some observedAt
-            | FileTailCutTailChain -> scanDescending tail
-            | FileTailNoDurable -> None
-
-        match scanDescending (List.rev paths) with
-        | Some observedAt -> observedAt
-        | None -> paths |> List.map (fun path -> statSync path |> fileActivityMs) |> List.max
+            unbox<float> verdict
 
     let private writerFileNames commonDir =
         let directory = eventsDirectory commonDir

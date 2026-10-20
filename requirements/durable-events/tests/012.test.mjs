@@ -308,3 +308,56 @@ test('WHAT[durable-events-012] closure_is_empty_for_a_fact_without_blob_fields',
     })
   }
 }
+
+// CUT-19 counterexample: append already refuses inline bytes that no PayloadRef
+// names, but replay only checked the declared refs. Replay folds every inline
+// payload into the content-addressed payload index by key, so a stored line
+// carrying bytes under someone else's content address made readPayload serve
+// those bytes for that address.
+test('WHAT[durable-events-012] reload refuses inline bytes that no PayloadRef names instead of serving them by that address', async () => {
+  const { default: assert } = await import('node:assert/strict')
+  const { createHash } = await import('node:crypto')
+  const { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const eventCodec = await import('../../../dist/Persistence/EventStore/CodecSurface.js')
+  const eventStore = await import('../../../dist/Persistence/EventStore/Surface.js')
+
+  const root = mkdtempSync(join(tmpdir(), 'wxs-durable-unreferenced-payload-'))
+  try {
+    const events = join(root, 'wanxiangshu/events')
+    mkdirSync(events, { recursive: true })
+    const writer = join(events, 'orphan-history.ndjson')
+    const address = createHash('sha256').update('the bytes a reader asked for').digest('hex')
+    const base = {
+      id: 'c'.repeat(40),
+      stream: 'durable-events-012/orphan',
+      type: 'JobRequested',
+      parents: [],
+      payload: { status: 'open' },
+      payloadRefs: [],
+    }
+    const orphanLine = eventCodec.encode({ ...base, payloads: { [address]: Buffer.from('forged bytes').toString('base64') } })
+    assert.match(orphanLine, /"payloads":\{/)
+    writeFileSync(writer, orphanLine)
+
+    assert.throws(
+      () => eventStore.create(root, 'orphan-reader'),
+      new RegExp(`local EventStore boot failed: unreferenced durable inline payload during replay: ${address}`),
+    )
+    assert.equal(readFileSync(writer, 'utf8'), orphanLine, 'a refused reload must not rewrite the stored line')
+
+    // Control: the same fact without the stray bytes loads, and the address resolves to nothing.
+    const cleanLine = eventCodec.encode(base)
+    writeFileSync(writer, cleanLine)
+    const handle = eventStore.create(root, 'orphan-reader')
+    try {
+      assert.equal(eventStore.read(handle, base.id).id, base.id)
+      assert.equal(await eventStore.readPayload(handle, address), null)
+    } finally {
+      eventStore.dispose(handle)
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})

@@ -296,43 +296,22 @@ module IntegratorEngine =
                 fullReplayUsed <- true
                 true)
 
-    let private validateLocalHistory (isEventTypeKnown: string -> bool) commonDir streams =
-        result {
-            let events = streams |> List.collect snd
-
-            do!
-                events
-                |> List.tryFind (fun envelope -> not (isEventTypeKnown envelope.EventType))
-                |> Option.map (fun envelope ->
-                    Error(sprintf "unknown durable event type during replay: %s" envelope.EventType))
-                |> Option.defaultValue (Ok())
-
-            do!
-                events
-                |> List.tryPick (fun envelope ->
-                    // durable-events-012: inline payloads are self-contained; a
-                    // PayloadRef is satisfied exactly when the event line embeds it
-                    // with a matching content address. Absence and digest mismatch are
-                    // distinct physical faults and stay distinguishable in the message.
-                    envelope.PayloadRefs
-                    |> List.tryPick (fun payloadRef ->
-                        match envelope.Payloads |> Map.tryFind payloadRef with
-                        | None ->
-                            Some(
-                                sprintf
-                                    "missing durable inline payload during replay: %s"
-                                    (PayloadRef.value payloadRef)
-                            )
-                        | Some content when ProcessEventLog.payloadDigest content <> PayloadRef.value payloadRef ->
-                            Some(
-                                sprintf
-                                    "durable inline payload digest mismatch during replay: %s"
-                                    (PayloadRef.value payloadRef)
-                            )
-                        | Some _ -> None))
-                |> Option.map Error
-                |> Option.defaultValue (Ok())
-        }
+    /// durable-events-012/027: a retained replay set must name only known
+    /// event types and every stored line must be self-contained. The rule is
+    /// wanxiangli/events `checkClosure` (CUT-19); this keeps only the replay
+    /// messages whose shape 027 pins. Parent closure is not checked here: the
+    /// retained window may name aged-out parents (EventKWayMerge.mergeRetained).
+    let private validateLocalHistory (isEventTypeKnown: string -> bool) (_commonDir: string) streams =
+        CanonicalEventCodec.checkStoredClosure isEventTypeKnown (streams |> List.collect snd)
+        |> Result.mapError (function
+            | StoredLineFault.UnknownEventType eventType ->
+                sprintf "unknown durable event type during replay: %s" eventType
+            | StoredLineFault.MissingPayload payloadRef ->
+                sprintf "missing durable inline payload during replay: %s" (PayloadRef.value payloadRef)
+            | StoredLineFault.PayloadDigestMismatch payloadRef ->
+                sprintf "durable inline payload digest mismatch during replay: %s" (PayloadRef.value payloadRef)
+            | StoredLineFault.UnreferencedPayload payloadRef ->
+                sprintf "unreferenced durable inline payload during replay: %s" (PayloadRef.value payloadRef))
 
     let create (rules: IntegrationRule list) (isEventTypeKnown: string -> bool) : ICanonicalIntegrator =
         requireStructuralRule rules
