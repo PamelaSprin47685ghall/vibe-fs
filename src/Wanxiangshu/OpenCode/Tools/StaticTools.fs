@@ -38,26 +38,12 @@ module StaticTools =
     /// keeps it.
     let hostExternalNamespaceAllowedForRole (role: Role) : bool = true
 
-    /// JS-001: a role whose capability set includes any programming-surface
-    /// permission gets its todowrite-for-* tool allowed in the permission
-    /// matrix. Fork/Join count: the Orchestrator's only programming surface is
-    /// delegation (this.fork/this.join).
-    let private hasFsCapability (role: Role) : bool =
-        let fsPermissions =
-            set
-                [ ToolPermission.Read
-                  ToolPermission.Write
-                  ToolPermission.Edit
-                  ToolPermission.Glob
-                  ToolPermission.Grep
-                  ToolPermission.Move
-                  ToolPermission.Remove
-                  ToolPermission.Fork
-                  ToolPermission.Join ]
-
-        Set.intersect (OfficeCapability.permissions role) fsPermissions
-        |> Set.isEmpty
-        |> not
+    /// JS-001: todowrite-for-* is allowed in the permission matrix exactly when
+    /// the role's office permissions project a programming surface. Same
+    /// predicate as JsToolSpec.admissionFor and JsToolGenerator (no second list).
+    let private admitsProgrammingSurface (role: Role) : bool =
+        Wanxiangshu.Repository.Programming.Js.JsCapability.admitsProgrammingSurface
+            (OfficeCapability.permissions role)
 
     /// Single source: OfficeCapability.permissions → OpenCode agent permission object.
     /// Emits explicit allow/deny for the full known tool name set so host schema
@@ -116,11 +102,7 @@ module StaticTools =
         if admitted then "allow" else "deny"
 
     let private jsPermission role name =
-        if name = "todowrite-for-manager" && role = Role.Manager then
-            "allow"
-        elif name = "todowrite-for-plan" && role = Role.Plan then
-            "allow"
-        elif name = jsToolName role && hasFsCapability role then
+        if name = jsToolName role && admitsProgrammingSurface role then
             "allow"
         else
             "deny"

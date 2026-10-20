@@ -27,6 +27,8 @@ module JsCapability =
     val ofToolPermission: permission: ToolPermission -> JsCapability option
     val ofToolCapabilities: capabilities: Set<ToolPermission> -> Set<JsCapability>
 
+    val admitsProgrammingSurface: capabilities: Set<ToolPermission> -> bool
+
 type JsCapabilityFragment =
     { Capability: JsCapability
       MemberName: string }

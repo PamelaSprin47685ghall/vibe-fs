@@ -79,6 +79,13 @@ module JsCapability =
         |> List.append expanded
         |> Set.ofList
 
+    /// True iff the office permission set projects at least one programming-surface
+    /// member. Schema (permissionObj), execution admission (JsToolSpec) and the
+    /// generator (JsToolGenerator) all ask this one question — there is no second
+    /// "fs capability" or "surface permission" list.
+    let admitsProgrammingSurface (capabilities: Set<ToolPermission>) : bool =
+        not (Set.isEmpty (ofToolCapabilities capabilities))
+
 /// One capability's SDK projection: the single source for the member name a
 /// capability brings into the base class. The member's signature and prose
 /// live in the localized `tool/js-program/base-class` resources, so the base

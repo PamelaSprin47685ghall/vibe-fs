@@ -83,3 +83,12 @@ membrane 驱动已抽入 `wanxiangli/sandbox`（库提交 `50f5e4c`，发布 `0.
 ## 旧 wrapProgram 退出（2026-10-21，eng-cut25b-goose）
 
 主仓 `JsSandbox.wrapProgram`（仍拼装 `__wrap`/`api`/`__deadlineRef` 的旧字符串，并在 `.fsi` 公开）已无调用方；包装体由 `wanxiangli/sandbox` 拥有。删除 `.fs`/`.fsi` 定义，避免再被误用。`006`/`006-cut25-escapes` 回归仍全绿。
+
+## 编程面准入统一（2026-10-21，eng-cut25b-goose）
+
+CUT-08 移交的 `StaticTools.hasFsCapability` / `jsPermission` 与 `JsToolSpec.admissionFor` 两份手写权限列表已删除。
+schema、执行准入、生成器都读 `JsCapability.admitsProgrammingSurface`（= `ofToolCapabilities` 非空）。
+
+反例（旧列表会分叉）：仅 Edit → 旧 hasFs 放行、生成器拒绝；仅 Exec → 旧 hasFs 拒绝、旧 admission 放行、生成器放行。
+证据：`evidence/CUT-25/differential-admission.mjs` → `admission-unified.json`（11 角色 compared / differing 0）。
+capability-enforcement 002/006 与 006-cut25-escapes 全绿。
