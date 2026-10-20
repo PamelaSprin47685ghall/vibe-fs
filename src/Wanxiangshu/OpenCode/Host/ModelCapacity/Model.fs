@@ -70,6 +70,7 @@ type internal QueueNodeId = private QueueNodeId of int64
 module internal QueueNodeId =
     let initial = QueueNodeId 0L
     let next (QueueNodeId value) = QueueNodeId(value + 1L)
+    let value (QueueNodeId value) = value
 
 [<Struct; StructuralEquality; StructuralComparison>]
 type internal QueueFence = private QueueFence of int64
@@ -77,6 +78,7 @@ type internal QueueFence = private QueueFence of int64
 module internal QueueFence =
     let initial = QueueFence 0L
     let next (QueueFence value) = QueueFence(value + 1L)
+    let value (QueueFence value) = value
 
 type internal ExecutionAdmissionQueueNode
     private

@@ -3,6 +3,8 @@ namespace Wanxiangshu.OpenCode
 open System
 open System.Collections.Generic
 open System.Threading.Tasks
+open Fable.Core
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 
 type internal CapacityStepDemand<'target> =
@@ -25,17 +27,6 @@ type internal ExecutionAdmissionDemand =
       LenderSessionId: string option
       PreviousTarget: ModelRoutingTarget option
       Node: ExecutionAdmissionQueueNode }
-
-[<RequireQualifiedAccess>]
-type private EnqueueEvidence =
-    | NewLogicalOperation
-    | SameLogicalOperation of ExecutionAdmissionQueueNode
-    | NewerPhysicalGeneration of ExecutionAdmissionDemand
-
-[<RequireQualifiedAccess>]
-type private QueueBoundDecision =
-    | HasRoom
-    | Full
 
 module internal ModelCapacityQueue =
     [<Literal>]
@@ -65,14 +56,52 @@ type internal CapacityStepDemandQueue<'target>() =
     member _.Snapshot() = demands.ToArray()
     member _.Count = demands.Count
 
+/// The slice of the `wanxiangli/admission-queue` execution admission wait
+/// queue owner (CUT-10) this host adapter reads. FIFO order, the pending bound,
+/// same-logical-operation reuse, newer-physical-generation supersession, exact
+/// node take and withdraw are decided there; this adapter keeps the F# node
+/// handle and its completion, settles completions and records the counters.
+type internal AdmissionQueueLibrary =
+    abstract contractVersion: int
+    abstract bound: int
+    abstract enqueue: sessionId: string * physicalUserMessageId: string * payload: obj -> obj
+    abstract current: sessionId: string -> obj
+    abstract take: node: obj -> bool
+    abstract withdraw: sessionId: string * physicalUserMessageId: obj -> obj
+    abstract snapshot: unit -> obj array
+    abstract drain: unit -> obj array
+    abstract count: unit -> int
+
+module internal AdmissionQueueBinding =
+    [<Import("AdmissionQueue", "wanxiangli/admission-queue")>]
+    let private queueClass: obj = jsNative
+
+    [<Emit("new $0($1)")>]
+    let private construct (cls: obj) (bound: int) : AdmissionQueueLibrary = jsNative
+
+    let create () =
+        let queue = construct queueClass ModelCapacityQueue.MaximumPendingDemands
+
+        if queue.contractVersion <> ModelCapacityQueue.ContractVersion then
+            invalidOp "execution-model-routing: admission queue contract version diverged"
+
+        queue
+
+    /// The host demand a library node carries; its payload is a holder the
+    /// adapter fills right after the library issued the node identity.
+    let demand (node: obj) : ExecutionAdmissionDemand = unbox node?payload?demand
+
+    let outcome (value: string) =
+        match value with
+        | "Applied" -> CapacityTransitionOutcome.Applied
+        | "AlreadyApplied" -> CapacityTransitionOutcome.AlreadyApplied
+        | "StaleFence" -> CapacityTransitionOutcome.StaleFence
+        | other -> invalidOp (sprintf "execution-model-routing: unknown admission queue outcome '%s'" other)
+
 type internal ExecutionAdmissionQueue(owner: obj, counters: CapacityTransitionCounters) =
-    let demands = ResizeArray<ExecutionAdmissionDemand>()
-    /// DSL-cross-callback-proof: physical waiter — bounded exact-demand index for one-shot queue settlement.
-    let bySession = Dictionary<string, ExecutionAdmissionDemand>()
-    // DSL-MUTABLE: resource
-    let mutable nextAdmissionDemandSequence = 0L
+    let queue = AdmissionQueueBinding.create ()
+    // DSL-MUTABLE: resource — host node identity, kept in step with the library node
     let mutable nextNodeId = QueueNodeId.initial
-    // DSL-MUTABLE: resource
     let mutable nextFence = QueueFence.initial
 
     let trySetException (completion: TaskCompletionSource<ExecutionAdmissionAcquisition>) (error: exn) =
@@ -82,79 +111,41 @@ type internal ExecutionAdmissionQueue(owner: obj, counters: CapacityTransitionCo
         with _ ->
             false
 
-    let remove demand =
-        let removed = demands.Remove demand
+    let settle outcome (node: obj) =
+        if not (isNull node) then
+            AsyncSupport.trySetResult (AdmissionQueueBinding.demand node).Node.Completion outcome
+            |> ignore
 
-        match bySession.TryGetValue demand.SessionId with
-        | true, current when obj.ReferenceEquals(current, demand) -> bySession.Remove demand.SessionId |> ignore
-        | _ -> ()
-
-        removed
-
-    let complete outcome demand =
-        if remove demand then
-            AsyncSupport.trySetResult demand.Node.Completion outcome |> ignore
-            true
+    /// The library node whose host handle is exactly `node`, if it is that session's current demand.
+    let libraryNodeOf (node: ExecutionAdmissionQueueNode) =
+        if isNull (box node) || not (obj.ReferenceEquals(node.Owner, owner)) then
+            None
         else
-            false
+            let current = queue.current node.SessionId
 
-    let knownNode (node: ExecutionAdmissionQueueNode) =
-        obj.ReferenceEquals(node.Owner, owner)
-        && (match bySession.TryGetValue node.SessionId with
-            | true, demand ->
-                obj.ReferenceEquals(demand.Node, node)
-                && demand.Node.NodeId = node.NodeId
-                && demand.Node.Fence = node.Fence
-            | false, _ -> false)
+            if isNull current then
+                None
+            else
+                let demand = AdmissionQueueBinding.demand current
 
-    let enqueueEvidence sessionId physicalUserMessageId =
-        match bySession.TryGetValue sessionId with
-        | true, current when current.PhysicalUserMessageId = physicalUserMessageId ->
-            EnqueueEvidence.SameLogicalOperation current.Node
-        | true, current -> EnqueueEvidence.NewerPhysicalGeneration current
-        | false, _ -> EnqueueEvidence.NewLogicalOperation
+                if
+                    obj.ReferenceEquals(demand.Node, node)
+                    && demand.Node.NodeId = node.NodeId
+                    && demand.Node.Fence = node.Fence
+                then
+                    Some current
+                else
+                    None
 
-    let queueBoundDecision pendingCount =
-        if pendingCount < ModelCapacityQueue.MaximumPendingDemands then
-            QueueBoundDecision.HasRoom
-        else
-            QueueBoundDecision.Full
+    let withdraw outcome sessionId (physicalUserMessageId: string option) =
+        let physical: obj =
+            match physicalUserMessageId with
+            | Some value -> box value
+            | None -> null
 
-    let enqueueFresh sessionId physicalUserMessageId role participant purpose lenderSessionId previousTarget =
-        match queueBoundDecision demands.Count with
-        | QueueBoundDecision.Full -> ExecutionAdmissionAcquisition.QueueFull
-        | QueueBoundDecision.HasRoom ->
-            nextAdmissionDemandSequence <- nextAdmissionDemandSequence + 1L
-            nextNodeId <- QueueNodeId.next nextNodeId
-            nextFence <- QueueFence.next nextFence
-
-            let completion =
-                TaskCompletionSource<ExecutionAdmissionAcquisition>(TaskCreationOptions.RunContinuationsAsynchronously)
-
-            let node =
-                ExecutionAdmissionQueueNode.Create(
-                    owner,
-                    nextNodeId,
-                    nextFence,
-                    sessionId,
-                    physicalUserMessageId,
-                    completion
-                )
-
-            let demand =
-                { Sequence = nextAdmissionDemandSequence
-                  SessionId = sessionId
-                  PhysicalUserMessageId = physicalUserMessageId
-                  Role = role
-                  Participant = participant
-                  Purpose = purpose
-                  LenderSessionId = lenderSessionId
-                  PreviousTarget = previousTarget
-                  Node = node }
-
-            demands.Add demand
-            bySession.[sessionId] <- demand
-            ExecutionAdmissionAcquisition.Queued node
+        let result = queue.withdraw (sessionId, physical)
+        settle outcome (result?node: obj)
+        unbox<string> result?outcome |> AdmissionQueueBinding.outcome |> counters.Record
 
     member _.Enqueue
         (
@@ -166,31 +157,69 @@ type internal ExecutionAdmissionQueue(owner: obj, counters: CapacityTransitionCo
             lenderSessionId: string option,
             previousTarget: ModelRoutingTarget option
         ) : ExecutionAdmissionAcquisition =
-        match enqueueEvidence sessionId physicalUserMessageId with
-        | EnqueueEvidence.SameLogicalOperation node -> ExecutionAdmissionAcquisition.Queued node
-        | EnqueueEvidence.NewLogicalOperation ->
-            enqueueFresh sessionId physicalUserMessageId role participant purpose lenderSessionId previousTarget
-        | EnqueueEvidence.NewerPhysicalGeneration existing ->
-            complete ExecutionAdmissionAcquisition.Superseded existing |> ignore
-            enqueueFresh sessionId physicalUserMessageId role participant purpose lenderSessionId previousTarget
+        let holder: obj = createObj [ "demand" ==> null ]
+        let result = queue.enqueue (sessionId, physicalUserMessageId, holder)
+        settle ExecutionAdmissionAcquisition.Superseded (result?superseded: obj)
+        let node: obj = result?node
+
+        match unbox<string> result?kind with
+        | "Reused" -> ExecutionAdmissionAcquisition.Queued (AdmissionQueueBinding.demand node).Node
+        | "Full" -> ExecutionAdmissionAcquisition.QueueFull
+        | "Queued" ->
+            nextNodeId <- QueueNodeId.next nextNodeId
+            nextFence <- QueueFence.next nextFence
+
+            if
+                float (QueueNodeId.value nextNodeId) <> unbox<float> node?nodeId
+                || float (QueueFence.value nextFence) <> unbox<float> node?fence
+            then
+                invalidOp "execution-model-routing: host queue node diverged from the admission queue owner"
+
+            let completion =
+                TaskCompletionSource<ExecutionAdmissionAcquisition>(TaskCreationOptions.RunContinuationsAsynchronously)
+
+            let hostNode =
+                ExecutionAdmissionQueueNode.Create(
+                    owner,
+                    nextNodeId,
+                    nextFence,
+                    sessionId,
+                    physicalUserMessageId,
+                    completion
+                )
+
+            let demand =
+                { Sequence = int64 (unbox<float> node?sequence)
+                  SessionId = sessionId
+                  PhysicalUserMessageId = physicalUserMessageId
+                  Role = role
+                  Participant = participant
+                  Purpose = purpose
+                  LenderSessionId = lenderSessionId
+                  PreviousTarget = previousTarget
+                  Node = hostNode }
+
+            holder?demand <- demand
+            ExecutionAdmissionAcquisition.Queued hostNode
+        | other -> invalidOp (sprintf "execution-model-routing: unknown admission queue kind '%s'" other)
 
     member _.Snapshot() =
-        demands |> Seq.sortBy _.Sequence |> Seq.toArray
+        queue.snapshot () |> Array.map AdmissionQueueBinding.demand
 
     member _.TryCurrent(sessionId: string) =
-        match bySession.TryGetValue sessionId with
-        | true, demand -> Some demand
-        | false, _ -> None
+        let current = queue.current sessionId
 
-    member _.ContainsSession(sessionId: string) = bySession.ContainsKey sessionId
+        if isNull current then
+            None
+        else
+            Some(AdmissionQueueBinding.demand current)
+
+    member _.ContainsSession(sessionId: string) = not (isNull (queue.current sessionId))
 
     member _.TryTake(node: ExecutionAdmissionQueueNode) =
-        if knownNode node then
-            let demand = bySession.[node.SessionId]
-            remove demand |> ignore
-            Some demand
-        else
-            None
+        match libraryNodeOf node with
+        | Some current when queue.take current -> Some(AdmissionQueueBinding.demand current)
+        | _ -> None
 
     member this.Admit(node: ExecutionAdmissionQueueNode, lease: ExecutionAdmissionLease) =
         match this.TryTake node with
@@ -202,34 +231,16 @@ type internal ExecutionAdmissionQueue(owner: obj, counters: CapacityTransitionCo
         | None -> counters.Record CapacityTransitionOutcome.StaleFence
 
     member _.CancelSession(sessionId: string) =
-        match bySession.TryGetValue sessionId with
-        | true, demand when complete ExecutionAdmissionAcquisition.Cancelled demand ->
-            counters.Record CapacityTransitionOutcome.Applied
-        | true, _ -> counters.Record CapacityTransitionOutcome.Conflict
-        | false, _ -> counters.Record CapacityTransitionOutcome.AlreadyApplied
+        withdraw ExecutionAdmissionAcquisition.Cancelled sessionId None
 
     member _.CancelExecution(sessionId: string, physicalUserMessageId: string) =
-        match bySession.TryGetValue sessionId with
-        | true, demand when demand.PhysicalUserMessageId <> physicalUserMessageId ->
-            counters.Record CapacityTransitionOutcome.StaleFence
-        | true, demand when complete ExecutionAdmissionAcquisition.Cancelled demand ->
-            counters.Record CapacityTransitionOutcome.Applied
-        | true, _ -> counters.Record CapacityTransitionOutcome.Conflict
-        | false, _ -> counters.Record CapacityTransitionOutcome.AlreadyApplied
+        withdraw ExecutionAdmissionAcquisition.Cancelled sessionId (Some physicalUserMessageId)
 
     member _.SupersedeSession(sessionId: string) =
-        match bySession.TryGetValue sessionId with
-        | true, demand when complete ExecutionAdmissionAcquisition.Superseded demand ->
-            counters.Record CapacityTransitionOutcome.Applied
-        | true, _ -> counters.Record CapacityTransitionOutcome.Conflict
-        | false, _ -> counters.Record CapacityTransitionOutcome.AlreadyApplied
+        withdraw ExecutionAdmissionAcquisition.Superseded sessionId None
 
     member _.Fail(error: exn) =
-        let pending = demands.ToArray()
-        demands.Clear()
-        bySession.Clear()
+        queue.drain ()
+        |> Array.iter (fun node -> trySetException (AdmissionQueueBinding.demand node).Node.Completion error |> ignore)
 
-        pending
-        |> Array.iter (fun demand -> trySetException demand.Node.Completion error |> ignore)
-
-    member _.Count = demands.Count
+    member _.Count = queue.count ()

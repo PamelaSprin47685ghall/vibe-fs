@@ -75,6 +75,7 @@ type internal QueueNodeId = private QueueNodeId of int64
 module internal QueueNodeId =
     val initial: QueueNodeId
     val next: QueueNodeId -> QueueNodeId
+    val value: QueueNodeId -> int64
 
 [<Struct; StructuralEquality; StructuralComparison>]
 type internal QueueFence = private QueueFence of int64
@@ -82,6 +83,7 @@ type internal QueueFence = private QueueFence of int64
 module internal QueueFence =
     val initial: QueueFence
     val next: QueueFence -> QueueFence
+    val value: QueueFence -> int64
 
 type internal ExecutionAdmissionQueueNode =
     private new:
