@@ -248,11 +248,7 @@ module HostForkRunLifecycle =
     /// evidence for this terminal, and a render cache (no call fence) is
     /// presentation only. The peek advances no cursor and removes nothing,
     /// so repeated reads of one terminal yield the same view.
-    let private peekDeliveredView
-        (run: PendingHostRun)
-        (result: AgentRunResult)
-        (prose: string option)
-        =
+    let private peekDeliveredView (run: PendingHostRun) (result: AgentRunResult) (prose: string option) =
         match JsDeliveredValues.peekFence (SessionId.value run.ChildId) with
         | Some fence when fence.ProviderRun = result.ProviderRun ->
             JsDeliveredValues.tryPeekRenderedWith (SessionId.value run.ChildId) prose
@@ -659,10 +655,7 @@ module HostForkRunLifecycle =
                         // nothing (another reader already consumed the cell)
                         // falls back to the peeked view, which is idempotent.
                         let taken =
-                            JsDeliveredValues.tryTakeRenderedFor
-                                (SessionId.value run.ChildId)
-                                result.ProviderRun
-                                prose
+                            JsDeliveredValues.tryTakeRenderedFor (SessionId.value run.ChildId) result.ProviderRun prose
 
                         let finalView =
                             match taken with

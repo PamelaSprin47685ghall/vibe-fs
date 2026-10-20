@@ -162,25 +162,25 @@ module ChildRecoveryWorkflow =
             if not witnessed then
                 ChildSnapshotEvidence.Unreadable "restart terminal has no durable delivery witness"
             else
-            let runId = "run-restored-" + ports.AgentId
-            let view = textOfParts assistant.Parts
+                let runId = "run-restored-" + ports.AgentId
+                let view = textOfParts assistant.Parts
 
-            let agentOutcome =
-                AgentCompletion.completed
-                    ports.AgentId
-                    ports.ChildSession
-                    runId
-                    ports.Role
-                    (PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id))
-                    (ProviderRunIdentity.create assistant.Id)
-                    view
-                    None
+                let agentOutcome =
+                    AgentCompletion.completed
+                        ports.AgentId
+                        ports.ChildSession
+                        runId
+                        ports.Role
+                        (PhysicalUserMessageId.promoteToAuthorityRoot (PhysicalUserMessageId.create user.Id))
+                        (ProviderRunIdentity.create assistant.Id)
+                        view
+                        None
 
-            let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
+                let body = HandleCompletionCodec.encodeOutcome runId agentOutcome
 
-            ChildSnapshotEvidence.Terminal(
-                TerminalEvidence.completed ports.AgentId ports.Handle ports.ChildSession body
-            )
+                ChildSnapshotEvidence.Terminal(
+                    TerminalEvidence.completed ports.AgentId ports.Handle ports.ChildSession body
+                )
 
     let private snapshotFromMessages (ports: Ports) (messages: SessionMessage list) : ChildSnapshotEvidence =
         match lastByRole messages "assistant" with

@@ -25,6 +25,7 @@ module JsDeliveredValues =
     /// Stage a view for presentation only: without the call fence this cell
     /// is a render cache and never delivery evidence (clauses 1 and 3).
     val recordView: sessionId: string -> view: obj option -> unit
+
     /// Record a delivery with the fence of the call that produced it. Only a
     /// fenced cell is delivery evidence (clause 3).
     val recordFencedView:
@@ -33,6 +34,7 @@ module JsDeliveredValues =
         toolCallId: Wanxiangshu.Foundation.Identity.ToolCallId ->
         view: obj option ->
             unit
+
     /// Consume the delivered view of this session. Only a fenced cell is a
     /// delivery; a render cache cell is left in place for presentation.
     val take: sessionId: string -> obj
@@ -47,6 +49,7 @@ module JsDeliveredValues =
     /// Render the staged view of a render cache cell. Presentation only:
     /// nothing taken here proves a delivery (clauses 1 and 3).
     val tryTakeRenderedWith: sessionId: string -> assistant: string option -> string option
+
     /// The harness/fallback handoff: the cell must carry the fence of this
     /// exact provider run. It matches the provider run only, not the full
     /// fence, so it is a fallback channel and never delivery evidence — the
@@ -56,6 +59,7 @@ module JsDeliveredValues =
         providerRun: Wanxiangshu.Foundation.Identity.ProviderRunIdentity ->
         assistant: string option ->
             string option
+
     /// Render the staged view of a render cache cell. Presentation only.
     val tryTakeRendered: sessionId: string -> string option
     /// Snapshot of the handoff, delivery or render cache. Presentation only:

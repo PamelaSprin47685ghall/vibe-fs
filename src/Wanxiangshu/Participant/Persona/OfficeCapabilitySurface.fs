@@ -14,7 +14,9 @@ module OfficeCapabilitySurface =
 
     /// office-capability-007 / ARCH-017: the canonical manager fork office consequence set.
     let managerForkableOffices () : string array =
-        ManagedAgentCatalog.managerForkableRoles |> List.map Roles.roleLabel |> List.toArray
+        ManagedAgentCatalog.managerForkableRoles
+        |> List.map Roles.roleLabel
+        |> List.toArray
 
     /// Sorted permission labels for a role. Unknown role fails closed; historical
     /// roles hold no office in `wanxiangli/capability` and so return none.

@@ -131,7 +131,7 @@ module DeliveryAttemptLedger =
 
     let private emptyFacts: InterruptFacts = { Issued = false; Observed = None }
 
-    let private emptyRecord (fence: Fence): Record =
+    let private emptyRecord (fence: Fence) : Record =
         { Fence = fence
           Physical = None
           Established = false
@@ -165,7 +165,8 @@ module DeliveryAttemptLedger =
                     | None -> physical })
 
     /// 呈现面事实：宿主已接受该交付的工具结果。呈现不改变提交面事实。
-    let recordPresented fence = update fence (fun current -> { current with Presented = true })
+    let recordPresented fence =
+        update fence (fun current -> { current with Presented = true })
 
     /// 本 session、且登记时物理输入仍是当前物理输入的最近一次已成立交付。
     /// 物理输入已变 → 不返回（不得误停新输入或后任）。
@@ -256,7 +257,10 @@ module DeliveryAttemptLedger =
     /// 中断「已观察到」：只有在这里才承认中断的结算结果。
     let recordInterruptObserved fence outcome =
         update fence (fun current ->
-            { current with Interrupt = { current.Interrupt with Observed = Some outcome } })
+            { current with
+                Interrupt =
+                    { current.Interrupt with
+                        Observed = Some outcome } })
 
     let interruptFacts fence =
         lock gate (fun () ->
@@ -1242,11 +1246,8 @@ type ToolRuntimeScope
     /// 不视为失败（旧 attempt 不再瞄准）。session 级 abort 的精确 attempt
     /// 围栏需要带 attempt 参数的 Host AbortSession API，本 slice 不新造。
     member private this.RunQuestionInterrupt
-        (
-            sessionId: SessionId,
-            question: UserQuestionAskedPayload,
-            key: SessionId * ProviderRunIdentity * ToolCallId
-        ) =
+        (sessionId: SessionId, question: UserQuestionAskedPayload, key: SessionId * ProviderRunIdentity * ToolCallId)
+        =
         task {
             try
                 let! stopped = sessions.InterruptAttempt sessionId
@@ -1261,6 +1262,7 @@ type ToolRuntimeScope
                           "physical_user_message_id", PhysicalUserMessageId.value question.PhysicalUserMessageId ]
 
                     questionInterrupts.Remove key |> ignore
+
                 return this.PruneFailedQuestionInterrupt(key, stopped)
             with ex ->
                 questionInterrupts.Remove key |> ignore
@@ -1280,8 +1282,9 @@ type ToolRuntimeScope
                 question.ToolCallId = callId
                 && question.ProviderRunId = providerRun
                 && currentPhysicalUserMessage (SessionId.value sessionId) = Some(
-                    PhysicalUserMessageId.value question.PhysicalUserMessageId
-                )
+                                                                                PhysicalUserMessageId.value
+                                                                                    question.PhysicalUserMessageId
+                                                                            )
                 && questionInterrupts.Add(sessionId, question.ProviderRunId, callId)
                 ->
                 return! this.RunQuestionInterrupt(sessionId, question, (sessionId, question.ProviderRunId, callId))
@@ -1292,8 +1295,12 @@ type ToolRuntimeScope
     /// 围栏与当时的物理输入。物理中断不在工具内部发生——停止由 transform 钩子
     /// 的交付裁决执行（条款 4），交付已提交不因中断未确认而呈现为失败（条款 6）。
     member this.RegisterEstablishedDelivery
-        (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId, ?physicalUserMessageId: PhysicalUserMessageId)
-        =
+        (
+            sessionId: SessionId,
+            providerRun: ProviderRunIdentity,
+            callId: ToolCallId,
+            ?physicalUserMessageId: PhysicalUserMessageId
+        ) =
         let physical =
             match physicalUserMessageId with
             | Some physical -> Some physical

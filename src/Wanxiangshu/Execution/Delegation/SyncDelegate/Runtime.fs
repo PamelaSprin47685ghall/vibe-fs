@@ -110,19 +110,14 @@ module internal SyncDelegateInternals =
     /// state are filters rather than identity: the exact fence is tried
     /// first, then the authority root alone, then the run alone. The reader
     /// itself refuses to pick between witnesses of differing material.
-    let private durableWitnessView
-        (journal: AgentJournal option)
-        (turn: ReconciledTurn)
-        : string option =
+    let private durableWitnessView (journal: AgentJournal option) (turn: ReconciledTurn) : string option =
         match journal with
         | None -> None
         | Some durable ->
             let authorityRoot = Some turn.AuthorityRootUserMessageId
             let physical = Some turn.PhysicalUserMessageId
 
-            [ authorityRoot, physical
-              authorityRoot, None
-              None, None ]
+            [ authorityRoot, physical; authorityRoot, None; None, None ]
             |> List.tryPick (fun (root, input) ->
                 TaskDeliveryJournal.tryFindByFenceFields
                     durable
@@ -178,6 +173,7 @@ module internal SyncDelegateInternals =
                 noteDelegateIfRole exact turn.SessionId record
                 AsyncSupport.trySetResult exact.Answer (Ok record) |> ignore
             | None -> ()
+
             Some record
         | _ -> None
 
@@ -207,6 +203,7 @@ module internal SyncDelegateInternals =
                 [ "session_id", SessionId.value turn.SessionId
                   "role", SyncDelegate.roleLabel call.Role
                   "result", "completed without a delivered view; the obligation stays open" ]
+
             true
 
     /// D1: a delegate child that was interrupted after it delivered. The
@@ -229,6 +226,7 @@ module internal SyncDelegateInternals =
                 [ "session_id", SessionId.value turn.SessionId
                   "role", SyncDelegate.roleLabel call.Role
                   "result", "interrupted without a delivered view; the obligation stays open" ]
+
             false
 
 /// EXEC-026 / EXEC-031: reusable SyncDelegate CE (Acquire → GetOrCreate → Send →
@@ -657,28 +655,17 @@ type SyncDelegateRuntime
             | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriterUnavailable _))
             | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.WriteUnknown _))
             | Error(XTraceCaptureError.StorageAppendFailed(JournalAppendFailure.NoNewWriteReleaseFailed _)) ->
-                return
-                    SyncDelegateInternals.settleCompletedFromParts
-                        (Some journal)
-                        noteDelegateIfRole
-                        store
-                        call
-                        turn
+                return SyncDelegateInternals.settleCompletedFromParts (Some journal) noteDelegateIfRole store call turn
             | Error error ->
                 // A capture that cannot be written is a real failure of this
                 // call: claim it and fail it.
                 store.TryPopExactCall call
                 |> Option.iter (fun exact ->
                     store.FailCall(exact, sprintf "sync delegate terminal trace capture failed: %A" error))
+
                 return true
             | Ok _ ->
-                return
-                    SyncDelegateInternals.settleCompletedFromParts
-                        (Some journal)
-                        noteDelegateIfRole
-                        store
-                        call
-                        turn
+                return SyncDelegateInternals.settleCompletedFromParts (Some journal) noteDelegateIfRole store call turn
         }
 
     /// Actual acceptance observers bind attempts to the concrete invocation
@@ -694,8 +681,7 @@ type SyncDelegateRuntime
         task {
             let! expectedRoot = call.AdmissionRoot.Task
 
-            return
-                expectedRoot = Some turn.AuthorityRootUserMessageId && belongsToCall call turn
+            return expectedRoot = Some turn.AuthorityRootUserMessageId && belongsToCall call turn
         }
 
     let popIfAcceptanceMatches
@@ -706,11 +692,7 @@ type SyncDelegateRuntime
         task {
             let! matches = matchesAcceptance call turn
 
-            return
-                if matches then
-                    store.TryPopExactCall call
-                else
-                    None
+            return if matches then store.TryPopExactCall call else None
         }
 
     /// The live call this turn belongs to. The call is not claimed here: an
@@ -728,11 +710,7 @@ type SyncDelegateRuntime
             task {
                 let! matches = matchesAcceptance call turn
 
-                return
-                    if matches then
-                        Some call
-                    else
-                        None
+                return if matches then Some call else None
             }
         | None -> Task.FromResult None
 
@@ -767,13 +745,7 @@ type SyncDelegateRuntime
         task {
             match! tryFindReadyCall store turn with
             | Some call ->
-                return
-                    SyncDelegateInternals.settleAbortedFromParts
-                        (Some journal)
-                        noteDelegateIfRole
-                        store
-                        call
-                        turn
+                return SyncDelegateInternals.settleAbortedFromParts (Some journal) noteDelegateIfRole store call turn
             | None -> return false
         }
 
@@ -1073,12 +1045,7 @@ type SyncDelegateRuntime
             call.AcceptedAuthorityRoot = Some turn.AuthorityRootUserMessageId
             && belongsToCall call turn)
         |> Option.map (fun call ->
-            SyncDelegateInternals.settleCompletedFromParts
-                (Some journal)
-                noteDelegateIfRole
-                store
-                call
-                turn)
+            SyncDelegateInternals.settleCompletedFromParts (Some journal) noteDelegateIfRole store call turn)
         |> Option.defaultValue false
 
     member _.AwaitAssignmentReady(sessionId: SessionId) : Task<bool> =

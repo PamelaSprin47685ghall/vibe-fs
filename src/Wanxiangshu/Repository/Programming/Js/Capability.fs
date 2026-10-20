@@ -95,10 +95,8 @@ module JsCapability =
 /// live in the localized `tool/js-program/base-class` resources, so the base
 /// class carries one document truth per language.
 type JsCapabilityFragment =
-    {
-        Capability: JsCapability
-        MemberName: string
-    }
+    { Capability: JsCapability
+      MemberName: string }
 
 /// Fixed registry of all fragments: the only place a js-* member can be born.
 module JsFragmentRegistry =
@@ -172,10 +170,7 @@ module JsFragmentRegistry =
     /// surface without Join has no join to compile the waves into, and a
     /// member listed without a method body is a lie.
     let additionalCapabilities (fragment: JsCapabilityFragment) : JsCapability list =
-        if fragment = dag then
-            [ JsCapability.Join ]
-        else
-            []
+        if fragment = dag then [ JsCapability.Join ] else []
 
     let join: JsCapabilityFragment =
         { Capability = JsCapability.Join

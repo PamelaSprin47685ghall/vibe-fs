@@ -539,11 +539,7 @@ module OrdinaryTurnWorkflow =
                 let completeAgent () =
                     let tracePort = journal |> Option.map TerminalTracePort.forJournal
 
-                    TerminalReporter.completeWithEvidence
-                        eventPort
-                        tracePort
-                        turn
-                        (hasDeliveryEvidence journal turn)
+                    TerminalReporter.completeWithEvidence eventPort tracePort turn (hasDeliveryEvidence journal turn)
 
                 return!
                     handleOutcome

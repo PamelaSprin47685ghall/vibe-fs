@@ -70,12 +70,13 @@ module TaskDeliveryJournal =
         task {
             match TaskDelivery.validate HostDigest.sha256Hex witness with
             | Error reason -> return Error reason
-            | Ok () ->
+            | Ok() ->
                 let! appended =
                     AgentJournal.appendAgent
                         (StreamId.Session witness.Fence.SessionId)
                         (Some witness.Fence.ProviderRun)
                         (AgentFact.Host(HostFactCases.TaskDeliveryCommitted witness))
                         journal
+
                 return appended |> Result.map ignore |> Result.mapError JournalAppendFailure.describe
         }

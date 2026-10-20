@@ -176,10 +176,13 @@ module FissionHost =
             | Ok _ -> return true
             | Error err ->
                 let retired = isHandleRetired durable ownerSessionId handle
+
                 if not retired then
                     Diagnostic.emit
                         "fission-handle-consume-failed"
-                        [ "session_id", SessionId.value ownerSessionId; "result", sprintf "handle consume failed: %A" err ]
+                        [ "session_id", SessionId.value ownerSessionId
+                          "result", sprintf "handle consume failed: %A" err ]
+
                 return retired
         }
 
@@ -380,28 +383,28 @@ module FissionHost =
             | Error reason ->
                 Diagnostic.emit
                     "fission-send-failed"
-                    [ "session_id",
-                      SessionId.value laneSessionId
+                    [ "session_id", SessionId.value laneSessionId
                       "result",
                       sprintf
                           "fission takeover prompt send failed: group=%s lane=%d reason=%s"
                           group.GroupId
                           laneIndex
                           reason ]
+
                 return false
             | Ok promptKey ->
                 match! appendTakeoverClaimed durable group aggregateBlob laneIndex laneSessionId promptKey with
                 | Error failure ->
                     Diagnostic.emit
                         "fission-takeover-claimed-append-failed"
-                        [ "session_id",
-                          SessionId.value laneSessionId
+                        [ "session_id", SessionId.value laneSessionId
                           "result",
                           sprintf
                               "fission takeover claim append failed: group=%s lane=%d reason=%s"
                               group.GroupId
                               laneIndex
                               failure ]
+
                     return false
                 | Ok() -> return true
         }
@@ -448,10 +451,9 @@ module FissionHost =
             | Error reason ->
                 Diagnostic.emit
                     "fission-aggregate-write-failed"
-                    [ "session_id",
-                      SessionId.value group.OwnerSessionId
-                      "result",
-                      sprintf "fission aggregate blob write failed: group=%s reason=%s" group.GroupId reason ]
+                    [ "session_id", SessionId.value group.OwnerSessionId
+                      "result", sprintf "fission aggregate blob write failed: group=%s reason=%s" group.GroupId reason ]
+
                 return false
             | Ok aggregateBlob ->
                 return!
@@ -477,10 +479,9 @@ module FissionHost =
             | Error reason ->
                 Diagnostic.emit
                     "fission-aggregate-view-read-failed"
-                    [ "session_id",
-                      SessionId.value group.OwnerSessionId
-                      "result",
-                      sprintf "fission aggregate view read failed: group=%s reason=%s" group.GroupId reason ]
+                    [ "session_id", SessionId.value group.OwnerSessionId
+                      "result", sprintf "fission aggregate view read failed: group=%s reason=%s" group.GroupId reason ]
+
                 return false
             | Ok aggregate ->
                 return! writeAggregateAndTakeover sessionPort durable directoryFor group authority aggregate
@@ -638,8 +639,7 @@ module FissionHost =
             | Error reason ->
                 Diagnostic.emit
                     "fission-send-failed"
-                    [ "session_id",
-                      SessionId.value laneSessionId
+                    [ "session_id", SessionId.value laneSessionId
                       "result",
                       sprintf
                           "fission shared completion send failed: group=%s completion=%s lane=%d reason=%s"
@@ -647,6 +647,7 @@ module FissionHost =
                           completionId
                           laneIndex
                           reason ]
+
                 return ()
             | Ok _ ->
                 let! appended = appendDeliveryFact durable groupId now.OwnerSessionId completionId laneIndex
@@ -655,8 +656,7 @@ module FissionHost =
                 | Error failure ->
                     Diagnostic.emit
                         "fission-delivery-fact-append-failed"
-                        [ "session_id",
-                          SessionId.value now.OwnerSessionId
+                        [ "session_id", SessionId.value now.OwnerSessionId
                           "result",
                           sprintf
                               "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
@@ -665,6 +665,7 @@ module FissionHost =
                               laneIndex
                               failure ]
                 | Ok() -> ()
+
                 return ()
         }
 
@@ -688,8 +689,7 @@ module FissionHost =
                 | Error failure ->
                     Diagnostic.emit
                         "fission-delivery-fact-append-failed"
-                        [ "session_id",
-                          SessionId.value now.OwnerSessionId
+                        [ "session_id", SessionId.value now.OwnerSessionId
                           "result",
                           sprintf
                               "fission completion delivered fact append failed: group=%s completion=%s lane=%d reason=%s"
@@ -698,6 +698,7 @@ module FissionHost =
                               laneIndex
                               failure ]
                 | Ok() -> ()
+
                 return ()
             }
         else
@@ -768,10 +769,8 @@ module FissionHost =
                 | Error reason ->
                     Diagnostic.emit
                         "fission-lane-abort-failed"
-                        [ "session_id",
-                          SessionId.value laneSessionId
-                          "result",
-                          sprintf "fission lane abort failed: group=%s reason=%s" group.GroupId reason ]
+                        [ "session_id", SessionId.value laneSessionId
+                          "result", sprintf "fission lane abort failed: group=%s reason=%s" group.GroupId reason ]
         }
 
     let private failOpenGroup
@@ -795,25 +794,20 @@ module FissionHost =
             | Error failure ->
                 Diagnostic.emit
                     "fission-failed-fact-append-failed"
-                    [ "session_id",
-                      SessionId.value group.OwnerSessionId
-                      "result",
-                      sprintf "fission failed fact append failed: group=%s reason=%s" group.GroupId failure ]
+                    [ "session_id", SessionId.value group.OwnerSessionId
+                      "result", sprintf "fission failed fact append failed: group=%s reason=%s" group.GroupId failure ]
 
                 return ()
             | Ok() ->
                 do! abortAllLaneSessions sessionPort group
 
                 let notified =
-                    eventPort.NotifyTerminal
-                        group.OwnerSessionId
-                        (TerminalOutcome.Failed(TerminalStop.session reason))
+                    eventPort.NotifyTerminal group.OwnerSessionId (TerminalOutcome.Failed(TerminalStop.session reason))
 
                 if not notified then
                     Diagnostic.emit
                         "fission-failed-terminal-unobserved"
-                        [ "session_id",
-                          SessionId.value group.OwnerSessionId
+                        [ "session_id", SessionId.value group.OwnerSessionId
                           "result",
                           sprintf "fission failed terminal was a duplicate or found no listener: group=%s" group.GroupId ]
 
@@ -1100,12 +1094,17 @@ module FissionHost =
 
                 match nudge with
                 | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
-                    do! failGroup sessionPort eventPort durable group (sprintf "fission undelivered lane nudge failed: %s" reason)
+                    do!
+                        failGroup
+                            sessionPort
+                            eventPort
+                            durable
+                            group
+                            (sprintf "fission undelivered lane nudge failed: %s" reason)
                 | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
                     Diagnostic.emit
                         "fission-join-nudge-unsent"
-                        [ "session_id",
-                          SessionId.value turn.SessionId
+                        [ "session_id", SessionId.value turn.SessionId
                           "result",
                           sprintf
                               "fission undelivered lane nudge unsent: group=%s lane=%d reason=not-sent"
@@ -1114,8 +1113,7 @@ module FissionHost =
                 | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
                     Diagnostic.emit
                         "fission-join-nudge-unsent"
-                        [ "session_id",
-                          SessionId.value turn.SessionId
+                        [ "session_id", SessionId.value turn.SessionId
                           "result",
                           sprintf
                               "fission undelivered lane nudge admission rejected: group=%s lane=%d reason=%A"
@@ -1166,15 +1164,18 @@ module FissionHost =
                 | HostJoinGuard.JoinGuardNudgeOutcome.Failed reason ->
                     Diagnostic.emit
                         "fission-join-nudge-failed"
-                        [ "session_id", SessionId.value turn.SessionId; "result", sprintf "fission outstanding external nudge failed: %s" reason ]
+                        [ "session_id", SessionId.value turn.SessionId
+                          "result", sprintf "fission outstanding external nudge failed: %s" reason ]
                 | HostJoinGuard.JoinGuardNudgeOutcome.NotSent ->
                     Diagnostic.emit
                         "fission-join-nudge-unsent"
-                        [ "session_id", SessionId.value turn.SessionId; "result", "fission outstanding external nudge unsent: not-sent" ]
+                        [ "session_id", SessionId.value turn.SessionId
+                          "result", "fission outstanding external nudge unsent: not-sent" ]
                 | HostJoinGuard.JoinGuardNudgeOutcome.AdmissionRejected failure ->
                     Diagnostic.emit
                         "fission-join-nudge-unsent"
-                        [ "session_id", SessionId.value turn.SessionId; "result", sprintf "fission outstanding external nudge admission rejected: %A" failure ]
+                        [ "session_id", SessionId.value turn.SessionId
+                          "result", sprintf "fission outstanding external nudge admission rejected: %A" failure ]
                 | HostJoinGuard.JoinGuardNudgeOutcome.Sent _
                 | HostJoinGuard.JoinGuardNudgeOutcome.AlreadyOutstanding
                 | HostJoinGuard.JoinGuardNudgeOutcome.Superseded -> ()

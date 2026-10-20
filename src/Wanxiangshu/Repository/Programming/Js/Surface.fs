@@ -45,10 +45,15 @@ module JsToolGenerator =
 
     let private tryProject (roleName: string) (capabilities: Set<ToolPermission>) =
         let projected = JsCapability.ofToolCapabilities capabilities
+
         let jsCapabilities =
-            if roleName.Trim().ToLowerInvariant() = "orchestrator" && Set.contains JsCapability.Fork projected then
+            if
+                roleName.Trim().ToLowerInvariant() = "orchestrator"
+                && Set.contains JsCapability.Fork projected
+            then
                 projected |> Set.remove JsCapability.Fork |> Set.add JsCapability.Commission
-            else projected
+            else
+                projected
 
         if Set.isEmpty jsCapabilities then
             None

@@ -437,9 +437,12 @@ module PluginHooks =
                         if isNull input then
                             false
                         else
-                            [ if isPresent (input?program) then 1
-                              if isPresent (input?unpark) then 1
-                              if isPresent (input?abandon) then 1 ]
+                            [ if isPresent (input?program) then
+                                  1
+                              if isPresent (input?unpark) then
+                                  1
+                              if isPresent (input?abandon) then
+                                  1 ]
                             |> List.length > 1
 
                     if conflictingState then
@@ -487,10 +490,7 @@ module PluginHooks =
             /// 条款 6：缺精确 provider run 身份时没有 attempt 围栏，就不该
             /// 中断（不得误停新输入或后任），只记诊断，不崩。
             let reportUserQuestionMissingProviderRun (sessionId: string) =
-                Diagnostic.emit
-                    "ask-observation-missing-provider-run"
-                    [ "session_id", sessionId
-                      "result", "unbound" ]
+                Diagnostic.emit "ask-observation-missing-provider-run" [ "session_id", sessionId; "result", "unbound" ]
 
             let settleUserQuestion rawInput =
                 task {
@@ -534,18 +534,13 @@ module PluginHooks =
                 task {
                     match toolTerminalObservation "deliver" rawInput, toolRegistration with
                     | Some(sessionId, callId, "completed", Some providerRun), Some registration ->
-                        registration.Runtime.RecordDeliveryPresented(
-                            SessionId.create sessionId,
-                            providerRun,
-                            callId
-                        )
+                        registration.Runtime.RecordDeliveryPresented(SessionId.create sessionId, providerRun, callId)
                     | Some(sessionId, _, "completed", None), Some registration when
                         registration.Runtime.HasEstablishedDelivery sessionId
                         ->
                         Diagnostic.emit
                             "post-s3-deliver-observation-missing-provider-run"
-                            [ "session_id", sessionId
-                              "result", "unbound" ]
+                            [ "session_id", sessionId; "result", "unbound" ]
                     | _ -> ()
                 }
 
@@ -601,8 +596,10 @@ module PluginHooks =
             let checkManagerReviewPermissions toolName toolInput =
                 task {
                     let sessionId = toolField toolInput "sessionID"
+
                     let blockedNative =
                         toolName = "todowrite-for-engineer" || toolName = "todowrite-for-devops"
+
                     if roleFor (SessionId.create sessionId) = Some Role.Manager && blockedNative then
                         invalidOp (sprintf "Manager tool '%s' is refused on the review gate" toolName)
                 }
