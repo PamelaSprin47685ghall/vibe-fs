@@ -28,3 +28,14 @@
 - 如实记录：主仓的需求套件没有抓住"不清提问"这个变异。interaction-authority、dispatch-protocol、managed-chat-execution、crash-reconciliation 的计数和 base 相同。这条规则目前只有两处证明：库测试 003，以及差分里的占位提问操作。
 - 套件（rebase 后的 candidate 和 base 计数相同）：interaction-authority 104 pass / 13 todo；dispatch-protocol 99 pass / 1 cancel / 1 skip / 7 todo；crash-reconciliation 52 / 2 skip / 15 todo；managed-chat-execution 82 / 2 / 4；effect-accounting 34 / 5 cancel / 3 / 1；degeneration-guard 55 / 6 todo。cancel 都是既有问题，和 base 相同。
 - 库：`src/dispatch/tests/003.test.mjs` 是独立 oracle，覆盖保留集、冻结、畸形输入。
+
+## 子范围③：Work.operation 与派发认领的关联
+
+- 运行 `node association-scan.mjs <repo-root>`，结果见 [association-scan.out](association-scan.out)，5 条事实全部成立：
+  1. 认领只在 Dispatch/Send.fs 创建，共 2 处。
+  2. Send.fs 的每次发送都带 PromptKey 元数据。
+  3. Work 交付 prompt 的 `Metadata = None`。
+  4. 交付先绑定会话再发 prompt。
+  5. 交付的重启恢复不发 prompt。
+- 反例见 [association-negatives.out](association-negatives.out)：在源码副本上做了 5 个变异，扫描全部以 exit 1 报出。
+- 如实记录：这是静态扫描，没有接进构建门禁。

@@ -4,7 +4,7 @@
 
 ## 1. 当前状态与前置核对
 
-- **当前列状态**：`DOING`（eng-cut09f-goose 接手 eng-cut09e-goose，2026-10-21 认领）。子范围①②④已合入。
+- **当前列状态**：`DONE`（eng-cut09f-goose 接手 eng-cut09e-goose，2026-10-21 完成）。子范围①②④已合入；③核实后不需要搬代码，只记录两类事实的关联（见 §2d）。
 - **前置**：CUT-09 `DONE`；CUT-10 在收尾（eng-cut10e-goose）。子范围①只碰认领账规则（`Interaction/Authority/{Model,Run}.fs` 的认领段、`Interaction/Dispatch/Recovery.fs`），不触及路由与容量写集合。
 
 ## 2. 子范围①：派发认领账规则 → `wanxiangli/dispatch`（0.40.0）
@@ -39,6 +39,19 @@
 
 库：wanxiangli `fce28cc`，发布 `d449747` **0.45.0**，`src/dispatch/tests/003.test.mjs` 独立 oracle。代价：三个文件净增 50 行（标签往返与 .fsi 签名）。证据见 evidence README 子范围④。
 
+## 2d. 子范围③：Work.operation 与派发认领的关联（不合并，只核实并记录）
+
+结论：同一个发送行为只有一个认领 owner。两类发送互不重叠，所以没有能抽进库的纯裁决，也没有第二个 owner 需要退役。
+
+| 发送行为 | 唯一 owner | 身份载体 | 重启后 |
+|---|---|---|---|
+| 认领型发送：根 prompt、continuation（gate nudge、repair 等） | `Interaction/Dispatch/Send.fs`。认领只在这里创建（`claimAgentOwnerRoot`、`claimContinuation`），规则归 `wanxiangli/dispatch` | 每次 `SendPrompt` 都带 PromptKey 元数据 | `PromptRecovery.reconcile` 按 PromptKey 核对物理承接，不重发 |
+| Work 交付首条 prompt | `Mission/Planning/PlanTools.fs` 的 Work.operation（operationId）。顺序是先 `bindObservedExecutionSession` 落 DeliverySessionBound，再 `promptBoundDelivery` | `ExecutionSpawn.prompt` 的 `Metadata = None`，不带 PromptKey，派发认领无法指向它 | `PluginRecoveryWiring` 只观察或绑定精确会话，不发 prompt |
+
+两类事实的关联方式：Work 交付靠 operationId 和已绑定的执行会话，派发认领靠 PromptKey。两本账不共用键，也不互相写。
+
+证据是静态扫描 `association-scan.mjs`，5 条事实全部成立。另做了 5 个反例变异（交付带元数据、Send.fs 之外创建认领、Send.fs 发送不带 key、先发后绑、恢复路径重发），扫描全部报红。如实记录：这只是静态核对，不是运行时门禁，没有接进 `scripts/checks`。这块写集合属于 CUT-34 正在改的 architecture 门禁，以后新增的发送路径需要由 CUT-34 或 CUT-38 复查。
+
 ## 3. 验收（§9）
 
 证据见 [evidence/CUT-11](../evidence/CUT-11/README.md)。
@@ -50,8 +63,8 @@
 - 已知缺口：主仓需求测试不覆盖恢复窗口与 role 规则，等价性只由恢复差分与库测试证明。
 - 回退：revert 本卡主仓提交即可；库 0.40.0 留在 main 不影响旧 master。
 
-## 4. 余项（本卡仍 DOING）
+## 4. 余项（本卡已 DONE）
 
 - ② 已合入（见 §2b）。发送链的其余部分（gate nudge 单 flight、Detached 入栈后立即返回）是宿主异步编排，不再有可抽的纯裁决。
-- ③ Work.operation 与 dispatch claim 的关联：同一发送行为只能有一个认领 owner，两类事实明确关联而不合并成一张账。
+- ③ 已核实并记录（见 §2d）：两类发送互不重叠，关联已写明。
 - ④ 已合入（见 §2c）：投影重置只剩库一个 owner。旧 claim 写入口：`registerClaim`/`submitClaim`/`acceptClaim`/`abandonClaim` 已只按库的编辑标签改投影（子范围①），没有第二条写路径。
