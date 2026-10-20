@@ -1132,26 +1132,33 @@ module ToolRegistry =
             | Error err -> Task.FromResult(Error err)
             | Ok fenced -> captureFencedFrontier journal sessionId fenced
 
-        let fenceAndCapture journal sessionId snapshotPort owningMessageId owningCallId =
-            task {
-                let! exchange = readOwningExchange snapshotPort sessionId owningMessageId owningCallId
-                return! captureOrPropagate journal sessionId exchange
-            }
+        let boundDeliveryPhysical messages owningMessageId =
+            messages
+            |> List.tryFind (fun (message: SessionMessage) ->
+                message.Id = owningMessageId && message.Role = "assistant")
+            |> Option.bind _.ParentId
+            |> Option.bind (fun parentId ->
+                messages
+                |> List.tryFind (fun message -> message.Id = parentId && message.Role = "user")
+                |> Option.map (fun message -> PhysicalUserMessageId.create message.Id))
 
         let resolveDeliverRetirementCursor
             (runtime: ToolRuntimeScope)
             (ctx: HostToolContext)
-            : Task<Result<int64, string>> =
+            : Task<Result<int64 * PhysicalUserMessageId option, string>> =
             task {
                 match deliverPorts runtime, deliverOwnership ctx with
                 | Ok(snapshotPort, journal), Ok(owningMessageId, owningCallId) ->
-                    return!
-                        fenceAndCapture
-                            journal
-                            (SessionId.create ctx.SessionId)
-                            snapshotPort
-                            owningMessageId
-                            owningCallId
+                    let! exchange =
+                        readOwningExchange snapshotPort (SessionId.create ctx.SessionId) owningMessageId owningCallId
+
+                    let boundPhysical =
+                        exchange
+                        |> Result.map (fun messages -> boundDeliveryPhysical messages owningMessageId)
+                        |> Result.defaultValue None
+
+                    let! cursor = captureOrPropagate journal (SessionId.create ctx.SessionId) exchange
+                    return cursor |> Result.map (fun value -> value, boundPhysical)
                 | Error err, _ -> return Error err
                 | _, Error err -> return Error err
             }
@@ -1170,14 +1177,17 @@ module ToolRegistry =
             | Ok res -> renderDeliverReceipt res
             | Error err -> sprintf "deliver failed: %s" err
 
-        let registerPostS3IfEntered
+        let registerPostS3Delivery
             (runtime: ToolRuntimeScope)
             (ctx: HostToolContext)
+            (boundPhysical: PhysicalUserMessageId option)
             (outcome: Result<DeliverResult, string>)
             =
-            match outcome, ctx.ProviderRunId, ctx.ToolCallId with
-            | Ok res, Some runId, Some callId when res.RetirementOutcome = "PostS3" ->
-                runtime.RegisterPostS3Interrupt(SessionId.create ctx.SessionId, runId, callId)
+            match outcome, boundPhysical, ctx.ProviderRunId, ctx.ToolCallId with
+            | Ok res, Some physical, Some runId, Some callId when
+                res.RetirementOutcome = "PostS3" || res.RetirementOutcome = "Delivered"
+                ->
+                runtime.RegisterPostS3Interrupt(SessionId.create ctx.SessionId, runId, callId, physical)
             | _ -> ()
 
         let deliverCursor
@@ -1201,7 +1211,7 @@ module ToolRegistry =
 
                 match! resolveDeliverRetirementCursor runtime ctx with
                 | Error err -> return sprintf "deliver failed: %s" err
-                | Ok retirementCursor ->
+                | Ok(retirementCursor, boundPhysical) ->
                     let! outcome =
                         PlanTools.enterPostS3OrRelay
                             gitCommonDir
@@ -1213,7 +1223,7 @@ module ToolRegistry =
                             retirementBlockers
                             retirementCursor
 
-                    registerPostS3IfEntered runtime ctx outcome
+                    registerPostS3Delivery runtime ctx boundPhysical outcome
 
                     return renderDeliverOutcome outcome
             }
@@ -1238,7 +1248,7 @@ module ToolRegistry =
 
                 match! resolveDeliverRetirementCursor runtime ctx with
                 | Error err -> return sprintf "deliver failed: %s" err
-                | Ok retirementCursor ->
+                | Ok(retirementCursor, boundPhysical) ->
                     let! outcome =
                         PlanTools.startPostS3Execution
                             gitCommonDir
@@ -1251,6 +1261,8 @@ module ToolRegistry =
                             (deliverPrompt runtime)
                             (deliverDiscard runtime)
                             retirementCursor
+
+                    registerPostS3Delivery runtime ctx boundPhysical outcome
 
                     return renderDeliverOutcome outcome
             }

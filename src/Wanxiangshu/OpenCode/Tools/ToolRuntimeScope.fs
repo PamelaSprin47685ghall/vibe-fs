@@ -1233,14 +1233,12 @@ type ToolRuntimeScope
                 return Error ex.Message
         }
 
-    /// LC-018: 登记时保存当时的 current physical；旧 deliver 完成事件只在
-    /// 该输入仍是最新输入时才允许触发 session 级中断。
-    member _.RegisterPostS3Interrupt(sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId) =
-        let physical =
-            currentPhysicalUserMessage (SessionId.value sessionId)
-            |> Option.map PhysicalUserMessageId.create
-
-        lock gate (fun () -> postS3PendingInterrupts.Add(sessionId, providerRun, callId, physical) |> ignore)
+    member _.RegisterPostS3Interrupt
+        (sessionId: SessionId, providerRun: ProviderRunIdentity, callId: ToolCallId, physical: PhysicalUserMessageId)
+        =
+        lock gate (fun () ->
+            postS3PendingInterrupts.Add(sessionId, providerRun, callId, Some physical)
+            |> ignore)
 
     member _.HasPendingPostS3Interrupt(sessionId: string) =
         let sid = SessionId.create sessionId

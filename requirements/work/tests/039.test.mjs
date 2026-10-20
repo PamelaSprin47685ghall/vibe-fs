@@ -64,6 +64,136 @@ const authorize = (root, commonDir, workId, content) => {
   return work.ActiveId
 }
 
+const reservePostS3 = (root, commonDir, workId, content) => {
+  const active = authorize(root, commonDir, workId, content)
+  const draft = surface.readAndValidatePlan(root, workId)
+  assert.equal(draft.ok, true, draft.error)
+  const receipt = accepted(host.execute(commonDir, workId, 'reserve-post-s3', {
+    type: 'Deliver', incumbencyId: active,
+    providerRunId: 's3-reserve-run', toolCallId: 's3-reserve-call', cursor: 40, blockers: [],
+    draft: { digest: draft.digest, path: draft.path },
+  }))
+  assert.equal(receipt.Kind, 'DeliveryRequested')
+  assert.equal(host.inspected(commonDir, workId).PendingDelivery, true)
+}
+
+test('WHAT[work-039] fresh post-S3 admission rechecks late resources and needs durable acceptance before a successful replay', async () => {
+  await withWorkspace(async (_store, root, commonDir) => {
+    const workId = 'fresh-late-resource'
+    const content = '# fresh execution with a late resource\n'
+    reservePostS3(root, commonDir, workId, content)
+    let busy = false
+    let queries = 0
+    let creates = 0
+    let prompts = 0
+    const blocked = () => { queries += 1; return busy }
+    const execution = {
+      create: async () => { creates += 1; return 'fresh-late-execution' },
+      prompt: async () => { prompts += 1; busy = true; return { kind: 'Started' } },
+      discard: async () => assert.fail('an accepted execution cannot be discarded'),
+    }
+    const first = await surface.startPostS3Execution(
+      commonDir, root, workId, 'fresh-resource-run', 'fresh-resource-call', blocked, execution, 50n,
+    )
+    assert.equal(first.ok, false)
+    assert.match(first.error, /live resources/)
+    assert.ok(queries >= 2, 'fresh admission must recheck resources after the prompt')
+    assert.equal(host.inspected(commonDir, workId).PendingDelivery, true)
+    assert.equal(host.inspected(commonDir, workId).Delivered, false)
+    busy = false
+    for (const [run, call] of [['fresh-resource-run', 'fresh-resource-call'], ['other-resource-run', 'other-resource-call']]) {
+      const replay = await surface.startPostS3Execution(commonDir, root, workId, run, call, blocked, execution, 50n)
+      assert.equal(replay.ok, false, 'a bound pending session is not a completed delivery')
+      assert.match(replay.error, /pending|unknown/)
+    }
+    assert.equal(creates, 1)
+    assert.equal(prompts, 1)
+    const settled = surface.reconcileBoundExecution(commonDir, workId, 'fresh-late-execution', content, [])
+    assert.equal(settled.ok, true, settled.error)
+    assert.equal(host.inspected(commonDir, workId).Delivered, true)
+    const revision = host.inspect(commonDir, workId).revision
+    const replay = await surface.startPostS3Execution(
+      commonDir, root, workId, 'fresh-resource-run', 'fresh-resource-call', blocked, execution, 50n,
+    )
+    assert.equal(replay.ok, true, replay.error)
+    assert.equal(replay.execSessionId, 'fresh-late-execution')
+    assert.equal(replay.digest, surface.readAndValidatePlan(root, workId).digest)
+    assert.equal(host.inspect(commonDir, workId).revision, revision)
+    assert.equal(creates, 1)
+    assert.equal(prompts, 1)
+  })
+})
+
+test('WHAT[work-039] fresh post-S3 unknown prompt remains pending across same and new call fences without a resend', async () => {
+  await withWorkspace(async (_store, root, commonDir) => {
+    const workId = 'fresh-unknown-prompt'
+    const content = '# unknown fresh execution\n'
+    reservePostS3(root, commonDir, workId, content)
+    let creates = 0
+    let prompts = 0
+    const execution = {
+      create: async () => { creates += 1; return 'fresh-unknown-execution' },
+      prompt: async () => { prompts += 1; return { kind: 'Unknown', reason: 'receipt lost after sending' } },
+      discard: async () => assert.fail('an unknown execution cannot be discarded'),
+    }
+    const first = await surface.startPostS3Execution(
+      commonDir, root, workId, 'fresh-unknown-run', 'fresh-unknown-call', false, execution, 50n,
+    )
+    assert.equal(first.ok, false)
+    assert.match(first.error, /outcome is unknown/)
+    const pending = host.inspected(commonDir, workId)
+    assert.equal(pending.PendingDelivery, true)
+    assert.equal(pending.PendingExecSessionId, 'fresh-unknown-execution')
+    const revision = host.inspect(commonDir, workId).revision
+    for (const [run, call] of [['fresh-unknown-run', 'fresh-unknown-call'], ['new-unknown-run', 'new-unknown-call']]) {
+      const replay = await surface.startPostS3Execution(commonDir, root, workId, run, call, false, execution, 50n)
+      assert.equal(replay.ok, false)
+      assert.match(replay.error, /pending|unknown/)
+      assert.equal(host.inspected(commonDir, workId).Delivered, false)
+    }
+    assert.equal(host.inspect(commonDir, workId).revision, revision)
+    assert.equal(creates, 1)
+    assert.equal(prompts, 1)
+    const settled = surface.reconcileBoundExecution(commonDir, workId, 'fresh-unknown-execution', content, [])
+    assert.equal(settled.ok, true, settled.error)
+    const settledRevision = host.inspect(commonDir, workId).revision
+    const replay = await surface.startPostS3Execution(
+      commonDir, root, workId, 'fresh-unknown-run', 'fresh-unknown-call', false, execution, 50n,
+    )
+    assert.equal(replay.ok, true, replay.error)
+    assert.equal(replay.execSessionId, 'fresh-unknown-execution')
+    assert.equal(replay.digest, surface.readAndValidatePlan(root, workId).digest)
+    assert.equal(host.inspect(commonDir, workId).revision, settledRevision)
+    assert.equal(creates, 1)
+    assert.equal(prompts, 1)
+  })
+})
+
+test('WHAT[work-039] fresh post-S3 definite refusal releases its reservation only after the bound session is discarded', async () => {
+  await withWorkspace(async (_store, root, commonDir) => {
+    const workId = 'fresh-definite-refusal'
+    reservePostS3(root, commonDir, workId, '# a definitely refused fresh execution\n')
+    let discarded = false
+    const refused = await surface.startPostS3Execution(
+      commonDir, root, workId, 'fresh-refused-run', 'fresh-refused-call', false,
+      {
+        create: async () => 'fresh-refused-execution',
+        prompt: async () => ({ kind: 'NotStarted', reason: 'refused before admission' }),
+        discard: async session => {
+          assert.equal(session, 'fresh-refused-execution')
+          assert.equal(host.inspected(commonDir, workId).PendingDelivery, true)
+          discarded = true
+        },
+      }, 50n,
+    )
+    assert.equal(refused.ok, false)
+    assert.match(refused.error, /refused before admission/)
+    assert.equal(discarded, true)
+    assert.equal(host.inspected(commonDir, workId).PendingDelivery, false)
+    assert.equal(host.inspected(commonDir, workId).Delivered, false)
+  })
+})
+
 test('WHAT[work-039] resources appearing during prompt admission block retirement and later settle without another prompt', async () => {
   await withWorkspace(async (_store, root, commonDir) => {
     const workId = 'delivery-late-resource'

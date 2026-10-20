@@ -3,6 +3,7 @@ namespace Wanxiangshu.Mission.Planning
 open System
 open System.Threading.Tasks
 open FsToolkit.ErrorHandling
+open Fable.Core.JsInterop
 open Wanxiangshu.Foundation
 open Wanxiangshu.Host
 
@@ -737,21 +738,6 @@ module PlanTools =
                 )
         }
 
-    let private discardFreshExecution
-        (discardSession: string -> Task<Result<unit, string>>)
-        (execSessionId: string)
-        (reason: string)
-        : Task<Result<DeliverResult, string>> =
-        task {
-            match! discardSession execSessionId with
-            | Error cleanup ->
-                return
-                    Error(
-                        sprintf "Execution prompt was refused, but its empty session could not be discarded: %s" cleanup
-                    )
-            | Ok() -> return Error reason
-        }
-
     /// LC-020: the fresh execution handoff settles through the same durable
     /// ledger as the first handoff. The operation id is the pending
     /// delivery's own identity, the created session is durably bound
@@ -783,6 +769,7 @@ module PlanTools =
         (gitCommonDir: string)
         (workId: string)
         (operationId: string)
+        (retirementBlockers: unit -> string array)
         (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
         (discardSession: string -> Task<Result<unit, string>>)
         (content: string)
@@ -792,7 +779,8 @@ module PlanTools =
         : Task<Result<DeliverResult, string>> =
         task {
             match! promptSession execSessionId "manager" content with
-            | NotStarted err -> return! discardFreshExecution discardSession execSessionId err
+            | NotStarted err ->
+                return! discardBeforeReject discardSession gitCommonDir workId operationId execSessionId err
             | Unknown err ->
                 let! _ = observePendingOperation gitCommonDir workId operationId |> Task.FromResult
 
@@ -800,26 +788,22 @@ module PlanTools =
             | Started observedSession when observedSession <> execSessionId ->
                 return Error "Execution prompt returned a different session identity"
             | Started _ ->
-                executionFences[operationId] <- execSessionId
-
                 return
-                    Ok
-                        { Ok = true
-                          Relayed = false
-                          Delivered = true
-                          RetiredIncumbencyId = ""
-                          RetirementOutcome = "Delivered"
-                          Digest = digest
-                          Path = path
-                          ExecSessionId = execSessionId
-                          NextIncumbencyId = ""
-                          Message = "Plan delivered" }
+                    settleAcceptedDelivery
+                        gitCommonDir
+                        workId
+                        operationId
+                        execSessionId
+                        digest
+                        path
+                        (retirementBlockers ())
         }
 
     let private createAndPromptFreshExecution
         (gitCommonDir: string)
         (workId: string)
         (operationId: string)
+        (retirementBlockers: unit -> string array)
         (createSession: string -> string -> Task<Result<string, string>>)
         (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
         (discardSession: string -> Task<Result<unit, string>>)
@@ -841,6 +825,7 @@ module PlanTools =
                     gitCommonDir
                     workId
                     operationId
+                    retirementBlockers
                     promptSession
                     discardSession
                     content
@@ -858,7 +843,7 @@ module PlanTools =
             return!
                 match work.PendingOperationId, work.PendingExecSessionId, work.PendingDigest, work.PendingPath with
                 | Some operationId, None, Some digest, Some path -> Ok(operationId, digest, path)
-                | Some _, Some bound, Some digest, Some path -> Ok("replay:" + bound, digest, path)
+                | Some _, Some _, Some _, Some _ -> Error "Execution session prompt outcome is still pending"
                 | _ -> Error "pending delivery evidence is incomplete"
         }
 
@@ -867,6 +852,7 @@ module PlanTools =
         root
         workId
         operationId
+        retirementBlockers
         createSession
         promptSession
         discardSession
@@ -882,6 +868,7 @@ module PlanTools =
                         gitCommonDir
                         workId
                         operationId
+                        retirementBlockers
                         createSession
                         promptSession
                         discardSession
@@ -902,40 +889,31 @@ module PlanTools =
         (gitCommonDir: string)
         (root: string)
         (workId: string)
-        (blockers: string array)
+        (retirementBlockers: unit -> string array)
         (createSession: string -> string -> Task<Result<string, string>>)
         (promptSession: string -> string -> string -> Task<DeliverySpawnOutcome>)
         (discardSession: string -> Task<Result<unit, string>>)
         : Task<Result<DeliverResult, string>> =
         taskResult {
-            do! Result.requireTrue "Cannot deliver: live resources block starting execution" (Array.isEmpty blockers)
+            do!
+                Result.requireTrue
+                    "Cannot deliver: live resources block starting execution"
+                    (Array.isEmpty (retirementBlockers ()))
 
             let! operationId, digest, path = pendingDeliveryOf gitCommonDir workId
 
-            if operationId.StartsWith "replay:" then
-                return
-                    { Ok = true
-                      Relayed = false
-                      Delivered = true
-                      RetiredIncumbencyId = ""
-                      RetirementOutcome = "Delivered"
-                      Digest = digest
-                      Path = path
-                      ExecSessionId = operationId.Substring("replay:".Length)
-                      NextIncumbencyId = ""
-                      Message = "Delivered" }
-            else
-                return!
-                    startReservedExecution
-                        gitCommonDir
-                        root
-                        workId
-                        operationId
-                        createSession
-                        promptSession
-                        discardSession
-                        digest
-                        path
+            return!
+                startReservedExecution
+                    gitCommonDir
+                    root
+                    workId
+                    operationId
+                    retirementBlockers
+                    createSession
+                    promptSession
+                    discardSession
+                    digest
+                    path
         }
 
     let private reviewAndDeliverReopenedPostS3
@@ -1059,10 +1037,46 @@ module PlanTools =
                         activeId
         }
 
-    let private rememberedExecutionSession key =
-        match executionFences.TryGetValue key with
-        | true, sessionId -> sessionId
-        | false, _ -> key
+    let private replayExecutionDelivery gitCommonDir workId operationId =
+        let observation =
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.command
+                "ResolveDelivery"
+                [ "operationId", box operationId; "outcome", box "Unknown" ]
+
+        let receipt =
+            durableObservation gitCommonDir workId (operationId + ":unknown") observation
+
+        if
+            not (Wanxiangshu.Mission.Lifecycle.DurableWorkHost.admitted receipt)
+            || receipt.Kind <> "Delivered"
+        then
+            Error "Execution session prompt outcome is still pending"
+        else
+            let retirementId =
+                Wanxiangshu.Mission.Lifecycle.DurableWorkHost.resultText receipt "retirementId"
+
+            Wanxiangshu.Mission.Lifecycle.DurableWorkHost.useWork gitCommonDir workId (fun work ->
+                let history: obj array = work?history ()
+
+                history
+                |> Array.collect (fun frame -> unbox<obj array> frame?events)
+                |> Array.tryFind (fun event ->
+                    (event?``type``: string) = "IncumbencyRetired"
+                    && (event?outcome: string) = "Delivered"
+                    && (event?retirementId: string) = retirementId
+                    && (event?operationId: string) = operationId)
+                |> Result.requireSome "The completed delivery has no exact execution receipt"
+                |> Result.map (fun event ->
+                    { Ok = true
+                      Relayed = false
+                      Delivered = true
+                      RetiredIncumbencyId = event?incumbencyId
+                      RetirementOutcome = "Delivered"
+                      Digest = event?digest
+                      Path = event?path
+                      ExecSessionId = event?execSessionId
+                      NextIncumbencyId = ""
+                      Message = "Delivered" }))
 
     let private dispatchPostS3Execution
         (gitCommonDir: string)
@@ -1090,27 +1104,13 @@ module PlanTools =
                 gitCommonDir
                 root
                 workId
-                (retirementBlockers ())
+                retirementBlockers
                 createSession
                 promptSession
                 discardSession
-        elif executionFences.ContainsKey(providerRunId + ":" + toolCallId) then
-            let remembered =
-                rememberedExecutionSession executionFences[providerRunId + ":" + toolCallId]
-
-            Task.FromResult(
-                Ok
-                    { Ok = true
-                      Relayed = false
-                      Delivered = true
-                      RetiredIncumbencyId = ""
-                      RetirementOutcome = "Delivered"
-                      Digest = ""
-                      Path = ""
-                      ExecSessionId = remembered
-                      NextIncumbencyId = ""
-                      Message = "Delivered" }
-            )
+        elif work.Delivered && executionFences.ContainsKey(providerRunId + ":" + toolCallId) then
+            replayExecutionDelivery gitCommonDir workId executionFences[providerRunId + ":" + toolCallId]
+            |> Task.FromResult
         elif retiredCount <= 1 then
             startFirstPostS3Execution
                 gitCommonDir
@@ -1129,7 +1129,7 @@ module PlanTools =
                 gitCommonDir
                 root
                 workId
-                (retirementBlockers ())
+                retirementBlockers
                 createSession
                 promptSession
                 discardSession

@@ -66,10 +66,11 @@ type ToolRuntimeScope =
     member InterruptForUserQuestion:
         sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> Task<Result<unit, string>>
 
-    /// LC-018: registers the pending post-S3 interrupt with the current physical
-    /// user message; a later deliver-completed event only fires the session
-    /// interrupt while that input is still the latest one.
-    member RegisterPostS3Interrupt: sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId -> unit
+    /// Bind the interrupt to the delivery's proven physical input.
+    member RegisterPostS3Interrupt:
+        sessionId: SessionId * providerRun: ProviderRunIdentity * callId: ToolCallId * physical: PhysicalUserMessageId ->
+            unit
+
     member HasPendingPostS3Interrupt: sessionId: string -> bool
 
     member InterruptForPostS3Deliver:
