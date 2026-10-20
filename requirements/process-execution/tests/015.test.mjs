@@ -15,13 +15,13 @@ import { refreshGlobalLanguage } from '../../../dist/Participant/Provider/Langua
 for (const offset of [0, 1, 2, 3, 4, 7]) {
   test(`WHAT[process-execution-015] UTF-8 tail bound at alignment offset ${offset} fits HostMaxBytes without splitting a code point`, () => {
     const original = 'a'.repeat(offset) + '中文🔥'.repeat(6000)
-    assert.ok(Buffer.byteLength(original, 'utf8') > toolResultBound.HostMaxBytes)
+    assert.ok(Buffer.byteLength(original, 'utf8') > toolResultBound.HostMaxBytes())
     const bounded = toolResultBound.bound(original)
     assert.ok(bounded.startsWith(toolResultBound.Marker))
     const tail = bounded.slice(toolResultBound.Marker.length)
     assert.equal(tail.includes('\uFFFD'), false)
-    assert.ok(Buffer.byteLength(tail, 'utf8') <= toolResultBound.ContentMaxBytes)
-    assert.ok(Buffer.byteLength(bounded, 'utf8') <= toolResultBound.HostMaxBytes)
+    assert.ok(Buffer.byteLength(tail, 'utf8') <= toolResultBound.ContentMaxBytes())
+    assert.ok(Buffer.byteLength(bounded, 'utf8') <= toolResultBound.HostMaxBytes())
     assert.ok(original.endsWith(tail))
     assert.equal(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.from(bounded)), bounded)
     assert.equal(toolResultBound.fitsInWindow(bounded), true)
@@ -44,10 +44,33 @@ test('WHAT[process-execution-015] the complete visible result fits the Host wind
     )
     assert.equal(caseName(outcome), 'Succeeded')
     const wire = render(outcome)
-    assert.ok(Buffer.byteLength(wire, 'utf8') <= toolResultBound.HostMaxBytes)
-    assert.ok(wire.split('\n').length <= toolResultBound.HostMaxLines)
+    assert.ok(Buffer.byteLength(wire, 'utf8') <= toolResultBound.HostMaxBytes())
+    assert.ok(wire.split('\n').length <= toolResultBound.HostMaxLines())
     assert.equal(toolResultBound.fitsInWindow(wire), true)
   } finally {
+    cleanup()
+  }
+})
+
+test('WHAT[process-execution-015] a lowered Host ceiling refuses before spawn and a usable ceiling bounds the complete wire', async () => {
+  const { dir, cleanup } = sandbox('wxs-host-ceiling-015-')
+  const marker = join(dir, 'started')
+  const command = nodeCommand(`require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'started'); process.stdout.write('中文😀'.repeat(10000))`)
+  try {
+    for (const [lines, bytes] of [[2000, 128], [3, 51200]]) {
+      toolResultBound.setHostLimits(lines, bytes)
+      const refused = await runProgram(dir, `return await js.run(${oneCommand(command)});`)
+      assert.equal(caseName(refused), 'Failed', render(refused))
+      assert.equal(existsSync(marker), false, 'unrepresentable results must refuse before effects')
+    }
+    toolResultBound.setHostLimits(2000, 4096)
+    const result = await runProgram(dir, `return await js.run(${oneCommand(command)});`)
+    assert.equal(caseName(result), 'Succeeded', render(result))
+    assert.equal(existsSync(marker), true)
+    assert.ok(Buffer.byteLength(render(result)) <= 4096)
+    assert.equal(parse(render(result)).data.truncated, true)
+  } finally {
+    toolResultBound.clearHostLimitsForTests()
     cleanup()
   }
 })

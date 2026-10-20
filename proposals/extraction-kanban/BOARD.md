@@ -8,6 +8,8 @@
 
 2026-10-19 用户已授权按[整合计划](UPSTREAM-SEMANTIC-MERGE-2026-10-19.md)推进 SM-01—SM-07，具体处置见[语义处置表](UPSTREAM-SEMANTIC-DISPOSITION-2026-10-19.md)。owner：本 chat 的 root；SM-01已提交，SM-02A/B/C库候选05f6b5a限定验收LIB_READY，SM-03至SM-06限定范围READY，SM-07候选进入REVIEW；完整发行未通过，未切换运行。证据与未决范围只在整合计划更新。公共编辑面为两仓 manifest/锁/gitlink、构建图、实际插件接线与本看板，串行集成。原 CUT/GAP 的状态、失败和剩余范围继续保留；本批局部通过不销父项。Blogger 全退役不在范围。
 
+2026-10-20 用户已授权下一批 M1—M6，唯一进度及证据索引为[增量接收计划](UPSTREAM-INTAKE-2026-10-20.md)，语义去向见[处置表](UPSTREAM-INTAKE-DISPOSITION-2026-10-20.md)。固定参照 upstream 0932e0c08，库保持 05f6b5a；小的边缘问题记录后继续，期限、取消与历史读取退化阻断交付，原 CUT/GAP 不自动改变。
+
 ## 列与流转
 
 ```text

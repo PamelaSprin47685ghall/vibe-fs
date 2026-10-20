@@ -15,8 +15,8 @@ open Wanxiangshu.Foundation
 /// ```
 ///
 /// We bound before Host sees the result and keep the **tail**. Marker is a
-/// fixed ASCII constant; content budgets are static literals — no iterative
-/// search, no safety fudge factor:
+/// fixed ASCII constant; content budgets subtract its cost from the live Host
+/// ceiling:
 ///
 /// ```text
 /// Marker        = "...head truncated (tail kept)...\n\n"   // 34 bytes, ASCII
@@ -26,25 +26,55 @@ open Wanxiangshu.Foundation
 ///   result.lines = 2 + content.lines     // "m\n\nx".split → 3 = 2+1
 ///   result.bytes = 34 + content.bytes
 ///
-/// ContentMaxLines = 2000 − 2  = 1998
-/// ContentMaxBytes = 51200 − 34 = 51166
+/// ContentMaxLines = HostMaxLines() − 2
+/// ContentMaxBytes = HostMaxBytes() − 34
 ///
 /// ⇒ result.lines ≤ 2000 ∧ result.bytes ≤ 51200  (Host no-ops)
 /// ```
 module ToolResultBound =
 
-    // Not [<Literal>]: Fable drops unused compile-time literals from JS exports.
-    // These are contract values tests and callers must observe.
-    let HostMaxLines = 2000
-    let HostMaxBytes = 51200
+    let DefaultHostMaxLines = 2000
+    let DefaultHostMaxBytes = 51200
 
     /// Fixed ASCII prefix. UTF-8 byte length = char length = 34.
     /// Host line cost when concatenated with non-empty content: +2
     /// (`split("\n")` of `"…\n\n" + content` keeps the marker line + one empty).
     let Marker = "...head truncated (tail kept)...\n\n"
     let MarkerBytes = 34
-    let ContentMaxLines = 1998
-    let ContentMaxBytes = 51166
+    let MarkerLineCost = 2
+
+    // DSL-MUTABLE: resource — Host-declared transport ceiling
+    let mutable private hostMaxLines = DefaultHostMaxLines
+    // DSL-MUTABLE: resource — Host-declared transport ceiling
+    let mutable private hostMaxBytes = DefaultHostMaxBytes
+
+    let HostMaxLines () = hostMaxLines
+    let HostMaxBytes () = hostMaxBytes
+    let ContentMaxLines () = hostMaxLines - MarkerLineCost
+    let ContentMaxBytes () = hostMaxBytes - MarkerBytes
+
+    let private ceilingOf (value: obj) floor =
+        if
+            Fable.Core.JsInterop.emitJsExpr
+                (value, floor)
+                "typeof $0 === 'number' && Number.isSafeInteger($0) && $0 > $1 && $0 <= 2147483647"
+        then
+            Some(unbox<int> value)
+        else
+            None
+
+    let setHostLimits (maxLines: obj) (maxBytes: obj) =
+        match ceilingOf maxLines MarkerLineCost with
+        | Some limit -> hostMaxLines <- limit
+        | None -> ()
+
+        match ceilingOf maxBytes MarkerBytes with
+        | Some limit -> hostMaxBytes <- limit
+        | None -> ()
+
+    let clearHostLimitsForTests () =
+        hostMaxLines <- DefaultHostMaxLines
+        hostMaxBytes <- DefaultHostMaxBytes
 
     let private isHighSurrogate (c: char) =
         let code = int c
@@ -112,7 +142,7 @@ module ToolResultBound =
         p + 1, p
 
     let private overflowTail (text: string) (segStart: int) (segEnd: int) : string list =
-        let tail = utf8Tail (text.Substring(segStart, segEnd - segStart)) ContentMaxBytes
+        let tail = utf8Tail (text.Substring(segStart, segEnd - segStart)) (ContentMaxBytes())
         if tail = "" then [] else [ tail ]
 
     let rec private collectTail
@@ -126,7 +156,7 @@ module ToolResultBound =
         let line = text.Substring(segStart, segEnd - segStart)
         let lineBytes = LlmFacing.byteCount line
         let size = lineBytes + (if count = 0 then 0 else 1)
-        let overBudget = count >= ContentMaxLines || accBytes + size > ContentMaxBytes
+        let overBudget = count >= ContentMaxLines() || accBytes + size > ContentMaxBytes()
 
         if overBudget && count = 0 then
             overflowTail text segStart segEnd
@@ -161,7 +191,7 @@ module ToolResultBound =
         else
             let totalBytes = LlmFacing.byteCount text
             let totalLines = countLines text
-            totalLines <= HostMaxLines && totalBytes <= HostMaxBytes
+            totalLines <= HostMaxLines() && totalBytes <= HostMaxBytes()
 
     /// Bound a custom tool result. Under Host limits → identity.
     /// Over → `Marker + tail`, sized so Host does not re-truncate.

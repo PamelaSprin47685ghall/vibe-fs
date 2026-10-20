@@ -50,7 +50,27 @@ integrationTest('WHAT[verification-system-016] selected complete Git source and 
 integrationTest('WHAT[verification-system-016] four selected input owners compile the original foundation identity project with Fable into isolated outputs', { skip: !hasExplicitReadonlyContext() }, repositoryFableProjectTest)
 integrationTest('WHAT[verification-system-016] mac readonly views protect actual original-project Fable inputs and restore all prepared owners', { skip: process.platform !== 'darwin' || !hasExplicitReadonlyContext() }, repositoryReadonlyFableProjectTest)
 
-test.todo('WHAT[verification-system-016] the actual verification run binds its evidence to the same immutable candidate snapshot')
+test('WHAT[verification-system-016] verification results retain the full input digest on success and failure', async () => {
+  const fixture = setupFixtureRepo()
+  const logDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-candidate-logs-'))
+  try {
+    const expectedDigest = computeDigest(collectVerificationInputs(fixture))
+    for (const ok of [true, false]) {
+      const result = await verify({
+        root: fixture,
+        release: false,
+        runStep: async ({ label }) => ({ label, ok, exitCode: ok ? 0 : 1, signal: null, durationMs: 1 }),
+        output: { write() {} },
+        logDirectory,
+      })
+      assert.equal(result.outcome, ok ? 'pass' : 'fail')
+      assert.equal(result.candidateDigest, expectedDigest)
+    }
+  } finally {
+    fs.rmSync(fixture, { recursive: true, force: true })
+    fs.rmSync(logDirectory, { recursive: true, force: true })
+  }
+})
 import { collectGeneratedInputs, collectVerificationInputs, computeDigest, diffVerificationInputs } from '../../../scripts/lib/build-state.mjs'
 import { verify } from '../../../scripts/verify.mjs'
 

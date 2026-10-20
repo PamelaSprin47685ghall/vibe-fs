@@ -337,7 +337,7 @@ module JsRunLoop =
 
             head + ProcessOutput.decodeText tailBytes
 
-    let private minimumOutputBudget root notice =
+    let private minimumResult root notice =
         let sample =
             outcome
                 "aborted"
@@ -359,7 +359,10 @@ module JsRunLoop =
         sample?notStarted <- true
         sample?root <- root
         sample?elapsedMs <- 9007199254740991.0
-        int64 (LlmFacing.byteCount (renderResult sample))
+        renderResult sample
+
+    let private minimumOutputBudget root notice =
+        int64 (LlmFacing.byteCount (minimumResult root notice))
 
     let private boundResult budget notice (value: obj) =
         let originalStdout = string value?stdout
@@ -1381,7 +1384,7 @@ module JsRunLoop =
                     if children.ContainsKey name then
                         result <- failure "RUN_CHILD_NAME_CONFLICT" ("A background already owns this name: " + name)
                     elif
-                        backgroundBudgetMinimum name > min spec.OutputBudgetBytes (int64 ToolResultBound.HostMaxBytes)
+                        backgroundBudgetMinimum name > min spec.OutputBudgetBytes (int64 (ToolResultBound.HostMaxBytes()))
                     then
                         result <-
                             failure
@@ -1856,7 +1859,10 @@ module JsRunLoop =
         | _ when parkState |> Option.exists (fun state -> state.AbandonRequested) ->
             task { return raise (abandoned ()) }
         | Error fail -> Task.FromResult fail
-        | Ok spec when spec.OutputBudgetBytes < minimumOutputBudget root (scope.OutputNotice()) ->
+        | Ok spec when
+            spec.OutputBudgetBytes < minimumOutputBudget root (scope.OutputNotice())
+            || not (ToolResultBound.fitsInWindow (minimumResult root (scope.OutputNotice())))
+            ->
             let refused =
                 failure "RUN_OUTPUT_BUDGET_TOO_SMALL" "outputBudgetBytes cannot encode the required result"
 

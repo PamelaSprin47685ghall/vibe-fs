@@ -60,6 +60,8 @@
 
 自定义工具返回的文本结果在进入宿主传输层前必须执行确定性的尾部有界截断，确保超长输出不会导致传输层溢出或阻塞。
 
+Host 的 `config.tool_output.max_lines/max_bytes` 提供实际上限，未提供时使用 2000 行、51200 字节。合法上限是可表示的正整数且大于截断标记成本；非法配置保留当前上限。内容预算扣除标记成本，完整结果按 UTF-8 字节和实际行数计费；采集容量不代替呈现上限。
+
 ## [016] HostEventPort Run 去重与 Sticky 重放
 
 事件端口对同一运行周期的完成事件执行幂等去重，对迟到订阅者提供粘性重放，并在监听器释放后彻底停止投递。run-scoped `Failed/Aborted` 与 `Completed` 一样必须保留其 Authority Root causal identity；future-only subscriber 不得重放既有 sticky terminal，供新 work unit 使用时只能观察订阅后的新事件。

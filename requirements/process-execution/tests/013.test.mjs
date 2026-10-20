@@ -41,7 +41,7 @@ test('WHAT[process-execution-013] js.run bounds large output deterministically t
     assert.equal(parsed.exitCode, 0)
     assert.equal(parsed.truncated, true)
     assert.equal(parsed.bytes, 10 + 200000 + 200000 + 10)
-    assert.ok(parsed.keptLength > 0 && parsed.keptLength <= toolResultBound.HostMaxBytes)
+    assert.ok(parsed.keptLength > 0 && parsed.keptLength <= toolResultBound.HostMaxBytes())
     assert.equal(parsed.startsWithHead, true)
     assert.equal(parsed.endsWithTail, true)
   } finally {
