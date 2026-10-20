@@ -253,19 +253,25 @@ module ProcessEventLog =
           FileNames: string list
           LastActivityMs: float }
 
-    /// durable-convergence-011: writer retention is a UTC calendar-day group,
-    /// not a rolling 24h window. A writer stays while its last-activity UTC date
-    /// is today or yesterday; the day before and earlier are collected. The date
-    /// is a GC grouping only — it carries no history meaning, and a writer's
-    /// activity may move it to a later day.
-    let private utcDayMilliseconds = 24.0 * 60.0 * 60.0 * 1000.0
+    /// durable-convergence-011: the whole-writer UTC calendar-day retention
+    /// rule has one owner, wanxiangli/retention (CUT-19). This log only supplies
+    /// the cut-off instant and each writer's activity; it never decides the day
+    /// arithmetic itself. A non-finite instant is rejected, never treated as
+    /// expired.
+    [<Import("WriterRetention", "wanxiangli/retention")>]
+    let private retentionClass: obj = jsNative
 
-    let utcDayOf (timeMs: float) = floor (timeMs / utcDayMilliseconds)
+    [<Emit("new $0()")>]
+    let private constructRetention (cls: obj) : obj = jsNative
 
-    let writerRetentionMilliseconds () = utcDayMilliseconds
+    let private retention: obj = constructRetention retentionClass
 
-    let isWriterActiveAt nowMs lastActivityMs =
-        utcDayOf lastActivityMs >= utcDayOf nowMs - 1.0
+    let utcDayOf (timeMs: float) : float = unbox<float> (retention?utcDay timeMs)
+
+    let writerRetentionMilliseconds () : float = unbox<float> retention?dayMilliseconds
+
+    let isWriterActiveAt (nowMs: float) (lastActivityMs: float) : bool =
+        unbox<bool> (retention?isRetained (nowMs, lastActivityMs))
 
     let private tryAcquireLock (target: string) (options: obj) waitStep : Task<obj option> =
         task {

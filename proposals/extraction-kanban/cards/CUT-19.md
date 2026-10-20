@@ -1,4 +1,4 @@
-# CUT-19：多 writer 存储与收敛 —— 第一子范围：结构 k-way 归并
+# CUT-19：多 writer 存储与收敛（子范围①结构 k-way 归并、②writer 保留规则）
 
 返回 [看板](../BOARD.md) / [职责卡](../CARDS.md#cut-19) / [范围对账](../COVERAGE.md)。
 
@@ -41,7 +41,7 @@
 - 文件：`src/convergence/{KWayMerge.fs, Wanxiangli.Convergence.fsproj, index.d.ts, AGENTS.md, tests/{001,002,003,011}.test.mjs}`，`scripts/tests/convergence-{package.test.mjs,consumer.mjs,consumer.ts}`。独立 fsproj，零 ProjectReference；运行时只 import `wanxiangli/events`（esbuild external）。
 - 库测试：`convergence` 15/15；含 events、exports、repository、build、convergence-package 的定向集 54/54（rebase 到 6bf65d3 之后、发布前，Node 22.21.1）。`convergence-package` 实际 `npm pack` → 干净目录安装 → `tsc --strict` 类型消费 → Node 与 Bun 各跑一次真实分叉归并。
 - 全量 `npm test`（rebase 前，Node 22.21.1）：475 项中 471 pass；4 项未通过均与本卡无关：`eventstore-001` 双进程争抢在机器满载下失败一次、单独重跑 5/5 通过；`ownership-package`/`package`/`trace-package` 三个安装包测试在 pass 之后进程不退出，被我手动终止（`trace-package` 单独重跑同样 ok 后挂起至超时）。如实记为未完成运行，不计为通过。
-- 主仓消费方式：子模块 gitlink（发行物不再是 vendor tarball，见 CUT-33）。gitlink `2564387 → 674bdfb`，`package-lock.json` 中 wanxiangli 版本 `0.9.0 → 0.14.0`。这次 gitlink 前进同时带入其他卡已发布的 0.10–0.13（prefix、identity、degeneration、spool），主仓在此 gitlink 下完整构建通过。
+- 主仓消费方式：子模块 gitlink（发行物不再是 vendor tarball，见 CUT-33）。落地提交 b7d45b063 把 gitlink 从 master 当时的 `6bf65d3`（0.13.0）推进到 `674bdfb`，`package-lock.json` 中 wanxiangli 版本 `0.13.0 → 0.14.0`（中途 master 从 0.9.0 前进，故 rebase 后的实际起点是 0.13.0），主仓在此 gitlink 下完整构建通过。
 
 ## 6. F. 接回真实链
 
@@ -75,8 +75,17 @@
 - 回退：纯计算，没有新数据；`git revert` 主仓提交即可回到旧算法（库 0.14.0 可保留）。
 - 未做：全量 `scripts/verify.mjs` 与 integration run.mjs（同机重型套件，留给集成者）。
 
-## 9. 下一子范围（仍归本卡）
+## 9. 子范围②：整条 writer 的 UTC 日保留规则
+
+- **职责**：`Retain(now, W)` 的日期判定（durable-convergence-011）：最近活动的 UTC 日 ≥ 今天的前一天即保留，否则整条过期。
+- **库**：`wanxiangli/retention` / `WriterRetention`（`utcDay`、`isRetained`、`retain`、`dayMilliseconds`），提交 `03f3c8b`，发布 `c9a943d`（0.16.0）。纯计算，不读时钟、不读文件、不删除；非有限时间抛错。库测试 `retention/tests/011` 5/5（日边界、日历日而非滚动 24h、活动推进、固定种子 300 组并集分配与按引用返回、非有限拒绝）；`convergence-package` 的干净安装消费同时覆盖 retention（Node + Bun，tsc strict）。发布前定向集 59/59。
+- **主仓**：`ProcessEventLog.{utcDayOf, writerRetentionMilliseconds, isWriterActiveAt}` 不再自己算日期，改为调用库；`.fsi` 不变。真实链：`ReloadLocal → readStreams → readStreamsAt → isWriterActiveAt`，以及 `RetentionSurface.retainedWriterIdsAt`。本仓生产代码中保留规则只用于读取过滤，没有删除路径；不改任何文件字节。活动时刻的取得（Journal 尾部 `ObservedAt`、`ProjectionCutTail` 回溯、文件时间回退）涉及文件 I/O，仍留在 `ProcessEventLog`。
+- **反例**：新增 `requirements/durable-convergence/tests/011.test.mjs`。在 base 上「non-finite cut-off is rejected instead of retaining nothing」**失败**：旧规则下 NaN 截止让所有比较为假，读取链返回空保留集，整个本地历史从 Current 静默消失。候选上抛错。生产 `readStreams` 的 now 来自 `currentTimeMs()`，正常是有限数，所以这里是 fail-closed 加固，不改变正常行为。
+- **比较**（同一工作树，base = b7d45b063 的 dist，`--skip-staleness-check` 因源码已改）：durable-convergence + durable-events 35 文件 base 245 pass / 1 fail（新反例）/ 14 skip / 10 todo；候选 **246 / 0** / 14 / 10。`check.mjs` 两侧都是既有 FAIL，154 条列出项、门禁计数相同。
+- **未做**：integration tier；全量 verify。
+
+## 10. 下一子范围（仍归本卡）
 
 1. `IntegratorEngine.validateLocalHistory` 的词汇/载荷闭包检查与 `wanxiangli/events.validate` 收敛（CUT-18 遗留，注意 027 锁定的错误消息形状）。
-2. retention：`Retain(now, W)` 的 UTC 日期分组判定抽为纯函数（输入 writer 元数据与 now），文件删除留在主仓。
+2. writer 活动时刻的尾部判定（Journal `ObservedAt` 优先、`ProjectionCutTail` 跨段回溯）中的纯分类部分；文件读取留在主仓。
 3. 段聚合与原子追加（`ProcessEventLog`）：需持久数据计划，按 README §10 另行准备。
