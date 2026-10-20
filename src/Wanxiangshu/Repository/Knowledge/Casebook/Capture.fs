@@ -66,7 +66,16 @@ module CasebookCapture =
 
     type MaintenanceCapture =
         { DiffSummary: string
+          Refresh: bool
           TargetState: string }
+
+    [<Import("CasebookMaintenanceLaw", "wanxiangli/casebook-maintenance")>]
+    let private maintenanceLawClass: obj = jsNative
+
+    [<Emit("new $0()")>]
+    let private construct (cls: obj) : obj = jsNative
+
+    let private maintenanceLaw: obj = construct maintenanceLawClass
 
     [<RequireQualifiedAccess>]
     type private StoredFileState =
@@ -192,26 +201,8 @@ module CasebookCapture =
     let caseIdentityForInvocation (sessionId: string) (invocationId: string) : string =
         sprintf "%s:%s" sessionId invocationId
 
-    let truncateDiffForBudget (diff: string) (budget: int) : obj =
-        if diff.Length <= budget then
-            box
-                {| text = diff
-                   isTruncated = false
-                   notice = "" |}
-        else
-            let notice = "\n[... diff truncated / 差异已截断 ...]\n"
-            let available = max 0 (budget - notice.Length)
-            let headLen = available / 2
-            let tailLen = available - headLen
-            let headText = diff.Substring(0, min headLen diff.Length)
-            let tailStart = max 0 (diff.Length - tailLen)
-            let tailText = diff.Substring(tailStart)
-            let truncatedText = headText + notice + tailText
-
-            box
-                {| text = truncatedText
-                   isTruncated = true
-                   notice = "diff truncated to budget" |}
+    /// knowledge-reuse-014: head/tail truncation is wanxiangli/casebook-maintenance `truncate`.
+    let truncateDiffForBudget (diff: string) (budget: int) : obj = maintenanceLaw?truncate (diff, budget)
 
     [<Import("readFileSync", "node:fs")>]
     let private readFileBytes (path: string) : byte[] = jsNative
@@ -234,8 +225,9 @@ module CasebookCapture =
         with _ ->
             Error(sprintf "failed to read file %s: invalid UTF-8" path)
 
+    /// knowledge-reuse-016: only ENOENT is Missing (wanxiangli/casebook-maintenance `readFailure`).
     let private classifyFileReadFailure path (error: exn) =
-        if string (error?code) = "ENOENT" then
+        if unbox<string> (maintenanceLaw?readFailure (error?code)) = "missing" then
             Ok None
         else
             Error(sprintf "failed to read file %s: %s" path error.Message)
@@ -359,290 +351,20 @@ module CasebookCapture =
         | StoredFileState.Missing -> Task.FromResult(Ok None)
         | StoredFileState.Present(hash, payload) -> readPresentContent store path hash payload
 
-    let private diffLines (text: string) =
-        let lines = text.Split '\n'
-
-        match text with
-        | "" -> [||]
-        | text when text.EndsWith "\n" -> lines.[.. lines.Length - 2] |> Array.map (fun line -> line + "\n")
-        | _ ->
-            lines
-            |> Array.mapi (fun index line -> if index = lines.Length - 1 then line else line + "\n")
-
-    let private renderDiffLine prefix (line: string) =
-        if line.EndsWith "\n" then
-            prefix + line
-        else
-            prefix + line + "\n\\ No newline at end of file\n"
-
-    let private fileChangeKind before after =
-        match before, after with
-        | None, _ -> "new file\n"
-        | _, None -> "deleted file\n"
-        | _ -> ""
-
-    type private LineRangePair =
-        { OldStart: int
-          OldEnd: int
-          NewStart: int
-          NewEnd: int }
-
-    let private followEqualLines (oldLines: string[]) (newLines: string[]) range backwards diagonal start =
-        let oldLength = range.OldEnd - range.OldStart
-        let newLength = range.NewEnd - range.NewStart
-
-        let oldLine index =
-            oldLines.[if backwards then
-                          range.OldEnd - index - 1
-                      else
-                          range.OldStart + index]
-
-        let newLine index =
-            newLines.[if backwards then
-                          range.NewEnd - index - 1
-                      else
-                          range.NewStart + index]
-        // DSL-MUTABLE: algorithm-scratch — end of the equal-line run on this diagonal.
-        let mutable position = start
-
-        while position >= 0
-              && position < oldLength
-              && position - diagonal < newLength
-              && oldLine position = newLine (position - diagonal) do
-            position <- position + 1
-
-        position
-
-    let private tryDiffOverlap oldLength newLength backwards diagonal oldPosition (opposite: int[]) oppositeDepth =
-        let otherDiagonal = oldLength - newLength - diagonal
-        let offset = opposite.Length / 2
-
-        let otherPosition =
-            match oppositeDepth with
-            | Some otherDepth when oldPosition >= 0 && abs otherDiagonal <= otherDepth ->
-                opposite.[offset + otherDiagonal]
-            | _ -> -1
-
-        match otherPosition with
-        | position when position < 0 || oldPosition + position < oldLength -> None
-        | position when backwards -> Some(position, position - otherDiagonal)
-        | _ -> Some(oldPosition, oldPosition - diagonal)
-
-    let private nextDiffPosition oldLength newLength depth diagonal (frontier: int[]) =
-        let offset = frontier.Length / 2
-
-        let insertion =
-            if diagonal < depth then
-                frontier.[offset + diagonal + 1]
-            else
-                -1
-
-        let deletion =
-            if diagonal > -depth then
-                frontier.[offset + diagonal - 1]
-            else
-                -1
-
-        let afterInsertion =
-            if insertion >= 0 && insertion - diagonal - 1 < newLength then
-                insertion
-            else
-                -1
-
-        let afterDeletion =
-            if deletion >= 0 && deletion < oldLength then
-                deletion + 1
-            else
-                -1
-
-        if depth = 0 then 0 else max afterInsertion afterDeletion
-
-    let private advanceDiffFrontier
-        (oldLines: string[])
-        (newLines: string[])
-        range
-        backwards
-        depth
-        (frontier: int[])
-        (opposite: int[])
-        oppositeDepth
-        =
-        let oldLength = range.OldEnd - range.OldStart
-        let newLength = range.NewEnd - range.NewStart
-        let offset = frontier.Length / 2
-        // DSL-MUTABLE: algorithm-scratch — current Myers wavefront diagonal.
-        let mutable diagonal = -depth
-        // DSL-MUTABLE: algorithm-scratch — first overlapping forward/reverse path.
-        let mutable split = None
-
-        while diagonal <= depth && split.IsNone do
-            let start = nextDiffPosition oldLength newLength depth diagonal frontier
-            let oldPosition = followEqualLines oldLines newLines range backwards diagonal start
-            frontier.[offset + diagonal] <- oldPosition
-            split <- tryDiffOverlap oldLength newLength backwards diagonal oldPosition opposite oppositeDepth
-            diagonal <- diagonal + 2
-
-        split
-
-    let private middleDiffSplit oldLines newLines range =
-        let oldLength = range.OldEnd - range.OldStart
-        let newLength = range.NewEnd - range.NewStart
-        let maxDepth = (oldLength + newLength + 1) / 2
-        let forward = Array.create (2 * maxDepth + 3) -1
-        let backward = Array.create forward.Length -1
-        let oddDistance = (oldLength - newLength) % 2 <> 0
-        // DSL-MUTABLE: algorithm-scratch — bidirectional edit distance.
-        let mutable depth = 0
-        // DSL-MUTABLE: algorithm-scratch — first meeting point at the shortest distance.
-        let mutable split = None
-
-        while split.IsNone && depth <= maxDepth do
-            split <-
-                advanceDiffFrontier
-                    oldLines
-                    newLines
-                    range
-                    false
-                    depth
-                    forward
-                    backward
-                    (if oddDistance then Some(depth - 1) else None)
-                |> Option.orElseWith (fun () ->
-                    advanceDiffFrontier
-                        oldLines
-                        newLines
-                        range
-                        true
-                        depth
-                        backward
-                        forward
-                        (if oddDistance then None else Some depth))
-
-            depth <- depth + 1
-
-        match split with
-        | Some(oldPosition, newPosition) when
-            (oldPosition > 0 || newPosition > 0)
-            && (oldPosition < oldLength || newPosition < newLength)
-            ->
-            range.OldStart + oldPosition, range.NewStart + newPosition
-        | _ -> invalidOp "line diff bisection did not make progress"
-
-    let private trimEqualLines (oldLines: string[]) (newLines: string[]) range =
-        let commonLength =
-            min (range.OldEnd - range.OldStart) (range.NewEnd - range.NewStart)
-
-        let prefix =
-            Seq.init commonLength id
-            |> Seq.takeWhile (fun index -> oldLines.[range.OldStart + index] = newLines.[range.NewStart + index])
-            |> Seq.length
-
-        let suffix =
-            Seq.init (commonLength - prefix) id
-            |> Seq.takeWhile (fun index -> oldLines.[range.OldEnd - index - 1] = newLines.[range.NewEnd - index - 1])
-            |> Seq.length
-
-        { OldStart = range.OldStart + prefix
-          OldEnd = range.OldEnd - suffix
-          NewStart = range.NewStart + prefix
-          NewEnd = range.NewEnd - suffix }
-
-    let private haveCommonLine (oldLines: string[]) (newLines: string[]) range =
-        let oldSet =
-            HashSet<string>(seq { for index in range.OldStart .. range.OldEnd - 1 -> oldLines.[index] })
-
-        seq { for index in range.NewStart .. range.NewEnd - 1 -> newLines.[index] }
-        |> Seq.exists oldSet.Contains
-
-    let private appendChangedRange (changes: ResizeArray<LineRangePair>) range =
-        if
-            changes.Count > 0
-            && changes.[changes.Count - 1].OldEnd = range.OldStart
-            && changes.[changes.Count - 1].NewEnd = range.NewStart
-        then
-            changes.[changes.Count - 1] <-
-                { changes.[changes.Count - 1] with
-                    OldEnd = range.OldEnd
-                    NewEnd = range.NewEnd }
-        else
-            changes.Add range
-
-    let private enqueueDiffHalves oldLines newLines (pending: ResizeArray<LineRangePair>) range =
-        let oldSplit, newSplit = middleDiffSplit oldLines newLines range
-
-        pending.Add
-            { range with
-                OldStart = oldSplit
-                NewStart = newSplit }
-
-        pending.Add
-            { range with
-                OldEnd = oldSplit
-                NewEnd = newSplit }
-
-    let private processDiffRange oldLines newLines pending changes range =
-        match range with
-        | range when range.OldStart = range.OldEnd && range.NewStart = range.NewEnd -> ()
-        | range when
-            range.OldStart = range.OldEnd
-            || range.NewStart = range.NewEnd
-            || not (haveCommonLine oldLines newLines range)
-            ->
-            appendChangedRange changes range
-        | range -> enqueueDiffHalves oldLines newLines pending range
-
-    let private changedLineRanges (oldLines: string[]) (newLines: string[]) =
-        let pending = ResizeArray<LineRangePair>()
-        let changes = ResizeArray<LineRangePair>()
-
-        pending.Add
-            { OldStart = 0
-              OldEnd = oldLines.Length
-              NewStart = 0
-              NewEnd = newLines.Length }
-
-        while pending.Count > 0 do
-            let range = pending.[pending.Count - 1] |> trimEqualLines oldLines newLines
-            pending.RemoveAt(pending.Count - 1)
-            processDiffRange oldLines newLines pending changes range
-
-        changes |> Seq.toList
-
-    let private renderDiffHunk (oldLines: string[]) (newLines: string[]) range =
-        let removed = range.OldEnd - range.OldStart
-        let added = range.NewEnd - range.NewStart
-
-        let start position count =
-            if count = 0 then position else position + 1
-
-        sprintf "@@ -%d,%d +%d,%d @@\n" (start range.OldStart removed) removed (start range.NewStart added) added
-        + (oldLines.[range.OldStart .. range.OldEnd - 1]
-           |> Array.map (renderDiffLine "-")
-           |> String.concat "")
-        + (newLines.[range.NewStart .. range.NewEnd - 1]
-           |> Array.map (renderDiffLine "+")
-           |> String.concat "")
-
-    let private fileDiff path (before: string option) (after: string option) =
-        if before = after then
-            ""
-        else
-            let oldLines = before |> Option.defaultValue "" |> diffLines
-            let newLines = after |> Option.defaultValue "" |> diffLines
-            let oldPath = if before.IsSome then "a/" + path else "/dev/null"
-            let newPath = if after.IsSome then "b/" + path else "/dev/null"
-
-            sprintf "diff --git a/%s b/%s\n%s--- %s\n+++ %s\n" path path (fileChangeKind before after) oldPath newPath
-            + (changedLineRanges oldLines newLines
-               |> List.map (renderDiffHunk oldLines newLines)
-               |> String.concat "")
+    /// knowledge-reuse-005/015/016: the B→T file diff is wanxiangli/casebook-maintenance
+    /// `CasebookMaintenanceLaw.fileDiff` (CUT-27); null is Missing.
+    let private fileDiff (path: string) (before: string option) (after: string option) : string =
+        unbox<string> (maintenanceLaw?fileDiff (path, Option.toObj before, Option.toObj after))
 
     let rec private captureMaintenancePaths store workspaceRoot entries captured diffs =
         taskResult {
             match entries with
             | [] ->
+                let summary = maintenanceLaw?summarize (diffs |> List.rev |> List.toArray)
+
                 return
-                    { DiffSummary = diffs |> List.rev |> String.concat ""
+                    { DiffSummary = unbox<string> summary?diffSummary
+                      Refresh = unbox<bool> summary?refresh
                       TargetState = captured |> List.rev |> Encode.object |> Encode.toString 0 }
             | (path, state) :: rest ->
                 let! before = readStoredContent store path state

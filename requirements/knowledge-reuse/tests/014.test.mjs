@@ -14,4 +14,15 @@ test('WHAT[knowledge-reuse-014] the truncator retains the tail and includes an e
   assert.equal(exact.isTruncated, false)
 })
 
+test('WHAT[knowledge-reuse-014] truncation never cuts a code point in half, so the truncated diff is well-formed text', () => {
+  // A head or tail cut inside a surrogate pair leaves a lone surrogate; any UTF-8 transport to the
+  // Bookkeeper turns it into U+FFFD, so the maintained diff would no longer quote the real change.
+  for (let budget = 40; budget < 80; budget += 1) {
+    const cut = casebook.truncateDiffForBudget('😀'.repeat(60), budget)
+    assert.equal(cut.isTruncated, true)
+    assert.equal(cut.text.isWellFormed(), true, `budget ${budget}`)
+    assert.ok(cut.text.length <= budget, `budget ${budget}`)
+  }
+})
+
 test.todo('WHAT[knowledge-reuse-014] GAP-160: actual request budgets cover the complete payload, preserve every changed path, and leave old case unchanged when useful maintenance is impossible')

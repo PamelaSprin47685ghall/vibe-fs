@@ -536,7 +536,7 @@ module CasebookSurface =
             | Ok captured ->
                 return
                     box
-                        {| hasDiff = captured.DiffSummary <> ""
+                        {| hasDiff = captured.Refresh
                            diffSummary = captured.DiffSummary
                            targetState = captured.TargetState |}
             | Error err -> return box {| ok = false; error = err |}

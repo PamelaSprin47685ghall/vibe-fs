@@ -61,7 +61,7 @@ module CasebookBookkeeper =
                 CasebookCapture.computeMaintenanceDiff store root paths case.MaintenanceFileState
                 |> TaskResult.mapError CasebookMutationError.PreparationRejected
 
-            if captured.DiffSummary <> "" then
+            if captured.Refresh then
                 return! applyRefresh store sessionId paths captured.TargetState captured.DiffSummary case
             else
                 return false
